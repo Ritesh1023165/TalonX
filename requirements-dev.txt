@@ -1,0 +1,7 @@
+-r talonx_ingest/requirements.txt
+-r talonx_quant/requirements.txt
+-r talonx_brain/requirements.txt
+-r talonx_core/requirements.txt
+-r talonx_dispatch/requirements.txt
+pytest>=8.0
+pytest-asyncio>=0.24

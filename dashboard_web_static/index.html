@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TalonX Pipeline Dashboard</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: #121821;
+    --panel-border: #1f2937;
+    --text: #e5e7eb;
+    --muted: #8b96a5;
+    --good: #34d399;
+    --warn: #fbbf24;
+    --bad: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--panel-border);
+    flex-wrap: wrap;
+  }
+  header h1 {
+    font-size: 18px;
+    margin: 0;
+    font-weight: 600;
+  }
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .status-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--bad);
+    transition: background 0.3s;
+  }
+  .status-dot.connected { background: var(--good); }
+  .status-dot.reconnecting { background: var(--warn); }
+  .stat {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .stat b { color: var(--text); font-size: 15px; }
+  main {
+    padding: 20px 24px 40px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-left: 3px solid var(--accent, #6b7280);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+  .card-title { font-size: 14px; font-weight: 600; }
+  .card-channel { font-size: 11px; color: var(--muted); font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+  .card-total { font-size: 28px; font-weight: 700; line-height: 1; }
+  .card-rate { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .sparkline { width: 100%; height: 40px; margin: 10px 0 4px; display: block; }
+  .bars { margin-top: 8px; }
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  .bar-label {
+    width: 56px;
+    flex-shrink: 0;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    text-align: right;
+  }
+  .bar-track {
+    flex: 1;
+    background: #1a212c;
+    border-radius: 3px;
+    height: 12px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--accent, #6b7280);
+    transition: width 0.4s ease;
+  }
+  .bar-count { width: 34px; flex-shrink: 0; color: var(--muted); font-size: 11px; text-align: right; }
+  .empty { color: var(--muted); font-size: 12px; font-style: italic; }
+  .unparseable { color: var(--warn); font-size: 11px; margin-top: 6px; }
+  footer {
+    padding: 12px 24px 30px;
+    color: var(--muted);
+    font-size: 11px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>TalonX Pipeline Dashboard</h1>
+  <div class="status"><span class="status-dot" id="status-dot"></span><span id="status-text">connecting...</span></div>
+  <div class="stat">uptime <b id="uptime">00:00:00</b></div>
+  <div class="stat">total messages <b id="grand-total">0</b></div>
+  <div class="stat">distinct tickers <b id="distinct-tickers">0</b></div>
+</header>
+<main id="cards"></main>
+<footer>Live, read-only view -- counts reset if this server restarts. Not a historical record.</footer>
+
+<script>
+const ACCENTS = {
+  filings: "#60a5fa",
+  market:  "#22d3ee",
+  signals: "#a78bfa",
+  reports: "#fbbf24",
+  alerts:  "#f87171",
+};
+
+const cardsEl = document.getElementById("cards");
+const cardEls = {};
+
+function ensureCard(ch) {
+  if (cardEls[ch.key]) return cardEls[ch.key];
+
+  const accent = ACCENTS[ch.key] || "#6b7280";
+  const card = document.createElement("div");
+  card.className = "card";
+  card.style.setProperty("--accent", accent);
+  card.innerHTML = `
+    <div class="card-head">
+      <div>
+        <div class="card-title">${ch.label}</div>
+        <div class="card-channel">${ch.channel}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="card-total" data-field="total">0</div>
+        <div class="card-rate"><span data-field="rate">0</span>/min</div>
+      </div>
+    </div>
+    <svg class="sparkline" data-field="sparkline" viewBox="0 0 200 40" preserveAspectRatio="none"></svg>
+    <div class="bars" data-field="bars"></div>
+    <div class="unparseable" data-field="unparseable" style="display:none"></div>
+  `;
+  cardsEl.appendChild(card);
+  const refs = {
+    root: card,
+    total: card.querySelector('[data-field="total"]'),
+    rate: card.querySelector('[data-field="rate"]'),
+    sparkline: card.querySelector('[data-field="sparkline"]'),
+    bars: card.querySelector('[data-field="bars"]'),
+    unparseable: card.querySelector('[data-field="unparseable"]'),
+    accent,
+  };
+  cardEls[ch.key] = refs;
+  return refs;
+}
+
+function renderSparkline(svg, history) {
+  if (!history || history.length === 0) {
+    svg.innerHTML = "";
+    return;
+  }
+  const max = Math.max(1, ...history);
+  const w = 200, h = 40;
+  const step = history.length > 1 ? w / (history.length - 1) : 0;
+  const points = history.map((v, i) => {
+    const x = i * step;
+    const y = h - (v / max) * (h - 4) - 2;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  svg.innerHTML = `<polyline points="${points}" fill="none" stroke="var(--accent, #6b7280)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />`;
+}
+
+function renderBars(container, topTickers, accent) {
+  if (!topTickers || topTickers.length === 0) {
+    container.innerHTML = '<div class="empty">no tickers yet</div>';
+    return;
+  }
+  const max = Math.max(...topTickers.map(([, c]) => c));
+  container.innerHTML = topTickers.map(([ticker, count]) => {
+    const pct = Math.max(4, (count / max) * 100);
+    return `
+      <div class="bar-row">
+        <div class="bar-label">${ticker}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <div class="bar-count">${count}</div>
+      </div>`;
+  }).join("");
+}
+
+function formatUptime(seconds) {
+  const s = Math.floor(seconds);
+  const hh = String(Math.floor(s / 3600)).padStart(2, "0");
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
+}
+
+function render(data) {
+  document.getElementById("uptime").textContent = formatUptime(data.uptime_seconds);
+  document.getElementById("grand-total").textContent = data.grand_total;
+  document.getElementById("distinct-tickers").textContent = data.distinct_tickers;
+
+  for (const ch of data.channels) {
+    const refs = ensureCard(ch);
+    refs.total.textContent = ch.total;
+    refs.rate.textContent = ch.rate_per_min;
+    renderSparkline(refs.sparkline, ch.history);
+    renderBars(refs.bars, ch.top_tickers, refs.accent);
+    if (ch.unparseable > 0) {
+      refs.unparseable.style.display = "block";
+      refs.unparseable.textContent = `${ch.unparseable} unparseable message(s)`;
+    }
+  }
+}
+
+function setStatus(state) {
+  const dot = document.getElementById("status-dot");
+  const text = document.getElementById("status-text");
+  dot.className = "status-dot" + (state === "connected" ? " connected" : state === "reconnecting" ? " reconnecting" : "");
+  text.textContent = state;
+}
+
+function connect() {
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  const ws = new WebSocket(`${proto}//${location.host}/ws`);
+  let backoff = 1000;
+
+  ws.onopen = () => { setStatus("connected"); backoff = 1000; };
+  ws.onmessage = (evt) => render(JSON.parse(evt.data));
+  ws.onclose = () => {
+    setStatus("reconnecting");
+    setTimeout(connect, backoff);
+    backoff = Math.min(backoff * 1.5, 15000);
+  };
+  ws.onerror = () => ws.close();
+}
+
+connect();
+</script>
+</body>
+</html>

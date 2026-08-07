@@ -1,0 +1,47 @@
+# ------------------------------------------------------------------
+# Secrets -- never commit real API keys/tokens
+# ------------------------------------------------------------------
+.env
+talonx_ingest/.env
+*.env
+!.env.example
+!talonx_ingest/.env.example
+
+# ------------------------------------------------------------------
+# Python
+# ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+
+# ------------------------------------------------------------------
+# Virtual environment
+# ------------------------------------------------------------------
+.venv/
+venv/
+
+# ------------------------------------------------------------------
+# Local runtime state (SQLite DBs, ChromaDB persist dir, raw filing
+# cache) -- these default to %USERPROFILE%\.talonx outside the repo,
+# but ignored here too in case anyone points a path inside it.
+# ------------------------------------------------------------------
+*.db
+*.sqlite3
+.talonx/
+chroma/
+
+# ------------------------------------------------------------------
+# Claude Code local settings (machine-specific permission allowlist,
+# not shared config)
+# ------------------------------------------------------------------
+.claude/settings.local.json
+
+# ------------------------------------------------------------------
+# OS / editor cruft
+# ------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

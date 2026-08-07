@@ -1,0 +1,12 @@
+python-dotenv>=1.0
+aiohttp>=3.9
+langchain-text-splitters>=0.2
+beautifulsoup4>=4.12
+lxml>=5.0
+chromadb>=0.5
+sentence-transformers>=2.7
+websockets>=12.0
+yfinance>=0.2.40
+pydantic>=2.0
+redis>=5.0
+feedparser>=6.0

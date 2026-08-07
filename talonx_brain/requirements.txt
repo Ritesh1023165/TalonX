@@ -1,0 +1,11 @@
+redis>=5.0
+chromadb>=0.5
+langchain-google-genai>=2.0
+langchain-ollama>=0.2
+pydantic>=2.0
+python-dotenv>=1.0
+
+# talonx_brain also imports talonx_ingest.storage.vector_store directly
+# (see retriever.py), which needs sentence-transformers for the embedding
+# function -- install talonx_ingest/requirements.txt first if you haven't:
+#   pip install -r talonx_ingest\requirements.txt -r talonx_brain\requirements.txt

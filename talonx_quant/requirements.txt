@@ -1,0 +1,4 @@
+redis>=5.0
+pandas>=2.0
+pandas_ta>=0.3.14b0
+pydantic>=2.0
