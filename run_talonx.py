@@ -20,26 +20,42 @@ terminal, one Ctrl+C to stop:
   - Module 4, continuous:  the decision engine, correlating QuantSignals
                             and ResearchReports per ticker, and publishing
                             ActionableAlerts when they agree or conflict.
+  - Module 5, continuous:  the dispatch agent, consuming those
+                            ActionableAlerts, recording them to the audit
+                            trail (SQLite), and pushing to Telegram if
+                            configured.
 
 Module 3 is OPTIONAL here, same "degrade, don't crash" philosophy as Redis
 publishing elsewhere in this project: if the configured LLM provider isn't
 ready (GEMINI_API_KEY not set for the "gemini" provider, or
 talonx_brain/requirements.txt isn't installed for either provider), it's
-logged once as a warning and Modules 1+2 run normally without it. Use
---skip-brain to leave it out on purpose even when it's configured. Module 4
-has no such optional dependency (just redis.asyncio + pydantic, already
-required everywhere else in this file), so it's always started unless
---skip-core is passed.
+logged once as a warning and the rest of the pipeline runs normally
+without it. Use --skip-brain to leave it out on purpose even when it's
+configured. Module 5 degrades the same way if its audit database can't be
+opened (rare -- a bad path/permissions issue; Telegram itself is already
+optional and handled internally, so its absence never disables the
+module). Modules 2 and 4 have no such optional dependency (just
+redis.asyncio + pydantic, already required everywhere else in this file),
+so they're always started unless explicitly skipped.
 
 EVERY continuous component can be pulled out with its own --skip-* flag
-(market data, quant scanner, brain, core) -- handy while actively
-iterating on one piece: run the other three here and the one you're
-working on in its own terminal (`python -m talonx_quant.run`, etc.)
+(market data, quant scanner, brain, core, dispatch) -- handy while
+actively iterating on one piece: run the other four here and the one
+you're working on in its own terminal (`python -m talonx_quant.run`, etc.)
 without restarting this whole process every time you make a change.
+
+NOT included here, and never will be: the Streamlit dashboard
+(talonx_dispatch/app.py). Streamlit reruns its entire script top-to-bottom
+on every interaction/autorefresh tick, which is fundamentally incompatible
+with holding a persistent asyncio task open in this process -- see that
+file's own docstring. It reads the same audit trail this file's dispatch
+agent writes to, so run it ALONGSIDE this file, in its own terminal:
+    streamlit run talonx_dispatch\\app.py
 
 Replaces running `talonx_ingest.pipeline`, `talonx_ingest.news.pipeline`,
 `talonx_ingest.market_data.run`, `talonx_quant.run`, `talonx_brain.run`,
-and `talonx_core.run` by hand in six separate terminals.
+`talonx_core.run`, and `talonx_dispatch.run` by hand in seven separate
+terminals.
 
 Usage:
     python run_talonx.py
@@ -50,6 +66,7 @@ Usage:
     python run_talonx.py --skip-quant         # skip Module 2 (talonx_quant)
     python run_talonx.py --skip-brain         # skip Module 3 (talonx_brain)
     python run_talonx.py --skip-core          # skip Module 4 (talonx_core)
+    python run_talonx.py --skip-dispatch      # skip Module 5 (talonx_dispatch)
 
     # e.g. iterating on talonx_quant: run everything ELSE here, run
     # talonx_quant yourself in another terminal so you can restart just
@@ -75,6 +92,7 @@ from talonx_brain.consumer import ResearchAgent
 from talonx_core.config import CoreConfig
 from talonx_core.consumer import DecisionEngine
 from talonx_core.store import TickerStateStore
+from talonx_dispatch.consumer import DispatchAgent
 
 logging.basicConfig(
     level=logging.INFO,
@@ -159,6 +177,17 @@ async def main() -> None:
                 )
         decision_engine = DecisionEngine(config=core_config, store=core_store)
 
+    dispatch_agent: DispatchAgent | None = None
+    if not args.skip_dispatch:
+        try:
+            dispatch_agent = DispatchAgent()
+        except Exception as exc:  # noqa: BLE001 -- audit DB init failure shouldn't crash the whole run
+            logger.warning(
+                "Module 5 (talonx_dispatch) disabled for this run: %s. Modules 1-4 "
+                "will run normally without it.",
+                exc,
+            )
+
     def _handle_sigint() -> None:
         logger.info("Shutdown requested (Ctrl+C) -- stopping all components...")
         stop_event.set()
@@ -170,6 +199,8 @@ async def main() -> None:
             research_agent.stop()
         if decision_engine is not None:
             decision_engine.stop()
+        if dispatch_agent is not None:
+            dispatch_agent.stop()
 
     loop = asyncio.get_running_loop()
     try:
@@ -182,12 +213,13 @@ async def main() -> None:
 
     logger.info(
         "Starting TalonX for tickers: %s (interval=%.1fh, ingestion=%s, market_data=%s, "
-        "quant=%s, brain=%s, core=%s)",
+        "quant=%s, brain=%s, core=%s, dispatch=%s)",
         tickers, args.interval_hours, "disabled" if args.skip_ingestion else "enabled",
         "enabled" if market_manager is not None else "disabled",
         "enabled" if quant_scanner is not None else "disabled",
         "enabled" if research_agent is not None else "disabled",
         "enabled" if decision_engine is not None else "disabled",
+        "enabled" if dispatch_agent is not None else "disabled",
     )
 
     tasks = []
@@ -204,6 +236,8 @@ async def main() -> None:
         tasks.append(asyncio.create_task(research_agent.run(), name="research_agent"))
     if decision_engine is not None:
         tasks.append(asyncio.create_task(decision_engine.run(), name="decision_engine"))
+    if dispatch_agent is not None:
+        tasks.append(asyncio.create_task(dispatch_agent.run(), name="dispatch_agent"))
     if not args.skip_ingestion:
         tasks.append(
             asyncio.create_task(
@@ -229,15 +263,19 @@ async def main() -> None:
             research_agent.stop()
         if decision_engine is not None:
             decision_engine.stop()
+        if dispatch_agent is not None:
+            dispatch_agent.stop()
     finally:
         await market_publisher.close()
         if core_store is not None:
             core_store.close()
+        if dispatch_agent is not None:
+            dispatch_agent.store.close()
         logger.info("All components stopped.")
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run all of TalonX Module 1 + 2 + 3 + 4 together")
+    parser = argparse.ArgumentParser(description="Run all of TalonX Module 1 + 2 + 3 + 4 + 5 together")
     parser.add_argument(
         "tickers", nargs="*", default=None,
         help=f"Ticker symbols to track (default: {' '.join(DEFAULT_TICKERS)})",
@@ -267,6 +305,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--skip-core", action="store_true",
         help="Skip Module 4 (talonx_core)",
+    )
+    parser.add_argument(
+        "--skip-dispatch", action="store_true",
+        help="Skip Module 5 (talonx_dispatch) -- run it yourself with "
+             "`python -m talonx_dispatch.run` instead",
     )
     return parser.parse_args()
 

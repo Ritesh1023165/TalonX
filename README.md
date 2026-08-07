@@ -46,7 +46,7 @@ pipeline. This repo contains all five of its modules:
 C:\workspace\TalonX\              <- open THIS folder as your project root
 ├── .gitignore
 ├── inspect_store.py               <- CLI to spot-check what's in ChromaDB
-├── run_talonx.py                   <- runs Module 1 + 2 + 3 + 4 together, one process
+├── run_talonx.py                   <- runs Module 1 + 2 + 3 + 4 + 5 together, one process (Streamlit dashboard always separate)
 ├── send_test_signal.py             <- publishes synthetic bars to test the quant scanner
 ├── dashboard.py                    <- live terminal dashboard: counts + per-ticker breakdown across all 5 Redis channels
 ├── dashboard_web.py                 <- same data, served as a local browser UI with charts (imports dashboard.py)
@@ -568,33 +568,36 @@ talonx:alerts:dispatch (Redis)
   `talonx:alerts:dispatch` is built" -- `dashboard.py`/`dashboard_web.py`
   gave visibility, but did nothing with an alert). Telegram push is the
   action; the audit trail + Streamlit dashboard is the review surface.
-- **Not wired into `run_talonx.py`** -- `consumer.py` COULD be (no
-  required API key, same as Module 4), but per explicit instruction while
-  other work is in flight, it's kept fully standalone for now. `app.py`
-  was never going to be wired in regardless -- Streamlit's own dev server
-  is not an `asyncio.gather()`-compatible task.
+- **`consumer.py` is wired into `run_talonx.py`** (§3.6) -- no required API
+  key, same "safe to always include" reasoning as Module 4. `app.py`
+  (Streamlit) is NOT, and never will be: Streamlit's own dev server is not
+  an `asyncio.gather()`-compatible task (see the "Two cooperating
+  processes" note above) -- always run it separately, alongside
+  `run_talonx.py`, in its own terminal (§5n).
 
 ### 3.6 `run_talonx.py` — orchestrator
 
 Runs Module 1's periodic ingestion (filings + news, immediately then on
-a repeating interval) and Module 1 + 2 + 3 + 4's four continuous streams
-(market data, quant scanner, research agent, decision engine) together as
-concurrent tasks in one process. A failure in one periodic ingestion cycle
-is logged and the loop continues to the next scheduled run; the continuous
-streams are unaffected by ingestion cycle failures entirely, since they're
-independent tasks. Module 3 is optional here -- `--skip-brain` leaves it
-out on purpose, and it's left out automatically (with a warning, not a
-crash) if `GEMINI_API_KEY` isn't configured. Module 4 is always included
-unless `--skip-core` is passed. **Module 5 is not included at all** (see
-§3.5 -- run `talonx_dispatch` standalone, §5m/§5n).
+a repeating interval) and Module 1 + 2 + 3 + 4 + 5's five continuous
+streams (market data, quant scanner, research agent, decision engine,
+dispatch agent) together as concurrent tasks in one process. A failure in
+one periodic ingestion cycle is logged and the loop continues to the next
+scheduled run; the continuous streams are unaffected by ingestion cycle
+failures entirely, since they're independent tasks. Module 3 is optional
+here -- `--skip-brain` leaves it out on purpose, and it's left out
+automatically (with a warning, not a crash) if its configured LLM
+provider isn't ready (§3.3). Module 5 degrades the same way if its audit
+database can't be opened (rare). Modules 2 and 4 are always included
+unless explicitly skipped. **The Streamlit dashboard is never included**
+(see §3.5 -- run it alongside this file, in its own terminal, §5n).
 
 **Every continuous component can be pulled out individually**
-(`--skip-market-data`, `--skip-quant`, `--skip-brain`, `--skip-core`) --
-useful while actively iterating on one piece: run the other three here
-and the one you're changing in its own terminal, so you don't have to
-restart this whole process on every edit. If every component ends up
-skipped (including `--skip-ingestion`), it logs an error and exits
-immediately rather than hanging on an empty task list.
+(`--skip-market-data`, `--skip-quant`, `--skip-brain`, `--skip-core`,
+`--skip-dispatch`) -- useful while actively iterating on one piece: run
+the other four here and the one you're changing in its own terminal, so
+you don't have to restart this whole process on every edit. If every
+component ends up skipped (including `--skip-ingestion`), it logs an
+error and exits immediately rather than hanging on an empty task list.
 
 ### 3.7 End-to-end data flow
 
@@ -760,6 +763,12 @@ Single process, single terminal, single Ctrl+C to stop. This starts:
   with a one-time warning, everything else still runs
 - The decision engine (Module 4), continuously -- always, no optional
   dependency to be missing
+- The dispatch agent (Module 5), continuously -- *if* its audit database
+  can open (essentially always; the only failure mode is a bad path/
+  permissions issue). Records every alert to the audit trail and pushes to
+  Telegram if configured. **The Streamlit dashboard is separate** -- run
+  `streamlit run talonx_dispatch\app.py` (§5n) in its own terminal
+  alongside this one if you want to view it live.
 
 Custom tickers:
 ```powershell
@@ -1096,6 +1105,11 @@ both.
 
 ### 5m. Run the notification dispatcher (talonx_dispatch, standalone)
 
+`run_talonx.py` (§5a) already starts this automatically — run it
+standalone instead if you want it decoupled from the other four modules
+(e.g. running on a different machine/schedule), or you're just iterating
+on `talonx_dispatch` itself.
+
 ```powershell
 pip install -r talonx_dispatch\requirements.txt
 python -m talonx_dispatch.run
@@ -1106,11 +1120,10 @@ the audit trail (`~\.talonx\dispatch_audit.db` by default —
 for anything at or above `TALONX_DISPATCH_MIN_SEVERITY` (default
 `warning`) if `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` are set (§4) —
 otherwise it logs one warning at startup and keeps recording to the
-audit trail without pushing. **Not wired into `run_talonx.py`** (see
-§3.5) — always run it as its own process, alongside whatever combination
-of the other four modules you're running. Runs continuously — `Ctrl+C`
-to stop; prints a summary of alerts processed / Telegram sent / failed
-on exit.
+audit trail without pushing. **The Streamlit dashboard (§5n) is never
+started this way, or by `run_talonx.py`** — see §3.5 for why; always run
+it as its own separate process. Runs continuously — `Ctrl+C` to stop;
+prints a summary of alerts processed / Telegram sent / failed on exit.
 
 ### 5n. Run the Streamlit dashboard (talonx_dispatch, standalone)
 
