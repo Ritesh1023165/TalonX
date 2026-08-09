@@ -1,0 +1,33 @@
+services:
+  talonx-redis:
+    image: redis:7.0.15
+    container_name: talonx-redis
+    restart: unless-stopped
+
+    # Startup command with internal Redis memory cap & LRU cleanup
+    command: redis-server --appendonly yes --maxmemory 400mb --maxmemory-policy allkeys-lru
+
+    # Port mapping matching original host exposure
+    ports:
+      - "6379:6379"
+
+    # Managed volume storage
+    volumes:
+      - talonx-redis-data:/data
+
+    # Hardware resource caps (protects WSL2 / Windows RAM)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+    # Container status monitoring
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  talonx-redis-data:

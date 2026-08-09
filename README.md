@@ -35,7 +35,7 @@ pipeline. This repo contains all five of its modules:
 | **Visual C++ Build Tools** (Windows only) | Needed if `pip install` fails compiling `chromadb`/`hnswlib`. Get the "Desktop development with C++" workload from the [VC++ Build Tools installer](https://visualstudio.microsoft.com/visual-cpp-build-tools/). |
 | **An editor** | VS Code (Python extension) or Visual Studio 2022 (Python Development workload). |
 | **~2GB free disk** | `sentence-transformers` pulls in PyTorch on first install. |
-| **Redis** | Required for Module 2 and Module 3, and for event publishing in Module 1 (Module 1 still works without it — publishing just degrades gracefully). A local Docker container is the easiest route: `docker run -d -p 6379:6379 redis:7`. |
+| **Redis** | Required for Module 2 and Module 3, and for event publishing in Module 1 (Module 1 still works without it — publishing just degrades gracefully). `docker compose up -d` from the repo root starts it (see `docker-compose.yaml` — pinned `redis:7.0.15`, healthchecked, named `talonx-redis`); `docker compose down` to stop it. |
 | **An LLM for Module 3** (`talonx_brain`) | Two options, switchable via `TALONX_BRAIN_LLM_PROVIDER` — see §3.3 and §9.4. **Gemini** (default): free-tier cloud, needs a `GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/apikey), but its free-tier quotas (per-minute AND per-day) are easy to exhaust under active testing. **Ollama** (local): no API key, no quota, runs entirely on your machine — needs [Ollama](https://ollama.com/download) installed with a model pulled (`ollama pull llama3.1`). |
 
 ---
@@ -935,10 +935,11 @@ writing to ChromaDB / printing to console:
 No setup is required to run the pipeline without Redis — if it's not
 reachable at `TALONX_REDIS_URL` (default `redis://localhost:6379/0`),
 publishing is disabled for that run (logged once as a warning) and
-everything else continues normally. To actually see events flowing, run
-a local Redis server and subscribe from another terminal:
+everything else continues normally. To actually see events flowing, make
+sure Redis is running (`docker compose up -d`) and subscribe from another
+terminal:
 ```powershell
-redis-cli subscribe talonx:filings:events
+docker exec talonx-redis redis-cli subscribe talonx:filings:events
 ```
 
 ### 5g. Run the quant scanner (standalone)
@@ -963,7 +964,7 @@ releases a fix.
 
 To watch signals arrive, subscribe in another terminal:
 ```powershell
-docker exec -it <your-redis-container> redis-cli subscribe talonx:signals:quant
+docker exec talonx-redis redis-cli subscribe talonx:signals:quant
 ```
 
 To fire a guaranteed test signal without waiting on real market
@@ -995,7 +996,7 @@ channel.
 
 To watch reports arrive, subscribe in another terminal:
 ```powershell
-docker exec -it <your-redis-container> redis-cli subscribe talonx:reports:brain
+docker exec talonx-redis redis-cli subscribe talonx:reports:brain
 ```
 
 ### 5i. Run the decision engine (talonx_core, standalone)
@@ -1025,7 +1026,7 @@ whichever half of an in-flight pair had already arrived. Set
 
 To watch alerts arrive, subscribe in another terminal:
 ```powershell
-docker exec -it <your-redis-container> redis-cli subscribe talonx:alerts:dispatch
+docker exec talonx-redis redis-cli subscribe talonx:alerts:dispatch
 ```
 
 ### 5j. Run the test suite
