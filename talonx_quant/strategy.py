@@ -34,19 +34,30 @@ def evaluate_signals(
 def _check_rsi_volume_setup(
     ticker: str, s: IndicatorSnapshot, config: QuantConfig, signals: list[QuantSignal]
 ) -> None:
-    if s.rsi is None or s.volume_surge_ratio is None:
+    """
+    Edge-triggered, like the MACD/MA crossover checks below: fires only on
+    the bar RSI first crosses the threshold, not on every subsequent bar it
+    remains oversold/overbought. Without this, a stock sitting under RSI 30
+    for 5 consecutive bars would fire 5 signals instead of 1 -- a major
+    source of the alert chatter this module was tuned to reduce.
+    """
+    if s.rsi is None or s.rsi_prev is None or s.volume_surge_ratio is None:
         return
 
-    if s.rsi < config.rsi_oversold and s.volume_surge_ratio > config.volume_surge_ratio_threshold:
+    crossed_oversold = s.rsi_prev >= config.rsi_oversold and s.rsi < config.rsi_oversold
+    if crossed_oversold and s.volume_surge_ratio > config.volume_surge_ratio_threshold:
         signals.append(_build_signal(
             ticker, s, SignalType.RSI_OVERSOLD_VOLUME_SURGE, SignalDirection.BULLISH,
-            f"RSI {s.rsi:.1f} oversold (< {config.rsi_oversold:.0f}) with "
+            f"RSI {s.rsi:.1f} crossed into oversold (< {config.rsi_oversold:.0f}) with "
             f"{s.volume_surge_ratio:.1f}x volume surge (> {config.volume_surge_ratio_threshold:.1f}x)",
         ))
-    elif s.rsi > config.rsi_overbought and s.volume_surge_ratio > config.volume_surge_ratio_threshold:
+        return  # a bar crosses one direction at most; skip the overbought check
+
+    crossed_overbought = s.rsi_prev <= config.rsi_overbought and s.rsi > config.rsi_overbought
+    if crossed_overbought and s.volume_surge_ratio > config.volume_surge_ratio_threshold:
         signals.append(_build_signal(
             ticker, s, SignalType.RSI_OVERBOUGHT_VOLUME_SURGE, SignalDirection.BEARISH,
-            f"RSI {s.rsi:.1f} overbought (> {config.rsi_overbought:.0f}) with "
+            f"RSI {s.rsi:.1f} crossed into overbought (> {config.rsi_overbought:.0f}) with "
             f"{s.volume_surge_ratio:.1f}x volume surge (> {config.volume_surge_ratio_threshold:.1f}x)",
         ))
 
@@ -78,8 +89,21 @@ def _check_macd_crossover(
 def _check_ma_crossover(
     ticker: str, s: IndicatorSnapshot, config: QuantConfig, signals: list[QuantSignal]
 ) -> None:
-    if None in (s.sma_fast, s.sma_slow, s.sma_fast_prev, s.sma_slow_prev):
+    """
+    Hysteresis-gated, on top of the was_below/now_above transition check:
+    a technical crossover on paper (fast nudges from <= to > slow) isn't
+    necessarily a real signal if the resulting gap is a few cents on a
+    $500 stock. Requires the CURRENT spread to be at least
+    config.min_ma_spread_pct of price before a crossover counts, so a
+    $0.03 drift on MSFT (~0.006%) is filtered out but a genuine trend
+    change (spread >= 0.15% of price, the default) still fires.
+    """
+    if None in (s.sma_fast, s.sma_slow, s.sma_fast_prev, s.sma_slow_prev, s.price) or not s.price:
         return
+
+    spread = abs(s.sma_fast - s.sma_slow)
+    if spread < config.min_ma_spread_pct * s.price:
+        return  # crossover too small to matter -- likely noise, not a real trend change
 
     was_below = s.sma_fast_prev <= s.sma_slow_prev
     now_above = s.sma_fast > s.sma_slow
