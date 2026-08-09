@@ -9,7 +9,7 @@ talonx_brain Python objects, so this module can run as an independent
 process/service consuming only the Redis wire contracts of BOTH upstream
 modules (talonx:signals:quant, talonx:reports:brain). Its only real
 dependencies are redis.asyncio, pydantic, and asyncio, matching the module
-spec. It DOES share talonx_ingest/.env for TALONX_REDIS_URL, same
+spec. It DOES share the repo-root .env for TALONX_REDIS_URL, same
 config-sharing-not-code-dependency pattern used everywhere else.
 """
 from __future__ import annotations
@@ -23,15 +23,15 @@ from dotenv import load_dotenv
 
 def _load_dotenv() -> None:
     """
-    Loads talonx_ingest/.env (the shared config file) if present.
-    `override=False`: real environment variables always win over .env,
-    same precedence rule as talonx_ingest.config.
+    Loads the shared .env file at the repo root, if present. `override=False`:
+    real environment variables always win over .env, same precedence rule
+    as talonx_ingest.config.
 
-    Resolved relative to this file's location (../talonx_ingest/.env from
-    here), not the current working directory, so it's found reliably
-    regardless of where you run `python -m talonx_core.run` from.
+    Resolved relative to this file's location (../.env from here), not the
+    current working directory, so it's found reliably regardless of where
+    you run `python -m talonx_core.run` from.
     """
-    shared_env = Path(__file__).resolve().parent.parent / "talonx_ingest" / ".env"
+    shared_env = Path(__file__).resolve().parent.parent / ".env"
     if shared_env.is_file():
         load_dotenv(shared_env, override=False)
 

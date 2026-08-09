@@ -44,6 +44,8 @@ pipeline. This repo contains all five of its modules:
 
 ```
 C:\workspace\TalonX\              <- open THIS folder as your project root
+├── .env                            <- your local secrets/config (create from .env.example), shared by every module
+├── .env.example
 ├── .gitignore
 ├── inspect_store.py               <- CLI to spot-check what's in ChromaDB
 ├── run_talonx.py                   <- runs Module 1 + 2 + 3 + 4 + 5 together, one process (Streamlit dashboard always separate)
@@ -75,8 +77,6 @@ C:\workspace\TalonX\              <- open THIS folder as your project root
 │   ├── test_dispatch_store.py
 │   └── test_dispatch_consumer.py
 ├── talonx_ingest\
-│   ├── .env                        <- your local secrets/config (create from .env.example)
-│   ├── .env.example
 │   ├── config.py                   <- all settings, env-driven
 │   ├── pipeline.py                 <- SEC filing ingestion entrypoint
 │   ├── check_connectivity.py       <- network diagnostic script
@@ -139,14 +139,14 @@ C:\workspace\TalonX\              <- open THIS folder as your project root
     └── app.py                        <- Streamlit dashboard: `streamlit run talonx_dispatch/app.py` (ALWAYS standalone)
 ```
 
-**Important:** `.env` lives inside `talonx_ingest\`, not at the repo root
-— all five modules resolve it by path relative to their own package
-location (not by searching the current working directory), so it's found
-reliably no matter which folder you run commands from. `talonx_quant`,
-`talonx_brain`, `talonx_core`, and `talonx_dispatch` all read the SAME
-file (they share `TALONX_REDIS_URL` and other Redis settings;
-`talonx_brain` also needs `GEMINI_API_KEY` and `talonx_dispatch` needs
-`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` from it) rather than needing
+**Important:** `.env` lives at the repo root — every module resolves it by
+path relative to its own package location (`../.env` from inside each
+package, not by searching the current working directory), so it's found
+reliably no matter which folder you run commands from. `talonx_ingest`,
+`talonx_quant`, `talonx_brain`, `talonx_core`, and `talonx_dispatch` all
+read the SAME file (they share `TALONX_REDIS_URL` and other Redis
+settings; `talonx_brain` also needs `GEMINI_API_KEY` and `talonx_dispatch`
+needs `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` from it) rather than needing
 their own copies. `inspect_store.py` and `pytest` still need to be run
 from the repo root (`C:\workspace\TalonX`), since that's how Python
 resolves `talonx_ingest.*` / `talonx_quant.*` / `talonx_brain.*` /
@@ -662,13 +662,11 @@ PyTorch — the slow part), `websockets`, `yfinance`, and a few smaller
 libraries. Expect this step to take several minutes on first run.
 
 ```powershell
-# 3. Set up your .env file (lives inside talonx_ingest\, shared with talonx_quant)
-cd talonx_ingest
+# 3. Set up your .env file (repo root, shared by every module)
 copy .env.example .env
-cd ..
 ```
 
-Edit `talonx_ingest\.env` and set at minimum:
+Edit `.env` and set at minimum:
 ```
 TALONX_SEC_USER_AGENT="Your Name Your Company your.email@example.com"
 ```
@@ -1155,8 +1153,8 @@ streamlit run talonx_dispatch\app.py --server.port 8502   # if 8501 is taken
 | `403` errors from SEC | `TALONX_SEC_USER_AGENT` not set to a real contact string | Edit `.env`, set a real name/email |
 | `pip install` fails on `chromadb`/`hnswlib` | Missing C++ build tools | Install VC++ Build Tools (see Prerequisites) |
 | New dependency "not found" after editing `requirements.txt` | Editing a different copy of the file than the one `pip install -r` reads | Confirm you're editing `C:\workspace\TalonX\talonx_ingest\requirements.txt` specifically, then re-run `pip install -r` |
-| `.env` values seem ignored | `.env` isn't inside `talonx_ingest\` | Move it to `C:\workspace\TalonX\talonx_ingest\.env` — it's resolved relative to that package, not the current directory |
-| `talonx_brain` raises `ValueError: GEMINI_API_KEY is not set` | Missing/empty `GEMINI_API_KEY` in `.env` while `TALONX_BRAIN_LLM_PROVIDER` is `gemini` (the default) | Get a key from [Google AI Studio](https://aistudio.google.com/apikey) and set it in `talonx_ingest\.env`, or switch to the local provider instead: `TALONX_BRAIN_LLM_PROVIDER=ollama` (§9.4) |
+| `.env` values seem ignored | `.env` isn't at the repo root | Move it to `C:\workspace\TalonX\.env` — it's resolved relative to each module's own file location (`../.env` from inside each package), not the current directory |
+| `talonx_brain` raises `ValueError: GEMINI_API_KEY is not set` | Missing/empty `GEMINI_API_KEY` in `.env` while `TALONX_BRAIN_LLM_PROVIDER` is `gemini` (the default) | Get a key from [Google AI Studio](https://aistudio.google.com/apikey) and set it in `.env` at the repo root, or switch to the local provider instead: `TALONX_BRAIN_LLM_PROVIDER=ollama` (§9.4) |
 | `talonx_brain` reports always come back `insufficient_context` | No filings ingested yet for that ticker | Run `python -m talonx_ingest.pipeline <TICKER>` (§5b) first so there's something in ChromaDB to retrieve |
 | `talonx_brain` logs `404 NOT_FOUND ... is not found for API version` | The pinned model name in `TALONX_BRAIN_GEMINI_MODEL` was retired/restricted for your key | Leave it unset to use the default `gemini-flash-latest` alias (tracks whatever Google currently recommends), or pick a live one from `client.models.list()` |
 | `talonx_brain` logs `429 RESOURCE_EXHAUSTED ... limit: 0` | Your key's free tier grants **zero** quota for that model (typically Pro models) | Switch to a Flash model, or enable billing on the Google AI Studio project |
@@ -1430,7 +1428,7 @@ Pro models entirely.
    ```
    Cross-reference actual per-model limits at https://ai.dev/rate-limit —
    these differ by plan tier and change over time.
-3. **Set `TALONX_BRAIN_GEMINI_MODEL`** in `talonx_ingest\.env`:
+3. **Set `TALONX_BRAIN_GEMINI_MODEL`** in `.env` at the repo root:
    - `gemini-pro-latest` — alias, recommended default if you want "current
      best Pro model, zero maintenance," mirroring the Flash choice made
      here.
@@ -1475,7 +1473,7 @@ ollama list
 # 4. Point talonx_brain at it
 pip install -r talonx_brain\requirements.txt   # now also installs langchain-ollama
 ```
-In `talonx_ingest\.env`:
+In `.env` at the repo root:
 ```
 TALONX_BRAIN_LLM_PROVIDER=ollama
 ```

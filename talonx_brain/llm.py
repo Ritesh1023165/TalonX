@@ -197,7 +197,7 @@ class GeminiResearchChain(_BaseResearchChain):
         if not config.gemini_api_key:
             raise ValueError(
                 "GEMINI_API_KEY is not set -- required to run talonx_brain with the "
-                "'gemini' provider. Add it to talonx_ingest/.env, or set "
+                "'gemini' provider. Add it to .env at the repo root, or set "
                 "TALONX_BRAIN_LLM_PROVIDER=ollama to use a local model instead."
             )
 
