@@ -65,9 +65,12 @@ C:\workspace\TalonX\              <- open THIS folder as your project root
 │   ├── test_events_schemas.py
 │   ├── test_pipeline_ledger_integration.py
 │   ├── test_reddit_client.py
+│   ├── test_quant_strategy.py        <- signal logic incl. edge-triggering + hysteresis (§3.2, §9.5)
+│   ├── test_quant_consumer.py        <- per-ticker cooldown + batch throttle orchestration (§3.2, §9.5)
 │   ├── test_brain_schemas.py
 │   ├── test_brain_retriever.py
 │   ├── test_brain_consumer.py
+│   ├── test_brain_llm.py             <- provider-switch (Gemini/Ollama) + retry/backoff (§3.3, §9.4)
 │   ├── test_core_schemas.py
 │   ├── test_core_decision.py
 │   ├── test_core_store.py
@@ -110,8 +113,8 @@ C:\workspace\TalonX\              <- open THIS folder as your project root
 │   ├── schemas.py                    <- MarketTickEvent (input, mirrors talonx_ingest's wire format), QuantSignal (output)
 │   ├── buffer.py                     <- per-ticker rolling OHLCV buffer (in-memory, bounded)
 │   ├── indicators.py                 <- RSI/MACD/SMA/volume-surge via pandas_ta
-│   ├── strategy.py                   <- indicator snapshot -> QuantSignal trigger logic
-│   ├── consumer.py                   <- async Redis subscriber (reconnects with backoff)
+│   ├── strategy.py                   <- indicator snapshot -> QuantSignal trigger logic, edge-triggered + hysteresis-gated (§3.2)
+│   ├── consumer.py                   <- async Redis subscriber; per-ticker cooldown + batch throttle (§3.2)
 │   └── run.py                        <- entrypoint: listens talonx:market:stream, publishes talonx:signals:quant
 ├── talonx_brain\                    <- Module 3: Deep Research Agent & RAG Engine
 │   ├── config.py                     <- all settings, env-driven (LLM provider + Gemini + Ollama, retrieval, Redis)
@@ -292,13 +295,50 @@ talonx:market:stream (Redis)
     → append to a per-ticker rolling buffer (bounded, oldest bars drop off)
     → once enough history exists (60 bars by default):
         → compute RSI, MACD, SMA fast/slow, volume-surge ratio via pandas_ta
-        → evaluate against configured thresholds:
-            - RSI < 30 AND volume > 2x average  → bullish (oversold + surge)
-            - RSI > 70 AND volume > 2x average  → bearish (overbought + surge)
-            - MACD line crosses its signal line → bullish/bearish cross
-            - fast MA crosses slow MA           → golden/death cross
-        → publish any triggered QuantSignal to Redis (talonx:signals:quant)
+        → evaluate against configured thresholds, EDGE-TRIGGERED (fires
+          only on the bar the condition first becomes true, not every
+          subsequent bar it remains true):
+            - RSI crosses under 30 AND volume > 2x average → bullish (oversold + surge)
+            - RSI crosses over 70 AND volume > 2x average  → bearish (overbought + surge)
+            - MACD line crosses its signal line             → bullish/bearish cross
+            - fast MA crosses slow MA, spread >= 0.15% of price → golden/death cross
+    → candidate signal(s) for a ticker are DROPPED if that ticker is still
+      within its post-signal cooldown (default 20 min); otherwise the
+      ticker's cooldown starts now and the candidate(s) are buffered
+    → every 60s (default), the buffer is ranked by volume_surge_ratio and
+      only the top 3 (default) are published to Redis
+      (talonx:signals:quant) -- the rest are dropped
 ```
+
+**Noise filters (added after live testing surfaced alert chatter — see
+§9.5 for the full before/after):**
+- **Edge-triggering** (`strategy.py`) — every signal type, including the
+  RSI+volume setup, fires only on the transition bar. Previously the
+  RSI+volume check was a pure level check that would re-fire on every bar
+  RSI stayed under 30/over 70; MACD and MA crossovers were already
+  edge-triggered via their existing was-below/now-above comparison.
+- **Hysteresis / minimum spread** (`strategy.py`, `TALONX_QUANT_MIN_MA_SPREAD_PCT`,
+  default 0.15%) — a MA crossover only counts if the resulting fast/slow
+  spread is at least this fraction of price. Filters a technically-real
+  but economically-meaningless crossover, e.g. a $0.03 drift on a $500
+  stock (~0.006%, far under 0.15%). Deliberately scoped to the MA cross
+  only, not MACD.
+- **Per-ticker cooldown** (`consumer.py`, `TALONX_QUANT_COOLDOWN_SECONDS`,
+  default 1200 = 20 min) — a Redis key `cooldown:{TICKER}` locks a ticker
+  out of producing ANY further candidate (regardless of signal_type) once
+  one is accepted, until the cooldown expires. This is what stops e.g. an
+  RSI+volume setup at 15:01 and an unrelated MACD cross at 15:12 on the
+  same ticker from both alerting.
+- **Batch throttle** (`consumer.py`, `TALONX_QUANT_THROTTLE_WINDOW_SECONDS`
+  default 60 / `TALONX_QUANT_THROTTLE_MAX_SIGNALS` default 3) — candidates
+  that clear cooldown are buffered, not published immediately. Every
+  window, the buffer is ranked by `volume_surge_ratio` (a signal with no
+  computed ratio sorts last) and only the top N are actually published.
+  **This is a deliberate latency-for-quality tradeoff**: a signal can sit
+  for up to the full window before it's published or dropped — there is
+  no way to guarantee "top N of the window" without waiting for the
+  window to close first. A final partial-window flush happens on
+  `Ctrl+C`/reconnect so nothing buffered is silently lost.
 
 - **`buffer.py`** — the rolling OHLCV window is deliberately deduped by
   timestamp: yfinance polling re-sends a snapshot of the *current* bar
@@ -306,13 +346,15 @@ talonx:market:stream (Redis)
   aggregate), so without this the buffer would fill with dozens of
   near-identical rows for what is, price-action-wise, one bar.
 - **`indicators.py`** — computes both the *current* and *previous*
-  values for MACD and moving averages, not just the latest, since
-  crossover detection needs to know the relationship flipped between two
-  consecutive bars, not just where it stands now.
+  values for RSI, MACD, and moving averages, not just the latest, since
+  edge-triggering/crossover detection needs to know the relationship
+  flipped between two consecutive bars, not just where it stands now.
 - **`strategy.py`** — a single bar update can trigger multiple
   independent signals at once (e.g. an RSI+volume setup and a MACD cross
-  on the same bar) — each is evaluated and published separately rather
-  than collapsed into one.
+  on the same bar) — each is evaluated separately rather than collapsed
+  into one. All of them still pass through the SAME per-ticker cooldown
+  in `consumer.py`, though, since that gate is ticker-scoped, not
+  signal_type-scoped.
 - This module is deliberately self-contained at the code level: it
   re-declares the `MarketTickEvent` shape locally rather than importing
   `talonx_ingest` Python objects, so the two modules could run as
@@ -1179,7 +1221,11 @@ See `.env.example` for the full list with defaults and descriptions —
 which LLM provider you pick; everything else is optional tuning (rate
 limits, chunk size, embedding model, ledger path, market data reconnect
 behavior, `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`/`REDDIT_USER_AGENT`/
-`TALONX_REDDIT_SUBREDDITS` for the optional Reddit source, retrieval
+`TALONX_REDDIT_SUBREDDITS` for the optional Reddit source, Module 2's
+indicator periods/thresholds plus its noise filters --
+`TALONX_QUANT_COOLDOWN_SECONDS` / `TALONX_QUANT_MIN_MA_SPREAD_PCT` /
+`TALONX_QUANT_THROTTLE_WINDOW_SECONDS` / `TALONX_QUANT_THROTTLE_MAX_SIGNALS`
+(§3.2, §9.5), retrieval
 top-K, `TALONX_BRAIN_LLM_PROVIDER` + Gemini model/temperature +
 `TALONX_BRAIN_OLLAMA_MODEL`/`TALONX_BRAIN_OLLAMA_BASE_URL`, Module 4's
 `TALONX_CORE_MIN_CONFIDENCE` / `TALONX_CORE_CORRELATION_WINDOW` /
@@ -1218,10 +1264,14 @@ top-K, `TALONX_BRAIN_LLM_PROVIDER` + Gemini model/temperature +
   list, filtering out `BAR` events for symbols not on it, and supporting
   add/remove at runtime (e.g. a Redis command channel, or a polled config
   file) without restarting the process.
-- Automated test suite for talonx_quant (talonx_ingest, talonx_brain, and
-  talonx_core all have one under `tests/` -- talonx_quant would benefit
-  from the same pattern: buffer, indicators, strategy, and consumer logic
-  are all unit-testable).
+- ~~No automated test suite for talonx_quant~~ -- **partially fixed**:
+  `tests/test_quant_strategy.py` and `tests/test_quant_consumer.py` now
+  cover `strategy.py`'s signal logic (including the noise filters in
+  §3.2) and `consumer.py`'s cooldown/throttle orchestration, matching the
+  mock-the-external-service pattern the other modules' consumer tests
+  use. `buffer.py` (the yfinance-dedup rolling window) and
+  `indicators.py` (the pandas_ta wrapping/column extraction) still have
+  no dedicated tests -- only exercised indirectly today.
 - ~~talonx_core's correlator state is in-memory only, not persisted~~ --
   **fixed**: `store.py`'s `TickerStateStore` (SQLite, same pattern as
   `talonx_ingest.storage.ledger`) rehydrates the correlator at startup and
@@ -1284,7 +1334,8 @@ the same failure modes from scratch.
 | 1 | News ingestion — Reddit (optional) | 60 req/min (token bucket), one search call per subreddit per ticker per cycle | Yes | `TALONX_REDDIT_RPM` |
 | 1 | Market data — yfinance fallback | 1 batched poll every 5s covering ALL tracked tickers in a single call | Yes (poll interval) | `TALONX_YF_POLL_INTERVAL` |
 | 1 | Market data — Polygon WebSocket | Real-time push, bounded by your Polygon plan tier, not by this code | No local cap | Polygon-side (plan tier) |
-| 2 | Quant scanner | No artificial cap — processes each BAR event synchronously as it arrives off Redis; sub-millisecond `pandas_ta` compute per bar | No | n/a |
+| 2 | Quant scanner — bar PROCESSING | No artificial cap — processes each BAR event synchronously as it arrives off Redis; sub-millisecond `pandas_ta` compute per bar | No | n/a |
+| 2 | Quant scanner — signal OUTPUT (what actually reaches Redis) | Per-ticker: locked out for `TALONX_QUANT_COOLDOWN_SECONDS` (default 20 min) after any signal. Globally: at most `TALONX_QUANT_THROTTLE_MAX_SIGNALS` (default 3) published per `TALONX_QUANT_THROTTLE_WINDOW_SECONDS` (default 60s), ranked by volume surge ratio — see §3.2, §9.5 | Yes (both) | `TALONX_QUANT_COOLDOWN_SECONDS`, `TALONX_QUANT_THROTTLE_*` |
 | 3 | talonx_brain (Gemini) | **5 requests/minute (~0.083 req/sec)**, token-bucket paced | Yes — see §9.2 | `TALONX_BRAIN_GEMINI_RPM` |
 | 4 | talonx_core (correlate + decide) | No artificial cap on PROCESSING — in-memory dict lookups and comparisons, no external calls, sub-millisecond per message. In practice bounded entirely by how fast Modules 2/3 feed it | No (processing); per-ticker cooldown only (see §3.4) | `TALONX_CORE_TICKER_COOLDOWN` |
 | 5 | talonx_dispatch — audit trail write | No artificial cap, sub-millisecond local SQLite insert per alert | No | n/a |
@@ -1293,7 +1344,12 @@ the same failure modes from scratch.
 **Module 3 is the bottleneck of the entire pipeline by 2+ orders of
 magnitude** — it's the only component paying for LLM inference against a
 free-tier quota, while everything upstream can produce `QuantSignal`s far
-faster than Module 3 can research them. Under a burst (many tickers
+faster than Module 3 can research them. Module 2's own cooldown/throttle
+(above) narrows that gap somewhat — capping output at 3/min globally
+means Module 3 is no longer asked to research every raw threshold
+breach — but it's a noise filter, not a rate-matching mechanism; it
+wasn't tuned against Module 3's ~5/min Gemini limit and can still
+outpace it. Under a burst (many tickers
 crossing thresholds around the same time, e.g. a correlated market move),
 reports queue up behind the rate limiter rather than being dropped or
 erroring — expect multi-minute delay between signal and report during a
@@ -1529,3 +1585,62 @@ task — treat it as a starting point to tune, not a verified equivalence.
   as this whole section documents happening); Gemini (or a paid Gemini
   tier, §9.3) if you want cloud-hosted throughput independent of your own
   machine, e.g. for a longer-running or higher-ticker-count deployment.
+
+### 9.5 talonx_quant noise filters: why, and what changed
+
+Live log analysis surfaced two distinct alert-chatter problems, both
+downstream of `talonx_quant` publishing a `QuantSignal` for literally
+every bar a threshold condition held:
+
+1. **Ticker-level duplication** — the same ticker alerting twice within a
+   ~10-minute window as *different* indicators fired off the same
+   underlying price move (e.g. an RSI+volume setup, then an unrelated
+   MACD cross a few minutes later on the same name).
+2. **Micro-burst clustering** — 8 separate signals across multiple
+   tickers within 49 seconds, several of them technically-real but
+   economically-meaningless crossovers (a $0.03 moving-average drift on a
+   $500 stock, ~0.006% — nowhere near a real trend change).
+
+Each was unfiltered noise reaching `talonx_brain`, which meant real LLM
+calls (and real Gemini free-tier quota, §9.2) spent on setups nobody
+would act on.
+
+**Four filters, layered in this order** (§3.2 has the mechanics of each):
+
+| # | Filter | Fixes | Where |
+|---|---|---|---|
+| 1 | Edge-triggering | A condition re-firing every bar it stays true (the underlying cause of most repeat alerts, ticker-duplication included) | `strategy.py` |
+| 2 | Hysteresis (min spread) | Micro-crossovers with no real economic significance (the $0.03 MSFT case) | `strategy.py` |
+| 3 | Per-ticker cooldown | The remaining ticker-duplication case: genuinely different signal types firing close together in time | `consumer.py` |
+| 4 | Batch throttle | Bursts across MANY tickers at once (a market-wide move) — global cap, ranked by conviction | `consumer.py` |
+
+**Why this order:** 1 and 2 run inside `strategy.py` itself, before a
+candidate signal exists at all — cheapest place to filter, and they
+address *why* a signal would be spurious in the first place, not just how
+often. 3 and 4 run in `consumer.py`, after candidates exist: cooldown
+removes same-ticker repeats regardless of which filter or signal type
+produced them, and the throttle is a last-resort global cap for exactly
+the cross-ticker burst scenario nothing upstream addresses (each
+individual signal in an 8-in-49-seconds burst can be perfectly legitimate
+on its own — the problem is the aggregate rate, which only a
+cross-ticker view can see).
+
+**The batch throttle's tradeoff, worth restating:** "rank by conviction,
+keep the top N" cannot be done without buffering candidates for the full
+window first — there's no way to know a signal is top-3 until you've seen
+everything else that arrived in its window. Default window is 60s
+(`TALONX_QUANT_THROTTLE_WINDOW_SECONDS`), so a signal can be delayed by
+up to a minute before it's published or dropped. This was a deliberate
+choice over a lower-latency micro-batch design (rank+release every
+10-15s against a rolling cap) — the tradeoff there is real, ranking
+would only compare candidates within each short batch rather than the
+full minute, so an earlier lower-conviction signal could beat a
+later higher-conviction one in the same minute. Revisit if the added
+latency turns out to matter more than whole-minute ranking accuracy in
+practice.
+
+**Suppression is counted, not silent** — `QuantScanner.signals_suppressed_cooldown`
+and `.signals_suppressed_throttle` track how much each filter is actually
+removing, and both log a line per suppression event (`consumer.py`). If
+noise is still getting through, or too much is being dropped, these are
+the first thing to check before retuning thresholds.

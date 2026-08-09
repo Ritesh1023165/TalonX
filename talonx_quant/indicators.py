@@ -33,6 +33,7 @@ class IndicatorSnapshot:
     bar_timestamp: pd.Timestamp
 
     rsi: float | None
+    rsi_prev: float | None
 
     macd: float | None
     macd_signal_line: float | None
@@ -89,7 +90,7 @@ def compute_indicators(df: pd.DataFrame, config: QuantConfig) -> IndicatorSnapsh
             return (None, None)
         return (float(valid.iloc[-1]), float(valid.iloc[-2]))
 
-    rsi_latest, _ = _last_two(rsi_series)
+    rsi_latest, rsi_prev = _last_two(rsi_series)
     macd_latest, macd_prev = _last_two(macd_df[macd_col])
     macd_signal_latest, macd_signal_prev = _last_two(macd_df[macd_signal_col])
     sma_fast_latest, sma_fast_prev = _last_two(sma_fast_series)
@@ -106,6 +107,7 @@ def compute_indicators(df: pd.DataFrame, config: QuantConfig) -> IndicatorSnapsh
         price=float(latest_row["close"]),
         bar_timestamp=df.index[-1],
         rsi=rsi_latest,
+        rsi_prev=rsi_prev,
         macd=macd_latest,
         macd_signal_line=macd_signal_latest,
         macd_prev=macd_prev,

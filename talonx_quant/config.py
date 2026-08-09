@@ -100,3 +100,30 @@ class QuantConfig:
     volume_surge_ratio_threshold: float = _env_float(
         "TALONX_QUANT_VOLUME_SURGE_RATIO", 2.0
     )
+
+    # --- Noise filters ---
+    # Per-ticker cooldown: once a signal fires for a ticker, a Redis key
+    # `cooldown:{TICKER}` locks out ANY further signal for that ticker
+    # (regardless of signal_type) until it expires. Default 20 minutes --
+    # the middle of the requested 15-30 minute range. This is what stops
+    # e.g. an RSI+volume setup at 15:01 and an unrelated MACD cross at
+    # 15:12 on the same ticker from both alerting.
+    cooldown_seconds: float = _env_float("TALONX_QUANT_COOLDOWN_SECONDS", 1200.0)
+
+    # Minimum SMA fast/slow separation, as a fraction of price, required at
+    # the crossover bar for a MA_GOLDEN_CROSS/MA_DEATH_CROSS to fire.
+    # Filters out e.g. a $0.03 drift on a $500 stock (0.006%, far under the
+    # 0.15% default) -- a real crossover event that's too small to matter.
+    # Deliberately scoped to the SMA cross only, not MACD, per spec.
+    min_ma_spread_pct: float = _env_float("TALONX_QUANT_MIN_MA_SPREAD_PCT", 0.0015)
+
+    # Batch throttle: across ALL tickers, at most this many signals are
+    # released per throttle_window_seconds, ranked by volume_surge_ratio
+    # (highest-conviction first; a signal with no computed ratio sorts
+    # last). Candidates are buffered for the full window before any of
+    # them are released -- see consumer.py's _flush_throttle_window --
+    # so a signal can be delayed by up to throttle_window_seconds, or
+    # dropped entirely if it doesn't rank in the top
+    # throttle_max_signals that window.
+    throttle_window_seconds: float = _env_float("TALONX_QUANT_THROTTLE_WINDOW_SECONDS", 60.0)
+    throttle_max_signals: int = _env_int("TALONX_QUANT_THROTTLE_MAX_SIGNALS", 3)
