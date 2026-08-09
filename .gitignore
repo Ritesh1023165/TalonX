@@ -2,10 +2,8 @@
 # Secrets -- never commit real API keys/tokens
 # ------------------------------------------------------------------
 .env
-talonx_ingest/.env
 *.env
 !.env.example
-!talonx_ingest/.env.example
 
 # ------------------------------------------------------------------
 # Python

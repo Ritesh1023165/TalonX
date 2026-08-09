@@ -157,7 +157,7 @@ async def main() -> None:
             logger.warning(
                 "Module 3 (talonx_brain) disabled for this run: %s. Install "
                 "talonx_brain\\requirements.txt, and either set GEMINI_API_KEY "
-                "in talonx_ingest\\.env (TALONX_BRAIN_LLM_PROVIDER=gemini, the "
+                "in .env at the repo root (TALONX_BRAIN_LLM_PROVIDER=gemini, the "
                 "default) or set TALONX_BRAIN_LLM_PROVIDER=ollama and run "
                 "`ollama serve` locally. Modules 1+2 will run normally without it.",
                 exc,

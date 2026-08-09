@@ -10,7 +10,7 @@ talonx_core/talonx_brain/talonx_ingest Python objects, so this module
 runs as an independent process/service consuming only the Redis wire
 contract (talonx:alerts:dispatch). Its dependencies match the module
 spec: redis.asyncio, pydantic, python-telegram-bot, streamlit,
-streamlit-autorefresh, pandas. It DOES share talonx_ingest/.env for
+streamlit-autorefresh, pandas. It DOES share the repo-root .env for
 TALONX_REDIS_URL, same config-sharing-not-code-dependency pattern used
 everywhere else.
 """
@@ -25,16 +25,16 @@ from dotenv import load_dotenv
 
 def _load_dotenv() -> None:
     """
-    Loads talonx_ingest/.env (the shared config file) if present.
-    `override=False`: real environment variables always win over .env,
-    same precedence rule as talonx_ingest.config.
+    Loads the shared .env file at the repo root, if present. `override=False`:
+    real environment variables always win over .env, same precedence rule
+    as talonx_ingest.config.
 
-    Resolved relative to this file's location (../talonx_ingest/.env from
-    here), not the current working directory, so it's found reliably
-    regardless of where you run `python -m talonx_dispatch.run` or
+    Resolved relative to this file's location (../.env from here), not the
+    current working directory, so it's found reliably regardless of where
+    you run `python -m talonx_dispatch.run` or
     `streamlit run talonx_dispatch/app.py` from.
     """
-    shared_env = Path(__file__).resolve().parent.parent / "talonx_ingest" / ".env"
+    shared_env = Path(__file__).resolve().parent.parent / ".env"
     if shared_env.is_file():
         load_dotenv(shared_env, override=False)
 

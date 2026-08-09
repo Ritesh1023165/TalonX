@@ -47,7 +47,7 @@ from dotenv import load_dotenv
 
 # Same resolution approach as send_test_signal.py -- load the shared .env
 # by path, not by searching the current directory.
-_shared_env = Path(__file__).resolve().parent / "talonx_ingest" / ".env"
+_shared_env = Path(__file__).resolve().parent / ".env"
 if _shared_env.is_file():
     load_dotenv(_shared_env, override=False)
 

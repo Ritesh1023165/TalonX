@@ -104,7 +104,7 @@ def test_ollama_chain_has_no_token_bucket_or_api_key_requirement(monkeypatch):
 def test_build_research_chain_selects_gemini(monkeypatch):
     # Explicit llm_provider rather than relying on BrainConfig's default --
     # that default is baked in from whatever TALONX_BRAIN_LLM_PROVIDER
-    # happens to be in the local talonx_ingest/.env at import time, so
+    # happens to be in the local repo-root .env at import time, so
     # asserting on it here would make this test depend on the developer's
     # local config instead of testing build_research_chain's own logic.
     monkeypatch.setattr(llm_module, "ChatGoogleGenerativeAI", _FakeChatModel)

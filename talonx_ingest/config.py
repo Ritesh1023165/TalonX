@@ -31,18 +31,19 @@ def _load_dotenv() -> None:
     silently override a deployment's real config.
 
     Resolution order:
-      1. talonx_ingest/.env -- resolved relative to THIS file's location,
-         not the current working directory. This means it's found
-         reliably regardless of whether you run commands from the repo
-         root or from inside talonx_ingest/, which is the layout that's
-         actually in use.
+      1. .env at the repo root -- resolved relative to THIS file's
+         location (../.env from here), not the current working directory.
+         This means it's found reliably regardless of whether you run
+         commands from the repo root or from inside talonx_ingest/, which
+         is the layout every module's config.py shares (see each one's
+         own _load_dotenv()).
       2. Fallback: find_dotenv(usecwd=True), which walks upward from the
-         current working directory. Kept as a fallback for anyone who
-         prefers a repo-root .env instead -- both layouts work.
+         current working directory. Kept as a fallback for anyone who's
+         set up a .env somewhere else on their own.
     """
-    package_local_env = Path(__file__).resolve().parent / ".env"
-    if package_local_env.is_file():
-        load_dotenv(package_local_env, override=False)
+    repo_root_env = Path(__file__).resolve().parent.parent / ".env"
+    if repo_root_env.is_file():
+        load_dotenv(repo_root_env, override=False)
         return
 
     dotenv_path = find_dotenv(usecwd=True)
