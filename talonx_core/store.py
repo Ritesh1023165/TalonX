@@ -28,19 +28,21 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from talonx_core.schemas import QuantSignal, ResearchReport
+from talonx_core.schemas import AlertAction, QuantSignal, ResearchReport
 from talonx_core.state import TickerCorrelator
 
 logger = logging.getLogger("talonx_core.store")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS ticker_state (
-    ticker         TEXT PRIMARY KEY,
-    signal_json    TEXT,
-    signal_at      TEXT,
-    report_json    TEXT,
-    report_at      TEXT,
-    last_alert_at  TEXT
+    ticker              TEXT PRIMARY KEY,
+    signal_json         TEXT,
+    signal_at           TEXT,
+    report_json         TEXT,
+    report_at           TEXT,
+    last_alert_at       TEXT,
+    last_alert_action   TEXT,
+    last_alert_price    REAL
 )
 """
 
@@ -51,7 +53,19 @@ class TickerStateStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.path)
         self._conn.execute(_SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Adds columns introduced after this table's first release, if a
+        pre-existing file doesn't have them yet -- same idempotent
+        PRAGMA-table_info-guarded ALTER TABLE pattern as
+        talonx_watchlist/store.py, safe to run every startup."""
+        cols = {row[1] for row in self._conn.execute("PRAGMA table_info(ticker_state)").fetchall()}
+        if "last_alert_action" not in cols:
+            self._conn.execute("ALTER TABLE ticker_state ADD COLUMN last_alert_action TEXT")
+        if "last_alert_price" not in cols:
+            self._conn.execute("ALTER TABLE ticker_state ADD COLUMN last_alert_price REAL")
 
     def close(self) -> None:
         self._conn.close()
@@ -88,14 +102,19 @@ class TickerStateStore:
         )
         self._conn.commit()
 
-    def save_alert_time(self, ticker: str, when: datetime) -> None:
+    def save_alert(
+        self, ticker: str, when: datetime, action: AlertAction, price: float
+    ) -> None:
         self._conn.execute(
             """
-            INSERT INTO ticker_state (ticker, last_alert_at)
-            VALUES (?, ?)
-            ON CONFLICT(ticker) DO UPDATE SET last_alert_at = excluded.last_alert_at
+            INSERT INTO ticker_state (ticker, last_alert_at, last_alert_action, last_alert_price)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(ticker) DO UPDATE SET
+                last_alert_at = excluded.last_alert_at,
+                last_alert_action = excluded.last_alert_action,
+                last_alert_price = excluded.last_alert_price
             """,
-            (ticker.upper(), when.isoformat()),
+            (ticker.upper(), when.isoformat(), action.value, price),
         )
         self._conn.commit()
 
@@ -107,11 +126,14 @@ class TickerStateStore:
         would exist in memory if the process had never restarted.
         """
         cursor = self._conn.execute(
-            "SELECT ticker, signal_json, signal_at, report_json, report_at, last_alert_at "
-            "FROM ticker_state"
+            "SELECT ticker, signal_json, signal_at, report_json, report_at, "
+            "last_alert_at, last_alert_action, last_alert_price FROM ticker_state"
         )
         rows = cursor.fetchall()
-        for ticker, signal_json, signal_at, report_json, report_at, last_alert_at in rows:
+        for (
+            ticker, signal_json, signal_at, report_json, report_at,
+            last_alert_at, last_alert_action, last_alert_price,
+        ) in rows:
             state = correlator.get_or_create(ticker)
             if signal_json:
                 state.latest_signal = QuantSignal.model_validate_json(signal_json)
@@ -121,6 +143,10 @@ class TickerStateStore:
                 state.latest_report_at = datetime.fromisoformat(report_at)
             if last_alert_at:
                 state.last_alert_at = datetime.fromisoformat(last_alert_at)
+            if last_alert_action:
+                state.last_alert_action = AlertAction(last_alert_action)
+            if last_alert_price is not None:
+                state.last_alert_price = last_alert_price
         if rows:
             logger.info("Rehydrated %d ticker(s) from %s", len(rows), self.path)
         return len(rows)

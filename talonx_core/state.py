@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from talonx_core.schemas import QuantSignal, ResearchReport
+from talonx_core.schemas import AlertAction, QuantSignal, ResearchReport
 
 
 @dataclass
@@ -30,6 +30,12 @@ class TickerState:
     latest_report_at: datetime | None = None
 
     last_alert_at: datetime | None = None
+    # The action and triggering-signal price of the last DISPATCHED alert
+    # for this ticker -- decision.py's state-transition + price-delta gate
+    # reads these to decide whether a same-action re-alert has moved
+    # enough to be worth re-sending (see decision.py's evaluate()).
+    last_alert_action: AlertAction | None = None
+    last_alert_price: float | None = None
 
 
 class TickerCorrelator:
@@ -56,9 +62,19 @@ class TickerCorrelator:
         state.latest_report_at = datetime.now(timezone.utc)
         return state
 
-    def mark_alerted(self, ticker: str, when: datetime | None = None) -> None:
+    def mark_alerted(
+        self,
+        ticker: str,
+        action: AlertAction | None = None,
+        price: float | None = None,
+        when: datetime | None = None,
+    ) -> None:
         state = self.get_or_create(ticker)
         state.last_alert_at = when or datetime.now(timezone.utc)
+        if action is not None:
+            state.last_alert_action = action
+        if price is not None:
+            state.last_alert_price = price
 
     def known_tickers(self) -> list[str]:
         return list(self._states.keys())

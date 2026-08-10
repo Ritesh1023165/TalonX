@@ -22,12 +22,14 @@ _ACTION_EMOJI = {
     AlertAction.CONFIRMED_BULLISH: "\U0001F7E2",  # green circle
     AlertAction.CONFIRMED_BEARISH: "\U0001F534",  # red circle
     AlertAction.CONTRADICTED: "⚠️",  # warning sign
+    AlertAction.DEGRADED_QUANT_ALERT: "\U0001F6A7",  # construction sign -- quant-only, no research backing it
 }
 
 _ACTION_LABEL = {
     AlertAction.CONFIRMED_BULLISH: "CONFIRMED BULLISH",
     AlertAction.CONFIRMED_BEARISH: "CONFIRMED BEARISH",
     AlertAction.CONTRADICTED: "CONTRADICTED",
+    AlertAction.DEGRADED_QUANT_ALERT: "DEGRADED (QUANT-ONLY)",
 }
 
 _SEVERITY_PREFIX = {

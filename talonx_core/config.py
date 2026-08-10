@@ -104,6 +104,15 @@ class CoreConfig:
     # same setup every time a new bar nudges an indicator.
     ticker_cooldown_seconds: float = _env_float("TALONX_CORE_TICKER_COOLDOWN", 300.0)
 
+    # A second, independent guardrail on top of the time cooldown above
+    # (both must pass): once an alert has fired for a ticker, a REPEAT of
+    # the exact same action (e.g. CONFIRMED_BULLISH -> CONFIRMED_BULLISH
+    # again) is suppressed unless price has moved at least this fraction
+    # since the price at that last alert. A genuine state TRANSITION
+    # (e.g. CONFIRMED_BULLISH -> CONTRADICTED) always bypasses this check
+    # -- it's only for "the same story repeating itself."
+    price_delta_retrigger_pct: float = _env_float("TALONX_CORE_PRICE_DELTA_RETRIGGER_PCT", 0.01)
+
     # --- Persistence ---
     # TickerCorrelator state was in-memory only until this was added: a
     # restart mid-correlation (a QuantSignal received but its

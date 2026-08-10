@@ -181,9 +181,13 @@ class DecisionEngine:
         alert = evaluate(state, self.config)
         if alert is not None:
             await self._publish_alert(alert)
-            self.correlator.mark_alerted(ticker, when=alert.correlated_at)
+            self.correlator.mark_alerted(
+                ticker, action=alert.action, price=alert.triggering_signal.price, when=alert.correlated_at,
+            )
             if self.store is not None:
-                self.store.save_alert_time(ticker, alert.correlated_at)
+                self.store.save_alert(
+                    ticker, alert.correlated_at, alert.action, alert.triggering_signal.price,
+                )
 
     async def _publish_alert(self, alert: ActionableAlert) -> None:
         try:

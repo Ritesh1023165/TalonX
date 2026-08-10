@@ -2,10 +2,13 @@
 tests/test_brain_consumer.py
 ---------------------------------
 Tests talonx_brain.consumer.ResearchAgent's message-handling orchestration:
-parse QuantSignal -> retrieve citations -> run the LLM chain -> publish a
-ResearchReport. The retriever, LLM chain, and Redis client are all mocked
+parse QuantSignal -> check cache -> retrieve citations -> run the LLM
+chain -> publish a ResearchReport (Requirement 2's caching, Requirement
+4A's cold-start/LLM-outage fallbacks, and filings-channel invalidation).
+The retriever, LLM chain, cache, and Redis client are all mocked
 (AsyncMock/MagicMock) here -- this is about the orchestration logic, not
-real ChromaDB, Gemini, or Redis I/O, same boundary
+real ChromaDB, Gemini, Redis, or cache.py's own boundary/timezone math
+(see test_brain_cache.py for that), same boundary
 test_pipeline_ledger_integration.py uses for talonx_ingest.pipeline.
 
 Requires pytest-asyncio (see requirements-dev.txt) for the
@@ -25,21 +28,53 @@ from talonx_brain.schemas import (
     Citation,
     CitationSourceType,
     QuantSignal,
+    ResearchReport,
     ResearchVerdict,
     SignalDirection,
     SignalType,
 )
 
 
-def _signal_payload() -> dict:
+def _signal_payload(ticker: str = "NVDA") -> dict:
     return {
-        "ticker": "NVDA",
+        "ticker": ticker,
         "signal_type": "rsi_oversold_volume_surge",
         "direction": "bullish",
         "message": "RSI 24.3 oversold with 2.8x volume surge",
         "price": 131.5,
         "bar_timestamp": "2026-08-04T12:00:00Z",
     }
+
+
+def _filing_event_payload(ticker: str = "NVDA") -> dict:
+    return {
+        "ticker": ticker,
+        "cik": "0001045810",
+        "company_name": "NVIDIA Corporation",
+        "form_type": "10-Q",
+        "accession_number": "0001045810-26-000123",
+        "filing_date": "2026-08-04",
+        "source_document": "nvda-10q.htm",
+        "chunk_count": 42,
+        "vector_collection": "sec_filings",
+    }
+
+
+def _signal() -> QuantSignal:
+    return QuantSignal.model_validate(_signal_payload())
+
+
+def _report(**overrides) -> ResearchReport:
+    defaults = dict(
+        ticker="NVDA",
+        triggering_signal=_signal(),
+        verdict=ResearchVerdict.BULLISH,
+        confidence=0.8,
+        summary="Fundamentals support the surge.",
+        model_used="gemini-flash-latest",
+    )
+    defaults.update(overrides)
+    return ResearchReport(**defaults)
 
 
 @pytest.fixture
@@ -64,16 +99,26 @@ def agent():
         risk_factors=["Export restrictions"],
     )
 
+    # cache_enabled defaults True, but agent.cache is None until
+    # _connect_and_listen runs (never called in these tests) -- every
+    # cache-branch check in consumer.py is `cache_enabled and cache is not
+    # None`, so leaving it None here reproduces the pre-caching flow for
+    # tests that don't care about caching. Tests that DO care inject a
+    # cache explicitly via ResearchAgent(cache=...).
     agent = ResearchAgent(retriever=retriever, llm_chain=llm_chain)
     agent._client = AsyncMock()
     return agent
 
 
+def _msg(agent: ResearchAgent, payload: dict, channel: str | None = None) -> dict:
+    return {"channel": channel or agent.config.signals_channel, "data": json.dumps(payload)}
+
+
+# --- Baseline flow (no cache configured) -------------------------------
+
 @pytest.mark.asyncio
 async def test_handle_message_publishes_research_report(agent):
-    message = {"data": json.dumps(_signal_payload())}
-
-    await agent._handle_message(message)
+    await agent._handle_message(_msg(agent, _signal_payload()))
 
     agent.retriever.retrieve.assert_called_once()
     agent.llm_chain.generate.assert_awaited_once()
@@ -85,6 +130,7 @@ async def test_handle_message_publishes_research_report(agent):
     assert body["ticker"] == "NVDA"
     assert body["verdict"] == "bullish"
     assert body["citations"][0]["excerpt"] == "Data center revenue up 40%."
+    assert body["is_degraded"] is False
 
     assert agent.signals_processed == 1
     assert agent.reports_published == 1
@@ -92,9 +138,7 @@ async def test_handle_message_publishes_research_report(agent):
 
 @pytest.mark.asyncio
 async def test_handle_message_drops_unparseable_payload(agent):
-    message = {"data": "not json"}
-
-    await agent._handle_message(message)
+    await agent._handle_message({"channel": agent.config.signals_channel, "data": "not json"})
 
     agent.retriever.retrieve.assert_not_called()
     agent.llm_chain.generate.assert_not_awaited()
@@ -103,15 +147,11 @@ async def test_handle_message_drops_unparseable_payload(agent):
 
 
 @pytest.mark.asyncio
-async def test_handle_message_skips_publish_when_report_generation_fails(agent):
-    agent.llm_chain.generate.side_effect = RuntimeError("Gemini exploded")
-    message = {"data": json.dumps(_signal_payload())}
+async def test_handle_message_drops_message_on_unexpected_channel(agent):
+    await agent._handle_message(_msg(agent, _signal_payload(), channel="some:other:channel"))
 
-    await agent._handle_message(message)
-
-    agent._client.publish.assert_not_awaited()
-    assert agent.signals_processed == 1
-    assert agent.reports_published == 0
+    agent.retriever.retrieve.assert_not_called()
+    assert agent.signals_processed == 0
 
 
 def test_build_retrieval_query_includes_ticker_direction_and_message():
@@ -128,3 +168,180 @@ def test_build_retrieval_query_includes_ticker_direction_and_message():
     assert "bullish" in query
     assert "macd bullish cross" in query
     assert "MACD crossed above signal line" in query
+
+
+# --- Cold start (Requirement 4A) ----------------------------------------
+
+@pytest.mark.asyncio
+async def test_handle_message_bypasses_llm_when_no_context_at_all(agent):
+    agent.retriever.retrieve.return_value = []
+
+    await agent._handle_message(_msg(agent, _signal_payload()))
+
+    agent.llm_chain.generate.assert_not_awaited()
+    agent._client.publish.assert_awaited_once()
+    body = json.loads(agent._client.publish.await_args.args[1])
+    assert body["verdict"] == "insufficient_context"
+    assert body["confidence"] == 0.0
+    assert body["is_degraded"] is False
+
+
+# --- LLM failure fallback chain (Requirement 4A) -------------------------
+
+@pytest.mark.asyncio
+async def test_llm_failure_with_no_cache_publishes_degraded_report(agent):
+    agent.llm_chain.generate.side_effect = RuntimeError("Gemini exploded")
+
+    await agent._handle_message(_msg(agent, _signal_payload()))
+
+    agent._client.publish.assert_awaited_once()
+    body = json.loads(agent._client.publish.await_args.args[1])
+    assert body["is_degraded"] is True
+    assert body["verdict"] == "neutral"
+    assert body["confidence"] == 0.0
+    assert agent.signals_processed == 1
+    assert agent.reports_published == 1
+
+
+@pytest.mark.asyncio
+async def test_llm_failure_with_cached_entry_falls_back_to_stale(agent):
+    agent.llm_chain.generate.side_effect = RuntimeError("Gemini exploded")
+    cached = _report(summary="Old but usable analysis.")
+    cache = AsyncMock()
+    cache.get.return_value = (cached, False)  # exists, not fresh -- stale
+    agent.cache = cache
+
+    await agent._handle_message(_msg(agent, _signal_payload()))
+
+    agent._client.publish.assert_awaited_once()
+    body = json.loads(agent._client.publish.await_args.args[1])
+    assert body["is_stale"] is True
+    assert body["is_degraded"] is False
+    assert body["summary"] == "Old but usable analysis."
+    cache.set.assert_not_awaited()  # never re-cache a stale/degraded result
+
+
+# --- Cache-first (Requirement 2) -----------------------------------------
+
+@pytest.mark.asyncio
+async def test_fresh_cache_hit_skips_retrieval_and_llm(agent):
+    cached = _report(summary="Cached analysis.")
+    cache = AsyncMock()
+    cache.get.return_value = (cached, True)  # fresh
+    agent.cache = cache
+
+    await agent._handle_message(_msg(agent, _signal_payload()))
+
+    agent.retriever.retrieve.assert_not_called()
+    agent.llm_chain.generate.assert_not_awaited()
+    cache.acquire_lock.assert_not_awaited()
+    agent._client.publish.assert_awaited_once()
+    body = json.loads(agent._client.publish.await_args.args[1])
+    assert body["from_cache"] is True
+    assert body["summary"] == "Cached analysis."
+
+
+@pytest.mark.asyncio
+async def test_cache_miss_acquires_lock_generates_and_caches(agent):
+    cache = AsyncMock()
+    cache.get.return_value = None  # nothing cached at all
+    cache.acquire_lock.return_value = True
+    agent.cache = cache
+
+    await agent._handle_message(_msg(agent, _signal_payload()))
+
+    cache.acquire_lock.assert_awaited_once()
+    agent.llm_chain.generate.assert_awaited_once()
+    cache.set.assert_awaited_once()
+    cache.release_lock.assert_awaited_once()
+    agent._client.publish.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_losing_the_lock_race_waits_for_and_uses_the_winners_cache(agent):
+    winner_report = _report(summary="Winner's analysis.")
+    cache = AsyncMock()
+    cache.get.return_value = None
+    cache.acquire_lock.return_value = False  # lost the race
+    cache.wait_for_cache.return_value = (winner_report, True)
+    agent.cache = cache
+
+    await agent._handle_message(_msg(agent, _signal_payload()))
+
+    cache.wait_for_cache.assert_awaited_once()
+    agent.llm_chain.generate.assert_not_awaited()  # never duplicated the LLM call
+    cache.release_lock.assert_not_awaited()  # never held the lock, nothing to release
+    body = json.loads(agent._client.publish.await_args.args[1])
+    assert body["summary"] == "Winner's analysis."
+
+
+@pytest.mark.asyncio
+async def test_losing_lock_race_and_wait_timeout_generates_anyway(agent):
+    cache = AsyncMock()
+    cache.get.return_value = None
+    cache.acquire_lock.return_value = False
+    cache.wait_for_cache.return_value = None  # timed out, nothing appeared
+    agent.cache = cache
+
+    await agent._handle_message(_msg(agent, _signal_payload()))
+
+    agent.llm_chain.generate.assert_awaited_once()
+    cache.release_lock.assert_not_awaited()  # never acquired it
+    agent._client.publish.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_degraded_report_is_never_cached(agent):
+    agent.llm_chain.generate.side_effect = RuntimeError("Gemini exploded")
+    cache = AsyncMock()
+    cache.get.return_value = None  # no fallback available either
+    cache.acquire_lock.return_value = True
+    agent.cache = cache
+
+    await agent._handle_message(_msg(agent, _signal_payload()))
+
+    cache.set.assert_not_awaited()
+    cache.release_lock.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_cache_disabled_skips_all_cache_interaction(agent):
+    from talonx_brain.config import BrainConfig
+
+    agent.config = BrainConfig(cache_enabled=False)
+    cache = AsyncMock()
+    agent.cache = cache
+
+    await agent._handle_message(_msg(agent, _signal_payload()))
+
+    cache.get.assert_not_awaited()
+    cache.acquire_lock.assert_not_awaited()
+    cache.set.assert_not_awaited()
+    agent.llm_chain.generate.assert_awaited_once()
+
+
+# --- Filings-channel invalidation (Requirement 2) -------------------------
+
+@pytest.mark.asyncio
+async def test_filing_event_invalidates_cache_for_that_ticker(agent):
+    cache = AsyncMock()
+    agent.cache = cache
+
+    await agent._handle_message(_msg(agent, _filing_event_payload("NVDA"), channel=agent.config.filings_channel))
+
+    cache.invalidate.assert_awaited_once_with("NVDA")
+    assert agent.filing_invalidations == 1
+    # Not treated as a research trigger.
+    agent.retriever.retrieve.assert_not_called()
+    agent._client.publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_unparseable_filing_event_is_dropped(agent):
+    cache = AsyncMock()
+    agent.cache = cache
+
+    await agent._handle_message({"channel": agent.config.filings_channel, "data": "not json"})
+
+    cache.invalidate.assert_not_awaited()
+    assert agent.filing_invalidations == 0

@@ -58,11 +58,29 @@ def evaluate(
          within config.ticker_cooldown_seconds. Guards against
          re-alerting on what is functionally the same setup every time a
          new bar nudges an indicator.
-      4. Confidence gate -- research confidence below
-         config.min_confidence is treated as UNCONFIRMED regardless of
-         verdict, same as NEUTRAL/INSUFFICIENT_CONTEXT. This is the
-         module's core risk guardrail: don't act on a low-confidence
-         LLM call.
+      4. Confidence gate -- research confidence below config.min_confidence
+         is treated as UNCONFIRMED regardless of verdict, same as
+         NEUTRAL/INSUFFICIENT_CONTEXT. This is the module's core risk
+         guardrail: don't act on a low-confidence LLM call. SKIPPED
+         entirely for a report.is_degraded=True report (talonx_brain
+         couldn't produce a real qualitative read at all -- see below).
+      5. State-transition + price-delta gate -- if the action this
+         evaluation would produce is the SAME action as the last alert
+         actually dispatched for this ticker, it's suppressed unless price
+         has moved config.price_delta_retrigger_pct since that alert. A
+         genuine transition (including a first-ever alert) always passes.
+         This runs IN ADDITION to the time cooldown (3), not instead of it
+         -- both must pass.
+
+    report.is_degraded=True (talonx_brain's LLM totally failed and no
+    cache existed to fall back on -- see talonx_brain/cache.py) bypasses
+    checks 4's confidence/verdict matrix entirely and always computes
+    AlertAction.DEGRADED_QUANT_ALERT instead -- the point is to still
+    surface that a technical signal fired even with zero qualitative
+    backing, rather than silently dropping it the way a normal
+    confidence=0.0 report would be. DEGRADED_QUANT_ALERT still
+    participates in check 5 as its own pseudo-state, so a sustained LLM
+    outage doesn't re-alert on every single signal for the same ticker.
     """
     now = now or datetime.now(timezone.utc)
 
@@ -82,25 +100,37 @@ def evaluate(
     report = state.latest_report
     signal = state.latest_signal
 
-    if report.confidence < config.min_confidence:
-        return None
-    if report.verdict not in (ResearchVerdict.BULLISH, ResearchVerdict.BEARISH):
-        return None
-
-    agrees = (
-        signal.direction == SignalDirection.BULLISH and report.verdict == ResearchVerdict.BULLISH
-    ) or (
-        signal.direction == SignalDirection.BEARISH and report.verdict == ResearchVerdict.BEARISH
-    )
-
-    if agrees:
-        action = (
-            AlertAction.CONFIRMED_BULLISH
-            if signal.direction == SignalDirection.BULLISH
-            else AlertAction.CONFIRMED_BEARISH
-        )
+    if report.is_degraded:
+        action = AlertAction.DEGRADED_QUANT_ALERT
     else:
-        action = AlertAction.CONTRADICTED
+        if report.confidence < config.min_confidence:
+            return None
+        if report.verdict not in (ResearchVerdict.BULLISH, ResearchVerdict.BEARISH):
+            return None
+
+        agrees = (
+            signal.direction == SignalDirection.BULLISH and report.verdict == ResearchVerdict.BULLISH
+        ) or (
+            signal.direction == SignalDirection.BEARISH and report.verdict == ResearchVerdict.BEARISH
+        )
+
+        if agrees:
+            action = (
+                AlertAction.CONFIRMED_BULLISH
+                if signal.direction == SignalDirection.BULLISH
+                else AlertAction.CONFIRMED_BEARISH
+            )
+        else:
+            action = AlertAction.CONTRADICTED
+
+    if (
+        state.last_alert_action is not None
+        and action == state.last_alert_action
+        and state.last_alert_price is not None
+    ):
+        delta_pct = abs(signal.price - state.last_alert_price) / state.last_alert_price
+        if delta_pct < config.price_delta_retrigger_pct:
+            return None
 
     return ActionableAlert(
         ticker=signal.ticker,
@@ -115,6 +145,7 @@ def evaluate(
         key_findings=report.key_findings,
         risk_factors=report.risk_factors,
         model_used=report.model_used,
+        is_degraded=report.is_degraded,
         signal_received_at=state.latest_signal_at,
         report_received_at=state.latest_report_at,
     )
@@ -127,6 +158,13 @@ def _is_fresh(received_at: datetime | None, now: datetime, window_seconds: float
 
 
 def _severity_for(action: AlertAction, confidence: float) -> AlertSeverity:
+    # A degraded alert means "no qualitative read at all" -- a
+    # data-quality/availability issue worth noticing regardless of
+    # confidence (which is a meaningless 0.0 placeholder for this action),
+    # so it's never downgraded to INFO the way a genuinely low-confidence
+    # real report would be.
+    if action == AlertAction.DEGRADED_QUANT_ALERT:
+        return AlertSeverity.WARNING
     if confidence >= _CRITICAL_CONFIDENCE:
         return AlertSeverity.CRITICAL
     if confidence >= _WARNING_CONFIDENCE:
@@ -139,6 +177,13 @@ def _severity_for(action: AlertAction, confidence: float) -> AlertSeverity:
 
 
 def _build_rationale(action: AlertAction, signal, report) -> str:
+    if action == AlertAction.DEGRADED_QUANT_ALERT:
+        return (
+            f"Quant signal ({signal.direction.value}): {signal.message}. "
+            f"No research verdict available -- talonx_brain could not produce a "
+            f"qualitative read for this ticker (LLM unavailable and no cached "
+            f"report to fall back on). Dispatched on quantitative data alone."
+        )
     relation = "agrees with" if action != AlertAction.CONTRADICTED else "CONTRADICTS"
     return (
         f"Quant signal ({signal.direction.value}): {signal.message}. "

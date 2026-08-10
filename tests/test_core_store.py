@@ -15,7 +15,14 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from talonx_core.schemas import QuantSignal, ResearchReport, ResearchVerdict, SignalDirection, SignalType
+from talonx_core.schemas import (
+    AlertAction,
+    QuantSignal,
+    ResearchReport,
+    ResearchVerdict,
+    SignalDirection,
+    SignalType,
+)
 from talonx_core.state import TickerCorrelator
 from talonx_core.store import TickerStateStore
 
@@ -89,7 +96,7 @@ def test_save_alert_time_then_load_into_rehydrates_cooldown(tmp_path):
     path = tmp_path / "core_state.db"
     with TickerStateStore(path) as store:
         store.save_signal("AAPL", _signal(), NOW)
-        store.save_alert_time("AAPL", NOW + timedelta(seconds=5))
+        store.save_alert("AAPL", NOW + timedelta(seconds=5), AlertAction.CONFIRMED_BULLISH, 200.0)
 
     correlator = TickerCorrelator()
     with TickerStateStore(path) as store:
@@ -97,6 +104,40 @@ def test_save_alert_time_then_load_into_rehydrates_cooldown(tmp_path):
 
     state = correlator.get_or_create("AAPL")
     assert state.last_alert_at == NOW + timedelta(seconds=5)
+    assert state.last_alert_action == AlertAction.CONFIRMED_BULLISH
+    assert state.last_alert_price == 200.0
+
+
+def test_migrates_a_pre_existing_ticker_state_db_without_alert_action_price(tmp_path):
+    """Regression coverage for the ALTER TABLE migration, same pattern as
+    talonx_watchlist/store.py's equivalent test -- a pre-existing
+    core_state.db from before last_alert_action/last_alert_price existed
+    must upgrade in place, not error."""
+    import sqlite3
+
+    path = tmp_path / "legacy_core_state.db"
+    legacy_conn = sqlite3.connect(path)
+    legacy_conn.execute(
+        "CREATE TABLE ticker_state (ticker TEXT PRIMARY KEY, signal_json TEXT, "
+        "signal_at TEXT, report_json TEXT, report_at TEXT, last_alert_at TEXT)"
+    )
+    legacy_conn.execute(
+        "INSERT INTO ticker_state (ticker, last_alert_at) VALUES ('AAPL', ?)",
+        (NOW.isoformat(),),
+    )
+    legacy_conn.commit()
+    legacy_conn.close()
+
+    with TickerStateStore(path) as store:
+        correlator = TickerCorrelator()
+        store.load_into(correlator)
+        state = correlator.get_or_create("AAPL")
+        assert state.last_alert_at == NOW
+        assert state.last_alert_action is None
+        assert state.last_alert_price is None
+
+        # And the migrated store is fully usable afterward.
+        store.save_alert("AAPL", NOW, AlertAction.CONTRADICTED, 150.0)
 
 
 def test_state_persists_across_reopen(tmp_path):

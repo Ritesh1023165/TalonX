@@ -46,6 +46,7 @@ class AlertAction(str, Enum):
     CONFIRMED_BULLISH = "confirmed_bullish"
     CONFIRMED_BEARISH = "confirmed_bearish"
     CONTRADICTED = "contradicted"
+    DEGRADED_QUANT_ALERT = "degraded_quant_alert"
 
 
 class AlertSeverity(str, Enum):
@@ -85,6 +86,7 @@ class ActionableAlert(BaseModel):
     key_findings: list[str] = Field(default_factory=list)
     risk_factors: list[str] = Field(default_factory=list)
     model_used: str
+    is_degraded: bool = False
 
     signal_received_at: datetime
     report_received_at: datetime

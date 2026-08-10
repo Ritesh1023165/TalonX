@@ -55,6 +55,7 @@ ACTION_EMOJI = {
     "confirmed_bullish": "\U0001F7E2",
     "confirmed_bearish": "\U0001F534",
     "contradicted": "⚠️",
+    "degraded_quant_alert": "\U0001F6A7",
 }
 SEVERITY_EMOJI = {"critical": "\U0001F525", "warning": "⚠️", "info": "ℹ️"}
 

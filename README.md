@@ -367,21 +367,40 @@ talonx:market:stream (Redis)
 ```
 talonx:signals:quant (Redis)
     → parse + validate each message as QuantSignal
+    → cache-first: brain_cache:{ticker} in Redis has a FRESH entry?
+        yes → skip retrieval AND the LLM call entirely, republish it
+              (from_cache=True) -- this is the actual LLM-spend reduction
+        no  → acquire lock:brain:{ticker} (distributed lock -- guards
+              against a cache stampede if this ever runs as more than one
+              process); lost the race? wait briefly for the winner's
+              cache write, else generate anyway rather than block forever
     → retrieve top-K relevant chunks from ChromaDB's "sec_filings"
       collection, scoped to the signal's ticker (same store, same
       embedding model Module 1 wrote it with)
     → ALSO retrieve top-K relevant chunks from the "news_feed" collection,
       same ticker scope (optional -- TALONX_BRAIN_INCLUDE_NEWS, on by
       default; see retriever.py)
-    → build a structured RAG prompt (technical trigger + filing excerpts
-      + news excerpts)
-    → run it through the configured LLM provider (TALONX_BRAIN_LLM_PROVIDER,
-      "gemini" by default or "ollama" for a local model -- see below) with a
-      structured-output schema
+    → zero chunks retrieved at all (cold start)? bypass the LLM entirely,
+      publish an INSUFFICIENT_CONTEXT report immediately
+    → otherwise, build a structured RAG prompt (technical trigger + filing
+      excerpts + news excerpts) and run it through the configured LLM
+      provider (TALONX_BRAIN_LLM_PROVIDER, "gemini" by default or "ollama"
+      for a local model -- see below) with a structured-output schema
       (verdict / confidence / summary / key findings / risk factors)
+        LLM call fails? → stale (expired) brain_cache entry exists?
+                            yes → republish it, flagged is_stale=True
+                            no  → publish a DEGRADED report instead
+                                  (verdict=neutral, confidence=0.0,
+                                  is_degraded=True)
     → assemble a ResearchReport (LLM findings + the original QuantSignal +
       citation objects for every retrieved chunk, filing or news)
-    → publish to Redis (talonx:reports:brain)
+    → cache the result (brain_cache:{ticker}, unless it's degraded or
+      itself a stale republish) and publish to Redis (talonx:reports:brain)
+
+talonx:filings:events (Redis, published by talonx_ingest.pipeline)
+    → NewFilingIngestedEvent for ticker X → DELETE brain_cache:X outright
+      (not just marked stale -- a new filing genuinely invalidates old
+      analysis, so it shouldn't be resurrected as a stale fallback either)
 ```
 
 - **`retriever.py`** — unlike `talonx_quant`, this module is NOT
@@ -422,13 +441,41 @@ talonx:signals:quant (Redis)
     No API key, no rate limiter (nothing to throttle against — see §9.4
     for full setup and tradeoffs).
 - **`consumer.py`** — same reconnect-with-backoff Redis listener shape as
-  `talonx_quant.consumer`, plus per-signal orchestration (retrieve →
-  generate → publish). A failure researching one signal (retrieval error,
-  LLM error, etc.) is logged and skipped rather than killing the
-  listener — one bad signal shouldn't stop research on the next one.
+  `talonx_quant.consumer`, subscribed to BOTH `talonx:signals:quant`
+  (research trigger) and `talonx:filings:events` (cache invalidation --
+  the publish side already existed in `talonx_ingest.pipeline`, this
+  module just added the subscriber). Per-signal orchestration is
+  cache-first → retrieve → generate → publish (see `cache.py` above), with
+  an LLM failure falling back to a stale cache entry, then a degraded
+  report, rather than just dropping the signal -- see the diagram. A
+  failure that isn't otherwise handled (a genuinely broken payload, etc.)
+  is logged and skipped rather than killing the listener.
 - Publishes a `verdict` of `"insufficient_context"` (distinct from
-  `"neutral"`) when retrieval comes back empty or too thin to say anything
-  meaningful, rather than letting the model guess.
+  `"neutral"`) when retrieval comes back empty -- **bypassing the LLM
+  call entirely** rather than spending a call asking the model to notice
+  it has nothing to work with.
+- **`cache.py`** — `BrainCache`, the Redis-backed qualitative cache
+  (`brain_cache:{ticker}`) behind the cache-first flow in the diagram
+  above. The one non-obvious design point: an "expired" entry still needs
+  to be usable as a fallback (see below), but Redis's own `EX` TTL just
+  DELETES a key once it elapses -- so every entry embeds its OWN logical
+  `expires_at` inside the JSON payload and is written under a much longer
+  Redis-level safety-net TTL (`TALONX_BRAIN_CACHE_SAFETY_TTL`, default
+  6h); reads compare `now` against the embedded timestamp, not Redis's
+  remaining TTL. `expires_at` at write time is the SOONER of a base TTL
+  (`TALONX_BRAIN_CACHE_BASE_TTL`, default 2h) or the next daily
+  market-open/close boundary (`TALONX_BRAIN_MARKET_TZ`, default
+  `America/New_York`, via `zoneinfo` so EST/EDT is handled automatically;
+  `TALONX_BRAIN_MARKET_OPEN_HOUR`/`_CLOSE_HOUR`, default 9/16) -- so
+  cached research never outlives the trading session it was generated
+  for. No holiday/weekend trading-calendar awareness -- see §8. The
+  distributed lock (`lock:brain:{ticker}`, `TALONX_BRAIN_CACHE_LOCK_TTL`)
+  and its bounded wait (`TALONX_BRAIN_CACHE_LOCK_WAIT_SECONDS`, default
+  20s) only matter if `talonx_brain.run` is ever scaled to more than one
+  process -- today's single-process consumer always acquires it
+  immediately. `TALONX_BRAIN_CACHE_ENABLED=false` disables caching
+  entirely (an escape hatch for debugging prompt changes, where a stale
+  hit would be actively misleading).
 - Wired into `run_talonx.py` as a third continuous task (see §3.5) --
   but OPTIONALLY: on the `gemini` provider, if `GEMINI_API_KEY` isn't set,
   the orchestrator logs a warning and runs Modules 1+2 without it rather
@@ -454,19 +501,38 @@ talonx:reports:brain (Redis)  ──┘     (TickerCorrelator -- freshest
                                (within TALONX_CORE_CORRELATION_WINDOW)?
                             2. ticker not in cooldown
                                (TALONX_CORE_TICKER_COOLDOWN)?
-                            3. research confidence >=
-                               TALONX_CORE_MIN_CONFIDENCE, and verdict is
-                               directional (not neutral/insufficient)?
-                          → any "no" at any step = no alert, silently
-                                       │ (all three "yes")
+                            3. report.is_degraded?
+                               yes → action = DEGRADED_QUANT_ALERT
+                                     (skips step 4 entirely)
+                               no  → research confidence >=
+                                     TALONX_CORE_MIN_CONFIDENCE, and verdict
+                                     is directional (not neutral/
+                                     insufficient)?
+                          → any "no" at steps 1-2, or failing step 4 = no
+                            alert, silently
+                                       │
                                        ▼
-                    quant direction == research verdict?
+                    (skipped for a degraded report) quant direction ==
+                    research verdict?
                       yes → CONFIRMED_BULLISH / CONFIRMED_BEARISH
                       no  → CONTRADICTED (quant and research disagree)
                                        │
                                        ▼
+                          5. state-transition + price-delta gate: is this
+                             action the SAME as the last alert actually
+                             dispatched for this ticker? If so, has price
+                             moved >= TALONX_CORE_PRICE_DELTA_RETRIGGER_PCT
+                             (default 1.0%) since that alert? A genuine
+                             transition (or a first-ever alert) always
+                             passes; a repeat of the same action without
+                             enough price movement is suppressed -- runs
+                             IN ADDITION to the cooldown at step 2, not
+                             instead of it.
+                                       │
+                                       ▼
                      publish ActionableAlert to Redis
-                     (talonx:alerts:dispatch), start that ticker's cooldown
+                     (talonx:alerts:dispatch), record that ticker's new
+                     cooldown/action/price
 ```
 
 - **`state.py`** — `TickerCorrelator` holds one `TickerState` per ticker,
@@ -478,11 +544,16 @@ talonx:reports:brain (Redis)  ──┘     (TickerCorrelator -- freshest
   README section).
 - **`store.py`** — `TickerStateStore`, SQLite-backed (stdlib, same choice
   `talonx_ingest.storage.ledger` makes), one row per ticker, upserted on
-  every update. Fixes a real gap: without it, a restart mid-correlation
-  (a `QuantSignal` received but its `ResearchReport` hasn't landed yet --
-  routine given `talonx_brain`'s multi-minute lag) would silently lose
-  that half of the pair forever. `consumer.py` rehydrates the correlator
-  from it at startup and writes through on every update; `run.py`
+  every update -- now including `last_alert_action`/`last_alert_price` for
+  the re-trigger gate above, added via the same idempotent
+  `PRAGMA table_info` + `ALTER TABLE` migration pattern used by
+  `talonx_watchlist/store.py`, so a pre-existing `core_state.db` upgrades
+  in place rather than erroring. Fixes a real gap: without it, a restart
+  mid-correlation (a `QuantSignal` received but its `ResearchReport`
+  hasn't landed yet -- routine given `talonx_brain`'s multi-minute lag)
+  would silently lose that half of the pair forever. `consumer.py`
+  rehydrates the correlator from it at startup and writes through on
+  every update; `run.py`
   constructs it (`TALONX_CORE_ENABLE_PERSISTENCE`, default on;
   `TALONX_CORE_STATE_DB`, default `~/.talonx/core_state.db`) and degrades
   gracefully (logs a warning, continues in-memory-only) if the file can't
@@ -494,15 +565,36 @@ talonx:reports:brain (Redis)  ──┘     (TickerCorrelator -- freshest
 - **`decision.py`** — the Decision Matrix itself: a pure function over a
   `TickerState` snapshot, no I/O, so it's trivial to unit test in
   isolation from Redis/asyncio (see `tests/test_core_decision.py`).
-  Deliberately narrow: only `CONFIRMED_BULLISH`, `CONFIRMED_BEARISH`, and
-  `CONTRADICTED` ever reach the alerts channel -- a neutral/
-  insufficient-context verdict, or one below the confidence gate, is
-  UNCONFIRMED and produces no alert at all, keeping
+  Deliberately narrow: only `CONFIRMED_BULLISH`, `CONFIRMED_BEARISH`,
+  `CONTRADICTED`, and `DEGRADED_QUANT_ALERT` ever reach the alerts
+  channel -- a neutral/insufficient-context verdict, or one below the
+  confidence gate, is UNCONFIRMED and produces no alert at all, keeping
   `talonx:alerts:dispatch` purely actionable rather than a firehose.
   `CONTRADICTED` is treated as at least as noteworthy as agreement (its
   severity floor is WARNING, never INFO) -- a technical signal and the
   research disagreeing is arguably the more actionable outcome of the
   two, not a "nothing to report" case.
+- **State-transition + price-delta re-trigger gate** — a second guardrail
+  on top of the time-based cooldown (both must pass, neither replaces the
+  other): `TickerState` now also tracks the `action` and `triggering
+  signal price` of the last alert actually dispatched for a ticker. A new
+  evaluation that would produce the SAME action as that last alert is
+  suppressed unless price has moved at least `TALONX_CORE_PRICE_DELTA_RETRIGGER_PCT`
+  (default 1.0%) since then; a genuine transition (including the very
+  first alert for a ticker) always passes regardless of price. Persisted
+  the same way as everything else in `store.py` (see below).
+- **`report.is_degraded` bypass** — `talonx_brain` publishes a
+  specially-flagged `ResearchReport` (verdict `neutral`, confidence 0.0,
+  `is_degraded=True`) when its LLM call fails AND it has no cached report
+  to fall back on (see §3.3's caching section). `decision.py` recognizes
+  this flag and skips the confidence/verdict matrix entirely, always
+  producing `DEGRADED_QUANT_ALERT` (severity WARNING, regardless of the
+  0.0 confidence) instead of silently suppressing it the way a normal
+  low-confidence report would be -- the point is the user should still
+  learn a technical signal fired even with zero qualitative backing.
+  `DEGRADED_QUANT_ALERT` participates in the state-transition gate above
+  as its own pseudo-state, so a sustained LLM outage doesn't re-alert on
+  every single signal for the same ticker.
 - **`consumer.py`** — subscribes to BOTH `talonx:signals:quant` and
   `talonx:reports:brain` on one Redis connection (`pubsub.subscribe`
   called with two channel names), routes each incoming message to the
@@ -520,9 +612,11 @@ talonx:reports:brain (Redis)  ──┘     (TickerCorrelator -- freshest
   `extra="ignore"` behavior means parsing the real, fuller wire payload
   still works fine). Its only real dependencies are `redis.asyncio`,
   `pydantic`, and `asyncio`, matching the module spec.
-- **Risk guardrails implemented**: a confidence gate (`TALONX_CORE_MIN_CONFIDENCE`)
-  and a per-ticker cooldown (`TALONX_CORE_TICKER_COOLDOWN`). **Not
-  implemented**: a global cross-ticker rate limiter -- see §8.
+- **Risk guardrails implemented**: a confidence gate (`TALONX_CORE_MIN_CONFIDENCE`),
+  a per-ticker time cooldown (`TALONX_CORE_TICKER_COOLDOWN`), and the
+  state-transition + price-delta re-trigger gate
+  (`TALONX_CORE_PRICE_DELTA_RETRIGGER_PCT`) above. **Not implemented**: a
+  global cross-ticker rate limiter -- see §8.
 - Wired into `run_talonx.py` as a fourth continuous task (see §3.6),
   unconditionally (unlike Module 3, it has no optional external
   dependency -- no API key, nothing that can plausibly be missing beyond
@@ -1244,10 +1338,15 @@ indicator periods/thresholds plus its noise filters --
 `TALONX_QUANT_THROTTLE_WINDOW_SECONDS` / `TALONX_QUANT_THROTTLE_MAX_SIGNALS`
 (§3.2, §9.5), retrieval
 top-K, `TALONX_BRAIN_LLM_PROVIDER` + Gemini model/temperature +
-`TALONX_BRAIN_OLLAMA_MODEL`/`TALONX_BRAIN_OLLAMA_BASE_URL`, Module 4's
-`TALONX_CORE_MIN_CONFIDENCE` / `TALONX_CORE_CORRELATION_WINDOW` /
-`TALONX_CORE_TICKER_COOLDOWN` / `TALONX_CORE_ENABLE_PERSISTENCE` /
-`TALONX_CORE_STATE_DB`, and Module 5's `TELEGRAM_BOT_TOKEN` /
+`TALONX_BRAIN_OLLAMA_MODEL`/`TALONX_BRAIN_OLLAMA_BASE_URL`, Module 3's
+qualitative cache -- `TALONX_BRAIN_CACHE_ENABLED` / `TALONX_BRAIN_CACHE_BASE_TTL`
+/ `TALONX_BRAIN_CACHE_SAFETY_TTL` / `TALONX_BRAIN_CACHE_LOCK_TTL` /
+`TALONX_BRAIN_CACHE_LOCK_WAIT_SECONDS` / `TALONX_BRAIN_MARKET_TZ` /
+`TALONX_BRAIN_MARKET_OPEN_HOUR` / `TALONX_BRAIN_MARKET_CLOSE_HOUR` (§3.3),
+Module 4's `TALONX_CORE_MIN_CONFIDENCE` / `TALONX_CORE_CORRELATION_WINDOW` /
+`TALONX_CORE_TICKER_COOLDOWN` / `TALONX_CORE_PRICE_DELTA_RETRIGGER_PCT` /
+`TALONX_CORE_ENABLE_PERSISTENCE` / `TALONX_CORE_STATE_DB` (§3.4), and
+Module 5's `TELEGRAM_BOT_TOKEN` /
 `TELEGRAM_CHAT_ID` (both optional -- see §4) /
 `TALONX_DISPATCH_MIN_SEVERITY` / `TALONX_DISPATCH_AUDIT_DB` /
 `TALONX_DISPATCH_FEED_LIMIT` / `TALONX_DISPATCH_AUTOREFRESH_MS`, and the
@@ -1263,11 +1362,22 @@ etc).
 - `talonx_brain` is purely signal-triggered (reacts to
   `talonx:signals:quant`) — there's no on-demand query interface (CLI/API)
   for asking it about a ticker outside of a quant signal firing.
-- `talonx_brain` retrieves from both `sec_filings` and `news_feed` now,
-  but only as CONTEXT for a `QuantSignal` trigger — it still doesn't
-  listen to `talonx:filings:events` itself, so a fresh 8-K/news item
-  doesn't trigger new research on its own; it just gets picked up
-  whenever the next technical signal fires for that ticker.
+- ~~`talonx_brain` doesn't listen to `talonx:filings:events`~~ --
+  **partially fixed**: it now subscribes to that channel and DELETES
+  `brain_cache:{ticker}` the moment a fresh filing lands (§3.3), so the
+  NEXT signal for that ticker is guaranteed a fresh LLM call instead of a
+  stale cache hit. Still open: this only invalidates the cache -- a fresh
+  8-K/news item still doesn't trigger NEW research on its own the way a
+  `QuantSignal` does; it's picked up passively, whenever the next
+  technical signal happens to fire for that ticker. Also: only filings
+  publish an invalidation event today (`NewFilingIngestedEvent`) -- fresh
+  news articles don't, so a cached report can go stale relative to
+  breaking news without anything forcing a refresh (only its TTL/
+  market-boundary expiry eventually catches it).
+- `talonx_brain`'s cache expiry (§3.3) uses plain daily 9am/4pm exchange
+  clock-time boundaries -- there's no real trading-calendar awareness, so
+  a cache entry set right before a market holiday or a weekend doesn't
+  know the market isn't actually opening at the next 9am boundary.
 - ~~**talonx_quant has no dynamic watchlist.**~~ -- **partially fixed**:
   which tickers get streamed (and periodically ingested for) is now a
   live, runtime-editable decision, via `talonx_watchlist`'s SQLite store

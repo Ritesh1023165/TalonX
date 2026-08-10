@@ -89,6 +89,15 @@ def test_format_contradicted_uses_warning_emoji():
     assert "CONTRADICTED" in text
 
 
+def test_format_degraded_quant_alert_does_not_raise():
+    # Regression coverage: _ACTION_EMOJI/_ACTION_LABEL are plain dict
+    # lookups with no default -- adding a new AlertAction without adding
+    # it to both would raise KeyError here and silently break Telegram
+    # delivery for every degraded alert.
+    text = format_telegram_message(_alert(action=AlertAction.DEGRADED_QUANT_ALERT))
+    assert "DEGRADED" in text
+
+
 def test_format_critical_severity_adds_fire_prefix():
     text = format_telegram_message(_alert(severity=AlertSeverity.CRITICAL))
     assert text.startswith("\U0001F525")
