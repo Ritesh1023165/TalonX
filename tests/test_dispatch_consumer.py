@@ -15,7 +15,7 @@ Requires pytest-asyncio (see requirements-dev.txt) for the
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock
 
 import pytest
@@ -132,6 +132,48 @@ async def test_drops_invalid_payload(agent):
 
     assert agent.alerts_processed == 0
     assert agent.store.count() == 0
+
+
+@pytest.mark.asyncio
+async def test_telegram_push_uses_the_short_summary_format(agent):
+    agent.telegram_client.is_configured = True
+    await agent._handle_message(_message(_alert_payload(severity="critical")))
+
+    text = agent.telegram_client.send.await_args.args[0]
+    row = agent.store.recent(limit=1)[0]
+    assert f"#{row['id']}" in text
+    assert "Reply with" in text
+    # The full research writeup no longer goes out in the push itself.
+    assert "summary text" not in text
+
+
+def test_stop_also_stops_the_reply_listener(agent):
+    agent.stop()
+    assert agent.reply_listener._stop_event.is_set()
+
+
+@pytest.mark.asyncio
+async def test_retention_sweep_purges_stale_alerts(agent):
+    old_payload = _alert_payload()
+    old_payload["correlated_at"] = (datetime(2026, 1, 1, tzinfo=timezone.utc)).isoformat()
+    await agent._handle_message(_message(old_payload))
+    assert agent.store.count() == 1
+
+    purged = await agent._run_retention_sweep_once()
+
+    assert purged == 1
+    assert agent.store.count() == 0
+    assert agent.alerts_purged == 1
+
+
+@pytest.mark.asyncio
+async def test_retention_sweep_leaves_recent_alerts_alone(agent):
+    await agent._handle_message(_message(_alert_payload()))  # correlated_at defaults to "now" (2026-08-07)
+
+    purged = await agent._run_retention_sweep_once()
+
+    assert purged == 0
+    assert agent.store.count() == 1
 
 
 def test_invalid_min_severity_config_falls_back_to_warning(tmp_path):

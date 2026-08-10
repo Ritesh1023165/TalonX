@@ -90,10 +90,20 @@ class DispatchConfig:
     telegram_backoff_base_seconds: float = _env_float("TALONX_DISPATCH_TELEGRAM_BACKOFF_BASE", 1.5)
     telegram_backoff_max_seconds: float = _env_float("TALONX_DISPATCH_TELEGRAM_BACKOFF_MAX", 30.0)
 
+    # How long Bot.get_updates() long-polls per call before returning an
+    # empty batch (telegram_listener.py) -- Telegram's own recommended
+    # server-side long-poll pattern, not a client-side sleep loop.
+    telegram_poll_timeout_seconds: float = _env_float("TALONX_DISPATCH_TELEGRAM_POLL_TIMEOUT", 30.0)
+
     # --- Audit trail (store.py) ---
     audit_db_path: str = os.environ.get(
         "TALONX_DISPATCH_AUDIT_DB", str(Path.home() / ".talonx" / "dispatch_audit.db")
     )
+    # How long an alert stays in the audit trail (and therefore
+    # look-up-able by ID via Telegram) before the retention sweep deletes
+    # it -- keeps a long-running install from growing this file forever.
+    retention_days: float = _env_float("TALONX_DISPATCH_RETENTION_DAYS", 5.0)
+    retention_sweep_interval_hours: float = _env_float("TALONX_DISPATCH_RETENTION_SWEEP_HOURS", 24.0)
 
     # --- Streamlit dashboard (app.py) ---
     feed_limit: int = _env_int("TALONX_DISPATCH_FEED_LIMIT", 200)

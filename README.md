@@ -632,11 +632,30 @@ talonx:alerts:dispatch (Redis)
       SQLite, durable; this is now the ONLY durable historical record of
       alerts anywhere in the pipeline, since Redis Pub/Sub itself isn't one)
     → if Telegram is configured AND severity >= TALONX_DISPATCH_MIN_SEVERITY:
-        → format as Markdown (formatter.py)
+        → format a SHORT summary (ticker/action/price/confidence/one-line
+          quant trigger + this alert's ID -- formatter.format_telegram_summary)
         → send via python-telegram-bot, with retry/backoff (telegram_client.py)
         → record delivery success/failure back onto that alert's audit row
-    (independently, as a SEPARATE process:)
-    Streamlit (`streamlit run talonx_dispatch/app.py`)
+
+(concurrently, in the SAME process -- DispatchAgent.run() is 3 tasks, not 1:)
+Telegram (incoming messages, telegram_listener.py's TelegramReplyListener)
+    → long-polls Bot.get_updates() -- Telegram's own server-side long-poll,
+      not a busy loop
+    → someone replies to a push with its ID (or "/details 47", "/id 47")
+    → look it up (store.get_by_id) → reply with the FULL writeup
+      (formatter.format_telegram_details); not found (or purged by
+      retention) → a "not found" reply; anything else → a usage hint
+    → only ever responds to the configured TELEGRAM_CHAT_ID -- a personal,
+      single-user bot, not multi-tenant
+
+(also concurrently:) retention sweep -- purge_older_than(), once at
+startup then every TALONX_DISPATCH_RETENTION_SWEEP_HOURS (default 24h),
+deleting audit rows older than TALONX_DISPATCH_RETENTION_DAYS (default 5)
+so a long-running install doesn't grow dispatch_audit.db forever (and so
+an alert ID stops being answerable via Telegram once it's aged out)
+
+(independently, as a SEPARATE process:)
+Streamlit (`streamlit run talonx_dispatch/app.py`)
     → reads the SAME audit trail SQLite file
     → renders live metrics, a derived per-ticker watchlist, a live alert
       feed, and a filterable audit trail table
@@ -665,25 +684,51 @@ talonx:alerts:dispatch (Redis)
   execution model can run a cached session object on a different thread
   than the one that created it -- a real constraint the ledger/core_state
   precedent didn't have to deal with. WAL journal mode is enabled for
-  smoother concurrent read-while-write between the two processes.
-- **`formatter.py`** — pure `ActionableAlert -> Markdown text` function,
-  no I/O, trivially unit-testable without a bot token. Uses Telegram's
-  LEGACY "Markdown" parse mode rather than "MarkdownV2" -- MarkdownV2
-  requires escaping a long list of characters that routinely show up in
-  Gemini-generated research text (`_*[]()~`>#+-=|{}.!`), which would be a
-  much larger surface for a garbled message than this is worth. Legacy
-  mode only needs 4 characters escaped (`_*\`[`), handled for any
-  upstream-generated text (ticker/enum values are from our own schemas
-  and never need escaping).
-- **`telegram_client.py`** — `is_configured` gates everything, same
-  "additive, degrade gracefully" pattern `RedditClient` established: if
-  `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` aren't set, `send()` is a
-  silent no-op and the audit trail (and Streamlit dashboard) work
-  normally without it. Retries transient failures with jittered backoff;
-  respects Telegram's own `RetryAfter` hint exactly when it's given one
-  rather than guessing a backoff; fails fast (no retry) on a bad
-  token/forbidden chat, since retrying a config problem just burns the
-  retry budget for nothing.
+  smoother concurrent read-while-write between the two processes. Every
+  public method holds an internal `threading.Lock`, added after a real
+  concurrency bug: two Streamlit reruns sharing the cached, `check_same_
+  thread=False` connection on different threads could interleave and hit
+  an "impossible" state. `get_by_id()` backs the Telegram reply lookup;
+  `purge_older_than()` backs the retention sweep
+  (`TALONX_DISPATCH_RETENTION_DAYS`, default 5) -- both new.
+- **`formatter.py`** — TWO pure formatting functions now, no I/O, trivially
+  unit-testable without a bot token. `format_telegram_summary(alert,
+  alert_id)` is the actual push: short enough to read at a glance during
+  a live session (ticker/action/price/confidence/one-line quant trigger +
+  the ID), which replaced a much longer message that used to carry the
+  full research writeup on every single push. `format_telegram_details(row)`
+  is that full writeup (rationale, key findings, risks, model/timestamp
+  footer) -- sent back on demand when someone replies with the ID. It
+  takes an audit ROW DICT (`AuditStore.get_by_id()`'s shape), not a live
+  `ActionableAlert` -- by reply time, possibly minutes or days later, the
+  original in-memory object is long gone, but every field it needs is
+  already a stored column. Both use Telegram's LEGACY "Markdown" parse
+  mode rather than "MarkdownV2" -- MarkdownV2 requires escaping a long
+  list of characters that routinely show up in Gemini-generated research
+  text (`_*[]()~`>#+-=|{}.!`), which would be a much larger surface for a
+  garbled message than this is worth. Legacy mode only needs 4 characters
+  escaped (`_*\`[`), handled for any upstream-generated text (ticker/enum
+  values are from our own schemas and never need escaping).
+- **`telegram_client.py`** — the SEND side. `is_configured` gates
+  everything, same "additive, degrade gracefully" pattern `RedditClient`
+  established: if `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` aren't set,
+  `send()` is a silent no-op and the audit trail (and Streamlit
+  dashboard) work normally without it. Retries transient failures with
+  jittered backoff; respects Telegram's own `RetryAfter` hint exactly
+  when it's given one rather than guessing a backoff; fails fast (no
+  retry) on a bad token/forbidden chat, since retrying a config problem
+  just burns the retry budget for nothing.
+- **`telegram_listener.py`** — the RECEIVE side (`TelegramReplyListener`),
+  new: long-polls `Bot.get_updates()` for incoming messages and answers
+  "reply with an alert's ID" requests by looking it up in the audit trail
+  and sending back `format_telegram_details`. Drains any backlog on
+  startup (one throwaway `get_updates()` call with no offset) so a
+  restart doesn't replay old commands. Only started (as a third task
+  under `DispatchAgent.run()`) if Telegram is configured -- no token,
+  nothing to poll. **Only one process may poll a given bot token's
+  `get_updates()` at a time** -- running two `DispatchAgent`s against the
+  same `TELEGRAM_BOT_TOKEN` makes the second one's polling fail with HTTP
+  409 Conflict.
 - **Mobile push notifications are severity-gated**
   (`TALONX_DISPATCH_MIN_SEVERITY`, default `warning`) -- an `INFO`-level
   alert still gets recorded to the audit trail and shows in the Streamlit
@@ -873,6 +918,14 @@ a mobile push:
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
 ```
+
+Each push is now a short summary ending in an ID (`#47`) — **reply to
+that message with the number** (`47`, `#47`, `/details 47`, or `/id 47`
+all work) to get the full research writeup back from the bot. Only
+replies from the `TELEGRAM_CHAT_ID` above are answered. An ID stops
+working once its alert ages out of the audit trail
+(`TALONX_DISPATCH_RETENTION_DAYS`, default 5 days) — the bot replies
+"not found" rather than erroring.
 
 ---
 
@@ -1349,7 +1402,9 @@ Module 4's `TALONX_CORE_MIN_CONFIDENCE` / `TALONX_CORE_CORRELATION_WINDOW` /
 Module 5's `TELEGRAM_BOT_TOKEN` /
 `TELEGRAM_CHAT_ID` (both optional -- see §4) /
 `TALONX_DISPATCH_MIN_SEVERITY` / `TALONX_DISPATCH_AUDIT_DB` /
-`TALONX_DISPATCH_FEED_LIMIT` / `TALONX_DISPATCH_AUTOREFRESH_MS`, and the
+`TALONX_DISPATCH_FEED_LIMIT` / `TALONX_DISPATCH_AUTOREFRESH_MS` /
+`TALONX_DISPATCH_TELEGRAM_POLL_TIMEOUT` / `TALONX_DISPATCH_RETENTION_DAYS` /
+`TALONX_DISPATCH_RETENTION_SWEEP_HOURS` (§3.5), and the
 ticker watchlist's `TALONX_WATCHLIST_DB` / `TALONX_WATCHLIST_DEFAULT_SYMBOL`
 / `TALONX_WATCHLIST_DEFAULT_NAME` / `TALONX_WATCHLIST_DEFAULT_EXCHANGE` /
 `TALONX_WATCHLIST_POLL_INTERVAL` (§5n),

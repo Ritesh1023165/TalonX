@@ -9,7 +9,7 @@ other local SQLite stores.
 from __future__ import annotations
 
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from talonx_dispatch.schemas import (
     ActionableAlert,
@@ -24,7 +24,11 @@ from talonx_dispatch.store import AuditStore
 NOW = datetime(2026, 8, 7, 12, 0, 0, tzinfo=timezone.utc)
 
 
-def _alert(ticker: str = "AAPL", action: AlertAction = AlertAction.CONFIRMED_BULLISH) -> ActionableAlert:
+def _alert(
+    ticker: str = "AAPL",
+    action: AlertAction = AlertAction.CONFIRMED_BULLISH,
+    correlated_at: datetime = NOW,
+) -> ActionableAlert:
     return ActionableAlert(
         ticker=ticker,
         action=action,
@@ -47,7 +51,7 @@ def _alert(ticker: str = "AAPL", action: AlertAction = AlertAction.CONFIRMED_BUL
         model_used="gemini-flash-latest",
         signal_received_at=NOW,
         report_received_at=NOW,
-        correlated_at=NOW,
+        correlated_at=correlated_at,
         published_at=NOW,
     )
 
@@ -150,6 +154,42 @@ def test_concurrent_access_does_not_crash_watchlist_summary(tmp_path):
 
         assert errors == []
         assert store.count() == 40
+
+
+def test_get_by_id_returns_the_matching_row(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_alert(_alert(ticker="NVDA"))
+        row = store.get_by_id(alert_id)
+        assert row is not None
+        assert row["id"] == alert_id
+        assert row["ticker"] == "NVDA"
+
+
+def test_get_by_id_returns_none_for_unknown_id(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        assert store.get_by_id(999) is None
+
+
+def test_purge_older_than_deletes_only_stale_rows(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        old_id = store.record_alert(_alert(ticker="OLD", correlated_at=NOW - timedelta(days=10)))
+        recent_id = store.record_alert(_alert(ticker="RECENT", correlated_at=NOW - timedelta(hours=1)))
+
+        cutoff = NOW - timedelta(days=5)
+        purged = store.purge_older_than(cutoff)
+
+        assert purged == 1
+        assert store.get_by_id(old_id) is None
+        assert store.get_by_id(recent_id) is not None
+        assert store.count() == 1
+
+
+def test_purge_older_than_returns_zero_when_nothing_is_stale(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_alert(_alert(correlated_at=NOW))
+        purged = store.purge_older_than(NOW - timedelta(days=5))
+        assert purged == 0
+        assert store.count() == 1
 
 
 def test_state_persists_across_reopen(tmp_path):

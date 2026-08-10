@@ -144,6 +144,26 @@ class AuditStore:
             )
             self._conn.commit()
 
+    def get_by_id(self, alert_id: int) -> dict | None:
+        """Single-row fetch for telegram_listener.py's reply-with-ID
+        lookup -- returns None if the id never existed, or has since
+        been purged by purge_older_than()."""
+        with self._lock:
+            row = self._conn.execute("SELECT * FROM alerts WHERE id = ?", (alert_id,)).fetchone()
+            return _row_to_dict(row) if row is not None else None
+
+    def purge_older_than(self, cutoff: datetime) -> int:
+        """Deletes every alert older than `cutoff` (compared against
+        correlated_at) -- the audit trail's retention sweep
+        (TALONX_DISPATCH_RETENTION_DAYS). Returns how many rows were
+        deleted, purely for logging."""
+        with self._lock:
+            cursor = self._conn.execute(
+                "DELETE FROM alerts WHERE correlated_at < ?", (cutoff.isoformat(),)
+            )
+            self._conn.commit()
+            return cursor.rowcount
+
     def recent(self, limit: int = 200) -> list[dict]:
         with self._lock:
             # `id DESC` as a tiebreaker: correlated_at alone is ambiguous if
