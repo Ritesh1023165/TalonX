@@ -1166,20 +1166,36 @@ started this way, or by `run_talonx.py`** — see §3.5 for why; always run
 it as its own separate process. Runs continuously — `Ctrl+C` to stop;
 prints a summary of alerts processed / Telegram sent / failed on exit.
 
-### 5n. Run the Streamlit dashboard (talonx_dispatch, standalone)
+### 5n. Run the Streamlit dashboard — live alerts + ticker watchlist
 
 ```powershell
 streamlit run talonx_dispatch\app.py
 ```
 Opens in your browser automatically (Streamlit's default behavior).
-Reads the SAME audit trail `talonx_dispatch.run` (§5m) writes to —
-**both need to be running** for the dashboard to show anything; the
-dashboard itself never touches Redis or Telegram, it's a pure read-only
-view over the SQLite file. Shows: summary metrics, a per-ticker
-watchlist derived from the audit trail (not a configured list — see §8's
-talonx_quant watchlist gap), a live expandable alert feed, and a
-filterable (ticker/action/severity) full audit trail table.
-Auto-refreshes every `TALONX_DISPATCH_AUTOREFRESH_MS` (default 5000ms).
+Reads the SAME audit trail `talonx_dispatch.run` (§5m) writes to for its
+alert-related sections — **both need to be running** for those to show
+anything; that half is a pure read-only view over the SQLite file. The
+**"🎯 Tracked tickers"** section at the top is different: it's a live
+control surface over the ticker watchlist (`talonx_watchlist/store.py`)
+— add, remove, or pause/resume a ticker there and `run_talonx.py`'s market
+data streaming (and periodic filing/news ingestion) picks it up within one
+poll interval, no restart needed. Pausing stops streaming/ingestion for
+that ticker but keeps its row (name, exchange, added date) — unlike
+removing, resuming it later doesn't lose that. A newly added ticker starts
+**paused** — resume it once you're ready to start tracking it (the
+auto-seeded fresh-install default and any CLI-seeded tickers still start
+active, only the dashboard's Add form defaults to paused). Each ticker
+also records a Primary Exchange/Market (picked from a fixed dropdown on
+add, so filtering by it is reliable), and the table itself supports
+filtering by exchange, sorting by any column, and pagination (10 tickers
+per page). Pause/Resume/Remove are color-coded (amber/green/red) to keep
+them visually distinct. Also shows: summary metrics, tickers
+with alert history (derived from the audit trail — which tickers have
+actually alerted, distinct from what's currently tracked), a live
+expandable alert feed, and a filterable (ticker/action/severity) full
+audit trail table. Auto-refreshes every `TALONX_DISPATCH_AUTOREFRESH_MS`
+(default 5000ms) — that's also how often an add/remove made by someone
+else shows up in your own browser tab.
 
 ```powershell
 streamlit run talonx_dispatch\app.py --server.port 8502   # if 8501 is taken
@@ -1234,7 +1250,11 @@ top-K, `TALONX_BRAIN_LLM_PROVIDER` + Gemini model/temperature +
 `TALONX_CORE_STATE_DB`, and Module 5's `TELEGRAM_BOT_TOKEN` /
 `TELEGRAM_CHAT_ID` (both optional -- see §4) /
 `TALONX_DISPATCH_MIN_SEVERITY` / `TALONX_DISPATCH_AUDIT_DB` /
-`TALONX_DISPATCH_FEED_LIMIT` / `TALONX_DISPATCH_AUTOREFRESH_MS`, etc).
+`TALONX_DISPATCH_FEED_LIMIT` / `TALONX_DISPATCH_AUTOREFRESH_MS`, and the
+ticker watchlist's `TALONX_WATCHLIST_DB` / `TALONX_WATCHLIST_DEFAULT_SYMBOL`
+/ `TALONX_WATCHLIST_DEFAULT_NAME` / `TALONX_WATCHLIST_DEFAULT_EXCHANGE` /
+`TALONX_WATCHLIST_POLL_INTERVAL` (§5n),
+etc).
 
 ---
 
@@ -1248,23 +1268,23 @@ top-K, `TALONX_BRAIN_LLM_PROVIDER` + Gemini model/temperature +
   listen to `talonx:filings:events` itself, so a fresh 8-K/news item
   doesn't trigger new research on its own; it just gets picked up
   whenever the next technical signal fires for that ticker.
-- **talonx_quant has no dynamic watchlist.** Root cause: `buffer.py`'s
+- ~~**talonx_quant has no dynamic watchlist.**~~ -- **partially fixed**:
+  which tickers get streamed (and periodically ingested for) is now a
+  live, runtime-editable decision, via `talonx_watchlist`'s SQLite store
+  and the dashboard's "🎯 Tracked tickers" section (§5n) — no restart to
+  add/remove a ticker, closing consequences (1) and (3) from the original
+  note below. Still open: (2), the ORIGINAL root cause itself. talonx_quant
+  itself still has no allow-list of its own -- `buffer.py`'s
   `RollingBarBuffer.add_bar()` unconditionally creates a new per-symbol
   buffer for ANY ticker seen on `talonx:market:stream` --
-  `if symbol not in self._bars: self._bars[symbol] = deque(...)` -- there
-  is no allow-list check anywhere in `consumer.py` or `buffer.py`. So
-  "which tickers get scanned" isn't actually a decision talonx_quant
-  makes; it's a side effect of whatever `market_data.run` (or
-  `run_talonx.py`) happens to be streaming. Consequences: (1) no way to
-  scan a different ticker set than what's live-streaming without changing
-  Module 1's config too; (2) memory grows unbounded by SYMBOL COUNT (each
-  new symbol gets its own buffer, bounded per-symbol by
-  `max_bars_per_symbol` but with no cap on how many symbols); (3) no
-  runtime add/remove of tracked tickers without a restart. Building this
-  would mean: giving talonx_quant its own explicit, live-updatable ticker
-  list, filtering out `BAR` events for symbols not on it, and supporting
-  add/remove at runtime (e.g. a Redis command channel, or a polled config
-  file) without restarting the process.
+  `if symbol not in self._bars: self._bars[symbol] = deque(...)` -- so a
+  ticker removed from the watchlist simply stops receiving new bars (its
+  buffer goes stale); the buffer itself is never evicted, so memory still
+  grows unbounded by CUMULATIVE distinct symbol count over a long-running
+  process's lifetime, not just the currently-tracked set. Fully closing
+  this would mean giving talonx_quant its own allow-list check (filtering
+  `BAR` events for symbols not on the current watchlist) plus buffer
+  eviction for removed tickers.
 - ~~No automated test suite for talonx_quant~~ -- **partially fixed**:
   `tests/test_quant_strategy.py` and `tests/test_quant_consumer.py` now
   cover `strategy.py`'s signal logic (including the noise filters in

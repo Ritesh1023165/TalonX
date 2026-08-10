@@ -8,6 +8,7 @@ other local SQLite stores.
 """
 from __future__ import annotations
 
+import threading
 from datetime import datetime, timezone
 
 from talonx_dispatch.schemas import (
@@ -107,6 +108,48 @@ def test_watchlist_summary_reflects_most_recent_action(tmp_path):
         store.record_alert(_alert(ticker="AAPL", action=AlertAction.CONTRADICTED))
         summary = store.watchlist_summary()
         assert summary[0]["last_action"] == "contradicted"
+
+
+def test_concurrent_access_does_not_crash_watchlist_summary(tmp_path):
+    """
+    Regression test for a real crash: app.py caches ONE AuditStore
+    (check_same_thread=False) across Streamlit's per-session reruns, which
+    can run concurrently on different threads (multiple tabs, or an
+    autorefresh tick overlapping a still-rendering previous run). Without
+    the store's internal lock, watchlist_summary()'s two-step query
+    (aggregate, then a per-ticker detail lookup) could interleave with a
+    concurrent write and hit `latest is None` -- crashing the whole
+    dashboard render. This hammers record_alert()/watchlist_summary() from
+    several threads at once and asserts nothing raises.
+    """
+    with AuditStore(tmp_path / "audit.db", check_same_thread=False) as store:
+        errors: list[Exception] = []
+
+        def writer(ticker: str) -> None:
+            for _ in range(20):
+                store.record_alert(_alert(ticker=ticker))
+
+        def reader() -> None:
+            for _ in range(20):
+                try:
+                    store.watchlist_summary()
+                    store.recent(limit=50)
+                except Exception as exc:  # noqa: BLE001 -- capture, don't let a thread crash silently
+                    errors.append(exc)
+
+        threads = [
+            threading.Thread(target=writer, args=("AAPL",)),
+            threading.Thread(target=writer, args=("NVDA",)),
+            threading.Thread(target=reader),
+            threading.Thread(target=reader),
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert errors == []
+        assert store.count() == 40
 
 
 def test_state_persists_across_reopen(tmp_path):
