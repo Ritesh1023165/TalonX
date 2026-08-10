@@ -52,6 +52,19 @@ file's own docstring. It reads the same audit trail this file's dispatch
 agent writes to, so run it ALONGSIDE this file, in its own terminal:
     streamlit run talonx_dispatch\\app.py
 
+Which tickers get tracked is no longer a startup-only decision. It's read
+from talonx_watchlist's SQLite store (~/.talonx/watchlist.db by default),
+which the Streamlit dashboard above can add to / remove from at any time --
+see talonx_watchlist/store.py and app.py's new "Tracked tickers" section.
+On a fresh install (empty store), it's seeded with one default ticker
+(TALONX_WATCHLIST_DEFAULT_SYMBOL, default MSFT). Market data streaming
+picks up an add/remove within one poll interval
+(TALONX_WATCHLIST_POLL_INTERVAL, default 10s) by restarting the stream
+with the new symbol set; periodic filing/news ingestion picks it up on its
+next scheduled cycle. Positional ticker args below still work, but only as
+a ONE-TIME seed for a genuinely empty store -- once the store has any
+rows, they're ignored in favor of the dashboard.
+
 Replaces running `talonx_ingest.pipeline`, `talonx_ingest.news.pipeline`,
 `talonx_ingest.market_data.run`, `talonx_quant.run`, `talonx_brain.run`,
 `talonx_core.run`, and `talonx_dispatch.run` by hand in seven separate
@@ -59,7 +72,7 @@ terminals.
 
 Usage:
     python run_talonx.py
-    python run_talonx.py AAPL MSFT NVDA TSLA
+    python run_talonx.py AAPL MSFT NVDA TSLA   # only seeds an empty watchlist
     python run_talonx.py --interval-hours 12
     python run_talonx.py --skip-ingestion     # skip periodic filing/news ingestion
     python run_talonx.py --skip-market-data   # skip Module 1's live market stream
@@ -93,6 +106,8 @@ from talonx_core.config import CoreConfig
 from talonx_core.consumer import DecisionEngine
 from talonx_core.store import TickerStateStore
 from talonx_dispatch.consumer import DispatchAgent
+from talonx_watchlist.config import WatchlistConfig
+from talonx_watchlist.store import TickerWatchlistStore
 
 logging.basicConfig(
     level=logging.INFO,
@@ -100,11 +115,97 @@ logging.basicConfig(
 )
 logger = logging.getLogger("run_talonx")
 
-DEFAULT_TICKERS = ["AAPL", "MSFT", "NVDA"]
+
+def _diff_symbols(old: set[str], new: set[str]) -> tuple[set[str], set[str]]:
+    """Returns (added, removed) between two symbol sets."""
+    return new - old, old - new
+
+
+class WatchlistDrivenMarketData:
+    """
+    Keeps a MarketDataManager's stream aligned with talonx_watchlist's
+    live-editable ticker list, without needing incremental subscribe/
+    unsubscribe support in either backend (Polygon WS or yfinance
+    polling). Simple over precise: on any add/remove, detected by polling
+    the store every `poll_interval_seconds`, the current stream is stopped
+    and a fresh one started with the new symbol set. A few seconds of
+    reconnect gap on the Polygon WS path is an acceptable trade for not
+    needing surgical per-backend incremental-update code -- see the
+    watchlist plan/README for the full rationale.
+
+    If the watchlist is empty (every ticker removed), stays idle -- logged
+    once -- rather than calling stream([]), which raises ValueError.
+    """
+
+    def __init__(self, watchlist_store: TickerWatchlistStore, on_event, poll_interval_seconds: float):
+        self._store = watchlist_store
+        self._on_event = on_event
+        self._poll_interval = poll_interval_seconds
+        self._stop_event = asyncio.Event()
+        self._manager: MarketDataManager | None = None
+        self._task: asyncio.Task | None = None
+        self._current_symbols: set[str] = set()
+        self._was_idle_empty = False
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._manager is not None:
+            self._manager.stop()
+
+    async def run(self) -> None:
+        await self._reconcile()
+        while not self._stop_event.is_set():
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=self._poll_interval)
+            except asyncio.TimeoutError:
+                pass  # normal case: poll interval elapsed, check for changes
+            if self._stop_event.is_set():
+                break
+            await self._reconcile()
+        await self._stop_current()
+
+    async def _reconcile(self) -> None:
+        new_symbols = set(self._store.list_active_symbols())
+        added, removed = _diff_symbols(self._current_symbols, new_symbols)
+        if not added and not removed:
+            return
+
+        logger.info(
+            "Ticker watchlist changed (added=%s, removed=%s) -- restarting market data stream",
+            sorted(added) or "none", sorted(removed) or "none",
+        )
+        await self._stop_current()
+        self._current_symbols = new_symbols
+
+        if not new_symbols:
+            if not self._was_idle_empty:
+                logger.warning(
+                    "Ticker watchlist is empty -- market data streaming paused "
+                    "until a ticker is added via the dashboard."
+                )
+                self._was_idle_empty = True
+            return
+
+        self._was_idle_empty = False
+        self._manager = MarketDataManager()
+        self._task = asyncio.create_task(
+            self._manager.stream(sorted(new_symbols), self._on_event), name="market_data_stream"
+        )
+
+    async def _stop_current(self) -> None:
+        if self._manager is not None:
+            self._manager.stop()
+        if self._task is not None:
+            try:
+                await self._task
+            except Exception as exc:  # noqa: BLE001 -- a stream failure shouldn't kill the reconciler
+                logger.warning("Previous market data stream ended with an error: %s", exc)
+            self._task = None
+        self._manager = None
 
 
 async def periodic_ingestion_loop(
-    tickers: list[str], interval_hours: float, stop_event: asyncio.Event
+    watchlist_store: TickerWatchlistStore, interval_hours: float, stop_event: asyncio.Event
 ) -> None:
     """
     Runs SEC filing + news ingestion immediately, then again every
@@ -112,11 +213,28 @@ async def periodic_ingestion_loop(
     is logged and the loop continues to the next scheduled run rather
     than dying -- same isolate-failures philosophy as the rest of the
     project (one bad cycle shouldn't take down a long-running process).
+
+    The ticker list is re-read from the watchlist store fresh at the top
+    of every cycle (not captured once at startup) -- an add/remove made
+    via the dashboard takes effect on the NEXT scheduled cycle, same as
+    any other periodic job; there's no reason to restart this loop
+    mid-interval just because the list changed. Only ACTIVE tickers are
+    ingested -- a paused ticker skips filing/news ingestion too, same as
+    it skips market data streaming.
     """
     interval_seconds = interval_hours * 3600
 
     while not stop_event.is_set():
-        logger.info("=== Ingestion cycle starting (filings + news) ===")
+        tickers = watchlist_store.list_active_symbols()
+        if not tickers:
+            logger.warning("Ticker watchlist is empty -- skipping this ingestion cycle.")
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
+            except asyncio.TimeoutError:
+                pass
+            continue
+
+        logger.info("=== Ingestion cycle starting (filings + news) for %s ===", tickers)
         try:
             filing_results = await run_ingestion(tickers)
             logger.info("Filing ingestion this cycle: %s", filing_results)
@@ -141,10 +259,34 @@ async def periodic_ingestion_loop(
 
 async def main() -> None:
     args = _parse_args()
-    tickers = args.tickers or DEFAULT_TICKERS
+
+    watchlist_config = WatchlistConfig()
+    watchlist_store = TickerWatchlistStore(watchlist_config.db_path)
+    if args.tickers:
+        # Only takes effect on a genuinely fresh (empty) store -- once the
+        # watchlist has any rows, the dashboard is the source of truth and
+        # these positional args are ignored.
+        if not watchlist_store.list_tickers():
+            for symbol in args.tickers:
+                watchlist_store.add_ticker(symbol, symbol)
+            logger.info("Seeded watchlist from command line: %s", args.tickers)
+        else:
+            logger.info(
+                "Ignoring command-line tickers %s -- watchlist already has "
+                "tracked tickers; manage it via the dashboard instead.",
+                args.tickers,
+            )
+    seeded = watchlist_store.ensure_seeded(
+        watchlist_config.default_symbol, watchlist_config.default_name, watchlist_config.default_exchange,
+    )
+    if seeded:
+        logger.info(
+            "Watchlist was empty -- seeded default ticker %s (%s).",
+            watchlist_config.default_symbol, watchlist_config.default_name,
+        )
+    logger.info("Tracked tickers: %s", watchlist_store.list_symbols())
 
     stop_event = asyncio.Event()
-    market_manager: MarketDataManager | None = None if args.skip_market_data else MarketDataManager()
     quant_scanner: QuantScanner | None = None if args.skip_quant else QuantScanner()
     market_publisher = RedisEventPublisher()
 
@@ -188,11 +330,17 @@ async def main() -> None:
                 exc,
             )
 
+    market_data_runner: WatchlistDrivenMarketData | None = None
+    if not args.skip_market_data:
+        market_data_runner = WatchlistDrivenMarketData(
+            watchlist_store, make_on_event(market_publisher), watchlist_config.poll_interval_seconds,
+        )
+
     def _handle_sigint() -> None:
         logger.info("Shutdown requested (Ctrl+C) -- stopping all components...")
         stop_event.set()
-        if market_manager is not None:
-            market_manager.stop()
+        if market_data_runner is not None:
+            market_data_runner.stop()
         if quant_scanner is not None:
             quant_scanner.stop()
         if research_agent is not None:
@@ -208,14 +356,14 @@ async def main() -> None:
     except NotImplementedError:
         pass  # Windows asyncio loop may not support this; Ctrl+C still raises KeyboardInterrupt
 
-    if market_manager is not None:
+    if market_data_runner is not None:
         await market_publisher.connect()  # logs a warning and continues if Redis unavailable
 
     logger.info(
-        "Starting TalonX for tickers: %s (interval=%.1fh, ingestion=%s, market_data=%s, "
+        "Starting TalonX (interval=%.1fh, ingestion=%s, market_data=%s, "
         "quant=%s, brain=%s, core=%s, dispatch=%s)",
-        tickers, args.interval_hours, "disabled" if args.skip_ingestion else "enabled",
-        "enabled" if market_manager is not None else "disabled",
+        args.interval_hours, "disabled" if args.skip_ingestion else "enabled",
+        "enabled" if market_data_runner is not None else "disabled",
         "enabled" if quant_scanner is not None else "disabled",
         "enabled" if research_agent is not None else "disabled",
         "enabled" if decision_engine is not None else "disabled",
@@ -223,13 +371,8 @@ async def main() -> None:
     )
 
     tasks = []
-    if market_manager is not None:
-        tasks.append(
-            asyncio.create_task(
-                market_manager.stream(tickers, make_on_event(market_publisher)),
-                name="market_data",
-            )
-        )
+    if market_data_runner is not None:
+        tasks.append(asyncio.create_task(market_data_runner.run(), name="market_data"))
     if quant_scanner is not None:
         tasks.append(asyncio.create_task(quant_scanner.run(), name="quant_scanner"))
     if research_agent is not None:
@@ -241,7 +384,7 @@ async def main() -> None:
     if not args.skip_ingestion:
         tasks.append(
             asyncio.create_task(
-                periodic_ingestion_loop(tickers, args.interval_hours, stop_event),
+                periodic_ingestion_loop(watchlist_store, args.interval_hours, stop_event),
                 name="periodic_ingestion",
             )
         )
@@ -249,14 +392,15 @@ async def main() -> None:
     if not tasks:
         logger.error("Everything was skipped -- nothing to run. Drop at least one --skip-* flag.")
         await market_publisher.close()
+        watchlist_store.close()
         return
 
     try:
         await asyncio.gather(*tasks)
     except KeyboardInterrupt:
         stop_event.set()
-        if market_manager is not None:
-            market_manager.stop()
+        if market_data_runner is not None:
+            market_data_runner.stop()
         if quant_scanner is not None:
             quant_scanner.stop()
         if research_agent is not None:
@@ -271,6 +415,7 @@ async def main() -> None:
             core_store.close()
         if dispatch_agent is not None:
             dispatch_agent.store.close()
+        watchlist_store.close()
         logger.info("All components stopped.")
 
 
@@ -278,7 +423,11 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run all of TalonX Module 1 + 2 + 3 + 4 + 5 together")
     parser.add_argument(
         "tickers", nargs="*", default=None,
-        help=f"Ticker symbols to track (default: {' '.join(DEFAULT_TICKERS)})",
+        help="Ticker symbols to seed the watchlist with -- only takes effect if the "
+             "watchlist is completely empty (fresh install). Once it has any tickers, "
+             "manage it via the dashboard instead (streamlit run talonx_dispatch/app.py). "
+             "A fresh install with no args here defaults to one ticker "
+             "(TALONX_WATCHLIST_DEFAULT_SYMBOL, default MSFT).",
     )
     parser.add_argument(
         "--interval-hours", type=float, default=6.0,

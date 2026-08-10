@@ -23,11 +23,27 @@ model can run a session's script on a different thread than the one that
 created a `@st.cache_resource`-cached object, so app.py explicitly passes
 `check_same_thread=False` for ITS OWN connection. consumer.py's
 connection (single asyncio process, single thread) keeps the default.
+
+`check_same_thread=False` only disables Python's same-thread ASSERTION --
+it does NOT make one sqlite3.Connection safe for concurrent use from
+multiple threads. app.py's connection is cached via `@st.cache_resource`
+and Streamlit can genuinely run more than one session's script
+concurrently on different threads (multiple browser tabs, or an
+autorefresh tick overlapping a still-rendering previous run) -- without
+serializing access, two threads' `execute()` calls on the SAME connection
+can interleave and produce exactly the kind of "impossible" result
+`watchlist_summary()` used to be able to hit (a per-ticker detail lookup
+racing another thread's query and coming back empty for a ticker the
+aggregate query just returned). A plain `threading.Lock` around every
+public method's body closes that gap by making method calls atomic with
+respect to each other, at negligible cost -- these are fast, local,
+single-connection SQLite calls, not something worth finer-grained locking.
 """
 from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -69,6 +85,7 @@ class AuditStore:
         self._conn.executescript(_SCHEMA)
         self._conn.commit()
         self._conn.row_factory = sqlite3.Row
+        self._lock = threading.Lock()
 
     def close(self) -> None:
         self._conn.close()
@@ -80,58 +97,62 @@ class AuditStore:
         self.close()
 
     def record_alert(self, alert: ActionableAlert) -> int:
-        cursor = self._conn.execute(
-            """
-            INSERT INTO alerts (
-                ticker, action, severity, rationale, quant_direction,
-                research_verdict, research_confidence, signal_type, price,
-                research_summary, key_findings_json, risk_factors_json,
-                model_used, correlated_at, received_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                alert.ticker.upper(),
-                alert.action.value,
-                alert.severity.value,
-                alert.rationale,
-                alert.quant_direction.value,
-                alert.research_verdict.value,
-                alert.research_confidence,
-                alert.triggering_signal.signal_type,
-                alert.triggering_signal.price,
-                alert.research_summary,
-                json.dumps(alert.key_findings),
-                json.dumps(alert.risk_factors),
-                alert.model_used,
-                alert.correlated_at.isoformat(),
-                datetime.now(timezone.utc).isoformat(),
-            ),
-        )
-        self._conn.commit()
-        return cursor.lastrowid
+        with self._lock:
+            cursor = self._conn.execute(
+                """
+                INSERT INTO alerts (
+                    ticker, action, severity, rationale, quant_direction,
+                    research_verdict, research_confidence, signal_type, price,
+                    research_summary, key_findings_json, risk_factors_json,
+                    model_used, correlated_at, received_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    alert.ticker.upper(),
+                    alert.action.value,
+                    alert.severity.value,
+                    alert.rationale,
+                    alert.quant_direction.value,
+                    alert.research_verdict.value,
+                    alert.research_confidence,
+                    alert.triggering_signal.signal_type,
+                    alert.triggering_signal.price,
+                    alert.research_summary,
+                    json.dumps(alert.key_findings),
+                    json.dumps(alert.risk_factors),
+                    alert.model_used,
+                    alert.correlated_at.isoformat(),
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+            self._conn.commit()
+            return cursor.lastrowid
 
     def mark_telegram_sent(self, alert_id: int, sent_at: datetime | None = None) -> None:
-        self._conn.execute(
-            "UPDATE alerts SET telegram_sent = 1, telegram_sent_at = ?, telegram_error = NULL WHERE id = ?",
-            ((sent_at or datetime.now(timezone.utc)).isoformat(), alert_id),
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                "UPDATE alerts SET telegram_sent = 1, telegram_sent_at = ?, telegram_error = NULL WHERE id = ?",
+                ((sent_at or datetime.now(timezone.utc)).isoformat(), alert_id),
+            )
+            self._conn.commit()
 
     def mark_telegram_failed(self, alert_id: int, error: str) -> None:
-        self._conn.execute(
-            "UPDATE alerts SET telegram_error = ? WHERE id = ?",
-            (error[:500], alert_id),
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                "UPDATE alerts SET telegram_error = ? WHERE id = ?",
+                (error[:500], alert_id),
+            )
+            self._conn.commit()
 
     def recent(self, limit: int = 200) -> list[dict]:
-        # `id DESC` as a tiebreaker: correlated_at alone is ambiguous if
-        # two alerts share the same wall-clock second (plausible under a
-        # fast burst) -- id guarantees insertion order wins deterministically.
-        cursor = self._conn.execute(
-            "SELECT * FROM alerts ORDER BY correlated_at DESC, id DESC LIMIT ?", (limit,)
-        )
-        return [_row_to_dict(row) for row in cursor.fetchall()]
+        with self._lock:
+            # `id DESC` as a tiebreaker: correlated_at alone is ambiguous if
+            # two alerts share the same wall-clock second (plausible under a
+            # fast burst) -- id guarantees insertion order wins deterministically.
+            cursor = self._conn.execute(
+                "SELECT * FROM alerts ORDER BY correlated_at DESC, id DESC LIMIT ?", (limit,)
+            )
+            return [_row_to_dict(row) for row in cursor.fetchall()]
 
     def watchlist_summary(self) -> list[dict]:
         """
@@ -142,30 +163,42 @@ class AuditStore:
         own yet -- see README §8 -- so this is derived data, not a
         configured list).
         """
-        cursor = self._conn.execute(
-            """
-            SELECT
-                ticker,
-                COUNT(*) AS alert_count,
-                MAX(correlated_at) AS last_seen
-            FROM alerts
-            GROUP BY ticker
-            ORDER BY last_seen DESC
-            """
-        )
-        tickers = [dict(row) for row in cursor.fetchall()]
-        for row in tickers:
-            latest = self._conn.execute(
-                "SELECT action, severity FROM alerts WHERE ticker = ? "
-                "ORDER BY correlated_at DESC, id DESC LIMIT 1",
-                (row["ticker"],),
-            ).fetchone()
-            row["last_action"] = latest["action"]
-            row["last_severity"] = latest["severity"]
-        return tickers
+        with self._lock:
+            cursor = self._conn.execute(
+                """
+                SELECT
+                    ticker,
+                    COUNT(*) AS alert_count,
+                    MAX(correlated_at) AS last_seen
+                FROM alerts
+                GROUP BY ticker
+                ORDER BY last_seen DESC
+                """
+            )
+            tickers = [dict(row) for row in cursor.fetchall()]
+            result = []
+            for row in tickers:
+                latest = self._conn.execute(
+                    "SELECT action, severity FROM alerts WHERE ticker = ? "
+                    "ORDER BY correlated_at DESC, id DESC LIMIT 1",
+                    (row["ticker"],),
+                ).fetchone()
+                if latest is None:
+                    # Shouldn't happen now that the whole method holds the
+                    # lock (this row came from the SAME table moments ago)
+                    # -- kept as a defensive guard rather than trusting that
+                    # invariant to hold forever, so a future change here
+                    # degrades to "skip this row" instead of crashing the
+                    # whole dashboard render.
+                    continue
+                row["last_action"] = latest["action"]
+                row["last_severity"] = latest["severity"]
+                result.append(row)
+            return result
 
     def count(self) -> int:
-        return self._conn.execute("SELECT COUNT(*) FROM alerts").fetchone()[0]
+        with self._lock:
+            return self._conn.execute("SELECT COUNT(*) FROM alerts").fetchone()[0]
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict:
