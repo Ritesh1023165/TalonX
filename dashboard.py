@@ -3,9 +3,9 @@ dashboard.py
 ----------------
 Live, read-only terminal dashboard for the whole TalonX pipeline.
 Subscribes to every Redis channel each module publishes to and renders a
-live-updating table of message counts, throughput, and per-ticker
-breakdowns -- one glance at how much data has moved through Modules 1-4
-and where the activity actually is.
+live-updating table of message counts, throughput, per-ticker, and
+per-CATEGORY breakdowns -- one glance at how much data has moved through
+Modules 1-6 and where the activity actually is.
 
 Channels watched:
     talonx:filings:events   (Module 1 -- NewFilingIngestedEvent)
@@ -13,6 +13,18 @@ Channels watched:
     talonx:signals:quant    (Module 2 -- QuantSignal)
     talonx:reports:brain    (Module 3 -- ResearchReport)
     talonx:alerts:dispatch  (Module 4 -- ActionableAlert)
+    talonx:paper:trades     (Module 6 -- PaperTradeExecution)
+
+The category breakdowns (e.g. "how many of those ResearchReports were
+actual LLM calls vs. cache hits") are derived entirely from fields
+ALREADY present in each message's payload -- no other module needed any
+change for this, since every category here was already being published,
+just not broken out. This is also why some genuinely useful metrics
+CAN'T show up here: a suppressed talonx_quant signal (cooldown/throttle),
+a failed Telegram send, or an ignored paper trade never gets published to
+begin with, so a pure Redis-message observer has nothing to count -- that
+would need each module to explicitly publish its own internal counters
+somewhere, which none of them do today.
 
 Purely an observer -- never publishes anything, and subscribing doesn't
 affect delivery to the pipeline's real consumers (Redis Pub/Sub fans out
@@ -38,6 +50,7 @@ import time
 from collections import Counter, deque
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 
 from dotenv import load_dotenv
 
@@ -56,12 +69,49 @@ from rich.text import Text
 REDIS_URL = os.environ.get("TALONX_REDIS_URL", "redis://localhost:6379/0")
 
 
+def _categorize_report(payload: dict) -> str | None:
+    """talonx:reports:brain -- breaks a ResearchReport down by how much
+    LLM/Gemini spend it actually cost (Module 3's caching, README §3.3):
+    a cache hit or stale fallback made NO retrieval+LLM call at all, a
+    cold start made a retrieval call but bypassed the LLM, a degraded
+    report means the LLM call FAILED, and "LLM call" is everything else
+    -- a genuine, billed Gemini/Ollama request. This is the "count of LLM
+    calls" the dashboard didn't show before."""
+    if payload.get("from_cache"):
+        return "stale fallback (no LLM)" if payload.get("is_stale") else "cache hit (no LLM)"
+    if payload.get("is_degraded"):
+        return "degraded (LLM failed)"
+    if payload.get("verdict") == "insufficient_context":
+        return "cold start (no LLM)"
+    return "LLM call"
+
+
+def _categorize_field(field_name: str) -> Callable[[dict], str | None]:
+    """Generic categorizer: just read one field and title-case it (used
+    for signal_type, action, order_type -- plain enum-valued fields that
+    don't need report.py's derived-condition logic above)."""
+    def _categorize(payload: dict) -> str | None:
+        value = payload.get(field_name)
+        return str(value).replace("_", " ") if value else None
+    return _categorize
+
+
 @dataclass
 class ChannelWatch:
     key: str
     channel: str
     label: str
     ticker_field: str  # which JSON field holds the ticker/symbol for this schema
+    # Optional category breakdown (e.g. LLM-call vs cache-hit, signal
+    # type, alert action, BUY vs SELL) -- purely derived from the
+    # message payload, see module docstring for why this is the only
+    # kind of "metric" a Redis-pub/sub observer can show.
+    categorize: Callable[[dict], str | None] | None = None
+    category_label: str = "Breakdown"
+    # Optional running sum of a numeric field (used for paper trading's
+    # realized PnL -- a total, not a count).
+    numeric_field: str | None = None
+    numeric_label: str = ""
 
 
 CHANNELS: list[ChannelWatch] = [
@@ -79,16 +129,26 @@ CHANNELS: list[ChannelWatch] = [
         "signals",
         os.environ.get("TALONX_REDIS_SIGNALS_CHANNEL", "talonx:signals:quant"),
         "M2 - Quant signals", "ticker",
+        categorize=_categorize_field("signal_type"), category_label="Signal types",
     ),
     ChannelWatch(
         "reports",
         os.environ.get("TALONX_REDIS_REPORTS_CHANNEL", "talonx:reports:brain"),
         "M3 - Research reports", "ticker",
+        categorize=_categorize_report, category_label="LLM usage",
     ),
     ChannelWatch(
         "alerts",
         os.environ.get("TALONX_REDIS_ALERTS_CHANNEL", "talonx:alerts:dispatch"),
         "M4 - Actionable alerts", "ticker",
+        categorize=_categorize_field("action"), category_label="Actions",
+    ),
+    ChannelWatch(
+        "paper_trades",
+        os.environ.get("TALONX_REDIS_PAPER_TRADES_CHANNEL", "talonx:paper:trades"),
+        "M6 - Paper trades", "ticker",
+        categorize=_categorize_field("order_type"), category_label="Order type",
+        numeric_field="realized_pnl_usd", numeric_label="Realized PnL ($)",
     ),
 ]
 
@@ -98,6 +158,8 @@ class ChannelStats:
     total: int = 0
     unparseable: int = 0
     tickers: Counter = field(default_factory=Counter)
+    categories: Counter = field(default_factory=Counter)  # watch.categorize(payload) breakdown
+    numeric_total: float = 0.0  # running sum of watch.numeric_field, if set
     # Rolling per-interval deltas -- unused by the terminal dashboard
     # (only dashboard_web.py calls snapshot_interval(), for its sparkline
     # charts), kept here so both tools share one ChannelStats definition.
@@ -123,6 +185,7 @@ def _render(stats: dict[str, ChannelStats], started_at: float, top_n: int) -> Gr
     table.add_column("Channel")
     table.add_column("Total", justify="right")
     table.add_column("Rate/min", justify="right")
+    table.add_column("Breakdown")
     table.add_column(f"Top {top_n} tickers")
 
     grand_total = 0
@@ -135,14 +198,25 @@ def _render(stats: dict[str, ChannelStats], started_at: float, top_n: int) -> Gr
         top = s.tickers.most_common(top_n)
         top_str = ", ".join(f"{ticker}:{count}" for ticker, count in top) or "-"
         rate = s.rate_per_min(elapsed)
+
+        breakdown_str = "-"
+        if watch.categorize is not None:
+            cats = s.categories.most_common()
+            breakdown_str = ", ".join(f"{cat}:{count}" for cat, count in cats) or "-"
+        if watch.numeric_field is not None:
+            sign = "+" if s.numeric_total >= 0 else ""
+            pnl = f"{watch.numeric_label} {sign}{s.numeric_total:,.2f}"
+            breakdown_str = pnl if breakdown_str == "-" else f"{breakdown_str}\n{pnl}"
+
         table.add_row(
             f"{watch.label}\n[dim]{watch.channel}[/dim]",
             str(s.total),
             f"{rate:.1f}",
+            breakdown_str,
             top_str,
         )
         if s.unparseable:
-            table.add_row("", f"[yellow]{s.unparseable} unparseable[/yellow]", "", "")
+            table.add_row("", f"[yellow]{s.unparseable} unparseable[/yellow]", "", "", "")
 
     hours, remainder = divmod(int(elapsed), 3600)
     minutes, seconds = divmod(remainder, 60)
@@ -232,6 +306,16 @@ def handle_message(
     ticker = payload.get(watch.ticker_field)
     if ticker:
         s.tickers[str(ticker).upper()] += 1
+
+    if watch.categorize is not None:
+        category = watch.categorize(payload)
+        if category:
+            s.categories[category] += 1
+
+    if watch.numeric_field is not None:
+        value = payload.get(watch.numeric_field)
+        if isinstance(value, (int, float)):
+            s.numeric_total += value
 
 
 if __name__ == "__main__":

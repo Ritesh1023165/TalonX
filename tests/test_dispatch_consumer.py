@@ -60,6 +60,23 @@ def _message(payload) -> dict:
     return {"channel": b"talonx:alerts:dispatch", "data": data}
 
 
+def _trade_execution_payload(order_type: str = "SELL") -> dict:
+    now = "2026-08-10T14:37:00Z"
+    return {
+        "trade_id": 12, "ticker": "SPCX", "order_type": order_type,
+        "execution_price": 135.60, "shares": 18.5185, "position_cost": 2500.0,
+        "entry_price": 135.00, "realized_pnl_usd": 44.81, "realized_pnl_pct": 0.45,
+        "portfolio_cash_after": 10177.68, "triggering_action": "contradicted",
+        "session_realized_pnl_usd": 177.68, "session_realized_pnl_pct": 1.78,
+        "timestamp": now,
+    }
+
+
+def _trade_message(payload) -> dict:
+    data = payload if isinstance(payload, str) else json.dumps(payload)
+    return {"channel": b"talonx:paper:trades", "data": data}
+
+
 @pytest.fixture
 def agent(tmp_path):
     store = AuditStore(tmp_path / "audit.db")
@@ -145,6 +162,49 @@ async def test_telegram_push_uses_the_short_summary_format(agent):
     assert "Reply with" in text
     # The full research writeup no longer goes out in the push itself.
     assert "summary text" not in text
+
+
+@pytest.mark.asyncio
+async def test_trade_execution_sends_its_own_short_push(agent):
+    agent.telegram_client.is_configured = True
+
+    await agent._handle_message(_trade_message(_trade_execution_payload()))
+
+    agent.telegram_client.send.assert_awaited_once()
+    text = agent.telegram_client.send.await_args.args[0]
+    assert "SPCX" in text
+    assert "SELL EXECUTED" in text
+    # Not recorded in the alert audit trail -- talonx_paper's own
+    # trade_history is the durable record for this, not this store.
+    assert agent.store.count() == 0
+    assert agent.alerts_processed == 0
+
+
+@pytest.mark.asyncio
+async def test_trade_execution_skipped_when_telegram_not_configured(agent):
+    agent.telegram_client.is_configured = False
+
+    await agent._handle_message(_trade_message(_trade_execution_payload()))
+
+    agent.telegram_client.send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_unparseable_trade_execution_is_dropped(agent):
+    agent.telegram_client.is_configured = True
+
+    await agent._handle_message(_trade_message("not json"))
+
+    agent.telegram_client.send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_invalid_trade_execution_payload_is_dropped(agent):
+    agent.telegram_client.is_configured = True
+
+    await agent._handle_message(_trade_message({"ticker": "SPCX"}))  # missing required fields
+
+    agent.telegram_client.send.assert_not_awaited()
 
 
 def test_stop_also_stops_the_reply_listener(agent):

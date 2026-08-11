@@ -16,11 +16,18 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from talonx_dispatch.formatter import escape_markdown, format_telegram_details, format_telegram_summary
+from talonx_dispatch.formatter import (
+    escape_markdown,
+    format_telegram_details,
+    format_telegram_summary,
+    format_telegram_trade_execution,
+)
 from talonx_dispatch.schemas import (
     ActionableAlert,
     AlertAction,
     AlertSeverity,
+    OrderType,
+    PaperTradeExecution,
     ResearchVerdict,
     SignalDirection,
     TriggeringSignalRef,
@@ -213,3 +220,58 @@ def test_details_truncates_very_long_rationale():
 def test_details_formats_the_correlated_at_timestamp():
     text = format_telegram_details(_row())
     assert "2026-08-07 14:23 UTC" in text
+
+
+# --- format_telegram_trade_execution (paper trading, decoupled push) -------
+
+def _execution(
+    order_type: OrderType = OrderType.SELL,
+    entry_price: float | None = 135.00,
+    execution_price: float = 135.60,
+    realized_pnl_usd: float | None = 44.81,
+    realized_pnl_pct: float | None = 0.45,
+    session_realized_pnl_usd: float = 177.68,
+    session_realized_pnl_pct: float = 1.78,
+    portfolio_cash_after: float = 10177.68,
+) -> PaperTradeExecution:
+    return PaperTradeExecution(
+        trade_id=12, ticker="SPCX", order_type=order_type,
+        execution_price=execution_price, shares=18.5185, position_cost=2500.0,
+        entry_price=entry_price, realized_pnl_usd=realized_pnl_usd, realized_pnl_pct=realized_pnl_pct,
+        portfolio_cash_after=portfolio_cash_after, triggering_action=AlertAction.CONTRADICTED,
+        session_realized_pnl_usd=session_realized_pnl_usd, session_realized_pnl_pct=session_realized_pnl_pct,
+        timestamp=NOW,
+    )
+
+
+def test_trade_execution_sell_includes_entry_exit_and_pnl():
+    text = format_telegram_trade_execution(_execution())
+    assert "SPCX" in text
+    assert "SELL EXECUTED" in text
+    assert "135.00" in text
+    assert "135.60" in text
+    assert "+$44.81" in text
+    assert "+0.45%" in text
+    assert "10,177.68" in text
+
+
+def test_trade_execution_sell_shows_negative_pnl_without_a_plus_sign():
+    text = format_telegram_trade_execution(
+        _execution(realized_pnl_usd=-50.0, realized_pnl_pct=-2.0, session_realized_pnl_usd=-10.0, session_realized_pnl_pct=-0.1)
+    )
+    assert "$-50.00" in text
+    assert "+$" not in text.split("\n")[2]  # the Trade PnL line specifically
+
+
+def test_trade_execution_buy_shows_shares_price_and_cash():
+    execution = PaperTradeExecution(
+        trade_id=5, ticker="NVDA", order_type=OrderType.BUY, execution_price=131.50,
+        shares=19.011, position_cost=2500.0, portfolio_cash_after=7500.0,
+        triggering_action=AlertAction.CONFIRMED_BULLISH,
+        session_realized_pnl_usd=0.0, session_realized_pnl_pct=0.0, timestamp=NOW,
+    )
+    text = format_telegram_trade_execution(execution)
+    assert "NVDA" in text
+    assert "BUY EXECUTED" in text
+    assert "131.50" in text
+    assert "7,500.00" in text

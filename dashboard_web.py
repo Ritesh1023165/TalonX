@@ -68,6 +68,10 @@ def _snapshot(stats: dict[str, ChannelStats], started_at: float) -> dict:
                 "rate_per_min": round(s.rate_per_min(elapsed), 1),
                 "top_tickers": s.tickers.most_common(8),
                 "history": list(s.history),
+                "category_label": watch.category_label,
+                "categories": s.categories.most_common(8) if watch.categorize else [],
+                "numeric_label": watch.numeric_label,
+                "numeric_total": round(s.numeric_total, 2) if watch.numeric_field else None,
             }
         )
 

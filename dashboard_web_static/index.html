@@ -109,8 +109,13 @@
     transition: width 0.4s ease;
   }
   .bar-count { width: 34px; flex-shrink: 0; color: var(--muted); font-size: 11px; text-align: right; }
+  .bar-label.wide { width: 150px; }
   .empty { color: var(--muted); font-size: 12px; font-style: italic; }
   .unparseable { color: var(--warn); font-size: 11px; margin-top: 6px; }
+  .section-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin: 10px 0 4px; }
+  .numeric-total { font-size: 13px; margin-top: 8px; }
+  .numeric-total b.pos { color: var(--good); }
+  .numeric-total b.neg { color: var(--bad); }
   footer {
     padding: 12px 24px 30px;
     color: var(--muted);
@@ -136,6 +141,7 @@ const ACCENTS = {
   signals: "#a78bfa",
   reports: "#fbbf24",
   alerts:  "#f87171",
+  paper_trades: "#34d399",
 };
 
 const cardsEl = document.getElementById("cards");
@@ -160,6 +166,10 @@ function ensureCard(ch) {
       </div>
     </div>
     <svg class="sparkline" data-field="sparkline" viewBox="0 0 200 40" preserveAspectRatio="none"></svg>
+    <div class="section-label" data-field="categories-label" style="display:none"></div>
+    <div class="bars" data-field="categories"></div>
+    <div class="numeric-total" data-field="numeric-total" style="display:none"></div>
+    <div class="section-label">Top tickers</div>
     <div class="bars" data-field="bars"></div>
     <div class="unparseable" data-field="unparseable" style="display:none"></div>
   `;
@@ -170,6 +180,9 @@ function ensureCard(ch) {
     rate: card.querySelector('[data-field="rate"]'),
     sparkline: card.querySelector('[data-field="sparkline"]'),
     bars: card.querySelector('[data-field="bars"]'),
+    categoriesLabel: card.querySelector('[data-field="categories-label"]'),
+    categories: card.querySelector('[data-field="categories"]'),
+    numericTotal: card.querySelector('[data-field="numeric-total"]'),
     unparseable: card.querySelector('[data-field="unparseable"]'),
     accent,
   };
@@ -193,17 +206,18 @@ function renderSparkline(svg, history) {
   svg.innerHTML = `<polyline points="${points}" fill="none" stroke="var(--accent, #6b7280)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />`;
 }
 
-function renderBars(container, topTickers, accent) {
-  if (!topTickers || topTickers.length === 0) {
-    container.innerHTML = '<div class="empty">no tickers yet</div>';
+function renderBars(container, entries, emptyText, wide) {
+  if (!entries || entries.length === 0) {
+    container.innerHTML = `<div class="empty">${emptyText}</div>`;
     return;
   }
-  const max = Math.max(...topTickers.map(([, c]) => c));
-  container.innerHTML = topTickers.map(([ticker, count]) => {
+  const max = Math.max(...entries.map(([, c]) => c));
+  const labelClass = wide ? "bar-label wide" : "bar-label";
+  container.innerHTML = entries.map(([label, count]) => {
     const pct = Math.max(4, (count / max) * 100);
     return `
       <div class="bar-row">
-        <div class="bar-label">${ticker}</div>
+        <div class="${labelClass}" title="${label}">${label}</div>
         <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
         <div class="bar-count">${count}</div>
       </div>`;
@@ -228,7 +242,26 @@ function render(data) {
     refs.total.textContent = ch.total;
     refs.rate.textContent = ch.rate_per_min;
     renderSparkline(refs.sparkline, ch.history);
-    renderBars(refs.bars, ch.top_tickers, refs.accent);
+    renderBars(refs.bars, ch.top_tickers, "no tickers yet");
+
+    if (ch.categories && ch.categories.length > 0) {
+      refs.categoriesLabel.style.display = "block";
+      refs.categoriesLabel.textContent = ch.category_label || "Breakdown";
+      renderBars(refs.categories, ch.categories, "no data yet", true);
+    } else {
+      refs.categoriesLabel.style.display = "none";
+      refs.categories.innerHTML = "";
+    }
+
+    if (ch.numeric_total !== null && ch.numeric_total !== undefined) {
+      const cls = ch.numeric_total >= 0 ? "pos" : "neg";
+      const sign = ch.numeric_total >= 0 ? "+" : "";
+      refs.numericTotal.style.display = "block";
+      refs.numericTotal.innerHTML = `${ch.numeric_label}: <b class="${cls}">${sign}${ch.numeric_total.toFixed(2)}</b>`;
+    } else {
+      refs.numericTotal.style.display = "none";
+    }
+
     if (ch.unparseable > 0) {
       refs.unparseable.style.display = "block";
       refs.unparseable.textContent = `${ch.unparseable} unparseable message(s)`;

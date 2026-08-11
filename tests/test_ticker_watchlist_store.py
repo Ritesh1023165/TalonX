@@ -168,6 +168,37 @@ def test_pausing_nonexistent_ticker_is_a_noop(store):
     assert store.list_active_symbols() == ["AAPL"]
 
 
+# --- Paper trading toggle (talonx_paper's "which ticker can be used") ------
+
+def test_new_ticker_defaults_paper_trading_disabled(store):
+    store.add_ticker("AAPL", "Apple Inc.")
+
+    assert store.list_tickers()[0]["paper_trading_enabled"] is False
+    assert store.list_paper_trading_symbols() == []
+
+
+def test_set_paper_trading_enables_and_disables(store):
+    store.add_ticker("AAPL", "Apple Inc.")
+    store.add_ticker("MSFT", "Microsoft Corporation")
+
+    store.set_paper_trading("aapl", True)  # case-insensitive
+
+    assert store.list_paper_trading_symbols() == ["AAPL"]
+    assert store.list_tickers()[0]["paper_trading_enabled"] is True
+
+    store.set_paper_trading("AAPL", False)
+    assert store.list_paper_trading_symbols() == []
+
+
+def test_add_ticker_upsert_does_not_reset_paper_trading_flag(store):
+    store.add_ticker("MSFT", "Microsoft Corporation")
+    store.set_paper_trading("MSFT", True)
+
+    store.add_ticker("MSFT", "Microsoft Corporation", "NASDAQ")  # re-add
+
+    assert store.list_tickers()[0]["paper_trading_enabled"] is True
+
+
 # --- Migration from the pre-exchange/status schema -----------------------
 
 def test_migrates_a_pre_existing_three_column_database(tmp_path):
@@ -192,10 +223,14 @@ def test_migrates_a_pre_existing_three_column_database(tmp_path):
         assert tickers[0]["name"] == "Microsoft Corporation"
         assert tickers[0]["exchange"] == ""
         assert tickers[0]["status"] == "active"
+        assert tickers[0]["paper_trading_enabled"] is False
         assert store.list_active_symbols() == ["MSFT"]
+        assert store.list_paper_trading_symbols() == []
 
         # And the migrated store is fully usable afterward.
         store.pause_ticker("MSFT")
         assert store.list_active_symbols() == []
+        store.set_paper_trading("MSFT", True)
+        assert store.list_paper_trading_symbols() == ["MSFT"]
     finally:
         store.close()

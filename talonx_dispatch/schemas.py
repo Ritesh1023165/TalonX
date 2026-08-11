@@ -92,3 +92,29 @@ class ActionableAlert(BaseModel):
     report_received_at: datetime
     correlated_at: datetime
     published_at: datetime
+
+
+class OrderType(str, Enum):
+    BUY = "BUY"
+    SELL = "SELL"
+
+
+class PaperTradeExecution(BaseModel):
+    """Consumed from talonx:paper:trades (published by talonx_paper) --
+    trimmed mirror of talonx_paper.schemas.PaperTradeExecution, same
+    re-declaration convention as ActionableAlert above."""
+
+    trade_id: int
+    ticker: str
+    order_type: OrderType
+    execution_price: float
+    shares: float
+    position_cost: float
+    entry_price: float | None = None
+    realized_pnl_usd: float | None = None
+    realized_pnl_pct: float | None = None
+    portfolio_cash_after: float
+    triggering_action: AlertAction
+    session_realized_pnl_usd: float
+    session_realized_pnl_pct: float
+    timestamp: datetime
