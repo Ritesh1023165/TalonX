@@ -150,6 +150,26 @@ def test_summary_critical_severity_adds_fire_prefix():
     assert text.startswith("\U0001F525")
 
 
+def test_summary_includes_the_triggered_timestamp():
+    text = format_telegram_summary(_alert(), alert_id=47)
+    assert "2026-08-07 14:23 UTC" in text
+
+
+def test_summary_includes_company_name_when_given():
+    text = format_telegram_summary(_alert(), alert_id=47, company_name="Apple Inc.")
+    assert "`AAPL` (Apple Inc.)" in text
+
+
+def test_summary_omits_company_name_when_not_given():
+    text = format_telegram_summary(_alert(), alert_id=47)
+    assert "(" not in text.split("•")[0]
+
+
+def test_summary_escapes_special_characters_in_company_name():
+    text = format_telegram_summary(_alert(), alert_id=47, company_name="Foo_Bar*Corp")
+    assert "Foo\\_Bar\\*Corp" in text
+
+
 # --- format_telegram_details (sent back on a reply) ------------------------
 
 def test_details_includes_ticker_price_verdict_and_id():
@@ -260,7 +280,7 @@ def test_trade_execution_sell_shows_negative_pnl_without_a_plus_sign():
         _execution(realized_pnl_usd=-50.0, realized_pnl_pct=-2.0, session_realized_pnl_usd=-10.0, session_realized_pnl_pct=-0.1)
     )
     assert "$-50.00" in text
-    assert "+$" not in text.split("\n")[2]  # the Trade PnL line specifically
+    assert "+$" not in text.split("\n")[3]  # the Trade PnL line specifically (after ticker + timestamp + entry/exit)
 
 
 def test_trade_execution_sell_shows_reversal_signal_reason():
@@ -279,6 +299,28 @@ def test_trade_execution_sell_shows_stop_loss_reason():
         )
     )
     assert "(stop-loss)" in text
+
+
+def test_trade_execution_includes_the_timestamp():
+    text = format_telegram_trade_execution(_execution())
+    assert "2026-08-07 14:23 UTC" in text
+
+
+def test_trade_execution_includes_company_name_when_given():
+    text = format_telegram_trade_execution(_execution(), company_name="SpaceX Holdings")
+    assert "`SPCX` (SpaceX Holdings)" in text
+
+
+def test_trade_execution_buy_includes_company_name_and_timestamp():
+    execution = PaperTradeExecution(
+        trade_id=5, ticker="NVDA", order_type=OrderType.BUY, execution_price=131.50,
+        shares=19.011, position_cost=2500.0, portfolio_cash_after=7500.0,
+        triggering_action=AlertAction.CONFIRMED_BULLISH,
+        session_realized_pnl_usd=0.0, session_realized_pnl_pct=0.0, timestamp=NOW,
+    )
+    text = format_telegram_trade_execution(execution, company_name="NVIDIA Corporation")
+    assert "`NVDA` (NVIDIA Corporation)" in text
+    assert "2026-08-07 14:23 UTC" in text
 
 
 def test_trade_execution_sell_shows_take_profit_reason():

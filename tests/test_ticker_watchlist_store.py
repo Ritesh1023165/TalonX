@@ -100,6 +100,26 @@ def test_remove_nonexistent_ticker_is_a_noop(store):
     assert store.list_symbols() == ["AAPL"]
 
 
+def test_get_ticker_returns_the_matching_row(store):
+    store.add_ticker("nvda", "NVIDIA Corporation", "NASDAQ")
+
+    ticker = store.get_ticker("NVDA")
+
+    assert ticker is not None
+    assert ticker["symbol"] == "NVDA"
+    assert ticker["name"] == "NVIDIA Corporation"
+
+
+def test_get_ticker_is_case_insensitive(store):
+    store.add_ticker("NVDA", "NVIDIA Corporation")
+
+    assert store.get_ticker("nvda") is not None
+
+
+def test_get_ticker_returns_none_for_an_untracked_symbol(store):
+    assert store.get_ticker("NVDA") is None
+
+
 def test_list_tickers_sorted_by_symbol(store):
     store.add_ticker("NVDA", "NVIDIA Corporation")
     store.add_ticker("AAPL", "Apple Inc.")

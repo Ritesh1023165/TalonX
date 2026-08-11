@@ -104,6 +104,24 @@ class TickerWatchlistStore:
                 for symbol, name, exchange, status, paper_trading_enabled, added_at in cursor.fetchall()
             ]
 
+    def get_ticker(self, symbol: str) -> dict | None:
+        """Single-ticker lookup, None if untracked -- e.g. talonx_dispatch's
+        Telegram formatter needs one ticker's company name without pulling
+        the whole watchlist."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT symbol, name, exchange, status, paper_trading_enabled, added_at "
+                "FROM tickers WHERE symbol = ?",
+                (symbol.strip().upper(),),
+            ).fetchone()
+        if row is None:
+            return None
+        symbol, name, exchange, status, paper_trading_enabled, added_at = row
+        return {
+            "symbol": symbol, "name": name, "exchange": exchange, "status": status,
+            "paper_trading_enabled": bool(paper_trading_enabled), "added_at": added_at,
+        }
+
     def list_symbols(self) -> list[str]:
         """All tracked symbols, regardless of status."""
         return [row["symbol"] for row in self.list_tickers()]

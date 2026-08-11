@@ -59,6 +59,7 @@ async def main() -> None:
             agent.alerts_processed, agent.telegram_sent, agent.telegram_failed,
         )
         agent.store.close()
+        agent.watchlist_store.close()
 
 
 if __name__ == "__main__":
