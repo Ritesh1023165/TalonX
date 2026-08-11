@@ -125,6 +125,21 @@ class ResearchReport(BaseModel):
     citations: list[Citation] = Field(default_factory=list)
     model_used: str
 
+    # is_stale: served from an EXPIRED cache entry because a fresh
+    # generation attempt failed (see cache.py) -- the analysis is real,
+    # just possibly outdated. is_degraded: no real analysis exists at all
+    # (LLM failed AND no cache to fall back on either) -- verdict/
+    # confidence are meaningless placeholders in this case, and
+    # talonx_core's decision matrix branches on this flag specifically to
+    # still dispatch a quant-only DEGRADED_QUANT_ALERT rather than
+    # silently suppressing it. from_cache: served from a FRESH cache hit
+    # (retrieval + LLM were skipped entirely) -- purely informational, not
+    # branched on downstream, kept for observability into the caching
+    # this module does to cut LLM spend.
+    is_stale: bool = False
+    is_degraded: bool = False
+    from_cache: bool = False
+
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

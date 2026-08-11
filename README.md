@@ -48,9 +48,9 @@ C:\workspace\TalonX\              <- open THIS folder as your project root
 ├── .env.example
 ├── .gitignore
 ├── inspect_store.py               <- CLI to spot-check what's in ChromaDB
-├── run_talonx.py                   <- runs Module 1 + 2 + 3 + 4 + 5 together, one process (Streamlit dashboard always separate)
+├── run_talonx.py                   <- runs Module 1 + 2 + 3 + 4 + 5 + 6 together, one process (Streamlit dashboard always separate)
 ├── send_test_signal.py             <- publishes synthetic bars to test the quant scanner
-├── dashboard.py                    <- live terminal dashboard: counts + per-ticker breakdown across all 5 Redis channels
+├── dashboard.py                    <- live terminal dashboard: counts + per-ticker + per-category breakdown across all 6 Redis channels
 ├── dashboard_web.py                 <- same data, served as a local browser UI with charts (imports dashboard.py)
 ├── dashboard_web_static\
 │   └── index.html                    <- self-contained HTML/CSS/JS -- no CDN, sparkline + bar charts, WebSocket client
@@ -367,21 +367,40 @@ talonx:market:stream (Redis)
 ```
 talonx:signals:quant (Redis)
     → parse + validate each message as QuantSignal
+    → cache-first: brain_cache:{ticker} in Redis has a FRESH entry?
+        yes → skip retrieval AND the LLM call entirely, republish it
+              (from_cache=True) -- this is the actual LLM-spend reduction
+        no  → acquire lock:brain:{ticker} (distributed lock -- guards
+              against a cache stampede if this ever runs as more than one
+              process); lost the race? wait briefly for the winner's
+              cache write, else generate anyway rather than block forever
     → retrieve top-K relevant chunks from ChromaDB's "sec_filings"
       collection, scoped to the signal's ticker (same store, same
       embedding model Module 1 wrote it with)
     → ALSO retrieve top-K relevant chunks from the "news_feed" collection,
       same ticker scope (optional -- TALONX_BRAIN_INCLUDE_NEWS, on by
       default; see retriever.py)
-    → build a structured RAG prompt (technical trigger + filing excerpts
-      + news excerpts)
-    → run it through the configured LLM provider (TALONX_BRAIN_LLM_PROVIDER,
-      "gemini" by default or "ollama" for a local model -- see below) with a
-      structured-output schema
+    → zero chunks retrieved at all (cold start)? bypass the LLM entirely,
+      publish an INSUFFICIENT_CONTEXT report immediately
+    → otherwise, build a structured RAG prompt (technical trigger + filing
+      excerpts + news excerpts) and run it through the configured LLM
+      provider (TALONX_BRAIN_LLM_PROVIDER, "gemini" by default or "ollama"
+      for a local model -- see below) with a structured-output schema
       (verdict / confidence / summary / key findings / risk factors)
+        LLM call fails? → stale (expired) brain_cache entry exists?
+                            yes → republish it, flagged is_stale=True
+                            no  → publish a DEGRADED report instead
+                                  (verdict=neutral, confidence=0.0,
+                                  is_degraded=True)
     → assemble a ResearchReport (LLM findings + the original QuantSignal +
       citation objects for every retrieved chunk, filing or news)
-    → publish to Redis (talonx:reports:brain)
+    → cache the result (brain_cache:{ticker}, unless it's degraded or
+      itself a stale republish) and publish to Redis (talonx:reports:brain)
+
+talonx:filings:events (Redis, published by talonx_ingest.pipeline)
+    → NewFilingIngestedEvent for ticker X → DELETE brain_cache:X outright
+      (not just marked stale -- a new filing genuinely invalidates old
+      analysis, so it shouldn't be resurrected as a stale fallback either)
 ```
 
 - **`retriever.py`** — unlike `talonx_quant`, this module is NOT
@@ -422,13 +441,41 @@ talonx:signals:quant (Redis)
     No API key, no rate limiter (nothing to throttle against — see §9.4
     for full setup and tradeoffs).
 - **`consumer.py`** — same reconnect-with-backoff Redis listener shape as
-  `talonx_quant.consumer`, plus per-signal orchestration (retrieve →
-  generate → publish). A failure researching one signal (retrieval error,
-  LLM error, etc.) is logged and skipped rather than killing the
-  listener — one bad signal shouldn't stop research on the next one.
+  `talonx_quant.consumer`, subscribed to BOTH `talonx:signals:quant`
+  (research trigger) and `talonx:filings:events` (cache invalidation --
+  the publish side already existed in `talonx_ingest.pipeline`, this
+  module just added the subscriber). Per-signal orchestration is
+  cache-first → retrieve → generate → publish (see `cache.py` above), with
+  an LLM failure falling back to a stale cache entry, then a degraded
+  report, rather than just dropping the signal -- see the diagram. A
+  failure that isn't otherwise handled (a genuinely broken payload, etc.)
+  is logged and skipped rather than killing the listener.
 - Publishes a `verdict` of `"insufficient_context"` (distinct from
-  `"neutral"`) when retrieval comes back empty or too thin to say anything
-  meaningful, rather than letting the model guess.
+  `"neutral"`) when retrieval comes back empty -- **bypassing the LLM
+  call entirely** rather than spending a call asking the model to notice
+  it has nothing to work with.
+- **`cache.py`** — `BrainCache`, the Redis-backed qualitative cache
+  (`brain_cache:{ticker}`) behind the cache-first flow in the diagram
+  above. The one non-obvious design point: an "expired" entry still needs
+  to be usable as a fallback (see below), but Redis's own `EX` TTL just
+  DELETES a key once it elapses -- so every entry embeds its OWN logical
+  `expires_at` inside the JSON payload and is written under a much longer
+  Redis-level safety-net TTL (`TALONX_BRAIN_CACHE_SAFETY_TTL`, default
+  6h); reads compare `now` against the embedded timestamp, not Redis's
+  remaining TTL. `expires_at` at write time is the SOONER of a base TTL
+  (`TALONX_BRAIN_CACHE_BASE_TTL`, default 2h) or the next daily
+  market-open/close boundary (`TALONX_BRAIN_MARKET_TZ`, default
+  `America/New_York`, via `zoneinfo` so EST/EDT is handled automatically;
+  `TALONX_BRAIN_MARKET_OPEN_HOUR`/`_CLOSE_HOUR`, default 9/16) -- so
+  cached research never outlives the trading session it was generated
+  for. No holiday/weekend trading-calendar awareness -- see §8. The
+  distributed lock (`lock:brain:{ticker}`, `TALONX_BRAIN_CACHE_LOCK_TTL`)
+  and its bounded wait (`TALONX_BRAIN_CACHE_LOCK_WAIT_SECONDS`, default
+  20s) only matter if `talonx_brain.run` is ever scaled to more than one
+  process -- today's single-process consumer always acquires it
+  immediately. `TALONX_BRAIN_CACHE_ENABLED=false` disables caching
+  entirely (an escape hatch for debugging prompt changes, where a stale
+  hit would be actively misleading).
 - Wired into `run_talonx.py` as a third continuous task (see §3.5) --
   but OPTIONALLY: on the `gemini` provider, if `GEMINI_API_KEY` isn't set,
   the orchestrator logs a warning and runs Modules 1+2 without it rather
@@ -454,19 +501,38 @@ talonx:reports:brain (Redis)  ──┘     (TickerCorrelator -- freshest
                                (within TALONX_CORE_CORRELATION_WINDOW)?
                             2. ticker not in cooldown
                                (TALONX_CORE_TICKER_COOLDOWN)?
-                            3. research confidence >=
-                               TALONX_CORE_MIN_CONFIDENCE, and verdict is
-                               directional (not neutral/insufficient)?
-                          → any "no" at any step = no alert, silently
-                                       │ (all three "yes")
+                            3. report.is_degraded?
+                               yes → action = DEGRADED_QUANT_ALERT
+                                     (skips step 4 entirely)
+                               no  → research confidence >=
+                                     TALONX_CORE_MIN_CONFIDENCE, and verdict
+                                     is directional (not neutral/
+                                     insufficient)?
+                          → any "no" at steps 1-2, or failing step 4 = no
+                            alert, silently
+                                       │
                                        ▼
-                    quant direction == research verdict?
+                    (skipped for a degraded report) quant direction ==
+                    research verdict?
                       yes → CONFIRMED_BULLISH / CONFIRMED_BEARISH
                       no  → CONTRADICTED (quant and research disagree)
                                        │
                                        ▼
+                          5. state-transition + price-delta gate: is this
+                             action the SAME as the last alert actually
+                             dispatched for this ticker? If so, has price
+                             moved >= TALONX_CORE_PRICE_DELTA_RETRIGGER_PCT
+                             (default 1.0%) since that alert? A genuine
+                             transition (or a first-ever alert) always
+                             passes; a repeat of the same action without
+                             enough price movement is suppressed -- runs
+                             IN ADDITION to the cooldown at step 2, not
+                             instead of it.
+                                       │
+                                       ▼
                      publish ActionableAlert to Redis
-                     (talonx:alerts:dispatch), start that ticker's cooldown
+                     (talonx:alerts:dispatch), record that ticker's new
+                     cooldown/action/price
 ```
 
 - **`state.py`** — `TickerCorrelator` holds one `TickerState` per ticker,
@@ -478,11 +544,16 @@ talonx:reports:brain (Redis)  ──┘     (TickerCorrelator -- freshest
   README section).
 - **`store.py`** — `TickerStateStore`, SQLite-backed (stdlib, same choice
   `talonx_ingest.storage.ledger` makes), one row per ticker, upserted on
-  every update. Fixes a real gap: without it, a restart mid-correlation
-  (a `QuantSignal` received but its `ResearchReport` hasn't landed yet --
-  routine given `talonx_brain`'s multi-minute lag) would silently lose
-  that half of the pair forever. `consumer.py` rehydrates the correlator
-  from it at startup and writes through on every update; `run.py`
+  every update -- now including `last_alert_action`/`last_alert_price` for
+  the re-trigger gate above, added via the same idempotent
+  `PRAGMA table_info` + `ALTER TABLE` migration pattern used by
+  `talonx_watchlist/store.py`, so a pre-existing `core_state.db` upgrades
+  in place rather than erroring. Fixes a real gap: without it, a restart
+  mid-correlation (a `QuantSignal` received but its `ResearchReport`
+  hasn't landed yet -- routine given `talonx_brain`'s multi-minute lag)
+  would silently lose that half of the pair forever. `consumer.py`
+  rehydrates the correlator from it at startup and writes through on
+  every update; `run.py`
   constructs it (`TALONX_CORE_ENABLE_PERSISTENCE`, default on;
   `TALONX_CORE_STATE_DB`, default `~/.talonx/core_state.db`) and degrades
   gracefully (logs a warning, continues in-memory-only) if the file can't
@@ -494,15 +565,36 @@ talonx:reports:brain (Redis)  ──┘     (TickerCorrelator -- freshest
 - **`decision.py`** — the Decision Matrix itself: a pure function over a
   `TickerState` snapshot, no I/O, so it's trivial to unit test in
   isolation from Redis/asyncio (see `tests/test_core_decision.py`).
-  Deliberately narrow: only `CONFIRMED_BULLISH`, `CONFIRMED_BEARISH`, and
-  `CONTRADICTED` ever reach the alerts channel -- a neutral/
-  insufficient-context verdict, or one below the confidence gate, is
-  UNCONFIRMED and produces no alert at all, keeping
+  Deliberately narrow: only `CONFIRMED_BULLISH`, `CONFIRMED_BEARISH`,
+  `CONTRADICTED`, and `DEGRADED_QUANT_ALERT` ever reach the alerts
+  channel -- a neutral/insufficient-context verdict, or one below the
+  confidence gate, is UNCONFIRMED and produces no alert at all, keeping
   `talonx:alerts:dispatch` purely actionable rather than a firehose.
   `CONTRADICTED` is treated as at least as noteworthy as agreement (its
   severity floor is WARNING, never INFO) -- a technical signal and the
   research disagreeing is arguably the more actionable outcome of the
   two, not a "nothing to report" case.
+- **State-transition + price-delta re-trigger gate** — a second guardrail
+  on top of the time-based cooldown (both must pass, neither replaces the
+  other): `TickerState` now also tracks the `action` and `triggering
+  signal price` of the last alert actually dispatched for a ticker. A new
+  evaluation that would produce the SAME action as that last alert is
+  suppressed unless price has moved at least `TALONX_CORE_PRICE_DELTA_RETRIGGER_PCT`
+  (default 1.0%) since then; a genuine transition (including the very
+  first alert for a ticker) always passes regardless of price. Persisted
+  the same way as everything else in `store.py` (see below).
+- **`report.is_degraded` bypass** — `talonx_brain` publishes a
+  specially-flagged `ResearchReport` (verdict `neutral`, confidence 0.0,
+  `is_degraded=True`) when its LLM call fails AND it has no cached report
+  to fall back on (see §3.3's caching section). `decision.py` recognizes
+  this flag and skips the confidence/verdict matrix entirely, always
+  producing `DEGRADED_QUANT_ALERT` (severity WARNING, regardless of the
+  0.0 confidence) instead of silently suppressing it the way a normal
+  low-confidence report would be -- the point is the user should still
+  learn a technical signal fired even with zero qualitative backing.
+  `DEGRADED_QUANT_ALERT` participates in the state-transition gate above
+  as its own pseudo-state, so a sustained LLM outage doesn't re-alert on
+  every single signal for the same ticker.
 - **`consumer.py`** — subscribes to BOTH `talonx:signals:quant` and
   `talonx:reports:brain` on one Redis connection (`pubsub.subscribe`
   called with two channel names), routes each incoming message to the
@@ -520,9 +612,11 @@ talonx:reports:brain (Redis)  ──┘     (TickerCorrelator -- freshest
   `extra="ignore"` behavior means parsing the real, fuller wire payload
   still works fine). Its only real dependencies are `redis.asyncio`,
   `pydantic`, and `asyncio`, matching the module spec.
-- **Risk guardrails implemented**: a confidence gate (`TALONX_CORE_MIN_CONFIDENCE`)
-  and a per-ticker cooldown (`TALONX_CORE_TICKER_COOLDOWN`). **Not
-  implemented**: a global cross-ticker rate limiter -- see §8.
+- **Risk guardrails implemented**: a confidence gate (`TALONX_CORE_MIN_CONFIDENCE`),
+  a per-ticker time cooldown (`TALONX_CORE_TICKER_COOLDOWN`), and the
+  state-transition + price-delta re-trigger gate
+  (`TALONX_CORE_PRICE_DELTA_RETRIGGER_PCT`) above. **Not implemented**: a
+  global cross-ticker rate limiter -- see §8.
 - Wired into `run_talonx.py` as a fourth continuous task (see §3.6),
   unconditionally (unlike Module 3, it has no optional external
   dependency -- no API key, nothing that can plausibly be missing beyond
@@ -538,11 +632,30 @@ talonx:alerts:dispatch (Redis)
       SQLite, durable; this is now the ONLY durable historical record of
       alerts anywhere in the pipeline, since Redis Pub/Sub itself isn't one)
     → if Telegram is configured AND severity >= TALONX_DISPATCH_MIN_SEVERITY:
-        → format as Markdown (formatter.py)
+        → format a SHORT summary (ticker/action/price/confidence/one-line
+          quant trigger + this alert's ID -- formatter.format_telegram_summary)
         → send via python-telegram-bot, with retry/backoff (telegram_client.py)
         → record delivery success/failure back onto that alert's audit row
-    (independently, as a SEPARATE process:)
-    Streamlit (`streamlit run talonx_dispatch/app.py`)
+
+(concurrently, in the SAME process -- DispatchAgent.run() is 3 tasks, not 1:)
+Telegram (incoming messages, telegram_listener.py's TelegramReplyListener)
+    → long-polls Bot.get_updates() -- Telegram's own server-side long-poll,
+      not a busy loop
+    → someone replies to a push with its ID (or "/details 47", "/id 47")
+    → look it up (store.get_by_id) → reply with the FULL writeup
+      (formatter.format_telegram_details); not found (or purged by
+      retention) → a "not found" reply; anything else → a usage hint
+    → only ever responds to the configured TELEGRAM_CHAT_ID -- a personal,
+      single-user bot, not multi-tenant
+
+(also concurrently:) retention sweep -- purge_older_than(), once at
+startup then every TALONX_DISPATCH_RETENTION_SWEEP_HOURS (default 24h),
+deleting audit rows older than TALONX_DISPATCH_RETENTION_DAYS (default 5)
+so a long-running install doesn't grow dispatch_audit.db forever (and so
+an alert ID stops being answerable via Telegram once it's aged out)
+
+(independently, as a SEPARATE process:)
+Streamlit (`streamlit run talonx_dispatch/app.py`)
     → reads the SAME audit trail SQLite file
     → renders live metrics, a derived per-ticker watchlist, a live alert
       feed, and a filterable audit trail table
@@ -571,25 +684,51 @@ talonx:alerts:dispatch (Redis)
   execution model can run a cached session object on a different thread
   than the one that created it -- a real constraint the ledger/core_state
   precedent didn't have to deal with. WAL journal mode is enabled for
-  smoother concurrent read-while-write between the two processes.
-- **`formatter.py`** — pure `ActionableAlert -> Markdown text` function,
-  no I/O, trivially unit-testable without a bot token. Uses Telegram's
-  LEGACY "Markdown" parse mode rather than "MarkdownV2" -- MarkdownV2
-  requires escaping a long list of characters that routinely show up in
-  Gemini-generated research text (`_*[]()~`>#+-=|{}.!`), which would be a
-  much larger surface for a garbled message than this is worth. Legacy
-  mode only needs 4 characters escaped (`_*\`[`), handled for any
-  upstream-generated text (ticker/enum values are from our own schemas
-  and never need escaping).
-- **`telegram_client.py`** — `is_configured` gates everything, same
-  "additive, degrade gracefully" pattern `RedditClient` established: if
-  `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` aren't set, `send()` is a
-  silent no-op and the audit trail (and Streamlit dashboard) work
-  normally without it. Retries transient failures with jittered backoff;
-  respects Telegram's own `RetryAfter` hint exactly when it's given one
-  rather than guessing a backoff; fails fast (no retry) on a bad
-  token/forbidden chat, since retrying a config problem just burns the
-  retry budget for nothing.
+  smoother concurrent read-while-write between the two processes. Every
+  public method holds an internal `threading.Lock`, added after a real
+  concurrency bug: two Streamlit reruns sharing the cached, `check_same_
+  thread=False` connection on different threads could interleave and hit
+  an "impossible" state. `get_by_id()` backs the Telegram reply lookup;
+  `purge_older_than()` backs the retention sweep
+  (`TALONX_DISPATCH_RETENTION_DAYS`, default 5) -- both new.
+- **`formatter.py`** — TWO pure formatting functions now, no I/O, trivially
+  unit-testable without a bot token. `format_telegram_summary(alert,
+  alert_id)` is the actual push: short enough to read at a glance during
+  a live session (ticker/action/price/confidence/one-line quant trigger +
+  the ID), which replaced a much longer message that used to carry the
+  full research writeup on every single push. `format_telegram_details(row)`
+  is that full writeup (rationale, key findings, risks, model/timestamp
+  footer) -- sent back on demand when someone replies with the ID. It
+  takes an audit ROW DICT (`AuditStore.get_by_id()`'s shape), not a live
+  `ActionableAlert` -- by reply time, possibly minutes or days later, the
+  original in-memory object is long gone, but every field it needs is
+  already a stored column. Both use Telegram's LEGACY "Markdown" parse
+  mode rather than "MarkdownV2" -- MarkdownV2 requires escaping a long
+  list of characters that routinely show up in Gemini-generated research
+  text (`_*[]()~`>#+-=|{}.!`), which would be a much larger surface for a
+  garbled message than this is worth. Legacy mode only needs 4 characters
+  escaped (`_*\`[`), handled for any upstream-generated text (ticker/enum
+  values are from our own schemas and never need escaping).
+- **`telegram_client.py`** — the SEND side. `is_configured` gates
+  everything, same "additive, degrade gracefully" pattern `RedditClient`
+  established: if `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` aren't set,
+  `send()` is a silent no-op and the audit trail (and Streamlit
+  dashboard) work normally without it. Retries transient failures with
+  jittered backoff; respects Telegram's own `RetryAfter` hint exactly
+  when it's given one rather than guessing a backoff; fails fast (no
+  retry) on a bad token/forbidden chat, since retrying a config problem
+  just burns the retry budget for nothing.
+- **`telegram_listener.py`** — the RECEIVE side (`TelegramReplyListener`),
+  new: long-polls `Bot.get_updates()` for incoming messages and answers
+  "reply with an alert's ID" requests by looking it up in the audit trail
+  and sending back `format_telegram_details`. Drains any backlog on
+  startup (one throwaway `get_updates()` call with no offset) so a
+  restart doesn't replay old commands. Only started (as a third task
+  under `DispatchAgent.run()`) if Telegram is configured -- no token,
+  nothing to poll. **Only one process may poll a given bot token's
+  `get_updates()` at a time** -- running two `DispatchAgent`s against the
+  same `TELEGRAM_BOT_TOKEN` makes the second one's polling fail with HTTP
+  409 Conflict.
 - **Mobile push notifications are severity-gated**
   (`TALONX_DISPATCH_MIN_SEVERITY`, default `warning`) -- an `INFO`-level
   alert still gets recorded to the audit trail and shows in the Streamlit
@@ -610,38 +749,125 @@ talonx:alerts:dispatch (Redis)
   `talonx:alerts:dispatch` is built" -- `dashboard.py`/`dashboard_web.py`
   gave visibility, but did nothing with an alert). Telegram push is the
   action; the audit trail + Streamlit dashboard is the review surface.
-- **`consumer.py` is wired into `run_talonx.py`** (§3.6) -- no required API
+- **`consumer.py` is wired into `run_talonx.py`** (§3.7) -- no required API
   key, same "safe to always include" reasoning as Module 4. `app.py`
   (Streamlit) is NOT, and never will be: Streamlit's own dev server is not
   an `asyncio.gather()`-compatible task (see the "Two cooperating
   processes" note above) -- always run it separately, alongside
   `run_talonx.py`, in its own terminal (§5n).
 
-### 3.6 `run_talonx.py` — orchestrator
+### 3.6 `talonx_paper` — Module 6: Live Paper Trading Engine
+
+```
+Redis: talonx:alerts:dispatch ──┐
+                                 ├──► talonx_paper.consumer
+Redis: talonx:market:stream ────┘         │
+                                           ├─ ticker has paper trading enabled?
+                                           │  (talonx_watchlist -- see below) no -> skip
+                                           │
+                                           ├─ market tick (BAR)? -> update_latest_price
+                                           │  (mark-to-market source for the dashboard,
+                                           │  a SEPARATE process with no access to this
+                                           │  one's in-memory state)
+                                           │
+                                           └─ alert -> engine.decide_trade (pure):
+                                                CONFIRMED_BULLISH + flat        -> BUY
+                                                CONFIRMED_BEARISH/CONTRADICTED
+                                                  + long                       -> SELL
+                                                repeat signal, same state       -> ignored
+                                                                                    (logged only)
+                                                DEGRADED_QUANT_ALERT            -> no action
+                                                          │
+                                                          ▼
+                                        PaperTradingStore.execute_buy/execute_sell
+                                        (SQLite -- positions, trade_history,
+                                        portfolio_state all updated atomically)
+                                                          │
+                                                          ▼
+                                        Redis: talonx:paper:trades (PaperTradeExecution)
+                                                          │
+                                                          ▼
+                                        talonx_dispatch.consumer -- its OWN short
+                                        Telegram push (§3.5), decoupled from the
+                                        triggering alert's push
+```
+
+- **Not what the original requirement doc specified, and why**: the doc
+  asked for a PostgreSQL ledger and one combined Telegram message (alert +
+  execution card together) -- both deliberately NOT built that way here.
+  SQLite matches every other store in this project (no new database
+  technology, no new docker service) and two DECOUPLED short pushes
+  preserve the alert-shortening work from the session before this one,
+  rather than reintroducing a long combined message. Position sizing is a
+  FIXED dollar amount per trade (default $2,500, `TALONX_PAPER_TRADE_ALLOCATION`)
+  rather than "100% of cash" -- since the one-position-per-TICKER limit is
+  per-ticker, not portfolio-wide, "100% of cash" would let the first BUY
+  signal claim the entire balance and starve every other tracked ticker.
+- **Trigger mapping**: the doc's own action names (`BUY_SIGNAL`,
+  `BEARISH`, `VALUE_TRAP_WARNING`) don't exist in the real `AlertAction`
+  enum -- mapped onto the real one in `engine.py`: BUY on
+  `CONFIRMED_BULLISH`, SELL on `CONFIRMED_BEARISH` **or** `CONTRADICTED`
+  (the doc's own Telegram example shows `CONTRADICTED` triggering a
+  SELL), no action at all on `DEGRADED_QUANT_ALERT` (no research backing,
+  not worth trading on).
+- **`engine.py`** -- pure functions, no I/O, same testability philosophy
+  as `talonx_core.decision`: `decide_trade` (the state machine above),
+  `calculate_buy` (spends `min(allocation, cash)`, so a low balance
+  partially fills rather than erroring), `calculate_sell_pnl` (exact
+  formulas from the requirement doc, verified against its own worked
+  example in `tests/test_paper_engine.py`).
+- **`store.py`** -- `PaperTradingStore`, SQLite (WAL, `threading.Lock`,
+  same convention every store built this session uses). Four tables:
+  `portfolio_state` (single row -- cash, allocation, cumulative PnL,
+  win/loss counts; percentages are DERIVED on read, never stored, so they
+  can't drift), `positions` (one row per OPEN position -- a ticker's
+  ABSENCE from this table IS "flat," no separate status column),
+  `trade_history` (append-only, powers the dashboard's trade table, CSV
+  export, and equity curve), `latest_prices` (updated on every market
+  tick -- exists because the Streamlit dashboard is a separate process
+  with no access to the engine's in-memory price cache). `execute_buy`/
+  `execute_sell` are OPERATION-shaped, not raw CRUD -- each updates
+  positions + portfolio_state + trade_history atomically (one lock, one
+  commit) so `consumer.py` never hand-coordinates a multi-table write.
+- **Per-ticker enable/disable lives in `talonx_watchlist`, not a second
+  ticker list** -- `paper_trading_enabled` is a new column on the SAME
+  `tickers` table §5n's dashboard already manages (same idempotent
+  migration pattern as `exchange`/`status` before it), toggled via a
+  multiselect in the dashboard's new "💰 Paper Trading" section. This is
+  the "configure which ticker can be used" control surface.
+- Wired into `run_talonx.py` as a sixth continuous task (see §3.7) --
+  `--skip-paper-trading` leaves it out on purpose; a ledger-open failure
+  degrades the same way Module 5's audit DB failure does (warns, doesn't
+  crash the rest of the pipeline). Run it standalone with
+  `python -m talonx_paper.run` if you want it decoupled.
+
+### 3.7 `run_talonx.py` — orchestrator
 
 Runs Module 1's periodic ingestion (filings + news, immediately then on
-a repeating interval) and Module 1 + 2 + 3 + 4 + 5's five continuous
+a repeating interval) and Module 1 + 2 + 3 + 4 + 5 + 6's six continuous
 streams (market data, quant scanner, research agent, decision engine,
-dispatch agent) together as concurrent tasks in one process. A failure in
-one periodic ingestion cycle is logged and the loop continues to the next
-scheduled run; the continuous streams are unaffected by ingestion cycle
-failures entirely, since they're independent tasks. Module 3 is optional
-here -- `--skip-brain` leaves it out on purpose, and it's left out
-automatically (with a warning, not a crash) if its configured LLM
-provider isn't ready (§3.3). Module 5 degrades the same way if its audit
-database can't be opened (rare). Modules 2 and 4 are always included
-unless explicitly skipped. **The Streamlit dashboard is never included**
-(see §3.5 -- run it alongside this file, in its own terminal, §5n).
+dispatch agent, paper trading engine) together as concurrent tasks in one
+process. A failure in one periodic ingestion cycle is logged and the loop
+continues to the next scheduled run; the continuous streams are
+unaffected by ingestion cycle failures entirely, since they're
+independent tasks. Module 3 is optional here -- `--skip-brain` leaves it
+out on purpose, and it's left out automatically (with a warning, not a
+crash) if its configured LLM provider isn't ready (§3.3). Modules 5 and 6
+degrade the same way if their respective SQLite ledgers can't be opened
+(rare). Modules 2 and 4 are always included unless explicitly skipped.
+**The Streamlit dashboard is never included** (see §3.5 -- run it
+alongside this file, in its own terminal, §5n).
 
 **Every continuous component can be pulled out individually**
 (`--skip-market-data`, `--skip-quant`, `--skip-brain`, `--skip-core`,
-`--skip-dispatch`) -- useful while actively iterating on one piece: run
-the other four here and the one you're changing in its own terminal, so
-you don't have to restart this whole process on every edit. If every
-component ends up skipped (including `--skip-ingestion`), it logs an
-error and exits immediately rather than hanging on an empty task list.
+`--skip-dispatch`, `--skip-paper-trading`) -- useful while actively
+iterating on one piece: run the others here and the one you're changing
+in its own terminal, so you don't have to restart this whole process on
+every edit. If every component ends up skipped (including
+`--skip-ingestion`), it logs an error and exits immediately rather than
+hanging on an empty task list.
 
-### 3.7 End-to-end data flow
+### 3.8 End-to-end data flow
 
 ```
 SEC EDGAR ──┐
@@ -668,17 +894,24 @@ Polygon/yfinance ──► talonx_ingest.market_data ──► Redis: talonx:mar
                                                     talonx_core (TickerCorrelator, Decision Matrix)
                                                                             │
                                                                             ▼
-                                                     Redis: talonx:alerts:dispatch
-                                                                            │
-                                                                            ▼
-                                                    talonx_dispatch.consumer (audit + Telegram push)
-                                                                            │
-                                                            ┌───────────────┴───────────────┐
-                                                            ▼                                ▼
-                                                   SQLite: dispatch_audit.db          Telegram (mobile push)
-                                                            ▲
-                                                            │ (read-only, separate process)
-                                                   talonx_dispatch.app (Streamlit dashboard)
+                                                     Redis: talonx:alerts:dispatch ──────┐
+                                                                            │            │
+                                                                            ▼            ▼
+                                                    talonx_dispatch.consumer      talonx_paper.consumer
+                                                    (audit + short Telegram push)  (BUY/SELL simulation,
+                                                                            │       ticker gated by
+                                                            ┌───────────────┤       talonx_watchlist)
+                                                            ▼               ▼            │
+                                                   SQLite: dispatch_audit.db  Telegram    ▼
+                                                            ▲                    Redis: talonx:paper:trades
+                                                            │ (read-only,               │
+                                                            │  separate process)         ▼
+                                                   talonx_dispatch.app ◄── SQLite: paper_trading.db
+                                                   (Streamlit dashboard:           │
+                                                    alerts + watchlist +           ▼
+                                                    paper trading)          talonx_dispatch.consumer's
+                                                                             OWN short Telegram push
+                                                                             (decoupled from the alert's)
 ```
 
 ---
@@ -780,6 +1013,14 @@ TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
 ```
 
+Each push is now a short summary ending in an ID (`#47`) — **reply to
+that message with the number** (`47`, `#47`, `/details 47`, or `/id 47`
+all work) to get the full research writeup back from the bot. Only
+replies from the `TELEGRAM_CHAT_ID` above are answered. An ID stops
+working once its alert ages out of the audit trail
+(`TALONX_DISPATCH_RETENTION_DAYS`, default 5 days) — the bot replies
+"not found" rather than erroring.
+
 ---
 
 ## 5. Running things
@@ -806,9 +1047,16 @@ Single process, single terminal, single Ctrl+C to stop. This starts:
 - The dispatch agent (Module 5), continuously -- *if* its audit database
   can open (essentially always; the only failure mode is a bad path/
   permissions issue). Records every alert to the audit trail and pushes to
-  Telegram if configured. **The Streamlit dashboard is separate** -- run
-  `streamlit run talonx_dispatch\app.py` (§5n) in its own terminal
-  alongside this one if you want to view it live.
+  Telegram if configured.
+- The paper trading engine (Module 6), continuously -- *if* its ledger
+  database can open (same failure mode as Module 5). Simulates BUY/SELL
+  execution for tickers with paper trading enabled (§3.6) and pushes its
+  own short Telegram notification per executed trade.
+
+**The Streamlit dashboard is separate** -- run
+`streamlit run talonx_dispatch\app.py` (§5n) in its own terminal
+alongside this one if you want to view it live (alerts, the ticker
+watchlist, AND the paper trading portfolio all live there).
 
 Custom tickers:
 ```powershell
@@ -836,6 +1084,11 @@ else on every change):
 ```powershell
 python run_talonx.py --skip-market-data
 python run_talonx.py --skip-quant
+```
+Leave out paper trading (e.g. you don't want simulated trades while just
+testing alert delivery):
+```powershell
+python run_talonx.py --skip-paper-trading
 ```
 
 The sections below describe each component separately -- useful for
@@ -1094,13 +1347,27 @@ python talonx_ingest\check_connectivity.py
 pip install -r requirements-dashboard.txt
 python dashboard.py
 ```
-A read-only, live-refreshing terminal view across ALL FIVE Redis
-channels at once (`talonx:filings:events`, `talonx:market:stream`,
-`talonx:signals:quant`, `talonx:reports:brain`, `talonx:alerts:dispatch`)
--- total messages, throughput (msgs/min), and a per-ticker breakdown for
-each, so you can see at a glance how much data has moved through
-Modules 1-4 and where the activity actually is, without digging through
-five different terminal logs. Run it alongside `run_talonx.py` (or any
+A read-only, live-refreshing terminal view across ALL SIX Redis channels
+at once (`talonx:filings:events`, `talonx:market:stream`,
+`talonx:signals:quant`, `talonx:reports:brain`, `talonx:alerts:dispatch`,
+`talonx:paper:trades`) -- total messages, throughput (msgs/min), a
+per-ticker breakdown, and a per-CATEGORY breakdown for each, so you can
+see at a glance how much data has moved through Modules 1-6 and where
+the activity actually is, without digging through six different terminal
+logs. The category breakdowns are the answer to "how many LLM calls is
+this actually making" and similar questions -- derived entirely from
+fields already present in each message (no other module needed to
+change for this): `talonx:reports:brain` splits into **LLM call / cache
+hit (no LLM) / stale fallback (no LLM) / cold start (no LLM) / degraded
+(LLM failed)** (Module 3's caching, §3.3), `talonx:signals:quant` splits
+by signal type, `talonx:alerts:dispatch` splits by action, and
+`talonx:paper:trades` splits by BUY/SELL plus a running realized-PnL
+total. **What this can't show**: anything that gets SUPPRESSED before
+publishing -- a talonx_quant signal dropped by cooldown/throttle, a
+failed Telegram send, an ignored paper trade -- never becomes a message,
+so a pure Redis observer has nothing to count; that would need each
+module to explicitly publish its own internal counters somewhere, which
+none of them do today. Run it alongside `run_talonx.py` (or any
 combination of standalone module processes) — it only subscribes, it
 never publishes, so it can't affect the pipeline it's watching.
 
@@ -1195,11 +1462,90 @@ actually alerted, distinct from what's currently tracked), a live
 expandable alert feed, and a filterable (ticker/action/severity) full
 audit trail table. Auto-refreshes every `TALONX_DISPATCH_AUTOREFRESH_MS`
 (default 5000ms) — that's also how often an add/remove made by someone
-else shows up in your own browser tab.
+else shows up in your own browser tab. Also shows the **"💰 Paper
+Trading"** section (§3.6) — portfolio value/win-rate/open-positions
+metrics, a Settings panel (starting balance, trade allocation, which
+tracked tickers have paper trading enabled, and a Reset Portfolio
+button), an open-positions table marked to the latest known price, an
+equity curve, a win/loss-colored per-trade PnL chart, and a downloadable
+CSV of the full trade history.
 
 ```powershell
 streamlit run talonx_dispatch\app.py --server.port 8502   # if 8501 is taken
 ```
+
+### 5o. Run the paper trading engine (talonx_paper, standalone)
+
+```powershell
+pip install -r talonx_paper\requirements.txt
+python -m talonx_paper.run
+```
+Listens to `talonx:alerts:dispatch` and `talonx:market:stream`, simulates
+BUY/SELL execution for tickers with paper trading enabled (toggle in the
+dashboard's Paper Trading section, §5n), and publishes each executed
+trade to `talonx:paper:trades` — `talonx_dispatch.run` (§5m) picks that
+up and sends its own short Telegram notification, decoupled from the
+triggering alert's push. Runs continuously — `Ctrl+C` to stop; prints a
+summary of alerts processed / trades executed / trades ignored on exit.
+
+**Risk management and friction, added after reviewing a live session's
+results** (negative risk-to-reward, gains too small to survive real
+friction, and too many low-conviction round trips on one ticker):
+- Every open position is checked against a **stop-loss/take-profit band**
+  (`TALONX_PAPER_STOP_LOSS_PCT`/`TALONX_PAPER_TAKE_PROFIT_PCT`, default
+  0.50%/1.00% — a 1:2 risk-to-reward ratio) on every market tick, not
+  just when a reversal alert happens to arrive. This is *additional* to
+  the existing alert-driven exit (`CONFIRMED_BEARISH`/`CONTRADICTED`
+  still closes a position immediately, regardless of stop/take) — a
+  genuine reversal signal is never suppressed, stop/take just adds a
+  price-based floor and ceiling. Static percentages for now; an
+  ATR-based dynamic version is a deliberately deferred follow-up.
+- Every fill (BUY or SELL, however triggered) crosses a **simulated
+  bid-ask spread** (`TALONX_PAPER_SIMULATED_SPREAD_BPS`, default 5bps),
+  so realized PnL isn't unrealistically clean the way a zero-friction
+  fill at the exact signal price is.
+- New positions can be gated to a **minimum alert severity**
+  (`TALONX_PAPER_MIN_ENTRY_SEVERITY`, default `warning`) — a
+  `CONFIRMED_BULLISH` alert below that bar never opens a position
+  (recorded `BELOW_MIN_SEVERITY`, visible in §5p's EOD report); exits are
+  never severity-gated. "warning" is a starting point, not a tuned
+  value — use the EOD report's `BELOW_MIN_SEVERITY` counts across a few
+  real sessions to decide whether to loosen it to `info` or tighten it
+  to `critical`.
+- Two EXISTING knobs also directly address trade frequency/sizing
+  without any code change: `TALONX_CORE_TICKER_COOLDOWN` (§9, how often
+  a ticker can re-enter) and `TALONX_PAPER_TRADE_ALLOCATION` (larger
+  positions make the spread cost a smaller fraction of each trade).
+
+### 5p. Generate an End-of-Day report (standalone)
+
+```powershell
+python generate_eod_report.py
+```
+Reads every module's own local SQLite store for a single trading day and
+writes a consolidated Markdown report (plus raw CSVs) to `reports/` —
+built for exactly the question "why didn't ticker X trade today", so you
+don't have to cross-reference the dashboard's tables or export a CSV by
+hand after market close. Covers, per ticker: alerts received, trades
+executed (with PnL), trades ignored (with the specific reason —
+`NO_ACTIVE_POSITION`, `POSITION_ALREADY_OPEN`, `INSUFFICIENT_CASH`,
+`DEGRADED_NOT_TRADABLE`), and — if `talonx_core`/`talonx_quant`/
+`talonx_brain` have run with persistence enabled (the default) at least
+once — the full signal funnel (quant signals generated → suppressed by
+cooldown/throttle → reached `talonx_core` → suppressed there by
+staleness/confidence/cooldown/no-state-change → became an alert) plus
+LLM/cache economics (cache hits, stale fallbacks, degraded reports, cold
+starts, genuine LLM calls). It reads only — nothing it does affects the
+running pipeline, and it's safe to run at any time, not just after close.
+
+```powershell
+python generate_eod_report.py --date 2026-08-11     # default: today, in --tz
+python generate_eod_report.py --tz Europe/London    # default: America/New_York
+python generate_eod_report.py --out-dir C:\reports  # default: .\reports
+```
+Nothing in this project schedules it automatically — wire up a Windows
+Task Scheduler entry yourself if you want it to run unattended right
+after market close each day.
 
 ---
 
@@ -1227,6 +1573,8 @@ streamlit run talonx_dispatch\app.py --server.port 8502   # if 8501 is taken
 | No Telegram push arrives even though the audit trail shows the alert | Severity below `TALONX_DISPATCH_MIN_SEVERITY` (default `warning` -- `info` alerts are recorded but not pushed on purpose), or `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` unset | Check the alert's `severity` in the audit trail/Streamlit feed; lower `TALONX_DISPATCH_MIN_SEVERITY` to `info` if you want everything pushed |
 | Telegram send fails with `Forbidden` | The bot hasn't been messaged first (bots can't initiate a DM), or it was blocked/removed from the chat | Message your bot at least once from the Telegram app before running `talonx_dispatch.run` (§4) |
 | Telegram message text looks garbled/truncated mid-sentence | An underscore/asterisk/backtick/bracket in Gemini-generated text wasn't escaped correctly, or a message exceeded Telegram's 4096-character limit | `formatter.py` escapes the 4 legacy-Markdown special characters and truncates the research summary to 500 chars -- if this still happens, it's likely in `key_findings`/`risk_factors` text, which isn't length-capped per-item today |
+| `generate_eod_report.py`'s "LLM / cache economics" / signal-funnel sections say "Not available" | `talonx_core`/`talonx_quant`/`talonx_brain` haven't run with persistence enabled since this feature was added (or `TALONX_*_ENABLE_PERSISTENCE=false`) -- their stats stores have no rows yet | Run the pipeline normally for at least one session with persistence enabled (the default); the report only ever shows what those processes actually recorded |
+| `generate_eod_report.py` shows an empty per-ticker section for a day you know had activity | `--date`/`--tz` picked a different trading-day window than you expected (a UTC timestamp near local midnight can land on the adjacent day) | Pass `--tz` explicitly if you're not in `America/New_York`, and double check `--date` is the LOCAL calendar date, not UTC |
 
 ---
 
@@ -1244,16 +1592,26 @@ indicator periods/thresholds plus its noise filters --
 `TALONX_QUANT_THROTTLE_WINDOW_SECONDS` / `TALONX_QUANT_THROTTLE_MAX_SIGNALS`
 (§3.2, §9.5), retrieval
 top-K, `TALONX_BRAIN_LLM_PROVIDER` + Gemini model/temperature +
-`TALONX_BRAIN_OLLAMA_MODEL`/`TALONX_BRAIN_OLLAMA_BASE_URL`, Module 4's
-`TALONX_CORE_MIN_CONFIDENCE` / `TALONX_CORE_CORRELATION_WINDOW` /
-`TALONX_CORE_TICKER_COOLDOWN` / `TALONX_CORE_ENABLE_PERSISTENCE` /
-`TALONX_CORE_STATE_DB`, and Module 5's `TELEGRAM_BOT_TOKEN` /
+`TALONX_BRAIN_OLLAMA_MODEL`/`TALONX_BRAIN_OLLAMA_BASE_URL`, Module 3's
+qualitative cache -- `TALONX_BRAIN_CACHE_ENABLED` / `TALONX_BRAIN_CACHE_BASE_TTL`
+/ `TALONX_BRAIN_CACHE_SAFETY_TTL` / `TALONX_BRAIN_CACHE_LOCK_TTL` /
+`TALONX_BRAIN_CACHE_LOCK_WAIT_SECONDS` / `TALONX_BRAIN_MARKET_TZ` /
+`TALONX_BRAIN_MARKET_OPEN_HOUR` / `TALONX_BRAIN_MARKET_CLOSE_HOUR` (§3.3),
+Module 4's `TALONX_CORE_MIN_CONFIDENCE` / `TALONX_CORE_CORRELATION_WINDOW` /
+`TALONX_CORE_TICKER_COOLDOWN` / `TALONX_CORE_PRICE_DELTA_RETRIGGER_PCT` /
+`TALONX_CORE_ENABLE_PERSISTENCE` / `TALONX_CORE_STATE_DB` (§3.4), and
+Module 5's `TELEGRAM_BOT_TOKEN` /
 `TELEGRAM_CHAT_ID` (both optional -- see §4) /
 `TALONX_DISPATCH_MIN_SEVERITY` / `TALONX_DISPATCH_AUDIT_DB` /
-`TALONX_DISPATCH_FEED_LIMIT` / `TALONX_DISPATCH_AUTOREFRESH_MS`, and the
+`TALONX_DISPATCH_FEED_LIMIT` / `TALONX_DISPATCH_AUTOREFRESH_MS` /
+`TALONX_DISPATCH_TELEGRAM_POLL_TIMEOUT` / `TALONX_DISPATCH_RETENTION_DAYS` /
+`TALONX_DISPATCH_RETENTION_SWEEP_HOURS` (§3.5), and the
 ticker watchlist's `TALONX_WATCHLIST_DB` / `TALONX_WATCHLIST_DEFAULT_SYMBOL`
 / `TALONX_WATCHLIST_DEFAULT_NAME` / `TALONX_WATCHLIST_DEFAULT_EXCHANGE` /
-`TALONX_WATCHLIST_POLL_INTERVAL` (§5n),
+`TALONX_WATCHLIST_POLL_INTERVAL` (§5n), and Module 6's `TALONX_PAPER_DB` /
+`TALONX_PAPER_INITIAL_BALANCE` / `TALONX_PAPER_TRADE_ALLOCATION` --
+fresh-install defaults only, since the dashboard's Settings panel is the
+actual live source of truth once a portfolio has been created (§3.6) --
 etc).
 
 ---
@@ -1263,11 +1621,22 @@ etc).
 - `talonx_brain` is purely signal-triggered (reacts to
   `talonx:signals:quant`) — there's no on-demand query interface (CLI/API)
   for asking it about a ticker outside of a quant signal firing.
-- `talonx_brain` retrieves from both `sec_filings` and `news_feed` now,
-  but only as CONTEXT for a `QuantSignal` trigger — it still doesn't
-  listen to `talonx:filings:events` itself, so a fresh 8-K/news item
-  doesn't trigger new research on its own; it just gets picked up
-  whenever the next technical signal fires for that ticker.
+- ~~`talonx_brain` doesn't listen to `talonx:filings:events`~~ --
+  **partially fixed**: it now subscribes to that channel and DELETES
+  `brain_cache:{ticker}` the moment a fresh filing lands (§3.3), so the
+  NEXT signal for that ticker is guaranteed a fresh LLM call instead of a
+  stale cache hit. Still open: this only invalidates the cache -- a fresh
+  8-K/news item still doesn't trigger NEW research on its own the way a
+  `QuantSignal` does; it's picked up passively, whenever the next
+  technical signal happens to fire for that ticker. Also: only filings
+  publish an invalidation event today (`NewFilingIngestedEvent`) -- fresh
+  news articles don't, so a cached report can go stale relative to
+  breaking news without anything forcing a refresh (only its TTL/
+  market-boundary expiry eventually catches it).
+- `talonx_brain`'s cache expiry (§3.3) uses plain daily 9am/4pm exchange
+  clock-time boundaries -- there's no real trading-calendar awareness, so
+  a cache entry set right before a market holiday or a weekend doesn't
+  know the market isn't actually opening at the next 9am boundary.
 - ~~**talonx_quant has no dynamic watchlist.**~~ -- **partially fixed**:
   which tickers get streamed (and periodically ingested for) is now a
   live, runtime-editable decision, via `talonx_watchlist`'s SQLite store

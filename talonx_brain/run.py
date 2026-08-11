@@ -13,7 +13,9 @@ import asyncio
 import logging
 import signal
 
+from talonx_brain.config import BrainConfig
 from talonx_brain.consumer import ResearchAgent
+from talonx_brain.store import BrainStatsStore
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,7 +25,20 @@ logger = logging.getLogger("talonx_brain.run")
 
 
 async def main() -> None:
-    agent = ResearchAgent()
+    config = BrainConfig()
+
+    store: BrainStatsStore | None = None
+    if config.enable_persistence:
+        try:
+            store = BrainStatsStore(config.db_path)
+        except Exception as exc:  # noqa: BLE001 -- persistence is a nice-to-have, not required
+            logger.warning(
+                "Report-category persistence disabled for this run: %s. "
+                "Continuing without it (EOD reports won't see this process' "
+                "cache-hit/LLM-call counts).", exc,
+            )
+
+    agent = ResearchAgent(config=config, store=store)
 
     loop = asyncio.get_running_loop()
 
@@ -50,6 +65,8 @@ async def main() -> None:
             "Stopped. Processed %d signals, published %d reports this run.",
             agent.signals_processed, agent.reports_published,
         )
+        if store is not None:
+            store.close()
 
 
 if __name__ == "__main__":

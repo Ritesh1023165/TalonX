@@ -76,6 +76,13 @@ class BrainConfig:
     reports_channel: str = os.environ.get(
         "TALONX_REDIS_REPORTS_CHANNEL", "talonx:reports:brain"
     )
+    # Same channel talonx_ingest.pipeline already publishes
+    # NewFilingIngestedEvent to after every successful filing ingestion --
+    # subscribing here is what actually closes the cache-invalidation loop
+    # (the publish side already existed before this cache was added).
+    filings_channel: str = os.environ.get(
+        "TALONX_REDIS_FILINGS_CHANNEL", "talonx:filings:events"
+    )
     connect_timeout_seconds: float = _env_float("TALONX_REDIS_CONNECT_TIMEOUT", 5.0)
     socket_timeout_seconds: float = _env_float("TALONX_REDIS_SOCKET_TIMEOUT", 5.0)
     reconnect_backoff_base_seconds: float = _env_float("TALONX_BRAIN_RECONNECT_BASE", 1.0)
@@ -145,3 +152,50 @@ class BrainConfig:
     ollama_max_retries: int = _env_int("TALONX_BRAIN_OLLAMA_MAX_RETRIES", 3)
     ollama_backoff_base_seconds: float = _env_float("TALONX_BRAIN_OLLAMA_BACKOFF_BASE", 2.0)
     ollama_backoff_max_seconds: float = _env_float("TALONX_BRAIN_OLLAMA_BACKOFF_MAX", 30.0)
+
+    # --- Qualitative caching (see cache.py) ---
+    # An escape hatch, not a tuning knob -- set false to always regenerate
+    # (e.g. while actively debugging LLM prompt changes, where a stale
+    # cache hit would be actively misleading).
+    cache_enabled: bool = _env_bool("TALONX_BRAIN_CACHE_ENABLED", True)
+    # Redis-level HARD TTL on a cache entry -- deliberately much longer
+    # than the entry's own embedded logical expiry (next_expiry(), see
+    # cache.py), so an entry survives PAST that logical expiry long enough
+    # to still serve as an `is_stale=True` fallback if a live regeneration
+    # attempt fails. This is just the outer safety net that stops a
+    # forgotten/orphaned entry from living in Redis forever.
+    cache_safety_ttl_seconds: float = _env_float("TALONX_BRAIN_CACHE_SAFETY_TTL", 21600.0)
+    # Distributed lock (lock:brain:{ticker}) guarding cache population --
+    # its own short TTL so a crashed worker can't hold it forever.
+    cache_lock_ttl_seconds: float = _env_float("TALONX_BRAIN_CACHE_LOCK_TTL", 30.0)
+    # How long a worker that LOST the lock race waits (polling the cache,
+    # not the lock) for the winner to populate it before giving up and
+    # generating its own report anyway -- bounded so a stuck/crashed lock
+    # holder can't block everyone else indefinitely.
+    cache_lock_wait_seconds: float = _env_float("TALONX_BRAIN_CACHE_LOCK_WAIT_SECONDS", 20.0)
+
+    # --- Market-hours-aware cache expiry (Requirement 4D) ---
+    # A cache entry's logical expiry is the SOONER of a base TTL or the
+    # next of these two daily boundaries, so cached research doesn't
+    # outlive the trading session it was generated for (e.g. overnight
+    # earnings should force fresh analysis at the next open). zoneinfo
+    # (stdlib) handles EST/EDT automatically -- these are plain exchange
+    # local-time hours, not a fixed UTC offset. No holiday/weekend
+    # calendar awareness -- see README's "what's not built yet".
+    market_timezone: str = os.environ.get("TALONX_BRAIN_MARKET_TZ", "America/New_York")
+    market_open_hour: int = _env_int("TALONX_BRAIN_MARKET_OPEN_HOUR", 9)
+    market_close_hour: int = _env_int("TALONX_BRAIN_MARKET_CLOSE_HOUR", 16)
+    # The "base TTL" side of the sooner-of comparison above -- caps how
+    # long a cache entry can live even in the middle of a trading session
+    # (e.g. generated at 10am shouldn't necessarily still be trusted at
+    # 3:59pm). Default 2h.
+    cache_base_ttl_seconds: float = _env_float("TALONX_BRAIN_CACHE_BASE_TTL", 7200.0)
+
+    # --- Persistence (report category counts, for the EOD report) ---
+    # Cache-hit/degraded/LLM-call counts were only computable LIVE from
+    # Redis messages (dashboard.py) until this was added -- see store.py's
+    # BrainStatsStore. Disable to run pure in-memory.
+    enable_persistence: bool = _env_bool("TALONX_BRAIN_ENABLE_PERSISTENCE", True)
+    db_path: str = os.environ.get(
+        "TALONX_BRAIN_DB_PATH", str(Path.home() / ".talonx" / "brain.db")
+    )

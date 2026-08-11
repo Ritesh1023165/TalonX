@@ -30,6 +30,10 @@ venv/
 .talonx/
 chroma/
 
+# generate_eod_report.py's default output -- generated locally, not
+# something to version.
+reports/
+
 # ------------------------------------------------------------------
 # Claude Code local settings (machine-specific permission allowlist,
 # not shared config)

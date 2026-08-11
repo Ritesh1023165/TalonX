@@ -25,6 +25,7 @@ from talonx_quant import consumer as consumer_module
 from talonx_quant.config import QuantConfig
 from talonx_quant.consumer import QuantScanner
 from talonx_quant.schemas import QuantSignal, SignalDirection, SignalType
+from talonx_quant.store import QuantStateStore
 
 
 def _signal(ticker: str, volume_surge_ratio: float | None, signal_type=SignalType.MACD_BULLISH_CROSS) -> QuantSignal:
@@ -137,3 +138,55 @@ async def test_flush_throttle_window_is_a_noop_when_nothing_pending(scanner):
 
     scanner._client.publish.assert_not_awaited()
     assert scanner.signals_published == 0
+
+
+# --- Suppression-count persistence (the EOD report's signal-funnel section) -
+
+@pytest.mark.asyncio
+async def test_cooldown_suppression_is_recorded_when_a_store_is_set(tmp_path, monkeypatch):
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config: [_signal("AAPL", 3.0)])
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        scanner = QuantScanner(QuantConfig(), store=store)
+        scanner._client = AsyncMock()
+        scanner._client.exists.return_value = True  # already on cooldown
+
+        await scanner._handle_message(_bar_message("AAPL"))
+
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        rows = store.suppression_counts_for_date(today)
+    assert len(rows) == 1
+    assert rows[0]["ticker"] == "AAPL"
+    assert rows[0]["reason"] == "COOLDOWN"
+    assert rows[0]["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_throttle_suppression_is_recorded_per_ticker(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        scanner = QuantScanner(QuantConfig(throttle_max_signals=1), store=store)
+        scanner._client = AsyncMock()
+        # Two candidates for the SAME dropped ticker in one flush -- the
+        # per-ticker count should be 2, not two separate rows.
+        scanner._pending_candidates = [
+            _signal("HIGH", 5.0), _signal("LOW", 1.0), _signal("LOW", 0.9),
+        ]
+
+        await scanner._flush_throttle_window()
+
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        rows = {r["ticker"]: r for r in store.suppression_counts_for_date(today)}
+    assert rows["LOW"]["reason"] == "THROTTLE"
+    assert rows["LOW"]["count"] == 2
+    assert "HIGH" not in rows  # released, not dropped
+
+
+@pytest.mark.asyncio
+async def test_no_store_means_no_persistence_attempted(scanner, monkeypatch):
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config: [_signal("AAPL", 3.0)])
+    scanner._client.exists.return_value = True
+
+    # scanner fixture has store=None by default -- must not raise.
+    await scanner._handle_message(_bar_message("AAPL"))
+    assert scanner.signals_suppressed_cooldown == 1

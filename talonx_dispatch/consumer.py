@@ -4,8 +4,25 @@ talonx_dispatch.consumer
 Async Redis Pub/Sub consumer: subscribes to talonx:alerts:dispatch, and
 for each ActionableAlert, records it to the durable audit trail
 (store.py) and -- if Telegram is configured and the alert's severity
-clears TALONX_DISPATCH_MIN_SEVERITY -- formats and sends it as a mobile
-push notification.
+clears TALONX_DISPATCH_MIN_SEVERITY -- formats and sends a SHORT push
+notification (formatter.format_telegram_summary) with just enough to
+read at a glance plus the alert's ID; the full writeup is available on
+demand by replying to that push with the ID (telegram_listener.py).
+
+Also subscribes to talonx:paper:trades (published by talonx_paper,
+Module 6) -- a PaperTradeExecution gets its OWN short push
+(formatter.format_telegram_trade_execution), deliberately SEPARATE from
+and not appended to the triggering alert's push, so a trade execution
+doesn't reinstate a long combined message. Not stored here either --
+talonx_paper's own trade_history is already the durable record; this
+module's job stays "notify," not "store twice."
+
+DispatchAgent.run() is three concurrent tasks, not one: the Redis alert
+listener below, TelegramReplyListener's incoming-message poll (only
+started if Telegram is configured -- no token, nothing to poll), and a
+periodic audit-trail retention sweep (purges rows older than
+TALONX_DISPATCH_RETENTION_DAYS so a long-running install doesn't grow
+the audit db forever). All three share self._stop_event.
 
 Reconnects with backoff on Redis connection loss, same pattern as every
 other consumer in this project (jitter helper reimplemented locally
@@ -26,14 +43,16 @@ import asyncio
 import json
 import logging
 import random
+from datetime import datetime, timedelta, timezone
 
 from pydantic import ValidationError
 
 from talonx_dispatch.config import DispatchConfig
-from talonx_dispatch.formatter import format_telegram_message
-from talonx_dispatch.schemas import ActionableAlert, AlertSeverity
+from talonx_dispatch.formatter import format_telegram_summary, format_telegram_trade_execution
+from talonx_dispatch.schemas import ActionableAlert, AlertSeverity, PaperTradeExecution
 from talonx_dispatch.store import AuditStore
 from talonx_dispatch.telegram_client import TelegramClient, TelegramSendError
+from talonx_dispatch.telegram_listener import TelegramReplyListener
 
 logger = logging.getLogger("talonx_dispatch.consumer")
 
@@ -59,11 +78,13 @@ class DispatchAgent:
         self.config = config or DispatchConfig()
         self.store = store or AuditStore(self.config.audit_db_path)
         self.telegram_client = telegram_client or TelegramClient(self.config)
+        self.reply_listener = TelegramReplyListener(self.store, self.config, self.telegram_client)
         self._client = None
         self._stop_event = asyncio.Event()
         self._alerts_processed = 0
         self._telegram_sent = 0
         self._telegram_failed = 0
+        self._alerts_purged = 0
 
         try:
             self._min_severity = AlertSeverity(self.config.telegram_min_severity.lower())
@@ -83,6 +104,7 @@ class DispatchAgent:
 
     def stop(self) -> None:
         self._stop_event.set()
+        self.reply_listener.stop()
 
     @property
     def alerts_processed(self) -> int:
@@ -96,12 +118,25 @@ class DispatchAgent:
     def telegram_failed(self) -> int:
         return self._telegram_failed
 
+    @property
+    def alerts_purged(self) -> int:
+        return self._alerts_purged
+
     async def run(self) -> None:
         if redis_asyncio is None:
             raise ImportError(
                 "The 'redis' package is required. Install it with: pip install redis"
             )
 
+        tasks = [
+            asyncio.create_task(self._run_redis_listener(), name="dispatch_redis_listener"),
+            asyncio.create_task(self._retention_sweep_loop(), name="dispatch_retention_sweep"),
+        ]
+        if self.telegram_client.is_configured:
+            tasks.append(asyncio.create_task(self.reply_listener.run(), name="telegram_reply_listener"))
+        await asyncio.gather(*tasks)
+
+    async def _run_redis_listener(self) -> None:
         attempt = 0
         while not self._stop_event.is_set():
             try:
@@ -119,6 +154,34 @@ class DispatchAgent:
                 )
                 await asyncio.sleep(wait)
 
+    async def _retention_sweep_loop(self) -> None:
+        """Purges audit rows older than TALONX_DISPATCH_RETENTION_DAYS,
+        once immediately at startup and then every
+        TALONX_DISPATCH_RETENTION_SWEEP_HOURS -- same sleep/wake-on-stop
+        shape as run_talonx.py's periodic_ingestion_loop."""
+        interval_seconds = self.config.retention_sweep_interval_hours * 3600
+        while not self._stop_event.is_set():
+            await self._run_retention_sweep_once()
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=interval_seconds)
+            except asyncio.TimeoutError:
+                pass  # normal case: interval elapsed, sweep again
+
+    async def _run_retention_sweep_once(self) -> int:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=self.config.retention_days)
+        try:
+            purged = self.store.purge_older_than(cutoff)
+        except Exception as exc:  # noqa: BLE001 -- one bad sweep shouldn't kill the loop
+            logger.error("Retention sweep failed: %s", exc)
+            return 0
+        self._alerts_purged += purged
+        if purged:
+            logger.info(
+                "Retention sweep: purged %d alert(s) older than %s (%.0f day(s))",
+                purged, cutoff.isoformat(), self.config.retention_days,
+            )
+        return purged
+
     async def _connect_and_listen(self) -> None:
         self._client = redis_asyncio.from_url(
             self.config.redis_url,
@@ -129,8 +192,10 @@ class DispatchAgent:
         logger.info("Connected to Redis at %s", self.config.redis_url)
 
         pubsub = self._client.pubsub()
-        await pubsub.subscribe(self.config.alerts_channel)
-        logger.info("Subscribed to %s", self.config.alerts_channel)
+        await pubsub.subscribe(self.config.alerts_channel, self.config.paper_trades_channel)
+        logger.info(
+            "Subscribed to %s and %s", self.config.alerts_channel, self.config.paper_trades_channel,
+        )
 
         try:
             while not self._stop_event.is_set():
@@ -141,7 +206,7 @@ class DispatchAgent:
                     continue  # normal: no message within this poll window
                 await self._handle_message(message)
         finally:
-            await pubsub.unsubscribe(self.config.alerts_channel)
+            await pubsub.unsubscribe(self.config.alerts_channel, self.config.paper_trades_channel)
             await pubsub.aclose()
             await self._client.aclose()
 
@@ -150,10 +215,26 @@ class DispatchAgent:
         if raw is None:
             return
 
+        channel = message.get("channel")
+        if isinstance(channel, bytes):
+            channel = channel.decode()
+
         try:
             payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            logger.warning("Dropping unparseable message on %s: %s", channel, exc)
+            return
+
+        if channel == self.config.paper_trades_channel:
+            await self._handle_trade_execution(payload)
+            return
+        if channel != self.config.alerts_channel:
+            logger.warning("Dropping message on unexpected channel %s", channel)
+            return
+
+        try:
             alert = ActionableAlert.model_validate(payload)
-        except (json.JSONDecodeError, ValidationError) as exc:
+        except ValidationError as exc:
             logger.warning("Dropping unparseable alert: %s", exc)
             return
 
@@ -166,13 +247,36 @@ class DispatchAgent:
 
         await self._maybe_send_telegram(alert, alert_id)
 
+    async def _handle_trade_execution(self, payload: dict) -> None:
+        try:
+            execution = PaperTradeExecution.model_validate(payload)
+        except ValidationError as exc:
+            logger.warning("Dropping unparseable paper trade execution: %s", exc)
+            return
+
+        if not self.telegram_client.is_configured:
+            return
+
+        text = format_telegram_trade_execution(execution)
+        try:
+            await self.telegram_client.send(text)
+            logger.info(
+                "Telegram push sent for paper trade #%d (%s %s)",
+                execution.trade_id, execution.ticker, execution.order_type.value,
+            )
+        except TelegramSendError as exc:
+            logger.error(
+                "Telegram push failed for paper trade #%d (%s): %s",
+                execution.trade_id, execution.ticker, exc,
+            )
+
     async def _maybe_send_telegram(self, alert: ActionableAlert, alert_id: int) -> None:
         if not self.telegram_client.is_configured:
             return
         if alert.severity.rank < self._min_severity.rank:
             return
 
-        text = format_telegram_message(alert)
+        text = format_telegram_summary(alert, alert_id)
         try:
             await self.telegram_client.send(text)
             self.store.mark_telegram_sent(alert_id)

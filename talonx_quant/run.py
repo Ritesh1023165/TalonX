@@ -13,7 +13,9 @@ import asyncio
 import logging
 import signal
 
+from talonx_quant.config import QuantConfig
 from talonx_quant.consumer import QuantScanner
+from talonx_quant.store import QuantStateStore
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,7 +25,20 @@ logger = logging.getLogger("talonx_quant.run")
 
 
 async def main() -> None:
-    scanner = QuantScanner()
+    config = QuantConfig()
+
+    store: QuantStateStore | None = None
+    if config.enable_persistence:
+        try:
+            store = QuantStateStore(config.db_path)
+        except Exception as exc:  # noqa: BLE001 -- persistence is a nice-to-have, not required
+            logger.warning(
+                "Suppression-count persistence disabled for this run: %s. "
+                "Continuing without it (EOD reports won't see this process' "
+                "cooldown/throttle counts).", exc,
+            )
+
+    scanner = QuantScanner(config=config, store=store)
 
     loop = asyncio.get_running_loop()
 
@@ -49,6 +64,8 @@ async def main() -> None:
             "Stopped. Processed %d bars, published %d signals this run.",
             scanner._bars_processed, scanner.signals_published,
         )
+        if store is not None:
+            store.close()
 
 
 if __name__ == "__main__":

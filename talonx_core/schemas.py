@@ -92,6 +92,18 @@ class ResearchReport(BaseModel):
     risk_factors: list[str] = Field(default_factory=list)
     model_used: str
 
+    # is_degraded=True is the ONE thing decision.py checks specially: it
+    # means talonx_brain couldn't produce a real qualitative read (LLM
+    # failed AND no cache existed) and this is a quant-only placeholder --
+    # bypasses the normal confidence gate into a DEGRADED_QUANT_ALERT
+    # rather than being silently suppressed like a normal low-confidence
+    # report. is_stale/from_cache are informational only (not branched on
+    # here), carried through from talonx_brain for dashboard/audit
+    # visibility.
+    is_stale: bool = False
+    is_degraded: bool = False
+    from_cache: bool = False
+
     generated_at: datetime
     published_at: datetime
 
@@ -108,6 +120,10 @@ class AlertAction(str, Enum):
     # actionable of the two outcomes: the technical setup says one thing,
     # the fundamentals/news say another.
     CONTRADICTED = "contradicted"
+    # talonx_brain couldn't produce a qualitative read at all (LLM outage,
+    # no cache to fall back on) -- dispatched anyway, quant-only, so the
+    # user knows a signal fired even without a research opinion backing it.
+    DEGRADED_QUANT_ALERT = "degraded_quant_alert"
 
 
 class AlertSeverity(str, Enum):
@@ -133,6 +149,7 @@ class ActionableAlert(BaseModel):
     key_findings: list[str] = Field(default_factory=list)
     risk_factors: list[str] = Field(default_factory=list)
     model_used: str
+    is_degraded: bool = False
 
     # When talonx_core itself received each half of the correlated pair --
     # useful for diagnosing how stale a pairing was, independent of the

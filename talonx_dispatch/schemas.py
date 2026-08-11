@@ -46,6 +46,16 @@ class AlertAction(str, Enum):
     CONFIRMED_BULLISH = "confirmed_bullish"
     CONFIRMED_BEARISH = "confirmed_bearish"
     CONTRADICTED = "contradicted"
+    DEGRADED_QUANT_ALERT = "degraded_quant_alert"
+    # Never a real ActionableAlert.action -- only ever appears as
+    # PaperTradeExecution.triggering_action (talonx_paper's own
+    # engine.check_stop_take triggered the SELL, not an alert). Must
+    # exist here too since PaperTradeExecution is re-validated against
+    # THIS module's mirror on talonx:paper:trades -- omitting it would
+    # silently drop every stop-loss/take-profit execution as an
+    # "invalid payload" rather than notify on it.
+    STOP_LOSS_EXIT = "stop_loss_exit"
+    TAKE_PROFIT_EXIT = "take_profit_exit"
 
 
 class AlertSeverity(str, Enum):
@@ -85,8 +95,35 @@ class ActionableAlert(BaseModel):
     key_findings: list[str] = Field(default_factory=list)
     risk_factors: list[str] = Field(default_factory=list)
     model_used: str
+    is_degraded: bool = False
 
     signal_received_at: datetime
     report_received_at: datetime
     correlated_at: datetime
     published_at: datetime
+
+
+class OrderType(str, Enum):
+    BUY = "BUY"
+    SELL = "SELL"
+
+
+class PaperTradeExecution(BaseModel):
+    """Consumed from talonx:paper:trades (published by talonx_paper) --
+    trimmed mirror of talonx_paper.schemas.PaperTradeExecution, same
+    re-declaration convention as ActionableAlert above."""
+
+    trade_id: int
+    ticker: str
+    order_type: OrderType
+    execution_price: float
+    shares: float
+    position_cost: float
+    entry_price: float | None = None
+    realized_pnl_usd: float | None = None
+    realized_pnl_pct: float | None = None
+    portfolio_cash_after: float
+    triggering_action: AlertAction
+    session_realized_pnl_usd: float
+    session_realized_pnl_pct: float
+    timestamp: datetime

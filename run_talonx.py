@@ -24,6 +24,11 @@ terminal, one Ctrl+C to stop:
                             ActionableAlerts, recording them to the audit
                             trail (SQLite), and pushing to Telegram if
                             configured.
+  - Module 6, continuous:  the paper trading engine, simulating BUY/SELL
+                            execution on ActionableAlerts for tickers with
+                            paper trading enabled (talonx_watchlist), and
+                            publishing PaperTradeExecutions that Module 5
+                            also notifies on.
 
 Module 3 is OPTIONAL here, same "degrade, don't crash" philosophy as Redis
 publishing elsewhere in this project: if the configured LLM provider isn't
@@ -39,10 +44,10 @@ redis.asyncio + pydantic, already required everywhere else in this file),
 so they're always started unless explicitly skipped.
 
 EVERY continuous component can be pulled out with its own --skip-* flag
-(market data, quant scanner, brain, core, dispatch) -- handy while
-actively iterating on one piece: run the other four here and the one
-you're working on in its own terminal (`python -m talonx_quant.run`, etc.)
-without restarting this whole process every time you make a change.
+(market data, quant scanner, brain, core, dispatch, paper trading) --
+handy while actively iterating on one piece: run the others here and the
+one you're working on in its own terminal (`python -m talonx_quant.run`,
+etc.) without restarting this whole process every time you make a change.
 
 NOT included here, and never will be: the Streamlit dashboard
 (talonx_dispatch/app.py). Streamlit reruns its entire script top-to-bottom
@@ -67,19 +72,20 @@ rows, they're ignored in favor of the dashboard.
 
 Replaces running `talonx_ingest.pipeline`, `talonx_ingest.news.pipeline`,
 `talonx_ingest.market_data.run`, `talonx_quant.run`, `talonx_brain.run`,
-`talonx_core.run`, and `talonx_dispatch.run` by hand in seven separate
-terminals.
+`talonx_core.run`, `talonx_dispatch.run`, and `talonx_paper.run` by hand
+in eight separate terminals.
 
 Usage:
     python run_talonx.py
     python run_talonx.py AAPL MSFT NVDA TSLA   # only seeds an empty watchlist
     python run_talonx.py --interval-hours 12
-    python run_talonx.py --skip-ingestion     # skip periodic filing/news ingestion
-    python run_talonx.py --skip-market-data   # skip Module 1's live market stream
-    python run_talonx.py --skip-quant         # skip Module 2 (talonx_quant)
-    python run_talonx.py --skip-brain         # skip Module 3 (talonx_brain)
-    python run_talonx.py --skip-core          # skip Module 4 (talonx_core)
-    python run_talonx.py --skip-dispatch      # skip Module 5 (talonx_dispatch)
+    python run_talonx.py --skip-ingestion       # skip periodic filing/news ingestion
+    python run_talonx.py --skip-market-data     # skip Module 1's live market stream
+    python run_talonx.py --skip-quant           # skip Module 2 (talonx_quant)
+    python run_talonx.py --skip-brain           # skip Module 3 (talonx_brain)
+    python run_talonx.py --skip-core            # skip Module 4 (talonx_core)
+    python run_talonx.py --skip-dispatch        # skip Module 5 (talonx_dispatch)
+    python run_talonx.py --skip-paper-trading   # skip Module 6 (talonx_paper)
 
     # e.g. iterating on talonx_quant: run everything ELSE here, run
     # talonx_quant yourself in another terminal so you can restart just
@@ -100,12 +106,17 @@ from talonx_ingest.market_data.manager import MarketDataManager
 from talonx_ingest.market_data.run import make_on_event
 from talonx_ingest.news.pipeline import run_news_ingestion
 from talonx_ingest.pipeline import run_ingestion
+from talonx_quant.config import QuantConfig
 from talonx_quant.consumer import QuantScanner
+from talonx_quant.store import QuantStateStore
+from talonx_brain.config import BrainConfig
 from talonx_brain.consumer import ResearchAgent
+from talonx_brain.store import BrainStatsStore
 from talonx_core.config import CoreConfig
 from talonx_core.consumer import DecisionEngine
 from talonx_core.store import TickerStateStore
 from talonx_dispatch.consumer import DispatchAgent
+from talonx_paper.consumer import PaperTradingEngine
 from talonx_watchlist.config import WatchlistConfig
 from talonx_watchlist.store import TickerWatchlistStore
 
@@ -287,13 +298,35 @@ async def main() -> None:
     logger.info("Tracked tickers: %s", watchlist_store.list_symbols())
 
     stop_event = asyncio.Event()
-    quant_scanner: QuantScanner | None = None if args.skip_quant else QuantScanner()
+    quant_scanner: QuantScanner | None = None
+    quant_store: QuantStateStore | None = None
+    if not args.skip_quant:
+        quant_config = QuantConfig()
+        if quant_config.enable_persistence:
+            try:
+                quant_store = QuantStateStore(quant_config.db_path)
+            except Exception as exc:  # noqa: BLE001 -- persistence is a nice-to-have, not required
+                logger.warning(
+                    "Module 2 (talonx_quant) suppression-count persistence disabled "
+                    "for this run: %s. Continuing without it.", exc,
+                )
+        quant_scanner = QuantScanner(config=quant_config, store=quant_store)
     market_publisher = RedisEventPublisher()
 
     research_agent: ResearchAgent | None = None
+    brain_store: BrainStatsStore | None = None
     if not args.skip_brain:
         try:
-            research_agent = ResearchAgent()
+            brain_config = BrainConfig()
+            if brain_config.enable_persistence:
+                try:
+                    brain_store = BrainStatsStore(brain_config.db_path)
+                except Exception as exc:  # noqa: BLE001 -- persistence is a nice-to-have, not required
+                    logger.warning(
+                        "Module 3 (talonx_brain) report-category persistence disabled "
+                        "for this run: %s. Continuing without it.", exc,
+                    )
+            research_agent = ResearchAgent(config=brain_config, store=brain_store)
             logger.info("Module 3 (talonx_brain) LLM provider: %s", research_agent.llm_chain.describe())
         except (ImportError, ValueError) as exc:
             logger.warning(
@@ -330,6 +363,21 @@ async def main() -> None:
                 exc,
             )
 
+    paper_trading_engine: PaperTradingEngine | None = None
+    if not args.skip_paper_trading:
+        try:
+            # Shares the SAME watchlist_store instance/connection already
+            # created above (not a second TickerWatchlistStore against the
+            # same file) -- one connection per process, matching the
+            # convention already used for market_data_runner/periodic_ingestion_loop.
+            paper_trading_engine = PaperTradingEngine(watchlist_store=watchlist_store)
+        except Exception as exc:  # noqa: BLE001 -- ledger init failure shouldn't crash the whole run
+            logger.warning(
+                "Module 6 (talonx_paper) disabled for this run: %s. Modules 1-5 "
+                "will run normally without it.",
+                exc,
+            )
+
     market_data_runner: WatchlistDrivenMarketData | None = None
     if not args.skip_market_data:
         market_data_runner = WatchlistDrivenMarketData(
@@ -349,6 +397,8 @@ async def main() -> None:
             decision_engine.stop()
         if dispatch_agent is not None:
             dispatch_agent.stop()
+        if paper_trading_engine is not None:
+            paper_trading_engine.stop()
 
     loop = asyncio.get_running_loop()
     try:
@@ -361,13 +411,14 @@ async def main() -> None:
 
     logger.info(
         "Starting TalonX (interval=%.1fh, ingestion=%s, market_data=%s, "
-        "quant=%s, brain=%s, core=%s, dispatch=%s)",
+        "quant=%s, brain=%s, core=%s, dispatch=%s, paper_trading=%s)",
         args.interval_hours, "disabled" if args.skip_ingestion else "enabled",
         "enabled" if market_data_runner is not None else "disabled",
         "enabled" if quant_scanner is not None else "disabled",
         "enabled" if research_agent is not None else "disabled",
         "enabled" if decision_engine is not None else "disabled",
         "enabled" if dispatch_agent is not None else "disabled",
+        "enabled" if paper_trading_engine is not None else "disabled",
     )
 
     tasks = []
@@ -381,6 +432,8 @@ async def main() -> None:
         tasks.append(asyncio.create_task(decision_engine.run(), name="decision_engine"))
     if dispatch_agent is not None:
         tasks.append(asyncio.create_task(dispatch_agent.run(), name="dispatch_agent"))
+    if paper_trading_engine is not None:
+        tasks.append(asyncio.create_task(paper_trading_engine.run(), name="paper_trading_engine"))
     if not args.skip_ingestion:
         tasks.append(
             asyncio.create_task(
@@ -409,18 +462,26 @@ async def main() -> None:
             decision_engine.stop()
         if dispatch_agent is not None:
             dispatch_agent.stop()
+        if paper_trading_engine is not None:
+            paper_trading_engine.stop()
     finally:
         await market_publisher.close()
+        if quant_store is not None:
+            quant_store.close()
+        if brain_store is not None:
+            brain_store.close()
         if core_store is not None:
             core_store.close()
         if dispatch_agent is not None:
             dispatch_agent.store.close()
+        if paper_trading_engine is not None:
+            paper_trading_engine.store.close()
         watchlist_store.close()
         logger.info("All components stopped.")
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run all of TalonX Module 1 + 2 + 3 + 4 + 5 together")
+    parser = argparse.ArgumentParser(description="Run all of TalonX Module 1 + 2 + 3 + 4 + 5 + 6 together")
     parser.add_argument(
         "tickers", nargs="*", default=None,
         help="Ticker symbols to seed the watchlist with -- only takes effect if the "
@@ -459,6 +520,11 @@ def _parse_args() -> argparse.Namespace:
         "--skip-dispatch", action="store_true",
         help="Skip Module 5 (talonx_dispatch) -- run it yourself with "
              "`python -m talonx_dispatch.run` instead",
+    )
+    parser.add_argument(
+        "--skip-paper-trading", action="store_true",
+        help="Skip Module 6 (talonx_paper) -- run it yourself with "
+             "`python -m talonx_paper.run` instead",
     )
     return parser.parse_args()
 

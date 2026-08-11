@@ -56,6 +56,13 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    val = os.environ.get(name)
+    if val is None:
+        return default
+    return val.strip().lower() in ("1", "true", "yes", "on")
+
+
 @dataclass(frozen=True)
 class QuantConfig:
     # --- Redis ---
@@ -127,3 +134,13 @@ class QuantConfig:
     # throttle_max_signals that window.
     throttle_window_seconds: float = _env_float("TALONX_QUANT_THROTTLE_WINDOW_SECONDS", 60.0)
     throttle_max_signals: int = _env_int("TALONX_QUANT_THROTTLE_MAX_SIGNALS", 3)
+
+    # --- Persistence (suppression counts, for the EOD report) ---
+    # Cooldown/throttle suppression counts were in-memory-only counters
+    # until this was added -- see store.py's QuantStateStore. Disable to
+    # run pure in-memory, same escape hatch talonx_core's equivalent flag
+    # provides.
+    enable_persistence: bool = _env_bool("TALONX_QUANT_ENABLE_PERSISTENCE", True)
+    db_path: str = os.environ.get(
+        "TALONX_QUANT_DB_PATH", str(Path.home() / ".talonx" / "quant.db")
+    )
