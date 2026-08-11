@@ -36,6 +36,13 @@ listener or losing the alert. The audit trail is the source of truth;
 Telegram is a best-effort notification layer on top, same "durable write
 first, best-effort broadcast second" split talonx_ingest.events.publisher
 established for MarketTickEvent/NewFilingIngestedEvent.
+
+Reads talonx_watchlist's store for a ticker's company name to show in
+both push types (e.g. "AAPL (Apple Inc.)") -- a shared control-plane
+lookup, not a pipeline data contract, same reasoning talonx_paper/
+config.py and app.py already depend on talonx_watchlist directly for.
+A ticker not (yet) on the watchlist just shows without a company name
+suffix rather than failing the push.
 """
 from __future__ import annotations
 
@@ -53,6 +60,8 @@ from talonx_dispatch.schemas import ActionableAlert, AlertSeverity, PaperTradeEx
 from talonx_dispatch.store import AuditStore
 from talonx_dispatch.telegram_client import TelegramClient, TelegramSendError
 from talonx_dispatch.telegram_listener import TelegramReplyListener
+from talonx_watchlist.config import WatchlistConfig
+from talonx_watchlist.store import TickerWatchlistStore
 
 logger = logging.getLogger("talonx_dispatch.consumer")
 
@@ -74,10 +83,12 @@ class DispatchAgent:
         config: DispatchConfig | None = None,
         store: AuditStore | None = None,
         telegram_client: TelegramClient | None = None,
+        watchlist_store: TickerWatchlistStore | None = None,
     ):
         self.config = config or DispatchConfig()
         self.store = store or AuditStore(self.config.audit_db_path)
         self.telegram_client = telegram_client or TelegramClient(self.config)
+        self.watchlist_store = watchlist_store or TickerWatchlistStore(WatchlistConfig().db_path)
         self.reply_listener = TelegramReplyListener(self.store, self.config, self.telegram_client)
         self._client = None
         self._stop_event = asyncio.Event()
@@ -247,6 +258,14 @@ class DispatchAgent:
 
         await self._maybe_send_telegram(alert, alert_id)
 
+    def _company_name(self, ticker: str) -> str | None:
+        try:
+            row = self.watchlist_store.get_ticker(ticker)
+        except Exception as exc:  # noqa: BLE001 -- a lookup failure shouldn't block the push
+            logger.warning("Watchlist lookup failed for %s (%s) -- pushing without a company name", ticker, exc)
+            return None
+        return row["name"] if row else None
+
     async def _handle_trade_execution(self, payload: dict) -> None:
         try:
             execution = PaperTradeExecution.model_validate(payload)
@@ -257,7 +276,7 @@ class DispatchAgent:
         if not self.telegram_client.is_configured:
             return
 
-        text = format_telegram_trade_execution(execution)
+        text = format_telegram_trade_execution(execution, self._company_name(execution.ticker))
         try:
             await self.telegram_client.send(text)
             logger.info(
@@ -276,7 +295,7 @@ class DispatchAgent:
         if alert.severity.rank < self._min_severity.rank:
             return
 
-        text = format_telegram_summary(alert, alert_id)
+        text = format_telegram_summary(alert, alert_id, self._company_name(alert.ticker))
         try:
             await self.telegram_client.send(text)
             self.store.mark_telegram_sent(alert_id)

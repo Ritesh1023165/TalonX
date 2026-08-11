@@ -355,7 +355,11 @@ async def main() -> None:
     dispatch_agent: DispatchAgent | None = None
     if not args.skip_dispatch:
         try:
-            dispatch_agent = DispatchAgent()
+            # Shares the SAME watchlist_store instance already created
+            # above (not a second TickerWatchlistStore against the same
+            # file) -- same one-connection-per-process convention
+            # paper_trading_engine's construction already follows.
+            dispatch_agent = DispatchAgent(watchlist_store=watchlist_store)
         except Exception as exc:  # noqa: BLE001 -- audit DB init failure shouldn't crash the whole run
             logger.warning(
                 "Module 5 (talonx_dispatch) disabled for this run: %s. Modules 1-4 "

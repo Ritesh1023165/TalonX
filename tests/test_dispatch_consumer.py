@@ -24,6 +24,7 @@ from talonx_dispatch.config import DispatchConfig
 from talonx_dispatch.consumer import DispatchAgent
 from talonx_dispatch.store import AuditStore
 from talonx_dispatch.telegram_client import TelegramSendError
+from talonx_watchlist.store import TickerWatchlistStore
 
 
 def _alert_payload(severity: str = "warning") -> dict:
@@ -80,13 +81,20 @@ def _trade_message(payload) -> dict:
 @pytest.fixture
 def agent(tmp_path):
     store = AuditStore(tmp_path / "audit.db")
+    watchlist_store = TickerWatchlistStore(tmp_path / "watchlist.db")
+    watchlist_store.add_ticker("AAPL", "Apple Inc.")
+    watchlist_store.add_ticker("SPCX", "SpaceX Holdings")
     telegram_client = AsyncMock()
     telegram_client.is_configured = False  # tests override per-case
 
-    agent = DispatchAgent(config=DispatchConfig(), store=store, telegram_client=telegram_client)
+    agent = DispatchAgent(
+        config=DispatchConfig(), store=store, telegram_client=telegram_client,
+        watchlist_store=watchlist_store,
+    )
     agent._client = AsyncMock()
     yield agent
     store.close()
+    watchlist_store.close()
 
 
 @pytest.mark.asyncio
@@ -236,12 +244,61 @@ async def test_retention_sweep_leaves_recent_alerts_alone(agent):
     assert agent.store.count() == 1
 
 
+# --- Company name + timestamp (looked up from talonx_watchlist) -----------
+
+@pytest.mark.asyncio
+async def test_telegram_push_includes_company_name_and_timestamp(agent):
+    agent.telegram_client.is_configured = True
+    await agent._handle_message(_message(_alert_payload(severity="critical")))
+
+    text = agent.telegram_client.send.await_args.args[0]
+    assert "Apple Inc." in text
+    assert "2026-08-07" in text  # correlated_at's date
+
+
+@pytest.mark.asyncio
+async def test_telegram_push_omits_company_name_for_an_untracked_ticker(agent):
+    agent.telegram_client.is_configured = True
+    payload = _alert_payload(severity="critical")
+    payload["ticker"] = "ZZZZ"  # not on the fixture's watchlist
+    payload["triggering_signal"]["ticker"] = "ZZZZ"
+    await agent._handle_message(_message(payload))
+
+    text = agent.telegram_client.send.await_args.args[0]
+    assert "ZZZZ" in text
+    assert "(" not in text.split("•")[0]  # no company-name parens before the ID marker
+
+
+@pytest.mark.asyncio
+async def test_trade_execution_push_includes_company_name_and_timestamp(agent):
+    agent.telegram_client.is_configured = True
+    await agent._handle_message(_trade_message(_trade_execution_payload()))
+
+    text = agent.telegram_client.send.await_args.args[0]
+    assert "SpaceX Holdings" in text
+    assert "2026-08-10" in text  # execution timestamp's date
+
+
+@pytest.mark.asyncio
+async def test_watchlist_lookup_failure_does_not_block_the_push(agent):
+    agent.telegram_client.is_configured = True
+    agent.watchlist_store.get_ticker = lambda ticker: (_ for _ in ()).throw(RuntimeError("db locked"))
+
+    await agent._handle_message(_message(_alert_payload(severity="critical")))
+
+    agent.telegram_client.send.assert_awaited_once()  # still sent, just without a company name
+
+
 def test_invalid_min_severity_config_falls_back_to_warning(tmp_path):
     store = AuditStore(tmp_path / "audit.db")
+    watchlist_store = TickerWatchlistStore(tmp_path / "watchlist.db")
     config = DispatchConfig(telegram_min_severity="not_a_real_severity")
-    agent = DispatchAgent(config=config, store=store, telegram_client=AsyncMock())
+    agent = DispatchAgent(
+        config=config, store=store, telegram_client=AsyncMock(), watchlist_store=watchlist_store,
+    )
     try:
         from talonx_dispatch.schemas import AlertSeverity
         assert agent._min_severity == AlertSeverity.WARNING
     finally:
         store.close()
+        watchlist_store.close()

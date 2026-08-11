@@ -75,14 +75,16 @@ def escape_markdown(text: str) -> str:
     return text
 
 
-def format_telegram_summary(alert: ActionableAlert, alert_id: int) -> str:
+def format_telegram_summary(alert: ActionableAlert, alert_id: int, company_name: str | None = None) -> str:
     emoji = _ACTION_EMOJI[alert.action]
     label = _ACTION_LABEL[alert.action]
     severity_prefix = _SEVERITY_PREFIX[alert.severity]
+    ticker_suffix = f" ({escape_markdown(company_name)})" if company_name else ""
 
     lines = [
-        f"{severity_prefix}{emoji} *{label}* — `{alert.ticker}`  •  #{alert_id}",
+        f"{severity_prefix}{emoji} *{label}* — `{alert.ticker}`{ticker_suffix}  •  #{alert_id}",
         f"Price: ${alert.triggering_signal.price:,.2f}  |  Confidence: {alert.research_confidence:.0%}",
+        f"\U0001F550 {_format_timestamp(alert.correlated_at)}",
         escape_markdown(_truncate(alert.triggering_signal.message, 200)),
         "",
         f"_Reply with {alert_id} for full details_",
@@ -122,16 +124,20 @@ def format_telegram_details(row: dict) -> str:
     return "\n".join(lines)
 
 
-def format_telegram_trade_execution(execution: PaperTradeExecution) -> str:
+def format_telegram_trade_execution(execution: PaperTradeExecution, company_name: str | None = None) -> str:
     """
     The paper-trading notification -- SEPARATE from and decoupled from
     format_telegram_summary's alert push (not appended to it), so a
     trade execution doesn't reinstate a long combined message. Short by
     design, same as every other push this module sends.
     """
+    ticker_suffix = f" ({escape_markdown(company_name)})" if company_name else ""
+    timestamp_line = f"\U0001F550 {_format_timestamp(execution.timestamp)}"
+
     if execution.order_type == OrderType.BUY:
         lines = [
-            f"\U0001F4B0 *BUY EXECUTED* — `{execution.ticker}`",
+            f"\U0001F4B0 *BUY EXECUTED* — `{execution.ticker}`{ticker_suffix}",
+            timestamp_line,
             f"{execution.shares:.4f} shares @ ${execution.execution_price:,.2f} "
             f"(${execution.position_cost:,.2f})",
             f"Cash: ${execution.portfolio_cash_after:,.2f}",
@@ -145,7 +151,8 @@ def format_telegram_trade_execution(execution: PaperTradeExecution) -> str:
         reason = _EXIT_REASON_LABEL.get(execution.triggering_action, "")
         reason_suffix = f" ({reason})" if reason else ""
         lines = [
-            f"\U0001F4B0 *SELL EXECUTED* — `{execution.ticker}`{reason_suffix}",
+            f"\U0001F4B0 *SELL EXECUTED* — `{execution.ticker}`{ticker_suffix}{reason_suffix}",
+            timestamp_line,
             f"Entry ${execution.entry_price:,.2f} → Exit ${execution.execution_price:,.2f}",
             f"Trade PnL: {pnl_sign}${execution.realized_pnl_usd:,.2f} "
             f"({pnl_sign}{execution.realized_pnl_pct:.2f}%)",
@@ -156,11 +163,12 @@ def format_telegram_trade_execution(execution: PaperTradeExecution) -> str:
     return "\n".join(lines)
 
 
-def _format_timestamp(iso_string: str) -> str:
+def _format_timestamp(value: datetime | str) -> str:
     try:
-        return datetime.fromisoformat(iso_string).strftime("%Y-%m-%d %H:%M UTC")
+        dt = value if isinstance(value, datetime) else datetime.fromisoformat(value)
+        return dt.strftime("%Y-%m-%d %H:%M UTC")
     except ValueError:
-        return iso_string
+        return str(value)
 
 
 def _truncate(text: str, max_chars: int) -> str:
