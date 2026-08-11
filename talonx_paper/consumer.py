@@ -20,6 +20,18 @@ published for it, but the reason is kept durably so an EOD report can
 explain "why didn't this ticker trade today" without re-deriving it from
 logs (see talonx_paper/store.py's ignored_decisions table).
 
+Every fill (BUY or SELL, whatever triggered it) crosses a simulated
+bid-ask spread (engine.apply_spread, config.simulated_spread_bps) so
+paper PnL isn't unrealistically clean. Every market tick for a ticker
+with an open position is also checked against a stop-loss/take-profit
+band (engine.check_stop_take) -- an independent, price-driven exit that
+runs ALONGSIDE the alert-driven SELL trigger in decide_trade(), not
+instead of it: a genuine CONFIRMED_BEARISH/CONTRADICTED reversal alert
+still closes a position immediately regardless of where price sits
+relative to stop/take. A CONFIRMED_BULLISH alert below
+config.min_entry_severity never opens a position at all (recorded as
+BELOW_MIN_SEVERITY) -- exits are never severity-gated.
+
 Reconnects with backoff on Redis connection loss, same pattern as every
 other consumer in this project.
 """
@@ -34,8 +46,15 @@ from datetime import datetime, timezone
 from pydantic import ValidationError
 
 from talonx_paper.config import PaperConfig
-from talonx_paper.engine import DecisionKind, TradeDecision, calculate_buy, decide_trade
-from talonx_paper.schemas import ActionableAlert, MarketTickEvent, PaperTradeExecution, TickEventType
+from talonx_paper.engine import DecisionKind, TradeDecision, apply_spread, calculate_buy, check_stop_take, decide_trade
+from talonx_paper.schemas import (
+    ActionableAlert,
+    AlertAction,
+    AlertSeverity,
+    MarketTickEvent,
+    PaperTradeExecution,
+    TickEventType,
+)
 from talonx_paper.store import PaperTradingStore
 from talonx_watchlist.config import WatchlistConfig
 from talonx_watchlist.store import TickerWatchlistStore
@@ -73,6 +92,15 @@ class PaperTradingEngine:
         self._alerts_processed = 0
         self._trades_executed = 0
         self._trades_ignored = 0
+
+        try:
+            self._min_entry_severity = AlertSeverity(self.config.min_entry_severity.lower())
+        except ValueError:
+            logger.warning(
+                "Invalid TALONX_PAPER_MIN_ENTRY_SEVERITY=%r, defaulting to 'warning'",
+                self.config.min_entry_severity,
+            )
+            self._min_entry_severity = AlertSeverity.WARNING
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -168,7 +196,25 @@ class PaperTradingEngine:
             return
         if event.event_type != TickEventType.BAR or event.close is None:
             return  # only BAR events carry a close price -- same filter talonx_quant.consumer uses
-        self.store.update_latest_price(event.symbol, event.close, datetime.now(timezone.utc))
+
+        now = datetime.now(timezone.utc)
+        self.store.update_latest_price(event.symbol, event.close, now)
+
+        position = self.store.get_position(event.symbol)
+        if position is None:
+            return  # flat -- nothing to check a stop/take band against
+
+        trigger = check_stop_take(
+            position["entry_price"], event.close, self.config.stop_loss_pct, self.config.take_profit_pct,
+        )
+        if trigger is None:
+            return
+
+        triggering_action = (
+            AlertAction.STOP_LOSS_EXIT if trigger == "STOP_LOSS" else AlertAction.TAKE_PROFIT_EXIT
+        )
+        fill_price = apply_spread(event.close, self.config.simulated_spread_bps, "SELL")
+        await self._close_position(event.symbol, fill_price, now, triggering_action)
 
     async def _handle_alert(self, payload: dict) -> None:
         try:
@@ -181,6 +227,16 @@ class PaperTradingEngine:
 
         if alert.ticker.upper() not in self.watchlist_store.list_paper_trading_symbols():
             return  # paper trading not enabled for this ticker -- silent skip, not an "ignored" event
+
+        if alert.action == AlertAction.CONFIRMED_BULLISH and alert.severity.rank < self._min_entry_severity.rank:
+            # Below the entry conviction bar -- never opens a position.
+            # Exits (SELL/stop-loss/take-profit) are never gated by
+            # severity, only new entries.
+            self.store.record_ignored(
+                alert.ticker, "BELOW_MIN_SEVERITY", alert.action,
+                alert.triggering_signal.price, alert.correlated_at,
+            )
+            return
 
         position = self.store.get_position(alert.ticker)
         decision = decide_trade(alert, position)
@@ -208,8 +264,9 @@ class PaperTradingEngine:
             await self._execute_sell(alert, decision)
 
     async def _execute_buy(self, alert: ActionableAlert, decision: TradeDecision) -> None:
+        fill_price = apply_spread(decision.price, self.config.simulated_spread_bps, "BUY")
         summary = self.store.get_portfolio_summary()
-        sized = calculate_buy(summary["current_cash"], summary["trade_allocation_usd"], decision.price)
+        sized = calculate_buy(summary["current_cash"], summary["trade_allocation_usd"], fill_price)
         if sized is None:
             self._trades_ignored += 1
             logger.warning(
@@ -217,35 +274,46 @@ class PaperTradingEngine:
                 alert.ticker, summary["current_cash"],
             )
             self.store.record_ignored(
-                alert.ticker, "INSUFFICIENT_CASH", alert.action, decision.price, alert.correlated_at,
+                alert.ticker, "INSUFFICIENT_CASH", alert.action, fill_price, alert.correlated_at,
             )
             return
 
         shares, cost = sized
-        execution = self.store.execute_buy(alert.ticker, shares, decision.price, cost, alert.correlated_at)
+        execution = self.store.execute_buy(alert.ticker, shares, fill_price, cost, alert.correlated_at)
         self._trades_executed += 1
         logger.info(
             "Paper BUY: %s %.4f shares @ $%.2f (cost $%.2f, cash after $%.2f)",
-            alert.ticker, shares, decision.price, cost, execution.portfolio_cash_after,
+            alert.ticker, shares, fill_price, cost, execution.portfolio_cash_after,
         )
         await self._publish_execution(execution)
 
     async def _execute_sell(self, alert: ActionableAlert, decision: TradeDecision) -> None:
-        execution = self.store.execute_sell(alert.ticker, decision.price, alert.correlated_at, alert.action)
+        """Alert-driven exit (CONFIRMED_BEARISH/CONTRADICTED) -- a genuine
+        reversal signal, always honored regardless of where price sits
+        relative to the stop-loss/take-profit band."""
+        fill_price = apply_spread(decision.price, self.config.simulated_spread_bps, "SELL")
+        await self._close_position(alert.ticker, fill_price, alert.correlated_at, alert.action)
+
+    async def _close_position(
+        self, ticker: str, fill_price: float, timestamp: datetime, triggering_action: AlertAction,
+    ) -> None:
+        """Shared by the alert-driven SELL path (_execute_sell) and the
+        price-driven stop-loss/take-profit path (_handle_market_tick) --
+        both end the same way: close the position, record the trade,
+        publish the execution."""
+        execution = self.store.execute_sell(ticker, fill_price, timestamp, triggering_action)
         if execution is None:
             logger.warning(
-                "Paper SELL skipped for %s -- no open position found at execution time", alert.ticker,
+                "Paper SELL skipped for %s -- no open position found at execution time", ticker,
             )
-            self.store.record_ignored(
-                alert.ticker, "NO_ACTIVE_POSITION", alert.action, decision.price, alert.correlated_at,
-            )
+            self.store.record_ignored(ticker, "NO_ACTIVE_POSITION", triggering_action, fill_price, timestamp)
             return
 
         self._trades_executed += 1
         logger.info(
-            "Paper SELL: %s @ $%.2f (PnL $%.2f / %.2f%%, cash after $%.2f)",
-            alert.ticker, decision.price, execution.realized_pnl_usd, execution.realized_pnl_pct,
-            execution.portfolio_cash_after,
+            "Paper SELL: %s @ $%.2f (%s, PnL $%.2f / %.2f%%, cash after $%.2f)",
+            ticker, fill_price, triggering_action.value, execution.realized_pnl_usd,
+            execution.realized_pnl_pct, execution.portfolio_cash_after,
         )
         await self._publish_execution(execution)
 

@@ -68,3 +68,26 @@ class PaperConfig:
     # Use the dashboard's Reset Portfolio to actually apply a new value.
     default_initial_balance: float = _env_float("TALONX_PAPER_INITIAL_BALANCE", 10000.0)
     default_trade_allocation_usd: float = _env_float("TALONX_PAPER_TRADE_ALLOCATION", 2500.0)
+
+    # --- Risk management (engine.check_stop_take) ---
+    # Percentage-based, off entry price. Static for now -- an ATR-based
+    # dynamic version is a deliberately deferred follow-up (needs its own
+    # rolling OHLC buffer + indicator calc); these defaults give a 1:2
+    # risk-to-reward ratio, exceeding a 1:1.5 minimum.
+    stop_loss_pct: float = _env_float("TALONX_PAPER_STOP_LOSS_PCT", 0.005)  # 0.50%
+    take_profit_pct: float = _env_float("TALONX_PAPER_TAKE_PROFIT_PCT", 0.01)  # 1.00%
+
+    # --- Friction simulation (engine.apply_spread) ---
+    # Applied to every fill (BUY pays more, SELL receives less) so paper
+    # PnL isn't unrealistically clean -- a flat commission is deliberately
+    # NOT modeled, since most modern retail brokers are commission-free;
+    # the bid-ask spread is the friction that actually always applies.
+    simulated_spread_bps: float = _env_float("TALONX_PAPER_SIMULATED_SPREAD_BPS", 5.0)  # 0.05%
+
+    # --- Entry conviction gate ---
+    # A CONFIRMED_BULLISH alert below this severity is recorded as
+    # ignored (BELOW_MIN_SEVERITY) rather than opening a position. Never
+    # gates exits. "warning" is a starting point, not a backtested value
+    # -- tune it using generate_eod_report.py's BELOW_MIN_SEVERITY counts
+    # once there's a few real sessions of data (README §5o).
+    min_entry_severity: str = os.environ.get("TALONX_PAPER_MIN_ENTRY_SEVERITY", "warning")

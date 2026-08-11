@@ -30,6 +30,25 @@ class AlertAction(str, Enum):
     CONFIRMED_BEARISH = "confirmed_bearish"
     CONTRADICTED = "contradicted"
     DEGRADED_QUANT_ALERT = "degraded_quant_alert"
+    # Never a real ActionableAlert.action -- only ever used as
+    # PaperTradeExecution.triggering_action for a SELL that engine.
+    # check_stop_take triggered on a market tick, with no originating
+    # alert at all.
+    STOP_LOSS_EXIT = "stop_loss_exit"
+    TAKE_PROFIT_EXIT = "take_profit_exit"
+
+
+class AlertSeverity(str, Enum):
+    INFO = "info"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+    @property
+    def rank(self) -> int:
+        """Ordinal for >= comparisons against config.min_entry_severity --
+        same pattern talonx_dispatch.schemas.AlertSeverity already uses
+        for its own TALONX_DISPATCH_MIN_SEVERITY gate."""
+        return {"info": 0, "warning": 1, "critical": 2}[self.value]
 
 
 class TriggeringSignalRef(BaseModel):
@@ -41,6 +60,9 @@ class ActionableAlert(BaseModel):
 
     ticker: str
     action: AlertAction
+    # Defaulted, not required -- keeps any payload/test that predates the
+    # entry-conviction gate (config.min_entry_severity) parsing cleanly.
+    severity: AlertSeverity = AlertSeverity.WARNING
     triggering_signal: TriggeringSignalRef
     correlated_at: datetime
 

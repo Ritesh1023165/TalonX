@@ -12,7 +12,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from talonx_paper.engine import DecisionKind, calculate_buy, calculate_sell_pnl, decide_trade
+from talonx_paper.engine import (
+    DecisionKind,
+    apply_spread,
+    calculate_buy,
+    calculate_sell_pnl,
+    check_stop_take,
+    decide_trade,
+)
 from talonx_paper.schemas import ActionableAlert, AlertAction, TriggeringSignalRef
 
 NOW = datetime(2026, 8, 10, 14, 37, 0, tzinfo=timezone.utc)
@@ -123,3 +130,55 @@ def test_calculate_sell_pnl_zero_for_a_flat_exit():
     pnl_usd, pnl_pct = calculate_sell_pnl(shares=10.0, entry_price=100.0, exit_price=100.0)
     assert pnl_usd == 0.0
     assert pnl_pct == 0.0
+
+
+# --- check_stop_take -------------------------------------------------------
+
+def test_check_stop_take_triggers_stop_loss_when_price_falls_far_enough():
+    # entry 100, stop 0.5% -> stop price 99.50
+    assert check_stop_take(100.0, 99.40, stop_loss_pct=0.005, take_profit_pct=0.01) == "STOP_LOSS"
+
+
+def test_check_stop_take_triggers_take_profit_when_price_rises_far_enough():
+    # entry 100, take 1% -> target 101.00
+    assert check_stop_take(100.0, 101.10, stop_loss_pct=0.005, take_profit_pct=0.01) == "TAKE_PROFIT"
+
+
+def test_check_stop_take_returns_none_inside_the_band():
+    assert check_stop_take(100.0, 100.20, stop_loss_pct=0.005, take_profit_pct=0.01) is None
+    assert check_stop_take(100.0, 99.80, stop_loss_pct=0.005, take_profit_pct=0.01) is None
+
+
+def test_check_stop_take_exact_stop_boundary_triggers():
+    assert check_stop_take(100.0, 99.50, stop_loss_pct=0.005, take_profit_pct=0.01) == "STOP_LOSS"
+
+
+def test_check_stop_take_exact_take_profit_boundary_triggers():
+    assert check_stop_take(100.0, 101.00, stop_loss_pct=0.005, take_profit_pct=0.01) == "TAKE_PROFIT"
+
+
+def test_check_stop_take_stop_loss_wins_if_somehow_both_cross_at_once():
+    # Contrived (can't really happen since stop is below entry and take
+    # is above), but confirms stop-loss is checked first.
+    assert check_stop_take(100.0, 50.0, stop_loss_pct=0.005, take_profit_pct=0.01) == "STOP_LOSS"
+
+
+def test_check_stop_take_returns_none_for_non_positive_entry_price():
+    assert check_stop_take(0.0, 100.0, stop_loss_pct=0.005, take_profit_pct=0.01) is None
+
+
+# --- apply_spread ------------------------------------------------------------
+
+def test_apply_spread_buy_fills_above_quoted_price():
+    filled = apply_spread(100.0, spread_bps=10.0, side="BUY")
+    assert round(filled, 4) == 100.05  # +half of 10bps = +5bps = +0.05
+
+
+def test_apply_spread_sell_fills_below_quoted_price():
+    filled = apply_spread(100.0, spread_bps=10.0, side="SELL")
+    assert round(filled, 4) == 99.95
+
+
+def test_apply_spread_zero_bps_is_a_noop():
+    assert apply_spread(131.50, spread_bps=0.0, side="BUY") == 131.50
+    assert apply_spread(131.50, spread_bps=0.0, side="SELL") == 131.50

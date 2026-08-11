@@ -1488,6 +1488,35 @@ up and sends its own short Telegram notification, decoupled from the
 triggering alert's push. Runs continuously — `Ctrl+C` to stop; prints a
 summary of alerts processed / trades executed / trades ignored on exit.
 
+**Risk management and friction, added after reviewing a live session's
+results** (negative risk-to-reward, gains too small to survive real
+friction, and too many low-conviction round trips on one ticker):
+- Every open position is checked against a **stop-loss/take-profit band**
+  (`TALONX_PAPER_STOP_LOSS_PCT`/`TALONX_PAPER_TAKE_PROFIT_PCT`, default
+  0.50%/1.00% — a 1:2 risk-to-reward ratio) on every market tick, not
+  just when a reversal alert happens to arrive. This is *additional* to
+  the existing alert-driven exit (`CONFIRMED_BEARISH`/`CONTRADICTED`
+  still closes a position immediately, regardless of stop/take) — a
+  genuine reversal signal is never suppressed, stop/take just adds a
+  price-based floor and ceiling. Static percentages for now; an
+  ATR-based dynamic version is a deliberately deferred follow-up.
+- Every fill (BUY or SELL, however triggered) crosses a **simulated
+  bid-ask spread** (`TALONX_PAPER_SIMULATED_SPREAD_BPS`, default 5bps),
+  so realized PnL isn't unrealistically clean the way a zero-friction
+  fill at the exact signal price is.
+- New positions can be gated to a **minimum alert severity**
+  (`TALONX_PAPER_MIN_ENTRY_SEVERITY`, default `warning`) — a
+  `CONFIRMED_BULLISH` alert below that bar never opens a position
+  (recorded `BELOW_MIN_SEVERITY`, visible in §5p's EOD report); exits are
+  never severity-gated. "warning" is a starting point, not a tuned
+  value — use the EOD report's `BELOW_MIN_SEVERITY` counts across a few
+  real sessions to decide whether to loosen it to `info` or tighten it
+  to `critical`.
+- Two EXISTING knobs also directly address trade frequency/sizing
+  without any code change: `TALONX_CORE_TICKER_COOLDOWN` (§9, how often
+  a ticker can re-enter) and `TALONX_PAPER_TRADE_ALLOCATION` (larger
+  positions make the spread cost a smaller fraction of each trade).
+
 ### 5p. Generate an End-of-Day report (standalone)
 
 ```powershell
