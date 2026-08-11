@@ -48,9 +48,9 @@ C:\workspace\TalonX\              <- open THIS folder as your project root
 ├── .env.example
 ├── .gitignore
 ├── inspect_store.py               <- CLI to spot-check what's in ChromaDB
-├── run_talonx.py                   <- runs Module 1 + 2 + 3 + 4 + 5 together, one process (Streamlit dashboard always separate)
+├── run_talonx.py                   <- runs Module 1 + 2 + 3 + 4 + 5 + 6 together, one process (Streamlit dashboard always separate)
 ├── send_test_signal.py             <- publishes synthetic bars to test the quant scanner
-├── dashboard.py                    <- live terminal dashboard: counts + per-ticker breakdown across all 5 Redis channels
+├── dashboard.py                    <- live terminal dashboard: counts + per-ticker + per-category breakdown across all 6 Redis channels
 ├── dashboard_web.py                 <- same data, served as a local browser UI with charts (imports dashboard.py)
 ├── dashboard_web_static\
 │   └── index.html                    <- self-contained HTML/CSS/JS -- no CDN, sparkline + bar charts, WebSocket client
@@ -749,38 +749,125 @@ Streamlit (`streamlit run talonx_dispatch/app.py`)
   `talonx:alerts:dispatch` is built" -- `dashboard.py`/`dashboard_web.py`
   gave visibility, but did nothing with an alert). Telegram push is the
   action; the audit trail + Streamlit dashboard is the review surface.
-- **`consumer.py` is wired into `run_talonx.py`** (§3.6) -- no required API
+- **`consumer.py` is wired into `run_talonx.py`** (§3.7) -- no required API
   key, same "safe to always include" reasoning as Module 4. `app.py`
   (Streamlit) is NOT, and never will be: Streamlit's own dev server is not
   an `asyncio.gather()`-compatible task (see the "Two cooperating
   processes" note above) -- always run it separately, alongside
   `run_talonx.py`, in its own terminal (§5n).
 
-### 3.6 `run_talonx.py` — orchestrator
+### 3.6 `talonx_paper` — Module 6: Live Paper Trading Engine
+
+```
+Redis: talonx:alerts:dispatch ──┐
+                                 ├──► talonx_paper.consumer
+Redis: talonx:market:stream ────┘         │
+                                           ├─ ticker has paper trading enabled?
+                                           │  (talonx_watchlist -- see below) no -> skip
+                                           │
+                                           ├─ market tick (BAR)? -> update_latest_price
+                                           │  (mark-to-market source for the dashboard,
+                                           │  a SEPARATE process with no access to this
+                                           │  one's in-memory state)
+                                           │
+                                           └─ alert -> engine.decide_trade (pure):
+                                                CONFIRMED_BULLISH + flat        -> BUY
+                                                CONFIRMED_BEARISH/CONTRADICTED
+                                                  + long                       -> SELL
+                                                repeat signal, same state       -> ignored
+                                                                                    (logged only)
+                                                DEGRADED_QUANT_ALERT            -> no action
+                                                          │
+                                                          ▼
+                                        PaperTradingStore.execute_buy/execute_sell
+                                        (SQLite -- positions, trade_history,
+                                        portfolio_state all updated atomically)
+                                                          │
+                                                          ▼
+                                        Redis: talonx:paper:trades (PaperTradeExecution)
+                                                          │
+                                                          ▼
+                                        talonx_dispatch.consumer -- its OWN short
+                                        Telegram push (§3.5), decoupled from the
+                                        triggering alert's push
+```
+
+- **Not what the original requirement doc specified, and why**: the doc
+  asked for a PostgreSQL ledger and one combined Telegram message (alert +
+  execution card together) -- both deliberately NOT built that way here.
+  SQLite matches every other store in this project (no new database
+  technology, no new docker service) and two DECOUPLED short pushes
+  preserve the alert-shortening work from the session before this one,
+  rather than reintroducing a long combined message. Position sizing is a
+  FIXED dollar amount per trade (default $2,500, `TALONX_PAPER_TRADE_ALLOCATION`)
+  rather than "100% of cash" -- since the one-position-per-TICKER limit is
+  per-ticker, not portfolio-wide, "100% of cash" would let the first BUY
+  signal claim the entire balance and starve every other tracked ticker.
+- **Trigger mapping**: the doc's own action names (`BUY_SIGNAL`,
+  `BEARISH`, `VALUE_TRAP_WARNING`) don't exist in the real `AlertAction`
+  enum -- mapped onto the real one in `engine.py`: BUY on
+  `CONFIRMED_BULLISH`, SELL on `CONFIRMED_BEARISH` **or** `CONTRADICTED`
+  (the doc's own Telegram example shows `CONTRADICTED` triggering a
+  SELL), no action at all on `DEGRADED_QUANT_ALERT` (no research backing,
+  not worth trading on).
+- **`engine.py`** -- pure functions, no I/O, same testability philosophy
+  as `talonx_core.decision`: `decide_trade` (the state machine above),
+  `calculate_buy` (spends `min(allocation, cash)`, so a low balance
+  partially fills rather than erroring), `calculate_sell_pnl` (exact
+  formulas from the requirement doc, verified against its own worked
+  example in `tests/test_paper_engine.py`).
+- **`store.py`** -- `PaperTradingStore`, SQLite (WAL, `threading.Lock`,
+  same convention every store built this session uses). Four tables:
+  `portfolio_state` (single row -- cash, allocation, cumulative PnL,
+  win/loss counts; percentages are DERIVED on read, never stored, so they
+  can't drift), `positions` (one row per OPEN position -- a ticker's
+  ABSENCE from this table IS "flat," no separate status column),
+  `trade_history` (append-only, powers the dashboard's trade table, CSV
+  export, and equity curve), `latest_prices` (updated on every market
+  tick -- exists because the Streamlit dashboard is a separate process
+  with no access to the engine's in-memory price cache). `execute_buy`/
+  `execute_sell` are OPERATION-shaped, not raw CRUD -- each updates
+  positions + portfolio_state + trade_history atomically (one lock, one
+  commit) so `consumer.py` never hand-coordinates a multi-table write.
+- **Per-ticker enable/disable lives in `talonx_watchlist`, not a second
+  ticker list** -- `paper_trading_enabled` is a new column on the SAME
+  `tickers` table §5n's dashboard already manages (same idempotent
+  migration pattern as `exchange`/`status` before it), toggled via a
+  multiselect in the dashboard's new "💰 Paper Trading" section. This is
+  the "configure which ticker can be used" control surface.
+- Wired into `run_talonx.py` as a sixth continuous task (see §3.7) --
+  `--skip-paper-trading` leaves it out on purpose; a ledger-open failure
+  degrades the same way Module 5's audit DB failure does (warns, doesn't
+  crash the rest of the pipeline). Run it standalone with
+  `python -m talonx_paper.run` if you want it decoupled.
+
+### 3.7 `run_talonx.py` — orchestrator
 
 Runs Module 1's periodic ingestion (filings + news, immediately then on
-a repeating interval) and Module 1 + 2 + 3 + 4 + 5's five continuous
+a repeating interval) and Module 1 + 2 + 3 + 4 + 5 + 6's six continuous
 streams (market data, quant scanner, research agent, decision engine,
-dispatch agent) together as concurrent tasks in one process. A failure in
-one periodic ingestion cycle is logged and the loop continues to the next
-scheduled run; the continuous streams are unaffected by ingestion cycle
-failures entirely, since they're independent tasks. Module 3 is optional
-here -- `--skip-brain` leaves it out on purpose, and it's left out
-automatically (with a warning, not a crash) if its configured LLM
-provider isn't ready (§3.3). Module 5 degrades the same way if its audit
-database can't be opened (rare). Modules 2 and 4 are always included
-unless explicitly skipped. **The Streamlit dashboard is never included**
-(see §3.5 -- run it alongside this file, in its own terminal, §5n).
+dispatch agent, paper trading engine) together as concurrent tasks in one
+process. A failure in one periodic ingestion cycle is logged and the loop
+continues to the next scheduled run; the continuous streams are
+unaffected by ingestion cycle failures entirely, since they're
+independent tasks. Module 3 is optional here -- `--skip-brain` leaves it
+out on purpose, and it's left out automatically (with a warning, not a
+crash) if its configured LLM provider isn't ready (§3.3). Modules 5 and 6
+degrade the same way if their respective SQLite ledgers can't be opened
+(rare). Modules 2 and 4 are always included unless explicitly skipped.
+**The Streamlit dashboard is never included** (see §3.5 -- run it
+alongside this file, in its own terminal, §5n).
 
 **Every continuous component can be pulled out individually**
 (`--skip-market-data`, `--skip-quant`, `--skip-brain`, `--skip-core`,
-`--skip-dispatch`) -- useful while actively iterating on one piece: run
-the other four here and the one you're changing in its own terminal, so
-you don't have to restart this whole process on every edit. If every
-component ends up skipped (including `--skip-ingestion`), it logs an
-error and exits immediately rather than hanging on an empty task list.
+`--skip-dispatch`, `--skip-paper-trading`) -- useful while actively
+iterating on one piece: run the others here and the one you're changing
+in its own terminal, so you don't have to restart this whole process on
+every edit. If every component ends up skipped (including
+`--skip-ingestion`), it logs an error and exits immediately rather than
+hanging on an empty task list.
 
-### 3.7 End-to-end data flow
+### 3.8 End-to-end data flow
 
 ```
 SEC EDGAR ──┐
@@ -807,17 +894,24 @@ Polygon/yfinance ──► talonx_ingest.market_data ──► Redis: talonx:mar
                                                     talonx_core (TickerCorrelator, Decision Matrix)
                                                                             │
                                                                             ▼
-                                                     Redis: talonx:alerts:dispatch
-                                                                            │
-                                                                            ▼
-                                                    talonx_dispatch.consumer (audit + Telegram push)
-                                                                            │
-                                                            ┌───────────────┴───────────────┐
-                                                            ▼                                ▼
-                                                   SQLite: dispatch_audit.db          Telegram (mobile push)
-                                                            ▲
-                                                            │ (read-only, separate process)
-                                                   talonx_dispatch.app (Streamlit dashboard)
+                                                     Redis: talonx:alerts:dispatch ──────┐
+                                                                            │            │
+                                                                            ▼            ▼
+                                                    talonx_dispatch.consumer      talonx_paper.consumer
+                                                    (audit + short Telegram push)  (BUY/SELL simulation,
+                                                                            │       ticker gated by
+                                                            ┌───────────────┤       talonx_watchlist)
+                                                            ▼               ▼            │
+                                                   SQLite: dispatch_audit.db  Telegram    ▼
+                                                            ▲                    Redis: talonx:paper:trades
+                                                            │ (read-only,               │
+                                                            │  separate process)         ▼
+                                                   talonx_dispatch.app ◄── SQLite: paper_trading.db
+                                                   (Streamlit dashboard:           │
+                                                    alerts + watchlist +           ▼
+                                                    paper trading)          talonx_dispatch.consumer's
+                                                                             OWN short Telegram push
+                                                                             (decoupled from the alert's)
 ```
 
 ---
@@ -953,9 +1047,16 @@ Single process, single terminal, single Ctrl+C to stop. This starts:
 - The dispatch agent (Module 5), continuously -- *if* its audit database
   can open (essentially always; the only failure mode is a bad path/
   permissions issue). Records every alert to the audit trail and pushes to
-  Telegram if configured. **The Streamlit dashboard is separate** -- run
-  `streamlit run talonx_dispatch\app.py` (§5n) in its own terminal
-  alongside this one if you want to view it live.
+  Telegram if configured.
+- The paper trading engine (Module 6), continuously -- *if* its ledger
+  database can open (same failure mode as Module 5). Simulates BUY/SELL
+  execution for tickers with paper trading enabled (§3.6) and pushes its
+  own short Telegram notification per executed trade.
+
+**The Streamlit dashboard is separate** -- run
+`streamlit run talonx_dispatch\app.py` (§5n) in its own terminal
+alongside this one if you want to view it live (alerts, the ticker
+watchlist, AND the paper trading portfolio all live there).
 
 Custom tickers:
 ```powershell
@@ -983,6 +1084,11 @@ else on every change):
 ```powershell
 python run_talonx.py --skip-market-data
 python run_talonx.py --skip-quant
+```
+Leave out paper trading (e.g. you don't want simulated trades while just
+testing alert delivery):
+```powershell
+python run_talonx.py --skip-paper-trading
 ```
 
 The sections below describe each component separately -- useful for
@@ -1241,13 +1347,27 @@ python talonx_ingest\check_connectivity.py
 pip install -r requirements-dashboard.txt
 python dashboard.py
 ```
-A read-only, live-refreshing terminal view across ALL FIVE Redis
-channels at once (`talonx:filings:events`, `talonx:market:stream`,
-`talonx:signals:quant`, `talonx:reports:brain`, `talonx:alerts:dispatch`)
--- total messages, throughput (msgs/min), and a per-ticker breakdown for
-each, so you can see at a glance how much data has moved through
-Modules 1-4 and where the activity actually is, without digging through
-five different terminal logs. Run it alongside `run_talonx.py` (or any
+A read-only, live-refreshing terminal view across ALL SIX Redis channels
+at once (`talonx:filings:events`, `talonx:market:stream`,
+`talonx:signals:quant`, `talonx:reports:brain`, `talonx:alerts:dispatch`,
+`talonx:paper:trades`) -- total messages, throughput (msgs/min), a
+per-ticker breakdown, and a per-CATEGORY breakdown for each, so you can
+see at a glance how much data has moved through Modules 1-6 and where
+the activity actually is, without digging through six different terminal
+logs. The category breakdowns are the answer to "how many LLM calls is
+this actually making" and similar questions -- derived entirely from
+fields already present in each message (no other module needed to
+change for this): `talonx:reports:brain` splits into **LLM call / cache
+hit (no LLM) / stale fallback (no LLM) / cold start (no LLM) / degraded
+(LLM failed)** (Module 3's caching, §3.3), `talonx:signals:quant` splits
+by signal type, `talonx:alerts:dispatch` splits by action, and
+`talonx:paper:trades` splits by BUY/SELL plus a running realized-PnL
+total. **What this can't show**: anything that gets SUPPRESSED before
+publishing -- a talonx_quant signal dropped by cooldown/throttle, a
+failed Telegram send, an ignored paper trade -- never becomes a message,
+so a pure Redis observer has nothing to count; that would need each
+module to explicitly publish its own internal counters somewhere, which
+none of them do today. Run it alongside `run_talonx.py` (or any
 combination of standalone module processes) — it only subscribes, it
 never publishes, so it can't affect the pipeline it's watching.
 
@@ -1342,11 +1462,31 @@ actually alerted, distinct from what's currently tracked), a live
 expandable alert feed, and a filterable (ticker/action/severity) full
 audit trail table. Auto-refreshes every `TALONX_DISPATCH_AUTOREFRESH_MS`
 (default 5000ms) — that's also how often an add/remove made by someone
-else shows up in your own browser tab.
+else shows up in your own browser tab. Also shows the **"💰 Paper
+Trading"** section (§3.6) — portfolio value/win-rate/open-positions
+metrics, a Settings panel (starting balance, trade allocation, which
+tracked tickers have paper trading enabled, and a Reset Portfolio
+button), an open-positions table marked to the latest known price, an
+equity curve, a win/loss-colored per-trade PnL chart, and a downloadable
+CSV of the full trade history.
 
 ```powershell
 streamlit run talonx_dispatch\app.py --server.port 8502   # if 8501 is taken
 ```
+
+### 5o. Run the paper trading engine (talonx_paper, standalone)
+
+```powershell
+pip install -r talonx_paper\requirements.txt
+python -m talonx_paper.run
+```
+Listens to `talonx:alerts:dispatch` and `talonx:market:stream`, simulates
+BUY/SELL execution for tickers with paper trading enabled (toggle in the
+dashboard's Paper Trading section, §5n), and publishes each executed
+trade to `talonx:paper:trades` — `talonx_dispatch.run` (§5m) picks that
+up and sends its own short Telegram notification, decoupled from the
+triggering alert's push. Runs continuously — `Ctrl+C` to stop; prints a
+summary of alerts processed / trades executed / trades ignored on exit.
 
 ---
 
@@ -1407,7 +1547,10 @@ Module 5's `TELEGRAM_BOT_TOKEN` /
 `TALONX_DISPATCH_RETENTION_SWEEP_HOURS` (§3.5), and the
 ticker watchlist's `TALONX_WATCHLIST_DB` / `TALONX_WATCHLIST_DEFAULT_SYMBOL`
 / `TALONX_WATCHLIST_DEFAULT_NAME` / `TALONX_WATCHLIST_DEFAULT_EXCHANGE` /
-`TALONX_WATCHLIST_POLL_INTERVAL` (§5n),
+`TALONX_WATCHLIST_POLL_INTERVAL` (§5n), and Module 6's `TALONX_PAPER_DB` /
+`TALONX_PAPER_INITIAL_BALANCE` / `TALONX_PAPER_TRADE_ALLOCATION` --
+fresh-install defaults only, since the dashboard's Settings panel is the
+actual live source of truth once a portfolio has been created (§3.6) --
 etc).
 
 ---

@@ -42,12 +42,15 @@ from pathlib import Path
 # .env loading, applied here to sys.path instead.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
 from talonx_dispatch.config import DispatchConfig
 from talonx_dispatch.store import AuditStore
+from talonx_paper.config import PaperConfig
+from talonx_paper.store import PaperTradingStore
 from talonx_watchlist.config import WatchlistConfig
 from talonx_watchlist.store import TickerWatchlistStore
 
@@ -76,6 +79,13 @@ def get_watchlist_store(db_path: str) -> TickerWatchlistStore:
     # TickerWatchlistStore already defaults to it for exactly this reason
     # (see its own docstring), but pinned explicitly here too.
     return TickerWatchlistStore(db_path)
+
+
+@st.cache_resource
+def get_paper_store(db_path: str, default_initial_balance: float, default_trade_allocation_usd: float) -> PaperTradingStore:
+    # default_* only matter the very first time this file/db is created --
+    # PaperTradingStore._ensure_portfolio_row is a no-op on every later call.
+    return PaperTradingStore(db_path, default_initial_balance, default_trade_allocation_usd)
 
 
 def render_metrics(df: pd.DataFrame) -> None:
@@ -218,6 +228,135 @@ def render_ticker_watchlist(store: TickerWatchlistStore, poll_interval_seconds: 
                 st.rerun()
 
 
+_TRADE_HISTORY_COLUMNS = {
+    "id": "Trade #", "ticker": "Ticker", "order_type": "Type", "execution_price": "Price",
+    "shares": "Shares", "entry_price": "Entry", "realized_pnl_usd": "PnL ($)",
+    "realized_pnl_pct": "PnL (%)", "portfolio_cash_after": "Cash after", "timestamp": "Time",
+}
+
+
+def render_paper_trading(paper_store: PaperTradingStore, watchlist_store: TickerWatchlistStore) -> None:
+    st.subheader("\U0001F4B0 Paper Trading")
+    st.caption(
+        "Virtual broker: simulates a BUY on a CONFIRMED_BULLISH alert and a SELL on "
+        "CONFIRMED_BEARISH/CONTRADICTED, for tickers enabled below. Only ONE open "
+        "position per ticker at a time -- a repeat signal while already in that state "
+        "is ignored, not stacked."
+    )
+
+    summary = paper_store.get_portfolio_summary()
+    open_positions = paper_store.get_open_positions()
+    latest_prices = paper_store.get_latest_prices()
+
+    open_value = 0.0
+    for pos in open_positions:
+        open_value += pos["shares"] * latest_prices.get(pos["ticker"], pos["entry_price"])
+    total_value = summary["current_cash"] + open_value
+    total_pnl = total_value - summary["initial_balance"]
+    total_pnl_pct = (total_pnl / summary["initial_balance"] * 100) if summary["initial_balance"] else 0.0
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Portfolio value", f"${total_value:,.2f}", f"{total_pnl:+,.2f} ({total_pnl_pct:+.2f}%)")
+    m2.metric("Cash", f"${summary['current_cash']:,.2f}")
+    closed_trades = summary["win_count"] + summary["loss_count"]
+    m3.metric(
+        "Win rate",
+        f"{summary['win_rate_pct']:.0f}%" if closed_trades else "—",
+        f"{summary['win_count']}W / {summary['loss_count']}L",
+        delta_color="off",
+    )
+    m4.metric("Open positions", summary["open_positions_count"])
+
+    with st.expander("⚙️ Settings", expanded=False):
+        s1, s2, s3 = st.columns([1, 1, 1])
+        new_balance = s1.number_input(
+            "Starting balance ($)", min_value=100.0, value=float(summary["initial_balance"]), step=500.0,
+            help="Only takes effect via Reset Portfolio below -- changing this alone doesn't touch the live balance.",
+        )
+        new_allocation = s2.number_input(
+            "Trade allocation ($/position)", min_value=10.0, value=float(summary["trade_allocation_usd"]), step=100.0,
+            help="Fixed $ spent per BUY, capped at whatever cash is actually available.",
+        )
+        if s3.button("Save allocation"):
+            paper_store.update_trade_allocation(new_allocation)
+            st.rerun()
+
+        tracked = [t["symbol"] for t in watchlist_store.list_tickers()]
+        currently_enabled = watchlist_store.list_paper_trading_symbols()
+        enabled = st.multiselect(
+            "Enable paper trading for", options=tracked, default=currently_enabled,
+            help="Only tracked tickers selected here are ever traded by the paper engine.",
+        )
+        if set(enabled) != set(currently_enabled):
+            for symbol in tracked:
+                watchlist_store.set_paper_trading(symbol, symbol in enabled)
+            st.rerun()
+
+        st.divider()
+        confirm_reset = st.checkbox("I understand this clears all open positions and trade history")
+        if st.button("\U0001F504 Reset Portfolio", disabled=not confirm_reset, type="primary"):
+            paper_store.reset_portfolio(new_balance, new_allocation)
+            st.rerun()
+
+    if open_positions:
+        st.markdown("**Open positions**")
+        rows = []
+        for pos in open_positions:
+            live = latest_prices.get(pos["ticker"], pos["entry_price"])
+            u_pnl = pos["shares"] * (live - pos["entry_price"])
+            u_pnl_pct = ((live - pos["entry_price"]) / pos["entry_price"] * 100) if pos["entry_price"] else 0.0
+            rows.append({
+                "Ticker": pos["ticker"], "Shares": round(pos["shares"], 4),
+                "Entry": pos["entry_price"], "Live price": live,
+                "Unrealized PnL ($)": round(u_pnl, 2), "Unrealized PnL (%)": round(u_pnl_pct, 2),
+            })
+        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    else:
+        st.info("No open positions.")
+
+    history = paper_store.get_trade_history()
+    if not history:
+        st.info("No trades executed yet.")
+        return
+
+    hdf = pd.DataFrame(history)
+
+    st.markdown("**Equity curve**")
+    equity_df = hdf.sort_values("id")[["timestamp", "portfolio_cash_after"]].copy()
+    equity_df["timestamp"] = pd.to_datetime(equity_df["timestamp"])
+    st.area_chart(equity_df.set_index("timestamp").rename(columns={"portfolio_cash_after": "Cash after trade"}))
+
+    closed = hdf[hdf["order_type"] == "SELL"].copy()
+    if not closed.empty:
+        st.markdown("**Per-trade PnL**")
+        closed["result"] = closed["realized_pnl_usd"].apply(lambda x: "Win" if x >= 0 else "Loss")
+        chart = (
+            alt.Chart(closed)
+            .mark_bar()
+            .encode(
+                x=alt.X("id:O", title="Trade #", sort=None),
+                y=alt.Y("realized_pnl_usd:Q", title="PnL ($)"),
+                color=alt.Color(
+                    "result:N", title="Result",
+                    scale=alt.Scale(domain=["Win", "Loss"], range=["#16A34A", "#DC2626"]),
+                ),
+                tooltip=["ticker", "realized_pnl_usd", "realized_pnl_pct"],
+            )
+            .properties(height=250)
+        )
+        st.altair_chart(chart, use_container_width=True)
+
+    st.markdown("**Trade history**")
+    display_df = hdf.rename(columns=_TRADE_HISTORY_COLUMNS)
+    st.dataframe(display_df, hide_index=True, use_container_width=True)
+    st.download_button(
+        "\U0001F4E5 Download trade history (CSV)",
+        data=hdf.to_csv(index=False).encode("utf-8"),
+        file_name="talonx_paper_trades.csv",
+        mime="text/csv",
+    )
+
+
 def render_feed(rows: list[dict], limit: int = 20) -> None:
     st.subheader("Live alert feed")
     if not rows:
@@ -284,10 +423,14 @@ def main() -> None:
 
     config = DispatchConfig()
     watchlist_config = WatchlistConfig()
+    paper_config = PaperConfig()
     st_autorefresh(interval=config.autorefresh_ms, key="dispatch_autorefresh")
 
     store = get_store(config.audit_db_path)
     watchlist_store = get_watchlist_store(watchlist_config.db_path)
+    paper_store = get_paper_store(
+        paper_config.db_path, paper_config.default_initial_balance, paper_config.default_trade_allocation_usd,
+    )
 
     st.title("\U0001F4E1 TalonX — Live Dashboard")
     st.caption(
@@ -297,6 +440,9 @@ def main() -> None:
     )
 
     render_ticker_watchlist(watchlist_store, watchlist_config.poll_interval_seconds)
+    st.divider()
+
+    render_paper_trading(paper_store, watchlist_store)
     st.divider()
 
     rows = store.recent(limit=config.feed_limit)

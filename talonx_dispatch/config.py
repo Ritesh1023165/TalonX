@@ -65,6 +65,13 @@ class DispatchConfig:
     alerts_channel: str = os.environ.get(
         "TALONX_REDIS_ALERTS_CHANNEL", "talonx:alerts:dispatch"
     )
+    # Same env var talonx_paper reads -- published there after every
+    # executed (non-ignored) paper trade; this module subscribes to it
+    # too, to push a SEPARATE short Telegram notification (decoupled from
+    # the original alert push -- see consumer.py).
+    paper_trades_channel: str = os.environ.get(
+        "TALONX_REDIS_PAPER_TRADES_CHANNEL", "talonx:paper:trades"
+    )
     connect_timeout_seconds: float = _env_float("TALONX_REDIS_CONNECT_TIMEOUT", 5.0)
     socket_timeout_seconds: float = _env_float("TALONX_REDIS_SOCKET_TIMEOUT", 5.0)
     reconnect_backoff_base_seconds: float = _env_float("TALONX_DISPATCH_RECONNECT_BASE", 1.0)

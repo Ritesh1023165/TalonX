@@ -36,7 +36,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from talonx_dispatch.schemas import ActionableAlert, AlertAction, AlertSeverity
+from talonx_dispatch.schemas import ActionableAlert, AlertAction, AlertSeverity, OrderType, PaperTradeExecution
 
 _ACTION_EMOJI = {
     AlertAction.CONFIRMED_BULLISH: "\U0001F7E2",  # green circle
@@ -112,6 +112,35 @@ def format_telegram_details(row: dict) -> str:
     lines.append("")
     lines.append(f"_{escape_markdown(row['model_used'])} · {_format_timestamp(row['correlated_at'])}_")
 
+    return "\n".join(lines)
+
+
+def format_telegram_trade_execution(execution: PaperTradeExecution) -> str:
+    """
+    The paper-trading notification -- SEPARATE from and decoupled from
+    format_telegram_summary's alert push (not appended to it), so a
+    trade execution doesn't reinstate a long combined message. Short by
+    design, same as every other push this module sends.
+    """
+    if execution.order_type == OrderType.BUY:
+        lines = [
+            f"\U0001F4B0 *BUY EXECUTED* — `{execution.ticker}`",
+            f"{execution.shares:.4f} shares @ ${execution.execution_price:,.2f} "
+            f"(${execution.position_cost:,.2f})",
+            f"Cash: ${execution.portfolio_cash_after:,.2f}",
+        ]
+    else:
+        pnl_sign = "+" if (execution.realized_pnl_usd or 0) >= 0 else ""
+        session_sign = "+" if execution.session_realized_pnl_usd >= 0 else ""
+        lines = [
+            f"\U0001F4B0 *SELL EXECUTED* — `{execution.ticker}`",
+            f"Entry ${execution.entry_price:,.2f} → Exit ${execution.execution_price:,.2f}",
+            f"Trade PnL: {pnl_sign}${execution.realized_pnl_usd:,.2f} "
+            f"({pnl_sign}{execution.realized_pnl_pct:.2f}%)",
+            f"Session PnL: {session_sign}${execution.session_realized_pnl_usd:,.2f} "
+            f"({session_sign}{execution.session_realized_pnl_pct:.2f}%) | "
+            f"Cash: ${execution.portfolio_cash_after:,.2f}",
+        ]
     return "\n".join(lines)
 
 

@@ -9,6 +9,14 @@ notification (formatter.format_telegram_summary) with just enough to
 read at a glance plus the alert's ID; the full writeup is available on
 demand by replying to that push with the ID (telegram_listener.py).
 
+Also subscribes to talonx:paper:trades (published by talonx_paper,
+Module 6) -- a PaperTradeExecution gets its OWN short push
+(formatter.format_telegram_trade_execution), deliberately SEPARATE from
+and not appended to the triggering alert's push, so a trade execution
+doesn't reinstate a long combined message. Not stored here either --
+talonx_paper's own trade_history is already the durable record; this
+module's job stays "notify," not "store twice."
+
 DispatchAgent.run() is three concurrent tasks, not one: the Redis alert
 listener below, TelegramReplyListener's incoming-message poll (only
 started if Telegram is configured -- no token, nothing to poll), and a
@@ -40,8 +48,8 @@ from datetime import datetime, timedelta, timezone
 from pydantic import ValidationError
 
 from talonx_dispatch.config import DispatchConfig
-from talonx_dispatch.formatter import format_telegram_summary
-from talonx_dispatch.schemas import ActionableAlert, AlertSeverity
+from talonx_dispatch.formatter import format_telegram_summary, format_telegram_trade_execution
+from talonx_dispatch.schemas import ActionableAlert, AlertSeverity, PaperTradeExecution
 from talonx_dispatch.store import AuditStore
 from talonx_dispatch.telegram_client import TelegramClient, TelegramSendError
 from talonx_dispatch.telegram_listener import TelegramReplyListener
@@ -184,8 +192,10 @@ class DispatchAgent:
         logger.info("Connected to Redis at %s", self.config.redis_url)
 
         pubsub = self._client.pubsub()
-        await pubsub.subscribe(self.config.alerts_channel)
-        logger.info("Subscribed to %s", self.config.alerts_channel)
+        await pubsub.subscribe(self.config.alerts_channel, self.config.paper_trades_channel)
+        logger.info(
+            "Subscribed to %s and %s", self.config.alerts_channel, self.config.paper_trades_channel,
+        )
 
         try:
             while not self._stop_event.is_set():
@@ -196,7 +206,7 @@ class DispatchAgent:
                     continue  # normal: no message within this poll window
                 await self._handle_message(message)
         finally:
-            await pubsub.unsubscribe(self.config.alerts_channel)
+            await pubsub.unsubscribe(self.config.alerts_channel, self.config.paper_trades_channel)
             await pubsub.aclose()
             await self._client.aclose()
 
@@ -205,10 +215,26 @@ class DispatchAgent:
         if raw is None:
             return
 
+        channel = message.get("channel")
+        if isinstance(channel, bytes):
+            channel = channel.decode()
+
         try:
             payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            logger.warning("Dropping unparseable message on %s: %s", channel, exc)
+            return
+
+        if channel == self.config.paper_trades_channel:
+            await self._handle_trade_execution(payload)
+            return
+        if channel != self.config.alerts_channel:
+            logger.warning("Dropping message on unexpected channel %s", channel)
+            return
+
+        try:
             alert = ActionableAlert.model_validate(payload)
-        except (json.JSONDecodeError, ValidationError) as exc:
+        except ValidationError as exc:
             logger.warning("Dropping unparseable alert: %s", exc)
             return
 
@@ -220,6 +246,29 @@ class DispatchAgent:
         )
 
         await self._maybe_send_telegram(alert, alert_id)
+
+    async def _handle_trade_execution(self, payload: dict) -> None:
+        try:
+            execution = PaperTradeExecution.model_validate(payload)
+        except ValidationError as exc:
+            logger.warning("Dropping unparseable paper trade execution: %s", exc)
+            return
+
+        if not self.telegram_client.is_configured:
+            return
+
+        text = format_telegram_trade_execution(execution)
+        try:
+            await self.telegram_client.send(text)
+            logger.info(
+                "Telegram push sent for paper trade #%d (%s %s)",
+                execution.trade_id, execution.ticker, execution.order_type.value,
+            )
+        except TelegramSendError as exc:
+            logger.error(
+                "Telegram push failed for paper trade #%d (%s): %s",
+                execution.trade_id, execution.ticker, exc,
+            )
 
     async def _maybe_send_telegram(self, alert: ActionableAlert, alert_id: int) -> None:
         if not self.telegram_client.is_configured:

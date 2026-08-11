@@ -44,11 +44,12 @@ from pathlib import Path
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS tickers (
-    symbol      TEXT PRIMARY KEY,
-    name        TEXT NOT NULL,
-    exchange    TEXT NOT NULL DEFAULT '',
-    status      TEXT NOT NULL DEFAULT 'active',
-    added_at    TEXT NOT NULL
+    symbol                  TEXT PRIMARY KEY,
+    name                    TEXT NOT NULL,
+    exchange                TEXT NOT NULL DEFAULT '',
+    status                  TEXT NOT NULL DEFAULT 'active',
+    paper_trading_enabled   INTEGER NOT NULL DEFAULT 0,
+    added_at                TEXT NOT NULL
 )
 """
 
@@ -73,6 +74,10 @@ class TickerWatchlistStore:
             self._conn.execute("ALTER TABLE tickers ADD COLUMN exchange TEXT NOT NULL DEFAULT ''")
         if "status" not in cols:
             self._conn.execute("ALTER TABLE tickers ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
+        if "paper_trading_enabled" not in cols:
+            self._conn.execute(
+                "ALTER TABLE tickers ADD COLUMN paper_trading_enabled INTEGER NOT NULL DEFAULT 0"
+            )
 
     def close(self) -> None:
         self._conn.close()
@@ -88,11 +93,15 @@ class TickerWatchlistStore:
         source (it needs to show paused tickers too, not just active ones)."""
         with self._lock:
             cursor = self._conn.execute(
-                "SELECT symbol, name, exchange, status, added_at FROM tickers ORDER BY symbol"
+                "SELECT symbol, name, exchange, status, paper_trading_enabled, added_at "
+                "FROM tickers ORDER BY symbol"
             )
             return [
-                {"symbol": symbol, "name": name, "exchange": exchange, "status": status, "added_at": added_at}
-                for symbol, name, exchange, status, added_at in cursor.fetchall()
+                {
+                    "symbol": symbol, "name": name, "exchange": exchange, "status": status,
+                    "paper_trading_enabled": bool(paper_trading_enabled), "added_at": added_at,
+                }
+                for symbol, name, exchange, status, paper_trading_enabled, added_at in cursor.fetchall()
             ]
 
     def list_symbols(self) -> list[str]:
@@ -148,6 +157,24 @@ class TickerWatchlistStore:
                 "UPDATE tickers SET status = 'active' WHERE symbol = ?", (symbol.strip().upper(),)
             )
             self._conn.commit()
+
+    def set_paper_trading(self, symbol: str, enabled: bool) -> None:
+        """The 'configure which ticker can be used [for paper trading]'
+        control -- talonx_paper.consumer checks list_paper_trading_symbols()
+        before ever deciding a trade for a ticker."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE tickers SET paper_trading_enabled = ? WHERE symbol = ?",
+                (1 if enabled else 0, symbol.strip().upper()),
+            )
+            self._conn.commit()
+
+    def list_paper_trading_symbols(self) -> list[str]:
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT symbol FROM tickers WHERE paper_trading_enabled = 1 ORDER BY symbol"
+            )
+            return [row[0] for row in cursor.fetchall()]
 
     def ensure_seeded(self, default_symbol: str, default_name: str, default_exchange: str = "") -> bool:
         """
