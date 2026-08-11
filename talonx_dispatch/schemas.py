@@ -47,6 +47,15 @@ class AlertAction(str, Enum):
     CONFIRMED_BEARISH = "confirmed_bearish"
     CONTRADICTED = "contradicted"
     DEGRADED_QUANT_ALERT = "degraded_quant_alert"
+    # Never a real ActionableAlert.action -- only ever appears as
+    # PaperTradeExecution.triggering_action (talonx_paper's own
+    # engine.check_stop_take triggered the SELL, not an alert). Must
+    # exist here too since PaperTradeExecution is re-validated against
+    # THIS module's mirror on talonx:paper:trades -- omitting it would
+    # silently drop every stop-loss/take-profit execution as an
+    # "invalid payload" rather than notify on it.
+    STOP_LOSS_EXIT = "stop_loss_exit"
+    TAKE_PROFIT_EXIT = "take_profit_exit"
 
 
 class AlertSeverity(str, Enum):

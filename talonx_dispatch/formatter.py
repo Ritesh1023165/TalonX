@@ -60,6 +60,13 @@ _SEVERITY_PREFIX = {
 
 _MARKDOWN_SPECIAL_CHARS = ("_", "*", "`", "[")
 
+_EXIT_REASON_LABEL = {
+    AlertAction.CONFIRMED_BEARISH: "reversal signal",
+    AlertAction.CONTRADICTED: "reversal signal",
+    AlertAction.STOP_LOSS_EXIT: "stop-loss",
+    AlertAction.TAKE_PROFIT_EXIT: "take-profit",
+}
+
 
 def escape_markdown(text: str) -> str:
     """Escapes the 4 characters Telegram's legacy Markdown mode treats as special."""
@@ -132,8 +139,13 @@ def format_telegram_trade_execution(execution: PaperTradeExecution) -> str:
     else:
         pnl_sign = "+" if (execution.realized_pnl_usd or 0) >= 0 else ""
         session_sign = "+" if execution.session_realized_pnl_usd >= 0 else ""
+        # .get() with a default, never a bare index -- a future new
+        # triggering_action value must not be able to KeyError this push
+        # (see DEGRADED_QUANT_ALERT's earlier history in this project).
+        reason = _EXIT_REASON_LABEL.get(execution.triggering_action, "")
+        reason_suffix = f" ({reason})" if reason else ""
         lines = [
-            f"\U0001F4B0 *SELL EXECUTED* — `{execution.ticker}`",
+            f"\U0001F4B0 *SELL EXECUTED* — `{execution.ticker}`{reason_suffix}",
             f"Entry ${execution.entry_price:,.2f} → Exit ${execution.execution_price:,.2f}",
             f"Trade PnL: {pnl_sign}${execution.realized_pnl_usd:,.2f} "
             f"({pnl_sign}{execution.realized_pnl_pct:.2f}%)",

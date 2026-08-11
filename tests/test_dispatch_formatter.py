@@ -263,6 +263,37 @@ def test_trade_execution_sell_shows_negative_pnl_without_a_plus_sign():
     assert "+$" not in text.split("\n")[2]  # the Trade PnL line specifically
 
 
+def test_trade_execution_sell_shows_reversal_signal_reason():
+    text = format_telegram_trade_execution(_execution())  # default triggering_action=CONTRADICTED
+    assert "(reversal signal)" in text
+
+
+def test_trade_execution_sell_shows_stop_loss_reason():
+    text = format_telegram_trade_execution(
+        PaperTradeExecution(
+            trade_id=12, ticker="SPCX", order_type=OrderType.SELL, execution_price=134.50,
+            shares=18.5185, position_cost=2500.0, entry_price=135.00,
+            realized_pnl_usd=-9.26, realized_pnl_pct=-0.37, portfolio_cash_after=10000.0,
+            triggering_action=AlertAction.STOP_LOSS_EXIT,
+            session_realized_pnl_usd=0.0, session_realized_pnl_pct=0.0, timestamp=NOW,
+        )
+    )
+    assert "(stop-loss)" in text
+
+
+def test_trade_execution_sell_shows_take_profit_reason():
+    text = format_telegram_trade_execution(
+        PaperTradeExecution(
+            trade_id=12, ticker="SPCX", order_type=OrderType.SELL, execution_price=136.35,
+            shares=18.5185, position_cost=2500.0, entry_price=135.00,
+            realized_pnl_usd=25.0, realized_pnl_pct=1.0, portfolio_cash_after=10025.0,
+            triggering_action=AlertAction.TAKE_PROFIT_EXIT,
+            session_realized_pnl_usd=0.0, session_realized_pnl_pct=0.0, timestamp=NOW,
+        )
+    )
+    assert "(take-profit)" in text
+
+
 def test_trade_execution_buy_shows_shares_price_and_cash():
     execution = PaperTradeExecution(
         trade_id=5, ticker="NVDA", order_type=OrderType.BUY, execution_price=131.50,

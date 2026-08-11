@@ -17,14 +17,17 @@ import pytest
 
 from talonx_paper.config import PaperConfig
 from talonx_paper.consumer import PaperTradingEngine
-from talonx_paper.schemas import AlertAction, OrderType, PaperTradeExecution
+from talonx_paper.schemas import AlertAction, AlertSeverity, OrderType, PaperTradeExecution
 
 NOW = datetime(2026, 8, 10, 14, 37, 0, tzinfo=timezone.utc)
 
 
-def _alert_payload(ticker: str = "NVDA", action: str = "confirmed_bullish", price: float = 131.50) -> dict:
+def _alert_payload(
+    ticker: str = "NVDA", action: str = "confirmed_bullish", price: float = 131.50,
+    severity: str = "warning",
+) -> dict:
     return {
-        "ticker": ticker, "action": action,
+        "ticker": ticker, "action": action, "severity": severity,
         "triggering_signal": {"price": price},
         "correlated_at": NOW.isoformat(),
     }
@@ -49,10 +52,15 @@ def _execution(order_type: OrderType = OrderType.BUY, trade_id: int = 1) -> Pape
 
 @pytest.fixture
 def engine() -> PaperTradingEngine:
+    # spread_bps=0 here so existing price-pass-through assertions stay
+    # exact -- spread's effect is covered by its own dedicated tests below.
     store = MagicMock()
+    store.get_position.return_value = None  # flat by default; tests override for an open position
     watchlist_store = MagicMock()
     watchlist_store.list_paper_trading_symbols.return_value = ["NVDA"]
-    e = PaperTradingEngine(config=PaperConfig(), store=store, watchlist_store=watchlist_store)
+    e = PaperTradingEngine(
+        config=PaperConfig(simulated_spread_bps=0.0), store=store, watchlist_store=watchlist_store,
+    )
     e._client = AsyncMock()
     return e
 
@@ -224,3 +232,151 @@ async def test_unparseable_alert_is_dropped(engine):
 async def test_invalid_alert_payload_is_dropped(engine):
     await engine._handle_message(_msg(engine.config, {"ticker": "NVDA"}))  # missing required fields
     assert engine.alerts_processed == 0
+
+
+# --- Simulated spread (friction) ---------------------------------------------
+
+@pytest.mark.asyncio
+async def test_buy_fill_price_crosses_the_spread():
+    store = MagicMock()
+    store.get_position.return_value = None
+    store.get_portfolio_summary.return_value = {"current_cash": 10000.0, "trade_allocation_usd": 2500.0}
+    store.execute_buy.return_value = _execution(OrderType.BUY)
+    watchlist_store = MagicMock()
+    watchlist_store.list_paper_trading_symbols.return_value = ["NVDA"]
+    engine = PaperTradingEngine(
+        config=PaperConfig(simulated_spread_bps=10.0), store=store, watchlist_store=watchlist_store,
+    )
+    engine._client = AsyncMock()
+
+    await engine._handle_message(_msg(engine.config, _alert_payload(action="confirmed_bullish", price=100.0)))
+
+    _, _, fill_price, _, _ = store.execute_buy.call_args.args
+    assert round(fill_price, 4) == 100.05  # +half of 10bps
+
+
+@pytest.mark.asyncio
+async def test_sell_fill_price_crosses_the_spread():
+    store = MagicMock()
+    store.get_position.return_value = {"ticker": "NVDA", "shares": 10.0, "entry_price": 100.0, "cost_basis": 1000.0}
+    store.execute_sell.return_value = _execution(OrderType.SELL)
+    watchlist_store = MagicMock()
+    watchlist_store.list_paper_trading_symbols.return_value = ["NVDA"]
+    engine = PaperTradingEngine(
+        config=PaperConfig(simulated_spread_bps=10.0), store=store, watchlist_store=watchlist_store,
+    )
+    engine._client = AsyncMock()
+
+    await engine._handle_message(_msg(engine.config, _alert_payload(action="contradicted", price=100.0)))
+
+    _, fill_price, _, _ = store.execute_sell.call_args.args
+    assert round(fill_price, 4) == 99.95  # -half of 10bps
+
+
+# --- Stop-loss / take-profit (price-driven exit) ----------------------------
+
+def _sl_tp_engine(entry_price: float = 100.0) -> PaperTradingEngine:
+    store = MagicMock()
+    store.get_position.return_value = {
+        "ticker": "NVDA", "shares": 10.0, "entry_price": entry_price, "cost_basis": entry_price * 10.0,
+    }
+    store.execute_sell.return_value = _execution(OrderType.SELL)
+    watchlist_store = MagicMock()
+    engine = PaperTradingEngine(
+        config=PaperConfig(simulated_spread_bps=0.0, stop_loss_pct=0.005, take_profit_pct=0.01),
+        store=store, watchlist_store=watchlist_store,
+    )
+    engine._client = AsyncMock()
+    return engine
+
+
+@pytest.mark.asyncio
+async def test_market_tick_past_stop_loss_closes_the_position():
+    engine = _sl_tp_engine(entry_price=100.0)
+
+    await engine._handle_message(
+        {"channel": engine.config.market_channel.encode(), "data": json.dumps(_bar_payload(close=99.40))}
+    )
+
+    engine.store.execute_sell.assert_called_once()
+    ticker, price, ts, triggering_action = engine.store.execute_sell.call_args.args
+    assert ticker == "NVDA"
+    assert price == 99.40
+    assert triggering_action == AlertAction.STOP_LOSS_EXIT
+    engine._client.publish.assert_awaited_once()
+    assert engine.trades_executed == 1
+
+
+@pytest.mark.asyncio
+async def test_market_tick_past_take_profit_closes_the_position():
+    engine = _sl_tp_engine(entry_price=100.0)
+
+    await engine._handle_message(
+        {"channel": engine.config.market_channel.encode(), "data": json.dumps(_bar_payload(close=101.10))}
+    )
+
+    engine.store.execute_sell.assert_called_once()
+    triggering_action = engine.store.execute_sell.call_args.args[3]
+    assert triggering_action == AlertAction.TAKE_PROFIT_EXIT
+
+
+@pytest.mark.asyncio
+async def test_market_tick_inside_the_band_does_not_close_the_position():
+    engine = _sl_tp_engine(entry_price=100.0)
+
+    await engine._handle_message(
+        {"channel": engine.config.market_channel.encode(), "data": json.dumps(_bar_payload(close=100.20))}
+    )
+
+    engine.store.execute_sell.assert_not_called()
+    engine._client.publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_market_tick_with_no_open_position_never_checks_stop_take(engine):
+    # fixture's store.get_position already returns None (flat)
+    await engine._handle_message(
+        _msg(engine.config, _bar_payload(close=99.40), channel=engine.config.market_channel)
+    )
+    engine.store.execute_sell.assert_not_called()
+
+
+# --- Entry conviction gate (min_entry_severity) ------------------------------
+
+@pytest.mark.asyncio
+async def test_confirmed_bullish_below_min_severity_is_ignored_and_never_reaches_decide_trade(engine):
+    engine._min_entry_severity = AlertSeverity.CRITICAL
+
+    await engine._handle_message(
+        _msg(engine.config, _alert_payload(action="confirmed_bullish", severity="warning"))
+    )
+
+    engine.store.get_position.assert_not_called()
+    engine.store.execute_buy.assert_not_called()
+    engine.store.record_ignored.assert_called_once()
+    assert engine.store.record_ignored.call_args.args[1] == "BELOW_MIN_SEVERITY"
+
+
+@pytest.mark.asyncio
+async def test_confirmed_bullish_at_min_severity_proceeds_normally(engine):
+    engine.store.get_portfolio_summary.return_value = {"current_cash": 10000.0, "trade_allocation_usd": 2500.0}
+    engine.store.execute_buy.return_value = _execution(OrderType.BUY)
+
+    await engine._handle_message(
+        _msg(engine.config, _alert_payload(action="confirmed_bullish", severity="warning"))
+    )
+
+    engine.store.execute_buy.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_sell_actions_are_never_severity_gated(engine):
+    engine._min_entry_severity = AlertSeverity.CRITICAL
+    engine.store.get_position.return_value = {"ticker": "NVDA", "shares": 10.0, "entry_price": 100.0, "cost_basis": 1000.0}
+    engine.store.execute_sell.return_value = _execution(OrderType.SELL)
+
+    await engine._handle_message(
+        _msg(engine.config, _alert_payload(action="contradicted", severity="info"))
+    )
+
+    engine.store.execute_sell.assert_called_once()
