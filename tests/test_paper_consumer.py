@@ -97,6 +97,7 @@ async def test_alert_for_a_ticker_without_paper_trading_enabled_is_skipped(engin
     await engine._handle_message(_msg(engine.config, _alert_payload(ticker="NVDA")))
 
     engine.store.get_position.assert_not_called()
+    engine.store.record_ignored.assert_not_called()  # config-gate skip, not a trading decision
     assert engine.alerts_processed == 1
     assert engine.trades_executed == 0
 
@@ -132,6 +133,8 @@ async def test_confirmed_bullish_already_long_is_ignored_and_not_published(engin
     engine.store.execute_buy.assert_not_called()
     engine._client.publish.assert_not_awaited()
     assert engine.trades_ignored == 1
+    engine.store.record_ignored.assert_called_once()
+    assert engine.store.record_ignored.call_args.args[1] == "POSITION_ALREADY_OPEN"
 
 
 @pytest.mark.asyncio
@@ -144,6 +147,8 @@ async def test_buy_with_insufficient_cash_is_ignored(engine):
     engine.store.execute_buy.assert_not_called()
     engine._client.publish.assert_not_awaited()
     assert engine.trades_ignored == 1
+    engine.store.record_ignored.assert_called_once()
+    assert engine.store.record_ignored.call_args.args[1] == "INSUFFICIENT_CASH"
 
 
 # --- SELL ----------------------------------------------------------------
@@ -172,6 +177,8 @@ async def test_confirmed_bearish_flat_is_ignored(engine):
 
     engine.store.execute_sell.assert_not_called()
     assert engine.trades_ignored == 1
+    engine.store.record_ignored.assert_called_once()
+    assert engine.store.record_ignored.call_args.args[1] == "NO_ACTIVE_POSITION"
 
 
 @pytest.mark.asyncio
@@ -185,6 +192,8 @@ async def test_sell_returning_none_from_store_is_not_published(engine):
 
     engine._client.publish.assert_not_awaited()
     assert engine.trades_executed == 0
+    engine.store.record_ignored.assert_called_once()
+    assert engine.store.record_ignored.call_args.args[1] == "NO_ACTIVE_POSITION"
 
 
 # --- DEGRADED_QUANT_ALERT --------------------------------------------------
@@ -199,6 +208,8 @@ async def test_degraded_quant_alert_takes_no_action(engine):
     engine._client.publish.assert_not_awaited()
     assert engine.trades_executed == 0
     assert engine.trades_ignored == 0
+    engine.store.record_ignored.assert_called_once()
+    assert engine.store.record_ignored.call_args.args[1] == "DEGRADED_NOT_TRADABLE"
 
 
 # --- Bad payloads ----------------------------------------------------------

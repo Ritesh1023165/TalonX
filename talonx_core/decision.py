@@ -45,36 +45,67 @@ def evaluate(
     """
     Returns an ActionableAlert if this ticker's current state clears the
     decision matrix, else None. `now` is injectable for testing;
-    defaults to the real current time.
+    defaults to the real current time. Thin wrapper over
+    _evaluate_with_reason -- see evaluate_verbose() for the same result
+    plus WHY a None was suppressed (used by consumer.py to persist a
+    durable trace for the EOD report; kept as a separate function rather
+    than changing this one's signature so every existing caller/test is
+    unaffected).
+    """
+    alert, _reason = _evaluate_with_reason(state, config, now)
+    return alert
 
-    Suppression checks, in order:
-      1. Missing half of the pair -- no signal yet, or no report yet.
-      2. Staleness -- either half is older than
+
+def evaluate_verbose(
+    state: TickerState, config: CoreConfig, now: datetime | None = None
+) -> tuple[ActionableAlert | None, str | None]:
+    """
+    Same decision as evaluate(), but also returns the suppression reason
+    when the result is None -- MISSING_PAIR / STALE_SIGNAL / STALE_REPORT
+    / COOLDOWN / LOW_CONFIDENCE / NEUTRAL_VERDICT / NO_STATE_CHANGE.
+    `reason` is always None when an alert IS returned. See
+    _evaluate_with_reason for what each one guards against.
+    """
+    return _evaluate_with_reason(state, config, now)
+
+
+def _evaluate_with_reason(
+    state: TickerState, config: CoreConfig, now: datetime | None = None
+) -> tuple[ActionableAlert | None, str | None]:
+    """
+    The actual decision matrix -- evaluate() and evaluate_verbose() are
+    both thin wrappers over this, so the gate logic lives in exactly one
+    place and can never drift between the two entry points.
+
+    Suppression checks, in order (each returns (None, "<REASON>")):
+      1. MISSING_PAIR -- no signal yet, or no report yet.
+      2. STALE_SIGNAL / STALE_REPORT -- either half is older than
          config.correlation_window_seconds. Guards against correlating a
          report against a signal from hours ago (or vice versa) just
          because both happen to be the most recent thing seen for that
          ticker.
-      3. Cooldown -- an alert was already dispatched for this ticker
+      3. COOLDOWN -- an alert was already dispatched for this ticker
          within config.ticker_cooldown_seconds. Guards against
          re-alerting on what is functionally the same setup every time a
          new bar nudges an indicator.
-      4. Confidence gate -- research confidence below config.min_confidence
-         is treated as UNCONFIRMED regardless of verdict, same as
-         NEUTRAL/INSUFFICIENT_CONTEXT. This is the module's core risk
-         guardrail: don't act on a low-confidence LLM call. SKIPPED
-         entirely for a report.is_degraded=True report (talonx_brain
-         couldn't produce a real qualitative read at all -- see below).
-      5. State-transition + price-delta gate -- if the action this
-         evaluation would produce is the SAME action as the last alert
-         actually dispatched for this ticker, it's suppressed unless price
-         has moved config.price_delta_retrigger_pct since that alert. A
-         genuine transition (including a first-ever alert) always passes.
-         This runs IN ADDITION to the time cooldown (3), not instead of it
-         -- both must pass.
+      4. LOW_CONFIDENCE / NEUTRAL_VERDICT -- research confidence below
+         config.min_confidence is treated as UNCONFIRMED regardless of
+         verdict, same as NEUTRAL/INSUFFICIENT_CONTEXT. This is the
+         module's core risk guardrail: don't act on a low-confidence LLM
+         call. SKIPPED entirely for a report.is_degraded=True report
+         (talonx_brain couldn't produce a real qualitative read at all --
+         see below).
+      5. NO_STATE_CHANGE -- if the action this evaluation would produce is
+         the SAME action as the last alert actually dispatched for this
+         ticker, it's suppressed unless price has moved
+         config.price_delta_retrigger_pct since that alert. A genuine
+         transition (including a first-ever alert) always passes. This
+         runs IN ADDITION to the time cooldown (3), not instead of it --
+         both must pass.
 
     report.is_degraded=True (talonx_brain's LLM totally failed and no
     cache existed to fall back on -- see talonx_brain/cache.py) bypasses
-    checks 4's confidence/verdict matrix entirely and always computes
+    check 4's confidence/verdict matrix entirely and always computes
     AlertAction.DEGRADED_QUANT_ALERT instead -- the point is to still
     surface that a technical signal fired even with zero qualitative
     backing, rather than silently dropping it the way a normal
@@ -85,17 +116,17 @@ def evaluate(
     now = now or datetime.now(timezone.utc)
 
     if state.latest_signal is None or state.latest_report is None:
-        return None
+        return None, "MISSING_PAIR"
 
     if not _is_fresh(state.latest_signal_at, now, config.correlation_window_seconds):
-        return None
+        return None, "STALE_SIGNAL"
     if not _is_fresh(state.latest_report_at, now, config.correlation_window_seconds):
-        return None
+        return None, "STALE_REPORT"
 
     if state.last_alert_at is not None:
         elapsed = (now - state.last_alert_at).total_seconds()
         if elapsed < config.ticker_cooldown_seconds:
-            return None
+            return None, "COOLDOWN"
 
     report = state.latest_report
     signal = state.latest_signal
@@ -104,9 +135,9 @@ def evaluate(
         action = AlertAction.DEGRADED_QUANT_ALERT
     else:
         if report.confidence < config.min_confidence:
-            return None
+            return None, "LOW_CONFIDENCE"
         if report.verdict not in (ResearchVerdict.BULLISH, ResearchVerdict.BEARISH):
-            return None
+            return None, "NEUTRAL_VERDICT"
 
         agrees = (
             signal.direction == SignalDirection.BULLISH and report.verdict == ResearchVerdict.BULLISH
@@ -130,7 +161,7 @@ def evaluate(
     ):
         delta_pct = abs(signal.price - state.last_alert_price) / state.last_alert_price
         if delta_pct < config.price_delta_retrigger_pct:
-            return None
+            return None, "NO_STATE_CHANGE"
 
     return ActionableAlert(
         ticker=signal.ticker,
@@ -148,7 +179,7 @@ def evaluate(
         is_degraded=report.is_degraded,
         signal_received_at=state.latest_signal_at,
         report_received_at=state.latest_report_at,
-    )
+    ), None
 
 
 def _is_fresh(received_at: datetime | None, now: datetime, window_seconds: float) -> bool:

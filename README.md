@@ -1488,6 +1488,36 @@ up and sends its own short Telegram notification, decoupled from the
 triggering alert's push. Runs continuously — `Ctrl+C` to stop; prints a
 summary of alerts processed / trades executed / trades ignored on exit.
 
+### 5p. Generate an End-of-Day report (standalone)
+
+```powershell
+python generate_eod_report.py
+```
+Reads every module's own local SQLite store for a single trading day and
+writes a consolidated Markdown report (plus raw CSVs) to `reports/` —
+built for exactly the question "why didn't ticker X trade today", so you
+don't have to cross-reference the dashboard's tables or export a CSV by
+hand after market close. Covers, per ticker: alerts received, trades
+executed (with PnL), trades ignored (with the specific reason —
+`NO_ACTIVE_POSITION`, `POSITION_ALREADY_OPEN`, `INSUFFICIENT_CASH`,
+`DEGRADED_NOT_TRADABLE`), and — if `talonx_core`/`talonx_quant`/
+`talonx_brain` have run with persistence enabled (the default) at least
+once — the full signal funnel (quant signals generated → suppressed by
+cooldown/throttle → reached `talonx_core` → suppressed there by
+staleness/confidence/cooldown/no-state-change → became an alert) plus
+LLM/cache economics (cache hits, stale fallbacks, degraded reports, cold
+starts, genuine LLM calls). It reads only — nothing it does affects the
+running pipeline, and it's safe to run at any time, not just after close.
+
+```powershell
+python generate_eod_report.py --date 2026-08-11     # default: today, in --tz
+python generate_eod_report.py --tz Europe/London    # default: America/New_York
+python generate_eod_report.py --out-dir C:\reports  # default: .\reports
+```
+Nothing in this project schedules it automatically — wire up a Windows
+Task Scheduler entry yourself if you want it to run unattended right
+after market close each day.
+
 ---
 
 ## 6. Common problems
@@ -1514,6 +1544,8 @@ summary of alerts processed / trades executed / trades ignored on exit.
 | No Telegram push arrives even though the audit trail shows the alert | Severity below `TALONX_DISPATCH_MIN_SEVERITY` (default `warning` -- `info` alerts are recorded but not pushed on purpose), or `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` unset | Check the alert's `severity` in the audit trail/Streamlit feed; lower `TALONX_DISPATCH_MIN_SEVERITY` to `info` if you want everything pushed |
 | Telegram send fails with `Forbidden` | The bot hasn't been messaged first (bots can't initiate a DM), or it was blocked/removed from the chat | Message your bot at least once from the Telegram app before running `talonx_dispatch.run` (§4) |
 | Telegram message text looks garbled/truncated mid-sentence | An underscore/asterisk/backtick/bracket in Gemini-generated text wasn't escaped correctly, or a message exceeded Telegram's 4096-character limit | `formatter.py` escapes the 4 legacy-Markdown special characters and truncates the research summary to 500 chars -- if this still happens, it's likely in `key_findings`/`risk_factors` text, which isn't length-capped per-item today |
+| `generate_eod_report.py`'s "LLM / cache economics" / signal-funnel sections say "Not available" | `talonx_core`/`talonx_quant`/`talonx_brain` haven't run with persistence enabled since this feature was added (or `TALONX_*_ENABLE_PERSISTENCE=false`) -- their stats stores have no rows yet | Run the pipeline normally for at least one session with persistence enabled (the default); the report only ever shows what those processes actually recorded |
+| `generate_eod_report.py` shows an empty per-ticker section for a day you know had activity | `--date`/`--tz` picked a different trading-day window than you expected (a UTC timestamp near local midnight can land on the adjacent day) | Pass `--tz` explicitly if you're not in `America/New_York`, and double check `--date` is the LOCAL calendar date, not UTC |
 
 ---
 

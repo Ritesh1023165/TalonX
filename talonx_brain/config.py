@@ -190,3 +190,12 @@ class BrainConfig:
     # (e.g. generated at 10am shouldn't necessarily still be trusted at
     # 3:59pm). Default 2h.
     cache_base_ttl_seconds: float = _env_float("TALONX_BRAIN_CACHE_BASE_TTL", 7200.0)
+
+    # --- Persistence (report category counts, for the EOD report) ---
+    # Cache-hit/degraded/LLM-call counts were only computable LIVE from
+    # Redis messages (dashboard.py) until this was added -- see store.py's
+    # BrainStatsStore. Disable to run pure in-memory.
+    enable_persistence: bool = _env_bool("TALONX_BRAIN_ENABLE_PERSISTENCE", True)
+    db_path: str = os.environ.get(
+        "TALONX_BRAIN_DB_PATH", str(Path.home() / ".talonx" / "brain.db")
+    )

@@ -32,11 +32,12 @@ import asyncio
 import json
 import logging
 import random
+from datetime import datetime, timezone
 
 from pydantic import ValidationError
 
 from talonx_core.config import CoreConfig
-from talonx_core.decision import evaluate
+from talonx_core.decision import evaluate_verbose
 from talonx_core.schemas import ActionableAlert, QuantSignal, ResearchReport
 from talonx_core.state import TickerCorrelator
 from talonx_core.store import TickerStateStore
@@ -178,7 +179,7 @@ class DecisionEngine:
             return
 
         state = self.correlator.get_or_create(ticker)
-        alert = evaluate(state, self.config)
+        alert, reason = evaluate_verbose(state, self.config)
         if alert is not None:
             await self._publish_alert(alert)
             self.correlator.mark_alerted(
@@ -188,6 +189,11 @@ class DecisionEngine:
                 self.store.save_alert(
                     ticker, alert.correlated_at, alert.action, alert.triggering_signal.price,
                 )
+        elif self.store is not None:
+            # Durable trace for the EOD report's signal-funnel section --
+            # previously evaluate() returning None left zero trace
+            # anywhere, ephemeral or durable (see decision.py).
+            self.store.record_suppressed(ticker, reason, datetime.now(timezone.utc))
 
     async def _publish_alert(self, alert: ActionableAlert) -> None:
         try:

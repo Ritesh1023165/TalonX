@@ -43,6 +43,15 @@ CREATE TABLE IF NOT EXISTS ticker_state (
     last_alert_at       TEXT,
     last_alert_action   TEXT,
     last_alert_price    REAL
+);
+
+CREATE TABLE IF NOT EXISTS suppression_counts (
+    date         TEXT NOT NULL,
+    ticker       TEXT NOT NULL,
+    reason       TEXT NOT NULL,
+    count        INTEGER NOT NULL DEFAULT 0,
+    last_seen_at TEXT NOT NULL,
+    PRIMARY KEY (date, ticker, reason)
 )
 """
 
@@ -52,7 +61,7 @@ class TickerStateStore:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.path)
-        self._conn.execute(_SCHEMA)
+        self._conn.executescript(_SCHEMA)
         self._migrate()
         self._conn.commit()
 
@@ -117,6 +126,36 @@ class TickerStateStore:
             (ticker.upper(), when.isoformat(), action.value, price),
         )
         self._conn.commit()
+
+    def record_suppressed(self, ticker: str, reason: str, when: datetime) -> None:
+        """Daily upserted counter, NOT one row per event -- evaluate()
+        can be called on every single signal/report tick for a ticker
+        stuck in one suppressed state (e.g. a sustained cooldown), and an
+        EOD report only ever needs "suppressed N times today by reason
+        X" aggregated, not an unbounded event log. Bucketed by `when`'s
+        UTC calendar date, matching every other timestamp in this store
+        (UTC ISO strings)."""
+        date = when.date().isoformat()
+        self._conn.execute(
+            """
+            INSERT INTO suppression_counts (date, ticker, reason, count, last_seen_at)
+            VALUES (?, ?, ?, 1, ?)
+            ON CONFLICT(date, ticker, reason) DO UPDATE SET
+                count = count + 1,
+                last_seen_at = excluded.last_seen_at
+            """,
+            (date, ticker.upper(), reason, when.isoformat()),
+        )
+        self._conn.commit()
+
+    def suppression_counts_for_date(self, date_str: str) -> list[dict]:
+        cursor = self._conn.execute(
+            "SELECT date, ticker, reason, count, last_seen_at FROM suppression_counts WHERE date = ? "
+            "ORDER BY ticker, reason",
+            (date_str,),
+        )
+        columns = [d[0] for d in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     def load_into(self, correlator: TickerCorrelator) -> int:
         """

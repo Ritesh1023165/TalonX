@@ -8,7 +8,7 @@ for this project's other local SQLite stores.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from talonx_paper.schemas import AlertAction
 from talonx_paper.store import PaperTradingStore
@@ -156,6 +156,50 @@ def test_update_latest_price_upserts(tmp_path):
 
 
 # --- Concurrent positions across tickers (the point of fixed-$ sizing) ------
+
+# --- Date-range queries (the EOD report's read path) -----------------------
+
+def test_get_trade_history_between_filters_to_the_window(tmp_path):
+    with _store(tmp_path) as store:
+        store.execute_buy("OLD", shares=1.0, price=100.0, cost=100.0, timestamp=NOW - timedelta(days=1))
+        store.execute_buy("IN", shares=1.0, price=100.0, cost=100.0, timestamp=NOW)
+
+        rows = store.get_trade_history_between(NOW - timedelta(hours=1), NOW + timedelta(hours=1))
+
+        assert [r["ticker"] for r in rows] == ["IN"]
+
+
+def test_get_trade_history_between_end_is_exclusive(tmp_path):
+    with _store(tmp_path) as store:
+        store.execute_buy("NVDA", shares=1.0, price=100.0, cost=100.0, timestamp=NOW)
+        rows = store.get_trade_history_between(NOW - timedelta(hours=1), NOW)
+        assert rows == []
+
+
+# --- Ignored decisions (the "why didn't it trade" trail) -------------------
+
+def test_record_ignored_round_trips_through_the_date_range_query(tmp_path):
+    with _store(tmp_path) as store:
+        store.record_ignored("NVDA", "NO_ACTIVE_POSITION", AlertAction.CONTRADICTED, 131.50, NOW)
+
+        rows = store.get_ignored_decisions_between(NOW - timedelta(hours=1), NOW + timedelta(hours=1))
+
+        assert len(rows) == 1
+        assert rows[0]["ticker"] == "NVDA"
+        assert rows[0]["reason"] == "NO_ACTIVE_POSITION"
+        assert rows[0]["triggering_action"] == "contradicted"
+        assert rows[0]["price"] == 131.50
+
+
+def test_get_ignored_decisions_between_filters_to_the_window(tmp_path):
+    with _store(tmp_path) as store:
+        store.record_ignored("OLD", "NO_ACTIVE_POSITION", AlertAction.CONTRADICTED, 100.0, NOW - timedelta(days=1))
+        store.record_ignored("IN", "NO_ACTIVE_POSITION", AlertAction.CONTRADICTED, 100.0, NOW)
+
+        rows = store.get_ignored_decisions_between(NOW - timedelta(hours=1), NOW + timedelta(hours=1))
+
+        assert [r["ticker"] for r in rows] == ["IN"]
+
 
 def test_multiple_tickers_can_hold_concurrent_positions(tmp_path):
     with _store(tmp_path, initial_balance=10000.0, allocation=2500.0) as store:

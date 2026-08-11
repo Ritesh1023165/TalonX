@@ -14,8 +14,11 @@ BUY/SELL executes via PaperTradingStore (which handles the atomic
 multi-table write) and publishes the resulting PaperTradeExecution to
 talonx:paper:trades for talonx_dispatch to notify on. An "ignored"
 decision (duplicate signal while already in that state, or insufficient
-cash) is only logged -- there's nothing for a downstream consumer to act
-on, so nothing is published for it.
+cash) is logged AND persisted via store.record_ignored -- there's
+nothing for a downstream Redis consumer to act on, so nothing is
+published for it, but the reason is kept durably so an EOD report can
+explain "why didn't this ticker trade today" without re-deriving it from
+logs (see talonx_paper/store.py's ignored_decisions table).
 
 Reconnects with backoff on Redis connection loss, same pattern as every
 other consumer in this project.
@@ -182,11 +185,21 @@ class PaperTradingEngine:
         position = self.store.get_position(alert.ticker)
         decision = decide_trade(alert, position)
         if decision is None:
-            return  # DEGRADED_QUANT_ALERT -- not a trading trigger
+            # DEGRADED_QUANT_ALERT -- not a trading trigger, but still
+            # worth a durable trace so an EOD report can show "N alerts
+            # today for this ticker were never tradable at all".
+            self.store.record_ignored(
+                alert.ticker, "DEGRADED_NOT_TRADABLE", alert.action,
+                alert.triggering_signal.price, alert.correlated_at,
+            )
+            return
 
         if decision.kind == DecisionKind.IGNORED:
             self._trades_ignored += 1
             logger.info("Paper trade ignored for %s: %s", alert.ticker, decision.reason)
+            self.store.record_ignored(
+                alert.ticker, decision.reason, alert.action, decision.price, alert.correlated_at,
+            )
             return
 
         if decision.kind == DecisionKind.BUY:
@@ -202,6 +215,9 @@ class PaperTradingEngine:
             logger.warning(
                 "Paper trade ignored for %s: INSUFFICIENT_CASH (cash=$%.2f)",
                 alert.ticker, summary["current_cash"],
+            )
+            self.store.record_ignored(
+                alert.ticker, "INSUFFICIENT_CASH", alert.action, decision.price, alert.correlated_at,
             )
             return
 
@@ -219,6 +235,9 @@ class PaperTradingEngine:
         if execution is None:
             logger.warning(
                 "Paper SELL skipped for %s -- no open position found at execution time", alert.ticker,
+            )
+            self.store.record_ignored(
+                alert.ticker, "NO_ACTIVE_POSITION", alert.action, decision.price, alert.correlated_at,
             )
             return
 

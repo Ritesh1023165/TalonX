@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from talonx_core.config import CoreConfig
-from talonx_core.decision import evaluate
+from talonx_core.decision import evaluate, evaluate_verbose
 from talonx_core.schemas import (
     AlertAction,
     AlertSeverity,
@@ -294,3 +294,91 @@ def test_degraded_alert_price_move_still_retriggers():
     alert = evaluate(state, config, now=NOW)
     assert alert is not None
     assert alert.action == AlertAction.DEGRADED_QUANT_ALERT
+
+
+# --- evaluate_verbose() -- the suppression reason surfaced for the EOD
+# report's signal-funnel section. Each case below mirrors an existing
+# evaluate()-returns-None test above, just asserting the reason too.
+
+def test_verbose_reason_missing_pair():
+    state = TickerState(latest_report=_report(), latest_report_at=NOW)
+    alert, reason = evaluate_verbose(state, CoreConfig(), now=NOW)
+    assert alert is None
+    assert reason == "MISSING_PAIR"
+
+
+def test_verbose_reason_stale_signal():
+    config = CoreConfig(correlation_window_seconds=60)
+    state = TickerState(
+        latest_signal=_signal(), latest_signal_at=NOW - timedelta(seconds=120),
+        latest_report=_report(), latest_report_at=NOW,
+    )
+    alert, reason = evaluate_verbose(state, config, now=NOW)
+    assert alert is None
+    assert reason == "STALE_SIGNAL"
+
+
+def test_verbose_reason_stale_report():
+    config = CoreConfig(correlation_window_seconds=60)
+    state = TickerState(
+        latest_signal=_signal(), latest_signal_at=NOW,
+        latest_report=_report(), latest_report_at=NOW - timedelta(seconds=120),
+    )
+    alert, reason = evaluate_verbose(state, config, now=NOW)
+    assert alert is None
+    assert reason == "STALE_REPORT"
+
+
+def test_verbose_reason_cooldown():
+    config = CoreConfig(ticker_cooldown_seconds=300)
+    state = TickerState(
+        latest_signal=_signal(), latest_signal_at=NOW,
+        latest_report=_report(), latest_report_at=NOW,
+        last_alert_at=NOW - timedelta(seconds=60),
+    )
+    alert, reason = evaluate_verbose(state, config, now=NOW)
+    assert alert is None
+    assert reason == "COOLDOWN"
+
+
+def test_verbose_reason_low_confidence():
+    config = CoreConfig(min_confidence=0.5)
+    state = TickerState(
+        latest_signal=_signal(), latest_signal_at=NOW,
+        latest_report=_report(confidence=0.3), latest_report_at=NOW,
+    )
+    alert, reason = evaluate_verbose(state, config, now=NOW)
+    assert alert is None
+    assert reason == "LOW_CONFIDENCE"
+
+
+def test_verbose_reason_neutral_verdict():
+    state = TickerState(
+        latest_signal=_signal(), latest_signal_at=NOW,
+        latest_report=_report(verdict=ResearchVerdict.NEUTRAL), latest_report_at=NOW,
+    )
+    alert, reason = evaluate_verbose(state, CoreConfig(), now=NOW)
+    assert alert is None
+    assert reason == "NEUTRAL_VERDICT"
+
+
+def test_verbose_reason_no_state_change():
+    config = CoreConfig(price_delta_retrigger_pct=0.01)
+    state = TickerState(
+        latest_signal=_signal(SignalDirection.BULLISH, price=200.5), latest_signal_at=NOW,
+        latest_report=_report(ResearchVerdict.BULLISH, price=200.5), latest_report_at=NOW,
+        last_alert_action=AlertAction.CONFIRMED_BULLISH, last_alert_price=200.0,
+    )
+    alert, reason = evaluate_verbose(state, config, now=NOW)
+    assert alert is None
+    assert reason == "NO_STATE_CHANGE"
+
+
+def test_verbose_reason_is_none_when_an_alert_is_produced():
+    state = TickerState(
+        latest_signal=_signal(SignalDirection.BULLISH), latest_signal_at=NOW,
+        latest_report=_report(ResearchVerdict.BULLISH, confidence=0.9), latest_report_at=NOW,
+    )
+    alert, reason = evaluate_verbose(state, CoreConfig(), now=NOW)
+    assert alert is not None
+    assert reason is None

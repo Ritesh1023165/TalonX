@@ -106,8 +106,12 @@ from talonx_ingest.market_data.manager import MarketDataManager
 from talonx_ingest.market_data.run import make_on_event
 from talonx_ingest.news.pipeline import run_news_ingestion
 from talonx_ingest.pipeline import run_ingestion
+from talonx_quant.config import QuantConfig
 from talonx_quant.consumer import QuantScanner
+from talonx_quant.store import QuantStateStore
+from talonx_brain.config import BrainConfig
 from talonx_brain.consumer import ResearchAgent
+from talonx_brain.store import BrainStatsStore
 from talonx_core.config import CoreConfig
 from talonx_core.consumer import DecisionEngine
 from talonx_core.store import TickerStateStore
@@ -294,13 +298,35 @@ async def main() -> None:
     logger.info("Tracked tickers: %s", watchlist_store.list_symbols())
 
     stop_event = asyncio.Event()
-    quant_scanner: QuantScanner | None = None if args.skip_quant else QuantScanner()
+    quant_scanner: QuantScanner | None = None
+    quant_store: QuantStateStore | None = None
+    if not args.skip_quant:
+        quant_config = QuantConfig()
+        if quant_config.enable_persistence:
+            try:
+                quant_store = QuantStateStore(quant_config.db_path)
+            except Exception as exc:  # noqa: BLE001 -- persistence is a nice-to-have, not required
+                logger.warning(
+                    "Module 2 (talonx_quant) suppression-count persistence disabled "
+                    "for this run: %s. Continuing without it.", exc,
+                )
+        quant_scanner = QuantScanner(config=quant_config, store=quant_store)
     market_publisher = RedisEventPublisher()
 
     research_agent: ResearchAgent | None = None
+    brain_store: BrainStatsStore | None = None
     if not args.skip_brain:
         try:
-            research_agent = ResearchAgent()
+            brain_config = BrainConfig()
+            if brain_config.enable_persistence:
+                try:
+                    brain_store = BrainStatsStore(brain_config.db_path)
+                except Exception as exc:  # noqa: BLE001 -- persistence is a nice-to-have, not required
+                    logger.warning(
+                        "Module 3 (talonx_brain) report-category persistence disabled "
+                        "for this run: %s. Continuing without it.", exc,
+                    )
+            research_agent = ResearchAgent(config=brain_config, store=brain_store)
             logger.info("Module 3 (talonx_brain) LLM provider: %s", research_agent.llm_chain.describe())
         except (ImportError, ValueError) as exc:
             logger.warning(
@@ -440,6 +466,10 @@ async def main() -> None:
             paper_trading_engine.stop()
     finally:
         await market_publisher.close()
+        if quant_store is not None:
+            quant_store.close()
+        if brain_store is not None:
+            brain_store.close()
         if core_store is not None:
             core_store.close()
         if dispatch_agent is not None:

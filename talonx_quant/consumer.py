@@ -33,6 +33,8 @@ import asyncio
 import json
 import logging
 import random
+from collections import Counter
+from datetime import datetime, timezone
 
 from pydantic import ValidationError
 
@@ -40,6 +42,7 @@ from talonx_quant.buffer import RollingBarBuffer
 from talonx_quant.config import QuantConfig
 from talonx_quant.indicators import compute_indicators
 from talonx_quant.schemas import MarketTickEvent, QuantSignal, TickEventType
+from talonx_quant.store import QuantStateStore
 from talonx_quant.strategy import evaluate_signals
 
 logger = logging.getLogger("talonx_quant.consumer")
@@ -57,8 +60,9 @@ def _jittered_backoff(attempt: int, base: float, max_delay: float) -> float:
 
 
 class QuantScanner:
-    def __init__(self, config: QuantConfig | None = None):
+    def __init__(self, config: QuantConfig | None = None, store: QuantStateStore | None = None):
         self.config = config or QuantConfig()
+        self.store = store
         self.buffer = RollingBarBuffer(self.config.max_bars_per_symbol)
         self._client = None
         self._stop_event = asyncio.Event()
@@ -198,6 +202,10 @@ class QuantScanner:
                 "Suppressed %d signal(s) for %s -- still in cooldown",
                 len(signals), event.symbol,
             )
+            if self.store is not None:
+                self.store.record_suppressed(
+                    event.symbol, "COOLDOWN", len(signals), datetime.now(timezone.utc)
+                )
             return
 
         # Lock the ticker out NOW, not at publish/flush time -- otherwise a
@@ -241,6 +249,12 @@ class QuantScanner:
                 len(released), len(candidates),
                 ", ".join(f"{s.ticker}/{s.signal_type.value}" for s in dropped),
             )
+            if self.store is not None:
+                now = datetime.now(timezone.utc)
+                # dropped can span multiple tickers in one flush -- one
+                # counter increment per ticker, not one blanket call.
+                for ticker, count in Counter(s.ticker for s in dropped).items():
+                    self.store.record_suppressed(ticker, "THROTTLE", count, now)
 
     async def _publish_signal(self, signal: QuantSignal) -> None:
         try:

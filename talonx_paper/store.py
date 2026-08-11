@@ -24,6 +24,13 @@ Four tables:
     process with no access to this module's in-memory price cache, and
     needs a durable, cross-process-readable source for marking open
     positions to market.
+  - ignored_decisions: append-only log of every alert that arrived but
+    did NOT result in a trade (NO_ACTIVE_POSITION, POSITION_ALREADY_OPEN,
+    INSUFFICIENT_CASH, DEGRADED_NOT_TRADABLE). Previously this was only a
+    logger.info/.warning line in consumer.py -- unrecoverable after the
+    fact, which is exactly what made "why didn't ticker X trade today"
+    require a manual log/CSV analysis instead of a query. Powers the EOD
+    report's per-ticker "ignored" breakdown.
 
 Same threading.Lock-around-every-public-method pattern every store built
 this session uses (WAL mode + check_same_thread=False, since app.py
@@ -84,6 +91,16 @@ CREATE TABLE IF NOT EXISTS latest_prices (
     price       REAL NOT NULL,
     updated_at  TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS ignored_decisions (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker              TEXT NOT NULL,
+    reason              TEXT NOT NULL,
+    triggering_action   TEXT NOT NULL,
+    price               REAL NOT NULL,
+    timestamp           TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ignored_decisions_timestamp ON ignored_decisions (timestamp);
 """
 
 
@@ -301,6 +318,47 @@ class PaperTradingStore:
                 "realized_pnl_usd, realized_pnl_pct, portfolio_cash_after, timestamp "
                 "FROM trade_history ORDER BY id DESC LIMIT ?",
                 (limit,),
+            )
+            columns = [d[0] for d in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    def get_trade_history_between(self, start: datetime, end: datetime) -> list[dict]:
+        """All executed trades with start <= timestamp < end -- the EOD
+        report's date-window equivalent of get_trade_history's LIMIT-based
+        read."""
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT id, ticker, order_type, execution_price, shares, position_cost, entry_price, "
+                "realized_pnl_usd, realized_pnl_pct, portfolio_cash_after, timestamp "
+                "FROM trade_history WHERE timestamp >= ? AND timestamp < ? ORDER BY id",
+                (start.isoformat(), end.isoformat()),
+            )
+            columns = [d[0] for d in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    # --- Ignored decisions (the "why didn't it trade" trail) ---------------
+
+    def record_ignored(
+        self, ticker: str, reason: str, triggering_action, price: float, timestamp: datetime,
+    ) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO ignored_decisions (ticker, reason, triggering_action, price, timestamp) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (
+                    ticker.upper(), reason,
+                    triggering_action.value if hasattr(triggering_action, "value") else triggering_action,
+                    price, timestamp.isoformat(),
+                ),
+            )
+            self._conn.commit()
+
+    def get_ignored_decisions_between(self, start: datetime, end: datetime) -> list[dict]:
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT id, ticker, reason, triggering_action, price, timestamp FROM ignored_decisions "
+                "WHERE timestamp >= ? AND timestamp < ? ORDER BY id",
+                (start.isoformat(), end.isoformat()),
             )
             columns = [d[0] for d in cursor.description]
             return [dict(zip(columns, row)) for row in cursor.fetchall()]

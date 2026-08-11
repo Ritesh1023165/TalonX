@@ -29,6 +29,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import datetime, timezone
 
 from pydantic import ValidationError
 
@@ -40,6 +41,7 @@ from talonx_brain.config import BrainConfig
 from talonx_brain.llm import _BaseResearchChain, build_research_chain
 from talonx_brain.retriever import ContextRetriever
 from talonx_brain.schemas import QuantSignal, ResearchReport, ResearchVerdict
+from talonx_brain.store import BrainStatsStore
 
 logger = logging.getLogger("talonx_brain.consumer")
 
@@ -56,10 +58,12 @@ class ResearchAgent:
         retriever: ContextRetriever | None = None,
         llm_chain: _BaseResearchChain | None = None,
         cache: BrainCache | None = None,
+        store: BrainStatsStore | None = None,
     ):
         self.config = config or BrainConfig()
         self.retriever = retriever or ContextRetriever(self.config)
         self.llm_chain = llm_chain or build_research_chain(self.config)
+        self.store = store
         # None until _connect_and_listen builds one against the real,
         # connected client -- unless a caller injects one directly (tests
         # inject a BrainCache pre-wired to a mock client, so
@@ -316,6 +320,8 @@ class ResearchAgent:
         )
 
     async def _publish_report(self, report: ResearchReport) -> None:
+        if self.store is not None:
+            self.store.record_report(report.ticker, _categorize(report), datetime.now(timezone.utc))
         try:
             await self._client.publish(self.config.reports_channel, report.to_redis_payload())
             self._reports_published += 1
@@ -326,6 +332,21 @@ class ResearchAgent:
             )
         except Exception as exc:  # noqa: BLE001 -- a publish failure shouldn't crash the agent
             logger.warning("Failed to publish report to Redis: %s", exc)
+
+
+def _categorize(report: ResearchReport) -> str:
+    """Same decision table as dashboard.py's _categorize_report, just
+    reading the ResearchReport object directly instead of a raw Redis
+    payload dict -- kept as its own local copy (not imported from
+    dashboard.py) since a root-level standalone script importing FROM a
+    module would invert this project's dependency direction."""
+    if report.from_cache:
+        return "stale_fallback" if report.is_stale else "cache_hit"
+    if report.is_degraded:
+        return "degraded"
+    if report.verdict == ResearchVerdict.INSUFFICIENT_CONTEXT:
+        return "cold_start"
+    return "llm_call"
 
 
 def _build_retrieval_query(signal: QuantSignal) -> str:

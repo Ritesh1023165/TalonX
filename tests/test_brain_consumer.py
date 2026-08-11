@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from talonx_brain.consumer import ResearchAgent, _build_retrieval_query
+from talonx_brain.consumer import ResearchAgent, _build_retrieval_query, _categorize
 from talonx_brain.llm import _LLMFindings
 from talonx_brain.schemas import (
     Citation,
@@ -33,6 +33,7 @@ from talonx_brain.schemas import (
     SignalDirection,
     SignalType,
 )
+from talonx_brain.store import BrainStatsStore
 
 
 def _signal_payload(ticker: str = "NVDA") -> dict:
@@ -345,3 +346,84 @@ async def test_unparseable_filing_event_is_dropped(agent):
 
     cache.invalidate.assert_not_awaited()
     assert agent.filing_invalidations == 0
+
+
+# --- _categorize() + report-count persistence (the EOD report's LLM/cache
+# economics section) --------------------------------------------------------
+
+def test_categorize_fresh_llm_call():
+    assert _categorize(_report()) == "llm_call"
+
+
+def test_categorize_cache_hit():
+    assert _categorize(_report(from_cache=True)) == "cache_hit"
+
+
+def test_categorize_stale_fallback():
+    assert _categorize(_report(from_cache=True, is_stale=True)) == "stale_fallback"
+
+
+def test_categorize_degraded():
+    assert _categorize(_report(is_degraded=True)) == "degraded"
+
+
+def test_categorize_cold_start():
+    assert _categorize(_report(verdict=ResearchVerdict.INSUFFICIENT_CONTEXT)) == "cold_start"
+
+
+@pytest.mark.asyncio
+async def test_fresh_llm_call_is_recorded(agent, tmp_path):
+    with BrainStatsStore(tmp_path / "brain.db") as store:
+        agent.store = store
+        await agent._handle_message(_msg(agent, _signal_payload()))
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        rows = store.report_counts_for_date(today)
+    assert len(rows) == 1
+    assert rows[0]["ticker"] == "NVDA"
+    assert rows[0]["category"] == "llm_call"
+
+
+@pytest.mark.asyncio
+async def test_cache_hit_is_recorded(agent, tmp_path):
+    cached = _report(summary="Cached analysis.")
+    cache = AsyncMock()
+    cache.get.return_value = (cached, True)
+    agent.cache = cache
+
+    with BrainStatsStore(tmp_path / "brain.db") as store:
+        agent.store = store
+        await agent._handle_message(_msg(agent, _signal_payload()))
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        rows = store.report_counts_for_date(today)
+    assert rows[0]["category"] == "cache_hit"
+
+
+@pytest.mark.asyncio
+async def test_degraded_report_is_recorded(agent, tmp_path):
+    agent.llm_chain.generate.side_effect = RuntimeError("Gemini exploded")
+
+    with BrainStatsStore(tmp_path / "brain.db") as store:
+        agent.store = store
+        await agent._handle_message(_msg(agent, _signal_payload()))
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        rows = store.report_counts_for_date(today)
+    assert rows[0]["category"] == "degraded"
+
+
+@pytest.mark.asyncio
+async def test_cold_start_is_recorded(agent, tmp_path):
+    agent.retriever.retrieve.return_value = []
+
+    with BrainStatsStore(tmp_path / "brain.db") as store:
+        agent.store = store
+        await agent._handle_message(_msg(agent, _signal_payload()))
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        rows = store.report_counts_for_date(today)
+    assert rows[0]["category"] == "cold_start"
+
+
+@pytest.mark.asyncio
+async def test_no_store_means_no_persistence_attempted(agent):
+    # agent fixture has store=None by default -- must not raise.
+    await agent._handle_message(_msg(agent, _signal_payload()))
+    assert agent.reports_published == 1

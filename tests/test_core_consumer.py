@@ -206,6 +206,44 @@ async def test_confirmed_alert_persists_report_and_cooldown(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_suppressed_evaluation_persists_a_reason(tmp_path):
+    with TickerStateStore(tmp_path / "core_state.db") as store:
+        engine = DecisionEngine(config=CoreConfig(min_confidence=0.5), store=store)
+        engine._client = AsyncMock()
+
+        await engine._handle_message(_message(engine.config.signals_channel, _signal_payload("bullish")))
+        await engine._handle_message(
+            _message(engine.config.reports_channel, _report_payload("bullish", confidence=0.1))
+        )
+
+        rows = store.suppression_counts_for_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    # The first message (signal alone) is itself a MISSING_PAIR
+    # suppression -- both get recorded.
+    by_reason = {r["reason"]: r for r in rows}
+    assert by_reason["LOW_CONFIDENCE"]["ticker"] == "AAPL"
+    assert by_reason["MISSING_PAIR"]["ticker"] == "AAPL"
+
+
+@pytest.mark.asyncio
+async def test_a_published_alert_does_not_also_record_a_suppression(tmp_path):
+    with TickerStateStore(tmp_path / "core_state.db") as store:
+        engine = DecisionEngine(config=CoreConfig(), store=store)
+        engine._client = AsyncMock()
+
+        await engine._handle_message(_message(engine.config.signals_channel, _signal_payload("bullish")))
+        await engine._handle_message(
+            _message(engine.config.reports_channel, _report_payload("bullish", confidence=0.9))
+        )
+
+        # The signal-alone message above IS a suppression (MISSING_PAIR),
+        # but the second message that completes the pair must not also
+        # record one -- it published an alert instead.
+        rows = store.suppression_counts_for_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    assert len(rows) == 1
+    assert rows[0]["reason"] == "MISSING_PAIR"
+
+
+@pytest.mark.asyncio
 async def test_no_store_means_no_persistence_attempted(engine):
     # The default `engine` fixture has store=None -- this should just be a
     # normal in-memory run, no AttributeError from a missing store.

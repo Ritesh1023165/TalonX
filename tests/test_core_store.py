@@ -177,6 +177,43 @@ def test_correlator_rehydrates_a_partial_pair_after_restart(tmp_path):
     assert state.latest_report is None  # report genuinely hasn't arrived yet
 
 
+# --- Suppression counts (the EOD report's signal-funnel section) ----------
+
+def test_record_suppressed_creates_a_counter_row(tmp_path):
+    with TickerStateStore(tmp_path / "core_state.db") as store:
+        store.record_suppressed("AAPL", "COOLDOWN", NOW)
+        rows = store.suppression_counts_for_date("2026-08-07")
+        assert len(rows) == 1
+        assert rows[0]["ticker"] == "AAPL"
+        assert rows[0]["reason"] == "COOLDOWN"
+        assert rows[0]["count"] == 1
+
+
+def test_record_suppressed_increments_the_same_day_ticker_reason_bucket(tmp_path):
+    with TickerStateStore(tmp_path / "core_state.db") as store:
+        store.record_suppressed("AAPL", "COOLDOWN", NOW)
+        store.record_suppressed("AAPL", "COOLDOWN", NOW + timedelta(minutes=5))
+        rows = store.suppression_counts_for_date("2026-08-07")
+        assert len(rows) == 1
+        assert rows[0]["count"] == 2
+
+
+def test_record_suppressed_keeps_different_reasons_separate(tmp_path):
+    with TickerStateStore(tmp_path / "core_state.db") as store:
+        store.record_suppressed("AAPL", "COOLDOWN", NOW)
+        store.record_suppressed("AAPL", "LOW_CONFIDENCE", NOW)
+        rows = {r["reason"]: r["count"] for r in store.suppression_counts_for_date("2026-08-07")}
+        assert rows == {"COOLDOWN": 1, "LOW_CONFIDENCE": 1}
+
+
+def test_suppression_counts_for_date_excludes_other_days(tmp_path):
+    with TickerStateStore(tmp_path / "core_state.db") as store:
+        store.record_suppressed("AAPL", "COOLDOWN", NOW)
+        store.record_suppressed("AAPL", "COOLDOWN", NOW + timedelta(days=1))
+        assert len(store.suppression_counts_for_date("2026-08-07")) == 1
+        assert len(store.suppression_counts_for_date("2026-08-08")) == 1
+
+
 def test_multiple_tickers_are_independent(tmp_path):
     path = tmp_path / "core_state.db"
     aapl_signal = _signal()

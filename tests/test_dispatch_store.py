@@ -192,6 +192,30 @@ def test_purge_older_than_returns_zero_when_nothing_is_stale(tmp_path):
         assert store.count() == 1
 
 
+def test_alerts_between_filters_to_the_window(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_alert(_alert(ticker="BEFORE", correlated_at=NOW - timedelta(days=1)))
+        in_window_id = store.record_alert(_alert(ticker="IN", correlated_at=NOW))
+        store.record_alert(_alert(ticker="AFTER", correlated_at=NOW + timedelta(days=1)))
+
+        rows = store.alerts_between(NOW - timedelta(hours=1), NOW + timedelta(hours=1))
+
+        assert [r["id"] for r in rows] == [in_window_id]
+        assert rows[0]["ticker"] == "IN"
+
+
+def test_alerts_between_end_is_exclusive(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_alert(_alert(correlated_at=NOW))
+        rows = store.alerts_between(NOW - timedelta(hours=1), NOW)
+        assert rows == []
+
+
+def test_alerts_between_returns_empty_list_when_nothing_matches(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        assert store.alerts_between(NOW, NOW + timedelta(hours=1)) == []
+
+
 def test_state_persists_across_reopen(tmp_path):
     path = tmp_path / "audit.db"
     with AuditStore(path) as store:

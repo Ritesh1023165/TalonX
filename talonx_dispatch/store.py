@@ -164,6 +164,18 @@ class AuditStore:
             self._conn.commit()
             return cursor.rowcount
 
+    def alerts_between(self, start: datetime, end: datetime) -> list[dict]:
+        """All alerts with start <= correlated_at < end -- the EOD report's
+        date-window read, same indexed-column comparison purge_older_than
+        already uses, just a SELECT instead of a DELETE."""
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT * FROM alerts WHERE correlated_at >= ? AND correlated_at < ? "
+                "ORDER BY correlated_at, id",
+                (start.isoformat(), end.isoformat()),
+            )
+            return [_row_to_dict(row) for row in cursor.fetchall()]
+
     def recent(self, limit: int = 200) -> list[dict]:
         with self._lock:
             # `id DESC` as a tiebreaker: correlated_at alone is ambiguous if
