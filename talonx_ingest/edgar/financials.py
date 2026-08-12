@@ -20,10 +20,15 @@ has every field -- callers should expect partial `FinancialStatementFacts`
 rows (missing fields are None) and treat downstream factor math
 accordingly (see talonx_quant.fundamentals).
 
-Only ANNUAL (10-K, fiscal_period="FY") facts are extracted -- multi-year
-trailing averages (the spec's "5-year average ROIC") are computed
-downstream in talonx_quant, this module's job stops at "parse the raw
-numbers out."
+Only ANNUAL (fiscal_period="FY") facts are extracted, from any of the 3
+SEC-recognized annual-report form types (_ANNUAL_REPORT_FORMS: 10-K for
+US domestic filers, 20-F for foreign private issuers, 40-F for Canadian
+MJDS filers) -- multi-year trailing averages (the spec's "5-year average
+ROIC") are computed downstream in talonx_quant, this module's job stops
+at "parse the raw numbers out." Still US-GAAP only -- a foreign private
+issuer reporting under IFRS instead (facts["ifrs-full"] rather than
+facts["us-gaap"]) has no usable data here; that's a genuinely separate,
+larger parsing path, not built.
 """
 from __future__ import annotations
 
@@ -95,15 +100,25 @@ _SHARES_CONCEPTS: tuple[str, ...] = ("CommonStockSharesOutstanding", "EntityComm
 
 _MAX_FISCAL_YEARS = 10
 
+# The 3 SEC-recognized ANNUAL report form types -- 10-K for US domestic
+# filers, 20-F for foreign private issuers (e.g. Alibaba, Toyota), 40-F
+# for Canadian MJDS filers. Restricting to just "10-K" silently discarded
+# every foreign private issuer's real, complete annual data (caught live:
+# BABA has 358 us-gaap concepts with genuine FY-period facts, all of them
+# tagged under form "20-F", not "10-K" -- this returned an empty facts
+# list despite the data existing).
+_ANNUAL_REPORT_FORMS = ("10-K", "20-F", "40-F")
+
 
 def _annual_values_by_year(concept_facts: dict, unit: str) -> dict[int, float]:
     """For one concept's `facts["us-gaap"][concept]` blob, return
-    {fiscal_year: value} restricted to annual (fp="FY") 10-K facts under
-    the given unit. When a fiscal year has more than one reported value
-    (e.g. a restatement), the most recently FILED one wins."""
+    {fiscal_year: value} restricted to annual (fp="FY") facts filed on
+    one of _ANNUAL_REPORT_FORMS, under the given unit. When a fiscal year
+    has more than one reported value (e.g. a restatement), the most
+    recently FILED one wins."""
     by_year: dict[int, tuple[str, float]] = {}  # fy -> (filed_date, value)
     for entry in concept_facts.get("units", {}).get(unit, []):
-        if entry.get("form") != "10-K" or entry.get("fp") != "FY":
+        if entry.get("form") not in _ANNUAL_REPORT_FORMS or entry.get("fp") != "FY":
             continue
         fy = entry.get("fy")
         val = entry.get("val")

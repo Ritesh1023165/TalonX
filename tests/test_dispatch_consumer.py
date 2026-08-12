@@ -240,7 +240,17 @@ async def test_retention_sweep_purges_stale_alerts(agent):
 
 @pytest.mark.asyncio
 async def test_retention_sweep_leaves_recent_alerts_alone(agent):
-    await agent._handle_message(_message(_alert_payload()))  # correlated_at defaults to "now" (2026-08-07)
+    """A genuinely fresh alert (correlated_at = actual wall-clock time at
+    test-run time, NOT _alert_payload()'s fixed 2026-08-07 default) must
+    survive the sweep. The fixed date is fine for tests that only check
+    content, but this test's whole point is "recent survives" -- a
+    hardcoded calendar date drifts into "old" as real time passes it by
+    (caught live: 2026-08-07 is exactly TALONX_DISPATCH_RETENTION_DAYS's
+    default 5.0 days before 2026-08-12, so this started failing the
+    moment "today" reached that date, with no code change involved)."""
+    fresh_payload = _alert_payload()
+    fresh_payload["correlated_at"] = datetime.now(timezone.utc).isoformat()
+    await agent._handle_message(_message(fresh_payload))
 
     purged = await agent._run_retention_sweep_once()
 

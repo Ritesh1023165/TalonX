@@ -88,6 +88,52 @@ def test_ignores_non_annual_and_non_10k_entries():
     assert rows[0].revenue == 400_000_000_000
 
 
+def test_accepts_20f_and_40f_as_annual_report_forms():
+    """Regression coverage for a bug caught live: BABA (Alibaba, a
+    foreign private issuer) files its annual report as Form 20-F, not
+    10-K -- restricting the annual-form filter to "10-K" alone silently
+    discarded BABA's real, complete FY-period data (358 us-gaap concepts
+    with genuine annual facts, all tagged under form "20-F")."""
+    raw = _raw({
+        "Revenues": _usd_facts((2025, 130_000_000_000, "20-F", "2025-07-01")),
+        "NetIncomeLoss": _usd_facts((2025, 12_000_000_000, "20-F", "2025-07-01")),
+    })
+    rows = parse_company_facts(raw, ticker="BABA", cik="0001577552")
+
+    assert len(rows) == 1
+    assert rows[0].revenue == 130_000_000_000
+
+
+def test_accepts_40f_as_an_annual_report_form():
+    raw = _raw({
+        "Revenues": _usd_facts((2025, 50_000_000_000, "40-F", "2025-03-01")),
+        "NetIncomeLoss": _usd_facts((2025, 5_000_000_000, "40-F", "2025-03-01")),
+    })
+    rows = parse_company_facts(raw, ticker="SHOP", cik="0001594805")
+
+    assert len(rows) == 1
+    assert rows[0].revenue == 50_000_000_000
+
+
+def test_ignores_a_10q_entry_even_when_it_claims_fp_fy():
+    """The non-annual-form entries a 20-F/40-F filer would ALSO have
+    (their own quarterly reports) must still be rejected -- accepting
+    more annual forms must not accidentally widen the quarterly filter."""
+    raw = _raw({
+        "Revenues": _usd_facts(
+            (2025, 130_000_000_000, "20-F", "2025-07-01"),
+        ),
+        "NetIncomeLoss": _usd_facts((2025, 12_000_000_000, "20-F", "2025-07-01")),
+    })
+    raw["facts"]["us-gaap"]["Revenues"]["units"]["USD"].append(
+        {"fy": 2025, "val": 30_000_000_000, "form": "6-K", "fp": "Q2", "filed": "2025-04-01"},
+    )
+    rows = parse_company_facts(raw, ticker="BABA", cik="0001577552")
+
+    assert len(rows) == 1
+    assert rows[0].revenue == 130_000_000_000  # the annual figure, not the 6-K interim one
+
+
 def test_restated_year_uses_the_most_recently_filed_value():
     raw = _raw({
         "Revenues": _usd_facts(
