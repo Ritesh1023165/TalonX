@@ -219,6 +219,79 @@ def test_alerts_between_returns_empty_list_when_nothing_matches(tmp_path):
         assert store.alerts_between(NOW, NOW + timedelta(hours=1)) == []
 
 
+def test_record_alert_leaves_suppress_reason_null_until_a_push_decision_is_made(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_alert(_alert())
+        row = store.get_by_id(alert_id)
+        assert row["suppress_reason"] is None
+
+
+def test_mark_suppressed_records_the_reason(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_alert(_alert())
+        store.mark_suppressed(alert_id, "ACTION_MUTED")
+
+        row = store.get_by_id(alert_id)
+        assert row["suppress_reason"] == "ACTION_MUTED"
+        assert row["telegram_sent"] is False
+
+
+def test_mark_telegram_sent_sets_suppress_reason_to_the_literal_none_value(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_alert(_alert())
+        store.mark_telegram_sent(alert_id)
+
+        row = store.get_by_id(alert_id)
+        assert row["suppress_reason"] == "NONE"
+
+
+def test_mark_telegram_failed_sets_suppress_reason_to_the_literal_none_value(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_alert(_alert())
+        store.mark_telegram_failed(alert_id, "bad token")
+
+        row = store.get_by_id(alert_id)
+        assert row["suppress_reason"] == "NONE"
+
+
+def test_migrates_an_alerts_table_from_before_the_suppress_reason_column(tmp_path):
+    """Simulates a real pre-existing dispatch_audit.db from before
+    suppress_reason was added to `alerts` -- same idempotent-migration
+    guard as the long_term_alerts/summary test below. A pre-existing row
+    must survive with suppress_reason=None, and the store stays usable."""
+    db_path = tmp_path / "legacy_audit.db"
+
+    legacy_conn = sqlite3.connect(db_path)
+    legacy_conn.execute(
+        "CREATE TABLE alerts ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT NOT NULL, action TEXT NOT NULL, "
+        "severity TEXT NOT NULL, rationale TEXT NOT NULL, quant_direction TEXT NOT NULL, "
+        "research_verdict TEXT NOT NULL, research_confidence REAL NOT NULL, signal_type TEXT NOT NULL, "
+        "price REAL NOT NULL, research_summary TEXT NOT NULL, key_findings_json TEXT NOT NULL, "
+        "risk_factors_json TEXT NOT NULL, model_used TEXT NOT NULL, correlated_at TEXT NOT NULL, "
+        "received_at TEXT NOT NULL, telegram_sent INTEGER NOT NULL DEFAULT 0, "
+        "telegram_sent_at TEXT, telegram_error TEXT)"
+    )
+    legacy_conn.execute(
+        "INSERT INTO alerts (ticker, action, severity, rationale, quant_direction, research_verdict, "
+        "research_confidence, signal_type, price, research_summary, key_findings_json, risk_factors_json, "
+        "model_used, correlated_at, received_at) VALUES ('MSFT', 'confirmed_bullish', 'warning', "
+        "'pre-migration rationale', 'bullish', 'bullish', 0.8, 'macd_bullish_cross', 503.81, "
+        "'summary', '[]', '[]', 'gemini-flash-latest', '2026-08-11T18:51:43+00:00', "
+        "'2026-08-11T18:51:44+00:00')"
+    )
+    legacy_conn.commit()
+    legacy_conn.close()
+
+    with AuditStore(db_path) as store:
+        rows = store.recent()
+        assert len(rows) == 1
+        assert rows[0]["suppress_reason"] is None
+
+        store.mark_suppressed(rows[0]["id"], "PUSH_COOLDOWN_ACTIVE")
+        assert store.get_by_id(rows[0]["id"])["suppress_reason"] == "PUSH_COOLDOWN_ACTIVE"
+
+
 def test_state_persists_across_reopen(tmp_path):
     path = tmp_path / "audit.db"
     with AuditStore(path) as store:
@@ -342,6 +415,25 @@ def test_long_term_state_persists_across_reopen(tmp_path):
         assert store2.count_long_term() == 1
 
 
+def test_mark_long_term_suppressed_records_the_reason(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(_long_term_alert())
+        store.mark_long_term_suppressed(alert_id, "ACTION_MUTED")
+
+        row = store.get_long_term_by_id(alert_id)
+        assert row["suppress_reason"] == "ACTION_MUTED"
+        assert row["telegram_sent"] is False
+
+
+def test_mark_long_term_telegram_sent_sets_suppress_reason_to_the_literal_none_value(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(_long_term_alert())
+        store.mark_long_term_telegram_sent(alert_id)
+
+        row = store.get_long_term_by_id(alert_id)
+        assert row["suppress_reason"] == "NONE"
+
+
 def test_migrates_a_long_term_alerts_table_from_before_the_summary_column(tmp_path):
     """Simulates a real pre-existing dispatch_audit.db from before `summary`
     was added to long_term_alerts -- AuditStore's first-ever migration.
@@ -375,6 +467,7 @@ def test_migrates_a_long_term_alerts_table_from_before_the_summary_column(tmp_pa
         rows = store.recent_long_term()
         assert len(rows) == 1
         assert rows[0]["summary"] == ""  # DEFAULT '' for a pre-migration row
+        assert rows[0]["suppress_reason"] is None  # this migration also predates suppress_reason
 
         # And the migrated store is fully usable afterward.
         store.record_long_term_alert(_long_term_alert(ticker="AAPL"))

@@ -78,8 +78,8 @@ C:\workspace\TalonX\              <- open THIS folder as your project root
 │   ├── test_core_consumer.py
 │   ├── test_dispatch_schemas.py
 │   ├── test_dispatch_formatter.py
-│   ├── test_dispatch_store.py
-│   └── test_dispatch_consumer.py
+│   ├── test_dispatch_store.py         <- audit trail incl. suppress_reason + migrations
+│   └── test_dispatch_consumer.py      <- Smart Dispatch Filtering: action mute, confidence gate, push cooldown/retrigger
 ├── talonx_ingest\
 │   ├── config.py                   <- all settings, env-driven
 │   ├── pipeline.py                 <- SEC filing ingestion entrypoint
@@ -680,6 +680,19 @@ talonx:alerts:dispatch (Redis)
       SQLite, durable; this is now the ONLY durable historical record of
       alerts anywhere in the pipeline, since Redis Pub/Sub itself isn't one)
     → if Telegram is configured AND severity >= TALONX_DISPATCH_MIN_SEVERITY:
+        → Smart Dispatch Filtering (consumer.py's _evaluate_push_eligibility):
+            - action not in the eligible set (CONFIRMED_BULLISH/BEARISH,
+              or long-term HIGH_CONVICTION_BUY/TAKE_PROFIT_REBALANCE/
+              UNDER_PERFORM_REBALANCE) → suppressed, ACTION_MUTED
+            - research_confidence < TALONX_DISPATCH_MIN_CONFIDENCE (intraday
+              only) → suppressed, CONFIDENCE_BELOW_GATE
+            - this ticker pushed within the last TALONX_DISPATCH_PUSH_
+              COOLDOWN_MINUTES (default 45) AND price hasn't moved >=
+              TALONX_DISPATCH_RETRIGGER_PRICE_DELTA_PCT (default 1.0%) since
+              → suppressed, PRICE_DELTA_TOO_LOW (or PUSH_COOLDOWN_ACTIVE if
+              there's no comparable prior price at all)
+            - a suppressed alert is marked on its OWN audit row
+              (suppress_reason) -- still 100% recorded, never pushed
         → format a SHORT summary (ticker/action/price/confidence/one-line
           quant trigger + this alert's ID -- formatter.format_telegram_summary)
         → send via python-telegram-bot, with retry/backoff (telegram_client.py)
@@ -739,6 +752,59 @@ Streamlit (`streamlit run talonx_dispatch/app.py`)
   an "impossible" state. `get_by_id()` backs the Telegram reply lookup;
   `purge_older_than()` backs the retention sweep
   (`TALONX_DISPATCH_RETENTION_DAYS`, default 5) -- both new.
+- **Smart Dispatch Filtering** (`consumer.py`, `store.py`'s `suppress_reason`
+  column) — added after a live session logged 86 Telegram pushes in 4.3
+  hours (~20/hour): 44.8% were non-actionable `CONTRADICTED` alerts, and
+  40.2% were the same ticker re-alerting every ~20 minutes on minor price
+  noise. `_evaluate_push_eligibility()` is a pure, directly-unit-testable
+  function applying 3 independent gates, cheapest/stateless first, BEFORE
+  a Telegram send is even attempted — **unconditional audit persistence is
+  untouched**: `record_alert()`/`record_long_term_alert()` still write
+  every alert before this filtering decision is made, so the audit trail
+  and Streamlit dashboard always show 100% of what `talonx_core` published.
+    1. **Action eligibility** (`TALONX_DISPATCH_MUTE_CONTRADICTIONS`,
+       default `true`) — an ALLOWLIST, not just a `CONTRADICTED`-specific
+       check: only actions representing a genuine trade decision
+       (`CONFIRMED_BULLISH`/`CONFIRMED_BEARISH` intraday;
+       `HIGH_CONVICTION_BUY`/`TAKE_PROFIT_REBALANCE`/
+       `UNDER_PERFORM_REBALANCE` long-term) are push-eligible. Everything
+       else — `CONTRADICTED`, `DEGRADED_QUANT_ALERT`, long-term
+       `HOLD_QUALITY` — is a "no strong trade signal" state and gets
+       muted the same way (`suppress_reason = "ACTION_MUTED"`).
+    2. **Research confidence gate** (`TALONX_DISPATCH_MIN_CONFIDENCE`,
+       default `0.75`) — intraday only. `LongTermActionableAlert` has no
+       `research_confidence` field; its own `quality_score >= 7`
+       threshold is already enforced upstream in `talonx_core`'s
+       long-term decision matrix before a long-term alert is even
+       published, so a redundant proxy gate isn't added here
+       (`suppress_reason = "CONFIDENCE_BELOW_GATE"`).
+    3. **Per-ticker push cooldown with a price-delta re-trigger bypass**
+       (`TALONX_DISPATCH_PUSH_COOLDOWN_MINUTES` default 45,
+       `TALONX_DISPATCH_RETRIGGER_PRICE_DELTA_PCT` default 1.0) — a
+       SEPARATE, longer lockout on the PUSH itself, on top of whatever
+       cooldown `talonx_core` already applied before publishing the
+       alert at all. Tracked as a plain in-process dict keyed by ticker
+       (`DispatchAgent._last_telegram_push` / `_last_telegram_push_long_term`
+       — kept separate per horizon so a `DUAL_HORIZON` ticker's two
+       cadences can't clobber each other), not Redis — unlike
+       `talonx_quant`'s loss-lockout, no OTHER process needs to see this
+       state, so a Redis round-trip would be pure overhead; resets on
+       restart, matching `talonx_core`'s own in-memory per-ticker
+       cooldown. If a new alert arrives inside the cooldown window,
+       price is compared against the last PUSHED price: a move
+       >= the retrigger threshold bypasses the cooldown
+       (`suppress_reason` stays unset, a genuine push goes out); under
+       threshold suppresses with `suppress_reason = "PRICE_DELTA_TOO_LOW"`
+       (the more specific diagnostic — the delta WAS checked); the rare
+       case of no comparable prior price at all falls back to the
+       generic `"PUSH_COOLDOWN_ACTIVE"`. Only a SUCCESSFUL push updates
+       the reference (timestamp, price) — a suppressed candidate never
+       counts as one.
+
+  A fully sent/attempted alert's `suppress_reason` reads the literal
+  string `"NONE"` (not SQL `NULL`) — `NULL` is reserved for a row from
+  before a push decision was ever made (or, after a schema migration, a
+  pre-existing row from before this column existed at all).
 - **`formatter.py`** — TWO pure formatting functions now, no I/O, trivially
   unit-testable without a bot token. `format_telegram_summary(alert,
   alert_id)` is the actual push: short enough to read at a glance during

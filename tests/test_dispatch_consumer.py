@@ -21,7 +21,12 @@ from unittest.mock import AsyncMock
 import pytest
 
 from talonx_dispatch.config import DispatchConfig
-from talonx_dispatch.consumer import DispatchAgent
+from talonx_dispatch.consumer import (
+    _PUSH_ELIGIBLE_ACTIONS_INTRADAY,
+    DispatchAgent,
+    _evaluate_push_eligibility,
+)
+from talonx_dispatch.schemas import AlertAction
 from talonx_dispatch.store import AuditStore
 from talonx_dispatch.telegram_client import TelegramSendError
 from talonx_watchlist.store import TickerWatchlistStore
@@ -300,6 +305,268 @@ async def test_watchlist_lookup_failure_does_not_block_the_push(agent):
     await agent._handle_message(_message(_alert_payload(severity="critical")))
 
     agent.telegram_client.send.assert_awaited_once()  # still sent, just without a company name
+
+
+# ==========================================================================
+# Smart Dispatch Filtering (mobile push volume reduction)
+# ==========================================================================
+
+@pytest.mark.asyncio
+async def test_contradicted_alert_is_muted_but_still_recorded(agent):
+    agent.telegram_client.is_configured = True
+    payload = _alert_payload(severity="critical")
+    payload["action"] = "contradicted"
+
+    await agent._handle_message(_message(payload))
+
+    agent.telegram_client.send.assert_not_awaited()
+    row = agent.store.recent(limit=1)[0]
+    assert row["telegram_sent"] is False
+    assert row["suppress_reason"] == "ACTION_MUTED"
+    assert agent.alerts_processed == 1  # 100% recorded regardless
+    assert agent.push_suppressed_action_muted == 1
+
+
+@pytest.mark.asyncio
+async def test_degraded_quant_alert_is_also_muted(agent):
+    # Not literally CONTRADICTED, but also not a genuine trade decision --
+    # the eligible-action ALLOWLIST covers this too, not just the one
+    # named example in the requirement doc.
+    agent.telegram_client.is_configured = True
+    payload = _alert_payload(severity="critical")
+    payload["action"] = "degraded_quant_alert"
+
+    await agent._handle_message(_message(payload))
+
+    agent.telegram_client.send.assert_not_awaited()
+    row = agent.store.recent(limit=1)[0]
+    assert row["suppress_reason"] == "ACTION_MUTED"
+
+
+@pytest.mark.asyncio
+async def test_action_mute_can_be_disabled_via_config(agent):
+    agent.telegram_client.is_configured = True
+    agent.config = DispatchConfig(mute_contradictions=False)
+    payload = _alert_payload(severity="critical")
+    payload["action"] = "contradicted"
+
+    await agent._handle_message(_message(payload))
+
+    agent.telegram_client.send.assert_awaited_once()
+    row = agent.store.recent(limit=1)[0]
+    assert row["telegram_sent"] is True
+
+
+@pytest.mark.asyncio
+async def test_confirmed_bullish_is_push_eligible(agent):
+    agent.telegram_client.is_configured = True
+    await agent._handle_message(_message(_alert_payload(severity="critical")))
+
+    agent.telegram_client.send.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_low_confidence_alert_is_suppressed(agent):
+    agent.telegram_client.is_configured = True
+    payload = _alert_payload(severity="critical")
+    payload["research_confidence"] = 0.5  # below the default 0.75 gate
+
+    await agent._handle_message(_message(payload))
+
+    agent.telegram_client.send.assert_not_awaited()
+    row = agent.store.recent(limit=1)[0]
+    assert row["suppress_reason"] == "CONFIDENCE_BELOW_GATE"
+    assert agent.push_suppressed_confidence_gate == 1
+
+
+@pytest.mark.asyncio
+async def test_confidence_at_the_gate_is_eligible(agent):
+    # Boundary check: >= min_confidence passes, not just strictly above.
+    agent.telegram_client.is_configured = True
+    payload = _alert_payload(severity="critical")
+    payload["research_confidence"] = 0.75
+
+    await agent._handle_message(_message(payload))
+
+    agent.telegram_client.send.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_second_alert_within_cooldown_at_the_same_price_is_suppressed(agent):
+    agent.telegram_client.is_configured = True
+    now = datetime.now(timezone.utc)
+    # Seed as if a push already went out 10 minutes ago at the same price
+    # -- well within the default 45-minute cooldown, and price hasn't moved.
+    agent._last_telegram_push["AAPL"] = (now - timedelta(minutes=10), 200.0)
+
+    payload = _alert_payload(severity="critical")
+    payload["triggering_signal"]["price"] = 200.0
+    await agent._handle_message(_message(payload))
+
+    agent.telegram_client.send.assert_not_awaited()
+    row = agent.store.recent(limit=1)[0]
+    assert row["suppress_reason"] == "PRICE_DELTA_TOO_LOW"
+    assert agent.push_suppressed_price_delta == 1
+
+
+@pytest.mark.asyncio
+async def test_second_alert_within_cooldown_bypasses_when_price_moved_enough(agent):
+    agent.telegram_client.is_configured = True
+    now = datetime.now(timezone.utc)
+    agent._last_telegram_push["AAPL"] = (now - timedelta(minutes=10), 200.0)
+
+    payload = _alert_payload(severity="critical")
+    payload["triggering_signal"]["price"] = 203.0  # 1.5% move, clears the 1.0% default gate
+    await agent._handle_message(_message(payload))
+
+    agent.telegram_client.send.assert_awaited_once()
+    row = agent.store.recent(limit=1)[0]
+    assert row["telegram_sent"] is True
+    # The bypassed push becomes the new reference point.
+    pushed_at, pushed_price = agent._last_telegram_push["AAPL"]
+    assert pushed_price == 203.0
+    assert pushed_at >= now
+
+
+@pytest.mark.asyncio
+async def test_alert_after_cooldown_window_elapses_is_not_suppressed(agent):
+    agent.telegram_client.is_configured = True
+    now = datetime.now(timezone.utc)
+    agent._last_telegram_push["AAPL"] = (now - timedelta(minutes=46), 200.0)  # past the 45-min default
+
+    payload = _alert_payload(severity="critical")
+    payload["triggering_signal"]["price"] = 200.0  # no price move needed once cooldown has elapsed
+    await agent._handle_message(_message(payload))
+
+    agent.telegram_client.send.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_successful_push_updates_the_cooldown_reference_price(agent):
+    agent.telegram_client.is_configured = True
+    payload = _alert_payload(severity="critical")
+    payload["triggering_signal"]["price"] = 200.0
+
+    await agent._handle_message(_message(payload))
+
+    assert "AAPL" in agent._last_telegram_push
+    _, last_price = agent._last_telegram_push["AAPL"]
+    assert last_price == 200.0
+
+
+@pytest.mark.asyncio
+async def test_suppressed_push_does_not_update_the_cooldown_reference(agent):
+    agent.telegram_client.is_configured = True
+    payload = _alert_payload(severity="critical")
+    payload["action"] = "contradicted"  # will be action-muted, never reaches the cooldown state
+
+    await agent._handle_message(_message(payload))
+
+    assert "AAPL" not in agent._last_telegram_push
+
+
+@pytest.mark.asyncio
+async def test_long_term_hold_quality_is_muted(agent):
+    agent.telegram_client.is_configured = True
+    payload = _long_term_alert_payload(severity="critical")
+    payload["action"] = "hold_quality"
+
+    await agent._handle_message(_long_term_message(payload))
+
+    agent.telegram_client.send.assert_not_awaited()
+    row = agent.store.recent_long_term(limit=1)[0]
+    assert row["suppress_reason"] == "ACTION_MUTED"
+    assert agent.long_term_push_suppressed_action_muted == 1
+
+
+@pytest.mark.asyncio
+async def test_long_term_high_conviction_buy_is_push_eligible(agent):
+    agent.telegram_client.is_configured = True
+    await agent._handle_message(_long_term_message(_long_term_alert_payload(severity="critical")))
+
+    agent.telegram_client.send.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_long_term_second_alert_within_cooldown_is_suppressed(agent):
+    agent.telegram_client.is_configured = True
+    now = datetime.now(timezone.utc)
+    agent._last_telegram_push_long_term["AAPL"] = (now - timedelta(minutes=10), 75.0)
+
+    payload = _long_term_alert_payload(severity="critical")
+    payload["market_price"] = 75.0  # unchanged -- still within cooldown
+    await agent._handle_message(_long_term_message(payload))
+
+    agent.telegram_client.send.assert_not_awaited()
+    row = agent.store.recent_long_term(limit=1)[0]
+    assert row["suppress_reason"] == "PRICE_DELTA_TOO_LOW"
+    assert agent.long_term_push_suppressed_price_delta == 1
+
+
+@pytest.mark.asyncio
+async def test_long_term_and_intraday_cooldowns_are_independent(agent):
+    """A DUAL_HORIZON ticker's intraday push history must not suppress
+    its long-term push, or vice versa -- separate dicts, separate keys."""
+    agent.telegram_client.is_configured = True
+    now = datetime.now(timezone.utc)
+    agent._last_telegram_push["AAPL"] = (now - timedelta(minutes=1), 200.0)  # intraday: deep in cooldown
+
+    await agent._handle_message(_long_term_message(_long_term_alert_payload(severity="critical")))
+
+    agent.telegram_client.send.assert_awaited_once()  # long-term push unaffected
+
+
+# --- _evaluate_push_eligibility: pure-function edge cases ------------------
+
+_NOW = datetime(2026, 8, 12, 15, 0, tzinfo=timezone.utc)
+
+
+def test_eligibility_falls_back_to_generic_cooldown_reason_without_a_comparable_price():
+    # last_push_price of 0 (falsy) means the delta can't be computed --
+    # falls back to the generic reason rather than dividing by zero.
+    config = DispatchConfig()
+    should_push, reason = _evaluate_push_eligibility(
+        action=AlertAction.CONFIRMED_BULLISH, eligible_actions=_PUSH_ELIGIBLE_ACTIONS_INTRADAY,
+        research_confidence=0.9, price=100.0, last_push=(_NOW - timedelta(minutes=5), 0.0),
+        config=config, now=_NOW,
+    )
+    assert should_push is False
+    assert reason == "PUSH_COOLDOWN_ACTIVE"
+
+
+def test_eligibility_confidence_gate_is_skipped_when_confidence_is_none():
+    # Long-term alerts pass research_confidence=None -- must not be
+    # treated as "0.0 confidence" and rejected.
+    config = DispatchConfig()
+    should_push, reason = _evaluate_push_eligibility(
+        action=AlertAction.HIGH_CONVICTION_BUY, eligible_actions={AlertAction.HIGH_CONVICTION_BUY},
+        research_confidence=None, price=100.0, last_push=None, config=config, now=_NOW,
+    )
+    assert should_push is True
+    assert reason is None
+
+
+def test_eligibility_no_prior_push_means_no_cooldown_to_check():
+    config = DispatchConfig()
+    should_push, reason = _evaluate_push_eligibility(
+        action=AlertAction.CONFIRMED_BULLISH, eligible_actions=_PUSH_ELIGIBLE_ACTIONS_INTRADAY,
+        research_confidence=0.9, price=100.0, last_push=None, config=config, now=_NOW,
+    )
+    assert should_push is True
+    assert reason is None
+
+
+def test_eligibility_action_mute_checked_before_confidence_gate():
+    # A muted action's reason must be ACTION_MUTED even if confidence is
+    # ALSO below the gate -- evaluation order matters for the recorded
+    # suppress_reason, cheapest/most-categorical check wins.
+    config = DispatchConfig()
+    should_push, reason = _evaluate_push_eligibility(
+        action=AlertAction.CONTRADICTED, eligible_actions=_PUSH_ELIGIBLE_ACTIONS_INTRADAY,
+        research_confidence=0.1, price=100.0, last_push=None, config=config, now=_NOW,
+    )
+    assert should_push is False
+    assert reason == "ACTION_MUTED"
 
 
 def test_invalid_min_severity_config_falls_back_to_warning(tmp_path):

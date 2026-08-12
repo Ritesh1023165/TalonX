@@ -56,6 +56,13 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    val = os.environ.get(name)
+    if val is None:
+        return default
+    return val.strip().lower() in ("1", "true", "yes", "on")
+
+
 @dataclass(frozen=True)
 class DispatchConfig:
     # --- Redis ---
@@ -123,3 +130,45 @@ class DispatchConfig:
     # --- Streamlit dashboard (app.py) ---
     feed_limit: int = _env_int("TALONX_DISPATCH_FEED_LIMIT", 200)
     autorefresh_ms: int = _env_int("TALONX_DISPATCH_AUTOREFRESH_MS", 5000)
+
+    # --- Smart Dispatch Filtering (mobile push volume reduction) ---
+    # Every alert is ALWAYS recorded to the audit trail and shown on the
+    # Streamlit dashboard regardless of these settings -- they only gate
+    # whether a Telegram push actually goes out, same "durable write
+    # first, filtered broadcast second" split telegram_min_severity
+    # above already established. A live session (dispatch_audit.db) found
+    # 86 pushes in 4.3 hours: 44.8% were non-actionable CONTRADICTED
+    # alerts, and 40.2% were the same ticker re-alerting every ~20 min on
+    # minor price noise.
+
+    # Requirement 1: only actions representing a genuine trade decision
+    # are push-eligible -- CONFIRMED_BULLISH/CONFIRMED_BEARISH intraday,
+    # HIGH_CONVICTION_BUY/TAKE_PROFIT_REBALANCE/UNDER_PERFORM_REBALANCE
+    # long-term (see consumer.py's _PUSH_ELIGIBLE_ACTIONS_*). Everything
+    # else -- CONTRADICTED, DEGRADED_QUANT_ALERT, long-term HOLD_QUALITY
+    # -- is a "no strong trade signal" state and gets muted the same way.
+    mute_contradictions: bool = _env_bool("TALONX_DISPATCH_MUTE_CONTRADICTIONS", True)
+
+    # Requirement 2: a SEPARATE, longer per-ticker lockout on the PUSH
+    # itself (on top of, not instead of, whatever cooldown talonx_core
+    # already applied before publishing the alert at all) -- stops the
+    # same ticker's minor back-and-forth from re-buzzing a phone every
+    # ~20 minutes. Tracked in-process (a plain dict keyed by ticker), not
+    # Redis -- unlike talonx_quant's loss-lockout, no OTHER process needs
+    # to see or set this state, so the extra Redis round-trip would be
+    # pure overhead. Resets on restart, matching talonx_core's own
+    # in-memory per-ticker cooldown (TickerCorrelator.last_alert_at).
+    push_cooldown_minutes: float = _env_float("TALONX_DISPATCH_PUSH_COOLDOWN_MINUTES", 45.0)
+
+    # Requirement 3: an early bypass of the cooldown above when price has
+    # genuinely moved since the last push -- a ticker sitting flat for 45
+    # minutes shouldn't push again, but one making a real move should.
+    retrigger_price_delta_pct: float = _env_float("TALONX_DISPATCH_RETRIGGER_PRICE_DELTA_PCT", 1.0)
+
+    # Requirement 4: suppress pushes for low-confidence research findings.
+    # Intraday only -- ActionableAlert.research_confidence is a talonx_brain
+    # output that has no long-term equivalent; LongTermActionableAlert's
+    # own quality_score>=7 threshold is already enforced upstream in
+    # talonx_core's decision matrix before a long-term alert is even
+    # published, so a redundant proxy gate isn't added here.
+    min_confidence: float = _env_float("TALONX_DISPATCH_MIN_CONFIDENCE", 0.75)

@@ -698,7 +698,7 @@ def render_audit_trail(df: pd.DataFrame, long_term_rows: list[dict]) -> None:
 
         display_cols = [
             "id", "correlated_at", "ticker", "action", "severity",
-            "research_confidence", "price", "telegram_sent",
+            "research_confidence", "price", "telegram_sent", "suppress_reason",
         ]
         st.dataframe(filtered[display_cols], hide_index=True)
         st.caption(f"{len(filtered)} of {len(df)} alert(s) shown")
@@ -728,7 +728,7 @@ def render_audit_trail(df: pd.DataFrame, long_term_rows: list[dict]) -> None:
         display_cols = [
             "id", "correlated_at", "ticker", "action", "severity", "quality_score",
             "moat_rating", "market_price", "intrinsic_fair_value", "margin_of_safety_pct",
-            "telegram_sent",
+            "telegram_sent", "suppress_reason",
         ]
         st.dataframe(filtered[display_cols], hide_index=True)
         st.caption(f"{len(filtered)} of {len(lt_df)} alert(s) shown")

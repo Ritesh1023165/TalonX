@@ -69,7 +69,8 @@ CREATE TABLE IF NOT EXISTS alerts (
     received_at         TEXT NOT NULL,
     telegram_sent       INTEGER NOT NULL DEFAULT 0,
     telegram_sent_at    TEXT,
-    telegram_error      TEXT
+    telegram_error      TEXT,
+    suppress_reason     TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_alerts_ticker ON alerts (ticker);
 CREATE INDEX IF NOT EXISTS idx_alerts_correlated_at ON alerts (correlated_at);
@@ -98,7 +99,8 @@ CREATE TABLE IF NOT EXISTS long_term_alerts (
     received_at                     TEXT NOT NULL,
     telegram_sent                   INTEGER NOT NULL DEFAULT 0,
     telegram_sent_at                TEXT,
-    telegram_error                  TEXT
+    telegram_error                  TEXT,
+    suppress_reason                 TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_long_term_alerts_ticker ON long_term_alerts (ticker);
 CREATE INDEX IF NOT EXISTS idx_long_term_alerts_correlated_at ON long_term_alerts (correlated_at);
@@ -127,10 +129,24 @@ class AuditStore:
         safe to run every startup. DEFAULT '' rather than NOT NULL alone
         -- SQLite requires a default when adding a NOT NULL column to a
         table that may already have rows; a pre-existing alert simply has
-        no retroactive summary, not a migration failure."""
+        no retroactive summary, not a migration failure.
+
+        `suppress_reason` (Smart Dispatch Filtering) is the second
+        evolution -- added to BOTH tables, same idempotent guard. NULL
+        (not a NOT NULL/DEFAULT column) for a pre-existing row: unlike
+        `summary`, which is always meaningful, "no push decision has been
+        made for this old row" is a genuinely different state than any
+        of the real suppress_reason values, so NULL is the correct
+        semantics here, not an empty-string placeholder."""
         cols = {row[1] for row in self._conn.execute("PRAGMA table_info(long_term_alerts)").fetchall()}
         if "summary" not in cols:
             self._conn.execute("ALTER TABLE long_term_alerts ADD COLUMN summary TEXT NOT NULL DEFAULT ''")
+        if "suppress_reason" not in cols:
+            self._conn.execute("ALTER TABLE long_term_alerts ADD COLUMN suppress_reason TEXT")
+
+        alert_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(alerts)").fetchall()}
+        if "suppress_reason" not in alert_cols:
+            self._conn.execute("ALTER TABLE alerts ADD COLUMN suppress_reason TEXT")
 
     def close(self) -> None:
         self._conn.close()
@@ -176,7 +192,8 @@ class AuditStore:
     def mark_telegram_sent(self, alert_id: int, sent_at: datetime | None = None) -> None:
         with self._lock:
             self._conn.execute(
-                "UPDATE alerts SET telegram_sent = 1, telegram_sent_at = ?, telegram_error = NULL WHERE id = ?",
+                "UPDATE alerts SET telegram_sent = 1, telegram_sent_at = ?, "
+                "telegram_error = NULL, suppress_reason = 'NONE' WHERE id = ?",
                 ((sent_at or datetime.now(timezone.utc)).isoformat(), alert_id),
             )
             self._conn.commit()
@@ -184,8 +201,22 @@ class AuditStore:
     def mark_telegram_failed(self, alert_id: int, error: str) -> None:
         with self._lock:
             self._conn.execute(
-                "UPDATE alerts SET telegram_error = ? WHERE id = ?",
+                "UPDATE alerts SET telegram_error = ?, suppress_reason = 'NONE' WHERE id = ?",
                 (error[:500], alert_id),
+            )
+            self._conn.commit()
+
+    def mark_suppressed(self, alert_id: int, reason: str) -> None:
+        """Smart Dispatch Filtering: records WHY a Telegram push was
+        withheld for this alert (ACTION_MUTED, CONFIDENCE_BELOW_GATE,
+        PUSH_COOLDOWN_ACTIVE, PRICE_DELTA_TOO_LOW -- see consumer.py's
+        _evaluate_push_eligibility). telegram_sent stays 0/False; the
+        alert row itself was already written unconditionally by
+        record_alert() before this filtering decision was even made."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE alerts SET suppress_reason = ? WHERE id = ?",
+                (reason, alert_id),
             )
             self._conn.commit()
 
@@ -319,7 +350,7 @@ class AuditStore:
         with self._lock:
             self._conn.execute(
                 "UPDATE long_term_alerts SET telegram_sent = 1, telegram_sent_at = ?, "
-                "telegram_error = NULL WHERE id = ?",
+                "telegram_error = NULL, suppress_reason = 'NONE' WHERE id = ?",
                 ((sent_at or datetime.now(timezone.utc)).isoformat(), alert_id),
             )
             self._conn.commit()
@@ -327,8 +358,16 @@ class AuditStore:
     def mark_long_term_telegram_failed(self, alert_id: int, error: str) -> None:
         with self._lock:
             self._conn.execute(
-                "UPDATE long_term_alerts SET telegram_error = ? WHERE id = ?",
+                "UPDATE long_term_alerts SET telegram_error = ?, suppress_reason = 'NONE' WHERE id = ?",
                 (error[:500], alert_id),
+            )
+            self._conn.commit()
+
+    def mark_long_term_suppressed(self, alert_id: int, reason: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE long_term_alerts SET suppress_reason = ? WHERE id = ?",
+                (reason, alert_id),
             )
             self._conn.commit()
 

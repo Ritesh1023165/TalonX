@@ -50,6 +50,23 @@ lookup, not a pipeline data contract, same reasoning talonx_paper/
 config.py and app.py already depend on talonx_watchlist directly for.
 A ticker not (yet) on the watchlist just shows without a company name
 suffix rather than failing the push.
+
+Smart Dispatch Filtering: a live session (dispatch_audit.db) found 86
+Telegram pushes in 4.3 hours (~20/hour) -- 44.8% non-actionable
+CONTRADICTED alerts, 40.2% the same ticker re-alerting every ~20 minutes
+on minor price noise. _evaluate_push_eligibility() (below) applies four
+independent gates BEFORE a push is attempted, cheapest/stateless first:
+  1. Action eligibility (TALONX_DISPATCH_MUTE_CONTRADICTIONS) -- only
+     actions representing a genuine trade decision are push-eligible.
+  2. Research confidence (TALONX_DISPATCH_MIN_CONFIDENCE) -- intraday only.
+  3+4. Per-ticker push cooldown (TALONX_DISPATCH_PUSH_COOLDOWN_MINUTES),
+     bypassed early if price has moved at least
+     TALONX_DISPATCH_RETRIGGER_PRICE_DELTA_PCT since the last push.
+This ONLY gates the Telegram push -- record_alert()/record_long_term_alert()
+still write every alert to the audit trail unconditionally, before this
+filtering decision is even made, so the dashboard and audit trail always
+show 100% of what talonx_core published. See store.py's suppress_reason
+column and README's Smart Dispatch Filtering section for the full rationale.
 """
 from __future__ import annotations
 
@@ -70,6 +87,7 @@ from talonx_dispatch.formatter import (
 )
 from talonx_dispatch.schemas import (
     ActionableAlert,
+    AlertAction,
     AlertSeverity,
     LongTermActionableAlert,
     LongTermTradeExecution,
@@ -89,10 +107,73 @@ except ImportError:  # pragma: no cover - exercised only when dependency missing
     redis_asyncio = None
 
 
+# Smart Dispatch Filtering, Requirement 1's action allowlist -- everything
+# NOT in these sets (CONTRADICTED, DEGRADED_QUANT_ALERT, long-term
+# HOLD_QUALITY, ...) is a "no strong trade signal" state and gets muted
+# the same way when TALONX_DISPATCH_MUTE_CONTRADICTIONS is true.
+_PUSH_ELIGIBLE_ACTIONS_INTRADAY = frozenset({AlertAction.CONFIRMED_BULLISH, AlertAction.CONFIRMED_BEARISH})
+_PUSH_ELIGIBLE_ACTIONS_LONG_TERM = frozenset({
+    AlertAction.HIGH_CONVICTION_BUY, AlertAction.TAKE_PROFIT_REBALANCE, AlertAction.UNDER_PERFORM_REBALANCE,
+})
+
+
 def _jittered_backoff(attempt: int, base: float, max_delay: float) -> float:
     raw = base * (2 ** (attempt - 1))
     capped = min(raw, max_delay)
     return capped * (0.5 + random.random())
+
+
+def _evaluate_push_eligibility(
+    *,
+    action: AlertAction,
+    eligible_actions: frozenset[AlertAction],
+    research_confidence: float | None,
+    price: float,
+    last_push: tuple[datetime, float] | None,
+    config: DispatchConfig,
+    now: datetime,
+) -> tuple[bool, str | None]:
+    """Pure decision function -- no I/O, no state mutation -- so it's
+    directly unit-testable without a running DispatchAgent. Returns
+    (should_push, suppress_reason); suppress_reason is None iff
+    should_push is True. Checked cheapest/stateless first:
+
+      1. Action eligibility (skipped entirely if TALONX_DISPATCH_MUTE_
+         CONTRADICTIONS is false).
+      2. Research confidence (skipped if research_confidence is None --
+         long-term alerts have no such field, gated upstream instead;
+         see config.py's min_confidence docstring).
+      3. Per-ticker push cooldown, with an early bypass if price has
+         moved at least retrigger_price_delta_pct since the last push.
+         `last_push` is (timestamp, price) of the last SUCCESSFUL push
+         for this ticker on this horizon, or None if there hasn't been
+         one -- the caller owns updating this, only AFTER an actual send
+         succeeds (a suppressed candidate must not count as a push).
+
+    PUSH_COOLDOWN_ACTIVE vs. PRICE_DELTA_TOO_LOW: both mean "still in
+    the cooldown window," but PRICE_DELTA_TOO_LOW is the more specific
+    diagnostic -- it means the retrigger check actually ran and the
+    price simply hadn't moved enough. PUSH_COOLDOWN_ACTIVE is the
+    fallback for the (in practice, shouldn't-happen) case where there's
+    no comparable last-pushed price to check a delta against at all.
+    """
+    if config.mute_contradictions and action not in eligible_actions:
+        return False, "ACTION_MUTED"
+
+    if research_confidence is not None and research_confidence < config.min_confidence:
+        return False, "CONFIDENCE_BELOW_GATE"
+
+    if last_push is not None:
+        last_push_at, last_push_price = last_push
+        if now - last_push_at < timedelta(minutes=config.push_cooldown_minutes):
+            if last_push_price:
+                delta_pct = abs(price - last_push_price) / last_push_price * 100.0
+                if delta_pct >= config.retrigger_price_delta_pct:
+                    return True, None  # price moved enough -- bypass the cooldown
+                return False, "PRICE_DELTA_TOO_LOW"
+            return False, "PUSH_COOLDOWN_ACTIVE"
+
+    return True, None
 
 
 class DispatchAgent:
@@ -118,6 +199,21 @@ class DispatchAgent:
         self._long_term_telegram_sent = 0
         self._long_term_telegram_failed = 0
         self._long_term_alerts_purged = 0
+
+        # Smart Dispatch Filtering: (timestamp, price) of the last
+        # SUCCESSFUL push per ticker, kept separate per horizon so a
+        # DUAL_HORIZON ticker's intraday and long-term push cadences
+        # can't clobber each other -- same "sibling, not shared" state
+        # convention the rest of this project's Phase 2 work uses.
+        self._last_telegram_push: dict[str, tuple[datetime, float]] = {}
+        self._last_telegram_push_long_term: dict[str, tuple[datetime, float]] = {}
+        self._push_suppressed_action_muted = 0
+        self._push_suppressed_confidence_gate = 0
+        self._push_suppressed_cooldown = 0
+        self._push_suppressed_price_delta = 0
+        self._long_term_push_suppressed_action_muted = 0
+        self._long_term_push_suppressed_cooldown = 0
+        self._long_term_push_suppressed_price_delta = 0
 
         try:
             self._min_severity = AlertSeverity(self.config.telegram_min_severity.lower())
@@ -170,6 +266,34 @@ class DispatchAgent:
     @property
     def long_term_alerts_purged(self) -> int:
         return self._long_term_alerts_purged
+
+    @property
+    def push_suppressed_action_muted(self) -> int:
+        return self._push_suppressed_action_muted
+
+    @property
+    def push_suppressed_confidence_gate(self) -> int:
+        return self._push_suppressed_confidence_gate
+
+    @property
+    def push_suppressed_cooldown(self) -> int:
+        return self._push_suppressed_cooldown
+
+    @property
+    def push_suppressed_price_delta(self) -> int:
+        return self._push_suppressed_price_delta
+
+    @property
+    def long_term_push_suppressed_action_muted(self) -> int:
+        return self._long_term_push_suppressed_action_muted
+
+    @property
+    def long_term_push_suppressed_cooldown(self) -> int:
+        return self._long_term_push_suppressed_cooldown
+
+    @property
+    def long_term_push_suppressed_price_delta(self) -> int:
+        return self._long_term_push_suppressed_price_delta
 
     async def run(self) -> None:
         if redis_asyncio is None:
@@ -363,16 +487,54 @@ class DispatchAgent:
                 execution.trade_id, execution.ticker, exc,
             )
 
+    def _record_push_suppression(self, reason: str, *, long_term: bool) -> None:
+        if long_term:
+            if reason == "ACTION_MUTED":
+                self._long_term_push_suppressed_action_muted += 1
+            elif reason == "PRICE_DELTA_TOO_LOW":
+                self._long_term_push_suppressed_price_delta += 1
+            else:  # PUSH_COOLDOWN_ACTIVE
+                self._long_term_push_suppressed_cooldown += 1
+        else:
+            if reason == "ACTION_MUTED":
+                self._push_suppressed_action_muted += 1
+            elif reason == "CONFIDENCE_BELOW_GATE":
+                self._push_suppressed_confidence_gate += 1
+            elif reason == "PRICE_DELTA_TOO_LOW":
+                self._push_suppressed_price_delta += 1
+            else:  # PUSH_COOLDOWN_ACTIVE
+                self._push_suppressed_cooldown += 1
+
     async def _maybe_send_telegram(self, alert: ActionableAlert, alert_id: int) -> None:
         if not self.telegram_client.is_configured:
             return
         if alert.severity.rank < self._min_severity.rank:
             return
 
+        now = datetime.now(timezone.utc)
+        ticker = alert.ticker.upper()
+        should_push, suppress_reason = _evaluate_push_eligibility(
+            action=alert.action,
+            eligible_actions=_PUSH_ELIGIBLE_ACTIONS_INTRADAY,
+            research_confidence=alert.research_confidence,
+            price=alert.triggering_signal.price,
+            last_push=self._last_telegram_push.get(ticker),
+            config=self.config,
+            now=now,
+        )
+        if not should_push:
+            self.store.mark_suppressed(alert_id, suppress_reason)
+            self._record_push_suppression(suppress_reason, long_term=False)
+            logger.info(
+                "Telegram push suppressed for alert #%d (%s): %s", alert_id, alert.ticker, suppress_reason,
+            )
+            return
+
         text = format_telegram_summary(alert, alert_id, self._company_name(alert.ticker))
         try:
             await self.telegram_client.send(text)
-            self.store.mark_telegram_sent(alert_id)
+            self.store.mark_telegram_sent(alert_id, now)
+            self._last_telegram_push[ticker] = (now, alert.triggering_signal.price)
             self._telegram_sent += 1
             logger.info("Telegram push sent for alert #%d (%s)", alert_id, alert.ticker)
         except TelegramSendError as exc:
@@ -411,10 +573,31 @@ class DispatchAgent:
         if alert.severity.rank < self._min_severity.rank:
             return
 
+        now = datetime.now(timezone.utc)
+        ticker = alert.ticker.upper()
+        should_push, suppress_reason = _evaluate_push_eligibility(
+            action=alert.action,
+            eligible_actions=_PUSH_ELIGIBLE_ACTIONS_LONG_TERM,
+            research_confidence=None,  # no equivalent field -- gated upstream via quality_score
+            price=alert.market_price,
+            last_push=self._last_telegram_push_long_term.get(ticker),
+            config=self.config,
+            now=now,
+        )
+        if not should_push:
+            self.store.mark_long_term_suppressed(alert_id, suppress_reason)
+            self._record_push_suppression(suppress_reason, long_term=True)
+            logger.info(
+                "Telegram push suppressed for long-term alert #LT%d (%s): %s",
+                alert_id, alert.ticker, suppress_reason,
+            )
+            return
+
         text = format_telegram_long_term_alert(alert, alert_id, self._company_name(alert.ticker))
         try:
             await self.telegram_client.send(text)
-            self.store.mark_long_term_telegram_sent(alert_id)
+            self.store.mark_long_term_telegram_sent(alert_id, now)
+            self._last_telegram_push_long_term[ticker] = (now, alert.market_price)
             self._long_term_telegram_sent += 1
             logger.info("Telegram push sent for long-term alert #LT%d (%s)", alert_id, alert.ticker)
         except TelegramSendError as exc:
