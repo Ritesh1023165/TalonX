@@ -87,6 +87,19 @@ class DispatchConfig:
     paper_trades_channel_long_term: str = os.environ.get(
         "TALONX_REDIS_PAPER_TRADES_LONG_TERM_CHANNEL", "talonx:paper:trades:longterm"
     )
+    # Event-Driven Earnings Radar's T-48h heads-up push (Requirement 5):
+    # subscribed PURELY to keep a latest-signal/report-per-ticker cache for
+    # that push's price/quality/moat/fair-value fields -- talonx_dispatch's
+    # own long_term_alerts audit table isn't a safe source for this (it only
+    # gets a row once a ticker clears the FULL decision matrix, which some
+    # tracked tickers may never do). Same env var names talonx_core/
+    # talonx_brain already read on their sides of each boundary.
+    fundamental_signals_channel: str = os.environ.get(
+        "TALONX_REDIS_FUNDAMENTAL_SIGNALS_CHANNEL", "talonx:signals:fundamental"
+    )
+    reports_channel_long_term: str = os.environ.get(
+        "TALONX_REDIS_REPORTS_LONG_TERM_CHANNEL", "talonx:reports:longterm"
+    )
     connect_timeout_seconds: float = _env_float("TALONX_REDIS_CONNECT_TIMEOUT", 5.0)
     socket_timeout_seconds: float = _env_float("TALONX_REDIS_SOCKET_TIMEOUT", 5.0)
     reconnect_backoff_base_seconds: float = _env_float("TALONX_DISPATCH_RECONNECT_BASE", 1.0)
@@ -126,6 +139,18 @@ class DispatchConfig:
     # it -- keeps a long-running install from growing this file forever.
     retention_days: float = _env_float("TALONX_DISPATCH_RETENTION_DAYS", 5.0)
     retention_sweep_interval_hours: float = _env_float("TALONX_DISPATCH_RETENTION_SWEEP_HOURS", 24.0)
+
+    # --- Event-Driven Earnings Radar, Requirement 5: T-48h heads-up push ---
+    # How often to re-check talonx_watchlist's upcoming_earnings table for
+    # tickers now within the heads-up window -- doesn't need to be
+    # frequent (the window itself is 48 hours wide), matching the daily
+    # cadence the requirement doc itself specifies.
+    earnings_heads_up_check_interval_hours: float = _env_float(
+        "TALONX_DISPATCH_EARNINGS_HEADS_UP_CHECK_HOURS", 24.0
+    )
+    earnings_heads_up_window_hours: float = _env_float(
+        "TALONX_DISPATCH_EARNINGS_HEADS_UP_WINDOW_HOURS", 48.0
+    )
 
     # --- Streamlit dashboard (app.py) ---
     feed_limit: int = _env_int("TALONX_DISPATCH_FEED_LIMIT", 200)

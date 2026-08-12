@@ -170,6 +170,27 @@ def test_context_retriever_form_type_filter_uses_and_operator():
     )
 
 
+def test_context_retriever_form_type_list_uses_in_operator():
+    """Event-Driven Earnings Radar: an earnings-triggered regeneration
+    passes form_type=["10-K", "10-Q", "8-K"] so retrieval can see the
+    freshly-ingested earnings filing alongside the prior annual-report
+    context, not just one form type in isolation."""
+    fake_filings = MagicMock()
+    fake_filings.query.return_value = _filing_chroma_result(0)
+    fake_news = MagicMock()
+    fake_news.query.return_value = _news_chroma_result(0)
+
+    retriever = ContextRetriever(
+        config=BrainConfig(), filings_store=fake_filings, news_store=fake_news
+    )
+    retriever.retrieve("MSFT", "guidance revision", form_type=["10-K", "10-Q", "8-K"])
+
+    fake_filings.query.assert_called_once_with(
+        query_text="guidance revision", n_results=6,
+        where={"$and": [{"ticker": "MSFT"}, {"form_type": {"$in": ["10-K", "10-Q", "8-K"]}}]},
+    )
+
+
 def test_context_retriever_n_results_override_applies_to_filings_only():
     fake_filings = MagicMock()
     fake_filings.query.return_value = _filing_chroma_result(0)

@@ -99,15 +99,18 @@ async def test_message_on_unexpected_channel_is_dropped(engine):
 # --- Ticker gating (the "configure which ticker can be used" control) --------
 
 @pytest.mark.asyncio
-async def test_alert_for_a_ticker_without_paper_trading_enabled_is_skipped(engine):
+async def test_alert_for_a_ticker_without_paper_trading_enabled_is_skipped(engine, caplog):
     engine.watchlist_store.list_paper_trading_symbols.return_value = ["AAPL"]  # NVDA not in it
 
-    await engine._handle_message(_msg(engine.config, _alert_payload(ticker="NVDA")))
+    with caplog.at_level("INFO"):
+        await engine._handle_message(_msg(engine.config, _alert_payload(ticker="NVDA")))
 
     engine.store.get_position.assert_not_called()
     engine.store.record_ignored.assert_not_called()  # config-gate skip, not a trading decision
     assert engine.alerts_processed == 1
     assert engine.trades_executed == 0
+    assert "PAPER_TRADING_DISABLED_FOR_TICKER" in caplog.text
+    assert "NVDA" in caplog.text
 
 
 # --- BUY -----------------------------------------------------------------

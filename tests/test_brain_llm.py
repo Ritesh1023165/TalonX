@@ -272,3 +272,25 @@ async def test_long_term_generate_uses_the_long_term_prompt_builder(monkeypatch)
     assert "Fundamental factor summary" in captured_prompt["text"]
     assert "economic moat" in captured_prompt["text"].lower()
     assert "AAPL" in captured_prompt["text"]
+
+
+# --- Event-Driven Earnings Radar: _build_long_term_prompt ------------------
+
+def test_long_term_prompt_omits_earnings_instruction_by_default():
+    prompt = llm_module._build_long_term_prompt(_fundamental_signal(), citations=[])
+    assert "FRESH EARNINGS EVENT" not in prompt
+
+
+def test_long_term_prompt_includes_earnings_instruction_when_earnings_related():
+    signal = _fundamental_signal().model_copy(update={"is_earnings_related": True})
+    prompt = llm_module._build_long_term_prompt(signal, citations=[])
+    assert "FRESH EARNINGS EVENT" in prompt
+
+
+def test_llm_findings_long_term_guidance_fields_default_to_none():
+    findings = _LLMFindingsLongTerm(
+        moat_rating=MoatRating.WIDE, capital_allocation_assessment="disciplined",
+        dcf_fair_value_per_share=210.0, quality_score=8, summary="strong compounder",
+    )
+    assert findings.guidance_revision_notes is None
+    assert findings.revenue_eps_surprise is None

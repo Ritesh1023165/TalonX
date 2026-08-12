@@ -150,6 +150,17 @@ class MoatRating(str, Enum):
     NONE = "none"
 
 
+class _TriggeringFundamentalSignalRef(BaseModel):
+    """Further-trimmed mirror of talonx_core.schemas.FundamentalFactorSignal
+    -- this module only ever displays roic/piotroski_f_score (the post-
+    earnings push's "Fundamental Shift" section), never the rest of the
+    signal, so there's no reason to carry ticker/fiscal_year/price/message/
+    computed_at here too."""
+
+    roic: float | None = None
+    piotroski_f_score: int | None = None
+
+
 class LongTermActionableAlert(BaseModel):
     """Trimmed mirror of talonx_core.schemas.LongTermActionableAlert --
     consumed from talonx:alerts:longterm."""
@@ -169,6 +180,19 @@ class LongTermActionableAlert(BaseModel):
     market_price: float
     intrinsic_fair_value: float
     margin_of_safety_pct: float
+
+    # Event-Driven Earnings Radar, Requirement 8: populated only for an
+    # earnings-triggered alert -- see talonx_core.schemas' mirror of this
+    # field for the full "before vs after" rationale. When True,
+    # consumer.py uses format_telegram_post_earnings_alert instead of the
+    # routine format_telegram_long_term_alert, and bypasses both the
+    # severity gate and _evaluate_push_eligibility entirely.
+    previous_fair_value: float | None = None
+    previous_margin_of_safety_pct: float | None = None
+    guidance_revision_notes: str | None = None
+    revenue_eps_surprise: str | None = None
+    is_earnings_related: bool = False
+    triggering_signal: _TriggeringFundamentalSignalRef | None = None
 
     capital_allocation_assessment: str
     key_findings: list[str] = Field(default_factory=list)
@@ -204,3 +228,29 @@ class LongTermTradeExecution(BaseModel):
     portfolio_cash_after: float
     triggering_action: AlertAction
     timestamp: datetime
+
+
+# ------------------------------------------------------------------
+# Event-Driven Earnings Radar -- Requirement 5's T-48h heads-up push.
+# Trimmed mirrors of talonx_brain.schemas.FundamentalFactorSignal /
+# LongTermResearchReport, consumed PURELY to keep an in-memory latest-
+# per-ticker cache (see consumer.py) for the heads-up push's price/
+# quality/moat/fair-value fields -- this module never branches decision
+# logic on them, same "wire-format-only" reasoning as every other mirror
+# in this file.
+# ------------------------------------------------------------------
+
+class FundamentalFactorSignal(BaseModel):
+    ticker: str
+    fiscal_year: int
+    price: float
+    computed_at: datetime
+
+
+class LongTermResearchReport(BaseModel):
+    ticker: str
+    moat_rating: MoatRating
+    dcf_fair_value_per_share: float
+    quality_score: int = Field(ge=0, le=10)
+    summary: str
+    is_degraded: bool = False

@@ -190,6 +190,11 @@ class FundamentalFactorSignal(BaseModel):
     debt_to_ebitda_proxy: float | None = None
     price: float
     message: str
+    # Event-Driven Earnings Radar: True for an earnings-triggered
+    # republish -- see talonx_quant.schemas.FundamentalFactorSignal's own
+    # docstring. decision.py bypasses its own cooldown/no-state-change
+    # gates when this is set on either the signal or the report below.
+    is_earnings_related: bool = False
     computed_at: datetime
 
 
@@ -215,6 +220,10 @@ class LongTermResearchReport(BaseModel):
     key_findings: list[str] = Field(default_factory=list)
     risk_factors: list[str] = Field(default_factory=list)
     model_used: str
+
+    guidance_revision_notes: str | None = None
+    revenue_eps_surprise: str | None = None
+    is_earnings_related: bool = False
 
     is_stale: bool = False
     is_degraded: bool = False
@@ -250,6 +259,18 @@ class LongTermActionableAlert(BaseModel):
     market_price: float
     intrinsic_fair_value: float
     margin_of_safety_pct: float  # (fair_value - price) / fair_value; negative means overvalued
+
+    # Event-Driven Earnings Radar, Requirement 7/8: populated only for an
+    # earnings-triggered alert (is_earnings_related=True) -- the PRE-
+    # update fair-value/margin-of-safety, captured from the correlator's
+    # state before update_report() overwrites it, same timing
+    # previous_moat_rating already uses. None for a routine alert (no
+    # "before" value to compare against, or not earnings-related at all).
+    previous_fair_value: float | None = None
+    previous_margin_of_safety_pct: float | None = None
+    guidance_revision_notes: str | None = None
+    revenue_eps_surprise: str | None = None
+    is_earnings_related: bool = False
 
     triggering_signal: FundamentalFactorSignal
     capital_allocation_assessment: str

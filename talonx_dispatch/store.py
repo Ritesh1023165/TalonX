@@ -100,7 +100,12 @@ CREATE TABLE IF NOT EXISTS long_term_alerts (
     telegram_sent                   INTEGER NOT NULL DEFAULT 0,
     telegram_sent_at                TEXT,
     telegram_error                  TEXT,
-    suppress_reason                 TEXT
+    suppress_reason                 TEXT,
+    is_earnings_related             INTEGER NOT NULL DEFAULT 0,
+    previous_fair_value             REAL,
+    previous_margin_of_safety_pct   REAL,
+    guidance_revision_notes         TEXT,
+    revenue_eps_surprise            TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_long_term_alerts_ticker ON long_term_alerts (ticker);
 CREATE INDEX IF NOT EXISTS idx_long_term_alerts_correlated_at ON long_term_alerts (correlated_at);
@@ -143,6 +148,23 @@ class AuditStore:
             self._conn.execute("ALTER TABLE long_term_alerts ADD COLUMN summary TEXT NOT NULL DEFAULT ''")
         if "suppress_reason" not in cols:
             self._conn.execute("ALTER TABLE long_term_alerts ADD COLUMN suppress_reason TEXT")
+        # Event-Driven Earnings Radar (Requirement 8) -- same idempotent
+        # guard, third evolution of this table. is_earnings_related
+        # defaults to 0/False for a pre-existing row (it predates the
+        # feature, so it genuinely wasn't); the rest stay NULL (no
+        # "before" data exists for an old row either).
+        if "is_earnings_related" not in cols:
+            self._conn.execute(
+                "ALTER TABLE long_term_alerts ADD COLUMN is_earnings_related INTEGER NOT NULL DEFAULT 0"
+            )
+        if "previous_fair_value" not in cols:
+            self._conn.execute("ALTER TABLE long_term_alerts ADD COLUMN previous_fair_value REAL")
+        if "previous_margin_of_safety_pct" not in cols:
+            self._conn.execute("ALTER TABLE long_term_alerts ADD COLUMN previous_margin_of_safety_pct REAL")
+        if "guidance_revision_notes" not in cols:
+            self._conn.execute("ALTER TABLE long_term_alerts ADD COLUMN guidance_revision_notes TEXT")
+        if "revenue_eps_surprise" not in cols:
+            self._conn.execute("ALTER TABLE long_term_alerts ADD COLUMN revenue_eps_surprise TEXT")
 
         alert_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(alerts)").fetchall()}
         if "suppress_reason" not in alert_cols:
@@ -321,8 +343,10 @@ class AuditStore:
                     ticker, action, severity, rationale, summary, quality_score, moat_rating,
                     market_price, intrinsic_fair_value, margin_of_safety_pct,
                     capital_allocation_assessment, key_findings_json, risk_factors_json,
-                    model_used, correlated_at, received_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    model_used, correlated_at, received_at, is_earnings_related,
+                    previous_fair_value, previous_margin_of_safety_pct,
+                    guidance_revision_notes, revenue_eps_surprise
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     alert.ticker.upper(),
@@ -341,6 +365,11 @@ class AuditStore:
                     alert.model_used,
                     alert.correlated_at.isoformat(),
                     datetime.now(timezone.utc).isoformat(),
+                    1 if alert.is_earnings_related else 0,
+                    alert.previous_fair_value,
+                    alert.previous_margin_of_safety_pct,
+                    alert.guidance_revision_notes,
+                    alert.revenue_eps_surprise,
                 ),
             )
             self._conn.commit()
@@ -418,4 +447,5 @@ def _long_term_row_to_dict(row: sqlite3.Row) -> dict:
     d["key_findings"] = json.loads(d.pop("key_findings_json"))
     d["risk_factors"] = json.loads(d.pop("risk_factors_json"))
     d["telegram_sent"] = bool(d["telegram_sent"])
+    d["is_earnings_related"] = bool(d["is_earnings_related"])
     return d

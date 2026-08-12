@@ -174,7 +174,23 @@ class NewFundamentalsIngestedEvent(BaseModel):
     ticker: str
     cik: str
     facts: list[FinancialStatementFacts]
+    # Event-Driven Earnings Radar Stage 2: True when this ingestion was
+    # triggered by the fast-track poller during the ticker's active
+    # earnings window -- threaded onto the republished FundamentalFactorSignal.
+    is_earnings_related: bool = False
     published_at: datetime
+
+
+class NewFilingIngestedEvent(BaseModel):
+    """Trimmed mirror of talonx_ingest.events.schemas.NewFilingIngestedEvent
+    -- consumed from talonx:filings:events PURELY to detect a fast-track-
+    confirmed earnings filing (form_type + is_earnings_related); this
+    module never needs the rest of the wire shape (accession/chunk-count/
+    vector-collection details are irrelevant here)."""
+
+    ticker: str
+    form_type: str
+    is_earnings_related: bool = False
 
 
 class FundamentalFactorSignal(BaseModel):
@@ -191,6 +207,14 @@ class FundamentalFactorSignal(BaseModel):
     debt_to_ebitda_proxy: float | None = None
     price: float  # last known market price used for fcf_yield/altman_z_score
     message: str
+
+    # Event-Driven Earnings Radar: True when this signal was republished
+    # by FundamentalScanner's earnings-triggered path (fast 8-K-stage
+    # reuse of persisted factors, or a genuinely fresh 10-Q-stage
+    # computation) rather than a routine periodic re-score. Consumers
+    # (talonx_brain, talonx_core) use this to bypass their own cooldowns
+    # and cache-hit shortcuts for exactly this one signal.
+    is_earnings_related: bool = False
 
     computed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

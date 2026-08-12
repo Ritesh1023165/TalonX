@@ -526,6 +526,41 @@ async def test_handle_message_publishes_long_term_research_report(agent):
 
 
 @pytest.mark.asyncio
+async def test_long_term_report_propagates_guidance_and_surprise_fields(agent):
+    from talonx_brain.llm import _LLMFindingsLongTerm
+
+    agent.long_term_llm_chain.generate.return_value = _LLMFindingsLongTerm(
+        moat_rating=MoatRating.WIDE, capital_allocation_assessment="disciplined",
+        dcf_fair_value_per_share=225.0, quality_score=9, summary="raised guidance",
+        guidance_revision_notes="FY26 revenue guidance raised by 2.5%.",
+        revenue_eps_surprise="Q2 revenue beat consensus by 3%.",
+    )
+    payload = _fundamental_signal_payload()
+    payload["is_earnings_related"] = True
+
+    await agent._handle_message(_msg(agent, payload, channel=agent.config.fundamental_signals_channel))
+
+    body = json.loads(agent._client.publish.await_args.args[1])
+    assert body["guidance_revision_notes"] == "FY26 revenue guidance raised by 2.5%."
+    assert body["revenue_eps_surprise"] == "Q2 revenue beat consensus by 3%."
+    assert body["is_earnings_related"] is True
+
+
+@pytest.mark.asyncio
+async def test_long_term_earnings_related_signal_retrieves_multiple_form_types(agent):
+    """Event-Driven Earnings Radar: an earnings-triggered signal needs
+    the freshly-ingested 8-K/10-Q chunks visible to retrieval, not just
+    the routine 10-K-only filter."""
+    payload = _fundamental_signal_payload()
+    payload["is_earnings_related"] = True
+
+    await agent._handle_message(_msg(agent, payload, channel=agent.config.fundamental_signals_channel))
+
+    args = agent.retriever.retrieve.call_args.args
+    assert args[3] == ["10-K", "10-Q", "8-K"]
+
+
+@pytest.mark.asyncio
 async def test_long_term_cold_start_bypasses_the_llm(agent):
     agent.retriever.retrieve.return_value = []
 
@@ -581,6 +616,26 @@ async def test_long_term_fresh_cache_hit_skips_retrieval_and_llm(agent):
     body = json.loads(agent._client.publish.await_args.args[1])
     assert body["from_cache"] is True
     assert body["summary"] == "Cached long-term analysis."
+
+
+@pytest.mark.asyncio
+async def test_long_term_earnings_related_signal_bypasses_a_fresh_cache_hit(agent):
+    """Event-Driven Earnings Radar: the whole point of the earnings-
+    triggered path is a same-day re-read of the NEW filing -- serving a
+    pre-earnings cached report would silently defeat that."""
+    cached = _long_term_report(summary="Stale pre-earnings analysis.")
+    cache = AsyncMock()
+    cache.get.return_value = (cached, True)  # fresh, but must be bypassed anyway
+    cache.acquire_lock.return_value = True
+    agent.cache = cache
+
+    payload = _fundamental_signal_payload()
+    payload["is_earnings_related"] = True
+    await agent._handle_message(_msg(agent, payload, channel=agent.config.fundamental_signals_channel))
+
+    cache.get.assert_not_awaited()
+    agent.retriever.retrieve.assert_called_once()
+    agent.long_term_llm_chain.generate.assert_awaited_once()
 
 
 @pytest.mark.asyncio

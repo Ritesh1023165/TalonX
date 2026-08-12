@@ -240,6 +240,7 @@ class PaperTradingEngine:
         self._alerts_processed += 1
 
         if alert.ticker.upper() not in self.watchlist_store.list_paper_trading_symbols():
+            logger.info("PAPER_TRADING_DISABLED_FOR_TICKER: %s -- skipping alert", alert.ticker.upper())
             return  # paper trading not enabled for this ticker -- silent skip, not an "ignored" event
 
         if alert.action == AlertAction.CONFIRMED_BULLISH and alert.severity.rank < self._min_entry_severity.rank:
@@ -568,6 +569,7 @@ class LongTermPaperEngine:
         self._alerts_processed += 1
 
         if alert.ticker.upper() not in self.watchlist_store.list_paper_trading_long_term_symbols():
+            logger.info("PAPER_TRADING_DISABLED_FOR_TICKER: %s -- skipping long-term alert", alert.ticker.upper())
             return  # long-term paper trading not enabled for this ticker -- silent skip, not an "ignored" event
 
         position = self.store.get_long_term_position(alert.ticker)

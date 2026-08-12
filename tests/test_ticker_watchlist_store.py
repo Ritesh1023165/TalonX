@@ -406,3 +406,113 @@ def test_migrates_a_database_from_before_the_long_term_paper_trading_split(tmp_p
         assert store.list_paper_trading_long_term_symbols() == ["MSFT"]
     finally:
         store.close()
+
+
+# ==========================================================================
+# Event-Driven Earnings Radar -- upcoming_earnings
+# ==========================================================================
+
+def test_upcoming_earnings_empty_by_default(store):
+    assert store.list_upcoming_earnings() == []
+    assert store.get_upcoming_earnings("AAPL") is None
+
+
+def test_upsert_upcoming_earnings_creates_a_row(store):
+    store.upsert_upcoming_earnings("aapl", "2026-08-13", "AFTER_MARKET", "Q2 2026")
+
+    row = store.get_upcoming_earnings("AAPL")
+    assert row["ticker"] == "AAPL"  # normalized
+    assert row["earnings_date"] == "2026-08-13"
+    assert row["session"] == "AFTER_MARKET"
+    assert row["reporting_period"] == "Q2 2026"
+    assert row["heads_up_sent"] is False
+
+
+def test_upsert_upcoming_earnings_defaults_session_and_period(store):
+    store.upsert_upcoming_earnings("AAPL", "2026-08-13")
+
+    row = store.get_upcoming_earnings("AAPL")
+    assert row["session"] == "UNSPECIFIED"
+    assert row["reporting_period"] == ""
+
+
+def test_upsert_upcoming_earnings_overwrites_not_appends(store):
+    store.upsert_upcoming_earnings("AAPL", "2026-08-13", "AFTER_MARKET", "Q2 2026")
+    store.upsert_upcoming_earnings("AAPL", "2026-11-05", "BEFORE_MARKET", "Q3 2026")
+
+    assert len(store.list_upcoming_earnings()) == 1
+    row = store.get_upcoming_earnings("AAPL")
+    assert row["earnings_date"] == "2026-11-05"
+    assert row["reporting_period"] == "Q3 2026"
+
+
+def test_upsert_resets_heads_up_sent_when_the_date_changes(store):
+    store.upsert_upcoming_earnings("AAPL", "2026-08-13")
+    store.mark_heads_up_sent("AAPL")
+    assert store.get_upcoming_earnings("AAPL")["heads_up_sent"] is True
+
+    store.upsert_upcoming_earnings("AAPL", "2026-11-05")  # rescheduled -- needs its own T-48h alert
+
+    assert store.get_upcoming_earnings("AAPL")["heads_up_sent"] is False
+
+
+def test_upsert_preserves_heads_up_sent_when_the_date_is_unchanged(store):
+    store.upsert_upcoming_earnings("AAPL", "2026-08-13", "AFTER_MARKET", "Q2 2026")
+    store.mark_heads_up_sent("AAPL")
+
+    # A re-sync of the SAME date (e.g. the weekly sync running again with
+    # no actual change) must not clear the flag and cause a duplicate push.
+    store.upsert_upcoming_earnings("AAPL", "2026-08-13", "AFTER_MARKET", "Q2 2026")
+
+    assert store.get_upcoming_earnings("AAPL")["heads_up_sent"] is True
+
+
+def test_list_upcoming_earnings_sorted_by_date(store):
+    store.upsert_upcoming_earnings("LATER", "2026-12-01")
+    store.upsert_upcoming_earnings("SOONER", "2026-08-13")
+
+    rows = store.list_upcoming_earnings()
+    assert [r["ticker"] for r in rows] == ["SOONER", "LATER"]
+
+
+def test_mark_heads_up_sent_on_unknown_ticker_is_a_noop(store):
+    store.mark_heads_up_sent("NOPE")  # must not raise
+    assert store.get_upcoming_earnings("NOPE") is None
+
+
+def test_upcoming_earnings_state_persists_across_reopen(tmp_path):
+    path = tmp_path / "watchlist.db"
+    with TickerWatchlistStore(path) as store:
+        store.upsert_upcoming_earnings("AAPL", "2026-08-13", "AFTER_MARKET", "Q2 2026")
+
+    with TickerWatchlistStore(path) as store2:
+        row = store2.get_upcoming_earnings("AAPL")
+        assert row["earnings_date"] == "2026-08-13"
+
+
+def test_upcoming_earnings_table_created_for_a_pre_existing_legacy_db(tmp_path):
+    """A real pre-existing watchlist.db from before upcoming_earnings
+    existed must gain the table (via CREATE TABLE IF NOT EXISTS in
+    _SCHEMA -- this is a brand-new table, not a new column on an
+    existing one, so no ALTER TABLE migration is needed) and stay fully
+    usable."""
+    db_path = tmp_path / "legacy_watchlist.db"
+
+    legacy_conn = sqlite3.connect(db_path)
+    legacy_conn.execute(
+        "CREATE TABLE tickers (symbol TEXT PRIMARY KEY, name TEXT NOT NULL, added_at TEXT NOT NULL)"
+    )
+    legacy_conn.execute(
+        "INSERT INTO tickers (symbol, name, added_at) VALUES ('MSFT', 'Microsoft Corporation', "
+        "'2026-01-01T00:00:00+00:00')"
+    )
+    legacy_conn.commit()
+    legacy_conn.close()
+
+    store = TickerWatchlistStore(db_path)
+    try:
+        assert store.list_upcoming_earnings() == []
+        store.upsert_upcoming_earnings("MSFT", "2026-08-13")
+        assert store.get_upcoming_earnings("MSFT")["earnings_date"] == "2026-08-13"
+    finally:
+        store.close()

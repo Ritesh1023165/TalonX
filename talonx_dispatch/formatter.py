@@ -41,8 +41,10 @@ from talonx_dispatch.schemas import (
     ActionableAlert,
     AlertAction,
     AlertSeverity,
+    FundamentalFactorSignal,
     LongTermActionableAlert,
     LongTermOrderType,
+    LongTermResearchReport,
     LongTermTradeExecution,
     OrderType,
     PaperTradeExecution,
@@ -121,6 +123,15 @@ _SHORT_PUSH_HEADER = {
 }
 _SHORT_PUSH_MAX_CHARS = 300
 _SHORT_PUSH_SUMMARY_MAX_CHARS = 120
+# The post-earnings push (format_telegram_post_earnings_alert) is
+# DELIBERATELY not held to the routine 300-char short-push budget above
+# -- it's a rare, important, once-per-quarter event with genuinely more
+# to say (before-vs-after fair value, guidance revision, fundamental
+# shift), not the noisy repeat-alert problem the 300-char cap exists to
+# solve. Still capped, well under Telegram's real ~4096-char message
+# limit, purely as a defensive ceiling against a pathological LLM-
+# generated guidance_revision_notes/summary overflow.
+_POST_EARNINGS_PUSH_MAX_CHARS = 1024
 # Matches internal threshold checks like "(>= 15%)" or "(>= 7)" -- these
 # come from FundamentalScanner's signal.message (fundamental_consumer.py),
 # embedded in talonx_core's full `rationale` text. Stripped defensively
@@ -357,6 +368,122 @@ def format_telegram_long_term_alert(
         f"_Reply with LT{alert_id} for full details_",
     ]
     return _fit_within_budget(lines, _SHORT_PUSH_MAX_CHARS, summary_line_index=6)
+
+
+def format_telegram_post_earnings_alert(
+    alert: LongTermActionableAlert, alert_id: int, company_name: str | None = None,
+) -> str:
+    """Event-Driven Earnings Radar, Requirement 8 -- used INSTEAD of
+    format_telegram_long_term_alert when alert.is_earnings_related is
+    True, showing the pre-vs-post-earnings valuation shift rather than
+    just the current snapshot. consumer.py sends this unconditionally
+    (bypasses severity + _evaluate_push_eligibility entirely), so this
+    still needs to stay within the same 300-char budget every other
+    short push does.
+
+    previous_price (for the %-move parenthetical) isn't a stored field
+    anywhere -- it's algebraically reconstructed from
+    previous_margin_of_safety_pct = (previous_fair_value - previous_price)
+    / previous_fair_value, i.e. previous_price = previous_fair_value *
+    (1 - previous_margin_of_safety_pct) -- the same "before" price
+    talonx_core.decision paired against previous_fair_value when it
+    computed that ratio, so this is exact, not an approximation."""
+    emoji, label = _SHORT_PUSH_HEADER.get(alert.action, ("ℹ️", alert.action.value.upper()))
+    company_suffix = f" ({escape_markdown(_short_company_name(company_name))})" if company_name else ""
+    discount_label = _discount_or_premium_label(alert.market_price, alert.margin_of_safety_pct)
+
+    price_move_suffix = ""
+    if (
+        alert.previous_fair_value is not None and alert.previous_fair_value > 0
+        and alert.previous_margin_of_safety_pct is not None
+    ):
+        previous_price = alert.previous_fair_value * (1 - alert.previous_margin_of_safety_pct)
+        if previous_price > 0:
+            move_pct = (alert.market_price - previous_price) / previous_price * 100.0
+            price_move_suffix = f" ({move_pct:+.1f}%)"
+
+    fair_value_suffix = ""
+    if alert.previous_fair_value is not None:
+        direction = "Up" if alert.intrinsic_fair_value >= alert.previous_fair_value else "Down"
+        fair_value_suffix = f" ({direction} from ${alert.previous_fair_value:,.2f})"
+
+    signal = alert.triggering_signal
+    fundamental_bits = []
+    if signal is not None and signal.roic is not None:
+        fundamental_bits.append(f"ROIC: {signal.roic:.1%}")
+    if signal is not None and signal.piotroski_f_score is not None:
+        fundamental_bits.append(f"Piotroski F-Score: {signal.piotroski_f_score}/9")
+    fundamentals_line = "  |  ".join(fundamental_bits) if fundamental_bits else "n/a"
+
+    # More room than the routine short push's summary -- see
+    # _POST_EARNINGS_PUSH_MAX_CHARS's own docstring for why this push
+    # type isn't held to the same tight budget.
+    summary = _one_sentence_summary(alert.summary or alert.rationale, _SHORT_PUSH_SUMMARY_MAX_CHARS * 3)
+
+    lines = [
+        f"{_HORIZON_EMOJI_LONG_TERM} POST-EARNINGS VALUATION UPDATE — "
+        f"`{alert.ticker}`{company_suffix} • #LT{alert_id}",
+        _SEPARATOR_LINE,
+        f"\U0001F4B0 Post-Earnings Price: ${alert.market_price:,.2f}{price_move_suffix}",
+        f"\U0001F3AF New Fair Value: ${alert.intrinsic_fair_value:,.2f}{fair_value_suffix}",
+        f"\U0001F6E1️ New Margin of Safety: {discount_label} ({label})",
+        "",
+        "\U0001F4CA Fundamental Shift:",
+        f"• {fundamentals_line}",
+    ]
+    if alert.guidance_revision_notes:
+        lines.append(f"• Guidance: {escape_markdown(alert.guidance_revision_notes)}")
+    lines.append("")
+    summary_line_index = len(lines)
+    lines.append(f"\U0001F4A1 Summary: {escape_markdown(summary)}")
+    lines.append(f"_Reply with LT{alert_id} for full details_")
+    return _fit_within_budget(lines, _POST_EARNINGS_PUSH_MAX_CHARS, summary_line_index=summary_line_index)
+
+
+_SESSION_LABEL = {
+    "BEFORE_MARKET": "Before-Market",
+    "AFTER_MARKET": "After-Market",
+    "UNSPECIFIED": "Time TBD",
+}
+
+
+def format_telegram_earnings_heads_up(
+    ticker: str, upcoming_earnings_row: dict, signal: FundamentalFactorSignal,
+    report: LongTermResearchReport, company_name: str | None = None,
+) -> str:
+    """Event-Driven Earnings Radar, Requirement 5's T-48h heads-up push --
+    a STANDALONE informational push, not itself an ActionableAlert (no
+    severity/action of its own), so it doesn't reuse _SHORT_PUSH_HEADER/
+    _SEVERITY_PREFIX. Sent unconditionally by consumer.py -- see its own
+    docstring for why this bypasses every suppression gate. `#RADAR`
+    (not a numeric ID) as the footer tag, since this push has no audit
+    row of its own to reply back into -- there's nothing to look up.
+
+    margin_of_safety_pct isn't a stored field on either input (it's a
+    talonx_core decision-matrix DERIVED value normally) -- computed here
+    directly from report.dcf_fair_value_per_share vs. signal.price, same
+    formula talonx_core/schemas.py's own docstring specifies:
+    (fair_value - price) / fair_value."""
+    company_suffix = f" ({escape_markdown(_short_company_name(company_name))})" if company_name else ""
+    earnings_date = datetime.fromisoformat(upcoming_earnings_row["earnings_date"])
+    reporting_line = f"{earnings_date.strftime('%A, %b')} {earnings_date.day}"
+    session_label = _SESSION_LABEL.get(upcoming_earnings_row["session"], "Time TBD")
+
+    fair_value = report.dcf_fair_value_per_share
+    margin_of_safety_pct = (fair_value - signal.price) / fair_value if fair_value else 0.0
+    discount_label = _discount_or_premium_label(signal.price, margin_of_safety_pct)
+
+    lines = [
+        f"\U0001F4C5 UPCOMING EARNINGS RADAR | `{ticker}`{company_suffix} • #RADAR",
+        _SEPARATOR_LINE,
+        f"\U0001F552 Reporting: {reporting_line} ({session_label})",
+        f"\U0001F4B0 Current Price: ${signal.price:,.2f}  |  Fair Value: ${fair_value:,.2f}",
+        f"⭐ Quality: {report.quality_score}/10  |  Moat: {report.moat_rating.value.upper()}",
+        f"\U0001F6E1️ Margin of Safety: {discount_label}",
+        "",
+        "\U0001F4A1 Status: Active Holding — Pipeline prepared for post-earnings re-evaluation.",
+    ]
+    return _fit_within_budget(lines, _SHORT_PUSH_MAX_CHARS, summary_line_index=7)
 
 
 def format_telegram_long_term_details(row: dict) -> str:

@@ -64,25 +64,38 @@ C:\workspace\TalonX\              <- open THIS folder as your project root
 │   ├── test_ledger.py
 │   ├── test_events_schemas.py
 │   ├── test_pipeline_ledger_integration.py
+│   ├── test_pipeline_earnings.py     <- ingest_earnings_filing: Item 2.02 text-scan, 10-Q always earnings-related (Earnings Radar §3.2)
+│   ├── test_edgar_client.py          <- get_recent_filings's `forms` override (Earnings Radar §3.2)
+│   ├── test_ingest_earnings.py       <- fetch_earnings_calendar: yfinance calendar shape handling (Earnings Radar §3.2)
+│   ├── test_yfinance_extended_hours.py  <- fetch_extended_hours_quote: prepost=True quote capture (Earnings Radar §3.2)
 │   ├── test_reddit_client.py
 │   ├── test_quant_strategy.py        <- signal logic incl. edge-triggering, hysteresis, ATR-move gate, confluence, risk/reward (§3.2, §9.5)
 │   ├── test_quant_indicators.py      <- RSI/MACD/ATR computation against a real pandas_ta call (§3.2)
 │   ├── test_quant_consumer.py        <- post-loss lockout, per-ticker cooldown, confluence/RR filters, batch throttle orchestration (§3.2, §9.5)
+│   ├── test_quant_store.py           <- suppression counts + latest_fundamental_factors persistence (Earnings Radar §3.2)
+│   ├── test_quant_fundamental_consumer.py  <- Stage 1 (8-K) republish from persisted factors (Earnings Radar §3.2)
 │   ├── test_brain_schemas.py
-│   ├── test_brain_retriever.py
-│   ├── test_brain_consumer.py
-│   ├── test_brain_llm.py             <- provider-switch (Gemini/Ollama) + retry/backoff (§3.3, §9.4)
+│   ├── test_brain_retriever.py       <- incl. list `form_type` -> Chroma `$in` (Earnings Radar §3.2)
+│   ├── test_brain_consumer.py        <- incl. earnings-related cache-bypass + multi-form_type retrieval (Earnings Radar §3.2)
+│   ├── test_brain_llm.py             <- provider-switch (Gemini/Ollama) + retry/backoff (§3.3, §9.4); incl. earnings prompt instruction
 │   ├── test_core_schemas.py
-│   ├── test_core_decision.py
+│   ├── test_core_decision.py         <- incl. earnings-triggered cooldown/no-state-change bypass, previous-fair-value (Earnings Radar §3.2)
+│   ├── test_core_state.py            <- LongTermTickerCorrelator: ROIC streak fiscal-year dedupe, previous_fair_value capture (Earnings Radar §3.2)
 │   ├── test_core_store.py
 │   ├── test_core_consumer.py
 │   ├── test_dispatch_schemas.py
-│   ├── test_dispatch_formatter.py
-│   ├── test_dispatch_store.py         <- audit trail incl. suppress_reason + migrations
-│   └── test_dispatch_consumer.py      <- Smart Dispatch Filtering: action mute, confidence gate, push cooldown/retrigger
+│   ├── test_dispatch_formatter.py    <- incl. format_telegram_earnings_heads_up, format_telegram_post_earnings_alert
+│   ├── test_dispatch_store.py         <- audit trail incl. suppress_reason + migrations; incl. Earnings Radar columns
+│   ├── test_dispatch_consumer.py      <- Smart Dispatch Filtering: action mute, confidence gate, push cooldown/retrigger; incl. T-48h heads-up + post-earnings bypass
+│   ├── test_ticker_watchlist_store.py  <- incl. upcoming_earnings CRUD (Earnings Radar §3.2)
+│   ├── test_run_talonx_ingestion.py
+│   ├── test_run_talonx_watchlist.py
+│   ├── test_run_talonx_earnings_sync.py       <- periodic_earnings_calendar_sync_loop (Earnings Radar §3.2)
+│   └── test_run_talonx_earnings_fast_track.py <- EarningsFastTrackPoller + LongTermPriceRunner race-fix exclusion (Earnings Radar §3.2)
 ├── talonx_ingest\
 │   ├── config.py                   <- all settings, env-driven
-│   ├── pipeline.py                 <- SEC filing ingestion entrypoint
+│   ├── pipeline.py                 <- SEC filing ingestion entrypoint; also ingest_earnings_filing (Earnings Radar fast-track)
+│   ├── earnings.py                 <- fetch_earnings_calendar -- yfinance calendar wrapper (Earnings Radar §3.2)
 │   ├── check_connectivity.py       <- network diagnostic script
 │   ├── common\
 │   │   └── backoff.py               <- shared retry/backoff helper
@@ -106,7 +119,7 @@ C:\workspace\TalonX\              <- open THIS folder as your project root
 │   └── market_data\
 │       ├── manager.py                <- WebSocket-first, polling-fallback orchestration
 │       ├── polygon_ws.py             <- Polygon.io WebSocket client
-│       ├── yfinance_poll.py          <- yfinance polling fallback
+│       ├── yfinance_poll.py          <- yfinance polling fallback; also fetch_extended_hours_quote (Earnings Radar §3.2)
 │       ├── models.py                 <- normalized market event type
 │       └── run.py                    <- market data entrypoint; also publishes to Redis
 ├── talonx_quant\                    <- Module 2: Technical & Quantitative Scanner
@@ -974,12 +987,15 @@ alongside this file, in its own terminal, §5n).
 
 **Every continuous component can be pulled out individually**
 (`--skip-market-data`, `--skip-quant`, `--skip-brain`, `--skip-core`,
-`--skip-dispatch`, `--skip-paper-trading`) -- useful while actively
-iterating on one piece: run the others here and the one you're changing
-in its own terminal, so you don't have to restart this whole process on
-every edit. If every component ends up skipped (including
-`--skip-ingestion`), it logs an error and exits immediately rather than
-hanging on an empty task list.
+`--skip-dispatch`, `--skip-paper-trading`, `--skip-earnings-sync`,
+`--skip-earnings-fast-track` -- the last two disable the Event-Driven
+Earnings Radar's weekly calendar sync / 15-min fast-track poller
+respectively, see §3.10) -- useful while actively iterating on one
+piece: run the others here and the one you're changing in its own
+terminal, so you don't have to restart this whole process on every edit.
+If every component ends up skipped (including `--skip-ingestion`), it
+logs an error and exits immediately rather than hanging on an empty task
+list.
 
 ### 3.8 End-to-end data flow
 
@@ -1146,12 +1162,17 @@ rather than sharing Python objects across module boundaries.
   disambiguated from a bare intraday `#12`.
 - **Dashboard (`talonx_dispatch/app.py`)** -- restructured into 3 tabs:
   **📈 Intraday Monitor** (everything Phase 1 already had), **💎
-  Long-Term Radar** (a Valuation & Margin of Safety table, the
-  moat/capital-allocation/DCF writeup behind each ticker, and the
-  long-term portfolio's cash/positions/DCA-contributed/equity curve),
-  and **⚙️ Watchlist & Settings** (the ticker watchlist with its horizon
-  selector, both portfolios' settings, and a horizon-filterable unified
-  audit trail).
+  Long-Term Radar** (an Upcoming Earnings Calendar widget — 🟢 within
+  48h / 🟡 within 7 days / ⚪ beyond, synced weekly by
+  `periodic_earnings_calendar_sync_loop`, see §3.10 — a Valuation &
+  Margin of Safety table with a "Last earnings event" column (date +
+  fair-value delta %, derivable straight from an earnings-triggered
+  alert's own `previous_fair_value`/`intrinsic_fair_value`, no extra
+  storage needed), the moat/capital-allocation/DCF writeup behind each
+  ticker, and the long-term portfolio's cash/positions/DCA-contributed/
+  equity curve), and **⚙️ Watchlist & Settings** (the ticker watchlist
+  with its horizon selector, paper-trading toggle, and filters, both
+  portfolios' settings, and a horizon-filterable unified audit trail).
 - **`generate_eod_report.py`** -- gained a Valuation & Margin of Safety
   Radar section (latest known price/fair-value/quality/moat snapshot per
   ticker -- NOT limited to the report's own calendar day, since
@@ -1196,6 +1217,116 @@ rather than sharing Python objects across module boundaries.
 dividend reinvestment, a separate End-of-Quarter report, a full
 structured-logging retrofit of the pre-existing intraday log lines, true
 calendar-month DCA scheduling, and a real CAPM-based WACC.
+
+---
+
+### 3.10 Event-Driven Earnings Radar (`LONG_TERM`/`DUAL_HORIZON` tickers)
+
+Moves LONG_TERM evaluation from "quarterly-cadence factor scoring only"
+to an active earnings lifecycle:
+
+```
+Weekly Calendar Sync -> T-48h Heads-Up Push -> Fast-Track 8-K/10-Q Ingestion
+    -> Two-Stage Valuation Recalculation -> Post-Earnings Push
+```
+
+```
+talonx_watchlist.upcoming_earnings (one row per LONG_TERM/DUAL_HORIZON ticker)
+    <- weekly (run_talonx.periodic_earnings_calendar_sync_loop, default
+       every 168h from process start -- NOT anchored to actual wall-clock
+       Sunday-00:00-UTC, this codebase has no day-of-week scheduling
+       precedent anywhere) calls talonx_ingest.earnings.fetch_earnings_calendar
+       (yfinance's undocumented .calendar property) for every ticker
+    -> talonx_dispatch.DispatchAgent's _earnings_heads_up_loop (daily)
+       sends a T-48h "reporting soon" push, UNCONDITIONALLY (bypasses
+       every dispatch suppression gate -- severity, cooldown, eligibility
+       -- same "always send" precedent trade-execution pushes already
+       establish), sourced from an in-memory latest-signal/report cache
+       DispatchAgent keeps by ALSO subscribing to talonx:signals:fundamental
+       and talonx:reports:longterm (NOT the audit trail -- see below for why)
+    -> on the earnings date, run_talonx.EarningsFastTrackPoller (every 15
+       min, default) fetches 8-K/10-Q for tickers currently in a flat
+       2-calendar-day window around the known date (session-aware
+       Before/After-Market windowing is skipped -- yfinance's session
+       data isn't reliable enough to window precisely against), and
+       captures an extended-hours price quote (yfinance's
+       history(prepost=True), unlike the regular batch poll's fast_info)
+    -> talonx_ingest.pipeline.ingest_earnings_filing fetches the body of
+       each new 8-K and text-scans it for the literal string "Item 2.02"
+       before treating it as the earnings release (a 10-Q always counts;
+       an 8-K that doesn't match is still ingested for RAG context, just
+       not flagged) -- publishes NewFilingIngestedEvent with
+       is_earnings_related=True only for confirmed filings
+    -> talonx_quant.fundamental_consumer.FundamentalScanner's Stage 1:
+       on a confirmed 8-K, republishes a FundamentalFactorSignal from
+       PERSISTED factors (talonx_quant/store.py's
+       latest_fundamental_factors table -- real XBRL numbers aren't in
+       an 8-K), is_earnings_related=True, bypassing its OWN 7-day
+       standard cooldown via a separate short-TTL
+       earnings_republish_cooldown:{TICKER} key
+    -> once the 10-Q lands (Stage 2), the EXISTING NewFundamentalsIngestedEvent
+       path re-scores ROIC/F-Score/FCF-Yield for real, also flagged
+       is_earnings_related=True
+    -> talonx_brain.consumer's long-term generation: retrieves
+       ["10-K","10-Q","8-K"] (not just "10-K") when the triggering
+       signal is earnings-related, and skips its own fresh-cache-hit
+       shortcut so a same-day re-read is never served a stale cached
+       report; the LLM is also asked (only when relevant) for
+       guidance_revision_notes/revenue_eps_surprise
+    -> talonx_core.decision's long-term matrix bypasses its own 30-day
+       cooldown AND price-delta no-state-change gate when either input
+       is earnings-related, and captures previous_fair_value (from the
+       correlator's state, the moment the new report overwrites the old
+       one -- same timing previous_moat_rating already uses) for the
+       "before vs after" push
+    -> talonx_dispatch sends a DISTINCT post-earnings push format
+       (format_telegram_post_earnings_alert -- old vs. new fair value,
+       fundamental shift, guidance revision), bypassing BOTH the
+       severity gate and Smart Dispatch Filtering's push-eligibility
+       check for this one alert
+```
+
+**Key design decisions:**
+- **`is_earnings_related` propagates end-to-end from the SOURCE ingestion
+  call** (`ingest_earnings_filing`/`run_long_term_financials_ingestion`),
+  not re-derived downstream at each stage -- every cooldown-bypass check
+  along the pipeline (`talonx_quant`, `talonx_core`, `talonx_dispatch`)
+  just reads this one flag rather than each independently re-checking
+  "is this ticker in its earnings window."
+- **Two-stage recalculation, not one.** An 8-K's press release text
+  arrives fast but has no real XBRL numbers; the 10-Q has the numbers but
+  arrives days later. Stage 1 lets `talonx_brain` re-read the fresh
+  filing text immediately (reusing the LAST real ROIC/F-Score); Stage 2
+  re-scores for real once the 10-Q lands. Up to two Telegram pushes per
+  earnings cycle is expected behavior, not a duplicate-alert bug. A
+  ticker's FIRST-EVER earnings cycle since being tagged `LONG_TERM` (no
+  persisted factors yet) correctly produces only the Stage 2 push.
+- **`FundamentalScanner`'s ROIC-vs-WACC streak dedupes on fiscal year,
+  not event count** (`LongTermTickerState.last_streak_fiscal_year`) --
+  without this, a Stage 1 republish reusing the same cached ROIC would
+  double-count one real data point toward the 2-consecutive-quarter
+  fundamental-stop trigger, a false `UNDER_PERFORM_REBALANCE` risk.
+- **The T-48h heads-up push's data source is a live in-memory cache, not
+  the audit trail.** `talonx_dispatch`'s own `long_term_alerts` table
+  only gets a row once a ticker clears the FULL decision matrix and
+  produces an alert -- a ticker whose fundamentals never clear
+  `FundamentalScanner`'s threshold would have zero rows there forever,
+  not just on day one. Subscribing directly to the signal/report
+  channels instead means the heads-up push has data the moment ANY
+  signal or report exists for a ticker.
+- **`LongTermPriceRunner` excludes any ticker `EarningsFastTrackPoller`
+  currently owns** (`active_earnings_symbols_fn`), the same "avoid
+  double-publishing ticks for the same symbol" reasoning it already
+  applies to `DUAL_HORIZON` tickers -- otherwise Redis pub/sub's
+  unordered delivery between two independent producers could let a
+  regular-session tick silently overwrite the post-earnings
+  extended-hours price this whole feature exists to capture.
+
+**Not built this pass:** true session-aware (Before/After-Market)
+fast-track windowing (yfinance doesn't reliably expose this, so a flat
+2-day window is used instead), and real wall-clock-anchored weekly
+scheduling (an interval-since-process-start is used instead, matching
+every other periodic loop in this codebase).
 
 ---
 
@@ -1756,9 +1887,20 @@ auto-seeded fresh-install default and any CLI-seeded tickers still start
 active, only the dashboard's Add form defaults to paused). Each ticker
 also records a Primary Exchange/Market (picked from a fixed dropdown on
 add, so filtering by it is reliable), and the table itself supports
-filtering by exchange, sorting by any column, and pagination (10 tickers
-per page). Pause/Resume/Remove are color-coded (amber/green/red) to keep
-them visually distinct. Also shows: summary metrics, tickers
+filtering by exchange, strategy horizon, paper-trading status, and
+active/paused status, sorting by any column, and pagination (10 tickers
+per page). An inline **Enable Paper Trading** checkbox column sits next
+to the horizon selector — toggling it writes straight to
+`paper_trading_enabled`/`paper_trading_enabled_long_term` immediately,
+same live-control-surface behavior as everything else in this table. A
+`DUAL_HORIZON` ticker shows BOTH checkboxes (they're independently
+tracked flags, one per paper-trading engine); `INTRADAY`/`LONG_TERM`
+show only the one that applies. `talonx_paper` already gated on these
+flags before this checkbox existed (a disabled ticker's alerts were
+silently skipped) — the only change there is a `PAPER_TRADING_DISABLED_
+FOR_TICKER` log line making that skip visible in the logs. Pause/Resume/
+Remove are color-coded (amber/green/red) to keep them visually distinct.
+Also shows: summary metrics, tickers
 with alert history (derived from the audit trail — which tickers have
 actually alerted, distinct from what's currently tracked), a live
 expandable alert feed, and a filterable (ticker/action/severity) full

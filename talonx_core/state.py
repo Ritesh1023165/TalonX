@@ -115,10 +115,23 @@ class LongTermTickerState:
     # talonx_ingest.edgar.financials's own docstring). Incremented/reset
     # in update_signal(), read (never mutated) by decision.py.
     roic_below_wacc_streak: int = 0
+    # The fiscal_year the streak above was last bumped/reset for --
+    # Event-Driven Earnings Radar's Stage 1 (8-K) republish reuses the
+    # SAME cached fiscal year's ROIC as a prior real publish; without
+    # this dedupe, update_signal() would count that one underlying data
+    # point twice toward the streak, risking a false UNDER_PERFORM_
+    # REBALANCE trip purely as an artifact of the republish plumbing.
+    last_streak_fiscal_year: int | None = None
     # The moat rating as of the PREVIOUS report (before the current one
     # in `longterm_report`) -- decision.py compares the two to detect a
     # downgrade. None until a second report has ever arrived.
     previous_moat_rating: MoatRating | None = None
+    # Event-Driven Earnings Radar, Requirement 8: the PREVIOUS report's
+    # fair-value estimate, captured the same way/same moment as
+    # previous_moat_rating above -- decision.py has no other way to see
+    # the "before" report, since update_report() below already
+    # overwrites `longterm_report` before decision.py ever runs.
+    previous_fair_value: float | None = None
 
 
 class LongTermTickerCorrelator:
@@ -141,6 +154,15 @@ class LongTermTickerCorrelator:
         state = self.get_or_create(signal.ticker)
         state.fundamental_signal = signal
         state.fundamental_signal_at = datetime.now(timezone.utc)
+        # Dedupe on fiscal year, not event count -- an Earnings Radar
+        # Stage 1 (8-K) republish reuses the SAME cached ROIC already
+        # counted once at its original publish; without this guard, that
+        # one real data point would be counted twice toward the streak.
+        # Also protects against any other future path that might
+        # redundantly republish the same year's signal.
+        if signal.fiscal_year == state.last_streak_fiscal_year:
+            return state
+        state.last_streak_fiscal_year = signal.fiscal_year
         if signal.roic is not None and signal.roic < wacc:
             state.roic_below_wacc_streak += 1
         else:
@@ -149,10 +171,12 @@ class LongTermTickerCorrelator:
 
     def update_report(self, report: LongTermResearchReport) -> LongTermTickerState:
         state = self.get_or_create(report.ticker)
-        # Capture the OUTGOING report's moat rating (if any) as the
-        # baseline for the NEXT downgrade check, before overwriting it.
+        # Capture the OUTGOING report's moat rating and fair value (if
+        # any) as the baseline for the NEXT downgrade check / earnings-
+        # triggered "before vs after" push, before overwriting them.
         if state.longterm_report is not None:
             state.previous_moat_rating = state.longterm_report.moat_rating
+            state.previous_fair_value = state.longterm_report.dcf_fair_value_per_share
         state.longterm_report = report
         state.longterm_report_at = datetime.now(timezone.utc)
         return state

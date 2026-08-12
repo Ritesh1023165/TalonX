@@ -42,7 +42,13 @@ from talonx_quant.fundamentals import (
     compute_piotroski_f_score,
     compute_roic,
 )
-from talonx_quant.schemas import FundamentalFactorSignal, MarketTickEvent, NewFundamentalsIngestedEvent, TickEventType
+from talonx_quant.schemas import (
+    FundamentalFactorSignal,
+    MarketTickEvent,
+    NewFilingIngestedEvent,
+    NewFundamentalsIngestedEvent,
+    TickEventType,
+)
 from talonx_quant.store import QuantStateStore
 
 from talonx_ingest.common.structured_logging import log_structured
@@ -90,6 +96,10 @@ class FundamentalScanner:
         # Last known market price per ticker, fed by market:stream BAR
         # events -- this scanner's only source of a current price.
         self._latest_prices: dict[str, float] = {}
+        # Event-Driven Earnings Radar (Requirement 7 Stage 1) counters.
+        self._earnings_signals_published = 0
+        self._earnings_republish_suppressed_cooldown = 0
+        self._earnings_republish_suppressed_no_factors = 0
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -105,6 +115,18 @@ class FundamentalScanner:
     @property
     def signals_suppressed_cooldown(self) -> int:
         return self._signals_suppressed_cooldown
+
+    @property
+    def earnings_signals_published(self) -> int:
+        return self._earnings_signals_published
+
+    @property
+    def earnings_republish_suppressed_cooldown(self) -> int:
+        return self._earnings_republish_suppressed_cooldown
+
+    @property
+    def earnings_republish_suppressed_no_factors(self) -> int:
+        return self._earnings_republish_suppressed_no_factors
 
     async def run(self) -> None:
         if redis_asyncio is None:
@@ -139,11 +161,11 @@ class FundamentalScanner:
         logger.info("Connected to Redis at %s", self.config.redis_url)
 
         pubsub = self._client.pubsub()
-        await pubsub.subscribe(self.config.fundamentals_events_channel, self.config.market_stream_channel)
-        logger.info(
-            "Subscribed to %s and %s",
-            self.config.fundamentals_events_channel, self.config.market_stream_channel,
+        channels = (
+            self.config.fundamentals_events_channel, self.config.market_stream_channel, self.config.filings_channel,
         )
+        await pubsub.subscribe(*channels)
+        logger.info("Subscribed to %s", ", ".join(channels))
 
         try:
             while not self._stop_event.is_set():
@@ -152,7 +174,7 @@ class FundamentalScanner:
                     continue
                 await self._handle_message(message)
         finally:
-            await pubsub.unsubscribe(self.config.fundamentals_events_channel, self.config.market_stream_channel)
+            await pubsub.unsubscribe(*channels)
             await pubsub.aclose()
             await self._client.aclose()
 
@@ -175,6 +197,8 @@ class FundamentalScanner:
             await self._handle_market_tick(payload)
         elif channel == self.config.fundamentals_events_channel:
             await self._handle_fundamentals_event(payload)
+        elif channel == self.config.filings_channel:
+            await self._handle_filing_event(payload)
         else:
             logger.warning("Dropping message on unexpected channel %s", channel)
 
@@ -256,6 +280,16 @@ class FundamentalScanner:
             price=price,
         )
 
+        # Event-Driven Earnings Radar: persisted regardless of whether
+        # these factors clear the publish threshold below --
+        # UNDER_PERFORM_REBALANCE needs below-threshold factors to be
+        # available too for a later earnings-triggered republish.
+        if self.store is not None:
+            self.store.save_latest_factors(
+                ticker, current.fiscal_year, roic, f_score, fcf_yield, altman_z, debt_to_ebitda,
+                datetime.now(timezone.utc),
+            )
+
         passes = roic is not None and roic >= self.config.roic_threshold and f_score >= self.config.f_score_threshold
         if not passes:
             logger.info(
@@ -297,6 +331,7 @@ class FundamentalScanner:
                 f"ROIC {roic:.1%} (>= {self.config.roic_threshold:.0%}), "
                 f"F-Score {f_score}/9 (>= {self.config.f_score_threshold})"
             ),
+            is_earnings_related=event.is_earnings_related,
         )
         await self._publish_signal(signal)
 
@@ -322,3 +357,85 @@ class FundamentalScanner:
             logger.info("Fundamental signal: %s -- %s", signal.ticker, signal.message)
         except Exception as exc:  # noqa: BLE001 -- a publish failure shouldn't crash the scanner
             logger.warning("Failed to publish fundamental signal to Redis: %s", exc)
+
+    # ------------------------------------------------------------------
+    # Event-Driven Earnings Radar, Requirement 7 Stage 1: an 8-K the
+    # fast-track poller confirmed as the earnings release republishes a
+    # FundamentalFactorSignal from PERSISTED factors (no fresh XBRL data
+    # exists yet at the 8-K stage) so talonx_brain can re-read the new
+    # filing text immediately. Stage 2 (real XBRL, once the 10-Q lands)
+    # flows through the normal _handle_fundamentals_event path above --
+    # its is_earnings_related flag is already threaded through there.
+    # ------------------------------------------------------------------
+
+    async def _handle_filing_event(self, payload: dict) -> None:
+        try:
+            event = NewFilingIngestedEvent.model_validate(payload)
+        except ValidationError as exc:
+            logger.warning("Dropping invalid filing event: %s", exc)
+            return
+
+        if not event.is_earnings_related or not event.form_type.startswith("8-K"):
+            return  # a routine (non-earnings) filing, or a 10-Q -- Stage 2 handles 10-Qs
+
+        ticker = event.ticker.upper()
+        if self.store is None:
+            return  # persisted factors are the only source for a Stage 1 republish
+
+        factors = self.store.get_latest_factors(ticker)
+        if factors is None:
+            self._earnings_republish_suppressed_no_factors += 1
+            logger.info(
+                "Earnings-triggered republish skipped for %s -- no persisted factors yet "
+                "(first earnings cycle since being tagged LONG_TERM)", ticker,
+            )
+            return
+
+        if await self._is_on_earnings_cooldown(ticker):
+            self._earnings_republish_suppressed_cooldown += 1
+            logger.info("Suppressed earnings-triggered republish for %s -- still in earnings cooldown", ticker)
+            return
+
+        price = self._latest_prices.get(ticker, 0.0)
+        if price <= 0:
+            price = await self._get_price_with_fallback(ticker)
+            if price <= 0:
+                logger.warning(
+                    "No usable price (live or fallback) for %s -- suppressing earnings-triggered republish", ticker,
+                )
+                return
+
+        await self._start_earnings_cooldown(ticker)
+        signal = FundamentalFactorSignal(
+            ticker=ticker,
+            fiscal_year=factors["fiscal_year"],
+            roic=factors["roic"],
+            piotroski_f_score=factors["piotroski_f_score"],
+            fcf_yield=factors["fcf_yield"],
+            altman_z_score=factors["altman_z_score"],
+            debt_to_ebitda_proxy=factors["debt_to_ebitda_proxy"],
+            price=price,
+            message=(
+                f"Earnings-triggered re-read ({event.form_type}) -- reusing FY{factors['fiscal_year']} "
+                f"factors (ROIC={factors['roic']}, F-Score={factors['piotroski_f_score']}) pending the 10-Q"
+            ),
+            is_earnings_related=True,
+        )
+        await self._publish_signal(signal)
+        self._earnings_signals_published += 1
+
+    async def _is_on_earnings_cooldown(self, ticker: str) -> bool:
+        try:
+            return bool(await self._client.exists(f"earnings_republish_cooldown:{ticker}"))
+        except Exception as exc:  # noqa: BLE001 -- a Redis hiccup shouldn't block the republish
+            logger.warning("Earnings cooldown check failed for %s (%s); treating as not on cooldown", ticker, exc)
+            return False
+
+    async def _start_earnings_cooldown(self, ticker: str) -> None:
+        try:
+            await self._client.set(
+                f"earnings_republish_cooldown:{ticker}", "1",
+                ex=int(self.config.earnings_republish_cooldown_seconds),
+            )
+        except Exception as exc:  # noqa: BLE001 -- a failed lock shouldn't drop the republish
+            logger.warning("Failed to set earnings cooldown for %s (%s)", ticker, exc)

@@ -88,14 +88,17 @@ async def test_message_on_unexpected_channel_is_dropped(engine):
 # --- Ticker gating ---------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_alert_for_a_ticker_without_paper_trading_enabled_is_skipped(engine):
+async def test_alert_for_a_ticker_without_paper_trading_enabled_is_skipped(engine, caplog):
     engine.watchlist_store.list_paper_trading_long_term_symbols.return_value = ["MSFT"]  # AAPL not in it
 
-    await engine._handle_message(_msg(engine.config, _alert_payload(ticker="AAPL")))
+    with caplog.at_level("INFO"):
+        await engine._handle_message(_msg(engine.config, _alert_payload(ticker="AAPL")))
 
     engine.store.get_long_term_position.assert_not_called()
     assert engine.alerts_processed == 1
     assert engine.trades_executed == 0
+    assert "PAPER_TRADING_DISABLED_FOR_TICKER" in caplog.text
+    assert "AAPL" in caplog.text
 
 
 # --- BUY (HIGH_CONVICTION_BUY) -----------------------------------------------

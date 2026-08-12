@@ -159,20 +159,43 @@ class _LLMFindingsLongTerm(BaseModel):
         default_factory=list,
         description="Risks grounded in the filing excerpts relevant to a multi-year holding period",
     )
+    # Event-Driven Earnings Radar: only meaningfully populated when the
+    # retrieved excerpts include a fresh earnings release (8-K) or
+    # quarterly filing (10-Q) -- routine annual-only evaluations leave
+    # these None/empty, which is expected, not a missing-data bug.
+    guidance_revision_notes: str | None = Field(
+        default=None,
+        description=(
+            "If the excerpts include management guidance (revenue/EPS/margin outlook for "
+            "future periods), summarize whether guidance was raised, lowered, reaffirmed, or "
+            "newly issued, and by how much if stated. Null if no guidance is present in the excerpts."
+        ),
+    )
+    revenue_eps_surprise: str | None = Field(
+        default=None,
+        description=(
+            "If the excerpts include actual results compared against prior estimates/consensus "
+            "or prior-year figures, summarize the revenue/EPS beat or miss and its magnitude. "
+            "Null if no such comparison is present in the excerpts."
+        ),
+    )
 
 
 SYSTEM_PROMPT_LONG_TERM = (
     "You are an equity research analyst assessing a company for a multi-year, "
     "buy-and-hold value/quality investment thesis -- NOT a short-term trading call. "
     "You are given a fundamental factor summary (ROIC, Piotroski F-Score, FCF Yield, "
-    "Altman Z-Score) and excerpts retrieved from the company's SEC 10-K filings. "
-    "Your job is to evaluate three things using ONLY the excerpts provided -- do not "
+    "Altman Z-Score) and excerpts retrieved from the company's SEC filings. "
+    "Your job is to evaluate the following using ONLY the excerpts provided -- do not "
     "invent facts or financials not present in the context: (1) the durability of the "
     "company's economic moat (pricing power, switching costs, cost advantages, network "
     "effects), (2) the quality of management's capital allocation (reinvestment, "
-    "buybacks, dividend sustainability), and (3) an intrinsic fair-value-per-share "
-    "estimate via a discounted cash flow approach. Cite specifics (numbers, dates, named "
-    "risks) from the excerpts wherever possible. Be concise and direct."
+    "buybacks, dividend sustainability), (3) an intrinsic fair-value-per-share "
+    "estimate via a discounted cash flow approach, and (4) IF AND ONLY IF the excerpts "
+    "include a fresh earnings release (8-K) or quarterly filing (10-Q), any management "
+    "guidance revisions and revenue/EPS surprises disclosed there -- leave those two "
+    "fields null when the excerpts don't cover a specific earnings event. Cite specifics "
+    "(numbers, dates, named risks) from the excerpts wherever possible. Be concise and direct."
 )
 
 
@@ -398,6 +421,12 @@ def _build_long_term_prompt(signal: FundamentalFactorSignal, citations: list[Cit
     roic_str = f"{signal.roic:.1%}" if signal.roic is not None else "n/a"
     fcf_yield_str = f"{signal.fcf_yield:.1%}" if signal.fcf_yield is not None else "n/a"
     altman_z_str = f"{signal.altman_z_score:.2f}" if signal.altman_z_score is not None else "n/a"
+    earnings_instruction = (
+        "\n\nThis evaluation was triggered by a FRESH EARNINGS EVENT (a new 8-K or 10-Q was just "
+        "filed) -- prioritize the retrieved excerpts from that filing specifically, and populate "
+        "guidance_revision_notes/revenue_eps_surprise if the excerpts support it."
+        if signal.is_earnings_related else ""
+    )
     return (
         f"{SYSTEM_PROMPT_LONG_TERM}\n\n"
         f"## Fundamental factor summary (FY{signal.fiscal_year})\n"
@@ -407,8 +436,8 @@ def _build_long_term_prompt(signal: FundamentalFactorSignal, citations: list[Cit
         f"FCF Yield: {fcf_yield_str}\n"
         f"Altman Z-Score: {altman_z_str}\n"
         f"Current market price: {signal.price}\n"
-        f"Detail: {signal.message}\n\n"
-        f"## Retrieved 10-K context ({len(citations)} excerpt(s))\n{context_block}\n\n"
+        f"Detail: {signal.message}{earnings_instruction}\n\n"
+        f"## Retrieved filing context ({len(citations)} excerpt(s))\n{context_block}\n\n"
         "Assess the economic moat, capital allocation quality, and derive an intrinsic "
         "fair-value-per-share estimate for a multi-year holding thesis."
     )

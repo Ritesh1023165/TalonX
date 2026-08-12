@@ -288,3 +288,152 @@ async def test_invalid_fundamentals_payload_is_dropped(scanner):
 async def test_message_on_unexpected_channel_is_dropped(scanner):
     await scanner._handle_message(_msg("some:other:channel", _fundamentals_payload()))
     assert scanner.events_processed == 0
+
+
+# ==========================================================================
+# Event-Driven Earnings Radar -- Stage 1 (8-K) republish from persisted factors
+# ==========================================================================
+
+def _filing_payload(
+    ticker: str = "AAPL", form_type: str = "8-K", is_earnings_related: bool = True,
+) -> dict:
+    return {"ticker": ticker, "form_type": form_type, "is_earnings_related": is_earnings_related}
+
+
+def _filing_msg(config, payload: dict) -> dict:
+    return _msg(config.filings_channel, payload)
+
+
+@pytest.fixture
+def scanner_with_store(tmp_path):
+    store = QuantStateStore(tmp_path / "quant.db")
+    s = FundamentalScanner(QuantConfig(), store=store)
+    s._client = AsyncMock()
+    s._client.exists.return_value = False
+    yield s
+    store.close()
+
+
+@pytest.mark.asyncio
+async def test_filing_event_ignores_non_earnings_related_8k(scanner_with_store):
+    scanner_with_store.store.save_latest_factors("AAPL", 2025, 0.21, 8, 0.05, 5.5, 1.2, datetime.now(timezone.utc))
+
+    await scanner_with_store._handle_message(
+        _filing_msg(scanner_with_store.config, _filing_payload(is_earnings_related=False))
+    )
+
+    scanner_with_store._client.publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_filing_event_ignores_a_10q_stage_2_handles_those(scanner_with_store):
+    scanner_with_store.store.save_latest_factors("AAPL", 2025, 0.21, 8, 0.05, 5.5, 1.2, datetime.now(timezone.utc))
+
+    await scanner_with_store._handle_message(
+        _filing_msg(scanner_with_store.config, _filing_payload(form_type="10-Q"))
+    )
+
+    scanner_with_store._client.publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_filing_event_republishes_using_persisted_factors(scanner_with_store):
+    await scanner_with_store._handle_message(_msg(scanner_with_store.config.market_stream_channel, _bar_payload(close=180.0)))
+    scanner_with_store.store.save_latest_factors("AAPL", 2025, 0.21, 8, 0.05, 5.5, 1.2, datetime.now(timezone.utc))
+
+    await scanner_with_store._handle_message(_filing_msg(scanner_with_store.config, _filing_payload()))
+
+    scanner_with_store._client.publish.assert_awaited_once()
+    channel, payload = scanner_with_store._client.publish.await_args.args
+    assert channel == scanner_with_store.config.fundamental_signals_channel
+    body = json.loads(payload)
+    assert body["ticker"] == "AAPL"
+    assert body["fiscal_year"] == 2025
+    assert body["roic"] == 0.21
+    assert body["price"] == 180.0
+    assert body["is_earnings_related"] is True
+    assert scanner_with_store.earnings_signals_published == 1
+
+
+@pytest.mark.asyncio
+async def test_filing_event_republishes_even_when_factors_are_below_threshold(scanner_with_store):
+    """UNDER_PERFORM_REBALANCE needs below-threshold factors to be
+    available too -- the republish path must NOT re-check the ROIC/
+    F-Score passes gate."""
+    await scanner_with_store._handle_message(_msg(scanner_with_store.config.market_stream_channel, _bar_payload(close=50.0)))
+    scanner_with_store.store.save_latest_factors("AAPL", 2025, 0.02, 2, -0.01, 1.0, 6.0, datetime.now(timezone.utc))
+
+    await scanner_with_store._handle_message(_filing_msg(scanner_with_store.config, _filing_payload()))
+
+    scanner_with_store._client.publish.assert_awaited_once()
+    body = json.loads(scanner_with_store._client.publish.await_args.args[1])
+    assert body["roic"] == 0.02
+    assert body["piotroski_f_score"] == 2
+
+
+@pytest.mark.asyncio
+async def test_filing_event_skipped_when_no_store_configured(scanner):
+    await scanner._handle_message(_filing_msg(scanner.config, _filing_payload()))
+    scanner._client.publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_filing_event_skipped_when_no_persisted_factors_yet(scanner_with_store):
+    # First-ever earnings cycle since being tagged LONG_TERM -- no 10-Q
+    # has ever landed, so nothing is persisted. Correct no-op, not a bug.
+    await scanner_with_store._handle_message(_filing_msg(scanner_with_store.config, _filing_payload()))
+
+    scanner_with_store._client.publish.assert_not_awaited()
+    assert scanner_with_store.earnings_republish_suppressed_no_factors == 1
+
+
+@pytest.mark.asyncio
+async def test_filing_event_suppressed_when_on_earnings_cooldown(scanner_with_store):
+    scanner_with_store.store.save_latest_factors("AAPL", 2025, 0.21, 8, 0.05, 5.5, 1.2, datetime.now(timezone.utc))
+    scanner_with_store._client.exists.return_value = True  # earnings_republish_cooldown:AAPL active
+
+    await scanner_with_store._handle_message(_filing_msg(scanner_with_store.config, _filing_payload()))
+
+    scanner_with_store._client.publish.assert_not_awaited()
+    assert scanner_with_store.earnings_republish_suppressed_cooldown == 1
+
+
+@pytest.mark.asyncio
+async def test_filing_event_starts_a_separate_earnings_cooldown_key(scanner_with_store):
+    await scanner_with_store._handle_message(_msg(scanner_with_store.config.market_stream_channel, _bar_payload(close=180.0)))
+    scanner_with_store.store.save_latest_factors("AAPL", 2025, 0.21, 8, 0.05, 5.5, 1.2, datetime.now(timezone.utc))
+
+    await scanner_with_store._handle_message(_filing_msg(scanner_with_store.config, _filing_payload()))
+
+    scanner_with_store._client.set.assert_awaited_once()
+    args, kwargs = scanner_with_store._client.set.await_args
+    assert args[0] == "earnings_republish_cooldown:AAPL"
+    assert kwargs["ex"] == int(scanner_with_store.config.earnings_republish_cooldown_seconds)
+
+
+@pytest.mark.asyncio
+async def test_filing_event_uses_price_fallback_when_no_live_price(scanner_with_store, monkeypatch):
+    monkeypatch.setattr("talonx_quant.fundamental_consumer._fetch_last_close", lambda ticker: 175.0)
+    scanner_with_store.store.save_latest_factors("AAPL", 2025, 0.21, 8, 0.05, 5.5, 1.2, datetime.now(timezone.utc))
+
+    await scanner_with_store._handle_message(_filing_msg(scanner_with_store.config, _filing_payload()))
+
+    scanner_with_store._client.publish.assert_awaited_once()
+    body = json.loads(scanner_with_store._client.publish.await_args.args[1])
+    assert body["price"] == 175.0
+
+
+@pytest.mark.asyncio
+async def test_filing_event_suppressed_when_no_usable_price(scanner_with_store, monkeypatch):
+    monkeypatch.setattr("talonx_quant.fundamental_consumer._fetch_last_close", lambda ticker: None)
+    scanner_with_store.store.save_latest_factors("AAPL", 2025, 0.21, 8, 0.05, 5.5, 1.2, datetime.now(timezone.utc))
+
+    await scanner_with_store._handle_message(_filing_msg(scanner_with_store.config, _filing_payload()))
+
+    scanner_with_store._client.publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_invalid_filing_payload_is_dropped(scanner_with_store):
+    await scanner_with_store._handle_message(_filing_msg(scanner_with_store.config, {"ticker": "AAPL"}))
+    scanner_with_store._client.publish.assert_not_awaited()

@@ -54,23 +54,33 @@ class ContextRetriever:
         return self._news_store
 
     def retrieve(
-        self, ticker: str, query_text: str, n_results: int | None = None, form_type: str | None = None,
+        self, ticker: str, query_text: str, n_results: int | None = None,
+        form_type: str | list[str] | None = None,
     ) -> list[Citation]:
         """`form_type` (e.g. "10-K") is Phase 2's LONG_TERM path narrowing
         retrieval to annual-report text specifically, skipping 10-Qs --
         chunker.py already writes form_type into every filing chunk's
         metadata, so this is a plain equality filter Chroma already
         supports; the intraday path leaves it None (no filter, matches
-        every form type, exactly today's behavior)."""
+        every form type, exactly today's behavior).
+
+        Also accepts a LIST of form types (e.g. ["10-K", "10-Q", "8-K"])
+        -- the Event-Driven Earnings Radar's post-earnings recalculation
+        needs the freshly-ingested 8-K/10-Q chunks alongside the prior
+        10-K's full-year context, not just one form type in isolation.
+        Chroma's `$in` operator handles this the same way `$and` handles
+        the two-field case below."""
         n = n_results or self.config.retrieval_top_k
         # Chroma's `where` rejects a raw multi-key dict ({"a": x, "b": y})
         # -- combining two field filters requires the explicit "$and"
         # operator form. Single-field filters (the intraday path, and the
         # news query below) stay a plain dict, which Chroma does accept.
-        where = (
-            {"ticker": ticker.upper()} if form_type is None
-            else {"$and": [{"ticker": ticker.upper()}, {"form_type": form_type}]}
-        )
+        if form_type is None:
+            where = {"ticker": ticker.upper()}
+        elif isinstance(form_type, list):
+            where = {"$and": [{"ticker": ticker.upper()}, {"form_type": {"$in": form_type}}]}
+        else:
+            where = {"$and": [{"ticker": ticker.upper()}, {"form_type": form_type}]}
         filing_results = self._filings_store.query(
             query_text=query_text, n_results=n, where=where
         )

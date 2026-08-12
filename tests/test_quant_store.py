@@ -58,3 +58,54 @@ def test_state_persists_across_reopen(tmp_path):
 
     with QuantStateStore(path) as store2:
         assert store2.suppression_counts_for_date("2026-08-07")[0]["count"] == 1
+
+
+# ==========================================================================
+# Event-Driven Earnings Radar -- latest_fundamental_factors
+# ==========================================================================
+
+def test_get_latest_factors_returns_none_when_unknown(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        assert store.get_latest_factors("AAPL") is None
+
+
+def test_save_and_get_latest_factors_round_trips(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.save_latest_factors("aapl", 2025, 0.21, 8, 0.05, 5.5, 1.2, NOW)
+
+        row = store.get_latest_factors("AAPL")
+        assert row["ticker"] == "AAPL"  # normalized
+        assert row["fiscal_year"] == 2025
+        assert row["roic"] == 0.21
+        assert row["piotroski_f_score"] == 8
+        assert row["fcf_yield"] == 0.05
+        assert row["altman_z_score"] == 5.5
+        assert row["debt_to_ebitda_proxy"] == 1.2
+
+
+def test_save_latest_factors_overwrites_not_appends(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.save_latest_factors("AAPL", 2024, 0.15, 7, 0.03, 4.0, 1.5, NOW)
+        store.save_latest_factors("AAPL", 2025, 0.21, 8, 0.05, 5.5, 1.2, NOW + timedelta(days=90))
+
+        row = store.get_latest_factors("AAPL")
+        assert row["fiscal_year"] == 2025
+        assert row["roic"] == 0.21
+
+
+def test_save_latest_factors_allows_none_values(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.save_latest_factors("AAPL", 2025, None, None, None, None, None, NOW)
+
+        row = store.get_latest_factors("AAPL")
+        assert row["roic"] is None
+        assert row["piotroski_f_score"] is None
+
+
+def test_latest_factors_persist_across_reopen(tmp_path):
+    path = tmp_path / "quant.db"
+    with QuantStateStore(path) as store:
+        store.save_latest_factors("AAPL", 2025, 0.21, 8, 0.05, 5.5, 1.2, NOW)
+
+    with QuantStateStore(path) as store2:
+        assert store2.get_latest_factors("AAPL")["fiscal_year"] == 2025

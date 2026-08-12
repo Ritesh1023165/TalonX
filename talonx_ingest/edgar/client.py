@@ -197,24 +197,32 @@ class EdgarClient:
     # Filing discovery
     # ------------------------------------------------------------------
 
-    async def get_recent_filings(self, company: CompanyRef) -> list[FilingMetadata]:
-        """Fetch the submissions feed and filter to target forms/lookback window."""
+    async def get_recent_filings(
+        self, company: CompanyRef, forms: tuple[str, ...] | None = None,
+    ) -> list[FilingMetadata]:
+        """Fetch the submissions feed and filter to target forms/lookback
+        window. `forms` overrides self.config.target_forms for just this
+        call -- e.g. the Earnings Radar's fast-track poller passing
+        `("8-K", "10-Q")` without touching the GLOBAL target_forms (which
+        stays 10-K/10-Q only, so the regular periodic ingestion loop
+        doesn't start pulling every unrelated 8-K for every ticker)."""
+        target_forms = forms if forms is not None else self.config.target_forms
         url = f"{self.config.submissions_base}/CIK{company.cik}.json"
         data = await self._get(url, as_json=True)
 
         recent = data.get("filings", {}).get("recent", {})
-        forms = recent.get("form", [])
+        forms_list = recent.get("form", [])
         accession_numbers = recent.get("accessionNumber", [])
         filing_dates = recent.get("filingDate", [])
         report_dates = recent.get("reportDate", [])
         primary_docs = recent.get("primaryDocument", [])
         primary_descs = recent.get("primaryDocDescription", [])
 
-        counts: dict[str, int] = {form: 0 for form in self.config.target_forms}
+        counts: dict[str, int] = {form: 0 for form in target_forms}
         results: list[FilingMetadata] = []
 
-        for i, form in enumerate(forms):
-            if form not in self.config.target_forms:
+        for i, form in enumerate(forms_list):
+            if form not in target_forms:
                 continue
             if counts[form] >= self.config.lookback_filings_per_form:
                 continue

@@ -165,6 +165,10 @@ class FundamentalFactorSignal(BaseModel):
     debt_to_ebitda_proxy: float | None = None
     price: float
     message: str
+    # Event-Driven Earnings Radar: True for an earnings-triggered
+    # republish -- see talonx_quant.schemas.FundamentalFactorSignal's own
+    # docstring. Consumer.py's cache-hit shortcut is bypassed when set.
+    is_earnings_related: bool = False
     computed_at: datetime
 
 
@@ -199,6 +203,17 @@ class LongTermResearchReport(BaseModel):
     risk_factors: list[str] = Field(default_factory=list)
     citations: list[Citation] = Field(default_factory=list)
     model_used: str
+
+    # Event-Driven Earnings Radar: populated only when the triggering
+    # signal was earnings-related (see _LLMFindingsLongTerm's own
+    # docstring) -- None/empty for a routine annual-only evaluation.
+    guidance_revision_notes: str | None = None
+    revenue_eps_surprise: str | None = None
+    # Propagated straight from triggering_signal.is_earnings_related --
+    # kept as its own top-level field (not just read off the nested
+    # signal) so talonx_core/talonx_dispatch's TRIMMED mirrors of this
+    # schema (which don't embed the full signal) can still see it.
+    is_earnings_related: bool = False
 
     # Same three flags ResearchReport carries, same meaning -- see its
     # own docstring above.

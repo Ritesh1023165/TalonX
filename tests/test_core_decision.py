@@ -393,24 +393,28 @@ def test_verbose_reason_is_none_when_an_alert_is_produced():
 
 def _fundamental_signal(
     price: float = 100.0, roic: float = 0.20, f_score: int = 8,
-    debt_to_ebitda: float | None = 2.0,
+    debt_to_ebitda: float | None = 2.0, is_earnings_related: bool = False,
 ) -> FundamentalFactorSignal:
     return FundamentalFactorSignal(
         ticker="AAPL", fiscal_year=2025, roic=roic, piotroski_f_score=f_score,
         fcf_yield=0.05, altman_z_score=5.0, debt_to_ebitda_proxy=debt_to_ebitda,
         price=price, message="ROIC clears threshold", computed_at=NOW - timedelta(seconds=30),
+        is_earnings_related=is_earnings_related,
     )
 
 
 def _long_term_report(
     quality_score: int = 8, moat: MoatRating = MoatRating.WIDE, fair_value: float = 100.0,
-    is_degraded: bool = False,
+    is_degraded: bool = False, is_earnings_related: bool = False,
+    guidance_revision_notes: str | None = None, revenue_eps_surprise: str | None = None,
 ) -> LongTermResearchReport:
     return LongTermResearchReport(
         ticker="AAPL", triggering_signal=_fundamental_signal(),
         moat_rating=moat, capital_allocation_assessment="disciplined",
         dcf_fair_value_per_share=fair_value, quality_score=quality_score,
         summary="Durable compounder.", model_used="gemini-flash-latest", is_degraded=is_degraded,
+        is_earnings_related=is_earnings_related, guidance_revision_notes=guidance_revision_notes,
+        revenue_eps_surprise=revenue_eps_surprise,
         generated_at=NOW - timedelta(seconds=30), published_at=NOW - timedelta(seconds=30),
     )
 
@@ -461,6 +465,22 @@ def test_long_term_cooldown():
     alert, reason = evaluate_long_term_verbose(state, config, now=NOW)
     assert alert is None
     assert reason == "COOLDOWN"
+
+
+def test_long_term_cooldown_is_bypassed_when_earnings_related():
+    """Event-Driven Earnings Radar, Requirement 7: the whole point of the
+    earnings-triggered path is to re-fire even inside the standard 30-day
+    cooldown -- without this bypass, the feature could never actually
+    produce a same-week re-evaluation."""
+    config = CoreConfig(ticker_cooldown_long_term_seconds=86400.0)
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(is_earnings_related=True), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(), longterm_report_at=NOW,
+        last_alert_at=NOW - timedelta(hours=1),
+    )
+    alert, reason = evaluate_long_term_verbose(state, config, now=NOW)
+    assert reason is None
+    assert alert is not None
 
 
 def test_long_term_degraded_report_is_suppressed():
@@ -662,6 +682,71 @@ def test_long_term_no_state_change_gate_bypassed_by_a_genuine_action_transition(
     alert, reason = evaluate_long_term_verbose(state, config, now=NOW)
     assert reason is None
     assert alert.action == AlertAction.HOLD_QUALITY
+
+
+def test_long_term_no_state_change_gate_bypassed_when_earnings_related():
+    # Same repeat-HOLD-at-nearly-the-same-price setup that gets suppressed
+    # by test_long_term_no_state_change_suppresses_a_repeat_hold above --
+    # but earnings-related, so it must fire anyway.
+    config = CoreConfig(price_delta_retrigger_pct_long_term=0.05)
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=101.0, is_earnings_related=True), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=7, fair_value=100.0), longterm_report_at=NOW,
+        last_alert_action=AlertAction.HOLD_QUALITY, last_alert_price=100.0,
+    )
+    alert, reason = evaluate_long_term_verbose(state, config, now=NOW)
+    assert reason is None
+    assert alert.action == AlertAction.HOLD_QUALITY
+
+
+def test_long_term_alert_is_earnings_related_when_either_signal_or_report_flags_it():
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=75.0, is_earnings_related=False), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(fair_value=100.0, is_earnings_related=True), longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert reason is None
+    assert alert.is_earnings_related is True
+
+
+def test_long_term_alert_carries_previous_fair_value_and_margin():
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=170.0, is_earnings_related=True), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(fair_value=225.0), longterm_report_at=NOW,
+        previous_fair_value=210.0, last_alert_price=175.0,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert reason is None
+    assert alert.previous_fair_value == 210.0
+    # (210 - 175) / 210
+    assert round(alert.previous_margin_of_safety_pct, 4) == round((210.0 - 175.0) / 210.0, 4)
+
+
+def test_long_term_alert_previous_fair_value_is_none_without_prior_state():
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=75.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(fair_value=100.0), longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert reason is None
+    assert alert.previous_fair_value is None
+    assert alert.previous_margin_of_safety_pct is None
+
+
+def test_long_term_alert_carries_guidance_and_surprise_fields():
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=75.0, is_earnings_related=True), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(
+            fair_value=100.0, is_earnings_related=True,
+            guidance_revision_notes="FY26 revenue guidance raised by 2.5%.",
+            revenue_eps_surprise="Q2 revenue beat consensus by 3%.",
+        ),
+        longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert reason is None
+    assert alert.guidance_revision_notes == "FY26 revenue guidance raised by 2.5%."
+    assert alert.revenue_eps_surprise == "Q2 revenue beat consensus by 3%."
 
 
 def test_long_term_state_change_with_enough_price_movement_still_fires():

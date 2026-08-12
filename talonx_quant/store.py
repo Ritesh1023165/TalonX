@@ -32,6 +32,26 @@ CREATE TABLE IF NOT EXISTS suppression_counts (
     count        INTEGER NOT NULL DEFAULT 0,
     last_seen_at TEXT NOT NULL,
     PRIMARY KEY (date, ticker, reason)
+);
+
+-- Event-Driven Earnings Radar: the last successfully-computed factor
+-- set per ticker, persisted (not just kept in-memory) so a process
+-- restart between a ticker's last real 10-Q ingestion and its next
+-- earnings date doesn't silently disable the fast 8-K-triggered
+-- republish path (Requirement 7 Stage 1) until the next 10-Q lands.
+-- Written on EVERY successful factor computation in
+-- fundamental_consumer.py, regardless of whether ROIC/F-Score cleared
+-- the publish threshold -- UNDER_PERFORM_REBALANCE needs below-
+-- threshold factors to be available too.
+CREATE TABLE IF NOT EXISTS latest_fundamental_factors (
+    ticker               TEXT PRIMARY KEY,
+    fiscal_year          INTEGER NOT NULL,
+    roic                 REAL,
+    piotroski_f_score    INTEGER,
+    fcf_yield            REAL,
+    altman_z_score       REAL,
+    debt_to_ebitda_proxy REAL,
+    computed_at          TEXT NOT NULL
 )
 """
 
@@ -78,3 +98,47 @@ class QuantStateStore:
         )
         columns = [d[0] for d in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    def save_latest_factors(
+        self, ticker: str, fiscal_year: int, roic: float | None, piotroski_f_score: int | None,
+        fcf_yield: float | None, altman_z_score: float | None, debt_to_ebitda_proxy: float | None,
+        computed_at: datetime,
+    ) -> None:
+        """One row per ticker -- overwrites the prior computation, since
+        only the LATEST factors matter for an earnings-triggered
+        republish (no history kept here; that's what fiscal_year on the
+        republished signal itself communicates downstream)."""
+        self._conn.execute(
+            """
+            INSERT INTO latest_fundamental_factors (
+                ticker, fiscal_year, roic, piotroski_f_score, fcf_yield,
+                altman_z_score, debt_to_ebitda_proxy, computed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(ticker) DO UPDATE SET
+                fiscal_year = excluded.fiscal_year,
+                roic = excluded.roic,
+                piotroski_f_score = excluded.piotroski_f_score,
+                fcf_yield = excluded.fcf_yield,
+                altman_z_score = excluded.altman_z_score,
+                debt_to_ebitda_proxy = excluded.debt_to_ebitda_proxy,
+                computed_at = excluded.computed_at
+            """,
+            (
+                ticker.upper(), fiscal_year, roic, piotroski_f_score, fcf_yield,
+                altman_z_score, debt_to_ebitda_proxy, computed_at.isoformat(),
+            ),
+        )
+        self._conn.commit()
+
+    def get_latest_factors(self, ticker: str) -> dict | None:
+        cursor = self._conn.execute(
+            "SELECT ticker, fiscal_year, roic, piotroski_f_score, fcf_yield, "
+            "altman_z_score, debt_to_ebitda_proxy, computed_at "
+            "FROM latest_fundamental_factors WHERE ticker = ?",
+            (ticker.upper(),),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        columns = [d[0] for d in cursor.description]
+        return dict(zip(columns, row))

@@ -233,3 +233,24 @@ class QuantConfig:
     fundamental_cooldown_seconds: float = _env_float(
         "TALONX_QUANT_FUNDAMENTAL_COOLDOWN_SECONDS", 7 * 86400.0
     )
+
+    # --- Event-Driven Earnings Radar (Requirement 7 Stage 1) ---
+    # FundamentalScanner ALSO subscribes to this channel (talonx_ingest's
+    # filing-text ingestion trigger, same env var talonx_brain already
+    # reads) purely to detect a fast-track-confirmed earnings filing
+    # (NewFilingIngestedEvent.is_earnings_related=True) and republish a
+    # FundamentalFactorSignal from persisted factors -- see
+    # fundamental_consumer.py's own module docstring for the full flow.
+    filings_channel: str = os.environ.get(
+        "TALONX_REDIS_FILINGS_CHANNEL", "talonx:filings:events"
+    )
+    # Deliberately its OWN short-TTL cooldown namespace
+    # (earnings_republish_cooldown:{TICKER}), NOT fundamental_cooldown_
+    # seconds above -- a duplicate/amended 8-K shouldn't re-fire the
+    # whole recalculation pipeline twice within the same hour, but this
+    # must NOT be blocked by (or block) the unrelated 7-day standard
+    # cooldown, which guards against a completely different scenario
+    # (redundant routine re-ingests).
+    earnings_republish_cooldown_seconds: float = _env_float(
+        "TALONX_QUANT_EARNINGS_REPUBLISH_COOLDOWN_SECONDS", 3600.0
+    )

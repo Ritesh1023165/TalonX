@@ -20,9 +20,11 @@ from talonx_dispatch.formatter import (
     _short_company_name,
     escape_markdown,
     format_telegram_details,
+    format_telegram_earnings_heads_up,
     format_telegram_long_term_alert,
     format_telegram_long_term_details,
     format_telegram_long_term_trade_execution,
+    format_telegram_post_earnings_alert,
     format_telegram_summary,
     format_telegram_trade_execution,
 )
@@ -30,8 +32,10 @@ from talonx_dispatch.schemas import (
     ActionableAlert,
     AlertAction,
     AlertSeverity,
+    FundamentalFactorSignal,
     LongTermActionableAlert,
     LongTermOrderType,
+    LongTermResearchReport,
     LongTermTradeExecution,
     MoatRating,
     OrderType,
@@ -39,6 +43,7 @@ from talonx_dispatch.schemas import (
     ResearchVerdict,
     SignalDirection,
     TriggeringSignalRef,
+    _TriggeringFundamentalSignalRef,
 )
 
 NOW = datetime(2026, 8, 7, 14, 23, 0, tzinfo=timezone.utc)
@@ -724,3 +729,208 @@ def test_long_term_trade_execution_truncates_a_long_company_name():
     )
     assert "(Alphabet Inc.)" in text
     assert "Class A" not in text
+
+
+# ==========================================================================
+# Event-Driven Earnings Radar -- format_telegram_earnings_heads_up
+# ==========================================================================
+
+def _fundamental_signal(price: float = 175.50) -> FundamentalFactorSignal:
+    return FundamentalFactorSignal(ticker="GOOGL", fiscal_year=2026, price=price, computed_at=NOW)
+
+
+def _longterm_report(fair_value: float = 210.0, quality_score: int = 9) -> LongTermResearchReport:
+    return LongTermResearchReport(
+        ticker="GOOGL", moat_rating=MoatRating.WIDE, dcf_fair_value_per_share=fair_value,
+        quality_score=quality_score, summary="Durable moat, strong cloud growth.",
+    )
+
+
+def _upcoming_earnings_row(earnings_date: str = "2026-08-13", session: str = "AFTER_MARKET") -> dict:
+    return {"earnings_date": earnings_date, "session": session}
+
+
+def test_earnings_heads_up_includes_ticker_price_and_fair_value():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(), _longterm_report(),
+    )
+    assert "GOOGL" in text
+    assert "175.50" in text
+    assert "210.00" in text
+
+
+def test_earnings_heads_up_uses_radar_footer_tag_not_a_numeric_id():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(), _longterm_report(),
+    )
+    assert "#RADAR" in text
+
+
+def test_earnings_heads_up_shows_reporting_date_and_session():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row("2026-08-13", "AFTER_MARKET"), _fundamental_signal(), _longterm_report(),
+    )
+    assert "Aug 13" in text
+    assert "After-Market" in text
+
+
+def test_earnings_heads_up_before_market_session_label():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row("2026-08-13", "BEFORE_MARKET"), _fundamental_signal(), _longterm_report(),
+    )
+    assert "Before-Market" in text
+
+
+def test_earnings_heads_up_unspecified_session_shows_time_tbd():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row("2026-08-13", "UNSPECIFIED"), _fundamental_signal(), _longterm_report(),
+    )
+    assert "Time TBD" in text
+
+
+def test_earnings_heads_up_shows_quality_and_moat():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(), _longterm_report(),
+    )
+    assert "9/10" in text
+    assert "WIDE" in text
+
+
+def test_earnings_heads_up_computes_margin_of_safety_as_discount():
+    # price 175.50 vs fair value 210.0 -> (210-175.5)/210 = 16.4% discount
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(175.50), _longterm_report(210.0),
+    )
+    assert "16.4%" in text
+    assert "Discount" in text
+
+
+def test_earnings_heads_up_price_above_fair_value_shows_premium():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(250.0), _longterm_report(210.0),
+    )
+    assert "Premium" in text
+
+
+def test_earnings_heads_up_includes_company_name():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(), _longterm_report(),
+        company_name="Alphabet Inc.",
+    )
+    assert "(Alphabet Inc.)" in text
+
+
+def test_earnings_heads_up_stays_under_the_300_char_budget():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(), _longterm_report(),
+        company_name="Alphabet Inc.",
+    )
+    assert len(text) <= 300
+
+
+def test_earnings_heads_up_includes_a_separator_line():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(), _longterm_report(),
+    )
+    assert "─" in text
+
+
+# ==========================================================================
+# Event-Driven Earnings Radar -- format_telegram_post_earnings_alert
+# ==========================================================================
+
+def _post_earnings_alert(
+    market_price: float = 170.0, intrinsic_fair_value: float = 225.0,
+    previous_fair_value: float | None = 210.0, previous_margin_of_safety_pct: float | None = 0.1667,
+    guidance_revision_notes: str | None = "FY26 revenue guidance raised by +2.5%.",
+    action: AlertAction = AlertAction.HIGH_CONVICTION_BUY,
+) -> LongTermActionableAlert:
+    margin_of_safety_pct = (intrinsic_fair_value - market_price) / intrinsic_fair_value
+    return LongTermActionableAlert(
+        ticker="GOOGL", action=action, severity=AlertSeverity.CRITICAL,
+        rationale="Post-earnings re-evaluation.",
+        summary="Q2 Cloud revenue accelerated. Post-earnings dip expands the margin of safety.",
+        quality_score=9, moat_rating=MoatRating.WIDE, market_price=market_price,
+        intrinsic_fair_value=intrinsic_fair_value, margin_of_safety_pct=margin_of_safety_pct,
+        previous_fair_value=previous_fair_value, previous_margin_of_safety_pct=previous_margin_of_safety_pct,
+        guidance_revision_notes=guidance_revision_notes, is_earnings_related=True,
+        triggering_signal=_TriggeringFundamentalSignalRef(roic=0.272, piotroski_f_score=8),
+        capital_allocation_assessment="disciplined", model_used="gemini-flash-latest",
+        correlated_at=NOW, published_at=NOW,
+    )
+
+
+def test_post_earnings_alert_includes_ticker_and_new_fair_value():
+    text = format_telegram_post_earnings_alert(_post_earnings_alert(), alert_id=2)
+    assert "GOOGL" in text
+    assert "225.00" in text
+
+
+def test_post_earnings_alert_shows_fair_value_moved_up_from_previous():
+    text = format_telegram_post_earnings_alert(_post_earnings_alert(), alert_id=2)
+    assert "Up from $210.00" in text
+
+
+def test_post_earnings_alert_shows_fair_value_moved_down_from_previous():
+    text = format_telegram_post_earnings_alert(
+        _post_earnings_alert(intrinsic_fair_value=190.0), alert_id=2,
+    )
+    assert "Down from $210.00" in text
+
+
+def test_post_earnings_alert_omits_fair_value_comparison_without_a_previous_value():
+    text = format_telegram_post_earnings_alert(
+        _post_earnings_alert(previous_fair_value=None, previous_margin_of_safety_pct=None), alert_id=2,
+    )
+    assert "Up from" not in text
+    assert "Down from" not in text
+
+
+def test_post_earnings_alert_computes_the_price_move_percentage():
+    # previous_fair_value=210, previous_margin_of_safety_pct=0.1667 ->
+    # previous_price = 210 * (1 - 0.1667) = 175.0 (approx)
+    # market_price=170 -> (170-175)/175 = -2.86%
+    text = format_telegram_post_earnings_alert(_post_earnings_alert(), alert_id=2)
+    assert "-2.9%" in text or "-2.8%" in text
+
+
+def test_post_earnings_alert_shows_roic_and_f_score():
+    text = format_telegram_post_earnings_alert(_post_earnings_alert(), alert_id=2)
+    assert "27.2%" in text
+    assert "8/9" in text
+
+
+def test_post_earnings_alert_includes_guidance_revision_notes():
+    text = format_telegram_post_earnings_alert(_post_earnings_alert(), alert_id=2)
+    assert "FY26 revenue guidance raised" in text
+
+
+def test_post_earnings_alert_omits_guidance_line_when_absent():
+    text = format_telegram_post_earnings_alert(
+        _post_earnings_alert(guidance_revision_notes=None), alert_id=2,
+    )
+    assert "Guidance:" not in text
+
+
+def test_post_earnings_alert_uses_lt_prefixed_id_and_reply_footer():
+    text = format_telegram_post_earnings_alert(_post_earnings_alert(), alert_id=2)
+    assert "#LT2" in text
+    assert "Reply with LT2" in text
+
+
+def test_post_earnings_alert_includes_company_name():
+    text = format_telegram_post_earnings_alert(_post_earnings_alert(), alert_id=2, company_name="Alphabet Inc.")
+    assert "(Alphabet Inc.)" in text
+
+
+def test_post_earnings_alert_under_perform_shows_fundamental_stop_label():
+    text = format_telegram_post_earnings_alert(
+        _post_earnings_alert(action=AlertAction.UNDER_PERFORM_REBALANCE), alert_id=2,
+    )
+    assert "FUNDAMENTAL STOP" in text
+
+
+def test_post_earnings_alert_handles_missing_triggering_signal_gracefully():
+    alert = _post_earnings_alert().model_copy(update={"triggering_signal": None})
+    text = format_telegram_post_earnings_alert(alert, alert_id=2)  # must not raise
+    assert "n/a" in text

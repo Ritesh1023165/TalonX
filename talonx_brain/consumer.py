@@ -433,7 +433,11 @@ class ResearchAgent:
     async def _generate_long_term_report(self, signal: FundamentalFactorSignal) -> LongTermResearchReport:
         ticker = signal.ticker
 
-        if self.config.cache_enabled and self.cache is not None:
+        # Event-Driven Earnings Radar: an earnings-triggered signal always
+        # forces a fresh generation, even if a recent cache entry exists
+        # -- the whole point is a same-day re-read of the NEW filing, so
+        # serving a pre-earnings cached report would silently defeat it.
+        if self.config.cache_enabled and self.cache is not None and not signal.is_earnings_related:
             hit = await self.cache.get(ticker, horizon="long_term")
             if hit is not None and hit[1]:  # fresh
                 logger.info("Long-term cache hit for %s -- skipping retrieval and the LLM call", ticker)
@@ -463,12 +467,18 @@ class ResearchAgent:
 
     async def _generate_fresh_long_term_report(self, signal: FundamentalFactorSignal) -> LongTermResearchReport:
         query_text = _build_long_term_retrieval_query(signal)
+        # Event-Driven Earnings Radar: an earnings-triggered signal needs
+        # the freshly-ingested 8-K/10-Q chunks visible to retrieval, not
+        # just the routine 10-K-only filter -- without this, an earnings-
+        # triggered regeneration would silently ground itself in stale
+        # annual-report text, with the actual earnings filing invisible.
+        form_type = ["10-K", "10-Q", "8-K"] if signal.is_earnings_related else "10-K"
         citations = await asyncio.to_thread(
-            self.retriever.retrieve, signal.ticker, query_text, self.config.retrieval_top_k, "10-K",
+            self.retriever.retrieve, signal.ticker, query_text, self.config.retrieval_top_k, form_type,
         )
 
         if not citations:
-            logger.info("No 10-K context at all for %s -- bypassing the LLM", signal.ticker)
+            logger.info("No filing context at all for %s -- bypassing the LLM", signal.ticker)
             return _insufficient_context_long_term_report(signal)
 
         try:
@@ -498,6 +508,9 @@ class ResearchAgent:
             risk_factors=findings.risk_factors,
             citations=citations,
             model_used=self.long_term_llm_chain.model_used,
+            guidance_revision_notes=findings.guidance_revision_notes,
+            revenue_eps_surprise=findings.revenue_eps_surprise,
+            is_earnings_related=signal.is_earnings_related,
         )
 
     async def _fallback_long_term_report(

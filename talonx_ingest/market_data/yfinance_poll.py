@@ -123,3 +123,67 @@ class YFinancePoller:
                 continue
 
         return events
+
+
+def _safe_float(value) -> float | None:
+    if value is None:
+        return None
+    try:
+        import pandas as pd  # imported lazily, same optionality posture as yfinance
+        if pd.isna(value):
+            return None
+    except Exception:  # noqa: BLE001 -- pd.isna choking on an odd type shouldn't crash the caller
+        pass
+    return float(value)
+
+
+def fetch_extended_hours_quote(symbol: str) -> MarketEvent | None:
+    """
+    Blocking call -- run via asyncio.to_thread, same as _fetch_snapshots
+    above. Event-Driven Earnings Radar, Requirement 6: captures the
+    LATEST minute bar including pre/post-market sessions
+    (`history(prepost=True)`), unlike _fetch_snapshots's `fast_info`
+    (regular-session only). Deliberately NOT part of the regular batch
+    poll -- `history(prepost=True)` is a heavier call than `fast_info`,
+    so it's only worth paying for a ticker currently inside its active
+    earnings window (run_talonx.EarningsFastTrackPoller), not every
+    tracked ticker every cycle.
+
+    Returns None if yfinance has nothing usable -- the caller should
+    skip this symbol for the current poll rather than publish a
+    zero/garbage price.
+    """
+    import yfinance as yf  # imported lazily so this stays optional
+
+    try:
+        history = yf.Ticker(symbol.upper()).history(period="1d", interval="1m", prepost=True)
+    except Exception as exc:  # noqa: BLE001 -- an unofficial endpoint, fail soft
+        logger.warning("Extended-hours quote fetch failed for %s: %s", symbol, exc)
+        return None
+
+    if history is None or history.empty:
+        return None
+
+    latest = history.iloc[-1]
+    close = _safe_float(latest.get("Close"))
+    if close is None:
+        return None
+
+    timestamp = history.index[-1]
+    if hasattr(timestamp, "to_pydatetime"):
+        timestamp = timestamp.to_pydatetime()
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
+
+    return MarketEvent(
+        symbol=symbol.upper(),
+        event_type=MarketEventType.BAR,
+        source=DataSource.POLLING,
+        timestamp=timestamp,
+        open=_safe_float(latest.get("Open")),
+        high=_safe_float(latest.get("High")),
+        low=_safe_float(latest.get("Low")),
+        close=close,
+        volume=_safe_float(latest.get("Volume")),
+        raw={},
+    )

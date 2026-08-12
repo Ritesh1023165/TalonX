@@ -80,8 +80,10 @@ from pydantic import ValidationError
 
 from talonx_dispatch.config import DispatchConfig
 from talonx_dispatch.formatter import (
+    format_telegram_earnings_heads_up,
     format_telegram_long_term_alert,
     format_telegram_long_term_trade_execution,
+    format_telegram_post_earnings_alert,
     format_telegram_summary,
     format_telegram_trade_execution,
 )
@@ -89,7 +91,9 @@ from talonx_dispatch.schemas import (
     ActionableAlert,
     AlertAction,
     AlertSeverity,
+    FundamentalFactorSignal,
     LongTermActionableAlert,
+    LongTermResearchReport,
     LongTermTradeExecution,
     PaperTradeExecution,
 )
@@ -215,6 +219,15 @@ class DispatchAgent:
         self._long_term_push_suppressed_cooldown = 0
         self._long_term_push_suppressed_price_delta = 0
 
+        # Event-Driven Earnings Radar, Requirement 5: latest-per-ticker
+        # cache of whatever fundamental signal/report this process has
+        # seen, purely to source the T-48h heads-up push's price/quality/
+        # moat/fair-value fields -- see config.py's channel docstrings for
+        # why this is NOT sourced from long_term_alerts.
+        self._latest_fundamental_signal: dict[str, FundamentalFactorSignal] = {}
+        self._latest_longterm_report: dict[str, LongTermResearchReport] = {}
+        self._earnings_heads_up_sent = 0
+
         try:
             self._min_severity = AlertSeverity(self.config.telegram_min_severity.lower())
         except ValueError:
@@ -295,6 +308,10 @@ class DispatchAgent:
     def long_term_push_suppressed_price_delta(self) -> int:
         return self._long_term_push_suppressed_price_delta
 
+    @property
+    def earnings_heads_up_sent(self) -> int:
+        return self._earnings_heads_up_sent
+
     async def run(self) -> None:
         if redis_asyncio is None:
             raise ImportError(
@@ -304,6 +321,7 @@ class DispatchAgent:
         tasks = [
             asyncio.create_task(self._run_redis_listener(), name="dispatch_redis_listener"),
             asyncio.create_task(self._retention_sweep_loop(), name="dispatch_retention_sweep"),
+            asyncio.create_task(self._earnings_heads_up_loop(), name="dispatch_earnings_heads_up"),
         ]
         if self.telegram_client.is_configured:
             tasks.append(asyncio.create_task(self.reply_listener.run(), name="telegram_reply_listener"))
@@ -367,6 +385,83 @@ class DispatchAgent:
             )
         return purged + lt_purged
 
+    async def _earnings_heads_up_loop(self) -> None:
+        """Event-Driven Earnings Radar, Requirement 5. Same sleep/wake-on-
+        stop shape as _retention_sweep_loop -- checks immediately at
+        startup, then every earnings_heads_up_check_interval_hours."""
+        interval_seconds = self.config.earnings_heads_up_check_interval_hours * 3600
+        while not self._stop_event.is_set():
+            await self._run_earnings_heads_up_once()
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=interval_seconds)
+            except asyncio.TimeoutError:
+                pass  # normal case: interval elapsed, check again
+
+    async def _run_earnings_heads_up_once(self) -> int:
+        """Sends the T-48h heads-up push for every ticker whose
+        earnings_date falls within earnings_heads_up_window_hours and
+        hasn't already been sent one for THIS date (upsert_upcoming_
+        earnings resets heads_up_sent when the date itself changes, so a
+        rescheduled report gets its own push). Sent UNCONDITIONALLY when
+        Telegram is configured -- deliberately bypasses BOTH the severity
+        gate and _evaluate_push_eligibility entirely, same "always send,
+        no suppression gate at all" precedent trade-execution pushes
+        already establish. Requires a cached signal+report for the
+        ticker; if this process hasn't seen one yet, skip and retry next
+        cycle rather than sending a push with placeholder data."""
+        if not self.telegram_client.is_configured:
+            return 0
+
+        now = datetime.now(timezone.utc)
+        window = timedelta(hours=self.config.earnings_heads_up_window_hours)
+        sent = 0
+        try:
+            rows = self.watchlist_store.list_upcoming_earnings()
+        except Exception as exc:  # noqa: BLE001 -- one bad read shouldn't kill the loop
+            logger.error("Earnings heads-up check failed to read upcoming_earnings: %s", exc)
+            return 0
+
+        for row in rows:
+            if row["heads_up_sent"]:
+                continue
+            try:
+                earnings_date = datetime.fromisoformat(row["earnings_date"]).replace(tzinfo=timezone.utc)
+            except ValueError:
+                logger.warning("Unparseable earnings_date for %s: %r", row["ticker"], row["earnings_date"])
+                continue
+            # earnings_date is midnight UTC of the reporting DAY -- compare
+            # against the end of that day, not its start, so "today" still
+            # counts as within the window even hours after midnight has
+            # already passed (a raw `now <= earnings_date` would wrongly
+            # exclude same-day tickers the moment any time elapsed past
+            # midnight). The date must also not be more than `window` away
+            # in the FUTURE, so this doesn't fire days too early.
+            earnings_day_end = earnings_date + timedelta(days=1)
+            if not (now <= earnings_day_end and earnings_date <= now + window):
+                continue
+
+            ticker = row["ticker"]
+            signal = self._latest_fundamental_signal.get(ticker)
+            report = self._latest_longterm_report.get(ticker)
+            if signal is None or report is None:
+                logger.info(
+                    "Earnings heads-up for %s deferred -- no cached signal/report yet this session", ticker,
+                )
+                continue
+
+            text = format_telegram_earnings_heads_up(
+                ticker, row, signal, report, self._company_name(ticker),
+            )
+            try:
+                await self.telegram_client.send(text)
+                self.watchlist_store.mark_heads_up_sent(ticker)
+                self._earnings_heads_up_sent += 1
+                sent += 1
+                logger.info("Earnings heads-up push sent for %s (reports %s)", ticker, row["earnings_date"])
+            except TelegramSendError as exc:
+                logger.error("Earnings heads-up push failed for %s: %s", ticker, exc)
+        return sent
+
     async def _connect_and_listen(self) -> None:
         self._client = redis_asyncio.from_url(
             self.config.redis_url,
@@ -380,6 +475,7 @@ class DispatchAgent:
         channels = (
             self.config.alerts_channel, self.config.paper_trades_channel,
             self.config.alerts_channel_long_term, self.config.paper_trades_channel_long_term,
+            self.config.fundamental_signals_channel, self.config.reports_channel_long_term,
         )
         await pubsub.subscribe(*channels)
         logger.info("Subscribed to %s", ", ".join(channels))
@@ -421,6 +517,12 @@ class DispatchAgent:
         if channel == self.config.alerts_channel_long_term:
             await self._handle_long_term_alert(payload)
             return
+        if channel == self.config.fundamental_signals_channel:
+            self._handle_fundamental_signal(payload)
+            return
+        if channel == self.config.reports_channel_long_term:
+            self._handle_longterm_report(payload)
+            return
         if channel != self.config.alerts_channel:
             logger.warning("Dropping message on unexpected channel %s", channel)
             return
@@ -455,6 +557,26 @@ class DispatchAgent:
         )
 
         await self._maybe_send_long_term_telegram(alert, alert_id)
+
+    def _handle_fundamental_signal(self, payload: dict) -> None:
+        """Not recorded/pushed here -- see run_earnings_heads_up_once's
+        own docstring for why this cache exists at all (Requirement 5's
+        data source). Purely updates the latest-per-ticker cache;
+        talonx_core is the module that actually acts on this signal."""
+        try:
+            signal = FundamentalFactorSignal.model_validate(payload)
+        except ValidationError as exc:
+            logger.warning("Dropping unparseable fundamental signal: %s", exc)
+            return
+        self._latest_fundamental_signal[signal.ticker.upper()] = signal
+
+    def _handle_longterm_report(self, payload: dict) -> None:
+        try:
+            report = LongTermResearchReport.model_validate(payload)
+        except ValidationError as exc:
+            logger.warning("Dropping unparseable long-term research report: %s", exc)
+            return
+        self._latest_longterm_report[report.ticker.upper()] = report
 
     def _company_name(self, ticker: str) -> str | None:
         try:
@@ -570,30 +692,43 @@ class DispatchAgent:
     async def _maybe_send_long_term_telegram(self, alert: LongTermActionableAlert, alert_id: int) -> None:
         if not self.telegram_client.is_configured:
             return
-        if alert.severity.rank < self._min_severity.rank:
-            return
 
         now = datetime.now(timezone.utc)
         ticker = alert.ticker.upper()
-        should_push, suppress_reason = _evaluate_push_eligibility(
-            action=alert.action,
-            eligible_actions=_PUSH_ELIGIBLE_ACTIONS_LONG_TERM,
-            research_confidence=None,  # no equivalent field -- gated upstream via quality_score
-            price=alert.market_price,
-            last_push=self._last_telegram_push_long_term.get(ticker),
-            config=self.config,
-            now=now,
-        )
-        if not should_push:
-            self.store.mark_long_term_suppressed(alert_id, suppress_reason)
-            self._record_push_suppression(suppress_reason, long_term=True)
-            logger.info(
-                "Telegram push suppressed for long-term alert #LT%d (%s): %s",
-                alert_id, alert.ticker, suppress_reason,
-            )
-            return
 
-        text = format_telegram_long_term_alert(alert, alert_id, self._company_name(alert.ticker))
+        # Event-Driven Earnings Radar, Requirement 8: an earnings-triggered
+        # alert bypasses BOTH the severity gate below AND
+        # _evaluate_push_eligibility entirely -- action-eligibility is
+        # moot (HIGH_CONVICTION_BUY/UNDER_PERFORM_REBALANCE are already
+        # allowlisted), there's no confidence gate on long-term alerts at
+        # all, so the only gate that could realistically block this in
+        # practice is the 45-min push cooldown, and letting a rare,
+        # deliberately important post-earnings valuation shift get
+        # silently swallowed by an unrelated timing cooldown is worse
+        # than the (small) risk of over-notifying on a genuine event.
+        if not alert.is_earnings_related:
+            if alert.severity.rank < self._min_severity.rank:
+                return
+            should_push, suppress_reason = _evaluate_push_eligibility(
+                action=alert.action,
+                eligible_actions=_PUSH_ELIGIBLE_ACTIONS_LONG_TERM,
+                research_confidence=None,  # no equivalent field -- gated upstream via quality_score
+                price=alert.market_price,
+                last_push=self._last_telegram_push_long_term.get(ticker),
+                config=self.config,
+                now=now,
+            )
+            if not should_push:
+                self.store.mark_long_term_suppressed(alert_id, suppress_reason)
+                self._record_push_suppression(suppress_reason, long_term=True)
+                logger.info(
+                    "Telegram push suppressed for long-term alert #LT%d (%s): %s",
+                    alert_id, alert.ticker, suppress_reason,
+                )
+                return
+
+        formatter = format_telegram_post_earnings_alert if alert.is_earnings_related else format_telegram_long_term_alert
+        text = formatter(alert, alert_id, self._company_name(alert.ticker))
         try:
             await self.telegram_client.send(text)
             self.store.mark_long_term_telegram_sent(alert_id, now)

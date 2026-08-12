@@ -52,6 +52,21 @@ CREATE TABLE IF NOT EXISTS tickers (
     paper_trading_enabled_long_term     INTEGER NOT NULL DEFAULT 0,
     strategy_horizon                    TEXT NOT NULL DEFAULT 'INTRADAY',
     added_at                            TEXT NOT NULL
+);
+
+-- Event-Driven Earnings Radar: one row per LONG_TERM/DUAL_HORIZON ticker's
+-- NEXT known earnings date, kept here rather than in a talonx_ingest ledger
+-- since this table is per-ticker control-plane METADATA, the same domain
+-- `tickers` above already owns -- other modules (talonx_paper, talonx_dispatch)
+-- already depend on this store directly rather than through a Redis wire
+-- contract, same precedent this table's own additions follow.
+CREATE TABLE IF NOT EXISTS upcoming_earnings (
+    ticker              TEXT PRIMARY KEY,
+    earnings_date       TEXT NOT NULL,
+    session             TEXT NOT NULL DEFAULT 'UNSPECIFIED',
+    reporting_period    TEXT NOT NULL DEFAULT '',
+    heads_up_sent       INTEGER NOT NULL DEFAULT 0,
+    last_updated        TEXT NOT NULL
 )
 """
 
@@ -64,7 +79,12 @@ class TickerWatchlistStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.path, check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute(_SCHEMA)
+        # executescript(), not execute() -- _SCHEMA now holds TWO CREATE
+        # TABLE statements (tickers, upcoming_earnings); execute() only
+        # ever runs a single statement. Same executescript() choice
+        # talonx_dispatch/store.py already makes for its own multi-table
+        # schema string.
+        self._conn.executescript(_SCHEMA)
         self._migrate()
         self._conn.commit()
         self._lock = threading.Lock()
@@ -303,3 +323,78 @@ class TickerWatchlistStore:
             return False
         self.add_ticker(default_symbol, default_name, default_exchange)
         return True
+
+    # ------------------------------------------------------------------
+    # Event-Driven Earnings Radar -- upcoming_earnings
+    # ------------------------------------------------------------------
+
+    def upsert_upcoming_earnings(
+        self, ticker: str, earnings_date: str, session: str = "UNSPECIFIED", reporting_period: str = "",
+    ) -> None:
+        """One row per ticker -- a fresh sync overwrites the prior date
+        rather than appending, since only the NEXT known earnings date
+        matters (no history kept here). Resets heads_up_sent back to 0
+        whenever the date itself actually changes (a rescheduled report
+        needs its own T-48h alert), but leaves it alone on a no-op
+        re-sync of the SAME date -- see the ON CONFLICT clause below."""
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO upcoming_earnings (ticker, earnings_date, session, reporting_period, last_updated)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(ticker) DO UPDATE SET
+                    earnings_date = excluded.earnings_date,
+                    session = excluded.session,
+                    reporting_period = excluded.reporting_period,
+                    last_updated = excluded.last_updated,
+                    heads_up_sent = CASE
+                        WHEN upcoming_earnings.earnings_date != excluded.earnings_date THEN 0
+                        ELSE upcoming_earnings.heads_up_sent
+                    END
+                """,
+                (
+                    ticker.strip().upper(), earnings_date, session, reporting_period,
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+            self._conn.commit()
+
+    def get_upcoming_earnings(self, ticker: str) -> dict | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT ticker, earnings_date, session, reporting_period, heads_up_sent, last_updated "
+                "FROM upcoming_earnings WHERE ticker = ?",
+                (ticker.strip().upper(),),
+            ).fetchone()
+        if row is None:
+            return None
+        ticker, earnings_date, session, reporting_period, heads_up_sent, last_updated = row
+        return {
+            "ticker": ticker, "earnings_date": earnings_date, "session": session,
+            "reporting_period": reporting_period, "heads_up_sent": bool(heads_up_sent),
+            "last_updated": last_updated,
+        }
+
+    def list_upcoming_earnings(self) -> list[dict]:
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT ticker, earnings_date, session, reporting_period, heads_up_sent, last_updated "
+                "FROM upcoming_earnings ORDER BY earnings_date"
+            )
+            return [
+                {
+                    "ticker": ticker, "earnings_date": earnings_date, "session": session,
+                    "reporting_period": reporting_period, "heads_up_sent": bool(heads_up_sent),
+                    "last_updated": last_updated,
+                }
+                for ticker, earnings_date, session, reporting_period, heads_up_sent, last_updated
+                in cursor.fetchall()
+            ]
+
+    def mark_heads_up_sent(self, ticker: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE upcoming_earnings SET heads_up_sent = 1 WHERE ticker = ?",
+                (ticker.strip().upper(),),
+            )
+            self._conn.commit()

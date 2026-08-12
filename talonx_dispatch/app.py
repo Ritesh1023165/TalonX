@@ -187,12 +187,35 @@ def render_ticker_watchlist(store: TickerWatchlistStore, poll_interval_seconds: 
         st.info("Watchlist is empty -- market data streaming is paused until you add a ticker.")
     else:
         exchanges_present = sorted({t["exchange"] for t in tickers if t["exchange"]})
-        f_col, sort_col, dir_col = st.columns([2, 2, 1])
+        f_col, h_col, p_col, s_col = st.columns([1.6, 1.6, 1.4, 1.2])
         filter_exchanges = f_col.multiselect("Filter by exchange", exchanges_present)
+        filter_horizons = h_col.multiselect("Filter by horizon", HORIZON_OPTIONS)
+        filter_paper = p_col.selectbox("Paper trading", ["All", "Enabled", "Disabled"])
+        filter_status = s_col.selectbox("Status", ["All", "Active", "Paused"])
+
+        sort_col, dir_col = st.columns([2, 1])
         sort_label = sort_col.selectbox("Sort by", list(_SORT_KEYS), key="watchlist_sort_by")
         sort_desc = dir_col.checkbox("Desc", key="watchlist_sort_desc")
 
-        filtered = [t for t in tickers if not filter_exchanges or t["exchange"] in filter_exchanges]
+        def _paper_trading_on(t: dict) -> bool:
+            # A DUAL_HORIZON ticker counts as "Enabled" if EITHER of its two
+            # independently-tracked flags is on -- matching how the inline
+            # checkboxes below present them (one checkbox per applicable
+            # horizon, not one combined flag).
+            return t["paper_trading_enabled"] or t["paper_trading_enabled_long_term"]
+
+        filtered = tickers
+        if filter_exchanges:
+            filtered = [t for t in filtered if t["exchange"] in filter_exchanges]
+        if filter_horizons:
+            filtered = [t for t in filtered if t["strategy_horizon"] in filter_horizons]
+        if filter_paper != "All":
+            want_enabled = filter_paper == "Enabled"
+            filtered = [t for t in filtered if _paper_trading_on(t) == want_enabled]
+        if filter_status != "All":
+            want_active = filter_status == "Active"
+            filtered = [t for t in filtered if (t["status"] == "active") == want_active]
+
         sort_key = _SORT_KEYS[sort_label]
         filtered.sort(key=lambda t: (t[sort_key] or "").lower(), reverse=sort_desc)
 
@@ -214,12 +237,14 @@ def render_ticker_watchlist(store: TickerWatchlistStore, poll_interval_seconds: 
         if not page_rows:
             st.info("No tickers match the current filter.")
         else:
-            h = st.columns([1, 1.8, 1.2, 1.4, 1, 1.3, 1, 1])
-            for col, label in zip(h, ["Symbol", "Name", "Exchange", "Added", "Status", "Horizon", "", ""]):
+            h = st.columns([1, 1.6, 1.1, 1.3, 1, 1.2, 1.4, 1, 1])
+            for col, label in zip(
+                h, ["Symbol", "Name", "Exchange", "Added", "Status", "Horizon", "Paper Trading", "", ""]
+            ):
                 col.markdown(f"**{label}**")
 
             for row in page_rows:
-                c = st.columns([1, 1.8, 1.2, 1.4, 1, 1.3, 1, 1])
+                c = st.columns([1, 1.6, 1.1, 1.3, 1, 1.2, 1.4, 1, 1])
                 c[0].write(row["symbol"])
                 c[1].write(row["name"])
                 c[2].write(row["exchange"] or "—")
@@ -235,15 +260,37 @@ def render_ticker_watchlist(store: TickerWatchlistStore, poll_interval_seconds: 
                 if new_horizon != horizon:
                     store.set_strategy_horizon(row["symbol"], new_horizon)
                     st.rerun()
+                # A DUAL_HORIZON ticker's two paper-trading engines are
+                # independently toggled flags (see talonx_watchlist/store.py's
+                # set_paper_trading vs. set_paper_trading_long_term docstrings)
+                # -- show one checkbox per horizon this ticker is actually
+                # eligible for, not a single combined flag.
+                with c[6]:
+                    if horizon in ("INTRADAY", "DUAL_HORIZON"):
+                        new_intraday = st.checkbox(
+                            "Intraday", value=row["paper_trading_enabled"],
+                            key=f"paper_intraday_{row['symbol']}",
+                        )
+                        if new_intraday != row["paper_trading_enabled"]:
+                            store.set_paper_trading(row["symbol"], new_intraday)
+                            st.rerun()
+                    if horizon in ("LONG_TERM", "DUAL_HORIZON"):
+                        new_lt = st.checkbox(
+                            "Long-term", value=row["paper_trading_enabled_long_term"],
+                            key=f"paper_lt_{row['symbol']}",
+                        )
+                        if new_lt != row["paper_trading_enabled_long_term"]:
+                            store.set_paper_trading_long_term(row["symbol"], new_lt)
+                            st.rerun()
                 if is_active:
-                    if c[6].button("⏳ Pause", key=f"pause_{row['symbol']}"):
+                    if c[7].button("⏳ Pause", key=f"pause_{row['symbol']}"):
                         store.pause_ticker(row["symbol"])
                         st.rerun()
                 else:
-                    if c[6].button("▶️ Resume", key=f"resume_{row['symbol']}"):
+                    if c[7].button("▶️ Resume", key=f"resume_{row['symbol']}"):
                         store.resume_ticker(row["symbol"])
                         st.rerun()
-                if c[7].button("\U0001F5D1️ Remove", key=f"remove_{row['symbol']}"):
+                if c[8].button("\U0001F5D1️ Remove", key=f"remove_{row['symbol']}"):
                     store.remove_ticker(row["symbol"])
                     st.rerun()
 
@@ -467,6 +514,74 @@ _LT_TRADE_HISTORY_COLUMNS = {
 }
 
 
+_EARNINGS_SESSION_LABEL = {
+    "BEFORE_MARKET": "Before-Market",
+    "AFTER_MARKET": "After-Market",
+    "UNSPECIFIED": "Time TBD",
+}
+
+
+def render_upcoming_earnings_calendar(watchlist_store: TickerWatchlistStore) -> None:
+    """Event-Driven Earnings Radar, Requirement 9. Emoji-prefixed urgency
+    (🟢 within 48h / 🟡 within 7 days / ⚪ beyond) -- matching this
+    dashboard's established visual-signaling convention (ACTION_EMOJI/
+    SEVERITY_EMOJI/MOAT_EMOJI), not pandas.Styler cell-coloring, which has
+    no precedent anywhere else in this file."""
+    st.subheader("\U0001F4C5 Upcoming Earnings Calendar")
+    st.caption(
+        "Next known earnings date per LONG_TERM/DUAL_HORIZON ticker, synced weekly from "
+        "yfinance. Session frequently shows as \"Time TBD\" -- yfinance doesn't reliably "
+        "expose Before/After-Market timing."
+    )
+    rows = watchlist_store.list_upcoming_earnings()
+    if not rows:
+        st.info("No upcoming earnings dates synced yet -- runs weekly once a ticker is tagged LONG_TERM.")
+        return
+
+    now = datetime.now(timezone.utc)
+    calendar_rows = []
+    for row in rows:
+        try:
+            earnings_date = datetime.fromisoformat(row["earnings_date"]).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        hours_until = (earnings_date - now).total_seconds() / 3600.0
+        if hours_until <= 48:
+            urgency = "\U0001F7E2"  # green
+        elif hours_until <= 24 * 7:
+            urgency = "\U0001F7E1"  # amber
+        else:
+            urgency = "⚪"
+        ticker_row = watchlist_store.get_ticker(row["ticker"])
+        company_name = ticker_row["name"] if ticker_row else row["ticker"]
+        calendar_rows.append({
+            "": urgency,
+            "Ticker": row["ticker"],
+            "Company": company_name,
+            "Reporting date": row["earnings_date"],
+            "Session": _EARNINGS_SESSION_LABEL.get(row["session"], "Time TBD"),
+            "Reporting period": row["reporting_period"] or "—",
+            "Heads-up sent": "✅" if row["heads_up_sent"] else "—",
+        })
+    calendar_df = pd.DataFrame(calendar_rows)
+    st.dataframe(calendar_df, hide_index=True, use_container_width=True)
+
+
+def _last_earnings_event_label(row: dict) -> str:
+    """Event-Driven Earnings Radar, Requirement 9's "Last Earnings Event"
+    column -- fully derivable from the alert row itself (is_earnings_related/
+    previous_fair_value/intrinsic_fair_value/correlated_at), no new
+    storage needed. Blank for a routine (non-earnings) alert, or one that
+    predates this feature (previous_fair_value is None -- nothing to
+    diff against)."""
+    if not row.get("is_earnings_related") or not row.get("previous_fair_value"):
+        return ""
+    previous_fair_value = row["previous_fair_value"]
+    delta_pct = (row["intrinsic_fair_value"] - previous_fair_value) / previous_fair_value * 100.0
+    date = row["correlated_at"][:10]
+    return f"{date}: Fair Value {delta_pct:+.1f}%"
+
+
 def render_valuation_radar(store: AuditStore) -> None:
     st.subheader("\U0001F48E Valuation & Margin of Safety Radar")
     st.caption(
@@ -493,6 +608,7 @@ def render_valuation_radar(store: AuditStore) -> None:
             "Quality": row["quality_score"],
             "Moat": f"{MOAT_EMOJI.get(row['moat_rating'], '')} {row['moat_rating'].title()}",
             "Last evaluated": row["correlated_at"][:19].replace("T", " "),
+            "Last earnings event": _last_earnings_event_label(row),
         }
         for row in latest_per_ticker.values()
     ]
@@ -778,6 +894,8 @@ def main() -> None:
         render_paper_trading(paper_store)
 
     with tab_long_term:
+        render_upcoming_earnings_calendar(watchlist_store)
+        st.divider()
         render_valuation_radar(store)
         st.divider()
         render_long_term_portfolio(paper_store)

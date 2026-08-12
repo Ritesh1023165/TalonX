@@ -125,14 +125,20 @@ import asyncio
 import logging
 import os
 import signal
+from datetime import datetime, timedelta, timezone
 
-from talonx_ingest.config import MarketDataConfig
+from talonx_ingest.config import MarketDataConfig, settings
+from talonx_ingest.earnings import fetch_earnings_calendar
+from talonx_ingest.edgar.client import EdgarClient
 from talonx_ingest.events.publisher import RedisEventPublisher
 from talonx_ingest.market_data.manager import MarketDataManager
 from talonx_ingest.market_data.run import make_on_event
-from talonx_ingest.market_data.yfinance_poll import YFinancePoller
+from talonx_ingest.market_data.yfinance_poll import YFinancePoller, fetch_extended_hours_quote
 from talonx_ingest.news.pipeline import run_news_ingestion
-from talonx_ingest.pipeline import run_ingestion, run_long_term_financials_ingestion
+from talonx_ingest.pipeline import ingest_earnings_filing, run_ingestion, run_long_term_financials_ingestion
+from talonx_ingest.processing.chunker import DocumentChunker
+from talonx_ingest.storage.ledger import IngestionLedger
+from talonx_ingest.storage.vector_store import VectorStore
 from talonx_quant.config import QuantConfig
 from talonx_quant.consumer import QuantScanner
 from talonx_quant.fundamental_consumer import FundamentalScanner
@@ -270,16 +276,28 @@ class LongTermPriceRunner:
     Same reconcile-by-restarting-the-whole-stream pattern
     WatchlistDrivenMarketData already uses, for the same reason: no
     incremental subscribe/unsubscribe support needed in the poller.
+
+    `active_earnings_symbols_fn`, if given, is called on every reconcile
+    to ALSO exclude any ticker currently owned by EarningsFastTrackPoller
+    (Event-Driven Earnings Radar, Requirement 6) -- same "avoid double-
+    publishing ticks for the same symbol" reasoning that already excludes
+    DUAL_HORIZON tickers above, extended to cover the OTHER situation
+    where two independent pollers could race MarketTickEvent ticks for
+    one symbol onto talonx:market:stream with no ordering/session
+    tiebreak: this runner's regular-session tick could otherwise silently
+    overwrite the post-earnings extended-hours price the fast-track
+    poller just captured.
     """
 
     def __init__(
         self, watchlist_store: TickerWatchlistStore, on_event, watchlist_poll_interval_seconds: float,
-        price_poll_interval_seconds: float,
+        price_poll_interval_seconds: float, active_earnings_symbols_fn=None,
     ):
         self._store = watchlist_store
         self._on_event = on_event
         self._watchlist_poll_interval = watchlist_poll_interval_seconds
         self._price_poll_interval = price_poll_interval_seconds
+        self._active_earnings_symbols_fn = active_earnings_symbols_fn
         self._stop_event = asyncio.Event()
         self._poller: YFinancePoller | None = None
         self._task: asyncio.Task | None = None
@@ -293,7 +311,10 @@ class LongTermPriceRunner:
     def _long_term_only_symbols(self) -> set[str]:
         long_term = set(self._store.list_by_horizon("LONG_TERM"))
         intraday = set(self._store.list_by_horizon("INTRADAY"))
-        return long_term - intraday
+        symbols = long_term - intraday
+        if self._active_earnings_symbols_fn is not None:
+            symbols -= self._active_earnings_symbols_fn()
+        return symbols
 
     async def run(self) -> None:
         await self._reconcile()
@@ -337,6 +358,126 @@ class LongTermPriceRunner:
                 logger.warning("Previous long-term price poll ended with an error: %s", exc)
             self._task = None
         self._poller = None
+
+
+class EarningsFastTrackPoller:
+    """
+    Event-Driven Earnings Radar, Requirement 6. Every poll_interval_seconds
+    (default 15 min), fast-track-ingests 8-K/10-Q filings AND captures an
+    extended-hours price quote for every ticker CURRENTLY inside its
+    earnings window (upcoming_earnings) -- independent of periodic_
+    ingestion_loop's/periodic_long_term_financials_loop's 6-hour cadence
+    and LongTermPriceRunner's daily one. No existing reconcile-loop
+    abstraction supports one ticker polling at a DIFFERENT cadence than
+    the rest of a symbol set (every one of them diffs a whole set at ONE
+    uniform interval), so this is a standalone poller, not a variant of
+    WatchlistDrivenIngestion/WatchlistDrivenMarketData.
+
+    Session-aware BEFORE_MARKET/AFTER_MARKET windowing is deliberately
+    skipped -- yfinance's session data isn't reliable enough to window
+    precisely against (see talonx_ingest.earnings's own docstring). The
+    active window is simply [earnings_date 00:00 UTC, earnings_date + 1
+    day 23:59:59 UTC], a flat 2-calendar-day span, same reasoning
+    talonx_dispatch.consumer's T-48h heads-up check already applies to
+    "is this ticker's earnings day still relevant."
+
+    Heavyweight resources (DocumentChunker, VectorStore, IngestionLedger,
+    RedisEventPublisher) are created ONCE in run(), not once per poll --
+    VectorStore alone loads/downloads an embedding model on first use, so
+    recreating it every 15 minutes would be wasteful. A fresh EdgarClient
+    (aiohttp session) IS opened per poll cycle, matching run_ingestion's/
+    run_long_term_financials_ingestion's own "new session per batch call"
+    convention.
+    """
+
+    def __init__(
+        self, watchlist_store: TickerWatchlistStore, on_event, poll_interval_seconds: float,
+    ):
+        self._store = watchlist_store
+        self._on_event = on_event
+        self._poll_interval = poll_interval_seconds
+        self._stop_event = asyncio.Event()
+        self._active_symbols: set[str] = set()
+        self._chunker: DocumentChunker | None = None
+        self._vector_store: VectorStore | None = None
+        self._ledger: IngestionLedger | None = None
+        self._publisher: RedisEventPublisher | None = None
+
+    def stop(self) -> None:
+        self._stop_event.set()
+
+    def active_symbols(self) -> set[str]:
+        """Read by LongTermPriceRunner (via active_earnings_symbols_fn)
+        to avoid double-publishing price ticks for a ticker this poller
+        currently owns."""
+        return set(self._active_symbols)
+
+    def _tickers_in_window(self) -> list[str]:
+        now = datetime.now(timezone.utc)
+        window_end = now + timedelta(days=1)
+        result = []
+        for row in self._store.list_upcoming_earnings():
+            try:
+                earnings_date = datetime.fromisoformat(row["earnings_date"]).replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
+            earnings_day_end = earnings_date + timedelta(days=1)
+            if now <= earnings_day_end and earnings_date <= window_end:
+                result.append(row["ticker"])
+        return result
+
+    async def run(self) -> None:
+        self._chunker = DocumentChunker()
+        self._vector_store = VectorStore()
+        self._ledger = IngestionLedger(settings.ledger.path)
+        self._publisher = RedisEventPublisher()
+        await self._publisher.connect()  # logs a warning and continues if Redis is unavailable
+
+        try:
+            while not self._stop_event.is_set():
+                await self._poll_once()
+                try:
+                    await asyncio.wait_for(self._stop_event.wait(), timeout=self._poll_interval)
+                except asyncio.TimeoutError:
+                    pass  # normal case: interval elapsed, poll again
+        finally:
+            self._ledger.close()
+            await self._publisher.close()
+
+    async def _poll_once(self) -> None:
+        tickers = self._tickers_in_window()
+        self._active_symbols = set(t.upper() for t in tickers)
+        if not tickers:
+            return
+
+        logger.info("Earnings fast-track poll for %s", tickers)
+        async with EdgarClient() as edgar_client:
+            for ticker in tickers:
+                try:
+                    found = await ingest_earnings_filing(
+                        ticker, edgar_client, self._chunker, self._vector_store, self._ledger, self._publisher,
+                    )
+                except Exception as exc:  # noqa: BLE001 -- one bad ticker shouldn't kill the poll
+                    logger.error("Earnings fast-track ingestion failed for %s: %s", ticker, exc)
+                    found = False
+
+                if found:
+                    # A confirmed earnings-related filing landed (8-K
+                    # Item 2.02 or a 10-Q) -- real XBRL facts may finally
+                    # be available too, so trigger financials ingestion
+                    # NOW rather than waiting for the next 6h cycle.
+                    try:
+                        await run_long_term_financials_ingestion([ticker], is_earnings_related=True)
+                    except Exception as exc:  # noqa: BLE001
+                        logger.error("Earnings-triggered financials ingestion failed for %s: %s", ticker, exc)
+
+                try:
+                    quote = await asyncio.to_thread(fetch_extended_hours_quote, ticker)
+                except Exception as exc:  # noqa: BLE001 -- one bad ticker shouldn't kill the poll
+                    logger.warning("Extended-hours quote fetch failed for %s: %s", ticker, exc)
+                    quote = None
+                if quote is not None:
+                    await self._on_event(quote)
 
 
 class WatchlistDrivenIngestion:
@@ -529,6 +670,61 @@ async def periodic_long_term_financials_loop(
             pass  # normal case: interval elapsed, loop again
 
 
+async def periodic_earnings_calendar_sync_loop(
+    watchlist_store: TickerWatchlistStore, interval_hours: float, stop_event: asyncio.Event
+) -> None:
+    """
+    Event-Driven Earnings Radar, Requirement 4: syncs each LONG_TERM/
+    DUAL_HORIZON ticker's next known earnings date from yfinance into
+    watchlist_store's upcoming_earnings table. Same interval-since-start
+    shape as periodic_ingestion_loop/periodic_long_term_financials_loop
+    above -- NOT anchored to actual Sunday-00:00-UTC wall-clock time (this
+    codebase has no wall-clock/day-of-week scheduling precedent anywhere;
+    the retention sweep is "every 24h from process start," not "at
+    midnight"), so "weekly" here means every interval_hours (default 168
+    = 7 days) from when this loop starts, which is close enough for a
+    calendar that itself only resolves to day-granularity.
+
+    A per-ticker fetch failure (see talonx_ingest.earnings's own
+    fail-soft posture) or a ticker with no available earnings date is
+    skipped, not fatal to the cycle.
+    """
+    interval_seconds = interval_hours * 3600
+
+    while not stop_event.is_set():
+        tickers = watchlist_store.list_by_horizon("LONG_TERM")
+        if not tickers:
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
+            except asyncio.TimeoutError:
+                pass
+            continue
+
+        logger.info("=== Earnings calendar sync starting for %s ===", tickers)
+        synced = 0
+        for ticker in tickers:
+            try:
+                entry = await asyncio.to_thread(fetch_earnings_calendar, ticker)
+            except Exception as exc:  # noqa: BLE001 -- one bad ticker shouldn't kill the cycle
+                logger.warning("Earnings calendar fetch failed for %s: %s", ticker, exc)
+                continue
+            if entry is None:
+                continue
+            watchlist_store.upsert_upcoming_earnings(
+                entry.ticker, entry.earnings_date.isoformat(), entry.session, entry.reporting_period,
+            )
+            synced += 1
+        logger.info(
+            "=== Earnings calendar sync complete: %d/%d ticker(s) updated. Next cycle in %.1f hours ===",
+            synced, len(tickers), interval_hours,
+        )
+
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
+        except asyncio.TimeoutError:
+            pass  # normal case: interval elapsed, loop again
+
+
 async def main() -> None:
     args = _parse_args()
 
@@ -664,12 +860,22 @@ async def main() -> None:
     if paper_store is not None and not args.skip_long_term_paper:
         long_term_paper_engine = LongTermPaperEngine(store=paper_store, watchlist_store=watchlist_store)
 
+    earnings_fast_track_poller: EarningsFastTrackPoller | None = None
+    if not args.skip_earnings_fast_track:
+        earnings_fast_track_poller = EarningsFastTrackPoller(
+            watchlist_store, make_on_event(market_publisher),
+            _env_float("TALONX_EARNINGS_FAST_TRACK_POLL_SECONDS", 900.0),
+        )
+
     market_data_runner: WatchlistDrivenMarketData | None = None
     long_term_price_runner: LongTermPriceRunner | None = None
     if not args.skip_market_data:
         long_term_price_runner = LongTermPriceRunner(
             watchlist_store, make_on_event(market_publisher), watchlist_config.poll_interval_seconds,
             _env_float("TALONX_LT_PRICE_POLL_INTERVAL", 86400.0),
+            active_earnings_symbols_fn=(
+                earnings_fast_track_poller.active_symbols if earnings_fast_track_poller is not None else None
+            ),
         )
         market_data_runner = WatchlistDrivenMarketData(
             watchlist_store, make_on_event(market_publisher), watchlist_config.poll_interval_seconds,
@@ -686,6 +892,8 @@ async def main() -> None:
             market_data_runner.stop()
         if long_term_price_runner is not None:
             long_term_price_runner.stop()
+        if earnings_fast_track_poller is not None:
+            earnings_fast_track_poller.stop()
         if quant_scanner is not None:
             quant_scanner.stop()
         if fundamental_scanner is not None:
@@ -730,6 +938,8 @@ async def main() -> None:
         tasks.append(asyncio.create_task(market_data_runner.run(), name="market_data"))
     if long_term_price_runner is not None:
         tasks.append(asyncio.create_task(long_term_price_runner.run(), name="long_term_price_poll"))
+    if earnings_fast_track_poller is not None:
+        tasks.append(asyncio.create_task(earnings_fast_track_poller.run(), name="earnings_fast_track"))
     if quant_scanner is not None:
         tasks.append(asyncio.create_task(quant_scanner.run(), name="quant_scanner"))
     if fundamental_scanner is not None:
@@ -757,6 +967,15 @@ async def main() -> None:
                 name="periodic_long_term_financials",
             )
         )
+    if not args.skip_earnings_sync:
+        tasks.append(
+            asyncio.create_task(
+                periodic_earnings_calendar_sync_loop(
+                    watchlist_store, _env_float("TALONX_INGEST_EARNINGS_SYNC_INTERVAL_HOURS", 168.0), stop_event,
+                ),
+                name="periodic_earnings_calendar_sync",
+            )
+        )
     if reactive_ingestion is not None:
         tasks.append(asyncio.create_task(reactive_ingestion.run(), name="reactive_ingestion"))
 
@@ -774,6 +993,8 @@ async def main() -> None:
             market_data_runner.stop()
         if long_term_price_runner is not None:
             long_term_price_runner.stop()
+        if earnings_fast_track_poller is not None:
+            earnings_fast_track_poller.stop()
         if quant_scanner is not None:
             quant_scanner.stop()
         if fundamental_scanner is not None:
@@ -856,6 +1077,17 @@ def _parse_args() -> argparse.Namespace:
         "--skip-long-term-paper", action="store_true",
         help="Skip the Phase 2 long-term paper trading engine (DCA + rebalance) -- "
              "run it yourself with `python -m talonx_paper.run` instead",
+    )
+    parser.add_argument(
+        "--skip-earnings-sync", action="store_true",
+        help="Skip the Event-Driven Earnings Radar's weekly earnings-calendar sync "
+             "(TALONX_INGEST_EARNINGS_SYNC_INTERVAL_HOURS, default every 168h)",
+    )
+    parser.add_argument(
+        "--skip-earnings-fast-track", action="store_true",
+        help="Skip the Event-Driven Earnings Radar's fast-track 8-K/10-Q ingestion + "
+             "extended-hours price capture (TALONX_EARNINGS_FAST_TRACK_POLL_SECONDS, "
+             "default every 900s) for tickers currently in their earnings window",
     )
     return parser.parse_args()
 

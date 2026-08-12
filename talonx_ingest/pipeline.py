@@ -120,7 +120,7 @@ async def ingest_ticker(
 
 
 async def _publish_filing_event(
-    publisher: RedisEventPublisher, metadata, chunk_count: int
+    publisher: RedisEventPublisher, metadata, chunk_count: int, is_earnings_related: bool = False,
 ) -> None:
     event = NewFilingIngestedEvent(
         ticker=metadata.company.ticker,
@@ -133,6 +133,7 @@ async def _publish_filing_event(
         source_document=metadata.primary_document,
         chunk_count=chunk_count,
         vector_collection=settings.vector_store.collection_name,
+        is_earnings_related=is_earnings_related,
     )
     await publisher.publish_filing_ingested(event)
 
@@ -142,6 +143,7 @@ async def ingest_long_term_financials(
     edgar_client: EdgarClient,
     ledger: IngestionLedger,
     publisher: RedisEventPublisher,
+    is_earnings_related: bool = False,
 ) -> int:
     """
     Phase 2's LONG_TERM path -- fetches SEC XBRL structured financials
@@ -153,6 +155,13 @@ async def ingest_long_term_financials(
     separate data source (XBRL company facts vs. raw filing HTML) with
     its own idempotency tracking (ledger.latest_ingested_fiscal_year,
     keyed by CIK+fiscal_year, not accession number).
+
+    `is_earnings_related` -- Event-Driven Earnings Radar: set True when
+    the fast-track poller calls this DURING a ticker's active earnings
+    window (Requirement 7's 10-Q stage), threaded straight onto the
+    published event so FundamentalScanner/talonx_core know to bypass
+    their own cooldowns for this one signal, without either of them
+    needing to re-derive "is this earnings-related" themselves.
 
     Returns the number of new fiscal years published this run (0 if
     already up to date, or if the ticker/facts couldn't be resolved).
@@ -185,7 +194,9 @@ async def ingest_long_term_financials(
         return 0
 
     await publisher.publish_fundamentals_ingested(
-        NewFundamentalsIngestedEvent(ticker=ticker.upper(), cik=company.cik, facts=facts)
+        NewFundamentalsIngestedEvent(
+            ticker=ticker.upper(), cik=company.cik, facts=facts, is_earnings_related=is_earnings_related,
+        )
     )
     ledger.mark_financials_ingested(ticker, company.cik, [f.fiscal_year for f in facts])
     logger.info(
@@ -193,6 +204,110 @@ async def ingest_long_term_financials(
         ticker, latest_available, len(facts) - 1,
     )
     return 1
+
+
+def _contains_item_202(document: FilingDocument) -> bool:
+    """Confirms an 8-K is actually the earnings release (Item 2.02,
+    "Results of Operations and Financial Condition") rather than one of
+    the many OTHER things an 8-K can announce (officer changes, entering
+    a material agreement, etc.) -- SEC's submissions JSON exposes only
+    the form TYPE, never the item number, so this is the only reliable
+    signal short of a human reading it. Checked against the CLEANED
+    text (post-HTML-stripping), not raw_html, since "Item 2.02" as a
+    literal substring is far more reliable once markup is gone."""
+    if document.metadata.form_type != "8-K" or not document.cleaned_text:
+        return False
+    return "item 2.02" in document.cleaned_text.lower()
+
+
+async def ingest_earnings_filing(
+    ticker: str,
+    edgar_client: EdgarClient,
+    chunker: DocumentChunker,
+    vector_store: VectorStore,
+    ledger: IngestionLedger,
+    publisher: RedisEventPublisher,
+) -> bool:
+    """
+    Event-Driven Earnings Radar, Requirement 6's fast-track ingestion --
+    called every 15 minutes by run_talonx.EarningsFastTrackPoller for a
+    ticker inside its active earnings window. A NEW orchestrating
+    function, not a parameter on ingest_ticker() above: that function
+    ingests every filing it finds uniformly, but this one needs to flag
+    only SOME of what it finds as earnings-related (a 10-Q filed during
+    the window always counts; an 8-K only counts once _contains_item_202
+    confirms it). Reuses the exact same primitives ingest_ticker() does
+    (CIK resolution, ledger.filter_unseen, fetch_documents,
+    clean_filing_html, chunk/embed/publish) -- just fetching 8-K/10-Q
+    specifically (via get_recent_filings's `forms` override, NOT the
+    global target_forms) and gating the earnings-related flag per filing.
+
+    An 8-K that does NOT contain Item 2.02 is still ingested normally
+    (useful RAG context for talonx_brain either way) but published with
+    is_earnings_related=False, so it never triggers the downstream
+    cooldown-bypass path.
+
+    Returns True if at least one earnings-related filing was
+    successfully ingested this call -- the fast-track poller uses this
+    to decide whether the ticker's earnings release has now been seen
+    (for the 8-K case) or whether to also immediately trigger XBRL
+    financials ingestion (for the 10-Q case).
+    """
+    logger.info("[%s] Resolving ticker -> CIK for earnings fast-track...", ticker)
+    try:
+        company = await edgar_client.resolve_ticker(ticker)
+    except EdgarClientError as exc:
+        logger.error("Skipping earnings fast-track for %s: %s", ticker, exc)
+        return False
+
+    all_filings = await edgar_client.get_recent_filings(company, forms=("8-K", "10-Q"))
+    if not all_filings:
+        return False
+
+    target_filings = ledger.filter_unseen(all_filings)
+    if not target_filings:
+        return False
+
+    documents = await edgar_client.fetch_documents(target_filings)
+    _clean_documents_inplace(documents)
+
+    found_earnings_related = False
+    for document in documents:
+        if not document.is_ready_for_chunking:
+            continue
+
+        is_earnings_related = document.metadata.form_type == "10-Q" or _contains_item_202(document)
+        if document.metadata.form_type == "8-K" and not is_earnings_related:
+            logger.info(
+                "[%s] 8-K %s has no Item 2.02 -- ingesting for RAG context only, "
+                "not treated as the earnings release",
+                ticker, document.metadata.accession_number,
+            )
+
+        chunks = chunker.chunk_document(document)
+        if not chunks:
+            continue
+
+        written = vector_store.upsert_chunks(chunks)
+        if written == len(chunks):
+            ledger.mark_ingested(document.metadata, chunk_count=written)
+            await _publish_filing_event(
+                publisher, document.metadata, written, is_earnings_related=is_earnings_related,
+            )
+            if is_earnings_related:
+                found_earnings_related = True
+                logger.info(
+                    "[%s] Confirmed earnings-related filing: %s %s",
+                    ticker, document.metadata.form_type, document.metadata.accession_number,
+                )
+        else:
+            logger.error(
+                "[%s] Partial upsert for %s (%d/%d chunks written) -- "
+                "NOT marking ledger complete, will retry next poll",
+                ticker, document.metadata.accession_number, written, len(chunks),
+            )
+
+    return found_earnings_related
 
 
 def _clean_documents_inplace(documents: list[FilingDocument]) -> None:
@@ -260,14 +375,22 @@ async def run_ingestion(
     return results
 
 
-async def run_long_term_financials_ingestion(tickers: list[str]) -> dict[str, int]:
+async def run_long_term_financials_ingestion(
+    tickers: list[str], is_earnings_related: bool = False,
+) -> dict[str, int]:
     """Phase 2's batch entrypoint for the structured-financials path --
     same shape as run_ingestion() above (own EdgarClient session, own
     ledger/publisher, per-ticker task with isolated failure handling),
     calling ingest_long_term_financials() instead of ingest_ticker().
     Deliberately a separate function, not a branch inside run_ingestion:
     the two paths share only the EdgarClient/ledger/publisher plumbing,
-    not the actual per-ticker work (text ingestion vs. XBRL facts)."""
+    not the actual per-ticker work (text ingestion vs. XBRL facts).
+
+    `is_earnings_related` -- threaded straight through to every ticker
+    in this batch (see ingest_long_term_financials's own docstring) --
+    the Earnings Radar's fast-track poller always calls this with a
+    single-ticker list, so a shared flag for the whole batch is fine;
+    the regular periodic loop never sets it."""
     logger.info("Starting long-term financials ingestion for tickers: %s", tickers)
 
     ledger = IngestionLedger(settings.ledger.path)
@@ -279,7 +402,9 @@ async def run_long_term_financials_ingestion(tickers: list[str]) -> dict[str, in
         async with EdgarClient() as edgar_client:
             tasks = {
                 ticker: asyncio.create_task(
-                    ingest_long_term_financials(ticker, edgar_client, ledger, publisher)
+                    ingest_long_term_financials(
+                        ticker, edgar_client, ledger, publisher, is_earnings_related=is_earnings_related,
+                    )
                 )
                 for ticker in tickers
             }

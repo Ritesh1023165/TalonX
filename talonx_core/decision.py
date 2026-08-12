@@ -280,18 +280,27 @@ def _evaluate_long_term_with_reason(
     if state.fundamental_signal is None or state.longterm_report is None:
         return None, "MISSING_PAIR"
 
+    signal = state.fundamental_signal
+    report = state.longterm_report
+    # Event-Driven Earnings Radar, Requirement 7: an earnings-triggered
+    # signal/report bypasses the standard 30-day cooldown AND the price-
+    # delta no-state-change gate below -- both exist to throttle ROUTINE
+    # quarterly re-evaluations, not the deliberate, rare, and important
+    # re-fire this whole feature exists to produce. Checked on EITHER
+    # input since Stage 1 (8-K, signal-side) and Stage 2 (10-Q, still
+    # signal-side but genuinely fresh) both set it on the signal, while
+    # the resulting report also carries it forward for symmetry.
+    is_earnings_related = signal.is_earnings_related or report.is_earnings_related
+
     if not _is_fresh(state.fundamental_signal_at, now, config.correlation_window_long_term_seconds):
         return None, "STALE_SIGNAL"
     if not _is_fresh(state.longterm_report_at, now, config.correlation_window_long_term_seconds):
         return None, "STALE_REPORT"
 
-    if state.last_alert_at is not None:
+    if not is_earnings_related and state.last_alert_at is not None:
         elapsed = (now - state.last_alert_at).total_seconds()
         if elapsed < config.ticker_cooldown_long_term_seconds:
             return None, "COOLDOWN"
-
-    signal = state.fundamental_signal
-    report = state.longterm_report
 
     # A degraded report carries no usable moat/quality/fair-value data
     # (all placeholder defaults -- see talonx_brain.consumer's degraded
@@ -352,7 +361,8 @@ def _evaluate_long_term_with_reason(
         return None, "LOW_QUALITY_OR_FAIR_VALUE"
 
     if (
-        state.last_alert_action is not None
+        not is_earnings_related
+        and state.last_alert_action is not None
         and action == state.last_alert_action
         and state.last_alert_price is not None
     ):
@@ -361,6 +371,19 @@ def _evaluate_long_term_with_reason(
             return None, "NO_STATE_CHANGE"
 
     margin_of_safety_pct = (fair_value - price) / fair_value if fair_value > 0 else 0.0
+
+    # Event-Driven Earnings Radar, Requirement 8: "before vs after" fields
+    # for the post-earnings push -- state.previous_fair_value was captured
+    # by update_report() the moment this NEW report overwrote the prior
+    # one (see state.py), so it's already the right "before" value here.
+    # previous_margin_of_safety_pct pairs that prior fair value against
+    # the price AT the last alert (the most recent "before" price this
+    # state actually has), not the current price -- both sides of the
+    # comparison should reflect the SAME point in time.
+    previous_fair_value = state.previous_fair_value
+    previous_margin_of_safety_pct = None
+    if previous_fair_value is not None and previous_fair_value > 0 and state.last_alert_price is not None:
+        previous_margin_of_safety_pct = (previous_fair_value - state.last_alert_price) / previous_fair_value
 
     return LongTermActionableAlert(
         ticker=signal.ticker,
@@ -375,6 +398,11 @@ def _evaluate_long_term_with_reason(
         market_price=price,
         intrinsic_fair_value=fair_value,
         margin_of_safety_pct=margin_of_safety_pct,
+        previous_fair_value=previous_fair_value,
+        previous_margin_of_safety_pct=previous_margin_of_safety_pct,
+        guidance_revision_notes=report.guidance_revision_notes,
+        revenue_eps_surprise=report.revenue_eps_surprise,
+        is_earnings_related=is_earnings_related,
         triggering_signal=signal,
         capital_allocation_assessment=report.capital_allocation_assessment,
         key_findings=report.key_findings,

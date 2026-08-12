@@ -309,6 +309,8 @@ def test_state_persists_across_reopen(tmp_path):
 
 def _long_term_alert(
     ticker: str = "AAPL", action: AlertAction = AlertAction.HIGH_CONVICTION_BUY, correlated_at: datetime = NOW,
+    is_earnings_related: bool = False, previous_fair_value: float | None = None,
+    previous_margin_of_safety_pct: float | None = None, guidance_revision_notes: str | None = None,
 ) -> LongTermActionableAlert:
     return LongTermActionableAlert(
         ticker=ticker, action=action, severity=AlertSeverity.CRITICAL,
@@ -319,6 +321,9 @@ def _long_term_alert(
         capital_allocation_assessment="Disciplined buybacks.",
         key_findings=["Strong recurring revenue"], risk_factors=["Regulatory scrutiny"],
         model_used="gemini-flash-latest", correlated_at=correlated_at, published_at=correlated_at,
+        is_earnings_related=is_earnings_related, previous_fair_value=previous_fair_value,
+        previous_margin_of_safety_pct=previous_margin_of_safety_pct,
+        guidance_revision_notes=guidance_revision_notes,
     )
 
 
@@ -355,6 +360,33 @@ def test_get_long_term_by_id_returns_the_stored_row(tmp_path):
 def test_get_long_term_by_id_returns_none_for_unknown_id(tmp_path):
     with AuditStore(tmp_path / "audit.db") as store:
         assert store.get_long_term_by_id(999) is None
+
+
+def test_record_long_term_alert_persists_earnings_radar_fields(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(
+            _long_term_alert(
+                is_earnings_related=True, previous_fair_value=210.0,
+                previous_margin_of_safety_pct=0.1667, guidance_revision_notes="Guidance raised.",
+            )
+        )
+        row = store.get_long_term_by_id(alert_id)
+
+        assert row["is_earnings_related"] is True
+        assert row["previous_fair_value"] == 210.0
+        assert row["previous_margin_of_safety_pct"] == 0.1667
+        assert row["guidance_revision_notes"] == "Guidance raised."
+
+
+def test_record_long_term_alert_earnings_radar_fields_default_correctly(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(_long_term_alert())  # routine, non-earnings alert
+        row = store.get_long_term_by_id(alert_id)
+
+        assert row["is_earnings_related"] is False
+        assert row["previous_fair_value"] is None
+        assert row["previous_margin_of_safety_pct"] is None
+        assert row["guidance_revision_notes"] is None
 
 
 def test_mark_long_term_telegram_sent(tmp_path):
@@ -468,6 +500,10 @@ def test_migrates_a_long_term_alerts_table_from_before_the_summary_column(tmp_pa
         assert len(rows) == 1
         assert rows[0]["summary"] == ""  # DEFAULT '' for a pre-migration row
         assert rows[0]["suppress_reason"] is None  # this migration also predates suppress_reason
+        assert rows[0]["is_earnings_related"] is False  # DEFAULT 0 for a pre-migration row
+        assert rows[0]["previous_fair_value"] is None
+        assert rows[0]["previous_margin_of_safety_pct"] is None
+        assert rows[0]["guidance_revision_notes"] is None
 
         # And the migrated store is fully usable afterward.
         store.record_long_term_alert(_long_term_alert(ticker="AAPL"))

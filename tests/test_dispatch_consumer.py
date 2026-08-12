@@ -26,7 +26,7 @@ from talonx_dispatch.consumer import (
     DispatchAgent,
     _evaluate_push_eligibility,
 )
-from talonx_dispatch.schemas import AlertAction
+from talonx_dispatch.schemas import AlertAction, FundamentalFactorSignal, LongTermResearchReport, MoatRating
 from talonx_dispatch.store import AuditStore
 from talonx_dispatch.telegram_client import TelegramSendError
 from talonx_watchlist.store import TickerWatchlistStore
@@ -762,3 +762,234 @@ async def test_retention_sweep_purges_both_horizons_independently(agent):
     assert purged == 2
     assert agent.store.count() == 0
     assert agent.store.count_long_term() == 0
+
+
+# ==========================================================================
+# Event-Driven Earnings Radar -- T-48h heads-up push
+# ==========================================================================
+
+def _fundamental_signal_payload(ticker: str = "AAPL", price: float = 175.50) -> dict:
+    return {"ticker": ticker, "fiscal_year": 2026, "price": price, "computed_at": "2026-08-11T12:00:00Z"}
+
+
+def _fundamental_signal_message(payload) -> dict:
+    data = payload if isinstance(payload, str) else json.dumps(payload)
+    return {"channel": b"talonx:signals:fundamental", "data": data}
+
+
+def _longterm_report_payload(ticker: str = "AAPL", fair_value: float = 210.0) -> dict:
+    return {
+        "ticker": ticker, "moat_rating": "wide", "dcf_fair_value_per_share": fair_value,
+        "quality_score": 9, "summary": "Durable moat.",
+    }
+
+
+def _longterm_report_message(payload) -> dict:
+    data = payload if isinstance(payload, str) else json.dumps(payload)
+    return {"channel": b"talonx:reports:longterm", "data": data}
+
+
+def _fundamental_signal(ticker: str, price: float = 175.50) -> FundamentalFactorSignal:
+    return FundamentalFactorSignal(
+        ticker=ticker, fiscal_year=2026, price=price, computed_at=datetime.now(timezone.utc),
+    )
+
+
+def _longterm_report(ticker: str, fair_value: float = 210.0) -> LongTermResearchReport:
+    return LongTermResearchReport(
+        ticker=ticker, moat_rating=MoatRating.WIDE, dcf_fair_value_per_share=fair_value,
+        quality_score=9, summary="Durable moat.",
+    )
+
+
+@pytest.mark.asyncio
+async def test_fundamental_signal_updates_the_latest_signal_cache(agent):
+    await agent._handle_message(_fundamental_signal_message(_fundamental_signal_payload("AAPL", 175.50)))
+
+    cached = agent._latest_fundamental_signal["AAPL"]
+    assert cached.price == 175.50
+
+
+@pytest.mark.asyncio
+async def test_longterm_report_updates_the_latest_report_cache(agent):
+    await agent._handle_message(_longterm_report_message(_longterm_report_payload("AAPL", 210.0)))
+
+    cached = agent._latest_longterm_report["AAPL"]
+    assert cached.dcf_fair_value_per_share == 210.0
+
+
+@pytest.mark.asyncio
+async def test_invalid_fundamental_signal_is_dropped(agent):
+    await agent._handle_message(_fundamental_signal_message({"ticker": "AAPL"}))  # missing required fields
+    assert "AAPL" not in agent._latest_fundamental_signal
+
+
+@pytest.mark.asyncio
+async def test_invalid_longterm_report_is_dropped(agent):
+    await agent._handle_message(_longterm_report_message({"ticker": "AAPL"}))  # missing required fields
+    assert "AAPL" not in agent._latest_longterm_report
+
+
+@pytest.mark.asyncio
+async def test_heads_up_sends_unconditionally_within_the_48h_window(agent):
+    agent.telegram_client.is_configured = True
+    agent.watchlist_store.add_ticker("AAPL", "Apple Inc.", strategy_horizon="LONG_TERM")
+    agent.watchlist_store.upsert_upcoming_earnings("AAPL", datetime.now(timezone.utc).date().isoformat(), "AFTER_MARKET")
+    agent._latest_fundamental_signal["AAPL"] = _fundamental_signal("AAPL")
+    agent._latest_longterm_report["AAPL"] = _longterm_report("AAPL")
+
+    sent = await agent._run_earnings_heads_up_once()
+
+    assert sent == 1
+    agent.telegram_client.send.assert_awaited_once()
+    assert agent.watchlist_store.get_upcoming_earnings("AAPL")["heads_up_sent"] is True
+    assert agent.earnings_heads_up_sent == 1
+
+
+@pytest.mark.asyncio
+async def test_heads_up_skipped_when_already_sent(agent):
+    agent.telegram_client.is_configured = True
+    agent.watchlist_store.add_ticker("AAPL", "Apple Inc.", strategy_horizon="LONG_TERM")
+    agent.watchlist_store.upsert_upcoming_earnings("AAPL", datetime.now(timezone.utc).date().isoformat())
+    agent.watchlist_store.mark_heads_up_sent("AAPL")
+    agent._latest_fundamental_signal["AAPL"] = _fundamental_signal("AAPL")
+    agent._latest_longterm_report["AAPL"] = _longterm_report("AAPL")
+
+    sent = await agent._run_earnings_heads_up_once()
+
+    assert sent == 0
+    agent.telegram_client.send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_heads_up_skipped_when_outside_the_window(agent):
+    agent.telegram_client.is_configured = True
+    far_future = (datetime.now(timezone.utc) + timedelta(days=10)).date().isoformat()
+    agent.watchlist_store.add_ticker("AAPL", "Apple Inc.", strategy_horizon="LONG_TERM")
+    agent.watchlist_store.upsert_upcoming_earnings("AAPL", far_future)
+    agent._latest_fundamental_signal["AAPL"] = _fundamental_signal("AAPL")
+    agent._latest_longterm_report["AAPL"] = _longterm_report("AAPL")
+
+    sent = await agent._run_earnings_heads_up_once()
+
+    assert sent == 0
+    agent.telegram_client.send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_heads_up_deferred_when_no_cached_signal_or_report_yet(agent):
+    agent.telegram_client.is_configured = True
+    agent.watchlist_store.add_ticker("AAPL", "Apple Inc.", strategy_horizon="LONG_TERM")
+    agent.watchlist_store.upsert_upcoming_earnings("AAPL", datetime.now(timezone.utc).date().isoformat())
+    # No cache entries seeded -- this process hasn't seen a signal/report yet.
+
+    sent = await agent._run_earnings_heads_up_once()
+
+    assert sent == 0
+    agent.telegram_client.send.assert_not_awaited()
+    assert agent.watchlist_store.get_upcoming_earnings("AAPL")["heads_up_sent"] is False
+
+
+@pytest.mark.asyncio
+async def test_heads_up_skipped_when_telegram_not_configured(agent):
+    agent.telegram_client.is_configured = False
+    agent.watchlist_store.add_ticker("AAPL", "Apple Inc.", strategy_horizon="LONG_TERM")
+    agent.watchlist_store.upsert_upcoming_earnings("AAPL", datetime.now(timezone.utc).date().isoformat())
+    agent._latest_fundamental_signal["AAPL"] = _fundamental_signal("AAPL")
+    agent._latest_longterm_report["AAPL"] = _longterm_report("AAPL")
+
+    sent = await agent._run_earnings_heads_up_once()
+
+    assert sent == 0
+
+
+@pytest.mark.asyncio
+async def test_heads_up_still_counts_a_same_day_ticker_hours_after_midnight(agent):
+    """Regression guard: comparing against the earnings DAY's end, not its
+    midnight start -- a naive `now <= earnings_date` would wrongly exclude
+    a same-day ticker the moment any time elapsed past midnight."""
+    agent.telegram_client.is_configured = True
+    today = datetime.now(timezone.utc).date().isoformat()
+    agent.watchlist_store.add_ticker("AAPL", "Apple Inc.", strategy_horizon="LONG_TERM")
+    agent.watchlist_store.upsert_upcoming_earnings("AAPL", today)
+    agent._latest_fundamental_signal["AAPL"] = _fundamental_signal("AAPL")
+    agent._latest_longterm_report["AAPL"] = _longterm_report("AAPL")
+
+    sent = await agent._run_earnings_heads_up_once()
+
+    assert sent == 1
+
+
+# ==========================================================================
+# Event-Driven Earnings Radar -- post-earnings push (Requirement 8) bypass
+# ==========================================================================
+
+def _post_earnings_alert_payload(action: str = "high_conviction_buy", severity: str = "critical") -> dict:
+    payload = _long_term_alert_payload(severity=severity)
+    payload["action"] = action
+    payload["is_earnings_related"] = True
+    payload["previous_fair_value"] = 90.0
+    payload["previous_margin_of_safety_pct"] = 0.10
+    payload["guidance_revision_notes"] = "FY26 guidance raised by 2.5%."
+    payload["triggering_signal"] = {"roic": 0.21, "piotroski_f_score": 8}
+    return payload
+
+
+@pytest.mark.asyncio
+async def test_post_earnings_alert_bypasses_the_severity_gate(agent):
+    agent.telegram_client.is_configured = True
+    agent.config = DispatchConfig(telegram_min_severity="critical")
+    payload = _post_earnings_alert_payload(action="take_profit_rebalance", severity="warning")
+
+    await agent._handle_message(_long_term_message(payload))
+
+    agent.telegram_client.send.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_post_earnings_alert_bypasses_push_eligibility(agent):
+    agent.telegram_client.is_configured = True
+    now = datetime.now(timezone.utc)
+    # Deep in an active push cooldown at the SAME price -- would normally
+    # suppress with PRICE_DELTA_TOO_LOW.
+    agent._last_telegram_push_long_term["AAPL"] = (now - timedelta(minutes=1), 75.0)
+    payload = _post_earnings_alert_payload()
+
+    await agent._handle_message(_long_term_message(payload))
+
+    agent.telegram_client.send.assert_awaited_once()
+    row = agent.store.recent_long_term(limit=1)[0]
+    assert row["telegram_sent"] is True
+
+
+@pytest.mark.asyncio
+async def test_post_earnings_alert_uses_the_post_earnings_formatter(agent):
+    agent.telegram_client.is_configured = True
+    payload = _post_earnings_alert_payload()
+
+    await agent._handle_message(_long_term_message(payload))
+
+    text = agent.telegram_client.send.await_args.args[0]
+    assert "POST-EARNINGS VALUATION UPDATE" in text
+    assert "Up from $90.00" in text
+
+
+@pytest.mark.asyncio
+async def test_routine_long_term_alert_still_uses_the_normal_formatter(agent):
+    agent.telegram_client.is_configured = True
+    payload = _long_term_alert_payload(severity="critical")  # is_earnings_related defaults False
+
+    await agent._handle_message(_long_term_message(payload))
+
+    text = agent.telegram_client.send.await_args.args[0]
+    assert "POST-EARNINGS VALUATION UPDATE" not in text
+
+
+@pytest.mark.asyncio
+async def test_routine_long_term_alert_is_still_gated_by_severity(agent):
+    agent.telegram_client.is_configured = True
+    payload = _long_term_alert_payload(severity="info")  # below default "warning" min
+
+    await agent._handle_message(_long_term_message(payload))
+
+    agent.telegram_client.send.assert_not_awaited()
