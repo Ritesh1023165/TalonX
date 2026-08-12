@@ -219,6 +219,68 @@ def test_add_ticker_upsert_does_not_reset_paper_trading_flag(store):
     assert store.list_tickers()[0]["paper_trading_enabled"] is True
 
 
+# --- Strategy horizon (Phase 2's intraday/long-term routing control) ------
+
+def test_new_ticker_defaults_to_intraday_horizon(store):
+    store.add_ticker("AAPL", "Apple Inc.")
+
+    assert store.list_tickers()[0]["strategy_horizon"] == "INTRADAY"
+    assert store.list_by_horizon("INTRADAY") == ["AAPL"]
+    assert store.list_by_horizon("LONG_TERM") == []
+
+
+def test_add_ticker_accepts_an_initial_horizon(store):
+    store.add_ticker("BRK.B", "Berkshire Hathaway", strategy_horizon="LONG_TERM")
+
+    assert store.list_tickers()[0]["strategy_horizon"] == "LONG_TERM"
+    assert store.list_by_horizon("LONG_TERM") == ["BRK.B"]
+    assert store.list_by_horizon("INTRADAY") == []
+
+
+def test_add_ticker_rejects_invalid_horizon(store):
+    with pytest.raises(ValueError):
+        store.add_ticker("AAPL", "Apple Inc.", strategy_horizon="WEEKLY")
+
+
+def test_set_strategy_horizon_changes_routing(store):
+    store.add_ticker("AAPL", "Apple Inc.")
+
+    store.set_strategy_horizon("aapl", "LONG_TERM")  # case-insensitive
+
+    assert store.list_tickers()[0]["strategy_horizon"] == "LONG_TERM"
+    assert store.list_by_horizon("LONG_TERM") == ["AAPL"]
+    assert store.list_by_horizon("INTRADAY") == []
+
+
+def test_set_strategy_horizon_rejects_invalid_value(store):
+    store.add_ticker("AAPL", "Apple Inc.")
+    with pytest.raises(ValueError):
+        store.set_strategy_horizon("AAPL", "NOT_A_HORIZON")
+
+
+def test_dual_horizon_ticker_appears_in_both_lists(store):
+    store.add_ticker("AAPL", "Apple Inc.", strategy_horizon="DUAL_HORIZON")
+    store.add_ticker("NVDA", "NVIDIA Corporation", strategy_horizon="INTRADAY")
+    store.add_ticker("BRK.B", "Berkshire Hathaway", strategy_horizon="LONG_TERM")
+
+    assert store.list_by_horizon("INTRADAY") == ["AAPL", "NVDA"]
+    assert store.list_by_horizon("LONG_TERM") == ["AAPL", "BRK.B"]
+    assert store.list_by_horizon("DUAL_HORIZON") == ["AAPL"]
+
+
+def test_add_ticker_upsert_does_not_reset_strategy_horizon(store):
+    store.add_ticker("AAPL", "Apple Inc.", strategy_horizon="LONG_TERM")
+
+    store.add_ticker("AAPL", "Apple Inc.", "NASDAQ")  # re-add, horizon omitted
+
+    assert store.list_tickers()[0]["strategy_horizon"] == "LONG_TERM"
+
+
+def test_list_by_horizon_rejects_invalid_value(store):
+    with pytest.raises(ValueError):
+        store.list_by_horizon("NOT_A_HORIZON")
+
+
 # --- Migration from the pre-exchange/status schema -----------------------
 
 def test_migrates_a_pre_existing_three_column_database(tmp_path):
@@ -244,13 +306,17 @@ def test_migrates_a_pre_existing_three_column_database(tmp_path):
         assert tickers[0]["exchange"] == ""
         assert tickers[0]["status"] == "active"
         assert tickers[0]["paper_trading_enabled"] is False
+        assert tickers[0]["strategy_horizon"] == "INTRADAY"
         assert store.list_active_symbols() == ["MSFT"]
         assert store.list_paper_trading_symbols() == []
+        assert store.list_by_horizon("INTRADAY") == ["MSFT"]
 
         # And the migrated store is fully usable afterward.
         store.pause_ticker("MSFT")
         assert store.list_active_symbols() == []
         store.set_paper_trading("MSFT", True)
         assert store.list_paper_trading_symbols() == ["MSFT"]
+        store.set_strategy_horizon("MSFT", "LONG_TERM")
+        assert store.list_by_horizon("LONG_TERM") == ["MSFT"]
     finally:
         store.close()

@@ -98,3 +98,40 @@ def test_filing_and_news_ledgers_are_independent(ledger_path, filing, news_artic
         assert ledger.is_ingested(filing.accession_number) is True
         assert ledger.is_news_ingested(filing.accession_number) is False
         assert ledger.is_news_ingested(news_article.article_id) is False
+
+
+# --- Structured financials tracking (Phase 2 LONG_TERM path) ---------------
+
+def test_fresh_ledger_has_no_ingested_fiscal_year(ledger_path):
+    with IngestionLedger(ledger_path) as ledger:
+        assert ledger.latest_ingested_fiscal_year("0000320193") is None
+
+
+def test_mark_financials_ingested_records_the_latest_fiscal_year(ledger_path):
+    with IngestionLedger(ledger_path) as ledger:
+        ledger.mark_financials_ingested("AAPL", "0000320193", [2023, 2024, 2025])
+
+        assert ledger.latest_ingested_fiscal_year("0000320193") == 2025
+
+
+def test_mark_financials_ingested_is_idempotent(ledger_path):
+    with IngestionLedger(ledger_path) as ledger:
+        ledger.mark_financials_ingested("AAPL", "0000320193", [2024, 2025])
+        ledger.mark_financials_ingested("AAPL", "0000320193", [2025])  # re-run, overlapping year
+
+        assert ledger.latest_ingested_fiscal_year("0000320193") == 2025
+
+
+def test_financials_ledger_is_per_cik(ledger_path):
+    with IngestionLedger(ledger_path) as ledger:
+        ledger.mark_financials_ingested("AAPL", "0000320193", [2025])
+
+        assert ledger.latest_ingested_fiscal_year("0000789019") is None  # MSFT's CIK, untouched
+
+
+def test_financials_state_persists_across_reopen(ledger_path):
+    with IngestionLedger(ledger_path) as ledger:
+        ledger.mark_financials_ingested("AAPL", "0000320193", [2025])
+
+    with IngestionLedger(ledger_path) as ledger2:
+        assert ledger2.latest_ingested_fiscal_year("0000320193") == 2025

@@ -242,6 +242,22 @@ class EdgarClient:
         return results
 
     # ------------------------------------------------------------------
+    # Structured financials (Phase 2 LONG_TERM path) -- XBRL company facts
+    # ------------------------------------------------------------------
+
+    async def get_company_facts(self, company: CompanyRef) -> dict[str, Any]:
+        """Fetches the FULL XBRL "company facts" JSON for a company --
+        every concept it has ever tagged, across every filing. Raw dict,
+        unparsed -- see edgar/financials.py's parse_company_facts for
+        turning this into structured FinancialStatementFacts rows. Reuses
+        self._get() for the exact same auth/rate-limit/retry/error
+        handling as every other EDGAR endpoint this client talks to;
+        `company_facts_base` was already defined in EdgarConfig before
+        this method existed, just never called."""
+        url = f"{self.config.company_facts_base}/CIK{company.cik}.json"
+        return await self._get(url, as_json=True)
+
+    # ------------------------------------------------------------------
     # Document fetch
     # ------------------------------------------------------------------
 

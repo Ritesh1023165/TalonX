@@ -15,6 +15,8 @@ from talonx_dispatch.schemas import (
     ActionableAlert,
     AlertAction,
     AlertSeverity,
+    LongTermActionableAlert,
+    MoatRating,
     ResearchVerdict,
     SignalDirection,
     TriggeringSignalRef,
@@ -225,3 +227,114 @@ def test_state_persists_across_reopen(tmp_path):
     # running as separate processes against the same file) -- must survive.
     with AuditStore(path) as store2:
         assert store2.count() == 1
+
+
+# ==========================================================================
+# Phase 2 LONG_TERM path
+# ==========================================================================
+
+def _long_term_alert(
+    ticker: str = "AAPL", action: AlertAction = AlertAction.HIGH_CONVICTION_BUY, correlated_at: datetime = NOW,
+) -> LongTermActionableAlert:
+    return LongTermActionableAlert(
+        ticker=ticker, action=action, severity=AlertSeverity.CRITICAL,
+        rationale="FY2025 fundamentals clear thresholds.",
+        quality_score=8, moat_rating=MoatRating.WIDE, market_price=75.0,
+        intrinsic_fair_value=100.0, margin_of_safety_pct=0.25,
+        capital_allocation_assessment="Disciplined buybacks.",
+        key_findings=["Strong recurring revenue"], risk_factors=["Regulatory scrutiny"],
+        model_used="gemini-flash-latest", correlated_at=correlated_at, published_at=correlated_at,
+    )
+
+
+def test_record_long_term_alert_returns_an_id(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(_long_term_alert())
+        assert alert_id == 1
+        assert store.count_long_term() == 1
+
+
+def test_long_term_and_intraday_alerts_are_fully_independent(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_alert(_alert())
+        store.record_long_term_alert(_long_term_alert())
+
+        assert store.count() == 1
+        assert store.count_long_term() == 1
+
+
+def test_get_long_term_by_id_returns_the_stored_row(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(_long_term_alert())
+        row = store.get_long_term_by_id(alert_id)
+
+        assert row["ticker"] == "AAPL"
+        assert row["action"] == "high_conviction_buy"
+        assert row["moat_rating"] == "wide"
+        assert row["quality_score"] == 8
+        assert row["key_findings"] == ["Strong recurring revenue"]
+        assert row["risk_factors"] == ["Regulatory scrutiny"]
+        assert row["telegram_sent"] is False
+
+
+def test_get_long_term_by_id_returns_none_for_unknown_id(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        assert store.get_long_term_by_id(999) is None
+
+
+def test_mark_long_term_telegram_sent(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(_long_term_alert())
+        store.mark_long_term_telegram_sent(alert_id)
+
+        row = store.get_long_term_by_id(alert_id)
+        assert row["telegram_sent"] is True
+        assert row["telegram_sent_at"] is not None
+
+
+def test_mark_long_term_telegram_failed(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(_long_term_alert())
+        store.mark_long_term_telegram_failed(alert_id, "bad token")
+
+        row = store.get_long_term_by_id(alert_id)
+        assert row["telegram_sent"] is False
+        assert "bad token" in row["telegram_error"]
+
+
+def test_long_term_alerts_between_filters_to_the_window(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_long_term_alert(_long_term_alert(ticker="OLD", correlated_at=NOW - timedelta(days=10)))
+        store.record_long_term_alert(_long_term_alert(ticker="IN", correlated_at=NOW))
+
+        rows = store.long_term_alerts_between(NOW - timedelta(hours=1), NOW + timedelta(hours=1))
+        assert [r["ticker"] for r in rows] == ["IN"]
+
+
+def test_purge_long_term_older_than_deletes_stale_rows(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_long_term_alert(_long_term_alert(correlated_at=NOW - timedelta(days=10)))
+        store.record_long_term_alert(_long_term_alert(correlated_at=NOW))
+
+        purged = store.purge_long_term_older_than(NOW - timedelta(days=1))
+
+        assert purged == 1
+        assert store.count_long_term() == 1
+
+
+def test_recent_long_term_orders_newest_first(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_long_term_alert(_long_term_alert(ticker="FIRST", correlated_at=NOW - timedelta(hours=1)))
+        store.record_long_term_alert(_long_term_alert(ticker="SECOND", correlated_at=NOW))
+
+        rows = store.recent_long_term()
+        assert [r["ticker"] for r in rows] == ["SECOND", "FIRST"]
+
+
+def test_long_term_state_persists_across_reopen(tmp_path):
+    path = tmp_path / "audit.db"
+    with AuditStore(path) as store:
+        store.record_long_term_alert(_long_term_alert())
+
+    with AuditStore(path) as store2:
+        assert store2.count_long_term() == 1

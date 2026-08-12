@@ -22,11 +22,20 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from talonx_brain.consumer import ResearchAgent, _build_retrieval_query, _categorize
-from talonx_brain.llm import _LLMFindings
+from talonx_brain.consumer import (
+    ResearchAgent,
+    _build_long_term_retrieval_query,
+    _build_retrieval_query,
+    _categorize,
+    _categorize_long_term,
+)
+from talonx_brain.llm import _LLMFindings, _LLMFindingsLongTerm
 from talonx_brain.schemas import (
     Citation,
     CitationSourceType,
+    FundamentalFactorSignal,
+    LongTermResearchReport,
+    MoatRating,
     QuantSignal,
     ResearchReport,
     ResearchVerdict,
@@ -100,13 +109,30 @@ def agent():
         risk_factors=["Export restrictions"],
     )
 
+    # Always injected (never left to the real build_long_term_research_chain
+    # default) -- that default constructs a REAL Gemini/Ollama chain, which
+    # would need a live API key/local model just to build a ResearchAgent
+    # in a unit test. Individual long-term tests override .generate's
+    # return_value/model_used as needed.
+    long_term_llm_chain = AsyncMock()
+    long_term_llm_chain.model_used = "gemini-flash-latest"
+    long_term_llm_chain.generate.return_value = _LLMFindingsLongTerm(
+        moat_rating=MoatRating.WIDE,
+        capital_allocation_assessment="Disciplined buybacks and reinvestment.",
+        dcf_fair_value_per_share=220.0,
+        quality_score=8,
+        summary="Durable compounder with a wide moat.",
+        key_findings=["Strong recurring revenue base"],
+        risk_factors=["Regulatory scrutiny"],
+    )
+
     # cache_enabled defaults True, but agent.cache is None until
     # _connect_and_listen runs (never called in these tests) -- every
     # cache-branch check in consumer.py is `cache_enabled and cache is not
     # None`, so leaving it None here reproduces the pre-caching flow for
     # tests that don't care about caching. Tests that DO care inject a
     # cache explicitly via ResearchAgent(cache=...).
-    agent = ResearchAgent(retriever=retriever, llm_chain=llm_chain)
+    agent = ResearchAgent(retriever=retriever, llm_chain=llm_chain, long_term_llm_chain=long_term_llm_chain)
     agent._client = AsyncMock()
     return agent
 
@@ -330,7 +356,12 @@ async def test_filing_event_invalidates_cache_for_that_ticker(agent):
 
     await agent._handle_message(_msg(agent, _filing_event_payload("NVDA"), channel=agent.config.filings_channel))
 
-    cache.invalidate.assert_awaited_once_with("NVDA")
+    # Fresh filing text invalidates BOTH horizons -- the intraday
+    # technical-signal cache AND the long_term moat/DCF cache, since both
+    # prompt types are grounded in the same filing text.
+    assert cache.invalidate.await_count == 2
+    cache.invalidate.assert_any_await("NVDA", horizon="intraday")
+    cache.invalidate.assert_any_await("NVDA", horizon="long_term")
     assert agent.filing_invalidations == 1
     # Not treated as a research trigger.
     agent.retriever.retrieve.assert_not_called()
@@ -427,3 +458,230 @@ async def test_no_store_means_no_persistence_attempted(agent):
     # agent fixture has store=None by default -- must not raise.
     await agent._handle_message(_msg(agent, _signal_payload()))
     assert agent.reports_published == 1
+
+
+# --- Phase 2 LONG_TERM path --------------------------------------------------
+
+def _fundamental_signal_payload(ticker: str = "AAPL") -> dict:
+    return {
+        "ticker": ticker,
+        "fiscal_year": 2025,
+        "roic": 0.21,
+        "piotroski_f_score": 8,
+        "fcf_yield": 0.05,
+        "altman_z_score": 5.5,
+        "price": 200.0,
+        "message": "ROIC 21.1%, F-Score 8/9",
+        "computed_at": "2026-08-04T12:00:00Z",
+    }
+
+
+def _fundamentals_ingested_payload(ticker: str = "AAPL") -> dict:
+    return {
+        "ticker": ticker,
+        "cik": "0000320193",
+        "facts": [{"ticker": ticker, "cik": "0000320193", "fiscal_year": 2025}],
+        "published_at": "2026-08-04T12:00:00Z",
+    }
+
+
+def _fundamental_signal() -> FundamentalFactorSignal:
+    return FundamentalFactorSignal.model_validate(_fundamental_signal_payload())
+
+
+def _long_term_report(**overrides) -> LongTermResearchReport:
+    defaults = dict(
+        ticker="AAPL",
+        triggering_signal=_fundamental_signal(),
+        moat_rating=MoatRating.WIDE,
+        capital_allocation_assessment="disciplined",
+        dcf_fair_value_per_share=220.0,
+        quality_score=8,
+        summary="durable compounder",
+        model_used="gemini-flash-latest",
+    )
+    defaults.update(overrides)
+    return LongTermResearchReport(**defaults)
+
+
+@pytest.mark.asyncio
+async def test_handle_message_publishes_long_term_research_report(agent):
+    await agent._handle_message(_msg(agent, _fundamental_signal_payload(), channel=agent.config.fundamental_signals_channel))
+
+    agent.retriever.retrieve.assert_called_once()
+    args = agent.retriever.retrieve.call_args.args
+    assert args[3] == "10-K"  # form_type filter, unique to the long-term retrieval call
+    agent.long_term_llm_chain.generate.assert_awaited_once()
+    agent._client.publish.assert_awaited_once()
+
+    channel, payload = agent._client.publish.await_args.args
+    assert channel == agent.config.reports_channel_long_term
+    body = json.loads(payload)
+    assert body["ticker"] == "AAPL"
+    assert body["moat_rating"] == "wide"
+    assert body["quality_score"] == 8
+
+    assert agent.fundamentals_processed == 1
+    assert agent.long_term_reports_published == 1
+
+
+@pytest.mark.asyncio
+async def test_long_term_cold_start_bypasses_the_llm(agent):
+    agent.retriever.retrieve.return_value = []
+
+    await agent._handle_message(_msg(agent, _fundamental_signal_payload(), channel=agent.config.fundamental_signals_channel))
+
+    agent.long_term_llm_chain.generate.assert_not_awaited()
+    body = json.loads(agent._client.publish.await_args.args[1])
+    assert body["moat_rating"] == "none"
+    assert body["model_used"] == "none (cold-start bypass)"
+
+
+@pytest.mark.asyncio
+async def test_long_term_llm_failure_with_no_cache_publishes_degraded_report(agent):
+    agent.long_term_llm_chain.generate.side_effect = RuntimeError("Gemini exploded")
+
+    await agent._handle_message(_msg(agent, _fundamental_signal_payload(), channel=agent.config.fundamental_signals_channel))
+
+    body = json.loads(agent._client.publish.await_args.args[1])
+    assert body["is_degraded"] is True
+    assert body["moat_rating"] == "none"
+    assert agent.long_term_reports_published == 1
+
+
+@pytest.mark.asyncio
+async def test_long_term_llm_failure_with_cached_entry_falls_back_to_stale(agent):
+    agent.long_term_llm_chain.generate.side_effect = RuntimeError("Gemini exploded")
+    cached = _long_term_report(summary="Old but usable long-term analysis.")
+    cache = AsyncMock()
+    cache.get.return_value = (cached, False)  # exists, not fresh -- stale
+    agent.cache = cache
+
+    await agent._handle_message(_msg(agent, _fundamental_signal_payload(), channel=agent.config.fundamental_signals_channel))
+
+    body = json.loads(agent._client.publish.await_args.args[1])
+    assert body["is_stale"] is True
+    assert body["is_degraded"] is False
+    assert body["summary"] == "Old but usable long-term analysis."
+    cache.set.assert_not_awaited()  # never re-cache a stale/degraded result
+
+
+@pytest.mark.asyncio
+async def test_long_term_fresh_cache_hit_skips_retrieval_and_llm(agent):
+    cached = _long_term_report(summary="Cached long-term analysis.")
+    cache = AsyncMock()
+    cache.get.return_value = (cached, True)  # fresh
+    agent.cache = cache
+
+    await agent._handle_message(_msg(agent, _fundamental_signal_payload(), channel=agent.config.fundamental_signals_channel))
+
+    agent.retriever.retrieve.assert_not_called()
+    agent.long_term_llm_chain.generate.assert_not_awaited()
+    cache.get.assert_awaited_once_with("AAPL", horizon="long_term")
+    body = json.loads(agent._client.publish.await_args.args[1])
+    assert body["from_cache"] is True
+    assert body["summary"] == "Cached long-term analysis."
+
+
+@pytest.mark.asyncio
+async def test_long_term_cache_miss_generates_and_caches_under_the_long_term_horizon(agent):
+    cache = AsyncMock()
+    cache.get.return_value = None
+    cache.acquire_lock.return_value = True
+    agent.cache = cache
+
+    await agent._handle_message(_msg(agent, _fundamental_signal_payload(), channel=agent.config.fundamental_signals_channel))
+
+    cache.acquire_lock.assert_awaited_once_with("AAPL", horizon="long_term")
+    agent.long_term_llm_chain.generate.assert_awaited_once()
+    cache.set.assert_awaited_once()
+    assert cache.set.await_args.kwargs["horizon"] == "long_term"
+    cache.release_lock.assert_awaited_once_with("AAPL", horizon="long_term")
+
+
+@pytest.mark.asyncio
+async def test_fundamental_signal_below_threshold_never_reaches_here_but_routing_still_works(agent):
+    """FundamentalScanner already gates on ROIC/F-Score thresholds before
+    ever publishing -- talonx_brain has no opinion on that, it just
+    researches whatever FundamentalFactorSignal arrives. This just
+    confirms channel routing works regardless of the signal's own values."""
+    payload = _fundamental_signal_payload()
+    payload["roic"] = 0.01  # would have failed FundamentalScanner's own gate upstream
+    await agent._handle_message(_msg(agent, payload, channel=agent.config.fundamental_signals_channel))
+
+    assert agent.fundamentals_processed == 1
+    agent._client.publish.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_fundamentals_ingested_event_invalidates_only_the_long_term_cache(agent):
+    cache = AsyncMock()
+    agent.cache = cache
+
+    await agent._handle_message(
+        _msg(agent, _fundamentals_ingested_payload("AAPL"), channel=agent.config.fundamentals_events_channel)
+    )
+
+    cache.invalidate.assert_awaited_once_with("AAPL", horizon="long_term")
+    # Not treated as a research trigger.
+    agent.retriever.retrieve.assert_not_called()
+    agent._client.publish.assert_not_awaited()
+    assert agent.fundamentals_processed == 0
+
+
+@pytest.mark.asyncio
+async def test_unparseable_fundamentals_ingested_event_is_dropped(agent):
+    cache = AsyncMock()
+    agent.cache = cache
+
+    await agent._handle_message(
+        {"channel": agent.config.fundamentals_events_channel, "data": "not json"}
+    )
+
+    cache.invalidate.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_unparseable_fundamental_signal_is_dropped(agent):
+    await agent._handle_message(
+        _msg(agent, {"ticker": "AAPL"}, channel=agent.config.fundamental_signals_channel)
+    )
+    assert agent.fundamentals_processed == 0
+
+
+@pytest.mark.asyncio
+async def test_long_term_report_persists_with_long_term_horizon(agent, tmp_path):
+    with BrainStatsStore(tmp_path / "brain.db") as store:
+        agent.store = store
+        await agent._handle_message(_msg(agent, _fundamental_signal_payload(), channel=agent.config.fundamental_signals_channel))
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        rows = store.report_counts_for_date(today)
+    assert len(rows) == 1
+    assert rows[0]["horizon"] == "long_term"
+    assert rows[0]["category"] == "llm_call"
+
+
+def test_build_long_term_retrieval_query_includes_ticker_and_moat_framing():
+    query = _build_long_term_retrieval_query(_fundamental_signal())
+    assert "AAPL" in query
+    assert "moat" in query.lower()
+
+
+def test_categorize_long_term_cache_hit():
+    assert _categorize_long_term(_long_term_report(from_cache=True)) == "cache_hit"
+
+
+def test_categorize_long_term_stale_fallback():
+    assert _categorize_long_term(_long_term_report(from_cache=True, is_stale=True)) == "stale_fallback"
+
+
+def test_categorize_long_term_degraded():
+    assert _categorize_long_term(_long_term_report(is_degraded=True)) == "degraded"
+
+
+def test_categorize_long_term_cold_start():
+    assert _categorize_long_term(_long_term_report(model_used="none (cold-start bypass)")) == "cold_start"
+
+
+def test_categorize_long_term_llm_call():
+    assert _categorize_long_term(_long_term_report()) == "llm_call"

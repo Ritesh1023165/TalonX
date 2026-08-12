@@ -72,6 +72,14 @@ class DispatchConfig:
     paper_trades_channel: str = os.environ.get(
         "TALONX_REDIS_PAPER_TRADES_CHANNEL", "talonx:paper:trades"
     )
+    # Phase 2 LONG_TERM path -- same env var names talonx_core/talonx_paper
+    # read on their sides of each boundary.
+    alerts_channel_long_term: str = os.environ.get(
+        "TALONX_REDIS_ALERTS_LONG_TERM_CHANNEL", "talonx:alerts:longterm"
+    )
+    paper_trades_channel_long_term: str = os.environ.get(
+        "TALONX_REDIS_PAPER_TRADES_LONG_TERM_CHANNEL", "talonx:paper:trades:longterm"
+    )
     connect_timeout_seconds: float = _env_float("TALONX_REDIS_CONNECT_TIMEOUT", 5.0)
     socket_timeout_seconds: float = _env_float("TALONX_REDIS_SOCKET_TIMEOUT", 5.0)
     reconnect_backoff_base_seconds: float = _env_float("TALONX_DISPATCH_RECONNECT_BASE", 1.0)

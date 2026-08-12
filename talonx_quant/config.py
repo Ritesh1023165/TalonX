@@ -144,3 +144,28 @@ class QuantConfig:
     db_path: str = os.environ.get(
         "TALONX_QUANT_DB_PATH", str(Path.home() / ".talonx" / "quant.db")
     )
+
+    # --- Phase 2 LONG_TERM path: fundamental factor scoring ---
+    # A sibling pipeline to everything above, not a second loop inside
+    # QuantScanner -- see fundamental_consumer.FundamentalScanner. Own
+    # channels, own thresholds, own (much longer) cooldown -- quarterly
+    # cadence, so no batch throttle at all (signal volume here is
+    # inherently low; throttling would be pointless complexity).
+    fundamentals_events_channel: str = os.environ.get(
+        "TALONX_REDIS_FUNDAMENTALS_CHANNEL", "talonx:fundamentals:events"
+    )
+    fundamental_signals_channel: str = os.environ.get(
+        "TALONX_REDIS_FUNDAMENTAL_SIGNALS_CHANNEL", "talonx:signals:fundamental"
+    )
+    # Spec's example thresholds: ROIC >= 15% and F-Score >= 7.
+    roic_threshold: float = _env_float("TALONX_QUANT_ROIC_THRESHOLD", 0.15)
+    f_score_threshold: int = _env_int("TALONX_QUANT_F_SCORE_THRESHOLD", 7)
+    # Deliberately its own key namespace (fundamental_cooldown:{TICKER}),
+    # NOT the intraday cooldown:{TICKER} key -- sharing it would let a
+    # same-day intraday signal suppress a quarterly fundamentals signal
+    # for the same ticker, or vice versa, purely by key collision.
+    # Default ~7 days: filings don't repeat within a quarter, this just
+    # guards against re-publishing on a redundant/duplicate ingest event.
+    fundamental_cooldown_seconds: float = _env_float(
+        "TALONX_QUANT_FUNDAMENTAL_COOLDOWN_SECONDS", 7 * 86400.0
+    )

@@ -17,6 +17,13 @@ doesn't reinstate a long combined message. Not stored here either --
 talonx_paper's own trade_history is already the durable record; this
 module's job stays "notify," not "store twice."
 
+Phase 2: ALSO subscribes to talonx:alerts:longterm and
+talonx:paper:trades:longterm, running the exact same
+record-then-maybe-notify shape through SEPARATE store methods/formatter
+functions/audit table (long_term_alerts) -- see store.py's own docstring
+for why long-term alerts get their own table rather than a horizon
+column on the intraday one.
+
 DispatchAgent.run() is three concurrent tasks, not one: the Redis alert
 listener below, TelegramReplyListener's incoming-message poll (only
 started if Telegram is configured -- no token, nothing to poll), and a
@@ -55,8 +62,19 @@ from datetime import datetime, timedelta, timezone
 from pydantic import ValidationError
 
 from talonx_dispatch.config import DispatchConfig
-from talonx_dispatch.formatter import format_telegram_summary, format_telegram_trade_execution
-from talonx_dispatch.schemas import ActionableAlert, AlertSeverity, PaperTradeExecution
+from talonx_dispatch.formatter import (
+    format_telegram_long_term_alert,
+    format_telegram_long_term_trade_execution,
+    format_telegram_summary,
+    format_telegram_trade_execution,
+)
+from talonx_dispatch.schemas import (
+    ActionableAlert,
+    AlertSeverity,
+    LongTermActionableAlert,
+    LongTermTradeExecution,
+    PaperTradeExecution,
+)
 from talonx_dispatch.store import AuditStore
 from talonx_dispatch.telegram_client import TelegramClient, TelegramSendError
 from talonx_dispatch.telegram_listener import TelegramReplyListener
@@ -96,6 +114,10 @@ class DispatchAgent:
         self._telegram_sent = 0
         self._telegram_failed = 0
         self._alerts_purged = 0
+        self._long_term_alerts_processed = 0
+        self._long_term_telegram_sent = 0
+        self._long_term_telegram_failed = 0
+        self._long_term_alerts_purged = 0
 
         try:
             self._min_severity = AlertSeverity(self.config.telegram_min_severity.lower())
@@ -132,6 +154,22 @@ class DispatchAgent:
     @property
     def alerts_purged(self) -> int:
         return self._alerts_purged
+
+    @property
+    def long_term_alerts_processed(self) -> int:
+        return self._long_term_alerts_processed
+
+    @property
+    def long_term_telegram_sent(self) -> int:
+        return self._long_term_telegram_sent
+
+    @property
+    def long_term_telegram_failed(self) -> int:
+        return self._long_term_telegram_failed
+
+    @property
+    def long_term_alerts_purged(self) -> int:
+        return self._long_term_alerts_purged
 
     async def run(self) -> None:
         if redis_asyncio is None:
@@ -184,14 +222,26 @@ class DispatchAgent:
             purged = self.store.purge_older_than(cutoff)
         except Exception as exc:  # noqa: BLE001 -- one bad sweep shouldn't kill the loop
             logger.error("Retention sweep failed: %s", exc)
-            return 0
+            purged = 0
         self._alerts_purged += purged
         if purged:
             logger.info(
                 "Retention sweep: purged %d alert(s) older than %s (%.0f day(s))",
                 purged, cutoff.isoformat(), self.config.retention_days,
             )
-        return purged
+
+        try:
+            lt_purged = self.store.purge_long_term_older_than(cutoff)
+        except Exception as exc:  # noqa: BLE001 -- one bad sweep shouldn't kill the loop
+            logger.error("Long-term retention sweep failed: %s", exc)
+            lt_purged = 0
+        self._long_term_alerts_purged += lt_purged
+        if lt_purged:
+            logger.info(
+                "Retention sweep: purged %d long-term alert(s) older than %s (%.0f day(s))",
+                lt_purged, cutoff.isoformat(), self.config.retention_days,
+            )
+        return purged + lt_purged
 
     async def _connect_and_listen(self) -> None:
         self._client = redis_asyncio.from_url(
@@ -203,10 +253,12 @@ class DispatchAgent:
         logger.info("Connected to Redis at %s", self.config.redis_url)
 
         pubsub = self._client.pubsub()
-        await pubsub.subscribe(self.config.alerts_channel, self.config.paper_trades_channel)
-        logger.info(
-            "Subscribed to %s and %s", self.config.alerts_channel, self.config.paper_trades_channel,
+        channels = (
+            self.config.alerts_channel, self.config.paper_trades_channel,
+            self.config.alerts_channel_long_term, self.config.paper_trades_channel_long_term,
         )
+        await pubsub.subscribe(*channels)
+        logger.info("Subscribed to %s", ", ".join(channels))
 
         try:
             while not self._stop_event.is_set():
@@ -217,7 +269,7 @@ class DispatchAgent:
                     continue  # normal: no message within this poll window
                 await self._handle_message(message)
         finally:
-            await pubsub.unsubscribe(self.config.alerts_channel, self.config.paper_trades_channel)
+            await pubsub.unsubscribe(*channels)
             await pubsub.aclose()
             await self._client.aclose()
 
@@ -239,6 +291,12 @@ class DispatchAgent:
         if channel == self.config.paper_trades_channel:
             await self._handle_trade_execution(payload)
             return
+        if channel == self.config.paper_trades_channel_long_term:
+            await self._handle_long_term_trade_execution(payload)
+            return
+        if channel == self.config.alerts_channel_long_term:
+            await self._handle_long_term_alert(payload)
+            return
         if channel != self.config.alerts_channel:
             logger.warning("Dropping message on unexpected channel %s", channel)
             return
@@ -257,6 +315,22 @@ class DispatchAgent:
         )
 
         await self._maybe_send_telegram(alert, alert_id)
+
+    async def _handle_long_term_alert(self, payload: dict) -> None:
+        try:
+            alert = LongTermActionableAlert.model_validate(payload)
+        except ValidationError as exc:
+            logger.warning("Dropping unparseable long-term alert: %s", exc)
+            return
+
+        self._long_term_alerts_processed += 1
+        alert_id = self.store.record_long_term_alert(alert)
+        logger.info(
+            "Recorded long-term alert #LT%d: %s %s (%s)",
+            alert_id, alert.ticker, alert.action.value, alert.severity.value,
+        )
+
+        await self._maybe_send_long_term_telegram(alert, alert_id)
 
     def _company_name(self, ticker: str) -> str | None:
         try:
@@ -306,4 +380,46 @@ class DispatchAgent:
             self._telegram_failed += 1
             logger.error(
                 "Telegram push failed for alert #%d (%s): %s", alert_id, alert.ticker, exc
+            )
+
+    async def _handle_long_term_trade_execution(self, payload: dict) -> None:
+        try:
+            execution = LongTermTradeExecution.model_validate(payload)
+        except ValidationError as exc:
+            logger.warning("Dropping unparseable long-term paper trade execution: %s", exc)
+            return
+
+        if not self.telegram_client.is_configured:
+            return
+
+        text = format_telegram_long_term_trade_execution(execution, self._company_name(execution.ticker))
+        try:
+            await self.telegram_client.send(text)
+            logger.info(
+                "Telegram push sent for long-term paper trade #%d (%s %s)",
+                execution.trade_id, execution.ticker, execution.order_type.value,
+            )
+        except TelegramSendError as exc:
+            logger.error(
+                "Telegram push failed for long-term paper trade #%d (%s): %s",
+                execution.trade_id, execution.ticker, exc,
+            )
+
+    async def _maybe_send_long_term_telegram(self, alert: LongTermActionableAlert, alert_id: int) -> None:
+        if not self.telegram_client.is_configured:
+            return
+        if alert.severity.rank < self._min_severity.rank:
+            return
+
+        text = format_telegram_long_term_alert(alert, alert_id, self._company_name(alert.ticker))
+        try:
+            await self.telegram_client.send(text)
+            self.store.mark_long_term_telegram_sent(alert_id)
+            self._long_term_telegram_sent += 1
+            logger.info("Telegram push sent for long-term alert #LT%d (%s)", alert_id, alert.ticker)
+        except TelegramSendError as exc:
+            self.store.mark_long_term_telegram_failed(alert_id, str(exc))
+            self._long_term_telegram_failed += 1
+            logger.error(
+                "Telegram push failed for long-term alert #LT%d (%s): %s", alert_id, alert.ticker, exc
             )

@@ -47,7 +47,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from talonx_dispatch.schemas import ActionableAlert
+from talonx_dispatch.schemas import ActionableAlert, LongTermActionableAlert
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS alerts (
@@ -73,6 +73,34 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 CREATE INDEX IF NOT EXISTS idx_alerts_ticker ON alerts (ticker);
 CREATE INDEX IF NOT EXISTS idx_alerts_correlated_at ON alerts (correlated_at);
+
+-- Phase 2 LONG_TERM path -- a SEPARATE table, not a horizon column on
+-- `alerts` above: the field sets genuinely differ (quality/moat/fair-
+-- value vs. quant-direction/research-verdict/confidence), so a shared
+-- table would need a pile of nullable columns instead of a clean schema.
+CREATE TABLE IF NOT EXISTS long_term_alerts (
+    id                              INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker                          TEXT NOT NULL,
+    action                          TEXT NOT NULL,
+    severity                        TEXT NOT NULL,
+    rationale                       TEXT NOT NULL,
+    quality_score                   INTEGER NOT NULL,
+    moat_rating                     TEXT NOT NULL,
+    market_price                    REAL NOT NULL,
+    intrinsic_fair_value            REAL NOT NULL,
+    margin_of_safety_pct            REAL NOT NULL,
+    capital_allocation_assessment   TEXT NOT NULL,
+    key_findings_json               TEXT NOT NULL,
+    risk_factors_json               TEXT NOT NULL,
+    model_used                      TEXT NOT NULL,
+    correlated_at                   TEXT NOT NULL,
+    received_at                     TEXT NOT NULL,
+    telegram_sent                   INTEGER NOT NULL DEFAULT 0,
+    telegram_sent_at                TEXT,
+    telegram_error                  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_long_term_alerts_ticker ON long_term_alerts (ticker);
+CREATE INDEX IF NOT EXISTS idx_long_term_alerts_correlated_at ON long_term_alerts (correlated_at);
 """
 
 
@@ -232,8 +260,103 @@ class AuditStore:
         with self._lock:
             return self._conn.execute("SELECT COUNT(*) FROM alerts").fetchone()[0]
 
+    # ------------------------------------------------------------------
+    # Phase 2 LONG_TERM path -- same method shapes as the intraday ones
+    # above, against long_term_alerts instead.
+    # ------------------------------------------------------------------
+
+    def record_long_term_alert(self, alert: LongTermActionableAlert) -> int:
+        with self._lock:
+            cursor = self._conn.execute(
+                """
+                INSERT INTO long_term_alerts (
+                    ticker, action, severity, rationale, quality_score, moat_rating,
+                    market_price, intrinsic_fair_value, margin_of_safety_pct,
+                    capital_allocation_assessment, key_findings_json, risk_factors_json,
+                    model_used, correlated_at, received_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    alert.ticker.upper(),
+                    alert.action.value,
+                    alert.severity.value,
+                    alert.rationale,
+                    alert.quality_score,
+                    alert.moat_rating.value,
+                    alert.market_price,
+                    alert.intrinsic_fair_value,
+                    alert.margin_of_safety_pct,
+                    alert.capital_allocation_assessment,
+                    json.dumps(alert.key_findings),
+                    json.dumps(alert.risk_factors),
+                    alert.model_used,
+                    alert.correlated_at.isoformat(),
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+            self._conn.commit()
+            return cursor.lastrowid
+
+    def mark_long_term_telegram_sent(self, alert_id: int, sent_at: datetime | None = None) -> None:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE long_term_alerts SET telegram_sent = 1, telegram_sent_at = ?, "
+                "telegram_error = NULL WHERE id = ?",
+                ((sent_at or datetime.now(timezone.utc)).isoformat(), alert_id),
+            )
+            self._conn.commit()
+
+    def mark_long_term_telegram_failed(self, alert_id: int, error: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE long_term_alerts SET telegram_error = ? WHERE id = ?",
+                (error[:500], alert_id),
+            )
+            self._conn.commit()
+
+    def get_long_term_by_id(self, alert_id: int) -> dict | None:
+        with self._lock:
+            row = self._conn.execute("SELECT * FROM long_term_alerts WHERE id = ?", (alert_id,)).fetchone()
+            return _long_term_row_to_dict(row) if row is not None else None
+
+    def purge_long_term_older_than(self, cutoff: datetime) -> int:
+        with self._lock:
+            cursor = self._conn.execute(
+                "DELETE FROM long_term_alerts WHERE correlated_at < ?", (cutoff.isoformat(),)
+            )
+            self._conn.commit()
+            return cursor.rowcount
+
+    def long_term_alerts_between(self, start: datetime, end: datetime) -> list[dict]:
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT * FROM long_term_alerts WHERE correlated_at >= ? AND correlated_at < ? "
+                "ORDER BY correlated_at, id",
+                (start.isoformat(), end.isoformat()),
+            )
+            return [_long_term_row_to_dict(row) for row in cursor.fetchall()]
+
+    def recent_long_term(self, limit: int = 200) -> list[dict]:
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT * FROM long_term_alerts ORDER BY correlated_at DESC, id DESC LIMIT ?", (limit,)
+            )
+            return [_long_term_row_to_dict(row) for row in cursor.fetchall()]
+
+    def count_long_term(self) -> int:
+        with self._lock:
+            return self._conn.execute("SELECT COUNT(*) FROM long_term_alerts").fetchone()[0]
+
 
 def _row_to_dict(row: sqlite3.Row) -> dict:
+    d = dict(row)
+    d["key_findings"] = json.loads(d.pop("key_findings_json"))
+    d["risk_factors"] = json.loads(d.pop("risk_factors_json"))
+    d["telegram_sent"] = bool(d["telegram_sent"])
+    return d
+
+
+def _long_term_row_to_dict(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["key_findings"] = json.loads(d.pop("key_findings_json"))
     d["risk_factors"] = json.loads(d.pop("risk_factors_json"))

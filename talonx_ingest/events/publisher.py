@@ -17,7 +17,11 @@ from __future__ import annotations
 import logging
 
 from talonx_ingest.config import RedisConfig, settings
-from talonx_ingest.events.schemas import MarketTickEvent, NewFilingIngestedEvent
+from talonx_ingest.events.schemas import (
+    MarketTickEvent,
+    NewFilingIngestedEvent,
+    NewFundamentalsIngestedEvent,
+)
 
 logger = logging.getLogger("talonx_ingest.events.publisher")
 
@@ -99,6 +103,9 @@ class RedisEventPublisher:
 
     async def publish_filing_ingested(self, event: NewFilingIngestedEvent) -> None:
         await self._publish(self.config.filings_events_channel, event.to_redis_payload())
+
+    async def publish_fundamentals_ingested(self, event: NewFundamentalsIngestedEvent) -> None:
+        await self._publish(self.config.fundamentals_events_channel, event.to_redis_payload())
 
     async def _publish(self, channel: str, payload: str) -> None:
         if self._client is None:

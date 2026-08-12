@@ -54,11 +54,25 @@ class ContextRetriever:
         return self._news_store
 
     def retrieve(
-        self, ticker: str, query_text: str, n_results: int | None = None
+        self, ticker: str, query_text: str, n_results: int | None = None, form_type: str | None = None,
     ) -> list[Citation]:
+        """`form_type` (e.g. "10-K") is Phase 2's LONG_TERM path narrowing
+        retrieval to annual-report text specifically, skipping 10-Qs --
+        chunker.py already writes form_type into every filing chunk's
+        metadata, so this is a plain equality filter Chroma already
+        supports; the intraday path leaves it None (no filter, matches
+        every form type, exactly today's behavior)."""
         n = n_results or self.config.retrieval_top_k
+        # Chroma's `where` rejects a raw multi-key dict ({"a": x, "b": y})
+        # -- combining two field filters requires the explicit "$and"
+        # operator form. Single-field filters (the intraday path, and the
+        # news query below) stay a plain dict, which Chroma does accept.
+        where = (
+            {"ticker": ticker.upper()} if form_type is None
+            else {"$and": [{"ticker": ticker.upper()}, {"form_type": form_type}]}
+        )
         filing_results = self._filings_store.query(
-            query_text=query_text, n_results=n, where={"ticker": ticker.upper()}
+            query_text=query_text, n_results=n, where=where
         )
         citations = _to_citations(
             filing_results, CitationSourceType.FILING, self.config.excerpt_max_chars

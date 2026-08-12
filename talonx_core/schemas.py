@@ -125,6 +125,14 @@ class AlertAction(str, Enum):
     # user knows a signal fired even without a research opinion backing it.
     DEGRADED_QUANT_ALERT = "degraded_quant_alert"
 
+    # --- Phase 2 LONG_TERM decision matrix (see decision.py's
+    # evaluate_long_term) -- disjoint from the intraday actions above,
+    # never mixed on the same alert or the same Redis channel.
+    HIGH_CONVICTION_BUY = "high_conviction_buy"
+    HOLD_QUALITY = "hold_quality"
+    TAKE_PROFIT_REBALANCE = "take_profit_rebalance"
+    UNDER_PERFORM_REBALANCE = "under_perform_rebalance"
+
 
 class AlertSeverity(str, Enum):
     INFO = "info"
@@ -154,6 +162,93 @@ class ActionableAlert(BaseModel):
     # When talonx_core itself received each half of the correlated pair --
     # useful for diagnosing how stale a pairing was, independent of the
     # bar_timestamp/generated_at already inside the upstream payloads.
+    signal_received_at: datetime
+    report_received_at: datetime
+
+    correlated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_redis_payload(self) -> str:
+        return self.model_dump_json()
+
+
+# ------------------------------------------------------------------
+# Phase 2 LONG_TERM path -- fundamentals/moat-DCF input contracts and
+# this module's own long-term output contract
+# ------------------------------------------------------------------
+
+class FundamentalFactorSignal(BaseModel):
+    """Mirrors talonx_quant.schemas.FundamentalFactorSignal -- consumed
+    from talonx:signals:fundamental."""
+
+    ticker: str
+    fiscal_year: int
+    roic: float | None = None
+    piotroski_f_score: int | None = None
+    fcf_yield: float | None = None
+    altman_z_score: float | None = None
+    debt_to_ebitda_proxy: float | None = None
+    price: float
+    message: str
+    computed_at: datetime
+
+
+class MoatRating(str, Enum):
+    WIDE = "wide"
+    NARROW = "narrow"
+    NONE = "none"
+
+
+class LongTermResearchReport(BaseModel):
+    """Trimmed mirror of talonx_brain.schemas.LongTermResearchReport --
+    consumed from talonx:reports:longterm. Omits `citations`, same
+    reasoning as the intraday ResearchReport mirror above: the decision
+    matrix never looks at excerpt text."""
+
+    ticker: str
+    triggering_signal: FundamentalFactorSignal
+    moat_rating: MoatRating
+    capital_allocation_assessment: str
+    dcf_fair_value_per_share: float
+    quality_score: int = Field(ge=0, le=10)
+    summary: str
+    key_findings: list[str] = Field(default_factory=list)
+    risk_factors: list[str] = Field(default_factory=list)
+    model_used: str
+
+    is_stale: bool = False
+    is_degraded: bool = False
+    from_cache: bool = False
+
+    generated_at: datetime
+    published_at: datetime
+
+
+class LongTermActionableAlert(BaseModel):
+    """Published to talonx:alerts:longterm when a correlated fundamental-
+    signal + long-term-report pair clears evaluate_long_term()'s matrix.
+    A SIBLING schema to ActionableAlert, not a repurposing of it -- the
+    fields genuinely differ (margin of safety / quality / moat instead of
+    quant-direction / research-verdict / confidence)."""
+
+    ticker: str
+    action: AlertAction
+    severity: AlertSeverity
+    rationale: str
+
+    quality_score: int = Field(ge=0, le=10)
+    moat_rating: MoatRating
+    market_price: float
+    intrinsic_fair_value: float
+    margin_of_safety_pct: float  # (fair_value - price) / fair_value; negative means overvalued
+
+    triggering_signal: FundamentalFactorSignal
+    capital_allocation_assessment: str
+    key_findings: list[str] = Field(default_factory=list)
+    risk_factors: list[str] = Field(default_factory=list)
+    model_used: str
+    is_degraded: bool = False
+
     signal_received_at: datetime
     report_received_at: datetime
 

@@ -27,9 +27,10 @@ import logging
 
 from talonx_ingest.config import settings
 from talonx_ingest.edgar.client import EdgarClient, EdgarClientError
+from talonx_ingest.edgar.financials import parse_company_facts
 from talonx_ingest.edgar.models import FilingDocument
 from talonx_ingest.events.publisher import RedisEventPublisher
-from talonx_ingest.events.schemas import NewFilingIngestedEvent
+from talonx_ingest.events.schemas import NewFilingIngestedEvent, NewFundamentalsIngestedEvent
 from talonx_ingest.processing.chunker import DocumentChunker
 from talonx_ingest.processing.cleaner import clean_filing_html
 from talonx_ingest.storage.ledger import IngestionLedger
@@ -136,6 +137,64 @@ async def _publish_filing_event(
     await publisher.publish_filing_ingested(event)
 
 
+async def ingest_long_term_financials(
+    ticker: str,
+    edgar_client: EdgarClient,
+    ledger: IngestionLedger,
+    publisher: RedisEventPublisher,
+) -> int:
+    """
+    Phase 2's LONG_TERM path -- fetches SEC XBRL structured financials
+    (numbers, not filing text) for a ticker, parses up to 10 years of
+    annual facts, and publishes them as ONE NewFundamentalsIngestedEvent
+    if a fiscal year newer than the ledger's last-known one is found.
+    Deliberately independent of ingest_ticker()'s text-ingestion path --
+    same EdgarClient session, same CIK resolution, but a completely
+    separate data source (XBRL company facts vs. raw filing HTML) with
+    its own idempotency tracking (ledger.latest_ingested_fiscal_year,
+    keyed by CIK+fiscal_year, not accession number).
+
+    Returns the number of new fiscal years published this run (0 if
+    already up to date, or if the ticker/facts couldn't be resolved).
+    """
+    logger.info("[%s] Resolving ticker -> CIK for financials...", ticker)
+    try:
+        company = await edgar_client.resolve_ticker(ticker)
+    except EdgarClientError as exc:
+        logger.error("Skipping financials for %s: %s", ticker, exc)
+        return 0
+
+    try:
+        raw_facts = await edgar_client.get_company_facts(company)
+    except EdgarClientError as exc:
+        logger.error("Failed to fetch company facts for %s (%s): %s", ticker, company.cik, exc)
+        return 0
+
+    facts = parse_company_facts(raw_facts, ticker=ticker, cik=company.cik)
+    if not facts:
+        logger.warning("No usable annual financial facts found for %s (%s)", ticker, company.cik)
+        return 0
+
+    latest_known = ledger.latest_ingested_fiscal_year(company.cik)
+    latest_available = facts[0].fiscal_year
+    if latest_known is not None and latest_available <= latest_known:
+        logger.info(
+            "[%s] Financials up to date -- latest available FY%d already ingested",
+            ticker, latest_available,
+        )
+        return 0
+
+    await publisher.publish_fundamentals_ingested(
+        NewFundamentalsIngestedEvent(ticker=ticker.upper(), cik=company.cik, facts=facts)
+    )
+    ledger.mark_financials_ingested(ticker, company.cik, [f.fiscal_year for f in facts])
+    logger.info(
+        "[%s] Published fresh financials: FY%d (and %d prior year(s) of context)",
+        ticker, latest_available, len(facts) - 1,
+    )
+    return 1
+
+
 def _clean_documents_inplace(documents: list[FilingDocument]) -> None:
     """Cleaning is CPU-bound and synchronous; run it after all I/O completes."""
     for doc in documents:
@@ -193,6 +252,42 @@ async def run_ingestion(
                     results[ticker] = await task
                 except Exception as exc:  # noqa: BLE001 -- isolate per-ticker failures
                     logger.error("Unhandled error ingesting %s: %s", ticker, exc)
+                    results[ticker] = 0
+    finally:
+        ledger.close()
+        await publisher.close()
+
+    return results
+
+
+async def run_long_term_financials_ingestion(tickers: list[str]) -> dict[str, int]:
+    """Phase 2's batch entrypoint for the structured-financials path --
+    same shape as run_ingestion() above (own EdgarClient session, own
+    ledger/publisher, per-ticker task with isolated failure handling),
+    calling ingest_long_term_financials() instead of ingest_ticker().
+    Deliberately a separate function, not a branch inside run_ingestion:
+    the two paths share only the EdgarClient/ledger/publisher plumbing,
+    not the actual per-ticker work (text ingestion vs. XBRL facts)."""
+    logger.info("Starting long-term financials ingestion for tickers: %s", tickers)
+
+    ledger = IngestionLedger(settings.ledger.path)
+    publisher = RedisEventPublisher()
+    await publisher.connect()  # logs a warning and continues if Redis is unavailable
+
+    results: dict[str, int] = {}
+    try:
+        async with EdgarClient() as edgar_client:
+            tasks = {
+                ticker: asyncio.create_task(
+                    ingest_long_term_financials(ticker, edgar_client, ledger, publisher)
+                )
+                for ticker in tickers
+            }
+            for ticker, task in tasks.items():
+                try:
+                    results[ticker] = await task
+                except Exception as exc:  # noqa: BLE001 -- isolate per-ticker failures
+                    logger.error("Unhandled error ingesting financials for %s: %s", ticker, exc)
                     results[ticker] = 0
     finally:
         ledger.close()

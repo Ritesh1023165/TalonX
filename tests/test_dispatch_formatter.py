@@ -19,6 +19,9 @@ from datetime import datetime, timezone
 from talonx_dispatch.formatter import (
     escape_markdown,
     format_telegram_details,
+    format_telegram_long_term_alert,
+    format_telegram_long_term_details,
+    format_telegram_long_term_trade_execution,
     format_telegram_summary,
     format_telegram_trade_execution,
 )
@@ -26,6 +29,10 @@ from talonx_dispatch.schemas import (
     ActionableAlert,
     AlertAction,
     AlertSeverity,
+    LongTermActionableAlert,
+    LongTermOrderType,
+    LongTermTradeExecution,
+    MoatRating,
     OrderType,
     PaperTradeExecution,
     ResearchVerdict,
@@ -348,3 +355,209 @@ def test_trade_execution_buy_shows_shares_price_and_cash():
     assert "BUY EXECUTED" in text
     assert "131.50" in text
     assert "7,500.00" in text
+
+
+# ==========================================================================
+# Phase 2 LONG_TERM path
+# ==========================================================================
+
+def _long_term_alert(action: AlertAction = AlertAction.HIGH_CONVICTION_BUY, severity: AlertSeverity = AlertSeverity.CRITICAL) -> LongTermActionableAlert:
+    return LongTermActionableAlert(
+        ticker="AAPL", action=action, severity=severity,
+        rationale="FY2025 fundamentals clear thresholds -- quality score 8/10, wide moat.",
+        quality_score=8, moat_rating=MoatRating.WIDE, market_price=75.0,
+        intrinsic_fair_value=100.0, margin_of_safety_pct=0.25,
+        capital_allocation_assessment="Disciplined buybacks.",
+        key_findings=["Strong recurring revenue"], risk_factors=["Regulatory scrutiny"],
+        model_used="gemini-flash-latest", correlated_at=NOW, published_at=NOW,
+    )
+
+
+def test_long_term_alert_includes_ticker_price_fair_value_and_id():
+    text = format_telegram_long_term_alert(_long_term_alert(), alert_id=12)
+    assert "AAPL" in text
+    assert "75.00" in text
+    assert "100.00" in text
+    # "LT" prefix distinguishes this ID space from the intraday alerts
+    # table's -- both start their own AUTOINCREMENT sequence at 1, so a
+    # bare "#12" would be ambiguous between the two.
+    assert "#LT12" in text
+    assert "Reply with LT12" in text
+
+
+def test_long_term_alert_high_conviction_buy_uses_green_circle():
+    text = format_telegram_long_term_alert(_long_term_alert(AlertAction.HIGH_CONVICTION_BUY), alert_id=1)
+    assert "\U0001F7E2" in text
+    assert "HIGH CONVICTION BUY" in text
+
+
+def test_long_term_alert_under_perform_rebalance_uses_red_circle():
+    text = format_telegram_long_term_alert(_long_term_alert(AlertAction.UNDER_PERFORM_REBALANCE), alert_id=1)
+    assert "\U0001F534" in text
+    assert "FUNDAMENTAL STOP" in text
+
+
+def test_long_term_alert_shows_margin_of_safety_quality_and_moat():
+    text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1)
+    assert "+25.0%" in text
+    assert "8/10" in text
+    assert "WIDE" in text
+
+
+def test_long_term_alert_shows_valuation_exit_target():
+    text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1)
+    assert "120.00" in text  # 1.20 * fair_value(100.00)
+
+
+def test_long_term_alert_shows_holding_horizon():
+    text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1)
+    assert "6-24 months" in text
+
+
+def test_long_term_alert_negative_margin_of_safety_has_no_plus_sign():
+    alert = _long_term_alert(AlertAction.TAKE_PROFIT_REBALANCE)
+    alert = alert.model_copy(update={"margin_of_safety_pct": -0.15})
+    text = format_telegram_long_term_alert(alert, alert_id=1)
+    assert "-15.0%" in text
+    assert "+-15.0%" not in text
+
+
+def test_long_term_alert_unknown_action_does_not_raise():
+    """Regression coverage for the exact KeyError class DEGRADED_QUANT_ALERT
+    hit earlier this project -- .get() with a default must hold for any
+    future new long-term action value too."""
+    text = format_telegram_long_term_alert(_long_term_alert(AlertAction.HOLD_QUALITY), alert_id=1)
+    assert "HOLD (QUALITY)" in text
+
+
+def test_long_term_alert_includes_company_name_when_given():
+    text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1, company_name="Apple Inc.")
+    assert "`AAPL` (Apple Inc.)" in text
+
+
+def _long_term_row(
+    alert_id: int = 47, action: str = "high_conviction_buy",
+    key_findings: list[str] | None = None, risk_factors: list[str] | None = None,
+) -> dict:
+    """Matches AuditStore.get_long_term_by_id()'s return shape."""
+    return {
+        "id": alert_id, "ticker": "AAPL", "action": action, "severity": "critical",
+        "rationale": "FY2025 fundamentals clear thresholds -- quality score 8/10, wide moat.",
+        "quality_score": 8, "moat_rating": "wide", "market_price": 75.0,
+        "intrinsic_fair_value": 100.0, "margin_of_safety_pct": 0.25,
+        "capital_allocation_assessment": "Disciplined buybacks and reinvestment.",
+        "key_findings": key_findings or [], "risk_factors": risk_factors or [],
+        "model_used": "gemini-flash-latest", "correlated_at": NOW.isoformat(),
+        "received_at": NOW.isoformat(), "telegram_sent": False,
+        "telegram_sent_at": None, "telegram_error": None,
+    }
+
+
+def test_long_term_details_includes_ticker_price_and_id():
+    text = format_telegram_long_term_details(_long_term_row())
+    assert "AAPL" in text
+    assert "75.00" in text
+    assert "100.00" in text
+    assert "#LT47" in text
+
+
+def test_long_term_details_includes_capital_allocation_assessment():
+    text = format_telegram_long_term_details(_long_term_row())
+    assert "Disciplined buybacks and reinvestment." in text
+
+
+def test_long_term_details_includes_key_findings_and_risks_as_bullets():
+    text = format_telegram_long_term_details(
+        _long_term_row(key_findings=["Finding one"], risk_factors=["Risk one"])
+    )
+    assert "Key findings:" in text
+    assert "• Finding one" in text
+    assert "Risks:" in text
+    assert "• Risk one" in text
+
+
+def test_long_term_details_omits_sections_when_lists_empty():
+    text = format_telegram_long_term_details(_long_term_row(key_findings=[], risk_factors=[]))
+    assert "Key findings:" not in text
+    assert "Risks:" not in text
+
+
+def test_long_term_details_under_perform_rebalance_does_not_raise():
+    text = format_telegram_long_term_details(_long_term_row(action="under_perform_rebalance"))
+    assert "FUNDAMENTAL STOP" in text
+
+
+def test_long_term_details_formats_the_correlated_at_timestamp():
+    text = format_telegram_long_term_details(_long_term_row())
+    assert "2026-08-07 14:23 UTC" in text
+
+
+def _long_term_execution(order_type: LongTermOrderType = LongTermOrderType.BUY, **overrides) -> LongTermTradeExecution:
+    defaults = dict(
+        trade_id=7, ticker="AAPL", order_type=order_type, execution_price=100.0,
+        shares=20.0, contribution_cost=2000.0, avg_cost_basis_after=100.0, total_shares_after=20.0,
+        portfolio_cash_after=18000.0, triggering_action=AlertAction.HIGH_CONVICTION_BUY, timestamp=NOW,
+    )
+    defaults.update(overrides)
+    return LongTermTradeExecution(**defaults)
+
+
+def test_long_term_trade_execution_buy_shows_position_opened():
+    text = format_telegram_long_term_trade_execution(_long_term_execution(LongTermOrderType.BUY))
+    assert "POSITION OPENED" in text
+    assert "AAPL" in text
+    assert "20.0000 shares" in text
+    assert "18,000.00" in text
+
+
+def test_long_term_trade_execution_dca_shows_new_avg_cost():
+    execution = _long_term_execution(
+        LongTermOrderType.DCA_CONTRIBUTION, shares=4.5, contribution_cost=500.0,
+        avg_cost_basis_after=110.0, total_shares_after=24.5, triggering_action=AlertAction.DCA_CONTRIBUTION,
+    )
+    text = format_telegram_long_term_trade_execution(execution)
+    assert "DCA CONTRIBUTION" in text
+    assert "110.00" in text
+    assert "24.5000" in text
+
+
+def test_long_term_trade_execution_full_exit_shows_holding_period():
+    execution = _long_term_execution(
+        LongTermOrderType.SELL, shares=20.0, avg_cost_basis_after=None, total_shares_after=None,
+        realized_pnl_usd=200.0, realized_pnl_pct=10.0, holding_period_days=200,
+        triggering_action=AlertAction.UNDER_PERFORM_REBALANCE,
+    )
+    text = format_telegram_long_term_trade_execution(execution)
+    assert "FULL EXIT" in text
+    assert "fundamental stop" in text
+    assert "Held 200 day(s)" in text
+    assert "+$200.00" in text
+    assert "Remaining" not in text
+
+
+def test_long_term_trade_execution_partial_trim_shows_remaining_shares():
+    execution = _long_term_execution(
+        LongTermOrderType.SELL, shares=9.9, avg_cost_basis_after=100.0, total_shares_after=20.1,
+        realized_pnl_usd=198.0, realized_pnl_pct=20.0, holding_period_days=90,
+        triggering_action=AlertAction.TAKE_PROFIT_REBALANCE,
+    )
+    text = format_telegram_long_term_trade_execution(execution)
+    assert "PARTIAL TRIM" in text
+    assert "take-profit rebalance" in text
+    assert "Remaining: 20.1000 shares" in text
+
+
+def test_long_term_trade_execution_negative_pnl_has_no_plus_sign():
+    execution = _long_term_execution(
+        LongTermOrderType.SELL, shares=10.0, avg_cost_basis_after=None, total_shares_after=None,
+        realized_pnl_usd=-50.0, realized_pnl_pct=-5.0, holding_period_days=30,
+        triggering_action=AlertAction.UNDER_PERFORM_REBALANCE,
+    )
+    text = format_telegram_long_term_trade_execution(execution)
+    assert "$-50.00" in text
+    assert "+$-50.00" not in text
+
+
+def test_long_term_trade_execution_includes_company_name():
+    text = format_telegram_long_term_trade_execution(_long_term_execution(), company_name="Apple Inc.")
+    assert "`AAPL` (Apple Inc.)" in text

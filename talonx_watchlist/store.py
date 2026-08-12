@@ -49,9 +49,12 @@ CREATE TABLE IF NOT EXISTS tickers (
     exchange                TEXT NOT NULL DEFAULT '',
     status                  TEXT NOT NULL DEFAULT 'active',
     paper_trading_enabled   INTEGER NOT NULL DEFAULT 0,
+    strategy_horizon        TEXT NOT NULL DEFAULT 'INTRADAY',
     added_at                TEXT NOT NULL
 )
 """
+
+_VALID_HORIZONS = ("INTRADAY", "LONG_TERM", "DUAL_HORIZON")
 
 
 class TickerWatchlistStore:
@@ -78,6 +81,10 @@ class TickerWatchlistStore:
             self._conn.execute(
                 "ALTER TABLE tickers ADD COLUMN paper_trading_enabled INTEGER NOT NULL DEFAULT 0"
             )
+        if "strategy_horizon" not in cols:
+            self._conn.execute(
+                "ALTER TABLE tickers ADD COLUMN strategy_horizon TEXT NOT NULL DEFAULT 'INTRADAY'"
+            )
 
     def close(self) -> None:
         self._conn.close()
@@ -93,15 +100,17 @@ class TickerWatchlistStore:
         source (it needs to show paused tickers too, not just active ones)."""
         with self._lock:
             cursor = self._conn.execute(
-                "SELECT symbol, name, exchange, status, paper_trading_enabled, added_at "
+                "SELECT symbol, name, exchange, status, paper_trading_enabled, strategy_horizon, added_at "
                 "FROM tickers ORDER BY symbol"
             )
             return [
                 {
                     "symbol": symbol, "name": name, "exchange": exchange, "status": status,
-                    "paper_trading_enabled": bool(paper_trading_enabled), "added_at": added_at,
+                    "paper_trading_enabled": bool(paper_trading_enabled),
+                    "strategy_horizon": strategy_horizon, "added_at": added_at,
                 }
-                for symbol, name, exchange, status, paper_trading_enabled, added_at in cursor.fetchall()
+                for symbol, name, exchange, status, paper_trading_enabled, strategy_horizon, added_at
+                in cursor.fetchall()
             ]
 
     def get_ticker(self, symbol: str) -> dict | None:
@@ -110,16 +119,17 @@ class TickerWatchlistStore:
         the whole watchlist."""
         with self._lock:
             row = self._conn.execute(
-                "SELECT symbol, name, exchange, status, paper_trading_enabled, added_at "
+                "SELECT symbol, name, exchange, status, paper_trading_enabled, strategy_horizon, added_at "
                 "FROM tickers WHERE symbol = ?",
                 (symbol.strip().upper(),),
             ).fetchone()
         if row is None:
             return None
-        symbol, name, exchange, status, paper_trading_enabled, added_at = row
+        symbol, name, exchange, status, paper_trading_enabled, strategy_horizon, added_at = row
         return {
             "symbol": symbol, "name": name, "exchange": exchange, "status": status,
-            "paper_trading_enabled": bool(paper_trading_enabled), "added_at": added_at,
+            "paper_trading_enabled": bool(paper_trading_enabled),
+            "strategy_horizon": strategy_horizon, "added_at": added_at,
         }
 
     def list_symbols(self) -> list[str]:
@@ -136,7 +146,10 @@ class TickerWatchlistStore:
             )
             return [row[0] for row in cursor.fetchall()]
 
-    def add_ticker(self, symbol: str, name: str, exchange: str = "", status: str = "active") -> None:
+    def add_ticker(
+        self, symbol: str, name: str, exchange: str = "", status: str = "active",
+        strategy_horizon: str = "INTRADAY",
+    ) -> None:
         symbol = symbol.strip().upper()
         name = name.strip()
         exchange = exchange.strip()
@@ -144,14 +157,19 @@ class TickerWatchlistStore:
             raise ValueError("Ticker symbol cannot be empty")
         if status not in ("active", "paused"):
             raise ValueError(f"Invalid status: {status!r}")
+        if strategy_horizon not in _VALID_HORIZONS:
+            raise ValueError(f"Invalid strategy_horizon: {strategy_horizon!r}")
         with self._lock:
             self._conn.execute(
                 """
-                INSERT INTO tickers (symbol, name, exchange, status, added_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO tickers (symbol, name, exchange, status, strategy_horizon, added_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(symbol) DO UPDATE SET name = excluded.name, exchange = excluded.exchange
                 """,
-                (symbol, name or symbol, exchange, status, datetime.now(timezone.utc).isoformat()),
+                (
+                    symbol, name or symbol, exchange, status, strategy_horizon,
+                    datetime.now(timezone.utc).isoformat(),
+                ),
             )
             self._conn.commit()
 
@@ -192,6 +210,47 @@ class TickerWatchlistStore:
             cursor = self._conn.execute(
                 "SELECT symbol FROM tickers WHERE paper_trading_enabled = 1 ORDER BY symbol"
             )
+            return [row[0] for row in cursor.fetchall()]
+
+    def set_strategy_horizon(self, symbol: str, horizon: str) -> None:
+        """Phase 2's per-ticker routing control: which of the intraday
+        technical pipeline, the long-term fundamentals pipeline, or both,
+        this ticker feeds. Every module that routes on horizon (market
+        data cadence, talonx_quant's two scanners, talonx_ingest's
+        filing-text vs. financials paths) reads this via list_by_horizon
+        rather than caching it locally, so a horizon change here takes
+        effect without restarting backend services."""
+        if horizon not in _VALID_HORIZONS:
+            raise ValueError(f"Invalid strategy_horizon: {horizon!r}")
+        with self._lock:
+            self._conn.execute(
+                "UPDATE tickers SET strategy_horizon = ? WHERE symbol = ?",
+                (horizon, symbol.strip().upper()),
+            )
+            self._conn.commit()
+
+    def list_by_horizon(self, horizon: str) -> list[str]:
+        """Symbols tagged exactly `horizon`, PLUS any DUAL_HORIZON ticker
+        (which feeds both pipelines) -- so calling this with "INTRADAY"
+        and "LONG_TERM" together always covers every DUAL_HORIZON symbol
+        twice, once per pipeline, never zero times. Regardless of status
+        ('active'/'paused') -- same "list_tickers shows everything,
+        list_active_symbols is the filtered one" split this store already
+        uses elsewhere; callers that also care about active/paused
+        combine this with list_active_symbols()."""
+        if horizon not in _VALID_HORIZONS:
+            raise ValueError(f"Invalid strategy_horizon: {horizon!r}")
+        with self._lock:
+            if horizon == "DUAL_HORIZON":
+                cursor = self._conn.execute(
+                    "SELECT symbol FROM tickers WHERE strategy_horizon = 'DUAL_HORIZON' ORDER BY symbol"
+                )
+            else:
+                cursor = self._conn.execute(
+                    "SELECT symbol FROM tickers WHERE strategy_horizon = ? OR strategy_horizon = 'DUAL_HORIZON' "
+                    "ORDER BY symbol",
+                    (horizon,),
+                )
             return [row[0] for row in cursor.fetchall()]
 
     def ensure_seeded(self, default_symbol: str, default_name: str, default_exchange: str = "") -> bool:

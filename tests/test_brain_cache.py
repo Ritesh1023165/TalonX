@@ -22,7 +22,16 @@ import pytest
 
 from talonx_brain.cache import BrainCache
 from talonx_brain.config import BrainConfig
-from talonx_brain.schemas import QuantSignal, ResearchReport, ResearchVerdict, SignalDirection, SignalType
+from talonx_brain.schemas import (
+    FundamentalFactorSignal,
+    LongTermResearchReport,
+    MoatRating,
+    QuantSignal,
+    ResearchReport,
+    ResearchVerdict,
+    SignalDirection,
+    SignalType,
+)
 
 NOW = datetime(2026, 8, 10, 15, 0, 0, tzinfo=timezone.utc)  # 11am ET, mid-session
 
@@ -240,3 +249,124 @@ def test_next_expiry_is_the_sooner_of_base_ttl_or_market_boundary():
     expiry = cache.next_expiry(now)
 
     assert expiry == now + timedelta(seconds=600)
+
+
+# --- Phase 2 LONG_TERM horizon -----------------------------------------------
+
+def _long_term_signal() -> FundamentalFactorSignal:
+    return FundamentalFactorSignal(
+        ticker="AAPL", fiscal_year=2025, roic=0.21, piotroski_f_score=8,
+        fcf_yield=0.05, altman_z_score=5.5, price=200.0, message="ROIC 21%",
+        computed_at=NOW,
+    )
+
+
+def _long_term_report() -> LongTermResearchReport:
+    return LongTermResearchReport(
+        ticker="AAPL", triggering_signal=_long_term_signal(), moat_rating=MoatRating.WIDE,
+        capital_allocation_assessment="disciplined buybacks", dcf_fair_value_per_share=220.0,
+        quality_score=8, summary="durable compounder", model_used="gemini-flash-latest",
+    )
+
+
+def test_default_horizon_key_format_is_unchanged():
+    """Regression guard: the default (intraday) key format must stay
+    byte-identical to before Phase 2, or every existing cache entry is
+    silently orphaned."""
+    assert BrainCache._cache_key("nvda") == "brain_cache:NVDA"
+    assert BrainCache._lock_key("nvda") == "lock:brain:NVDA"
+    assert BrainCache._cache_key("nvda", "intraday") == "brain_cache:NVDA"
+
+
+def test_long_term_horizon_uses_a_separate_key_namespace():
+    assert BrainCache._cache_key("aapl", "long_term") == "brain_cache:long_term:AAPL"
+    assert BrainCache._lock_key("aapl", "long_term") == "lock:brain:long_term:AAPL"
+
+
+@pytest.mark.asyncio
+async def test_long_term_set_then_get_round_trips_the_right_model(cache, client):
+    store = {}
+
+    async def fake_set(key, value, ex=None, nx=None):
+        store[key] = value
+        return True
+
+    async def fake_get(key):
+        return store.get(key)
+
+    client.set.side_effect = fake_set
+    client.get.side_effect = fake_get
+
+    await cache.set("AAPL", _long_term_report(), horizon="long_term")
+    hit = await cache.get("AAPL", horizon="long_term")
+
+    assert hit is not None
+    report, is_fresh = hit
+    assert isinstance(report, LongTermResearchReport)
+    assert report.moat_rating == MoatRating.WIDE
+    assert is_fresh is True
+    # Confirms it landed under the long_term key, not the intraday one.
+    assert "brain_cache:long_term:AAPL" in store
+    assert "brain_cache:AAPL" not in store
+
+
+@pytest.mark.asyncio
+async def test_intraday_and_long_term_caches_for_the_same_ticker_are_independent(cache, client):
+    store = {}
+
+    async def fake_set(key, value, ex=None, nx=None):
+        store[key] = value
+        return True
+
+    async def fake_get(key):
+        return store.get(key)
+
+    client.set.side_effect = fake_set
+    client.get.side_effect = fake_get
+
+    await cache.set("AAPL", _report(), horizon="intraday")
+    await cache.set("AAPL", _long_term_report(), horizon="long_term")
+
+    intraday_hit = await cache.get("AAPL", horizon="intraday")
+    long_term_hit = await cache.get("AAPL", horizon="long_term")
+
+    assert isinstance(intraday_hit[0], ResearchReport)
+    assert isinstance(long_term_hit[0], LongTermResearchReport)
+
+
+def test_long_term_next_expiry_is_a_flat_ninety_day_cap_with_no_market_boundary():
+    cache = BrainCache(AsyncMock(), BrainConfig())
+    # Midday on a Sunday, well outside any weekday market-hours boundary
+    # logic -- proves long_term expiry never touches that math at all.
+    now = datetime(2026, 1, 11, 15, 0, 0, tzinfo=timezone.utc)
+
+    expiry = cache.next_expiry(now, horizon="long_term")
+
+    assert expiry == now + timedelta(seconds=90 * 86400.0)
+
+
+def test_long_term_next_expiry_respects_a_configured_ttl():
+    cache = BrainCache(AsyncMock(), BrainConfig(cache_base_ttl_long_term_seconds=30 * 86400.0))
+    now = datetime(2026, 1, 11, 15, 0, 0, tzinfo=timezone.utc)
+
+    expiry = cache.next_expiry(now, horizon="long_term")
+
+    assert expiry == now + timedelta(days=30)
+
+
+@pytest.mark.asyncio
+async def test_long_term_invalidate_only_clears_the_long_term_key(cache, client):
+    await cache.invalidate("AAPL", horizon="long_term")
+
+    client.delete.assert_awaited_once_with("brain_cache:long_term:AAPL")
+
+
+@pytest.mark.asyncio
+async def test_long_term_lock_acquire_and_release_use_the_long_term_key(cache, client):
+    client.set.return_value = True
+
+    await cache.acquire_lock("AAPL", horizon="long_term")
+    await cache.release_lock("AAPL", horizon="long_term")
+
+    assert client.set.await_args.args[0] == "lock:brain:long_term:AAPL"
+    client.delete.assert_awaited_once_with("lock:brain:long_term:AAPL")

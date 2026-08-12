@@ -60,6 +60,16 @@ CREATE TABLE IF NOT EXISTS ingested_news_articles (
 );
 CREATE INDEX IF NOT EXISTS idx_ingested_news_ticker
     ON ingested_news_articles (ticker);
+
+CREATE TABLE IF NOT EXISTS ingested_financials (
+    cik          TEXT NOT NULL,
+    fiscal_year  INTEGER NOT NULL,
+    ticker       TEXT NOT NULL,
+    ingested_at  TEXT NOT NULL,
+    PRIMARY KEY (cik, fiscal_year)
+);
+CREATE INDEX IF NOT EXISTS idx_ingested_financials_ticker
+    ON ingested_financials (ticker);
 """
 
 
@@ -212,5 +222,30 @@ class IngestionLedger:
                 chunk_count,
                 datetime.now(timezone.utc).isoformat(),
             ),
+        )
+        self._conn.commit()
+
+    # ------------------------------------------------------------------
+    # Structured financials tracking (Phase 2 LONG_TERM path) -- keyed by
+    # (cik, fiscal_year), not accession number, since XBRL company facts
+    # aren't fetched per-filing the way 10-K/10-Q text is; "already
+    # ingested" here means "this fiscal year's numbers are already
+    # parsed and published," so a re-run only needs to check for a NEW
+    # most-recent fiscal year, not re-walk every year every time.
+    # ------------------------------------------------------------------
+
+    def latest_ingested_fiscal_year(self, cik: str) -> int | None:
+        cursor = self._conn.execute(
+            "SELECT MAX(fiscal_year) FROM ingested_financials WHERE cik = ?", (cik,)
+        )
+        row = cursor.fetchone()
+        return row[0] if row and row[0] is not None else None
+
+    def mark_financials_ingested(self, ticker: str, cik: str, fiscal_years: list[int]) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.executemany(
+            "INSERT OR REPLACE INTO ingested_financials (cik, fiscal_year, ticker, ingested_at) "
+            "VALUES (?, ?, ?, ?)",
+            [(cik, fy, ticker.upper(), now) for fy in fiscal_years],
         )
         self._conn.commit()

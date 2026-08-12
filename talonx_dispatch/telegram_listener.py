@@ -7,6 +7,12 @@ alert ID, sends back the full detail (formatter.format_telegram_details)
 looked up from the audit trail. telegram_client.py only ever SENDS; this
 is the only place that reads.
 
+Phase 2: a bare numeric reply ("47") looks up the intraday `alerts`
+table; an "LT"-prefixed reply ("LT47") looks up `long_term_alerts`
+instead -- both tables start their own AUTOINCREMENT id sequence at 1,
+so the prefix is what disambiguates which ledger a given reply means
+(matches the "#LT{id}" the long-term push itself already shows).
+
 Uses Bot.get_updates(timeout=N) -- Telegram's own server-side long-poll:
 the call blocks up to N seconds waiting for a new message before
 returning (possibly empty), so this isn't a busy-wait loop. `read_timeout`
@@ -39,7 +45,7 @@ from telegram import Bot, Update
 from telegram.error import TelegramError
 
 from talonx_dispatch.config import DispatchConfig
-from talonx_dispatch.formatter import format_telegram_details
+from talonx_dispatch.formatter import format_telegram_details, format_telegram_long_term_details
 from talonx_dispatch.store import AuditStore
 # _jittered_backoff comes from telegram_client.py (not consumer.py) specifically to
 # avoid a consumer.py <-> telegram_listener.py import cycle -- consumer.py imports
@@ -48,8 +54,10 @@ from talonx_dispatch.telegram_client import TelegramClient, TelegramSendError, _
 
 logger = logging.getLogger("talonx_dispatch.telegram_listener")
 
-# Accepts a bare number ("47"), "#47", "/details 47", or "/id 47".
-_ID_PATTERN = re.compile(r"^/?(?:details|id)?\s*#?(\d+)$", re.IGNORECASE)
+# Accepts a bare number ("47"), "#47", "/details 47", "/id 47" (intraday),
+# or the same shapes prefixed with "LT" ("LT47", "#LT47") for a long-term
+# alert. Group 1 captures the optional "LT" marker, group 2 the digits.
+_ID_PATTERN = re.compile(r"^/?(?:details|id)?\s*#?(LT)?(\d+)$", re.IGNORECASE)
 
 
 class TelegramReplyListener:
@@ -132,9 +140,24 @@ class TelegramReplyListener:
             logger.warning("Ignoring Telegram message from unrecognized chat_id=%s", message.chat_id)
             return
 
-        alert_id = _parse_alert_id(message.text)
-        if alert_id is None:
-            await self._reply("Reply with an alert ID number (e.g. 47) to get its full details.")
+        parsed = _parse_alert_id(message.text)
+        if parsed is None:
+            await self._reply(
+                "Reply with an alert ID number (e.g. 47) or a long-term alert ID "
+                "(e.g. LT47) to get its full details."
+            )
+            return
+        is_long_term, alert_id = parsed
+
+        if is_long_term:
+            row = self.store.get_long_term_by_id(alert_id)
+            if row is None:
+                await self._reply(
+                    f"Long-term alert #LT{alert_id} not found -- either it never existed, or it's "
+                    f"older than the {self.config.retention_days:.0f}-day retention window."
+                )
+                return
+            await self._reply(format_telegram_long_term_details(row))
             return
 
         row = self.store.get_by_id(alert_id)
@@ -155,6 +178,11 @@ class TelegramReplyListener:
             logger.error("Failed to send Telegram reply: %s", exc)
 
 
-def _parse_alert_id(text: str) -> int | None:
+def _parse_alert_id(text: str) -> tuple[bool, int] | None:
+    """Returns (is_long_term, id), or None if the text doesn't match the
+    ID pattern at all."""
     match = _ID_PATTERN.match(text.strip())
-    return int(match.group(1)) if match else None
+    if not match:
+        return None
+    is_long_term = match.group(1) is not None
+    return is_long_term, int(match.group(2))

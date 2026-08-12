@@ -75,6 +75,17 @@ class CoreConfig:
     alerts_channel: str = os.environ.get(
         "TALONX_REDIS_ALERTS_CHANNEL", "talonx:alerts:dispatch"
     )
+    # Phase 2 LONG_TERM path -- same env var names talonx_quant/talonx_brain
+    # read on their sides of each boundary.
+    fundamental_signals_channel: str = os.environ.get(
+        "TALONX_REDIS_FUNDAMENTAL_SIGNALS_CHANNEL", "talonx:signals:fundamental"
+    )
+    reports_channel_long_term: str = os.environ.get(
+        "TALONX_REDIS_REPORTS_LONG_TERM_CHANNEL", "talonx:reports:longterm"
+    )
+    alerts_channel_long_term: str = os.environ.get(
+        "TALONX_REDIS_ALERTS_LONG_TERM_CHANNEL", "talonx:alerts:longterm"
+    )
     connect_timeout_seconds: float = _env_float("TALONX_REDIS_CONNECT_TIMEOUT", 5.0)
     socket_timeout_seconds: float = _env_float("TALONX_REDIS_SOCKET_TIMEOUT", 5.0)
     reconnect_backoff_base_seconds: float = _env_float("TALONX_CORE_RECONNECT_BASE", 1.0)
@@ -125,4 +136,38 @@ class CoreConfig:
     enable_persistence: bool = _env_bool("TALONX_CORE_ENABLE_PERSISTENCE", True)
     state_db_path: str = os.environ.get(
         "TALONX_CORE_STATE_DB", str(Path.home() / ".talonx" / "core_state.db")
+    )
+
+    # --- Phase 2 LONG_TERM decision matrix (decision.py's evaluate_long_term) ---
+    # Spec's example thresholds, verbatim: Quality Score >= 7/10, Margin
+    # of Safety >= 20% (price <= 0.8x fair value), overvaluation trim at
+    # a 20% premium (price > 1.2x fair value).
+    quality_score_min: int = _env_int("TALONX_CORE_LT_QUALITY_SCORE_MIN", 7)
+    margin_of_safety_pct: float = _env_float("TALONX_CORE_LT_MARGIN_OF_SAFETY_PCT", 0.20)
+    valuation_premium_pct: float = _env_float("TALONX_CORE_LT_VALUATION_PREMIUM_PCT", 0.20)
+    # No beta/market-risk-premium data source exists anywhere in this
+    # project to compute a real CAPM-based WACC -- used as a documented
+    # assumed constant instead (roughly the long-run US equity market
+    # average, a reasonable generic default).
+    assumed_wacc: float = _env_float("TALONX_CORE_LT_ASSUMED_WACC", 0.09)
+    max_debt_to_ebitda: float = _env_float("TALONX_CORE_LT_MAX_DEBT_TO_EBITDA", 4.0)
+    # Roughly one fiscal year -- annual (10-K-only) facts mean a fresh
+    # signal/report pair genuinely can't arrive more often than that; a
+    # generous window avoids treating last year's still-relevant pair as
+    # too stale to correlate against a slightly-lagged report.
+    correlation_window_long_term_seconds: float = _env_float(
+        "TALONX_CORE_LT_CORRELATION_WINDOW", 400 * 86400.0
+    )
+    # Long-term alerts intentionally repeat far less often than intraday
+    # ones -- ~1 month, so a HOLD_QUALITY doesn't re-fire on every minor
+    # daily-close price wobble once the state-transition gate below also
+    # judges it unchanged.
+    ticker_cooldown_long_term_seconds: float = _env_float(
+        "TALONX_CORE_LT_TICKER_COOLDOWN", 30 * 86400.0
+    )
+    # Same "repeat of the same action needs a real price move" gate as
+    # the intraday price_delta_retrigger_pct, just a wider default (5%
+    # vs. 1%) since long-term valuation bands are inherently coarser.
+    price_delta_retrigger_pct_long_term: float = _env_float(
+        "TALONX_CORE_LT_PRICE_DELTA_RETRIGGER_PCT", 0.05
     )

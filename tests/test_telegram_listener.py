@@ -74,16 +74,22 @@ def listener(store, telegram_client) -> TelegramReplyListener:
 
 
 # --- _parse_alert_id --------------------------------------------------------
+# Returns (is_long_term, id) since Phase 2 -- a bare number is the
+# intraday alerts table; an "LT"-prefixed one is long_term_alerts.
 
 @pytest.mark.parametrize(
     "text,expected",
     [
-        ("47", 47),
-        ("#47", 47),
-        ("/details 47", 47),
-        ("/details47", 47),
-        ("/id 47", 47),
-        ("  47  ", 47),
+        ("47", (False, 47)),
+        ("#47", (False, 47)),
+        ("/details 47", (False, 47)),
+        ("/details47", (False, 47)),
+        ("/id 47", (False, 47)),
+        ("  47  ", (False, 47)),
+        ("LT47", (True, 47)),
+        ("#LT47", (True, 47)),
+        ("lt47", (True, 47)),  # case-insensitive
+        ("/details LT47", (True, 47)),
         ("hello", None),
         ("", None),
         ("47.5", None),
@@ -119,6 +125,46 @@ async def test_unknown_id_replies_not_found(listener, store, telegram_client):
     text = telegram_client.send.await_args.args[0]
     assert "999" in text
     assert "not found" in text.lower()
+
+
+# --- Phase 2 LONG_TERM path -------------------------------------------------
+
+def _long_term_row(alert_id: int = 12) -> dict:
+    return {
+        "id": alert_id, "ticker": "AAPL", "action": "high_conviction_buy", "severity": "critical",
+        "rationale": "FY2025 fundamentals clear thresholds.",
+        "quality_score": 8, "moat_rating": "wide", "market_price": 75.0,
+        "intrinsic_fair_value": 100.0, "margin_of_safety_pct": 0.25,
+        "capital_allocation_assessment": "Disciplined buybacks.",
+        "key_findings": [], "risk_factors": [],
+        "model_used": "gemini-flash-latest", "correlated_at": "2026-08-10T18:51:43+00:00",
+    }
+
+
+@pytest.mark.asyncio
+async def test_lt_prefixed_id_looks_up_the_long_term_table(listener, store, telegram_client):
+    store.get_long_term_by_id.return_value = _long_term_row(alert_id=12)
+
+    await listener._handle_update(_update(1, "LT12"))
+
+    store.get_long_term_by_id.assert_called_once_with(12)
+    store.get_by_id.assert_not_called()
+    text = telegram_client.send.await_args.args[0]
+    assert "AAPL" in text
+    assert "#LT12" in text
+    assert listener.replies_sent == 1
+
+
+@pytest.mark.asyncio
+async def test_unknown_long_term_id_replies_not_found(listener, store, telegram_client):
+    store.get_long_term_by_id.return_value = None
+
+    await listener._handle_update(_update(1, "LT999"))
+
+    text = telegram_client.send.await_args.args[0]
+    assert "LT999" in text
+    assert "not found" in text.lower()
+    store.get_by_id.assert_not_called()
 
 
 @pytest.mark.asyncio

@@ -103,3 +103,63 @@ class QuantSignal(BaseModel):
 
     def to_redis_payload(self) -> str:
         return self.model_dump_json()
+
+
+# ------------------------------------------------------------------
+# Phase 2 LONG_TERM path -- fundamentals input/output contracts
+# ------------------------------------------------------------------
+
+class FinancialStatementFacts(BaseModel):
+    """Mirrors talonx_ingest.edgar.financials.FinancialStatementFacts
+    field-for-field, same re-declared-not-imported convention as
+    MarketTickEvent above -- this module only knows the wire shape
+    published on talonx:fundamentals:events."""
+
+    ticker: str
+    cik: str
+    fiscal_year: int
+    fiscal_period: str = "FY"
+    revenue: float | None = None
+    operating_income: float | None = None
+    net_income: float | None = None
+    operating_cash_flow: float | None = None
+    capex: float | None = None
+    total_debt: float | None = None
+    cash_and_equivalents: float | None = None
+    total_equity: float | None = None
+    total_assets: float | None = None
+    retained_earnings: float | None = None
+    shares_outstanding: float | None = None
+
+
+class NewFundamentalsIngestedEvent(BaseModel):
+    """Mirrors talonx_ingest.events.schemas.NewFundamentalsIngestedEvent --
+    consumed from talonx:fundamentals:events, this module's trigger for
+    the fundamental factor pipeline."""
+
+    ticker: str
+    cik: str
+    facts: list[FinancialStatementFacts]
+    published_at: datetime
+
+
+class FundamentalFactorSignal(BaseModel):
+    """Published to talonx:signals:fundamental when a ticker's latest
+    fundamental factor scores clear config's thresholds -- the LONG_TERM
+    horizon's equivalent of QuantSignal."""
+
+    ticker: str
+    fiscal_year: int
+    roic: float | None = None
+    piotroski_f_score: int | None = None
+    fcf_yield: float | None = None
+    altman_z_score: float | None = None
+    debt_to_ebitda_proxy: float | None = None
+    price: float  # last known market price used for fcf_yield/altman_z_score
+    message: str
+
+    computed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_redis_payload(self) -> str:
+        return self.model_dump_json()

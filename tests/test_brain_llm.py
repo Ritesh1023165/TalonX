@@ -21,9 +21,18 @@ from talonx_brain.llm import (
     GeminiResearchChain,
     OllamaResearchChain,
     _LLMFindings,
+    _LLMFindingsLongTerm,
+    build_long_term_research_chain,
     build_research_chain,
 )
-from talonx_brain.schemas import QuantSignal, ResearchVerdict, SignalDirection, SignalType
+from talonx_brain.schemas import (
+    FundamentalFactorSignal,
+    MoatRating,
+    QuantSignal,
+    ResearchVerdict,
+    SignalDirection,
+    SignalType,
+)
 
 
 class _FakeCompiledChain:
@@ -38,16 +47,20 @@ class _FakeCompiledChain:
 
 
 class _FakeChatModel:
-    """Stand-in for ChatGoogleGenerativeAI/ChatOllama -- records init kwargs."""
+    """Stand-in for ChatGoogleGenerativeAI/ChatOllama -- records init kwargs
+    and which structured-output schema it was asked to bind to (checked
+    explicitly by the tests that care, e.g. the long-term-chain ones --
+    everything else just needs SOME compiled chain back)."""
 
     last_kwargs: dict | None = None
+    last_schema: type | None = None
     compiled: _FakeCompiledChain | None = None
 
     def __init__(self, **kwargs):
         type(self).last_kwargs = kwargs
 
     def with_structured_output(self, schema):
-        assert schema is _LLMFindings
+        type(self).last_schema = schema
         return type(self).compiled or _FakeCompiledChain()
 
 
@@ -62,12 +75,28 @@ def _signal() -> QuantSignal:
     )
 
 
+def _fundamental_signal() -> FundamentalFactorSignal:
+    return FundamentalFactorSignal(
+        ticker="AAPL",
+        fiscal_year=2025,
+        roic=0.21,
+        piotroski_f_score=8,
+        fcf_yield=0.05,
+        altman_z_score=5.5,
+        price=200.0,
+        message="ROIC 21.1%, F-Score 8/9",
+        computed_at=datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc),
+    )
+
+
 @pytest.fixture(autouse=True)
 def _reset_fake_chat_model():
     _FakeChatModel.last_kwargs = None
+    _FakeChatModel.last_schema = None
     _FakeChatModel.compiled = None
     yield
     _FakeChatModel.last_kwargs = None
+    _FakeChatModel.last_schema = None
     _FakeChatModel.compiled = None
 
 
@@ -179,3 +208,67 @@ async def test_generate_raises_after_exhausting_retries(monkeypatch):
         await chain.generate(_signal(), citations=[])
 
     assert _FakeChatModel.compiled.ainvoke.await_count == 3  # initial attempt + 2 retries
+
+
+# --- Phase 2 LONG_TERM chain (moat/DCF structured output + prompt) ---------
+
+def test_default_chain_binds_the_intraday_schema(monkeypatch):
+    monkeypatch.setattr(llm_module, "ChatOllama", _FakeChatModel)
+    OllamaResearchChain(BrainConfig(llm_provider="ollama"))
+    assert _FakeChatModel.last_schema is _LLMFindings
+
+
+def test_long_term_gemini_chain_binds_the_long_term_schema(monkeypatch):
+    monkeypatch.setattr(llm_module, "ChatGoogleGenerativeAI", _FakeChatModel)
+    config = BrainConfig(gemini_api_key="fake-key", llm_provider="gemini")
+
+    chain = build_long_term_research_chain(config)
+
+    assert isinstance(chain, GeminiResearchChain)
+    assert _FakeChatModel.last_schema is _LLMFindingsLongTerm
+
+
+def test_long_term_ollama_chain_binds_the_long_term_schema(monkeypatch):
+    monkeypatch.setattr(llm_module, "ChatOllama", _FakeChatModel)
+    config = BrainConfig(llm_provider="ollama")
+
+    chain = build_long_term_research_chain(config)
+
+    assert isinstance(chain, OllamaResearchChain)
+    assert _FakeChatModel.last_schema is _LLMFindingsLongTerm
+
+
+def test_build_long_term_research_chain_unknown_provider_raises():
+    config = BrainConfig(llm_provider="not-a-real-provider")
+    with pytest.raises(ValueError, match="not-a-real-provider"):
+        build_long_term_research_chain(config)
+
+
+@pytest.mark.asyncio
+async def test_long_term_generate_uses_the_long_term_prompt_builder(monkeypatch):
+    """Confirms generate() routes through _build_long_term_prompt, not the
+    intraday _build_prompt -- the prompt text must reference the
+    fundamental-factor framing, not the technical-trigger one."""
+    monkeypatch.setattr(llm_module, "ChatOllama", _FakeChatModel)
+    expected = _LLMFindingsLongTerm(
+        moat_rating=MoatRating.WIDE, capital_allocation_assessment="disciplined",
+        dcf_fair_value_per_share=210.0, quality_score=8, summary="strong compounder",
+    )
+    _FakeChatModel.compiled = _FakeCompiledChain(result=expected)
+    config = BrainConfig(llm_provider="ollama")
+    chain = build_long_term_research_chain(config)
+
+    captured_prompt = {}
+
+    async def _capture(prompt):
+        captured_prompt["text"] = prompt
+        return expected
+
+    _FakeChatModel.compiled.ainvoke.side_effect = _capture
+
+    result = await chain.generate(_fundamental_signal(), citations=[])
+
+    assert result is expected
+    assert "Fundamental factor summary" in captured_prompt["text"]
+    assert "economic moat" in captured_prompt["text"].lower()
+    assert "AAPL" in captured_prompt["text"]

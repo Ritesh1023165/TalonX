@@ -144,6 +144,32 @@ def test_context_retriever_respects_news_top_k_override():
     assert fake_news.query.call_args.kwargs["n_results"] == 2
 
 
+def test_context_retriever_form_type_filter_uses_and_operator():
+    """Phase 2's LONG_TERM path passes form_type="10-K" to narrow
+    retrieval to annual-report text. Chroma's `where` REJECTS a raw
+    multi-key dict ({"ticker": x, "form_type": y}) -- combining two field
+    filters requires the explicit "$and" operator form, or Chroma raises
+    ValueError("Expected where to have exactly one operator..."). Caught
+    live (a real ChromaDB call, not the mocked VectorStore this test file
+    otherwise uses) during the Phase 2 end-to-end smoke test -- this
+    locks the fix in since every OTHER test here mocks .query() and would
+    never have caught an invalid where-clause shape on its own."""
+    fake_filings = MagicMock()
+    fake_filings.query.return_value = _filing_chroma_result(0)
+    fake_news = MagicMock()
+    fake_news.query.return_value = _news_chroma_result(0)
+
+    retriever = ContextRetriever(
+        config=BrainConfig(), filings_store=fake_filings, news_store=fake_news
+    )
+    retriever.retrieve("MSFT", "moat and capital allocation", form_type="10-K")
+
+    fake_filings.query.assert_called_once_with(
+        query_text="moat and capital allocation", n_results=6,
+        where={"$and": [{"ticker": "MSFT"}, {"form_type": "10-K"}]},
+    )
+
+
 def test_context_retriever_n_results_override_applies_to_filings_only():
     fake_filings = MagicMock()
     fake_filings.query.return_value = _filing_chroma_result(0)

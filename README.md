@@ -916,6 +916,150 @@ Polygon/yfinance ──► talonx_ingest.market_data ──► Redis: talonx:mar
 
 ---
 
+### 3.9 Phase 2 — Multi-Horizon Architecture (`LONG_TERM` alongside `INTRADAY`)
+
+TalonX started as a purely intraday momentum scanner (minutes-to-hours
+holding period). Phase 2 adds a SECOND, fully independent horizon --
+fundamentals-driven quality/value investing (6-months-to-multi-year
+holding) -- running alongside the first, without touching how the
+intraday engine behaves. Both horizons share the same watchlist, the
+same Redis connection, and (for `talonx_paper`) the same SQLite file,
+but every other piece of state is a SIBLING, not a shared/merged one --
+that segregation is the core design decision behind everything below.
+
+**Tagging a ticker's horizon.** `talonx_watchlist`'s "🎯 Tracked
+tickers" table (§5n) gained a Horizon selector per row (and on the
+add-ticker form): `INTRADAY` (default, Phase 1 behavior, unchanged),
+`LONG_TERM` (fundamentals path only -- bypasses minute-bar technical
+scanning entirely), or `DUAL_HORIZON` (both paths run independently for
+the same ticker). A `DUAL_HORIZON` ticker's intraday and long-term
+state, positions, and alerts never collide -- see "Why sibling objects,
+not composite keys" below.
+
+**Why sibling objects, not composite keys.** Threading a `(ticker,
+horizon)` tuple through the EXISTING intraday structures
+(`TickerCorrelator`, `TickerStateStore.ticker_state`,
+`PaperTradingStore.positions`) would have meant a `DUAL_HORIZON`
+ticker's two evaluations silently colliding in the same slot. Instead,
+every Phase 2 addition is a separate class/table/schema: a second
+`LongTermTickerCorrelator` alongside `TickerCorrelator`, a second
+`ticker_state_long_term` table alongside `ticker_state`, a second set of
+`long_term_*` tables in the SAME `paper_trading.db` file (sharing only
+the `latest_prices` mark-to-market cache -- a price is a price
+regardless of horizon), and a second `long_term_alerts` table alongside
+`alerts` in the audit trail. This also matches the project's existing
+convention of each module re-declaring its own trimmed wire schemas
+rather than sharing Python objects across module boundaries.
+
+**Per-module additions:**
+
+- **`talonx_ingest`** -- a new structured-financials path, entirely
+  separate from the existing filing-TEXT ingestion (which still runs
+  too; moat/DCF research needs the qualitative 10-K text as well as the
+  numbers). `edgar/financials.py` parses up to 10 years of annual facts
+  from SEC's XBRL "company facts" API (`EdgarClient.get_company_facts`),
+  with a fallback chain per financial-statement field since XBRL tag
+  naming varies by company/era. `ingest_long_term_financials()`
+  publishes a `NewFundamentalsIngestedEvent` (embedding the parsed
+  numbers directly, not just metadata) on `talonx:fundamentals:events`
+  whenever a fiscal year newer than the ledger's last-known one is
+  found.
+- **`talonx_quant`** -- `fundamentals.py` computes ROIC, the Piotroski
+  F-Score (0-9; 2 of the spec's 9 checks are substituted with
+  revenue-growth and FCF-positivity, since this codebase has no prior
+  Days-Sales-Outstanding/gross-margin data to compare against), FCF
+  Yield, and a documented Altman Z-Score variant (Working Capital and
+  Total Liabilities components substituted with Cash/Total Assets and a
+  Total Debt proxy -- returns `None` for a debt-free company, since the
+  debt-based proxy is undefined for one). `fundamental_consumer.py`'s
+  `FundamentalScanner` is a SIBLING to `QuantScanner`, not a second loop
+  inside it -- a quarterly-cadence signal has no use for a 20-minute
+  intraday cooldown, and batch-throttling a handful of quarterly signals
+  would be pointless complexity. Publishes a `FundamentalFactorSignal`
+  to `talonx:signals:fundamental` whenever ROIC and F-Score both clear
+  their configured thresholds (`TALONX_QUANT_ROIC_THRESHOLD` /
+  `TALONX_QUANT_F_SCORE_THRESHOLD`, defaults 15% / 7).
+- **`talonx_brain`** -- a long-term research chain
+  (`build_long_term_research_chain`) producing moat rating
+  (WIDE/NARROW/NONE), a capital-allocation assessment, a DCF fair value
+  per share, and a 0-10 quality score, using the SAME Gemini/Ollama
+  provider already configured for the intraday chain (§3.3, §9.4). The
+  qualitative-research cache (§3.3) gained a `horizon` parameter --
+  intraday keys are byte-identical to before (no invalidation of
+  existing cache entries), long-term keys use a flat 90-day TTL cap (no
+  market-hours-boundary math -- a multi-year thesis has no "trading
+  session" to outlive) and are ALSO invalidated the moment a fresh
+  filing OR fresh structured financials arrive for that ticker.
+- **`talonx_core`** -- `evaluate_long_term()` implements the spec's
+  4-rule decision matrix verbatim: `HIGH_CONVICTION_BUY` (quality ≥ 7/10,
+  a real moat, price ≤ 0.8× fair value), `HOLD_QUALITY` (quality ≥ 7/10,
+  price within the 0.8×-1.2× band), `TAKE_PROFIT_REBALANCE` (price >
+  1.2× fair value), `UNDER_PERFORM_REBALANCE` (ROIC below WACC for 2
+  consecutive quarters, OR Debt/EBITDA above `TALONX_CORE_LT_MAX_DEBT_TO_EBITDA`,
+  OR the moat rating was downgraded since the last evaluation). WACC has
+  no real data source anywhere in this project (no beta/market-risk-
+  premium feed) -- it's a documented assumed constant
+  (`TALONX_CORE_LT_ASSUMED_WACC`, default 9%), and EBITDA is proxied by
+  operating income (no separate D&A line exists in the parsed XBRL
+  facts) -- both intentionally conservative-direction simplifications,
+  not real financial-model outputs.
+- **`talonx_paper`** -- a DCA-aware ledger in the SAME `paper_trading.db`
+  file, with its OWN cash pool (`TALONX_PAPER_LT_INITIAL_BALANCE`,
+  default $20,000, entirely separate from the intraday portfolio's
+  balance). `HIGH_CONVICTION_BUY` opens a position only when flat
+  (`TALONX_PAPER_LT_INITIAL_POSITION`); ongoing conviction is then
+  expressed through a recurring DCA contribution
+  (`TALONX_PAPER_DCA_CONTRIBUTION`, every `TALONX_PAPER_DCA_INTERVAL_DAYS`
+  -- a fixed-interval approximation of "monthly," not true calendar-month
+  scheduling) into every currently-open long-term position, not by
+  repeating the BUY alert itself. `TAKE_PROFIT_REBALANCE` trims a
+  configurable fraction (`TALONX_PAPER_REBALANCE_TRIM_PCT`, default
+  33%); `UNDER_PERFORM_REBALANCE` is a full exit. As with the intraday
+  engine, entry (BUY-type) triggers are gated by conviction; exit
+  (SELL-type / fundamental-stop) triggers are NEVER gated.
+- **`talonx_dispatch`** -- a separate `long_term_alerts` audit table and
+  its own Telegram push format (price vs. fair value, margin of safety,
+  quality/moat, the take-profit exit target, expected holding horizon).
+  Because `alerts` and `long_term_alerts` are two independently-
+  auto-incrementing tables, long-term Telegram IDs are prefixed --
+  `#LT12` in the push, reply `LT12` (case-insensitive) for full detail,
+  disambiguated from a bare intraday `#12`.
+- **Dashboard (`talonx_dispatch/app.py`)** -- restructured into 3 tabs:
+  **📈 Intraday Monitor** (everything Phase 1 already had), **💎
+  Long-Term Radar** (a Valuation & Margin of Safety table, the
+  moat/capital-allocation/DCF writeup behind each ticker, and the
+  long-term portfolio's cash/positions/DCA-contributed/equity curve),
+  and **⚙️ Watchlist & Settings** (the ticker watchlist with its horizon
+  selector, both portfolios' settings, and a horizon-filterable unified
+  audit trail).
+- **`generate_eod_report.py`** -- gained a Valuation & Margin of Safety
+  Radar section (latest known price/fair-value/quality/moat snapshot per
+  ticker -- NOT limited to the report's own calendar day, since
+  fundamentals evaluations happen on the order of quarters, not daily)
+  and a Long-Term Portfolio summary section (cash, total DCA
+  contributed, unrealized + realized PnL), both from `AuditStore`/
+  `PaperTradingStore`'s existing Phase 2 tables.
+- **Structured JSON logging** -- `talonx_ingest/common/structured_logging.py`'s
+  `log_structured()` helper (one JSON line per key event:
+  `FACTOR_CALCULATED`, `MOAT_EVALUATED`, `VALUATION_DERIVED`,
+  `TRADE_EXECUTED`, `FUNDAMENTAL_STOP_TRIGGERED`) is applied to every NEW
+  long-term code path. It's routed through a dedicated
+  `<module>.structured` CHILD logger rather than the module's own
+  logger, specifically because `talonx_brain.consumer` /
+  `talonx_core.consumer` / `talonx_paper.consumer` each handle BOTH
+  horizons in the same class -- this keeps the new JSON lines fully
+  isolated from that module's pre-existing plain-text intraday log
+  lines, in either direction. Retrofitting those existing ~15 intraday
+  log call sites to the same format is a deliberate, separate follow-up
+  (§8).
+
+**Not built this pass** (see §8 for the reasoning behind each): DRIP /
+dividend reinvestment, a separate End-of-Quarter report, a full
+structured-logging retrofit of the pre-existing intraday log lines, true
+calendar-month DCA scheduling, and a real CAPM-based WACC.
+
+---
+
 ## 4. First-time setup
 
 Open a terminal (VS Code integrated terminal, or Visual Studio's Terminal
@@ -1052,6 +1196,15 @@ Single process, single terminal, single Ctrl+C to stop. This starts:
   database can open (same failure mode as Module 5). Simulates BUY/SELL
   execution for tickers with paper trading enabled (§3.6) and pushes its
   own short Telegram notification per executed trade.
+- **Phase 2 (§3.9)**, automatically for any ticker tagged `LONG_TERM` or
+  `DUAL_HORIZON` in the watchlist -- structured financials ingestion, the
+  fundamental factor scanner, a slow daily-close price poll for
+  `LONG_TERM`-only tickers (a `DUAL_HORIZON` ticker already gets prices
+  from the regular stream above), and the DCA-aware long-term paper
+  engine. Modules 3/4/5 (`talonx_brain`/`talonx_core`/`talonx_dispatch`)
+  already handle both horizons internally within the same task started
+  above -- no separate flag needed for those three. A fresh install with
+  no `LONG_TERM`-tagged tickers simply has nothing for any of this to do.
 
 **The Streamlit dashboard is separate** -- run
 `streamlit run talonx_dispatch\app.py` (§5n) in its own terminal
@@ -1089,6 +1242,11 @@ Leave out paper trading (e.g. you don't want simulated trades while just
 testing alert delivery):
 ```powershell
 python run_talonx.py --skip-paper-trading
+```
+Leave out just the Phase 2 long-term paper engine (e.g. you want the
+intraday paper engine but not DCA contributions while testing):
+```powershell
+python run_talonx.py --skip-long-term-paper
 ```
 
 The sections below describe each component separately -- useful for
@@ -1612,7 +1770,14 @@ ticker watchlist's `TALONX_WATCHLIST_DB` / `TALONX_WATCHLIST_DEFAULT_SYMBOL`
 `TALONX_PAPER_INITIAL_BALANCE` / `TALONX_PAPER_TRADE_ALLOCATION` --
 fresh-install defaults only, since the dashboard's Settings panel is the
 actual live source of truth once a portfolio has been created (§3.6) --
-etc).
+etc). `.env.example`'s final "Phase 2" block covers everything specific
+to the LONG_TERM horizon (§3.9) -- fundamental factor thresholds
+(`TALONX_QUANT_ROIC_THRESHOLD` / `TALONX_QUANT_F_SCORE_THRESHOLD`), the
+long-term decision matrix (`TALONX_CORE_LT_*`), the long-term cache TTL
+(`TALONX_BRAIN_CACHE_BASE_TTL_LONG_TERM`), and the DCA-aware paper ledger
+(`TALONX_PAPER_LT_*` / `TALONX_PAPER_DCA_*` / `TALONX_PAPER_REBALANCE_TRIM_PCT`)
+-- none of it required; a fresh install with no `LONG_TERM`-tagged
+tickers ignores all of it.
 
 ---
 
@@ -1702,6 +1867,31 @@ etc).
   unbuilt, deliberately -- its API has no usable free read tier
   anymore (paid Basic tier, $100+/month required), which doesn't fit
   this project's free-by-default pattern. Revisit if that changes.
+- **Phase 2 (§3.9) has no DRIP / dividend reinvestment.** No dividend
+  data source exists anywhere in this pipeline (not in the SEC XBRL
+  facts parsed today, not in market data) -- this needs a genuinely new
+  external data integration before it's buildable at all, not just new
+  code. Worth a dedicated design pass once a dividend data source is
+  chosen.
+- **Phase 2 has no separate End-of-Quarter report.** The EOD report's
+  new Valuation Radar section (§3.9, §5p) already surfaces the same
+  underlying snapshot daily; an EOQ report's distinct value (moat-
+  stability history, quarter-over-quarter trend) needs this system to
+  have actually been running for a full quarter before there's any
+  history to report on.
+- **Phase 2's structured JSON logging (§3.9) only covers the NEW
+  long-term code paths**, not a retrofit of the ~15 pre-existing
+  intraday `logger.info(...)` call sites across all 6 modules --
+  deliberately deferred as a separate, purely mechanical follow-up.
+- **Phase 2's DCA scheduling is fixed-interval, not calendar-aware.**
+  `TALONX_PAPER_DCA_INTERVAL_DAYS` (default 30) approximates "monthly"
+  rather than firing on, say, the 1st of every calendar month.
+- **Phase 2's WACC is a flat assumed constant, not a real CAPM
+  calculation.** No beta/market-risk-premium data source exists
+  anywhere in this project -- `TALONX_CORE_LT_ASSUMED_WACC` (default 9%)
+  stands in for it, same documented-simplification treatment as the
+  Debt/EBITDA proxy (operating income substituting for EBITDA, no
+  separate D&A line in the parsed XBRL facts).
 
 ---
 

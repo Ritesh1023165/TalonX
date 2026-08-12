@@ -57,6 +57,17 @@ class AlertAction(str, Enum):
     STOP_LOSS_EXIT = "stop_loss_exit"
     TAKE_PROFIT_EXIT = "take_profit_exit"
 
+    # --- Phase 2 LONG_TERM decision matrix -- disjoint from the
+    # intraday actions above, never mixed on the same alert/channel.
+    HIGH_CONVICTION_BUY = "high_conviction_buy"
+    HOLD_QUALITY = "hold_quality"
+    TAKE_PROFIT_REBALANCE = "take_profit_rebalance"
+    UNDER_PERFORM_REBALANCE = "under_perform_rebalance"
+    # Never a real LongTermActionableAlert.action -- only ever appears as
+    # LongTermTradeExecution.triggering_action for a recurring DCA
+    # contribution, which has no originating alert.
+    DCA_CONTRIBUTION = "dca_contribution"
+
 
 class AlertSeverity(str, Enum):
     INFO = "info"
@@ -126,4 +137,65 @@ class PaperTradeExecution(BaseModel):
     triggering_action: AlertAction
     session_realized_pnl_usd: float
     session_realized_pnl_pct: float
+    timestamp: datetime
+
+
+# ------------------------------------------------------------------
+# Phase 2 LONG_TERM path
+# ------------------------------------------------------------------
+
+class MoatRating(str, Enum):
+    WIDE = "wide"
+    NARROW = "narrow"
+    NONE = "none"
+
+
+class LongTermActionableAlert(BaseModel):
+    """Trimmed mirror of talonx_core.schemas.LongTermActionableAlert --
+    consumed from talonx:alerts:longterm."""
+
+    ticker: str
+    action: AlertAction
+    severity: AlertSeverity
+    rationale: str
+
+    quality_score: int
+    moat_rating: MoatRating
+    market_price: float
+    intrinsic_fair_value: float
+    margin_of_safety_pct: float
+
+    capital_allocation_assessment: str
+    key_findings: list[str] = Field(default_factory=list)
+    risk_factors: list[str] = Field(default_factory=list)
+    model_used: str
+    is_degraded: bool = False
+
+    correlated_at: datetime
+    published_at: datetime
+
+
+class LongTermOrderType(str, Enum):
+    BUY = "BUY"
+    SELL = "SELL"
+    DCA_CONTRIBUTION = "DCA_CONTRIBUTION"
+
+
+class LongTermTradeExecution(BaseModel):
+    """Trimmed mirror of talonx_paper.schemas.LongTermTradeExecution --
+    consumed from talonx:paper:trades:longterm."""
+
+    trade_id: int
+    ticker: str
+    order_type: LongTermOrderType
+    execution_price: float
+    shares: float
+    contribution_cost: float
+    avg_cost_basis_after: float | None = None
+    total_shares_after: float | None = None
+    realized_pnl_usd: float | None = None
+    realized_pnl_pct: float | None = None
+    holding_period_days: int | None = None
+    portfolio_cash_after: float
+    triggering_action: AlertAction
     timestamp: datetime

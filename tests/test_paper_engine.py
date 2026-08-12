@@ -14,13 +14,17 @@ from datetime import datetime, timezone
 
 from talonx_paper.engine import (
     DecisionKind,
+    LongTermDecisionKind,
     apply_spread,
+    calculate_average_cost_basis,
     calculate_buy,
+    calculate_partial_sell_pnl,
     calculate_sell_pnl,
     check_stop_take,
+    decide_long_term_trade,
     decide_trade,
 )
-from talonx_paper.schemas import ActionableAlert, AlertAction, TriggeringSignalRef
+from talonx_paper.schemas import ActionableAlert, AlertAction, LongTermActionableAlert, MoatRating, TriggeringSignalRef
 
 NOW = datetime(2026, 8, 10, 14, 37, 0, tzinfo=timezone.utc)
 
@@ -182,3 +186,128 @@ def test_apply_spread_sell_fills_below_quoted_price():
 def test_apply_spread_zero_bps_is_a_noop():
     assert apply_spread(131.50, spread_bps=0.0, side="BUY") == 131.50
     assert apply_spread(131.50, spread_bps=0.0, side="SELL") == 131.50
+
+
+# ==========================================================================
+# Phase 2 LONG_TERM path
+# ==========================================================================
+
+def _long_term_alert(action: AlertAction, price: float = 100.0) -> LongTermActionableAlert:
+    return LongTermActionableAlert(
+        ticker="AAPL", action=action, quality_score=8, moat_rating=MoatRating.WIDE,
+        market_price=price, intrinsic_fair_value=120.0, margin_of_safety_pct=0.20, correlated_at=NOW,
+    )
+
+
+def _long_term_position(avg_cost_basis: float = 90.0, total_shares: float = 25.0) -> dict:
+    return {
+        "ticker": "AAPL", "total_shares": total_shares, "avg_cost_basis": avg_cost_basis,
+        "first_entry_at": NOW.isoformat(), "total_contributed_usd": total_shares * avg_cost_basis,
+    }
+
+
+# --- decide_long_term_trade ---------------------------------------------
+
+def test_high_conviction_buy_flat_produces_buy():
+    decision = decide_long_term_trade(_long_term_alert(AlertAction.HIGH_CONVICTION_BUY), position=None, rebalance_trim_pct=0.33)
+    assert decision.kind == LongTermDecisionKind.BUY
+    assert decision.ticker == "AAPL"
+
+
+def test_high_conviction_buy_already_long_is_ignored():
+    decision = decide_long_term_trade(
+        _long_term_alert(AlertAction.HIGH_CONVICTION_BUY), position=_long_term_position(), rebalance_trim_pct=0.33,
+    )
+    assert decision.kind == LongTermDecisionKind.IGNORED
+    assert decision.reason == "POSITION_ALREADY_OPEN"
+
+
+def test_take_profit_rebalance_long_produces_sell_partial():
+    decision = decide_long_term_trade(
+        _long_term_alert(AlertAction.TAKE_PROFIT_REBALANCE), position=_long_term_position(), rebalance_trim_pct=0.33,
+    )
+    assert decision.kind == LongTermDecisionKind.SELL_PARTIAL
+    assert decision.trim_fraction == 0.33
+
+
+def test_take_profit_rebalance_flat_is_ignored():
+    decision = decide_long_term_trade(
+        _long_term_alert(AlertAction.TAKE_PROFIT_REBALANCE), position=None, rebalance_trim_pct=0.33,
+    )
+    assert decision.kind == LongTermDecisionKind.IGNORED
+    assert decision.reason == "NO_ACTIVE_POSITION"
+
+
+def test_under_perform_rebalance_long_produces_sell_full():
+    decision = decide_long_term_trade(
+        _long_term_alert(AlertAction.UNDER_PERFORM_REBALANCE), position=_long_term_position(), rebalance_trim_pct=0.33,
+    )
+    assert decision.kind == LongTermDecisionKind.SELL_FULL
+
+
+def test_under_perform_rebalance_flat_is_ignored():
+    decision = decide_long_term_trade(
+        _long_term_alert(AlertAction.UNDER_PERFORM_REBALANCE), position=None, rebalance_trim_pct=0.33,
+    )
+    assert decision.kind == LongTermDecisionKind.IGNORED
+    assert decision.reason == "NO_ACTIVE_POSITION"
+
+
+def test_hold_quality_is_not_a_trading_trigger():
+    assert decide_long_term_trade(_long_term_alert(AlertAction.HOLD_QUALITY), position=None, rebalance_trim_pct=0.33) is None
+    assert decide_long_term_trade(
+        _long_term_alert(AlertAction.HOLD_QUALITY), position=_long_term_position(), rebalance_trim_pct=0.33,
+    ) is None
+
+
+def test_long_term_decision_carries_the_triggering_price():
+    decision = decide_long_term_trade(
+        _long_term_alert(AlertAction.HIGH_CONVICTION_BUY, price=88.5), position=None, rebalance_trim_pct=0.33,
+    )
+    assert decision.price == 88.5
+
+
+# --- calculate_average_cost_basis ----------------------------------------
+
+def test_calculate_average_cost_basis_first_buy_from_flat():
+    avg = calculate_average_cost_basis(existing_shares=0.0, existing_avg_cost=0.0, new_shares=10.0, new_price=100.0)
+    assert avg == 100.0
+
+
+def test_calculate_average_cost_basis_weighted_average_worked_example():
+    # 10 shares @ $100 (existing) + 10 shares @ $120 (new DCA buy)
+    # -> avg = (1000 + 1200) / 20 = 110.0
+    avg = calculate_average_cost_basis(existing_shares=10.0, existing_avg_cost=100.0, new_shares=10.0, new_price=120.0)
+    assert avg == 110.0
+
+
+def test_calculate_average_cost_basis_zero_total_shares_falls_back_to_new_price():
+    avg = calculate_average_cost_basis(existing_shares=0.0, existing_avg_cost=0.0, new_shares=0.0, new_price=50.0)
+    assert avg == 50.0
+
+
+# --- calculate_partial_sell_pnl -------------------------------------------
+
+def test_calculate_partial_sell_pnl_worked_example():
+    pnl_usd, pnl_pct = calculate_partial_sell_pnl(shares_to_sell=10.0, avg_cost_basis=90.0, exit_price=120.0)
+    assert pnl_usd == 300.0  # 10 * (120 - 90)
+    assert round(pnl_pct, 2) == 33.33
+
+
+def test_calculate_partial_sell_pnl_only_covers_the_sold_shares():
+    # Position is 25 shares, but only 8 (a trim fraction) are being sold --
+    # PnL must reflect just those 8, not the full 25.
+    pnl_usd, _ = calculate_partial_sell_pnl(shares_to_sell=8.0, avg_cost_basis=90.0, exit_price=120.0)
+    assert pnl_usd == 240.0  # 8 * (120 - 90)
+
+
+def test_calculate_partial_sell_pnl_negative_for_a_loss():
+    pnl_usd, pnl_pct = calculate_partial_sell_pnl(shares_to_sell=10.0, avg_cost_basis=100.0, exit_price=90.0)
+    assert pnl_usd == -100.0
+    assert pnl_pct == -10.0
+
+
+def test_calculate_partial_sell_pnl_zero_cost_basis_does_not_divide_by_zero():
+    pnl_usd, pnl_pct = calculate_partial_sell_pnl(shares_to_sell=10.0, avg_cost_basis=0.0, exit_price=90.0)
+    assert pnl_usd == 900.0
+    assert pnl_pct == 0.0

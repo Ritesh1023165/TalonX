@@ -302,3 +302,182 @@ def test_invalid_min_severity_config_falls_back_to_warning(tmp_path):
     finally:
         store.close()
         watchlist_store.close()
+
+
+# ==========================================================================
+# Phase 2 LONG_TERM path
+# ==========================================================================
+
+def _long_term_alert_payload(severity: str = "critical") -> dict:
+    now = "2026-08-07T12:00:00Z"
+    return {
+        "ticker": "AAPL", "action": "high_conviction_buy", "severity": severity,
+        "rationale": "FY2025 fundamentals clear thresholds.",
+        "quality_score": 8, "moat_rating": "wide", "market_price": 75.0,
+        "intrinsic_fair_value": 100.0, "margin_of_safety_pct": 0.25,
+        "capital_allocation_assessment": "Disciplined buybacks.",
+        "key_findings": [], "risk_factors": [],
+        "model_used": "gemini-flash-latest", "correlated_at": now, "published_at": now,
+    }
+
+
+def _long_term_message(payload) -> dict:
+    data = payload if isinstance(payload, str) else json.dumps(payload)
+    return {"channel": b"talonx:alerts:longterm", "data": data}
+
+
+def _long_term_trade_execution_payload(order_type: str = "BUY") -> dict:
+    now = "2026-08-10T14:37:00Z"
+    return {
+        "trade_id": 7, "ticker": "AAPL", "order_type": order_type, "execution_price": 100.0,
+        "shares": 20.0, "contribution_cost": 2000.0, "avg_cost_basis_after": 100.0,
+        "total_shares_after": 20.0, "portfolio_cash_after": 18000.0,
+        "triggering_action": "high_conviction_buy", "timestamp": now,
+    }
+
+
+def _long_term_trade_message(payload) -> dict:
+    data = payload if isinstance(payload, str) else json.dumps(payload)
+    return {"channel": b"talonx:paper:trades:longterm", "data": data}
+
+
+@pytest.mark.asyncio
+async def test_long_term_alert_always_recorded_even_when_telegram_not_configured(agent):
+    await agent._handle_message(_long_term_message(_long_term_alert_payload()))
+
+    assert agent.long_term_alerts_processed == 1
+    assert agent.store.count_long_term() == 1
+    agent.telegram_client.send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_long_term_telegram_sent_when_configured_and_severity_clears_threshold(agent):
+    agent.telegram_client.is_configured = True
+    await agent._handle_message(_long_term_message(_long_term_alert_payload(severity="critical")))
+
+    agent.telegram_client.send.assert_awaited_once()
+    row = agent.store.recent_long_term(limit=1)[0]
+    assert row["telegram_sent"] is True
+    assert agent.long_term_telegram_sent == 1
+
+
+@pytest.mark.asyncio
+async def test_long_term_telegram_skipped_when_below_min_severity(agent):
+    agent.telegram_client.is_configured = True
+    await agent._handle_message(_long_term_message(_long_term_alert_payload(severity="info")))
+
+    agent.telegram_client.send.assert_not_awaited()
+    row = agent.store.recent_long_term(limit=1)[0]
+    assert row["telegram_sent"] is False
+    assert agent.long_term_alerts_processed == 1
+
+
+@pytest.mark.asyncio
+async def test_long_term_telegram_failure_is_recorded_not_raised(agent):
+    agent.telegram_client.is_configured = True
+    agent.telegram_client.send.side_effect = TelegramSendError("bad token")
+
+    await agent._handle_message(_long_term_message(_long_term_alert_payload(severity="critical")))
+
+    row = agent.store.recent_long_term(limit=1)[0]
+    assert row["telegram_sent"] is False
+    assert "bad token" in row["telegram_error"]
+    assert agent.long_term_telegram_failed == 1
+
+
+@pytest.mark.asyncio
+async def test_long_term_alert_and_intraday_alert_are_independent(agent):
+    agent.telegram_client.is_configured = True
+    await agent._handle_message(_message(_alert_payload(severity="critical")))
+    await agent._handle_message(_long_term_message(_long_term_alert_payload(severity="critical")))
+
+    assert agent.alerts_processed == 1
+    assert agent.long_term_alerts_processed == 1
+    assert agent.store.count() == 1
+    assert agent.store.count_long_term() == 1
+    assert agent.telegram_client.send.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_long_term_push_uses_the_lt_prefixed_id_format(agent):
+    agent.telegram_client.is_configured = True
+    await agent._handle_message(_long_term_message(_long_term_alert_payload(severity="critical")))
+
+    text = agent.telegram_client.send.await_args.args[0]
+    row = agent.store.recent_long_term(limit=1)[0]
+    assert f"#LT{row['id']}" in text
+    assert f"Reply with LT{row['id']}" in text
+
+
+@pytest.mark.asyncio
+async def test_long_term_trade_execution_sends_its_own_short_push(agent):
+    agent.telegram_client.is_configured = True
+
+    await agent._handle_message(_long_term_trade_message(_long_term_trade_execution_payload()))
+
+    agent.telegram_client.send.assert_awaited_once()
+    text = agent.telegram_client.send.await_args.args[0]
+    assert "AAPL" in text
+    assert "POSITION OPENED" in text
+    # Not recorded in the long_term_alerts audit trail -- talonx_paper's
+    # own long_term_trade_history is the durable record for this.
+    assert agent.store.count_long_term() == 0
+    assert agent.long_term_alerts_processed == 0
+
+
+@pytest.mark.asyncio
+async def test_long_term_trade_execution_skipped_when_telegram_not_configured(agent):
+    agent.telegram_client.is_configured = False
+
+    await agent._handle_message(_long_term_trade_message(_long_term_trade_execution_payload()))
+
+    agent.telegram_client.send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_unparseable_long_term_alert_is_dropped(agent):
+    await agent._handle_message(_long_term_message("not json"))
+    assert agent.long_term_alerts_processed == 0
+
+
+@pytest.mark.asyncio
+async def test_invalid_long_term_alert_payload_is_dropped(agent):
+    await agent._handle_message(_long_term_message({"ticker": "AAPL"}))
+    assert agent.long_term_alerts_processed == 0
+
+
+@pytest.mark.asyncio
+async def test_unparseable_long_term_trade_execution_is_dropped(agent):
+    agent.telegram_client.is_configured = True
+    await agent._handle_message(_long_term_trade_message("not json"))
+    agent.telegram_client.send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_long_term_retention_sweep_purges_stale_alerts(agent):
+    old_payload = _long_term_alert_payload()
+    old_payload["correlated_at"] = (datetime(2026, 1, 1, tzinfo=timezone.utc)).isoformat()
+    await agent._handle_message(_long_term_message(old_payload))
+    assert agent.store.count_long_term() == 1
+
+    purged = await agent._run_retention_sweep_once()
+
+    assert purged == 1
+    assert agent.store.count_long_term() == 0
+    assert agent.long_term_alerts_purged == 1
+
+
+@pytest.mark.asyncio
+async def test_retention_sweep_purges_both_horizons_independently(agent):
+    old_intraday = _alert_payload()
+    old_intraday["correlated_at"] = "2026-01-01T00:00:00Z"
+    old_long_term = _long_term_alert_payload()
+    old_long_term["correlated_at"] = "2026-01-01T00:00:00Z"
+    await agent._handle_message(_message(old_intraday))
+    await agent._handle_message(_long_term_message(old_long_term))
+
+    purged = await agent._run_retention_sweep_once()
+
+    assert purged == 2
+    assert agent.store.count() == 0
+    assert agent.store.count_long_term() == 0

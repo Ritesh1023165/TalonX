@@ -140,6 +140,9 @@ class RedisConfig:
     filings_events_channel: str = os.environ.get(
         "TALONX_REDIS_FILINGS_CHANNEL", "talonx:filings:events"
     )
+    fundamentals_events_channel: str = os.environ.get(
+        "TALONX_REDIS_FUNDAMENTALS_CHANNEL", "talonx:fundamentals:events"
+    )
     connect_timeout_seconds: float = _env_float("TALONX_REDIS_CONNECT_TIMEOUT", 5.0)
     socket_timeout_seconds: float = _env_float("TALONX_REDIS_SOCKET_TIMEOUT", 5.0)
 

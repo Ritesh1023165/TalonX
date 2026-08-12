@@ -18,6 +18,8 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+from talonx_ingest.edgar.financials import FinancialStatementFacts
+
 
 class TickEventType(str, Enum):
     TRADE = "trade"
@@ -50,6 +52,34 @@ class MarketTickEvent(BaseModel):
     high: float | None = None
     low: float | None = None
     close: float | None = None
+
+    published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_redis_payload(self) -> str:
+        return self.model_dump_json()
+
+
+class NewFundamentalsIngestedEvent(BaseModel):
+    """
+    Published to the `talonx:fundamentals:events` Redis channel once fresh
+    structured financials (SEC XBRL company facts, NOT filing text) have
+    been parsed for a ticker -- Phase 2's LONG_TERM-horizon trigger,
+    parallel to NewFilingIngestedEvent's role for the intraday/RAG path.
+
+    EMBEDS the actual parsed numbers (`facts`), not just metadata --
+    unlike NewFilingIngestedEvent (which only needs to tell talonx_brain
+    "go invalidate your cache," since the filing TEXT itself already
+    lives in the shared ChromaDB both processes can query), a consumer
+    of THIS event (talonx_quant's FundamentalScanner) has no database of
+    its own to read the numbers back from -- talonx_quant only ever
+    talks to other modules over the Redis wire contract, never by
+    querying talonx_ingest's SQLite directly. So the numbers have to
+    ride along on the event itself.
+    """
+
+    ticker: str
+    cik: str
+    facts: list[FinancialStatementFacts]  # most recent fiscal year first, up to 10 years
 
     published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

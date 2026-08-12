@@ -209,3 +209,250 @@ def test_multiple_tickers_can_hold_concurrent_positions(tmp_path):
         positions = store.get_open_positions()
         assert {p["ticker"] for p in positions} == {"AAPL", "NVDA"}
         assert store.get_portfolio_summary()["current_cash"] == 5000.0
+
+
+# ==========================================================================
+# Phase 2 LONG_TERM path
+# ==========================================================================
+
+def _lt_store(tmp_path, initial_balance=20000.0, dca=500.0) -> PaperTradingStore:
+    return PaperTradingStore(
+        tmp_path / "paper.db", default_long_term_initial_balance=initial_balance,
+        default_dca_contribution_usd=dca,
+    )
+
+
+def test_fresh_store_seeds_long_term_portfolio_state(tmp_path):
+    with _lt_store(tmp_path) as store:
+        summary = store.get_long_term_portfolio_summary()
+        assert summary["initial_balance"] == 20000.0
+        assert summary["current_cash"] == 20000.0
+        assert summary["dca_contribution_usd"] == 500.0
+        assert summary["open_positions_count"] == 0
+
+
+def test_intraday_and_long_term_portfolios_are_independent_pools(tmp_path):
+    with PaperTradingStore(
+        tmp_path / "paper.db", default_initial_balance=10000.0, default_trade_allocation_usd=2500.0,
+        default_long_term_initial_balance=20000.0, default_dca_contribution_usd=500.0,
+    ) as store:
+        store.execute_buy("NVDA", shares=10.0, price=100.0, cost=1000.0, timestamp=NOW)
+        store.execute_long_term_buy("AAPL", shares=10.0, price=100.0, cost=1000.0, timestamp=NOW)
+
+        assert store.get_portfolio_summary()["current_cash"] == 9000.0
+        assert store.get_long_term_portfolio_summary()["current_cash"] == 19000.0
+        # A DUAL_HORIZON position for the SAME ticker on both ledgers must
+        # not collide with each other.
+        store.execute_buy("MSFT", shares=5.0, price=200.0, cost=1000.0, timestamp=NOW)
+        store.execute_long_term_buy("MSFT", shares=5.0, price=200.0, cost=1000.0, timestamp=NOW)
+        assert store.get_position("MSFT")["shares"] == 5.0
+        assert store.get_long_term_position("MSFT")["total_shares"] == 5.0
+
+
+def test_execute_long_term_buy_opens_a_position(tmp_path):
+    with _lt_store(tmp_path) as store:
+        execution = store.execute_long_term_buy("AAPL", shares=10.0, price=100.0, cost=1000.0, timestamp=NOW)
+
+        assert execution.ticker == "AAPL"
+        assert execution.order_type.value == "BUY"
+        assert execution.avg_cost_basis_after == 100.0
+        assert execution.total_shares_after == 10.0
+        assert execution.portfolio_cash_after == 19000.0
+
+        position = store.get_long_term_position("AAPL")
+        assert position["total_shares"] == 10.0
+        assert position["avg_cost_basis"] == 100.0
+        assert position["total_contributed_usd"] == 1000.0
+
+
+def test_execute_dca_contribution_recomputes_the_weighted_average(tmp_path):
+    with _lt_store(tmp_path) as store:
+        store.execute_long_term_buy("AAPL", shares=10.0, price=100.0, cost=1000.0, timestamp=NOW)
+        execution = store.execute_dca_contribution("AAPL", contribution_usd=1200.0, price=120.0, timestamp=NOW)
+
+        # 10 shares @ 100 (existing) + 10 shares @ 120 (new, 1200/120=10)
+        # -> avg = (1000 + 1200) / 20 = 110.0
+        assert round(execution.avg_cost_basis_after, 2) == 110.0
+        assert execution.total_shares_after == 20.0
+        assert execution.order_type.value == "DCA_CONTRIBUTION"
+
+        position = store.get_long_term_position("AAPL")
+        assert round(position["avg_cost_basis"], 2) == 110.0
+        assert position["total_shares"] == 20.0
+        assert position["total_contributed_usd"] == 2200.0
+
+
+def test_execute_dca_contribution_debits_the_shared_cash_pool(tmp_path):
+    with _lt_store(tmp_path) as store:
+        store.execute_long_term_buy("AAPL", shares=10.0, price=100.0, cost=1000.0, timestamp=NOW)
+        store.execute_dca_contribution("AAPL", contribution_usd=500.0, price=100.0, timestamp=NOW)
+
+        assert store.get_long_term_portfolio_summary()["current_cash"] == 20000.0 - 1000.0 - 500.0
+
+
+def test_execute_dca_contribution_returns_none_without_an_open_position(tmp_path):
+    with _lt_store(tmp_path) as store:
+        result = store.execute_dca_contribution("AAPL", contribution_usd=500.0, price=100.0, timestamp=NOW)
+        assert result is None
+
+
+def test_execute_long_term_sell_full_exit_closes_the_position(tmp_path):
+    with _lt_store(tmp_path) as store:
+        store.execute_long_term_buy("AAPL", shares=10.0, price=100.0, cost=1000.0, timestamp=NOW)
+        execution = store.execute_long_term_sell(
+            "AAPL", trim_fraction=1.0, exit_price=120.0, timestamp=NOW + timedelta(days=200),
+            triggering_action=AlertAction.UNDER_PERFORM_REBALANCE,
+        )
+
+        assert execution.shares == 10.0
+        assert execution.realized_pnl_usd == 200.0  # 10 * (120-100)
+        assert execution.avg_cost_basis_after is None
+        assert execution.total_shares_after is None
+        assert execution.holding_period_days == 200
+        assert store.get_long_term_position("AAPL") is None  # flat again
+
+
+def test_execute_long_term_sell_partial_trim_leaves_the_remainder_open(tmp_path):
+    with _lt_store(tmp_path) as store:
+        store.execute_long_term_buy("AAPL", shares=30.0, price=100.0, cost=3000.0, timestamp=NOW)
+        execution = store.execute_long_term_sell(
+            "AAPL", trim_fraction=0.33, exit_price=120.0, timestamp=NOW,
+            triggering_action=AlertAction.TAKE_PROFIT_REBALANCE,
+        )
+
+        assert round(execution.shares, 2) == 9.9  # 30 * 0.33
+        assert execution.avg_cost_basis_after == 100.0  # trimming doesn't change the average
+
+        position = store.get_long_term_position("AAPL")
+        assert round(position["total_shares"], 2) == 20.1  # 30 - 9.9
+
+
+def test_execute_long_term_sell_returns_none_without_an_open_position(tmp_path):
+    with _lt_store(tmp_path) as store:
+        result = store.execute_long_term_sell(
+            "AAPL", trim_fraction=1.0, exit_price=100.0, timestamp=NOW,
+            triggering_action=AlertAction.UNDER_PERFORM_REBALANCE,
+        )
+        assert result is None
+
+
+def test_execute_long_term_sell_credits_cash_and_updates_win_loss(tmp_path):
+    with _lt_store(tmp_path) as store:
+        store.execute_long_term_buy("AAPL", shares=10.0, price=100.0, cost=1000.0, timestamp=NOW)
+        store.execute_long_term_sell(
+            "AAPL", trim_fraction=1.0, exit_price=120.0, timestamp=NOW,
+            triggering_action=AlertAction.UNDER_PERFORM_REBALANCE,
+        )
+
+        summary = store.get_long_term_portfolio_summary()
+        assert summary["current_cash"] == 20000.0 - 1000.0 + 1200.0
+        assert summary["win_count"] == 1
+        assert summary["loss_count"] == 0
+
+
+def test_long_term_trade_history_records_buy_dca_and_sell(tmp_path):
+    with _lt_store(tmp_path) as store:
+        store.execute_long_term_buy("AAPL", shares=10.0, price=100.0, cost=1000.0, timestamp=NOW)
+        store.execute_dca_contribution("AAPL", contribution_usd=500.0, price=110.0, timestamp=NOW)
+        store.execute_long_term_sell(
+            "AAPL", trim_fraction=1.0, exit_price=120.0, timestamp=NOW,
+            triggering_action=AlertAction.UNDER_PERFORM_REBALANCE,
+        )
+
+        history = store.get_long_term_trade_history()
+        order_types = [h["order_type"] for h in history]
+        assert set(order_types) == {"BUY", "DCA_CONTRIBUTION", "SELL"}
+
+
+def test_total_dca_contributed_is_computable_from_trade_history(tmp_path):
+    with _lt_store(tmp_path) as store:
+        store.execute_long_term_buy("AAPL", shares=10.0, price=100.0, cost=1000.0, timestamp=NOW)
+        store.execute_dca_contribution("AAPL", contribution_usd=500.0, price=110.0, timestamp=NOW)
+        store.execute_dca_contribution("AAPL", contribution_usd=500.0, price=115.0, timestamp=NOW)
+
+        history = store.get_long_term_trade_history()
+        total_dca = sum(h["contribution_cost"] for h in history if h["order_type"] == "DCA_CONTRIBUTION")
+        assert total_dca == 1000.0
+
+
+def test_get_long_term_trade_history_between_filters_to_the_window(tmp_path):
+    with _lt_store(tmp_path) as store:
+        store.execute_long_term_buy("OLD", shares=1.0, price=100.0, cost=100.0, timestamp=NOW - timedelta(days=1))
+        store.execute_long_term_buy("IN", shares=1.0, price=100.0, cost=100.0, timestamp=NOW)
+
+        rows = store.get_long_term_trade_history_between(NOW - timedelta(hours=1), NOW + timedelta(hours=1))
+        assert [r["ticker"] for r in rows] == ["IN"]
+
+
+def test_reset_long_term_portfolio_clears_positions_and_history(tmp_path):
+    with _lt_store(tmp_path) as store:
+        store.execute_long_term_buy("AAPL", shares=10.0, price=100.0, cost=1000.0, timestamp=NOW)
+
+        store.reset_long_term_portfolio(initial_balance=5000.0, dca_contribution_usd=250.0)
+
+        summary = store.get_long_term_portfolio_summary()
+        assert summary["initial_balance"] == 5000.0
+        assert summary["current_cash"] == 5000.0
+        assert summary["dca_contribution_usd"] == 250.0
+        assert store.get_open_long_term_positions() == []
+        assert store.get_long_term_trade_history() == []
+
+
+def test_update_dca_contribution_amount_changes_only_that_field(tmp_path):
+    with _lt_store(tmp_path) as store:
+        store.update_dca_contribution_amount(999.0)
+        summary = store.get_long_term_portfolio_summary()
+        assert summary["dca_contribution_usd"] == 999.0
+        assert summary["current_cash"] == 20000.0  # untouched
+
+
+def test_multiple_long_term_positions_are_independent(tmp_path):
+    with _lt_store(tmp_path) as store:
+        store.execute_long_term_buy("AAPL", shares=10.0, price=100.0, cost=1000.0, timestamp=NOW)
+        store.execute_long_term_buy("MSFT", shares=5.0, price=200.0, cost=1000.0, timestamp=NOW)
+
+        positions = store.get_open_long_term_positions()
+        assert {p["ticker"] for p in positions} == {"AAPL", "MSFT"}
+
+
+def test_record_ignored_defaults_to_intraday_horizon(tmp_path):
+    with _store(tmp_path) as store:
+        store.record_ignored("NVDA", "NO_ACTIVE_POSITION", AlertAction.CONTRADICTED, 131.50, NOW)
+        rows = store.get_ignored_decisions_between(NOW - timedelta(hours=1), NOW + timedelta(hours=1))
+        assert rows[0]["horizon"] == "intraday"
+
+
+def test_record_ignored_accepts_a_long_term_horizon(tmp_path):
+    with _store(tmp_path) as store:
+        store.record_ignored(
+            "AAPL", "NO_ACTIVE_POSITION", AlertAction.UNDER_PERFORM_REBALANCE, 100.0, NOW, horizon="long_term",
+        )
+        rows = store.get_ignored_decisions_between(NOW - timedelta(hours=1), NOW + timedelta(hours=1))
+        assert rows[0]["horizon"] == "long_term"
+
+
+def test_migrates_a_pre_existing_ignored_decisions_table_without_horizon(tmp_path):
+    import sqlite3
+
+    db_path = tmp_path / "legacy_paper.db"
+    legacy_conn = sqlite3.connect(db_path)
+    legacy_conn.execute(
+        "CREATE TABLE ignored_decisions (id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT NOT NULL, "
+        "reason TEXT NOT NULL, triggering_action TEXT NOT NULL, price REAL NOT NULL, timestamp TEXT NOT NULL)"
+    )
+    legacy_conn.execute(
+        "INSERT INTO ignored_decisions (ticker, reason, triggering_action, price, timestamp) "
+        "VALUES ('AAPL', 'NO_ACTIVE_POSITION', 'contradicted', 100.0, ?)",
+        (NOW.isoformat(),),
+    )
+    legacy_conn.commit()
+    legacy_conn.close()
+
+    with PaperTradingStore(db_path) as store:
+        rows = store.get_ignored_decisions_between(NOW - timedelta(hours=1), NOW + timedelta(hours=1))
+        assert len(rows) == 1
+        assert rows[0]["horizon"] == "intraday"
+
+        store.record_ignored("MSFT", "NO_ACTIVE_POSITION", AlertAction.CONTRADICTED, 100.0, NOW, horizon="long_term")
+        rows = store.get_ignored_decisions_between(NOW - timedelta(hours=1), NOW + timedelta(hours=1))
+        assert len(rows) == 2

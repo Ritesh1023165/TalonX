@@ -30,6 +30,25 @@ terminal, one Ctrl+C to stop:
                             publishing PaperTradeExecutions that Module 5
                             also notifies on.
 
+Phase 2 (LONG_TERM horizon) adds, for tickers tagged LONG_TERM or
+DUAL_HORIZON in talonx_watchlist (see its strategy_horizon column):
+  - periodic:    structured SEC XBRL financials ingestion (separate from,
+                  alongside, the existing filing-TEXT ingestion above --
+                  both run for a LONG_TERM ticker, since moat/DCF research
+                  needs the qualitative text too).
+  - continuous:  a slow (default daily) price poll for tickers that are
+                  ONLY long-term (a DUAL_HORIZON ticker already gets a
+                  price stream from Module 1's regular continuous feed
+                  above -- this doesn't double up for those).
+  - continuous:  the fundamental factor scanner (talonx_quant's sibling to
+                  the technical scanner), publishing FundamentalFactorSignals.
+  - continuous:  the long-term paper trading engine (talonx_paper's
+                  sibling to Module 6 above), with its own recurring DCA
+                  contribution loop.
+Modules 3/4/5 (talonx_brain/talonx_core/talonx_dispatch) already handle
+BOTH horizons internally within the SAME class/task started above --
+no separate construction needed for those three.
+
 Module 3 is OPTIONAL here, same "degrade, don't crash" philosophy as Redis
 publishing elsewhere in this project: if the configured LLM provider isn't
 ready (GEMINI_API_KEY not set for the "gemini" provider, or
@@ -99,15 +118,19 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import signal
 
+from talonx_ingest.config import MarketDataConfig
 from talonx_ingest.events.publisher import RedisEventPublisher
 from talonx_ingest.market_data.manager import MarketDataManager
 from talonx_ingest.market_data.run import make_on_event
+from talonx_ingest.market_data.yfinance_poll import YFinancePoller
 from talonx_ingest.news.pipeline import run_news_ingestion
-from talonx_ingest.pipeline import run_ingestion
+from talonx_ingest.pipeline import run_ingestion, run_long_term_financials_ingestion
 from talonx_quant.config import QuantConfig
 from talonx_quant.consumer import QuantScanner
+from talonx_quant.fundamental_consumer import FundamentalScanner
 from talonx_quant.store import QuantStateStore
 from talonx_brain.config import BrainConfig
 from talonx_brain.consumer import ResearchAgent
@@ -116,7 +139,9 @@ from talonx_core.config import CoreConfig
 from talonx_core.consumer import DecisionEngine
 from talonx_core.store import TickerStateStore
 from talonx_dispatch.consumer import DispatchAgent
-from talonx_paper.consumer import PaperTradingEngine
+from talonx_paper.config import PaperConfig
+from talonx_paper.consumer import LongTermPaperEngine, PaperTradingEngine
+from talonx_paper.store import PaperTradingStore
 from talonx_watchlist.config import WatchlistConfig
 from talonx_watchlist.store import TickerWatchlistStore
 
@@ -125,6 +150,13 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("run_talonx")
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
 
 
 def _diff_symbols(old: set[str], new: set[str]) -> tuple[set[str], set[str]]:
@@ -215,6 +247,93 @@ class WatchlistDrivenMarketData:
         self._manager = None
 
 
+class LongTermPriceRunner:
+    """
+    Phase 2's slow-cadence price feed for LONG_TERM-ONLY tickers (a
+    DUAL_HORIZON ticker already gets a price stream from
+    WatchlistDrivenMarketData above -- this deliberately EXCLUDES those,
+    to avoid double-publishing ticks for the same symbol). Reuses
+    talonx_ingest.market_data.yfinance_poll.YFinancePoller -- the same
+    fallback poller Module 1's continuous feed already uses when Polygon
+    isn't configured -- just at a much longer interval (default daily,
+    TALONX_LT_PRICE_POLL_INTERVAL), since margin-of-safety math needs A
+    current price, not minute-fresh ticks (the spec's "bypass minute-bar
+    TECHNICAL SCANNING" for LONG_TERM tickers -- this poller never
+    computes RSI/MACD, it only keeps talonx_paper/talonx_quant's
+    fundamental scanner fed with a price to value against).
+
+    Same reconcile-by-restarting-the-whole-stream pattern
+    WatchlistDrivenMarketData already uses, for the same reason: no
+    incremental subscribe/unsubscribe support needed in the poller.
+    """
+
+    def __init__(
+        self, watchlist_store: TickerWatchlistStore, on_event, watchlist_poll_interval_seconds: float,
+        price_poll_interval_seconds: float,
+    ):
+        self._store = watchlist_store
+        self._on_event = on_event
+        self._watchlist_poll_interval = watchlist_poll_interval_seconds
+        self._price_poll_interval = price_poll_interval_seconds
+        self._stop_event = asyncio.Event()
+        self._poller: YFinancePoller | None = None
+        self._task: asyncio.Task | None = None
+        self._current_symbols: set[str] = set()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._poller is not None:
+            self._poller.stop()
+
+    def _long_term_only_symbols(self) -> set[str]:
+        long_term = set(self._store.list_by_horizon("LONG_TERM"))
+        intraday = set(self._store.list_by_horizon("INTRADAY"))
+        return long_term - intraday
+
+    async def run(self) -> None:
+        await self._reconcile()
+        while not self._stop_event.is_set():
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=self._watchlist_poll_interval)
+            except asyncio.TimeoutError:
+                pass  # normal case: poll interval elapsed, check for changes
+            if self._stop_event.is_set():
+                break
+            await self._reconcile()
+        await self._stop_current()
+
+    async def _reconcile(self) -> None:
+        new_symbols = self._long_term_only_symbols()
+        if new_symbols == self._current_symbols:
+            return
+
+        logger.info(
+            "LONG_TERM-only ticker set changed (now %s) -- restarting daily price poll",
+            sorted(new_symbols) or "none",
+        )
+        await self._stop_current()
+        self._current_symbols = new_symbols
+
+        if not new_symbols:
+            return
+
+        self._poller = YFinancePoller(MarketDataConfig(yfinance_poll_interval_seconds=self._price_poll_interval))
+        self._task = asyncio.create_task(
+            self._poller.stream(sorted(new_symbols), self._on_event), name="long_term_price_poll"
+        )
+
+    async def _stop_current(self) -> None:
+        if self._poller is not None:
+            self._poller.stop()
+        if self._task is not None:
+            try:
+                await self._task
+            except Exception as exc:  # noqa: BLE001 -- a stream failure shouldn't kill the reconciler
+                logger.warning("Previous long-term price poll ended with an error: %s", exc)
+            self._task = None
+        self._poller = None
+
+
 async def periodic_ingestion_loop(
     watchlist_store: TickerWatchlistStore, interval_hours: float, stop_event: asyncio.Event
 ) -> None:
@@ -268,6 +387,45 @@ async def periodic_ingestion_loop(
             pass  # normal case: interval elapsed, loop again
 
 
+async def periodic_long_term_financials_loop(
+    watchlist_store: TickerWatchlistStore, interval_hours: float, stop_event: asyncio.Event
+) -> None:
+    """
+    Phase 2's sibling to periodic_ingestion_loop above -- SEC XBRL
+    structured financials instead of filing text, for every ticker
+    tagged LONG_TERM or DUAL_HORIZON (list_by_horizon already includes
+    DUAL_HORIZON in a "LONG_TERM" query -- see talonx_watchlist/store.py).
+    Runs on the SAME interval_hours as the text-ingestion loop for
+    simplicity (one --interval-hours flag, not two) -- financials update
+    far less often than that in reality (annual 10-Ks), but
+    ingest_long_term_financials()'s own ledger check already makes a
+    same-fiscal-year re-run a fast no-op, so a shorter-than-necessary
+    interval costs a bit of wasted polling, not correctness.
+    """
+    interval_seconds = interval_hours * 3600
+
+    while not stop_event.is_set():
+        tickers = watchlist_store.list_by_horizon("LONG_TERM")
+        if not tickers:
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
+            except asyncio.TimeoutError:
+                pass
+            continue
+
+        logger.info("=== Long-term financials ingestion cycle starting for %s ===", tickers)
+        try:
+            results = await run_long_term_financials_ingestion(tickers)
+            logger.info("Long-term financials ingestion this cycle: %s", results)
+        except Exception as exc:  # noqa: BLE001 -- one bad cycle shouldn't kill the loop
+            logger.error("Long-term financials ingestion cycle failed: %s", exc)
+
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
+        except asyncio.TimeoutError:
+            pass  # normal case: interval elapsed, loop again
+
+
 async def main() -> None:
     args = _parse_args()
 
@@ -299,6 +457,7 @@ async def main() -> None:
 
     stop_event = asyncio.Event()
     quant_scanner: QuantScanner | None = None
+    fundamental_scanner: FundamentalScanner | None = None
     quant_store: QuantStateStore | None = None
     if not args.skip_quant:
         quant_config = QuantConfig()
@@ -311,6 +470,11 @@ async def main() -> None:
                     "for this run: %s. Continuing without it.", exc,
                 )
         quant_scanner = QuantScanner(config=quant_config, store=quant_store)
+        # Sibling to quant_scanner, not a second loop inside it (different
+        # cooldown/throttle semantics -- see fundamental_consumer.py's own
+        # docstring) -- shares the SAME quant_store/config the technical
+        # scanner uses.
+        fundamental_scanner = FundamentalScanner(config=quant_config, store=quant_store)
     market_publisher = RedisEventPublisher()
 
     research_agent: ResearchAgent | None = None
@@ -368,13 +532,19 @@ async def main() -> None:
             )
 
     paper_trading_engine: PaperTradingEngine | None = None
-    if not args.skip_paper_trading:
+    long_term_paper_engine: LongTermPaperEngine | None = None
+    paper_store: PaperTradingStore | None = None
+    if not args.skip_paper_trading or not args.skip_long_term_paper:
         try:
-            # Shares the SAME watchlist_store instance/connection already
-            # created above (not a second TickerWatchlistStore against the
-            # same file) -- one connection per process, matching the
-            # convention already used for market_data_runner/periodic_ingestion_loop.
-            paper_trading_engine = PaperTradingEngine(watchlist_store=watchlist_store)
+            # ONE PaperTradingStore instance/connection, shared by BOTH
+            # engines below (same SQLite file, different tables -- see
+            # store.py) -- not two separate connections to the same file.
+            paper_config = PaperConfig()
+            paper_store = PaperTradingStore(
+                paper_config.db_path, paper_config.default_initial_balance,
+                paper_config.default_trade_allocation_usd, paper_config.default_long_term_initial_balance,
+                paper_config.dca_contribution_usd,
+            )
         except Exception as exc:  # noqa: BLE001 -- ledger init failure shouldn't crash the whole run
             logger.warning(
                 "Module 6 (talonx_paper) disabled for this run: %s. Modules 1-5 "
@@ -382,8 +552,22 @@ async def main() -> None:
                 exc,
             )
 
+    if paper_store is not None and not args.skip_paper_trading:
+        # Shares the SAME watchlist_store instance/connection already
+        # created above (not a second TickerWatchlistStore against the
+        # same file) -- one connection per process, matching the
+        # convention already used for market_data_runner/periodic_ingestion_loop.
+        paper_trading_engine = PaperTradingEngine(store=paper_store, watchlist_store=watchlist_store)
+    if paper_store is not None and not args.skip_long_term_paper:
+        long_term_paper_engine = LongTermPaperEngine(store=paper_store, watchlist_store=watchlist_store)
+
     market_data_runner: WatchlistDrivenMarketData | None = None
+    long_term_price_runner: LongTermPriceRunner | None = None
     if not args.skip_market_data:
+        long_term_price_runner = LongTermPriceRunner(
+            watchlist_store, make_on_event(market_publisher), watchlist_config.poll_interval_seconds,
+            _env_float("TALONX_LT_PRICE_POLL_INTERVAL", 86400.0),
+        )
         market_data_runner = WatchlistDrivenMarketData(
             watchlist_store, make_on_event(market_publisher), watchlist_config.poll_interval_seconds,
         )
@@ -393,8 +577,12 @@ async def main() -> None:
         stop_event.set()
         if market_data_runner is not None:
             market_data_runner.stop()
+        if long_term_price_runner is not None:
+            long_term_price_runner.stop()
         if quant_scanner is not None:
             quant_scanner.stop()
+        if fundamental_scanner is not None:
+            fundamental_scanner.stop()
         if research_agent is not None:
             research_agent.stop()
         if decision_engine is not None:
@@ -403,6 +591,8 @@ async def main() -> None:
             dispatch_agent.stop()
         if paper_trading_engine is not None:
             paper_trading_engine.stop()
+        if long_term_paper_engine is not None:
+            long_term_paper_engine.stop()
 
     loop = asyncio.get_running_loop()
     try:
@@ -415,7 +605,7 @@ async def main() -> None:
 
     logger.info(
         "Starting TalonX (interval=%.1fh, ingestion=%s, market_data=%s, "
-        "quant=%s, brain=%s, core=%s, dispatch=%s, paper_trading=%s)",
+        "quant=%s, brain=%s, core=%s, dispatch=%s, paper_trading=%s, long_term_paper=%s)",
         args.interval_hours, "disabled" if args.skip_ingestion else "enabled",
         "enabled" if market_data_runner is not None else "disabled",
         "enabled" if quant_scanner is not None else "disabled",
@@ -423,13 +613,18 @@ async def main() -> None:
         "enabled" if decision_engine is not None else "disabled",
         "enabled" if dispatch_agent is not None else "disabled",
         "enabled" if paper_trading_engine is not None else "disabled",
+        "enabled" if long_term_paper_engine is not None else "disabled",
     )
 
     tasks = []
     if market_data_runner is not None:
         tasks.append(asyncio.create_task(market_data_runner.run(), name="market_data"))
+    if long_term_price_runner is not None:
+        tasks.append(asyncio.create_task(long_term_price_runner.run(), name="long_term_price_poll"))
     if quant_scanner is not None:
         tasks.append(asyncio.create_task(quant_scanner.run(), name="quant_scanner"))
+    if fundamental_scanner is not None:
+        tasks.append(asyncio.create_task(fundamental_scanner.run(), name="fundamental_scanner"))
     if research_agent is not None:
         tasks.append(asyncio.create_task(research_agent.run(), name="research_agent"))
     if decision_engine is not None:
@@ -438,11 +633,19 @@ async def main() -> None:
         tasks.append(asyncio.create_task(dispatch_agent.run(), name="dispatch_agent"))
     if paper_trading_engine is not None:
         tasks.append(asyncio.create_task(paper_trading_engine.run(), name="paper_trading_engine"))
+    if long_term_paper_engine is not None:
+        tasks.append(asyncio.create_task(long_term_paper_engine.run(), name="long_term_paper_engine"))
     if not args.skip_ingestion:
         tasks.append(
             asyncio.create_task(
                 periodic_ingestion_loop(watchlist_store, args.interval_hours, stop_event),
                 name="periodic_ingestion",
+            )
+        )
+        tasks.append(
+            asyncio.create_task(
+                periodic_long_term_financials_loop(watchlist_store, args.interval_hours, stop_event),
+                name="periodic_long_term_financials",
             )
         )
 
@@ -458,8 +661,12 @@ async def main() -> None:
         stop_event.set()
         if market_data_runner is not None:
             market_data_runner.stop()
+        if long_term_price_runner is not None:
+            long_term_price_runner.stop()
         if quant_scanner is not None:
             quant_scanner.stop()
+        if fundamental_scanner is not None:
+            fundamental_scanner.stop()
         if research_agent is not None:
             research_agent.stop()
         if decision_engine is not None:
@@ -468,6 +675,8 @@ async def main() -> None:
             dispatch_agent.stop()
         if paper_trading_engine is not None:
             paper_trading_engine.stop()
+        if long_term_paper_engine is not None:
+            long_term_paper_engine.stop()
     finally:
         await market_publisher.close()
         if quant_store is not None:
@@ -478,8 +687,8 @@ async def main() -> None:
             core_store.close()
         if dispatch_agent is not None:
             dispatch_agent.store.close()
-        if paper_trading_engine is not None:
-            paper_trading_engine.store.close()
+        if paper_store is not None:
+            paper_store.close()
         watchlist_store.close()
         logger.info("All components stopped.")
 
@@ -529,6 +738,11 @@ def _parse_args() -> argparse.Namespace:
         "--skip-paper-trading", action="store_true",
         help="Skip Module 6 (talonx_paper) -- run it yourself with "
              "`python -m talonx_paper.run` instead",
+    )
+    parser.add_argument(
+        "--skip-long-term-paper", action="store_true",
+        help="Skip the Phase 2 long-term paper trading engine (DCA + rebalance) -- "
+             "run it yourself with `python -m talonx_paper.run` instead",
     )
     return parser.parse_args()
 
