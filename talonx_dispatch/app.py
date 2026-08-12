@@ -652,6 +652,20 @@ def render_feed(rows: list[dict], limit: int = 20) -> None:
             st.caption(f"{row['model_used']} · {row['correlated_at']}")
 
 
+def _apply_date_range_filter(df: pd.DataFrame, date_col: str, date_range: tuple) -> pd.DataFrame:
+    """st.date_input(value=()) returns an empty tuple until the user picks
+    a date, a 1-tuple after just the start date, and a 2-tuple once both
+    are picked -- handles all three (no filter / single-day / inclusive
+    range). Compared as UTC calendar dates, matching how every timestamp
+    in this project is stored (datetime.now(timezone.utc).isoformat())."""
+    if not date_range:
+        return df
+    dates = pd.to_datetime(df[date_col], utc=True).dt.date
+    start = date_range[0]
+    end = date_range[1] if len(date_range) > 1 else date_range[0]
+    return df[(dates >= start) & (dates <= end)]
+
+
 def render_audit_trail(df: pd.DataFrame, long_term_rows: list[dict]) -> None:
     """Unified audit trail with a horizon filter -- a radio toggle rather
     than one merged table, since the intraday/long-term field sets differ
@@ -664,10 +678,14 @@ def render_audit_trail(df: pd.DataFrame, long_term_rows: list[dict]) -> None:
         if df.empty:
             st.info("Nothing recorded yet.")
             return
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 1.4])
         tickers = col1.multiselect("Ticker", sorted(df["ticker"].unique()), key="audit_intraday_ticker")
         actions = col2.multiselect("Action", sorted(df["action"].unique()), key="audit_intraday_action")
         severities = col3.multiselect("Severity", sorted(df["severity"].unique()), key="audit_intraday_severity")
+        date_range = col4.date_input(
+            "Date range", value=(), key="audit_intraday_date_range",
+            help="Filters on correlated_at. Leave empty for no date filter.",
+        )
 
         filtered = df
         if tickers:
@@ -676,6 +694,7 @@ def render_audit_trail(df: pd.DataFrame, long_term_rows: list[dict]) -> None:
             filtered = filtered[filtered["action"].isin(actions)]
         if severities:
             filtered = filtered[filtered["severity"].isin(severities)]
+        filtered = _apply_date_range_filter(filtered, "correlated_at", date_range)
 
         display_cols = [
             "id", "correlated_at", "ticker", "action", "severity",
@@ -688,10 +707,14 @@ def render_audit_trail(df: pd.DataFrame, long_term_rows: list[dict]) -> None:
             st.info("Nothing recorded yet.")
             return
         lt_df = pd.DataFrame(long_term_rows)
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 1.4])
         tickers = col1.multiselect("Ticker", sorted(lt_df["ticker"].unique()), key="audit_lt_ticker")
         actions = col2.multiselect("Action", sorted(lt_df["action"].unique()), key="audit_lt_action")
         severities = col3.multiselect("Severity", sorted(lt_df["severity"].unique()), key="audit_lt_severity")
+        date_range = col4.date_input(
+            "Date range", value=(), key="audit_lt_date_range",
+            help="Filters on correlated_at. Leave empty for no date filter.",
+        )
 
         filtered = lt_df
         if tickers:
@@ -700,6 +723,7 @@ def render_audit_trail(df: pd.DataFrame, long_term_rows: list[dict]) -> None:
             filtered = filtered[filtered["action"].isin(actions)]
         if severities:
             filtered = filtered[filtered["severity"].isin(severities)]
+        filtered = _apply_date_range_filter(filtered, "correlated_at", date_range)
 
         display_cols = [
             "id", "correlated_at", "ticker", "action", "severity", "quality_score",
