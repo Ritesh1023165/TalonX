@@ -84,10 +84,15 @@ On a fresh install (empty store), it's seeded with one default ticker
 (TALONX_WATCHLIST_DEFAULT_SYMBOL, default MSFT). Market data streaming
 picks up an add/remove within one poll interval
 (TALONX_WATCHLIST_POLL_INTERVAL, default 10s) by restarting the stream
-with the new symbol set; periodic filing/news ingestion picks it up on its
-next scheduled cycle. Positional ticker args below still work, but only as
-a ONE-TIME seed for a genuinely empty store -- once the store has any
-rows, they're ignored in favor of the dashboard.
+with the new symbol set; filing/news/financials ingestion for a NEWLY
+added, resumed, or re-tagged-LONG_TERM ticker is ALSO triggered within
+one poll interval (WatchlistDrivenIngestion, below) -- it doesn't wait
+for periodic_ingestion_loop's/periodic_long_term_financials_loop's next
+scheduled --interval-hours cycle, which used to leave a freshly-tagged
+LONG_TERM ticker with zero fundamental data for up to several hours.
+Positional ticker args below still work, but only as a ONE-TIME seed for
+a genuinely empty store -- once the store has any rows, they're ignored
+in favor of the dashboard.
 
 Replaces running `talonx_ingest.pipeline`, `talonx_ingest.news.pipeline`,
 `talonx_ingest.market_data.run`, `talonx_quant.run`, `talonx_brain.run`,
@@ -334,6 +339,104 @@ class LongTermPriceRunner:
         self._poller = None
 
 
+class WatchlistDrivenIngestion:
+    """
+    Reacts to talonx_watchlist changes by triggering a ONE-OFF ingestion
+    for just the ticker(s) that changed, immediately -- rather than
+    waiting for periodic_ingestion_loop's/periodic_long_term_financials_loop's
+    next --interval-hours cycle (default 6h, so a ticker added or
+    re-tagged mid-session could otherwise sit with zero filing/financials
+    data for hours). Same "poll short interval, diff against last-known
+    state, react only to the diff" shape as WatchlistDrivenMarketData
+    above, for the same underlying reason: talonx_watchlist is a live,
+    dashboard-editable control surface, not a startup-only ticker list --
+    ingestion should behave the same way market data streaming and
+    paper-trading enablement already do.
+
+    Two independent diffs, since they trigger different work:
+      - a ticker newly ACTIVE (added, or resumed from paused) gets
+        immediate filing-text + news ingestion -- this benefits ANY
+        horizon, since talonx_brain's retrieval needs this context for
+        both the intraday and long-term research chains.
+      - a ticker newly eligible for LONG_TERM (added with that horizon,
+        OR re-tagged from INTRADAY to LONG_TERM/DUAL_HORIZON) gets
+        immediate structured-financials ingestion -- this is the gap a
+        live smoke test caught: re-tagging a ticker LONG_TERM used to
+        leave it with zero fundamental data until the next scheduled
+        cycle, up to --interval-hours away.
+
+    Seeds its "known" sets from the CURRENT watchlist state at startup
+    (not empty) -- the initial batch is already covered by the periodic
+    loops' own "run immediately on startup" behavior; this class only
+    reacts to CHANGES made after that.
+
+    A failure for a given ticker (e.g. a transient SEC API error) is
+    logged and NOT retried by this class -- the ticker is still marked
+    "known" after the attempt either way, so it won't be re-triggered
+    reactively. The existing periodic --interval-hours cycle remains the
+    eventual safety net/retry path for anything that fails here.
+    """
+
+    def __init__(self, watchlist_store: TickerWatchlistStore, poll_interval_seconds: float):
+        self._store = watchlist_store
+        self._poll_interval = poll_interval_seconds
+        self._stop_event = asyncio.Event()
+        self._known_active_symbols: set[str] = set()
+        self._known_long_term_symbols: set[str] = set()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+
+    async def run(self) -> None:
+        self._known_active_symbols = set(self._store.list_active_symbols())
+        self._known_long_term_symbols = set(self._store.list_by_horizon("LONG_TERM"))
+
+        while not self._stop_event.is_set():
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=self._poll_interval)
+            except asyncio.TimeoutError:
+                pass  # normal case: poll interval elapsed, check for changes
+            if self._stop_event.is_set():
+                break
+            await self._reconcile()
+
+    async def _reconcile(self) -> None:
+        current_active = set(self._store.list_active_symbols())
+        current_long_term = set(self._store.list_by_horizon("LONG_TERM"))
+
+        new_active = sorted(current_active - self._known_active_symbols)
+        new_long_term = sorted(current_long_term - self._known_long_term_symbols)
+        self._known_active_symbols = current_active
+        self._known_long_term_symbols = current_long_term
+
+        if new_active:
+            logger.info(
+                "New/resumed ticker(s) detected -- triggering immediate filing+news ingestion: %s",
+                new_active,
+            )
+            try:
+                results = await run_ingestion(new_active)
+                logger.info("Reactive filing ingestion: %s", results)
+            except Exception as exc:  # noqa: BLE001 -- one bad batch shouldn't kill the reconciler
+                logger.error("Reactive filing ingestion failed: %s", exc)
+            try:
+                news_results = await run_news_ingestion(new_active)
+                logger.info("Reactive news ingestion: %s", news_results)
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Reactive news ingestion failed: %s", exc)
+
+        if new_long_term:
+            logger.info(
+                "New LONG_TERM-eligible ticker(s) detected -- triggering immediate financials ingestion: %s",
+                new_long_term,
+            )
+            try:
+                results = await run_long_term_financials_ingestion(new_long_term)
+                logger.info("Reactive long-term financials ingestion: %s", results)
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Reactive long-term financials ingestion failed: %s", exc)
+
+
 async def periodic_ingestion_loop(
     watchlist_store: TickerWatchlistStore, interval_hours: float, stop_event: asyncio.Event
 ) -> None:
@@ -572,6 +675,10 @@ async def main() -> None:
             watchlist_store, make_on_event(market_publisher), watchlist_config.poll_interval_seconds,
         )
 
+    reactive_ingestion: WatchlistDrivenIngestion | None = None
+    if not args.skip_ingestion:
+        reactive_ingestion = WatchlistDrivenIngestion(watchlist_store, watchlist_config.poll_interval_seconds)
+
     def _handle_sigint() -> None:
         logger.info("Shutdown requested (Ctrl+C) -- stopping all components...")
         stop_event.set()
@@ -593,6 +700,8 @@ async def main() -> None:
             paper_trading_engine.stop()
         if long_term_paper_engine is not None:
             long_term_paper_engine.stop()
+        if reactive_ingestion is not None:
+            reactive_ingestion.stop()
 
     loop = asyncio.get_running_loop()
     try:
@@ -648,6 +757,8 @@ async def main() -> None:
                 name="periodic_long_term_financials",
             )
         )
+    if reactive_ingestion is not None:
+        tasks.append(asyncio.create_task(reactive_ingestion.run(), name="reactive_ingestion"))
 
     if not tasks:
         logger.error("Everything was skipped -- nothing to run. Drop at least one --skip-* flag.")
@@ -677,6 +788,8 @@ async def main() -> None:
             paper_trading_engine.stop()
         if long_term_paper_engine is not None:
             long_term_paper_engine.stop()
+        if reactive_ingestion is not None:
+            reactive_ingestion.stop()
     finally:
         await market_publisher.close()
         if quant_store is not None:

@@ -1058,6 +1058,25 @@ rather than sharing Python objects across module boundaries.
   lines, in either direction. Retrofitting those existing ~15 intraday
   log call sites to the same format is a deliberate, separate follow-up
   (§8).
+- **Reactive ingestion** (`run_talonx.py`'s `WatchlistDrivenIngestion`) --
+  fixes a real gap a live smoke test caught: `periodic_ingestion_loop`/
+  `periodic_long_term_financials_loop` only re-scan the watchlist once
+  every `--interval-hours` (default 6h), so a ticker added or re-tagged
+  LONG_TERM mid-session used to sit with zero filing/financials data for
+  up to several hours -- silently, since nothing else in the pipeline
+  surfaces "this ticker has no data yet" as an error. `WatchlistDrivenIngestion`
+  polls the watchlist on the same short cadence market data streaming
+  already uses (`TALONX_WATCHLIST_POLL_INTERVAL`, default 10s), diffs
+  against its own last-known state, and triggers a ONE-OFF ingestion for
+  just the ticker(s) that changed: newly active (added or resumed) gets
+  immediate filing+news ingestion; newly LONG_TERM-eligible (added with
+  that horizon, or re-tagged from `INTRADAY`) gets immediate structured-
+  financials ingestion. Same reconcile-by-diffing shape
+  `WatchlistDrivenMarketData` already uses for market data. The periodic
+  `--interval-hours` cycle stays in place as the retry/safety net for
+  anything this reactive path fails to ingest (a transient SEC API
+  error, say) -- it isn't retried reactively, only on the next scheduled
+  cycle.
 
 **Not built this pass** (see §8 for the reasoning behind each): DRIP /
 dividend reinvestment, a separate End-of-Quarter report, a full
@@ -1184,7 +1203,12 @@ current directory is `C:\workspace\TalonX`.
 python run_talonx.py
 ```
 Single process, single terminal, single Ctrl+C to stop. This starts:
-- SEC filing + news ingestion, immediately, then again every 6 hours (`--interval-hours` to change)
+- SEC filing + news ingestion, immediately, then again every 6 hours
+  (`--interval-hours` to change) -- PLUS a reactive watcher
+  (`WatchlistDrivenIngestion`, §3.9) that triggers an immediate one-off
+  ingestion the moment a ticker is added, resumed, or re-tagged
+  LONG_TERM via the dashboard, instead of waiting for the next scheduled
+  cycle
 - Live market data streaming, continuously
 - The quant scanner, continuously
 - The research agent (Module 3), continuously -- *if* its LLM provider is
