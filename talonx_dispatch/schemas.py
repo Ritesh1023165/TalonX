@@ -158,6 +158,11 @@ class LongTermActionableAlert(BaseModel):
     action: AlertAction
     severity: AlertSeverity
     rationale: str
+    # The LLM's clean free-text summary, separate from the more technical
+    # `rationale` above -- the SHORT Telegram push uses this; the FULL
+    # detail reply still uses rationale. See talonx_core.schemas' mirror
+    # of this field for why the two are kept separate.
+    summary: str
 
     quality_score: int
     moat_rating: MoatRating

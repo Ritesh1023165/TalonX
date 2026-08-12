@@ -228,7 +228,8 @@ def _lt_alert(
 ) -> LongTermActionableAlert:
     return LongTermActionableAlert(
         ticker=ticker, action=action, severity=AlertSeverity.WARNING,
-        rationale="rationale text", quality_score=quality_score, moat_rating=moat_rating,
+        rationale="rationale text", summary="summary text",
+        quality_score=quality_score, moat_rating=moat_rating,
         market_price=market_price, intrinsic_fair_value=intrinsic_fair_value,
         margin_of_safety_pct=margin_of_safety_pct,
         capital_allocation_assessment="Disciplined buybacks.",

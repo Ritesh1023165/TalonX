@@ -2,3 +2,9 @@ redis>=5.0
 pandas>=2.0
 pandas_ta>=0.3.14b0
 pydantic>=2.0
+
+# fundamental_consumer.py's last-close fallback (Phase 2 LONG_TERM path) --
+# used when a fundamentals event arrives before any market:stream tick has
+# been seen for the ticker yet. Already installed if you followed the
+# primary setup (pip install -r talonx_ingest\requirements.txt).
+yfinance>=0.2.40

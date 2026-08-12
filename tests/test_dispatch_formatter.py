@@ -361,10 +361,14 @@ def test_trade_execution_buy_shows_shares_price_and_cash():
 # Phase 2 LONG_TERM path
 # ==========================================================================
 
-def _long_term_alert(action: AlertAction = AlertAction.HIGH_CONVICTION_BUY, severity: AlertSeverity = AlertSeverity.CRITICAL) -> LongTermActionableAlert:
+def _long_term_alert(
+    action: AlertAction = AlertAction.HIGH_CONVICTION_BUY, severity: AlertSeverity = AlertSeverity.CRITICAL,
+    summary: str = "Apple's ecosystem lock-in and services growth support a durable moat.",
+) -> LongTermActionableAlert:
     return LongTermActionableAlert(
         ticker="AAPL", action=action, severity=severity,
         rationale="FY2025 fundamentals clear thresholds -- quality score 8/10, wide moat.",
+        summary=summary,
         quality_score=8, moat_rating=MoatRating.WIDE, market_price=75.0,
         intrinsic_fair_value=100.0, margin_of_safety_pct=0.25,
         capital_allocation_assessment="Disciplined buybacks.",
@@ -385,10 +389,10 @@ def test_long_term_alert_includes_ticker_price_fair_value_and_id():
     assert "Reply with LT12" in text
 
 
-def test_long_term_alert_high_conviction_buy_uses_green_circle():
+def test_long_term_alert_high_conviction_buy_uses_value_buy_header():
     text = format_telegram_long_term_alert(_long_term_alert(AlertAction.HIGH_CONVICTION_BUY), alert_id=1)
-    assert "\U0001F7E2" in text
-    assert "HIGH CONVICTION BUY" in text
+    assert "\U0001F3DB" in text
+    assert "VALUE BUY" in text
 
 
 def test_long_term_alert_under_perform_rebalance_uses_red_circle():
@@ -397,14 +401,14 @@ def test_long_term_alert_under_perform_rebalance_uses_red_circle():
     assert "FUNDAMENTAL STOP" in text
 
 
-def test_long_term_alert_shows_margin_of_safety_quality_and_moat():
+def test_long_term_alert_shows_discount_quality_and_moat():
     text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1)
-    assert "+25.0%" in text
+    assert "25.0% Discount" in text
     assert "8/10" in text
     assert "WIDE" in text
 
 
-def test_long_term_alert_shows_valuation_exit_target():
+def test_long_term_alert_shows_target_price():
     text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1)
     assert "120.00" in text  # 1.20 * fair_value(100.00)
 
@@ -414,12 +418,25 @@ def test_long_term_alert_shows_holding_horizon():
     assert "6-24 months" in text
 
 
-def test_long_term_alert_negative_margin_of_safety_has_no_plus_sign():
+def test_long_term_alert_price_above_fair_value_shows_premium_not_discount():
     alert = _long_term_alert(AlertAction.TAKE_PROFIT_REBALANCE)
     alert = alert.model_copy(update={"margin_of_safety_pct": -0.15})
     text = format_telegram_long_term_alert(alert, alert_id=1)
-    assert "-15.0%" in text
-    assert "+-15.0%" not in text
+    assert "15.0% Premium" in text
+    assert "Discount" not in text
+
+
+def test_long_term_alert_zero_price_shows_na_not_bogus_percentage():
+    """Regression coverage for the exact bug a live smoke test caught:
+    price=$0.00 (talonx_ingest hadn't fetched a live tick yet) produced an
+    artificial "Margin of Safety: +100.0%". The primary fix is upstream
+    (FundamentalScanner falls back to yfinance's last close, talonx_core
+    refuses to evaluate price<=0 at all) -- this is the display-layer
+    safety net for any alert that predates that fix."""
+    alert = _long_term_alert().model_copy(update={"market_price": 0.0, "margin_of_safety_pct": 1.0})
+    text = format_telegram_long_term_alert(alert, alert_id=1)
+    assert "N/A" in text
+    assert "100.0%" not in text
 
 
 def test_long_term_alert_unknown_action_does_not_raise():
@@ -427,12 +444,53 @@ def test_long_term_alert_unknown_action_does_not_raise():
     hit earlier this project -- .get() with a default must hold for any
     future new long-term action value too."""
     text = format_telegram_long_term_alert(_long_term_alert(AlertAction.HOLD_QUALITY), alert_id=1)
-    assert "HOLD (QUALITY)" in text
+    assert "HOLD" in text
 
 
 def test_long_term_alert_includes_company_name_when_given():
     text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1, company_name="Apple Inc.")
     assert "`AAPL` (Apple Inc.)" in text
+
+
+def test_long_term_alert_strips_internal_formula_checks_from_summary():
+    """Guardrail: the short push must never leak internal threshold
+    checks like "(>= 15%)" or "(>= 7)" -- these come from
+    FundamentalScanner's signal.message, embedded in the FULL rationale
+    text (which the short push deliberately does NOT use anymore)."""
+    alert = _long_term_alert(
+        summary="ROIC 30.7% (>= 15%) and F-Score 7/9 (>= 7) support a durable moat.",
+    )
+    text = format_telegram_long_term_alert(alert, alert_id=1)
+    assert ">=" not in text
+    assert "durable moat" in text
+
+
+def test_long_term_alert_summary_is_truncated_to_one_sentence():
+    alert = _long_term_alert(
+        summary="First sentence stays. Second sentence should be dropped entirely from the short push.",
+    )
+    text = format_telegram_long_term_alert(alert, alert_id=1)
+    assert "First sentence stays." in text
+    assert "Second sentence" not in text
+
+
+def test_long_term_alert_total_length_stays_under_300_chars():
+    """Guardrail: total short-push length must stay under 300 characters
+    even with a long company name and a maximally long summary."""
+    alert = _long_term_alert(
+        summary="x" * 400,  # far longer than the 120-char summary cap, no sentence break
+    )
+    text = format_telegram_long_term_alert(
+        alert, alert_id=999999, company_name="International Business Machines Corporation",
+    )
+    assert len(text) <= 300
+
+
+def test_long_term_alert_falls_back_to_rationale_when_summary_is_empty():
+    alert = _long_term_alert(summary="")
+    text = format_telegram_long_term_alert(alert, alert_id=1)
+    # rationale's own text (minus formula checks, which it has none of here)
+    assert "FY2025 fundamentals clear thresholds" in text
 
 
 def _long_term_row(
@@ -443,6 +501,7 @@ def _long_term_row(
     return {
         "id": alert_id, "ticker": "AAPL", "action": action, "severity": "critical",
         "rationale": "FY2025 fundamentals clear thresholds -- quality score 8/10, wide moat.",
+        "summary": "Apple's ecosystem lock-in and services growth support a durable moat.",
         "quality_score": 8, "moat_rating": "wide", "market_price": 75.0,
         "intrinsic_fair_value": 100.0, "margin_of_safety_pct": 0.25,
         "capital_allocation_assessment": "Disciplined buybacks and reinvestment.",

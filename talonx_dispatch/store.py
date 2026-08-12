@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS long_term_alerts (
     action                          TEXT NOT NULL,
     severity                        TEXT NOT NULL,
     rationale                       TEXT NOT NULL,
+    summary                         TEXT NOT NULL DEFAULT '',
     quality_score                   INTEGER NOT NULL,
     moat_rating                     TEXT NOT NULL,
     market_price                    REAL NOT NULL,
@@ -111,9 +112,25 @@ class AuditStore:
         self._conn = sqlite3.connect(self.path, check_same_thread=check_same_thread)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(_SCHEMA)
+        self._migrate()
         self._conn.commit()
         self._conn.row_factory = sqlite3.Row
         self._lock = threading.Lock()
+
+    def _migrate(self) -> None:
+        """This table's first schema evolution since its original release
+        -- `summary` is a new column (the LLM's clean one-sentence
+        write-up, separate from the more technical `rationale`; see
+        talonx_core.schemas' LongTermActionableAlert.summary docstring).
+        Same idempotent PRAGMA-table_info-guarded ALTER TABLE pattern
+        talonx_watchlist/store.py and talonx_core/store.py already use,
+        safe to run every startup. DEFAULT '' rather than NOT NULL alone
+        -- SQLite requires a default when adding a NOT NULL column to a
+        table that may already have rows; a pre-existing alert simply has
+        no retroactive summary, not a migration failure."""
+        cols = {row[1] for row in self._conn.execute("PRAGMA table_info(long_term_alerts)").fetchall()}
+        if "summary" not in cols:
+            self._conn.execute("ALTER TABLE long_term_alerts ADD COLUMN summary TEXT NOT NULL DEFAULT ''")
 
     def close(self) -> None:
         self._conn.close()
@@ -270,17 +287,18 @@ class AuditStore:
             cursor = self._conn.execute(
                 """
                 INSERT INTO long_term_alerts (
-                    ticker, action, severity, rationale, quality_score, moat_rating,
+                    ticker, action, severity, rationale, summary, quality_score, moat_rating,
                     market_price, intrinsic_fair_value, margin_of_safety_pct,
                     capital_allocation_assessment, key_findings_json, risk_factors_json,
                     model_used, correlated_at, received_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     alert.ticker.upper(),
                     alert.action.value,
                     alert.severity.value,
                     alert.rationale,
+                    alert.summary,
                     alert.quality_score,
                     alert.moat_rating.value,
                     alert.market_price,

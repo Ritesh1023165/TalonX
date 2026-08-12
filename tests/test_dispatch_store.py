@@ -8,6 +8,7 @@ other local SQLite stores.
 """
 from __future__ import annotations
 
+import sqlite3
 import threading
 from datetime import datetime, timedelta, timezone
 
@@ -239,6 +240,7 @@ def _long_term_alert(
     return LongTermActionableAlert(
         ticker=ticker, action=action, severity=AlertSeverity.CRITICAL,
         rationale="FY2025 fundamentals clear thresholds.",
+        summary="Strong recurring revenue and durable moat support the thesis.",
         quality_score=8, moat_rating=MoatRating.WIDE, market_price=75.0,
         intrinsic_fair_value=100.0, margin_of_safety_pct=0.25,
         capital_allocation_assessment="Disciplined buybacks.",
@@ -338,3 +340,43 @@ def test_long_term_state_persists_across_reopen(tmp_path):
 
     with AuditStore(path) as store2:
         assert store2.count_long_term() == 1
+
+
+def test_migrates_a_long_term_alerts_table_from_before_the_summary_column(tmp_path):
+    """Simulates a real pre-existing dispatch_audit.db from before `summary`
+    was added to long_term_alerts -- AuditStore's first-ever migration.
+    A pre-existing row must survive with summary='' (the DEFAULT), and the
+    store must stay fully usable (a fresh insert populates a real summary)."""
+    db_path = tmp_path / "legacy_audit.db"
+
+    legacy_conn = sqlite3.connect(db_path)
+    legacy_conn.execute(
+        "CREATE TABLE long_term_alerts ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT NOT NULL, action TEXT NOT NULL, "
+        "severity TEXT NOT NULL, rationale TEXT NOT NULL, quality_score INTEGER NOT NULL, "
+        "moat_rating TEXT NOT NULL, market_price REAL NOT NULL, intrinsic_fair_value REAL NOT NULL, "
+        "margin_of_safety_pct REAL NOT NULL, capital_allocation_assessment TEXT NOT NULL, "
+        "key_findings_json TEXT NOT NULL, risk_factors_json TEXT NOT NULL, model_used TEXT NOT NULL, "
+        "correlated_at TEXT NOT NULL, received_at TEXT NOT NULL, "
+        "telegram_sent INTEGER NOT NULL DEFAULT 0, telegram_sent_at TEXT, telegram_error TEXT)"
+    )
+    legacy_conn.execute(
+        "INSERT INTO long_term_alerts (ticker, action, severity, rationale, quality_score, moat_rating, "
+        "market_price, intrinsic_fair_value, margin_of_safety_pct, capital_allocation_assessment, "
+        "key_findings_json, risk_factors_json, model_used, correlated_at, received_at) "
+        "VALUES ('MSFT', 'hold_quality', 'info', 'pre-migration rationale', 8, 'wide', "
+        "503.81, 525.0, 0.04, 'Disciplined buybacks.', '[]', '[]', 'gemini-flash-latest', "
+        "'2026-08-11T18:51:43+00:00', '2026-08-11T18:51:44+00:00')"
+    )
+    legacy_conn.commit()
+    legacy_conn.close()
+
+    with AuditStore(db_path) as store:
+        rows = store.recent_long_term()
+        assert len(rows) == 1
+        assert rows[0]["summary"] == ""  # DEFAULT '' for a pre-migration row
+
+        # And the migrated store is fully usable afterward.
+        store.record_long_term_alert(_long_term_alert(ticker="AAPL"))
+        rows = store.recent_long_term()
+        assert {r["summary"] for r in rows} == {"", "Strong recurring revenue and durable moat support the thesis."}

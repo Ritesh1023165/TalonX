@@ -304,6 +304,17 @@ def _evaluate_long_term_with_reason(
 
     fair_value = report.dcf_fair_value_per_share
     price = signal.price
+    if price <= 0:
+        # Defense-in-depth boundary check -- FundamentalFactorSignal
+        # arrives over Redis (a cross-process wire contract, not internal
+        # code this function can trust), and a non-positive price would
+        # make margin_of_safety_pct below read as a nonsense +100% AND
+        # make the HIGH_CONVICTION_BUY price<=threshold check always pass
+        # (0 <= any positive number) -- a false BUY trigger. talonx_quant's
+        # FundamentalScanner is the primary fix (falls back to yfinance's
+        # last close rather than ever publishing price=0.0), this is the
+        # second line of defense.
+        return None, "INVALID_PRICE"
     moat_downgraded = (
         state.previous_moat_rating is not None
         and _moat_rank(report.moat_rating) < _moat_rank(state.previous_moat_rating)
@@ -358,6 +369,7 @@ def _evaluate_long_term_with_reason(
         rationale=_build_long_term_rationale(
             action, signal, report, moat_downgraded, debt_to_ebitda_breach, roic_streak_breach,
         ),
+        summary=report.summary,
         quality_score=report.quality_score,
         moat_rating=report.moat_rating,
         market_price=price,

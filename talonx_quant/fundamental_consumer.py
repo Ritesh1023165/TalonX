@@ -61,6 +61,23 @@ def _jittered_backoff(attempt: int, base: float, max_delay: float) -> float:
     return capped * (0.5 + random.random())
 
 
+def _fetch_last_close(ticker: str) -> float | None:
+    """Blocking call, run off the event loop via asyncio.to_thread -- same
+    yf.Tickers().fast_info.last_price pattern talonx_ingest.market_data.
+    yfinance_poll.py already uses for its own live-price fallback. Only
+    reached when a fundamentals event arrives before this scanner has
+    seen ANY market:stream tick for the ticker yet (e.g. right after a
+    fresh startup, or a LONG_TERM-only ticker whose slow daily-close
+    poller hasn't run its first cycle) -- see _get_price_with_fallback."""
+    import yfinance as yf  # imported lazily so this stays optional
+
+    info = yf.Tickers(ticker.upper()).tickers.get(ticker.upper())
+    if info is None:
+        return None
+    last_price = getattr(info.fast_info, "last_price", None)
+    return float(last_price) if last_price is not None else None
+
+
 class FundamentalScanner:
     def __init__(self, config: QuantConfig | None = None, store: QuantStateStore | None = None):
         self.config = config or QuantConfig()
@@ -171,6 +188,38 @@ class FundamentalScanner:
             return  # only BAR events carry a close price, same filter QuantScanner uses
         self._latest_prices[event.symbol.upper()] = event.close
 
+    async def _get_price_with_fallback(self, ticker: str) -> float:
+        """Only called right before publishing a signal (see
+        _handle_fundamentals_event) -- NOT on every fundamentals event --
+        since the fallback below is a real network call, not worth paying
+        for a ticker whose ROIC/F-Score won't clear the threshold anyway.
+
+        A fundamentals event can arrive before this scanner has seen ANY
+        market:stream tick for the ticker (a fresh startup, or a
+        LONG_TERM-only ticker whose slow daily-close poller hasn't run
+        its first cycle yet). Publishing a signal with price=0.0 in that
+        case is actively dangerous, not just cosmetically wrong: talonx_core's
+        HIGH_CONVICTION_BUY check is `price <= (1 - margin_of_safety_pct) *
+        fair_value`, and 0 <= any positive number, so a zero price would
+        ALWAYS satisfy it -- a false BUY trigger -- and margin_of_safety_pct
+        itself would read as a nonsense +100%. Falls back to yfinance's
+        last close instead of publishing 0.0; caches a successful fallback
+        into _latest_prices too, so a second fundamentals event this
+        session doesn't re-fetch."""
+        price = self._latest_prices.get(ticker)
+        if price is not None and price > 0:
+            return price
+        try:
+            fallback = await asyncio.to_thread(_fetch_last_close, ticker)
+        except Exception as exc:  # noqa: BLE001 -- a fallback-fetch failure isn't fatal
+            logger.warning("Fallback price fetch failed for %s: %s", ticker, exc)
+            return 0.0
+        if fallback is not None and fallback > 0:
+            logger.info("No live price for %s yet -- using yfinance last close $%.2f as fallback", ticker, fallback)
+            self._latest_prices[ticker] = fallback
+            return fallback
+        return 0.0
+
     async def _handle_fundamentals_event(self, payload: dict) -> None:
         try:
             event = NewFundamentalsIngestedEvent.model_validate(payload)
@@ -214,6 +263,25 @@ class FundamentalScanner:
                 ticker, current.fiscal_year, roic, f_score,
             )
             return
+
+        if price <= 0:
+            # No live market:stream tick yet -- try the yfinance fallback
+            # NOW (only reached once we know the signal would otherwise
+            # publish, so this network call isn't wasted on tickers whose
+            # ROIC/F-Score wouldn't have cleared the threshold anyway).
+            price = await self._get_price_with_fallback(ticker)
+            if price <= 0:
+                # Fallback also failed -- suppress rather than publish a
+                # signal talonx_core's decision matrix would misread.
+                logger.warning("No usable price (live or fallback) for %s -- suppressing fundamental signal", ticker)
+                if self.store is not None:
+                    self.store.record_suppressed(ticker, "NO_PRICE_AVAILABLE", 1, datetime.now(timezone.utc))
+                return
+            # Recompute the price-dependent factors now that a real price
+            # is known -- they were computed against the 0.0 placeholder
+            # above, purely for the FACTOR_CALCULATED observability log.
+            fcf_yield = compute_fcf_yield(current, price)
+            altman_z = compute_altman_z_score(current, price)
 
         await self._start_cooldown(ticker)
         signal = FundamentalFactorSignal(

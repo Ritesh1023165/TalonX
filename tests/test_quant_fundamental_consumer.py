@@ -9,7 +9,8 @@ boundary every other consumer's tests in this project use.
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -93,6 +94,96 @@ async def test_fundamentals_event_that_clears_thresholds_publishes_a_signal(scan
     assert body["roic"] is not None
     assert body["piotroski_f_score"] is not None
     assert scanner.signals_published == 1
+
+
+# --- Price fallback (regression coverage for a live-caught bug: a fundamentals
+# event arriving before any market tick produced price=0.0, which made
+# talonx_core's margin-of-safety math read as a bogus "+100% discount" and
+# would have made the HIGH_CONVICTION_BUY price<=threshold check always pass) ---
+
+@pytest.mark.asyncio
+async def test_no_live_price_falls_back_to_yfinance_last_close(scanner, monkeypatch):
+    """No BAR event was ever sent for AAPL -- _latest_prices is empty --
+    but the fallback should still let a genuinely-qualifying signal
+    publish, using yfinance's last close instead of price=0.0."""
+    monkeypatch.setattr(
+        "talonx_quant.fundamental_consumer._fetch_last_close", lambda ticker: 187.50,
+    )
+
+    await scanner._handle_message(_msg(scanner.config.fundamentals_events_channel, _fundamentals_payload()))
+
+    scanner._client.publish.assert_awaited_once()
+    _, payload = scanner._client.publish.await_args.args
+    body = json.loads(payload)
+    assert body["price"] == 187.50
+    assert scanner._latest_prices["AAPL"] == 187.50  # cached for next time
+
+
+@pytest.mark.asyncio
+async def test_fallback_is_not_attempted_when_a_live_price_is_already_known(scanner, monkeypatch):
+    fetch = MagicMock(return_value=999.0)
+    monkeypatch.setattr("talonx_quant.fundamental_consumer._fetch_last_close", fetch)
+    await scanner._handle_message(_msg(scanner.config.market_stream_channel, _bar_payload(close=190.0)))
+
+    await scanner._handle_message(_msg(scanner.config.fundamentals_events_channel, _fundamentals_payload()))
+
+    fetch.assert_not_called()
+    _, payload = scanner._client.publish.await_args.args
+    assert json.loads(payload)["price"] == 190.0
+
+
+@pytest.mark.asyncio
+async def test_fallback_is_not_attempted_for_a_signal_that_would_not_pass_anyway(scanner, monkeypatch):
+    """The fallback is a real network call -- only worth paying for once
+    we know the signal would otherwise publish. A ticker whose ROIC/F-Score
+    don't clear the threshold should never trigger it."""
+    fetch = MagicMock(return_value=100.0)
+    monkeypatch.setattr("talonx_quant.fundamental_consumer._fetch_last_close", fetch)
+    weak_facts = [_facts(2025, operating_income=1.0, total_debt=1000.0, total_equity=1000.0)]
+
+    await scanner._handle_message(_msg(scanner.config.fundamentals_events_channel, _fundamentals_payload(weak_facts)))
+
+    fetch.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_fallback_failure_suppresses_the_signal_instead_of_publishing_zero_price(scanner, monkeypatch):
+    monkeypatch.setattr("talonx_quant.fundamental_consumer._fetch_last_close", lambda ticker: None)
+
+    await scanner._handle_message(_msg(scanner.config.fundamentals_events_channel, _fundamentals_payload()))
+
+    scanner._client.publish.assert_not_awaited()
+    assert scanner.signals_published == 0
+
+
+@pytest.mark.asyncio
+async def test_fallback_failure_is_persisted_as_suppressed_when_a_store_is_set(tmp_path, monkeypatch):
+    monkeypatch.setattr("talonx_quant.fundamental_consumer._fetch_last_close", lambda ticker: None)
+    store = QuantStateStore(tmp_path / "quant.db")
+    try:
+        scanner = FundamentalScanner(QuantConfig(), store=store)
+        scanner._client = AsyncMock()
+        scanner._client.exists.return_value = False
+
+        await scanner._handle_message(_msg(scanner.config.fundamentals_events_channel, _fundamentals_payload()))
+
+        today = datetime.now(timezone.utc).date().isoformat()
+        counts = store.suppression_counts_for_date(today)
+        assert any(c["reason"] == "NO_PRICE_AVAILABLE" for c in counts)
+    finally:
+        store.close()
+
+
+@pytest.mark.asyncio
+async def test_fallback_fetch_exception_does_not_crash_the_scanner(scanner, monkeypatch):
+    def _raise(ticker):
+        raise ConnectionError("network unreachable")
+
+    monkeypatch.setattr("talonx_quant.fundamental_consumer._fetch_last_close", _raise)
+
+    await scanner._handle_message(_msg(scanner.config.fundamentals_events_channel, _fundamentals_payload()))
+
+    scanner._client.publish.assert_not_awaited()  # suppressed, not crashed
 
 
 @pytest.mark.asyncio

@@ -483,6 +483,26 @@ def test_long_term_no_fair_value_estimate():
     assert reason == "NO_FAIR_VALUE_ESTIMATE"
 
 
+def test_long_term_invalid_price_is_suppressed():
+    """Regression coverage for a bug a live smoke test caught: price=0.0
+    (talonx_ingest hadn't fetched a live tick yet) made margin_of_safety_pct
+    read as a bogus +100% AND would have made the HIGH_CONVICTION_BUY
+    price<=threshold check always pass (0 <= any positive number) -- a
+    false BUY trigger. talonx_quant.fundamental_consumer.FundamentalScanner
+    is the primary fix (falls back to yfinance's last close rather than
+    ever publishing price=0.0); this is the second line of defense, since
+    FundamentalFactorSignal arrives over Redis -- a boundary this function
+    should not blindly trust."""
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=0.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=8, moat=MoatRating.WIDE, fair_value=100.0),
+        longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert alert is None
+    assert reason == "INVALID_PRICE"
+
+
 def test_long_term_high_conviction_buy():
     # fair_value=100, margin_of_safety_pct=0.20 -> BUY threshold price <= 80
     state = LongTermTickerState(
@@ -495,6 +515,10 @@ def test_long_term_high_conviction_buy():
     assert alert.action == AlertAction.HIGH_CONVICTION_BUY
     assert alert.severity == AlertSeverity.CRITICAL
     assert round(alert.margin_of_safety_pct, 2) == 0.25  # (100-75)/100
+    # The LLM's clean summary, carried straight through from the report --
+    # NOT re-derived from the technical rationale (see LongTermActionableAlert
+    # .summary's docstring for why the two are kept separate).
+    assert alert.summary == "Durable compounder."
 
 
 def test_long_term_high_conviction_buy_requires_a_real_moat():

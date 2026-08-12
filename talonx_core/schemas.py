@@ -235,6 +235,15 @@ class LongTermActionableAlert(BaseModel):
     action: AlertAction
     severity: AlertSeverity
     rationale: str
+    # The LLM's own free-text summary (LongTermResearchReport.summary),
+    # carried separately from `rationale` above -- rationale is the FULL
+    # technical writeup (formula checks, quality/moat/price restated),
+    # meant for format_telegram_long_term_details(); summary is a clean
+    # one-or-two-sentence readout with no internal-threshold noise, meant
+    # for the SHORT Telegram push (format_telegram_long_term_alert), which
+    # needs something safe to truncate to ~120 chars without cutting off
+    # mid-formula or mid-number.
+    summary: str
 
     quality_score: int = Field(ge=0, le=10)
     moat_rating: MoatRating

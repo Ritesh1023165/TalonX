@@ -34,6 +34,7 @@ schemas and never need escaping.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
 
 from talonx_dispatch.schemas import (
@@ -103,6 +104,26 @@ _LONG_TERM_EXIT_REASON_LABEL = {
 # already fired using the real configured value.
 _VALUATION_EXIT_PREMIUM = 1.20
 _HOLDING_HORIZON_TEXT = "6-24 months, quarterly review"
+
+# --- SHORT long-term push (format_telegram_long_term_alert) -----------------
+# A distinct, compact header per action -- "VALUE BUY" for the primary
+# HIGH_CONVICTION_BUY case per spec, adapted for the other 3 long-term
+# actions so none of them fall through to the generic ℹ️ fallback.
+_SHORT_PUSH_HEADER = {
+    AlertAction.HIGH_CONVICTION_BUY: ("\U0001F3DB️", "VALUE BUY"),  # classical building
+    AlertAction.HOLD_QUALITY: ("\U0001F535", "HOLD"),
+    AlertAction.TAKE_PROFIT_REBALANCE: ("\U0001F7E1", "TAKE PROFIT"),
+    AlertAction.UNDER_PERFORM_REBALANCE: ("\U0001F534", "FUNDAMENTAL STOP"),
+}
+_SHORT_PUSH_MAX_CHARS = 300
+_SHORT_PUSH_SUMMARY_MAX_CHARS = 120
+# Matches internal threshold checks like "(>= 15%)" or "(>= 7)" -- these
+# come from FundamentalScanner's signal.message (fundamental_consumer.py),
+# embedded in talonx_core's full `rationale` text. Stripped defensively
+# from the short push's summary even though alert.summary (the LLM's own
+# free-text write-up) shouldn't normally contain them -- a future
+# rationale/summary format change must not be able to leak them in.
+_FORMULA_CHECK_RE = re.compile(r"\s*\([<>]=\s*[^)]*\)")
 
 
 def escape_markdown(text: str) -> str:
@@ -200,35 +221,68 @@ def format_telegram_trade_execution(execution: PaperTradeExecution, company_name
     return "\n".join(lines)
 
 
+def _strip_formula_checks(text: str) -> str:
+    return _FORMULA_CHECK_RE.sub("", text).strip()
+
+
+def _one_sentence_summary(text: str, max_chars: int) -> str:
+    """Reduces to roughly one sentence (the LLM's summary is usually
+    2-3), strips internal formula checks, then hard-truncates to
+    max_chars -- the short push's guardrail is "ONE_SENTENCE... (Max 120
+    characters)", not "however much the LLM felt like writing"."""
+    cleaned = _strip_formula_checks(text)
+    first_sentence_end = cleaned.find(". ")
+    if first_sentence_end != -1:
+        cleaned = cleaned[: first_sentence_end + 1]
+    return _truncate(cleaned, max_chars)
+
+
+def _discount_or_premium_label(price: float, margin_of_safety_pct: float) -> str:
+    """price<=0 is a display-time safety net, not the primary fix -- the
+    primary fix is talonx_quant.fundamental_consumer.FundamentalScanner
+    falling back to yfinance's last close (and talonx_core.decision
+    refusing to evaluate a non-positive price at all, returning
+    INVALID_PRICE) rather than ever publishing a signal/alert with
+    price=0.0 in the first place. This still guards against showing a
+    nonsense "+100.0% Discount" for any alert that predates that fix."""
+    if price <= 0:
+        return "N/A"
+    if margin_of_safety_pct >= 0:
+        return f"{margin_of_safety_pct:.1%} Discount"
+    return f"{abs(margin_of_safety_pct):.1%} Premium"
+
+
 def format_telegram_long_term_alert(
     alert: LongTermActionableAlert, alert_id: int, company_name: str | None = None,
 ) -> str:
-    """The LONG_TERM push -- per the spec's Module 5B: current price vs.
-    fair value, margin of safety, quality/moat, the take-profit exit
-    target, and expected holding horizon. `.get()` with a default (never
-    a bare index) for the action maps -- same defensive posture the
-    intraday formatter uses, since a future new long-term action value
-    must not be able to KeyError this push."""
-    emoji = _LONG_TERM_ACTION_EMOJI.get(alert.action, "ℹ️")
-    label = _LONG_TERM_ACTION_LABEL.get(alert.action, alert.action.value.upper())
-    severity_prefix = _SEVERITY_PREFIX[alert.severity]
+    """The LONG_TERM SHORT push: header, price vs. fair value (framed as
+    a discount/premium), quality/moat, a valuation-based target price and
+    holding horizon, and a ONE-sentence executive summary -- deliberately
+    NOT the full technical rationale (formula checks, restated numbers),
+    which is what made the old version of this push long, redundant, and
+    prone to being cut off mid-sentence by Telegram/display truncation.
+    Hard-capped under 300 chars end-to-end regardless of how long the
+    company name or summary get. `.get()` with a default (never a bare
+    index) for the header map -- same defensive posture the intraday
+    formatter uses, since a future new long-term action value must not be
+    able to KeyError this push."""
+    emoji, label = _SHORT_PUSH_HEADER.get(alert.action, ("ℹ️", alert.action.value.upper()))
     ticker_suffix = f" ({escape_markdown(company_name)})" if company_name else ""
-    margin_sign = "+" if alert.margin_of_safety_pct >= 0 else ""
     exit_target = alert.intrinsic_fair_value * _VALUATION_EXIT_PREMIUM
+    discount_label = _discount_or_premium_label(alert.market_price, alert.margin_of_safety_pct)
+    summary = _one_sentence_summary(alert.summary or alert.rationale, _SHORT_PUSH_SUMMARY_MAX_CHARS)
 
     lines = [
-        f"{severity_prefix}{emoji} *{label}* — `{alert.ticker}`{ticker_suffix}  •  #LT{alert_id}",
-        f"\U0001F550 {_format_timestamp(alert.correlated_at)}",
-        f"Price: ${alert.market_price:,.2f}  vs  Fair Value: ${alert.intrinsic_fair_value:,.2f}",
-        f"Margin of Safety: {margin_sign}{alert.margin_of_safety_pct:.1%}",
-        f"Quality: {alert.quality_score}/10  |  Moat: {alert.moat_rating.value.upper()}",
-        f"Valuation exit target: ${exit_target:,.2f} (take-profit trim level)",
-        f"Expected holding horizon: {_HOLDING_HORIZON_TEXT}",
-        escape_markdown(_truncate(alert.rationale, 300)),
-        "",
+        f"{emoji} {label}: `{alert.ticker}`{ticker_suffix} • #LT{alert_id}",
+        f"\U0001F4B0 Price: ${alert.market_price:,.2f} | Fair Value: ${alert.intrinsic_fair_value:,.2f} "
+        f"({discount_label})",
+        f"⭐ Quality: {alert.quality_score}/10 | Moat: {alert.moat_rating.value.upper()}",
+        f"\U0001F3AF Target Price: ${exit_target:,.2f} | Horizon: {_HOLDING_HORIZON_TEXT}",
+        f"\U0001F4A1 Summary: {escape_markdown(summary)}",
         f"_Reply with LT{alert_id} for full details_",
     ]
-    return "\n".join(lines)
+    text = "\n".join(lines)
+    return _truncate(text, _SHORT_PUSH_MAX_CHARS) if len(text) > _SHORT_PUSH_MAX_CHARS else text
 
 
 def format_telegram_long_term_details(row: dict) -> str:
@@ -243,22 +297,26 @@ def format_telegram_long_term_details(row: dict) -> str:
     label = _LONG_TERM_ACTION_LABEL.get(action, action.value.upper())
     severity = AlertSeverity(row["severity"])
     severity_prefix = _SEVERITY_PREFIX[severity]
-    margin_sign = "+" if row["margin_of_safety_pct"] >= 0 else ""
+    discount_label = _discount_or_premium_label(row["market_price"], row["margin_of_safety_pct"])
     exit_target = row["intrinsic_fair_value"] * _VALUATION_EXIT_PREMIUM
 
     lines = [
         f"{severity_prefix}{emoji} *{label}* — `{row['ticker']}`  •  #LT{row['id']}",
         "",
-        f"Price: ${row['market_price']:,.2f}  vs  Fair Value: ${row['intrinsic_fair_value']:,.2f}",
-        f"Margin of Safety: {margin_sign}{row['margin_of_safety_pct']:.1%}",
+        f"Price: ${row['market_price']:,.2f}  vs  Fair Value: ${row['intrinsic_fair_value']:,.2f} ({discount_label})",
         f"Quality: {row['quality_score']}/10  |  Moat: {row['moat_rating'].upper()}",
         f"Valuation exit target: ${exit_target:,.2f}",
         f"Expected holding horizon: {_HOLDING_HORIZON_TEXT}",
+    ]
+    if row.get("summary"):
+        lines.append("")
+        lines.append(escape_markdown(row["summary"]))
+    lines.extend([
         "",
         escape_markdown(_truncate(row["rationale"], 800)),
         "",
         f"*Capital allocation:* {escape_markdown(row['capital_allocation_assessment'])}",
-    ]
+    ])
 
     if row["key_findings"]:
         lines.append("")

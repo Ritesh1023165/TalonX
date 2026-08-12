@@ -313,6 +313,7 @@ def _long_term_alert_payload(severity: str = "critical") -> dict:
     return {
         "ticker": "AAPL", "action": "high_conviction_buy", "severity": severity,
         "rationale": "FY2025 fundamentals clear thresholds.",
+        "summary": "Apple's ecosystem lock-in and services growth support a durable moat.",
         "quality_score": 8, "moat_rating": "wide", "market_price": 75.0,
         "intrinsic_fair_value": 100.0, "margin_of_safety_pct": 0.25,
         "capital_allocation_assessment": "Disciplined buybacks.",
