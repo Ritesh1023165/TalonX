@@ -168,8 +168,12 @@ async def test_telegram_push_uses_the_short_summary_format(agent):
     row = agent.store.recent(limit=1)[0]
     assert f"#{row['id']}" in text
     assert "Reply with" in text
-    # The full research writeup no longer goes out in the push itself.
-    assert "summary text" not in text
+    # The short-push structural contract's one-sentence Executive Summary
+    # line -- research_summary itself now legitimately appears (it's the
+    # whole point of that line), but not the FULL writeup (key findings/
+    # risks), which only goes out in the reply-triggered detail push.
+    assert "summary text" in text
+    assert "Key findings" not in text
 
 
 @pytest.mark.asyncio
@@ -247,13 +251,12 @@ async def test_retention_sweep_leaves_recent_alerts_alone(agent):
 # --- Company name + timestamp (looked up from talonx_watchlist) -----------
 
 @pytest.mark.asyncio
-async def test_telegram_push_includes_company_name_and_timestamp(agent):
+async def test_telegram_push_includes_company_name(agent):
     agent.telegram_client.is_configured = True
     await agent._handle_message(_message(_alert_payload(severity="critical")))
 
     text = agent.telegram_client.send.await_args.args[0]
     assert "Apple Inc." in text
-    assert "2026-08-07" in text  # correlated_at's date
 
 
 @pytest.mark.asyncio

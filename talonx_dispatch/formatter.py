@@ -108,9 +108,13 @@ _HOLDING_HORIZON_TEXT = "6-24 months, quarterly review"
 # --- SHORT long-term push (format_telegram_long_term_alert) -----------------
 # A distinct, compact header per action -- "VALUE BUY" for the primary
 # HIGH_CONVICTION_BUY case per spec, adapted for the other 3 long-term
-# actions so none of them fall through to the generic ℹ️ fallback.
+# actions so none of them fall through to the generic ℹ️ fallback. Same
+# per-action color coding as _LONG_TERM_ACTION_EMOJI (green/blue/yellow/
+# red) -- deliberately NOT 🏛️ for HIGH_CONVICTION_BUY, since 🏛️ is now
+# the fixed LONG_TERM horizon marker added alongside this (see
+# _HORIZON_EMOJI_LONG_TERM); reusing it here would print it twice.
 _SHORT_PUSH_HEADER = {
-    AlertAction.HIGH_CONVICTION_BUY: ("\U0001F3DB️", "VALUE BUY"),  # classical building
+    AlertAction.HIGH_CONVICTION_BUY: ("\U0001F7E2", "VALUE BUY"),  # green circle
     AlertAction.HOLD_QUALITY: ("\U0001F535", "HOLD"),
     AlertAction.TAKE_PROFIT_REBALANCE: ("\U0001F7E1", "TAKE PROFIT"),
     AlertAction.UNDER_PERFORM_REBALANCE: ("\U0001F534", "FUNDAMENTAL STOP"),
@@ -125,6 +129,31 @@ _SHORT_PUSH_SUMMARY_MAX_CHARS = 120
 # rationale/summary format change must not be able to leak them in.
 _FORMULA_CHECK_RE = re.compile(r"\s*\([<>]=\s*[^)]*\)")
 
+# --- Shared short-push structural contract (both horizons) ------------------
+# A fixed per-HORIZON marker (not per-action) -- alongside, not replacing,
+# each push's existing per-action emoji/color coding. Lets a reader tell
+# "which engine fired this" at a glance in a feed that interleaves both.
+_HORIZON_EMOJI_INTRADAY = "⚡"  # ⚡
+_HORIZON_EMOJI_LONG_TERM = "\U0001F3DB️"  # 🏛️
+_SEPARATOR_LINE = "─" * 16
+_COMPANY_NAME_MAX_CHARS = 25
+_TRAILING_PARENTHETICAL_RE = re.compile(r"\s*\([^)]*\)\s*$")
+
+
+def _short_company_name(name: str, max_chars: int = _COMPANY_NAME_MAX_CHARS) -> str:
+    """Company Name Resolution guardrail: strips a trailing parenthetical
+    qualifier first (e.g. "Alphabet Inc. (Class A)" -> "Alphabet Inc.")
+    -- a share-class suffix rarely adds value to a one-line mobile header
+    and is the first thing worth cutting -- THEN hard-caps at max_chars
+    so a genuinely long name on its own can't blow out the header's
+    single line on a phone screen."""
+    name = name.strip()
+    stripped = _TRAILING_PARENTHETICAL_RE.sub("", name).strip()
+    base = stripped or name
+    if len(base) <= max_chars:
+        return base
+    return base[: max_chars - 1].rstrip() + "…"
+
 
 def escape_markdown(text: str) -> str:
     """Escapes the 4 characters Telegram's legacy Markdown mode treats as special."""
@@ -134,17 +163,36 @@ def escape_markdown(text: str) -> str:
 
 
 def format_telegram_summary(alert: ActionableAlert, alert_id: int, company_name: str | None = None) -> str:
+    """The INTRADAY SHORT push, per the short-push structural contract
+    shared with the long-term push: header (existing per-action emoji/
+    color coding PLUS an extra ⚡ horizon marker alongside it -- see
+    _HORIZON_EMOJI_INTRADAY), a separator, price vs. confidence, the
+    triggering indicator setup, a blank line, and a ONE-sentence
+    executive summary drawn from research_summary (the LLM's own
+    write-up) rather than the raw indicator-trigger text.
+
+    Deliberately has NO Exit Targets line, unlike the long-term push's
+    Target Price line -- talonx_paper's stop-loss/take-profit percentages
+    (TALONX_PAPER_STOP_LOSS_PCT/TAKE_PROFIT_PCT) only ever apply to an
+    ACTUAL open position's real entry price (talonx_paper.engine.
+    check_stop_take), computed well after this alert is dispatched.
+    Showing a price here would be a hypothetical number this
+    I/O-free formatter has no business computing -- omitted on purpose,
+    not a gap."""
     emoji = _ACTION_EMOJI[alert.action]
     label = _ACTION_LABEL[alert.action]
     severity_prefix = _SEVERITY_PREFIX[alert.severity]
-    ticker_suffix = f" ({escape_markdown(company_name)})" if company_name else ""
+    company_suffix = f" ({escape_markdown(_short_company_name(company_name))})" if company_name else ""
+    summary = _one_sentence_summary(alert.research_summary, _SHORT_PUSH_SUMMARY_MAX_CHARS)
 
     lines = [
-        f"{severity_prefix}{emoji} *{label}* — `{alert.ticker}`{ticker_suffix}  •  #{alert_id}",
-        f"Price: ${alert.triggering_signal.price:,.2f}  |  Confidence: {alert.research_confidence:.0%}",
-        f"\U0001F550 {_format_timestamp(alert.correlated_at)}",
-        escape_markdown(_truncate(alert.triggering_signal.message, 200)),
+        f"{severity_prefix}{emoji} {_HORIZON_EMOJI_INTRADAY} *{label}* — "
+        f"`{alert.ticker}`{company_suffix} • #{alert_id}",
+        _SEPARATOR_LINE,
+        f"\U0001F4B0 Price: ${alert.triggering_signal.price:,.2f} | Confidence: {alert.research_confidence:.0%}",
+        f"\U0001F4CA Setup: {escape_markdown(_truncate(alert.triggering_signal.message, 200))}",
         "",
+        f"\U0001F4A1 Summary: {escape_markdown(summary)}",
         f"_Reply with {alert_id} for full details_",
     ]
     return "\n".join(lines)
@@ -189,7 +237,7 @@ def format_telegram_trade_execution(execution: PaperTradeExecution, company_name
     trade execution doesn't reinstate a long combined message. Short by
     design, same as every other push this module sends.
     """
-    ticker_suffix = f" ({escape_markdown(company_name)})" if company_name else ""
+    ticker_suffix = f" ({escape_markdown(_short_company_name(company_name))})" if company_name else ""
     timestamp_line = f"\U0001F550 {_format_timestamp(execution.timestamp)}"
 
     if execution.order_type == OrderType.BUY:
@@ -237,6 +285,23 @@ def _one_sentence_summary(text: str, max_chars: int) -> str:
     return _truncate(cleaned, max_chars)
 
 
+def _fit_within_budget(lines: list[str], max_chars: int, summary_line_index: int) -> str:
+    """Joins `lines`; if the result exceeds max_chars, trims ONLY the
+    summary line to fit -- never the header/separator/price/quality/
+    target/footer lines. A blind whole-string truncation (the original
+    approach) risks silently swallowing the reply-hint footer whenever
+    a long company name or ticker eats into the 300-char budget, which
+    defeats the point of including that footer at all."""
+    text = "\n".join(lines)
+    if len(text) <= max_chars:
+        return text
+    overflow = len(text) - max_chars
+    lines = list(lines)
+    summary_line = lines[summary_line_index]
+    lines[summary_line_index] = _truncate(summary_line, max(0, len(summary_line) - overflow))
+    return "\n".join(lines)
+
+
 def _discount_or_premium_label(price: float, margin_of_safety_pct: float) -> str:
     """price<=0 is a display-time safety net, not the primary fix -- the
     primary fix is talonx_quant.fundamental_consumer.FundamentalScanner
@@ -255,34 +320,43 @@ def _discount_or_premium_label(price: float, margin_of_safety_pct: float) -> str
 def format_telegram_long_term_alert(
     alert: LongTermActionableAlert, alert_id: int, company_name: str | None = None,
 ) -> str:
-    """The LONG_TERM SHORT push: header, price vs. fair value (framed as
-    a discount/premium), quality/moat, a valuation-based target price and
-    holding horizon, and a ONE-sentence executive summary -- deliberately
-    NOT the full technical rationale (formula checks, restated numbers),
-    which is what made the old version of this push long, redundant, and
-    prone to being cut off mid-sentence by Telegram/display truncation.
+    """The LONG_TERM SHORT push, per the short-push structural contract
+    shared with the intraday push: header (per-action emoji/color coding
+    PLUS an extra 🏛️ horizon marker alongside it -- see
+    _HORIZON_EMOJI_LONG_TERM), a separator, price vs. fair value (framed
+    as a discount/premium), quality/moat, a valuation-based target price
+    and holding horizon, a blank line, and a ONE-sentence executive
+    summary -- deliberately NOT the full technical rationale (formula
+    checks, restated numbers), which is what made the old version of this
+    push long, redundant, and prone to being cut off mid-sentence.
     Hard-capped under 300 chars end-to-end regardless of how long the
-    company name or summary get. `.get()` with a default (never a bare
+    company name or summary get -- see _fit_within_budget: any overflow
+    is trimmed from the summary line specifically, never from the
+    header/footer, so the #LT{id} reply hint is never the thing that
+    silently gets swallowed. `.get()` with a default (never a bare
     index) for the header map -- same defensive posture the intraday
     formatter uses, since a future new long-term action value must not be
     able to KeyError this push."""
     emoji, label = _SHORT_PUSH_HEADER.get(alert.action, ("ℹ️", alert.action.value.upper()))
-    ticker_suffix = f" ({escape_markdown(company_name)})" if company_name else ""
+    severity_prefix = _SEVERITY_PREFIX[alert.severity]
+    company_suffix = f" ({escape_markdown(_short_company_name(company_name))})" if company_name else ""
     exit_target = alert.intrinsic_fair_value * _VALUATION_EXIT_PREMIUM
     discount_label = _discount_or_premium_label(alert.market_price, alert.margin_of_safety_pct)
     summary = _one_sentence_summary(alert.summary or alert.rationale, _SHORT_PUSH_SUMMARY_MAX_CHARS)
 
     lines = [
-        f"{emoji} {label}: `{alert.ticker}`{ticker_suffix} • #LT{alert_id}",
+        f"{severity_prefix}{emoji} {_HORIZON_EMOJI_LONG_TERM} *{label}* — "
+        f"`{alert.ticker}`{company_suffix} • #LT{alert_id}",
+        _SEPARATOR_LINE,
         f"\U0001F4B0 Price: ${alert.market_price:,.2f} | Fair Value: ${alert.intrinsic_fair_value:,.2f} "
         f"({discount_label})",
         f"⭐ Quality: {alert.quality_score}/10 | Moat: {alert.moat_rating.value.upper()}",
         f"\U0001F3AF Target Price: ${exit_target:,.2f} | Horizon: {_HOLDING_HORIZON_TEXT}",
+        "",
         f"\U0001F4A1 Summary: {escape_markdown(summary)}",
         f"_Reply with LT{alert_id} for full details_",
     ]
-    text = "\n".join(lines)
-    return _truncate(text, _SHORT_PUSH_MAX_CHARS) if len(text) > _SHORT_PUSH_MAX_CHARS else text
+    return _fit_within_budget(lines, _SHORT_PUSH_MAX_CHARS, summary_line_index=6)
 
 
 def format_telegram_long_term_details(row: dict) -> str:
@@ -340,7 +414,7 @@ def format_telegram_long_term_trade_execution(
     """The LONG_TERM paper-trading notification -- three distinct shapes
     (position opened, DCA contribution, partial/full exit), each SHORT
     by design, same as every other push this module sends."""
-    ticker_suffix = f" ({escape_markdown(company_name)})" if company_name else ""
+    ticker_suffix = f" ({escape_markdown(_short_company_name(company_name))})" if company_name else ""
     timestamp_line = f"\U0001F550 {_format_timestamp(execution.timestamp)}"
 
     if execution.order_type == LongTermOrderType.BUY:

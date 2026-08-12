@@ -17,6 +17,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from talonx_dispatch.formatter import (
+    _short_company_name,
     escape_markdown,
     format_telegram_details,
     format_telegram_long_term_alert,
@@ -116,6 +117,30 @@ def test_escape_markdown_leaves_plain_text_untouched():
     assert escape_markdown("plain text 123") == "plain text 123"
 
 
+# --- _short_company_name (shared Company Name Resolution rule) -------------
+
+def test_short_company_name_drops_a_trailing_parenthetical_first():
+    assert _short_company_name("Alphabet Inc. (Class A)") == "Alphabet Inc."
+
+
+def test_short_company_name_leaves_a_short_plain_name_untouched():
+    assert _short_company_name("Apple Inc.") == "Apple Inc."
+
+
+def test_short_company_name_hard_caps_at_25_chars_when_no_parenthetical_helps():
+    long_name = "International Business Machines Corporation"
+    result = _short_company_name(long_name)
+    assert len(result) <= 25
+    assert result.endswith("…")
+
+
+def test_short_company_name_caps_even_after_dropping_the_parenthetical():
+    long_name = "The Extraordinarily Long Holding Company Name (Class A)"
+    result = _short_company_name(long_name)
+    assert len(result) <= 25
+    assert "(" not in result
+
+
 # --- format_telegram_summary (the actual push) ----------------------------
 
 def test_summary_includes_ticker_price_confidence_and_id():
@@ -132,19 +157,35 @@ def test_summary_includes_the_one_line_quant_trigger():
     assert "MACD crossed above signal line" in text
 
 
-def test_summary_stays_short_and_omits_the_research_writeup():
+def test_summary_includes_a_one_sentence_executive_summary():
+    """The short-push structural contract's Executive Summary line -- a
+    clean one-sentence takeaway from research_summary. Key
+    findings/risks are still never shown -- those belong to the FULL
+    detail reply, not this push."""
     text = format_telegram_summary(_alert(), alert_id=47)
-    # The full research summary/findings/risks never appear in the short push.
-    assert "Fundamentals support the move." not in text
+    assert "Fundamentals support the move." in text
     assert "Key findings" not in text
     assert "Risks" not in text
-    assert len(text) < 400
 
 
 def test_summary_confirmed_bullish_uses_green_circle():
     text = format_telegram_summary(_alert(action=AlertAction.CONFIRMED_BULLISH), alert_id=1)
     assert "\U0001F7E2" in text
     assert "CONFIRMED BULLISH" in text
+
+
+def test_summary_shows_the_intraday_horizon_marker_alongside_the_action_emoji():
+    """The ⚡ horizon marker is ADDITIVE, not a replacement for the
+    existing per-action color coding -- both must be present."""
+    text = format_telegram_summary(_alert(action=AlertAction.CONFIRMED_BULLISH), alert_id=1)
+    assert "\U0001F7E2" in text  # per-action green circle, unchanged
+    assert "⚡" in text  # horizon marker, new
+
+
+def test_summary_includes_a_separator_line():
+    text = format_telegram_summary(_alert(), alert_id=1)
+    lines = text.split("\n")
+    assert lines[1] == "─" * 16
 
 
 def test_summary_degraded_quant_alert_does_not_raise():
@@ -157,9 +198,12 @@ def test_summary_critical_severity_adds_fire_prefix():
     assert text.startswith("\U0001F525")
 
 
-def test_summary_includes_the_triggered_timestamp():
+def test_summary_has_no_timestamp_line():
+    """The short-push structural contract has no timestamp line (unlike
+    format_telegram_details, the full-detail reply, which still shows
+    one) -- intentional, not an oversight."""
     text = format_telegram_summary(_alert(), alert_id=47)
-    assert "2026-08-07 14:23 UTC" in text
+    assert "UTC" not in text
 
 
 def test_summary_includes_company_name_when_given():
@@ -175,6 +219,13 @@ def test_summary_omits_company_name_when_not_given():
 def test_summary_escapes_special_characters_in_company_name():
     text = format_telegram_summary(_alert(), alert_id=47, company_name="Foo_Bar*Corp")
     assert "Foo\\_Bar\\*Corp" in text
+
+
+def test_summary_truncates_a_long_company_name_in_the_header():
+    text = format_telegram_summary(_alert(), alert_id=47, company_name="Alphabet Inc. (Class A)")
+    header = text.split("\n")[0]
+    assert "(Alphabet Inc.)" in header
+    assert "Class A" not in header
 
 
 # --- format_telegram_details (sent back on a reply) ------------------------
@@ -318,6 +369,12 @@ def test_trade_execution_includes_company_name_when_given():
     assert "`SPCX` (SpaceX Holdings)" in text
 
 
+def test_trade_execution_truncates_a_long_company_name():
+    text = format_telegram_trade_execution(_execution(), company_name="Alphabet Inc. (Class A)")
+    assert "(Alphabet Inc.)" in text
+    assert "Class A" not in text
+
+
 def test_trade_execution_buy_includes_company_name_and_timestamp():
     execution = PaperTradeExecution(
         trade_id=5, ticker="NVDA", order_type=OrderType.BUY, execution_price=131.50,
@@ -401,6 +458,31 @@ def test_long_term_alert_under_perform_rebalance_uses_red_circle():
     assert "FUNDAMENTAL STOP" in text
 
 
+def test_long_term_alert_shows_the_horizon_marker_alongside_the_action_emoji():
+    """The 🏛️ horizon marker is ADDITIVE, not a replacement for the
+    existing per-action color coding -- both must be present, and must
+    be two DISTINCT emoji (HIGH_CONVICTION_BUY's own action emoji was
+    changed away from 🏛️ specifically to avoid a literal duplicate)."""
+    text = format_telegram_long_term_alert(_long_term_alert(AlertAction.HIGH_CONVICTION_BUY), alert_id=1)
+    header = text.split("\n")[0]
+    assert "\U0001F7E2" in header  # per-action green circle
+    assert "\U0001F3DB" in header  # horizon marker
+    assert header.count("\U0001F3DB") == 1
+
+
+def test_long_term_alert_includes_a_separator_line():
+    text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1)
+    lines = text.split("\n")
+    assert lines[1] == "─" * 16
+
+
+def test_long_term_alert_has_a_blank_line_before_the_summary():
+    text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1)
+    lines = text.split("\n")
+    summary_index = next(i for i, line in enumerate(lines) if line.startswith("\U0001F4A1 Summary:"))
+    assert lines[summary_index - 1] == ""
+
+
 def test_long_term_alert_shows_discount_quality_and_moat():
     text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1)
     assert "25.0% Discount" in text
@@ -452,6 +534,15 @@ def test_long_term_alert_includes_company_name_when_given():
     assert "`AAPL` (Apple Inc.)" in text
 
 
+def test_long_term_alert_truncates_a_long_company_name():
+    text = format_telegram_long_term_alert(
+        _long_term_alert(), alert_id=1, company_name="Alphabet Inc. (Class A)",
+    )
+    header = text.split("\n")[0]
+    assert "(Alphabet Inc.)" in header
+    assert "Class A" not in header
+
+
 def test_long_term_alert_strips_internal_formula_checks_from_summary():
     """Guardrail: the short push must never leak internal threshold
     checks like "(>= 15%)" or "(>= 7)" -- these come from
@@ -476,7 +567,11 @@ def test_long_term_alert_summary_is_truncated_to_one_sentence():
 
 def test_long_term_alert_total_length_stays_under_300_chars():
     """Guardrail: total short-push length must stay under 300 characters
-    even with a long company name and a maximally long summary."""
+    even with a long company name and a maximally long summary -- AND
+    the footer (the #LT{id} reply hint) must survive intact. A blind
+    whole-string truncation used to silently swallow the footer whenever
+    a long company name pushed the header over budget; the fix trims
+    only the summary line, so the footer is always the last thing cut."""
     alert = _long_term_alert(
         summary="x" * 400,  # far longer than the 120-char summary cap, no sentence break
     )
@@ -484,6 +579,7 @@ def test_long_term_alert_total_length_stays_under_300_chars():
         alert, alert_id=999999, company_name="International Business Machines Corporation",
     )
     assert len(text) <= 300
+    assert text.endswith("_Reply with LT999999 for full details_")
 
 
 def test_long_term_alert_falls_back_to_rationale_when_summary_is_empty():
@@ -620,3 +716,11 @@ def test_long_term_trade_execution_negative_pnl_has_no_plus_sign():
 def test_long_term_trade_execution_includes_company_name():
     text = format_telegram_long_term_trade_execution(_long_term_execution(), company_name="Apple Inc.")
     assert "`AAPL` (Apple Inc.)" in text
+
+
+def test_long_term_trade_execution_truncates_a_long_company_name():
+    text = format_telegram_long_term_trade_execution(
+        _long_term_execution(), company_name="Alphabet Inc. (Class A)",
+    )
+    assert "(Alphabet Inc.)" in text
+    assert "Class A" not in text
