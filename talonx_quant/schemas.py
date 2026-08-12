@@ -98,11 +98,45 @@ class QuantSignal(BaseModel):
     volume: float | None = None
     volume_surge_ratio: float | None = None
 
+    # Analyst-review additions (see strategy.py): atr feeds the
+    # risk/reward calculation below; confluence_score (0-3) counts how
+    # many of {MACD cross, RSI extreme, volume surge} agree on this bar,
+    # gating whether this signal survives past consumer.py's
+    # confluence_score_min filter; risk_reward_ratio is
+    # (atr_reward_multiplier * atr) / (assumed_stop_loss_pct * price),
+    # gating consumer.py's min_risk_reward_ratio filter.
+    atr: float | None = None
+    confluence_score: int | None = None
+    risk_reward_ratio: float | None = None
+
     bar_timestamp: datetime
     published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_redis_payload(self) -> str:
         return self.model_dump_json()
+
+
+# ------------------------------------------------------------------
+# Post-Loss Lockout input contract (mirrors
+# talonx_paper.schemas.PaperTradeExecution, DELIBERATELY TRIMMED to just
+# the 3 fields consumer.py's loss-lockout check actually needs -- same
+# "each module only knows the wire shape of what it consumes" convention
+# as MarketTickEvent above; Pydantic's default extra="ignore" means
+# parsing the real, fuller payload still works fine)
+# ------------------------------------------------------------------
+
+class PaperOrderType(str, Enum):
+    BUY = "BUY"
+    SELL = "SELL"
+
+
+class PaperTradeExecution(BaseModel):
+    """Consumed from talonx:paper:trades, talonx_paper's own output
+    contract -- this module only cares whether a SELL closed at a loss."""
+
+    ticker: str
+    order_type: PaperOrderType
+    realized_pnl_usd: float | None = None
 
 
 # ------------------------------------------------------------------

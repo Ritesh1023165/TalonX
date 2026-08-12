@@ -65,8 +65,9 @@ C:\workspace\TalonX\              <- open THIS folder as your project root
 │   ├── test_events_schemas.py
 │   ├── test_pipeline_ledger_integration.py
 │   ├── test_reddit_client.py
-│   ├── test_quant_strategy.py        <- signal logic incl. edge-triggering + hysteresis (§3.2, §9.5)
-│   ├── test_quant_consumer.py        <- per-ticker cooldown + batch throttle orchestration (§3.2, §9.5)
+│   ├── test_quant_strategy.py        <- signal logic incl. edge-triggering, hysteresis, ATR-move gate, confluence, risk/reward (§3.2, §9.5)
+│   ├── test_quant_indicators.py      <- RSI/MACD/ATR computation against a real pandas_ta call (§3.2)
+│   ├── test_quant_consumer.py        <- post-loss lockout, per-ticker cooldown, confluence/RR filters, batch throttle orchestration (§3.2, §9.5)
 │   ├── test_brain_schemas.py
 │   ├── test_brain_retriever.py
 │   ├── test_brain_consumer.py
@@ -293,25 +294,39 @@ talonx:market:stream (Redis)
     → only BAR-type events matter (trades/quotes are ignored --
       indicators need OHLCV, not tick-level data)
     → append to a per-ticker rolling buffer (bounded, oldest bars drop off)
-    → once enough history exists (60 bars by default):
-        → compute RSI, MACD, SMA fast/slow, volume-surge ratio via pandas_ta
+    → once enough history exists (120 bars by default):
+        → compute RSI, MACD, SMA fast/slow, volume-surge ratio, ATR(14) via pandas_ta
         → evaluate against configured thresholds, EDGE-TRIGGERED (fires
           only on the bar the condition first becomes true, not every
-          subsequent bar it remains true):
+          subsequent bar it remains true), AND requiring this bar's own
+          true range to clear 1.0x ATR (a routine, average-sized bar
+          doesn't count as a real move):
             - RSI crosses under 30 AND volume > 2x average → bullish (oversold + surge)
             - RSI crosses over 70 AND volume > 2x average  → bearish (overbought + surge)
             - MACD line crosses its signal line             → bullish/bearish cross
             - fast MA crosses slow MA, spread >= 0.15% of price → golden/death cross
-    → candidate signal(s) for a ticker are DROPPED if that ticker is still
-      within its post-signal cooldown (default 20 min); otherwise the
-      ticker's cooldown starts now and the candidate(s) are buffered
-    → every 60s (default), the buffer is ranked by volume_surge_ratio and
-      only the top 3 (default) are published to Redis
-      (talonx:signals:quant) -- the rest are dropped
+        → every signal that fires on a bar carries that bar's confluence_score
+          (0-3: MACD cross + RSI extreme + volume surge) and risk_reward_ratio
+          (ATR-scaled reward / talonx_paper's stop-loss distance)
+    → candidate signal(s) for a ticker are DROPPED if that ticker is
+      currently in POST-LOSS LOCKOUT (75 min default, armed when
+      talonx_paper reports a losing SELL for it) or within its standard
+      post-signal cooldown (default 20 min)
+    → candidates below confluence_score_min (default 2) or
+      min_risk_reward_ratio (default 1.5) are DROPPED next, BEFORE the
+      cooldown lock is armed -- a filtered-out candidate must not still
+      consume the ticker's cooldown slot
+    → surviving candidate(s) arm the ticker's cooldown now and are buffered
+    → every 60s (default), the buffer is ranked by (confluence_score,
+      volume_surge_ratio) and only the top 3 (default) are published to
+      Redis (talonx:signals:quant) -- the rest are dropped
 ```
 
-**Noise filters (added after live testing surfaced alert chatter — see
-§9.5 for the full before/after):**
+**Noise + signal-quality filters (edge-triggering/hysteresis added after
+live testing surfaced alert chatter; ATR-move/confluence/risk-reward/
+post-loss-lockout added after a later live paper-trading review found a
+0.33 profit factor and 25% win rate, with 3 consecutive SMCI losses
+driving 93% of session losses — see §9.5 for the full before/after):**
 - **Edge-triggering** (`strategy.py`) — every signal type, including the
   RSI+volume setup, fires only on the transition bar. Previously the
   RSI+volume check was a pure level check that would re-fire on every bar
@@ -323,6 +338,37 @@ talonx:market:stream (Redis)
   but economically-meaningless crossover, e.g. a $0.03 drift on a $500
   stock (~0.006%, far under 0.15%). Deliberately scoped to the MA cross
   only, not MACD.
+- **ATR-move gate** (`strategy.py`, `TALONX_QUANT_ATR_MOVE_MULTIPLIER`,
+  default 1.0) — a candidate's own bar (true range: `max(high-low,
+  |high-prev_close|, |low-prev_close|)`) must clear this many multiples
+  of ATR(14) to count as a genuine directional move rather than routine
+  noise on a high-beta name. Applied inside every one of `strategy.py`'s
+  own checks, upstream of everything below.
+- **Confluence score** (`strategy.py`, `TALONX_QUANT_CONFLUENCE_SCORE_MIN`,
+  default 2) — a bar-level score, 0-3: +1 each for a MACD cross firing
+  that bar, RSI sitting in its extreme zone, and a volume surge above
+  threshold. Computed once per bar and attached to every signal that
+  fires on it; `consumer.py` drops anything below the minimum before the
+  per-ticker cooldown is armed.
+- **Risk/reward filter** (`strategy.py`, `TALONX_QUANT_ATR_REWARD_MULTIPLIER`
+  default 1.5, `TALONX_QUANT_ASSUMED_STOP_LOSS_PCT` default 0.5%,
+  `TALONX_QUANT_MIN_RISK_REWARD_RATIO` default 1.5) — reward is
+  `atr_reward_multiplier x ATR`; risk is `assumed_stop_loss_pct x price`,
+  a local mirror of `talonx_paper`'s actual stop-loss distance (NOT
+  another ATR multiple of the same ATR value — pairing two multiples of
+  one number always produces the same constant ratio regardless of
+  market data, which would make the filter a permanent no-op). A
+  candidate below the minimum ratio is dropped alongside the confluence
+  filter, before the cooldown lock.
+- **Post-loss lockout** (`consumer.py`, `TALONX_QUANT_LOSS_LOCKOUT_SECONDS`,
+  default 4500 = 75 min) — `QuantScanner` also subscribes to
+  `talonx:paper:trades` (talonx_paper's own execution feed) purely to
+  detect a losing SELL. On one, a Redis key `loss_lockout:{TICKER}` locks
+  that ticker out for LONGER than, and on top of, the standard cooldown
+  below — stopping the engine from repeatedly re-entering a stock that
+  just proved it was chopping/declining. Only ever engages for a ticker
+  with paper trading enabled (one with it off never publishes an
+  execution, so it only ever sees the standard cooldown).
 - **Per-ticker cooldown** (`consumer.py`, `TALONX_QUANT_COOLDOWN_SECONDS`,
   default 1200 = 20 min) — a Redis key `cooldown:{TICKER}` locks a ticker
   out of producing ANY further candidate (regardless of signal_type) once
@@ -331,14 +377,16 @@ talonx:market:stream (Redis)
   same ticker from both alerting.
 - **Batch throttle** (`consumer.py`, `TALONX_QUANT_THROTTLE_WINDOW_SECONDS`
   default 60 / `TALONX_QUANT_THROTTLE_MAX_SIGNALS` default 3) — candidates
-  that clear cooldown are buffered, not published immediately. Every
-  window, the buffer is ranked by `volume_surge_ratio` (a signal with no
-  computed ratio sorts last) and only the top N are actually published.
-  **This is a deliberate latency-for-quality tradeoff**: a signal can sit
-  for up to the full window before it's published or dropped — there is
-  no way to guarantee "top N of the window" without waiting for the
-  window to close first. A final partial-window flush happens on
-  `Ctrl+C`/reconnect so nothing buffered is silently lost.
+  that clear everything above are buffered, not published immediately.
+  Every window, the buffer is ranked by `(confluence_score,
+  volume_surge_ratio)` — confluence first, volume surge as the tiebreaker
+  (a signal with no computed ratio sorts last within its confluence tier)
+  — and only the top N are actually published. **This is a deliberate
+  latency-for-quality tradeoff**: a signal can sit for up to the full
+  window before it's published or dropped — there is no way to guarantee
+  "top N of the window" without waiting for the window to close first. A
+  final partial-window flush happens on `Ctrl+C`/reconnect so nothing
+  buffered is silently lost.
 
 - **`buffer.py`** — the rolling OHLCV window is deliberately deduped by
   timestamp: yfinance polling re-sends a snapshot of the *current* bar
@@ -1393,7 +1441,7 @@ Listens to `talonx:market:stream`, maintains a rolling OHLCV buffer per
 ticker from BAR events, and publishes `QuantSignal` events to
 `talonx:signals:quant` when RSI+volume, MACD crossover, or MA crossover
 conditions trigger. Runs continuously — `Ctrl+C` to stop. Needs bars to
-accumulate before signals can fire (`TALONX_QUANT_MIN_BARS`, default 60),
+accumulate before signals can fire (`TALONX_QUANT_MIN_BARS`, default 120),
 so pair it with `market_data.run` streaming the same tickers, and expect
 a warm-up period before the first signal.
 
@@ -1775,9 +1823,11 @@ which LLM provider you pick; everything else is optional tuning (rate
 limits, chunk size, embedding model, ledger path, market data reconnect
 behavior, `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`/`REDDIT_USER_AGENT`/
 `TALONX_REDDIT_SUBREDDITS` for the optional Reddit source, Module 2's
-indicator periods/thresholds plus its noise filters --
+indicator periods/thresholds plus its noise and signal-quality filters --
 `TALONX_QUANT_COOLDOWN_SECONDS` / `TALONX_QUANT_MIN_MA_SPREAD_PCT` /
-`TALONX_QUANT_THROTTLE_WINDOW_SECONDS` / `TALONX_QUANT_THROTTLE_MAX_SIGNALS`
+`TALONX_QUANT_THROTTLE_WINDOW_SECONDS` / `TALONX_QUANT_THROTTLE_MAX_SIGNALS` /
+`TALONX_QUANT_ATR_MOVE_MULTIPLIER` / `TALONX_QUANT_CONFLUENCE_SCORE_MIN` /
+`TALONX_QUANT_MIN_RISK_REWARD_RATIO` / `TALONX_QUANT_LOSS_LOCKOUT_SECONDS`
 (§3.2, §9.5), retrieval
 top-K, `TALONX_BRAIN_LLM_PROVIDER` + Gemini model/temperature +
 `TALONX_BRAIN_OLLAMA_MODEL`/`TALONX_BRAIN_OLLAMA_BASE_URL`, Module 3's
@@ -1945,7 +1995,7 @@ the same failure modes from scratch.
 | 1 | Market data — yfinance fallback | 1 batched poll every 5s covering ALL tracked tickers in a single call | Yes (poll interval) | `TALONX_YF_POLL_INTERVAL` |
 | 1 | Market data — Polygon WebSocket | Real-time push, bounded by your Polygon plan tier, not by this code | No local cap | Polygon-side (plan tier) |
 | 2 | Quant scanner — bar PROCESSING | No artificial cap — processes each BAR event synchronously as it arrives off Redis; sub-millisecond `pandas_ta` compute per bar | No | n/a |
-| 2 | Quant scanner — signal OUTPUT (what actually reaches Redis) | Per-ticker: locked out for `TALONX_QUANT_COOLDOWN_SECONDS` (default 20 min) after any signal. Globally: at most `TALONX_QUANT_THROTTLE_MAX_SIGNALS` (default 3) published per `TALONX_QUANT_THROTTLE_WINDOW_SECONDS` (default 60s), ranked by volume surge ratio — see §3.2, §9.5 | Yes (both) | `TALONX_QUANT_COOLDOWN_SECONDS`, `TALONX_QUANT_THROTTLE_*` |
+| 2 | Quant scanner — signal OUTPUT (what actually reaches Redis) | Per-ticker: locked out for `TALONX_QUANT_LOSS_LOCKOUT_SECONDS` (default 75 min) after a losing paper trade, and `TALONX_QUANT_COOLDOWN_SECONDS` (default 20 min) after any signal. Globally: at most `TALONX_QUANT_THROTTLE_MAX_SIGNALS` (default 3) published per `TALONX_QUANT_THROTTLE_WINDOW_SECONDS` (default 60s), ranked by (confluence score, volume surge ratio) — see §3.2, §9.5 | Yes (both) | `TALONX_QUANT_COOLDOWN_SECONDS`, `TALONX_QUANT_LOSS_LOCKOUT_SECONDS`, `TALONX_QUANT_THROTTLE_*` |
 | 3 | talonx_brain (Gemini) | **5 requests/minute (~0.083 req/sec)**, token-bucket paced | Yes — see §9.2 | `TALONX_BRAIN_GEMINI_RPM` |
 | 4 | talonx_core (correlate + decide) | No artificial cap on PROCESSING — in-memory dict lookups and comparisons, no external calls, sub-millisecond per message. In practice bounded entirely by how fast Modules 2/3 feed it | No (processing); per-ticker cooldown only (see §3.4) | `TALONX_CORE_TICKER_COOLDOWN` |
 | 5 | talonx_dispatch — audit trail write | No artificial cap, sub-millisecond local SQLite insert per alert | No | n/a |
@@ -2215,25 +2265,41 @@ Each was unfiltered noise reaching `talonx_brain`, which meant real LLM
 calls (and real Gemini free-tier quota, §9.2) spent on setups nobody
 would act on.
 
-**Four filters, layered in this order** (§3.2 has the mechanics of each):
+A LATER live paper-trading review found a different, more expensive
+problem than noise: a 0.33 profit factor and 25% win rate, with 3
+consecutive SMCI losses driving 93% of session losses — signals that
+were individually well-formed but fired on routine-sized bars with no
+real conviction behind them, then got re-entered again and again on a
+name that had just proven it was chopping/declining. Four more filters
+were added on top of the original noise filters below to address that.
+
+**Eight filters total, layered in this order** (§3.2 has the mechanics of each):
 
 | # | Filter | Fixes | Where |
 |---|---|---|---|
 | 1 | Edge-triggering | A condition re-firing every bar it stays true (the underlying cause of most repeat alerts, ticker-duplication included) | `strategy.py` |
 | 2 | Hysteresis (min spread) | Micro-crossovers with no real economic significance (the $0.03 MSFT case) | `strategy.py` |
-| 3 | Per-ticker cooldown | The remaining ticker-duplication case: genuinely different signal types firing close together in time | `consumer.py` |
-| 4 | Batch throttle | Bursts across MANY tickers at once (a market-wide move) — global cap, ranked by conviction | `consumer.py` |
+| 3 | ATR-move gate | A signal firing on a routine, average-sized bar rather than a genuine directional move | `strategy.py` |
+| 4 | Confluence score | Low-conviction single-indicator setups with no corroborating evidence (MACD cross / RSI extreme / volume surge) | `strategy.py` (computed) / `consumer.py` (filtered) |
+| 5 | Risk/reward filter | Setups whose ATR-scaled upside doesn't justify the downside implied by the paper-trading stop-loss distance | `strategy.py` (computed) / `consumer.py` (filtered) |
+| 6 | Post-loss lockout | Repeat re-entry into a ticker that just closed a losing trade — the exact SMCI pattern above | `consumer.py` |
+| 7 | Per-ticker cooldown | The remaining ticker-duplication case: genuinely different signal types firing close together in time | `consumer.py` |
+| 8 | Batch throttle | Bursts across MANY tickers at once (a market-wide move) — global cap, ranked by (confluence, volume) | `consumer.py` |
 
-**Why this order:** 1 and 2 run inside `strategy.py` itself, before a
+**Why this order:** 1-3 run inside `strategy.py` itself, before a
 candidate signal exists at all — cheapest place to filter, and they
 address *why* a signal would be spurious in the first place, not just how
-often. 3 and 4 run in `consumer.py`, after candidates exist: cooldown
-removes same-ticker repeats regardless of which filter or signal type
-produced them, and the throttle is a last-resort global cap for exactly
-the cross-ticker burst scenario nothing upstream addresses (each
-individual signal in an 8-in-49-seconds burst can be perfectly legitimate
-on its own — the problem is the aggregate rate, which only a
-cross-ticker view can see).
+often. 6-8 run in `consumer.py`, after candidates exist: post-loss
+lockout and cooldown remove same-ticker repeats (for two different
+reasons — a proven loss vs. any prior signal at all), and the throttle is
+a last-resort global cap for exactly the cross-ticker burst scenario
+nothing upstream addresses (each individual signal in an 8-in-49-seconds
+burst can be perfectly legitimate on its own — the problem is the
+aggregate rate, which only a cross-ticker view can see). Filter 4/5
+(confluence + risk/reward) deliberately runs BEFORE filter 6/7's cooldown
+lock is armed, even though it's listed after ATR/hysteresis — a
+candidate that gets filtered out for low conviction must not still burn
+the ticker's cooldown slot and block a later, better signal.
 
 **The batch throttle's tradeoff, worth restating:** "rank by conviction,
 keep the top N" cannot be done without buffering candidates for the full
@@ -2249,8 +2315,12 @@ later higher-conviction one in the same minute. Revisit if the added
 latency turns out to matter more than whole-minute ranking accuracy in
 practice.
 
-**Suppression is counted, not silent** — `QuantScanner.signals_suppressed_cooldown`
-and `.signals_suppressed_throttle` track how much each filter is actually
-removing, and both log a line per suppression event (`consumer.py`). If
-noise is still getting through, or too much is being dropped, these are
-the first thing to check before retuning thresholds.
+**Suppression is counted, not silent** — `QuantScanner.signals_suppressed_cooldown`,
+`.signals_suppressed_throttle`, `.signals_suppressed_loss_lockout`,
+`.signals_suppressed_low_confluence`, and `.signals_suppressed_low_risk_reward`
+each track how much their filter is actually removing, and all of them
+log a line per suppression event (`consumer.py`) plus persist a
+`(ticker, reason, count)` row when a `QuantStateStore` is configured, for
+generate_eod_report.py's signal-funnel section. If noise is still getting
+through, or too much is being dropped, these are the first thing to check
+before retuning thresholds.

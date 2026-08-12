@@ -99,7 +99,13 @@ class QuantConfig:
     # least ma_slow_period + 1 for crossover detection (need a "previous"
     # value too). Left independently configurable rather than derived, so
     # it's explicit and can be tuned without doing the math each time.
-    min_bars_required: int = _env_int("TALONX_QUANT_MIN_BARS", 60)
+    # 120 (not just macd_slow+macd_signal=35) per an investment-analyst
+    # review of live paper trading results: an EMA is mathematically
+    # defined from its first bar, but its value is still biased toward
+    # its seed for a while after that -- 120 bars gives MACD's 26-period
+    # EMA roughly 4-5x its own period to settle before this module trusts
+    # a crossover, well under max_bars_per_symbol's 200-bar cap above.
+    min_bars_required: int = _env_int("TALONX_QUANT_MIN_BARS", 120)
 
     # --- Signal trigger thresholds ---
     rsi_oversold: float = _env_float("TALONX_QUANT_RSI_OVERSOLD", 30.0)
@@ -125,15 +131,73 @@ class QuantConfig:
     min_ma_spread_pct: float = _env_float("TALONX_QUANT_MIN_MA_SPREAD_PCT", 0.0015)
 
     # Batch throttle: across ALL tickers, at most this many signals are
-    # released per throttle_window_seconds, ranked by volume_surge_ratio
-    # (highest-conviction first; a signal with no computed ratio sorts
-    # last). Candidates are buffered for the full window before any of
-    # them are released -- see consumer.py's _flush_throttle_window --
-    # so a signal can be delayed by up to throttle_window_seconds, or
-    # dropped entirely if it doesn't rank in the top
-    # throttle_max_signals that window.
+    # released per throttle_window_seconds, ranked by (confluence_score,
+    # volume_surge_ratio) -- confluence first, volume surge as the
+    # tiebreaker (a signal with no computed ratio sorts last within its
+    # confluence tier). Candidates are buffered for the full window
+    # before any of them are released -- see consumer.py's
+    # _flush_throttle_window -- so a signal can be delayed by up to
+    # throttle_window_seconds, or dropped entirely if it doesn't rank in
+    # the top throttle_max_signals that window.
     throttle_window_seconds: float = _env_float("TALONX_QUANT_THROTTLE_WINDOW_SECONDS", 60.0)
     throttle_max_signals: int = _env_int("TALONX_QUANT_THROTTLE_MAX_SIGNALS", 3)
+
+    # --- Analyst-review filters (added after a live paper-trading review
+    # found a 0.33 profit factor and a 25% win rate, with 3 consecutive
+    # SMCI losses accounting for 93% of session losses) ---
+
+    # 14-period Average True Range, in the SAME units as price -- the
+    # basis for both the movement-confirmation gate and the risk/reward
+    # filter below.
+    atr_period: int = _env_int("TALONX_QUANT_ATR_PERIOD", 14)
+
+    # A candidate signal's own bar must move at least this many multiples
+    # of ATR (true range: max(high-low, |high-prev_close|, |low-prev_close|))
+    # to count as a real directional move rather than routine noise on a
+    # high-beta name -- applied inside strategy.py's own edge-trigger
+    # checks (an ADDITIONAL condition, alongside each check's existing
+    # RSI/MACD/MA logic), not a separate downstream filter.
+    atr_move_multiplier: float = _env_float("TALONX_QUANT_ATR_MOVE_MULTIPLIER", 1.0)
+
+    # Confluence score: +1 each for a MACD cross firing this bar, RSI
+    # currently in its extreme zone (< rsi_oversold or > rsi_overbought),
+    # and volume_surge_ratio > volume_surge_ratio_threshold -- computed
+    # once per bar (0-3) and attached to every signal that fires on it.
+    # A signal below this score is suppressed before it ever reaches the
+    # per-ticker cooldown lock or the global throttle.
+    confluence_score_min: int = _env_int("TALONX_QUANT_CONFLUENCE_SCORE_MIN", 2)
+
+    # Risk/reward filter. Reward side = atr_reward_multiplier * ATR (a
+    # volatility-scaled profit target). Risk side is intentionally NOT
+    # another ATR multiple -- 1.5x ATR / 0.75x ATR is a constant 2.0
+    # regardless of any market data, which would make the filter a
+    # permanent no-op. Instead the risk side mirrors talonx_paper's own
+    # stop-loss distance (assumed_stop_loss_pct, default matching
+    # TALONX_PAPER_STOP_LOSS_PCT's 0.5% -- talonx_quant stays
+    # config-independent from talonx_paper by design, same "shadow
+    # constant, documented as an approximation" pattern
+    # talonx_dispatch/formatter.py's _VALUATION_EXIT_PREMIUM already
+    # uses for a different cross-module display value), so the ratio
+    # actually varies with each ticker's ATR-to-price relationship.
+    atr_reward_multiplier: float = _env_float("TALONX_QUANT_ATR_REWARD_MULTIPLIER", 1.5)
+    assumed_stop_loss_pct: float = _env_float("TALONX_QUANT_ASSUMED_STOP_LOSS_PCT", 0.005)
+    min_risk_reward_ratio: float = _env_float("TALONX_QUANT_MIN_RISK_REWARD_RATIO", 1.5)
+
+    # Post-loss lockout: talonx_paper's own trade-execution channel is
+    # subscribed to (paper_trades_channel below) purely to detect a
+    # losing SELL -- when one closes at realized_pnl_usd < 0, that ticker
+    # is locked out for loss_lockout_seconds (75 min, the middle of the
+    # analyst review's suggested 60-90 min range), on top of and longer
+    # than the standard cooldown above, specifically to stop repeat
+    # re-entries into a stock that just proved it was chopping/declining
+    # (the exact pattern that drove 93% of session losses in the
+    # reviewed run). Only ever engages for a ticker with paper trading
+    # ENABLED -- one with it off never publishes a trade execution, so it
+    # only ever sees the standard cooldown above, not this lockout.
+    paper_trades_channel: str = os.environ.get(
+        "TALONX_REDIS_PAPER_TRADES_CHANNEL", "talonx:paper:trades"
+    )
+    loss_lockout_seconds: float = _env_float("TALONX_QUANT_LOSS_LOCKOUT_SECONDS", 75 * 60.0)
 
     # --- Persistence (suppression counts, for the EOD report) ---
     # Cooldown/throttle suppression counts were in-memory-only counters

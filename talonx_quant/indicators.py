@@ -1,8 +1,9 @@
 """
 talonx_quant.indicators
 ---------------------------
-Computes RSI, MACD, moving average crossover inputs, and volume surge
-ratio for a symbol's buffered OHLCV DataFrame, via pandas_ta.
+Computes RSI, MACD, moving average crossover inputs, volume surge ratio,
+and ATR (14-period, plus this bar's own true range) for a symbol's
+buffered OHLCV DataFrame, via pandas_ta.
 
 KNOWN COMPATIBILITY CAVEAT: pandas_ta (as of its last released version)
 references `numpy.NaN`, which was removed in NumPy 2.0 -- importing
@@ -49,6 +50,15 @@ class IndicatorSnapshot:
     volume_avg: float | None
     volume_surge_ratio: float | None
 
+    # Analyst-review addition: 14-period ATR (a smoothed AVERAGE true
+    # range) alongside this specific bar's OWN true range -- the two are
+    # deliberately separate fields. strategy.py compares them
+    # (bar_true_range >= atr_move_multiplier * atr) to confirm a signal's
+    # triggering bar represents a real move, not routine noise; atr alone
+    # also feeds the risk/reward filter's reward-side calculation.
+    atr: float | None
+    bar_true_range: float | None
+
 
 def compute_indicators(df: pd.DataFrame, config: QuantConfig) -> IndicatorSnapshot | None:
     """
@@ -70,6 +80,7 @@ def compute_indicators(df: pd.DataFrame, config: QuantConfig) -> IndicatorSnapsh
     sma_fast_series = df.ta.sma(length=config.ma_fast_period)
     sma_slow_series = df.ta.sma(length=config.ma_slow_period)
     volume_avg_series = df["volume"].rolling(window=config.volume_avg_period).mean()
+    atr_series = df.ta.atr(length=config.atr_period)
 
     if macd_df is None or rsi_series is None:
         logger.warning("pandas_ta returned None for RSI/MACD -- insufficient data or version mismatch")
@@ -96,12 +107,29 @@ def compute_indicators(df: pd.DataFrame, config: QuantConfig) -> IndicatorSnapsh
     sma_fast_latest, sma_fast_prev = _last_two(sma_fast_series)
     sma_slow_latest, sma_slow_prev = _last_two(sma_slow_series)
     volume_avg_latest, _ = _last_two(volume_avg_series)
+    atr_latest = None if atr_series is None else _last_two(atr_series)[0]
 
     latest_row = df.iloc[-1]
     volume_latest = float(latest_row["volume"]) if pd.notna(latest_row["volume"]) else None
     volume_surge_ratio = None
     if volume_latest is not None and volume_avg_latest and volume_avg_latest > 0:
         volume_surge_ratio = volume_latest / volume_avg_latest
+
+    # This specific bar's true range -- max(high-low, |high-prev_close|,
+    # |low-prev_close|), the SAME formula ATR itself averages over
+    # atr_period bars. Needs a previous close, so it's None on the very
+    # first bar of the buffer (never happens in practice -- min_bars_required
+    # is always > 1).
+    bar_true_range = None
+    if len(df) >= 2:
+        high, low, close = latest_row["high"], latest_row["low"], latest_row["close"]
+        prev_close = df.iloc[-2]["close"]
+        if pd.notna(high) and pd.notna(low) and pd.notna(close) and pd.notna(prev_close):
+            bar_true_range = max(
+                float(high) - float(low),
+                abs(float(high) - float(prev_close)),
+                abs(float(low) - float(prev_close)),
+            )
 
     return IndicatorSnapshot(
         price=float(latest_row["close"]),
@@ -119,4 +147,6 @@ def compute_indicators(df: pd.DataFrame, config: QuantConfig) -> IndicatorSnapsh
         volume=volume_latest,
         volume_avg=volume_avg_latest,
         volume_surge_ratio=volume_surge_ratio,
+        atr=atr_latest,
+        bar_true_range=bar_true_range,
     )
