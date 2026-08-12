@@ -384,8 +384,10 @@ def render_paper_trading_settings(paper_store: PaperTradingStore, watchlist_stor
         tracked = [t["symbol"] for t in watchlist_store.list_tickers()]
         currently_enabled = watchlist_store.list_paper_trading_symbols()
         enabled = st.multiselect(
-            "Enable paper trading for", options=tracked, default=currently_enabled,
-            help="Only tracked tickers selected here are ever traded by the paper engine.",
+            "Enable intraday paper trading for", options=tracked, default=currently_enabled,
+            help="Only tracked tickers selected here are ever traded by the INTRADAY paper engine. "
+                 "Independent of the Long-Term Paper Trading Settings toggle below -- a DUAL_HORIZON "
+                 "ticker can have one enabled without the other.",
         )
         if set(enabled) != set(currently_enabled):
             for symbol in tracked:
@@ -405,11 +407,14 @@ def render_paper_trading_settings(paper_store: PaperTradingStore, watchlist_stor
             st.rerun()
 
 
-def render_long_term_paper_settings(paper_store: PaperTradingStore) -> None:
+def render_long_term_paper_settings(paper_store: PaperTradingStore, watchlist_store: TickerWatchlistStore) -> None:
     """Phase 2's sibling to render_paper_trading_settings above -- its own
-    starting balance/DCA amount/rebalance trim %, and its own independent
-    Reset button (deliberately NOT the same reset as the intraday
-    portfolio -- the two cash pools are fully separate, see store.py)."""
+    starting balance/DCA amount/rebalance trim %, its own ticker-enablement
+    toggle (a SEPARATE flag from the intraday one -- see
+    talonx_watchlist/store.py's set_paper_trading_long_term), and its own
+    independent Reset button (deliberately NOT the same reset as the
+    intraday portfolio -- the two cash pools are fully separate, see
+    store.py)."""
     lt_summary = paper_store.get_long_term_portfolio_summary()
     with st.expander("\U0001F48E Long-Term Paper Trading Settings", expanded=False):
         s1, s2 = st.columns([1, 1])
@@ -425,6 +430,20 @@ def render_long_term_paper_settings(paper_store: PaperTradingStore) -> None:
         )
         if st.button("Save DCA amount"):
             paper_store.update_dca_contribution_amount(new_dca)
+            st.rerun()
+
+        tracked = [t["symbol"] for t in watchlist_store.list_tickers()]
+        currently_enabled_lt = watchlist_store.list_paper_trading_long_term_symbols()
+        enabled_lt = st.multiselect(
+            "Enable long-term paper trading for", options=tracked, default=currently_enabled_lt,
+            help="Only tracked tickers selected here are ever traded by the LONG-TERM paper engine "
+                 "(and only if they're also tagged LONG_TERM or DUAL_HORIZON -- untagged tickers "
+                 "never receive a long-term alert to act on regardless of this toggle). Independent "
+                 "of the intraday toggle above.",
+        )
+        if set(enabled_lt) != set(currently_enabled_lt):
+            for symbol in tracked:
+                watchlist_store.set_paper_trading_long_term(symbol, symbol in enabled_lt)
             st.rerun()
 
         st.divider()
@@ -745,7 +764,7 @@ def main() -> None:
         render_ticker_watchlist(watchlist_store, watchlist_config.poll_interval_seconds)
         st.divider()
         render_paper_trading_settings(paper_store, watchlist_store)
-        render_long_term_paper_settings(paper_store)
+        render_long_term_paper_settings(paper_store, watchlist_store)
         st.divider()
         render_audit_trail(df, long_term_rows)
 

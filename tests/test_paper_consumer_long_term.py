@@ -54,7 +54,7 @@ def engine() -> LongTermPaperEngine:
     store = MagicMock()
     store.get_long_term_position.return_value = None
     watchlist_store = MagicMock()
-    watchlist_store.list_paper_trading_symbols.return_value = ["AAPL"]
+    watchlist_store.list_paper_trading_long_term_symbols.return_value = ["AAPL"]
     e = LongTermPaperEngine(config=PaperConfig(simulated_spread_bps=0.0), store=store, watchlist_store=watchlist_store)
     e._client = AsyncMock()
     return e
@@ -89,7 +89,7 @@ async def test_message_on_unexpected_channel_is_dropped(engine):
 
 @pytest.mark.asyncio
 async def test_alert_for_a_ticker_without_paper_trading_enabled_is_skipped(engine):
-    engine.watchlist_store.list_paper_trading_symbols.return_value = ["MSFT"]  # AAPL not in it
+    engine.watchlist_store.list_paper_trading_long_term_symbols.return_value = ["MSFT"]  # AAPL not in it
 
     await engine._handle_message(_msg(engine.config, _alert_payload(ticker="AAPL")))
 
@@ -193,7 +193,7 @@ async def test_take_profit_rebalance_flat_is_ignored():
     store = MagicMock()
     store.get_long_term_position.return_value = None
     watchlist_store = MagicMock()
-    watchlist_store.list_paper_trading_symbols.return_value = ["AAPL"]
+    watchlist_store.list_paper_trading_long_term_symbols.return_value = ["AAPL"]
     engine = LongTermPaperEngine(config=PaperConfig(simulated_spread_bps=0.0), store=store, watchlist_store=watchlist_store)
     engine._client = AsyncMock()
 
@@ -244,7 +244,7 @@ async def test_buy_fill_price_crosses_the_spread():
     store.get_long_term_portfolio_summary.return_value = {"current_cash": 20000.0}
     store.execute_long_term_buy.return_value = _execution(LongTermOrderType.BUY)
     watchlist_store = MagicMock()
-    watchlist_store.list_paper_trading_symbols.return_value = ["AAPL"]
+    watchlist_store.list_paper_trading_long_term_symbols.return_value = ["AAPL"]
     engine = LongTermPaperEngine(
         config=PaperConfig(simulated_spread_bps=10.0), store=store, watchlist_store=watchlist_store,
     )

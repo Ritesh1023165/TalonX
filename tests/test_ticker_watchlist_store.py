@@ -219,6 +219,53 @@ def test_add_ticker_upsert_does_not_reset_paper_trading_flag(store):
     assert store.list_tickers()[0]["paper_trading_enabled"] is True
 
 
+# --- Long-term paper trading toggle (independent of the intraday one) ------
+
+def test_new_ticker_defaults_long_term_paper_trading_disabled(store):
+    store.add_ticker("AAPL", "Apple Inc.")
+
+    assert store.list_tickers()[0]["paper_trading_enabled_long_term"] is False
+    assert store.list_paper_trading_long_term_symbols() == []
+
+
+def test_set_paper_trading_long_term_enables_and_disables(store):
+    store.add_ticker("AAPL", "Apple Inc.")
+    store.add_ticker("MSFT", "Microsoft Corporation")
+
+    store.set_paper_trading_long_term("aapl", True)  # case-insensitive
+
+    assert store.list_paper_trading_long_term_symbols() == ["AAPL"]
+    assert store.list_tickers()[0]["paper_trading_enabled_long_term"] is True
+
+    store.set_paper_trading_long_term("AAPL", False)
+    assert store.list_paper_trading_long_term_symbols() == []
+
+
+def test_intraday_and_long_term_paper_trading_flags_are_independent(store):
+    store.add_ticker("AAPL", "Apple Inc.", strategy_horizon="DUAL_HORIZON")
+
+    store.set_paper_trading("AAPL", True)
+    store.set_paper_trading_long_term("AAPL", False)
+
+    assert store.list_paper_trading_symbols() == ["AAPL"]
+    assert store.list_paper_trading_long_term_symbols() == []
+
+    store.set_paper_trading("AAPL", False)
+    store.set_paper_trading_long_term("AAPL", True)
+
+    assert store.list_paper_trading_symbols() == []
+    assert store.list_paper_trading_long_term_symbols() == ["AAPL"]
+
+
+def test_add_ticker_upsert_does_not_reset_long_term_paper_trading_flag(store):
+    store.add_ticker("MSFT", "Microsoft Corporation")
+    store.set_paper_trading_long_term("MSFT", True)
+
+    store.add_ticker("MSFT", "Microsoft Corporation", "NASDAQ")  # re-add
+
+    assert store.list_tickers()[0]["paper_trading_enabled_long_term"] is True
+
+
 # --- Strategy horizon (Phase 2's intraday/long-term routing control) ------
 
 def test_new_ticker_defaults_to_intraday_horizon(store):
@@ -306,9 +353,11 @@ def test_migrates_a_pre_existing_three_column_database(tmp_path):
         assert tickers[0]["exchange"] == ""
         assert tickers[0]["status"] == "active"
         assert tickers[0]["paper_trading_enabled"] is False
+        assert tickers[0]["paper_trading_enabled_long_term"] is False
         assert tickers[0]["strategy_horizon"] == "INTRADAY"
         assert store.list_active_symbols() == ["MSFT"]
         assert store.list_paper_trading_symbols() == []
+        assert store.list_paper_trading_long_term_symbols() == []
         assert store.list_by_horizon("INTRADAY") == ["MSFT"]
 
         # And the migrated store is fully usable afterward.
@@ -316,7 +365,44 @@ def test_migrates_a_pre_existing_three_column_database(tmp_path):
         assert store.list_active_symbols() == []
         store.set_paper_trading("MSFT", True)
         assert store.list_paper_trading_symbols() == ["MSFT"]
+        store.set_paper_trading_long_term("MSFT", True)
+        assert store.list_paper_trading_long_term_symbols() == ["MSFT"]
         store.set_strategy_horizon("MSFT", "LONG_TERM")
         assert store.list_by_horizon("LONG_TERM") == ["MSFT"]
+    finally:
+        store.close()
+
+
+def test_migrates_a_database_from_before_the_long_term_paper_trading_split(tmp_path):
+    """Narrower migration than the legacy 3-column test above -- simulates
+    a watchlist.db from right before paper_trading_enabled_long_term was
+    added (everything else already present), the migration path an
+    existing Phase 2 install actually hits."""
+    db_path = tmp_path / "pre_split_watchlist.db"
+
+    legacy_conn = sqlite3.connect(db_path)
+    legacy_conn.execute(
+        "CREATE TABLE tickers ("
+        "symbol TEXT PRIMARY KEY, name TEXT NOT NULL, exchange TEXT NOT NULL DEFAULT '', "
+        "status TEXT NOT NULL DEFAULT 'active', paper_trading_enabled INTEGER NOT NULL DEFAULT 0, "
+        "strategy_horizon TEXT NOT NULL DEFAULT 'INTRADAY', added_at TEXT NOT NULL)"
+    )
+    legacy_conn.execute(
+        "INSERT INTO tickers (symbol, name, paper_trading_enabled, strategy_horizon, added_at) "
+        "VALUES ('MSFT', 'Microsoft Corporation', 1, 'DUAL_HORIZON', '2026-01-01T00:00:00+00:00')"
+    )
+    legacy_conn.commit()
+    legacy_conn.close()
+
+    store = TickerWatchlistStore(db_path)
+    try:
+        ticker = store.list_tickers()[0]
+        assert ticker["paper_trading_enabled"] is True  # pre-existing value preserved
+        assert ticker["paper_trading_enabled_long_term"] is False  # new column defaults off
+        assert store.list_paper_trading_symbols() == ["MSFT"]
+        assert store.list_paper_trading_long_term_symbols() == []
+
+        store.set_paper_trading_long_term("MSFT", True)
+        assert store.list_paper_trading_long_term_symbols() == ["MSFT"]
     finally:
         store.close()

@@ -1016,7 +1016,13 @@ rather than sharing Python objects across module boundaries.
   configurable fraction (`TALONX_PAPER_REBALANCE_TRIM_PCT`, default
   33%); `UNDER_PERFORM_REBALANCE` is a full exit. As with the intraday
   engine, entry (BUY-type) triggers are gated by conviction; exit
-  (SELL-type / fundamental-stop) triggers are NEVER gated.
+  (SELL-type / fundamental-stop) triggers are NEVER gated. Which tickers
+  it actually trades is its OWN toggle -- `talonx_watchlist`'s
+  `paper_trading_enabled_long_term` column, set via the dashboard's
+  "💎 Long-Term Paper Trading Settings" multiselect -- fully independent
+  of the intraday engine's `paper_trading_enabled` flag, so a
+  `DUAL_HORIZON` ticker can be paper-traded on one horizon without the
+  other.
 - **`talonx_dispatch`** -- a separate `long_term_alerts` audit table and
   its own Telegram push format (price vs. fair value, margin of safety,
   quality/moat, the take-profit exit target, expected holding horizon).

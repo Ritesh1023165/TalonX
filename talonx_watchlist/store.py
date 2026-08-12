@@ -44,13 +44,14 @@ from pathlib import Path
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS tickers (
-    symbol                  TEXT PRIMARY KEY,
-    name                    TEXT NOT NULL,
-    exchange                TEXT NOT NULL DEFAULT '',
-    status                  TEXT NOT NULL DEFAULT 'active',
-    paper_trading_enabled   INTEGER NOT NULL DEFAULT 0,
-    strategy_horizon        TEXT NOT NULL DEFAULT 'INTRADAY',
-    added_at                TEXT NOT NULL
+    symbol                              TEXT PRIMARY KEY,
+    name                                TEXT NOT NULL,
+    exchange                            TEXT NOT NULL DEFAULT '',
+    status                              TEXT NOT NULL DEFAULT 'active',
+    paper_trading_enabled               INTEGER NOT NULL DEFAULT 0,
+    paper_trading_enabled_long_term     INTEGER NOT NULL DEFAULT 0,
+    strategy_horizon                    TEXT NOT NULL DEFAULT 'INTRADAY',
+    added_at                            TEXT NOT NULL
 )
 """
 
@@ -81,6 +82,10 @@ class TickerWatchlistStore:
             self._conn.execute(
                 "ALTER TABLE tickers ADD COLUMN paper_trading_enabled INTEGER NOT NULL DEFAULT 0"
             )
+        if "paper_trading_enabled_long_term" not in cols:
+            self._conn.execute(
+                "ALTER TABLE tickers ADD COLUMN paper_trading_enabled_long_term INTEGER NOT NULL DEFAULT 0"
+            )
         if "strategy_horizon" not in cols:
             self._conn.execute(
                 "ALTER TABLE tickers ADD COLUMN strategy_horizon TEXT NOT NULL DEFAULT 'INTRADAY'"
@@ -100,16 +105,19 @@ class TickerWatchlistStore:
         source (it needs to show paused tickers too, not just active ones)."""
         with self._lock:
             cursor = self._conn.execute(
-                "SELECT symbol, name, exchange, status, paper_trading_enabled, strategy_horizon, added_at "
+                "SELECT symbol, name, exchange, status, paper_trading_enabled, "
+                "paper_trading_enabled_long_term, strategy_horizon, added_at "
                 "FROM tickers ORDER BY symbol"
             )
             return [
                 {
                     "symbol": symbol, "name": name, "exchange": exchange, "status": status,
                     "paper_trading_enabled": bool(paper_trading_enabled),
+                    "paper_trading_enabled_long_term": bool(paper_trading_enabled_long_term),
                     "strategy_horizon": strategy_horizon, "added_at": added_at,
                 }
-                for symbol, name, exchange, status, paper_trading_enabled, strategy_horizon, added_at
+                for symbol, name, exchange, status, paper_trading_enabled,
+                    paper_trading_enabled_long_term, strategy_horizon, added_at
                 in cursor.fetchall()
             ]
 
@@ -119,16 +127,19 @@ class TickerWatchlistStore:
         the whole watchlist."""
         with self._lock:
             row = self._conn.execute(
-                "SELECT symbol, name, exchange, status, paper_trading_enabled, strategy_horizon, added_at "
+                "SELECT symbol, name, exchange, status, paper_trading_enabled, "
+                "paper_trading_enabled_long_term, strategy_horizon, added_at "
                 "FROM tickers WHERE symbol = ?",
                 (symbol.strip().upper(),),
             ).fetchone()
         if row is None:
             return None
-        symbol, name, exchange, status, paper_trading_enabled, strategy_horizon, added_at = row
+        (symbol, name, exchange, status, paper_trading_enabled,
+            paper_trading_enabled_long_term, strategy_horizon, added_at) = row
         return {
             "symbol": symbol, "name": name, "exchange": exchange, "status": status,
             "paper_trading_enabled": bool(paper_trading_enabled),
+            "paper_trading_enabled_long_term": bool(paper_trading_enabled_long_term),
             "strategy_horizon": strategy_horizon, "added_at": added_at,
         }
 
@@ -195,9 +206,13 @@ class TickerWatchlistStore:
             self._conn.commit()
 
     def set_paper_trading(self, symbol: str, enabled: bool) -> None:
-        """The 'configure which ticker can be used [for paper trading]'
-        control -- talonx_paper.consumer checks list_paper_trading_symbols()
-        before ever deciding a trade for a ticker."""
+        """The INTRADAY 'configure which ticker can be used [for paper
+        trading]' control -- talonx_paper.consumer.PaperTradingEngine
+        checks list_paper_trading_symbols() before ever deciding a trade
+        for a ticker. Independent of set_paper_trading_long_term() below
+        -- a DUAL_HORIZON ticker can have one enabled without the other,
+        since the two engines trade against separate cash pools/positions
+        (see talonx_paper/store.py)."""
         with self._lock:
             self._conn.execute(
                 "UPDATE tickers SET paper_trading_enabled = ? WHERE symbol = ?",
@@ -209,6 +224,27 @@ class TickerWatchlistStore:
         with self._lock:
             cursor = self._conn.execute(
                 "SELECT symbol FROM tickers WHERE paper_trading_enabled = 1 ORDER BY symbol"
+            )
+            return [row[0] for row in cursor.fetchall()]
+
+    def set_paper_trading_long_term(self, symbol: str, enabled: bool) -> None:
+        """LONG_TERM sibling to set_paper_trading() above -- a SEPARATE
+        flag, not a re-use of the intraday one, so a DUAL_HORIZON ticker's
+        two paper-trading engines can be toggled independently.
+        talonx_paper.consumer.LongTermPaperEngine checks
+        list_paper_trading_long_term_symbols() before ever deciding a
+        trade for a ticker."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE tickers SET paper_trading_enabled_long_term = ? WHERE symbol = ?",
+                (1 if enabled else 0, symbol.strip().upper()),
+            )
+            self._conn.commit()
+
+    def list_paper_trading_long_term_symbols(self) -> list[str]:
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT symbol FROM tickers WHERE paper_trading_enabled_long_term = 1 ORDER BY symbol"
             )
             return [row[0] for row in cursor.fetchall()]
 

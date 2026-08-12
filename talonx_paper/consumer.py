@@ -362,12 +362,16 @@ class LongTermPaperEngine:
     EVERY currently-open long-term position each cycle, using whatever
     price update_latest_price last saw for that ticker.
 
-    Same paper_trading_enabled watchlist flag PaperTradingEngine checks
-    gates whether a ticker is traded here too -- it's a general "paper-
-    trade this ticker" toggle, orthogonal to which horizon(s) a ticker
-    is even eligible to receive alerts for in the first place (that's
-    talonx_watchlist's separate strategy_horizon field, checked far
-    upstream by every module that routes on it).
+    Gated by its OWN watchlist flag -- paper_trading_enabled_long_term,
+    checked via list_paper_trading_long_term_symbols() -- independent of
+    the paper_trading_enabled flag PaperTradingEngine checks. A
+    DUAL_HORIZON ticker can therefore have one engine paper-trading it
+    and not the other (e.g. long-term conviction without wanting the
+    intraday noise, or vice versa). Both flags are themselves orthogonal
+    to which horizon(s) a ticker is even eligible to receive alerts for
+    in the first place -- that's talonx_watchlist's separate
+    strategy_horizon field, checked far upstream by every module that
+    routes on it.
     """
 
     def __init__(
@@ -563,8 +567,8 @@ class LongTermPaperEngine:
 
         self._alerts_processed += 1
 
-        if alert.ticker.upper() not in self.watchlist_store.list_paper_trading_symbols():
-            return  # paper trading not enabled for this ticker -- silent skip, not an "ignored" event
+        if alert.ticker.upper() not in self.watchlist_store.list_paper_trading_long_term_symbols():
+            return  # long-term paper trading not enabled for this ticker -- silent skip, not an "ignored" event
 
         position = self.store.get_long_term_position(alert.ticker)
         decision = decide_long_term_trade(alert, position, self.config.rebalance_trim_pct)
