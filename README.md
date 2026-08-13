@@ -990,7 +990,8 @@ alongside this file, in its own terminal, §5n).
 `--skip-dispatch`, `--skip-paper-trading`, `--skip-earnings-sync`,
 `--skip-earnings-fast-track` -- the last two disable the Event-Driven
 Earnings Radar's weekly calendar sync / 15-min fast-track poller
-respectively, see §3.10) -- useful while actively iterating on one
+respectively, see §3.10 -- `--skip-premarket` disables the whole-watchlist
+pre-market poller, see §3.11) -- useful while actively iterating on one
 piece: run the others here and the one you're changing in its own
 terminal, so you don't have to restart this whole process on every edit.
 If every component ends up skipped (including `--skip-ingestion`), it
@@ -1327,6 +1328,46 @@ fast-track windowing (yfinance doesn't reliably expose this, so a flat
 2-day window is used instead), and real wall-clock-anchored weekly
 scheduling (an interval-since-process-start is used instead, matching
 every other periodic loop in this codebase).
+
+---
+
+### 3.11 Pre-Market Radar (whole watchlist)
+
+`run_talonx.PreMarketPoller` extends the extended-hours price capture
+built for §3.10 above (originally only for tickers inside their earnings
+window) to **every active ticker**, so pre-market moves are visible
+before the regular session opens rather than gapping into view all at
+once when it does.
+
+- Regular hours already get live prices from `WatchlistDrivenMarketData`/
+  `LongTermPriceRunner` via yfinance's `fast_info`, which does **not**
+  reflect pre/post-market trading -- without this poller, a pre-market
+  move was invisible until the regular session opened.
+- Polls every `TALONX_PREMARKET_POLL_INTERVAL_SECONDS` (default 300s)
+  using `fetch_extended_hours_quote` (`history(prepost=True)`, the same
+  call §3.10's fast-track poller uses), but only while inside a
+  configurable UTC time-of-day window: `TALONX_PREMARKET_START_UTC` /
+  `TALONX_PREMARKET_END_UTC` (default `08:00`-`14:30` UTC). Ticks flow
+  onto the same `talonx:market:stream` channel as every other price
+  source, so they hit the exact same downstream signal/decision/
+  notification pipeline and gates as a regular-session tick -- no
+  separate, looser filtering for pre-market moves.
+- **Deliberately simplified**, same posture as §3.10's flat 2-day
+  earnings window: Monday-Friday only, no trading-holiday calendar, no
+  per-exchange session lookup for non-US tickers. US pre-market is
+  4:00-9:30am ET, which is 08:00-13:30 UTC during EDT or 09:00-14:30 UTC
+  during EST; the default window deliberately covers the **union** of
+  both rather than picking one side of DST, since a bit of slack at
+  either edge is harmless (the fetch just returns the latest available
+  bar) but missing an hour of real pre-market movement from picking the
+  wrong side of DST would not be.
+- Excludes any ticker `EarningsFastTrackPoller` currently owns (same
+  `active_earnings_symbols_fn` exclusion `LongTermPriceRunner` already
+  applies) -- that poller already handles extended-hours pricing for its
+  own narrower ticker set at a cadence tied to the actual earnings event,
+  so this poller staying out of its way avoids two independent sources
+  racing ticks for one symbol.
+- Disable with `--skip-premarket`.
 
 ---
 

@@ -516,3 +516,14 @@ def test_upcoming_earnings_table_created_for_a_pre_existing_legacy_db(tmp_path):
         assert store.get_upcoming_earnings("MSFT")["earnings_date"] == "2026-08-13"
     finally:
         store.close()
+
+
+# ==========================================================================
+# WAL checkpoint (fixes the dashboard-slowdown-over-a-session issue --
+# see run_talonx.periodic_wal_checkpoint_loop's own docstring)
+# ==========================================================================
+
+def test_checkpoint_does_not_raise(store):
+    store.add_ticker("AAPL", "Apple Inc.")
+    store.checkpoint()
+    assert store.list_symbols() == ["AAPL"]  # data survives, store stays usable

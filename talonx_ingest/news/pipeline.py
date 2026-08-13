@@ -32,7 +32,7 @@ from talonx_ingest.news.models import NewsArticle
 from talonx_ingest.news.reddit_client import RedditClient
 from talonx_ingest.processing.chunker import DocumentChunker
 from talonx_ingest.storage.ledger import IngestionLedger
-from talonx_ingest.storage.vector_store import VectorStore
+from talonx_ingest.storage.vector_store import VectorStore, get_vector_store
 
 logging.basicConfig(
     level=logging.INFO,
@@ -122,7 +122,11 @@ async def run_news_ingestion(
     reddit_client = RedditClient()  # no-op per ticker if not configured -- see RedditConfig
     chunker = DocumentChunker()
 
-    vector_store = VectorStore(collection_name=settings.news.vector_collection_name)
+    # Cached process-wide (see get_vector_store's docstring) -- this used to
+    # reload the embedding model fresh on every call, and WatchlistDrivenIngestion
+    # in run_talonx.py calls run_news_ingestion right after run_ingestion on
+    # every single reactive ticker-add event, doubling that reload per event.
+    vector_store = get_vector_store(collection_name=settings.news.vector_collection_name)
     logger.info(
         "News vector store ready (collection=%s). Existing chunk count: %d. "
         "Reddit source: %s",

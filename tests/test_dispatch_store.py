@@ -509,3 +509,15 @@ def test_migrates_a_long_term_alerts_table_from_before_the_summary_column(tmp_pa
         store.record_long_term_alert(_long_term_alert(ticker="AAPL"))
         rows = store.recent_long_term()
         assert {r["summary"] for r in rows} == {"", "Strong recurring revenue and durable moat support the thesis."}
+
+
+# ==========================================================================
+# WAL checkpoint (fixes the dashboard-slowdown-over-a-session issue --
+# see run_talonx.periodic_wal_checkpoint_loop's own docstring)
+# ==========================================================================
+
+def test_checkpoint_does_not_raise(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_alert(_alert())
+        store.checkpoint()
+        assert store.count() == 1  # data survives, store stays usable

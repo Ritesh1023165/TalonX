@@ -219,6 +219,28 @@ class PaperTradingStore:
                 )
                 self._conn.commit()
 
+    def checkpoint(self) -> None:
+        """Forces a WAL checkpoint (TRUNCATE mode -- also shrinks the
+        -wal file back down, not just flushes it). SQLite's automatic
+        "PASSIVE" checkpoint (the default, triggered at ~1000 WAL pages)
+        silently SKIPS itself if any other connection has a read
+        transaction open at that moment -- harmless occasionally, but
+        this store's update_latest_price() commits on every single
+        market tick across every tracked ticker, and a long-lived reader
+        polling on a short interval (talonx_dispatch/app.py's Streamlit
+        autorefresh, in another PROCESS -- a threading.Lock here doesn't
+        apply across processes) can end up "in the way" often enough
+        that the WAL never actually gets checkpointed, growing
+        unbounded for as long as the process runs. Every read against a
+        large uncheckpointed WAL gets progressively slower (SQLite has
+        to reconstruct the current page state by scanning the whole
+        WAL), which is what actually made the dashboard "hang" over a
+        session -- not query complexity, not data volume (row counts
+        stay tiny; this is write CHURN to the same handful of rows).
+        Called periodically by run_talonx.py's periodic_wal_checkpoint_loop."""
+        with self._lock:
+            self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+
     def close(self) -> None:
         self._conn.close()
 

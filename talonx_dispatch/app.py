@@ -361,7 +361,7 @@ def render_paper_trading(paper_store: PaperTradingStore) -> None:
                 "Entry": pos["entry_price"], "Live price": live,
                 "Unrealized PnL ($)": round(u_pnl, 2), "Unrealized PnL (%)": round(u_pnl_pct, 2),
             })
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     else:
         st.info("No open positions.")
 
@@ -395,11 +395,11 @@ def render_paper_trading(paper_store: PaperTradingStore) -> None:
             )
             .properties(height=250)
         )
-        st.altair_chart(chart, use_container_width=True)
+        st.altair_chart(chart, width="stretch")
 
     st.markdown("**Trade history**")
     display_df = hdf.rename(columns=_TRADE_HISTORY_COLUMNS)
-    st.dataframe(display_df, hide_index=True, use_container_width=True)
+    st.dataframe(display_df, hide_index=True, width="stretch")
     st.download_button(
         "\U0001F4E5 Download trade history (CSV)",
         data=hdf.to_csv(index=False).encode("utf-8"),
@@ -538,6 +538,14 @@ def render_upcoming_earnings_calendar(watchlist_store: TickerWatchlistStore) -> 
         st.info("No upcoming earnings dates synced yet -- runs weekly once a ticker is tagged LONG_TERM.")
         return
 
+    # One list_tickers() call, not one get_ticker() PER ROW -- each
+    # get_ticker() is its own locked SQLite round-trip (see
+    # TickerWatchlistStore's docstring), and this whole function reruns
+    # every TALONX_DISPATCH_AUTOREFRESH_MS regardless of which tab is
+    # actually visible (Streamlit re-executes every `with tab:` block on
+    # every script rerun, not just the active one).
+    company_names = {t["symbol"]: t["name"] for t in watchlist_store.list_tickers()}
+
     now = datetime.now(timezone.utc)
     calendar_rows = []
     for row in rows:
@@ -552,8 +560,7 @@ def render_upcoming_earnings_calendar(watchlist_store: TickerWatchlistStore) -> 
             urgency = "\U0001F7E1"  # amber
         else:
             urgency = "⚪"
-        ticker_row = watchlist_store.get_ticker(row["ticker"])
-        company_name = ticker_row["name"] if ticker_row else row["ticker"]
+        company_name = company_names.get(row["ticker"], row["ticker"])
         calendar_rows.append({
             "": urgency,
             "Ticker": row["ticker"],
@@ -564,7 +571,7 @@ def render_upcoming_earnings_calendar(watchlist_store: TickerWatchlistStore) -> 
             "Heads-up sent": "✅" if row["heads_up_sent"] else "—",
         })
     calendar_df = pd.DataFrame(calendar_rows)
-    st.dataframe(calendar_df, hide_index=True, use_container_width=True)
+    st.dataframe(calendar_df, hide_index=True, width="stretch")
 
 
 def _last_earnings_event_label(row: dict) -> str:
@@ -582,14 +589,13 @@ def _last_earnings_event_label(row: dict) -> str:
     return f"{date}: Fair Value {delta_pct:+.1f}%"
 
 
-def render_valuation_radar(store: AuditStore) -> None:
+def render_valuation_radar(rows: list[dict]) -> None:
     st.subheader("\U0001F48E Valuation & Margin of Safety Radar")
     st.caption(
         "Latest long-term alert per ticker -- current price vs. talonx_brain's DCF fair "
         "value, quality score (0-10), and moat rating. Only tickers that have cleared the "
         "fundamental factor threshold and produced at least one long-term alert show up here."
     )
-    rows = store.recent_long_term(limit=500)
     if not rows:
         st.info("No long-term alerts yet. Tag a ticker LONG_TERM in the watchlist tab and wait for a signal.")
         return
@@ -614,7 +620,7 @@ def render_valuation_radar(store: AuditStore) -> None:
     ]
     radar_df = pd.DataFrame(radar_rows).sort_values("Margin of safety %", ascending=False)
     st.dataframe(
-        radar_df, hide_index=True, use_container_width=True,
+        radar_df, hide_index=True, width="stretch",
         column_config={
             "Price": st.column_config.NumberColumn(format="$%.2f"),
             "Fair value": st.column_config.NumberColumn(format="$%.2f"),
@@ -624,10 +630,9 @@ def render_valuation_radar(store: AuditStore) -> None:
     )
 
 
-def render_long_term_research_viewer(store: AuditStore) -> None:
+def render_long_term_research_viewer(rows: list[dict]) -> None:
     st.subheader("\U0001F4DA Long-Term Research")
     st.caption("The latest moat/capital-allocation/DCF writeup behind each ticker's radar row above.")
-    rows = store.recent_long_term(limit=500)
     if not rows:
         st.info("Nothing yet.")
         return
@@ -707,7 +712,7 @@ def render_long_term_portfolio(paper_store: PaperTradingStore) -> None:
                 "First entry": pos["first_entry_at"][:19].replace("T", " "),
                 "Unrealized PnL ($)": round(u_pnl, 2), "Unrealized PnL (%)": round(u_pnl_pct, 2),
             })
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     else:
         st.info("No open long-term positions.")
 
@@ -725,7 +730,7 @@ def render_long_term_portfolio(paper_store: PaperTradingStore) -> None:
 
     st.markdown("**Trade history** (BUY / DCA_CONTRIBUTION / SELL)")
     display_df = hdf.rename(columns=_LT_TRADE_HISTORY_COLUMNS)
-    st.dataframe(display_df, hide_index=True, use_container_width=True)
+    st.dataframe(display_df, hide_index=True, width="stretch")
     st.download_button(
         "\U0001F4E5 Download long-term trade history (CSV)",
         data=hdf.to_csv(index=False).encode("utf-8"),
@@ -789,6 +794,11 @@ def render_audit_trail(df: pd.DataFrame, long_term_rows: list[dict]) -> None:
     alerts/long_term_alerts as separate tables in store.py)."""
     st.subheader("Audit trail")
     horizon = st.radio("Horizon", ["Intraday", "Long-Term"], horizontal=True, key="audit_trail_horizon")
+    # Defaults to today (UTC, matching how every timestamp in this project
+    # is stored) rather than showing the full unbounded history -- pass a
+    # (start, end) 2-tuple, not a bare date, so date_input stays in range
+    # mode and _apply_date_range_filter's tuple handling still applies.
+    today = datetime.now(timezone.utc).date()
 
     if horizon == "Intraday":
         if df.empty:
@@ -799,8 +809,8 @@ def render_audit_trail(df: pd.DataFrame, long_term_rows: list[dict]) -> None:
         actions = col2.multiselect("Action", sorted(df["action"].unique()), key="audit_intraday_action")
         severities = col3.multiselect("Severity", sorted(df["severity"].unique()), key="audit_intraday_severity")
         date_range = col4.date_input(
-            "Date range", value=(), key="audit_intraday_date_range",
-            help="Filters on correlated_at. Leave empty for no date filter.",
+            "Date range", value=(today, today), key="audit_intraday_date_range",
+            help="Filters on correlated_at. Clear the field for no date filter.",
         )
 
         filtered = df
@@ -828,8 +838,8 @@ def render_audit_trail(df: pd.DataFrame, long_term_rows: list[dict]) -> None:
         actions = col2.multiselect("Action", sorted(lt_df["action"].unique()), key="audit_lt_action")
         severities = col3.multiselect("Severity", sorted(lt_df["severity"].unique()), key="audit_lt_severity")
         date_range = col4.date_input(
-            "Date range", value=(), key="audit_lt_date_range",
-            help="Filters on correlated_at. Leave empty for no date filter.",
+            "Date range", value=(today, today), key="audit_lt_date_range",
+            help="Filters on correlated_at. Clear the field for no date filter.",
         )
 
         filtered = lt_df
@@ -872,15 +882,24 @@ def main() -> None:
         f"last render {datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}"
     )
 
-    rows = store.recent(limit=config.feed_limit)
-    df = pd.DataFrame(rows)
-    long_term_rows = store.recent_long_term(limit=config.feed_limit)
-
-    tab_intraday, tab_long_term, tab_settings = st.tabs(
-        ["\U0001F4C8 Intraday Monitor", "\U0001F48E Long-Term Radar", "⚙️ Watchlist & Settings"]
+    # A plain st.tabs() would look nicer, but Streamlit renders ALL tab
+    # bodies on every single script rerun -- not just the visible one --
+    # so with a 5s autorefresh that meant every DB query on this page ran
+    # 3x per tick regardless of which tab you were actually looking at.
+    # st.radio only executes the branch that's actually selected, so an
+    # idle session now does ~1/3 the work. Persisted in session_state so
+    # the selection survives the autorefresh rerun.
+    section = st.radio(
+        "View",
+        ["\U0001F4C8 Intraday Monitor", "\U0001F48E Long-Term Radar", "⚙️ Watchlist & Settings"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="active_section",
     )
 
-    with tab_intraday:
+    if section == "\U0001F4C8 Intraday Monitor":
+        rows = store.recent(limit=config.feed_limit)
+        df = pd.DataFrame(rows)
         render_metrics(df)
         st.divider()
 
@@ -893,21 +912,29 @@ def main() -> None:
         st.divider()
         render_paper_trading(paper_store)
 
-    with tab_long_term:
+    elif section == "\U0001F48E Long-Term Radar":
         render_upcoming_earnings_calendar(watchlist_store)
         st.divider()
-        render_valuation_radar(store)
+        # Fetched ONCE and shared -- both functions below independently
+        # read the identical store.recent_long_term(limit=500) before,
+        # doubling that query (SQL + per-row JSON decode of up to 500
+        # rows) on every single autorefresh tick for no reason.
+        long_term_alert_rows = store.recent_long_term(limit=500)
+        render_valuation_radar(long_term_alert_rows)
         st.divider()
         render_long_term_portfolio(paper_store)
         st.divider()
-        render_long_term_research_viewer(store)
+        render_long_term_research_viewer(long_term_alert_rows)
 
-    with tab_settings:
+    else:
         render_ticker_watchlist(watchlist_store, watchlist_config.poll_interval_seconds)
         st.divider()
         render_paper_trading_settings(paper_store, watchlist_store)
         render_long_term_paper_settings(paper_store, watchlist_store)
         st.divider()
+        rows = store.recent(limit=config.feed_limit)
+        df = pd.DataFrame(rows)
+        long_term_rows = store.recent_long_term(limit=config.feed_limit)
         render_audit_trail(df, long_term_rows)
 
 

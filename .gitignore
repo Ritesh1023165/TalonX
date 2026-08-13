@@ -34,6 +34,10 @@ chroma/
 # something to version.
 reports/
 
+# scripts/start_talonx.ps1 / start_dashboard_web.ps1's PID-tracking JSON
+# and redirected stdout/stderr log files -- machine-local runtime state.
+.run/
+
 # ------------------------------------------------------------------
 # Claude Code local settings (machine-specific permission allowlist,
 # not shared config)

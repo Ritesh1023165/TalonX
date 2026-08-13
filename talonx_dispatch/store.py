@@ -170,6 +170,18 @@ class AuditStore:
         if "suppress_reason" not in alert_cols:
             self._conn.execute("ALTER TABLE alerts ADD COLUMN suppress_reason TEXT")
 
+    def checkpoint(self) -> None:
+        """Forces a WAL checkpoint (TRUNCATE mode). See
+        talonx_paper.store.PaperTradingStore.checkpoint's docstring for
+        the full rationale -- same passive-checkpoint-starvation risk
+        applies to any WAL-mode store with a frequent writer (consumer.py)
+        and a frequent separate-process reader (app.py's autorefresh),
+        this store just sees far less write volume than PaperTradingStore
+        so it's a lower-urgency instance of the same issue. Called
+        periodically by run_talonx.py's periodic_wal_checkpoint_loop."""
+        with self._lock:
+            self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+
     def close(self) -> None:
         self._conn.close()
 

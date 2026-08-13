@@ -13,6 +13,7 @@ without touching call sites.
 from __future__ import annotations
 
 import logging
+import threading
 
 import chromadb
 from chromadb.utils import embedding_functions
@@ -45,6 +46,19 @@ class VectorStore:
             embedding_function=self._embedding_fn,
             metadata={"hnsw:space": "cosine"},
         )
+        # NOT thread-safe for genuinely concurrent access from two OS
+        # threads -- see get_vector_store's docstring and
+        # talonx_brain/consumer.py's _generate_fresh_report for why that
+        # matters and how it's actually avoided (keeping every caller on
+        # the single asyncio event-loop thread, not a threading.Lock here).
+        # A threading.Lock was tried first (2026-08-13) and made it WORSE:
+        # it stopped the crash but froze the entire process instead (every
+        # asyncio task stalls once the single event-loop thread blocks on
+        # a synchronous Lock.acquire() with no timeout) -- a silent total
+        # hang, confirmed via the main log going dead across ALL tasks
+        # (market data ticks included, a completely unrelated coroutine),
+        # not just the one doing the upsert. Reverted in favor of removing
+        # the cross-thread call at its source instead.
 
     def upsert_chunks(self, chunks: list[TextChunk]) -> int:
         """Batch-upsert chunks into the collection. Returns count written."""
@@ -87,3 +101,43 @@ class VectorStore:
 def _sanitize_metadata(metadata: dict) -> dict:
     """Chroma metadata values must be str/int/float/bool -- strip Nones."""
     return {k: v for k, v in metadata.items() if v is not None}
+
+
+_vector_store_cache: dict[str, "VectorStore"] = {}
+_cache_lock = threading.Lock()
+
+
+def get_vector_store(
+    config: VectorStoreConfig | None = None, collection_name: str | None = None,
+) -> "VectorStore":
+    """Process-wide cached VectorStore, keyed by resolved collection name.
+
+    Constructing a VectorStore loads the sentence-transformers embedding
+    model into memory (PyTorch weights + runtime init) -- a real, non-trivial
+    allocation. Before this cache existed, every reactive ingestion trigger
+    (run_talonx.py's WatchlistDrivenIngestion, firing once per newly added/
+    resumed ticker) called `run_ingestion()` and `run_news_ingestion()` back
+    to back, each building its own fresh VectorStore -- reloading the model
+    from scratch twice per ticker event, for the life of the process, on top
+    of whatever else was already resident. That repeated reload is what was
+    tripping raw malloc failures under memory pressure. Callers that want a
+    private (uncached) instance can still construct VectorStore(...) directly.
+
+    _cache_lock only protects the dict lookup/insert (so two threads racing
+    to populate the SAME not-yet-cached key can't each build and load their
+    own throwaway model) -- narrow and low-risk, unlike locking the actual
+    query/upsert calls themselves (tried and reverted -- see
+    VectorStore.__init__'s docstring). The real hazard this cache creates
+    -- one shared embedding model touched from more than one OS thread --
+    is avoided by keeping every caller of a cached VectorStore on the
+    single asyncio event-loop thread (no asyncio.to_thread around calls
+    into it), not by locking here.
+    """
+    resolved_config = config or settings.vector_store
+    key = collection_name or resolved_config.collection_name
+    with _cache_lock:
+        store = _vector_store_cache.get(key)
+        if store is None:
+            store = VectorStore(config=resolved_config, collection_name=collection_name)
+            _vector_store_cache[key] = store
+        return store

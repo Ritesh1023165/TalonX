@@ -456,3 +456,33 @@ def test_migrates_a_pre_existing_ignored_decisions_table_without_horizon(tmp_pat
         store.record_ignored("MSFT", "NO_ACTIVE_POSITION", AlertAction.CONTRADICTED, 100.0, NOW, horizon="long_term")
         rows = store.get_ignored_decisions_between(NOW - timedelta(hours=1), NOW + timedelta(hours=1))
         assert len(rows) == 2
+
+
+# ==========================================================================
+# WAL checkpoint (fixes the dashboard-slowdown-over-a-session issue --
+# see run_talonx.periodic_wal_checkpoint_loop's own docstring)
+# ==========================================================================
+
+def test_checkpoint_does_not_raise(tmp_path):
+    with _store(tmp_path) as store:
+        store.checkpoint()
+
+
+def test_checkpoint_shrinks_the_wal_file(tmp_path):
+    db_path = tmp_path / "paper.db"
+    wal_path = tmp_path / "paper.db-wal"
+    with _store(tmp_path) as store:
+        # update_latest_price commits every call -- this is the exact
+        # high-frequency write path (once per market tick, per ticker)
+        # that grows the WAL in real usage.
+        for i in range(50):
+            store.update_latest_price("AAPL", 100.0 + i, NOW + timedelta(seconds=i))
+        assert wal_path.exists()
+        size_before = wal_path.stat().st_size
+
+        store.checkpoint()
+
+        size_after = wal_path.stat().st_size
+        assert size_after <= size_before
+        # And the data itself survives the checkpoint intact.
+        assert store.get_latest_prices()["AAPL"] == 149.0

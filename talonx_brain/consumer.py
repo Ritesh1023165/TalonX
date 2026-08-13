@@ -337,12 +337,21 @@ class ResearchAgent:
     async def _generate_fresh_report(self, signal: QuantSignal) -> ResearchReport:
         query_text = _build_retrieval_query(signal)
         # VectorStore.query() is a synchronous, blocking chromadb call --
-        # offload it so it doesn't stall the event loop, same treatment
-        # yfinance_poll.py gives the other synchronous library dependency
-        # in this project.
-        citations = await asyncio.to_thread(
-            self.retriever.retrieve, signal.ticker, query_text, self.config.retrieval_top_k
-        )
+        # called directly (not offloaded via asyncio.to_thread) since
+        # self.retriever wraps a get_vector_store()-cached VectorStore
+        # shared with talonx_ingest.pipeline.ingest_ticker's upsert_chunks(),
+        # which also runs synchronously on this SAME event-loop thread.
+        # Offloading only this side to a real OS thread (tried 2026-08-13)
+        # let the two calls genuinely run concurrently against one shared
+        # embedding model -- crashed python.exe twice (ACCESS_VIOLATION in
+        # c10.dll, PyTorch's core). A lock around the shared calls fixed
+        # the crash but froze the whole process instead (see
+        # VectorStore.__init__'s docstring). Keeping this on the main
+        # thread, same as upsert_chunks(), means the two can never overlap
+        # in the first place -- the cost is this call blocking the event
+        # loop for its duration, same accepted tradeoff as
+        # periodic_wal_checkpoint_loop's AuditStore call in run_talonx.py.
+        citations = self.retriever.retrieve(signal.ticker, query_text, self.config.retrieval_top_k)
 
         if not citations:
             # Cold start (Requirement 4A): bypass the LLM entirely rather
@@ -473,8 +482,11 @@ class ResearchAgent:
         # triggered regeneration would silently ground itself in stale
         # annual-report text, with the actual earnings filing invisible.
         form_type = ["10-K", "10-Q", "8-K"] if signal.is_earnings_related else "10-K"
-        citations = await asyncio.to_thread(
-            self.retriever.retrieve, signal.ticker, query_text, self.config.retrieval_top_k, form_type,
+        # Not offloaded via asyncio.to_thread -- see _generate_fresh_report's
+        # docstring above for why (shared embedding model with
+        # talonx_ingest.pipeline.ingest_ticker, same fix applies here).
+        citations = self.retriever.retrieve(
+            signal.ticker, query_text, self.config.retrieval_top_k, form_type,
         )
 
         if not citations:

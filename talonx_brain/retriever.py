@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 
 from talonx_ingest.config import settings as ingest_settings
-from talonx_ingest.storage.vector_store import VectorStore
+from talonx_ingest.storage.vector_store import VectorStore, get_vector_store
 
 from talonx_brain.config import BrainConfig
 from talonx_brain.schemas import Citation, CitationSourceType
@@ -40,7 +40,13 @@ class ContextRetriever:
         news_store: VectorStore | None = None,
     ):
         self.config = config or BrainConfig()
-        self._filings_store = filings_store or VectorStore()
+        # get_vector_store(): process-wide cache keyed by collection name --
+        # run_talonx.py runs this ResearchAgent in the SAME process as
+        # talonx_ingest's own run_ingestion()/EarningsFastTrackPoller, which
+        # already populate this cache for the default "sec_filings"
+        # collection; reusing it here means the embedding model is shared
+        # rather than a second full copy sitting resident in memory.
+        self._filings_store = filings_store or get_vector_store()
         # Lazily constructed (see _get_news_store) so a real Chroma client
         # for news_feed isn't built when include_news_context is False, or
         # in tests that only care about filings.
@@ -48,7 +54,7 @@ class ContextRetriever:
 
     def _get_news_store(self) -> VectorStore:
         if self._news_store is None:
-            self._news_store = VectorStore(
+            self._news_store = get_vector_store(
                 collection_name=ingest_settings.news.vector_collection_name
             )
         return self._news_store

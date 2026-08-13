@@ -9,7 +9,11 @@ terminal, one Ctrl+C to stop:
                             repeating interval (default every 6 hours).
   - Module 1, continuous:  live market data (Polygon WebSocket, or
                             yfinance polling fallback), streaming until
-                            stopped.
+                            stopped. Also polls pre-market prices
+                            (PreMarketPoller, --skip-premarket) for the
+                            whole watchlist during a configurable UTC
+                            window, since the regular feed above only
+                            reflects regular-session prices.
   - Module 2, continuous:  the quant scanner, consuming that market data
                             via Redis and publishing QuantSignals.
   - Module 3, continuous:  the research agent, consuming those QuantSignals,
@@ -110,6 +114,7 @@ Usage:
     python run_talonx.py --skip-core            # skip Module 4 (talonx_core)
     python run_talonx.py --skip-dispatch        # skip Module 5 (talonx_dispatch)
     python run_talonx.py --skip-paper-trading   # skip Module 6 (talonx_paper)
+    python run_talonx.py --skip-premarket       # skip pre-market price monitoring
 
     # e.g. iterating on talonx_quant: run everything ELSE here, run
     # talonx_quant yourself in another terminal so you can restart just
@@ -125,7 +130,7 @@ import asyncio
 import logging
 import os
 import signal
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 
 from talonx_ingest.config import MarketDataConfig, settings
 from talonx_ingest.earnings import fetch_earnings_calendar
@@ -138,7 +143,7 @@ from talonx_ingest.news.pipeline import run_news_ingestion
 from talonx_ingest.pipeline import ingest_earnings_filing, run_ingestion, run_long_term_financials_ingestion
 from talonx_ingest.processing.chunker import DocumentChunker
 from talonx_ingest.storage.ledger import IngestionLedger
-from talonx_ingest.storage.vector_store import VectorStore
+from talonx_ingest.storage.vector_store import VectorStore, get_vector_store
 from talonx_quant.config import QuantConfig
 from talonx_quant.consumer import QuantScanner
 from talonx_quant.fundamental_consumer import FundamentalScanner
@@ -168,6 +173,25 @@ def _env_float(name: str, default: float) -> float:
         return float(os.environ.get(name, default))
     except (TypeError, ValueError):
         return default
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_time(name: str, default: str) -> time:
+    """Parses an "HH:MM" env var into a UTC time-of-day. Falls back to
+    `default` (also "HH:MM") on anything unparseable."""
+    raw = os.environ.get(name, default)
+    try:
+        hour, minute = raw.split(":")
+        return time(int(hour), int(minute))
+    except (TypeError, ValueError):
+        default_hour, default_minute = default.split(":")
+        return time(int(default_hour), int(default_minute))
 
 
 def _diff_symbols(old: set[str], new: set[str]) -> tuple[set[str], set[str]]:
@@ -428,7 +452,12 @@ class EarningsFastTrackPoller:
 
     async def run(self) -> None:
         self._chunker = DocumentChunker()
-        self._vector_store = VectorStore()
+        # Cached process-wide (talonx_ingest.storage.vector_store.get_vector_store) --
+        # this uses the same default "sec_filings" collection run_ingestion()
+        # does, so it shares that already-loaded embedding model instead of
+        # holding a second full copy resident in memory for the life of the
+        # process.
+        self._vector_store = get_vector_store()
         self._ledger = IngestionLedger(settings.ledger.path)
         self._publisher = RedisEventPublisher()
         await self._publisher.connect()  # logs a warning and continues if Redis is unavailable
@@ -478,6 +507,133 @@ class EarningsFastTrackPoller:
                     quote = None
                 if quote is not None:
                     await self._on_event(quote)
+
+
+class PreMarketPoller:
+    """
+    Pre-Market Radar: extends `fetch_extended_hours_quote` (originally
+    built only for EarningsFastTrackPoller's narrow earnings-window ticker
+    set, Requirement 6 above) to the WHOLE active watchlist during the
+    pre-market session. Regular hours already get live prices from
+    WatchlistDrivenMarketData/LongTermPriceRunner via yfinance's
+    `fast_info`, which does NOT reflect pre/post-market trading (see
+    fetch_extended_hours_quote's own docstring) -- so without this, a
+    pre-market move sits invisible until the regular session opens and
+    the price gaps into view all at once.
+
+    Ticks flow onto the SAME talonx:market:stream channel as every other
+    price source, so they hit the exact same downstream signal/decision/
+    notification pipeline and gates as a regular-session tick -- no
+    separate, looser filtering for pre-market moves.
+
+    Deliberately simplified, same posture as EarningsFastTrackPoller's own
+    "session-aware BMO/AMC windowing is skipped" choice above: gates on a
+    flat, configurable UTC time-of-day window
+    (TALONX_PREMARKET_START_UTC/TALONX_PREMARKET_END_UTC) and Mon-Fri
+    only -- no trading-holiday calendar, no per-exchange session lookup
+    for non-US tickers. US pre-market is 4:00-9:30am ET, which is
+    08:00-13:30 UTC during EDT or 09:00-14:30 UTC during EST; the default
+    window (08:00-14:30 UTC) deliberately covers the UNION of both rather
+    than picking one, since this doesn't do DST-awareness -- a bit of
+    slack at either edge is harmless (fetch_extended_hours_quote just
+    returns the latest available bar), a missed hour of real pre-market
+    movement from picking the wrong side of DST would not be.
+
+    Excludes any ticker currently owned by EarningsFastTrackPoller, same
+    "avoid double-publishing ticks for one symbol" reasoning
+    LongTermPriceRunner already applies to that poller -- it already
+    handles extended-hours pricing for its own (narrower) ticker set at a
+    cadence tied to the actual earnings event, so this poller staying out
+    of its way avoids two independent sources racing ticks for one symbol
+    with no ordering/session tiebreak.
+
+    Polls a ROTATING BATCH of at most `batch_size` symbols per tick
+    (TALONX_PREMARKET_BATCH_SIZE, default 5) rather than the whole
+    watchlist at once -- `fetch_extended_hours_quote` goes through
+    yfinance's `history(prepost=True)`, which is backed by curl_cffi;
+    the installed curl_cffi build (0.16.0) has a broken `Curl.__del__`
+    (raises AttributeError on `_ws_recv_buffer` before it can free the
+    native handle in `close()`), so every one of these calls leaks
+    native memory that Python's own GC can't see or reclaim. Hitting
+    the full watchlist every single cycle was confirmed live to OOM the
+    whole machine (both this process and the separate Streamlit
+    dashboard process) within ~15 minutes. Batching bounds how much of
+    that leak accumulates per tick; the full watchlist still gets
+    covered, just spread out over several ticks instead of hit in one
+    burst. The real fix is a curl_cffi upgrade/patch -- this is
+    mitigation, not a cure.
+    """
+
+    def __init__(
+        self, watchlist_store: TickerWatchlistStore, on_event, poll_interval_seconds: float,
+        start_utc: time, end_utc: time, active_earnings_symbols_fn=None, batch_size: int = 5,
+    ):
+        self._store = watchlist_store
+        self._on_event = on_event
+        self._poll_interval = poll_interval_seconds
+        self._start_utc = start_utc
+        self._end_utc = end_utc
+        self._active_earnings_symbols_fn = active_earnings_symbols_fn
+        self._batch_size = max(1, batch_size)
+        self._cursor = 0
+        self._stop_event = asyncio.Event()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+
+    def _in_window(self) -> bool:
+        now = datetime.now(timezone.utc)
+        if now.weekday() >= 5:  # Saturday/Sunday -- no trading-holiday calendar beyond this
+            return False
+        return self._start_utc <= now.time() < self._end_utc
+
+    def _symbols(self) -> set[str]:
+        symbols = set(self._store.list_active_symbols())
+        if self._active_earnings_symbols_fn is not None:
+            symbols -= self._active_earnings_symbols_fn()
+        return symbols
+
+    async def run(self) -> None:
+        while not self._stop_event.is_set():
+            if self._in_window():
+                await self._poll_once()
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=self._poll_interval)
+            except asyncio.TimeoutError:
+                pass  # normal case: interval elapsed -- poll again if still in window, or check again if not
+
+    def _next_batch(self, symbols: list[str]) -> list[str]:
+        """Rotates through `symbols` (sorted, stable order) `batch_size` at a
+        time, wrapping around -- so repeated calls eventually cover the
+        whole watchlist without ever fetching more than a bounded slice
+        in one tick. Batch length is capped at len(symbols) so a
+        watchlist smaller than batch_size doesn't wrap around onto
+        itself and fetch the same symbol twice in one tick. Cursor is
+        clamped to len(symbols) each call since the watchlist can
+        grow/shrink between ticks."""
+        if not symbols:
+            return []
+        n = len(symbols)
+        size = min(self._batch_size, n)
+        self._cursor %= n
+        batch = [symbols[(self._cursor + i) % n] for i in range(size)]
+        self._cursor = (self._cursor + size) % n
+        return batch
+
+    async def _poll_once(self) -> None:
+        symbols = sorted(self._symbols())
+        batch = self._next_batch(symbols)
+        if not batch:
+            return
+        logger.info("Pre-market poll for %s (of %d tracked)", batch, len(symbols))
+        for symbol in batch:
+            try:
+                quote = await asyncio.to_thread(fetch_extended_hours_quote, symbol)
+            except Exception as exc:  # noqa: BLE001 -- one bad ticker shouldn't kill the poll
+                logger.warning("Pre-market quote fetch failed for %s: %s", symbol, exc)
+                continue
+            if quote is not None:
+                await self._on_event(quote)
 
 
 class WatchlistDrivenIngestion:
@@ -670,6 +826,66 @@ async def periodic_long_term_financials_loop(
             pass  # normal case: interval elapsed, loop again
 
 
+async def periodic_wal_checkpoint_loop(
+    checkpointable_stores: list, interval_seconds: float, stop_event: asyncio.Event,
+) -> None:
+    """
+    Forces a WAL checkpoint (PRAGMA wal_checkpoint(TRUNCATE)) on every
+    WAL-mode SQLite store this process owns, on a fixed interval. Exists
+    because SQLite's own automatic "PASSIVE" checkpoint silently skips
+    itself whenever another connection has a read transaction open at
+    that moment -- and talonx_dispatch/app.py's Streamlit dashboard (a
+    SEPARATE process, polling every TALONX_DISPATCH_AUTOREFRESH_MS) is
+    exactly that kind of frequent reader. Left unchecked, the WAL file
+    grows unbounded for as long as this process runs -- and every read
+    against a large uncheckpointed WAL gets progressively SLOWER (SQLite
+    has to reconstruct current page state by scanning the whole WAL),
+    which is what actually made the dashboard feel like it was "hanging"
+    over a live session, not query complexity or data volume (row counts
+    stay tiny; this is write CHURN to the same handful of rows -- see
+    talonx_paper.store.PaperTradingStore.checkpoint's own docstring, the
+    highest-write-volume store and the one this was first diagnosed
+    against, since it commits on every single market tick).
+
+    Runs immediately at startup (so a long-uncheckpointed WAL left over
+    from a PREVIOUS session gets cleaned up right away, not just
+    eventually) then every interval_seconds thereafter. Always runs,
+    independent of any --skip-* flag -- pure maintenance, no functional
+    effect on the pipeline, cheap even when there's nothing to do.
+
+    Each store.checkpoint() runs INLINE on the event loop, not via
+    asyncio.to_thread -- tried that once (2026-08-13) and it broke
+    AuditStore immediately: its connection deliberately keeps
+    check_same_thread's True default (see talonx_dispatch/store.py's own
+    docstring, which names asyncio.to_thread specifically as the thing
+    NOT to do), because it's built for exactly this -- one connection,
+    one thread, for its whole life. Handing that connection to
+    to_thread's threadpool raised "SQLite objects created in a thread
+    can only be used in that same thread" on every single checkpoint
+    attempt. PaperTradingStore/TickerWatchlistStore pass
+    check_same_thread=False so they wouldn't raise, but per that same
+    docstring that only disables the assertion -- it doesn't make a
+    connection safe for genuinely concurrent cross-thread access, so
+    to_thread would have been a latent hazard for those two even without
+    an error to show for it. Net effect: TRUNCATE-mode checkpoints DO
+    block (busy-retry up to sqlite3.connect's default 5s timeout) until
+    every other connection's read transaction clears, so this can stall
+    the rest of this process for up to ~5s per store, per interval, if
+    the dashboard happens to be mid-read right then -- accepted as the
+    lesser risk given the alternative is a cross-thread SQLite violation.
+    """
+    while not stop_event.is_set():
+        for store in checkpointable_stores:
+            try:
+                store.checkpoint()
+            except Exception as exc:  # noqa: BLE001 -- one bad checkpoint shouldn't kill the loop
+                logger.warning("WAL checkpoint failed for %s: %s", type(store).__name__, exc)
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
+        except asyncio.TimeoutError:
+            pass  # normal case: interval elapsed, checkpoint again
+
+
 async def periodic_earnings_calendar_sync_loop(
     watchlist_store: TickerWatchlistStore, interval_hours: float, stop_event: asyncio.Event
 ) -> None:
@@ -860,11 +1076,34 @@ async def main() -> None:
     if paper_store is not None and not args.skip_long_term_paper:
         long_term_paper_engine = LongTermPaperEngine(store=paper_store, watchlist_store=watchlist_store)
 
+    # Every WAL-mode store this process owns -- see
+    # periodic_wal_checkpoint_loop's own docstring for why this needs to
+    # be forced periodically rather than left to SQLite's own automatic
+    # (but easily-starved) checkpoint.
+    checkpointable_stores = [watchlist_store]
+    if dispatch_agent is not None:
+        checkpointable_stores.append(dispatch_agent.store)
+    if paper_store is not None:
+        checkpointable_stores.append(paper_store)
+
     earnings_fast_track_poller: EarningsFastTrackPoller | None = None
     if not args.skip_earnings_fast_track:
         earnings_fast_track_poller = EarningsFastTrackPoller(
             watchlist_store, make_on_event(market_publisher),
             _env_float("TALONX_EARNINGS_FAST_TRACK_POLL_SECONDS", 900.0),
+        )
+
+    premarket_poller: PreMarketPoller | None = None
+    if not args.skip_premarket:
+        premarket_poller = PreMarketPoller(
+            watchlist_store, make_on_event(market_publisher),
+            _env_float("TALONX_PREMARKET_POLL_INTERVAL_SECONDS", 300.0),
+            _env_time("TALONX_PREMARKET_START_UTC", "08:00"),
+            _env_time("TALONX_PREMARKET_END_UTC", "14:30"),
+            active_earnings_symbols_fn=(
+                earnings_fast_track_poller.active_symbols if earnings_fast_track_poller is not None else None
+            ),
+            batch_size=_env_int("TALONX_PREMARKET_BATCH_SIZE", 5),
         )
 
     market_data_runner: WatchlistDrivenMarketData | None = None
@@ -894,6 +1133,8 @@ async def main() -> None:
             long_term_price_runner.stop()
         if earnings_fast_track_poller is not None:
             earnings_fast_track_poller.stop()
+        if premarket_poller is not None:
+            premarket_poller.stop()
         if quant_scanner is not None:
             quant_scanner.stop()
         if fundamental_scanner is not None:
@@ -940,6 +1181,8 @@ async def main() -> None:
         tasks.append(asyncio.create_task(long_term_price_runner.run(), name="long_term_price_poll"))
     if earnings_fast_track_poller is not None:
         tasks.append(asyncio.create_task(earnings_fast_track_poller.run(), name="earnings_fast_track"))
+    if premarket_poller is not None:
+        tasks.append(asyncio.create_task(premarket_poller.run(), name="premarket_poller"))
     if quant_scanner is not None:
         tasks.append(asyncio.create_task(quant_scanner.run(), name="quant_scanner"))
     if fundamental_scanner is not None:
@@ -985,6 +1228,19 @@ async def main() -> None:
         watchlist_store.close()
         return
 
+    # Added only once we know there's real work happening -- otherwise
+    # this trivial maintenance task alone would defeat the "nothing to
+    # run" check above (it would always be non-empty, since
+    # checkpointable_stores always has at least watchlist_store in it).
+    tasks.append(
+        asyncio.create_task(
+            periodic_wal_checkpoint_loop(
+                checkpointable_stores, _env_float("TALONX_WAL_CHECKPOINT_INTERVAL_SECONDS", 300.0), stop_event,
+            ),
+            name="periodic_wal_checkpoint",
+        )
+    )
+
     try:
         await asyncio.gather(*tasks)
     except KeyboardInterrupt:
@@ -995,6 +1251,8 @@ async def main() -> None:
             long_term_price_runner.stop()
         if earnings_fast_track_poller is not None:
             earnings_fast_track_poller.stop()
+        if premarket_poller is not None:
+            premarket_poller.stop()
         if quant_scanner is not None:
             quant_scanner.stop()
         if fundamental_scanner is not None:
@@ -1088,6 +1346,13 @@ def _parse_args() -> argparse.Namespace:
         help="Skip the Event-Driven Earnings Radar's fast-track 8-K/10-Q ingestion + "
              "extended-hours price capture (TALONX_EARNINGS_FAST_TRACK_POLL_SECONDS, "
              "default every 900s) for tickers currently in their earnings window",
+    )
+    parser.add_argument(
+        "--skip-premarket", action="store_true",
+        help="Skip pre-market price monitoring for the whole watchlist "
+             "(TALONX_PREMARKET_START_UTC/END_UTC, default 08:00-14:30 UTC, "
+             "poll every TALONX_PREMARKET_POLL_INTERVAL_SECONDS, default 300s, "
+             "TALONX_PREMARKET_BATCH_SIZE symbols per tick, default 5)",
     )
     return parser.parse_args()
 

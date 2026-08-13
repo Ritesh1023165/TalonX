@@ -111,6 +111,14 @@ class TickerWatchlistStore:
                 "ALTER TABLE tickers ADD COLUMN strategy_horizon TEXT NOT NULL DEFAULT 'INTRADAY'"
             )
 
+    def checkpoint(self) -> None:
+        """Forces a WAL checkpoint (TRUNCATE mode). See
+        talonx_paper.store.PaperTradingStore.checkpoint's docstring for
+        the full rationale. Called periodically by run_talonx.py's
+        periodic_wal_checkpoint_loop."""
+        with self._lock:
+            self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+
     def close(self) -> None:
         self._conn.close()
 

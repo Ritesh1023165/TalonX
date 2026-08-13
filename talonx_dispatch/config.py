@@ -154,7 +154,12 @@ class DispatchConfig:
 
     # --- Streamlit dashboard (app.py) ---
     feed_limit: int = _env_int("TALONX_DISPATCH_FEED_LIMIT", 200)
-    autorefresh_ms: int = _env_int("TALONX_DISPATCH_AUTOREFRESH_MS", 5000)
+    # Was 5000 -- with st.tabs() rendering every tab's queries on every
+    # tick (fixed separately by switching to a single-active-section
+    # radio), 5s was an aggressive baseline load even for one section.
+    # 10s keeps the feed responsive without re-querying twice as often
+    # as needed.
+    autorefresh_ms: int = _env_int("TALONX_DISPATCH_AUTOREFRESH_MS", 10000)
 
     # --- Smart Dispatch Filtering (mobile push volume reduction) ---
     # Every alert is ALWAYS recorded to the audit trail and shown on the

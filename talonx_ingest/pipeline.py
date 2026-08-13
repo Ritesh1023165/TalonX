@@ -34,7 +34,7 @@ from talonx_ingest.events.schemas import NewFilingIngestedEvent, NewFundamentals
 from talonx_ingest.processing.chunker import DocumentChunker
 from talonx_ingest.processing.cleaner import clean_filing_html
 from talonx_ingest.storage.ledger import IngestionLedger
-from talonx_ingest.storage.vector_store import VectorStore
+from talonx_ingest.storage.vector_store import VectorStore, get_vector_store
 
 logging.basicConfig(
     level=logging.INFO,
@@ -335,11 +335,13 @@ async def run_ingestion(
     chunker = DocumentChunker()
 
     logger.info(
-        "Initializing vector store (first run downloads the embedding "
-        "model, ~90MB, from huggingface.co -- this can take a while and "
-        "shows its own progress bar, not our log lines)..."
+        "Getting vector store (first call in this process downloads the "
+        "embedding model, ~90MB, from huggingface.co and loads it into "
+        "memory -- can take a while and shows its own progress bar, not "
+        "our log lines; cached process-wide after that, see "
+        "get_vector_store's docstring)..."
     )
-    vector_store = VectorStore()
+    vector_store = get_vector_store()
     logger.info("Vector store ready. Existing chunk count: %d", vector_store.count())
 
     ledger = IngestionLedger(settings.ledger.path)
