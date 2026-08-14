@@ -72,7 +72,18 @@ CREATE TABLE IF NOT EXISTS ticker_state_long_term (
     last_alert_action         TEXT,
     last_alert_price          REAL,
     roic_below_wacc_streak    INTEGER NOT NULL DEFAULT 0,
-    previous_moat_rating      TEXT
+    previous_moat_rating      TEXT,
+    -- Restart-survival fix: these two were captured on LongTermTickerState
+    -- (state.py) alongside roic_below_wacc_streak/previous_moat_rating
+    -- above, at the SAME moments, but were never actually persisted --
+    -- a restart between two same-fiscal-year signal arrivals (e.g. an
+    -- Earnings Radar Stage-1 8-K republish reusing a cached ROIC) would
+    -- silently reset last_streak_fiscal_year to None, defeating the
+    -- dedupe guard and risking a false UNDER_PERFORM_REBALANCE trip from
+    -- double-counting one real data point. previous_fair_value has the
+    -- same gap for the post-earnings "before vs after" fair-value push.
+    last_streak_fiscal_year  INTEGER,
+    previous_fair_value      REAL
 )
 """
 
@@ -96,6 +107,12 @@ class TickerStateStore:
             self._conn.execute("ALTER TABLE ticker_state ADD COLUMN last_alert_action TEXT")
         if "last_alert_price" not in cols:
             self._conn.execute("ALTER TABLE ticker_state ADD COLUMN last_alert_price REAL")
+
+        lt_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(ticker_state_long_term)").fetchall()}
+        if "last_streak_fiscal_year" not in lt_cols:
+            self._conn.execute("ALTER TABLE ticker_state_long_term ADD COLUMN last_streak_fiscal_year INTEGER")
+        if "previous_fair_value" not in lt_cols:
+            self._conn.execute("ALTER TABLE ticker_state_long_term ADD COLUMN previous_fair_value REAL")
 
         # suppression_counts' `horizon` column (Phase 2) needs a REBUILD,
         # not a plain ALTER TABLE ADD COLUMN -- a pre-existing table's
@@ -293,21 +310,36 @@ class TickerStateStore:
 
     def save_long_term_fundamental_stop_state(
         self, ticker: str, roic_below_wacc_streak: int, previous_moat_rating: MoatRating | None,
+        last_streak_fiscal_year: int | None = None, previous_fair_value: float | None = None,
     ) -> None:
         """Persists LongTermTickerState's fundamental-stop bookkeeping
         (the ROIC-vs-WACC streak, the prior moat rating for downgrade
-        detection) -- without this, a restart mid-streak would silently
-        reset the streak to 0 and a genuinely-deteriorating position
-        could dodge the fundamental stop indefinitely across restarts."""
+        detection, the fiscal-year dedupe guard, and the prior fair
+        value for the post-earnings "before vs after" push) -- without
+        this, a restart mid-streak would silently reset the streak to 0
+        and a genuinely-deteriorating position could dodge the
+        fundamental stop indefinitely across restarts. last_streak_fiscal_year
+        and previous_fair_value were ADDED to this persistence call after
+        the original streak/moat-rating fields -- see the schema's own
+        docstring for why a restart between two same-fiscal-year signal
+        arrivals could otherwise double-count one real data point."""
         self._conn.execute(
             """
-            INSERT INTO ticker_state_long_term (ticker, roic_below_wacc_streak, previous_moat_rating)
-            VALUES (?, ?, ?)
+            INSERT INTO ticker_state_long_term (
+                ticker, roic_below_wacc_streak, previous_moat_rating,
+                last_streak_fiscal_year, previous_fair_value
+            )
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(ticker) DO UPDATE SET
                 roic_below_wacc_streak = excluded.roic_below_wacc_streak,
-                previous_moat_rating = excluded.previous_moat_rating
+                previous_moat_rating = excluded.previous_moat_rating,
+                last_streak_fiscal_year = excluded.last_streak_fiscal_year,
+                previous_fair_value = excluded.previous_fair_value
             """,
-            (ticker.upper(), roic_below_wacc_streak, previous_moat_rating.value if previous_moat_rating else None),
+            (
+                ticker.upper(), roic_below_wacc_streak, previous_moat_rating.value if previous_moat_rating else None,
+                last_streak_fiscal_year, previous_fair_value,
+            ),
         )
         self._conn.commit()
 
@@ -317,13 +349,15 @@ class TickerStateStore:
         cursor = self._conn.execute(
             "SELECT ticker, signal_json, signal_at, report_json, report_at, "
             "last_alert_at, last_alert_action, last_alert_price, "
-            "roic_below_wacc_streak, previous_moat_rating FROM ticker_state_long_term"
+            "roic_below_wacc_streak, previous_moat_rating, "
+            "last_streak_fiscal_year, previous_fair_value FROM ticker_state_long_term"
         )
         rows = cursor.fetchall()
         for (
             ticker, signal_json, signal_at, report_json, report_at,
             last_alert_at, last_alert_action, last_alert_price,
             roic_below_wacc_streak, previous_moat_rating,
+            last_streak_fiscal_year, previous_fair_value,
         ) in rows:
             state = correlator.get_or_create(ticker)
             if signal_json:
@@ -341,6 +375,9 @@ class TickerStateStore:
             state.roic_below_wacc_streak = roic_below_wacc_streak or 0
             if previous_moat_rating:
                 state.previous_moat_rating = MoatRating(previous_moat_rating)
+            state.last_streak_fiscal_year = last_streak_fiscal_year
+            if previous_fair_value is not None:
+                state.previous_fair_value = previous_fair_value
         if rows:
             logger.info("Rehydrated %d long-term ticker(s) from %s", len(rows), self.path)
         return len(rows)

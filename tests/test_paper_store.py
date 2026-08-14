@@ -431,6 +431,44 @@ def test_update_dca_contribution_amount_changes_only_that_field(tmp_path):
         assert summary["current_cash"] == 20000.0  # untouched
 
 
+# --- last_dca_at (DCA loop restart-survival fix) --------------------------
+
+def test_get_last_dca_at_is_none_for_a_fresh_store(tmp_path):
+    with _lt_store(tmp_path) as store:
+        assert store.get_last_dca_at() is None
+
+
+def test_set_and_get_last_dca_at_round_trips(tmp_path):
+    with _lt_store(tmp_path) as store:
+        store.set_last_dca_at(NOW)
+        assert store.get_last_dca_at() == NOW
+
+
+def test_set_last_dca_at_overwrites_not_appends(tmp_path):
+    with _lt_store(tmp_path) as store:
+        store.set_last_dca_at(NOW - timedelta(days=30))
+        store.set_last_dca_at(NOW)
+        assert store.get_last_dca_at() == NOW
+
+
+def test_last_dca_at_persists_across_reopen(tmp_path):
+    path = tmp_path / "paper.db"
+    with PaperTradingStore(path, default_long_term_initial_balance=20000.0, default_dca_contribution_usd=500.0) as store:
+        store.set_last_dca_at(NOW)
+
+    with PaperTradingStore(path, default_long_term_initial_balance=20000.0, default_dca_contribution_usd=500.0) as store2:
+        assert store2.get_last_dca_at() == NOW
+
+
+def test_reset_long_term_portfolio_also_clears_last_dca_at(tmp_path):
+    with _lt_store(tmp_path) as store:
+        store.set_last_dca_at(NOW)
+
+        store.reset_long_term_portfolio(initial_balance=5000.0, dca_contribution_usd=250.0)
+
+        assert store.get_last_dca_at() is None
+
+
 def test_multiple_long_term_positions_are_independent(tmp_path):
     with _lt_store(tmp_path) as store:
         store.execute_long_term_buy("AAPL", shares=10.0, price=100.0, cost=1000.0, timestamp=NOW)

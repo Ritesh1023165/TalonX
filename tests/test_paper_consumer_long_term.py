@@ -10,12 +10,14 @@ uses.
 """
 from __future__ import annotations
 
+import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+import talonx_paper.consumer as consumer_module
 from talonx_paper.config import PaperConfig
 from talonx_paper.consumer import LongTermPaperEngine
 from talonx_paper.schemas import AlertAction, LongTermOrderType, LongTermTradeExecution
@@ -350,6 +352,36 @@ async def test_dca_cycle_with_no_open_positions_is_a_noop(engine):
 
 
 @pytest.mark.asyncio
+async def test_dca_cycle_records_last_dca_at_even_with_no_open_positions(engine):
+    """Restart-survival fix: the CYCLE, not per-ticker success, is the
+    schedulable unit -- the clock must reset even when there's nothing
+    to contribute to yet, so a position opened later doesn't inherit a
+    months-stale (or never-set) timestamp and immediately fire."""
+    engine.store.get_open_long_term_positions.return_value = []
+
+    await engine._run_dca_cycle_once()
+
+    engine.store.set_last_dca_at.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_dca_cycle_records_last_dca_at_before_contributing(engine):
+    engine.store.get_open_long_term_positions.return_value = [
+        {"ticker": "AAPL", "total_shares": 20.0, "avg_cost_basis": 100.0,
+         "first_entry_at": NOW.isoformat(), "total_contributed_usd": 2000.0},
+    ]
+    engine.store.get_latest_prices.return_value = {"AAPL": 110.0}
+    engine.store.get_long_term_portfolio_summary.return_value = {
+        "current_cash": 20000.0, "dca_contribution_usd": 500.0,
+    }
+    engine.store.execute_dca_contribution.return_value = _execution(LongTermOrderType.DCA_CONTRIBUTION)
+
+    await engine._run_dca_cycle_once()
+
+    engine.store.set_last_dca_at.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_dca_cycle_none_execution_result_is_skipped_gracefully(engine):
     """Defensive race: the position was listed as open, but closed by an
     alert-driven SELL between the listing and the DCA write."""
@@ -367,3 +399,79 @@ async def test_dca_cycle_none_execution_result_is_skipped_gracefully(engine):
 
     engine._client.publish.assert_not_awaited()
     assert engine.dca_contributions_made == 0
+
+
+# ==========================================================================
+# _seconds_until_next_dca (restart-survival fix)
+#
+# Before this fix, _dca_loop waited a fixed dca_interval_days*86400
+# CONSTANT on every restart, with no persisted checkpoint -- since that
+# interval (30 days default) vastly exceeds this project's typical
+# scheduled daily uptime window, the timer could never complete at all
+# under a daily-restart schedule, and zero DCA_CONTRIBUTION rows had
+# EVER been recorded live. These tests exercise the fix directly: the
+# wait is now derived from store.get_last_dca_at(), a persisted
+# timestamp, so it reflects true wall-clock elapsed time across restarts.
+# ==========================================================================
+
+def test_seconds_until_next_dca_is_full_interval_on_first_ever_cycle(engine):
+    engine.store.get_last_dca_at.return_value = None
+
+    seconds = engine._seconds_until_next_dca()
+
+    assert seconds == pytest.approx(engine.config.dca_interval_days * 86400.0)
+
+
+class _FrozenDatetime(datetime):
+    """datetime.now() pinned to NOW, everything else (fromisoformat,
+    isoformat, arithmetic, __sub__) inherited unchanged -- lets
+    _seconds_until_next_dca's `datetime.now(timezone.utc) - last_dca_at`
+    be tested deterministically via monkeypatch instead of depending on
+    real wall-clock time during the test run."""
+
+    @classmethod
+    def now(cls, tz=None):
+        return NOW
+
+
+def test_seconds_until_next_dca_accounts_for_real_elapsed_time_across_a_restart(engine, monkeypatch):
+    """Simulates a restart mid-interval: 10 days have genuinely elapsed
+    (persisted timestamp), so only interval-10d worth of waiting remains
+    -- NOT a fresh full interval, which is what the old constant-timeout
+    design would have (incorrectly) waited."""
+    engine.store.get_last_dca_at.return_value = NOW - timedelta(days=10)
+    monkeypatch.setattr(consumer_module, "datetime", _FrozenDatetime)
+
+    seconds = engine._seconds_until_next_dca()
+
+    expected = engine.config.dca_interval_days * 86400.0 - 10 * 86400.0
+    assert seconds == pytest.approx(expected, abs=1.0)
+
+
+def test_seconds_until_next_dca_is_zero_not_negative_when_overdue(engine, monkeypatch):
+    """A restart after a gap LONGER than the interval (e.g. the app was
+    down well past its scheduled DCA date) must fire on the very next
+    tick, not wait a further (negative, silently-never-elapsing) delay."""
+    engine.store.get_last_dca_at.return_value = NOW - timedelta(days=999)
+    monkeypatch.setattr(consumer_module, "datetime", _FrozenDatetime)
+
+    seconds = engine._seconds_until_next_dca()
+
+    assert seconds == 0.0
+
+
+@pytest.mark.asyncio
+async def test_dca_loop_catches_up_immediately_when_overdue_after_a_restart(engine):
+    """End-to-end: a persisted last_dca_at far enough in the past that
+    the interval has already elapsed must cause _dca_loop to run a
+    cycle almost immediately, not silently wait a fresh full interval."""
+    engine.store.get_last_dca_at.return_value = NOW - timedelta(days=999)
+    engine.store.get_open_long_term_positions.return_value = []
+
+    async def _stop_soon():
+        await asyncio.sleep(0.05)
+        engine.stop()
+
+    await asyncio.gather(engine._dca_loop(), _stop_soon())
+
+    engine.store.set_last_dca_at.assert_called()  # a cycle ran before stop() landed

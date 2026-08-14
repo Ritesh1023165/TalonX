@@ -66,6 +66,26 @@ class IndicatorSnapshot:
     bar_true_range: float | None
 
 
+def _same_session_tail(df: pd.DataFrame) -> pd.DataFrame:
+    """The trailing contiguous run of rows sharing the LAST row's
+    `session` tag -- e.g. if the buffer holds pre-market bars followed
+    by regular-session bars, this returns only the regular-session tail.
+    Falls back to the full frame if there's no `session` column at all
+    (a df built without buffer.py's tagging, e.g. a hand-built test
+    fixture) or the column is empty/unpopulated."""
+    if "session" not in df.columns or df.empty:
+        return df
+    sessions = df["session"]
+    latest = sessions.iloc[-1]
+    if pd.isna(latest):
+        return df
+    same = sessions == latest
+    start = len(df) - 1
+    while start > 0 and same.iloc[start - 1]:
+        start -= 1
+    return df.iloc[start:]
+
+
 def compute_indicators(df: pd.DataFrame, config: QuantConfig) -> IndicatorSnapshot | None:
     """
     Returns None if there isn't enough buffered history yet
@@ -87,7 +107,34 @@ def compute_indicators(df: pd.DataFrame, config: QuantConfig) -> IndicatorSnapsh
     sma_slow_series = df.ta.sma(length=config.ma_slow_period)
     volume_avg_series = df["volume"].rolling(window=config.volume_avg_period).mean()
     dollar_volume_series = (df["volume"] * df["close"]).rolling(window=config.volume_avg_period).mean()
-    atr_series = df.ta.atr(length=config.atr_period)
+
+    # Session-aware ATR reset (Requirement 3): ATR/bar_true_range are
+    # recomputed from scratch on every call (no persistent running
+    # state to explicitly "reset"), so restricting their INPUT to the
+    # trailing contiguous run of bars sharing the latest bar's session
+    # tag achieves the same effect -- the instant the regular session
+    # opens, pre-market bars fall out of the window on their own, and
+    # ATR/bar_true_range go back to None (a fresh warm-up) until enough
+    # regular-session bars accumulate, rather than blending the thin
+    # pre-market range into the post-open baseline. RSI/MACD/SMA above
+    # are deliberately NOT restricted this way -- only the ATR-based
+    # movement-confirmation/risk-reward inputs need the reset.
+    atr_df = _same_session_tail(df)
+    # Guard BEFORE calling .ta.atr(), not after: pandas_ta's atr() does
+    # NOT return a NaN-filled Series when given fewer than length+1 rows
+    # (the behavior compute_indicators previously relied on) -- it
+    # silently returns the INPUT DATAFRAME unchanged instead. That never
+    # surfaced before this function's own len(df) < min_bars_required
+    # gate above always guaranteed df (the full buffer) had 120+ rows by
+    # the time any pandas_ta call ran on it -- but atr_df is a
+    # session-restricted SUBSET that can be far shorter right at a
+    # session transition (confirmed live: crashed talonx_quant in a
+    # reconnect loop for 40+ consecutive attempts at market close, when
+    # the newest bars' session flips and _same_session_tail narrows to
+    # just a handful of them). _last_two() then called float() on a
+    # one-row DataFrame slice (a Series, not a scalar), raising
+    # "float() argument must be a string or a real number, not 'Series'".
+    atr_series = atr_df.ta.atr(length=config.atr_period) if len(atr_df) > config.atr_period else None
 
     if macd_df is None or rsi_series is None:
         logger.warning("pandas_ta returned None for RSI/MACD -- insufficient data or version mismatch")
@@ -125,13 +172,14 @@ def compute_indicators(df: pd.DataFrame, config: QuantConfig) -> IndicatorSnapsh
 
     # This specific bar's true range -- max(high-low, |high-prev_close|,
     # |low-prev_close|), the SAME formula ATR itself averages over
-    # atr_period bars. Needs a previous close, so it's None on the very
-    # first bar of the buffer (never happens in practice -- min_bars_required
-    # is always > 1).
+    # atr_period bars. Needs a previous close FROM THE SAME SESSION
+    # (see atr_df above) -- None on the first bar of a session (e.g. the
+    # regular-session open right after a pre-market run), same as the
+    # first bar of the buffer overall.
     bar_true_range = None
-    if len(df) >= 2:
+    if len(atr_df) >= 2:
         high, low, close = latest_row["high"], latest_row["low"], latest_row["close"]
-        prev_close = df.iloc[-2]["close"]
+        prev_close = atr_df.iloc[-2]["close"]
         if pd.notna(high) and pd.notna(low) and pd.notna(close) and pd.notna(prev_close):
             bar_true_range = max(
                 float(high) - float(low),

@@ -528,3 +528,106 @@ def test_checkpoint_does_not_raise(tmp_path):
         store.record_alert(_alert())
         store.checkpoint()
         assert store.count() == 1  # data survives, store stays usable
+
+
+# ==========================================================================
+# Restart-survival: latest earnings-context cache (T-48h heads-up push)
+# ==========================================================================
+
+def test_load_latest_earnings_context_is_empty_for_a_fresh_store(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        assert store.load_latest_earnings_context() == []
+
+
+def test_save_and_load_fundamental_signal_cache_round_trips(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.save_latest_fundamental_signal_cache("AAPL", '{"ticker": "AAPL"}', NOW)
+
+        rows = store.load_latest_earnings_context()
+        assert len(rows) == 1
+        assert rows[0]["ticker"] == "AAPL"
+        assert rows[0]["signal_json"] == '{"ticker": "AAPL"}'
+        assert rows[0]["report_json"] is None
+
+
+def test_save_signal_then_report_merges_into_the_same_row(tmp_path):
+    """Signal and report arrive independently (different Redis channels)
+    -- a report write must not clobber an already-cached signal for the
+    same ticker, and vice versa."""
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.save_latest_fundamental_signal_cache("AAPL", '{"a": 1}', NOW)
+        store.save_latest_longterm_report_cache("AAPL", '{"b": 2}', NOW)
+
+        rows = store.load_latest_earnings_context()
+        assert len(rows) == 1  # one row, not two
+        assert rows[0]["signal_json"] == '{"a": 1}'
+        assert rows[0]["report_json"] == '{"b": 2}'
+
+
+def test_save_fundamental_signal_cache_overwrites_not_appends(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.save_latest_fundamental_signal_cache("AAPL", '{"v": 1}', NOW)
+        store.save_latest_fundamental_signal_cache("AAPL", '{"v": 2}', NOW + timedelta(days=1))
+
+        rows = store.load_latest_earnings_context()
+        assert len(rows) == 1
+        assert rows[0]["signal_json"] == '{"v": 2}'
+
+
+def test_earnings_context_cache_persists_across_reopen(tmp_path):
+    path = tmp_path / "audit.db"
+    with AuditStore(path) as store:
+        store.save_latest_fundamental_signal_cache("AAPL", '{"v": 1}', NOW)
+        store.save_latest_longterm_report_cache("MSFT", '{"v": 2}', NOW)
+
+    with AuditStore(path) as store2:
+        rows = {r["ticker"]: r for r in store2.load_latest_earnings_context()}
+        assert rows["AAPL"]["signal_json"] == '{"v": 1}'
+        assert rows["MSFT"]["report_json"] == '{"v": 2}'
+
+
+# ==========================================================================
+# Restart-survival: per-ticker push cooldown (Smart Dispatch Filtering)
+# ==========================================================================
+
+def test_load_last_telegram_pushes_is_empty_for_a_fresh_store(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        assert store.load_last_telegram_pushes("intraday") == {}
+
+
+def test_save_and_load_last_telegram_push_round_trips(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.save_last_telegram_push("AAPL", "intraday", NOW, 123.45)
+
+        pushes = store.load_last_telegram_pushes("intraday")
+        assert pushes["AAPL"] == (NOW, 123.45)
+
+
+def test_last_telegram_push_keeps_horizons_independent(tmp_path):
+    """A DUAL_HORIZON ticker's intraday and long-term push cadences must
+    not clobber each other -- same isolation the in-memory dicts always had."""
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.save_last_telegram_push("AAPL", "intraday", NOW, 100.0)
+        store.save_last_telegram_push("AAPL", "long_term", NOW - timedelta(days=1), 90.0)
+
+        assert store.load_last_telegram_pushes("intraday")["AAPL"] == (NOW, 100.0)
+        assert store.load_last_telegram_pushes("long_term")["AAPL"] == (NOW - timedelta(days=1), 90.0)
+
+
+def test_save_last_telegram_push_overwrites_not_appends(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.save_last_telegram_push("AAPL", "intraday", NOW - timedelta(hours=1), 100.0)
+        store.save_last_telegram_push("AAPL", "intraday", NOW, 105.0)
+
+        pushes = store.load_last_telegram_pushes("intraday")
+        assert len(pushes) == 1
+        assert pushes["AAPL"] == (NOW, 105.0)
+
+
+def test_last_telegram_push_persists_across_reopen(tmp_path):
+    path = tmp_path / "audit.db"
+    with AuditStore(path) as store:
+        store.save_last_telegram_push("AAPL", "intraday", NOW, 100.0)
+
+    with AuditStore(path) as store2:
+        assert store2.load_last_telegram_pushes("intraday")["AAPL"] == (NOW, 100.0)

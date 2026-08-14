@@ -477,19 +477,51 @@ class LongTermPaperEngine:
         currently-open long-term position -- fires once immediately isn't
         the pattern here (unlike periodic_ingestion_loop's startup
         catch-up), since a freshly-opened position shouldn't get an
-        immediate DCA top-up the same session it was bought."""
-        interval_seconds = self.config.dca_interval_days * 86400.0
+        immediate DCA top-up the same session it was bought.
+
+        The wait is computed from store.get_last_dca_at() (a PERSISTED
+        timestamp), not a fixed interval_seconds constant -- a plain
+        `asyncio.wait_for(timeout=dca_interval_days*86400)` resets to
+        zero on every restart, and since that interval (30 days default)
+        vastly exceeds this project's typical scheduled daily uptime
+        window (register_scheduled_tasks.ps1's default 10:00-22:00,
+        ~12h), the timer could never complete at all -- confirmed live,
+        zero DCA_CONTRIBUTION rows had EVER been recorded under the old
+        design. Recomputing the wait from a persisted last-cycle
+        timestamp each loop iteration means a restart mid-interval
+        resumes with the correct REMAINING wait, and an interval that's
+        already elapsed while the app was down fires on the very next
+        tick (asyncio.wait_for(timeout=0) resolves virtually
+        immediately) rather than silently losing the cycle."""
         while not self._stop_event.is_set():
+            wait_seconds = self._seconds_until_next_dca()
             try:
-                await asyncio.wait_for(self._stop_event.wait(), timeout=interval_seconds)
+                await asyncio.wait_for(self._stop_event.wait(), timeout=wait_seconds)
             except asyncio.TimeoutError:
                 pass  # normal: interval elapsed, run a DCA cycle
             else:
                 return  # stop() was called during the wait
             if not self._stop_event.is_set():
-                await self._run_dca_cycle_once()
+                try:
+                    await self._run_dca_cycle_once()
+                except Exception as exc:  # noqa: BLE001 -- one bad cycle shouldn't kill the loop
+                    logger.error("DCA cycle failed: %s", exc)
+
+    def _seconds_until_next_dca(self) -> float:
+        interval_seconds = self.config.dca_interval_days * 86400.0
+        last_dca_at = self.store.get_last_dca_at()
+        if last_dca_at is None:
+            return interval_seconds  # first-ever cycle -- wait the full interval, same original intent
+        elapsed = (datetime.now(timezone.utc) - last_dca_at).total_seconds()
+        return max(0.0, interval_seconds - elapsed)
 
     async def _run_dca_cycle_once(self) -> None:
+        # Recorded FIRST, before any per-position work -- the "cycle"
+        # itself is the schedulable unit (see _seconds_until_next_dca),
+        # not per-ticker success/failure, so the clock resets even when
+        # there are no open positions yet or every contribution this
+        # cycle gets skipped (insufficient cash/no price).
+        self.store.set_last_dca_at(datetime.now(timezone.utc))
         positions = self.store.get_open_long_term_positions()
         if not positions:
             return

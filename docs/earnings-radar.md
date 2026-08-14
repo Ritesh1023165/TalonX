@@ -85,6 +85,15 @@ talonx_watchlist.upcoming_earnings (one row per LONG_TERM/DUAL_HORIZON ticker)
   without this, a Stage 1 republish reusing the same cached ROIC would
   double-count one real data point toward the 2-consecutive-quarter
   fundamental-stop trigger, a false `UNDER_PERFORM_REBALANCE` risk.
+  **Restart-survival fix**: `last_streak_fiscal_year` (and
+  `previous_fair_value`, captured at the same moment for the post-
+  earnings "before vs after" push) were captured on `LongTermTickerState`
+  alongside `roic_below_wacc_streak`/`previous_moat_rating`, but
+  `talonx_core/store.py` originally only persisted the latter two --
+  `save_long_term_fundamental_stop_state`/`load_into_long_term` now
+  persist and rehydrate all four, so a restart between two
+  same-fiscal-year signal arrivals can no longer silently defeat the
+  dedupe guard.
 - **The T-48h heads-up push's data source is a live in-memory cache, not
   the audit trail.** `talonx_dispatch`'s own `long_term_alerts` table
   only gets a row once a ticker clears the FULL decision matrix and
@@ -92,7 +101,16 @@ talonx_watchlist.upcoming_earnings (one row per LONG_TERM/DUAL_HORIZON ticker)
   `FundamentalScanner`'s threshold would have zero rows there forever,
   not just on day one. Subscribing directly to the signal/report
   channels instead means the heads-up push has data the moment ANY
-  signal or report exists for a ticker.
+  signal or report exists for a ticker. **Restart-survival fix**: this
+  cache (and Smart Dispatch Filtering's separate per-ticker push-cooldown
+  cache) used to reset to empty on every `DispatchAgent` restart, with no
+  persisted backing and no replay source (Redis Pub/Sub delivers only
+  messages published after a fresh subscribe) -- a restart during a
+  ticker's heads-up window could permanently lose that cycle's push, and
+  a restart mid-cooldown let the very next alert bypass whatever cooldown
+  should still have been active. Both are now persisted to
+  `dispatch_audit.db` (`latest_earnings_context`, `last_telegram_push`)
+  and reloaded at startup via `DispatchAgent._load_restart_survival_caches`.
 - **`LongTermPriceRunner` excludes any ticker `EarningsFastTrackPoller`
   currently owns** (`active_earnings_symbols_fn`), the same "avoid
   double-publishing ticks for the same symbol" reasoning it already

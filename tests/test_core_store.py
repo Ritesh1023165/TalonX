@@ -359,6 +359,60 @@ def test_fundamental_stop_state_defaults_when_never_saved(tmp_path):
     assert state.previous_moat_rating is None
 
 
+def test_fundamental_stop_state_persists_last_streak_fiscal_year_and_previous_fair_value(tmp_path):
+    """Restart-survival fix: these two fields are captured on
+    LongTermTickerState at the SAME moments as roic_below_wacc_streak/
+    previous_moat_rating, but were originally never persisted -- a
+    restart between two same-fiscal-year signal arrivals (e.g. an
+    Earnings Radar Stage-1 8-K republish reusing a cached ROIC) would
+    silently reset last_streak_fiscal_year to None, defeating the
+    dedupe guard in LongTermTickerCorrelator.update_signal and risking a
+    false UNDER_PERFORM_REBALANCE trip from double-counting one real
+    data point."""
+    path = tmp_path / "core_state.db"
+    with TickerStateStore(path) as store:
+        store.save_long_term_fundamental_stop_state(
+            "AAPL", 2, MoatRating.NARROW, last_streak_fiscal_year=2025, previous_fair_value=210.0,
+        )
+
+    correlator = LongTermTickerCorrelator()
+    with TickerStateStore(path) as store:
+        store.load_into_long_term(correlator)
+
+    state = correlator.get_or_create("AAPL")
+    assert state.last_streak_fiscal_year == 2025
+    assert state.previous_fair_value == 210.0
+
+
+def test_fundamental_stop_state_dedupe_guard_survives_a_restart():
+    """End-to-end: without the fix, update_signal() re-processing the
+    SAME fiscal year after a simulated restart would double-bump the
+    streak (2 instead of 1) because last_streak_fiscal_year reset to
+    None. With state correctly rehydrated, the dedupe guard holds."""
+    correlator = LongTermTickerCorrelator()
+    signal = FundamentalFactorSignal(
+        ticker="AAPL", fiscal_year=2025, roic=0.05, piotroski_f_score=8,  # roic below assumed WACC
+        fcf_yield=0.05, altman_z_score=5.0, debt_to_ebitda_proxy=2.0,
+        price=100.0, message="ROIC below WACC", computed_at=NOW,
+    )
+    correlator.update_signal(signal, wacc=0.10)
+    state = correlator.get_or_create("AAPL")
+    assert state.roic_below_wacc_streak == 1
+    assert state.last_streak_fiscal_year == 2025
+
+    # Simulate a restart: rehydrate a FRESH correlator from exactly what
+    # would have been persisted (last_streak_fiscal_year included).
+    fresh_correlator = LongTermTickerCorrelator()
+    fresh_state = fresh_correlator.get_or_create("AAPL")
+    fresh_state.roic_below_wacc_streak = state.roic_below_wacc_streak
+    fresh_state.last_streak_fiscal_year = state.last_streak_fiscal_year
+
+    # The SAME fiscal year's signal republished (Earnings Radar Stage 1)
+    # after the "restart" -- must be deduped, not double-counted.
+    fresh_correlator.update_signal(signal, wacc=0.10)
+    assert fresh_correlator.get_or_create("AAPL").roic_below_wacc_streak == 1
+
+
 # --- suppression_counts horizon dimension + migration -----------------------
 
 def test_record_suppressed_defaults_to_intraday_horizon(tmp_path):

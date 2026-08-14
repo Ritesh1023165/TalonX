@@ -350,6 +350,26 @@ class FundamentalScanner:
         except Exception as exc:  # noqa: BLE001 -- a failed lock shouldn't drop the signal
             logger.warning("Failed to set fundamental cooldown for %s (%s)", ticker, exc)
 
+    async def clear_cooldown(self, ticker: str) -> None:
+        """Public escape hatch for run_talonx.reconcile_missing_long_term_factors.
+        That reconciliation only ever force-republishes a ticker it has
+        already confirmed has NO computed factors in quant_store at all
+        -- if this ticker's cooldown key is still armed from an EARLIER
+        attempt whose result was later lost (e.g. quant.db losing that
+        row to a reset that predates this fix, while the Redis TTL key
+        it also set kept ticking down independently), the forced
+        republish would just get silently re-suppressed by
+        _is_on_cooldown, defeating the whole point of forcing it. A
+        ticker with genuinely fresh, present factors is never passed
+        here, so clearing this unconditionally on the reconciliation's
+        say-so is safe -- it isn't a general-purpose cooldown bypass."""
+        if self._client is None:
+            return
+        try:
+            await self._client.delete(f"fundamental_cooldown:{ticker.upper()}")
+        except Exception as exc:  # noqa: BLE001 -- best-effort; the forced republish still helps even if this fails
+            logger.warning("Failed to clear fundamental cooldown for %s (%s)", ticker, exc)
+
     async def _publish_signal(self, signal: FundamentalFactorSignal) -> None:
         try:
             await self._client.publish(self.config.fundamental_signals_channel, signal.to_redis_payload())

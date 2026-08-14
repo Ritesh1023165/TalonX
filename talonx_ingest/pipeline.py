@@ -145,6 +145,7 @@ async def ingest_long_term_financials(
     ledger: IngestionLedger,
     publisher: RedisEventPublisher,
     is_earnings_related: bool = False,
+    force: bool = False,
 ) -> int:
     """
     Phase 2's LONG_TERM path -- fetches SEC XBRL structured financials
@@ -164,8 +165,23 @@ async def ingest_long_term_financials(
     their own cooldowns for this one signal, without either of them
     needing to re-derive "is this earnings-related" themselves.
 
+    `force` -- bypasses the ledger's "already ingested" skip below.
+    NewFundamentalsIngestedEvent is a single Redis Pub/Sub publish with
+    no replay/ack/retry: if FundamentalScanner wasn't subscribed yet at
+    the exact moment this fired (a real race against run_talonx.py's
+    concurrent startup -- confirmed live, 18 of 30 tickers lost their
+    event this way over repeated restarts), the ledger nonetheless marks
+    that fiscal year done, so every NORMAL future call here silently,
+    permanently skips it until the next annual filing. `force=True`
+    re-fetches from EDGAR regardless (the ledger only ever stored a
+    fiscal-year watermark, never the actual facts, so there's no cached
+    copy to reuse) and re-publishes -- see
+    run_talonx.reconcile_missing_long_term_factors, the only caller that
+    sets this.
+
     Returns the number of new fiscal years published this run (0 if
-    already up to date, or if the ticker/facts couldn't be resolved).
+    already up to date and not forced, or if the ticker/facts couldn't
+    be resolved).
     """
     logger.info("[%s] Resolving ticker -> CIK for financials...", ticker)
     try:
@@ -187,7 +203,7 @@ async def ingest_long_term_financials(
 
     latest_known = ledger.latest_ingested_fiscal_year(company.cik)
     latest_available = facts[0].fiscal_year
-    if latest_known is not None and latest_available <= latest_known:
+    if not force and latest_known is not None and latest_available <= latest_known:
         logger.info(
             "[%s] Financials up to date -- latest available FY%d already ingested",
             ticker, latest_available,
@@ -201,8 +217,8 @@ async def ingest_long_term_financials(
     )
     ledger.mark_financials_ingested(ticker, company.cik, [f.fiscal_year for f in facts])
     logger.info(
-        "[%s] Published fresh financials: FY%d (and %d prior year(s) of context)",
-        ticker, latest_available, len(facts) - 1,
+        "[%s] Published %s financials: FY%d (and %d prior year(s) of context)",
+        ticker, "re-published (forced)" if force else "fresh", latest_available, len(facts) - 1,
     )
     return 1
 
@@ -379,7 +395,7 @@ async def run_ingestion(
 
 
 async def run_long_term_financials_ingestion(
-    tickers: list[str], is_earnings_related: bool = False,
+    tickers: list[str], is_earnings_related: bool = False, force: bool = False,
 ) -> dict[str, int]:
     """Phase 2's batch entrypoint for the structured-financials path --
     same shape as run_ingestion() above (own EdgarClient session, own
@@ -393,7 +409,11 @@ async def run_long_term_financials_ingestion(
     in this batch (see ingest_long_term_financials's own docstring) --
     the Earnings Radar's fast-track poller always calls this with a
     single-ticker list, so a shared flag for the whole batch is fine;
-    the regular periodic loop never sets it."""
+    the regular periodic loop never sets it.
+
+    `force` -- threaded straight through to every ticker in this batch
+    too; see ingest_long_term_financials's own docstring. Only
+    run_talonx.reconcile_missing_long_term_factors sets this."""
     logger.info("Starting long-term financials ingestion for tickers: %s", tickers)
 
     ledger = IngestionLedger(settings.ledger.path)
@@ -406,7 +426,8 @@ async def run_long_term_financials_ingestion(
             tasks = {
                 ticker: asyncio.create_task(
                     ingest_long_term_financials(
-                        ticker, edgar_client, ledger, publisher, is_earnings_related=is_earnings_related,
+                        ticker, edgar_client, ledger, publisher,
+                        is_earnings_related=is_earnings_related, force=force,
                     )
                 )
                 for ticker in tickers

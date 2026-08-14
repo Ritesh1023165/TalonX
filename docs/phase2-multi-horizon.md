@@ -106,6 +106,19 @@ rather than sharing Python objects across module boundaries.
   `DUAL_HORIZON` ticker can be paper-traded on one horizon without the
   other. Note: no DRIP/dividend reinvestment — see
   [roadmap.md](roadmap.md).
+
+  **Restart-survival fix**: the DCA cadence used to be a purely
+  in-process `asyncio.sleep(dca_interval_days)` timer with no persisted
+  checkpoint — since that interval (30 days default) vastly exceeds a
+  typical scheduled daily uptime window
+  (`register_scheduled_tasks.ps1`'s default 10:00–22:00, ~12h), the
+  timer could never complete at all under a daily-restart schedule, and
+  zero `DCA_CONTRIBUTION` rows had ever been recorded live. `_dca_loop`
+  now computes its wait from `store.get_last_dca_at()`/`set_last_dca_at()`
+  (a timestamp persisted on `long_term_portfolio_state`), so a restart
+  mid-interval resumes with the correct remaining wait, and an interval
+  that already elapsed while the app was down fires on the very next
+  tick instead of silently losing the cycle.
 - **`talonx_dispatch`** -- a separate `long_term_alerts` audit table and
   its own Telegram push format (price vs. fair value, margin of safety,
   quality/moat, the take-profit exit target, expected holding horizon).
@@ -165,6 +178,32 @@ rather than sharing Python objects across module boundaries.
   anything this reactive path fails to ingest (a transient SEC API
   error, say) -- it isn't retried reactively, only on the next scheduled
   cycle.
+- **Long-term factors reconciliation** (`run_talonx.reconcile_missing_long_term_factors`)
+  -- fixes a confirmed-live gap: `NewFundamentalsIngestedEvent` is a
+  single Redis Pub/Sub publish with no replay/ack/retry, so if
+  `FundamentalScanner` wasn't subscribed yet at the exact moment
+  `periodic_long_term_financials_loop`'s first cycle published it (a
+  real race, since both start concurrently in this process's task list),
+  the event was gone -- and `ingest_long_term_financials`'s own ledger
+  then marked that fiscal year "already ingested," so every NORMAL
+  future cycle correctly (and silently) skipped re-fetching it,
+  permanently starving that ticker's long-term pipeline until its next
+  annual 10-K. Confirmed live: 18 of 30 ever-ingested tickers lost their
+  event this way across repeated restarts, with zero long-term alerts
+  for any of them for 2+ days as a direct result. Runs once per process
+  start, after a 15s head start (`head_start_seconds`) for
+  `FundamentalScanner`'s own connect+subscribe: compares
+  `quant_store.get_latest_factors()` -- populated ONLY by
+  `FundamentalScanner` actually receiving and computing from the event,
+  never by the ledger -- against every `LONG_TERM`/`DUAL_HORIZON`
+  watchlist ticker, and force-republishes (`ingest_long_term_financials(...,
+  force=True)`, bypassing the ledger's "already ingested" skip -- the
+  ledger never stored the actual facts, only a fiscal-year watermark, so
+  there's nothing cheaper to reuse) whatever's still missing. Self-
+  healing even if this pass also loses the race or hits a transient
+  EDGAR error: a ticker it fails to fix is still missing afterward, so
+  the NEXT restart's pass retries it too, with no separate "did this
+  already run" state of its own.
 
 **Not built this pass** (see [roadmap.md](roadmap.md) for the reasoning
 behind each): DRIP / dividend reinvestment, a separate End-of-Quarter

@@ -30,7 +30,14 @@ import pytest
 from talonx_quant import consumer as consumer_module
 from talonx_quant.config import QuantConfig
 from talonx_quant.consumer import QuantScanner
-from talonx_quant.schemas import QuantSignal, SignalDirection, SignalType
+from talonx_quant.schemas import (
+    MarketTickEvent,
+    QuantSignal,
+    SignalDirection,
+    SignalType,
+    TickEventType,
+    TickSource,
+)
 from talonx_quant.store import QuantStateStore
 
 
@@ -85,6 +92,17 @@ def _exists_side_effect(on_cooldown: bool = False, locked_out: bool = False):
             return locked_out
         return False
     return _exists
+
+
+@pytest.fixture(autouse=True)
+def _stub_preseed(monkeypatch):
+    """Every test in this file is hermetic by default -- no test should
+    make a real yfinance network call just because it happens to touch
+    _load_buffers_from_store/_handle_market_tick/preseed_symbols. Tests
+    that specifically exercise the pre-seed success path override these
+    with their own monkeypatch."""
+    monkeypatch.setattr(consumer_module.preseed, "fetch_1m_history", lambda symbol, period: [])
+    monkeypatch.setattr(consumer_module.preseed, "fetch_15m_history", lambda symbol, period: [])
 
 
 @pytest.fixture
@@ -623,33 +641,63 @@ def test_checkpoint_all_buffers_is_a_noop_with_no_store():
     scanner._checkpoint_all_buffers()  # must not raise
 
 
-def test_load_buffers_from_store_reloads_a_recent_1m_checkpoint(tmp_path):
+@pytest.mark.asyncio
+async def test_load_buffers_from_store_reloads_a_recent_1m_checkpoint(tmp_path):
     now = datetime.now(timezone.utc)
     with QuantStateStore(tmp_path / "quant.db") as store:
         store.checkpoint_buffer("AAPL", "1m", [
             {"timestamp": now - timedelta(minutes=2), "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.5, "volume": 1000.0},
         ])
-        scanner = QuantScanner(QuantConfig(buffer_reload_max_gap_seconds=900.0), store=store)
+        scanner = QuantScanner(
+            QuantConfig(buffer_reload_max_gap_seconds=900.0, historical_preseed_enabled=False), store=store,
+        )
 
-        scanner._load_buffers_from_store()
+        await scanner._load_buffers_from_store()
 
         assert scanner.buffer.bar_count("AAPL") == 1
 
 
-def test_load_buffers_from_store_skips_a_stale_1m_checkpoint(tmp_path):
+@pytest.mark.asyncio
+async def test_load_buffers_from_store_skips_a_stale_1m_checkpoint(tmp_path):
     now = datetime.now(timezone.utc)
     with QuantStateStore(tmp_path / "quant.db") as store:
         store.checkpoint_buffer("AAPL", "1m", [
             {"timestamp": now - timedelta(hours=10), "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.5, "volume": 1000.0},
         ])
-        scanner = QuantScanner(QuantConfig(buffer_reload_max_gap_seconds=900.0), store=store)
+        scanner = QuantScanner(
+            QuantConfig(buffer_reload_max_gap_seconds=900.0, historical_preseed_enabled=False), store=store,
+        )
 
-        scanner._load_buffers_from_store()
+        await scanner._load_buffers_from_store()
 
         assert scanner.buffer.bar_count("AAPL") == 0  # too old -- discarded, not reloaded
 
 
-def test_load_buffers_from_store_reloads_stale_15m_checkpoint_regardless_of_gap(tmp_path):
+@pytest.mark.asyncio
+async def test_load_buffers_from_store_stale_1m_checkpoint_triggers_preseed(tmp_path, monkeypatch):
+    """Requirement 4: a discarded (too-stale) 1-min checkpoint falls
+    through to historical pre-seeding via yfinance rather than leaving
+    the symbol to re-warm-up purely from live ticks."""
+    now = datetime.now(timezone.utc)
+    seed_bars = [
+        {"timestamp": now - timedelta(minutes=i), "open": 1.0, "high": 1.0, "low": 1.0, "close": 1.0,
+         "volume": 1.0, "session": "regular"}
+        for i in range(5)
+    ]
+    monkeypatch.setattr(consumer_module.preseed, "fetch_1m_history", lambda symbol, period: seed_bars)
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.checkpoint_buffer("AAPL", "1m", [
+            {"timestamp": now - timedelta(hours=10), "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.5, "volume": 1000.0},
+        ])
+        scanner = QuantScanner(QuantConfig(buffer_reload_max_gap_seconds=900.0, min_bars_required=5), store=store)
+
+        await scanner._load_buffers_from_store()
+
+        assert scanner.buffer.bar_count("AAPL") == 5
+
+
+@pytest.mark.asyncio
+async def test_load_buffers_from_store_reloads_stale_15m_checkpoint_regardless_of_gap(tmp_path):
     """The HTF buffer has no gap gate -- surviving an overnight/multi-day
     gap is the whole point (200 bars needs ~50 continuous hours to warm
     up, which a daily restart could never accumulate otherwise)."""
@@ -658,22 +706,52 @@ def test_load_buffers_from_store_reloads_stale_15m_checkpoint_regardless_of_gap(
         store.checkpoint_buffer("AAPL", "15m", [
             {"timestamp": now - timedelta(days=3), "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.5, "volume": 1000.0},
         ])
-        scanner = QuantScanner(QuantConfig(buffer_reload_max_gap_seconds=900.0), store=store)
+        scanner = QuantScanner(
+            QuantConfig(buffer_reload_max_gap_seconds=900.0, historical_preseed_enabled=False), store=store,
+        )
 
-        scanner._load_buffers_from_store()
+        await scanner._load_buffers_from_store()
 
         assert scanner.buffer_htf.bar_count("AAPL") == 1
 
 
-def test_load_buffers_from_store_is_a_noop_with_no_store():
+@pytest.mark.asyncio
+async def test_load_buffers_from_store_backfills_15m_checkpoint_older_than_backfill_gap(tmp_path, monkeypatch):
+    """Requirement 4: on top of the unconditional reload, a 15-min
+    checkpoint whose newest bar is older than htf_backfill_gap_seconds
+    (e.g. after a weekend) also triggers a yfinance backfill."""
+    now = datetime.now(timezone.utc)
+    fresh_bars = [
+        {"timestamp": now - timedelta(minutes=15 * i), "open": 1.0, "high": 1.0, "low": 1.0, "close": 1.0,
+         "volume": 1.0, "session": "regular"}
+        for i in range(3)
+    ]
+    monkeypatch.setattr(consumer_module.preseed, "fetch_15m_history", lambda symbol, period: fresh_bars)
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.checkpoint_buffer("AAPL", "15m", [
+            {"timestamp": now - timedelta(days=3), "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.5, "volume": 1000.0},
+        ])
+        scanner = QuantScanner(
+            QuantConfig(buffer_reload_max_gap_seconds=900.0, htf_backfill_gap_seconds=86400.0), store=store,
+        )
+
+        await scanner._load_buffers_from_store()
+
+        # 1 reloaded bar (unconditional reload) + 3 backfilled bars.
+        assert scanner.buffer_htf.bar_count("AAPL") == 4
+
+
+@pytest.mark.asyncio
+async def test_load_buffers_from_store_is_a_noop_with_no_store():
     scanner = QuantScanner(QuantConfig(), store=None)
 
-    scanner._load_buffers_from_store()  # must not raise
+    await scanner._load_buffers_from_store()  # must not raise
 
     assert scanner.buffer.known_symbols() == []
 
 
-def test_load_buffers_from_store_handles_multiple_symbols_independently(tmp_path):
+@pytest.mark.asyncio
+async def test_load_buffers_from_store_handles_multiple_symbols_independently(tmp_path):
     now = datetime.now(timezone.utc)
     with QuantStateStore(tmp_path / "quant.db") as store:
         store.checkpoint_buffer("AAPL", "1m", [
@@ -682,9 +760,11 @@ def test_load_buffers_from_store_handles_multiple_symbols_independently(tmp_path
         store.checkpoint_buffer("MSFT", "1m", [
             {"timestamp": now - timedelta(hours=5), "open": 1.0, "high": 1.0, "low": 1.0, "close": 1.0, "volume": 1.0},
         ])
-        scanner = QuantScanner(QuantConfig(buffer_reload_max_gap_seconds=900.0), store=store)
+        scanner = QuantScanner(
+            QuantConfig(buffer_reload_max_gap_seconds=900.0, historical_preseed_enabled=False), store=store,
+        )
 
-        scanner._load_buffers_from_store()
+        await scanner._load_buffers_from_store()
 
         assert scanner.buffer.bar_count("AAPL") == 1  # fresh -- reloaded
         assert scanner.buffer.bar_count("MSFT") == 0  # stale -- skipped
@@ -699,3 +779,261 @@ async def test_no_store_means_no_persistence_attempted(scanner, monkeypatch):
     # scanner fixture has store=None by default -- must not raise.
     await scanner._handle_message(_bar_message("AAPL"))
     assert scanner.signals_suppressed_cooldown == 1
+
+
+# --- True Calendar-Aligned 1-Minute Candle Aggregation (Requirement 1) ----
+
+def _bar_event(symbol: str, timestamp: datetime, close: float, volume: float = 100.0) -> MarketTickEvent:
+    # open/high/low deliberately set to values FAR from `close` -- the
+    # yfinance polling fallback's fast_info-derived open/day_high/day_low
+    # are DAY-level, not minute-level, so _update_1m_buffer must ignore
+    # them and build the candle purely from each tick's own price.
+    return MarketTickEvent(
+        event_type=TickEventType.BAR, symbol=symbol, source=TickSource.POLLING,
+        timestamp=timestamp, open=9999.0, high=9999.0, low=1.0, close=close, volume=volume,
+    )
+
+
+def test_update_1m_buffer_merges_ticks_within_the_same_minute(scanner):
+    base = datetime(2026, 8, 14, 15, 0, 5, tzinfo=timezone.utc)
+    scanner._update_1m_buffer(_bar_event("AAPL", base, close=100.0, volume=10.0))
+    scanner._update_1m_buffer(_bar_event("AAPL", base + timedelta(seconds=40), close=101.5, volume=20.0))
+
+    assert scanner.buffer.bar_count("AAPL") == 1
+    bar = scanner.buffer.get_bars("AAPL")[0]
+    assert bar["open"] == 100.0  # first tick's price this minute
+    assert bar["high"] == 101.5
+    assert bar["low"] == 100.0
+    assert bar["close"] == 101.5  # latest tick's price
+    assert bar["volume"] == 30.0  # accumulated
+
+
+def test_update_1m_buffer_ignores_the_events_own_ohlc_fields(scanner):
+    # _bar_event sets open=9999/high=9999/low=1 -- none of that should
+    # leak into the aggregated candle, only `close` (the tick's price).
+    ts = datetime(2026, 8, 14, 15, 0, 5, tzinfo=timezone.utc)
+    scanner._update_1m_buffer(_bar_event("AAPL", ts, close=100.0))
+
+    bar = scanner.buffer.get_bars("AAPL")[0]
+    assert bar["open"] == 100.0
+    assert bar["high"] == 100.0
+    assert bar["low"] == 100.0
+
+
+def test_update_1m_buffer_finalizes_a_new_row_only_when_the_minute_rolls_over(scanner):
+    base = datetime(2026, 8, 14, 15, 0, 5, tzinfo=timezone.utc)
+    scanner._update_1m_buffer(_bar_event("AAPL", base, close=100.0))
+    scanner._update_1m_buffer(_bar_event("AAPL", base + timedelta(seconds=40), close=101.0))
+    scanner._update_1m_buffer(_bar_event("AAPL", base + timedelta(minutes=1), close=102.0))
+
+    bars = scanner.buffer.get_bars("AAPL")
+    assert len(bars) == 2  # only the minute boundary crossing added a new row
+    assert bars[0]["close"] == 101.0  # locked in once the first minute closed out
+    assert bars[1]["open"] == 102.0
+    assert bars[1]["close"] == 102.0
+
+
+def test_update_1m_buffer_drops_a_tick_with_no_close(scanner):
+    ts = datetime(2026, 8, 14, 15, 0, 5, tzinfo=timezone.utc)
+    event = MarketTickEvent(
+        event_type=TickEventType.BAR, symbol="AAPL", source=TickSource.POLLING,
+        timestamp=ts, close=None,
+    )
+
+    scanner._update_1m_buffer(event)  # must not raise
+
+    assert scanner.buffer.bar_count("AAPL") == 0
+
+
+@pytest.mark.asyncio
+async def test_handle_market_tick_computes_indicators_on_every_tick_including_partial_bars(scanner, monkeypatch):
+    """Every tick still triggers indicator computation/signal evaluation
+    (the currently-forming minute's evolving price must be visible
+    immediately) -- this is what keeps single-tick tests elsewhere in
+    this file working unchanged despite the new aggregation layer."""
+    calls = []
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: calls.append(1) or None)
+
+    await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
+
+    assert len(calls) == 1
+
+
+# --- Session-aware HTF buffer (Requirement 3: RTH-only 200-SMA source) ---
+
+def _htf_bar_event(symbol: str, timestamp: datetime, close: float) -> MarketTickEvent:
+    return MarketTickEvent(
+        event_type=TickEventType.BAR, symbol=symbol, source=TickSource.POLLING,
+        timestamp=timestamp, open=close, high=close, low=close, close=close, volume=100.0,
+    )
+
+
+def test_update_htf_buffer_excludes_pre_market_bucket_when_rth_only_enabled():
+    scanner = QuantScanner(QuantConfig(rth_only_htf_sma=True))
+    # 09:00 UTC = 05:00 ET -- pre-market. Two ticks in this 15-min bucket,
+    # then one in the NEXT bucket to trigger finalization of the first.
+    bucket = datetime(2026, 8, 14, 9, 0, 0, tzinfo=timezone.utc)
+    scanner._update_htf_buffer(_htf_bar_event("AAPL", bucket, 100.0))
+    scanner._update_htf_buffer(_htf_bar_event("AAPL", bucket + timedelta(minutes=15), 101.0))
+
+    assert scanner.buffer_htf.bar_count("AAPL") == 0  # the pre-market bucket was never finalized in
+
+
+def test_update_htf_buffer_includes_regular_session_bucket():
+    scanner = QuantScanner(QuantConfig(rth_only_htf_sma=True))
+    # 14:00 UTC = 10:00 ET -- regular session.
+    bucket = datetime(2026, 8, 14, 14, 0, 0, tzinfo=timezone.utc)
+    scanner._update_htf_buffer(_htf_bar_event("AAPL", bucket, 100.0))
+    scanner._update_htf_buffer(_htf_bar_event("AAPL", bucket + timedelta(minutes=15), 101.0))
+
+    assert scanner.buffer_htf.bar_count("AAPL") == 1
+
+
+def test_update_htf_buffer_includes_pre_market_when_rth_only_disabled():
+    scanner = QuantScanner(QuantConfig(rth_only_htf_sma=False))
+    bucket = datetime(2026, 8, 14, 9, 0, 0, tzinfo=timezone.utc)
+    scanner._update_htf_buffer(_htf_bar_event("AAPL", bucket, 100.0))
+    scanner._update_htf_buffer(_htf_bar_event("AAPL", bucket + timedelta(minutes=15), 101.0))
+
+    assert scanner.buffer_htf.bar_count("AAPL") == 1
+
+
+# --- Historical pre-seeding (Requirement 2) -------------------------------
+
+def _seed_bar(minutes_ago: int, session: str = "regular") -> dict:
+    now = datetime.now(timezone.utc)
+    return {
+        "timestamp": now - timedelta(minutes=minutes_ago), "open": 100.0, "high": 101.0,
+        "low": 99.0, "close": 100.5, "volume": 1000.0, "session": session,
+    }
+
+
+@pytest.mark.asyncio
+async def test_preseed_1m_if_needed_populates_buffer_from_yfinance(scanner, monkeypatch):
+    bars = [_seed_bar(i) for i in range(150, 0, -1)]
+    monkeypatch.setattr(consumer_module.preseed, "fetch_1m_history", lambda symbol, period: bars)
+
+    await scanner._preseed_1m_if_needed("AAPL")
+
+    assert scanner.buffer.bar_count("AAPL") == scanner.config.min_bars_required  # capped to the threshold
+
+
+@pytest.mark.asyncio
+async def test_preseed_1m_if_needed_skips_when_already_above_threshold(scanner, monkeypatch):
+    monkeypatch.setattr(
+        consumer_module.preseed, "fetch_1m_history", lambda symbol, period: pytest.fail("should not be called"),
+    )
+    for i in range(scanner.config.min_bars_required):
+        scanner.buffer.add_bar("AAPL", datetime.now(timezone.utc) - timedelta(minutes=i), 1.0, 1.0, 1.0, 1.0, 1.0)
+
+    await scanner._preseed_1m_if_needed("AAPL")  # must not call fetch_1m_history at all
+
+
+@pytest.mark.asyncio
+async def test_preseed_1m_if_needed_only_attempts_once_per_symbol(scanner, monkeypatch):
+    call_count = {"n": 0}
+
+    def _fetch(symbol, period):
+        call_count["n"] += 1
+        return []
+
+    monkeypatch.setattr(consumer_module.preseed, "fetch_1m_history", _fetch)
+
+    await scanner._preseed_1m_if_needed("AAPL")
+    await scanner._preseed_1m_if_needed("AAPL")
+
+    assert call_count["n"] == 1
+
+
+@pytest.mark.asyncio
+async def test_preseed_1m_if_needed_is_disabled_by_config(scanner, monkeypatch):
+    scanner.config = QuantConfig(historical_preseed_enabled=False)
+    monkeypatch.setattr(
+        consumer_module.preseed, "fetch_1m_history", lambda symbol, period: pytest.fail("should not be called"),
+    )
+
+    await scanner._preseed_1m_if_needed("AAPL")  # must not call fetch_1m_history at all
+
+
+@pytest.mark.asyncio
+async def test_preseed_1m_if_needed_falls_back_soft_on_fetch_failure(scanner, monkeypatch):
+    def _boom(symbol, period):
+        raise RuntimeError("yfinance rate limited")
+
+    monkeypatch.setattr(consumer_module.preseed, "fetch_1m_history", _boom)
+
+    await scanner._preseed_1m_if_needed("AAPL")  # must not raise
+
+    assert scanner.buffer.bar_count("AAPL") == 0
+
+
+@pytest.mark.asyncio
+async def test_preseed_htf_if_needed_filters_to_regular_session_bars_by_default(scanner, monkeypatch):
+    mixed = [_seed_bar(i, session="pre_market") for i in range(10)] + [
+        _seed_bar(i, session="regular") for i in range(210, 10, -1)
+    ]
+    monkeypatch.setattr(consumer_module.preseed, "fetch_15m_history", lambda symbol, period: mixed)
+
+    await scanner._preseed_htf_if_needed("AAPL")
+
+    bars = scanner.buffer_htf.get_bars("AAPL")
+    assert bars  # something loaded
+    assert all(b["session"] == "regular" for b in bars)
+
+
+@pytest.mark.asyncio
+async def test_preseed_htf_if_needed_keeps_pre_market_bars_when_rth_only_disabled(monkeypatch):
+    scanner = QuantScanner(QuantConfig(rth_only_htf_sma=False))
+    bars = [_seed_bar(i, session="pre_market") for i in range(5)]
+    monkeypatch.setattr(consumer_module.preseed, "fetch_15m_history", lambda symbol, period: bars)
+
+    await scanner._preseed_htf_if_needed("AAPL")
+
+    assert scanner.buffer_htf.bar_count("AAPL") == 5
+
+
+@pytest.mark.asyncio
+async def test_preseed_htf_if_needed_force_bypasses_the_threshold_check(scanner, monkeypatch):
+    for i in range(scanner.config.htf_sma_period):
+        scanner.buffer_htf.add_bar(
+            "AAPL", datetime.now(timezone.utc) - timedelta(minutes=15 * i), 1.0, 1.0, 1.0, 1.0, 1.0, session="regular",
+        )
+    call_count = {"n": 0}
+
+    def _fetch(symbol, period):
+        call_count["n"] += 1
+        return []
+
+    monkeypatch.setattr(consumer_module.preseed, "fetch_15m_history", _fetch)
+
+    await scanner._preseed_htf_if_needed("AAPL", force=True)
+
+    assert call_count["n"] == 1  # fetched despite already being at/above threshold
+
+
+@pytest.mark.asyncio
+async def test_preseed_checkpoints_immediately_when_a_store_is_set(tmp_path, monkeypatch):
+    bars = [_seed_bar(i) for i in range(10, 0, -1)]
+    monkeypatch.setattr(consumer_module.preseed, "fetch_1m_history", lambda symbol, period: bars)
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        scanner = QuantScanner(QuantConfig(), store=store)  # 10 fetched bars stay well under min_bars_required=120
+
+        await scanner._preseed_1m_if_needed("AAPL")
+
+        # Doesn't wait for the periodic 60s checkpoint loop -- the whole
+        # point is the ticker_funnel_report reads a checkpoint that's
+        # already ready shortly after boot, not up to a minute later.
+        assert len(store.load_buffer("AAPL", "1m")) == 10
+
+
+@pytest.mark.asyncio
+async def test_preseed_symbols_seeds_both_buffers_for_every_symbol(scanner, monkeypatch):
+    monkeypatch.setattr(consumer_module.preseed, "fetch_1m_history", lambda symbol, period: [_seed_bar(1)])
+    monkeypatch.setattr(consumer_module.preseed, "fetch_15m_history", lambda symbol, period: [_seed_bar(1)])
+
+    await scanner.preseed_symbols(["aapl", "msft"])
+
+    assert scanner.buffer.bar_count("AAPL") == 1
+    assert scanner.buffer.bar_count("MSFT") == 1
+    assert scanner.buffer_htf.bar_count("AAPL") == 1
+    assert scanner.buffer_htf.bar_count("MSFT") == 1

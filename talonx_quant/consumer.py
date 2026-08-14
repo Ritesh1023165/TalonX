@@ -59,6 +59,7 @@ from datetime import datetime, timezone
 
 from pydantic import ValidationError
 
+from talonx_quant import preseed
 from talonx_quant.buffer import RollingBarBuffer
 from talonx_quant.config import QuantConfig
 from talonx_quant.indicators import compute_htf_trend, compute_indicators
@@ -70,6 +71,7 @@ from talonx_quant.schemas import (
     QuantSignal,
     TickEventType,
 )
+from talonx_quant.session import get_session
 from talonx_quant.store import QuantStateStore
 from talonx_quant.strategy import evaluate_signals
 
@@ -137,6 +139,23 @@ class QuantScanner:
         # of capacity, far cheaper than resampling the 1-min buffer.
         self.buffer_htf = RollingBarBuffer(self.config.htf_max_bars)
         self._htf_accumulators: dict[str, dict] = {}
+        # True Calendar-Aligned 1-Minute Candle Aggregation (Requirement 1):
+        # raw poll-cycle BAR events (12s cadence by default) accumulate here,
+        # floor-bucketed to the minute, and the running OHLCV is written
+        # into self.buffer on EVERY tick (not just on bucket rollover) so
+        # indicator computation always sees the latest partial minute --
+        # see _update_1m_buffer. A new row only appears once the wall clock
+        # actually crosses into a new minute, so min_bars_required bars
+        # really do span that many calendar minutes, not poll cycles.
+        self._1m_accumulators: dict[str, dict] = {}
+        # Historical pre-seeding (Requirement 2): each symbol is attempted
+        # at most once per process lifetime -- a failed/rate-limited
+        # attempt falls back to live accumulation rather than retrying
+        # every tick (same "attempt once, periodic reconciler is the
+        # safety net" posture run_talonx.py's WatchlistDrivenIngestion
+        # already documents for its own reactive triggers).
+        self._preseeded_1m: set[str] = set()
+        self._preseeded_htf: set[str] = set()
         # Pre-market liquidity gate: latest QUOTE event per symbol
         # (bid, ask, timestamp) -- QUOTE events carry spread info the BAR
         # buffer above never sees (buffer.py only stores BAR-type events).
@@ -206,7 +225,7 @@ class QuantScanner:
                 "The 'redis' package is required. Install it with: pip install redis"
             )
 
-        self._load_buffers_from_store()
+        await self._load_buffers_from_store()
 
         attempt = 0
         while not self._stop_event.is_set():
@@ -318,37 +337,44 @@ class QuantScanner:
             if bars:
                 self.store.checkpoint_buffer(symbol, "15m", bars)
 
-    def _load_buffers_from_store(self) -> None:
+    async def _load_buffers_from_store(self) -> None:
         """Reloads both RollingBarBuffers from their last checkpoint --
         called once at the start of run(), before the connect/listen
         retry loop, so a restart doesn't force every symbol through a
         full re-warm-up from empty (min_bars_required=120 for the 1-min
         buffer, htf_sma_period=200 -- ~50 continuous hours -- for the HTF
         one). See config.py's buffer_reload_max_gap_seconds docstring for
-        why the 1-min buffer is gap-gated and the HTF buffer isn't."""
+        why the 1-min buffer is gap-gated and the HTF buffer isn't.
+
+        Requirement 4 (Weekend & Overnight Gap Handling): a stale/short
+        1-min reload and a 15-min reload that's still missing recent bars
+        (gap > htf_backfill_gap_seconds, e.g. a weekend) both fall through
+        to historical pre-seeding via yfinance (_preseed_1m_if_needed /
+        _preseed_htf_if_needed) instead of leaving the symbol to re-warm
+        up purely from live ticks."""
         if self.store is None:
             return
 
         now = datetime.now(timezone.utc)
         for symbol in self.store.buffered_symbols("1m"):
             bars = self.store.load_buffer(symbol, "1m")
-            if not bars:
-                continue
-            last_bar_at = _ensure_utc(datetime.fromisoformat(bars[-1]["timestamp"]))
-            gap_seconds = (now - last_bar_at).total_seconds()
-            if gap_seconds > self.config.buffer_reload_max_gap_seconds:
-                logger.info(
-                    "Skipping stale 1-min buffer reload for %s (last bar %.0fs old, over the %.0fs limit)",
-                    symbol, gap_seconds, self.config.buffer_reload_max_gap_seconds,
-                )
-                continue
-            for bar in bars:
-                self.buffer.add_bar(
-                    symbol=symbol, timestamp=datetime.fromisoformat(bar["timestamp"]),
-                    open_=bar["open"], high=bar["high"], low=bar["low"],
-                    close=bar["close"], volume=bar["volume"],
-                )
-            logger.info("Reloaded %d 1-min bar(s) for %s from checkpoint", len(bars), symbol)
+            if bars:
+                last_bar_at = _ensure_utc(datetime.fromisoformat(bars[-1]["timestamp"]))
+                gap_seconds = (now - last_bar_at).total_seconds()
+                if gap_seconds > self.config.buffer_reload_max_gap_seconds:
+                    logger.info(
+                        "Skipping stale 1-min buffer reload for %s (last bar %.0fs old, over the %.0fs limit)",
+                        symbol, gap_seconds, self.config.buffer_reload_max_gap_seconds,
+                    )
+                else:
+                    for bar in bars:
+                        self.buffer.add_bar(
+                            symbol=symbol, timestamp=datetime.fromisoformat(bar["timestamp"]),
+                            open_=bar["open"], high=bar["high"], low=bar["low"],
+                            close=bar["close"], volume=bar["volume"], session=bar.get("session"),
+                        )
+                    logger.info("Reloaded %d 1-min bar(s) for %s from checkpoint", len(bars), symbol)
+            await self._preseed_1m_if_needed(symbol)
 
         for symbol in self.store.buffered_symbols("15m"):
             bars = self.store.load_buffer(symbol, "15m")
@@ -356,12 +382,111 @@ class QuantScanner:
                 self.buffer_htf.add_bar(
                     symbol=symbol, timestamp=datetime.fromisoformat(bar["timestamp"]),
                     open_=bar["open"], high=bar["high"], low=bar["low"],
-                    close=bar["close"], volume=bar["volume"],
+                    close=bar["close"], volume=bar["volume"], session=bar.get("session"),
                 )
+            gap_seconds = None
             if bars:
+                last_bar_at = _ensure_utc(datetime.fromisoformat(bars[-1]["timestamp"]))
+                gap_seconds = (now - last_bar_at).total_seconds()
                 logger.info(
                     "Reloaded %d 15-min HTF bar(s) for %s from checkpoint (no gap limit)", len(bars), symbol,
                 )
+            force_backfill = gap_seconds is not None and gap_seconds > self.config.htf_backfill_gap_seconds
+            if force_backfill:
+                logger.info(
+                    "15-min HTF checkpoint for %s is %.0fs old (over the %.0fs backfill threshold) -- "
+                    "backfilling via yfinance", symbol, gap_seconds, self.config.htf_backfill_gap_seconds,
+                )
+            await self._preseed_htf_if_needed(symbol, force=force_backfill)
+
+    async def preseed_symbols(self, symbols: list[str]) -> None:
+        """Public entrypoint for run_talonx.py's watchlist-driven pre-seed
+        reconciler (Requirement 2's "new ticker added to the watchlist"
+        trigger). QuantScanner deliberately never imports talonx_watchlist
+        itself (this module stays self-contained at the code level, same
+        convention every other cross-module boundary here follows) -- the
+        orchestrator owns the watchlist and calls this once at startup for
+        the full watchlist, then again for just the symbol(s) that changed
+        whenever it detects an addition/resume."""
+        for symbol in symbols:
+            symbol = symbol.upper()
+            await self._preseed_1m_if_needed(symbol)
+            await self._preseed_htf_if_needed(symbol)
+
+    async def _preseed_1m_if_needed(self, symbol: str) -> None:
+        if not self.config.historical_preseed_enabled:
+            return
+        symbol = symbol.upper()
+        if symbol in self._preseeded_1m:
+            return
+        self._preseeded_1m.add(symbol)
+        if self.buffer.bar_count(symbol) >= self.config.min_bars_required:
+            return
+        await self._run_1m_preseed(symbol)
+
+    async def _run_1m_preseed(self, symbol: str) -> None:
+        try:
+            bars = await asyncio.to_thread(preseed.fetch_1m_history, symbol, self.config.preseed_1m_period)
+        except Exception as exc:  # noqa: BLE001 -- pre-seeding is best-effort, never fatal
+            logger.warning("1-min historical pre-seed failed for %s: %s", symbol, exc)
+            return
+        if not bars:
+            logger.info(
+                "1-min historical pre-seed returned no data for %s -- falling back to live accumulation", symbol,
+            )
+            return
+
+        threshold = self.config.min_bars_required
+        for bar in bars[-threshold:]:
+            self.buffer.add_bar(
+                symbol=symbol, timestamp=bar["timestamp"], open_=bar["open"], high=bar["high"],
+                low=bar["low"], close=bar["close"], volume=bar["volume"], session=bar["session"],
+            )
+        logger.info(
+            "1-min historical pre-seed: loaded %d bar(s) for %s (buffer now %d/%d)",
+            len(bars[-threshold:]), symbol, self.buffer.bar_count(symbol), threshold,
+        )
+        if self.store is not None:
+            self.store.checkpoint_buffer(symbol, "1m", self.buffer.get_bars(symbol))
+
+    async def _preseed_htf_if_needed(self, symbol: str, force: bool = False) -> None:
+        if not self.config.historical_preseed_enabled:
+            return
+        symbol = symbol.upper()
+        if symbol in self._preseeded_htf:
+            return
+        self._preseeded_htf.add(symbol)
+        if not force and self.buffer_htf.bar_count(symbol) >= self.config.htf_sma_period:
+            return
+        await self._run_htf_preseed(symbol)
+
+    async def _run_htf_preseed(self, symbol: str) -> None:
+        try:
+            bars = await asyncio.to_thread(preseed.fetch_15m_history, symbol, self.config.preseed_15m_period)
+        except Exception as exc:  # noqa: BLE001 -- pre-seeding is best-effort, never fatal
+            logger.warning("15-min HTF historical pre-seed failed for %s: %s", symbol, exc)
+            return
+        if self.config.rth_only_htf_sma:
+            bars = [b for b in bars if b["session"] == "regular"]
+        if not bars:
+            logger.info(
+                "15-min HTF historical pre-seed returned no usable data for %s -- "
+                "falling back to live accumulation", symbol,
+            )
+            return
+
+        threshold = self.config.htf_sma_period
+        for bar in bars[-threshold:]:
+            self.buffer_htf.add_bar(
+                symbol=symbol, timestamp=bar["timestamp"], open_=bar["open"], high=bar["high"],
+                low=bar["low"], close=bar["close"], volume=bar["volume"], session=bar["session"],
+            )
+        logger.info(
+            "15-min HTF historical pre-seed: loaded %d bar(s) for %s (buffer now %d/%d)",
+            len(bars[-threshold:]), symbol, self.buffer_htf.bar_count(symbol), threshold,
+        )
+        if self.store is not None:
+            self.store.checkpoint_buffer(symbol, "15m", self.buffer_htf.get_bars(symbol))
 
     async def _handle_message(self, message: dict) -> None:
         raw = message.get("data")
@@ -463,7 +588,14 @@ class QuantScanner:
         coarser bars (default 15-min), floor-bucketed by
         htf_bar_interval_minutes. Finalizes the previous bucket into
         buffer_htf only once a bar from the NEXT bucket arrives -- the
-        currently-forming bucket is never pushed early/partial."""
+        currently-forming bucket is never pushed early/partial.
+
+        Session-aware buffering (Requirement 3): when
+        config.rth_only_htf_sma is set, a finalized bucket that falls
+        OUTSIDE regular trading hours is simply never added to
+        buffer_htf -- the 200-SMA trend gate this buffer exists for is
+        RTH-only by definition, so a pre-market 15-min candle would only
+        occupy a htf_max_bars slot the gate can never use."""
         symbol = event.symbol.upper()
         interval = self.config.htf_bar_interval_minutes
         bucket_start = event.timestamp.replace(
@@ -472,10 +604,11 @@ class QuantScanner:
 
         acc = self._htf_accumulators.get(symbol)
         if acc is not None and acc["bucket_start"] != bucket_start:
-            self.buffer_htf.add_bar(
-                symbol=symbol, timestamp=acc["bucket_start"], open_=acc["open"],
-                high=acc["high"], low=acc["low"], close=acc["close"], volume=acc["volume"],
-            )
+            if not self.config.rth_only_htf_sma or get_session(acc["bucket_start"]) == "regular":
+                self.buffer_htf.add_bar(
+                    symbol=symbol, timestamp=acc["bucket_start"], open_=acc["open"],
+                    high=acc["high"], low=acc["low"], close=acc["close"], volume=acc["volume"],
+                )
             acc = None
 
         if acc is None:
@@ -492,6 +625,50 @@ class QuantScanner:
             if event.close is not None:
                 acc["close"] = event.close
             acc["volume"] = (acc["volume"] or 0.0) + (event.volume or 0.0)
+
+    def _update_1m_buffer(self, event: MarketTickEvent) -> None:
+        """True Calendar-Aligned 1-Minute Candle Aggregation (Requirement
+        1): floor-buckets incoming BAR events to the minute and builds a
+        real OHLCV candle from each tick's own price (`event.close`) --
+        open = first tick's price this minute, high/low = running max/min
+        of every tick's price, close = latest tick's price, volume =
+        accumulated. This is deliberately NOT the same as the raw
+        open/high/low fields on the event itself (for the yfinance
+        polling fallback those are the whole DAY's open/high/low --
+        constant all session, useless for a 1-minute candle's shape).
+
+        Unlike _update_htf_buffer, the still-forming bucket IS written
+        into self.buffer on EVERY tick (not only once the bucket rolls
+        over) -- indicator computation needs to see the latest partial
+        minute's evolving price immediately, not wait up to 60s for a
+        new poll cycle to close the bar out. A new ROW only appears once
+        the wall clock actually crosses into a new minute (buffer.add_bar
+        updates the existing row in place for the same bucket timestamp),
+        so min_bars_required bars really do span that many calendar
+        minutes, not raw poll cycles."""
+        symbol = event.symbol.upper()
+        if event.close is None:
+            return
+        bucket_start = event.timestamp.replace(second=0, microsecond=0)
+
+        acc = self._1m_accumulators.get(symbol)
+        if acc is None or acc["bucket_start"] != bucket_start:
+            acc = {
+                "bucket_start": bucket_start,
+                "open": event.close, "high": event.close, "low": event.close,
+                "close": event.close, "volume": event.volume or 0.0,
+            }
+        else:
+            acc["high"] = max(acc["high"], event.close)
+            acc["low"] = min(acc["low"], event.close)
+            acc["close"] = event.close
+            acc["volume"] = (acc["volume"] or 0.0) + (event.volume or 0.0)
+        self._1m_accumulators[symbol] = acc
+
+        self.buffer.add_bar(
+            symbol=symbol, timestamp=acc["bucket_start"], open_=acc["open"],
+            high=acc["high"], low=acc["low"], close=acc["close"], volume=acc["volume"],
+        )
 
     async def _handle_market_tick(self, payload: dict) -> None:
         try:
@@ -512,15 +689,7 @@ class QuantScanner:
         if event.event_type != TickEventType.BAR:
             return  # only BAR/QUOTE events are handled; TRADE is a no-op here
 
-        self.buffer.add_bar(
-            symbol=event.symbol,
-            timestamp=event.timestamp,
-            open_=event.open,
-            high=event.high,
-            low=event.low,
-            close=event.close,
-            volume=event.volume,
-        )
+        self._update_1m_buffer(event)
         self._update_htf_buffer(event)
         self._bars_processed += 1
 

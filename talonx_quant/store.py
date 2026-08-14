@@ -61,6 +61,9 @@ CREATE TABLE IF NOT EXISTS latest_fundamental_factors (
 -- is '1m' or '15m' -- two independent snapshots per symbol, since the
 -- two buffers have different sizes, reload rules, and purposes (see
 -- QuantScanner._load_buffers_from_store's gap-gating, 1m only).
+-- `session` (pre_market/regular/closed, see session.py) was added for
+-- Requirement 3's session-aware buffering -- see _migrate_bar_buffer_schema
+-- below for how a pre-existing table without this column is handled.
 CREATE TABLE IF NOT EXISTS bar_buffer (
     symbol      TEXT NOT NULL,
     buffer_type TEXT NOT NULL,
@@ -70,6 +73,7 @@ CREATE TABLE IF NOT EXISTS bar_buffer (
     low         REAL,
     close       REAL,
     volume      REAL,
+    session     TEXT,
     PRIMARY KEY (symbol, buffer_type, ts)
 );
 CREATE INDEX IF NOT EXISTS idx_bar_buffer_symbol_type ON bar_buffer (symbol, buffer_type)
@@ -81,8 +85,31 @@ class QuantStateStore:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.path)
+        self._migrate_bar_buffer_schema()
         self._conn.executescript(_SCHEMA)
         self._conn.commit()
+
+    def _migrate_bar_buffer_schema(self) -> None:
+        """bar_buffer gained a `session` column (Requirement 3). Unlike
+        talonx_watchlist.store's ALTER-TABLE-ADD-COLUMN migrations, an
+        in-place ALTER here would leave every pre-existing row's session
+        NULL -- silently defeating the new RTH-only HTF filter for any
+        bar checkpointed before this upgrade. bar_buffer is purely a
+        checkpoint CACHE of RollingBarBuffer's in-memory state (see
+        checkpoint_buffer's own docstring: a full delete-then-reinsert
+        every checkpoint interval), so dropping a stale-schema table and
+        letting it repopulate from live/pre-seeded data is safe -- it's
+        not a real data loss, just a one-time warm-up reset."""
+        table_exists = self._conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='bar_buffer'"
+        ).fetchone()
+        if not table_exists:
+            return
+        cols = {row[1] for row in self._conn.execute("PRAGMA table_info(bar_buffer)").fetchall()}
+        if "session" not in cols:
+            self._conn.execute("DROP INDEX IF EXISTS idx_bar_buffer_symbol_type")
+            self._conn.execute("DROP TABLE IF EXISTS bar_buffer")
+            self._conn.commit()
 
     def close(self) -> None:
         self._conn.close()
@@ -175,12 +202,13 @@ class QuantStateStore:
             "DELETE FROM bar_buffer WHERE symbol = ? AND buffer_type = ?", (symbol, buffer_type)
         )
         self._conn.executemany(
-            "INSERT INTO bar_buffer (symbol, buffer_type, ts, open, high, low, close, volume) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO bar_buffer (symbol, buffer_type, ts, open, high, low, close, volume, session) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     symbol, buffer_type, bar["timestamp"].isoformat(),
                     bar["open"], bar["high"], bar["low"], bar["close"], bar["volume"],
+                    bar.get("session"),
                 )
                 for bar in bars
             ],
@@ -193,13 +221,13 @@ class QuantStateStore:
         into a datetime, same "this store doesn't know consumer.py's
         types" boundary every other read method here keeps."""
         cursor = self._conn.execute(
-            "SELECT ts, open, high, low, close, volume FROM bar_buffer "
+            "SELECT ts, open, high, low, close, volume, session FROM bar_buffer "
             "WHERE symbol = ? AND buffer_type = ? ORDER BY ts",
             (symbol.upper(), buffer_type),
         )
         return [
-            {"timestamp": ts, "open": o, "high": h, "low": l, "close": c, "volume": v}
-            for ts, o, h, l, c, v in cursor.fetchall()
+            {"timestamp": ts, "open": o, "high": h, "low": l, "close": c, "volume": v, "session": s}
+            for ts, o, h, l, c, v, s in cursor.fetchall()
         ]
 
     def buffered_symbols(self, buffer_type: str) -> list[str]:

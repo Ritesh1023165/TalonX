@@ -277,6 +277,7 @@ class DecisionEngine:
                     self.store.save_fundamental_signal(ticker, signal, state.fundamental_signal_at)
                     self.store.save_long_term_fundamental_stop_state(
                         ticker, state.roic_below_wacc_streak, state.previous_moat_rating,
+                        state.last_streak_fiscal_year, state.previous_fair_value,
                     )
             elif channel == self.config.reports_channel_long_term:
                 report = LongTermResearchReport.model_validate(payload)
@@ -287,6 +288,7 @@ class DecisionEngine:
                     self.store.save_long_term_report(ticker, report, state.longterm_report_at)
                     self.store.save_long_term_fundamental_stop_state(
                         ticker, state.roic_below_wacc_streak, state.previous_moat_rating,
+                        state.last_streak_fiscal_year, state.previous_fair_value,
                     )
             else:
                 logger.warning("Dropping message on unexpected channel %s", channel)

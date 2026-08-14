@@ -284,6 +284,28 @@ class QuantConfig:
     # its own.
     buffer_reload_max_gap_seconds: float = _env_float("TALONX_QUANT_BUFFER_RELOAD_MAX_GAP_SECONDS", 900.0)
 
+    # --- Historical pre-seeding (Requirement 2: eliminate the ~24min/1m
+    # and ~50-continuous-hour/15m cold-start warm-up above by backfilling
+    # both buffers via yfinance the moment a ticker is first seen, or has
+    # too little checkpointed history to reload -- see preseed.py and
+    # consumer.py's _preseed_1m_if_needed/_preseed_htf_if_needed) ---
+    historical_preseed_enabled: bool = _env_bool("TALONX_QUANT_PRESEED_ENABLED", True)
+    preseed_1m_period: str = os.environ.get("TALONX_QUANT_PRESEED_1M_PERIOD", "1d")
+    preseed_15m_period: str = os.environ.get("TALONX_QUANT_PRESEED_15M_PERIOD", "1mo")
+    # Session-aware buffering (Requirement 3): restrict the 15m-200-SMA
+    # trend gate's source buffer to Regular Trading Hours bars only --
+    # pre-market 15m bars are simply never finalized into buffer_htf (see
+    # consumer.py's _update_htf_buffer) rather than filtered out at SMA
+    # compute time, so htf_max_bars' capacity is never spent on bars the
+    # gate will never use.
+    rth_only_htf_sma: bool = _env_bool("TALONX_QUANT_RTH_ONLY_HTF", True)
+    # Requirement 4: the 15-min HTF buffer reloads unconditionally
+    # (see buffer_reload_max_gap_seconds's own docstring for why), but a
+    # gap this large since the newest checkpointed bar (default 24h --
+    # e.g. a weekend) additionally triggers a yfinance backfill of
+    # whatever's missing since then, on top of the unconditional reload.
+    htf_backfill_gap_seconds: float = _env_float("TALONX_QUANT_HTF_BACKFILL_GAP_SECONDS", 86400.0)
+
     # --- Phase 2 LONG_TERM path: fundamental factor scoring ---
     # A sibling pipeline to everything above, not a second loop inside
     # QuantScanner -- see fundamental_consumer.FundamentalScanner. Own

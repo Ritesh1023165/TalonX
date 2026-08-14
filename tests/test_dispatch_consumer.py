@@ -830,6 +830,94 @@ async def test_invalid_longterm_report_is_dropped(agent):
     assert "AAPL" not in agent._latest_longterm_report
 
 
+# --- Restart-survival: earnings-context cache persists and reloads -------
+
+@pytest.mark.asyncio
+async def test_fundamental_signal_is_persisted_to_the_store(agent):
+    await agent._handle_message(_fundamental_signal_message(_fundamental_signal_payload("AAPL", 175.50)))
+
+    rows = {r["ticker"]: r for r in agent.store.load_latest_earnings_context()}
+    assert rows["AAPL"]["signal_json"] is not None
+
+
+@pytest.mark.asyncio
+async def test_longterm_report_is_persisted_to_the_store(agent):
+    await agent._handle_message(_longterm_report_message(_longterm_report_payload("AAPL", 210.0)))
+
+    rows = {r["ticker"]: r for r in agent.store.load_latest_earnings_context()}
+    assert rows["AAPL"]["report_json"] is not None
+
+
+def test_earnings_context_cache_reloads_from_store_on_a_fresh_agent(agent):
+    """The core restart-survival property: a signal+report cached by one
+    DispatchAgent instance (e.g. before a restart) must be visible to a
+    BRAND NEW instance constructed against the same store, with no
+    message having been received by the new instance at all."""
+    signal = _fundamental_signal("AAPL", price=175.50)
+    report = _longterm_report("AAPL", fair_value=210.0)
+    agent.store.save_latest_fundamental_signal_cache("AAPL", signal.model_dump_json(), datetime.now(timezone.utc))
+    agent.store.save_latest_longterm_report_cache("AAPL", report.model_dump_json(), datetime.now(timezone.utc))
+
+    fresh_agent = DispatchAgent(
+        config=agent.config, store=agent.store, telegram_client=AsyncMock(),
+        watchlist_store=agent.watchlist_store,
+    )
+
+    assert fresh_agent._latest_fundamental_signal["AAPL"].price == 175.50
+    assert fresh_agent._latest_longterm_report["AAPL"].dcf_fair_value_per_share == 210.0
+
+
+def test_earnings_context_cache_load_failure_does_not_block_startup(tmp_path):
+    """A store read error at startup (fresh/corrupt file, schema drift)
+    must degrade to an empty cache, not crash agent construction."""
+    class _BrokenStore:
+        def load_latest_earnings_context(self):
+            raise RuntimeError("boom")
+
+        def load_last_telegram_pushes(self, horizon):
+            raise RuntimeError("boom")
+
+    watchlist_store = TickerWatchlistStore(tmp_path / "watchlist.db")
+    try:
+        agent = DispatchAgent(
+            config=DispatchConfig(), store=_BrokenStore(), telegram_client=AsyncMock(),
+            watchlist_store=watchlist_store,
+        )
+        assert agent._latest_fundamental_signal == {}
+        assert agent._last_telegram_push == {}
+    finally:
+        watchlist_store.close()
+
+
+# --- Restart-survival: push-cooldown cache persists and reloads ----------
+
+@pytest.mark.asyncio
+async def test_successful_telegram_push_persists_the_cooldown(agent):
+    agent.telegram_client.is_configured = True
+    agent.telegram_client.send = AsyncMock()
+
+    await agent._handle_message(_message(_alert_payload()))
+
+    pushes = agent.store.load_last_telegram_pushes("intraday")
+    assert "AAPL" in pushes
+
+
+def test_push_cooldown_reloads_from_store_on_a_fresh_agent(agent):
+    """Same restart-survival property as the earnings-context cache: a
+    cooldown recorded by one instance must bind a BRAND NEW instance
+    against the same store, so the very next alert after a restart
+    doesn't bypass a cooldown that should still be active."""
+    now = datetime.now(timezone.utc)
+    agent.store.save_last_telegram_push("AAPL", "intraday", now, 150.0)
+
+    fresh_agent = DispatchAgent(
+        config=agent.config, store=agent.store, telegram_client=AsyncMock(),
+        watchlist_store=agent.watchlist_store,
+    )
+
+    assert fresh_agent._last_telegram_push["AAPL"] == (now, 150.0)
+
+
 @pytest.mark.asyncio
 async def test_heads_up_sends_unconditionally_within_the_48h_window(agent):
     agent.telegram_client.is_configured = True

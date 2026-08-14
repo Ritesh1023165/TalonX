@@ -246,6 +246,11 @@ class DispatchAgent:
         # DUAL_HORIZON ticker's intraday and long-term push cadences
         # can't clobber each other -- same "sibling, not shared" state
         # convention the rest of this project's Phase 2 work uses.
+        # Restart-survival: rehydrated from self.store below rather than
+        # starting empty -- an in-memory-only cooldown resets to "never
+        # pushed" on every restart, letting the very next alert push
+        # immediately even if up to push_cooldown_minutes of real
+        # cooldown should still remain.
         self._last_telegram_push: dict[str, tuple[datetime, float]] = {}
         self._last_telegram_push_long_term: dict[str, tuple[datetime, float]] = {}
         self._push_suppressed_action_muted = 0
@@ -260,10 +265,16 @@ class DispatchAgent:
         # cache of whatever fundamental signal/report this process has
         # seen, purely to source the T-48h heads-up push's price/quality/
         # moat/fair-value fields -- see config.py's channel docstrings for
-        # why this is NOT sourced from long_term_alerts.
+        # why this is NOT sourced from long_term_alerts. Restart-survival:
+        # rehydrated from self.store below (see _load_restart_survival_caches)
+        # -- without this, a restart during a ticker's heads-up window
+        # permanently loses that cycle's push unless a genuinely NEW
+        # signal/report happens to arrive afterward (Redis Pub/Sub has no
+        # replay for a freshly (re)subscribed consumer).
         self._latest_fundamental_signal: dict[str, FundamentalFactorSignal] = {}
         self._latest_longterm_report: dict[str, LongTermResearchReport] = {}
         self._earnings_heads_up_sent = 0
+        self._load_restart_survival_caches()
 
         try:
             self._min_severity = AlertSeverity(self.config.telegram_min_severity.lower())
@@ -280,6 +291,44 @@ class DispatchAgent:
                 "alerts will still be recorded to the audit trail, but no mobile push "
                 "notifications will be sent."
             )
+
+    def _load_restart_survival_caches(self) -> None:
+        """Rehydrates the two in-memory-only caches above from
+        self.store at startup -- both used to reset to empty on every
+        restart with no way to recover: the earnings heads-up cache
+        (self._latest_fundamental_signal/_latest_longterm_report) could
+        permanently lose a push if no fresh signal/report arrived before
+        a ticker's window closed, and the push-cooldown cache
+        (self._last_telegram_push/_long_term) let the first alert after
+        any restart bypass whatever cooldown should still have been
+        active. A read failure here (fresh store, corrupt row) is logged
+        and skipped rather than blocking startup -- the caches just stay
+        empty, same as before this fix existed."""
+        try:
+            for row in self.store.load_latest_earnings_context():
+                ticker = row["ticker"]
+                if row["signal_json"]:
+                    try:
+                        self._latest_fundamental_signal[ticker] = FundamentalFactorSignal.model_validate_json(
+                            row["signal_json"]
+                        )
+                    except ValidationError as exc:
+                        logger.warning("Failed to parse cached fundamental signal for %s: %s", ticker, exc)
+                if row["report_json"]:
+                    try:
+                        self._latest_longterm_report[ticker] = LongTermResearchReport.model_validate_json(
+                            row["report_json"]
+                        )
+                    except ValidationError as exc:
+                        logger.warning("Failed to parse cached long-term report for %s: %s", ticker, exc)
+        except Exception as exc:  # noqa: BLE001 -- a bad read shouldn't block startup
+            logger.warning("Failed to load persisted earnings-context cache: %s", exc)
+
+        try:
+            self._last_telegram_push = self.store.load_last_telegram_pushes("intraday")
+            self._last_telegram_push_long_term = self.store.load_last_telegram_pushes("long_term")
+        except Exception as exc:  # noqa: BLE001 -- a bad read shouldn't block startup
+            logger.warning("Failed to load persisted push-cooldown cache: %s", exc)
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -608,6 +657,12 @@ class DispatchAgent:
             logger.warning("Dropping unparseable fundamental signal: %s", exc)
             return
         self._latest_fundamental_signal[signal.ticker.upper()] = signal
+        try:
+            self.store.save_latest_fundamental_signal_cache(
+                signal.ticker, signal.model_dump_json(), datetime.now(timezone.utc),
+            )
+        except Exception as exc:  # noqa: BLE001 -- a cache-persist failure shouldn't drop the in-memory update
+            logger.warning("Failed to persist fundamental signal cache for %s: %s", signal.ticker, exc)
 
     def _handle_longterm_report(self, payload: dict) -> None:
         try:
@@ -616,6 +671,12 @@ class DispatchAgent:
             logger.warning("Dropping unparseable long-term research report: %s", exc)
             return
         self._latest_longterm_report[report.ticker.upper()] = report
+        try:
+            self.store.save_latest_longterm_report_cache(
+                report.ticker, report.model_dump_json(), datetime.now(timezone.utc),
+            )
+        except Exception as exc:  # noqa: BLE001 -- a cache-persist failure shouldn't drop the in-memory update
+            logger.warning("Failed to persist long-term report cache for %s: %s", report.ticker, exc)
 
     def _company_name(self, ticker: str) -> str | None:
         try:
@@ -699,6 +760,10 @@ class DispatchAgent:
             await self.telegram_client.send(text)
             self.store.mark_telegram_sent(alert_id, now)
             self._last_telegram_push[ticker] = (now, alert.triggering_signal.price)
+            try:
+                self.store.save_last_telegram_push(ticker, "intraday", now, alert.triggering_signal.price)
+            except Exception as exc:  # noqa: BLE001 -- a cache-persist failure shouldn't drop the in-memory update
+                logger.warning("Failed to persist push-cooldown cache for %s: %s", ticker, exc)
             self._telegram_sent += 1
             await _incr_metric(self._client, "dispatch", "pushed_telegram")
             logger.info("Telegram push sent for alert #%d (%s)", alert_id, alert.ticker)
@@ -779,6 +844,10 @@ class DispatchAgent:
             await self.telegram_client.send(text)
             self.store.mark_long_term_telegram_sent(alert_id, now)
             self._last_telegram_push_long_term[ticker] = (now, alert.market_price)
+            try:
+                self.store.save_last_telegram_push(ticker, "long_term", now, alert.market_price)
+            except Exception as exc:  # noqa: BLE001 -- a cache-persist failure shouldn't drop the in-memory update
+                logger.warning("Failed to persist push-cooldown cache for %s: %s", ticker, exc)
             self._long_term_telegram_sent += 1
             await _incr_metric(self._client, "dispatch", "pushed_telegram")
             logger.info("Telegram push sent for long-term alert #LT%d (%s)", alert_id, alert.ticker)

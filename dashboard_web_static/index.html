@@ -69,6 +69,18 @@
     border-radius: 10px;
     padding: 16px 18px;
   }
+  .card-wide { grid-column: 1 / -1; }
+  .bw-summary { display: flex; gap: 28px; margin: 2px 0 14px; flex-wrap: wrap; }
+  .bw-stat { font-size: 12px; color: var(--muted); }
+  .bw-stat b { color: var(--text); font-size: 22px; display: block; line-height: 1.2; }
+  .bw-stat.all-ready b { color: var(--good); }
+  .bw-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+  .bw-table th { text-align: left; color: var(--muted); font-weight: 500; padding: 4px 10px 6px 0; border-bottom: 1px solid var(--panel-border); }
+  .bw-table td { padding: 5px 10px 5px 0; border-bottom: 1px solid #1a212c; font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+  .bw-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .bw-dot.ready { background: var(--good); }
+  .bw-dot.not-ready { background: var(--warn); }
+  .bw-more { color: var(--muted); font-size: 11px; margin-top: 8px; }
   .card-head {
     display: flex;
     justify-content: space-between;
@@ -131,7 +143,31 @@
   <div class="stat">total messages <b id="grand-total">0</b></div>
   <div class="stat">distinct tickers <b id="distinct-tickers">0</b></div>
 </header>
-<main id="cards"></main>
+<main id="cards">
+  <div class="card card-wide" style="--accent:#2dd4bf">
+    <div class="card-head">
+      <div>
+        <div class="card-title">M2 - Bar buffer warm-up</div>
+        <div class="card-channel">quant.db :: bar_buffer (talonx_quant, not Redis -- polled every 10s)</div>
+      </div>
+    </div>
+    <div id="bw-unavailable" class="empty" style="display:none">quant.db not found yet, or bar_buffer is still empty -- waiting for the quant scanner to checkpoint.</div>
+    <div id="bw-content">
+      <div class="bw-summary">
+        <div class="bw-stat" id="bw-1m-wrap"><b id="bw-1m-ready">0/0</b>1-min buffer ready (<span id="bw-1m-threshold">120</span> bars)</div>
+        <div class="bw-stat" id="bw-15m-wrap"><b id="bw-15m-ready">0/0</b>15-min HTF buffer ready (<span id="bw-15m-threshold">200</span> bars)</div>
+      </div>
+      <div class="section-label">Session mix (checkpointed bars)</div>
+      <div class="bars" id="bw-sessions"></div>
+      <div class="section-label">Per-ticker warm-up</div>
+      <table class="bw-table">
+        <thead><tr><th>Symbol</th><th>1m buffer</th><th>15m HTF buffer</th></tr></thead>
+        <tbody id="bw-tbody"></tbody>
+      </table>
+      <div class="bw-more" id="bw-more" style="display:none"></div>
+    </div>
+  </div>
+</main>
 <footer>Live, read-only view -- counts reset if this server restarts. Not a historical record.</footer>
 
 <script>
@@ -240,10 +276,68 @@ function formatUptime(seconds) {
   return `${hh}:${mm}:${ss}`;
 }
 
+function renderBufferWarmup(bw) {
+  const unavailableEl = document.getElementById("bw-unavailable");
+  const contentEl = document.getElementById("bw-content");
+  if (!bw || bw.db_unavailable) {
+    unavailableEl.style.display = "block";
+    contentEl.style.display = "none";
+    return;
+  }
+  unavailableEl.style.display = "none";
+  contentEl.style.display = "block";
+
+  const s = bw.summary || { total: 0, ready_1m: 0, ready_15m: 0 };
+  document.getElementById("bw-1m-ready").textContent = `${s.ready_1m}/${s.total}`;
+  document.getElementById("bw-15m-ready").textContent = `${s.ready_15m}/${s.total}`;
+  document.getElementById("bw-1m-threshold").textContent = bw.min_bars_required;
+  document.getElementById("bw-15m-threshold").textContent = bw.htf_sma_period;
+  document.getElementById("bw-1m-wrap").classList.toggle("all-ready", s.total > 0 && s.ready_1m === s.total);
+  document.getElementById("bw-15m-wrap").classList.toggle("all-ready", s.total > 0 && s.ready_15m === s.total);
+
+  const sessionEntries = Object.entries(bw.session_counts || {}).sort((a, b) => b[1] - a[1]);
+  renderBars(document.getElementById("bw-sessions"), sessionEntries, "no bars checkpointed yet", true);
+
+  const symbols = bw.symbols || [];
+  const notReady = symbols.filter((x) => !x.ready_1m || !x.ready_15m);
+  const listed = notReady.length > 0 ? notReady : symbols;
+  const shown = listed.slice(0, 12);
+  const tbody = document.getElementById("bw-tbody");
+  if (shown.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3" class="empty">no tickers checkpointed yet</td></tr>`;
+  } else {
+    tbody.innerHTML = shown
+      .map(
+        (x) => `
+      <tr>
+        <td>${x.symbol}</td>
+        <td><span class="bw-dot ${x.ready_1m ? "ready" : "not-ready"}"></span>${x.bar_1m}/${bw.min_bars_required}</td>
+        <td><span class="bw-dot ${x.ready_15m ? "ready" : "not-ready"}"></span>${x.bar_15m}/${bw.htf_sma_period}</td>
+      </tr>`
+      )
+      .join("");
+  }
+
+  const moreEl = document.getElementById("bw-more");
+  const remaining = listed.length - shown.length;
+  if (remaining > 0) {
+    moreEl.style.display = "block";
+    moreEl.style.color = "var(--muted)";
+    moreEl.textContent = notReady.length > 0 ? `+${remaining} more still warming up` : `+${remaining} more, all ready`;
+  } else if (notReady.length === 0 && symbols.length > 0) {
+    moreEl.style.display = "block";
+    moreEl.style.color = "var(--good)";
+    moreEl.textContent = `All ${symbols.length} ticker(s) fully warmed up`;
+  } else {
+    moreEl.style.display = "none";
+  }
+}
+
 function render(data) {
   document.getElementById("uptime").textContent = formatUptime(data.uptime_seconds);
   document.getElementById("grand-total").textContent = data.grand_total;
   document.getElementById("distinct-tickers").textContent = data.distinct_tickers;
+  renderBufferWarmup(data.buffer_warmup);
 
   for (const ch of data.channels) {
     const refs = ensureCard(ch);

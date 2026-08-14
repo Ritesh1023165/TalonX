@@ -119,21 +119,31 @@ for the full before/after):**
   `TALONX_QUANT_HTF_SMA_PERIOD` default 200) — regular-session, BULLISH
   candidates only: drops a candidate whose price is at/below the 15-min
   200-period SMA. Built from a second, coarser `RollingBarBuffer`
-  aggregated from the same incoming 1-min bars. See
+  aggregated from the same incoming 1-min bars, restricted to Regular
+  Trading Hours bars only (`TALONX_QUANT_RTH_ONLY_HTF`, default on) — a
+  pre-market 15-min candle is never finalized into this buffer at all. See
   [../bar_buffer_persistence.md](../bar_buffer_persistence.md) for the
-  full write-up of this buffer's warm-up time (~50 continuous hours) and
-  how it survives a restart.
+  full write-up of this buffer's warm-up, historical pre-seeding, and how
+  it survives a restart.
 
 ## Implementation notes
 
-- **`buffer.py`** — the rolling OHLCV window is deliberately deduped by
-  timestamp: yfinance polling re-sends a snapshot of the *current* bar
-  every poll cycle (it's not a discrete new-bar push like a WebSocket
-  aggregate), so without this the buffer would fill with dozens of
-  near-identical rows for what is, price-action-wise, one bar. Both
-  buffers (1-min and the 15-min HTF one) are periodically checkpointed to
-  `quant.db` and reloaded on restart — see
-  [../bar_buffer_persistence.md](../bar_buffer_persistence.md).
+- **`buffer.py`** — the rolling OHLCV window is a true calendar-aligned
+  1-minute candle, not a raw poll-cycle snapshot: `consumer.py`'s
+  `_update_1m_buffer` floor-buckets each incoming tick to the minute and
+  builds open/high/low/close/volume purely from the tick's own price,
+  updating the SAME row in place (`RollingBarBuffer.add_bar`'s
+  same-timestamp-replace behavior) until the wall clock crosses into a new
+  minute. Without this, a 12-second poll interval would flood the buffer
+  with dozens of near-identical rows for what is, price-action-wise, one
+  bar — `min_bars_required` bars now genuinely span that many calendar
+  minutes. Every bar is also tagged with its session (pre-market/regular/
+  closed). Both buffers (1-min and the 15-min HTF one) are periodically
+  checkpointed to `quant.db`, reloaded on restart, and can be instantly
+  backfilled via yfinance historical pre-seeding rather than re-warming up
+  purely from live ticks — see
+  [../bar_buffer_persistence.md](../bar_buffer_persistence.md) for the
+  full write-up.
 - **`indicators.py`** — computes both the *current* and *previous*
   values for RSI, MACD, and moving averages, not just the latest, since
   edge-triggering/crossover detection needs to know the relationship

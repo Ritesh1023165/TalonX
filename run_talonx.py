@@ -734,6 +734,60 @@ class WatchlistDrivenIngestion:
                 logger.error("Reactive long-term financials ingestion failed: %s", exc)
 
 
+class WatchlistDrivenQuantPreseed:
+    """
+    Requirement 2 (Instant Historical Pre-Seeding): eagerly backfills
+    both of QuantScanner's RollingBarBuffers via yfinance for every
+    watchlist symbol -- once for the WHOLE watchlist at startup (so a
+    fresh process doesn't sit through the ~24min/1-min-buffer and
+    ~50-continuous-hour/HTF-buffer live warm-up documented in
+    docs/bar_buffer_persistence.md), then reactively for just the
+    symbol(s) newly added/resumed thereafter. Same poll-and-diff shape
+    as WatchlistDrivenIngestion above, for the same reason: the
+    watchlist is a live, dashboard-editable control surface, not a
+    startup-only list.
+
+    QuantScanner itself deliberately never imports talonx_watchlist (see
+    its own module docstring's "self-contained at the code level"
+    convention) -- this class is the one place that bridges the two,
+    driving QuantScanner.preseed_symbols() from here instead.
+    """
+
+    def __init__(self, watchlist_store: TickerWatchlistStore, quant_scanner: QuantScanner, poll_interval_seconds: float):
+        self._store = watchlist_store
+        self._scanner = quant_scanner
+        self._poll_interval = poll_interval_seconds
+        self._stop_event = asyncio.Event()
+        self._known_active_symbols: set[str] = set()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+
+    async def run(self) -> None:
+        initial = sorted(self._store.list_active_symbols())
+        self._known_active_symbols = set(initial)
+        if initial:
+            logger.info("Pre-seeding talonx_quant buffers for the current watchlist: %s", initial)
+            await self._scanner.preseed_symbols(initial)
+
+        while not self._stop_event.is_set():
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=self._poll_interval)
+            except asyncio.TimeoutError:
+                pass  # normal case: poll interval elapsed, check for changes
+            if self._stop_event.is_set():
+                break
+
+            current_active = set(self._store.list_active_symbols())
+            new_active = sorted(current_active - self._known_active_symbols)
+            self._known_active_symbols = current_active
+            if new_active:
+                logger.info(
+                    "New/resumed ticker(s) detected -- pre-seeding talonx_quant buffers: %s", new_active,
+                )
+                await self._scanner.preseed_symbols(new_active)
+
+
 async def periodic_ingestion_loop(
     watchlist_store: TickerWatchlistStore, interval_hours: float, stop_event: asyncio.Event
 ) -> None:
@@ -824,6 +878,76 @@ async def periodic_long_term_financials_loop(
             await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
         except asyncio.TimeoutError:
             pass  # normal case: interval elapsed, loop again
+
+
+async def reconcile_missing_long_term_factors(
+    watchlist_store: TickerWatchlistStore, quant_store: QuantStateStore, stop_event: asyncio.Event,
+    fundamental_scanner: FundamentalScanner | None = None, head_start_seconds: float = 15.0,
+) -> None:
+    """
+    One-shot startup reconciliation for a confirmed-live gap: `NewFundamentalsIngestedEvent`
+    is a single Redis Pub/Sub publish with no replay/ack/retry, so if
+    `FundamentalScanner` (talonx_quant) wasn't subscribed yet at the
+    exact moment `periodic_long_term_financials_loop`'s first cycle
+    published it -- a real race, since both start concurrently in this
+    process's task list -- the event is gone. Worse, `ingest_long_term_financials`'s
+    OWN ledger then marks that fiscal year "already ingested," so every
+    NORMAL future cycle correctly (and silently) skips re-fetching it --
+    permanently starving that ticker's long-term pipeline until its next
+    annual 10-K, months away. Confirmed live: 18 of 30 ever-ingested
+    tickers lost their event this way across repeated restarts.
+
+    Fix: after giving the rest of this process's startup tasks (in
+    particular FundamentalScanner's own Redis connect+subscribe) a head
+    start, compare quant_store.get_latest_factors() -- populated ONLY by
+    FundamentalScanner actually receiving and computing from the event,
+    never by the ledger -- against every LONG_TERM/DUAL_HORIZON
+    watchlist ticker. Anything missing gets one `force=True` re-publish,
+    which bypasses ingest_long_term_financials's ledger skip and
+    re-fetches from EDGAR (the ledger never stored the actual facts,
+    only a fiscal-year watermark, so there's nothing cheaper to reuse).
+
+    Self-healing even if THIS attempt also loses the race (FundamentalScanner
+    still starting up, a transient EDGAR error): a ticker this pass fails
+    to fix is still missing from quant_store afterward, so the NEXT
+    restart's reconciliation pass retries it too -- no separate state of
+    its own to track "did this already run."
+
+    `fundamental_scanner`, if given, also gets each missing ticker's
+    `fundamental_cooldown:{TICKER}` Redis key cleared before the forced
+    republish -- found live: a ticker whose quant.db row was lost
+    SEPARATELY from its original successful run (that run's cooldown TTL
+    keeps ticking down independently in Redis, unaffected by whatever
+    wiped the SQLite row) would otherwise have this reconciliation's
+    forced republish immediately re-suppressed by that stale cooldown,
+    right back to square one. Safe to clear unconditionally here since
+    this method is only ever called for a ticker already confirmed to
+    have NO computed factors at all -- never a general-purpose bypass.
+    """
+    try:
+        await asyncio.wait_for(stop_event.wait(), timeout=head_start_seconds)
+        return  # stop() fired during the head-start delay -- shutting down already
+    except asyncio.TimeoutError:
+        pass  # normal case: head start elapsed, proceed
+
+    tickers = watchlist_store.list_by_horizon("LONG_TERM")
+    missing = [t for t in tickers if quant_store.get_latest_factors(t) is None]
+    if not missing:
+        logger.info("Long-term factors reconciliation: every tracked ticker already has computed factors.")
+        return
+
+    logger.info(
+        "Long-term factors reconciliation: %d ticker(s) missing computed factors "
+        "(lost NewFundamentalsIngestedEvent or never ingested) -- %s", len(missing), missing,
+    )
+    if fundamental_scanner is not None:
+        for ticker in missing:
+            await fundamental_scanner.clear_cooldown(ticker)
+    try:
+        results = await run_long_term_financials_ingestion(missing, force=True)
+        logger.info("Long-term factors reconciliation complete: %s", results)
+    except Exception as exc:  # noqa: BLE001 -- best-effort; retried on the next restart regardless
+        logger.error("Long-term factors reconciliation failed: %s", exc)
 
 
 async def periodic_wal_checkpoint_loop(
@@ -1124,6 +1248,18 @@ async def main() -> None:
     if not args.skip_ingestion:
         reactive_ingestion = WatchlistDrivenIngestion(watchlist_store, watchlist_config.poll_interval_seconds)
 
+    quant_preseed: WatchlistDrivenQuantPreseed | None = None
+    if quant_scanner is not None:
+        quant_preseed = WatchlistDrivenQuantPreseed(
+            watchlist_store, quant_scanner, watchlist_config.poll_interval_seconds,
+        )
+
+    # Gated on quant_store specifically (not just not args.skip_quant) --
+    # without persistence enabled there's no get_latest_factors() to
+    # reconcile against, and without a FundamentalScanner running at all
+    # (--skip-quant) there's no subscriber to receive a re-publish anyway.
+    run_long_term_factors_reconciliation = quant_store is not None and not args.skip_ingestion
+
     def _handle_sigint() -> None:
         logger.info("Shutdown requested (Ctrl+C) -- stopping all components...")
         stop_event.set()
@@ -1151,6 +1287,8 @@ async def main() -> None:
             long_term_paper_engine.stop()
         if reactive_ingestion is not None:
             reactive_ingestion.stop()
+        if quant_preseed is not None:
+            quant_preseed.stop()
 
     loop = asyncio.get_running_loop()
     try:
@@ -1221,6 +1359,17 @@ async def main() -> None:
         )
     if reactive_ingestion is not None:
         tasks.append(asyncio.create_task(reactive_ingestion.run(), name="reactive_ingestion"))
+    if quant_preseed is not None:
+        tasks.append(asyncio.create_task(quant_preseed.run(), name="quant_preseed"))
+    if run_long_term_factors_reconciliation:
+        tasks.append(
+            asyncio.create_task(
+                reconcile_missing_long_term_factors(
+                    watchlist_store, quant_store, stop_event, fundamental_scanner,
+                ),
+                name="reconcile_long_term_factors",
+            )
+        )
 
     if not tasks:
         logger.error("Everything was skipped -- nothing to run. Drop at least one --skip-* flag.")
@@ -1269,6 +1418,8 @@ async def main() -> None:
             long_term_paper_engine.stop()
         if reactive_ingestion is not None:
             reactive_ingestion.stop()
+        if quant_preseed is not None:
+            quant_preseed.stop()
     finally:
         await market_publisher.close()
         if quant_store is not None:

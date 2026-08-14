@@ -122,7 +122,19 @@ CREATE TABLE IF NOT EXISTS long_term_portfolio_state (
     dca_contribution_usd    REAL NOT NULL,
     total_realized_pnl_usd  REAL NOT NULL DEFAULT 0,
     win_count               INTEGER NOT NULL DEFAULT 0,
-    loss_count              INTEGER NOT NULL DEFAULT 0
+    loss_count              INTEGER NOT NULL DEFAULT 0,
+    -- Last time a DCA cycle actually ran (see get_last_dca_at/
+    -- set_last_dca_at, and consumer.py's LongTermPaperEngine._dca_loop).
+    -- NULL until the first-ever cycle. Persisted specifically so the
+    -- monthly cadence survives a restart: a purely in-process
+    -- asyncio.sleep(dca_interval_days) timer resets to zero every
+    -- restart, and since the interval (30 days default) vastly exceeds
+    -- a typical scheduled daily uptime window, that timer could never
+    -- complete at all under a daily-restart schedule -- confirmed live,
+    -- zero DCA_CONTRIBUTION rows had ever been recorded. Computing the
+    -- wait from this persisted timestamp instead means a restart
+    -- mid-interval resumes with the correct REMAINING wait.
+    last_dca_at             TEXT
 );
 
 -- One row per OPEN long-term position, keyed by ticker (same "absence
@@ -209,6 +221,16 @@ class PaperTradingStore:
         if position_cols and "stop_price" not in position_cols:
             self._conn.execute("DROP TABLE positions")
             self._conn.executescript(_SCHEMA)
+
+        # last_dca_at (restart-survival fix for the DCA loop) -- plain
+        # ALTER TABLE is safe here, same reasoning as the horizon column
+        # above: long_term_portfolio_state's PK is a fixed singleton
+        # (id=1), not a composite key a new column would need to widen,
+        # and this table holds real portfolio state worth preserving
+        # (unlike positions' DROP+recreate above).
+        lt_portfolio_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(long_term_portfolio_state)").fetchall()}
+        if lt_portfolio_cols and "last_dca_at" not in lt_portfolio_cols:
+            self._conn.execute("ALTER TABLE long_term_portfolio_state ADD COLUMN last_dca_at TEXT")
 
     def _ensure_portfolio_row(self, initial_balance: float, trade_allocation_usd: float) -> None:
         with self._lock:
@@ -544,14 +566,34 @@ class PaperTradingStore:
             )
             self._conn.commit()
 
+    def get_last_dca_at(self) -> datetime | None:
+        """None until the first-ever DCA cycle has run -- see
+        LongTermPaperEngine._seconds_until_next_dca, which treats this
+        the same way it always treated a fresh process: don't fire
+        immediately, wait a full dca_interval_days for the first cycle."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT last_dca_at FROM long_term_portfolio_state WHERE id = 1"
+            ).fetchone()
+        if row is None or row[0] is None:
+            return None
+        return datetime.fromisoformat(row[0])
+
+    def set_last_dca_at(self, when: datetime) -> None:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE long_term_portfolio_state SET last_dca_at = ? WHERE id = 1", (when.isoformat(),)
+            )
+            self._conn.commit()
+
     def reset_long_term_portfolio(self, initial_balance: float, dca_contribution_usd: float) -> None:
         with self._lock:
             self._conn.execute("DELETE FROM long_term_positions")
             self._conn.execute("DELETE FROM long_term_trade_history")
             self._conn.execute(
                 "UPDATE long_term_portfolio_state SET initial_balance = ?, current_cash = ?, "
-                "dca_contribution_usd = ?, total_realized_pnl_usd = 0, win_count = 0, loss_count = 0 "
-                "WHERE id = 1",
+                "dca_contribution_usd = ?, total_realized_pnl_usd = 0, win_count = 0, loss_count = 0, "
+                "last_dca_at = NULL WHERE id = 1",
                 (initial_balance, initial_balance, dca_contribution_usd),
             )
             self._conn.commit()

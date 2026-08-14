@@ -251,6 +251,52 @@ async def test_cooldown_uses_its_own_key_namespace_not_the_intraday_one(scanner)
     assert not key_set.startswith("cooldown:")
 
 
+# --- clear_cooldown (run_talonx.reconcile_missing_long_term_factors's escape hatch) --
+
+@pytest.mark.asyncio
+async def test_clear_cooldown_deletes_the_right_key(scanner):
+    await scanner.clear_cooldown("AAPL")
+
+    scanner._client.delete.assert_awaited_once_with("fundamental_cooldown:AAPL")
+
+
+@pytest.mark.asyncio
+async def test_clear_cooldown_normalizes_the_ticker_case(scanner):
+    await scanner.clear_cooldown("aapl")
+
+    scanner._client.delete.assert_awaited_once_with("fundamental_cooldown:AAPL")
+
+
+@pytest.mark.asyncio
+async def test_clear_cooldown_is_a_noop_with_no_client():
+    scanner_ = FundamentalScanner(QuantConfig())  # fresh instance -- _client is None until run()
+    await scanner_.clear_cooldown("AAPL")  # must not raise
+
+
+@pytest.mark.asyncio
+async def test_clear_cooldown_swallows_redis_errors(scanner):
+    scanner._client.delete.side_effect = ConnectionError("redis down")
+
+    await scanner.clear_cooldown("AAPL")  # must not raise
+
+
+@pytest.mark.asyncio
+async def test_cleared_cooldown_lets_a_republished_event_through(scanner):
+    """End-to-end: a ticker still 'on cooldown' per the client's exists()
+    check would normally get suppressed -- after clear_cooldown, the
+    SAME client's own delete() having been called doesn't automatically
+    flip exists() in this mocked test, so this instead verifies the
+    intended real-Redis behavior indirectly: clear_cooldown targets
+    the EXACT key _is_on_cooldown checks, nothing else."""
+    await scanner.clear_cooldown("AAPL")
+    deleted_key = scanner._client.delete.await_args.args[0]
+
+    is_on_cooldown = await scanner._is_on_cooldown("AAPL")  # a fresh mock call, not affected by the delete above
+    checked_key = scanner._client.exists.await_args.args[0]
+
+    assert deleted_key == checked_key == "fundamental_cooldown:AAPL"
+
+
 @pytest.mark.asyncio
 async def test_suppression_is_persisted_when_a_store_is_set(tmp_path):
     with QuantStateStore(tmp_path / "quant.db") as store:

@@ -119,6 +119,41 @@ CREATE TABLE IF NOT EXISTS long_term_alerts (
 );
 CREATE INDEX IF NOT EXISTS idx_long_term_alerts_ticker ON long_term_alerts (ticker);
 CREATE INDEX IF NOT EXISTS idx_long_term_alerts_correlated_at ON long_term_alerts (correlated_at);
+
+-- Restart-survival fix for the Event-Driven Earnings Radar's T-48h
+-- heads-up push: persists the SAME latest-per-ticker fundamental
+-- signal/long-term report cache consumer.py keeps in memory
+-- (_latest_fundamental_signal/_latest_longterm_report), so a
+-- DispatchAgent restart doesn't wipe it. Without this, a restart during
+-- a ticker's heads-up window permanently loses that cycle's push unless
+-- a genuinely NEW signal/report happens to arrive post-restart -- Redis
+-- Pub/Sub has no backlog/replay for a freshly (re)subscribed consumer.
+-- JSON blobs, not flattened columns: these are already pydantic models
+-- one call away from (de)serializing, and this table only ever needs
+-- "the one most recent copy," never queried by field.
+CREATE TABLE IF NOT EXISTS latest_earnings_context (
+    ticker      TEXT PRIMARY KEY,
+    signal_json TEXT,
+    report_json TEXT,
+    updated_at  TEXT NOT NULL
+);
+
+-- Restart-survival fix for Smart Dispatch Filtering's per-ticker push
+-- cooldown: persists self._last_telegram_push/_long_term's (timestamp,
+-- price) per ticker so a restart doesn't reset every ticker's cooldown
+-- to "never pushed." Without this, a restart mid-cooldown lets the very
+-- next alert push immediately, even though up to push_cooldown_minutes
+-- (45min default) of real cooldown should still remain -- narrower
+-- blast radius than the earnings-context gap above (bounded to one
+-- cooldown window per restart, not a permanently lost cycle), but the
+-- same underlying "in-memory-only state resets on restart" defect.
+CREATE TABLE IF NOT EXISTS last_telegram_push (
+    ticker      TEXT NOT NULL,
+    horizon     TEXT NOT NULL,
+    pushed_at   TEXT NOT NULL,
+    price       REAL,
+    PRIMARY KEY (ticker, horizon)
+);
 """
 
 
@@ -487,6 +522,59 @@ class AuditStore:
     def count_long_term(self) -> int:
         with self._lock:
             return self._conn.execute("SELECT COUNT(*) FROM long_term_alerts").fetchone()[0]
+
+    # ------------------------------------------------------------------
+    # Restart-survival: latest earnings-context cache (T-48h heads-up push)
+    # ------------------------------------------------------------------
+
+    def save_latest_fundamental_signal_cache(self, ticker: str, signal_json: str, when: datetime) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO latest_earnings_context (ticker, signal_json, updated_at) VALUES (?, ?, ?) "
+                "ON CONFLICT(ticker) DO UPDATE SET signal_json = excluded.signal_json, updated_at = excluded.updated_at",
+                (ticker.upper(), signal_json, when.isoformat()),
+            )
+            self._conn.commit()
+
+    def save_latest_longterm_report_cache(self, ticker: str, report_json: str, when: datetime) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO latest_earnings_context (ticker, report_json, updated_at) VALUES (?, ?, ?) "
+                "ON CONFLICT(ticker) DO UPDATE SET report_json = excluded.report_json, updated_at = excluded.updated_at",
+                (ticker.upper(), report_json, when.isoformat()),
+            )
+            self._conn.commit()
+
+    def load_latest_earnings_context(self) -> list[dict]:
+        """Returns every cached row (ticker/signal_json/report_json) --
+        either JSON field may be None if only one half has ever arrived
+        for that ticker. consumer.py re-parses each into its own typed
+        in-memory cache at startup."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT ticker, signal_json, report_json FROM latest_earnings_context"
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    # ------------------------------------------------------------------
+    # Restart-survival: per-ticker push cooldown (Smart Dispatch Filtering)
+    # ------------------------------------------------------------------
+
+    def save_last_telegram_push(self, ticker: str, horizon: str, when: datetime, price: float | None) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO last_telegram_push (ticker, horizon, pushed_at, price) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(ticker, horizon) DO UPDATE SET pushed_at = excluded.pushed_at, price = excluded.price",
+                (ticker.upper(), horizon, when.isoformat(), price),
+            )
+            self._conn.commit()
+
+    def load_last_telegram_pushes(self, horizon: str) -> dict[str, tuple[datetime, float]]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT ticker, pushed_at, price FROM last_telegram_push WHERE horizon = ?", (horizon,)
+            ).fetchall()
+        return {row["ticker"]: (datetime.fromisoformat(row["pushed_at"]), row["price"]) for row in rows}
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict:
