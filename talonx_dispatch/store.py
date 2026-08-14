@@ -44,7 +44,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from talonx_dispatch.schemas import ActionableAlert, LongTermActionableAlert
@@ -70,7 +70,17 @@ CREATE TABLE IF NOT EXISTS alerts (
     telegram_sent       INTEGER NOT NULL DEFAULT 0,
     telegram_sent_at    TEXT,
     telegram_error      TEXT,
-    suppress_reason     TEXT
+    suppress_reason     TEXT,
+    rsi                 REAL,
+    macd                REAL,
+    macd_signal_line    REAL,
+    volume_surge_ratio  REAL,
+    atr                 REAL,
+    stop_price          REAL,
+    target_price        REAL,
+    trend_aligned       INTEGER,
+    htf_sma_200         REAL,
+    session             TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_alerts_ticker ON alerts (ticker);
 CREATE INDEX IF NOT EXISTS idx_alerts_correlated_at ON alerts (correlated_at);
@@ -166,9 +176,19 @@ class AuditStore:
         if "revenue_eps_surprise" not in cols:
             self._conn.execute("ALTER TABLE long_term_alerts ADD COLUMN revenue_eps_surprise TEXT")
 
+        # `alerts` evolution: checking for the newest column ("rsi", the
+        # Phase 2 technical-detail fields) alone is sufficient -- any
+        # table missing it also predates suppress_reason, since both are
+        # older than this check. Per project direction, this local audit
+        # DB has no data worth preserving across the change: a stale
+        # `alerts` table is dropped and recreated from _SCHEMA (which
+        # already includes every column, suppress_reason included) rather
+        # than ALTER TABLE'd column-by-column, same approach as
+        # talonx_paper.store's `positions` table migration.
         alert_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(alerts)").fetchall()}
-        if "suppress_reason" not in alert_cols:
-            self._conn.execute("ALTER TABLE alerts ADD COLUMN suppress_reason TEXT")
+        if alert_cols and "rsi" not in alert_cols:
+            self._conn.execute("DROP TABLE alerts")
+            self._conn.executescript(_SCHEMA)
 
     def checkpoint(self) -> None:
         """Forces a WAL checkpoint (TRUNCATE mode). See
@@ -192,6 +212,7 @@ class AuditStore:
         self.close()
 
     def record_alert(self, alert: ActionableAlert) -> int:
+        sig = alert.triggering_signal
         with self._lock:
             cursor = self._conn.execute(
                 """
@@ -199,8 +220,10 @@ class AuditStore:
                     ticker, action, severity, rationale, quant_direction,
                     research_verdict, research_confidence, signal_type, price,
                     research_summary, key_findings_json, risk_factors_json,
-                    model_used, correlated_at, received_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    model_used, correlated_at, received_at,
+                    rsi, macd, macd_signal_line, volume_surge_ratio, atr,
+                    stop_price, target_price, trend_aligned, htf_sma_200, session
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     alert.ticker.upper(),
@@ -210,14 +233,18 @@ class AuditStore:
                     alert.quant_direction.value,
                     alert.research_verdict.value,
                     alert.research_confidence,
-                    alert.triggering_signal.signal_type,
-                    alert.triggering_signal.price,
+                    sig.signal_type,
+                    sig.price,
                     alert.research_summary,
                     json.dumps(alert.key_findings),
                     json.dumps(alert.risk_factors),
                     alert.model_used,
                     alert.correlated_at.isoformat(),
                     datetime.now(timezone.utc).isoformat(),
+                    sig.rsi, sig.macd, sig.macd_signal_line, sig.volume_surge_ratio, sig.atr,
+                    sig.stop_price, sig.target_price,
+                    None if sig.trend_aligned is None else int(sig.trend_aligned),
+                    sig.htf_sma_200, sig.session,
                 ),
             )
             self._conn.commit()
@@ -253,6 +280,22 @@ class AuditStore:
                 (reason, alert_id),
             )
             self._conn.commit()
+
+    def count_alerts_today(self) -> tuple[int, int]:
+        """`/ping`'s "Today's Signals Pushed" line -- (total_logs, pushed)
+        across BOTH alerts and long_term_alerts for the current UTC
+        calendar day. Reuses alerts_between/long_term_alerts_between
+        rather than a raw COUNT query since the row count here is always
+        small (a day's worth of alerts), and this keeps one indexed-
+        column comparison convention instead of a second query shape."""
+        now = datetime.now(timezone.utc)
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1)
+        intraday = self.alerts_between(start, end)
+        long_term = self.long_term_alerts_between(start, end)
+        total = len(intraday) + len(long_term)
+        pushed = sum(1 for r in intraday if r["telegram_sent"]) + sum(1 for r in long_term if r["telegram_sent"])
+        return total, pushed
 
     def get_by_id(self, alert_id: int) -> dict | None:
         """Single-row fetch for telegram_listener.py's reply-with-ID
@@ -451,6 +494,8 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
     d["key_findings"] = json.loads(d.pop("key_findings_json"))
     d["risk_factors"] = json.loads(d.pop("risk_factors_json"))
     d["telegram_sent"] = bool(d["telegram_sent"])
+    if "trend_aligned" in d and d["trend_aligned"] is not None:
+        d["trend_aligned"] = bool(d["trend_aligned"])
     return d
 
 

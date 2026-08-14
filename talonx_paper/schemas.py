@@ -64,6 +64,12 @@ class AlertSeverity(str, Enum):
 
 class TriggeringSignalRef(BaseModel):
     price: float
+    # ATR-anchored dollar stop/target (Phase 2 requirement doc) -- mirrored
+    # from talonx_core.schemas.QuantSignal, None when ATR wasn't available
+    # at signal time. See engine.check_stop_take for how these override
+    # the static stop_loss_pct/take_profit_pct config once a position is open.
+    stop_price: float | None = None
+    target_price: float | None = None
 
 
 class ActionableAlert(BaseModel):

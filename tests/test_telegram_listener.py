@@ -11,6 +11,8 @@ constructor is actually meant to be used.
 """
 from __future__ import annotations
 
+import json
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -203,6 +205,112 @@ async def test_telegram_send_failure_is_logged_not_raised(listener, store, teleg
 
 
 # --- run() / polling loop ----------------------------------------------------
+
+# --- /ping (Interactive System Health Check) --------------------------------
+
+def _dispatch_agent(started_at=None, redis_client=None):
+    agent = MagicMock()
+    agent.started_at = started_at or (datetime.now(timezone.utc) - timedelta(hours=14, minutes=22))
+    agent._client = redis_client
+    return agent
+
+
+@pytest.mark.parametrize("text", ["/ping", "ping", "PING", "  /Ping  "])
+@pytest.mark.asyncio
+async def test_ping_replies_with_pong(listener, store, telegram_client, text):
+    store.count_alerts_today.return_value = (86, 12)
+    listener.dispatch_agent = _dispatch_agent()
+
+    await listener._handle_update(_update(1, text))
+
+    telegram_client.send.assert_awaited_once()
+    reply = telegram_client.send.await_args.args[0]
+    assert "Pong" in reply
+    store.get_by_id.assert_not_called()  # never mistaken for an alert-ID lookup
+
+
+@pytest.mark.asyncio
+async def test_ping_reports_uptime_from_dispatch_agent(listener, store, telegram_client):
+    store.count_alerts_today.return_value = (0, 0)
+    listener.dispatch_agent = _dispatch_agent(
+        started_at=datetime.now(timezone.utc) - timedelta(hours=14, minutes=22)
+    )
+
+    await listener._handle_update(_update(1, "/ping"))
+
+    reply = telegram_client.send.await_args.args[0]
+    assert "14h 22m" in reply
+
+
+@pytest.mark.asyncio
+async def test_ping_reports_todays_signal_counts(listener, store, telegram_client):
+    store.count_alerts_today.return_value = (86, 12)
+    listener.dispatch_agent = _dispatch_agent()
+
+    await listener._handle_update(_update(1, "/ping"))
+
+    reply = telegram_client.send.await_args.args[0]
+    assert "12 Pushes" in reply
+    assert "86 Logs" in reply
+
+
+@pytest.mark.asyncio
+async def test_ping_reports_websocket_connected_via_polygon(listener, store, telegram_client):
+    store.count_alerts_today.return_value = (0, 0)
+    redis_client = AsyncMock()
+    redis_client.get.return_value = json.dumps({"source": "websocket", "connected": True})
+    listener.dispatch_agent = _dispatch_agent(redis_client=redis_client)
+
+    await listener._handle_update(_update(1, "/ping"))
+
+    reply = telegram_client.send.await_args.args[0]
+    assert "Connected (Polygon.io)" in reply
+
+
+@pytest.mark.asyncio
+async def test_ping_reports_websocket_connected_via_polling_fallback(listener, store, telegram_client):
+    store.count_alerts_today.return_value = (0, 0)
+    redis_client = AsyncMock()
+    redis_client.get.return_value = json.dumps({"source": "polling", "connected": True})
+    listener.dispatch_agent = _dispatch_agent(redis_client=redis_client)
+
+    await listener._handle_update(_update(1, "/ping"))
+
+    reply = telegram_client.send.await_args.args[0]
+    assert "yfinance polling" in reply
+
+
+@pytest.mark.asyncio
+async def test_ping_reports_websocket_disconnected_when_heartbeat_missing(listener, store, telegram_client):
+    store.count_alerts_today.return_value = (0, 0)
+    redis_client = AsyncMock()
+    redis_client.get.return_value = None  # heartbeat key expired/never set
+    listener.dispatch_agent = _dispatch_agent(redis_client=redis_client)
+
+    await listener._handle_update(_update(1, "/ping"))
+
+    reply = telegram_client.send.await_args.args[0]
+    assert "Disconnected" in reply
+
+
+@pytest.mark.asyncio
+async def test_ping_reports_uptime_unknown_without_dispatch_agent(listener, store, telegram_client):
+    store.count_alerts_today.return_value = (0, 0)
+    # listener.dispatch_agent stays None (constructor default) -- must not raise.
+
+    await listener._handle_update(_update(1, "/ping"))
+
+    reply = telegram_client.send.await_args.args[0]
+    assert "unknown" in reply
+    assert "Disconnected" not in reply  # no Redis client to even check
+
+
+@pytest.mark.asyncio
+async def test_ping_ignored_from_unrecognized_chat(listener, store, telegram_client):
+    await listener._handle_update(_update(1, "/ping", chat_id="99999"))
+
+    telegram_client.send.assert_not_awaited()
+
 
 @pytest.mark.asyncio
 async def test_run_is_a_noop_when_telegram_not_configured(store):

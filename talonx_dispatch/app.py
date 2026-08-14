@@ -44,6 +44,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import altair as alt
 import pandas as pd
+import redis
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
@@ -105,6 +106,16 @@ def get_paper_store(
         db_path, default_initial_balance, default_trade_allocation_usd,
         default_long_term_initial_balance, default_dca_contribution_usd,
     )
+
+
+@st.cache_resource
+def get_redis_client(redis_url: str) -> redis.Redis:
+    """Stage-Gate Metric Funnel's read side -- a SYNC redis client
+    (unlike every producer module's redis.asyncio, this is a plain
+    Streamlit script rerun, not an event loop) scoped to just the
+    metrics:* key namespace this dashboard reads. Cached the same way
+    every other store/connection on this page is."""
+    return redis.Redis.from_url(redis_url, decode_responses=True)
 
 
 def render_metrics(df: pd.DataFrame) -> None:
@@ -787,6 +798,100 @@ def _apply_date_range_filter(df: pd.DataFrame, date_col: str, date_range: tuple)
     return df[(dates >= start) & (dates <= end)]
 
 
+def _fetch_daily_metrics(client: redis.Redis, date_str: str) -> dict[str, dict[str, int]]:
+    """Reads every `metrics:{date_str}:{module}:{counter}` key written by
+    the 5 producer modules' `_incr_metric` helpers, grouped back into
+    {module: {counter: value}}. Returns {} (not raises) on a Redis
+    outage -- the rest of the dashboard must stay usable even if this
+    one tab's data source is down."""
+    metrics: dict[str, dict[str, int]] = {}
+    try:
+        keys = list(client.scan_iter(match=f"metrics:{date_str}:*", count=200))
+        if not keys:
+            return metrics
+        values = client.mget(keys)
+    except Exception as exc:  # noqa: BLE001 -- a Redis outage shouldn't crash the dashboard
+        st.warning(f"Could not read metrics from Redis: {exc}")
+        return metrics
+
+    for key, value in zip(keys, values):
+        if value is None:
+            continue
+        _, _, module, counter = key.split(":", 3)
+        try:
+            metrics.setdefault(module, {})[counter] = int(value)
+        except ValueError:
+            continue
+    return metrics
+
+
+# Matches the README's funnel formula: Bars Ingested -> Quant Triggers ->
+# LLM Evaluated -> Core Alerts -> Telegram Pushes. "Core Alerts" is
+# computed (sum of the three intraday action_* counters), not a single
+# key -- talonx_core doesn't publish one flat "alerts produced" counter.
+_FUNNEL_STAGES = ["Bars Ingested", "Quant Triggers", "LLM Evaluated", "Core Alerts", "Telegram Pushes"]
+# Single series, magnitude (not identity) -- one hue, not a categorical
+# palette; matches the app's existing accent usage (green/red/amber are
+# already reserved for win/loss/pause elsewhere on this dashboard).
+_FUNNEL_BAR_COLOR = "#2563EB"
+
+
+def _funnel_counts(metrics: dict[str, dict[str, int]]) -> list[dict]:
+    core = metrics.get("core", {})
+    core_alerts = core.get("action_bullish", 0) + core.get("action_bearish", 0) + core.get("action_contradicted", 0)
+    values = [
+        metrics.get("ingest", {}).get("bars_read", 0),
+        metrics.get("quant", {}).get("evaluated", 0),
+        metrics.get("brain", {}).get("received", 0),
+        core_alerts,
+        metrics.get("dispatch", {}).get("pushed_telegram", 0),
+    ]
+    return [{"Stage": stage, "Count": count} for stage, count in zip(_FUNNEL_STAGES, values)]
+
+
+def render_daily_funnel_metrics(client: redis.Redis) -> None:
+    st.subheader("\U0001F4CA Daily Funnel & System Metrics")
+    st.caption(
+        "Stage-gate counters published by every module (ingest → quant → brain → "
+        "core → dispatch) to Redis, keyed per UTC day. Pick a date to see exact throughput "
+        "and drop reasons at each stage."
+    )
+
+    selected_date = st.date_input("Date (UTC)", value=datetime.now(timezone.utc).date(), key="funnel_date")
+    date_str = selected_date.strftime("%Y-%m-%d")
+
+    metrics = _fetch_daily_metrics(client, date_str)
+    if not metrics:
+        st.info(f"No metrics recorded for {date_str} yet.")
+        return
+
+    funnel_df = pd.DataFrame(_funnel_counts(metrics))
+    chart = (
+        alt.Chart(funnel_df)
+        .mark_bar(cornerRadiusEnd=4, size=28, color=_FUNNEL_BAR_COLOR)
+        .encode(
+            y=alt.Y("Stage:N", sort=_FUNNEL_STAGES, title=None),
+            x=alt.X("Count:Q", title="Count"),
+            tooltip=["Stage", "Count"],
+        )
+        .properties(height=220)
+    )
+    st.altair_chart(chart, width="stretch")
+
+    st.markdown("**Stage-gate breakdown (all counters, this date)**")
+    st.caption(
+        "Failed-gate counters (quant:failed_*, dispatch:muted_*) show exactly which check "
+        "dropped a candidate -- cross-reference against the funnel above to see where "
+        "throughput was lost."
+    )
+    breakdown_rows = [
+        {"Module": module, "Counter": counter, "Count": value}
+        for module in sorted(metrics)
+        for counter, value in sorted(metrics[module].items())
+    ]
+    st.dataframe(pd.DataFrame(breakdown_rows), hide_index=True, width="stretch")
+
+
 def render_audit_trail(df: pd.DataFrame, long_term_rows: list[dict]) -> None:
     """Unified audit trail with a horizon filter -- a radio toggle rather
     than one merged table, since the intraday/long-term field sets differ
@@ -891,7 +996,10 @@ def main() -> None:
     # the selection survives the autorefresh rerun.
     section = st.radio(
         "View",
-        ["\U0001F4C8 Intraday Monitor", "\U0001F48E Long-Term Radar", "⚙️ Watchlist & Settings"],
+        [
+            "\U0001F4C8 Intraday Monitor", "\U0001F48E Long-Term Radar",
+            "\U0001F4CA Daily Funnel & Metrics", "⚙️ Watchlist & Settings",
+        ],
         horizontal=True,
         label_visibility="collapsed",
         key="active_section",
@@ -925,6 +1033,10 @@ def main() -> None:
         render_long_term_portfolio(paper_store)
         st.divider()
         render_long_term_research_viewer(long_term_alert_rows)
+
+    elif section == "\U0001F4CA Daily Funnel & Metrics":
+        redis_client = get_redis_client(config.redis_url)
+        render_daily_funnel_metrics(redis_client)
 
     else:
         render_ticker_watchlist(watchlist_store, watchlist_config.poll_interval_seconds)

@@ -74,6 +74,25 @@ def _jittered_backoff(attempt: int, base: float, max_delay: float) -> float:
     return capped * (0.5 + random.random())
 
 
+async def _incr_metric(client, stage: str, counter: str, amount: int = 1) -> None:
+    """Stage-Gate Metric Funnel (Phase 2 requirement doc): atomic,
+    per-UTC-day Redis counters at `metrics:{YYYY-MM-DD}:{stage}:{counter}`,
+    read by talonx_dispatch's Daily Funnel dashboard tab. Each module
+    re-declares this same small helper locally rather than sharing one --
+    same "no internal library between modules" convention this project
+    uses everywhere else. Never raises -- a metrics-write failure must
+    not affect correlation/decisioning."""
+    if client is None or amount <= 0:
+        return
+    key = f"metrics:{datetime.now(timezone.utc):%Y-%m-%d}:{stage}:{counter}"
+    try:
+        new_value = await client.incrby(key, amount)
+        if new_value == amount:
+            await client.expire(key, 2764800)  # 32 days
+    except Exception as exc:  # noqa: BLE001 -- telemetry must never break correlation/decisioning
+        logger.debug("Metric increment failed for %s: %s", key, exc)
+
+
 class DecisionEngine:
     def __init__(
         self,
@@ -222,8 +241,15 @@ class DecisionEngine:
 
         state = self.correlator.get_or_create(ticker)
         alert, reason = evaluate_verbose(state, self.config)
+        await _incr_metric(self._client, "core", "correlated")
         if alert is not None:
             await self._publish_alert(alert)
+            if alert.action == AlertAction.CONFIRMED_BULLISH:
+                await _incr_metric(self._client, "core", "action_bullish")
+            elif alert.action == AlertAction.CONFIRMED_BEARISH:
+                await _incr_metric(self._client, "core", "action_bearish")
+            elif alert.action == AlertAction.CONTRADICTED:
+                await _incr_metric(self._client, "core", "action_contradicted")
             self.correlator.mark_alerted(
                 ticker, action=alert.action, price=alert.triggering_signal.price, when=alert.correlated_at,
             )

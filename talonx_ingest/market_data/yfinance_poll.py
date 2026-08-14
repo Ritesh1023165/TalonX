@@ -45,6 +45,15 @@ class YFinancePoller:
         Poll all symbols every `yfinance_poll_interval_seconds`, emitting
         one BAR-type MarketEvent per symbol per successful cycle. Runs
         until `stop()` is called.
+
+        A cycle where most/all symbols fail per-symbol (see
+        _fetch_snapshots) is treated as a DEGRADED cycle, not a silent
+        success -- it gets the same backoff a hard exception would, and
+        after enough consecutive degraded/failed cycles proactively
+        resets yfinance's cached session (_reset_session) rather than
+        repeating the same doomed request pattern indefinitely. Without
+        this, a stuck yfinance session previously required a manual
+        process restart to recover from.
         """
         logger.info(
             "Starting yfinance polling for %d symbols every %.0fs",
@@ -55,11 +64,9 @@ class YFinancePoller:
         while not self._stop_event.is_set():
             try:
                 snapshots = await asyncio.to_thread(self._fetch_snapshots, symbols)
-                consecutive_failures = 0
-                for event in snapshots:
-                    await on_event(event)
             except Exception as exc:  # noqa: BLE001 -- keep polling alive regardless
                 consecutive_failures += 1
+                self._maybe_reset_session(consecutive_failures)
                 wait = jittered_backoff_seconds(
                     consecutive_failures,
                     self.config.yfinance_backoff_base_seconds,
@@ -72,7 +79,32 @@ class YFinancePoller:
                 await asyncio.sleep(wait)
                 continue
 
+            for event in snapshots:
+                await on_event(event)
+
+            failure_rate = 1.0 - (len(snapshots) / len(symbols) if symbols else 1.0)
+            if len(symbols) >= 3 and failure_rate >= self.config.yfinance_degraded_cycle_failure_rate:
+                consecutive_failures += 1
+                self._maybe_reset_session(consecutive_failures)
+                wait = jittered_backoff_seconds(
+                    consecutive_failures,
+                    self.config.yfinance_backoff_base_seconds,
+                    self.config.yfinance_backoff_max_seconds,
+                )
+                logger.warning(
+                    "yfinance poll cycle degraded: only %d/%d symbols returned data "
+                    "(%.0f%% failure, %d consecutive); backing off %.1fs",
+                    len(snapshots), len(symbols), failure_rate * 100, consecutive_failures, wait,
+                )
+                await asyncio.sleep(wait)
+                continue
+
+            consecutive_failures = 0
             await self._sleep_or_stop(self.config.yfinance_poll_interval_seconds)
+
+    def _maybe_reset_session(self, consecutive_failures: int) -> None:
+        if consecutive_failures > 0 and consecutive_failures % self.config.yfinance_session_reset_after_failures == 0:
+            _reset_yfinance_session()
 
     async def _sleep_or_stop(self, seconds: float) -> None:
         try:
@@ -123,6 +155,39 @@ class YFinancePoller:
                 continue
 
         return events
+
+
+def _reset_yfinance_session() -> None:
+    """
+    yfinance.data.YfData is a process-wide singleton holding one cached
+    HTTP session + auth 'crumb' for the whole process (its own docstring:
+    "Singleton means one session one cookie shared by all threads"). A
+    long enough run can get that singleton stuck in a bad state -- e.g.
+    Yahoo rate-limiting or otherwise degrading the cached session's
+    responses, which surfaces as a bare KeyError deep in yfinance's own
+    parsing code (scrapers/quote.py's timezone lookup has no fallback
+    for a malformed/incomplete response) rather than a clean, retryable
+    exception. A fresh Python process gets a brand new singleton and
+    immediately works again -- this reproduces that same fresh-start
+    effect in-process by dropping the cached crumb/cookie and building a
+    new underlying requests session, so the NEXT poll cycle re-authenticates
+    from scratch instead of repeating the same doomed request pattern.
+
+    Reaches into yfinance's private (`_`-prefixed) internals since there's
+    no public reset API for this -- deliberately wrapped in a single
+    broad except so a yfinance internals change in a future version
+    degrades this to a no-op (logged) rather than crashing the poller.
+    """
+    try:
+        from yfinance.data import YfData, new_session
+
+        data = YfData()
+        data._crumb = None
+        data._cookie = None
+        data._set_session(new_session())
+        logger.warning("Reset yfinance's cached session/crumb after repeated degraded poll cycles")
+    except Exception as exc:  # noqa: BLE001 -- best-effort; never let this crash the poller
+        logger.debug("yfinance session reset failed (non-fatal): %s", exc)
 
 
 def _safe_float(value) -> float | None:

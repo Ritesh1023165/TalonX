@@ -179,9 +179,62 @@ class QuantConfig:
     # talonx_dispatch/formatter.py's _VALUATION_EXIT_PREMIUM already
     # uses for a different cross-module display value), so the ratio
     # actually varies with each ticker's ATR-to-price relationship.
-    atr_reward_multiplier: float = _env_float("TALONX_QUANT_ATR_REWARD_MULTIPLIER", 1.5)
+    # Phase 2 requirement doc default: reward = 2.0x ATR, stop = 1.0x ATR
+    # (atr_stop_multiplier below) -- both explicit ATR multiples now, so
+    # stop_price/target_price (see schemas.QuantSignal) are real, dollar-
+    # denominated levels rather than just a ratio. min_risk_reward_ratio
+    # stays a live gate (not a permanent no-op) because a signal can still
+    # have atr=None (insufficient history) or the two multipliers can be
+    # tuned independently via env vars.
+    atr_reward_multiplier: float = _env_float("TALONX_QUANT_ATR_REWARD_MULTIPLIER", 2.0)
+    atr_stop_multiplier: float = _env_float("TALONX_QUANT_ATR_STOP_MULTIPLIER", 1.0)
     assumed_stop_loss_pct: float = _env_float("TALONX_QUANT_ASSUMED_STOP_LOSS_PCT", 0.005)
     min_risk_reward_ratio: float = _env_float("TALONX_QUANT_MIN_RISK_REWARD_RATIO", 1.5)
+
+    # --- 15-minute 200 SMA higher-timeframe trend gate ---
+    # A second, coarser RollingBarBuffer (see consumer.py's buffer_htf),
+    # incrementally aggregated from the same 1-min BAR events that feed
+    # the primary buffer -- only needs htf_sma_period+a few bars of
+    # capacity (~210 rows), far cheaper than inflating the 1-min buffer
+    # 15x to resample from scratch. Regular-session, BULLISH-only gate:
+    # drops a bullish candidate whose price is at/below the 15m 200 SMA.
+    htf_bar_interval_minutes: int = _env_int("TALONX_QUANT_HTF_BAR_INTERVAL_MINUTES", 15)
+    htf_sma_period: int = _env_int("TALONX_QUANT_HTF_SMA_PERIOD", 200)
+    htf_max_bars: int = _env_int("TALONX_QUANT_HTF_MAX_BARS", 210)
+    trend_gate_enabled: bool = _env_bool("TALONX_QUANT_TREND_GATE_ENABLED", True)
+
+    # --- Pre-market session rules (04:00-09:30 America/New_York) ---
+    # Stricter volume-surge bar than the regular-session default above,
+    # plus a liquidity gate (dollar volume + bid-ask spread) and a news-
+    # catalyst requirement -- pre-market liquidity is thin enough that the
+    # regular-session thresholds alone aren't a meaningful filter. All
+    # three pre-market-only checks are FAIL-CLOSED: if the data needed to
+    # confirm a gate is missing (no recent quote, no news ever seen for
+    # the ticker), the candidate is dropped rather than assumed to pass.
+    premarket_volume_surge_ratio_threshold: float = _env_float(
+        "TALONX_QUANT_PREMARKET_VOLUME_SURGE_RATIO", 3.0
+    )
+    premarket_min_dollar_volume_per_min: float = _env_float(
+        "TALONX_QUANT_PREMARKET_MIN_DOLLAR_VOLUME_PER_MIN", 100_000.0
+    )
+    premarket_max_spread_pct: float = _env_float(
+        "TALONX_QUANT_PREMARKET_MAX_SPREAD_PCT", 0.0012
+    )
+    # A QUOTE event older than this is treated as "no live quote" for the
+    # spread gate -- pre-market quotes can go stale for illiquid names.
+    premarket_quote_staleness_seconds: float = _env_float(
+        "TALONX_QUANT_PREMARKET_QUOTE_STALENESS_SECONDS", 120.0
+    )
+    news_catalyst_lookback_hours: float = _env_float(
+        "TALONX_QUANT_NEWS_CATALYST_LOOKBACK_HOURS", 4.0
+    )
+    # talonx_ingest.news.pipeline publishes one NewsArticleIngestedEvent
+    # per newly-ingested article to this channel (mirrors filings_channel
+    # above) -- this module only tracks the MOST RECENT timestamp per
+    # ticker, not article content, for the 4h-lookback check.
+    news_events_channel: str = os.environ.get(
+        "TALONX_REDIS_NEWS_EVENTS_CHANNEL", "talonx:news:events"
+    )
 
     # Post-loss lockout: talonx_paper's own trade-execution channel is
     # subscribed to (paper_trades_channel below) purely to detect a
@@ -208,6 +261,28 @@ class QuantConfig:
     db_path: str = os.environ.get(
         "TALONX_QUANT_DB_PATH", str(Path.home() / ".talonx" / "quant.db")
     )
+
+    # --- Buffer persistence (survive a restart without a full re-warm-up) ---
+    # How often to snapshot both RollingBarBuffers to quant.db (gated on
+    # enable_persistence above, same as suppression counts). Also
+    # snapshotted once on a graceful stop().
+    buffer_checkpoint_interval_seconds: float = _env_float("TALONX_QUANT_BUFFER_CHECKPOINT_SECONDS", 60.0)
+    # Only the 1-min buffer's reload is gap-gated by this: RSI/MACD/ATR
+    # crossover detection compares consecutive bars, and a large gap
+    # (e.g. an overnight shutdown) would make the first live bar after
+    # reload look like one giant single-bar move, potentially firing a
+    # signal purely off the overnight gap rather than a real intraday
+    # move. If the most recent persisted 1-min bar for a symbol is older
+    # than this, that symbol's 1-min buffer is discarded and re-warms up
+    # normally instead of being reloaded stale.
+    #
+    # The 15-min HTF buffer (htf_sma_200, a slow trend-direction read,
+    # never signal-triggering) has NO such gate -- it's deliberately
+    # reloaded regardless of gap size, since surviving exactly this kind
+    # of gap is the whole point: 200 bars needs ~50 continuous hours to
+    # warm up from empty, which a daily restart can never accumulate on
+    # its own.
+    buffer_reload_max_gap_seconds: float = _env_float("TALONX_QUANT_BUFFER_RELOAD_MAX_GAP_SECONDS", 900.0)
 
     # --- Phase 2 LONG_TERM path: fundamental factor scoring ---
     # A sibling pipeline to everything above, not a second loop inside

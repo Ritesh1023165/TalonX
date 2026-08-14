@@ -109,3 +109,88 @@ def test_latest_factors_persist_across_reopen(tmp_path):
 
     with QuantStateStore(path) as store2:
         assert store2.get_latest_factors("AAPL")["fiscal_year"] == 2025
+
+
+# ==========================================================================
+# Buffer persistence -- bar_buffer (survive a restart without a re-warm-up)
+# ==========================================================================
+
+def _bars(n: int, start: datetime = NOW, step_seconds: int = 60) -> list[dict]:
+    return [
+        {
+            "timestamp": start + timedelta(seconds=step_seconds * i),
+            "open": 100.0 + i, "high": 101.0 + i, "low": 99.0 + i,
+            "close": 100.5 + i, "volume": 1000.0 + i,
+        }
+        for i in range(n)
+    ]
+
+
+def test_load_buffer_returns_empty_list_when_never_checkpointed(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        assert store.load_buffer("AAPL", "1m") == []
+
+
+def test_checkpoint_and_load_buffer_round_trips_in_chronological_order(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        bars = _bars(3)
+        store.checkpoint_buffer("aapl", "1m", bars)
+
+        loaded = store.load_buffer("AAPL", "1m")
+        assert len(loaded) == 3
+        assert loaded[0]["close"] == 100.5
+        assert loaded[-1]["close"] == 102.5
+        assert loaded[0]["timestamp"] == bars[0]["timestamp"].isoformat()
+
+
+def test_checkpoint_buffer_replaces_not_appends(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.checkpoint_buffer("AAPL", "1m", _bars(3))
+        store.checkpoint_buffer("AAPL", "1m", _bars(2, start=NOW + timedelta(hours=1)))
+
+        loaded = store.load_buffer("AAPL", "1m")
+        assert len(loaded) == 2  # old snapshot fully replaced, not merged
+
+
+def test_checkpoint_buffer_keeps_1m_and_15m_independent(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.checkpoint_buffer("AAPL", "1m", _bars(3))
+        store.checkpoint_buffer("AAPL", "15m", _bars(2, step_seconds=900))
+
+        assert len(store.load_buffer("AAPL", "1m")) == 3
+        assert len(store.load_buffer("AAPL", "15m")) == 2
+
+
+def test_checkpoint_buffer_keeps_symbols_independent(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.checkpoint_buffer("AAPL", "1m", _bars(3))
+        store.checkpoint_buffer("MSFT", "1m", _bars(1))
+
+        assert len(store.load_buffer("AAPL", "1m")) == 3
+        assert len(store.load_buffer("MSFT", "1m")) == 1
+
+
+def test_buffered_symbols_lists_only_symbols_with_that_buffer_type(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.checkpoint_buffer("AAPL", "1m", _bars(1))
+        store.checkpoint_buffer("MSFT", "15m", _bars(1))
+
+        assert store.buffered_symbols("1m") == ["AAPL"]
+        assert store.buffered_symbols("15m") == ["MSFT"]
+
+
+def test_checkpoint_buffer_with_empty_list_clears_the_symbol(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.checkpoint_buffer("AAPL", "1m", _bars(3))
+        store.checkpoint_buffer("AAPL", "1m", [])
+
+        assert store.load_buffer("AAPL", "1m") == []
+
+
+def test_buffer_persists_across_reopen(tmp_path):
+    path = tmp_path / "quant.db"
+    with QuantStateStore(path) as store:
+        store.checkpoint_buffer("AAPL", "1m", _bars(3))
+
+    with QuantStateStore(path) as store2:
+        assert len(store2.load_buffer("AAPL", "1m")) == 3

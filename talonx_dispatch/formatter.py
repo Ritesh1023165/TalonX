@@ -209,6 +209,43 @@ def format_telegram_summary(alert: ActionableAlert, alert_id: int, company_name:
     return "\n".join(lines)
 
 
+def _format_technical_section(row: dict) -> list[str]:
+    """Phase 2 requirement doc's Long Reply technical-indicator section --
+    MACD cross/RSI level/volume surge ratio/15m 200 SMA trend status/ATR
+    stop-target. Every value is optional (None for a long-term alert, or
+    any row that predates these columns) -- only lines with real data are
+    emitted, same conditional-section style the key_findings/risk_factors
+    blocks below already use."""
+    lines: list[str] = []
+
+    rsi, macd, macd_signal, vol_surge = (
+        row.get("rsi"), row.get("macd"), row.get("macd_signal_line"), row.get("volume_surge_ratio"),
+    )
+    if rsi is not None or macd is not None or vol_surge is not None:
+        parts = []
+        if rsi is not None:
+            parts.append(f"RSI: {rsi:.1f}")
+        if macd is not None and macd_signal is not None:
+            cross = "bullish" if macd > macd_signal else "bearish"
+            parts.append(f"MACD: {cross} cross")
+        if vol_surge is not None:
+            parts.append(f"Vol Surge: {vol_surge:.1f}x")
+        lines.append(f"\U0001F4C8 {' | '.join(parts)}")
+
+    htf_sma_200, trend_aligned = row.get("htf_sma_200"), row.get("trend_aligned")
+    if htf_sma_200 is not None:
+        status = "Aligned" if trend_aligned else "Not Aligned"
+        lines.append(
+            f"\U0001F4D0 15m 200 SMA Trend: {status} (price ${row['price']:,.2f} vs SMA ${htf_sma_200:,.2f})"
+        )
+
+    stop_price, target_price = row.get("stop_price"), row.get("target_price")
+    if stop_price is not None and target_price is not None:
+        lines.append(f"\U0001F3AF Target: ${target_price:,.2f}  |  \U0001F6D1 Stop: ${stop_price:,.2f}")
+
+    return lines
+
+
 def format_telegram_details(row: dict) -> str:
     action = AlertAction(row["action"])
     severity = AlertSeverity(row["severity"])
@@ -221,9 +258,12 @@ def format_telegram_details(row: dict) -> str:
         "",
         f"Price: ${row['price']:,.2f}",
         f"Research: {row['research_verdict']} ({row['research_confidence']:.0%} confidence)",
-        "",
-        escape_markdown(_truncate(row["rationale"], 800)),
     ]
+    technical_lines = _format_technical_section(row)
+    if technical_lines:
+        lines.extend(technical_lines)
+    lines.append("")
+    lines.append(escape_markdown(_truncate(row["rationale"], 800)))
 
     if row["key_findings"]:
         lines.append("")

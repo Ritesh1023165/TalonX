@@ -49,7 +49,15 @@ class SignalDirection(str, Enum):
 
 
 class QuantSignal(BaseModel):
-    """Mirrors talonx_quant.schemas.QuantSignal -- consumed from talonx:signals:quant."""
+    """Mirrors talonx_quant.schemas.QuantSignal -- consumed from talonx:signals:quant.
+
+    Widened (Phase 2 requirement doc) to carry atr/stop_price/target_price/
+    trend_aligned/htf_sma_200 through to ActionableAlert.triggering_signal --
+    previously even more trimmed than talonx_quant's own schema (lacked
+    atr/confluence_score/risk_reward_ratio entirely). talonx_paper needs
+    stop_price/target_price for ATR-anchored exits; talonx_dispatch needs
+    all of these plus rsi/macd/volume_surge_ratio for the Telegram detail
+    reply's technical-indicator section."""
 
     ticker: str
     signal_type: SignalType
@@ -64,6 +72,12 @@ class QuantSignal(BaseModel):
     sma_slow: float | None = None
     volume: float | None = None
     volume_surge_ratio: float | None = None
+    atr: float | None = None
+    stop_price: float | None = None
+    target_price: float | None = None
+    trend_aligned: bool | None = None
+    htf_sma_200: float | None = None
+    session: str | None = None
 
     bar_timestamp: datetime
     published_at: datetime | None = None

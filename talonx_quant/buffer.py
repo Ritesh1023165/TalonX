@@ -87,3 +87,10 @@ class RollingBarBuffer:
 
     def known_symbols(self) -> list[str]:
         return list(self._bars.keys())
+
+    def get_bars(self, symbol: str) -> list[dict]:
+        """Raw bar dicts (timestamp/open/high/low/close/volume) in
+        chronological order -- exactly the internal deque shape, no
+        DataFrame round-trip. This is the buffer-persistence checkpoint's
+        source (see QuantScanner._checkpoint_all_buffers)."""
+        return list(self._bars.get(symbol.upper(), ()))

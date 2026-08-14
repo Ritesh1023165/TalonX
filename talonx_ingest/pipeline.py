@@ -136,6 +136,7 @@ async def _publish_filing_event(
         is_earnings_related=is_earnings_related,
     )
     await publisher.publish_filing_ingested(event)
+    await publisher.incr_metric("ingest", "filings_parsed")
 
 
 async def ingest_long_term_financials(

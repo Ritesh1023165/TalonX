@@ -254,11 +254,14 @@ def test_mark_telegram_failed_sets_suppress_reason_to_the_literal_none_value(tmp
         assert row["suppress_reason"] == "NONE"
 
 
-def test_migrates_an_alerts_table_from_before_the_suppress_reason_column(tmp_path):
-    """Simulates a real pre-existing dispatch_audit.db from before
-    suppress_reason was added to `alerts` -- same idempotent-migration
-    guard as the long_term_alerts/summary test below. A pre-existing row
-    must survive with suppress_reason=None, and the store stays usable."""
+def test_stale_alerts_table_is_dropped_and_recreated_not_migrated_in_place(tmp_path):
+    """Simulates a real pre-existing dispatch_audit.db from before the
+    Phase 2 technical-detail columns (rsi/macd/.../session) were added to
+    `alerts`. Per project direction, this table is dropped and recreated
+    on startup rather than ALTER TABLE'd -- local dev audit data isn't
+    worth an incremental migration for this change, unlike every other
+    table's guard in this file. The pre-existing row does NOT survive;
+    the store must still come up clean and usable afterward."""
     db_path = tmp_path / "legacy_audit.db"
 
     legacy_conn = sqlite3.connect(db_path)
@@ -285,11 +288,15 @@ def test_migrates_an_alerts_table_from_before_the_suppress_reason_column(tmp_pat
 
     with AuditStore(db_path) as store:
         rows = store.recent()
-        assert len(rows) == 1
-        assert rows[0]["suppress_reason"] is None
+        assert rows == []  # dropped, not migrated -- the legacy row is gone
 
-        store.mark_suppressed(rows[0]["id"], "PUSH_COOLDOWN_ACTIVE")
-        assert store.get_by_id(rows[0]["id"])["suppress_reason"] == "PUSH_COOLDOWN_ACTIVE"
+        # Store is fully usable afterward, with the new columns present.
+        alert_id = store.record_alert(_alert())
+        row = store.get_by_id(alert_id)
+        assert row["suppress_reason"] is None
+        assert "rsi" in row
+        store.mark_suppressed(alert_id, "PUSH_COOLDOWN_ACTIVE")
+        assert store.get_by_id(alert_id)["suppress_reason"] == "PUSH_COOLDOWN_ACTIVE"
 
 
 def test_state_persists_across_reopen(tmp_path):

@@ -72,6 +72,25 @@ except ImportError:  # pragma: no cover - exercised only when dependency missing
     redis_asyncio = None
 
 
+async def _incr_metric(client, stage: str, counter: str, amount: int = 1) -> None:
+    """Stage-Gate Metric Funnel (Phase 2 requirement doc): atomic,
+    per-UTC-day Redis counters at `metrics:{YYYY-MM-DD}:{stage}:{counter}`,
+    read by talonx_dispatch's Daily Funnel dashboard tab. Each module
+    re-declares this same small helper locally rather than sharing one --
+    same "no internal library between modules" convention this project
+    uses everywhere else. Never raises -- a metrics-write failure must
+    not affect research generation."""
+    if client is None or amount <= 0:
+        return
+    key = f"metrics:{datetime.now(timezone.utc):%Y-%m-%d}:{stage}:{counter}"
+    try:
+        new_value = await client.incrby(key, amount)
+        if new_value == amount:
+            await client.expire(key, 2764800)  # 32 days
+    except Exception as exc:  # noqa: BLE001 -- telemetry must never break research generation
+        logger.debug("Metric increment failed for %s: %s", key, exc)
+
+
 class ResearchAgent:
     def __init__(
         self,
@@ -206,6 +225,7 @@ class ResearchAgent:
             return
 
         self._signals_processed += 1
+        await _incr_metric(self._client, "brain", "received")
         logger.info(
             "Researching %s trigger for %s: %s",
             signal.signal_type.value, signal.ticker, signal.message,
@@ -268,6 +288,7 @@ class ResearchAgent:
             return
 
         self._fundamentals_processed += 1
+        await _incr_metric(self._client, "brain", "received")
         logger.info(
             "Researching long-term thesis for %s (FY%d): %s",
             signal.ticker, signal.fiscal_year, signal.message,
@@ -302,6 +323,7 @@ class ResearchAgent:
             hit = await self.cache.get(ticker)
             if hit is not None and hit[1]:  # fresh
                 logger.info("Cache hit for %s -- skipping retrieval and the LLM call", ticker)
+                await _incr_metric(self._client, "brain", "cache_hits")
                 return hit[0].model_copy(update={"triggering_signal": signal, "from_cache": True})
 
         acquired = False
@@ -359,6 +381,7 @@ class ResearchAgent:
             logger.info("No filing or news context at all for %s -- bypassing the LLM", signal.ticker)
             return _insufficient_context_report(signal)
 
+        await _incr_metric(self._client, "brain", "llm_calls")
         try:
             findings = await self.llm_chain.generate(signal, citations)
         except Exception as exc:  # noqa: BLE001 -- fall back rather than losing this signal entirely
@@ -450,6 +473,7 @@ class ResearchAgent:
             hit = await self.cache.get(ticker, horizon="long_term")
             if hit is not None and hit[1]:  # fresh
                 logger.info("Long-term cache hit for %s -- skipping retrieval and the LLM call", ticker)
+                await _incr_metric(self._client, "brain", "cache_hits")
                 return hit[0].model_copy(update={"triggering_signal": signal, "from_cache": True})
 
         acquired = False
@@ -493,6 +517,7 @@ class ResearchAgent:
             logger.info("No filing context at all for %s -- bypassing the LLM", signal.ticker)
             return _insufficient_context_long_term_report(signal)
 
+        await _incr_metric(self._client, "brain", "llm_calls")
         try:
             findings = await self.long_term_llm_chain.generate(signal, citations)
         except Exception as exc:  # noqa: BLE001 -- fall back rather than losing this signal entirely

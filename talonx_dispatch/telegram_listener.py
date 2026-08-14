@@ -34,13 +34,27 @@ information disclosure about which IDs exist to an unrecognized chat).
 Operational note: Telegram allows only ONE get_updates poller per bot
 token at a time -- running two DispatchAgent processes against the same
 token will make the second one's polling fail with HTTP 409 Conflict.
+
+Interactive System Health Check (Phase 2 requirement doc): a bare "/ping"
+or "ping" message is handled BEFORE the alert-ID pattern below, replying
+with process uptime, CPU/RAM, the ingest WebSocket's heartbeat status
+(a Redis key, not a channel -- see talonx_ingest.events.publisher.
+RedisEventPublisher.write_ws_heartbeat), and today's signal counts from
+the audit trail. `dispatch_agent` (optional, set by consumer.py) is how
+this otherwise-standalone-testable class reaches DispatchAgent's process
+start time and live Redis client without a hard constructor dependency --
+None just means /ping still replies, with "unknown" for anything it needs
+the agent for.
 """
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
+from datetime import datetime, timezone
 
+import psutil
 from telegram import Bot, Update
 from telegram.error import TelegramError
 
@@ -66,10 +80,16 @@ class TelegramReplyListener:
         store: AuditStore,
         config: DispatchConfig | None = None,
         telegram_client: TelegramClient | None = None,
+        dispatch_agent=None,
     ):
         self.store = store
         self.config = config or DispatchConfig()
         self.telegram_client = telegram_client or TelegramClient(self.config)
+        # Optional -- see module docstring. Gives /ping access to
+        # DispatchAgent.started_at (uptime) and its live Redis client (WS
+        # heartbeat lookup) without a hard constructor dependency.
+        self.dispatch_agent = dispatch_agent
+        self._process = psutil.Process()
         self._stop_event = asyncio.Event()
         self._replies_sent = 0
 
@@ -140,6 +160,10 @@ class TelegramReplyListener:
             logger.warning("Ignoring Telegram message from unrecognized chat_id=%s", message.chat_id)
             return
 
+        if message.text.strip().lower() in ("/ping", "ping"):
+            await self._handle_ping()
+            return
+
         parsed = _parse_alert_id(message.text)
         if parsed is None:
             await self._reply(
@@ -169,6 +193,52 @@ class TelegramReplyListener:
             return
 
         await self._reply(format_telegram_details(row))
+
+    async def _handle_ping(self) -> None:
+        """Interactive System Health Check -- replies within the same
+        long-poll turn that received the message (no extra network hop
+        beyond the Telegram send itself), well under the spec's <1s target."""
+        cpu_pct = self._process.cpu_percent(interval=None)
+        mem_used_gb = self._process.memory_info().rss / (1024 ** 3)
+        mem_total_gb = psutil.virtual_memory().total / (1024 ** 3)
+        total_today, pushed_today = self.store.count_alerts_today()
+
+        lines = [
+            "\U0001F3D3 Pong! TalonX Engine Online",
+            "─" * 30,
+            "\U0001F7E2 Server Status: Active / Healthy",
+            f"⏱️ Uptime: {self._format_uptime()}",
+            f"\U0001F4BB CPU Usage: {cpu_pct:.1f}%  |  RAM: {mem_used_gb:.1f} GB / {mem_total_gb:.1f} GB",
+            f"\U0001F4E1 WebSocket Stream: {await self._ws_status()}",
+            f"\U0001F4CA Today's Signals Pushed: {pushed_today} Pushes ({total_today} Logs)",
+        ]
+        await self._reply("\n".join(lines))
+
+    def _format_uptime(self) -> str:
+        if self.dispatch_agent is None or getattr(self.dispatch_agent, "started_at", None) is None:
+            return "unknown"
+        total_seconds = int((datetime.now(timezone.utc) - self.dispatch_agent.started_at).total_seconds())
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, _ = divmod(remainder, 60)
+        return f"{hours}h {minutes}m"
+
+    async def _ws_status(self) -> str:
+        client = getattr(self.dispatch_agent, "_client", None)
+        if client is None:
+            return "Unknown (no Redis connection)"
+        try:
+            raw = await client.get(self.config.ws_heartbeat_key)
+        except Exception as exc:  # noqa: BLE001 -- a status-check failure must not break /ping
+            logger.warning("WS heartbeat lookup failed: %s", exc)
+            return "Unknown"
+        if raw is None:
+            return "Disconnected"
+        try:
+            source = json.loads(raw).get("source")
+        except (TypeError, ValueError):
+            return "Connected"
+        label = "Polygon.io" if source == "websocket" else "yfinance polling" if source == "polling" else source
+        return f"Connected ({label})" if label else "Connected"
 
     async def _reply(self, text: str) -> None:
         try:

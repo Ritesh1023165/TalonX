@@ -97,6 +97,24 @@ class NewFundamentalsIngestedEvent(BaseModel):
         return self.model_dump_json()
 
 
+class NewsArticleIngestedEvent(BaseModel):
+    """
+    Published to the `talonx:news:events` Redis channel once per newly-
+    ingested news/social article -- talonx_quant's pre-market news-
+    catalyst gate trigger (requires a catalyst within the last N hours).
+    Deliberately minimal, same "consumer only needs recency, not content"
+    reasoning as NewFilingIngestedEvent's own trimmed-mirror consumers:
+    talonx_quant only tracks the MOST RECENT published_at per ticker, it
+    never reads article text.
+    """
+
+    ticker: str
+    published_at: datetime
+
+    def to_redis_payload(self) -> str:
+        return self.model_dump_json()
+
+
 class NewFilingIngestedEvent(BaseModel):
     """
     Published to the `talonx:filings:events` Redis channel once per filing,

@@ -109,6 +109,24 @@ class QuantSignal(BaseModel):
     confluence_score: int | None = None
     risk_reward_ratio: float | None = None
 
+    # Phase 2 requirement doc: explicit dollar stop/target (1x/2x ATR),
+    # rather than only the derived ratio above -- see strategy.py's
+    # _stop_target_prices. None when atr is None (insufficient history).
+    stop_price: float | None = None
+    target_price: float | None = None
+
+    # 15-min 200 SMA higher-timeframe trend gate (regular session, BULLISH
+    # candidates only -- see strategy.py). trend_aligned is None when the
+    # gate doesn't apply to this signal (bearish, pre-market, or the HTF
+    # buffer hasn't warmed up yet), not "failed".
+    trend_aligned: bool | None = None
+    htf_sma_200: float | None = None
+
+    # Session this candidate's triggering bar fell in -- carried through
+    # so downstream consumers (talonx_dispatch's detail reply) can label
+    # a push "Pre-Market" vs "Regular" without recomputing it.
+    session: str | None = None
+
     bar_timestamp: datetime
     published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -191,6 +209,16 @@ class NewFilingIngestedEvent(BaseModel):
     ticker: str
     form_type: str
     is_earnings_related: bool = False
+
+
+class NewsArticleIngestedEvent(BaseModel):
+    """Trimmed mirror of talonx_ingest.events.schemas.NewsArticleIngestedEvent
+    -- consumed from talonx:news:events, the pre-market news-catalyst
+    gate's trigger. This module only tracks the most recent published_at
+    per ticker (see consumer.py's _last_news_seen), never article text."""
+
+    ticker: str
+    published_at: datetime
 
 
 class FundamentalFactorSignal(BaseModel):

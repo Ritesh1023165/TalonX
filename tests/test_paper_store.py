@@ -61,6 +61,31 @@ def test_execute_buy_opens_a_position_and_debits_cash(tmp_path):
         assert store.get_portfolio_summary()["current_cash"] == 9000.0
 
 
+def test_execute_buy_persists_atr_stop_and_target_prices(tmp_path):
+    with _store(tmp_path) as store:
+        store.execute_buy(
+            "NVDA", shares=10.0, price=100.0, cost=1000.0, timestamp=NOW,
+            stop_price=98.0, target_price=104.0,
+        )
+
+        position = store.get_position("NVDA")
+        assert position["stop_price"] == 98.0
+        assert position["target_price"] == 104.0
+
+        open_positions = store.get_open_positions()
+        assert open_positions[0]["stop_price"] == 98.0
+        assert open_positions[0]["target_price"] == 104.0
+
+
+def test_execute_buy_without_atr_levels_leaves_them_none(tmp_path):
+    with _store(tmp_path) as store:
+        store.execute_buy("NVDA", shares=10.0, price=100.0, cost=1000.0, timestamp=NOW)
+
+        position = store.get_position("NVDA")
+        assert position["stop_price"] is None
+        assert position["target_price"] is None
+
+
 def test_execute_buy_records_trade_history(tmp_path):
     with _store(tmp_path) as store:
         store.execute_buy("NVDA", shares=10.0, price=100.0, cost=1000.0, timestamp=NOW)

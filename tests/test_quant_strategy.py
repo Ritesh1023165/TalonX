@@ -26,7 +26,7 @@ import pytest
 
 from talonx_quant.config import QuantConfig
 from talonx_quant.indicators import IndicatorSnapshot
-from talonx_quant.schemas import SignalType
+from talonx_quant.schemas import SignalDirection, SignalType
 from talonx_quant.strategy import _confluence_score, _risk_reward_ratio, evaluate_signals
 
 
@@ -47,6 +47,7 @@ def _snapshot(**overrides) -> IndicatorSnapshot:
         volume=None,
         volume_avg=None,
         volume_surge_ratio=None,
+        dollar_volume_avg=None,
         atr=1.0,
         bar_true_range=2.0,  # clears the default 1.0x ATR move gate
     )
@@ -203,13 +204,13 @@ def test_confluence_score_counts_all_three_factors(config):
         volume_surge_ratio=3.0,  # above threshold
     )
 
-    assert _confluence_score(snap, config) == 3
+    assert _confluence_score(snap, config, config.volume_surge_ratio_threshold) == 3
 
 
 def test_confluence_score_is_zero_when_nothing_qualifies(config):
     snap = _snapshot(rsi=50.0, volume_surge_ratio=1.0)
 
-    assert _confluence_score(snap, config) == 0
+    assert _confluence_score(snap, config, config.volume_surge_ratio_threshold) == 0
 
 
 def test_confluence_score_counts_rsi_extreme_without_a_fresh_cross(config):
@@ -218,7 +219,7 @@ def test_confluence_score_counts_rsi_extreme_without_a_fresh_cross(config):
     # now," not "did this specific indicator just cross."
     snap = _snapshot(rsi=22.0)
 
-    assert _confluence_score(snap, config) == 1
+    assert _confluence_score(snap, config, config.volume_surge_ratio_threshold) == 1
 
 
 def test_confluence_score_is_shared_across_every_signal_on_the_bar(config):
@@ -235,14 +236,15 @@ def test_confluence_score_is_shared_across_every_signal_on_the_bar(config):
 
 # --- Risk/reward ratio -----------------------------------------------------
 
-def test_risk_reward_ratio_uses_atr_reward_over_stop_loss_risk(config):
-    # reward = 1.5 * atr(2.0) = 3.0; risk = 0.005 * price(100.0) = 0.5
-    # ratio = 3.0 / 0.5 = 6.0
+def test_risk_reward_ratio_uses_atr_reward_over_atr_stop_risk(config):
+    # Phase 2 requirement doc: both sides are ATR multiples now --
+    # reward = atr_reward_multiplier(2.0) * atr(2.0) = 4.0;
+    # risk = atr_stop_multiplier(1.0) * atr(2.0) = 2.0; ratio = 4.0/2.0 = 2.0
     snap = _snapshot(price=100.0, atr=2.0)
 
     ratio = _risk_reward_ratio(snap, config)
 
-    assert ratio == pytest.approx(6.0)
+    assert ratio == pytest.approx(2.0)
 
 
 def test_risk_reward_ratio_is_none_when_atr_missing(config):
@@ -257,16 +259,27 @@ def test_risk_reward_ratio_is_none_when_price_is_zero(config):
     assert _risk_reward_ratio(snap, config) is None
 
 
-def test_risk_reward_ratio_varies_with_atr_unlike_the_naive_formula(config):
-    # A sanity check on the analyst-review correction: pairing two
-    # multiples of the SAME atr value (e.g. 1.5x/0.75x) always produces a
-    # constant 2.0 regardless of market data. This formula must NOT do
-    # that -- two different ATR values against the same price must
-    # produce two different ratios.
+def test_risk_reward_ratio_is_constant_across_atr_values_by_design(config):
+    # Phase 2 requirement doc supersedes the earlier analyst-review
+    # correction: both stop and target are now explicit ATR multiples
+    # (1x/2x by default), so the ratio is the CONSTANT
+    # atr_reward_multiplier/atr_stop_multiplier regardless of the ticker's
+    # actual ATR value -- this is intentional (the requirement doc fixes
+    # both legs to ATR multiples), not a regression of the earlier fix.
     low_vol = _risk_reward_ratio(_snapshot(price=100.0, atr=0.5), config)
     high_vol = _risk_reward_ratio(_snapshot(price=100.0, atr=5.0), config)
 
-    assert low_vol != high_vol
+    assert low_vol == pytest.approx(high_vol)
+    assert low_vol == pytest.approx(config.atr_reward_multiplier / config.atr_stop_multiplier)
+
+
+def test_risk_reward_ratio_varies_with_the_configured_multipliers(config):
+    from dataclasses import replace
+
+    baseline = _risk_reward_ratio(_snapshot(price=100.0, atr=2.0), config)
+    wider_stop = _risk_reward_ratio(_snapshot(price=100.0, atr=2.0), replace(config, atr_stop_multiplier=2.0))
+
+    assert baseline != wider_stop
 
 
 def test_signal_carries_atr_confluence_and_risk_reward(config):
@@ -279,4 +292,117 @@ def test_signal_carries_atr_confluence_and_risk_reward(config):
     assert len(signals) == 1
     assert signals[0].atr == 2.0
     assert signals[0].confluence_score == 2  # RSI extreme + volume surge, no MACD cross
-    assert signals[0].risk_reward_ratio == pytest.approx(6.0)
+    assert signals[0].risk_reward_ratio == pytest.approx(2.0)
+
+
+# --- Explicit $ stop/target (Phase 2 requirement doc: 1x/2x ATR) ----------
+
+def test_bullish_signal_carries_atr_based_stop_and_target(config):
+    # price=100, atr=2 -> stop = 100 - 1*2 = 98, target = 100 + 2*2 = 104
+    snap = _snapshot(rsi=28.0, rsi_prev=32.0, volume_surge_ratio=3.0, price=100.0, atr=2.0, bar_true_range=2.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    assert len(signals) == 1
+    assert signals[0].direction == SignalDirection.BULLISH
+    assert signals[0].stop_price == pytest.approx(98.0)
+    assert signals[0].target_price == pytest.approx(104.0)
+
+
+def test_bearish_signal_carries_inverted_atr_based_stop_and_target(config):
+    # price=100, atr=2 -> stop = 100 + 1*2 = 102, target = 100 - 2*2 = 96
+    snap = _snapshot(rsi=72.0, rsi_prev=68.0, volume_surge_ratio=3.0, price=100.0, atr=2.0, bar_true_range=2.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    assert len(signals) == 1
+    assert signals[0].direction == SignalDirection.BEARISH
+    assert signals[0].stop_price == pytest.approx(102.0)
+    assert signals[0].target_price == pytest.approx(96.0)
+
+
+def test_stop_and_target_are_none_when_atr_missing(config):
+    snap = _snapshot(rsi=28.0, rsi_prev=32.0, volume_surge_ratio=3.0, atr=None, bar_true_range=None)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    assert signals == []  # ATR-move gate also fails open here, nothing to assert on
+
+
+# --- 15-min 200 SMA trend gate metadata (regular session, bullish only) --
+
+def test_trend_aligned_true_when_price_above_htf_sma(config):
+    snap = _snapshot(rsi=28.0, rsi_prev=32.0, volume_surge_ratio=3.0, price=100.0)  # bullish, regular session
+
+    signals = evaluate_signals("AAPL", snap, config, htf_sma_200=95.0)
+
+    assert signals[0].trend_aligned is True
+    assert signals[0].htf_sma_200 == pytest.approx(95.0)
+
+
+def test_trend_aligned_false_when_price_at_or_below_htf_sma(config):
+    snap = _snapshot(rsi=28.0, rsi_prev=32.0, volume_surge_ratio=3.0, price=100.0)
+
+    signals = evaluate_signals("AAPL", snap, config, htf_sma_200=105.0)
+
+    assert signals[0].trend_aligned is False
+
+
+def test_trend_aligned_is_none_when_htf_sma_not_yet_available(config):
+    snap = _snapshot(rsi=28.0, rsi_prev=32.0, volume_surge_ratio=3.0, price=100.0)
+
+    signals = evaluate_signals("AAPL", snap, config, htf_sma_200=None)
+
+    assert signals[0].trend_aligned is None
+
+
+def test_trend_aligned_is_none_for_bearish_signals_regardless_of_htf_sma(config):
+    # Requirement doc: the trend gate applies to BULLISH setups only.
+    snap = _snapshot(rsi=72.0, rsi_prev=68.0, volume_surge_ratio=3.0, price=100.0)
+
+    signals = evaluate_signals("AAPL", snap, config, htf_sma_200=50.0)  # would be "aligned" if checked
+
+    assert signals[0].direction == SignalDirection.BEARISH
+    assert signals[0].trend_aligned is None
+
+
+def test_trend_aligned_is_none_pre_market_even_when_bullish(config):
+    # 08:00 UTC = 04:00 ET -- pre-market, not regular session.
+    from datetime import datetime, timezone
+    snap = _snapshot(
+        rsi=28.0, rsi_prev=32.0, volume_surge_ratio=5.0, price=100.0,
+        bar_timestamp=datetime(2026, 8, 7, 8, 0, tzinfo=timezone.utc),
+    )
+
+    signals = evaluate_signals("AAPL", snap, config, htf_sma_200=50.0)
+
+    assert signals[0].session == "pre_market"
+    assert signals[0].trend_aligned is None
+
+
+# --- Session-aware volume-surge threshold (pre-market stricter) ----------
+
+def test_premarket_bar_requires_the_stricter_volume_surge_threshold(config):
+    from datetime import datetime, timezone
+    # 2.5x clears the regular threshold (2.0x) but not the pre-market one (3.0x).
+    snap = _snapshot(
+        rsi=28.0, rsi_prev=32.0, volume_surge_ratio=2.5,
+        bar_timestamp=datetime(2026, 8, 7, 8, 0, tzinfo=timezone.utc),
+    )
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    assert signals == []
+
+
+def test_premarket_bar_fires_once_volume_surge_clears_the_stricter_threshold(config):
+    from datetime import datetime, timezone
+    snap = _snapshot(
+        rsi=28.0, rsi_prev=32.0, volume_surge_ratio=3.5,
+        bar_timestamp=datetime(2026, 8, 7, 8, 0, tzinfo=timezone.utc),
+    )
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    assert len(signals) == 1
+    assert signals[0].session == "pre_market"

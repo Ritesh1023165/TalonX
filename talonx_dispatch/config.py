@@ -104,6 +104,14 @@ class DispatchConfig:
     socket_timeout_seconds: float = _env_float("TALONX_REDIS_SOCKET_TIMEOUT", 5.0)
     reconnect_backoff_base_seconds: float = _env_float("TALONX_DISPATCH_RECONNECT_BASE", 1.0)
     reconnect_backoff_max_seconds: float = _env_float("TALONX_DISPATCH_RECONNECT_MAX", 30.0)
+    # `/ping` health check's WS-status source -- same key talonx_ingest's
+    # market_data.run writes a heartbeat to (see RedisEventPublisher.
+    # write_ws_heartbeat). Re-declared here, not imported, same "each
+    # module only knows the wire/key contract of what it consumes"
+    # convention as every channel name above.
+    ws_heartbeat_key: str = os.environ.get(
+        "TALONX_REDIS_WS_HEARTBEAT_KEY", "talonx:ingest:ws_heartbeat"
+    )
 
     # --- Telegram ---
     # Optional, same "additive, degrade gracefully" philosophy as

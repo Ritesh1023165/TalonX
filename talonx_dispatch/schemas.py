@@ -10,17 +10,19 @@ re-declarations: this module only knows the WIRE format published to
 talonx:alerts:dispatch, so producer and consumer stay independently
 deployable/versionable.
 
-The embedded triggering signal is trimmed to TriggeringSignalRef (ticker,
-signal_type as a plain str, direction, message, price, bar_timestamp) --
-dropping rsi/macd/macd_signal_line/sma_fast/sma_slow/volume/
-volume_surge_ratio, which this module only ever displays, never
-recomputes or branches logic on. `signal_type` is kept as `str` rather
-than talonx_core's SignalType enum for the same reason: a display-only
-consumer doesn't need to reject an unrecognized-but-valid new signal type
-talonx_quant might add later. Pydantic's default `extra="ignore"`
-behavior means the omitted numeric fields are simply dropped on parse,
-not an error, so this stays a strictly valid subset of the real wire
-shape.
+The embedded triggering signal is TriggeringSignalRef (ticker, signal_type
+as a plain str, direction, message, price, bar_timestamp), plus (Phase 2
+requirement doc) rsi/macd/macd_signal_line/volume_surge_ratio/atr/
+stop_price/target_price/trend_aligned/htf_sma_200/session -- the Telegram
+`#ID` detail reply now renders these (see formatter.format_telegram_details),
+closing a real gap: the reply used to show only research fields, never
+the technical setup that actually triggered the alert. `signal_type` is
+kept as `str` rather than talonx_core's SignalType enum for the same
+reason as before: a display-only consumer doesn't need to reject an
+unrecognized-but-valid new signal type talonx_quant might add later.
+Pydantic's default `extra="ignore"` behavior means any still-omitted
+field (sma_fast/sma_slow/volume) is simply dropped on parse, not an
+error, so this stays a strictly valid subset of the real wire shape.
 """
 from __future__ import annotations
 
@@ -87,6 +89,20 @@ class TriggeringSignalRef(BaseModel):
     message: str
     price: float
     bar_timestamp: datetime
+
+    # Technical-detail fields for the Telegram #ID reply (Phase 2
+    # requirement doc) -- None for long-term alerts or any signal that
+    # predates these fields.
+    rsi: float | None = None
+    macd: float | None = None
+    macd_signal_line: float | None = None
+    volume_surge_ratio: float | None = None
+    atr: float | None = None
+    stop_price: float | None = None
+    target_price: float | None = None
+    trend_aligned: bool | None = None
+    htf_sma_200: float | None = None
+    session: str | None = None
 
 
 class ActionableAlert(BaseModel):

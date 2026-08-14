@@ -143,6 +143,19 @@ class RedisConfig:
     fundamentals_events_channel: str = os.environ.get(
         "TALONX_REDIS_FUNDAMENTALS_CHANNEL", "talonx:fundamentals:events"
     )
+    # Pre-market news-catalyst gate's trigger (talonx_quant) -- published
+    # once per newly-ingested article by news/pipeline.py, mirroring
+    # filings_events_channel's role for the filing-ingestion side.
+    news_events_channel: str = os.environ.get(
+        "TALONX_REDIS_NEWS_EVENTS_CHANNEL", "talonx:news:events"
+    )
+    # /ping health-check's WebSocket status source (talonx_dispatch) -- a
+    # short-TTL heartbeat key (not Pub/Sub) written by market_data on each
+    # successful connect/tick, read directly via GET, not subscribed to.
+    ws_heartbeat_key: str = os.environ.get(
+        "TALONX_REDIS_WS_HEARTBEAT_KEY", "talonx:ingest:ws_heartbeat"
+    )
+    ws_heartbeat_ttl_seconds: int = _env_int("TALONX_REDIS_WS_HEARTBEAT_TTL_SECONDS", 120)
     connect_timeout_seconds: float = _env_float("TALONX_REDIS_CONNECT_TIMEOUT", 5.0)
     socket_timeout_seconds: float = _env_float("TALONX_REDIS_SOCKET_TIMEOUT", 5.0)
 
@@ -262,6 +275,22 @@ class MarketDataConfig:
     yfinance_max_retries: int = _env_int("TALONX_YF_MAX_RETRIES", 3)
     yfinance_backoff_base_seconds: float = _env_float("TALONX_YF_BACKOFF_BASE", 2.0)
     yfinance_backoff_max_seconds: float = _env_float("TALONX_YF_BACKOFF_MAX", 30.0)
+
+    # A poll cycle where most/all symbols fail per-symbol (yfinance's
+    # unofficial API occasionally gets a long-running process's cached
+    # session/crumb into a stuck bad state -- e.g. a bare KeyError on
+    # 'exchangeTimezoneName' when Yahoo returns a throttled/malformed
+    # response) currently looks IDENTICAL to a healthy cycle to the outer
+    # retry loop, since _fetch_snapshots catches every per-symbol
+    # exception and just returns fewer events -- no backoff ever engages,
+    # and the process needs a manual restart to recover. This threshold
+    # (fraction of symbols that failed) is what promotes such a cycle
+    # into a real, backed-off failure worth acting on.
+    yfinance_degraded_cycle_failure_rate: float = _env_float("TALONX_YF_DEGRADED_FAILURE_RATE", 0.5)
+    # After this many CONSECUTIVE degraded/failed cycles, proactively
+    # reset yfinance's cached session/crumb (see YFinancePoller._reset_session)
+    # rather than keep repeating the same doomed request pattern.
+    yfinance_session_reset_after_failures: int = _env_int("TALONX_YF_SESSION_RESET_AFTER", 3)
 
 
 @dataclass(frozen=True)

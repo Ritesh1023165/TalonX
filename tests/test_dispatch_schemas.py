@@ -5,8 +5,12 @@ Tests talonx_dispatch.schemas -- the Pydantic contract at this module's
 Redis boundary. ActionableAlert must parse the FULL wire shape
 talonx_core.schemas.ActionableAlert.to_redis_payload() emits (full
 QuantSignal embedded, with all its numeric indicator fields), even though
-this module's TriggeringSignalRef mirror only declares a subset --
-Pydantic's default extra="ignore" behavior is what makes that safe.
+this module's TriggeringSignalRef mirror only declares a SUBSET (rsi/macd/
+volume_surge_ratio/atr/stop_price/target_price/trend_aligned/htf_sma_200/
+session are declared as of the Phase 2 requirement doc's technical-detail
+reply; sma_fast/sma_slow/volume remain genuinely trimmed) --
+Pydantic's default extra="ignore" behavior is what makes the still-omitted
+fields safe to receive anyway.
 """
 from __future__ import annotations
 
@@ -46,6 +50,12 @@ def _full_wire_payload() -> dict:
             "sma_slow": 290.0,
             "volume": 1_000_000.0,
             "volume_surge_ratio": 2.8,
+            "atr": 4.2,
+            "stop_price": 308.21,
+            "target_price": 320.81,
+            "trend_aligned": True,
+            "htf_sma_200": 295.0,
+            "session": "regular",
             "bar_timestamp": "2026-08-07T12:00:00Z",
             "published_at": "2026-08-07T12:00:01Z",
         },
@@ -67,10 +77,19 @@ def test_actionable_alert_parses_full_producer_wire_shape():
     assert alert.severity == AlertSeverity.CRITICAL
     assert alert.research_verdict == ResearchVerdict.BULLISH
     assert alert.quant_direction == SignalDirection.BULLISH
-    # Trimmed mirror -- only the fields TriggeringSignalRef declares.
     assert alert.triggering_signal.price == 312.41
     assert alert.triggering_signal.signal_type == "rsi_oversold_volume_surge"
-    assert not hasattr(alert.triggering_signal, "rsi")
+    # Technical-detail fields (Phase 2 requirement doc) ARE declared and parsed now.
+    assert alert.triggering_signal.rsi == 24.3
+    assert alert.triggering_signal.atr == 4.2
+    assert alert.triggering_signal.stop_price == 308.21
+    assert alert.triggering_signal.target_price == 320.81
+    assert alert.triggering_signal.trend_aligned is True
+    assert alert.triggering_signal.htf_sma_200 == 295.0
+    assert alert.triggering_signal.session == "regular"
+    # sma_fast/sma_slow/volume remain genuinely trimmed -- still not declared.
+    assert not hasattr(alert.triggering_signal, "sma_fast")
+    assert not hasattr(alert.triggering_signal, "volume")
 
 
 def test_actionable_alert_round_trips_through_json():

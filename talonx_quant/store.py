@@ -52,7 +52,27 @@ CREATE TABLE IF NOT EXISTS latest_fundamental_factors (
     altman_z_score       REAL,
     debt_to_ebitda_proxy REAL,
     computed_at          TEXT NOT NULL
-)
+);
+
+-- Buffer persistence: a periodic snapshot of RollingBarBuffer's
+-- in-memory content (both the 1-min buffer and the 15-min HTF buffer),
+-- so a restart doesn't force every symbol back through a full
+-- min_bars_required/htf_sma_period re-warm-up from empty. buffer_type
+-- is '1m' or '15m' -- two independent snapshots per symbol, since the
+-- two buffers have different sizes, reload rules, and purposes (see
+-- QuantScanner._load_buffers_from_store's gap-gating, 1m only).
+CREATE TABLE IF NOT EXISTS bar_buffer (
+    symbol      TEXT NOT NULL,
+    buffer_type TEXT NOT NULL,
+    ts          TEXT NOT NULL,
+    open        REAL,
+    high        REAL,
+    low         REAL,
+    close       REAL,
+    volume      REAL,
+    PRIMARY KEY (symbol, buffer_type, ts)
+);
+CREATE INDEX IF NOT EXISTS idx_bar_buffer_symbol_type ON bar_buffer (symbol, buffer_type)
 """
 
 
@@ -142,3 +162,49 @@ class QuantStateStore:
             return None
         columns = [d[0] for d in cursor.description]
         return dict(zip(columns, row))
+
+    def checkpoint_buffer(self, symbol: str, buffer_type: str, bars: list[dict]) -> None:
+        """Replaces the persisted snapshot for (symbol, buffer_type) with
+        `bars` -- a full overwrite, not an incremental sync. The in-memory
+        RollingBarBuffer this mirrors is itself bounded (a deque with
+        maxlen) and small (<=210 rows), so a full rewrite each checkpoint
+        is cheap and can never accumulate rows the live buffer has
+        already evicted."""
+        symbol = symbol.upper()
+        self._conn.execute(
+            "DELETE FROM bar_buffer WHERE symbol = ? AND buffer_type = ?", (symbol, buffer_type)
+        )
+        self._conn.executemany(
+            "INSERT INTO bar_buffer (symbol, buffer_type, ts, open, high, low, close, volume) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (
+                    symbol, buffer_type, bar["timestamp"].isoformat(),
+                    bar["open"], bar["high"], bar["low"], bar["close"], bar["volume"],
+                )
+                for bar in bars
+            ],
+        )
+        self._conn.commit()
+
+    def load_buffer(self, symbol: str, buffer_type: str) -> list[dict]:
+        """Returns bars in chronological order, `timestamp` as the raw
+        ISO string as stored -- the caller (QuantScanner) parses it back
+        into a datetime, same "this store doesn't know consumer.py's
+        types" boundary every other read method here keeps."""
+        cursor = self._conn.execute(
+            "SELECT ts, open, high, low, close, volume FROM bar_buffer "
+            "WHERE symbol = ? AND buffer_type = ? ORDER BY ts",
+            (symbol.upper(), buffer_type),
+        )
+        return [
+            {"timestamp": ts, "open": o, "high": h, "low": l, "close": c, "volume": v}
+            for ts, o, h, l, c, v in cursor.fetchall()
+        ]
+
+    def buffered_symbols(self, buffer_type: str) -> list[str]:
+        cursor = self._conn.execute(
+            "SELECT DISTINCT symbol FROM bar_buffer WHERE buffer_type = ? ORDER BY symbol",
+            (buffer_type,),
+        )
+        return [row[0] for row in cursor.fetchall()]

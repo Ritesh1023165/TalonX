@@ -27,6 +27,8 @@ import asyncio
 import logging
 
 from talonx_ingest.config import settings
+from talonx_ingest.events.publisher import RedisEventPublisher
+from talonx_ingest.events.schemas import NewsArticleIngestedEvent
 from talonx_ingest.news.client import NewsClient
 from talonx_ingest.news.models import NewsArticle
 from talonx_ingest.news.reddit_client import RedditClient
@@ -49,6 +51,7 @@ async def ingest_ticker_news(
     ledger: IngestionLedger,
     reddit_client: RedditClient | None = None,
     force_refresh: bool = False,
+    publisher: RedisEventPublisher | None = None,
 ) -> int:
     """Fetch, chunk, and embed new articles/posts for one ticker. Returns new chunks written."""
     logger.info("[%s] Fetching recent news/social articles...", ticker)
@@ -85,6 +88,13 @@ async def ingest_ticker_news(
         if written == len(chunks):
             ledger.mark_news_ingested(article, chunk_count=written)
             total_written += written
+            if publisher is not None and article.published_at is not None:
+                # Pre-market news-catalyst gate's trigger (talonx_quant) --
+                # fire-and-forget, non-fatal on publish failure, same
+                # posture every other publish call in this project takes.
+                await publisher.publish_news_ingested(
+                    NewsArticleIngestedEvent(ticker=ticker.upper(), published_at=article.published_at)
+                )
         else:
             logger.error(
                 "[%s] Partial upsert for article %s (%d/%d chunks) -- "
@@ -135,6 +145,8 @@ async def run_news_ingestion(
     )
 
     ledger = IngestionLedger(settings.ledger.path)  # same ledger file, separate table
+    publisher = RedisEventPublisher()
+    await publisher.connect()  # logs a warning and continues if Redis is unavailable
 
     results: dict[str, int] = {}
     try:
@@ -142,7 +154,7 @@ async def run_news_ingestion(
             ticker: asyncio.create_task(
                 ingest_ticker_news(
                     ticker, news_client, chunker, vector_store, ledger,
-                    reddit_client=reddit_client, force_refresh=force_refresh,
+                    reddit_client=reddit_client, force_refresh=force_refresh, publisher=publisher,
                 )
             )
             for ticker in tickers
@@ -155,6 +167,7 @@ async def run_news_ingestion(
                 results[ticker] = 0
     finally:
         ledger.close()
+        await publisher.close()
 
     return results
 

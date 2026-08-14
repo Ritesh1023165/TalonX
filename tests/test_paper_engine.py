@@ -171,6 +171,41 @@ def test_check_stop_take_returns_none_for_non_positive_entry_price():
     assert check_stop_take(0.0, 100.0, stop_loss_pct=0.005, take_profit_pct=0.01) is None
 
 
+# --- check_stop_take: ATR-anchored levels (Phase 2 requirement doc) -------
+# When both stop_price/target_price are provided, they OVERRIDE the
+# percentage bands entirely -- entry=100 with pct bands that would fire at
+# 99.50/101.00 is used below with much wider ATR levels to prove the
+# percentage config is genuinely ignored, not just coincidentally satisfied.
+
+def test_check_stop_take_uses_atr_stop_price_when_provided_long():
+    assert check_stop_take(
+        100.0, 96.0, stop_loss_pct=0.005, take_profit_pct=0.01,
+        stop_price=95.0, target_price=110.0,
+    ) is None  # inside the ATR band even though outside the pct band
+
+
+def test_check_stop_take_atr_stop_price_triggers_long():
+    assert check_stop_take(
+        100.0, 94.0, stop_loss_pct=0.005, take_profit_pct=0.01,
+        stop_price=95.0, target_price=110.0,
+    ) == "STOP_LOSS"
+
+
+def test_check_stop_take_atr_target_price_triggers_long():
+    assert check_stop_take(
+        100.0, 111.0, stop_loss_pct=0.005, take_profit_pct=0.01,
+        stop_price=95.0, target_price=110.0,
+    ) == "TAKE_PROFIT"
+
+
+def test_check_stop_take_falls_back_to_pct_when_only_one_atr_level_given():
+    # Only stop_price provided -- treated as "not available", falls back
+    # to the percentage bands (entry=100, stop pct=0.5% -> 99.50).
+    assert check_stop_take(
+        100.0, 99.40, stop_loss_pct=0.005, take_profit_pct=0.01, stop_price=95.0, target_price=None,
+    ) == "STOP_LOSS"
+
+
 # --- apply_spread ------------------------------------------------------------
 
 def test_apply_spread_buy_fills_above_quoted_price():

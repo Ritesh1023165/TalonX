@@ -127,6 +127,38 @@ def _jittered_backoff(attempt: int, base: float, max_delay: float) -> float:
     return capped * (0.5 + random.random())
 
 
+async def _incr_metric(client, stage: str, counter: str, amount: int = 1) -> None:
+    """Stage-Gate Metric Funnel (Phase 2 requirement doc): atomic,
+    per-UTC-day Redis counters at `metrics:{YYYY-MM-DD}:{stage}:{counter}`,
+    read by the Daily Funnel dashboard tab (app.py). Each module
+    re-declares this same small helper locally rather than sharing one --
+    same "no internal library between modules" convention this project
+    uses everywhere else. Never raises -- a metrics-write failure must
+    not affect alert dispatch."""
+    if client is None or amount <= 0:
+        return
+    key = f"metrics:{datetime.now(timezone.utc):%Y-%m-%d}:{stage}:{counter}"
+    try:
+        new_value = await client.incrby(key, amount)
+        if new_value == amount:
+            await client.expire(key, 2764800)  # 32 days
+    except Exception as exc:  # noqa: BLE001 -- telemetry must never break alert dispatch
+        logger.debug("Metric increment failed for %s: %s", key, exc)
+
+
+# suppress_reason (from _evaluate_push_eligibility) -> Stage-Gate Metric
+# Funnel counter name. PUSH_COOLDOWN_ACTIVE and PRICE_DELTA_TOO_LOW both
+# collapse to "muted_cooldown" -- both mean "still in the per-ticker push
+# cooldown window," just with different diagnostic specificity (see
+# _evaluate_push_eligibility's own docstring).
+_SUPPRESS_REASON_METRIC = {
+    "ACTION_MUTED": "muted_contradictions",
+    "CONFIDENCE_BELOW_GATE": "muted_confidence",
+    "PUSH_COOLDOWN_ACTIVE": "muted_cooldown",
+    "PRICE_DELTA_TOO_LOW": "muted_cooldown",
+}
+
+
 def _evaluate_push_eligibility(
     *,
     action: AlertAction,
@@ -192,7 +224,12 @@ class DispatchAgent:
         self.store = store or AuditStore(self.config.audit_db_path)
         self.telegram_client = telegram_client or TelegramClient(self.config)
         self.watchlist_store = watchlist_store or TickerWatchlistStore(WatchlistConfig().db_path)
-        self.reply_listener = TelegramReplyListener(self.store, self.config, self.telegram_client)
+        # /ping health check's uptime source -- process start, not just
+        # this consumer loop's connect time (matches "Server Status: Active").
+        self.started_at = datetime.now(timezone.utc)
+        self.reply_listener = TelegramReplyListener(
+            self.store, self.config, self.telegram_client, dispatch_agent=self
+        )
         self._client = None
         self._stop_event = asyncio.Event()
         self._alerts_processed = 0
@@ -534,6 +571,7 @@ class DispatchAgent:
             return
 
         self._alerts_processed += 1
+        await _incr_metric(self._client, "dispatch", "received")
         alert_id = self.store.record_alert(alert)
         logger.info(
             "Recorded alert #%d: %s %s (%s)",
@@ -550,6 +588,7 @@ class DispatchAgent:
             return
 
         self._long_term_alerts_processed += 1
+        await _incr_metric(self._client, "dispatch", "received")
         alert_id = self.store.record_long_term_alert(alert)
         logger.info(
             "Recorded long-term alert #LT%d: %s %s (%s)",
@@ -647,6 +686,9 @@ class DispatchAgent:
         if not should_push:
             self.store.mark_suppressed(alert_id, suppress_reason)
             self._record_push_suppression(suppress_reason, long_term=False)
+            metric = _SUPPRESS_REASON_METRIC.get(suppress_reason)
+            if metric is not None:
+                await _incr_metric(self._client, "dispatch", metric)
             logger.info(
                 "Telegram push suppressed for alert #%d (%s): %s", alert_id, alert.ticker, suppress_reason,
             )
@@ -658,6 +700,7 @@ class DispatchAgent:
             self.store.mark_telegram_sent(alert_id, now)
             self._last_telegram_push[ticker] = (now, alert.triggering_signal.price)
             self._telegram_sent += 1
+            await _incr_metric(self._client, "dispatch", "pushed_telegram")
             logger.info("Telegram push sent for alert #%d (%s)", alert_id, alert.ticker)
         except TelegramSendError as exc:
             self.store.mark_telegram_failed(alert_id, str(exc))
@@ -721,6 +764,9 @@ class DispatchAgent:
             if not should_push:
                 self.store.mark_long_term_suppressed(alert_id, suppress_reason)
                 self._record_push_suppression(suppress_reason, long_term=True)
+                metric = _SUPPRESS_REASON_METRIC.get(suppress_reason)
+                if metric is not None:
+                    await _incr_metric(self._client, "dispatch", metric)
                 logger.info(
                     "Telegram push suppressed for long-term alert #LT%d (%s): %s",
                     alert_id, alert.ticker, suppress_reason,
@@ -734,6 +780,7 @@ class DispatchAgent:
             self.store.mark_long_term_telegram_sent(alert_id, now)
             self._last_telegram_push_long_term[ticker] = (now, alert.market_price)
             self._long_term_telegram_sent += 1
+            await _incr_metric(self._client, "dispatch", "pushed_telegram")
             logger.info("Telegram push sent for long-term alert #LT%d (%s)", alert_id, alert.ticker)
         except TelegramSendError as exc:
             self.store.mark_long_term_telegram_failed(alert_id, str(exc))

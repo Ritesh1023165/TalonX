@@ -68,7 +68,9 @@ CREATE TABLE IF NOT EXISTS positions (
     shares          REAL NOT NULL,
     entry_price     REAL NOT NULL,
     entry_timestamp TEXT NOT NULL,
-    cost_basis      REAL NOT NULL
+    cost_basis      REAL NOT NULL,
+    stop_price      REAL,
+    target_price    REAL
 );
 
 CREATE TABLE IF NOT EXISTS trade_history (
@@ -197,6 +199,17 @@ class PaperTradingStore:
                 "ALTER TABLE ignored_decisions ADD COLUMN horizon TEXT NOT NULL DEFAULT 'intraday'"
             )
 
+        # ATR-based stop/target (Phase 2 requirement doc) -- a pre-existing
+        # `positions` table predates stop_price/target_price. Per project
+        # direction, this local dev SQLite file has no data worth
+        # preserving across the change, so a stale-schema table is simply
+        # dropped and recreated from _SCHEMA rather than ALTER TABLE'd --
+        # any open position at upgrade time is lost, not migrated.
+        position_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(positions)").fetchall()}
+        if position_cols and "stop_price" not in position_cols:
+            self._conn.execute("DROP TABLE positions")
+            self._conn.executescript(_SCHEMA)
+
     def _ensure_portfolio_row(self, initial_balance: float, trade_allocation_usd: float) -> None:
         with self._lock:
             row = self._conn.execute("SELECT id FROM portfolio_state WHERE id = 1").fetchone()
@@ -300,37 +313,45 @@ class PaperTradingStore:
     def get_position(self, ticker: str) -> dict | None:
         with self._lock:
             row = self._conn.execute(
-                "SELECT ticker, shares, entry_price, entry_timestamp, cost_basis "
+                "SELECT ticker, shares, entry_price, entry_timestamp, cost_basis, stop_price, target_price "
                 "FROM positions WHERE ticker = ?",
                 (ticker.upper(),),
             ).fetchone()
         if row is None:
             return None
-        ticker, shares, entry_price, entry_timestamp, cost_basis = row
+        ticker, shares, entry_price, entry_timestamp, cost_basis, stop_price, target_price = row
         return {
             "ticker": ticker, "shares": shares, "entry_price": entry_price,
             "entry_timestamp": entry_timestamp, "cost_basis": cost_basis,
+            "stop_price": stop_price, "target_price": target_price,
         }
 
     def get_open_positions(self) -> list[dict]:
         with self._lock:
             rows = self._conn.execute(
-                "SELECT ticker, shares, entry_price, entry_timestamp, cost_basis "
+                "SELECT ticker, shares, entry_price, entry_timestamp, cost_basis, stop_price, target_price "
                 "FROM positions ORDER BY ticker"
             ).fetchall()
         return [
             {
                 "ticker": ticker, "shares": shares, "entry_price": entry_price,
                 "entry_timestamp": entry_timestamp, "cost_basis": cost_basis,
+                "stop_price": stop_price, "target_price": target_price,
             }
-            for ticker, shares, entry_price, entry_timestamp, cost_basis in rows
+            for ticker, shares, entry_price, entry_timestamp, cost_basis, stop_price, target_price in rows
         ]
 
     # --- Trade execution (atomic, multi-table) ----------------------------
 
     def execute_buy(
         self, ticker: str, shares: float, price: float, cost: float, timestamp: datetime,
+        stop_price: float | None = None, target_price: float | None = None,
     ) -> PaperTradeExecution:
+        """stop_price/target_price, when provided, are the ATR-anchored
+        dollar levels captured at signal time (see engine.check_stop_take)
+        -- persisted with the position so every SUBSEQUENT tick checks
+        against the level the trade was actually sized against, not a
+        live-recomputed one (ATR drifts after entry)."""
         ticker = ticker.upper()
         with self._lock:
             current_cash = self._conn.execute(
@@ -339,9 +360,9 @@ class PaperTradingStore:
             new_cash = current_cash - cost
             self._conn.execute("UPDATE portfolio_state SET current_cash = ? WHERE id = 1", (new_cash,))
             self._conn.execute(
-                "INSERT INTO positions (ticker, shares, entry_price, entry_timestamp, cost_basis) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (ticker, shares, price, timestamp.isoformat(), cost),
+                "INSERT INTO positions (ticker, shares, entry_price, entry_timestamp, cost_basis, "
+                "stop_price, target_price) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (ticker, shares, price, timestamp.isoformat(), cost, stop_price, target_price),
             )
             cursor = self._conn.execute(
                 "INSERT INTO trade_history "

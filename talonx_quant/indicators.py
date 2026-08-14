@@ -50,6 +50,12 @@ class IndicatorSnapshot:
     volume_avg: float | None
     volume_surge_ratio: float | None
 
+    # Pre-market liquidity gate input: mean(volume x close) over the same
+    # trailing window as volume_avg -- "average dollar volume per minute"
+    # for a symbol whose buffer is 1-min bars. None during warm-up, same
+    # as every other rolling-window field here.
+    dollar_volume_avg: float | None
+
     # Analyst-review addition: 14-period ATR (a smoothed AVERAGE true
     # range) alongside this specific bar's OWN true range -- the two are
     # deliberately separate fields. strategy.py compares them
@@ -80,6 +86,7 @@ def compute_indicators(df: pd.DataFrame, config: QuantConfig) -> IndicatorSnapsh
     sma_fast_series = df.ta.sma(length=config.ma_fast_period)
     sma_slow_series = df.ta.sma(length=config.ma_slow_period)
     volume_avg_series = df["volume"].rolling(window=config.volume_avg_period).mean()
+    dollar_volume_series = (df["volume"] * df["close"]).rolling(window=config.volume_avg_period).mean()
     atr_series = df.ta.atr(length=config.atr_period)
 
     if macd_df is None or rsi_series is None:
@@ -107,6 +114,7 @@ def compute_indicators(df: pd.DataFrame, config: QuantConfig) -> IndicatorSnapsh
     sma_fast_latest, sma_fast_prev = _last_two(sma_fast_series)
     sma_slow_latest, sma_slow_prev = _last_two(sma_slow_series)
     volume_avg_latest, _ = _last_two(volume_avg_series)
+    dollar_volume_avg_latest, _ = _last_two(dollar_volume_series)
     atr_latest = None if atr_series is None else _last_two(atr_series)[0]
 
     latest_row = df.iloc[-1]
@@ -147,6 +155,23 @@ def compute_indicators(df: pd.DataFrame, config: QuantConfig) -> IndicatorSnapsh
         volume=volume_latest,
         volume_avg=volume_avg_latest,
         volume_surge_ratio=volume_surge_ratio,
+        dollar_volume_avg=dollar_volume_avg_latest,
         atr=atr_latest,
         bar_true_range=bar_true_range,
     )
+
+
+def compute_htf_trend(df_htf: pd.DataFrame | None, period: int) -> float | None:
+    """SMA(period) of the higher-timeframe buffer's close column -- None
+    if the HTF buffer doesn't have `period` bars yet (warm-up), same
+    tolerant posture as compute_indicators' own min_bars_required check.
+    Deliberately separate from compute_indicators: the HTF buffer is a
+    second, independently-sized RollingBarBuffer (see consumer.py), not
+    part of the primary 1-min df this function's sibling operates on."""
+    if df_htf is None or len(df_htf) < period:
+        return None
+    sma = df_htf["close"].rolling(window=period).mean()
+    valid = sma.dropna()
+    if valid.empty:
+        return None
+    return float(valid.iloc[-1])

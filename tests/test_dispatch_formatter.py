@@ -86,10 +86,13 @@ def _row(
     rationale: str = "Quant signal (bullish): RSI oversold. Research verdict agrees: bullish at 85% confidence -- Fundamentals support the move.",
     key_findings: list[str] | None = None,
     risk_factors: list[str] | None = None,
+    **technical_overrides,
 ) -> dict:
     """Matches AuditStore.get_by_id()'s return shape (talonx_dispatch/store.py's
-    _row_to_dict) -- a plain dict with string action/severity/verdict, not enums."""
-    return {
+    _row_to_dict) -- a plain dict with string action/severity/verdict, not enums.
+    technical_overrides lets tests set rsi/macd/.../session (all None by
+    default, matching a pre-Phase-2 row or a long-term alert)."""
+    row = {
         "id": alert_id,
         "ticker": "AAPL",
         "action": action.value,
@@ -109,7 +112,12 @@ def _row(
         "telegram_sent": False,
         "telegram_sent_at": None,
         "telegram_error": None,
+        "rsi": None, "macd": None, "macd_signal_line": None, "volume_surge_ratio": None,
+        "atr": None, "stop_price": None, "target_price": None,
+        "trend_aligned": None, "htf_sma_200": None, "session": None,
     }
+    row.update(technical_overrides)
+    return row
 
 
 def test_escape_markdown_escapes_the_four_special_characters():
@@ -303,6 +311,53 @@ def test_details_truncates_very_long_rationale():
 def test_details_formats_the_correlated_at_timestamp():
     text = format_telegram_details(_row())
     assert "2026-08-07 14:23 UTC" in text
+
+
+# --- format_telegram_details: technical-indicator section (Phase 2) --------
+
+def test_details_omits_technical_section_when_all_fields_are_none():
+    # Pre-Phase-2 row / a long-term alert -- nothing to render. (The
+    # default rationale text itself mentions "RSI oversold" in prose, so
+    # this checks for the technical section's own line markers, not the
+    # bare substring "RSI".)
+    text = format_telegram_details(_row())
+    assert "RSI:" not in text
+    assert "SMA Trend" not in text
+    assert "Target:" not in text and "Stop:" not in text
+
+
+def test_details_renders_rsi_macd_and_volume_surge():
+    text = format_telegram_details(_row(rsi=24.3, macd=0.5, macd_signal_line=0.3, volume_surge_ratio=2.8))
+    assert "RSI: 24.3" in text
+    assert "MACD: bullish cross" in text
+    assert "Vol Surge: 2.8x" in text
+
+
+def test_details_renders_bearish_macd_cross():
+    text = format_telegram_details(_row(macd=0.2, macd_signal_line=0.5))
+    assert "MACD: bearish cross" in text
+
+
+def test_details_renders_trend_status_aligned():
+    text = format_telegram_details(_row(htf_sma_200=295.0, trend_aligned=True))
+    assert "15m 200 SMA Trend: Aligned" in text
+    assert "$295.00" in text
+
+
+def test_details_renders_trend_status_not_aligned():
+    text = format_telegram_details(_row(htf_sma_200=320.0, trend_aligned=False))
+    assert "15m 200 SMA Trend: Not Aligned" in text
+
+
+def test_details_renders_stop_and_target_prices():
+    text = format_telegram_details(_row(stop_price=308.21, target_price=320.81))
+    assert "Target: $320.81" in text
+    assert "Stop: $308.21" in text
+
+
+def test_details_omits_stop_target_when_only_one_is_present():
+    text = format_telegram_details(_row(stop_price=308.21, target_price=None))
+    assert "Stop:" not in text and "Target:" not in text
 
 
 # --- format_telegram_trade_execution (paper trading, decoupled push) -------

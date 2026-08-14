@@ -91,21 +91,45 @@ def calculate_sell_pnl(shares: float, entry_price: float, exit_price: float) -> 
 
 def check_stop_take(
     entry_price: float, current_price: float, stop_loss_pct: float, take_profit_pct: float,
+    stop_price: float | None = None, target_price: float | None = None,
 ) -> str | None:
     """
     Independent, price-driven exit check -- runs on every market tick for
     an open position, alongside (not instead of) the alert-driven SELL
-    trigger in decide_trade(). Percentage-based off entry price, same
-    style as talonx_core's price_delta_retrigger_pct.
+    trigger in decide_trade().
 
-    Returns "STOP_LOSS" if current_price has fallen stop_loss_pct or more
-    below entry, "TAKE_PROFIT" if it has risen take_profit_pct or more
-    above entry, else None. Stop-loss is checked first -- on the (rare)
-    tick where both thresholds are somehow crossed at once, protecting
-    capital wins the tiebreak over locking in a gain.
+    When stop_price/target_price are BOTH provided (ATR-anchored levels
+    captured at signal time and persisted on the position -- see
+    store.execute_buy), those exact dollar levels are used instead of the
+    percentage bands: the trade was sized against those specific levels,
+    not a live-recomputed ATR (which drifts after entry). Falls back to
+    the percentage-based check (same style as talonx_core's
+    price_delta_retrigger_pct) when either is missing -- e.g. a
+    DEGRADED_QUANT_ALERT or any alert predating this field.
+
+    Returns "STOP_LOSS" if current_price has crossed the stop side,
+    "TAKE_PROFIT" if it has crossed the target side, else None. Stop-loss
+    is checked first -- on the (rare) tick where both thresholds are
+    somehow crossed at once, protecting capital wins the tiebreak over
+    locking in a gain.
     """
     if entry_price <= 0:
         return None
+
+    if stop_price is not None and target_price is not None:
+        bullish = target_price > entry_price  # long position: target above entry, stop below
+        if bullish:
+            if current_price <= stop_price:
+                return "STOP_LOSS"
+            if current_price >= target_price:
+                return "TAKE_PROFIT"
+        else:
+            if current_price >= stop_price:
+                return "STOP_LOSS"
+            if current_price <= target_price:
+                return "TAKE_PROFIT"
+        return None
+
     change_pct = (current_price - entry_price) / entry_price
     if change_pct <= -stop_loss_pct:
         return "STOP_LOSS"

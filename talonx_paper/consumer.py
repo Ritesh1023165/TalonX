@@ -220,6 +220,7 @@ class PaperTradingEngine:
 
         trigger = check_stop_take(
             position["entry_price"], event.close, self.config.stop_loss_pct, self.config.take_profit_pct,
+            stop_price=position.get("stop_price"), target_price=position.get("target_price"),
         )
         if trigger is None:
             return
@@ -294,7 +295,10 @@ class PaperTradingEngine:
             return
 
         shares, cost = sized
-        execution = self.store.execute_buy(alert.ticker, shares, fill_price, cost, alert.correlated_at)
+        execution = self.store.execute_buy(
+            alert.ticker, shares, fill_price, cost, alert.correlated_at,
+            stop_price=alert.triggering_signal.stop_price, target_price=alert.triggering_signal.target_price,
+        )
         self._trades_executed += 1
         logger.info(
             "Paper BUY: %s %.4f shares @ $%.2f (cost $%.2f, cash after $%.2f)",
