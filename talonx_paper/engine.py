@@ -19,10 +19,14 @@ fictional; mapped onto the real one here):
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from talonx_paper.schemas import ActionableAlert, AlertAction, LongTermActionableAlert
+
+_ET = ZoneInfo("America/New_York")
 
 _SELL_ACTIONS = (AlertAction.CONFIRMED_BEARISH, AlertAction.CONTRADICTED)
 
@@ -147,6 +151,24 @@ def apply_spread(price: float, spread_bps: float, side: Literal["BUY", "SELL"]) 
     """
     half_spread = price * (spread_bps / 2 / 10000)
     return price + half_spread if side == "BUY" else price - half_spread
+
+
+def seconds_until_next_eod_flatten(now: datetime, hour_et: int, minute_et: int) -> float:
+    """Seconds from `now` until the next occurrence of hour_et:minute_et
+    America/New_York local time -- today if that moment hasn't passed yet,
+    else tomorrow. Converts via ZoneInfo rather than a fixed UTC offset,
+    so the target stays pinned to the correct ET wall-clock time across
+    the spring/fall DST transition (a naive "wait until HH:MM UTC" would
+    silently drift an hour off local close every six months). `now` may
+    be tz-aware (any zone) or naive -- naive is assumed UTC, same
+    convention talonx_quant.session.get_session uses."""
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    local_now = now.astimezone(_ET)
+    target_local = local_now.replace(hour=hour_et, minute=minute_et, second=0, microsecond=0)
+    if target_local <= local_now:
+        target_local += timedelta(days=1)
+    return (target_local - local_now).total_seconds()
 
 
 # ------------------------------------------------------------------

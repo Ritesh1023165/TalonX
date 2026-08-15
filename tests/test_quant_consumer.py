@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -41,12 +42,25 @@ from talonx_quant.schemas import (
 from talonx_quant.store import QuantStateStore
 
 
+def _snapshot_stub() -> SimpleNamespace:
+    """Stand-in for compute_indicators' real IndicatorSnapshot in the
+    _handle_market_tick-level tests below -- carries the fields the
+    min-volatility gate and entry-blackout gate read: atr/price well
+    clear of QuantConfig's default min_atr_pct (0.25%), and bar_timestamp
+    at 15:00 UTC (11:00 ET, matching _bar_message's fixed event
+    timestamp) -- safely inside the regular active window, outside both
+    the 09:30-09:45 and 15:30-16:00 ET blackouts, so neither gate trips
+    in tests that aren't testing for it."""
+    return SimpleNamespace(atr=10.0, price=100.0, bar_timestamp=datetime(2026, 8, 7, 15, 0, tzinfo=timezone.utc))
+
+
 def _signal(
     ticker: str,
     volume_surge_ratio: float | None,
     signal_type=SignalType.MACD_BULLISH_CROSS,
     confluence_score: int | None = 3,
     risk_reward_ratio: float | None = 2.0,
+    direction: SignalDirection = SignalDirection.BULLISH,
 ) -> QuantSignal:
     # Defaults (confluence_score=3, risk_reward_ratio=2.0) clear the
     # default config's confluence_score_min=2 / min_risk_reward_ratio=1.5
@@ -56,7 +70,7 @@ def _signal(
     return QuantSignal(
         ticker=ticker,
         signal_type=signal_type,
-        direction=SignalDirection.BULLISH,
+        direction=direction,
         message="test signal",
         price=100.0,
         volume_surge_ratio=volume_surge_ratio,
@@ -179,7 +193,7 @@ async def test_handle_paper_trade_ignores_invalid_payload(scanner):
 
 @pytest.mark.asyncio
 async def test_handle_market_tick_suppresses_signals_when_locked_out(scanner, monkeypatch):
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)])
     scanner._client.exists.side_effect = _exists_side_effect(locked_out=True)
 
@@ -202,7 +216,7 @@ async def test_is_loss_locked_out_treats_redis_error_as_not_locked_out(scanner):
 
 @pytest.mark.asyncio
 async def test_handle_message_suppresses_signals_when_ticker_on_cooldown(scanner, monkeypatch):
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)])
     scanner._client.exists.side_effect = _exists_side_effect(on_cooldown=True)
 
@@ -216,7 +230,7 @@ async def test_handle_message_suppresses_signals_when_ticker_on_cooldown(scanner
 
 @pytest.mark.asyncio
 async def test_handle_message_starts_cooldown_and_buffers_candidate_when_not_on_cooldown(scanner, monkeypatch):
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)])
 
     await scanner._handle_message(_bar_message("AAPL"))
@@ -242,7 +256,7 @@ async def test_is_on_cooldown_treats_redis_error_as_not_on_cooldown(scanner):
 @pytest.mark.asyncio
 async def test_handle_message_suppresses_low_confluence_signal(scanner, monkeypatch):
     low_confluence = _signal("AAPL", 3.0, confluence_score=1)  # below confluence_score_min=2
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [low_confluence])
 
     await scanner._handle_message(_bar_message("AAPL"))
@@ -256,7 +270,7 @@ async def test_handle_message_suppresses_low_confluence_signal(scanner, monkeypa
 @pytest.mark.asyncio
 async def test_handle_message_suppresses_low_risk_reward_signal(scanner, monkeypatch):
     low_rr = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=1.0)  # below min_risk_reward_ratio=1.5
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [low_rr])
 
     await scanner._handle_message(_bar_message("AAPL"))
@@ -270,7 +284,7 @@ async def test_handle_message_suppresses_low_risk_reward_signal(scanner, monkeyp
 @pytest.mark.asyncio
 async def test_handle_message_suppresses_signal_missing_risk_reward_ratio(scanner, monkeypatch):
     no_rr = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=None)  # ATR unavailable
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [no_rr])
 
     await scanner._handle_message(_bar_message("AAPL"))
@@ -283,7 +297,7 @@ async def test_handle_message_suppresses_signal_missing_risk_reward_ratio(scanne
 async def test_handle_message_only_survivors_proceed_when_signals_are_mixed(scanner, monkeypatch):
     survivor = _signal("AAPL", 5.0, signal_type=SignalType.MACD_BULLISH_CROSS, confluence_score=3, risk_reward_ratio=2.0)
     filtered_by_rr = _signal("AAPL", 1.0, signal_type=SignalType.MA_GOLDEN_CROSS, confluence_score=3, risk_reward_ratio=0.5)
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [survivor, filtered_by_rr])
 
     await scanner._handle_message(_bar_message("AAPL"))
@@ -357,7 +371,7 @@ async def test_flush_throttle_window_is_a_noop_when_nothing_pending(scanner):
 
 @pytest.mark.asyncio
 async def test_cooldown_suppression_is_recorded_when_a_store_is_set(tmp_path, monkeypatch):
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)])
     with QuantStateStore(tmp_path / "quant.db") as store:
         scanner = QuantScanner(QuantConfig(), store=store)
@@ -376,7 +390,7 @@ async def test_cooldown_suppression_is_recorded_when_a_store_is_set(tmp_path, mo
 
 @pytest.mark.asyncio
 async def test_loss_lockout_suppression_is_recorded_when_a_store_is_set(tmp_path, monkeypatch):
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [_signal("SMCI", 3.0)])
     with QuantStateStore(tmp_path / "quant.db") as store:
         scanner = QuantScanner(QuantConfig(), store=store)
@@ -430,7 +444,7 @@ def _premarket_signal(ticker: str = "AAPL", **overrides) -> QuantSignal:
 async def test_handle_message_suppresses_signal_failing_trend_gate(scanner, monkeypatch):
     below_trend = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=2.0)
     below_trend.trend_aligned = False  # pydantic model, plain attribute assignment
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
         consumer_module, "evaluate_signals",
         lambda ticker, snap, config, **kwargs: [below_trend],
@@ -448,7 +462,7 @@ async def test_handle_message_suppresses_signal_failing_trend_gate(scanner, monk
 async def test_handle_message_passes_signal_with_trend_aligned_true(scanner, monkeypatch):
     aligned = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=2.0)
     aligned.trend_aligned = True
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
         consumer_module, "evaluate_signals",
         lambda ticker, snap, config, **kwargs: [aligned],
@@ -464,7 +478,7 @@ async def test_handle_message_suppresses_premarket_signal_without_liquidity_data
     # session="pre_market", no buffered bars and no cached quote --
     # fail-closed: dollar volume and spread can't be confirmed.
     candidate = _premarket_signal()
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
         consumer_module, "evaluate_signals",
         lambda ticker, snap, config, **kwargs: [candidate],
@@ -480,7 +494,7 @@ async def test_handle_message_suppresses_premarket_signal_without_liquidity_data
 @pytest.mark.asyncio
 async def test_handle_message_passes_premarket_signal_when_liquidity_and_news_clear(scanner, monkeypatch):
     candidate = _premarket_signal()
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
         consumer_module, "evaluate_signals",
         lambda ticker, snap, config, **kwargs: [candidate],
@@ -498,7 +512,7 @@ async def test_handle_message_passes_premarket_signal_when_liquidity_and_news_cl
 @pytest.mark.asyncio
 async def test_handle_message_suppresses_premarket_signal_without_recent_news(scanner, monkeypatch):
     candidate = _premarket_signal()
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
         consumer_module, "evaluate_signals",
         lambda ticker, snap, config, **kwargs: [candidate],
@@ -517,7 +531,7 @@ async def test_handle_message_suppresses_premarket_signal_without_recent_news(sc
 async def test_handle_message_suppresses_premarket_signal_with_stale_news(scanner, monkeypatch):
     from datetime import timedelta
     candidate = _premarket_signal()
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
         consumer_module, "evaluate_signals",
         lambda ticker, snap, config, **kwargs: [candidate],
@@ -535,7 +549,7 @@ async def test_regular_session_signal_is_not_subject_to_premarket_gates(scanner,
     # session="regular" (the default _signal() bar_timestamp is 15:00 UTC
     # = 11:00 ET) -- no quote/news cached at all, must still pass.
     candidate = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=2.0)
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
         consumer_module, "evaluate_signals",
         lambda ticker, snap, config, **kwargs: [candidate],
@@ -772,7 +786,7 @@ async def test_load_buffers_from_store_handles_multiple_symbols_independently(tm
 
 @pytest.mark.asyncio
 async def test_no_store_means_no_persistence_attempted(scanner, monkeypatch):
-    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: object())
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)])
     scanner._client.exists.side_effect = _exists_side_effect(on_cooldown=True)
 
@@ -1037,3 +1051,110 @@ async def test_preseed_symbols_seeds_both_buffers_for_every_symbol(scanner, monk
     assert scanner.buffer.bar_count("MSFT") == 1
     assert scanner.buffer_htf.bar_count("AAPL") == 1
     assert scanner.buffer_htf.bar_count("MSFT") == 1
+
+
+# --- Minimum volatility gate (_fails_min_volatility) -----------------------
+
+def test_fails_min_volatility_true_below_threshold():
+    # ATR 0.20 on a $100 stock = 0.20% ATR, below the default 0.25% floor.
+    snapshot = SimpleNamespace(atr=0.20, price=100.0)
+    assert consumer_module._fails_min_volatility(snapshot, QuantConfig()) is True
+
+
+def test_fails_min_volatility_false_above_threshold():
+    # ATR 2.00 on a $100 stock = 2.00% ATR, well clear of the floor.
+    snapshot = SimpleNamespace(atr=2.0, price=100.0)
+    assert consumer_module._fails_min_volatility(snapshot, QuantConfig()) is False
+
+
+def test_fails_min_volatility_does_not_fail_closed_on_missing_atr():
+    # Warm-up (ATR not yet available) must NOT trip this gate -- every
+    # RSI/MACD/MA check downstream already requires ATR, so an unwarmed
+    # symbol produces zero signals regardless of this gate's answer.
+    snapshot = SimpleNamespace(atr=None, price=100.0)
+    assert consumer_module._fails_min_volatility(snapshot, QuantConfig()) is False
+
+
+@pytest.mark.asyncio
+async def test_handle_market_tick_suppresses_low_volatility_bar_before_evaluating(scanner, monkeypatch):
+    low_vol_snapshot = SimpleNamespace(
+        atr=0.10, price=100.0, bar_timestamp=datetime(2026, 8, 7, 15, 0, tzinfo=timezone.utc),
+    )
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: low_vol_snapshot)
+    evaluate_called = {"n": 0}
+
+    def _evaluate(ticker, snap, config, **kwargs):
+        evaluate_called["n"] += 1
+        return [_signal("AAPL", 3.0)]
+
+    monkeypatch.setattr(consumer_module, "evaluate_signals", _evaluate)
+
+    await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
+
+    # Gated BEFORE evaluate_signals is even called (skips momentum
+    # evaluation entirely for a low-beta bar), and nothing published.
+    assert evaluate_called["n"] == 0
+    scanner._client.publish.assert_not_awaited()
+    assert scanner.signals_suppressed_low_volatility == 1
+
+
+# --- Entry blackout gate (get_entry_blackout) -------------------------------
+
+@pytest.mark.asyncio
+async def test_handle_market_tick_suppresses_all_signals_during_opening_blackout(scanner, monkeypatch):
+    # 09:35 ET = 13:35 UTC -- inside the 09:30-09:45 opening blackout.
+    opening_snapshot = SimpleNamespace(
+        atr=10.0, price=100.0, bar_timestamp=datetime(2026, 8, 7, 13, 35, tzinfo=timezone.utc),
+    )
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: opening_snapshot)
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [
+            _signal("AAPL", 3.0, direction=SignalDirection.BULLISH),
+            _signal("AAPL", 3.0, direction=SignalDirection.BEARISH),
+        ],
+    )
+
+    await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
+
+    scanner._client.publish.assert_not_awaited()
+    assert scanner.signals_suppressed_opening_blackout == 2
+
+
+@pytest.mark.asyncio
+async def test_handle_market_tick_closing_blackout_drops_bullish_keeps_bearish(scanner, monkeypatch):
+    # 15:45 ET = 19:45 UTC -- inside the 15:30-16:00 closing blackout.
+    closing_snapshot = SimpleNamespace(
+        atr=10.0, price=100.0, bar_timestamp=datetime(2026, 8, 7, 19, 45, tzinfo=timezone.utc),
+    )
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: closing_snapshot)
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [
+            _signal("AAPL", 3.0, direction=SignalDirection.BULLISH),
+            _signal("AAPL", 3.0, direction=SignalDirection.BEARISH),
+        ],
+    )
+
+    await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
+
+    # The BULLISH candidate is dropped, but the BEARISH one survives this
+    # gate and proceeds into the rest of the pipeline (cooldown, etc.) --
+    # an open position should still be able to exit before EOD-flatten.
+    assert scanner.signals_suppressed_closing_blackout == 1
+    scanner._client.set.assert_awaited()  # cooldown started for the surviving BEARISH candidate
+
+
+@pytest.mark.asyncio
+async def test_handle_market_tick_no_blackout_during_active_session(scanner, monkeypatch):
+    # 11:00 ET = 15:00 UTC -- deep in the active window, outside both
+    # blackout sub-windows.
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)],
+    )
+
+    await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
+
+    assert scanner.signals_suppressed_opening_blackout == 0
+    assert scanner.signals_suppressed_closing_blackout == 0

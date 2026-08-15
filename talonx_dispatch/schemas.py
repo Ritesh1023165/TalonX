@@ -58,6 +58,13 @@ class AlertAction(str, Enum):
     # "invalid payload" rather than notify on it.
     STOP_LOSS_EXIT = "stop_loss_exit"
     TAKE_PROFIT_EXIT = "take_profit_exit"
+    # Same reasoning as STOP_LOSS_EXIT/TAKE_PROFIT_EXIT above -- must exist
+    # here too since PaperTradeExecution is re-validated against THIS
+    # module's mirror on talonx:paper:trades. Emitted by talonx_paper's
+    # daily EOD-flatten sweep (15:50 ET); consumer.py's
+    # _handle_trade_execution mutes the Telegram push for this one
+    # specific action (routine, not actionable) but still records it.
+    EOD_FLAT_LIQUIDATION = "eod_flat_liquidation"
 
     # --- Phase 2 LONG_TERM decision matrix -- disjoint from the
     # intraday actions above, never mixed on the same alert/channel.

@@ -58,6 +58,7 @@ from talonx_paper.engine import (
     check_stop_take,
     decide_long_term_trade,
     decide_trade,
+    seconds_until_next_eod_flatten,
 )
 from talonx_paper.schemas import (
     ActionableAlert,
@@ -170,15 +171,68 @@ class PaperTradingEngine:
         )
 
         try:
-            while not self._stop_event.is_set():
-                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
-                if message is None:
-                    continue  # normal: no message within this poll window
-                await self._handle_message(message)
+            await asyncio.gather(self._poll_messages(pubsub), self._eod_flatten_loop())
         finally:
             await pubsub.unsubscribe(self.config.alerts_channel, self.config.market_channel)
             await pubsub.aclose()
             await self._client.aclose()
+
+    async def _poll_messages(self, pubsub) -> None:
+        while not self._stop_event.is_set():
+            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            if message is None:
+                continue  # normal: no message within this poll window
+            await self._handle_message(message)
+
+    async def _eod_flatten_loop(self) -> None:
+        """Daily sweep (config.eod_flatten_hour_et:eod_flatten_minute_et,
+        default 15:50 ET) that liquidates every still-open INTRADAY
+        position -- same while-not-stopped/wait_for(stop.wait(), timeout=…)
+        shape as LongTermPaperEngine._dca_loop, but computed from a fixed
+        daily wall-clock target (engine.seconds_until_next_eod_flatten)
+        rather than a persisted last-run timestamp: unlike the DCA loop's
+        ~30-day interval, a single missed day here just means tomorrow's
+        cycle runs on schedule -- there's no multi-week drift to protect
+        against by persisting state across a restart. Returns immediately
+        (a no-op sibling task under asyncio.gather) if disabled via
+        config.eod_flatten_enabled."""
+        if not self.config.eod_flatten_enabled:
+            return
+        while not self._stop_event.is_set():
+            wait_seconds = seconds_until_next_eod_flatten(
+                datetime.now(timezone.utc), self.config.eod_flatten_hour_et, self.config.eod_flatten_minute_et,
+            )
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=wait_seconds)
+            except asyncio.TimeoutError:
+                pass  # normal: target time reached, run the flatten sweep
+            else:
+                return  # stop() was called during the wait
+            if not self._stop_event.is_set():
+                try:
+                    await self._run_eod_flatten_once()
+                except Exception as exc:  # noqa: BLE001 -- one bad cycle shouldn't kill the loop
+                    logger.error("EOD flatten cycle failed: %s", exc)
+
+    async def _run_eod_flatten_once(self) -> None:
+        """Closes every open position in the INTRADAY `positions` table
+        only -- store.get_open_positions() never touches
+        long_term_positions (a separate table/ledger entirely), so the
+        LONG_TERM DCA-aware path is structurally unreachable from here,
+        not just untouched by convention."""
+        positions = self.store.get_open_positions()
+        if not positions:
+            return
+        latest_prices = self.store.get_latest_prices()
+        now = datetime.now(timezone.utc)
+        for position in positions:
+            ticker = position["ticker"]
+            price = latest_prices.get(ticker)
+            if price is None or price <= 0:
+                logger.warning("Skipping EOD flatten for %s -- no known current price", ticker)
+                continue
+            fill_price = apply_spread(price, self.config.simulated_spread_bps, "SELL")
+            await self._close_position(ticker, fill_price, now, AlertAction.EOD_FLAT_LIQUIDATION)
 
     async def _handle_message(self, message: dict) -> None:
         raw = message.get("data")

@@ -83,6 +83,15 @@ CREATE TABLE IF NOT EXISTS trade_history (
     entry_price             REAL,
     realized_pnl_usd        REAL,
     realized_pnl_pct        REAL,
+    -- SELL only (NULL on a BUY row, same nullability convention as
+    -- entry_price/realized_pnl_usd above). exit_reason is the closing
+    -- trade's triggering_action value (e.g. "stop_loss_exit",
+    -- "eod_flat_liquidation", "confirmed_bearish") -- a duplicate of what
+    -- PaperTradeExecution.triggering_action already carries on the wire,
+    -- persisted as its own column so the CSV export/dashboard can show it
+    -- without re-deriving it from triggering_action's enum value.
+    exit_reason             TEXT,
+    holding_duration_seconds REAL,
     portfolio_cash_after    REAL NOT NULL,
     timestamp               TEXT NOT NULL
 );
@@ -220,6 +229,15 @@ class PaperTradingStore:
         position_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(positions)").fetchall()}
         if position_cols and "stop_price" not in position_cols:
             self._conn.execute("DROP TABLE positions")
+            self._conn.executescript(_SCHEMA)
+
+        # exit_reason/holding_duration_seconds (EOD-flattening requirement
+        # doc) -- a pre-existing trade_history table predates both. Same
+        # "no data worth preserving, drop and recreate from _SCHEMA" call
+        # as the positions migration directly above, per project direction.
+        trade_history_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(trade_history)").fetchall()}
+        if trade_history_cols and "exit_reason" not in trade_history_cols:
+            self._conn.execute("DROP TABLE trade_history")
             self._conn.executescript(_SCHEMA)
 
         # last_dca_at (restart-survival fix for the DCA loop) -- plain
@@ -416,15 +434,20 @@ class PaperTradingStore:
         ticker = ticker.upper()
         with self._lock:
             pos = self._conn.execute(
-                "SELECT shares, entry_price, cost_basis FROM positions WHERE ticker = ?", (ticker,)
+                "SELECT shares, entry_price, cost_basis, entry_timestamp FROM positions WHERE ticker = ?",
+                (ticker,),
             ).fetchone()
             if pos is None:
                 return None
-            shares, entry_price, cost_basis = pos
+            shares, entry_price, cost_basis, entry_timestamp_str = pos
 
             proceeds = shares * exit_price
             pnl_usd, pnl_pct = calculate_sell_pnl(shares, entry_price, exit_price)
             is_win = pnl_usd > 0
+            exit_reason = triggering_action.value
+            holding_duration_seconds = (
+                timestamp - datetime.fromisoformat(entry_timestamp_str)
+            ).total_seconds()
 
             current_cash, total_pnl, win_count, loss_count, initial_balance = self._conn.execute(
                 "SELECT current_cash, total_realized_pnl_usd, win_count, loss_count, initial_balance "
@@ -444,10 +467,11 @@ class PaperTradingStore:
             cursor = self._conn.execute(
                 "INSERT INTO trade_history "
                 "(ticker, order_type, execution_price, shares, position_cost, entry_price, "
-                "realized_pnl_usd, realized_pnl_pct, portfolio_cash_after, timestamp) "
-                "VALUES (?, 'SELL', ?, ?, ?, ?, ?, ?, ?, ?)",
+                "realized_pnl_usd, realized_pnl_pct, exit_reason, holding_duration_seconds, "
+                "portfolio_cash_after, timestamp) "
+                "VALUES (?, 'SELL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (ticker, exit_price, shares, cost_basis, entry_price, pnl_usd, pnl_pct,
-                 new_cash, timestamp.isoformat()),
+                 exit_reason, holding_duration_seconds, new_cash, timestamp.isoformat()),
             )
             trade_id = cursor.lastrowid
             self._conn.commit()
@@ -468,7 +492,8 @@ class PaperTradingStore:
         with self._lock:
             cursor = self._conn.execute(
                 "SELECT id, ticker, order_type, execution_price, shares, position_cost, entry_price, "
-                "realized_pnl_usd, realized_pnl_pct, portfolio_cash_after, timestamp "
+                "realized_pnl_usd, realized_pnl_pct, exit_reason, holding_duration_seconds, "
+                "portfolio_cash_after, timestamp "
                 "FROM trade_history ORDER BY id DESC LIMIT ?",
                 (limit,),
             )
@@ -482,7 +507,8 @@ class PaperTradingStore:
         with self._lock:
             cursor = self._conn.execute(
                 "SELECT id, ticker, order_type, execution_price, shares, position_cost, entry_price, "
-                "realized_pnl_usd, realized_pnl_pct, portfolio_cash_after, timestamp "
+                "realized_pnl_usd, realized_pnl_pct, exit_reason, holding_duration_seconds, "
+                "portfolio_cash_after, timestamp "
                 "FROM trade_history WHERE timestamp >= ? AND timestamp < ? ORDER BY id",
                 (start.isoformat(), end.isoformat()),
             )

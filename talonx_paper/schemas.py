@@ -36,6 +36,14 @@ class AlertAction(str, Enum):
     # alert at all.
     STOP_LOSS_EXIT = "stop_loss_exit"
     TAKE_PROFIT_EXIT = "take_profit_exit"
+    # Never a real ActionableAlert.action -- only ever used as
+    # PaperTradeExecution.triggering_action for the daily EOD-flatten
+    # sweep (talonx_paper.consumer's _run_eod_flatten_once), which closes
+    # every open INTRADAY position with no originating alert at all. Must
+    # also be mirrored onto talonx_dispatch.schemas.AlertAction (same
+    # "re-validated against THIS module's mirror" reasoning STOP_LOSS_EXIT/
+    # TAKE_PROFIT_EXIT already document there).
+    EOD_FLAT_LIQUIDATION = "eod_flat_liquidation"
 
     # --- Phase 2 LONG_TERM decision matrix (talonx_core.decision's
     # evaluate_long_term) -- disjoint from the intraday actions above.

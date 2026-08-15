@@ -69,9 +69,10 @@ from talonx_quant.schemas import (
     PaperOrderType,
     PaperTradeExecution,
     QuantSignal,
+    SignalDirection,
     TickEventType,
 )
-from talonx_quant.session import get_session
+from talonx_quant.session import get_entry_blackout, get_session
 from talonx_quant.store import QuantStateStore
 from talonx_quant.strategy import evaluate_signals
 
@@ -102,6 +103,20 @@ def _ensure_utc(dt: datetime) -> datetime:
     convention elsewhere in this module -- avoids a naive/aware
     subtraction TypeError if an upstream event ever omits tzinfo."""
     return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
+def _fails_min_volatility(snapshot, config: QuantConfig) -> bool:
+    """True if this bar's ATR14/price (as a percentage) is below
+    config.min_atr_pct -- filters out low-beta/income names (e.g. a REIT)
+    that can occupy an execution slot without enough range to ever reach
+    an ATR-scaled stop/target. Deliberately does NOT fail closed on
+    missing ATR (warm-up): every RSI/MACD/MA check in strategy.py already
+    requires ATR via _clears_atr_move, so an unwarmed symbol produces zero
+    signals downstream regardless of this gate's answer."""
+    if snapshot.atr is None or not snapshot.price:
+        return False
+    atr_pct = (snapshot.atr / snapshot.price) * 100
+    return atr_pct < config.min_atr_pct
 
 
 async def _incr_metric(client, stage: str, counter: str, amount: int = 1) -> None:
@@ -176,6 +191,9 @@ class QuantScanner:
         self._signals_suppressed_trend_gate = 0
         self._signals_suppressed_premarket_liquidity = 0
         self._signals_suppressed_news_catalyst = 0
+        self._signals_suppressed_low_volatility = 0
+        self._signals_suppressed_opening_blackout = 0
+        self._signals_suppressed_closing_blackout = 0
         # Candidates that cleared strategy.py's own filters AND the
         # per-ticker cooldown, waiting for the next throttle window flush.
         self._pending_candidates: list[QuantSignal] = []
@@ -218,6 +236,18 @@ class QuantScanner:
     @property
     def signals_suppressed_news_catalyst(self) -> int:
         return self._signals_suppressed_news_catalyst
+
+    @property
+    def signals_suppressed_low_volatility(self) -> int:
+        return self._signals_suppressed_low_volatility
+
+    @property
+    def signals_suppressed_opening_blackout(self) -> int:
+        return self._signals_suppressed_opening_blackout
+
+    @property
+    def signals_suppressed_closing_blackout(self) -> int:
+        return self._signals_suppressed_closing_blackout
 
     async def run(self) -> None:
         if redis_asyncio is None:
@@ -701,6 +731,15 @@ class QuantScanner:
         if snapshot is None:
             return  # not enough history yet for this symbol
 
+        if _fails_min_volatility(snapshot, self.config):
+            self._signals_suppressed_low_volatility += 1
+            await _incr_metric(self._client, "quant", "failed_min_volatility", 1)
+            if self.store is not None:
+                self.store.record_suppressed(
+                    event.symbol, "LOW_VOLATILITY", 1, datetime.now(timezone.utc)
+                )
+            return  # ATR% below config.min_atr_pct -- low-beta name, skip momentum evaluation entirely
+
         htf_sma_200 = compute_htf_trend(
             self.buffer_htf.get_dataframe(event.symbol), self.config.htf_sma_period
         )
@@ -708,6 +747,47 @@ class QuantScanner:
         if not signals:
             return
         await _incr_metric(self._client, "quant", "evaluated", len(signals))
+
+        blackout = get_entry_blackout(snapshot.bar_timestamp)
+        if blackout == "opening":
+            # Opening Range Blackout (09:30-09:45 ET): ALL candidates
+            # suppressed, both directions -- the first 15 minutes are
+            # thin/volatile enough that even a bearish/exit read isn't
+            # trustworthy yet.
+            self._signals_suppressed_opening_blackout += len(signals)
+            await _incr_metric(self._client, "quant", "dropped_opening_blackout", len(signals))
+            if self.store is not None:
+                self.store.record_suppressed(
+                    event.symbol, "OPENING_BLACKOUT", len(signals), datetime.now(timezone.utc)
+                )
+            logger.info(
+                "Suppressed %d candidate(s) for %s -- opening-range blackout (09:30-09:45 ET)",
+                len(signals), event.symbol,
+            )
+            return
+        if blackout == "closing":
+            # Closing Entry Blackout (15:30-16:00 ET): only new BULLISH
+            # entries are blocked -- prevents late-session whipsaws like
+            # the PYPL #44 buy this gate was added for. A genuine bearish/
+            # exit signal still fires, since an open position should be
+            # allowed to exit before talonx_paper's EOD-flatten sweep
+            # (15:50 ET) closes it out regardless.
+            signals, dropped_for_closing = _partition(signals, lambda s: s.direction != SignalDirection.BULLISH)
+            if dropped_for_closing:
+                self._signals_suppressed_closing_blackout += len(dropped_for_closing)
+                await _incr_metric(
+                    self._client, "quant", "dropped_closing_blackout", len(dropped_for_closing)
+                )
+                if self.store is not None:
+                    self.store.record_suppressed(
+                        event.symbol, "CLOSING_BLACKOUT", len(dropped_for_closing), datetime.now(timezone.utc)
+                    )
+                logger.info(
+                    "Suppressed %d BULLISH candidate(s) for %s -- closing-entry blackout (15:30-16:00 ET)",
+                    len(dropped_for_closing), event.symbol,
+                )
+            if not signals:
+                return
 
         if await self._is_loss_locked_out(event.symbol):
             self._signals_suppressed_loss_lockout += len(signals)

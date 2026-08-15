@@ -260,6 +260,7 @@ class DispatchAgent:
         self._long_term_push_suppressed_action_muted = 0
         self._long_term_push_suppressed_cooldown = 0
         self._long_term_push_suppressed_price_delta = 0
+        self._eod_notifications_suppressed = 0
 
         # Event-Driven Earnings Radar, Requirement 5: latest-per-ticker
         # cache of whatever fundamental signal/report this process has
@@ -397,6 +398,10 @@ class DispatchAgent:
     @property
     def earnings_heads_up_sent(self) -> int:
         return self._earnings_heads_up_sent
+
+    @property
+    def eod_notifications_suppressed(self) -> int:
+        return self._eod_notifications_suppressed
 
     async def run(self) -> None:
         if redis_asyncio is None:
@@ -691,6 +696,32 @@ class DispatchAgent:
             execution = PaperTradeExecution.model_validate(payload)
         except ValidationError as exc:
             logger.warning("Dropping unparseable paper trade execution: %s", exc)
+            return
+
+        if execution.triggering_action == AlertAction.EOD_FLAT_LIQUIDATION:
+            # Routine daily flatten (talonx_paper, ~15:50 ET) -- not
+            # actionable, so the Telegram push is muted, same posture
+            # ACTION_MUTED already takes for CONTRADICTED research alerts.
+            # Still recorded durably (a routine SELL a user might
+            # otherwise wonder "why wasn't I told about this" for), just
+            # in this narrower audit table rather than `alerts` -- an
+            # EOD_FLAT_LIQUIDATION execution has no originating
+            # ActionableAlert to record it against at all.
+            self._eod_notifications_suppressed += 1
+            try:
+                self.store.record_paper_trade_notification(
+                    execution.trade_id, execution.ticker, execution.order_type.value,
+                    execution.triggering_action.value, telegram_sent=False,
+                    suppress_reason="EOD_LIQUIDATION_ROUTINE", timestamp=datetime.now(timezone.utc),
+                )
+            except Exception as exc:  # noqa: BLE001 -- an audit-write failure shouldn't crash the consumer
+                logger.warning(
+                    "Failed to record EOD liquidation audit row for trade #%d: %s", execution.trade_id, exc,
+                )
+            logger.info(
+                "Telegram push muted for paper trade #%d (%s) -- EOD_LIQUIDATION_ROUTINE",
+                execution.trade_id, execution.ticker,
+            )
             return
 
         if not self.telegram_client.is_configured:

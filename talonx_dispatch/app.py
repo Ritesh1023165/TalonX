@@ -31,8 +31,9 @@ ticker add/remove here won't be picked up by anything.
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 # `streamlit run` invokes its own console-script entry point rather than
 # `python -m`, so unlike every other entrypoint in this project it does
@@ -323,8 +324,42 @@ def render_ticker_watchlist(store: TickerWatchlistStore, poll_interval_seconds: 
 _TRADE_HISTORY_COLUMNS = {
     "id": "Trade #", "ticker": "Ticker", "order_type": "Type", "execution_price": "Price",
     "shares": "Shares", "entry_price": "Entry", "realized_pnl_usd": "PnL ($)",
-    "realized_pnl_pct": "PnL (%)", "portfolio_cash_after": "Cash after", "timestamp": "Time",
+    "realized_pnl_pct": "PnL (%)", "exit_reason": "Exit Reason",
+    "holding_duration_seconds": "Held (s)", "portfolio_cash_after": "Cash after", "timestamp": "Time",
 }
+
+_MARKET_SESSION_ET = ZoneInfo("America/New_York")
+
+
+def _market_session_banner(now_utc: datetime) -> str:
+    """Display-only read of the same clock-time windows talonx_quant's
+    entry-blackout gate and talonx_paper's EOD-flatten sweep act on
+    (09:30/09:45/15:30/16:00 ET) -- duplicated here rather than imported,
+    same "shadow constant, documented as an approximation" pattern
+    talonx_quant.config's assumed_stop_loss_pct already uses for a
+    cross-module display value, since this Streamlit process has no live
+    handle into either module to ask directly."""
+    local_time = now_utc.astimezone(_MARKET_SESSION_ET).time()
+    if time(9, 45) <= local_time < time(15, 30):
+        return "\U0001F7E2 **ACTIVE TRADING**"
+    if time(9, 30) <= local_time < time(9, 45) or time(15, 30) <= local_time < time(16, 0):
+        return "\U0001F7E1 **ENTRY BLACKOUT** — no new entries until the next window"
+    return "\U0001F534 **EOD FLATTENED / CLOSED**"
+
+
+def _highlight_exit_reason(row: pd.Series) -> list[str]:
+    """Row-level highlight for the closed-trades table: EOD_FLAT_LIQUIDATION
+    in blue, STOP_LOSS in red -- BUY rows and other exit reasons get no
+    highlight (Exit Reason is None/NaN for a BUY, matching every other
+    SELL-only column in this table)."""
+    reason = row.get("Exit Reason")
+    if reason == "eod_flat_liquidation":
+        color = "background-color: rgba(59, 130, 246, 0.18)"
+    elif reason == "stop_loss_exit":
+        color = "background-color: rgba(220, 38, 38, 0.18)"
+    else:
+        color = ""
+    return [color] * len(row)
 
 
 def render_paper_trading(paper_store: PaperTradingStore) -> None:
@@ -336,6 +371,7 @@ def render_paper_trading(paper_store: PaperTradingStore) -> None:
         "is ignored, not stacked. Settings (allocation, ticker enablement, reset) are "
         "in the Watchlist & Settings tab."
     )
+    st.markdown(_market_session_banner(datetime.now(timezone.utc)))
 
     summary = paper_store.get_portfolio_summary()
     open_positions = paper_store.get_open_positions()
@@ -410,7 +446,7 @@ def render_paper_trading(paper_store: PaperTradingStore) -> None:
 
     st.markdown("**Trade history**")
     display_df = hdf.rename(columns=_TRADE_HISTORY_COLUMNS)
-    st.dataframe(display_df, hide_index=True, width="stretch")
+    st.dataframe(display_df.style.apply(_highlight_exit_reason, axis=1), hide_index=True, width="stretch")
     st.download_button(
         "\U0001F4E5 Download trade history (CSV)",
         data=hdf.to_csv(index=False).encode("utf-8"),

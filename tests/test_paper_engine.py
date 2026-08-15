@@ -23,6 +23,7 @@ from talonx_paper.engine import (
     check_stop_take,
     decide_long_term_trade,
     decide_trade,
+    seconds_until_next_eod_flatten,
 )
 from talonx_paper.schemas import ActionableAlert, AlertAction, LongTermActionableAlert, MoatRating, TriggeringSignalRef
 
@@ -346,3 +347,32 @@ def test_calculate_partial_sell_pnl_zero_cost_basis_does_not_divide_by_zero():
     pnl_usd, pnl_pct = calculate_partial_sell_pnl(shares_to_sell=10.0, avg_cost_basis=0.0, exit_price=90.0)
     assert pnl_usd == 900.0
     assert pnl_pct == 0.0
+
+
+# --- seconds_until_next_eod_flatten (DST-safe, ZoneInfo-based) ------------
+
+def test_eod_flatten_wait_is_same_day_when_target_still_ahead():
+    # 15:00 ET = 19:00 UTC (EDT, UTC-4 in August) -- 15:50 ET target is 50
+    # minutes ahead, later today.
+    now = datetime(2026, 8, 14, 19, 0, 0, tzinfo=timezone.utc)
+    assert seconds_until_next_eod_flatten(now, hour_et=15, minute_et=50) == 50 * 60
+
+
+def test_eod_flatten_wait_rolls_to_tomorrow_once_target_has_passed():
+    # 16:30 ET = 20:30 UTC -- already past today's 15:50 ET, so the next
+    # occurrence is tomorrow: 23h20m away.
+    now = datetime(2026, 8, 14, 20, 30, 0, tzinfo=timezone.utc)
+    assert seconds_until_next_eod_flatten(now, hour_et=15, minute_et=50) == (23 * 3600) + (20 * 60)
+
+
+def test_eod_flatten_wait_at_exact_target_rolls_to_tomorrow():
+    # `now` exactly AT 15:50 ET -- that moment has already "passed" for
+    # scheduling purposes (target_local <= local_now), so it waits a full
+    # day rather than firing immediately/negative.
+    now = datetime(2026, 8, 14, 19, 50, 0, tzinfo=timezone.utc)
+    assert seconds_until_next_eod_flatten(now, hour_et=15, minute_et=50) == 24 * 3600
+
+
+def test_eod_flatten_wait_naive_timestamp_is_treated_as_utc():
+    naive = datetime(2026, 8, 14, 19, 0, 0)  # same instant as the same-day test above
+    assert seconds_until_next_eod_flatten(naive, hour_et=15, minute_et=50) == 50 * 60

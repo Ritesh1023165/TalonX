@@ -191,6 +191,18 @@ class QuantConfig:
     assumed_stop_loss_pct: float = _env_float("TALONX_QUANT_ASSUMED_STOP_LOSS_PCT", 0.005)
     min_risk_reward_ratio: float = _env_float("TALONX_QUANT_MIN_RISK_REWARD_RATIO", 1.5)
 
+    # --- Minimum volatility gate (2026-08-14 session review: ADC, a
+    # low-beta REIT, took up an intraday execution slot without enough
+    # range to ever reach an ATR-scaled stop/target) -- ATR14/price, as a
+    # percentage, must clear this before a bar's momentum indicators are
+    # even evaluated. Distinct from atr_move_multiplier above: that gate
+    # compares THIS bar's range to its own ATR (routine bar vs. genuine
+    # move); this one is a per-symbol volatility floor independent of any
+    # single bar. Missing ATR (warm-up) does NOT fail this gate closed --
+    # every RSI/MACD/MA check already requires ATR via _clears_atr_move,
+    # so an unwarmed symbol produces zero signals downstream regardless.
+    min_atr_pct: float = _env_float("TALONX_QUANT_MIN_ATR_PCT", 0.25)
+
     # --- 15-minute 200 SMA higher-timeframe trend gate ---
     # A second, coarser RollingBarBuffer (see consumer.py's buffer_htf),
     # incrementally aggregated from the same 1-min BAR events that feed

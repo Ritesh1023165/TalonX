@@ -154,6 +154,26 @@ CREATE TABLE IF NOT EXISTS last_telegram_push (
     price       REAL,
     PRIMARY KEY (ticker, horizon)
 );
+
+-- Audit trail for the EOD-flatten Telegram mute (2026-08-14 session
+-- review, Module 4A): a routine EOD_FLAT_LIQUIDATION execution never
+-- reaches the `alerts` table above at all (it has no originating
+-- ActionableAlert -- see talonx_paper.consumer's _run_eod_flatten_once),
+-- so this is a NEW, narrower audit trail, not an extension of `alerts`.
+-- Brand-new table -- CREATE TABLE IF NOT EXISTS alone covers both a
+-- fresh install and an existing dispatch_audit.db, no ALTER-based
+-- migration needed.
+CREATE TABLE IF NOT EXISTS paper_trade_notifications (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    trade_id            INTEGER NOT NULL,
+    ticker              TEXT NOT NULL,
+    order_type          TEXT NOT NULL,
+    triggering_action   TEXT NOT NULL,
+    telegram_sent       INTEGER NOT NULL DEFAULT 0,
+    suppress_reason     TEXT,
+    timestamp           TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_paper_trade_notifications_timestamp ON paper_trade_notifications (timestamp);
 """
 
 
@@ -575,6 +595,24 @@ class AuditStore:
                 "SELECT ticker, pushed_at, price FROM last_telegram_push WHERE horizon = ?", (horizon,)
             ).fetchall()
         return {row["ticker"]: (datetime.fromisoformat(row["pushed_at"]), row["price"]) for row in rows}
+
+    # ------------------------------------------------------------------
+    # Paper trade notification audit trail (EOD-flatten Telegram mute)
+    # ------------------------------------------------------------------
+
+    def record_paper_trade_notification(
+        self, trade_id: int, ticker: str, order_type: str, triggering_action: str,
+        telegram_sent: bool, suppress_reason: str | None, timestamp: datetime,
+    ) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO paper_trade_notifications "
+                "(trade_id, ticker, order_type, triggering_action, telegram_sent, suppress_reason, timestamp) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (trade_id, ticker.upper(), order_type, triggering_action,
+                 1 if telegram_sent else 0, suppress_reason, timestamp.isoformat()),
+            )
+            self._conn.commit()
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict:
