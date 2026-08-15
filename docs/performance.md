@@ -298,7 +298,16 @@ real conviction behind them, then got re-entered again and again on a
 name that had just proven it was chopping/declining. Four more filters
 were added on top of the original noise filters below to address that.
 
-**Eight filters total, layered in this order** ([modules/quant.md](modules/quant.md)
+A THIRD review, combining the 2026-08-14 execution ledger and dispatch
+audit trail, found a different failure mode again: not noise, and not a
+losing edge, but two structural gaps — a `PYPL` `BUY` at 19:45:17 UTC
+stopped out 33 seconds later on late-session order-book rebalancing, and
+a low-beta REIT (`ADC`) occupied an execution slot it could never
+profitably fill given its actual range. Two more filters were added for
+that (plus `talonx_paper`'s EOD-flatten sweep — a remediation, not a
+signal filter, see [modules/paper.md](modules/paper.md)).
+
+**Ten filters total, layered in this order** ([modules/quant.md](modules/quant.md)
 has the mechanics of each):
 
 | # | Filter | Fixes | Where |
@@ -311,6 +320,8 @@ has the mechanics of each):
 | 6 | Post-loss lockout | Repeat re-entry into a ticker that just closed a losing trade — the exact SMCI pattern above | `consumer.py` |
 | 7 | Per-ticker cooldown | The remaining ticker-duplication case: genuinely different signal types firing close together in time | `consumer.py` |
 | 8 | Batch throttle | Bursts across MANY tickers at once (a market-wide move) — global cap, ranked by (confluence, volume) | `consumer.py` |
+| 9 | Minimum volatility gate | A low-beta name (e.g. a REIT) occupying an execution slot without the range to ever hit an ATR-scaled stop/target — the `ADC` case | `consumer.py`, before `evaluate_signals` runs at all |
+| 10 | Entry blackout windows | Opening-range chop (09:30-09:45 ET) and late-session institutional rebalancing whipsaws (15:30-16:00 ET) — the `PYPL` case | `session.py` (classification) / `consumer.py` (filtered) |
 
 Plus (Phase 2) the session-aware pre-market volume/liquidity/news-catalyst
 gates and the 15-min 200-SMA trend gate — see
@@ -349,7 +360,9 @@ practice.
 counters (`signals_suppressed_cooldown`, `.signals_suppressed_throttle`,
 `.signals_suppressed_loss_lockout`, `.signals_suppressed_low_confluence`,
 `.signals_suppressed_low_risk_reward`, `.signals_suppressed_trend_gate`,
-`.signals_suppressed_premarket_liquidity`) each track how much their
+`.signals_suppressed_premarket_liquidity`, `.signals_suppressed_low_volatility`,
+`.signals_suppressed_opening_blackout`, `.signals_suppressed_closing_blackout`)
+each track how much their
 filter is actually removing, and all of them log a line per suppression
 event plus persist a `(ticker, reason, count)` row when a
 `QuantStateStore` is configured, for `generate_eod_report.py`'s

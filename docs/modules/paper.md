@@ -76,13 +76,17 @@ Redis: talonx:market:stream ────┘         │
   can't drift), `positions` (one row per OPEN position -- a ticker's
   ABSENCE from this table IS "flat," no separate status column; now also
   carries `stop_price`/`target_price`), `trade_history` (append-only,
-  powers the dashboard's trade table, CSV export, and equity curve),
-  `latest_prices` (updated on every market tick -- exists because the
-  Streamlit dashboard is a separate process with no access to the
-  engine's in-memory price cache). `execute_buy`/`execute_sell` are
-  OPERATION-shaped, not raw CRUD -- each updates positions +
-  portfolio_state + trade_history atomically (one lock, one commit) so
-  `consumer.py` never hand-coordinates a multi-table write.
+  powers the dashboard's trade table, CSV export, and equity curve --
+  every closed SELL now also carries `exit_reason` (the closing trade's
+  `triggering_action` value, e.g. `stop_loss_exit`/`eod_flat_liquidation`/
+  `confirmed_bearish`) and `holding_duration_seconds` (exit timestamp
+  minus entry timestamp), both `NULL` on a BUY row), `latest_prices`
+  (updated on every market tick -- exists because the Streamlit dashboard
+  is a separate process with no access to the engine's in-memory price
+  cache). `execute_buy`/`execute_sell` are OPERATION-shaped, not raw
+  CRUD -- each updates positions + portfolio_state + trade_history
+  atomically (one lock, one commit) so `consumer.py` never
+  hand-coordinates a multi-table write.
 - **Per-ticker enable/disable lives in `talonx_watchlist`, not a second
   ticker list** -- `paper_trading_enabled` is a new column on the SAME
   `tickers` table [running.md](../running.md)'s dashboard already
@@ -96,6 +100,31 @@ Redis: talonx:market:stream ────┘         │
   audit DB failure does (warns, doesn't crash the rest of the pipeline).
   Run it standalone with `python -m talonx_paper.run` if you want it
   decoupled.
+
+## Automated End-of-Day flattening
+
+Added after a 2026-08-14 session review found an intraday `ADC` position
+opened at 14:44 UTC and left open through market close, with nothing to
+catch it. `PaperTradingEngine._eod_flatten_loop` runs as a SECOND
+concurrent task alongside message polling (`asyncio.gather`, same shape
+as `LongTermPaperEngine._dca_loop`'s coexistence with its own message
+poller) -- every day at `TALONX_PAPER_EOD_FLATTEN_HOUR_ET`:`_MINUTE_ET`
+(default 15:50 ET), it iterates every row in `PaperTradingStore.
+get_open_positions()` (the INTRADAY `positions` table only -- structurally
+unreachable from `long_term_positions`, a separate table entirely, so the
+DCA-aware ledger is untouched by design, not just by convention) and
+closes each one through the SAME `_close_position` path a stop-loss/
+take-profit exit uses, tagged `AlertAction.EOD_FLAT_LIQUIDATION`.
+
+The wait until the next cycle is computed via `engine.
+seconds_until_next_eod_flatten` -- converts through `ZoneInfo("America/
+New_York")` rather than a fixed UTC offset, so the target stays pinned to
+15:50 ET (not 19:50 UTC) across the spring/fall DST transition. Disable
+entirely with `TALONX_PAPER_EOD_FLATTEN_ENABLED=false`.
+
+`talonx_dispatch` mutes the Telegram push for this specific
+`triggering_action` (a routine daily sweep, not an actionable event) --
+see [dispatch.md](dispatch.md).
 
 ## Long-term (DCA-aware) ledger
 

@@ -447,11 +447,15 @@ tracked), a live expandable alert feed, and a filterable
 (ticker/action/severity) full audit trail table. Auto-refreshes every
 `TALONX_DISPATCH_AUTOREFRESH_MS` (default 5000ms) — that's also how
 often an add/remove made by someone else shows up in your own browser
-tab. Also shows the **"💰 Paper Trading"** section (portfolio
-value/win-rate/open-positions metrics, a Settings panel, an
+tab. Also shows the **"💰 Paper Trading"** section (a market-session status
+banner — 🟢 Active Trading / 🟡 Entry Blackout / 🔴 EOD Flattened-Closed,
+see [modules/quant.md](modules/quant.md) for the underlying windows;
+portfolio value/win-rate/open-positions metrics, a Settings panel, an
 open-positions table marked to the latest known price, an equity curve,
-a win/loss-colored per-trade PnL chart, and a downloadable CSV of the
-full trade history) and the **"📊 Daily Funnel & Metrics"** tab (see
+a win/loss-colored per-trade PnL chart with `EOD_FLAT_LIQUIDATION` rows
+highlighted blue and `STOP_LOSS` rows red, and a downloadable CSV of the
+full trade history including `exit_reason`/`holding_duration_seconds`)
+and the **"📊 Daily Funnel & Metrics"** tab (see
 [modules/dispatch.md](modules/dispatch.md)).
 
 ```powershell
@@ -471,6 +475,9 @@ trade to `talonx:paper:trades` — `talonx_dispatch.run` picks that
 up and sends its own short Telegram notification, decoupled from the
 triggering alert's push. Runs continuously — `Ctrl+C` to stop; prints a
 summary of alerts processed / trades executed / trades ignored on exit.
+Also runs a daily 15:50 ET sweep that flattens any still-open intraday
+position (`TALONX_PAPER_EOD_FLATTEN_ENABLED` to disable) — see
+[modules/paper.md](modules/paper.md).
 
 **Risk management and friction, added after reviewing a live session's
 results** (negative risk-to-reward, gains too small to survive real

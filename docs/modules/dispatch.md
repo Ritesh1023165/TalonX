@@ -214,6 +214,23 @@ Streamlit (`streamlit run talonx_dispatch/app.py`)
   5-stage conversion chart (Bars Ingested → Quant Triggers → LLM Evaluated
   → Core Alerts → Telegram Pushes) plus a full per-module/per-counter
   breakdown table for a selected date.
+- **Paper trade execution pushes** (`consumer.py`'s
+  `_handle_trade_execution`, subscribed to `talonx:paper:trades`) — a
+  SEPARATE, decoupled short Telegram push per executed `PaperTradeExecution`
+  (BUY/SELL fill), independent of the triggering alert's own push (see
+  [paper.md](paper.md)). No audit-DB record for a normal fill (Telegram
+  send-or-skip only) — **except** `EOD_FLAT_LIQUIDATION` (`talonx_paper`'s
+  daily 15:50 ET flatten sweep, see [paper.md](paper.md)): that one
+  specific `triggering_action` is muted (no Telegram push at all, same
+  "quiet but recorded" posture `ACTION_MUTED` alerts get above) and
+  instead recorded to a new `paper_trade_notifications` audit table
+  (`trade_id`, `ticker`, `order_type`, `triggering_action`,
+  `telegram_sent`, `suppress_reason="EOD_LIQUIDATION_ROUTINE"`,
+  `timestamp`) — a routine daily liquidation isn't actionable, but a user
+  might still reasonably ask "why wasn't I told about this," so it's kept
+  durable in its own narrower table rather than silently dropped (an
+  `EOD_FLAT_LIQUIDATION` execution has no originating `ActionableAlert`
+  to record it against in the `alerts` table at all).
 - **Mobile push notifications are severity-gated**
   (`TALONX_DISPATCH_MIN_SEVERITY`, default `warning`) -- an `INFO`-level
   alert still gets recorded to the audit trail and shows in the Streamlit

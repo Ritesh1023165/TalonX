@@ -15,7 +15,9 @@ pick; everything else is optional tuning:
   `TALONX_QUANT_MIN_MA_SPREAD_PCT` / `TALONX_QUANT_THROTTLE_WINDOW_SECONDS`
   / `TALONX_QUANT_THROTTLE_MAX_SIGNALS` / `TALONX_QUANT_ATR_MOVE_MULTIPLIER`
   / `TALONX_QUANT_CONFLUENCE_SCORE_MIN` / `TALONX_QUANT_MIN_RISK_REWARD_RATIO`
-  / `TALONX_QUANT_LOSS_LOCKOUT_SECONDS` (see [modules/quant.md](modules/quant.md),
+  / `TALONX_QUANT_LOSS_LOCKOUT_SECONDS` / `TALONX_QUANT_MIN_ATR_PCT` (the
+  minimum-volatility gate, and the opening/closing entry blackout windows
+  it sits alongside — see [modules/quant.md](modules/quant.md),
   [performance.md](performance.md)), plus the Phase 2 pre-market/trend-gate
   additions (`TALONX_QUANT_PREMARKET_VOLUME_SURGE_RATIO`,
   `TALONX_QUANT_PREMARKET_MIN_DOLLAR_VOLUME_PER_MIN`,
@@ -56,7 +58,9 @@ pick; everything else is optional tuning:
 - Module 6's `TALONX_PAPER_DB` / `TALONX_PAPER_INITIAL_BALANCE` /
   `TALONX_PAPER_TRADE_ALLOCATION` -- fresh-install defaults only, since
   the dashboard's Settings panel is the actual live source of truth once
-  a portfolio has been created (see [modules/paper.md](modules/paper.md)).
+  a portfolio has been created -- plus the automated End-of-Day flatten
+  sweep's `TALONX_PAPER_EOD_FLATTEN_ENABLED` / `_HOUR_ET` / `_MINUTE_ET`
+  (see [modules/paper.md](modules/paper.md)).
 
 `.env.example`'s "Phase 2" block covers everything specific to the
 `LONG_TERM` horizon (see [phase2-multi-horizon.md](phase2-multi-horizon.md))

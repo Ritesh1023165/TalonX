@@ -98,6 +98,46 @@ for the full before/after):**
   final partial-window flush happens on `Ctrl+C`/reconnect so nothing
   buffered is silently lost.
 
+## 2026-08-14 session review: entry blackouts and the volatility gate
+
+Added after combining the execution ledger and dispatch audit trail for
+the 2026-08-14 session: a `PYPL` `BUY` at 19:45:17 UTC stopped out 33
+seconds later on late-session order-book rebalancing, and `ADC` (a
+low-beta REIT) took up an intraday execution slot without ever having
+the range to reach an ATR-scaled stop/target.
+
+- **Minimum volatility gate** (`consumer.py`'s `_fails_min_volatility`,
+  `TALONX_QUANT_MIN_ATR_PCT`, default 0.25%) — `ATR(14)/price`, as a
+  percentage, must clear this floor BEFORE `evaluate_signals` is even
+  called for a bar — skips momentum evaluation entirely for a low-beta
+  name rather than letting it occupy an execution slot it can't
+  profitably fill. Distinct from the ATR-move gate above (that one
+  compares a bar's OWN range to its ATR; this one is a per-symbol
+  volatility floor independent of any single bar). Does NOT fail closed
+  on missing ATR (warm-up) — every RSI/MACD/MA check already requires
+  ATR via `_clears_atr_move`, so an unwarmed symbol produces zero signals
+  downstream regardless of this gate's answer. Suppression recorded as
+  `LOW_VOLATILITY`; metric `failed_min_volatility`.
+- **Entry blackout windows** (`session.py`'s `get_entry_blackout`,
+  fixed constants, not env-configurable — same treatment the
+  pre-market/regular boundary already gets in that module) — a narrower
+  classification layered ON TOP of, not folded into, `get_session`'s
+  pre-market/regular/closed states: widening `Session` itself to 5 states
+  would reset ATR's session-continuity window at 09:30, 09:45, 15:30 AND
+  16:00 every day instead of just at the pre-market/regular boundary,
+  right during the highest-volume parts of the session.
+    - **Opening blackout** (09:30–09:45 ET) — ALL candidates suppressed,
+      both directions. Suppression recorded as `OPENING_BLACKOUT`; metric
+      `dropped_opening_blackout`.
+    - **Closing blackout** (15:30–16:00 ET) — only new **BULLISH**
+      candidates suppressed (`_partition`'d out in `consumer.py`, same
+      style as the trend/liquidity/news gates below); a genuine
+      **BEARISH**/exit candidate still fires, since an open position
+      should still be able to exit before `talonx_paper`'s EOD-flatten
+      sweep (see [paper.md](paper.md)) closes it out at 15:50 ET anyway.
+      Suppression recorded as `CLOSING_BLACKOUT`; metric
+      `dropped_closing_blackout`.
+
 ## Phase 2 additions: pre-market rules and the 15-min trend gate
 
 - **Session-aware volume-surge threshold** (`session.py`,
@@ -163,9 +203,10 @@ for the full before/after):**
 - **Stage-Gate Metric Funnel** — publishes `metrics:{date}:quant:*`
   counters (`evaluated`, `published`, and one per drop reason:
   `failed_confluence`, `failed_rr_gate`, `failed_trend_gate`,
-  `failed_premarket_liquidity`, `failed_loss_lockout`) to Redis, read by
-  the Streamlit dashboard's Daily Funnel tab — see
-  [dispatch.md](dispatch.md).
+  `failed_premarket_liquidity`, `failed_loss_lockout`,
+  `failed_min_volatility`, `dropped_opening_blackout`,
+  `dropped_closing_blackout`) to Redis, read by the Streamlit dashboard's
+  Daily Funnel tab — see [dispatch.md](dispatch.md).
 
 ## Long-term (fundamentals) path
 
