@@ -31,22 +31,13 @@ venv/
 chroma/
 
 # generate_eod_report.py's default output -- generated locally, not
-# versioned by default. Specific runs are explicit exceptions below,
-# same pattern as results/latest/ further down.
-/reports/*
-!/reports/eod_2026-08-11.md
-!/reports/eod_2026-08-11_alerts.csv
-!/reports/eod_2026-08-11_trades.csv
-!/reports/yfinance_recent_run/
-!/reports/yfinance_recent_run.zip
+# something to version.
+reports/
 
 # talonx_backtest's default --out directory -- generated report output,
-# not something to version by default (examples/data/ IS versioned --
-# that's the checked-in sample INPUT, not generated output).
-# results/latest/ is an explicit exception, versioned on request as a
-# reference example of the report output.
-/results/*
-!/results/latest/
+# not something to version (examples/data/ IS versioned -- that's the
+# checked-in sample INPUT, not generated output).
+/results/
 
 # scripts/download_historical_1m.py's default --output-dir -- downloaded
 # real market data, not something to version (large, regenerable,
