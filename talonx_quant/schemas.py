@@ -140,6 +140,18 @@ class QuantSignal(BaseModel):
     # a push "Pre-Market" vs "Regular" without recomputing it.
     session: str | None = None
 
+    # Dynamic R:R Revalidation (2026-08-16 quant audit): signal_generated_at
+    # is stamped the instant this candidate is built (strategy.py's
+    # _build_signal), NOT when it's actually published -- consumer.py's
+    # _flush_throttle_window uses it to measure how long a candidate sat
+    # in the throttle buffer before being ranked/released, and drops
+    # anything older than max_candidate_age_seconds rather than
+    # publishing a stale entry price. signal_age_ms is filled in at
+    # publish time (age at the moment of revalidation, in milliseconds)
+    # -- None until a candidate has actually been through that flush.
+    signal_generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    signal_age_ms: float | None = None
+
     bar_timestamp: datetime
     published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

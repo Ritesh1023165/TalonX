@@ -28,32 +28,56 @@ below):
      ticker with paper trading ENABLED (one with it off never publishes
      an execution, so it only ever sees the standard cooldown).
   2. Per-ticker cooldown (Redis `cooldown:{TICKER}` key, TTL
-     config.cooldown_seconds): once ANY signal is accepted for a ticker,
+     config.cooldown_seconds): once a signal is PUBLISHED for a ticker,
      that ticker is locked out of producing further candidates -- of any
      signal_type -- until the cooldown expires. This is what stops e.g.
      an RSI+volume setup and a later, unrelated MACD cross on the same
-     ticker from both alerting within a few minutes of each other.
+     ticker from both alerting within a few minutes of each other. Armed
+     in _publish_signal, AFTER the batch throttle and revalidation below
+     (2026-08-16 quant audit, Post-Publication Cooldown Trigger) -- a
+     candidate the throttle later drops must not still burn the
+     ticker's cooldown slot and block a later, better one.
   3. Confluence + risk/reward filters (strategy.py computes both,
      attached to every candidate signal): a candidate below
      config.confluence_score_min or config.min_risk_reward_ratio is
-     dropped BEFORE the per-ticker cooldown is started -- a low-
-     conviction candidate that never becomes a real signal must not
-     still burn the ticker's cooldown slot and block a later, better one.
-  4. Batch throttle (tumbling window, config.throttle_window_seconds):
-     candidates that pass everything above are buffered, not published
-     immediately. Every throttle_window_seconds, the buffer is ranked by
-     a weighted Composite Opportunity Score (see _opportunity_score --
-     confluence, structural R:R, volume surge, and trend alignment, each
-     normalized to [0, 1] before weighting) and only the top
-     config.throttle_max_signals are actually published; the rest are
-     dropped. This means a signal can sit for up to throttle_window_seconds
-     before it's published OR dropped -- a deliberate latency-for-quality
+     dropped before it's even queued for the throttle window.
+  4. Batch throttle (tumbling window, config.throttle_window_seconds,
+     15s default) + Dynamic R:R Revalidation: candidates that pass
+     everything above are buffered, not published immediately. Every
+     throttle_window_seconds, the buffer is ranked by a weighted
+     Composite Opportunity Score (see _opportunity_score -- confluence,
+     structural R:R, volume surge, and trend alignment, each normalized
+     to [0, 1] before weighting) and only the top config.throttle_max_signals
+     are actually revalidated and published; the rest are dropped. This
+     means a signal can sit for up to throttle_window_seconds before
+     it's published OR dropped -- a deliberate latency-for-quality
      tradeoff, not a bug. (2026-08-16 quant audit, P1: replaced the
      original (confluence_score, volume_surge_ratio) tuple-sort, whose
      raw-ratio tiebreaker systematically favored penny/meme-stock pumps
      -- which can post enormous surge ratios on a thin baseline volume --
      over a higher-conviction, better-risk-reward setup on a liquid
-     large-cap with a smaller relative surge.)
+     large-cap with a smaller relative surge.) Each of the top-ranked
+     candidates is then re-checked against the LATEST buffered price
+     before it actually publishes (see _revalidate_candidate) -- dropped
+     if it's aged past config.max_candidate_age_seconds
+     (EXPIRED_IN_THROTTLE_QUEUE) or its recalculated R:R has fallen
+     below config.min_risk_reward_ratio (RR_DEGRADED_DURING_THROTTLE),
+     rather than publishing a stale entry price/ratio.
+
+Two further 2026-08-16 quant-audit fixes apply upstream of all of the
+above:
+  - Fail-Closed Risk Management: a Redis connection/timeout error inside
+    the Post-Loss Lockout or per-ticker cooldown CHECK (not the SET --
+    see _handle_risk_check_failure) is treated as "yes, blocked" by
+    default (config.risk_check_fail_closed), not "no, clear to trade" --
+    a genuine risk-state blackout must not silently degrade into
+    publishing candidates as if nothing were wrong.
+  - Bar-Level Ingestion Idempotency: every incoming BAR tick is checked
+    against a dedup key (ticker + the tick's own precise timestamp,
+    Redis SETNX with a TTL, in-memory fallback) BEFORE it's fed into the
+    rolling buffer at all -- see _is_new_bar_tick -- so a stream replay
+    or Pub/Sub reconnect redelivering the same tick can't double-count
+    its volume in a still-forming bucket's running accumulation.
 """
 from __future__ import annotations
 
@@ -61,6 +85,7 @@ import asyncio
 import json
 import logging
 import random
+from collections import deque
 from datetime import datetime, timezone
 
 from pydantic import ValidationError
@@ -209,6 +234,9 @@ _GATE_NAMES = {
     "PREMARKET_LIQUIDITY": "premarket_liquidity_gate",
     "NEWS_CATALYST": "news_catalyst_gate",
     "THROTTLE": "throttle_gate",
+    "EXPIRED_IN_THROTTLE_QUEUE": "throttle_revalidation_gate",
+    "RR_DEGRADED_DURING_THROTTLE": "throttle_revalidation_gate",
+    "RISK_STORE_UNAVAILABLE_FAIL_CLOSED": "risk_store_gate",
 }
 
 
@@ -251,6 +279,12 @@ class QuantScanner:
         # timestamp seen per symbol -- only the recency matters, not the
         # article content, for the 4h-lookback check.
         self._last_news_seen: dict[str, datetime] = {}
+        # Bar-Level Ingestion Idempotency: in-memory fallback dedup set,
+        # used only when Redis itself is unavailable (see
+        # _is_new_bar_tick) -- bounded to the last 200 dedup keys per
+        # symbol, same "recent window, not unbounded history" posture as
+        # every other in-process cache here.
+        self._recent_bar_keys: dict[str, deque] = {}
         self._client = None
         self._stop_event = asyncio.Event()
         self._signals_published = 0
@@ -782,6 +816,40 @@ class QuantScanner:
             high=acc["high"], low=acc["low"], close=acc["close"], volume=acc["volume"],
         )
 
+    async def _is_new_bar_tick(self, event: MarketTickEvent) -> bool:
+        """Bar-Level Ingestion Idempotency (2026-08-16 quant audit): True
+        if this exact tick (ticker + its own precise timestamp) hasn't
+        been processed before. Redis SETNX (atomic, TTL'd
+        bar_dedup_ttl_seconds) is the primary path -- it works across a
+        process restart and across however many duplicate deliveries one
+        reconnect storm produces, not just within this process's own
+        memory. When Redis itself is unavailable, falls back to a
+        bounded in-memory set of the last 200 dedup keys per symbol --
+        best-effort, since idempotency is a data-quality concern here,
+        not a trade-safety one (unlike the risk gates below, this does
+        NOT need to fail closed -- a duplicate slipping through during a
+        Redis outage costs at most one double-counted tick's worth of
+        volume, not a bypassed risk control)."""
+        symbol = event.symbol.upper()
+        dedup_key = f"processed_bar:{symbol}:{event.timestamp.isoformat()}"
+
+        if self._client is not None:
+            try:
+                is_new = await self._client.set(
+                    dedup_key, "1", ex=int(self.config.bar_dedup_ttl_seconds), nx=True
+                )
+                return bool(is_new)
+            except Exception as exc:  # noqa: BLE001 -- fall through to the in-memory fallback
+                logger.warning(
+                    "Bar dedup check failed for %s (%s); falling back to in-memory dedup", symbol, exc,
+                )
+
+        seen = self._recent_bar_keys.setdefault(symbol, deque(maxlen=200))
+        if dedup_key in seen:
+            return False
+        seen.append(dedup_key)
+        return True
+
     async def _handle_market_tick(self, payload: dict) -> None:
         try:
             event = MarketTickEvent.model_validate(payload)
@@ -800,6 +868,19 @@ class QuantScanner:
 
         if event.event_type != TickEventType.BAR:
             return  # only BAR/QUOTE events are handled; TRADE is a no-op here
+
+        # Bar-Level Ingestion Idempotency (2026-08-16 quant audit): drop a
+        # redelivered duplicate of a tick already processed -- a stream
+        # replay or Pub/Sub reconnect resending the SAME tick would
+        # otherwise double-count its volume in the still-forming bucket's
+        # running accumulation below. Gated on the tick's own precise
+        # timestamp (not the floor-bucketed minute), so legitimate
+        # accumulation -- multiple distinct ticks landing in the same
+        # forming minute -- is unaffected; only an exact repeat is caught.
+        if not await self._is_new_bar_tick(event):
+            await _incr_metric(self._client, "quant", "dropped_duplicate_bars", 1)
+            logger.debug("Dropped duplicate bar tick for %s at %s", event.symbol, event.timestamp)
+            return
 
         # Closed-Bar Evaluation (2026-08-16 quant audit, P0): indicators/
         # signals are evaluated ONLY on a just-CLOSED 1-min bar, never the
@@ -1007,19 +1088,27 @@ class QuantScanner:
             )
             return
 
-        # Lock the ticker out NOW, not at publish/flush time -- otherwise a
-        # ticker firing twice before the next throttle flush would queue
-        # two separate candidate batches into the same window, defeating
-        # the point of the cooldown.
-        await self._start_cooldown(event.symbol)
+        # Post-Publication Cooldown Trigger (2026-08-16 quant audit):
+        # cooldown is NO LONGER armed here, at survival time -- it's
+        # armed in _publish_signal, only once a candidate actually
+        # clears the throttle window's ranking AND revalidation. Arming
+        # it here (the original design) locked a ticker out for the full
+        # 20-minute cooldown even when the batch throttle went on to drop
+        # every one of its candidates that window -- a ticker that never
+        # got a signal published was still penalized as if it had.
+        # Closed-Bar Evaluation (see _handle_market_tick) already caps a
+        # ticker to at most one candidate batch per closed bar
+        # (structurally, not via this lock), so the original "prevent
+        # two batches queuing in one window" race this comment used to
+        # warn about can no longer happen regardless of when cooldown is
+        # armed.
         self._pending_candidates.extend(survivors)
 
     async def _is_on_cooldown(self, ticker: str) -> bool:
         try:
             return bool(await self._client.exists(f"cooldown:{ticker.upper()}"))
-        except Exception as exc:  # noqa: BLE001 -- Redis hiccup shouldn't block signal evaluation
-            logger.warning("Cooldown check failed for %s (%s); treating as not on cooldown", ticker, exc)
-            return False
+        except Exception as exc:  # noqa: BLE001 -- see _handle_risk_check_failure for the fail-closed policy
+            return await self._handle_risk_check_failure(ticker, "Cooldown", exc)
 
     async def _start_cooldown(self, ticker: str) -> None:
         try:
@@ -1032,9 +1121,39 @@ class QuantScanner:
     async def _is_loss_locked_out(self, ticker: str) -> bool:
         try:
             return bool(await self._client.exists(f"loss_lockout:{ticker.upper()}"))
-        except Exception as exc:  # noqa: BLE001 -- Redis hiccup shouldn't block signal evaluation
-            logger.warning("Loss-lockout check failed for %s (%s); treating as not locked out", ticker, exc)
-            return False
+        except Exception as exc:  # noqa: BLE001 -- see _handle_risk_check_failure for the fail-closed policy
+            return await self._handle_risk_check_failure(ticker, "Loss-lockout", exc)
+
+    async def _handle_risk_check_failure(self, ticker: str, check_name: str, exc: Exception) -> bool:
+        """Fail-Closed Risk Management (2026-08-16 quant audit): a Redis
+        connection/timeout error inside _is_on_cooldown/_is_loss_locked_out
+        means this process can no longer answer "is this ticker actually
+        safe to trade right now" at all -- the PREVIOUS behavior (treat
+        the exception as "not on cooldown"/"not locked out", i.e. return
+        False) let candidates keep publishing during exactly the kind of
+        risk-state blackout these two gates exist to prevent. Logged at
+        CRITICAL (not WARNING) since this is a risk-control gap, not a
+        routine hiccup -- an operator should notice immediately, not
+        find it in a log review after the fact.
+
+        config.risk_check_fail_closed (default True) is the enforced
+        policy: return True (treat the ticker as BLOCKED) so the caller's
+        `if await self._is_on_cooldown(...)` / `if await
+        self._is_loss_locked_out(...)` check trips and the candidate is
+        suppressed. Setting it False is an explicit, deliberate opt back
+        into the old fail-open behavior -- not the default, and not
+        silent (still logged CRITICAL either way)."""
+        fail_closed = self.config.risk_check_fail_closed
+        logger.critical(
+            "%s check failed for %s (%s); %s", check_name, ticker, exc,
+            "failing CLOSED (blocking trade)" if fail_closed
+            else "failing OPEN (TALONX_QUANT_RISK_FAIL_CLOSED=false) -- NOT recommended",
+        )
+        if fail_closed:
+            await self._record_rejection(
+                ticker, "RISK_STORE_UNAVAILABLE_FAIL_CLOSED", 1, datetime.now(timezone.utc),
+            )
+        return fail_closed
 
     async def _start_loss_lockout(self, ticker: str) -> None:
         try:
@@ -1044,6 +1163,84 @@ class QuantScanner:
         except Exception as exc:  # noqa: BLE001 -- a failed lock shouldn't crash the handler
             logger.warning("Failed to set loss lockout for %s (%s)", ticker, exc)
 
+    def _latest_close(self, ticker: str) -> float | None:
+        """Dynamic R:R Revalidation's current-price source -- the same
+        buffer _handle_market_tick already keeps updated on every tick,
+        just read directly rather than threaded through as an argument."""
+        df = self.buffer.get_dataframe(ticker)
+        if df is None or df.empty:
+            return None
+        return float(df["close"].iloc[-1])
+
+    async def _revalidate_candidate(self, signal: QuantSignal, now: datetime) -> QuantSignal | None:
+        """Dynamic R:R Revalidation (2026-08-16 quant audit): a candidate
+        can sit in the throttle buffer for up to throttle_window_seconds
+        before being ranked/released -- by the time it's actually about
+        to publish, its entry price (and therefore its R:R) may have
+        drifted from what strategy.py computed when the bar first
+        closed. Re-checks age and re-derives reward/risk against the
+        LATEST buffered close before publishing, rather than trusting
+        stale numbers. Risk stays atr_stop_multiplier x the signal's OWN
+        atr (ATR itself doesn't meaningfully change over a 15-30s
+        window, and re-running full indicator computation here would be
+        wasted work); only reward (which depends on the now-stale entry
+        price) and the resulting ratio are recalculated. Returns None if
+        the candidate should be dropped instead of published."""
+        generated_at = _ensure_utc(signal.signal_generated_at)
+        age_seconds = (now - generated_at).total_seconds()
+        signal_age_ms = age_seconds * 1000.0
+
+        if age_seconds > self.config.max_candidate_age_seconds:
+            logger.info(
+                "Dropping %s %s -- expired in throttle queue (%.0fms old, over %.0fms)",
+                signal.ticker, signal.signal_type.value, signal_age_ms,
+                self.config.max_candidate_age_seconds * 1000.0,
+            )
+            await self._record_rejection(
+                signal.ticker, "EXPIRED_IN_THROTTLE_QUEUE", 1, now, [signal],
+            )
+            return None
+
+        current_price = self._latest_close(signal.ticker)
+        if (
+            current_price is None or signal.atr is None
+            or signal.pivot_resistance is None or signal.pivot_support is None
+        ):
+            # Can't recompute reward/risk without a fresh price and the
+            # same ATR/pivot inputs the original R:R used -- publish
+            # as-generated (with signal_age_ms filled in) rather than
+            # dropping a candidate purely because fresher data isn't
+            # available; strategy.py's own gate already confirmed a
+            # valid R:R at generation time.
+            return signal.model_copy(update={"signal_age_ms": signal_age_ms})
+
+        risk = self.config.atr_stop_multiplier * signal.atr
+        if risk <= 0:
+            return signal.model_copy(update={"signal_age_ms": signal_age_ms})
+
+        if signal.direction == SignalDirection.BULLISH:
+            reward = signal.pivot_resistance - current_price
+        else:
+            reward = current_price - signal.pivot_support
+        recalculated_rr = (reward / risk) if reward > 0 else 0.0
+
+        if recalculated_rr < self.config.min_risk_reward_ratio:
+            logger.info(
+                "Dropping %s %s -- R:R degraded to %.2f during throttle wait (was %.2f, needs >= %.2f)",
+                signal.ticker, signal.signal_type.value, recalculated_rr,
+                signal.risk_reward_ratio or 0.0, self.config.min_risk_reward_ratio,
+            )
+            await self._record_rejection(
+                signal.ticker, "RR_DEGRADED_DURING_THROTTLE", 1, now, [signal],
+            )
+            return None
+
+        return signal.model_copy(update={
+            "price": current_price,
+            "risk_reward_ratio": recalculated_rr,
+            "signal_age_ms": signal_age_ms,
+        })
+
     async def _flush_throttle_window(self) -> None:
         if not self._pending_candidates:
             return
@@ -1052,8 +1249,12 @@ class QuantScanner:
         candidates.sort(key=lambda sig: _opportunity_score(sig, self.config), reverse=True)
 
         released, dropped = candidates[: self.config.throttle_max_signals], candidates[self.config.throttle_max_signals :]
+        now = datetime.now(timezone.utc)
         for signal in released:
-            await self._publish_signal(signal)
+            revalidated = await self._revalidate_candidate(signal, now)
+            if revalidated is None:
+                continue
+            await self._publish_signal(revalidated)
 
         if dropped:
             self._signals_suppressed_throttle += len(dropped)
@@ -1063,7 +1264,6 @@ class QuantScanner:
                 len(released), len(candidates),
                 ", ".join(f"{s.ticker}/{s.signal_type.value}" for s in dropped),
             )
-            now = datetime.now(timezone.utc)
             # dropped can span multiple tickers in one flush -- one
             # rejection record (count + per-candidate detail) per ticker,
             # not one blanket call.
@@ -1123,3 +1323,11 @@ class QuantScanner:
             logger.info("Signal: %s %s -- %s", signal.ticker, signal.signal_type.value, signal.message)
         except Exception as exc:  # noqa: BLE001 -- a publish failure shouldn't crash the scanner
             logger.warning("Failed to publish signal to Redis: %s", exc)
+            return
+        # Post-Publication Cooldown Trigger (2026-08-16 quant audit):
+        # armed HERE, only once a candidate has actually cleared the
+        # throttle window and successfully published -- not merely
+        # survived strategy.py's gates. A candidate the throttle later
+        # drops (or that fails revalidation/publish) must not burn the
+        # ticker's cooldown slot and block a later, better one.
+        await self._start_cooldown(signal.ticker)

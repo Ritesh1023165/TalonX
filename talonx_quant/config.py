@@ -96,6 +96,20 @@ class QuantConfig:
     # memory per symbol regardless of how long the process has been running.
     max_bars_per_symbol: int = _env_int("TALONX_QUANT_MAX_BARS", 200)
 
+    # Bar-Level Ingestion Idempotency (2026-08-16 quant audit): a Redis
+    # SETNX key (`processed_bar:{TICKER}:{tick_timestamp}`) per incoming
+    # BAR tick, TTL'd for this long -- guards against a Pub/Sub reconnect
+    # or upstream retry redelivering the EXACT same tick, which would
+    # otherwise double-count that tick's volume in the still-forming
+    # bucket's running accumulation (buffer.add_bar's own upsert-by-
+    # timestamp only dedupes the FINAL row per bucket, not each tick
+    # feeding it) or spuriously re-trigger Closed-Bar Evaluation. 600s
+    # (10 min) comfortably covers any realistic reconnect-storm replay
+    # window without the dedup set growing unbounded. See
+    # consumer.py's _is_new_bar_tick for the in-memory fallback used
+    # when Redis itself is unavailable.
+    bar_dedup_ttl_seconds: float = _env_float("TALONX_QUANT_BAR_DEDUP_TTL_SECONDS", 600.0)
+
     # --- Indicator parameters ---
     rsi_period: int = _env_int("TALONX_QUANT_RSI_PERIOD", 14)
     macd_fast: int = _env_int("TALONX_QUANT_MACD_FAST", 12)
@@ -131,8 +145,22 @@ class QuantConfig:
     # (regardless of signal_type) until it expires. Default 20 minutes --
     # the middle of the requested 15-30 minute range. This is what stops
     # e.g. an RSI+volume setup at 15:01 and an unrelated MACD cross at
-    # 15:12 on the same ticker from both alerting.
+    # 15:12 on the same ticker from both alerting. Armed on actual
+    # PUBLICATION (see consumer.py's _publish_signal), not merely on a
+    # candidate surviving strategy.py's gates -- a candidate the batch
+    # throttle later drops must not still burn the ticker's cooldown
+    # slot (2026-08-16 quant audit: Post-Publication Cooldown Trigger).
     cooldown_seconds: float = _env_float("TALONX_QUANT_COOLDOWN_SECONDS", 1200.0)
+
+    # Fail-closed risk gates (2026-08-16 quant audit): if Redis itself is
+    # unreachable, _is_on_cooldown/_is_loss_locked_out can no longer
+    # answer "is this ticker actually safe to trade" at all -- treating
+    # that as "assume no" (the previous behavior) let candidates publish
+    # during a genuine risk-state blackout. Default True: an exception
+    # from either check is treated as "yes, blocked" (fail closed) rather
+    # than "no, clear to trade" (fail open). Set False only as an
+    # explicit, deliberate opt back into the old fail-open behavior.
+    risk_check_fail_closed: bool = _env_bool("TALONX_QUANT_RISK_FAIL_CLOSED", True)
 
     # Minimum SMA fast/slow separation, as a fraction of price, required at
     # the crossover bar for a MA_GOLDEN_CROSS/MA_DEATH_CROSS to fire.
@@ -148,9 +176,28 @@ class QuantConfig:
     # released -- see consumer.py's _flush_throttle_window -- so a signal
     # can be delayed by up to throttle_window_seconds, or dropped
     # entirely if it doesn't rank in the top throttle_max_signals that
-    # window.
-    throttle_window_seconds: float = _env_float("TALONX_QUANT_THROTTLE_WINDOW_SECONDS", 60.0)
+    # window. 15s default (2026-08-16 quant audit: down from 60s) --
+    # a candidate's entry price/R:R can drift materially over a full
+    # minute of sitting in the buffer; a shorter window bounds that drift
+    # before Dynamic R:R Revalidation (max_candidate_age_seconds below)
+    # even has to reject anything for staleness.
+    throttle_window_seconds: float = _env_float("TALONX_QUANT_THROTTLE_WINDOW_SECONDS", 15.0)
     throttle_max_signals: int = _env_int("TALONX_QUANT_THROTTLE_MAX_SIGNALS", 3)
+
+    # Dynamic R:R Revalidation (2026-08-16 quant audit): a candidate
+    # selected at throttle flush is re-evaluated against the LATEST
+    # buffered close before it's actually published -- see
+    # consumer.py's _revalidate_candidate. Older than this many seconds
+    # (measured from QuantSignal.signal_generated_at) -> dropped as
+    # EXPIRED_IN_THROTTLE_QUEUE regardless of price; still fresh enough
+    # but its recalculated R:R (reward to the SAME pivot level / risk =
+    # atr_stop_multiplier x the signal's own ATR) now sits below
+    # min_risk_reward_ratio -> dropped as RR_DEGRADED_DURING_THROTTLE.
+    # Deliberately double the throttle window (15s) rather than equal to
+    # it -- a candidate generated right at the START of a window and
+    # flushed at the END is already throttle_window_seconds old before
+    # revalidation even runs.
+    max_candidate_age_seconds: float = _env_float("TALONX_QUANT_MAX_CANDIDATE_AGE_SECONDS", 30.0)
 
     # Composite Opportunity Score weights (2026-08-16 quant audit, P1) --
     # replaces the old (confluence_score, volume_surge_ratio) tuple-sort,

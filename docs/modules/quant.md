@@ -5,6 +5,11 @@ talonx:market:stream (Redis)
     → parse + validate each message as MarketTickEvent
     → only BAR-type events matter (trades/quotes are ignored --
       indicators need OHLCV, not tick-level data)
+    → dedup check: has THIS EXACT tick (ticker + its own precise
+      timestamp) already been processed? A Redis-replayed/reconnect-
+      redelivered duplicate is dropped here, before it can double-count
+      volume into a still-forming bucket -- see Bar-Level Ingestion
+      Idempotency below
     → append to a per-ticker rolling buffer (bounded, oldest bars drop off);
       the still-FORMING bucket updates in place on every tick, but
       indicators/signals are only ever EVALUATED once that bucket CLOSES
@@ -30,17 +35,23 @@ talonx:market:stream (Redis)
     → candidate signal(s) for a ticker are DROPPED if that ticker is
       currently in POST-LOSS LOCKOUT (75 min default, armed when
       talonx_paper reports a losing SELL for it) or within its standard
-      post-signal cooldown (default 20 min)
+      post-signal cooldown (default 20 min) -- a Redis connection/timeout
+      error on EITHER check fails CLOSED (treated as "blocked") by
+      default, not open, see Fail-Closed Risk Management below
     → candidates below confluence_score_min (default 2) or
-      min_risk_reward_ratio (default 1.5) are DROPPED next, BEFORE the
-      cooldown lock is armed -- a filtered-out candidate must not still
-      consume the ticker's cooldown slot
-    → surviving candidate(s) arm the ticker's cooldown now and are buffered
-    → every 60s (default), the buffer is ranked by a weighted Composite
+      min_risk_reward_ratio (default 1.5) are DROPPED next -- a
+      filtered-out candidate is never even queued for the throttle window
+    → surviving candidate(s) are buffered for the next throttle flush
+      (cooldown is NOT armed yet -- see Post-Publication Cooldown Trigger)
+    → every 15s (default), the buffer is ranked by a weighted Composite
       Opportunity Score (confluence + structural R:R + volume surge +
-      trend alignment, each normalized to [0,1]) and only the top 3
-      (default) are published to Redis (talonx:signals:quant) -- the
-      rest are dropped
+      trend alignment, each normalized to [0,1]); the top 3 (default)
+      are each RE-VALIDATED against the LATEST buffered price (dropped
+      if aged past 30s, or if the recalculated R:R has fallen below
+      min_risk_reward_ratio -- see Dynamic R:R Revalidation below) and,
+      if still valid, published to Redis (talonx:signals:quant) AND
+      the ticker's cooldown is armed now, for the first time; the rest
+      are dropped
     → EVERY dropped candidate, at EVERY gate above, also publishes a
       RejectedCandidateEvent to talonx:quant:rejected -- talonx_dispatch
       persists one row per candidate to its rejected_candidates table (see
@@ -120,18 +131,25 @@ for the full before/after):**
   just proved it was chopping/declining. Only ever engages for a ticker
   with paper trading enabled (one with it off never publishes an
   execution, so it only ever sees the standard cooldown).
-- **Per-ticker cooldown** (`consumer.py`, `TALONX_QUANT_COOLDOWN_SECONDS`,
-  default 1200 = 20 min) — a Redis key `cooldown:{TICKER}` locks a ticker
-  out of producing ANY further candidate (regardless of signal_type) once
-  one is accepted, until the cooldown expires. This is what stops e.g. an
-  RSI+volume setup at 15:01 and an unrelated MACD cross at 15:12 on the
-  same ticker from both alerting.
+- **Per-ticker cooldown** (`consumer.py`'s `_publish_signal`,
+  `TALONX_QUANT_COOLDOWN_SECONDS`, default 1200 = 20 min) — a Redis key
+  `cooldown:{TICKER}` locks a ticker out of producing ANY further
+  candidate (regardless of signal_type) once one PUBLISHES, until the
+  cooldown expires. This is what stops e.g. an RSI+volume setup at 15:01
+  and an unrelated MACD cross at 15:12 on the same ticker from both
+  alerting. Armed on actual publication, not merely on a candidate
+  surviving strategy.py's gates -- see Post-Publication Cooldown Trigger
+  in the round-2 quant audit section below.
 - **Batch throttle + Composite Opportunity Score** (`consumer.py`'s
   `_flush_throttle_window`/`_opportunity_score`, `TALONX_QUANT_THROTTLE_WINDOW_SECONDS`
-  default 60 / `TALONX_QUANT_THROTTLE_MAX_SIGNALS` default 3) — candidates
+  default **15s** (down from 60s as of the round-2 quant audit below --
+  bounds price/R:R drift before Dynamic R:R Revalidation even runs) /
+  `TALONX_QUANT_THROTTLE_MAX_SIGNALS` default 3) — candidates
   that clear everything above are buffered, not published immediately.
   Every window, the buffer is ranked by a weighted composite score and
-  only the top N are actually published:
+  the top N are each revalidated against the current price (see the
+  round-2 quant audit section's Dynamic R:R Revalidation) before
+  actually publishing:
   ```
   score = 0.35 * (confluence_score / 3)
         + 0.30 * min(risk_reward_ratio / 5.0, 1.0)
@@ -211,6 +229,74 @@ a P1 volatility-modeling flaw:
   alias and previously required a developer to manually patch it before
   import against a modern NumPy — a fragile, easy-to-forget workaround
   now made unreachable by a correct dependency floor instead.
+
+## 2026-08-16 quant audit (round 2): throttle latency, risk-state integrity, and ingest idempotency
+
+A follow-up audit of the round-1 fixes above identified four further
+gaps in execution correctness and stream-processing robustness:
+
+- **Dynamic R:R Revalidation** (`consumer.py`'s `_revalidate_candidate`,
+  `TALONX_QUANT_MAX_CANDIDATE_AGE_SECONDS` default 30s) — a candidate
+  selected at throttle flush is re-checked against the LATEST buffered
+  close price before it actually publishes, not trusted as-generated.
+  Dropped as `EXPIRED_IN_THROTTLE_QUEUE` if `now - signal_generated_at`
+  exceeds the age limit; otherwise reward/ratio are recalculated against
+  the fresh price (`reward = pivot_resistance - current_price` bullish /
+  `current_price - pivot_support` bearish, `risk = atr_stop_multiplier x
+  the signal's own ATR` — unchanged from generation, since ATR itself
+  doesn't meaningfully drift over 15-30s) and dropped as
+  `RR_DEGRADED_DURING_THROTTLE` if the recalculated ratio has fallen
+  below `min_risk_reward_ratio`. A candidate that can't be revalidated
+  at all (no fresh buffered price yet, or missing atr/pivot inputs) is
+  published as-generated rather than dropped purely for missing fresher
+  data. The published `QuantSignal.price`/`risk_reward_ratio` reflect the
+  revalidated values; `signal_age_ms` records how old the candidate was
+  at that moment. Paired with a shorter throttle window
+  (`TALONX_QUANT_THROTTLE_WINDOW_SECONDS`, **60s → 15s default**) to
+  bound how much drift can accumulate before revalidation even runs.
+- **Post-Publication Cooldown Trigger** (`consumer.py`'s
+  `_publish_signal`) — the per-ticker cooldown (`cooldown:{TICKER}`) is
+  now armed ONLY once a candidate actually clears the throttle window's
+  ranking AND revalidation and successfully publishes — not merely once
+  it survives strategy.py's own gates. A candidate the batch throttle
+  (or revalidation) later drops no longer burns the ticker's 20-minute
+  cooldown slot and blocks a later, better candidate for a signal that
+  was never actually published. Safe against the original design's "two
+  candidate batches queuing in one window" concern because Closed-Bar
+  Evaluation (round 1) already caps a ticker to at most one candidate
+  batch per closed 1-minute bar, structurally, independent of when
+  cooldown is armed.
+- **Fail-Closed Risk Management** (`consumer.py`'s
+  `_handle_risk_check_failure`, `TALONX_QUANT_RISK_FAIL_CLOSED` default
+  `true`) — a Redis connection/timeout error inside `_is_on_cooldown`/
+  `_is_loss_locked_out` used to be treated as "not on cooldown"/"not
+  locked out" (fail OPEN), letting candidates keep publishing during
+  exactly the risk-state blackout these two gates exist to prevent.
+  Logged at `CRITICAL` (not a routine warning) and, by default, now
+  returns `True` (treat the ticker as BLOCKED) instead — an explicit,
+  non-default opt BACK into fail-open behavior is still available via
+  the config flag, for operators who've made that tradeoff deliberately.
+  Also records a `RISK_STORE_UNAVAILABLE_FAIL_CLOSED` rejection trace
+  event so an outage is visible in the audit trail, not just the logs.
+- **Bar-Level Ingestion Idempotency** (`consumer.py`'s `_is_new_bar_tick`,
+  `TALONX_QUANT_BAR_DEDUP_TTL_SECONDS` default 600s) — every incoming
+  BAR tick is checked against a dedup key
+  (`processed_bar:{TICKER}:{tick's own precise timestamp}`, a Redis
+  `SETNX` with a TTL) BEFORE it's fed into the rolling buffer at all. A
+  stream replay or Pub/Sub reconnect redelivering the EXACT same tick is
+  silently dropped (metric `dropped_duplicate_bars`) rather than
+  double-counting that tick's volume into a still-forming bucket's
+  running accumulation — `RollingBarBuffer.add_bar`'s own upsert-by-
+  timestamp only dedupes the FINAL row per bucket, not each tick feeding
+  it, so a genuinely duplicate tick could otherwise inflate a bucket's
+  volume before it ever closes. Keyed on the tick's own PRECISE
+  timestamp (not the floor-bucketed minute), so legitimate accumulation
+  — multiple genuinely different ticks landing in the same forming
+  minute — is unaffected; only an exact repeat is caught. Falls back to
+  a bounded in-memory set (last 200 keys per symbol) when Redis itself
+  is unavailable — deliberately best-effort, NOT fail-closed, since a
+  duplicate slipping through during a Redis outage costs at most one
+  double-counted tick's volume, not a bypassed risk control.
 
 ## 2026-08-14 session review: entry blackouts and the volatility gate
 

@@ -22,6 +22,7 @@ would make every test ambiguous about which lock actually fired.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -96,6 +97,24 @@ def _signal_publishes(scanner) -> list:
 
 def _rejection_publishes(scanner) -> list:
     return _channel_publishes(scanner, scanner.config.rejected_candidates_channel)
+
+
+def _lock_set_calls(scanner, prefix: str) -> list:
+    """Filters scanner._client.set's recorded calls down to keys starting
+    with `prefix` -- since Bar-Level Ingestion Idempotency (2026-08-16
+    quant audit), the SAME mocked `set` now ALSO receives one call per
+    BAR tick for the dedup key (`processed_bar:...`), so a bare
+    `set.assert_not_awaited()`/`assert_awaited_once()` no longer isolates
+    cooldown/loss-lockout arming specifically."""
+    return [call for call in scanner._client.set.await_args_list if call.args[0].startswith(prefix)]
+
+
+def _cooldown_set_calls(scanner) -> list:
+    return _lock_set_calls(scanner, "cooldown:")
+
+
+def _lockout_set_calls(scanner) -> list:
+    return _lock_set_calls(scanner, "loss_lockout:")
 
 
 def _bar_message(symbol: str = "AAPL") -> dict:
@@ -245,16 +264,51 @@ async def test_handle_market_tick_suppresses_signals_when_locked_out(scanner, mo
     await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
 
     assert _signal_publishes(scanner) == []
-    scanner._client.set.assert_not_awaited()  # neither lock re-armed
+    assert _cooldown_set_calls(scanner) == []
+    assert _lockout_set_calls(scanner) == []  # neither lock re-armed
     assert scanner.signals_suppressed_loss_lockout == 1
     assert scanner._pending_candidates == []
 
 
 @pytest.mark.asyncio
-async def test_is_loss_locked_out_treats_redis_error_as_not_locked_out(scanner):
+async def test_is_loss_locked_out_fails_closed_on_redis_error_by_default(scanner):
+    """Fail-Closed Risk Management (2026-08-16 quant audit): a Redis
+    error means this process can't actually confirm the ticker is safe
+    to trade -- default policy is to treat that as BLOCKED, not clear."""
+    scanner._client.exists.side_effect = ConnectionError("redis down")
+
+    assert await scanner._is_loss_locked_out("AAPL") is True
+
+
+@pytest.mark.asyncio
+async def test_is_loss_locked_out_fails_open_when_explicitly_configured(scanner):
+    scanner.config = replace(scanner.config, risk_check_fail_closed=False)
     scanner._client.exists.side_effect = ConnectionError("redis down")
 
     assert await scanner._is_loss_locked_out("AAPL") is False
+
+
+@pytest.mark.asyncio
+async def test_risk_check_failure_records_a_rejection_when_failing_closed(scanner, tmp_path):
+    scanner.store = QuantStateStore(tmp_path / "quant.db")
+    scanner._client.exists.side_effect = ConnectionError("redis down")
+
+    await scanner._is_loss_locked_out("AAPL")
+
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert len(rejections) == 1
+    assert rejections[0]["reason"] == "RISK_STORE_UNAVAILABLE_FAIL_CLOSED"
+    assert rejections[0]["gate"] == "risk_store_gate"
+
+
+@pytest.mark.asyncio
+async def test_risk_check_failure_does_not_record_a_rejection_when_failing_open(scanner):
+    scanner.config = replace(scanner.config, risk_check_fail_closed=False)
+    scanner._client.exists.side_effect = ConnectionError("redis down")
+
+    await scanner._is_loss_locked_out("AAPL")
+
+    assert _rejection_publishes(scanner) == []
 
 
 # --- Cooldown -------------------------------------------------------------
@@ -269,30 +323,60 @@ async def test_handle_message_suppresses_signals_when_ticker_on_cooldown(scanner
     await scanner._handle_message(_bar_message("AAPL"))
 
     assert _signal_publishes(scanner) == []
-    scanner._client.set.assert_not_awaited()  # cooldown not re-armed while already locked
+    assert _cooldown_set_calls(scanner) == []  # cooldown not re-armed while already locked
     assert scanner.signals_suppressed_cooldown == 1
     assert scanner._pending_candidates == []
 
 
 @pytest.mark.asyncio
-async def test_handle_message_starts_cooldown_and_buffers_candidate_when_not_on_cooldown(scanner, monkeypatch):
+async def test_handle_message_buffers_candidate_without_arming_cooldown_yet(scanner, monkeypatch):
+    """Post-Publication Cooldown Trigger (2026-08-16 quant audit):
+    surviving strategy.py's gates only queues the candidate for the next
+    throttle flush -- it does NOT arm cooldown yet. Cooldown is armed
+    only once the candidate actually publishes (see the flush-level test
+    below)."""
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)])
 
     await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
-    scanner._client.set.assert_awaited_once()
-    args, kwargs = scanner._client.set.await_args
-    assert args[0] == "cooldown:AAPL"
-    assert kwargs["ex"] == int(scanner.config.cooldown_seconds)
+    assert _cooldown_set_calls(scanner) == []
     # Not published yet -- candidates wait for the throttle window flush.
-    scanner._client.publish.assert_not_awaited()
+    assert _signal_publishes(scanner) == []
     assert len(scanner._pending_candidates) == 1
 
 
 @pytest.mark.asyncio
-async def test_is_on_cooldown_treats_redis_error_as_not_on_cooldown(scanner):
+async def test_flush_throttle_window_arms_cooldown_only_for_published_signals(scanner):
+    """Post-Publication Cooldown Trigger: cooldown is armed in
+    _publish_signal, so it's only set for a candidate that actually
+    clears the throttle window's ranking (and revalidation) -- a
+    candidate dropped by the throttle must not burn the cooldown slot."""
+    scanner.config = replace(scanner.config, throttle_max_signals=1)
+    published = _signal("PUBLISHED", 5.0, confluence_score=3, risk_reward_ratio=2.0)
+    dropped_by_throttle = _signal("DROPPED", 0.1, confluence_score=0, risk_reward_ratio=1.5)
+    scanner._pending_candidates = [published, dropped_by_throttle]
+
+    await scanner._flush_throttle_window()
+
+    cooldown_tickers = {call.args[0] for call in _cooldown_set_calls(scanner)}
+    assert cooldown_tickers == {"cooldown:PUBLISHED"}
+
+
+@pytest.mark.asyncio
+async def test_is_on_cooldown_fails_closed_on_redis_error_by_default(scanner):
+    """Fail-Closed Risk Management (2026-08-16 quant audit): a Redis
+    error means this process can't confirm the ticker is actually clear
+    of cooldown -- default policy is BLOCKED, not clear."""
+    scanner._client.exists.side_effect = ConnectionError("redis down")
+
+    assert await scanner._is_on_cooldown("AAPL") is True
+
+
+@pytest.mark.asyncio
+async def test_is_on_cooldown_fails_open_when_explicitly_configured(scanner):
+    scanner.config = replace(scanner.config, risk_check_fail_closed=False)
     scanner._client.exists.side_effect = ConnectionError("redis down")
 
     assert await scanner._is_on_cooldown("AAPL") is False
@@ -309,7 +393,7 @@ async def test_handle_message_suppresses_low_confluence_signal(scanner, monkeypa
     await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
-    scanner._client.set.assert_not_awaited()  # cooldown never armed for a filtered-out candidate
+    assert _cooldown_set_calls(scanner) == []  # cooldown never armed for a filtered-out candidate
     assert _signal_publishes(scanner) == []
     assert scanner.signals_suppressed_low_confluence == 1
     assert scanner._pending_candidates == []
@@ -324,7 +408,7 @@ async def test_handle_message_suppresses_low_risk_reward_signal(scanner, monkeyp
     await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
-    scanner._client.set.assert_not_awaited()
+    assert _cooldown_set_calls(scanner) == []
     assert _signal_publishes(scanner) == []
     assert scanner.signals_suppressed_low_risk_reward == 1
     assert scanner._pending_candidates == []
@@ -353,9 +437,10 @@ async def test_handle_message_only_survivors_proceed_when_signals_are_mixed(scan
     await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
-    # At least one signal survived, so the ticker's cooldown IS started
-    # and only the survivor is queued.
-    scanner._client.set.assert_awaited_once()
+    # At least one signal survived, so only it is queued for the next
+    # throttle flush -- cooldown isn't armed yet (Post-Publication
+    # Cooldown Trigger), only once it's actually published.
+    assert _cooldown_set_calls(scanner) == []
     assert len(scanner._pending_candidates) == 1
     assert scanner._pending_candidates[0].signal_type == SignalType.MACD_BULLISH_CROSS
     assert scanner.signals_suppressed_low_risk_reward == 1
@@ -517,6 +602,273 @@ def test_opportunity_score_is_the_sum_of_configured_weights_at_full_marks(config
     assert _opportunity_score(signal, config) == pytest.approx(expected)
 
 
+# --- Dynamic R:R Revalidation (_revalidate_candidate) ----------------------
+
+def _revalidatable_signal(
+    ticker: str = "AAPL", price: float = 100.0, atr: float = 2.0,
+    pivot_resistance: float = 110.0, pivot_support: float = 90.0,
+    direction: SignalDirection = SignalDirection.BULLISH,
+    signal_generated_at: datetime | None = None,
+) -> QuantSignal:
+    signal = _signal("AAPL" if ticker is None else ticker, 3.0, confluence_score=3, risk_reward_ratio=2.0, direction=direction)
+    signal.price = price
+    signal.atr = atr
+    signal.pivot_resistance = pivot_resistance
+    signal.pivot_support = pivot_support
+    if signal_generated_at is not None:
+        signal.signal_generated_at = signal_generated_at
+    return signal
+
+
+def _seed_close(scanner, ticker: str, close: float) -> None:
+    scanner.buffer.add_bar(
+        symbol=ticker, timestamp=datetime(2026, 8, 7, 15, 1, tzinfo=timezone.utc),
+        open_=close, high=close, low=close, close=close, volume=1000.0,
+    )
+
+
+@pytest.mark.asyncio
+async def test_revalidate_candidate_drops_when_expired(scanner):
+    now = datetime.now(timezone.utc)
+    stale = _revalidatable_signal(signal_generated_at=now - timedelta(seconds=31))
+
+    result = await scanner._revalidate_candidate(stale, now)
+
+    assert result is None
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert len(rejections) == 1
+    assert rejections[0]["reason"] == "EXPIRED_IN_THROTTLE_QUEUE"
+
+
+@pytest.mark.asyncio
+async def test_revalidate_candidate_survives_just_under_the_age_limit(scanner):
+    now = datetime.now(timezone.utc)
+    fresh = _revalidatable_signal(signal_generated_at=now - timedelta(seconds=29))
+    _seed_close(scanner, "AAPL", 100.0)
+
+    result = await scanner._revalidate_candidate(fresh, now)
+
+    assert result is not None
+    assert result.signal_age_ms == pytest.approx(29000, abs=100)
+
+
+@pytest.mark.asyncio
+async def test_revalidate_candidate_drops_when_rr_degraded_by_price_drift(scanner):
+    now = datetime.now(timezone.utc)
+    # entry=100, atr=2 -> risk = 1.5*2 = 3; resistance=103 -> reward at
+    # entry = 3, ratio = 1.0 (already below 1.5, but the ORIGINAL price
+    # drifting up to 102 makes it materially worse: reward = 1, ratio = 0.33).
+    signal = _revalidatable_signal(price=100.0, atr=2.0, pivot_resistance=106.0, pivot_support=90.0)
+    _seed_close(scanner, "AAPL", 104.5)  # price drifted up close to resistance -- reward shrank
+
+    result = await scanner._revalidate_candidate(signal, now)
+
+    assert result is None
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert len(rejections) == 1
+    assert rejections[0]["reason"] == "RR_DEGRADED_DURING_THROTTLE"
+
+
+@pytest.mark.asyncio
+async def test_revalidate_candidate_updates_price_and_rr_on_success(scanner):
+    now = datetime.now(timezone.utc)
+    signal = _revalidatable_signal(price=100.0, atr=2.0, pivot_resistance=110.0, pivot_support=90.0)
+    _seed_close(scanner, "AAPL", 101.0)  # small, harmless drift
+
+    result = await scanner._revalidate_candidate(signal, now)
+
+    assert result is not None
+    # reward = 110 - 101 = 9; risk = 1.5 * 2 = 3; ratio = 3.0
+    assert result.price == pytest.approx(101.0)
+    assert result.risk_reward_ratio == pytest.approx(3.0)
+    assert result.signal_age_ms is not None
+
+
+@pytest.mark.asyncio
+async def test_revalidate_candidate_bearish_uses_pivot_support(scanner):
+    now = datetime.now(timezone.utc)
+    signal = _revalidatable_signal(
+        price=100.0, atr=2.0, pivot_resistance=115.0, pivot_support=94.0, direction=SignalDirection.BEARISH,
+    )
+    _seed_close(scanner, "AAPL", 99.0)
+
+    result = await scanner._revalidate_candidate(signal, now)
+
+    assert result is not None
+    # reward = 99 - 94 = 5; risk = 1.5 * 2 = 3; ratio ~= 1.67
+    assert result.risk_reward_ratio == pytest.approx(5.0 / 3.0)
+
+
+@pytest.mark.asyncio
+async def test_revalidate_candidate_publishes_as_generated_when_no_fresh_price_available(scanner):
+    now = datetime.now(timezone.utc)
+    signal = _revalidatable_signal()  # no bar ever seeded for this ticker
+
+    result = await scanner._revalidate_candidate(signal, now)
+
+    assert result is not None
+    assert result.price == pytest.approx(100.0)  # unchanged, original price
+    assert result.risk_reward_ratio == pytest.approx(2.0)  # unchanged
+    assert result.signal_age_ms is not None
+
+
+@pytest.mark.asyncio
+async def test_revalidate_candidate_publishes_as_generated_when_pivots_missing(scanner):
+    now = datetime.now(timezone.utc)
+    signal = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=2.0)  # no atr/pivots set
+    _seed_close(scanner, "AAPL", 105.0)
+
+    result = await scanner._revalidate_candidate(signal, now)
+
+    assert result is not None
+    assert result.price == pytest.approx(100.0)  # original, not re-fetched close
+
+
+@pytest.mark.asyncio
+async def test_flush_throttle_window_publishes_the_revalidated_price(scanner):
+    signal = _revalidatable_signal(price=100.0, atr=2.0, pivot_resistance=110.0, pivot_support=90.0)
+    _seed_close(scanner, "AAPL", 103.0)
+    scanner._pending_candidates = [signal]
+
+    await scanner._flush_throttle_window()
+
+    published = [json.loads(p) for p in _signal_publishes(scanner)]
+    assert len(published) == 1
+    assert published[0]["price"] == pytest.approx(103.0)
+
+
+@pytest.mark.asyncio
+async def test_flush_throttle_window_does_not_publish_an_expired_candidate(scanner):
+    now = datetime.now(timezone.utc)
+    signal = _revalidatable_signal(signal_generated_at=now - timedelta(seconds=60))
+    scanner._pending_candidates = [signal]
+
+    await scanner._flush_throttle_window()
+
+    assert _signal_publishes(scanner) == []
+    assert _cooldown_set_calls(scanner) == []
+
+
+# --- Bar-Level Ingestion Idempotency (_is_new_bar_tick) ---------------------
+
+@pytest.mark.asyncio
+async def test_is_new_bar_tick_true_for_a_fresh_tick(scanner):
+    event = MarketTickEvent(
+        event_type=TickEventType.BAR, symbol="AAPL", source=TickSource.POLLING,
+        timestamp=datetime(2026, 8, 7, 15, 0, 5, tzinfo=timezone.utc), close=100.0,
+    )
+    scanner._client.set.return_value = True  # Redis SETNX succeeded -- key didn't already exist
+
+    assert await scanner._is_new_bar_tick(event) is True
+
+
+@pytest.mark.asyncio
+async def test_is_new_bar_tick_false_for_a_redis_confirmed_duplicate(scanner):
+    event = MarketTickEvent(
+        event_type=TickEventType.BAR, symbol="AAPL", source=TickSource.POLLING,
+        timestamp=datetime(2026, 8, 7, 15, 0, 5, tzinfo=timezone.utc), close=100.0,
+    )
+    scanner._client.set.return_value = None  # Redis SETNX failed -- key already existed
+
+    assert await scanner._is_new_bar_tick(event) is False
+
+
+@pytest.mark.asyncio
+async def test_is_new_bar_tick_uses_the_configured_dedup_ttl(scanner):
+    event = MarketTickEvent(
+        event_type=TickEventType.BAR, symbol="AAPL", source=TickSource.POLLING,
+        timestamp=datetime(2026, 8, 7, 15, 0, 5, tzinfo=timezone.utc), close=100.0,
+    )
+
+    await scanner._is_new_bar_tick(event)
+
+    args, kwargs = scanner._client.set.await_args
+    assert args[0] == "processed_bar:AAPL:2026-08-07T15:00:05+00:00"
+    assert kwargs["ex"] == int(scanner.config.bar_dedup_ttl_seconds)
+    assert kwargs["nx"] is True
+
+
+@pytest.mark.asyncio
+async def test_is_new_bar_tick_falls_back_to_in_memory_dedup_on_redis_error(scanner):
+    event = MarketTickEvent(
+        event_type=TickEventType.BAR, symbol="AAPL", source=TickSource.POLLING,
+        timestamp=datetime(2026, 8, 7, 15, 0, 5, tzinfo=timezone.utc), close=100.0,
+    )
+    scanner._client.set.side_effect = ConnectionError("redis down")
+
+    first = await scanner._is_new_bar_tick(event)
+    second = await scanner._is_new_bar_tick(event)  # exact same tick again
+
+    assert first is True
+    assert second is False  # caught by the in-memory fallback
+
+
+@pytest.mark.asyncio
+async def test_is_new_bar_tick_falls_back_to_in_memory_dedup_with_no_client(scanner):
+    scanner._client = None
+    event = MarketTickEvent(
+        event_type=TickEventType.BAR, symbol="AAPL", source=TickSource.POLLING,
+        timestamp=datetime(2026, 8, 7, 15, 0, 5, tzinfo=timezone.utc), close=100.0,
+    )
+
+    first = await scanner._is_new_bar_tick(event)
+    second = await scanner._is_new_bar_tick(event)
+
+    assert first is True
+    assert second is False
+
+
+@pytest.mark.asyncio
+async def test_handle_market_tick_drops_a_redelivered_duplicate_tick(scanner, monkeypatch):
+    """Acceptance criterion: sending identical bar payloads twice results
+    in only one entry added to RollingBarBuffer -- i.e. the SECOND,
+    exact-duplicate delivery must not double-count volume into the
+    still-forming bucket's running accumulation."""
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: None)
+    # Redis SETNX: first delivery claims the dedup key (truthy), the
+    # identical redelivery finds it already claimed (None).
+    scanner._client.set.side_effect = [True, None]
+    payload = json.loads(_bar_message("AAPL")["data"])  # close=100.5, volume=1000.0
+
+    await scanner._handle_market_tick(payload)
+    await scanner._handle_market_tick(dict(payload))  # exact duplicate redelivery
+
+    df = scanner.buffer.get_dataframe("AAPL")
+    assert len(df) == 1
+    assert df["volume"].iloc[0] == pytest.approx(1000.0)  # NOT double-counted to 2000.0
+
+
+@pytest.mark.asyncio
+async def test_handle_market_tick_still_accumulates_a_distinct_later_tick(scanner, monkeypatch):
+    """A second, genuinely DIFFERENT tick (different timestamp) landing
+    in the same still-forming minute must still accumulate normally --
+    dedup must not suppress legitimate accumulation."""
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: None)
+    first = json.loads(_bar_message("AAPL")["data"])  # 2026-08-07T15:00:00Z, volume=1000.0
+    second = dict(first, timestamp="2026-08-07T15:00:05Z", close=101.0, volume=500.0)
+
+    await scanner._handle_market_tick(first)
+    await scanner._handle_market_tick(second)
+
+    df = scanner.buffer.get_dataframe("AAPL")
+    assert len(df) == 1  # still one BAR (same bucket), but...
+    assert df["volume"].iloc[0] == pytest.approx(1500.0)  # ...both ticks' volume accumulated
+    assert df["close"].iloc[0] == pytest.approx(101.0)
+
+
+@pytest.mark.asyncio
+async def test_handle_market_tick_increments_duplicate_bar_metric(scanner, monkeypatch):
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: None)
+    scanner._client.set.side_effect = [True, None]
+    payload = json.loads(_bar_message("AAPL")["data"])
+
+    await scanner._handle_market_tick(payload)
+    await scanner._handle_market_tick(dict(payload))
+
+    incr_calls = [c for c in scanner._client.incrby.await_args_list if "dropped_duplicate_bars" in c.args[0]]
+    assert len(incr_calls) == 1
+
+
 # --- Suppression-count persistence (the EOD report's signal-funnel section) -
 
 @pytest.mark.asyncio
@@ -605,7 +957,7 @@ async def test_handle_message_suppresses_signal_failing_trend_gate(scanner, monk
     await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
-    scanner._client.set.assert_not_awaited()
+    assert _cooldown_set_calls(scanner) == []
     assert _signal_publishes(scanner) == []
     assert scanner.signals_suppressed_trend_gate == 1
     assert scanner._pending_candidates == []
@@ -1356,10 +1708,14 @@ async def test_handle_market_tick_closing_blackout_drops_bullish_keeps_bearish(s
     await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
 
     # The BULLISH candidate is dropped, but the BEARISH one survives this
-    # gate and proceeds into the rest of the pipeline (cooldown, etc.) --
-    # an open position should still be able to exit before EOD-flatten.
+    # gate and proceeds into the rest of the pipeline (queued for the
+    # next throttle flush) -- an open position should still be able to
+    # exit before EOD-flatten. Cooldown isn't armed yet at this point
+    # (Post-Publication Cooldown Trigger) -- only once actually published.
     assert scanner.signals_suppressed_closing_blackout == 1
-    scanner._client.set.assert_awaited()  # cooldown started for the surviving BEARISH candidate
+    assert _cooldown_set_calls(scanner) == []
+    assert len(scanner._pending_candidates) == 1
+    assert scanner._pending_candidates[0].direction == SignalDirection.BEARISH
 
 
 @pytest.mark.asyncio
