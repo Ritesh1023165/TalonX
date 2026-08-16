@@ -63,6 +63,8 @@ the final report's "Known Limitations" section):
 from __future__ import annotations
 
 import itertools
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -194,12 +196,29 @@ class BacktestEngine:
     # Public entrypoint
     # ------------------------------------------------------------------
 
-    def run(self, df: pd.DataFrame) -> BacktestResult:
+    def run(
+        self,
+        df: pd.DataFrame,
+        progress_callback: Callable[[int, int], None] | None = None,
+        progress_interval_seconds: float = 2.0,
+    ) -> BacktestResult:
         """`df`: normalized columns [timestamp, symbol, open, high, low,
         close, volume], tz-aware UTC (see talonx_backtest.data). Must
         already be sorted/deduped -- this engine does not repair data
         (see data.sort_and_dedupe); pass through check_dataset_quality
-        first."""
+        first.
+
+        `progress_callback`, if given, is called as `callback(bars_done,
+        bars_total)` -- throttled to at most once every
+        `progress_interval_seconds` of wall-clock time (compute_indicators
+        recomputing indicators over the buffer on every bar makes a full
+        run on months of data genuinely slow -- see docs/backtesting.md's
+        "Where to get historical 1-minute OHLCV data" section -- so a
+        run with no feedback at all is easy to mistake for hung). Always
+        called at least once at completion (bars_done == bars_total),
+        even for a run so fast the interval never elapses. A None
+        callback (the default) costs nothing extra -- no timing calls,
+        no branches taken in the hot per-bar loop beyond the None check."""
         if df.empty:
             return BacktestResult(
                 trades=[], rejections=[], signals_generated=0, signals_published=0,
@@ -208,6 +227,8 @@ class BacktestEngine:
 
         ordered = df.sort_values(["timestamp", "symbol"], kind="mergesort")
         symbols = sorted(ordered["symbol"].unique().tolist())
+        total_bars = len(ordered)
+        last_report = time.monotonic()
 
         for timestamp, group in ordered.groupby("timestamp", sort=True):
             candidates: list[QuantSignal] = []
@@ -218,7 +239,16 @@ class BacktestEngine:
             if self.config.eod_flatten_enabled:
                 self._maybe_eod_flatten(timestamp)
 
+            if progress_callback is not None:
+                now = time.monotonic()
+                if now - last_report >= progress_interval_seconds:
+                    progress_callback(self.bars_processed, total_bars)
+                    last_report = now
+
         self._finalize_at_data_end()
+
+        if progress_callback is not None:
+            progress_callback(self.bars_processed, total_bars)  # unconditional final report -- always reaches 100%
 
         return BacktestResult(
             trades=self.trades,

@@ -16,6 +16,9 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+import pandas as pd
+
+from talonx_backtest.data import from_dataframe
 from talonx_backtest.engine import BacktestConfig, BacktestEngine
 from talonx_backtest.portfolio import Trade
 from talonx_quant.config import QuantConfig
@@ -215,3 +218,58 @@ def test_eod_flatten_only_fires_once_per_day():
     engine._maybe_eod_flatten(at_flatten + timedelta(minutes=1))
     assert engine.simulator.has_open("AAAA")
     assert len(engine.trades) == 1
+
+
+# --- progress reporting (BacktestEngine.run's progress_callback) ---
+
+def _flat_bars_df(n=60, symbol="AAAA"):
+    ts = pd.date_range("2026-01-05 14:30:00", periods=n, freq="1min", tz="UTC")
+    rows = [
+        {"timestamp": t, "open": 100.0, "high": 100.5, "low": 99.5, "close": 100.2, "volume": 1000.0}
+        for t in ts
+    ]
+    return from_dataframe(pd.DataFrame(rows), symbol=symbol)
+
+
+def test_run_without_a_progress_callback_is_unaffected():
+    engine = BacktestEngine(BacktestConfig(quant_config=QuantConfig(), eod_flatten_enabled=False))
+    result = engine.run(_flat_bars_df())
+    assert result.symbols == ["AAAA"]
+
+
+def test_progress_callback_is_always_called_once_at_completion():
+    # progress_interval_seconds is huge -- the wall-clock throttle never
+    # elapses during this fast test run -- so the ONLY call should be the
+    # unconditional final one, with bars_done == bars_total.
+    df = _flat_bars_df(n=60)
+    calls = []
+    engine = BacktestEngine(BacktestConfig(quant_config=QuantConfig(), eod_flatten_enabled=False))
+    engine.run(df, progress_callback=lambda done, total: calls.append((done, total)), progress_interval_seconds=9999.0)
+
+    assert len(calls) == 1
+    done, total = calls[0]
+    assert done == total == 60
+
+
+def test_progress_callback_reports_increasing_bars_done_when_unthrottled():
+    df = _flat_bars_df(n=60)
+    calls = []
+    engine = BacktestEngine(BacktestConfig(quant_config=QuantConfig(), eod_flatten_enabled=False))
+    engine.run(df, progress_callback=lambda done, total: calls.append((done, total)), progress_interval_seconds=0.0)
+
+    assert len(calls) >= 2
+    bars_done_seq = [done for done, _ in calls]
+    assert bars_done_seq == sorted(bars_done_seq)
+    assert all(total == 60 for _, total in calls)
+    assert calls[-1] == (60, 60)
+
+
+def test_progress_callback_reflects_multiple_symbols_in_bars_total():
+    # bars_total counts rows, not distinct timestamps -- two symbols over
+    # the same 30 timestamps is 60 bars, not 30.
+    df = pd.concat([_flat_bars_df(n=30, symbol="AAAA"), _flat_bars_df(n=30, symbol="BBBB")], ignore_index=True)
+    calls = []
+    engine = BacktestEngine(BacktestConfig(quant_config=QuantConfig(), eod_flatten_enabled=False))
+    engine.run(df, progress_callback=lambda done, total: calls.append((done, total)), progress_interval_seconds=9999.0)
+
+    assert calls == [(60, 60)]

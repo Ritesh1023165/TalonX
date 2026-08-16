@@ -124,6 +124,23 @@ def test_no_cost_sensitivity_flag_omits_the_cli_flag(tmp_path):
     assert "--cost-sensitivity" not in called_argv
 
 
+def test_run_regime_does_not_capture_subprocess_output(tmp_path):
+    # Regression test: capture_output=True/text=True used to buffer the
+    # child `python -m talonx_backtest` process's stdout/stderr (including
+    # its own progress lines) and only print it after the whole subprocess
+    # exited -- a long regime run looked hung with zero output for
+    # minutes. The child must inherit this process's stdout/stderr so
+    # everything streams live.
+    regime = Regime("test_regime", "2024-01-01", "2024-06-30", "test")
+    fake_result = MagicMock(returncode=1, stdout="", stderr="")
+    with patch("subprocess.run", return_value=fake_result) as mock_run:
+        run_regime(regime, tmp_path / "data", ["AAPL"], tmp_path / "reports", cost_sensitivity=False, tz="UTC")
+
+    assert mock_run.call_args.kwargs.get("capture_output") is not True
+    assert "stdout" not in mock_run.call_args.kwargs
+    assert "stderr" not in mock_run.call_args.kwargs
+
+
 # --- markdown table ---
 
 def test_markdown_table_includes_every_regime_and_a_no_optimization_disclaimer():

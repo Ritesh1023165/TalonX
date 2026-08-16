@@ -76,7 +76,27 @@ def _build_parser() -> argparse.ArgumentParser:
              f"(entry slippage = exit slippage = spread, per scenario) and write cost_sensitivity.csv. "
              f"Sensitivity analysis only -- never selects or recommends a scenario.",
     )
+    parser.add_argument(
+        "--no-progress", action="store_true",
+        help="Disable the periodic 'X% (bars done/total)' progress line printed during a run "
+             "(on by default -- a run over months of data can take minutes with compute_indicators's "
+             "per-bar recompute, and a silent process is easy to mistake for hung).",
+    )
+    parser.add_argument(
+        "--progress-interval", type=float, default=2.0,
+        help="Seconds between progress updates (default: 2.0). Ignored if --no-progress is set.",
+    )
     return parser
+
+
+def _print_progress(bars_done: int, bars_total: int) -> None:
+    pct = (bars_done / bars_total * 100) if bars_total else 100.0
+    print(f"  progress: {pct:5.1f}%  ({bars_done:,}/{bars_total:,} bars)", flush=True)
+
+
+def _print_cost_sensitivity_progress(scenario_index: int, scenario_count: int, bps: int, bars_done: int, bars_total: int) -> None:
+    pct = (bars_done / bars_total * 100) if bars_total else 100.0
+    print(f"  progress: scenario {scenario_index}/{scenario_count} ({bps} bps)  {pct:5.1f}%  ({bars_done:,}/{bars_total:,} bars)", flush=True)
 
 
 def _load_data(args: argparse.Namespace) -> pd.DataFrame:
@@ -157,12 +177,13 @@ def main(argv: list[str] | None = None) -> int:
         ),
         eod_flatten_enabled=not args.no_eod_flatten,
     )
-    engine = BacktestEngine(config)
-    result = engine.run(df)
+    progress_callback = None if args.no_progress else _print_progress
 
     print("=" * 70)
     print("BACKTEST RESULT")
     print("=" * 70)
+    engine = BacktestEngine(config)
+    result = engine.run(df, progress_callback=progress_callback, progress_interval_seconds=args.progress_interval)
     print(result_summary_text(result, input_timezone=args.tz))
 
     cost_sensitivity_rows = None
@@ -170,9 +191,10 @@ def main(argv: list[str] | None = None) -> int:
         print("=" * 70)
         print("COST SENSITIVITY (sensitivity analysis only -- no scenario is recommended)")
         print("=" * 70)
+        cs_progress_callback = None if args.no_progress else _print_cost_sensitivity_progress
         cost_sensitivity_rows = cost_sensitivity_scenarios(
             df, config.quant_config, same_bar_resolution=args.same_bar_resolution,
-            eod_flatten_enabled=config.eod_flatten_enabled,
+            eod_flatten_enabled=config.eod_flatten_enabled, progress_callback=cs_progress_callback,
         )
         print(f"{'cost_bps':>10} {'trades':>8} {'win_rate':>10} {'PF':>8} {'expectancy_R':>14} {'max_DD_R':>10}")
         for row in cost_sensitivity_rows:

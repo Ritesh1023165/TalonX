@@ -170,3 +170,41 @@ def test_multi_trade_trade_count_and_win_loss_mix_are_cost_invariant(multi_trade
     assert {r["trades"] for r in multi_trade_scenario_rows} == {3}
     for row in multi_trade_scenario_rows:
         assert row["win_rate"] == pytest.approx(2 / 3)
+
+
+# ------------------------------------------------------------------
+# progress_callback: cost_sensitivity_scenarios wraps BacktestEngine's
+# own per-bar progress with (scenario_index, scenario_count, bps, ...),
+# one full engine pass per scenario. Uses `sample_df` (module-scoped,
+# already cheap/cached) rather than re-running the multi_trade fixture.
+# ------------------------------------------------------------------
+
+def test_progress_callback_labels_every_scenario_with_its_index_and_bps(sample_df):
+    calls = []
+    cost_sensitivity_scenarios(
+        sample_df, QuantConfig(), eod_flatten_enabled=False,
+        progress_callback=lambda *args: calls.append(args),
+    )
+    seen_scenarios = {(scenario_index, bps) for scenario_index, _scenario_count, bps, _done, _total in calls}
+    assert seen_scenarios == {(i, bps) for i, bps in enumerate(DEFAULT_COST_SCENARIOS_BPS, start=1)}
+    assert all(scenario_count == len(DEFAULT_COST_SCENARIOS_BPS) for _i, scenario_count, _bps, _done, _total in calls)
+
+
+def test_progress_callback_reports_completion_for_every_scenario(sample_df):
+    calls = []
+    cost_sensitivity_scenarios(
+        sample_df, QuantConfig(), eod_flatten_enabled=False,
+        progress_callback=lambda *args: calls.append(args),
+    )
+    for i in range(1, len(DEFAULT_COST_SCENARIOS_BPS) + 1):
+        scenario_calls = [c for c in calls if c[0] == i]
+        assert scenario_calls, f"scenario {i} reported no progress at all"
+        last_done, last_total = scenario_calls[-1][3], scenario_calls[-1][4]
+        assert last_done == last_total
+
+
+def test_no_progress_callback_is_the_default_and_costs_nothing_extra(sample_df):
+    # Same call as scenario_rows' fixture (no progress_callback) -- just
+    # asserts it still runs cleanly with the new parameter present but unused.
+    rows = cost_sensitivity_scenarios(sample_df, QuantConfig(), eod_flatten_enabled=False)
+    assert [r["cost_bps"] for r in rows] == list(DEFAULT_COST_SCENARIOS_BPS)

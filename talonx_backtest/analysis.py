@@ -279,6 +279,7 @@ def cost_sensitivity_scenarios(
     bps_scenarios: tuple[int, ...] = DEFAULT_COST_SCENARIOS_BPS,
     same_bar_resolution: str = "stop_first",
     eod_flatten_enabled: bool = True,
+    progress_callback=None,
 ) -> list[dict]:
     """Runs a fresh BacktestEngine once per `bps_scenarios` entry, over
     the identical `df` and `quant_config` (the frozen strategy is
@@ -297,12 +298,20 @@ def cost_sensitivity_scenarios(
     redundant): cost_bps, trades, win_rate, profit_factor, expectancy_r,
     total_r, max_drawdown_r. Never picks or highlights a "best" row --
     that judgment is left entirely to whoever reads the table.
-    """
+
+    `progress_callback`, if given, is called as `callback(scenario_index,
+    scenario_count, bps, bars_done, bars_total)` -- one full BacktestEngine
+    pass runs per scenario, so this is the SAME per-bar progress
+    BacktestEngine.run() reports, just labeled with which of the
+    `len(bps_scenarios)` passes is currently running (this function is
+    every bit as slow as a plain run, just repeated once per scenario --
+    see engine.run()'s own docstring for why a bar-level progress signal
+    matters here)."""
     from talonx_backtest.engine import BacktestConfig, BacktestEngine
     from talonx_backtest.execution import ExecutionConfig
 
     rows: list[dict] = []
-    for bps in bps_scenarios:
+    for i, bps in enumerate(bps_scenarios, start=1):
         config = BacktestConfig(
             quant_config=quant_config,
             execution=ExecutionConfig(
@@ -311,7 +320,11 @@ def cost_sensitivity_scenarios(
             ),
             eod_flatten_enabled=eod_flatten_enabled,
         )
-        result = BacktestEngine(config).run(df)
+        engine_progress = None
+        if progress_callback is not None:
+            def engine_progress(bars_done, bars_total, _i=i, _bps=bps):
+                progress_callback(_i, len(bps_scenarios), _bps, bars_done, bars_total)
+        result = BacktestEngine(config).run(df, progress_callback=engine_progress)
         m = compute_metrics(result.trades, r_field="net_R")
         rows.append({
             "cost_bps": bps,

@@ -97,3 +97,51 @@ def test_cli_start_end_actually_filters_rows(tmp_path):
     assert exit_code == 0
     dq = json.loads((out_dir / "backtest_data_quality.json").read_text(encoding="utf-8"))
     assert dq["AAPL"]["rows"] == 61  # 15:00 through 16:00 inclusive, 1-min bars
+
+
+# --- progress reporting (--no-progress / --progress-interval) ---
+
+def test_cli_prints_progress_lines_by_default(tmp_path, capsys):
+    csv_path = tmp_path / "aapl.csv"
+    _write_csv(csv_path, n=150)
+    out_dir = tmp_path / "out"
+
+    exit_code = cli.main([
+        "--data", str(csv_path), "--symbol", "AAPL", "--out", str(out_dir),
+        "--progress-interval", "0",
+    ])
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "progress:" in out
+    assert "150/150 bars" in out
+
+
+def test_cli_no_progress_flag_suppresses_progress_lines(tmp_path, capsys):
+    csv_path = tmp_path / "aapl.csv"
+    _write_csv(csv_path, n=150)
+    out_dir = tmp_path / "out"
+
+    exit_code = cli.main([
+        "--data", str(csv_path), "--symbol", "AAPL", "--out", str(out_dir),
+        "--no-progress", "--progress-interval", "0",
+    ])
+
+    assert exit_code == 0
+    assert "progress:" not in capsys.readouterr().out
+
+
+def test_cli_cost_sensitivity_progress_lines_are_labeled_per_scenario(tmp_path, capsys):
+    csv_path = tmp_path / "aapl.csv"
+    _write_csv(csv_path, n=60)
+    out_dir = tmp_path / "out"
+
+    exit_code = cli.main([
+        "--data", str(csv_path), "--symbol", "AAPL", "--out", str(out_dir),
+        "--cost-sensitivity", "--progress-interval", "0",
+    ])
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "progress: scenario 1/4 (0 bps)" in out
+    assert "progress: scenario 4/4 (20 bps)" in out

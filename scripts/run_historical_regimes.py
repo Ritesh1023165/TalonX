@@ -99,11 +99,16 @@ def run_regime(
     if cost_sensitivity:
         argv += ["--cost-sensitivity"]
 
-    print(f"\n{'=' * 70}\nRegime: {regime.name} ({regime.start} -> {regime.end})\n  {regime.description}\n{'=' * 70}")
-    result = subprocess.run(argv, cwd=_REPO_ROOT, capture_output=True, text=True)
-    print(result.stdout)
-    if result.stderr:
-        print(result.stderr, file=sys.stderr)
+    print(f"\n{'=' * 70}\nRegime: {regime.name} ({regime.start} -> {regime.end})\n  {regime.description}\n{'=' * 70}", flush=True)
+    # Deliberately NOT capture_output=True: talonx_backtest's own progress
+    # lines (see cli.py's --no-progress) and its data-quality/result
+    # printout are only useful if they stream live -- capturing and
+    # printing them only after the whole subprocess exits is exactly why
+    # a long regime run used to look hung with zero output for minutes.
+    # Nothing downstream reads result.stdout/stderr (only returncode and
+    # the written backtest_summary.json matter), so letting the child
+    # inherit this process's stdout/stderr directly is safe.
+    result = subprocess.run(argv, cwd=_REPO_ROOT)
 
     summary_path = out_dir / "backtest_summary.json"
     if result.returncode != 0 or not summary_path.is_file():
