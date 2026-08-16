@@ -10,10 +10,14 @@ trading-calendar authority. A false "regular" classification on a holiday
 just means the (normally quieter) regular-session thresholds apply
 instead of the stricter pre-market ones -- not a correctness bug worth
 the added dependency of a holiday calendar.
+
+is_operating_window_open, below, is an UNRELATED, orthogonal concept
+living in this file purely because it's also a timestamp/timezone
+session classifier -- see its own docstring.
 """
 from __future__ import annotations
 
-from datetime import time, timezone
+from datetime import datetime, time, timezone
 from typing import Literal
 from zoneinfo import ZoneInfo
 
@@ -69,3 +73,58 @@ def get_entry_blackout(timestamp) -> EntryBlackout:
     if _CLOSING_BLACKOUT_START <= local_time < _CLOSING_BLACKOUT_END:
         return "closing"
     return "none"
+
+
+# ------------------------------------------------------------------
+# TalonX's own UK-local operating window (2026-08-16 quant audit,
+# round 5) -- unrelated to the US-market ET session above. See
+# is_operating_window_open's own docstring.
+# ------------------------------------------------------------------
+
+_UK_TZ = ZoneInfo("Europe/London")
+_OPERATING_WINDOW_START = time(8, 0)
+_OPERATING_WINDOW_END = time(22, 0)
+# datetime.weekday(): Monday=0 .. Sunday=6 -- Mon-Fri only, Sat/Sun
+# unconditionally excluded regardless of time of day.
+_OPERATING_WEEKDAYS = frozenset({0, 1, 2, 3, 4})
+
+
+def is_operating_window_open(timestamp: datetime | None = None) -> bool:
+    """True if `timestamp` (default: the current wall-clock instant)
+    falls inside TalonX's own declared UK-local operating window
+    (Mon-Fri 08:00-22:00 Europe/London).
+
+    This is a SEPARATE, orthogonal concept from get_session/
+    get_entry_blackout above, which classify a bar's timestamp against
+    the US EQUITIES MARKET's own ET session -- this function instead
+    answers "is TalonX allowed to publish signals right now, per the
+    operator's own declared schedule" (see consumer.py's
+    _handle_market_tick/_revalidate_candidate for where it gates
+    publication).
+
+    Deliberately evaluated FRESH from the current time (or an explicit
+    `timestamp`, mainly for testing) on every call -- never cached, and
+    never derived from when the process itself started. "08:00-22:00
+    Monday-Friday is a trading-session rule, not an application-startup
+    rule": TalonX can be started at any time of day (mid-session, before
+    the window opens, on a weekend, after an unplanned restart) and this
+    function's answer depends only on the CURRENT UK date/time, never on
+    process uptime or launch time.
+
+    Europe/London via zoneinfo (not a fixed UTC+0/UTC+1 offset) so the
+    08:00/22:00 boundary stays the correct LOCAL time across the
+    GMT/BST transition -- same "use a real IANA tz, not a hardcoded
+    offset" convention _ET above already follows for the US market side.
+
+    Boundary semantics (half-open interval, matching get_session/
+    get_entry_blackout's own convention above): 08:00:00 local is OPEN
+    (inclusive), 22:00:00 local is CLOSED (exclusive) -- so 07:59:59 is
+    CLOSED and 21:59:59 is OPEN."""
+    if timestamp is None:
+        timestamp = datetime.now(timezone.utc)
+    elif timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
+    local = timestamp.astimezone(_UK_TZ)
+    if local.weekday() not in _OPERATING_WEEKDAYS:
+        return False
+    return _OPERATING_WINDOW_START <= local.time() < _OPERATING_WINDOW_END

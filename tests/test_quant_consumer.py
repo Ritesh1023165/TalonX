@@ -188,6 +188,23 @@ def _stub_preseed(monkeypatch):
     monkeypatch.setattr(consumer_module.preseed, "fetch_15m_history", lambda symbol, period: [])
 
 
+@pytest.fixture(autouse=True)
+def _stub_uk_operating_window_open(monkeypatch):
+    """UK Operating Window (2026-08-16 quant audit, round 5): consumer.py
+    gates on is_operating_window_open() called with NO argument -- i.e.
+    the REAL current wall-clock instant, by design (see that function's
+    own docstring: it must reflect "right now," never a fixed bar
+    timestamp). Left un-stubbed, every test in this file that reaches
+    that gate would non-deterministically pass or fail depending on
+    whatever the ACTUAL time happens to be when the suite runs (e.g.
+    failing outright if run at 2am UK time or on a weekend). Defaults
+    every test in this file to "the window is open" so existing
+    session-agnostic tests stay deterministic; the small number of tests
+    that specifically exercise the UK-session-closed gate override this
+    locally with their own monkeypatch."""
+    monkeypatch.setattr(consumer_module, "is_operating_window_open", lambda *args, **kwargs: True)
+
+
 @pytest.fixture
 def scanner() -> QuantScanner:
     s = QuantScanner(QuantConfig())
@@ -654,6 +671,160 @@ async def test_checkpoint_loop_retries_reconciliation_only_while_degraded(scanne
     if scanner._risk_degraded:
         await scanner._reconcile_risk_state()
     scanner._reconcile_risk_state.assert_awaited_once()
+
+
+# --- UK Operating Window (2026-08-16 quant audit, round 5) ----------------
+# "08:00-22:00 Monday-Friday is a trading-session rule, not an
+# application-startup rule" -- TalonX may be started at any time; each
+# candidate's UK-window check is evaluated fresh, independent of when the
+# process launched. is_operating_window_open's own boundary/DST behavior
+# is covered in test_quant_session.py; these confirm consumer.py's two
+# gates (early per-tick, and the authoritative final-revalidation check).
+
+@pytest.mark.asyncio
+async def test_handle_market_tick_suppresses_every_ticker_when_uk_window_closed(scanner, monkeypatch):
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)],
+    )
+    monkeypatch.setattr(consumer_module, "is_operating_window_open", lambda *a, **k: False)
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert _signal_publishes(scanner) == []
+    assert scanner.signals_suppressed_uk_session_closed == 1
+    assert scanner._pending_candidates == []
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert any(r["reason"] == "UK_SESSION_CLOSED" for r in rejections)
+
+
+@pytest.mark.asyncio
+async def test_handle_market_tick_does_not_touch_redis_locks_when_uk_window_closed(scanner, monkeypatch):
+    """Requirement 15: session closure must not corrupt/modify any
+    existing Redis risk state -- it only prevents new publication."""
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)],
+    )
+    monkeypatch.setattr(consumer_module, "is_operating_window_open", lambda *a, **k: False)
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert _cooldown_set_calls(scanner) == []
+    assert _lockout_set_calls(scanner) == []
+
+
+@pytest.mark.asyncio
+async def test_handle_market_tick_allows_publication_when_uk_window_open(scanner, monkeypatch):
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)],
+    )
+    # default autouse fixture already stubs is_operating_window_open -> True
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert len(scanner._pending_candidates) == 1
+    assert scanner.signals_suppressed_uk_session_closed == 0
+
+
+@pytest.mark.asyncio
+async def test_revalidate_candidate_rejects_when_uk_window_closed(scanner, monkeypatch):
+    monkeypatch.setattr(consumer_module, "is_operating_window_open", lambda *a, **k: False)
+    now = datetime.now(timezone.utc)
+    signal = _revalidatable_signal()
+    _seed_close(scanner, "AAPL", 100.0)  # fresh data IS available -- window itself is the reason to reject
+
+    result = await scanner._revalidate_candidate(signal, now)
+
+    assert result is None
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert len(rejections) == 1
+    assert rejections[0]["reason"] == "UK_SESSION_CLOSED"
+
+
+@pytest.mark.asyncio
+async def test_candidate_generated_before_close_is_rejected_if_window_closes_before_final_publication(
+    scanner, monkeypatch,
+):
+    """Requirement 14's exact boundary scenario: a candidate generated
+    at (say) 21:59:50, while the window was still open, can still be
+    sitting in the throttle buffer when the window closes at 22:00:00 --
+    the early per-tick check alone (which only saw the window as OPEN at
+    generation time) would miss this; final revalidation must catch it."""
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)],
+    )
+    window_calls = iter([True, False])  # open when generated (early gate), closed by final revalidation
+    monkeypatch.setattr(consumer_module, "is_operating_window_open", lambda *a, **k: next(window_calls))
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))  # early gate: window open -> queued
+    assert len(scanner._pending_candidates) == 1
+
+    await scanner._flush_throttle_window()  # final revalidation: window now closed -> rejected
+
+    assert _signal_publishes(scanner) == []
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert any(r["reason"] == "UK_SESSION_CLOSED" for r in rejections)
+
+
+@pytest.mark.asyncio
+async def test_freshly_constructed_scanner_blocks_publication_when_started_outside_window(monkeypatch):
+    """Simulates TalonX being started at an arbitrary/outside-hours time
+    (an unplanned restart, or a weekend startup) -- a brand-new
+    QuantScanner has no special startup-time state of its own; it simply
+    evaluates the CURRENT UK window fresh on its very first tick, exactly
+    like every other tick."""
+    scanner = QuantScanner(QuantConfig())
+    scanner._client = AsyncMock()
+    scanner._client.exists.side_effect = _exists_side_effect()
+    monkeypatch.setattr(consumer_module.preseed, "fetch_1m_history", lambda symbol, period: [])
+    monkeypatch.setattr(consumer_module.preseed, "fetch_15m_history", lambda symbol, period: [])
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)],
+    )
+    monkeypatch.setattr(consumer_module, "is_operating_window_open", lambda *a, **k: False)
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert scanner._pending_candidates == []
+    assert scanner.signals_suppressed_uk_session_closed == 1
+
+
+@pytest.mark.asyncio
+async def test_freshly_constructed_scanner_allows_publication_when_started_mid_window(monkeypatch):
+    """Mirrors the test above for a mid-session (re)start -- e.g. Monday
+    14:00, or a restart at 15:00 after an unexpected shutdown at 14:00:
+    trading resumes immediately, no wait until the next scheduled 08:00."""
+    scanner = QuantScanner(QuantConfig())
+    scanner._client = AsyncMock()
+    scanner._client.exists.side_effect = _exists_side_effect()
+    monkeypatch.setattr(consumer_module.preseed, "fetch_1m_history", lambda symbol, period: [])
+    monkeypatch.setattr(consumer_module.preseed, "fetch_15m_history", lambda symbol, period: [])
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)],
+    )
+    monkeypatch.setattr(consumer_module, "is_operating_window_open", lambda *a, **k: True)
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert len(scanner._pending_candidates) == 1
+    assert scanner.signals_suppressed_uk_session_closed == 0
 
 
 # --- Restart semantics (2026-08-16 quant audit, round 4, Requirement 4/13) -

@@ -36,6 +36,10 @@ talonx:market:stream (Redis)
       (loss-lockout/cooldown) has failed ANYWHERE in this process and
       hasn't yet been reconciled, EVERY ticker's candidates are dropped
       right here, process-wide -- see round 4's GLOBAL_RISK_DEGRADED below
+    → UK Operating Window check: outside Mon-Fri 08:00-22:00 Europe/London
+      (evaluated fresh from the CURRENT instant, never from when TalonX
+      itself started), EVERY ticker's candidates are dropped here too --
+      see round 5's UK operating window below
     → candidate signal(s) for a ticker are DROPPED if that ticker is
       currently in POST-LOSS LOCKOUT (75 min default, armed when
       talonx_paper reports a losing SELL for it) or within its standard
@@ -53,7 +57,10 @@ talonx:market:stream (Redis)
       are each RE-VALIDATED against the LATEST buffered price -- price,
       stop, target, AND ratio are re-derived TOGETHER via the same
       calculate_trade_geometry signal generation itself uses (dropped if
-      aged past 30s, if fresh price/ATR/pivot data isn't available at all
+      aged past 30s, if the UK Operating Window has closed since the
+      candidate was generated -- UK_SESSION_CLOSED, round 5, checked
+      FIRST since a closed window makes everything else moot -- if fresh
+      price/ATR/pivot data isn't available at all
       -- FINAL_REVALIDATION_DATA_UNAVAILABLE, round 4 -- or if the
       recalculated R:R has fallen below min_risk_reward_ratio -- see
       round 3's Canonical Trade Geometry below) -- and, if still valid,
@@ -443,6 +450,53 @@ already treat delivery as best-effort, same as every other Pub/Sub
 channel in this project. Bar-Level Ingestion Idempotency (round 2) is
 this module's actual exactly-once guarantee, and it's scoped to INPUT
 tick processing, not to the outbound publish.
+
+## 2026-08-16 quant audit (round 5): UK operating window, arbitrary startup/shutdown safety
+
+**"08:00-22:00 Monday-Friday is a trading-session rule, not an
+application-startup rule."** TalonX may be started at any time of day —
+mid-session, before the window opens, on a weekend, or after an
+unplanned crash — and must never assume it was launched at exactly
+08:00. This round adds an explicit, dynamically-evaluated gate for
+that, on top of (not instead of) round 4's `GLOBAL_RISK_DEGRADED`; both
+must be satisfied before a signal actually publishes.
+
+- **`is_operating_window_open`** (`session.py`) — a new, orthogonal
+  function alongside `get_session`/`get_entry_blackout` (which classify
+  the US MARKET's own ET session for a bar's timestamp): this one
+  answers "is TalonX allowed to publish signals right now," evaluated
+  from `Europe/London` via `zoneinfo` (DST-aware — the boundary stays
+  08:00/22:00 UK LOCAL time across the GMT/BST transition, never a fixed
+  UTC offset), Mon-Fri only, Saturday/Sunday unconditionally closed
+  regardless of time of day. Deliberately stateless and evaluated FRESH
+  on every call from the current wall-clock instant (or an explicit
+  `timestamp` for testing) — never cached, never derived from when the
+  process itself started. Boundary semantics match `get_session`'s own
+  half-open-interval convention: `08:00:00` local is OPEN (inclusive),
+  `22:00:00` local is CLOSED (exclusive).
+- **Two gates in `consumer.py`**, mirroring `GLOBAL_RISK_DEGRADED`'s own
+  early/authoritative split: an early, cheap check in
+  `_handle_market_tick` (`UK_SESSION_CLOSED`, before any ticker-specific
+  gate), and the AUTHORITATIVE check in `_revalidate_candidate` — a
+  candidate generated just before the window closes (e.g. 21:59:50) can
+  still be sitting in the throttle buffer past the actual close
+  (22:00:00), so the early per-tick check alone can't catch that; final
+  revalidation re-checks the window immediately before publish.
+- **No new scheduler, daemon, or 24x7 process** — the check is a pure
+  function of the current instant, called inline wherever publication is
+  about to happen. A "random restart" (crash mid-session, restart on a
+  weekend, restart hours after a scheduled 08:00 start) needs no special
+  handling: a freshly-constructed `QuantScanner` simply evaluates the
+  current window on its very first tick, exactly like every other tick
+  — same reasoning round 4 already established for per-ticker Redis
+  locks needing no restart-time reconciliation of their own.
+- **Session closure doesn't touch state** — at 22:00 (or any other
+  window-closed instant), nothing is deleted, reset, or cleared: Redis
+  TTLs, per-ticker cooldown/loss-lockout locks, and bar-dedup state are
+  completely untouched; only NEW publication is prevented. The existing
+  deployment architecture (`docs/running.md` / `scripts/start_talonx.ps1`
+  + `docker-compose.yaml`'s Redis-only Compose service) is unchanged —
+  this round is purely an in-process gating rule, not a deployment change.
 
 ## 2026-08-14 session review: entry blackouts and the volatility gate
 

@@ -187,6 +187,33 @@ are expected to be stopped. Four fixes below, all scoped to that model:
     Downstream consumers of talonx:signals:quant are expected to treat
     delivery as best-effort, same as every other Pub/Sub channel in this
     project.
+
+Round-5 quant audit (2026-08-16): "08:00-22:00 Monday-Friday is a
+TRADING-SESSION rule, not an APPLICATION-STARTUP rule." TalonX may be
+started at any time of day -- mid-session, before the window opens, on a
+weekend, or after an unplanned crash/restart -- and must never assume it
+was launched at exactly 08:00. session.py's is_operating_window_open
+answers "is TalonX allowed to publish signals RIGHT NOW" from the
+CURRENT UK-local (Europe/London, DST-aware) date/time on every call,
+never from process uptime or launch time. Gated in two places, mirroring
+GLOBAL_RISK_DEGRADED's own early/authoritative split above: early and
+cheaply in _handle_market_tick (UK_SESSION_CLOSED, before the
+ticker-specific gates below it), and AUTHORITATIVELY in
+_revalidate_candidate -- a candidate generated just before the window
+closes (e.g. 21:59:50) can still be sitting in the throttle buffer past
+the close (22:00:00), so the early per-tick check alone isn't sufficient;
+final revalidation re-checks the window immediately before publish. Both
+Redis/risk health (GLOBAL_RISK_DEGRADED) AND the UK operating window must
+be satisfied before a signal actually publishes -- neither check
+substitutes for the other. Weekends are unconditionally closed via the
+same function (Saturday/Sunday), no separate code path. No new
+scheduler/daemon of any kind was added for this -- the check is a pure,
+stateless function of the current instant, evaluated inline wherever
+publication is about to happen, same "no 24x7 recovery service" posture
+round 4 already established for GLOBAL_RISK_DEGRADED's own recovery
+retries. At 22:00 (or any other window-closed instant), NOTHING is
+deleted/reset/cleared -- Redis TTLs, per-ticker locks, and bar-dedup
+state are completely untouched; only NEW publication is prevented.
 """
 from __future__ import annotations
 
@@ -213,7 +240,7 @@ from talonx_quant.schemas import (
     SignalDirection,
     TickEventType,
 )
-from talonx_quant.session import get_entry_blackout, get_session
+from talonx_quant.session import get_entry_blackout, get_session, is_operating_window_open
 from talonx_quant.store import QuantStateStore
 from talonx_quant.strategy import calculate_trade_geometry, evaluate_signals
 
@@ -364,6 +391,7 @@ _GATE_NAMES = {
     "RISK_STORE_UNAVAILABLE_FAIL_CLOSED": "risk_store_gate",
     "GLOBAL_RISK_DEGRADED": "risk_degraded_gate",
     "FINAL_REVALIDATION_DATA_UNAVAILABLE": "throttle_revalidation_gate",
+    "UK_SESSION_CLOSED": "uk_session_gate",
 }
 
 
@@ -442,6 +470,7 @@ class QuantScanner:
         # _reconcile_risk_state.
         self._risk_degraded: bool = False
         self._signals_suppressed_risk_degraded = 0
+        self._signals_suppressed_uk_session_closed = 0
         self._client = None
         self._stop_event = asyncio.Event()
         self._signals_published = 0
@@ -500,6 +529,10 @@ class QuantScanner:
     @property
     def signals_suppressed_risk_degraded(self) -> int:
         return self._signals_suppressed_risk_degraded
+
+    @property
+    def signals_suppressed_uk_session_closed(self) -> int:
+        return self._signals_suppressed_uk_session_closed
 
     @property
     def risk_degraded(self) -> bool:
@@ -1152,6 +1185,33 @@ class QuantScanner:
             )
             return
 
+        # UK Operating Window (2026-08-16 quant audit, round 5): checked
+        # against the CURRENT wall-clock instant (never the bar's own
+        # timestamp, and never derived from when this process started --
+        # see is_operating_window_open's own docstring), early and
+        # per-ticker-uniformly, same posture as GLOBAL_RISK_DEGRADED
+        # above. "08:00-22:00 Monday-Friday is a trading-session rule,
+        # not an application-startup rule" -- TalonX may be started at
+        # any time of day (mid-session, before the window opens, on a
+        # weekend after an unplanned restart) and this check's answer
+        # depends only on the CURRENT UK date/time. This is a fast,
+        # cheap early-exit; _revalidate_candidate below has the
+        # AUTHORITATIVE final check, since a candidate can be generated
+        # just before 22:00 and not reach actual publication until after
+        # it.
+        if not is_operating_window_open():
+            self._signals_suppressed_uk_session_closed += len(signals)
+            await _incr_metric(self._client, "quant", "dropped_uk_session_closed", len(signals))
+            await self._record_rejection(
+                event.symbol, "UK_SESSION_CLOSED", len(signals), datetime.now(timezone.utc), signals,
+            )
+            logger.info(
+                "Suppressed %d candidate(s) for %s -- outside TalonX's UK operating "
+                "window (Mon-Fri 08:00-22:00 Europe/London)",
+                len(signals), event.symbol,
+            )
+            return
+
         blackout = get_entry_blackout(snapshot.bar_timestamp)
         if blackout == "opening":
             # Opening Range Blackout (09:30-09:45 ET): ALL candidates
@@ -1594,7 +1654,27 @@ class QuantScanner:
         atr (ATR itself doesn't meaningfully change over a 15-30s window,
         and re-running full indicator computation here would be wasted
         work). Returns None if the candidate should be dropped instead of
-        published."""
+        published.
+
+        2026-08-16 quant audit (round 5): also the AUTHORITATIVE final
+        check of TalonX's UK operating window (see
+        is_operating_window_open) -- the early per-tick check in
+        _handle_market_tick only catches a candidate EVALUATED after the
+        window closed; a candidate generated at 21:59:50 can still sit
+        in the throttle buffer past 22:00:00 and reach THIS point after
+        the window has closed. Checked first, before age/geometry, since
+        a closed window makes every other check moot."""
+        if not is_operating_window_open():
+            logger.info(
+                "Dropping %s %s -- TalonX's UK operating window closed before final "
+                "revalidation (Mon-Fri 08:00-22:00 Europe/London)",
+                signal.ticker, signal.signal_type.value,
+            )
+            await self._record_rejection(
+                signal.ticker, "UK_SESSION_CLOSED", 1, now, [signal],
+            )
+            return None
+
         generated_at = _ensure_utc(signal.signal_generated_at)
         age_seconds = (now - generated_at).total_seconds()
         signal_age_ms = age_seconds * 1000.0
