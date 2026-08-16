@@ -34,6 +34,11 @@ chroma/
 # something to version.
 reports/
 
+# talonx_backtest's default --out directory -- generated report output,
+# not something to version (examples/data/ IS versioned -- that's the
+# checked-in sample INPUT, not generated output).
+/results/
+
 # scripts/start_talonx.ps1 / start_dashboard_web.ps1's PID-tracking JSON
 # and redirected stdout/stderr log files -- machine-local runtime state.
 .run/

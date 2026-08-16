@@ -15,11 +15,67 @@ from dataclasses import asdict
 from io import StringIO
 from pathlib import Path
 
-from talonx_backtest import analysis
+from talonx_backtest import analysis, reproducibility
 from talonx_backtest.data import DataQualityReport
 from talonx_backtest.engine import BacktestResult, RejectionRecord
 from talonx_backtest.metrics import PerformanceMetrics, metric_set
 from talonx_backtest.portfolio import Trade
+
+_SESSION_TIMEZONE = "America/New_York"  # talonx_quant.session's hardcoded market-session timezone
+
+PORTFOLIO_DISCLAIMER = (
+    "This backtest evaluates TRADE-LEVEL strategy performance (R-multiples per signal). "
+    "It does NOT model starting capital, position sizing, maximum portfolio exposure, "
+    "concurrent-position limits, or buying power. Aggregate R/expectancy figures here "
+    "describe the strategy's per-trade edge, not a realistic portfolio-level return."
+)
+
+SURVIVORSHIP_BIAS_NOTE = (
+    "This is an INDIVIDUAL-SECURITY backtest, not a historical-universe backtest. If the "
+    "symbol(s) tested were selected because they are prominent/liquid TODAY (e.g. current "
+    "S&P 500 constituents), results may overstate historical edge relative to a "
+    "point-in-time universe that would have also included names that were later delisted, "
+    "acquired, or otherwise dropped out -- classic survivorship bias. Point-in-time "
+    "universe construction is not implemented by this engine; interpret results "
+    "accordingly, especially over long lookback periods."
+)
+
+
+def execution_assumptions_dict(result: BacktestResult) -> dict:
+    """The exact execution-mechanics settings this run used -- read
+    straight off result.config, never re-derived or guessed. Spec
+    section 8: these must be prominent in every report, not buried in
+    raw JSON."""
+    execution = result.config.execution
+    return {
+        "entry_slippage_bps": execution.entry_slippage_bps,
+        "exit_slippage_bps": execution.exit_slippage_bps,
+        "spread_bps": execution.spread_bps,
+        "same_bar_resolution": execution.same_bar_resolution,
+        "eod_flatten_enabled": result.config.eod_flatten_enabled,
+        "allow_overlapping_trades": result.config.allow_overlapping_trades,
+    }
+
+
+def is_zero_cost_run(result: BacktestResult) -> bool:
+    execution = result.config.execution
+    return execution.entry_slippage_bps == 0 and execution.exit_slippage_bps == 0 and execution.spread_bps == 0
+
+
+def timezone_info_dict(input_timezone: str | None) -> dict:
+    """Spec section 12: the report must show input/internal/session
+    timezone explicitly, never leave a reader to infer them. `internal`
+    is always UTC (every talonx_backtest.data loader normalizes to it);
+    `session` is talonx_quant.session's hardcoded America/New_York
+    market-session timezone (not configurable -- it IS the US equities
+    market's own timezone). `input_timezone` is None when the caller
+    didn't say what --tz was used (e.g. building a report without going
+    through the CLI) -- reported as "unspecified", never guessed."""
+    return {
+        "input_timezone": input_timezone or "unspecified",
+        "internal_timezone": "UTC",
+        "session_timezone": _SESSION_TIMEZONE,
+    }
 
 
 def trades_to_csv(trades: list[Trade]) -> str:
@@ -46,17 +102,61 @@ def metrics_to_dict(m: PerformanceMetrics) -> dict:
     return d
 
 
-def result_summary_text(result: BacktestResult) -> str:
+def result_summary_text(result: BacktestResult, input_timezone: str | None = None) -> str:
+    assumptions = execution_assumptions_dict(result)
+    tz = timezone_info_dict(input_timezone)
+    meta = reproducibility.build_metadata(result.config)
+
     lines = [
         "Backtest Summary",
         "----------------",
         "",
         f"Period:               {result.start} -> {result.end}",
         f"Symbols:              {', '.join(result.symbols)}",
+        f"Bars processed:       {result.bars_processed:,}",
         f"Signals generated:    {result.signals_generated}",
         f"Signals published:    {result.signals_published}",
         f"Trades executed:      {len(result.trades)}",
         f"Throttle fidelity:    {result.config.throttle_fidelity}",
+        "",
+        "Execution assumptions",
+        "----------------------",
+        f"Entry slippage:       {assumptions['entry_slippage_bps']} bps",
+        f"Exit slippage:        {assumptions['exit_slippage_bps']} bps",
+        f"Spread:               {assumptions['spread_bps']} bps",
+        f"Same-bar resolution:  {assumptions['same_bar_resolution'].upper()}",
+        f"EOD flatten:          {'ENABLED' if assumptions['eod_flatten_enabled'] else 'DISABLED'}",
+        "",
+    ]
+
+    if is_zero_cost_run(result):
+        lines += [
+            "*** COST-FREE BASELINE ***",
+            "Slippage: 0 bps   Spread: 0 bps",
+            "These results do NOT represent realistic execution costs -- do not call this",
+            "\"realistic performance\" or \"live expected return\". Use --cost-sensitivity for",
+            "a range of non-zero cost assumptions.",
+            "",
+        ]
+
+    lines += [
+        "Timezone",
+        "--------",
+        f"Input timezone:       {tz['input_timezone']}",
+        f"Internal timezone:    {tz['internal_timezone']}",
+        f"Session timezone:     {tz['session_timezone']}",
+        "",
+        "Reproducibility",
+        "----------------",
+        f"git_commit:           {meta.git_commit}",
+        f"backtester_version:   {meta.backtester_version}",
+        f"strategy_version:     {meta.strategy_version}",
+        f"config_hash:          {meta.config_hash}",
+        f"run_timestamp:        {meta.run_timestamp}",
+        "",
+        "Portfolio disclaimer",
+        "---------------------",
+        PORTFOLIO_DISCLAIMER,
         "",
     ]
 
@@ -73,17 +173,30 @@ def result_summary_text(result: BacktestResult) -> str:
     return "\n".join(lines)
 
 
-def result_summary_json(result: BacktestResult) -> str:
+def result_summary_json(
+    result: BacktestResult,
+    input_timezone: str | None = None,
+    cost_sensitivity: list[dict] | None = None,
+) -> str:
     sets = metric_set(result.trades) if result.trades else {}
+    meta = reproducibility.build_metadata(result.config)
     payload = {
         "period": {"start": str(result.start), "end": str(result.end)},
         "symbols": result.symbols,
+        "bars_processed": result.bars_processed,
         "signals_generated": result.signals_generated,
         "signals_published": result.signals_published,
         "trades_executed": len(result.trades),
         "throttle_fidelity": result.config.throttle_fidelity,
+        "execution_assumptions": execution_assumptions_dict(result),
+        "zero_cost_baseline_warning": is_zero_cost_run(result),
+        "timezone": timezone_info_dict(input_timezone),
+        "reproducibility": meta.to_dict(),
+        "portfolio_disclaimer": PORTFOLIO_DISCLAIMER,
+        "survivorship_bias_note": SURVIVORSHIP_BIAS_NOTE,
         "metrics": {label: metrics_to_dict(m) for label, m in sets.items()},
         "rejections_by_reason": _rejection_counts(result),
+        "cost_sensitivity": cost_sensitivity or [],
     }
     return json.dumps(payload, indent=2, default=str)
 
@@ -150,6 +263,16 @@ def data_quality_to_json(reports: dict[str, DataQualityReport] | None) -> str:
     return json.dumps(payload, indent=2, default=str)
 
 
+def cost_sensitivity_to_csv(rows: list[dict] | None) -> str:
+    if not rows:
+        return ""
+    buf = StringIO()
+    writer = csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
+    writer.writeheader()
+    writer.writerows(rows)
+    return buf.getvalue()
+
+
 _BREAKDOWN_FUNCS = {
     "by_symbol": analysis.by_symbol,
     "by_confluence": analysis.by_confluence,
@@ -179,22 +302,35 @@ def _breakdown_payload(trades: list[Trade], r_field: str) -> dict[str, dict[str,
 def build_html_report(
     result: BacktestResult,
     data_quality: dict[str, DataQualityReport] | None = None,
+    input_timezone: str | None = None,
+    cost_sensitivity: list[dict] | None = None,
 ) -> str:
     """A single, self-contained HTML file (no external requests, no CDN,
     inline CSS/JS only -- opens directly from disk in any browser) with
-    an equity curve, metrics cards (gross vs net), breakdown charts, the
-    exit-reason/rejection funnel, and the full trade table. Every number
-    in it comes straight from `result`/`data_quality` -- if there are no
-    trades, the report says so instead of rendering empty charts as if
-    they meant something."""
+    an equity curve, drawdown, trade-return distribution, metrics cards
+    (gross vs net), breakdown charts, the exit-reason/rejection funnel,
+    execution assumptions (with a zero-cost warning when applicable),
+    timezone/reproducibility metadata, the portfolio/survivorship
+    disclaimers, and the full trade table. Every number in it comes
+    straight from `result`/`data_quality`/`cost_sensitivity` -- if there
+    are no trades, the report says so instead of rendering empty charts
+    as if they meant something."""
     sets = metric_set(result.trades) if result.trades else {}
+    meta = reproducibility.build_metadata(result.config)
     payload = {
         "meta": {
             "period_start": str(result.start), "period_end": str(result.end),
-            "symbols": result.symbols, "signals_generated": result.signals_generated,
+            "symbols": result.symbols, "bars_processed": result.bars_processed,
+            "signals_generated": result.signals_generated,
             "signals_published": result.signals_published, "trades_executed": len(result.trades),
             "throttle_fidelity": result.config.throttle_fidelity,
         },
+        "execution_assumptions": execution_assumptions_dict(result),
+        "zero_cost_baseline_warning": is_zero_cost_run(result),
+        "timezone": timezone_info_dict(input_timezone),
+        "reproducibility": meta.to_dict(),
+        "portfolio_disclaimer": PORTFOLIO_DISCLAIMER,
+        "survivorship_bias_note": SURVIVORSHIP_BIAS_NOTE,
         "metrics": {label: metrics_to_dict(m) for label, m in sets.items()},
         "equity_curve": equity_curve_rows(result.trades),
         "breakdowns": _breakdown_payload(result.trades, "net_R") if result.trades else {},
@@ -203,6 +339,7 @@ def build_html_report(
         "trades": [t.to_dict() for t in result.trades],
         "data_quality": json.loads(data_quality_to_json(data_quality)),
         "time_of_day_order": list(analysis.TIME_OF_DAY_ORDER),
+        "cost_sensitivity": cost_sensitivity or [],
     }
     # Escape "</" so an embedded string (e.g. a rejection reason) can
     # never prematurely close the <script> tag it's embedded in.
@@ -215,6 +352,8 @@ def write_report(
     out_dir: str | Path,
     prefix: str = "backtest",
     data_quality: dict[str, DataQualityReport] | None = None,
+    input_timezone: str | None = None,
+    cost_sensitivity: list[dict] | None = None,
 ) -> dict[str, Path]:
     """Writes the full results/ set into `out_dir` (created if missing):
     trades.csv/json, summary.json/txt, equity_curve.csv,
@@ -236,14 +375,25 @@ def write_report(
         "data_quality_json": out_dir / f"{prefix}_data_quality.json",
         "results_html": out_dir / f"{prefix}_results.html",
     }
+    if cost_sensitivity:
+        paths["cost_sensitivity_csv"] = out_dir / f"{prefix}_cost_sensitivity.csv"
+
     paths["trades_csv"].write_text(trades_to_csv(result.trades), encoding="utf-8")
     paths["trades_json"].write_text(trades_to_json(result.trades), encoding="utf-8")
-    paths["summary_json"].write_text(result_summary_json(result), encoding="utf-8")
-    paths["summary_txt"].write_text(result_summary_text(result), encoding="utf-8")
+    paths["summary_json"].write_text(
+        result_summary_json(result, input_timezone=input_timezone, cost_sensitivity=cost_sensitivity),
+        encoding="utf-8",
+    )
+    paths["summary_txt"].write_text(result_summary_text(result, input_timezone=input_timezone), encoding="utf-8")
     paths["equity_curve_csv"].write_text(equity_curve_to_csv(result.trades), encoding="utf-8")
     paths["rejected_signals_csv"].write_text(rejected_signals_to_csv(result.rejections), encoding="utf-8")
     paths["data_quality_json"].write_text(data_quality_to_json(data_quality), encoding="utf-8")
-    paths["results_html"].write_text(build_html_report(result, data_quality), encoding="utf-8")
+    paths["results_html"].write_text(
+        build_html_report(result, data_quality, input_timezone=input_timezone, cost_sensitivity=cost_sensitivity),
+        encoding="utf-8",
+    )
+    if cost_sensitivity:
+        paths["cost_sensitivity_csv"].write_text(cost_sensitivity_to_csv(cost_sensitivity), encoding="utf-8")
     return paths
 
 
@@ -296,6 +446,13 @@ _HTML_TEMPLATE = r"""<!doctype html>
   svg text { fill: var(--muted); font-size: 10px; }
   .flex-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 800px) { .flex-cols { grid-template-columns: 1fr; } }
+  .warning-banner { background: color-mix(in srgb, var(--neg) 15%, var(--panel)); border: 1px solid var(--neg);
+    border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+  .warning-banner .title { font-weight: 700; color: var(--neg); margin-bottom: 4px; }
+  .kv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px 20px; font-size: 12.5px; }
+  .kv-grid div span.k { color: var(--muted); display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+  .kv-grid div span.v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .disclaimer { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -304,15 +461,28 @@ _HTML_TEMPLATE = r"""<!doctype html>
   <div class="muted" id="meta-line"></div>
 </div>
 
+<div id="zero-cost-warning"></div>
+
 <div class="panel" id="metrics-panel">
   <h2>Performance</h2>
   <div class="toggle-group" id="metric-toggle"></div>
   <div class="grid" id="metric-cards"></div>
 </div>
 
-<div class="panel" id="equity-panel">
-  <h2>Equity Curve (cumulative net R)</h2>
-  <div id="equity-chart"></div>
+<div class="flex-cols">
+  <div class="panel" id="equity-panel">
+    <h2>Equity Curve (cumulative net R)</h2>
+    <div id="equity-chart"></div>
+  </div>
+  <div class="panel" id="drawdown-panel">
+    <h2>Drawdown (from running peak, net R)</h2>
+    <div id="drawdown-chart"></div>
+  </div>
+</div>
+
+<div class="panel" id="distribution-panel">
+  <h2>Trade return distribution (net R)</h2>
+  <div id="distribution-chart"></div>
 </div>
 
 <div class="flex-cols">
@@ -325,9 +495,35 @@ _HTML_TEMPLATE = r"""<!doctype html>
   <div id="breakdowns"></div>
 </div>
 
+<div class="panel" id="cost-sensitivity-panel">
+  <h2>Cost sensitivity</h2>
+  <div id="cost-sensitivity"></div>
+</div>
+
+<div class="panel">
+  <h2>Execution assumptions</h2>
+  <div class="kv-grid" id="execution-assumptions"></div>
+</div>
+
+<div class="panel">
+  <h2>Timezone</h2>
+  <div class="kv-grid" id="timezone-info"></div>
+</div>
+
+<div class="panel">
+  <h2>Reproducibility</h2>
+  <div class="kv-grid" id="reproducibility-info"></div>
+</div>
+
 <div class="panel">
   <h2>Data quality</h2>
   <div id="data-quality"></div>
+</div>
+
+<div class="panel">
+  <h2>Research limitations</h2>
+  <p class="disclaimer" id="portfolio-disclaimer"></p>
+  <p class="disclaimer" id="survivorship-note"></p>
 </div>
 
 <div class="panel">
@@ -350,8 +546,40 @@ function signClass(x) { return x === null || x === undefined ? "neutral" : (x > 
 // ---- meta ----
 document.getElementById("meta-line").textContent =
   `${DATA.meta.period_start} -> ${DATA.meta.period_end}  |  Symbols: ${DATA.meta.symbols.join(", ") || "none"}  |  ` +
-  `Signals generated: ${DATA.meta.signals_generated}  |  Published: ${DATA.meta.signals_published}  |  ` +
-  `Trades: ${DATA.meta.trades_executed}  |  Throttle fidelity: ${DATA.meta.throttle_fidelity}`;
+  `Bars processed: ${DATA.meta.bars_processed}  |  Signals generated: ${DATA.meta.signals_generated}  |  ` +
+  `Published: ${DATA.meta.signals_published}  |  Trades: ${DATA.meta.trades_executed}  |  ` +
+  `Throttle fidelity: ${DATA.meta.throttle_fidelity}`;
+
+// ---- zero-cost warning banner ----
+if (DATA.zero_cost_baseline_warning) {
+  const ea = DATA.execution_assumptions;
+  document.getElementById("zero-cost-warning").innerHTML = `<div class="warning-banner">
+    <div class="title">⚠ COST-FREE BASELINE</div>
+    Slippage: ${ea.entry_slippage_bps}/${ea.exit_slippage_bps} bps (entry/exit) &nbsp; Spread: ${ea.spread_bps} bps<br>
+    These results do NOT represent realistic execution costs. Do not call this "realistic performance" or
+    "live expected return" -- run with <code>--cost-sensitivity</code> for a range of non-zero cost assumptions.
+  </div>`;
+}
+
+// ---- execution assumptions / timezone / reproducibility (plain key-value panels) ----
+function renderKvGrid(elId, obj, formatters) {
+  const el = document.getElementById(elId);
+  el.innerHTML = Object.entries(obj).map(([k, v]) => {
+    const display = (formatters && formatters[k]) ? formatters[k](v) : String(v);
+    return `<div><span class="k">${k.replace(/_/g, " ")}</span><span class="v">${display}</span></div>`;
+  }).join("");
+}
+renderKvGrid("execution-assumptions", DATA.execution_assumptions, {
+  entry_slippage_bps: v => `${v} bps`, exit_slippage_bps: v => `${v} bps`, spread_bps: v => `${v} bps`,
+  same_bar_resolution: v => String(v).toUpperCase(),
+  eod_flatten_enabled: v => v ? "ENABLED" : "DISABLED",
+  allow_overlapping_trades: v => v ? "yes" : "no",
+});
+renderKvGrid("timezone-info", DATA.timezone);
+renderKvGrid("reproducibility-info", DATA.reproducibility);
+
+document.getElementById("portfolio-disclaimer").textContent = DATA.portfolio_disclaimer;
+document.getElementById("survivorship-note").textContent = DATA.survivorship_bias_note;
 
 // ---- metric cards (gross/net toggle) ----
 const metricFields = [
@@ -413,6 +641,77 @@ if (labels.length) {
     <path d="${path}" fill="none" stroke="${lineColor}" stroke-width="2"/>
   </svg>
   <div class="muted">${points.length} trade(s) -- final cumulative net R: <b class="${signClass(last.cumulative_net_R)}">${fmt(last.cumulative_net_R, 2)}</b></div>`;
+})();
+
+// ---- drawdown (running peak minus cumulative net R -- derived from the
+// SAME equity_curve data the chart above uses, not a separate series) ----
+(function renderDrawdown() {
+  const el = document.getElementById("drawdown-chart");
+  const points = DATA.equity_curve;
+  if (!points.length) { el.innerHTML = '<div class="empty-note">No closed trades to chart.</div>'; return; }
+  let peak = 0;
+  const dd = points.map(p => { peak = Math.max(peak, p.cumulative_net_R); return peak - p.cumulative_net_R; });
+  const maxDd = Math.max(...dd, 0.001);
+  const w = 900, h = 220, padL = 40, padB = 20, padT = 10, padR = 10;
+  const x = i => padL + (i / Math.max(points.length - 1, 1)) * (w - padL - padR);
+  const y = v => padT + (v / maxDd) * (h - padT - padB);
+  const path = "M" + dd.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" L");
+  const areaPath = path + ` L${x(dd.length - 1).toFixed(1)},${padT} L${x(0).toFixed(1)},${padT} Z`;
+  el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}">
+    <text x="${padL - 6}" y="${padT + 4}" text-anchor="end">-${maxDd.toFixed(1)}R</text>
+    <text x="${padL - 6}" y="${h - padB}" text-anchor="end">0R</text>
+    <path d="${areaPath}" fill="var(--neg)" fill-opacity="0.15" stroke="none"/>
+    <path d="${path}" fill="none" stroke="var(--neg)" stroke-width="2"/>
+  </svg>
+  <div class="muted">Max drawdown: <b class="neg">-${maxDd.toFixed(2)}R</b></div>`;
+})();
+
+// ---- trade return distribution (histogram of net R) ----
+(function renderDistribution() {
+  const el = document.getElementById("distribution-chart");
+  const values = DATA.trades.map(t => t.net_R).filter(v => v !== null && v !== undefined);
+  if (!values.length) { el.innerHTML = '<div class="empty-note">No closed trades to chart.</div>'; return; }
+  const min = Math.min(...values), max = Math.max(...values);
+  const bucketCount = Math.min(12, Math.max(4, Math.ceil(Math.sqrt(values.length))));
+  const span = (max - min) || 1;
+  const bucketWidth = span / bucketCount;
+  const buckets = new Array(bucketCount).fill(0);
+  for (const v of values) {
+    let idx = Math.floor((v - min) / bucketWidth);
+    if (idx >= bucketCount) idx = bucketCount - 1;
+    if (idx < 0) idx = 0;
+    buckets[idx]++;
+  }
+  const maxCount = Math.max(...buckets, 1);
+  let html = '<div style="display:flex;align-items:flex-end;gap:3px;height:140px">';
+  for (let i = 0; i < bucketCount; i++) {
+    const bucketStart = min + i * bucketWidth;
+    const heightPct = (buckets[i] / maxCount) * 100;
+    const color = (bucketStart + bucketWidth / 2) >= 0 ? "var(--pos)" : "var(--neg)";
+    html += `<div title="${bucketStart.toFixed(2)}R to ${(bucketStart + bucketWidth).toFixed(2)}R: ${buckets[i]} trade(s)"
+      style="flex:1;height:${Math.max(heightPct, 2)}%;background:${color};border-radius:2px 2px 0 0"></div>`;
+  }
+  html += "</div>";
+  html += `<div class="muted" style="display:flex;justify-content:space-between;margin-top:4px">
+    <span>${min.toFixed(2)}R</span><span>${max.toFixed(2)}R</span></div>`;
+  el.innerHTML = html;
+})();
+
+// ---- cost sensitivity (spec section 10 -- sensitivity only, no "best" highlighted) ----
+(function renderCostSensitivity() {
+  const el = document.getElementById("cost-sensitivity");
+  const rows = DATA.cost_sensitivity;
+  if (!rows || !rows.length) {
+    el.innerHTML = '<div class="empty-note">Not run for this backtest -- pass --cost-sensitivity to generate this table.</div>';
+    return;
+  }
+  const body = rows.map(r => `<tr>
+    <td>${r.cost_bps}</td><td>${r.trades}</td><td>${pct(r.win_rate)}</td>
+    <td>${fmt(r.profit_factor, 2)}</td><td class="${signClass(r.expectancy_r)}">${fmt(r.expectancy_r, 3)}</td>
+    <td class="${signClass(r.max_drawdown_r)}">${fmt(r.max_drawdown_r, 2)}</td></tr>`).join("");
+  el.innerHTML = `<table><thead><tr><th>Cost (bps)</th><th>Trades</th><th>Win rate</th>
+    <th>Profit factor</th><th>Expectancy (R)</th><th>Max DD (R)</th></tr></thead><tbody>${body}</tbody></table>
+    <div class="muted" style="margin-top:6px">Sensitivity analysis only -- no scenario above is selected or recommended.</div>`;
 })();
 
 // ---- exit reasons / rejections ----

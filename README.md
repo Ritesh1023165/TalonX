@@ -46,7 +46,7 @@ for anything beyond this quick overview:
 
 | | |
 |---|---|
-| **Getting started** | [Setup](docs/setup.md) · [Running things](docs/running.md) · [Troubleshooting](docs/troubleshooting.md) · [Configuration reference](docs/configuration.md) |
+| **Getting started** | [Setup](docs/setup.md) · [Running things](docs/running.md) · [Troubleshooting](docs/troubleshooting.md) · [Configuration reference](docs/configuration.md) · [Backtesting](docs/backtesting.md) |
 | **Architecture** | [Overview & data flow](docs/architecture-overview.md) · [Module 1: ingest](docs/modules/ingest.md) · [Module 2: quant](docs/modules/quant.md) · [Module 3: brain](docs/modules/brain.md) · [Module 4: core](docs/modules/core.md) · [Module 5: dispatch](docs/modules/dispatch.md) · [Module 6: paper](docs/modules/paper.md) · [Orchestrator](docs/modules/orchestrator.md) |
 | **Cross-cutting features** | [Phase 2 multi-horizon](docs/phase2-multi-horizon.md) · [Earnings Radar](docs/earnings-radar.md) · [Pre-Market Radar](docs/premarket-radar.md) · [Bar buffer persistence](docs/bar_buffer_persistence.md) |
 | **Reference** | [Roadmap / not built yet](docs/roadmap.md) · [Performance & Gemini tradeoffs](docs/performance.md) |
@@ -72,6 +72,33 @@ for anything beyond this quick overview:
 
 See **[docs/running.md](docs/running.md)** for every module's standalone
 entrypoint, `--skip-*` flags, and the test suite.
+
+## Run your first backtest
+
+`talonx_backtest` replays historical 1-minute OHLCV data through the
+same, frozen live strategy code — it measures TalonX, it doesn't change
+it. No market data needed to try it:
+
+1. Install dependencies (`pip install -r talonx_quant\requirements.txt`
+   covers `talonx_backtest` too — no separate requirements file).
+2. Run the deterministic sample:
+   ```powershell
+   python -m talonx_backtest --data examples\data\sample_AAPL_1m.csv --symbol AAPL --tz America/New_York --out results\sample
+   ```
+3. Open:
+   ```text
+   results\sample\backtest_results.html
+   ```
+4. For real historical data:
+   ```powershell
+   python -m talonx_backtest --data data\AAPL_1m.csv --symbol AAPL --tz America/New_York --start 2025-01-01 --end 2025-12-31 --out results\AAPL
+   ```
+5. Review: profit factor, expectancy, max drawdown, MFE/MAE, and (with
+   `--cost-sensitivity`) how sensitive the result is to execution costs.
+
+See **[docs/backtesting.md](docs/backtesting.md)** for data-format
+requirements, timezone handling, data-quality validation, and what the
+report does and doesn't tell you.
 
 ## Project layout
 

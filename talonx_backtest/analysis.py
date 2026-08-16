@@ -259,3 +259,67 @@ def ablation_configs(base_config) -> dict[str, object]:
     compare metrics.metric_set() output -- this function does not do
     that itself."""
     return {label: dataclasses.replace(base_config, **overrides) for label, overrides in _ABLATIONS.items()}
+
+
+# ------------------------------------------------------------------
+# Cost-sensitivity analysis (spec section 10) -- runs the SAME frozen
+# strategy over the SAME historical data once per execution-cost
+# scenario, varying ONLY entry/exit slippage and spread. This is
+# sensitivity analysis only: it never selects, ranks as "best", or
+# recommends any one scenario -- see cost_sensitivity_scenarios' own
+# docstring for the cost model and DEFAULT_COST_SCENARIOS_BPS below.
+# ------------------------------------------------------------------
+
+DEFAULT_COST_SCENARIOS_BPS: tuple[int, ...] = (0, 5, 10, 20)
+
+
+def cost_sensitivity_scenarios(
+    df: pd.DataFrame,
+    quant_config,
+    bps_scenarios: tuple[int, ...] = DEFAULT_COST_SCENARIOS_BPS,
+    same_bar_resolution: str = "stop_first",
+    eod_flatten_enabled: bool = True,
+) -> list[dict]:
+    """Runs a fresh BacktestEngine once per `bps_scenarios` entry, over
+    the identical `df` and `quant_config` (the frozen strategy is
+    untouched between scenarios) -- only execution cost changes.
+
+    Cost model (deliberately simple and uniform, not calibrated to any
+    specific venue -- documented here so a reader knows exactly what
+    "N bps" means in this table): for a scenario of `bps` basis points,
+    entry_slippage_bps = exit_slippage_bps = spread_bps = bps. This
+    charges the SAME cost on both legs of the trade plus the same
+    nominal spread, rather than trying to model a specific broker's fee
+    schedule.
+
+    Returns one dict per scenario (net-of-cost metrics only -- gross is
+    cost-invariant by definition, so showing it here would be
+    redundant): cost_bps, trades, win_rate, profit_factor, expectancy_r,
+    total_r, max_drawdown_r. Never picks or highlights a "best" row --
+    that judgment is left entirely to whoever reads the table.
+    """
+    from talonx_backtest.engine import BacktestConfig, BacktestEngine
+    from talonx_backtest.execution import ExecutionConfig
+
+    rows: list[dict] = []
+    for bps in bps_scenarios:
+        config = BacktestConfig(
+            quant_config=quant_config,
+            execution=ExecutionConfig(
+                entry_slippage_bps=float(bps), exit_slippage_bps=float(bps), spread_bps=float(bps),
+                same_bar_resolution=same_bar_resolution,
+            ),
+            eod_flatten_enabled=eod_flatten_enabled,
+        )
+        result = BacktestEngine(config).run(df)
+        m = compute_metrics(result.trades, r_field="net_R")
+        rows.append({
+            "cost_bps": bps,
+            "trades": m.total_trades,
+            "win_rate": m.win_rate,
+            "profit_factor": None if m.profit_factor in (None, float("inf")) else m.profit_factor,
+            "expectancy_r": m.expectancy_r,
+            "total_r": m.total_r,
+            "max_drawdown_r": m.max_drawdown_r,
+        })
+    return rows

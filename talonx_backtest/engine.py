@@ -152,6 +152,7 @@ class BacktestResult:
     start: pd.Timestamp | None
     end: pd.Timestamp | None
     symbols: list[str]
+    bars_processed: int = 0
 
 
 class BacktestEngine:
@@ -185,6 +186,7 @@ class BacktestEngine:
         self.signal_log: list[dict] = []
         self.signals_generated = 0
         self.signals_published = 0
+        self.bars_processed = 0
         self._last_close: dict[str, float] = {}
         self._last_timestamp: dict[str, pd.Timestamp] = {}
 
@@ -227,6 +229,7 @@ class BacktestEngine:
             start=ordered["timestamp"].iloc[0],
             end=ordered["timestamp"].iloc[-1],
             symbols=symbols,
+            bars_processed=self.bars_processed,
         )
 
     # ------------------------------------------------------------------
@@ -235,6 +238,7 @@ class BacktestEngine:
 
     def _process_symbol_bar(self, symbol: str, timestamp: pd.Timestamp, row, candidates: list[QuantSignal]) -> None:
         symbol = symbol.upper()
+        self.bars_processed += 1
 
         # --- Trade lifecycle: entry / exit checks come BEFORE this bar's
         # data feeds indicator computation, matching "a signal published

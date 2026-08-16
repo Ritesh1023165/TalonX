@@ -8,11 +8,20 @@ thresholds are not exposed as CLI flags -- only backtest-mechanics
 settings are: slippage, spread, same-bar resolution, EOD flatten).
 Writes the full results/ set (trades.csv/json, summary.json/txt,
 equity_curve.csv, rejected_signals.csv, data_quality.json,
-results.html) via talonx_backtest.reports.write_report.
+results.html, and cost_sensitivity.csv when --cost-sensitivity is
+passed) via talonx_backtest.reports.write_report.
+
+Data-safety posture (spec section 5): critical corruption (NaN/
+infinite values, non-positive prices, an impossible OHLC relationship,
+negative volume, or an unusable/unparseable timestamp) ABORTS the run
+with a non-zero exit code before any backtest logic runs at all -- see
+data.abort_on_critical_corruption. Recoverable issues (duplicate/
+out-of-order timestamps) only warn unless --auto-dedupe is passed.
 
 Usage:
     python -m talonx_backtest --data data/AAPL_1m.csv --symbol AAPL --out results
     python -m talonx_backtest --data data/ --start 2024-01-01 --end 2026-07-31 --out results
+    python -m talonx_backtest --data data/AAPL_1m.csv --symbol AAPL --cost-sensitivity --out results
 """
 from __future__ import annotations
 
@@ -22,7 +31,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from talonx_backtest.analysis import DEFAULT_COST_SCENARIOS_BPS, cost_sensitivity_scenarios
 from talonx_backtest.data import (
+    DataValidationError,
+    abort_on_critical_corruption,
     check_dataset_quality,
     load_ohlcv_csv,
     load_ohlcv_directory,
@@ -44,7 +56,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--symbols", help="Comma-separated symbol filter (directory loads, or post-filtering a combined CSV).")
     parser.add_argument("--start", help="ISO date/datetime (UTC) -- only bars at/after this are included.")
     parser.add_argument("--end", help="ISO date/datetime (UTC) -- only bars at/before this are included.")
-    parser.add_argument("--tz", default="UTC", help="Timezone naive timestamps in the source data should be interpreted as (default UTC).")
+    parser.add_argument(
+        "--tz", default="UTC",
+        help="Timezone naive timestamps in the source data should be interpreted as, e.g. "
+             "'America/New_York' for exchange-local timestamps (default: UTC). Already-tz-aware "
+             "timestamps in the file are converted to UTC regardless of this flag.",
+    )
     parser.add_argument("--out", default="results", help="Output directory for the report files (default: results).")
     parser.add_argument("--prefix", default="backtest", help="Filename prefix for report files (default: backtest).")
     parser.add_argument("--entry-slippage-bps", type=float, default=0.0)
@@ -53,6 +70,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--same-bar-resolution", choices=["stop_first", "target_first"], default="stop_first")
     parser.add_argument("--no-eod-flatten", action="store_true", help="Disable the 15:50 ET daily flatten sweep.")
     parser.add_argument("--auto-dedupe", action="store_true", help="Sort/dedupe the input before running if duplicates are found (see data.sort_and_dedupe).")
+    parser.add_argument(
+        "--cost-sensitivity", action="store_true",
+        help=f"Also run the same backtest across cost scenarios {list(DEFAULT_COST_SCENARIOS_BPS)} bps "
+             f"(entry slippage = exit slippage = spread, per scenario) and write cost_sensitivity.csv. "
+             f"Sensitivity analysis only -- never selects or recommends a scenario.",
+    )
     return parser
 
 
@@ -81,6 +104,9 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         df = _load_data(args)
+    except DataValidationError as exc:
+        print("ERROR\nBACKTEST ABORTED\n" + str(exc), file=sys.stderr)
+        return 2
     except (FileNotFoundError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -93,23 +119,31 @@ def main(argv: list[str] | None = None) -> int:
     print("=" * 70)
     print("DATA QUALITY")
     print("=" * 70)
-    dirty_symbols = []
-    for symbol, report in quality.items():
+    for report in quality.values():
         print(report.summary())
         print()
-        if not report.is_clean:
-            dirty_symbols.append(symbol)
 
-    if dirty_symbols:
+    # Critical corruption (NaN/infinite values, non-positive prices, an
+    # impossible OHLC relationship, negative volume) hard-aborts here,
+    # BEFORE any backtest logic runs -- spec section 5. Never
+    # auto-repaired; the caller must fix the source data.
+    try:
+        abort_on_critical_corruption(quality)
+    except DataValidationError as exc:
+        print("ERROR\nBACKTEST ABORTED\n" + str(exc), file=sys.stderr)
+        return 2
+
+    recoverable_symbols = [s for s, r in quality.items() if r.has_recoverable_issues]
+    if recoverable_symbols:
         if args.auto_dedupe:
-            print(f"--auto-dedupe: sorting/deduplicating {dirty_symbols} before running\n")
+            print(f"--auto-dedupe: sorting/deduplicating {recoverable_symbols} before running\n")
             df = sort_and_dedupe(df)
             quality = check_dataset_quality(df)
         else:
             print(
-                f"WARNING: data-quality issues found for {dirty_symbols} -- proceeding as-is "
-                f"(pass --auto-dedupe to sort/dedupe timestamp issues automatically; other "
-                f"issues like invalid prices are never auto-repaired).\n",
+                f"WARNING: recoverable data-quality issues found for {recoverable_symbols} "
+                f"(duplicate/out-of-order timestamps) -- proceeding as-is. Pass --auto-dedupe to "
+                f"sort/dedupe automatically. The dataset was NOT modified.\n",
                 file=sys.stderr,
             )
 
@@ -129,9 +163,30 @@ def main(argv: list[str] | None = None) -> int:
     print("=" * 70)
     print("BACKTEST RESULT")
     print("=" * 70)
-    print(result_summary_text(result))
+    print(result_summary_text(result, input_timezone=args.tz))
 
-    paths = write_report(result, args.out, prefix=args.prefix, data_quality=quality)
+    cost_sensitivity_rows = None
+    if args.cost_sensitivity:
+        print("=" * 70)
+        print("COST SENSITIVITY (sensitivity analysis only -- no scenario is recommended)")
+        print("=" * 70)
+        cost_sensitivity_rows = cost_sensitivity_scenarios(
+            df, config.quant_config, same_bar_resolution=args.same_bar_resolution,
+            eod_flatten_enabled=config.eod_flatten_enabled,
+        )
+        print(f"{'cost_bps':>10} {'trades':>8} {'win_rate':>10} {'PF':>8} {'expectancy_R':>14} {'max_DD_R':>10}")
+        for row in cost_sensitivity_rows:
+            win_rate = "n/a" if row["win_rate"] is None else f"{row['win_rate']:.1%}"
+            pf = "n/a" if row["profit_factor"] is None else f"{row['profit_factor']:.2f}"
+            expectancy = "n/a" if row["expectancy_r"] is None else f"{row['expectancy_r']:.3f}"
+            max_dd = "n/a" if row["max_drawdown_r"] is None else f"{row['max_drawdown_r']:.2f}"
+            print(f"{row['cost_bps']:>10} {row['trades']:>8} {win_rate:>10} {pf:>8} {expectancy:>14} {max_dd:>10}")
+        print()
+
+    paths = write_report(
+        result, args.out, prefix=args.prefix, data_quality=quality,
+        input_timezone=args.tz, cost_sensitivity=cost_sensitivity_rows,
+    )
     print("Report files written:")
     for label, out_path in paths.items():
         print(f"  {label:20s} {out_path}")

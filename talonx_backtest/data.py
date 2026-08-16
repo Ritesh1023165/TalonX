@@ -25,7 +25,18 @@ from pathlib import Path
 
 import pandas as pd
 
+from talonx_quant.session import get_session
+
 _REQUIRED_COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
+
+
+class DataValidationError(ValueError):
+    """Raised when a dataset contains corruption too severe to safely
+    backtest (see DataQualityReport.has_critical_corruption /
+    abort_on_critical_corruption below) -- NaN/infinite values,
+    non-positive prices, a physically impossible OHLC relationship, or
+    negative volume. These are never auto-repaired; the caller must fix
+    the source data."""
 
 
 @dataclass(frozen=True)
@@ -51,18 +62,45 @@ class DataQualityReport:
     last_timestamp: pd.Timestamp | None
     inferred_bar_interval_seconds: float | None
     missing_bar_gaps: list[tuple[pd.Timestamp, pd.Timestamp]] = field(default_factory=list, repr=False)
+    # Expected-vs-unexpected gap classification (spec section 6): a
+    # missing bar outside the REGULAR session (09:30-16:00 ET -- i.e.
+    # overnight/weekend/holiday closure, OR simply a pre-market minute a
+    # dataset never covered, which is extremely common and not itself a
+    # defect) is EXPECTED. A missing bar INSIDE the regular session is
+    # the one that actually indicates a data problem. Both are already
+    # counted once each in `missing_bars` above; these two fields are
+    # that same total split by cause, not an additional count.
+    expected_session_gap_bars: int = 0
+    unexpected_intra_session_gap_bars: int = 0
+
+    @property
+    def has_critical_corruption(self) -> bool:
+        """True if this dataset contains corruption severe enough that a
+        backtest run on it should be REFUSED, not merely warned about --
+        see DataValidationError/abort_on_critical_corruption. Duplicate
+        or out-of-order timestamps are NOT included here: both are
+        mechanically recoverable via sort_and_dedupe, so they're
+        `has_recoverable_issues` instead."""
+        return (
+            self.invalid_prices > 0
+            or self.invalid_ohlc_relationship > 0
+            or self.negative_volume > 0
+            or self.nan_values > 0
+            or self.infinite_values > 0
+        )
+
+    @property
+    def has_recoverable_issues(self) -> bool:
+        """True if this dataset has issues that sort_and_dedupe (the
+        one opt-in repair helper this module provides) can actually
+        fix -- duplicate or out-of-order timestamps. Does NOT include
+        missing bars: a gap isn't something dedup/sort can invent data
+        to fill."""
+        return self.duplicate_timestamps > 0 or self.out_of_order_timestamps > 0
 
     @property
     def is_clean(self) -> bool:
-        return (
-            self.duplicate_timestamps == 0
-            and self.out_of_order_timestamps == 0
-            and self.invalid_prices == 0
-            and self.invalid_ohlc_relationship == 0
-            and self.negative_volume == 0
-            and self.nan_values == 0
-            and self.infinite_values == 0
-        )
+        return not self.has_critical_corruption and not self.has_recoverable_issues
 
     def summary(self) -> str:
         lines = [
@@ -73,14 +111,36 @@ class DataQualityReport:
             f"  Inferred bar interval:   {self.inferred_bar_interval_seconds}s",
             f"  Duplicate timestamps:    {self.duplicate_timestamps}",
             f"  Out-of-order timestamps: {self.out_of_order_timestamps}",
-            f"  Missing bars:            {self.missing_bars} ({len(self.missing_bar_gaps)} gap(s))",
+            f"  Missing bars (total):    {self.missing_bars} ({len(self.missing_bar_gaps)} gap(s))",
+            f"    Expected (session closed):    {self.expected_session_gap_bars}",
+            f"    Unexpected (inside session):  {self.unexpected_intra_session_gap_bars}",
             f"  Invalid prices (<=0):    {self.invalid_prices}",
             f"  Invalid OHLC relations:  {self.invalid_ohlc_relationship}",
             f"  Negative volume:         {self.negative_volume}",
             f"  NaN values:              {self.nan_values}",
             f"  Infinite values:         {self.infinite_values}",
+            f"  CRITICAL CORRUPTION:     {'YES -- backtest must be aborted' if self.has_critical_corruption else 'no'}",
         ]
         return "\n".join(lines)
+
+
+def abort_on_critical_corruption(reports: dict[str, DataQualityReport]) -> None:
+    """Raises DataValidationError if ANY report has
+    has_critical_corruption -- the CLI (and any other caller) must call
+    this BEFORE running a backtest and let the exception propagate,
+    rather than silently continuing on corrupted data (spec section 5).
+    A no-op when every report is free of critical corruption; duplicate/
+    out-of-order timestamps (recoverable) do not trigger this."""
+    bad = {symbol: r for symbol, r in reports.items() if r.has_critical_corruption}
+    if not bad:
+        return
+    lines = ["Critical data corruption detected -- backtest aborted. Fix the source data before retrying."]
+    for symbol, r in bad.items():
+        lines.append(
+            f"  {symbol}: invalid_prices={r.invalid_prices} invalid_ohlc_relationship={r.invalid_ohlc_relationship} "
+            f"negative_volume={r.negative_volume} nan_values={r.nan_values} infinite_values={r.infinite_values}"
+        )
+    raise DataValidationError("\n".join(lines))
 
 
 def load_ohlcv_csv(
@@ -109,11 +169,7 @@ def load_ohlcv_csv(
     if missing:
         raise ValueError(f"{path}: missing required column(s): {missing}")
 
-    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=False)
-    if df["timestamp"].dt.tz is None:
-        df["timestamp"] = df["timestamp"].dt.tz_localize(tz).dt.tz_convert("UTC")
-    else:
-        df["timestamp"] = df["timestamp"].dt.tz_convert("UTC")
+    df["timestamp"] = _parse_and_localize(df["timestamp"], tz, source=str(path))
 
     if "symbol" not in df.columns:
         if symbol is None:
@@ -138,11 +194,7 @@ def from_dataframe(
     if missing:
         raise ValueError(f"missing required column(s): {missing}")
 
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
-    if df["timestamp"].dt.tz is None:
-        df["timestamp"] = df["timestamp"].dt.tz_localize(tz).dt.tz_convert("UTC")
-    else:
-        df["timestamp"] = df["timestamp"].dt.tz_convert("UTC")
+    df["timestamp"] = _parse_and_localize(df["timestamp"], tz, source="<dataframe>")
 
     if "symbol" not in df.columns:
         if symbol is None:
@@ -152,6 +204,41 @@ def from_dataframe(
         df["symbol"] = df["symbol"].astype(str).str.upper()
 
     return df[["timestamp", "symbol", "open", "high", "low", "close", "volume"]].copy()
+
+
+def _parse_and_localize(raw: pd.Series, tz: str, source: str) -> pd.Series:
+    """Parses a raw timestamp column and normalizes it to tz-aware UTC.
+    Naive timestamps are localized to `tz` first (spec section 12 --
+    `--tz` is how a caller says what timezone naive timestamps in their
+    file actually are; UTC by default, matching every other
+    bar_timestamp convention in talonx_quant).
+
+    DST safety: `nonexistent="shift_forward"` and `ambiguous="NaT"`
+    handle the two DST-transition edge cases explicitly rather than
+    letting pandas raise -- a spring-forward "missing" local hour is
+    shifted forward to the next valid instant, and a fall-back
+    "ambiguous" hour (which occurs twice) becomes NaT rather than an
+    unchecked guess at which occurrence was meant. Either produces an
+    explicit, checked failure below (an "unusable timestamp" per spec
+    section 5), never a silent wrong answer.
+    """
+    parsed = pd.to_datetime(raw, utc=False)
+    if parsed.dt.tz is None:
+        try:
+            localized = parsed.dt.tz_localize(tz, nonexistent="shift_forward", ambiguous="NaT")
+        except Exception as exc:  # noqa: BLE001 -- any tz_localize failure is an unusable-timestamp abort
+            raise DataValidationError(f"{source}: could not interpret timestamps in timezone {tz!r}: {exc}") from exc
+        result = localized.dt.tz_convert("UTC")
+    else:
+        result = parsed.dt.tz_convert("UTC")
+
+    if result.isna().any():
+        bad_count = int(result.isna().sum())
+        raise DataValidationError(
+            f"{source}: {bad_count} unusable timestamp(s) -- unparseable, or ambiguous under DST "
+            f"for timezone {tz!r}. Backtest aborted; fix the source data before retrying."
+        )
+    return result
 
 
 def load_ohlcv_directory(
@@ -268,6 +355,8 @@ def check_data_quality(df: pd.DataFrame, symbol: str | None = None) -> DataQuali
     interval_seconds = _infer_interval_seconds(sorted_ts)
 
     missing_bars = 0
+    expected_gap_bars = 0
+    unexpected_gap_bars = 0
     gaps: list[tuple[pd.Timestamp, pd.Timestamp]] = []
     if interval_seconds:
         deduped_sorted = sorted_ts.drop_duplicates()
@@ -276,9 +365,30 @@ def check_data_quality(df: pd.DataFrame, symbol: str | None = None) -> DataQuali
             if pd.isna(gap) or gap <= interval_seconds * 1.5:
                 continue
             missing_here = int(round(gap / interval_seconds)) - 1
-            if missing_here > 0:
-                missing_bars += missing_here
-                gaps.append((deduped_sorted.iloc[i - 1], deduped_sorted.iloc[i]))
+            if missing_here <= 0:
+                continue
+            missing_bars += missing_here
+            gaps.append((deduped_sorted.iloc[i - 1], deduped_sorted.iloc[i]))
+
+            # Session-aware classification of EACH missing minute in this
+            # gap (spec section 6): only a missing REGULAR-session
+            # (09:30-16:00 ET) minute is flagged UNEXPECTED. Both
+            # "closed" (overnight/weekend/outside the 04:00-16:00 ET
+            # window) AND "pre_market" count as EXPECTED here --
+            # overnight/weekend closure is an obvious market fact, and a
+            # huge fraction of legitimately-sourced 1-minute equity
+            # datasets simply don't include pre-market bars at all (many
+            # vendors don't offer them, or a user only cares about
+            # regular-session evaluation) -- that absence is normal, not
+            # a data defect, so it must not drown out a genuine
+            # regular-session hole in noise.
+            cursor = deduped_sorted.iloc[i - 1] + pd.Timedelta(seconds=interval_seconds)
+            for _ in range(missing_here):
+                if get_session(cursor) == "regular":
+                    unexpected_gap_bars += 1
+                else:
+                    expected_gap_bars += 1
+                cursor += pd.Timedelta(seconds=interval_seconds)
 
     tzinfo = str(ts.dt.tz) if hasattr(ts.dt, "tz") and ts.dt.tz is not None else "naive"
 
@@ -298,6 +408,8 @@ def check_data_quality(df: pd.DataFrame, symbol: str | None = None) -> DataQuali
         last_timestamp=sorted_ts.iloc[-1],
         inferred_bar_interval_seconds=interval_seconds,
         missing_bar_gaps=gaps,
+        expected_session_gap_bars=expected_gap_bars,
+        unexpected_intra_session_gap_bars=unexpected_gap_bars,
     )
 
 
