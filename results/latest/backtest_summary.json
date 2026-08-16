@@ -1,0 +1,176 @@
+{
+  "period": {
+    "start": "2026-01-05 14:30:00+00:00",
+    "end": "2026-01-06 21:06:00+00:00"
+  },
+  "symbols": [
+    "TSTE",
+    "TSTL",
+    "TSTW"
+  ],
+  "bars_processed": 1718,
+  "signals_generated": 4,
+  "signals_published": 3,
+  "trades_executed": 3,
+  "throttle_fidelity": "LIMITED (flushed once per 1-minute bar-close, not continuously every throttle_window_seconds)",
+  "execution_assumptions": {
+    "entry_slippage_bps": 0.0,
+    "exit_slippage_bps": 0.0,
+    "spread_bps": 0.0,
+    "same_bar_resolution": "stop_first",
+    "eod_flatten_enabled": true,
+    "allow_overlapping_trades": false
+  },
+  "zero_cost_baseline_warning": true,
+  "small_sample_warning": true,
+  "timezone": {
+    "input_timezone": "America/New_York",
+    "internal_timezone": "UTC",
+    "session_timezone": "America/New_York"
+  },
+  "reproducibility": {
+    "git_commit": "755cae7c3039e4bf074fb6f00a3ab5b1bea4858b",
+    "backtester_version": "0.1.0",
+    "strategy_version": "a660d03ff462",
+    "config_hash": "19654e22ffd5",
+    "run_timestamp": "2026-08-16T20:07:35.122059+00:00"
+  },
+  "portfolio_disclaimer": "This backtest evaluates TRADE-LEVEL strategy performance (R-multiples per signal). It does NOT model starting capital, position sizing, maximum portfolio exposure, concurrent-position limits, or buying power. Aggregate R/expectancy figures here describe the strategy's per-trade edge, not a realistic portfolio-level return.",
+  "survivorship_bias_note": "This is an INDIVIDUAL-SECURITY backtest, not a historical-universe backtest. If the symbol(s) tested were selected because they are prominent/liquid TODAY (e.g. current S&P 500 constituents), results may overstate historical edge relative to a point-in-time universe that would have also included names that were later delisted, acquired, or otherwise dropped out -- classic survivorship bias. Point-in-time universe construction is not implemented by this engine; interpret results accordingly, especially over long lookback periods.",
+  "metrics": {
+    "gross": {
+      "r_field": "gross_R",
+      "total_trades": 3,
+      "winning_trades": 2,
+      "losing_trades": 1,
+      "breakeven_trades": 0,
+      "win_rate": 0.6666666666666666,
+      "average_win_r": 6.044954632541915,
+      "average_loss_r": -1.0,
+      "average_r": 3.6966364216946097,
+      "median_r": 4.0450269597810244,
+      "total_r": 11.08990926508383,
+      "profit_factor": 12.08990926508383,
+      "expectancy_r": 3.6966364216946097,
+      "max_drawdown_r": -1.0,
+      "average_holding_seconds": 7060.0,
+      "median_holding_seconds": 900.0,
+      "best_trade_r": 8.044882305302805,
+      "worst_trade_r": -1.0,
+      "average_mfe_r": 5.605399366611889,
+      "average_mae_r": -0.5538322608494199,
+      "winners_average_mfe_r": 6.2479755942648625,
+      "winners_average_mae_r": -0.0017591171060678684,
+      "losers_average_mfe_r": 4.32024691130594,
+      "losers_average_mae_r": -1.657978548336124,
+      "sharpe_per_trade": 0.8155854267683391,
+      "sortino_per_trade": 7.841750044084297,
+      "win_rate_ci": {
+        "point_estimate": 0.6666666666666666,
+        "lower_95": 0.13322223379388565,
+        "upper_95": 1.0,
+        "n": 3
+      },
+      "expectancy_ci": {
+        "point_estimate": 3.6966364216946097,
+        "lower_95": -1.432363886184656,
+        "upper_95": 8.825636729573876,
+        "n": 3
+      },
+      "average_r_ci": {
+        "point_estimate": 3.6966364216946097,
+        "lower_95": -1.432363886184656,
+        "upper_95": 8.825636729573876,
+        "n": 3
+      }
+    },
+    "net": {
+      "r_field": "net_R",
+      "total_trades": 3,
+      "winning_trades": 2,
+      "losing_trades": 1,
+      "breakeven_trades": 0,
+      "win_rate": 0.6666666666666666,
+      "average_win_r": 6.044954632541915,
+      "average_loss_r": -1.0,
+      "average_r": 3.6966364216946097,
+      "median_r": 4.0450269597810244,
+      "total_r": 11.08990926508383,
+      "profit_factor": 12.08990926508383,
+      "expectancy_r": 3.6966364216946097,
+      "max_drawdown_r": -1.0,
+      "average_holding_seconds": 7060.0,
+      "median_holding_seconds": 900.0,
+      "best_trade_r": 8.044882305302805,
+      "worst_trade_r": -1.0,
+      "average_mfe_r": 5.605399366611889,
+      "average_mae_r": -0.5538322608494199,
+      "winners_average_mfe_r": 6.2479755942648625,
+      "winners_average_mae_r": -0.0017591171060678684,
+      "losers_average_mfe_r": 4.32024691130594,
+      "losers_average_mae_r": -1.657978548336124,
+      "sharpe_per_trade": 0.8155854267683391,
+      "sortino_per_trade": 7.841750044084297,
+      "win_rate_ci": {
+        "point_estimate": 0.6666666666666666,
+        "lower_95": 0.13322223379388565,
+        "upper_95": 1.0,
+        "n": 3
+      },
+      "expectancy_ci": {
+        "point_estimate": 3.6966364216946097,
+        "lower_95": -1.432363886184656,
+        "upper_95": 8.825636729573876,
+        "n": 3
+      },
+      "average_r_ci": {
+        "point_estimate": 3.6966364216946097,
+        "lower_95": -1.432363886184656,
+        "upper_95": 8.825636729573876,
+        "n": 3
+      }
+    }
+  },
+  "rejections_by_reason": {
+    "LOW_VOLATILITY": 1217,
+    "LOSS_LOCKOUT": 1
+  },
+  "cost_sensitivity": [
+    {
+      "cost_bps": 0,
+      "trades": 3,
+      "win_rate": 0.6666666666666666,
+      "profit_factor": 12.08990926508383,
+      "expectancy_r": 3.6966364216946097,
+      "total_r": 11.08990926508383,
+      "max_drawdown_r": -1.0
+    },
+    {
+      "cost_bps": 5,
+      "trades": 3,
+      "win_rate": 0.6666666666666666,
+      "profit_factor": 10.74267009641923,
+      "expectancy_r": 3.5943888909258477,
+      "total_r": 10.783166672777543,
+      "max_drawdown_r": -1.1067978866225523
+    },
+    {
+      "cost_bps": 10,
+      "trades": 3,
+      "win_rate": 0.6666666666666666,
+      "profit_factor": 9.632548259835936,
+      "expectancy_r": 3.4921413601570914,
+      "total_r": 10.476424080471276,
+      "max_drawdown_r": -1.2135957732451046
+    },
+    {
+      "cost_bps": 20,
+      "trades": 3,
+      "win_rate": 0.6666666666666666,
+      "profit_factor": 7.910732424189378,
+      "expectancy_r": 3.2876462986195825,
+      "total_r": 9.862938895858747,
+      "max_drawdown_r": -1.4271915464901914
+    }
+  ]
+}

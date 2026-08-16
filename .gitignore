@@ -35,9 +35,12 @@ chroma/
 reports/
 
 # talonx_backtest's default --out directory -- generated report output,
-# not something to version (examples/data/ IS versioned -- that's the
-# checked-in sample INPUT, not generated output).
-/results/
+# not something to version by default (examples/data/ IS versioned --
+# that's the checked-in sample INPUT, not generated output).
+# results/latest/ is an explicit exception, versioned on request as a
+# reference example of the report output.
+/results/*
+!/results/latest/
 
 # scripts/download_historical_1m.py's default --output-dir -- downloaded
 # real market data, not something to version (large, regenerable,
