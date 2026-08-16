@@ -234,6 +234,7 @@ from datetime import datetime, timedelta, timezone
 from pydantic import ValidationError
 
 from talonx_quant import preseed
+from talonx_quant.aggregation import HtfBarAggregator
 from talonx_quant.buffer import RollingBarBuffer
 from talonx_quant.config import QuantConfig
 from talonx_quant.indicators import compute_daily_pivots, compute_htf_trend, compute_indicators
@@ -247,7 +248,7 @@ from talonx_quant.schemas import (
     SignalDirection,
     TickEventType,
 )
-from talonx_quant.session import get_entry_blackout, get_session, is_operating_window_open
+from talonx_quant.session import get_entry_blackout, is_operating_window_open
 from talonx_quant.store import QuantStateStore
 from talonx_quant.strategy import calculate_trade_geometry, evaluate_signals
 
@@ -412,7 +413,13 @@ class QuantScanner:
         # (see _update_htf_buffer) -- only needs htf_sma_period+a few bars
         # of capacity, far cheaper than resampling the 1-min buffer.
         self.buffer_htf = RollingBarBuffer(self.config.htf_max_bars)
-        self._htf_accumulators: dict[str, dict] = {}
+        # HTF bucketing itself (floor-bucket + finalize-on-next-bucket) is
+        # factored into aggregation.HtfBarAggregator, shared unchanged
+        # with talonx_backtest's historical replay engine -- see that
+        # module's own docstring for why.
+        self._htf_aggregator = HtfBarAggregator(
+            self.config.htf_bar_interval_minutes, rth_only=self.config.rth_only_htf_sma,
+        )
         # True Calendar-Aligned 1-Minute Candle Aggregation (Requirement 1):
         # raw poll-cycle BAR events (12s cadence by default) accumulate here,
         # floor-bucketed to the minute, and the running OHLCV is written
@@ -956,46 +963,30 @@ class QuantScanner:
 
     def _update_htf_buffer(self, event: MarketTickEvent) -> None:
         """Incrementally rolls up 1-min BAR events into buffer_htf's
-        coarser bars (default 15-min), floor-bucketed by
-        htf_bar_interval_minutes. Finalizes the previous bucket into
-        buffer_htf only once a bar from the NEXT bucket arrives -- the
-        currently-forming bucket is never pushed early/partial.
+        coarser bars (default 15-min). The actual bucketing (floor-bucket
+        + finalize-on-next-bucket) lives in self._htf_aggregator
+        (aggregation.HtfBarAggregator), shared unchanged with
+        talonx_backtest's replay engine -- this method just feeds it and
+        writes whatever it finalizes into buffer_htf.
 
-        Session-aware buffering (Requirement 3): when
-        config.rth_only_htf_sma is set, a finalized bucket that falls
-        OUTSIDE regular trading hours is simply never added to
-        buffer_htf -- the 200-SMA trend gate this buffer exists for is
-        RTH-only by definition, so a pre-market 15-min candle would only
-        occupy a htf_max_bars slot the gate can never use."""
+        Session-aware buffering (Requirement 3): HtfBarAggregator itself
+        drops a finalized bucket that falls OUTSIDE regular trading hours
+        when constructed with rth_only=True (see __init__) -- the
+        200-SMA trend gate this buffer exists for is RTH-only by
+        definition, so a pre-market 15-min candle would only occupy a
+        htf_max_bars slot the gate can never use."""
         symbol = event.symbol.upper()
-        interval = self.config.htf_bar_interval_minutes
-        bucket_start = event.timestamp.replace(
-            minute=(event.timestamp.minute // interval) * interval, second=0, microsecond=0
+        finalized = self._htf_aggregator.update(
+            symbol=symbol, timestamp=event.timestamp,
+            open_=event.open, high=event.high, low=event.low,
+            close=event.close, volume=event.volume,
         )
-
-        acc = self._htf_accumulators.get(symbol)
-        if acc is not None and acc["bucket_start"] != bucket_start:
-            if not self.config.rth_only_htf_sma or get_session(acc["bucket_start"]) == "regular":
-                self.buffer_htf.add_bar(
-                    symbol=symbol, timestamp=acc["bucket_start"], open_=acc["open"],
-                    high=acc["high"], low=acc["low"], close=acc["close"], volume=acc["volume"],
-                )
-            acc = None
-
-        if acc is None:
-            self._htf_accumulators[symbol] = {
-                "bucket_start": bucket_start,
-                "open": event.open, "high": event.high, "low": event.low,
-                "close": event.close, "volume": event.volume or 0.0,
-            }
-        else:
-            if event.high is not None:
-                acc["high"] = event.high if acc["high"] is None else max(acc["high"], event.high)
-            if event.low is not None:
-                acc["low"] = event.low if acc["low"] is None else min(acc["low"], event.low)
-            if event.close is not None:
-                acc["close"] = event.close
-            acc["volume"] = (acc["volume"] or 0.0) + (event.volume or 0.0)
+        if finalized is not None:
+            self.buffer_htf.add_bar(
+                symbol=symbol, timestamp=finalized["timestamp"], open_=finalized["open"],
+                high=finalized["high"], low=finalized["low"], close=finalized["close"],
+                volume=finalized["volume"],
+            )
 
     def _update_1m_buffer(self, event: MarketTickEvent) -> None:
         """True Calendar-Aligned 1-Minute Candle Aggregation (Requirement
