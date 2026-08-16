@@ -327,6 +327,20 @@ Plus (Phase 2) the session-aware pre-market volume/liquidity/news-catalyst
 gates and the 15-min 200-SMA trend gate — see
 [modules/quant.md](modules/quant.md).
 
+Plus four more, from the 2026-08-16 quant audits (rounds 3-5 — see
+[modules/quant.md](modules/quant.md) for the full mechanics of each,
+this file only tracks them for the suppression-counter list below):
+HTF-Unavailable Trend Gate (`HTF_DATA_UNAVAILABLE` — a regular-session
+bullish candidate rejected outright when the 15-min 200-SMA buffer
+hasn't warmed up yet, rather than silently passing with zero trend
+confirmation), Final Revalidation Data Availability
+(`FINAL_REVALIDATION_DATA_UNAVAILABLE`), GLOBAL_RISK_DEGRADED (a
+mandatory Redis persistence write failing anywhere blocks ALL
+publication, process-wide, until reconciled), and the UK Operating
+Window (`UK_SESSION_CLOSED` — Mon-Fri 08:00-22:00 Europe/London,
+evaluated fresh from the current instant regardless of when TalonX
+itself was started).
+
 **Why this order:** 1-3 run inside `strategy.py` itself, before a
 candidate signal exists at all — cheapest place to filter, and they
 address *why* a signal would be spurious in the first place, not just how
@@ -345,22 +359,31 @@ the ticker's cooldown slot and block a later, better signal.
 **The batch throttle's tradeoff, worth restating:** "rank by conviction,
 keep the top N" cannot be done without buffering candidates for the full
 window first — there's no way to know a signal is top-3 until you've seen
-everything else that arrived in its window. Default window is 60s
-(`TALONX_QUANT_THROTTLE_WINDOW_SECONDS`), so a signal can be delayed by
-up to a minute before it's published or dropped. This was a deliberate
-choice over a lower-latency micro-batch design (rank+release every
-10-15s against a rolling cap) — the tradeoff there is real, ranking
-would only compare candidates within each short batch rather than the
-full minute, so an earlier lower-conviction signal could beat a
-later higher-conviction one in the same minute. Revisit if the added
-latency turns out to matter more than whole-minute ranking accuracy in
+everything else that arrived in its window. Default window is 15s
+(`TALONX_QUANT_THROTTLE_WINDOW_SECONDS`, down from an original 60s as of
+the 2026-08-16 quant audit — a candidate's entry price/R:R can drift
+materially over a full minute of sitting in the buffer), so a signal can
+be delayed by up to that long before it's published or dropped, and each
+top-ranked candidate is then re-validated against the LATEST price
+(`FINAL_REVALIDATION_DATA_UNAVAILABLE`/`RR_DEGRADED_DURING_THROTTLE`/
+`EXPIRED_IN_THROTTLE_QUEUE`/`UK_SESSION_CLOSED` — see
+[modules/quant.md](modules/quant.md)'s round 3-5 sections) rather than
+publishing a stale entry price on faith. This was a deliberate choice
+over a lower-latency micro-batch design (rank+release every 5-10s
+against a rolling cap) — the tradeoff there is real, ranking would only
+compare candidates within each short batch rather than the full window,
+so an earlier lower-conviction signal could beat a later
+higher-conviction one arriving moments later. Revisit if the added
+latency turns out to matter more than whole-window ranking accuracy in
 practice.
 
 **Suppression is counted, not silent** — `QuantScanner`'s in-memory
-counters (`signals_suppressed_cooldown`, `.signals_suppressed_throttle`,
+counters (`.signals_suppressed_cooldown`, `.signals_suppressed_throttle`,
 `.signals_suppressed_loss_lockout`, `.signals_suppressed_low_confluence`,
 `.signals_suppressed_low_risk_reward`, `.signals_suppressed_trend_gate`,
-`.signals_suppressed_premarket_liquidity`, `.signals_suppressed_low_volatility`,
+`.signals_suppressed_htf_unavailable`, `.signals_suppressed_risk_degraded`,
+`.signals_suppressed_uk_session_closed`, `.signals_suppressed_premarket_liquidity`,
+`.signals_suppressed_news_catalyst`, `.signals_suppressed_low_volatility`,
 `.signals_suppressed_opening_blackout`, `.signals_suppressed_closing_blackout`)
 each track how much their
 filter is actually removing, and all of them log a line per suppression
@@ -369,6 +392,18 @@ event plus persist a `(ticker, reason, count)` row when a
 signal-funnel section, AND increment a Redis
 `metrics:{date}:quant:failed_*` counter for the Streamlit dashboard's
 Daily Funnel & Metrics tab (see [modules/dispatch.md](modules/dispatch.md)).
+`.signals_suppressed_risk_degraded`/`.signals_suppressed_uk_session_closed`
+only count the EARLY per-tick suppression in `_handle_market_tick` (see
+[modules/quant.md](modules/quant.md)'s round 4/5 sections) — a
+`GLOBAL_RISK_DEGRADED`/`UK_SESSION_CLOSED` rejection at the
+AUTHORITATIVE final-revalidation/publish-time check, along with
+`FINAL_REVALIDATION_DATA_UNAVAILABLE`/`RR_DEGRADED_DURING_THROTTLE`/
+`EXPIRED_IN_THROTTLE_QUEUE` (all three throttle-flush-time-only
+conditions with no dedicated counter of their own), is tracked purely
+via Rejection Trace Logging (the `RejectedCandidateEvent`s below) and
+the `QuantStateStore` suppression-counts table instead.
+`.risk_degraded` (a plain bool property, not a counter) exposes the
+CURRENT `GLOBAL_RISK_DEGRADED` state itself.
 If noise is still getting through, or too much is being dropped, these
 are the first thing to check — or run
 `python scripts\ticker_funnel_report.py <TICKER>` for a live, per-ticker
