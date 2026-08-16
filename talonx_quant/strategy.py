@@ -25,7 +25,8 @@ rationale -- a live paper-trading review found a 0.33 profit factor and
     before a signal is even allowed to start the per-ticker cooldown.
 
 Phase 2 requirement doc additions:
-  - Explicit $ stop_price/target_price (1x ATR stop / pivot-or-2x-ATR
+  - Explicit $ stop_price/target_price (atr_stop_multiplier x ATR stop --
+    1.5x default, see the harmonization fix below -- / pivot-or-2x-ATR
     target) attached to every signal, not just the derived
     risk_reward_ratio -- see _stop_target_prices.
   - Session-aware volume-surge threshold: pre-market bars (04:00-09:30 ET)
