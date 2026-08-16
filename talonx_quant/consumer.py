@@ -104,6 +104,89 @@ Round-3 quant audit (2026-08-16), three more correctness/integrity gaps:
     is now rejected as HTF_DATA_UNAVAILABLE instead of silently
     publishing with zero trend confirmation -- see
     _trend_gate_applicable.
+
+Round-4 quant audit (2026-08-16): deployment context for this section --
+this process is NOT a 24x7 service. It's a host process (NOT
+Dockerised -- see docker-compose.yaml, which runs only Redis, and
+scripts/start_talonx.ps1/stop_talonx.ps1) started/stopped by a daily
+Windows Scheduled Task, normally Mon-Fri ~08:00-22:00 UK local time (see
+scripts/register_scheduled_tasks.ps1 -- Task Scheduler's own daily
+trigger already handles BST/GMT transitions; this module adds no
+UK-time-of-day logic of its own). Off-hours, both this process AND Redis
+are expected to be stopped. Four fixes below, all scoped to that model:
+
+  - GLOBAL_RISK_DEGRADED (process-wide, not per-ticker): round 3's
+    per-ticker in-memory fallback lock (_arm_fallback_lock) is a real
+    improvement over silently logging a warning, but it's still scoped
+    to the one ticker whose write failed -- a Redis SET failing for
+    AAPL's cooldown says nothing about whether Redis can be trusted for
+    MSFT or NVDA; it says Redis itself is unreliable RIGHT NOW. Every
+    mandatory-write failure (_arm_fallback_lock, called from both
+    _start_loss_lockout and _start_cooldown) now ALSO calls
+    _enter_risk_degraded, setting a single process-wide
+    self._risk_degraded flag. Checked at two points: early and cheaply
+    in _handle_market_tick (skips a ticker's candidates before running
+    any of the gates below it) and AUTHORITATIVELY in _publish_signal
+    (the single funnel every actual Redis publish goes through, for
+    every ticker -- this is what makes the block truly process-wide, and
+    also catches a candidate already queued in _pending_candidates from
+    before degradation began). Cleared ONLY by _reconcile_risk_state
+    confirming Redis can actually PERSIST a write (_verify_redis_persistence
+    -- PING succeeding is deliberately not enough), run at the start of
+    every _connect_and_listen call (a genuine process startup AND every
+    reconnect after a dropped connection) and periodically by
+    _checkpoint_loop while already degraded. GLOBAL_RISK_DEGRADED is
+    NEVER written to Redis or otherwise persisted -- it's this process's
+    own in-memory safety state; when the process stops (the normal
+    ~22:00 shutdown), it simply disappears, and the next run/reconnect
+    re-derives it fresh via _reconcile_risk_state. This is deliberately
+    NOT a 24x7 recovery daemon -- both retry paths above piggyback on
+    infrastructure (the reconnect-backoff loop, the buffer-checkpoint
+    loop) that already only runs for the life of one connected session.
+  - Per-ticker lock state needs no restart-time reconciliation of its
+    own: _is_on_cooldown/_is_loss_locked_out always read
+    `EXISTS cooldown:{TICKER}`/`loss_lockout:{TICKER}` LIVE from Redis,
+    never from a process-local cache -- so a still-valid TTL'd lock from
+    a PRIOR run (e.g. one active when Friday's process stopped) is
+    honoured automatically the instant this process starts checking
+    again, and an expired one is equally simple (Redis's own TTL already
+    removed the key). There is no in-memory copy of that state to go
+    stale, resurrect, or need reloading at startup -- see
+    _reconcile_risk_state's own docstring.
+  - Final Revalidation Data Availability: _revalidate_candidate
+    previously published a candidate AS-GENERATED (its original,
+    now-unverified geometry) when it couldn't obtain fresh
+    price/ATR/pivot data at throttle-flush time. It now rejects that
+    candidate outright as FINAL_REVALIDATION_DATA_UNAVAILABLE instead --
+    final publication must be based on a VERIFIED current trade
+    geometry, never an assumed-still-good stale one.
+  - Race-condition analysis (Requirement 12, no code change): a
+    theoretical check-then-act race exists between _is_on_cooldown's
+    read and _start_cooldown's write for the SAME ticker, since
+    _flush_throttle_window runs as a separate task from the main
+    _handle_message loop. In practice this can't produce a duplicate
+    publication: Closed-Bar Evaluation already caps a ticker to at most
+    ONE candidate batch per closed 1-minute bar (structurally, via the
+    bar-buffer bucket logic, not via this lock), so the earliest a
+    SECOND batch for the same ticker could even be queued is the NEXT
+    bar close, at least ~60s later -- while the entire
+    revalidate-then-publish-then-arm-cooldown sequence for the first
+    batch takes at most a few Redis round trips (milliseconds). A
+    genuine collision would require the next bar-close event to arrive
+    inside that multi-millisecond window, which the ~60s bar cadence
+    makes structurally impossible. Bar-Level Ingestion Idempotency (see
+    _is_new_bar_tick) is the actual exactly-once guarantee this module
+    provides, and it's scoped to INPUT tick processing (a replayed/
+    redelivered tick can't double-process), not to the downstream
+    QuantSignal publish itself: Redis Pub/Sub has no delivery guarantee
+    at all (not even at-least-once) for a published message a
+    disconnected subscriber simply never receives -- this is a stated,
+    accepted architectural limitation of Pub/Sub as a transport, not a
+    gap this module can close without replacing Pub/Sub itself (an
+    explicitly out-of-scope distributed-transaction-style change here).
+    Downstream consumers of talonx:signals:quant are expected to treat
+    delivery as best-effort, same as every other Pub/Sub channel in this
+    project.
 """
 from __future__ import annotations
 
@@ -279,6 +362,8 @@ _GATE_NAMES = {
     "EXPIRED_IN_THROTTLE_QUEUE": "throttle_revalidation_gate",
     "RR_DEGRADED_DURING_THROTTLE": "throttle_revalidation_gate",
     "RISK_STORE_UNAVAILABLE_FAIL_CLOSED": "risk_store_gate",
+    "GLOBAL_RISK_DEGRADED": "risk_degraded_gate",
+    "FINAL_REVALIDATION_DATA_UNAVAILABLE": "throttle_revalidation_gate",
 }
 
 
@@ -339,6 +424,24 @@ class QuantScanner:
         # _in_memory_lock_active.
         self._loss_lockout_fallback: dict[str, datetime] = {}
         self._cooldown_fallback: dict[str, datetime] = {}
+        # GLOBAL_RISK_DEGRADED (2026-08-16 quant audit, round 4): process-
+        # wide (not per-ticker) fail-closed state -- True whenever this
+        # process can no longer TRUST that a mandatory risk-state write
+        # (loss-lockout or cooldown) actually persisted to Redis. Blocks
+        # ALL subsequent signal publication for EVERY ticker, not just the
+        # one whose write failed (see _enter_risk_degraded's own
+        # docstring for why a per-ticker response isn't sufficient here).
+        # Defaults to False: a genuinely fresh, never-connected scanner
+        # has no reason to assume Redis is broken -- the actual
+        # startup-time verification runs in _connect_and_listen's
+        # _reconcile_risk_state call, BEFORE the message loop (and so
+        # before any tick can be processed or signal published) ever
+        # starts, so production code is never at risk of publishing
+        # ahead of that check. This flag is deliberately in-process only
+        # (never written to Redis) -- see _enter_risk_degraded and
+        # _reconcile_risk_state.
+        self._risk_degraded: bool = False
+        self._signals_suppressed_risk_degraded = 0
         self._client = None
         self._stop_event = asyncio.Event()
         self._signals_published = 0
@@ -395,6 +498,17 @@ class QuantScanner:
         return self._signals_suppressed_htf_unavailable
 
     @property
+    def signals_suppressed_risk_degraded(self) -> int:
+        return self._signals_suppressed_risk_degraded
+
+    @property
+    def risk_degraded(self) -> bool:
+        """GLOBAL_RISK_DEGRADED's public read -- see _enter_risk_degraded
+        and _reconcile_risk_state. Exposed for dashboards/health checks;
+        this process's own gates read self._risk_degraded directly."""
+        return self._risk_degraded
+
+    @property
     def signals_suppressed_premarket_liquidity(self) -> int:
         return self._signals_suppressed_premarket_liquidity
 
@@ -447,6 +561,16 @@ class QuantScanner:
         )
         await self._client.ping()
         logger.info("Connected to Redis at %s", self.config.redis_url)
+
+        # Risk-State Reconciliation (2026-08-16 quant audit, round 4,
+        # Requirements 3/8): runs BEFORE subscribe/the message loop below,
+        # on EVERY connect AND every reconnect after a dropped connection
+        # -- a PING succeeding is not sufficient to trust Redis for
+        # mandatory risk-state persistence (see _verify_redis_persistence),
+        # so GLOBAL_RISK_DEGRADED is set/cleared here based on a confirmed
+        # write-verify BEFORE any tick can be processed or signal
+        # published this connection.
+        await self._reconcile_risk_state()
 
         pubsub = self._client.pubsub()
         await pubsub.subscribe(
@@ -512,11 +636,23 @@ class QuantScanner:
         _checkpoint_all_buffers) -- bounds how much of the most recent
         buffered history a crash (as opposed to a graceful stop(), which
         gets one final checkpoint in _connect_and_listen's finally block)
-        could lose to at most buffer_checkpoint_interval_seconds."""
+        could lose to at most buffer_checkpoint_interval_seconds.
+
+        Also doubles as GLOBAL_RISK_DEGRADED's recovery-retry cadence
+        (round 4 quant audit, Requirement 3): while degraded, each tick
+        of this ALREADY-EXISTING periodic loop re-attempts
+        _reconcile_risk_state. Deliberately reuses this loop rather than
+        adding a new one -- the operating model is "no 24x7 daemon,"
+        and this loop already only runs for the life of one connected
+        session, exactly the scope recovery-retrying needs (a full
+        connection drop is instead handled by _connect_and_listen's own
+        reconciliation on reconnect, above)."""
         try:
             while True:
                 await asyncio.sleep(self.config.buffer_checkpoint_interval_seconds)
                 self._checkpoint_all_buffers()
+                if self._risk_degraded:
+                    await self._reconcile_risk_state()
         except asyncio.CancelledError:
             pass
 
@@ -993,6 +1129,29 @@ class QuantScanner:
             return
         await _incr_metric(self._client, "quant", "evaluated", len(signals))
 
+        # GLOBAL_RISK_DEGRADED (2026-08-16 quant audit, round 4): checked
+        # here, EARLY and per-ticker-uniformly, before any of the
+        # ticker-specific gates below -- a mandatory Redis persistence
+        # write failing for one ticker (see _enter_risk_degraded) means
+        # this process can't trust risk-state integrity for ANY ticker,
+        # so every candidate is suppressed here regardless of which
+        # ticker triggered the degradation. This is a fast, cheap
+        # early-exit; _publish_signal below has the AUTHORITATIVE final
+        # gate, which also covers candidates already sitting in
+        # _pending_candidates from before degradation began.
+        if self._risk_degraded:
+            self._signals_suppressed_risk_degraded += len(signals)
+            await _incr_metric(self._client, "quant", "dropped_risk_degraded", len(signals))
+            await self._record_rejection(
+                event.symbol, "GLOBAL_RISK_DEGRADED", len(signals), datetime.now(timezone.utc), signals,
+            )
+            logger.info(
+                "Suppressed %d candidate(s) for %s -- GLOBAL_RISK_DEGRADED "
+                "(mandatory Redis risk-state persistence unavailable)",
+                len(signals), event.symbol,
+            )
+            return
+
         blackout = get_entry_blackout(snapshot.bar_timestamp)
         if blackout == "opening":
             # Opening Range Blackout (09:30-09:45 ET): ALL candidates
@@ -1258,6 +1417,108 @@ class QuantScanner:
             "%s lock persistence failed for %s (%s); enforcing in-memory fallback lock until %s",
             lock_name, ticker, exc, expiry.isoformat(),
         )
+        self._enter_risk_degraded(f"{lock_name} persistence failed for {ticker}: {exc}")
+
+    def _enter_risk_degraded(self, reason: str) -> None:
+        """GLOBAL_RISK_DEGRADED (2026-08-16 quant audit, round 4): a
+        mandatory risk-state persistence WRITE (loss-lockout or cooldown,
+        via _arm_fallback_lock above) failed. The per-ticker in-memory
+        fallback lock _arm_fallback_lock also arms remains an ADDITIONAL
+        defense for the one ticker involved, but it must not be the ONLY
+        response: a write failure on ANY ticker's mandatory lock means
+        this process can no longer guarantee risk-state integrity FOR ANY
+        TICKER -- this is a risk-control failure, not a ticker-specific
+        market condition (e.g. AAPL's cooldown SET failing says nothing
+        about whether MSFT or NVDA are actually safe to trade; it says
+        Redis itself can't be trusted right now). ALL subsequent signal
+        publication is blocked process-wide (see the gates in
+        _handle_market_tick and _publish_signal) until
+        _reconcile_risk_state confirms Redis can persist writes again --
+        connectivity (PING) alone does not clear this, see
+        _verify_redis_persistence."""
+        was_degraded = self._risk_degraded
+        self._risk_degraded = True
+        if not was_degraded:
+            logger.critical(
+                "GLOBAL_RISK_DEGRADED entered (%s) -- blocking ALL signal publication "
+                "process-wide until Redis persistence is reconciled.", reason,
+            )
+
+    async def _verify_redis_persistence(self) -> bool:
+        """Round-4 quant audit, Requirement 8: PING succeeding is NOT
+        sufficient to trust Redis for mandatory risk-state persistence --
+        a reachable Redis can still fail to durably accept a write (mid
+        failover, a read-only replica, disk full, quota/eviction
+        rejecting the write, etc.), none of which PING alone would ever
+        surface. Writes a short-TTL canary key and reads the exact value
+        back; only a confirmed roundtrip counts as verified. Used both at
+        connect/reconnect time and periodically while GLOBAL_RISK_DEGRADED
+        (see _reconcile_risk_state)."""
+        if self._client is None:
+            return False
+        key = "talonx:quant:risk_state_healthcheck"
+        probe = str(datetime.now(timezone.utc).timestamp())
+        try:
+            await self._client.set(key, probe, ex=30)
+            readback = await self._client.get(key)
+            if isinstance(readback, bytes):
+                readback = readback.decode()
+            return readback == probe
+        except Exception as exc:  # noqa: BLE001 -- any failure here means "not verified healthy"
+            logger.warning("Redis persistence verification failed: %s", exc)
+            return False
+
+    async def _reconcile_risk_state(self) -> None:
+        """Risk-State Reconciliation (2026-08-16 quant audit, round 4,
+        Requirements 3/8/12): the single place GLOBAL_RISK_DEGRADED is
+        cleared. Run once at the START of every _connect_and_listen call
+        (BOTH a genuine process startup -- e.g. the Mon-Fri 08:00 UK
+        Task-Scheduler-driven launch -- AND every reconnect after a
+        dropped connection, which is exactly the boundary the existing
+        reconnect-backoff loop already provides, so no separate 24x7
+        monitoring process is needed for that case) and again on every
+        _checkpoint_loop tick WHILE already degraded (covers a live
+        connection that stays up but individual commands are failing).
+        Clears the flag ONLY on a confirmed write-verify
+        (_verify_redis_persistence) -- a bare successful PING is
+        deliberately not enough (Requirement 8).
+
+        Per-ticker cooldown/loss-lockout state itself needs NO separate
+        reconciliation step: _is_on_cooldown/_is_loss_locked_out already
+        read `EXISTS cooldown:{TICKER}`/`loss_lockout:{TICKER}` LIVE from
+        Redis on every candidate, never from process-local memory, so a
+        still-valid TTL'd lock from a PRIOR run (e.g. one still active
+        when Friday's process stopped) is honoured automatically the
+        moment this process starts checking again -- there is no
+        in-memory copy of that state to go stale or need reloading. An
+        expired lock is equally simple: Redis's own TTL has already
+        removed the key, so EXISTS just returns false, same as any other
+        key that was never set. GLOBAL_RISK_DEGRADED itself is NEVER
+        persisted to Redis (see _enter_risk_degraded) -- it is this
+        process's own in-memory safety state, and naturally disappears
+        (acceptably -- see this module's own docstring) when the process
+        stops; the NEXT run/reconnect re-derives it fresh, from scratch,
+        via this method."""
+        healthy = await self._verify_redis_persistence()
+        was_degraded = self._risk_degraded
+        self._risk_degraded = not healthy
+        if healthy and was_degraded:
+            logger.info(
+                "GLOBAL_RISK_DEGRADED cleared -- Redis write persistence confirmed, "
+                "resuming signal publication."
+            )
+        elif healthy:
+            logger.info("Risk-state reconciliation: Redis write persistence confirmed.")
+        elif was_degraded:
+            logger.critical(
+                "GLOBAL_RISK_DEGRADED: Redis write persistence still not confirmed -- "
+                "remaining degraded, no signal publication."
+            )
+        else:
+            logger.critical(
+                "GLOBAL_RISK_DEGRADED: Redis write persistence could not be confirmed at "
+                "connect -- blocking ALL signal publication until reconciled."
+            )
 
     async def _handle_risk_check_failure(self, ticker: str, check_name: str, exc: Exception) -> bool:
         """Fail-Closed Risk Management (2026-08-16 quant audit): a Redis
@@ -1354,13 +1615,25 @@ class QuantScanner:
             current_price is None or signal.atr is None
             or signal.pivot_resistance is None or signal.pivot_support is None
         ):
-            # Can't recompute geometry without a fresh price and the same
-            # ATR/pivot inputs the original geometry used -- publish
-            # as-generated (with signal_age_ms filled in) rather than
-            # dropping a candidate purely because fresher data isn't
-            # available; strategy.py's own gate already confirmed a
-            # valid, internally-consistent geometry at generation time.
-            return signal.model_copy(update={"signal_age_ms": signal_age_ms})
+            # Final Revalidation Data Availability (2026-08-16 quant
+            # audit, round 4, Requirement 10): a PRIOR version of this
+            # method published the candidate as-generated here (its
+            # original, now-UNVERIFIED geometry) on the reasoning that
+            # strategy.py's own gate had already confirmed a valid
+            # geometry at generation time. That is no longer good enough
+            # -- final publication must be based on a VERIFIED CURRENT
+            # trade geometry, not an assumed-still-good stale one. If
+            # fresh price/ATR/pivot data can't be obtained at this final
+            # revalidation step, the candidate is rejected outright
+            # rather than published on faith.
+            logger.info(
+                "Dropping %s %s -- fresh market data unavailable for final revalidation",
+                signal.ticker, signal.signal_type.value,
+            )
+            await self._record_rejection(
+                signal.ticker, "FINAL_REVALIDATION_DATA_UNAVAILABLE", 1, now, [signal],
+            )
+            return None
 
         geometry = calculate_trade_geometry(
             current_price, signal.atr, signal.direction,
@@ -1475,6 +1748,23 @@ class QuantScanner:
                 logger.debug("Failed to publish rejection trace for %s (%s): %s", ticker, reason, exc)
 
     async def _publish_signal(self, signal: QuantSignal) -> None:
+        # GLOBAL_RISK_DEGRADED (2026-08-16 quant audit, round 4): the
+        # AUTHORITATIVE final gate -- every path to an actual Redis
+        # publish funnels through this one method, for every ticker, so
+        # this single check is what makes the degraded state truly
+        # process-wide rather than per-ticker. Also covers a candidate
+        # that was already sitting in _pending_candidates (queued for up
+        # to throttle_window_seconds) BEFORE degradation began -- the
+        # early per-tick gate in _handle_market_tick only catches
+        # candidates evaluated AFTER degradation starts.
+        if self._risk_degraded:
+            logger.warning(
+                "Dropping %s %s at publish time -- GLOBAL_RISK_DEGRADED", signal.ticker, signal.signal_type.value,
+            )
+            await self._record_rejection(
+                signal.ticker, "GLOBAL_RISK_DEGRADED", 1, datetime.now(timezone.utc), [signal],
+            )
+            return
         try:
             await self._client.publish(self.config.signals_channel, signal.to_redis_payload())
             self._signals_published += 1

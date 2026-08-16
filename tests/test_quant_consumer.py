@@ -68,6 +68,14 @@ def _signal(
     # so cooldown/throttle-focused tests aren't accidentally tripped by
     # the newer confluence/RR filters -- tests that specifically exercise
     # those filters override these two params.
+    #
+    # atr/pivot_resistance/pivot_support default to a valid, internally-
+    # consistent geometry (same values _revalidatable_signal below uses)
+    # so a candidate built here can actually clear Final Revalidation
+    # Data Availability (2026-08-16 quant audit, round 4) in a
+    # _flush_throttle_window-level test -- that still additionally
+    # requires the ticker have a buffered close price (see _seed_close)
+    # for _revalidate_candidate's `current_price` to resolve.
     return QuantSignal(
         ticker=ticker,
         signal_type=signal_type,
@@ -77,6 +85,9 @@ def _signal(
         volume_surge_ratio=volume_surge_ratio,
         confluence_score=confluence_score,
         risk_reward_ratio=risk_reward_ratio,
+        atr=2.0,
+        pivot_resistance=110.0,
+        pivot_support=90.0,
         bar_timestamp=datetime(2026, 8, 7, 15, 0, tzinfo=timezone.utc),
     )
 
@@ -388,6 +399,7 @@ async def test_flush_throttle_window_arms_cooldown_only_for_published_signals(sc
     scanner.config = replace(scanner.config, throttle_max_signals=1)
     published = _signal("PUBLISHED", 5.0, confluence_score=3, risk_reward_ratio=2.0)
     dropped_by_throttle = _signal("DROPPED", 0.1, confluence_score=0, risk_reward_ratio=1.5)
+    _seed_close(scanner, "PUBLISHED", 100.0)  # so revalidation can confirm fresh geometry
     scanner._pending_candidates = [published, dropped_by_throttle]
 
     await scanner._flush_throttle_window()
@@ -441,6 +453,245 @@ async def test_start_cooldown_clears_in_memory_fallback_on_successful_set(scanne
     await scanner._start_cooldown("AAPL")
 
     assert "AAPL" not in scanner._cooldown_fallback
+
+
+# --- GLOBAL_RISK_DEGRADED (2026-08-16 quant audit, round 4) ---------------
+# Process-wide (not per-ticker) fail-closed state: a mandatory Redis
+# persistence WRITE failure (loss-lockout or cooldown) must block ALL
+# subsequent signal publication for EVERY ticker, cleared only once
+# _reconcile_risk_state confirms Redis can actually PERSIST a write again
+# (not merely respond to PING).
+
+def _fake_redis_kv(client) -> dict:
+    """Wires client.set/client.get to a real in-memory dict so
+    _verify_redis_persistence's write-then-readback roundtrip actually
+    round-trips, instead of AsyncMock's default (a MagicMock that isn't
+    the written value)."""
+    store: dict[str, str] = {}
+
+    async def fake_set(key, value, ex=None, nx=None):
+        store[key] = value
+        return True
+
+    async def fake_get(key):
+        return store.get(key)
+
+    client.set = AsyncMock(side_effect=fake_set)
+    client.get = AsyncMock(side_effect=fake_get)
+    return store
+
+
+@pytest.mark.asyncio
+async def test_loss_lockout_set_failure_enters_global_risk_degraded(scanner):
+    scanner._client.set.side_effect = ConnectionError("redis down")
+
+    await scanner._start_loss_lockout("AAPL")
+
+    assert scanner.risk_degraded is True
+
+
+@pytest.mark.asyncio
+async def test_cooldown_set_failure_enters_global_risk_degraded(scanner):
+    scanner._client.set.side_effect = ConnectionError("redis down")
+
+    await scanner._start_cooldown("AAPL")
+
+    assert scanner.risk_degraded is True
+
+
+@pytest.mark.asyncio
+async def test_loss_lockout_failure_blocks_publication_for_every_ticker_not_just_the_affected_one(scanner):
+    """Requirement 2/15: a Redis loss-lock SET failure for ONE ticker
+    (AAPL) must block publication for every OTHER ticker too (MSFT,
+    NVDA) -- this is a risk-CONTROL failure, not a ticker-specific
+    market condition."""
+    scanner._client.set.side_effect = ConnectionError("redis down")
+    await scanner._start_loss_lockout("AAPL")
+    assert scanner.risk_degraded is True
+
+    for ticker in ("AAPL", "MSFT", "NVDA"):
+        await scanner._publish_signal(_signal(ticker, 3.0))
+
+    assert _signal_publishes(scanner) == []
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    degraded_rejections = [r for r in rejections if r["reason"] == "GLOBAL_RISK_DEGRADED"]
+    assert {r["ticker"] for r in degraded_rejections} == {"AAPL", "MSFT", "NVDA"}
+
+
+@pytest.mark.asyncio
+async def test_cooldown_set_failure_after_publish_degrades_and_blocks_subsequent_publication(scanner):
+    """Requirement 6/15: the first signal's publish itself already
+    succeeded (can't be undone) -- but once its cooldown persistence
+    fails, every SUBSEQUENT publish attempt (any ticker) must be
+    blocked, not merely warned about."""
+    first = _signal("AAPL", 3.0)
+    scanner._client.set.side_effect = ConnectionError("redis down")  # cooldown SET will fail
+
+    await scanner._publish_signal(first)
+
+    assert len(_signal_publishes(scanner)) == 1  # already-published signal can't be undone
+    assert scanner.risk_degraded is True
+
+    second = _signal("MSFT", 3.0)
+    await scanner._publish_signal(second)
+
+    assert len(_signal_publishes(scanner)) == 1  # second publish blocked
+
+
+@pytest.mark.asyncio
+async def test_handle_market_tick_suppresses_every_ticker_when_risk_degraded(scanner, monkeypatch):
+    scanner._risk_degraded = True
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)],
+    )
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert _signal_publishes(scanner) == []
+    assert scanner.signals_suppressed_risk_degraded == 1
+    assert scanner._pending_candidates == []
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert any(r["reason"] == "GLOBAL_RISK_DEGRADED" for r in rejections)
+
+
+@pytest.mark.asyncio
+async def test_verify_redis_persistence_true_on_successful_roundtrip(scanner):
+    _fake_redis_kv(scanner._client)
+
+    assert await scanner._verify_redis_persistence() is True
+
+
+@pytest.mark.asyncio
+async def test_verify_redis_persistence_false_on_set_failure(scanner):
+    scanner._client.set.side_effect = ConnectionError("redis down")
+
+    assert await scanner._verify_redis_persistence() is False
+
+
+@pytest.mark.asyncio
+async def test_verify_redis_persistence_false_when_readback_does_not_match(scanner):
+    """Requirement 8: connectivity alone (e.g. a read-only replica that
+    still answers GET/PING but silently drops writes) must not count as
+    verified -- only a confirmed write-then-readback roundtrip does."""
+    scanner._client.set = AsyncMock(return_value=True)
+    scanner._client.get = AsyncMock(return_value=None)  # write didn't actually stick
+
+    assert await scanner._verify_redis_persistence() is False
+
+
+@pytest.mark.asyncio
+async def test_reconcile_risk_state_clears_degraded_on_successful_verify(scanner):
+    scanner._risk_degraded = True
+    _fake_redis_kv(scanner._client)
+
+    await scanner._reconcile_risk_state()
+
+    assert scanner.risk_degraded is False
+
+
+@pytest.mark.asyncio
+async def test_reconcile_risk_state_remains_degraded_when_mandatory_set_still_fails(scanner):
+    """Requirement 15's 'recovery failure' scenario: Redis PING succeeds
+    (this test never touches .ping at all -- _reconcile_risk_state
+    doesn't call it, deliberately, see Requirement 8) but the mandatory
+    SET still fails -- must remain degraded, not clear."""
+    scanner._risk_degraded = True
+    scanner._client.set.side_effect = ConnectionError("redis down")
+
+    await scanner._reconcile_risk_state()
+
+    assert scanner.risk_degraded is True
+
+
+@pytest.mark.asyncio
+async def test_reconcile_risk_state_enters_degraded_when_verify_fails_from_healthy(scanner):
+    scanner._risk_degraded = False
+    scanner._client.set.side_effect = ConnectionError("redis down")
+
+    await scanner._reconcile_risk_state()
+
+    assert scanner.risk_degraded is True
+
+
+@pytest.mark.asyncio
+async def test_full_recovery_cycle_clears_degraded_and_resumes_publication(scanner):
+    """Requirement 15's 'recovery' scenario end to end: Redis fails ->
+    degraded -> Redis recovers -> required risk state successfully
+    persisted -> degraded cleared -> publication resumes."""
+    scanner._client.set.side_effect = ConnectionError("redis down")
+    await scanner._start_cooldown("AAPL")
+    assert scanner.risk_degraded is True
+
+    _fake_redis_kv(scanner._client)  # Redis recovers -- writes actually persist now
+    await scanner._reconcile_risk_state()
+    assert scanner.risk_degraded is False
+
+    await scanner._publish_signal(_signal("MSFT", 3.0))
+    assert len(_signal_publishes(scanner)) == 1
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_loop_retries_reconciliation_only_while_degraded(scanner):
+    """Requirement 3: recovery retrying piggybacks on the ALREADY-
+    EXISTING buffer-checkpoint loop rather than a new 24x7 daemon --
+    this confirms _reconcile_risk_state is (and isn't) invoked from
+    there at the right times, without actually running the loop's
+    sleep."""
+    scanner._reconcile_risk_state = AsyncMock()
+    scanner.store = None  # _checkpoint_all_buffers is a no-op without a store
+
+    scanner._risk_degraded = False
+    scanner._checkpoint_all_buffers()
+    if scanner._risk_degraded:
+        await scanner._reconcile_risk_state()
+    scanner._reconcile_risk_state.assert_not_awaited()
+
+    scanner._risk_degraded = True
+    scanner._checkpoint_all_buffers()
+    if scanner._risk_degraded:
+        await scanner._reconcile_risk_state()
+    scanner._reconcile_risk_state.assert_awaited_once()
+
+
+# --- Restart semantics (2026-08-16 quant audit, round 4, Requirement 4/13) -
+# TalonX is a host process (scripts/start_talonx.ps1, Task Scheduler),
+# stopped and restarted daily -- these confirm a BRAND-NEW QuantScanner
+# (no in-memory history at all, simulating a Monday-morning restart)
+# still honours whatever Redis itself currently says about a per-ticker
+# lock's TTL, since these checks always read Redis live, never a
+# process-local cache.
+
+@pytest.mark.asyncio
+async def test_valid_ttl_lock_is_honoured_by_a_freshly_constructed_scanner():
+    scanner = QuantScanner(QuantConfig())
+    scanner._client = AsyncMock()
+    scanner._client.exists.side_effect = _exists_side_effect(locked_out=True)
+
+    assert await scanner._is_loss_locked_out("AAPL") is True
+
+
+@pytest.mark.asyncio
+async def test_expired_ttl_lock_is_not_resurrected_by_a_freshly_constructed_scanner():
+    scanner = QuantScanner(QuantConfig())
+    scanner._client = AsyncMock()
+    scanner._client.exists.side_effect = _exists_side_effect(locked_out=False)
+
+    assert await scanner._is_loss_locked_out("AAPL") is False
+
+
+@pytest.mark.asyncio
+async def test_freshly_constructed_scanner_starts_reconciled_not_degraded():
+    """A brand-new process has no reason to assume Redis is broken --
+    GLOBAL_RISK_DEGRADED defaults False; production correctness comes
+    from _connect_and_listen's _reconcile_risk_state call running BEFORE
+    the message loop starts (see that method's own docstring), not from
+    this default."""
+    scanner = QuantScanner(QuantConfig())
+
+    assert scanner.risk_degraded is False
 
 
 # --- Confluence / risk-reward filters (run before the cooldown lock) ------
@@ -516,6 +767,8 @@ async def test_flush_throttle_window_releases_top_n_by_volume_surge_ratio(scanne
     mid = _signal("MID", 2.5)
     high = _signal("HIGH", 5.0)
     no_ratio = _signal("NORATIO", None)
+    for ticker in ("LOW", "MID", "HIGH"):  # NORATIO is dropped by the throttle, never reaches revalidation
+        _seed_close(scanner, ticker, 100.0)
     scanner._pending_candidates = [low, mid, no_ratio, high]  # 4 candidates, cap is 3; all tied on confluence
 
     await scanner._flush_throttle_window()
@@ -537,6 +790,7 @@ async def test_flush_throttle_window_ranks_confluence_before_volume_surge(scanne
     scanner.config = QuantConfig(throttle_max_signals=1)
     low_confluence_high_volume = _signal("LOWCONF", 10.0, confluence_score=1)
     high_confluence_low_volume = _signal("HIGHCONF", 0.5, confluence_score=3)
+    _seed_close(scanner, "HIGHCONF", 100.0)  # the only one that should survive to revalidation
     scanner._pending_candidates = [low_confluence_high_volume, high_confluence_low_volume]
 
     await scanner._flush_throttle_window()
@@ -550,11 +804,13 @@ async def test_flush_throttle_window_ranks_confluence_before_volume_surge(scanne
 @pytest.mark.asyncio
 async def test_flush_throttle_window_publishes_all_when_under_the_cap(scanner):
     scanner.config = QuantConfig(throttle_max_signals=3)
+    _seed_close(scanner, "A", 100.0)
+    _seed_close(scanner, "B", 100.0)
     scanner._pending_candidates = [_signal("A", 1.0), _signal("B", 2.0)]
 
     await scanner._flush_throttle_window()
 
-    assert scanner._client.publish.await_count == 2
+    assert len(_signal_publishes(scanner)) == 2
     assert scanner.signals_suppressed_throttle == 0
 
 
@@ -582,6 +838,7 @@ async def test_flush_throttle_window_prefers_quality_over_a_raw_volume_pump(scan
     quality_setup = _signal(
         "QUALITY", volume_surge_ratio=3.0, confluence_score=3, risk_reward_ratio=4.5,
     )
+    _seed_close(scanner, "QUALITY", 100.0)  # the one expected to win the throttle
     scanner._pending_candidates = [meme_pump, quality_setup]
 
     await scanner._flush_throttle_window()
@@ -769,28 +1026,53 @@ async def test_revalidate_candidate_bearish_uses_pivot_support(scanner):
 
 
 @pytest.mark.asyncio
-async def test_revalidate_candidate_publishes_as_generated_when_no_fresh_price_available(scanner):
+async def test_revalidate_candidate_rejects_when_no_fresh_price_available(scanner):
+    """Final Revalidation Data Availability (2026-08-16 quant audit,
+    round 4, Requirement 10): a prior version of this method published
+    the candidate as-generated (its original, now-unverified geometry)
+    when no fresh buffered price was available. That's no longer
+    acceptable -- final publication must be based on a VERIFIED current
+    trade geometry, so the candidate is rejected instead."""
     now = datetime.now(timezone.utc)
     signal = _revalidatable_signal()  # no bar ever seeded for this ticker
 
     result = await scanner._revalidate_candidate(signal, now)
 
-    assert result is not None
-    assert result.price == pytest.approx(100.0)  # unchanged, original price
-    assert result.risk_reward_ratio == pytest.approx(2.0)  # unchanged
-    assert result.signal_age_ms is not None
+    assert result is None
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert len(rejections) == 1
+    assert rejections[0]["reason"] == "FINAL_REVALIDATION_DATA_UNAVAILABLE"
 
 
 @pytest.mark.asyncio
-async def test_revalidate_candidate_publishes_as_generated_when_pivots_missing(scanner):
+async def test_revalidate_candidate_rejects_when_atr_missing(scanner):
     now = datetime.now(timezone.utc)
-    signal = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=2.0)  # no atr/pivots set
+    signal = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=2.0)
+    signal.atr = None  # pydantic model, plain attribute assignment
     _seed_close(scanner, "AAPL", 105.0)
 
     result = await scanner._revalidate_candidate(signal, now)
 
-    assert result is not None
-    assert result.price == pytest.approx(100.0)  # original, not re-fetched close
+    assert result is None
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert len(rejections) == 1
+    assert rejections[0]["reason"] == "FINAL_REVALIDATION_DATA_UNAVAILABLE"
+
+
+@pytest.mark.asyncio
+async def test_revalidate_candidate_rejects_when_pivots_missing(scanner):
+    now = datetime.now(timezone.utc)
+    signal = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=2.0)
+    signal.pivot_resistance = None
+    signal.pivot_support = None
+    _seed_close(scanner, "AAPL", 105.0)
+
+    result = await scanner._revalidate_candidate(signal, now)
+
+    assert result is None
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert len(rejections) == 1
+    assert rejections[0]["reason"] == "FINAL_REVALIDATION_DATA_UNAVAILABLE"
 
 
 @pytest.mark.asyncio
@@ -985,6 +1267,7 @@ async def test_throttle_suppression_is_recorded_per_ticker(tmp_path):
     with QuantStateStore(tmp_path / "quant.db") as store:
         scanner = QuantScanner(QuantConfig(throttle_max_signals=1), store=store)
         scanner._client = AsyncMock()
+        _seed_close(scanner, "HIGH", 100.0)  # the one expected to win and publish
         # Two candidates for the SAME dropped ticker in one flush -- the
         # per-ticker count should be 2, not two separate rows.
         scanner._pending_candidates = [

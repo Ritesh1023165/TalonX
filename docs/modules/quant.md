@@ -32,6 +32,10 @@ talonx:market:stream (Redis)
           and a structural risk_reward_ratio (distance to the prior session's
           nearest pivot level / atr_stop_multiplier x ATR -- the SAME
           multiplier the executed stop_price uses)
+    → GLOBAL_RISK_DEGRADED check: if a mandatory Redis risk-state write
+      (loss-lockout/cooldown) has failed ANYWHERE in this process and
+      hasn't yet been reconciled, EVERY ticker's candidates are dropped
+      right here, process-wide -- see round 4's GLOBAL_RISK_DEGRADED below
     → candidate signal(s) for a ticker are DROPPED if that ticker is
       currently in POST-LOSS LOCKOUT (75 min default, armed when
       talonx_paper reports a losing SELL for it) or within its standard
@@ -49,15 +53,18 @@ talonx:market:stream (Redis)
       are each RE-VALIDATED against the LATEST buffered price -- price,
       stop, target, AND ratio are re-derived TOGETHER via the same
       calculate_trade_geometry signal generation itself uses (dropped if
-      aged past 30s, or if the recalculated R:R has fallen below
-      min_risk_reward_ratio -- see round 3's Canonical Trade Geometry
-      below) -- and, if still valid, published to Redis
-      (talonx:signals:quant) AND the ticker's cooldown is armed now, for
-      the first time (a Redis SET failure while arming EITHER the
-      cooldown or a post-loss lockout falls back to an in-memory lock
-      for the same duration rather than silently not taking effect --
-      see round 3's Fail-Closed Lock Persistence below); the rest are
-      dropped
+      aged past 30s, if fresh price/ATR/pivot data isn't available at all
+      -- FINAL_REVALIDATION_DATA_UNAVAILABLE, round 4 -- or if the
+      recalculated R:R has fallen below min_risk_reward_ratio -- see
+      round 3's Canonical Trade Geometry below) -- and, if still valid,
+      re-checked ONE LAST TIME against GLOBAL_RISK_DEGRADED (round 4)
+      before actually publishing to Redis (talonx:signals:quant) AND the
+      ticker's cooldown is armed now, for the first time (a Redis SET
+      failure while arming EITHER the cooldown or a post-loss lockout
+      falls back to an in-memory lock for the same duration AND flips
+      GLOBAL_RISK_DEGRADED process-wide, rather than silently not taking
+      effect -- see round 3's Fail-Closed Lock Persistence and round 4's
+      GLOBAL_RISK_DEGRADED below); the rest are dropped
     → EVERY dropped candidate, at EVERY gate above, also publishes a
       RejectedCandidateEvent to talonx:quant:rejected -- talonx_dispatch
       persists one row per candidate to its rejected_candidates table (see
@@ -352,6 +359,90 @@ correctness gaps:
   `trend_gate_enabled` gate and `htf_sma_200` still `None` is now
   rejected as `HTF_DATA_UNAVAILABLE` (its own gate/reason, distinct from
   `TREND_GATE`'s "evaluated and failed") instead.
+
+## 2026-08-16 quant audit (round 4): global degraded state, final-revalidation data availability, and deployment-model correctness
+
+A third follow-up audit, this time explicit about the deployment model
+this process actually runs under: **not a 24x7 service**. `talonx_quant`
+(via `run_talonx.py`) is a host process, NOT Dockerised — only Redis is
+(`docker-compose.yaml`'s `talonx-redis`, already running with AOF
+persistence (`--appendonly yes`) and a named volume (`talonx-redis-data:
+/data`), so no persistence changes were needed there. TalonX itself is
+started/stopped by `scripts/start_talonx.ps1`/`stop_talonx.ps1`, normally
+on a daily Windows Scheduled Task (`scripts/register_scheduled_tasks.ps1`)
+covering Mon-Fri ~08:00-22:00 UK local time — Task Scheduler's own daily
+trigger already handles the GMT/BST transition, so no new timezone logic
+was needed either. Both this process and Redis are expected to be
+stopped outside that window. Three fixes, all scoped to that model (see
+`consumer.py`'s own module docstring, "Round-4 quant audit" section, for
+the full technical writeup):
+
+- **GLOBAL_RISK_DEGRADED** (`consumer.py`'s `_enter_risk_degraded`/
+  `_reconcile_risk_state`/`_verify_redis_persistence`) — round 3's
+  per-ticker in-memory fallback lock (`_arm_fallback_lock`) was a real
+  improvement over silently logging a warning, but it's still scoped to
+  the ONE ticker whose write failed: a Redis SET failing for AAPL's
+  cooldown says nothing about whether MSFT or NVDA are safe to trade, it
+  says Redis itself can't currently be trusted. Every mandatory-write
+  failure now ALSO flips a single process-wide `self._risk_degraded`
+  flag, checked early (`_handle_market_tick`, per-ticker, cheap) and
+  authoritatively (`_publish_signal`, the one funnel every actual
+  publish goes through for every ticker — also catches a candidate
+  already sitting in the throttle queue from before degradation began).
+  Cleared ONLY by a CONFIRMED Redis write-verify
+  (`_verify_redis_persistence` — a write-then-readback roundtrip; PING
+  succeeding is deliberately NOT sufficient), run at the start of every
+  `_connect_and_listen` call (both a genuine process startup and every
+  reconnect after a dropped connection) and, while already degraded, on
+  every `_checkpoint_loop` tick (piggybacking on that ALREADY-EXISTING
+  periodic loop rather than adding a new one — deliberately not a 24x7
+  recovery daemon; both retry paths only run for the life of one
+  connected session). `GLOBAL_RISK_DEGRADED` itself is NEVER written to
+  Redis — it's this process's own in-memory safety state; it disappears
+  on the normal ~22:00 shutdown (acceptable, per this module's own
+  docstring) and is re-derived from scratch on the next run/reconnect.
+- **Per-ticker locks need no restart-time reconciliation of their own**
+  — this was already correct before round 4 and didn't need new code:
+  `_is_on_cooldown`/`_is_loss_locked_out` always read
+  `EXISTS cooldown:{TICKER}`/`loss_lockout:{TICKER}` LIVE from Redis,
+  never from a process-local cache, so a Friday-still-valid TTL'd lock
+  is honoured automatically the instant a fresh Monday process starts
+  checking again, and an expired one is equally simple (Redis's own TTL
+  already removed the key). Existing TTL/cooldown/lockout DURATIONS are
+  completely unchanged.
+- **Final Revalidation Data Availability** (`consumer.py`'s
+  `_revalidate_candidate`) — previously, when fresh price/ATR/pivot data
+  wasn't available at throttle-flush time, the candidate published
+  AS-GENERATED (its original, by-then-unverified geometry). It's now
+  rejected instead, as `FINAL_REVALIDATION_DATA_UNAVAILABLE` — final
+  publication must be based on a VERIFIED current trade geometry, never
+  an assumed-still-good stale one.
+
+**Explicitly NOT changed:** any of the frozen strategy parameters (RSI
+30/70, volume 2x/premarket 3x, ATR move 1x, ATR stop 1.5x, min R:R 1.5,
+cooldown 20min, throttle 15s, max candidate age 30s, min confluence 2/3,
+opportunity-score weights 35/30/20/15) — this was a correctness/
+reliability patch only. Also explicitly not built: a 24x7 Redis/TalonX
+monitoring daemon, a new scheduler, or Dockerising TalonX — none of those
+match the actual deployment model above.
+
+A theoretical check-then-act race between `_is_on_cooldown`'s read and
+`_start_cooldown`'s write for the SAME ticker was reviewed (the batch
+throttle's flush runs as a separate task from the main message loop) and
+found to be structurally prevented rather than needing a distributed
+lock: Closed-Bar Evaluation already caps a ticker to at most one
+candidate batch per closed 1-minute bar, so the earliest a second batch
+for the same ticker could even be queued is the NEXT bar close, ≥60s
+later — far longer than the few-millisecond revalidate→publish→arm-
+cooldown sequence for the first batch. Redis Pub/Sub itself provides no
+delivery guarantee (not even at-least-once) for the published
+`QuantSignal` — a disconnected subscriber simply never receives it. This
+is a stated, accepted limitation of Pub/Sub as a transport, not a gap
+closed by this module; downstream consumers of `talonx:signals:quant`
+already treat delivery as best-effort, same as every other Pub/Sub
+channel in this project. Bar-Level Ingestion Idempotency (round 2) is
+this module's actual exactly-once guarantee, and it's scoped to INPUT
+tick processing, not to the outbound publish.
 
 ## 2026-08-14 session review: entry blackouts and the volatility gate
 
