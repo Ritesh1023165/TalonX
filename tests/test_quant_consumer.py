@@ -30,7 +30,7 @@ import pytest
 
 from talonx_quant import consumer as consumer_module
 from talonx_quant.config import QuantConfig
-from talonx_quant.consumer import QuantScanner
+from talonx_quant.consumer import QuantScanner, _opportunity_score
 from talonx_quant.schemas import (
     MarketTickEvent,
     QuantSignal,
@@ -109,6 +109,27 @@ def _bar_message(symbol: str = "AAPL") -> dict:
     return {"channel": b"talonx:market:stream", "data": json.dumps(payload)}
 
 
+def _priming_bar_payload(symbol: str = "AAPL") -> dict:
+    """Closed-Bar Evaluation (2026-08-16 quant audit): _handle_market_tick
+    now only evaluates indicators/signals on a bar's FIRST tick after it
+    closes -- the previous minute's bucket, i.e. a SECOND tick in a NEW
+    bucket for the same symbol. This is the priming (first) tick, one
+    minute before _bar_message's fixed timestamp, so a subsequent
+    _bar_message delivery is recognized as closing the bucket THIS tick
+    opens. compute_indicators/evaluate_signals are never reached by this
+    priming call alone (bar_just_closed is False on a symbol's very
+    first tick), so it's safe to send even when those are monkeypatched
+    for the real, following call."""
+    return {
+        "event_type": "bar", "symbol": symbol, "source": "polling",
+        "timestamp": "2026-08-07T14:59:00Z", "close": 100.0, "volume": 500.0,
+    }
+
+
+def _priming_bar_message(symbol: str = "AAPL") -> dict:
+    return {"channel": b"talonx:market:stream", "data": json.dumps(_priming_bar_payload(symbol))}
+
+
 def _paper_trade_message(
     ticker: str = "AAPL", order_type: str = "SELL", realized_pnl_usd: float | None = -5.0
 ) -> dict:
@@ -143,6 +164,11 @@ def scanner() -> QuantScanner:
     s._client = AsyncMock()
     s._client.exists.side_effect = _exists_side_effect()
     return s
+
+
+@pytest.fixture
+def config() -> QuantConfig:
+    return QuantConfig()
 
 
 # --- Channel routing ----------------------------------------------------
@@ -215,6 +241,7 @@ async def test_handle_market_tick_suppresses_signals_when_locked_out(scanner, mo
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)])
     scanner._client.exists.side_effect = _exists_side_effect(locked_out=True)
 
+    await scanner._handle_market_tick(_priming_bar_payload("AAPL"))
     await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
 
     assert _signal_publishes(scanner) == []
@@ -238,6 +265,7 @@ async def test_handle_message_suppresses_signals_when_ticker_on_cooldown(scanner
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)])
     scanner._client.exists.side_effect = _exists_side_effect(on_cooldown=True)
 
+    await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
     assert _signal_publishes(scanner) == []
@@ -251,6 +279,7 @@ async def test_handle_message_starts_cooldown_and_buffers_candidate_when_not_on_
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)])
 
+    await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
     scanner._client.set.assert_awaited_once()
@@ -277,6 +306,7 @@ async def test_handle_message_suppresses_low_confluence_signal(scanner, monkeypa
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [low_confluence])
 
+    await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
     scanner._client.set.assert_not_awaited()  # cooldown never armed for a filtered-out candidate
@@ -291,6 +321,7 @@ async def test_handle_message_suppresses_low_risk_reward_signal(scanner, monkeyp
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [low_rr])
 
+    await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
     scanner._client.set.assert_not_awaited()
@@ -305,6 +336,7 @@ async def test_handle_message_suppresses_signal_missing_risk_reward_ratio(scanne
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [no_rr])
 
+    await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
     assert scanner.signals_suppressed_low_risk_reward == 1
@@ -318,6 +350,7 @@ async def test_handle_message_only_survivors_proceed_when_signals_are_mixed(scan
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [survivor, filtered_by_rr])
 
+    await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
     # At least one signal survived, so the ticker's cooldown IS started
@@ -387,6 +420,103 @@ async def test_flush_throttle_window_is_a_noop_when_nothing_pending(scanner):
     assert scanner.signals_published == 0
 
 
+@pytest.mark.asyncio
+async def test_flush_throttle_window_prefers_quality_over_a_raw_volume_pump(scanner):
+    """2026-08-16 quant-audit regression: the exact scenario the
+    Composite Opportunity Score was added to fix -- a "meme pump" with a
+    huge raw volume surge but mediocre confluence/R:R must NOT
+    automatically outrank a higher-conviction, better-risk-reward setup
+    on a smaller relative surge, the way the old (confluence_score,
+    volume_surge_ratio) tuple-sort's raw-ratio tiebreaker would have
+    let it."""
+    scanner.config = QuantConfig(throttle_max_signals=1)
+    meme_pump = _signal(
+        "MEME", volume_surge_ratio=25.0, confluence_score=2, risk_reward_ratio=1.6,
+    )
+    quality_setup = _signal(
+        "QUALITY", volume_surge_ratio=3.0, confluence_score=3, risk_reward_ratio=4.5,
+    )
+    scanner._pending_candidates = [meme_pump, quality_setup]
+
+    await scanner._flush_throttle_window()
+
+    published_payloads = _signal_publishes(scanner)
+    assert "QUALITY" in "".join(published_payloads)
+    assert "MEME" not in "".join(published_payloads)
+
+
+# --- Composite Opportunity Score (pure function) --------------------------
+
+def test_opportunity_score_normalizes_confluence_to_zero_to_one(config):
+    zero_signal = _signal("A", None, confluence_score=0, risk_reward_ratio=None)
+    zero_signal.trend_aligned = False  # isolate confluence's own contribution
+    max_signal = _signal("A", None, confluence_score=3, risk_reward_ratio=None)
+    max_signal.trend_aligned = False
+
+    zero = _opportunity_score(zero_signal, config)
+    max_confluence = _opportunity_score(max_signal, config)
+
+    assert max_confluence > zero
+    assert max_confluence == pytest.approx(config.opportunity_score_confluence_weight)
+
+
+def test_opportunity_score_caps_risk_reward_at_the_configured_ceiling(config):
+    at_cap = _signal("A", None, confluence_score=0, risk_reward_ratio=config.opportunity_score_rr_cap)
+    way_above_cap = _signal("A", None, confluence_score=0, risk_reward_ratio=config.opportunity_score_rr_cap * 10)
+
+    assert _opportunity_score(at_cap, config) == pytest.approx(_opportunity_score(way_above_cap, config))
+
+
+def test_opportunity_score_caps_volume_surge_at_the_configured_ceiling(config):
+    at_cap = _signal("A", volume_surge_ratio=config.opportunity_score_volume_cap, confluence_score=0, risk_reward_ratio=None)
+    way_above_cap = _signal(
+        "A", volume_surge_ratio=config.opportunity_score_volume_cap * 10, confluence_score=0, risk_reward_ratio=None,
+    )
+
+    assert _opportunity_score(at_cap, config) == pytest.approx(_opportunity_score(way_above_cap, config))
+
+
+def test_opportunity_score_trend_aligned_true_scores_higher_than_none(config):
+    signal_true = _signal("A", None, confluence_score=0, risk_reward_ratio=None)
+    signal_true.trend_aligned = True
+    signal_none = _signal("A", None, confluence_score=0, risk_reward_ratio=None)
+    signal_none.trend_aligned = None
+
+    assert _opportunity_score(signal_true, config) > _opportunity_score(signal_none, config)
+
+
+def test_opportunity_score_trend_aligned_none_scores_higher_than_false(config):
+    # Defensive-only path -- a False candidate should never actually
+    # reach the throttle window (the trend gate drops it upstream), but
+    # the scoring itself must still rank it correctly if it somehow did.
+    signal_none = _signal("A", None, confluence_score=0, risk_reward_ratio=None)
+    signal_none.trend_aligned = None
+    signal_false = _signal("A", None, confluence_score=0, risk_reward_ratio=None)
+    signal_false.trend_aligned = False
+
+    assert _opportunity_score(signal_none, config) > _opportunity_score(signal_false, config)
+
+
+def test_opportunity_score_is_zero_for_a_maximally_uninteresting_candidate(config):
+    signal = _signal("A", None, confluence_score=0, risk_reward_ratio=None)
+    signal.trend_aligned = False
+
+    assert _opportunity_score(signal, config) == pytest.approx(0.0)
+
+
+def test_opportunity_score_is_the_sum_of_configured_weights_at_full_marks(config):
+    signal = _signal("A", volume_surge_ratio=config.opportunity_score_volume_cap, confluence_score=3, risk_reward_ratio=config.opportunity_score_rr_cap)
+    signal.trend_aligned = True
+
+    expected = (
+        config.opportunity_score_confluence_weight
+        + config.opportunity_score_rr_weight
+        + config.opportunity_score_volume_weight
+        + config.opportunity_score_trend_weight
+    )
+    assert _opportunity_score(signal, config) == pytest.approx(expected)
+
+
 # --- Suppression-count persistence (the EOD report's signal-funnel section) -
 
 @pytest.mark.asyncio
@@ -398,6 +528,7 @@ async def test_cooldown_suppression_is_recorded_when_a_store_is_set(tmp_path, mo
         scanner._client = AsyncMock()
         scanner._client.exists.side_effect = _exists_side_effect(on_cooldown=True)
 
+        await scanner._handle_message(_priming_bar_message("AAPL"))
         await scanner._handle_message(_bar_message("AAPL"))
 
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -417,6 +548,7 @@ async def test_loss_lockout_suppression_is_recorded_when_a_store_is_set(tmp_path
         scanner._client = AsyncMock()
         scanner._client.exists.side_effect = _exists_side_effect(locked_out=True)
 
+        await scanner._handle_message(_priming_bar_message("SMCI"))
         await scanner._handle_message(_bar_message("SMCI"))
 
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -470,6 +602,7 @@ async def test_handle_message_suppresses_signal_failing_trend_gate(scanner, monk
         lambda ticker, snap, config, **kwargs: [below_trend],
     )
 
+    await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
     scanner._client.set.assert_not_awaited()
@@ -488,6 +621,7 @@ async def test_handle_message_passes_signal_with_trend_aligned_true(scanner, mon
         lambda ticker, snap, config, **kwargs: [aligned],
     )
 
+    await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
     assert len(scanner._pending_candidates) == 1
@@ -504,6 +638,7 @@ async def test_handle_message_suppresses_premarket_signal_without_liquidity_data
         lambda ticker, snap, config, **kwargs: [candidate],
     )
 
+    await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
     assert _signal_publishes(scanner) == []
@@ -522,6 +657,7 @@ async def test_handle_message_passes_premarket_signal_when_liquidity_and_news_cl
     monkeypatch.setattr(scanner, "_clears_premarket_liquidity", lambda s: True)
     scanner._last_news_seen["AAPL"] = datetime.now(timezone.utc)
 
+    await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
     assert scanner.signals_suppressed_premarket_liquidity == 0
@@ -540,6 +676,7 @@ async def test_handle_message_suppresses_premarket_signal_without_recent_news(sc
     monkeypatch.setattr(scanner, "_clears_premarket_liquidity", lambda s: True)
     # No entry in _last_news_seen at all -- fail-closed.
 
+    await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
     assert _signal_publishes(scanner) == []
@@ -559,6 +696,7 @@ async def test_handle_message_suppresses_premarket_signal_with_stale_news(scanne
     monkeypatch.setattr(scanner, "_clears_premarket_liquidity", lambda s: True)
     scanner._last_news_seen["AAPL"] = datetime.now(timezone.utc) - timedelta(hours=5)  # > 4h lookback
 
+    await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
     assert scanner.signals_suppressed_news_catalyst == 1
@@ -575,6 +713,7 @@ async def test_regular_session_signal_is_not_subject_to_premarket_gates(scanner,
         lambda ticker, snap, config, **kwargs: [candidate],
     )
 
+    await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
     assert scanner.signals_suppressed_premarket_liquidity == 0
@@ -811,6 +950,7 @@ async def test_no_store_means_no_persistence_attempted(scanner, monkeypatch):
     scanner._client.exists.side_effect = _exists_side_effect(on_cooldown=True)
 
     # scanner fixture has store=None by default -- must not raise.
+    await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
     assert scanner.signals_suppressed_cooldown == 1
 
@@ -880,17 +1020,69 @@ def test_update_1m_buffer_drops_a_tick_with_no_close(scanner):
 
 
 @pytest.mark.asyncio
-async def test_handle_market_tick_computes_indicators_on_every_tick_including_partial_bars(scanner, monkeypatch):
-    """Every tick still triggers indicator computation/signal evaluation
-    (the currently-forming minute's evolving price must be visible
-    immediately) -- this is what keeps single-tick tests elsewhere in
-    this file working unchanged despite the new aggregation layer."""
+async def test_handle_market_tick_does_not_evaluate_on_a_symbols_very_first_tick(scanner, monkeypatch):
+    """Closed-Bar Evaluation (2026-08-16 quant audit): a symbol's very
+    first tick only OPENS a bucket -- there is no prior closed bar yet,
+    so compute_indicators must not be called at all."""
     calls = []
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: calls.append(1) or None)
 
     await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
 
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_handle_market_tick_does_not_evaluate_while_a_bucket_is_still_forming(scanner, monkeypatch):
+    """A second tick landing in the SAME bucket (same floored minute) as
+    the first must not trigger evaluation either -- the bar hasn't
+    closed, only accumulated another tick."""
+    calls = []
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: calls.append(1) or None)
+
+    first = json.loads(_bar_message("AAPL")["data"])
+    still_forming = dict(first, close=101.0)  # same "2026-08-07T15:00:00Z" bucket, different price
+    await scanner._handle_market_tick(first)
+    await scanner._handle_market_tick(still_forming)
+
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_handle_market_tick_evaluates_exactly_once_when_the_bucket_closes(scanner, monkeypatch):
+    """Closed-Bar Evaluation: the FIRST tick of a NEW bucket for a symbol
+    already being tracked triggers evaluation of the bar that just
+    closed -- exactly once per closed bar, not once per tick."""
+    calls = []
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: calls.append(1) or None)
+
+    await scanner._handle_market_tick(_priming_bar_payload("AAPL"))  # opens the first bucket
+    await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))  # closes it, opens the next
+
     assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_handle_market_tick_evaluates_against_the_closed_bars_final_values(scanner, monkeypatch):
+    """The dataframe passed to compute_indicators when a bar closes must
+    reflect the CLOSED bar's own final OHLCV (the priming tick's bucket),
+    not the tick that just started the NEXT (still-forming) bucket --
+    the core Closed-Bar Evaluation correctness fix: evaluation must never
+    see a partial, still-moving candle."""
+    captured = []
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: captured.append(df) or None)
+
+    await scanner._handle_market_tick(_priming_bar_payload("AAPL"))  # close=100.0, bucket 14:59
+    await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))  # close=100.5, bucket 15:00 (new)
+
+    assert len(captured) == 1
+    df = captured[0]
+    last_row = df.iloc[-1]
+    # The evaluated bar is the PRIMING one (14:59, close=100.0) -- NOT
+    # the just-arrived 15:00 tick (close=100.5), which only opened the
+    # next, still-forming bucket.
+    assert last_row["close"] == pytest.approx(100.0)
+    assert df.index[-1] == datetime(2026, 8, 7, 14, 59, tzinfo=timezone.utc)
 
 
 # --- Session-aware HTF buffer (Requirement 3: RTH-only 200-SMA source) ---
@@ -1109,6 +1301,7 @@ async def test_handle_market_tick_suppresses_low_volatility_bar_before_evaluatin
 
     monkeypatch.setattr(consumer_module, "evaluate_signals", _evaluate)
 
+    await scanner._handle_market_tick(_priming_bar_payload("AAPL"))
     await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
 
     # Gated BEFORE evaluate_signals is even called (skips momentum
@@ -1137,6 +1330,7 @@ async def test_handle_market_tick_suppresses_all_signals_during_opening_blackout
         ],
     )
 
+    await scanner._handle_market_tick(_priming_bar_payload("AAPL"))
     await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
 
     assert _signal_publishes(scanner) == []
@@ -1158,6 +1352,7 @@ async def test_handle_market_tick_closing_blackout_drops_bullish_keeps_bearish(s
         ],
     )
 
+    await scanner._handle_market_tick(_priming_bar_payload("AAPL"))
     await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
 
     # The BULLISH candidate is dropped, but the BEARISH one survives this
@@ -1176,6 +1371,7 @@ async def test_handle_market_tick_no_blackout_during_active_session(scanner, mon
         consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [_signal("AAPL", 3.0)],
     )
 
+    await scanner._handle_market_tick(_priming_bar_payload("AAPL"))
     await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
 
     assert scanner.signals_suppressed_opening_blackout == 0
@@ -1267,6 +1463,7 @@ async def test_handle_message_low_risk_reward_rejection_uses_rr_gate(scanner, mo
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [low_rr])
 
+    await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
     rejections = [json.loads(p) for p in _rejection_publishes(scanner)]

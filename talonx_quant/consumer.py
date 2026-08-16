@@ -42,11 +42,18 @@ below):
   4. Batch throttle (tumbling window, config.throttle_window_seconds):
      candidates that pass everything above are buffered, not published
      immediately. Every throttle_window_seconds, the buffer is ranked by
-     (confluence_score, volume_surge_ratio) -- confluence first, volume
-     surge as the tiebreaker -- and only the top config.throttle_max_signals
-     are actually published; the rest are dropped. This means a signal
-     can sit for up to throttle_window_seconds before it's published OR
-     dropped -- a deliberate latency-for-quality tradeoff, not a bug.
+     a weighted Composite Opportunity Score (see _opportunity_score --
+     confluence, structural R:R, volume surge, and trend alignment, each
+     normalized to [0, 1] before weighting) and only the top
+     config.throttle_max_signals are actually published; the rest are
+     dropped. This means a signal can sit for up to throttle_window_seconds
+     before it's published OR dropped -- a deliberate latency-for-quality
+     tradeoff, not a bug. (2026-08-16 quant audit, P1: replaced the
+     original (confluence_score, volume_surge_ratio) tuple-sort, whose
+     raw-ratio tiebreaker systematically favored penny/meme-stock pumps
+     -- which can post enormous surge ratios on a thin baseline volume --
+     over a higher-conviction, better-risk-reward setup on a liquid
+     large-cap with a smaller relative surge.)
 """
 from __future__ import annotations
 
@@ -119,6 +126,47 @@ def _fails_min_volatility(snapshot, config: QuantConfig) -> bool:
     return atr_pct < config.min_atr_pct
 
 
+def _opportunity_score(signal: QuantSignal, config: QuantConfig) -> float:
+    """Composite Opportunity Score (2026-08-16 quant audit, P1): the
+    throttle window's ranking key, replacing the old
+    (confluence_score, volume_surge_ratio) tuple-sort -- whose raw-ratio
+    tiebreaker systematically favored penny/meme-stock pumps (which can
+    post enormous surge ratios on a thin baseline volume) over a
+    higher-conviction, better-risk-reward setup on a liquid large-cap
+    with a smaller relative surge. Each factor is normalized to [0, 1]
+    before weighting, so no single unbounded input (R:R, volume surge)
+    can dominate the ranking purely on scale."""
+    confluence_norm = (signal.confluence_score or 0) / 3.0
+
+    rr_norm = 0.0
+    if signal.risk_reward_ratio is not None and config.opportunity_score_rr_cap > 0:
+        rr_norm = min(signal.risk_reward_ratio / config.opportunity_score_rr_cap, 1.0)
+
+    volume_norm = 0.0
+    if signal.volume_surge_ratio is not None and config.opportunity_score_volume_cap > 0:
+        volume_norm = min(signal.volume_surge_ratio / config.opportunity_score_volume_cap, 1.0)
+
+    # trend_aligned is True (aligned), None (not applicable -- bearish,
+    # pre-market, or the HTF buffer hasn't warmed up -- treated as
+    # NEUTRAL, since "not applicable" isn't "misaligned"), or False
+    # (should never actually reach the throttle window: the trend gate
+    # already dropped a False candidate upstream in _handle_market_tick --
+    # kept here only as a defensive, correctly-scored fallback).
+    if signal.trend_aligned is True:
+        trend_norm = 1.0
+    elif signal.trend_aligned is False:
+        trend_norm = 0.0
+    else:
+        trend_norm = 0.5
+
+    return (
+        config.opportunity_score_confluence_weight * confluence_norm
+        + config.opportunity_score_rr_weight * rr_norm
+        + config.opportunity_score_volume_weight * volume_norm
+        + config.opportunity_score_trend_weight * trend_norm
+    )
+
+
 async def _incr_metric(client, stage: str, counter: str, amount: int = 1) -> None:
     """Stage-Gate Metric Funnel (Phase 2 requirement doc): atomic,
     per-UTC-day Redis counters at `metrics:{YYYY-MM-DD}:{stage}:{counter}`,
@@ -179,10 +227,13 @@ class QuantScanner:
         # raw poll-cycle BAR events (12s cadence by default) accumulate here,
         # floor-bucketed to the minute, and the running OHLCV is written
         # into self.buffer on EVERY tick (not just on bucket rollover) so
-        # indicator computation always sees the latest partial minute --
-        # see _update_1m_buffer. A new row only appears once the wall clock
-        # actually crosses into a new minute, so min_bars_required bars
-        # really do span that many calendar minutes, not poll cycles.
+        # OTHER consumers (e.g. the pre-market liquidity gate) see the
+        # latest partial minute -- see _update_1m_buffer. Indicator/signal
+        # EVALUATION itself is a separate concern (Closed-Bar Evaluation,
+        # see _handle_market_tick) and only ever runs once a bucket has
+        # closed. A new row only appears once the wall clock actually
+        # crosses into a new minute, so min_bars_required bars really do
+        # span that many calendar minutes, not poll cycles.
         self._1m_accumulators: dict[str, dict] = {}
         # Historical pre-seeding (Requirement 2): each symbol is attempted
         # at most once per process lifetime -- a failed/rate-limited
@@ -690,13 +741,23 @@ class QuantScanner:
 
         Unlike _update_htf_buffer, the still-forming bucket IS written
         into self.buffer on EVERY tick (not only once the bucket rolls
-        over) -- indicator computation needs to see the latest partial
-        minute's evolving price immediately, not wait up to 60s for a
-        new poll cycle to close the bar out. A new ROW only appears once
-        the wall clock actually crosses into a new minute (buffer.add_bar
-        updates the existing row in place for the same bucket timestamp),
-        so min_bars_required bars really do span that many calendar
-        minutes, not raw poll cycles."""
+        over) -- OTHER consumers of the buffer (e.g. the pre-market
+        liquidity gate's dollar-volume read) want the freshest
+        partial-minute price, and buffer.py's session-tagged rows are
+        also this module's restart-checkpoint source. A new ROW only
+        appears once the wall clock actually crosses into a new minute
+        (buffer.add_bar updates the existing row in place for the same
+        bucket timestamp), so min_bars_required bars really do span that
+        many calendar minutes, not raw poll cycles.
+
+        Closed-Bar Evaluation (2026-08-16 quant audit): despite the
+        buffer itself updating every tick, strategy.py's indicator/signal
+        EVALUATION is deliberately NOT run against this still-forming
+        row -- see _handle_market_tick's own bar_just_closed check, which
+        captures the dataframe BEFORE this method is called on the tick
+        that starts a new bucket, so evaluation always sees the bar that
+        JUST closed, never a partial one. This function only aggregates;
+        it does not decide when evaluation happens."""
         symbol = event.symbol.upper()
         if event.close is None:
             return
@@ -740,11 +801,35 @@ class QuantScanner:
         if event.event_type != TickEventType.BAR:
             return  # only BAR/QUOTE events are handled; TRADE is a no-op here
 
+        # Closed-Bar Evaluation (2026-08-16 quant audit, P0): indicators/
+        # signals are evaluated ONLY on a just-CLOSED 1-min bar, never the
+        # still-forming one. The buffer itself still updates the forming
+        # bucket in place on every tick (unchanged -- other consumers, e.g.
+        # the pre-market liquidity gate's dollar-volume read, want the
+        # freshest partial-minute price), but evaluating strategy.py
+        # against that partial candle let its OHLC keep moving mid-bar --
+        # an RSI/MACD/MA crossing could flash true on an early, still-
+        # forming tick and be false again by the bar's actual close (a
+        # "phantom trigger"/repaint the audit flagged as a P0 correctness
+        # flaw, not just noise). A bar is "closed" the instant the FIRST
+        # tick of the NEXT bucket arrives -- capture the buffer's
+        # dataframe BEFORE that tick's own bucket is written, so its last
+        # row is the bar that just closed (no more ticks can land in it),
+        # not the one just starting.
+        symbol = event.symbol.upper()
+        bucket_start = event.timestamp.replace(second=0, microsecond=0)
+        prior_accumulator = self._1m_accumulators.get(symbol)
+        bar_just_closed = prior_accumulator is not None and prior_accumulator["bucket_start"] != bucket_start
+        closed_bar_df = self.buffer.get_dataframe(symbol) if bar_just_closed else None
+
         self._update_1m_buffer(event)
         self._update_htf_buffer(event)
         self._bars_processed += 1
 
-        df = self.buffer.get_dataframe(event.symbol)
+        if not bar_just_closed:
+            return  # this bucket is still forming -- wait for the next bar's first tick to close it out
+
+        df = closed_bar_df
         if df is None:
             return
 
@@ -964,7 +1049,7 @@ class QuantScanner:
             return
 
         candidates, self._pending_candidates = self._pending_candidates, []
-        candidates.sort(key=lambda sig: (sig.confluence_score or 0, sig.volume_surge_ratio or 0.0), reverse=True)
+        candidates.sort(key=lambda sig: _opportunity_score(sig, self.config), reverse=True)
 
         released, dropped = candidates[: self.config.throttle_max_signals], candidates[self.config.throttle_max_signals :]
         for signal in released:
@@ -973,8 +1058,8 @@ class QuantScanner:
         if dropped:
             self._signals_suppressed_throttle += len(dropped)
             logger.info(
-                "Throttle: released %d/%d candidate(s) this window (ranked by confluence "
-                "score, then volume surge ratio), dropped %s",
+                "Throttle: released %d/%d candidate(s) this window (ranked by Composite "
+                "Opportunity Score), dropped %s",
                 len(released), len(candidates),
                 ", ".join(f"{s.ticker}/{s.signal_type.value}" for s in dropped),
             )

@@ -104,9 +104,10 @@ class QuantSignal(BaseModel):
     # {MACD cross, RSI extreme IN THIS DIRECTION, volume surge} agree on
     # this bar, gating whether this signal survives past consumer.py's
     # confluence_score_min filter; risk_reward_ratio is the Structural
-    # R:R -- (pivot_resistance/support - price) / (pivot_stop_atr_multiplier
-    # * atr), see strategy.py's _structural_risk_reward -- gating
-    # consumer.py's min_risk_reward_ratio filter.
+    # R:R -- (pivot_resistance/support - price) / (atr_stop_multiplier *
+    # atr) -- the SAME atr_stop_multiplier stop_price is built from, see
+    # strategy.py's _structural_risk_reward -- gating consumer.py's
+    # min_risk_reward_ratio filter.
     atr: float | None = None
     confluence_score: int | None = None
     risk_reward_ratio: float | None = None

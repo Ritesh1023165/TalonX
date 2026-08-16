@@ -221,11 +221,15 @@ so pair it with `market_data.run` streaming the same tickers, and expect
 a warm-up period before the first signal — unless a recent buffer
 checkpoint exists, see [bar_buffer_persistence.md](bar_buffer_persistence.md).
 
-**Known compatibility caveat**: `pandas_ta` references `numpy.NaN`, which
-was removed in NumPy 2.0. If `pip install pandas_ta` or its import fails
-with `AttributeError: module 'numpy' has no attribute 'NaN'`, pin
-`numpy<2` in your environment (`pip install "numpy<2"`) until upstream
-releases a fix.
+**Dependency note**: older `pandas_ta` releases (<=0.3.14b0) reference
+`numpy.NaN`, which was removed in NumPy 2.0, and fail with
+`AttributeError: module 'numpy' has no attribute 'NaN'` against a modern
+NumPy. `talonx_quant/requirements.txt` pins `pandas_ta>=0.4.71b0` (the
+pandas-ta.dev fork, which dropped the `numpy.NaN` reference) with an
+explicit `numpy>=2.0,<3.0`, so a normal `pip install -r
+talonx_quant\requirements.txt` should never hit this -- if you do see it,
+you likely have a stale/conflicting `pandas_ta` installed from before
+this pin; `pip install -U pandas_ta` should resolve it.
 
 To watch signals arrive, subscribe in another terminal:
 ```powershell

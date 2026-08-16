@@ -5,15 +5,18 @@ Computes RSI, MACD, moving average crossover inputs, volume surge ratio,
 and ATR (14-period, plus this bar's own true range) for a symbol's
 buffered OHLCV DataFrame, via pandas_ta.
 
-KNOWN COMPATIBILITY CAVEAT: pandas_ta (as of its last released version)
-references `numpy.NaN`, which was removed in NumPy 2.0 -- importing
-pandas_ta against numpy>=2.0 raises `AttributeError: module 'numpy' has
-no attribute 'NaN'`. If you hit that on `pip install`, either pin
-`numpy<2` in your environment, or patch pandas_ta locally (add
-`numpy.NaN = numpy.nan` before importing it, e.g. at the top of this
-module) -- both are common workarounds until upstream releases a fix.
-This module does NOT apply that patch automatically; it's left visible
-here so you know exactly where to add it if needed.
+DEPENDENCY NOTE (2026-08-16 quant audit): older pandas_ta releases
+(<=0.3.14b0) reference `numpy.NaN`, which was removed in NumPy 2.0 --
+importing pandas_ta against numpy>=2.0 raised
+`AttributeError: module 'numpy' has no attribute 'NaN'` unless a
+developer manually patched it before import (`numpy.NaN = numpy.nan`).
+Fixed at the dependency level, not a runtime patch here: talonx_quant's
+requirements.txt now floors on `pandas_ta>=0.4.71b0` (the pandas-ta.dev
+fork, which dropped the `numpy.NaN` reference) with an explicit
+`numpy>=2.0,<3.0` pin -- relying on every developer remembering a manual
+monkeypatch before `pip install` is fragile and was flagged as a DevOps
+risk; a correct dependency floor makes the whole class of failure
+unreachable instead.
 """
 from __future__ import annotations
 
@@ -110,35 +113,35 @@ def compute_indicators(df: pd.DataFrame, config: QuantConfig) -> IndicatorSnapsh
     sma_fast_series = df.ta.sma(length=config.ma_fast_period)
     sma_slow_series = df.ta.sma(length=config.ma_slow_period)
 
-    # Session-aware baseline reset, shared by the ATR gate below AND the
-    # volume-surge baseline (Dual Volume Baselines requirement): both are
-    # restricted to the trailing contiguous run of bars sharing the
-    # LATEST bar's session tag, so a regular-session bar's volume is
-    # never compared against a 20-bar window still mostly full of thin
-    # pre-market volume (or vice versa) -- the instant the session
-    # changes, both baselines go back to None (a fresh warm-up) until
-    # enough same-session bars accumulate, rather than blending two
-    # structurally different liquidity regimes into one average. RSI/MACD/
-    # SMA above are deliberately NOT restricted this way -- only the
-    # ATR-based and volume-based gates need the reset.
-    atr_df = _same_session_tail(df)
-    volume_avg_series = atr_df["volume"].rolling(window=config.volume_avg_period).mean()
-    dollar_volume_series = (atr_df["volume"] * atr_df["close"]).rolling(window=config.volume_avg_period).mean()
-    # Guard BEFORE calling .ta.atr(), not after: pandas_ta's atr() does
-    # NOT return a NaN-filled Series when given fewer than length+1 rows
-    # (the behavior compute_indicators previously relied on) -- it
-    # silently returns the INPUT DATAFRAME unchanged instead. That never
-    # surfaced before this function's own len(df) < min_bars_required
-    # gate above always guaranteed df (the full buffer) had 120+ rows by
-    # the time any pandas_ta call ran on it -- but atr_df is a
-    # session-restricted SUBSET that can be far shorter right at a
-    # session transition (confirmed live: crashed talonx_quant in a
-    # reconnect loop for 40+ consecutive attempts at market close, when
-    # the newest bars' session flips and _same_session_tail narrows to
-    # just a handful of them). _last_two() then called float() on a
-    # one-row DataFrame slice (a Series, not a scalar), raising
-    # "float() argument must be a string or a real number, not 'Series'".
-    atr_series = atr_df.ta.atr(length=config.atr_period) if len(atr_df) > config.atr_period else None
+    # Dual Volume Baselines: the volume-surge baseline is restricted to
+    # the trailing contiguous run of bars sharing the LATEST bar's
+    # session tag, so a regular-session bar's volume is never compared
+    # against a 20-bar window still mostly full of thin pre-market
+    # volume (or vice versa) -- the instant the session changes, this
+    # baseline goes back to None (a fresh warm-up) until enough
+    # same-session bars accumulate, rather than blending two
+    # structurally different liquidity regimes into one average.
+    # RSI/MACD/SMA above are deliberately NOT restricted this way.
+    session_tail = _same_session_tail(df)
+    volume_avg_series = session_tail["volume"].rolling(window=config.volume_avg_period).mean()
+    dollar_volume_series = (
+        session_tail["volume"] * session_tail["close"]
+    ).rolling(window=config.volume_avg_period).mean()
+
+    # ATR is deliberately CONTINUOUS across the session boundary (2026-08-16
+    # quant audit, P1) -- NOT session-restricted the way the volume
+    # baseline above is. An earlier version reset ATR's window to the
+    # same-session tail too, which meant the first handful of bars after
+    # the regular-session open computed ATR (and bar_true_range's
+    # "previous close") from only 1-3 new bars -- a 09:30-09:45 opening
+    # range that typically runs 3-5x wider than midday, giving a wildly
+    # unstable, artificially inflated baseline right when the ATR-move
+    # gate and structural R:R's risk distance most need a STABLE read.
+    # Volatility itself doesn't reset at a session boundary the way
+    # LIQUIDITY does (pre-market volume is thin because of low
+    # participation, not because true price range resets to zero), so a
+    # rolling ATR that spans the boundary is the more accurate model.
+    atr_series = df.ta.atr(length=config.atr_period) if len(df) > config.atr_period else None
 
     if macd_df is None or rsi_series is None:
         logger.warning("pandas_ta returned None for RSI/MACD -- insufficient data or version mismatch")
@@ -176,14 +179,14 @@ def compute_indicators(df: pd.DataFrame, config: QuantConfig) -> IndicatorSnapsh
 
     # This specific bar's true range -- max(high-low, |high-prev_close|,
     # |low-prev_close|), the SAME formula ATR itself averages over
-    # atr_period bars. Needs a previous close FROM THE SAME SESSION
-    # (see atr_df above) -- None on the first bar of a session (e.g. the
-    # regular-session open right after a pre-market run), same as the
-    # first bar of the buffer overall.
+    # atr_period bars. Continuous across the session boundary, same as
+    # atr_series above -- previous close is simply the prior row in the
+    # full buffer, not session-restricted. None only on the very first
+    # bar of the buffer overall (no previous close exists at all yet).
     bar_true_range = None
-    if len(atr_df) >= 2:
+    if len(df) >= 2:
         high, low, close = latest_row["high"], latest_row["low"], latest_row["close"]
-        prev_close = atr_df.iloc[-2]["close"]
+        prev_close = df.iloc[-2]["close"]
         if pd.notna(high) and pd.notna(low) and pd.notna(close) and pd.notna(prev_close):
             bar_true_range = max(
                 float(high) - float(low),

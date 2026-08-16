@@ -108,14 +108,36 @@ def test_rsi_volume_setup_requires_volume_surge_on_the_recovery_bar(config):
     assert signals == []
 
 
-def test_rsi_volume_setup_fires_overbought_on_the_crossing_bar(config):
-    # Bearish leg unchanged: still fires on the initial cross INTO overbought.
-    snap = _snapshot(rsi=72.0, rsi_prev=68.0, volume_surge_ratio=2.5)
+def test_rsi_volume_setup_fires_overbought_on_the_recovery_bar(config):
+    # RSI Reversal Curl (symmetric): RSI was overbought (72) last bar,
+    # recovered back down to 68 (<= 70) this bar.
+    snap = _snapshot(rsi=68.0, rsi_prev=72.0, volume_surge_ratio=2.5)
 
     signals = evaluate_signals("AAPL", snap, config)
 
     assert len(signals) == 1
     assert signals[0].signal_type == SignalType.RSI_OVERBOUGHT_VOLUME_SURGE
+
+
+def test_rsi_volume_setup_does_not_fire_on_the_initial_rise_into_overbought(config):
+    # RSI Reversal Curl (symmetric): rising INTO overbought (68 -> 72)
+    # must NOT fire a short on its own anymore -- only the recovery back
+    # below 70 does.
+    snap = _snapshot(rsi=72.0, rsi_prev=68.0, volume_surge_ratio=2.5)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    assert signals == []
+
+
+def test_rsi_volume_setup_does_not_refire_while_already_recovered_from_overbought(config):
+    # Both this bar and the previous bar are already at/below 70 -- no
+    # fresh recovery edge.
+    snap = _snapshot(rsi=65.0, rsi_prev=68.0, volume_surge_ratio=2.5)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    assert signals == []
 
 
 # --- MACD crossover (regression baseline, unchanged behavior) ------------
@@ -281,8 +303,8 @@ def test_confluence_score_is_computed_per_signal_direction(config):
 
 # --- Structural R:R Calculation --------------------------------------------
 
-def test_structural_rr_uses_pivot_resistance_and_pivot_stop_atr_multiplier(config):
-    # reward = resistance(110) - price(100) = 10; risk = 1.5 * atr(2) = 3
+def test_structural_rr_uses_pivot_resistance_and_atr_stop_multiplier(config):
+    # reward = resistance(110) - price(100) = 10; risk = atr_stop_multiplier(1.5) * atr(2) = 3
     snap = _snapshot(price=100.0, atr=2.0)
     pivots = _pivots(resistance=110.0, support=90.0)
 
@@ -292,7 +314,7 @@ def test_structural_rr_uses_pivot_resistance_and_pivot_stop_atr_multiplier(confi
 
 
 def test_structural_rr_bearish_uses_pivot_support(config):
-    # reward = price(100) - support(92) = 8; risk = 1.5 * atr(2) = 3
+    # reward = price(100) - support(92) = 8; risk = atr_stop_multiplier(1.5) * atr(2) = 3
     snap = _snapshot(price=100.0, atr=2.0)
     pivots = _pivots(resistance=115.0, support=92.0)
 
@@ -355,6 +377,32 @@ def test_signal_risk_reward_is_none_without_pivots(config):
     assert signals[0].pivot_resistance is None
 
 
+def test_gated_risk_reward_matches_the_actually_executed_stop_distance(config):
+    """2026-08-16 quant-audit regression: risk_reward_ratio's implied
+    risk distance (config.atr_stop_multiplier x ATR) must equal
+    price - stop_price exactly -- a candidate must never be gated on a
+    WIDER (or narrower) risk distance than the stop it's actually
+    published with. Before the fix, the gate used
+    pivot_stop_atr_multiplier (1.5x ATR) while the executed stop used a
+    separate atr_stop_multiplier (1.0x ATR): a $6 pivot target against a
+    $2 ATR gated at R:R=2.0 (6 / (1.5*2)=3) but would have EXECUTED at
+    R:R=3.0 (6 / (1.0*2)=2) -- passing the >=1.5 gate on a materially
+    different number than the trade actually risked."""
+    snap = _snapshot(rsi=32.0, rsi_prev=28.0, volume_surge_ratio=3.0, atr=2.0, bar_true_range=2.0, price=100.0)
+    pivots = _pivots(resistance=106.0, support=90.0)
+
+    signals = evaluate_signals("AAPL", snap, config, daily_pivots=pivots)
+
+    assert len(signals) == 1
+    signal = signals[0]
+    implied_risk_distance = config.atr_stop_multiplier * signal.atr
+    executed_risk_distance = signal.price - signal.stop_price
+    assert implied_risk_distance == pytest.approx(executed_risk_distance)
+    # And the published ratio must equal reward / the SAME executed distance.
+    reward_distance = signal.pivot_resistance - signal.price
+    assert signal.risk_reward_ratio == pytest.approx(reward_distance / executed_risk_distance)
+
+
 # --- Explicit $ stop/target -------------------------------------------------
 
 def test_bullish_signal_target_uses_pivot_resistance_when_available(config):
@@ -364,40 +412,40 @@ def test_bullish_signal_target_uses_pivot_resistance_when_available(config):
     signals = evaluate_signals("AAPL", snap, config, daily_pivots=pivots)
 
     assert len(signals) == 1
-    assert signals[0].stop_price == pytest.approx(98.0)  # atr_stop_multiplier(1.0) * atr(2.0)
+    assert signals[0].stop_price == pytest.approx(97.0)  # atr_stop_multiplier(1.5) * atr(2.0)
     assert signals[0].target_price == pytest.approx(108.0)  # pivot resistance, not 2x ATR
 
 
 def test_bullish_signal_falls_back_to_atr_target_without_pivots(config):
-    # price=100, atr=2 -> stop = 100 - 1*2 = 98, target = 100 + 2*2 = 104 (fallback)
+    # price=100, atr=2 -> stop = 100 - 1.5*2 = 97, target = 100 + 2*2 = 104 (fallback)
     snap = _snapshot(rsi=32.0, rsi_prev=28.0, volume_surge_ratio=3.0, price=100.0, atr=2.0, bar_true_range=2.0)
 
     signals = evaluate_signals("AAPL", snap, config)
 
     assert len(signals) == 1
-    assert signals[0].stop_price == pytest.approx(98.0)
+    assert signals[0].stop_price == pytest.approx(97.0)
     assert signals[0].target_price == pytest.approx(104.0)
 
 
 def test_bearish_signal_target_uses_pivot_support_when_available(config):
-    snap = _snapshot(rsi=72.0, rsi_prev=68.0, volume_surge_ratio=3.0, price=100.0, atr=2.0, bar_true_range=2.0)
+    snap = _snapshot(rsi=68.0, rsi_prev=72.0, volume_surge_ratio=3.0, price=100.0, atr=2.0, bar_true_range=2.0)
     pivots = _pivots(resistance=115.0, support=93.0)
 
     signals = evaluate_signals("AAPL", snap, config, daily_pivots=pivots)
 
     assert len(signals) == 1
-    assert signals[0].stop_price == pytest.approx(102.0)
+    assert signals[0].stop_price == pytest.approx(103.0)
     assert signals[0].target_price == pytest.approx(93.0)
 
 
 def test_bearish_signal_falls_back_to_atr_target_without_pivots(config):
-    # price=100, atr=2 -> stop = 100 + 1*2 = 102, target = 100 - 2*2 = 96 (fallback)
-    snap = _snapshot(rsi=72.0, rsi_prev=68.0, volume_surge_ratio=3.0, price=100.0, atr=2.0, bar_true_range=2.0)
+    # price=100, atr=2 -> stop = 100 + 1.5*2 = 103, target = 100 - 2*2 = 96 (fallback)
+    snap = _snapshot(rsi=68.0, rsi_prev=72.0, volume_surge_ratio=3.0, price=100.0, atr=2.0, bar_true_range=2.0)
 
     signals = evaluate_signals("AAPL", snap, config)
 
     assert len(signals) == 1
-    assert signals[0].stop_price == pytest.approx(102.0)
+    assert signals[0].stop_price == pytest.approx(103.0)
     assert signals[0].target_price == pytest.approx(96.0)
 
 
@@ -438,7 +486,7 @@ def test_trend_aligned_is_none_when_htf_sma_not_yet_available(config):
 
 def test_trend_aligned_is_none_for_bearish_signals_regardless_of_htf_sma(config):
     # Requirement doc: the trend gate applies to BULLISH setups only.
-    snap = _snapshot(rsi=72.0, rsi_prev=68.0, volume_surge_ratio=3.0, price=100.0)
+    snap = _snapshot(rsi=68.0, rsi_prev=72.0, volume_surge_ratio=3.0, price=100.0)
 
     signals = evaluate_signals("AAPL", snap, config, htf_sma_200=50.0)  # would be "aligned" if checked
 

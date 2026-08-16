@@ -50,10 +50,18 @@ Requirement-doc gap fixes (2026-08-16):
     the nearest classic floor-trader pivot level (prior completed
     regular session's R1/S1, see indicators.compute_daily_pivots) rather
     than a second ATR multiple -- see _structural_risk_reward.
-  - RSI Reversal Curl: the bullish RSI+volume setup no longer fires the
-    instant RSI dips below rsi_oversold (a falling-knife entry); it
-    waits for RSI to recover back ABOVE rsi_oversold first -- see
-    _check_rsi_volume_setup.
+  - RSI Reversal Curl: neither RSI+volume leg fires on the initial
+    threshold breach anymore; both wait for RSI to curl back to the
+    neutral side first -- bullish recovers back ABOVE rsi_oversold,
+    bearish recovers back BELOW rsi_overbought (made symmetric
+    2026-08-16 per a quant audit -- see _check_rsi_volume_setup).
+  - Harmonized risk distance: risk_reward_ratio's denominator and the
+    published stop_price now use the SAME atr_stop_multiplier x ATR
+    distance (2026-08-16 quant-audit fix) -- previously a separate,
+    wider multiplier fed only the gate while a narrower one fed only the
+    executed stop, so a candidate could pass the R:R gate on a different
+    number than its actual executed R:R -- see _structural_risk_reward
+    and _stop_target_prices.
 """
 from __future__ import annotations
 
@@ -176,15 +184,22 @@ def _structural_risk_reward(
     regular session (R1 for a BULLISH candidate, S1 for a BEARISH one --
     see indicators.compute_daily_pivots), a genuine market-derived target
     rather than a second ATR multiple; risk is
-    pivot_stop_atr_multiplier x ATR (default 1.5x, the requirement's own
-    figure). Returns None -- same fail-closed, "insufficient data -> no
+    atr_stop_multiplier x ATR (default 1.5x) -- the SAME multiplier
+    _stop_target_prices uses for the EXECUTED dollar stop below. These
+    two must use one shared multiplier: a 2026-08-16 quant audit caught
+    an earlier version of this code gating on a WIDER risk distance
+    (1.5x ATR) than the stop it then actually placed (1.0x ATR) --
+    passing the gate at a nominal 2.0 R:R while the executed trade's real
+    R:R (reward / the tighter 1.0x-ATR stop that was actually live) was
+    3.0, a discrepancy between "what was evaluated" and "what was
+    traded." Returns None -- same fail-closed, "insufficient data -> no
     signal" posture every other warm-up-dependent check in this module
     takes -- when ATR/price/pivots aren't available yet, or when the
     relevant pivot level sits on the WRONG side of entry (e.g. price has
     already traded through R1, leaving no bullish room left to target)."""
     if s.atr is None or s.atr <= 0 or not s.price or pivots is None:
         return None
-    risk = config.pivot_stop_atr_multiplier * s.atr
+    risk = config.atr_stop_multiplier * s.atr
     if risk <= 0:
         return None
     if direction == SignalDirection.BULLISH:
@@ -201,14 +216,17 @@ def _stop_target_prices(
     pivots: DailyPivots | None,
 ) -> tuple[float | None, float | None]:
     """Explicit dollar stop/target levels: stop = atr_stop_multiplier x
-    ATR against the trade (default 1x); target = the nearest pivot level
-    (R1/S1) when available -- the SAME structural level
-    _structural_risk_reward's reward side uses, so a published signal's
-    displayed/executed target actually matches what cleared the R:R gate
-    -- else the old atr_reward_multiplier x ATR approximation (default
-    2x) while prior-session pivot data is still warming up. None/None
-    when ATR isn't available yet (insufficient history), same warm-up
-    posture as every other ATR-derived value here."""
+    ATR against the trade (default 1.5x -- the SAME multiplier
+    _structural_risk_reward's risk side uses, so the executed stop always
+    matches what the R:R gate actually evaluated; see that function's own
+    docstring for the harmonization fix this is half of); target = the
+    nearest pivot level (R1/S1) when available -- the SAME structural
+    level _structural_risk_reward's reward side uses, so a published
+    signal's displayed/executed target actually matches what cleared the
+    R:R gate -- else the old atr_reward_multiplier x ATR approximation
+    (default 2x) while prior-session pivot data is still warming up.
+    None/None when ATR isn't available yet (insufficient history), same
+    warm-up posture as every other ATR-derived value here."""
     if atr is None or atr <= 0:
         return None, None
     stop_distance = config.atr_stop_multiplier * atr
@@ -253,15 +271,20 @@ def _check_rsi_volume_setup(
     for 5 consecutive bars would fire 5 signals instead of 1 -- a major
     source of the alert chatter this module was tuned to reduce.
 
-    RSI Reversal Curl: the BULLISH leg deliberately does NOT fire the
-    instant RSI first dips below rsi_oversold (a falling-knife entry with
-    no confirmation the selloff has actually stopped) -- it waits for RSI
-    to curl back UP and recover above rsi_oversold first (rsi_prev still
-    below the threshold, rsi now at/above it), then fires on that
-    recovery bar. The BEARISH leg is intentionally left as the original
-    entering-overbought edge trigger -- the RSI Reversal Curl requirement
-    is specifically about a BUY signal waiting for recovery, not a
-    symmetric change to the short side.
+    RSI Reversal Curl: NEITHER leg fires on the initial breach of its
+    threshold -- both wait for RSI to curl back to the neutral side
+    first, then fire on that recovery bar. Bullish fires when RSI curls
+    back UP above rsi_oversold (rsi_prev still below it, rsi now
+    at/above it) -- avoids a falling-knife entry with no confirmation the
+    selloff has actually stopped. Bearish fires when RSI curls back DOWN
+    below rsi_overbought (rsi_prev still above it, rsi now at/below it)
+    -- symmetric with the bullish leg as of a 2026-08-16 quant audit,
+    which flagged the ORIGINAL asymmetric version (bearish fired
+    immediately on the initial cross INTO overbought) as a momentum
+    trap: in a trending bull market RSI can sit elevated for hours, and
+    shorting the first touch fights the trend rather than confirming a
+    genuine reversal, the same false-signal risk the bullish leg was
+    already fixed for.
     """
     if s.rsi is None or s.rsi_prev is None or s.volume_surge_ratio is None:
         return
@@ -279,12 +302,13 @@ def _check_rsi_volume_setup(
         ))
         return  # a bar crosses one direction at most; skip the overbought check
 
-    crossed_overbought = s.rsi_prev <= config.rsi_overbought and s.rsi > config.rsi_overbought
-    if crossed_overbought and s.volume_surge_ratio > ctx.volume_threshold:
+    recovered_from_overbought = s.rsi_prev > config.rsi_overbought and s.rsi <= config.rsi_overbought
+    if recovered_from_overbought and s.volume_surge_ratio > ctx.volume_threshold:
         signals.append(_build_signal(
             ticker, s, SignalType.RSI_OVERBOUGHT_VOLUME_SURGE, SignalDirection.BEARISH,
-            f"RSI {s.rsi:.1f} crossed into overbought (> {config.rsi_overbought:.0f}) with "
-            f"{s.volume_surge_ratio:.1f}x volume surge (> {ctx.volume_threshold:.1f}x)",
+            f"RSI {s.rsi:.1f} curled back below overbought (<= {config.rsi_overbought:.0f}, "
+            f"was {s.rsi_prev:.1f}) with {s.volume_surge_ratio:.1f}x volume surge "
+            f"(> {ctx.volume_threshold:.1f}x)",
             config, ctx,
         ))
 

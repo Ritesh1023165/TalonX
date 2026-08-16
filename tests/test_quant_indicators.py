@@ -127,13 +127,24 @@ def test_indicator_snapshot_fields_are_all_present(config):
     assert snapshot.bar_true_range is not None
 
 
-# --- Session-aware ATR reset at the regular-session open (Requirement 3) --
+# --- Continuous ATR across the session boundary (2026-08-16 quant audit, P1) --
+#
+# ATR/bar_true_range used to reset at the regular-session open the same
+# way the volume baseline below still does -- a 2026-08-16 quant audit
+# flagged this as a P1 flaw: the 09:30-09:45 opening range typically runs
+# 3-5x wider than midday trading, so restricting ATR's window to just the
+# first few post-open bars produced a wildly unstable, artificially
+# inflated baseline exactly when the ATR-move gate and structural R:R's
+# risk distance most need a stable read. Volatility doesn't reset at a
+# session boundary the way liquidity does, so ATR is now computed from
+# the FULL buffer, continuous across the boundary -- only the volume
+# baseline (a genuinely different, session-scoped concept: thin
+# pre-market PARTICIPATION, not true price range) still resets.
 
 def test_atr_uses_the_full_buffer_when_every_bar_is_the_same_session(config):
     """Regression guard: the default _seed_buffer window (all pre-market)
-    must produce IDENTICAL atr/bar_true_range to a plain full-buffer
-    computation -- the session-aware restriction must be a no-op when
-    there's no session boundary in the window at all."""
+    must produce a real atr/bar_true_range -- sanity baseline before the
+    session-crossing test below."""
     from talonx_quant.indicators import compute_indicators, _same_session_tail
 
     buf = _seed_buffer(config.min_bars_required)
@@ -145,13 +156,13 @@ def test_atr_uses_the_full_buffer_when_every_bar_is_the_same_session(config):
     assert snapshot.bar_true_range is not None
 
 
-def test_atr_resets_at_the_regular_session_open(config):
+def test_atr_is_continuous_across_the_regular_session_open(config):
     """A buffer whose first few bars are pre-market and the rest regular
-    (crossing 09:30 ET) must compute ATR/bar_true_range from ONLY the
-    regular-session tail -- confirmed here by checking the restricted
-    window is shorter than the full buffer, not blended across the
-    session boundary."""
-    from talonx_quant.indicators import _same_session_tail
+    (crossing 09:30 ET) must still compute a real ATR/bar_true_range from
+    the FULL buffer -- not reset/None right at the boundary the way the
+    volume baseline (test_volume_baseline_resets_at_the_regular_session_open)
+    deliberately does."""
+    from talonx_quant.indicators import compute_indicators
 
     # 13:25 UTC = 09:25 ET -- 5 minutes of pre-market, then the 6th bar
     # (13:30 UTC = 09:30 ET) crosses into regular session.
@@ -162,28 +173,19 @@ def test_atr_resets_at_the_regular_session_open(config):
     assert df["session"].iloc[0] == "pre_market"
     assert df["session"].iloc[-1] == "regular"
 
-    atr_df = _same_session_tail(df)
-    assert len(atr_df) < len(df)  # pre-market bars excluded from the ATR window
-    assert (atr_df["session"] == "regular").all()
+    snapshot = compute_indicators(df, config)
+
+    assert snapshot.atr is not None
+    assert snapshot.bar_true_range is not None
 
 
-def test_atr_does_not_crash_when_the_session_tail_is_shorter_than_atr_period(config):
-    """Regression for a confirmed live production crash: pandas_ta's
-    .atr() does NOT return a NaN-filled Series when given fewer than
-    atr_period+1 rows -- it silently returns the INPUT DATAFRAME
-    unchanged instead. compute_indicators' own len(df) < min_bars_required
-    gate always guaranteed the FULL buffer had 120+ rows before any
-    pandas_ta call ran on it, but atr_df (the session-restricted subset)
-    can be much shorter right at a session transition. This crashed
-    talonx_quant in a Redis reconnect loop for 40+ consecutive attempts
-    at market close in production before the fix (a guard on atr_df's
-    own length before calling .ta.atr() at all)."""
+def test_atr_is_continuous_even_when_the_regular_session_tail_is_very_short(config):
+    """Only 3 bars have crossed into the regular session so far (far
+    short of atr_period+1) -- ATR must still be populated from the FULL
+    120-bar buffer rather than going None, since it's no longer
+    restricted to the (here, very thin) same-session tail."""
     from talonx_quant.indicators import compute_indicators
 
-    # Default seed is all pre-market; force just the LAST 3 rows to
-    # "regular" -- the session tail (3 rows) is shorter than
-    # atr_period+1 (15), the exact condition that broke pandas_ta's
-    # atr() live.
     buf = _seed_buffer(config.min_bars_required)
     df = buf.get_dataframe("AAPL")
     session_col = df.columns.get_loc("session")
@@ -193,15 +195,16 @@ def test_atr_does_not_crash_when_the_session_tail_is_shorter_than_atr_period(con
 
     snapshot = compute_indicators(df, config)  # must not raise
 
-    assert snapshot.atr is None  # correctly reset -- not enough same-session bars yet
+    assert snapshot.atr is not None
+    assert snapshot.bar_true_range is not None
 
 
-def test_atr_and_bar_true_range_are_none_when_the_latest_bar_is_the_sessions_first(config):
+def test_atr_and_bar_true_range_are_continuous_when_the_latest_bar_is_the_sessions_first(config):
     """The buffer's LAST bar is exactly the regular session's FIRST bar
-    (09:30 ET), every bar before it pre-market -- ATR's baseline must
-    reset to None here (no in-session history at all yet to compute
-    either the smoothed average or a "previous close" true range from),
-    rather than reaching back across the session boundary."""
+    (09:30 ET), every bar before it pre-market -- ATR/bar_true_range must
+    still be populated (reading the previous, pre-market bar's close as
+    the "previous close" for this bar's true range), not go None the way
+    a session-restricted baseline would right at this exact boundary."""
     from talonx_quant.indicators import compute_indicators
 
     # 119 minutes before 13:30 UTC (09:30 ET) puts bar 119 (the last of
@@ -214,8 +217,8 @@ def test_atr_and_bar_true_range_are_none_when_the_latest_bar_is_the_sessions_fir
 
     snapshot = compute_indicators(df, config)
 
-    assert snapshot.atr is None
-    assert snapshot.bar_true_range is None
+    assert snapshot.atr is not None
+    assert snapshot.bar_true_range is not None
 
 
 # --- Dual Volume Baselines (pre-market vs. regular session) --------------

@@ -43,12 +43,15 @@ EntryBlackout = Literal["none", "opening", "closing"]
 
 # Carved out of the `regular` session purely for consumer.py's entry gate --
 # deliberately NOT folded into get_session/Session above, which also drives
-# bar-buffer session tagging (buffer.py) and ATR-continuity resets
-# (indicators.py's _same_session_tail): widening Session to 5 states would
-# make ATR reset itself every day at 09:30, 09:45, 15:30 AND 16:00 instead
-# of just at the pre-market/regular boundary, right during the highest-
-# volume parts of the session -- an unrelated regression this module must
-# not cause. This is an orthogonal, narrower classification layered on top.
+# bar-buffer session tagging (buffer.py) and the volume-surge baseline's
+# session-scoped reset (indicators.py's _same_session_tail -- ATR itself
+# is deliberately continuous across sessions as of a 2026-08-16 quant
+# audit, and no longer uses this helper): widening Session to 5 states
+# would make the volume baseline reset itself every day at 09:30, 09:45,
+# 15:30 AND 16:00 instead of just at the pre-market/regular boundary,
+# right during the highest-volume parts of the session -- an unrelated
+# regression this module must not cause. This is an orthogonal, narrower
+# classification layered on top.
 _OPENING_BLACKOUT_START = time(9, 30)
 _OPENING_BLACKOUT_END = time(9, 45)
 _CLOSING_BLACKOUT_START = time(15, 30)

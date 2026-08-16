@@ -142,16 +142,40 @@ class QuantConfig:
     min_ma_spread_pct: float = _env_float("TALONX_QUANT_MIN_MA_SPREAD_PCT", 0.0015)
 
     # Batch throttle: across ALL tickers, at most this many signals are
-    # released per throttle_window_seconds, ranked by (confluence_score,
-    # volume_surge_ratio) -- confluence first, volume surge as the
-    # tiebreaker (a signal with no computed ratio sorts last within its
-    # confluence tier). Candidates are buffered for the full window
-    # before any of them are released -- see consumer.py's
-    # _flush_throttle_window -- so a signal can be delayed by up to
-    # throttle_window_seconds, or dropped entirely if it doesn't rank in
-    # the top throttle_max_signals that window.
+    # released per throttle_window_seconds, ranked by a weighted
+    # Composite Opportunity Score (see consumer.py's _opportunity_score).
+    # Candidates are buffered for the full window before any of them are
+    # released -- see consumer.py's _flush_throttle_window -- so a signal
+    # can be delayed by up to throttle_window_seconds, or dropped
+    # entirely if it doesn't rank in the top throttle_max_signals that
+    # window.
     throttle_window_seconds: float = _env_float("TALONX_QUANT_THROTTLE_WINDOW_SECONDS", 60.0)
     throttle_max_signals: int = _env_int("TALONX_QUANT_THROTTLE_MAX_SIGNALS", 3)
+
+    # Composite Opportunity Score weights (2026-08-16 quant audit, P1) --
+    # replaces the old (confluence_score, volume_surge_ratio) tuple-sort,
+    # whose raw-ratio tiebreaker systematically favored penny/meme-stock
+    # pumps (huge surge ratios on a thin baseline volume) over a
+    # higher-conviction, better-risk-reward setup on a liquid large-cap
+    # with a smaller relative surge. Each factor is normalized to [0, 1]
+    # before weighting (confluence_score/3, min(risk_reward_ratio/
+    # opportunity_score_rr_cap, 1), min(volume_surge_ratio/
+    # opportunity_score_volume_cap, 1), and 1.0/0.5/0.0 for
+    # trend_aligned True/None/False) so no single unbounded input can
+    # dominate the ranking on scale alone. Weights sum to 1.0 by default
+    # but aren't required to -- only their RELATIVE size matters for
+    # ranking.
+    opportunity_score_confluence_weight: float = _env_float("TALONX_QUANT_OPPORTUNITY_CONFLUENCE_WEIGHT", 0.35)
+    opportunity_score_rr_weight: float = _env_float("TALONX_QUANT_OPPORTUNITY_RR_WEIGHT", 0.30)
+    opportunity_score_volume_weight: float = _env_float("TALONX_QUANT_OPPORTUNITY_VOLUME_WEIGHT", 0.20)
+    opportunity_score_trend_weight: float = _env_float("TALONX_QUANT_OPPORTUNITY_TREND_WEIGHT", 0.15)
+    # R:R of 5:1 and a 10x volume surge are both treated as "maxed out"
+    # (normalized to 1.0) -- comfortably above what min_risk_reward_ratio
+    # (1.5) and the surge thresholds (2.0x/3.0x) require, so a genuinely
+    # exceptional setup doesn't need an even MORE extreme reading to rank
+    # at the top of its factor.
+    opportunity_score_rr_cap: float = _env_float("TALONX_QUANT_OPPORTUNITY_RR_CAP", 5.0)
+    opportunity_score_volume_cap: float = _env_float("TALONX_QUANT_OPPORTUNITY_VOLUME_CAP", 10.0)
 
     # --- Analyst-review filters (added after a live paper-trading review
     # found a 0.33 profit factor and a 25% win rate, with 3 consecutive
@@ -178,30 +202,39 @@ class QuantConfig:
     # per-ticker cooldown lock or the global throttle.
     confluence_score_min: int = _env_int("TALONX_QUANT_CONFLUENCE_SCORE_MIN", 2)
 
-    # Dollar stop/target levels attached to a published signal (see
-    # strategy.py's _stop_target_prices) -- stop = atr_stop_multiplier x
-    # ATR against the trade; target = pivot_resistance/support (see
-    # DailyPivots below) when available, else atr_reward_multiplier x ATR
-    # as a fallback while the prior-session pivot data is still warming up.
-    atr_reward_multiplier: float = _env_float("TALONX_QUANT_ATR_REWARD_MULTIPLIER", 2.0)
-    atr_stop_multiplier: float = _env_float("TALONX_QUANT_ATR_STOP_MULTIPLIER", 1.0)
-    assumed_stop_loss_pct: float = _env_float("TALONX_QUANT_ASSUMED_STOP_LOSS_PCT", 0.005)
-
     # Structural Risk/Reward filter (replaces the old constant-ATR-ratio
     # gate, which compared two fixed ATR multiples against each other and
     # was mathematically constant regardless of market data -- see git
-    # history for the prior implementation). Reward is now measured to the
+    # history for the prior implementation). Reward is measured to the
     # nearest classic floor-trader PIVOT LEVEL (prior completed regular
     # session's R1/S1 -- see indicators.compute_daily_pivots), a genuine
     # market-derived target rather than another ATR multiple; risk is
-    # pivot_stop_atr_multiplier x ATR (Requirement default: 1.5x). A
-    # candidate whose prior-session pivot data isn't available yet
-    # (cold start, or the HTF buffer hasn't accumulated a full session)
-    # gets risk_reward_ratio=None and is dropped by this gate -- same
+    # atr_stop_multiplier x ATR (default 1.5x). A candidate whose
+    # prior-session pivot data isn't available yet (cold start, or the
+    # HTF buffer hasn't accumulated a full session) gets
+    # risk_reward_ratio=None and is dropped by this gate -- same
     # "insufficient data -> no signal" fail-closed posture every other
     # warm-up-dependent check in this module already takes, rather than
     # silently falling back to a non-structural approximation.
-    pivot_stop_atr_multiplier: float = _env_float("TALONX_QUANT_PIVOT_STOP_ATR_MULTIPLIER", 1.5)
+    #
+    # 2026-08-16 quant-audit fix: atr_stop_multiplier is now the SINGLE
+    # source of truth for the risk distance, used identically by
+    # _structural_risk_reward's denominator AND _stop_target_prices'
+    # EXECUTED dollar stop (see strategy.py's own docstrings). This used
+    # to be two separate config values (a `pivot_stop_atr_multiplier`
+    # of 1.5x feeding only the gate, a `atr_stop_multiplier` of 1.0x
+    # feeding only the executed stop) -- a real trade could pass the
+    # gate at a nominal 2.0 R:R while its ACTUAL executed R:R (reward /
+    # the tighter 1.0x-ATR stop that was really live) was 3.0, an
+    # evaluated-vs-executed discrepancy an independent audit caught by
+    # example. One multiplier, one risk distance, everywhere.
+    atr_stop_multiplier: float = _env_float("TALONX_QUANT_ATR_STOP_MULTIPLIER", 1.5)
+    # Fallback target multiple (see _stop_target_prices) -- only used
+    # while a candidate's prior-session pivot data is still warming up;
+    # once pivots are available, the target is the structural pivot
+    # level instead, not this ATR multiple.
+    atr_reward_multiplier: float = _env_float("TALONX_QUANT_ATR_REWARD_MULTIPLIER", 2.0)
+    assumed_stop_loss_pct: float = _env_float("TALONX_QUANT_ASSUMED_STOP_LOSS_PCT", 0.005)
     min_risk_reward_ratio: float = _env_float("TALONX_QUANT_MIN_RISK_REWARD_RATIO", 1.5)
 
     # --- Minimum volatility gate (2026-08-14 session review: ADC, a

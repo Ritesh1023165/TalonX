@@ -1,6 +1,15 @@
 redis>=5.0
 pandas>=2.0
-pandas_ta>=0.3.14b0
+# 2026-08-16 quant audit (DevOps finding): floor was previously
+# pandas_ta>=0.3.14b0, which references the removed numpy.NaN alias and
+# crashes on install against numpy>=2.0 (AttributeError: module 'numpy'
+# has no attribute 'NaN') unless a developer manually patches it before
+# import -- see indicators.py's own compatibility note. 0.4.71b0 (the
+# pandas-ta.dev fork, confirmed working here against numpy 2.2.6) is the
+# first version that dropped the numpy.NaN reference; pinning the floor
+# here instead of relying on a manual runtime patch.
+pandas_ta>=0.4.71b0
+numpy>=2.0,<3.0
 pydantic>=2.0
 
 # fundamental_consumer.py's last-close fallback (Phase 2 LONG_TERM path) --

@@ -5,23 +5,28 @@ talonx:market:stream (Redis)
     → parse + validate each message as MarketTickEvent
     → only BAR-type events matter (trades/quotes are ignored --
       indicators need OHLCV, not tick-level data)
-    → append to a per-ticker rolling buffer (bounded, oldest bars drop off)
-    → once enough history exists (120 bars by default):
-        → compute RSI, MACD, SMA fast/slow, volume-surge ratio, ATR(14) via pandas_ta
+    → append to a per-ticker rolling buffer (bounded, oldest bars drop off);
+      the still-FORMING bucket updates in place on every tick, but
+      indicators/signals are only ever EVALUATED once that bucket CLOSES
+      (the next bucket's first tick arrives) -- see Closed-Bar Evaluation below
+    → once enough history exists (120 bars by default) AND a bar has just closed:
+        → compute RSI, MACD, SMA fast/slow, volume-surge ratio, and ATR(14)
+          (continuous across the session boundary, see below) via pandas_ta
         → evaluate against configured thresholds, EDGE-TRIGGERED (fires
           only on the bar the condition first becomes true, not every
           subsequent bar it remains true), AND requiring this bar's own
           true range to clear 1.0x ATR (a routine, average-sized bar
           doesn't count as a real move):
             - RSI curls back ABOVE 30 (was below, recovers) AND volume > 2x average → bullish (oversold reversal + surge)
-            - RSI crosses over 70 AND volume > 2x average  → bearish (overbought + surge)
+            - RSI curls back BELOW 70 (was above, recovers) AND volume > 2x average → bearish (overbought reversal + surge)
             - MACD line crosses its signal line             → bullish/bearish cross
             - fast MA crosses slow MA, spread >= 0.15% of price → golden/death cross
         → every signal that fires carries a DIRECTION-AWARE confluence_score
           (0-3: MACD cross + RSI extreme IN THAT DIRECTION + volume surge --
           an overbought RSI earns a BULLISH candidate 0 points for that leg)
           and a structural risk_reward_ratio (distance to the prior session's
-          nearest pivot level / 1.5x ATR)
+          nearest pivot level / atr_stop_multiplier x ATR -- the SAME
+          multiplier the executed stop_price uses)
     → candidate signal(s) for a ticker are DROPPED if that ticker is
       currently in POST-LOSS LOCKOUT (75 min default, armed when
       talonx_paper reports a losing SELL for it) or within its standard
@@ -31,9 +36,11 @@ talonx:market:stream (Redis)
       cooldown lock is armed -- a filtered-out candidate must not still
       consume the ticker's cooldown slot
     → surviving candidate(s) arm the ticker's cooldown now and are buffered
-    → every 60s (default), the buffer is ranked by (confluence_score,
-      volume_surge_ratio) and only the top 3 (default) are published to
-      Redis (talonx:signals:quant) -- the rest are dropped
+    → every 60s (default), the buffer is ranked by a weighted Composite
+      Opportunity Score (confluence + structural R:R + volume surge +
+      trend alignment, each normalized to [0,1]) and only the top 3
+      (default) are published to Redis (talonx:signals:quant) -- the
+      rest are dropped
     → EVERY dropped candidate, at EVERY gate above, also publishes a
       RejectedCandidateEvent to talonx:quant:rejected -- talonx_dispatch
       persists one row per candidate to its rejected_candidates table (see
@@ -72,26 +79,36 @@ for the full before/after):**
   since overbought is bearish evidence, not long conviction), +1 for a
   volume surge above threshold. `consumer.py` drops anything below the
   minimum before the per-ticker cooldown is armed.
-- **RSI Reversal Curl** (`strategy.py`'s `_check_rsi_volume_setup`) — the
-  bullish RSI+volume setup no longer fires the instant RSI first dips
-  below `rsi_oversold` (a falling-knife entry with no confirmation the
-  selloff has stopped); it waits for RSI to curl back UP and recover
-  above the threshold first (`rsi_prev` still below it, `rsi` now at/above
-  it), then fires on that recovery bar. The bearish leg (RSI crossing
-  INTO overbought) is unchanged.
+- **RSI Reversal Curl** (`strategy.py`'s `_check_rsi_volume_setup`) —
+  BOTH legs now wait for a recovery instead of firing on the initial
+  breach: bullish fires when RSI curls back UP above `rsi_oversold`
+  (`rsi_prev` still below it, `rsi` now at/above it), and bearish fires
+  when RSI curls back DOWN below `rsi_overbought` (symmetric --
+  `rsi_prev` still above it, `rsi` now at/below it). A 2026-08-16 quant
+  audit flagged the original asymmetric version (bearish fired
+  immediately on the INITIAL cross into overbought) as a momentum trap:
+  in a trending bull market RSI can sit elevated for hours, and shorting
+  the first touch fights the trend rather than confirming a genuine
+  reversal.
 - **Structural R:R filter** (`strategy.py`'s `_structural_risk_reward`,
-  `TALONX_QUANT_PIVOT_STOP_ATR_MULTIPLIER` default 1.5,
+  `TALONX_QUANT_ATR_STOP_MULTIPLIER` default 1.5,
   `TALONX_QUANT_MIN_RISK_REWARD_RATIO` default 1.5) — reward is measured
   to the nearest classic floor-trader pivot level (the prior COMPLETED
   regular session's R1 for a bullish candidate, S1 for a bearish one —
   `P = (H+L+C)/3`, `R1 = 2P-L`, `S1 = 2P-H`, computed by
   `indicators.compute_daily_pivots` from the 15-min HTF buffer), not a
   second ATR multiple — a genuine market-derived target, not a
-  configuration-constant ratio. Risk is `pivot_stop_atr_multiplier x ATR`.
-  `risk_reward_ratio` is `None` (fail-closed, gate drops the candidate)
-  until at least one full prior regular session's pivot data is
-  available. `stop_price`/`target_price` (`TALONX_QUANT_ATR_STOP_MULTIPLIER`
-  default 1.0 for the stop) use this SAME pivot level as the target when
+  configuration-constant ratio. Risk is `atr_stop_multiplier x ATR` —
+  **the SAME multiplier `stop_price` is built from** (harmonized
+  2026-08-16 after a quant audit caught the gate evaluating against a
+  DIFFERENT, wider risk distance — the old separate
+  `pivot_stop_atr_multiplier`, 1.5x — than the stop actually executed
+  with — the old `atr_stop_multiplier`, 1.0x — so a trade could pass the
+  R:R gate at a nominal ratio while its actual executed R:R, measured
+  against the real stop, was materially different). `risk_reward_ratio` is
+  `None` (fail-closed, gate drops the candidate) until at least one full
+  prior regular session's pivot data is available. `target_price` uses
+  the SAME pivot level `risk_reward_ratio`'s reward side does when
   available, falling back to `TALONX_QUANT_ATR_REWARD_MULTIPLIER` (2.0x
   ATR) only while pivot data is still warming up.
 - **Post-loss lockout** (`consumer.py`, `TALONX_QUANT_LOSS_LOCKOUT_SECONDS`,
@@ -109,18 +126,91 @@ for the full before/after):**
   one is accepted, until the cooldown expires. This is what stops e.g. an
   RSI+volume setup at 15:01 and an unrelated MACD cross at 15:12 on the
   same ticker from both alerting.
-- **Batch throttle** (`consumer.py`, `TALONX_QUANT_THROTTLE_WINDOW_SECONDS`
+- **Batch throttle + Composite Opportunity Score** (`consumer.py`'s
+  `_flush_throttle_window`/`_opportunity_score`, `TALONX_QUANT_THROTTLE_WINDOW_SECONDS`
   default 60 / `TALONX_QUANT_THROTTLE_MAX_SIGNALS` default 3) — candidates
   that clear everything above are buffered, not published immediately.
-  Every window, the buffer is ranked by `(confluence_score,
-  volume_surge_ratio)` — confluence first, volume surge as the tiebreaker
-  (a signal with no computed ratio sorts last within its confluence tier)
-  — and only the top N are actually published. **This is a deliberate
-  latency-for-quality tradeoff**: a signal can sit for up to the full
-  window before it's published or dropped — there is no way to guarantee
-  "top N of the window" without waiting for the window to close first. A
-  final partial-window flush happens on `Ctrl+C`/reconnect so nothing
-  buffered is silently lost.
+  Every window, the buffer is ranked by a weighted composite score and
+  only the top N are actually published:
+  ```
+  score = 0.35 * (confluence_score / 3)
+        + 0.30 * min(risk_reward_ratio / 5.0, 1.0)
+        + 0.20 * min(volume_surge_ratio / 10.0, 1.0)
+        + 0.15 * (1.0 if trend_aligned else 0.5 if trend_aligned is None else 0.0)
+  ```
+  All four weights and both caps are env-configurable
+  (`TALONX_QUANT_OPPORTUNITY_{CONFLUENCE,RR,VOLUME,TREND}_WEIGHT`,
+  `TALONX_QUANT_OPPORTUNITY_{RR,VOLUME}_CAP`). Replaces the original
+  `(confluence_score, volume_surge_ratio)` tuple-sort (2026-08-16 quant
+  audit, P1): sorting on the RAW volume-surge ratio as a tiebreaker
+  systematically favored penny/meme-stock pumps — which can post
+  enormous surge ratios purely because their baseline volume is thin —
+  over a higher-conviction, better-risk-reward setup on a liquid
+  large-cap with a smaller relative surge. Normalizing every factor to
+  `[0, 1]` before weighting means no single unbounded input can dominate
+  the ranking on scale alone. **This is a deliberate latency-for-quality
+  tradeoff**: a signal can sit for up to the full window before it's
+  published or dropped — there is no way to guarantee "top N of the
+  window" without waiting for the window to close first. A final
+  partial-window flush happens on `Ctrl+C`/reconnect so nothing buffered
+  is silently lost.
+
+## 2026-08-16 quant audit: closed-bar evaluation and continuous ATR
+
+An independent quantitative/architectural audit of the 2026-08-16
+requirement-doc fixes above (direction-aware confluence, structural R:R,
+RSI reversal curl) surfaced two further P0-severity correctness gaps and
+a P1 volatility-modeling flaw:
+
+- **Closed-Bar Evaluation** (`consumer.py`'s `_handle_market_tick`) —
+  indicators/signals used to be evaluated on EVERY tick, including a
+  still-forming (not yet closed) 1-minute bar: `_update_1m_buffer`
+  already updated the current bucket's OHLCV in place on every tick (for
+  other consumers, e.g. the pre-market liquidity gate's dollar-volume
+  read), but `compute_indicators`/`evaluate_signals` ran against that
+  SAME partial, still-moving candle. An RSI/MACD/MA crossing could flash
+  true on an early tick within the minute and be false again by the
+  bar's actual close — a "phantom trigger"/repaint, not just extra
+  noise, since the published signal's own indicator values (rsi, macd,
+  etc.) reflected a price that was never the bar's final one. Fixed by
+  gating evaluation on `bar_just_closed`: the buffer's dataframe is
+  captured the INSTANT a symbol's next bucket's first tick arrives —
+  before that tick's own bucket is written — so its last row is always
+  the bar that just closed, never the one just starting. The buffer
+  itself still updates every tick unchanged; only the evaluation trigger
+  changed.
+- **Harmonized risk distance** — see the Structural R:R filter bullet
+  above; `_structural_risk_reward`'s gate and `_stop_target_prices`'
+  executed stop now share one `atr_stop_multiplier`, closing a
+  discrepancy where a candidate could pass the R:R gate on a WIDER risk
+  distance than the stop it was actually published/executed with.
+- **RSI Reversal Curl made symmetric** — see the RSI Reversal Curl
+  bullet above; the bearish leg now waits for a recovery back below
+  `rsi_overbought` too, instead of firing on the initial cross in (a
+  momentum trap in a trending market).
+- **Continuous ATR across the session boundary** (`indicators.py`'s
+  `compute_indicators`) — ATR/`bar_true_range` used to reset at the
+  regular-session open the same way the volume-surge baseline still
+  does (`_same_session_tail`), restricting the ATR window to only the
+  bars since 09:30 ET. Right after the open, that meant computing ATR
+  from a handful of opening-range bars — which typically run 3-5x wider
+  than midday trading — producing an artificially inflated, unstable
+  baseline exactly when the ATR-move gate and structural R:R's risk
+  distance most need a stable read. Liquidity genuinely resets at a
+  session boundary (pre-market participation is thin); true price range
+  doesn't, so ATR is now computed from the FULL buffer, continuous
+  across the boundary. The volume baseline is UNCHANGED and still
+  session-restricted — these are two different concepts (a rolling
+  volatility measure vs. a session-scoped liquidity measure) that
+  happened to share one reset mechanism before this fix, not one that
+  should.
+- **Dependency pinning** (`talonx_quant/requirements.txt`) — floored
+  `pandas_ta` at `0.4.71b0` (confirmed numpy-2.0-compatible) with an
+  explicit `numpy>=2.0,<3.0` pin, replacing the prior
+  `pandas_ta>=0.3.14b0` floor, which references the removed `numpy.NaN`
+  alias and previously required a developer to manually patch it before
+  import against a modern NumPy — a fragile, easy-to-forget workaround
+  now made unreachable by a correct dependency floor instead.
 
 ## 2026-08-14 session review: entry blackouts and the volatility gate
 
@@ -147,9 +237,11 @@ the range to reach an ATR-scaled stop/target.
   pre-market/regular boundary already gets in that module) — a narrower
   classification layered ON TOP of, not folded into, `get_session`'s
   pre-market/regular/closed states: widening `Session` itself to 5 states
-  would reset ATR's session-continuity window at 09:30, 09:45, 15:30 AND
-  16:00 every day instead of just at the pre-market/regular boundary,
-  right during the highest-volume parts of the session.
+  would reset the volume-surge baseline's session-scoped window at
+  09:30, 09:45, 15:30 AND 16:00 every day instead of just at the
+  pre-market/regular boundary, right during the highest-volume parts of
+  the session (ATR itself is exempt from this concern entirely — see
+  the Continuous ATR fix in the 2026-08-16 quant audit section above).
     - **Opening blackout** (09:30–09:45 ET) — ALL candidates suppressed,
       both directions. Suppression recorded as `OPENING_BLACKOUT`; metric
       `dropped_opening_blackout`.
@@ -207,7 +299,13 @@ the range to reach an ATR-scaled stop/target.
   backfilled via yfinance historical pre-seeding rather than re-warming up
   purely from live ticks — see
   [../bar_buffer_persistence.md](../bar_buffer_persistence.md) for the
-  full write-up.
+  full write-up. **Aggregation vs. evaluation are deliberately separate**
+  (Closed-Bar Evaluation, above): the buffer keeps updating the
+  still-forming bucket in place every tick (other consumers, e.g. the
+  pre-market liquidity gate, want that freshness), but
+  `_handle_market_tick` only ever runs `compute_indicators`/
+  `evaluate_signals` once a bucket has fully CLOSED, never against the
+  partial one.
 - **`indicators.py`** — computes both the *current* and *previous*
   values for RSI, MACD, and moving averages, not just the latest, since
   edge-triggering/crossover detection needs to know the relationship
@@ -215,14 +313,17 @@ the range to reach an ATR-scaled stop/target.
   **Dual Volume Baselines**: the 20-bar volume-surge baseline
   (`TALONX_QUANT_VOLUME_AVG_PERIOD`) is restricted to the trailing
   contiguous run of bars sharing the LATEST bar's session tag (via
-  `buffer.py`'s per-bar session tagging and the same `_same_session_tail`
-  helper the ATR-reset gate already used) — a regular-session bar's
-  volume is never compared against a window still mostly full of thin
-  pre-market volume, or vice versa. Goes back to `None` (fresh warm-up)
-  right at a session transition until 20 same-session bars accumulate,
-  same posture as the ATR reset. `compute_daily_pivots` (Structural R:R,
-  above) also lives here, reading the 15-min HTF buffer's
-  `regular`-session bars only, grouped by America/New_York calendar date.
+  `buffer.py`'s per-bar session tagging and the `_same_session_tail`
+  helper) — a regular-session bar's volume is never compared against a
+  window still mostly full of thin pre-market volume, or vice versa.
+  Goes back to `None` (fresh warm-up) right at a session transition
+  until 20 same-session bars accumulate. **ATR is deliberately NOT
+  restricted this way** (see the 2026-08-16 Continuous ATR fix above) —
+  liquidity resets at a session boundary, true price range doesn't, so
+  `_same_session_tail` is now used ONLY for this volume baseline, not
+  ATR. `compute_daily_pivots` (Structural R:R, above) also lives here,
+  reading the 15-min HTF buffer's `regular`-session bars only, grouped
+  by America/New_York calendar date.
 - **`strategy.py`** — a single bar update can trigger multiple
   independent signals at once (e.g. an RSI+volume setup and a MACD cross
   on the same bar) — each is evaluated separately rather than collapsed
