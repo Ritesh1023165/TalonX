@@ -110,9 +110,10 @@ rather than sharing Python objects across module boundaries.
   **Restart-survival fix**: the DCA cadence used to be a purely
   in-process `asyncio.sleep(dca_interval_days)` timer with no persisted
   checkpoint — since that interval (30 days default) vastly exceeds a
-  typical scheduled daily uptime window
-  (`register_scheduled_tasks.ps1`'s default 10:00–22:00, ~12h), the
-  timer could never complete at all under a daily-restart schedule, and
+  typical scheduled Mon-Fri uptime window
+  (`register_scheduled_tasks.ps1`'s default 08:00–22:00, ~14h/day,
+  Mon-Fri only), the timer could never complete at all under a
+  daily-restart schedule, and
   zero `DCA_CONTRIBUTION` rows had ever been recorded live. `_dca_loop`
   now computes its wait from `store.get_last_dca_at()`/`set_last_dca_at()`
   (a timestamp persisted on `long_term_portfolio_state`), so a restart

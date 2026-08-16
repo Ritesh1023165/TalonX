@@ -376,10 +376,13 @@ this process actually runs under: **not a 24x7 service**. `talonx_quant`
 persistence (`--appendonly yes`) and a named volume (`talonx-redis-data:
 /data`), so no persistence changes were needed there. TalonX itself is
 started/stopped by `scripts/start_talonx.ps1`/`stop_talonx.ps1`, normally
-on a daily Windows Scheduled Task (`scripts/register_scheduled_tasks.ps1`)
-covering Mon-Fri ~08:00-22:00 UK local time — Task Scheduler's own daily
-trigger already handles the GMT/BST transition, so no new timezone logic
-was needed either. Both this process and Redis are expected to be
+on a Monday-Friday-only Windows Scheduled Task
+(`scripts/register_scheduled_tasks.ps1`, a WEEKLY trigger scoped to
+`-DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday` — NOT `-Daily`,
+which would also fire on Saturday/Sunday) covering ~08:00-22:00 UK local
+time by default — Task Scheduler's own weekly trigger already handles
+the GMT/BST transition, so no new timezone logic was needed for the
+scheduler itself. Both this process and Redis are expected to be
 stopped outside that window. Three fixes, all scoped to that model (see
 `consumer.py`'s own module docstring, "Round-4 quant audit" section, for
 the full technical writeup):
@@ -497,6 +500,32 @@ must be satisfied before a signal actually publishes.
   deployment architecture (`docs/running.md` / `scripts/start_talonx.ps1`
   + `docker-compose.yaml`'s Redis-only Compose service) is unchanged —
   this round is purely an in-process gating rule, not a deployment change.
+
+## 2026-08-16 quant audit (round 6): scheduled-task weekday scoping
+
+**Critical design principle: the scheduled task controls PROCESS
+LIFECYCLE; the TalonX application itself controls whether trading is
+currently PERMITTED.** Round 5 above already made the application side
+of that true (`is_operating_window_open`, checked independently of when
+or how the process started). This round fixes the one place the OTHER
+half of that statement wasn't yet true: `scripts/register_scheduled_tasks.ps1`
+used `New-ScheduledTaskTrigger -Daily`, which fires every day INCLUDING
+Saturday/Sunday — harmless in practice (round 5's gate would still have
+refused to publish), but pointless: no reason to leave the process
+running unattended on a weekend at all. Fixed to
+`New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday,Tuesday,Wednesday,
+Thursday,Friday`, and `-StartTime`'s default corrected from `10:00` to
+match the actual trading-session open, `08:00` (`-StopTime`'s `22:00`
+default was already correct). Windows Task Scheduler's weekly triggers
+are just as DST-aware as its daily ones were (a local-time trigger of
+any recurrence type auto-adjusts for the machine's own GMT/BST changes),
+so this is a day-of-week fix only, nothing timezone-related changed.
+This script remains explicitly NOT the mechanism that keeps trading
+safe — it merely avoids leaving the process running unattended outside
+the normal window on a machine that's otherwise always on. A manual
+`.\scripts\start_talonx.ps1` at any arbitrary time (Saturday, or any
+other outside-window instant) still leaves the process running with
+trading correctly disabled by round 5's gate.
 
 ## 2026-08-14 session review: entry blackouts and the volatility gate
 

@@ -22,7 +22,7 @@ C:\workspace\TalonX\              <- open THIS folder as your project root
 │   ├── stop_talonx.ps1
 │   ├── start_dashboard_web.ps1
 │   ├── stop_dashboard_web.ps1
-│   ├── register_scheduled_tasks.ps1  <- daily scheduled restart
+│   ├── register_scheduled_tasks.ps1  <- Mon-Fri scheduled start/stop (08:00/22:00 default)
 │   └── ticker_funnel_report.py       <- per-ticker pipeline diagnostic (read-only, safe against a live instance)
 ├── docs\                           <- this documentation
 ├── tests\                          <- see running.md §"Run the test suite"
