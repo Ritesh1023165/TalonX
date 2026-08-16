@@ -311,6 +311,38 @@ async def test_risk_check_failure_does_not_record_a_rejection_when_failing_open(
     assert _rejection_publishes(scanner) == []
 
 
+# --- Fail-Closed Lock Persistence (2026-08-16 quant audit, round 3) -------
+# A Redis SET failure while ARMING loss-lockout/cooldown (as opposed to a
+# failure CHECKING one, covered above) used to only log a warning and let
+# the lock silently never take effect -- these cover the in-memory
+# fallback lock that now enforces it instead.
+
+@pytest.mark.asyncio
+async def test_start_loss_lockout_falls_back_to_in_memory_lock_on_redis_set_failure(scanner):
+    scanner._client.set.side_effect = ConnectionError("redis down")
+
+    await scanner._start_loss_lockout("AAPL")
+
+    assert await scanner._is_loss_locked_out("AAPL") is True
+
+
+@pytest.mark.asyncio
+async def test_is_loss_locked_out_ignores_expired_in_memory_fallback_lock(scanner):
+    scanner._loss_lockout_fallback["AAPL"] = datetime.now(timezone.utc) - timedelta(seconds=1)
+
+    assert await scanner._is_loss_locked_out("AAPL") is False
+    assert "AAPL" not in scanner._loss_lockout_fallback  # pruned on read
+
+
+@pytest.mark.asyncio
+async def test_start_loss_lockout_clears_in_memory_fallback_on_successful_set(scanner):
+    scanner._loss_lockout_fallback["AAPL"] = datetime.now(timezone.utc) + timedelta(seconds=60)
+
+    await scanner._start_loss_lockout("AAPL")
+
+    assert "AAPL" not in scanner._loss_lockout_fallback
+
+
 # --- Cooldown -------------------------------------------------------------
 
 @pytest.mark.asyncio
@@ -380,6 +412,35 @@ async def test_is_on_cooldown_fails_open_when_explicitly_configured(scanner):
     scanner._client.exists.side_effect = ConnectionError("redis down")
 
     assert await scanner._is_on_cooldown("AAPL") is False
+
+
+# --- Fail-Closed Lock Persistence, cooldown leg (2026-08-16 quant audit,
+# round 3) -- see the loss-lockout block above for the mirrored coverage.
+
+@pytest.mark.asyncio
+async def test_start_cooldown_falls_back_to_in_memory_lock_on_redis_set_failure(scanner):
+    scanner._client.set.side_effect = ConnectionError("redis down")
+
+    await scanner._start_cooldown("AAPL")
+
+    assert await scanner._is_on_cooldown("AAPL") is True
+
+
+@pytest.mark.asyncio
+async def test_is_on_cooldown_ignores_expired_in_memory_fallback_lock(scanner):
+    scanner._cooldown_fallback["AAPL"] = datetime.now(timezone.utc) - timedelta(seconds=1)
+
+    assert await scanner._is_on_cooldown("AAPL") is False
+    assert "AAPL" not in scanner._cooldown_fallback  # pruned on read
+
+
+@pytest.mark.asyncio
+async def test_start_cooldown_clears_in_memory_fallback_on_successful_set(scanner):
+    scanner._cooldown_fallback["AAPL"] = datetime.now(timezone.utc) + timedelta(seconds=60)
+
+    await scanner._start_cooldown("AAPL")
+
+    assert "AAPL" not in scanner._cooldown_fallback
 
 
 # --- Confluence / risk-reward filters (run before the cooldown lock) ------
@@ -682,6 +743,12 @@ async def test_revalidate_candidate_updates_price_and_rr_on_success(scanner):
     assert result.price == pytest.approx(101.0)
     assert result.risk_reward_ratio == pytest.approx(3.0)
     assert result.signal_age_ms is not None
+    # Canonical Trade Geometry (2026-08-16 quant audit, round 3): stop/
+    # target must be re-derived against the SAME revalidated price the
+    # ratio above was measured against -- not left pinned to the
+    # original, stale entry price.
+    assert result.stop_price == pytest.approx(101.0 - 3.0)  # price - atr_stop_multiplier(1.5)*atr(2.0)
+    assert result.target_price == pytest.approx(110.0)  # pivot resistance, unchanged
 
 
 @pytest.mark.asyncio
@@ -697,6 +764,8 @@ async def test_revalidate_candidate_bearish_uses_pivot_support(scanner):
     assert result is not None
     # reward = 99 - 94 = 5; risk = 1.5 * 2 = 3; ratio ~= 1.67
     assert result.risk_reward_ratio == pytest.approx(5.0 / 3.0)
+    assert result.stop_price == pytest.approx(99.0 + 3.0)  # price + atr_stop_multiplier(1.5)*atr(2.0)
+    assert result.target_price == pytest.approx(94.0)  # pivot support, unchanged
 
 
 @pytest.mark.asyncio
@@ -966,6 +1035,8 @@ async def test_handle_message_suppresses_signal_failing_trend_gate(scanner, monk
 @pytest.mark.asyncio
 async def test_handle_message_passes_signal_with_trend_aligned_true(scanner, monkeypatch):
     aligned = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=2.0)
+    aligned.session = "regular"
+    aligned.htf_sma_200 = 90.0  # gate applicable AND resolved -- not the unavailable case
     aligned.trend_aligned = True
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
@@ -977,6 +1048,74 @@ async def test_handle_message_passes_signal_with_trend_aligned_true(scanner, mon
     await scanner._handle_message(_bar_message("AAPL"))
 
     assert len(scanner._pending_candidates) == 1
+    assert scanner.signals_suppressed_htf_unavailable == 0
+
+
+# --- HTF-Unavailable Trend Gate (2026-08-16 quant audit, round 3) ---------
+# trend_aligned=None used to mean BOTH "gate doesn't apply" and "gate
+# applies but the HTF buffer hasn't warmed up" -- these confirm the two
+# are now distinguished (see _trend_gate_applicable).
+
+@pytest.mark.asyncio
+async def test_handle_message_suppresses_bullish_regular_session_signal_when_htf_unavailable(scanner, monkeypatch):
+    candidate = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=2.0)
+    candidate.session = "regular"
+    # trend_aligned/htf_sma_200 both default to None -- gate applies
+    # (bullish, regular session, enabled) but the buffer isn't ready.
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [candidate],
+    )
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert _signal_publishes(scanner) == []
+    assert scanner.signals_suppressed_htf_unavailable == 1
+    assert scanner.signals_suppressed_trend_gate == 0  # distinct gate, not double-counted
+    assert scanner._pending_candidates == []
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert len(rejections) == 1
+    assert rejections[0]["reason"] == "HTF_DATA_UNAVAILABLE"
+
+
+@pytest.mark.asyncio
+async def test_handle_message_passes_signal_when_trend_gate_disabled_and_htf_unavailable(scanner, monkeypatch):
+    scanner.config = replace(scanner.config, trend_gate_enabled=False)
+    candidate = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=2.0)
+    candidate.session = "regular"
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [candidate],
+    )
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert len(scanner._pending_candidates) == 1
+    assert scanner.signals_suppressed_htf_unavailable == 0
+
+
+@pytest.mark.asyncio
+async def test_handle_message_suppresses_bearish_regular_session_signal_via_trend_aligned_none_unaffected(scanner, monkeypatch):
+    """A BEARISH candidate is never subject to the trend gate at all --
+    trend_aligned=None here means "not applicable", not "unavailable",
+    even in a regular session with htf_sma_200 still None."""
+    candidate = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=2.0, direction=SignalDirection.BEARISH)
+    candidate.session = "regular"
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [candidate],
+    )
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert len(scanner._pending_candidates) == 1
+    assert scanner.signals_suppressed_htf_unavailable == 0
 
 
 @pytest.mark.asyncio

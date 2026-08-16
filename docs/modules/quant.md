@@ -46,12 +46,18 @@ talonx:market:stream (Redis)
     → every 15s (default), the buffer is ranked by a weighted Composite
       Opportunity Score (confluence + structural R:R + volume surge +
       trend alignment, each normalized to [0,1]); the top 3 (default)
-      are each RE-VALIDATED against the LATEST buffered price (dropped
-      if aged past 30s, or if the recalculated R:R has fallen below
-      min_risk_reward_ratio -- see Dynamic R:R Revalidation below) and,
-      if still valid, published to Redis (talonx:signals:quant) AND
-      the ticker's cooldown is armed now, for the first time; the rest
-      are dropped
+      are each RE-VALIDATED against the LATEST buffered price -- price,
+      stop, target, AND ratio are re-derived TOGETHER via the same
+      calculate_trade_geometry signal generation itself uses (dropped if
+      aged past 30s, or if the recalculated R:R has fallen below
+      min_risk_reward_ratio -- see round 3's Canonical Trade Geometry
+      below) -- and, if still valid, published to Redis
+      (talonx:signals:quant) AND the ticker's cooldown is armed now, for
+      the first time (a Redis SET failure while arming EITHER the
+      cooldown or a post-loss lockout falls back to an in-memory lock
+      for the same duration rather than silently not taking effect --
+      see round 3's Fail-Closed Lock Persistence below); the rest are
+      dropped
     → EVERY dropped candidate, at EVERY gate above, also publishes a
       RejectedCandidateEvent to talonx:quant:rejected -- talonx_dispatch
       persists one row per candidate to its rejected_candidates table (see
@@ -240,18 +246,18 @@ gaps in execution correctness and stream-processing robustness:
   selected at throttle flush is re-checked against the LATEST buffered
   close price before it actually publishes, not trusted as-generated.
   Dropped as `EXPIRED_IN_THROTTLE_QUEUE` if `now - signal_generated_at`
-  exceeds the age limit; otherwise reward/ratio are recalculated against
-  the fresh price (`reward = pivot_resistance - current_price` bullish /
-  `current_price - pivot_support` bearish, `risk = atr_stop_multiplier x
-  the signal's own ATR` — unchanged from generation, since ATR itself
-  doesn't meaningfully drift over 15-30s) and dropped as
+  exceeds the age limit; otherwise the full trade geometry (stop, target,
+  risk, reward, ratio — see `calculate_trade_geometry` in the round-3
+  section below) is recalculated against the fresh price and dropped as
   `RR_DEGRADED_DURING_THROTTLE` if the recalculated ratio has fallen
-  below `min_risk_reward_ratio`. A candidate that can't be revalidated
-  at all (no fresh buffered price yet, or missing atr/pivot inputs) is
-  published as-generated rather than dropped purely for missing fresher
-  data. The published `QuantSignal.price`/`risk_reward_ratio` reflect the
-  revalidated values; `signal_age_ms` records how old the candidate was
-  at that moment. Paired with a shorter throttle window
+  below `min_risk_reward_ratio` (or couldn't be confirmed at all, e.g.
+  price has drifted through the pivot level). A candidate that can't be
+  revalidated at all (no fresh buffered price yet, or missing atr/pivot
+  inputs) is published as-generated rather than dropped purely for
+  missing fresher data. The published `QuantSignal.price`/`stop_price`/
+  `target_price`/`risk_reward_ratio` all reflect the SAME revalidated
+  geometry; `signal_age_ms` records how old the candidate was at that
+  moment. Paired with a shorter throttle window
   (`TALONX_QUANT_THROTTLE_WINDOW_SECONDS`, **60s → 15s default**) to
   bound how much drift can accumulate before revalidation even runs.
 - **Post-Publication Cooldown Trigger** (`consumer.py`'s
@@ -297,6 +303,55 @@ gaps in execution correctness and stream-processing robustness:
   is unavailable — deliberately best-effort, NOT fail-closed, since a
   duplicate slipping through during a Redis outage costs at most one
   double-counted tick's volume, not a bypassed risk control.
+
+## 2026-08-16 quant audit (round 3): canonical trade geometry, lock persistence, and the HTF-unavailable gate
+
+A second follow-up audit of the round-2 fixes above (itself independently
+re-checking the code, not just the requirement doc) found three more
+correctness gaps:
+
+- **Canonical Trade Geometry** (`strategy.py`'s
+  `calculate_trade_geometry`) — round 2's `_revalidate_candidate` only
+  recalculated `price` and `risk_reward_ratio` against the fresh buffered
+  close, leaving `stop_price`/`target_price` pinned to the ORIGINAL,
+  now-stale entry price. A published signal could therefore show a ratio
+  measured against one price alongside a stop/target measured against a
+  different one — an internally inconsistent trade. `calculate_trade_geometry`
+  is now the single function that derives stop/target/risk/reward/ratio
+  from an entry price, used both by `strategy.py`'s `_build_signal` (via
+  thin `_structural_risk_reward`/`_stop_target_prices` wrappers, kept for
+  their existing unit tests) at signal generation and directly by
+  `consumer.py`'s `_revalidate_candidate` at throttle-flush time — so
+  price, stop, target, and ratio always move together, structurally.
+- **Fail-Closed Lock Persistence** (`consumer.py`'s `_arm_fallback_lock` /
+  `_in_memory_lock_active`) — round 2's Fail-Closed Risk Management only
+  covered a Redis error while CHECKING the cooldown/loss-lockout keys;
+  a Redis error while ARMING one (the `SET` in `_start_cooldown`/
+  `_start_loss_lockout`) still only logged a warning and moved on, so the
+  lock could silently never take effect — a losing trade's mandatory
+  75-minute lockout, or a just-published signal's 20-minute cooldown,
+  simply wouldn't be enforced if that one `SET` call failed. Both now
+  fall back to an in-memory, process-local lock for the same ticker and
+  duration when the `SET` fails (logged `CRITICAL`), checked on every
+  subsequent `_is_on_cooldown`/`_is_loss_locked_out` call ahead of the
+  Redis read, until it naturally expires or a later `SET` for that ticker
+  actually succeeds (which clears the fallback). This is a same-process
+  safety net, not cross-restart durable state — the underlying Redis
+  outage still needs fixing, but a candidate can no longer publish (or a
+  losing ticker re-enter) purely because one lock-arming write failed.
+- **HTF-Unavailable Trend Gate** (`consumer.py`'s `_trend_gate_applicable`,
+  reason `HTF_DATA_UNAVAILABLE`) — `QuantSignal.trend_aligned=None` has
+  always meant two different things: "the trend gate doesn't apply to
+  this candidate" (bearish, pre-market, or the gate disabled) and "the
+  gate DOES apply but the 15m-200-SMA buffer hasn't warmed up to 200 bars
+  yet." The old `trend_aligned is not False` filter treated both
+  identically, so a regular-session BULLISH candidate could publish with
+  ZERO trend confirmation whenever the HTF buffer was still cold — not
+  merely "gate not applicable," but "gate applicable, answer unknown,
+  passed anyway." A regular-session bullish candidate with a
+  `trend_gate_enabled` gate and `htf_sma_200` still `None` is now
+  rejected as `HTF_DATA_UNAVAILABLE` (its own gate/reason, distinct from
+  `TREND_GATE`'s "evaluated and failed") instead.
 
 ## 2026-08-14 session review: entry blackouts and the volatility gate
 
@@ -366,7 +421,11 @@ the range to reach an ATR-scaled stop/target.
   pre-market 15-min candle is never finalized into this buffer at all. See
   [../bar_buffer_persistence.md](../bar_buffer_persistence.md) for the
   full write-up of this buffer's warm-up, historical pre-seeding, and how
-  it survives a restart.
+  it survives a restart. A candidate this gate applies to (bullish,
+  regular session, gate enabled) whose 200-SMA isn't warmed up yet is
+  rejected as `HTF_DATA_UNAVAILABLE`, distinct from `TREND_GATE`'s
+  "evaluated below the SMA and failed" — see round 3's HTF-Unavailable
+  Trend Gate above.
 
 ## Implementation notes
 

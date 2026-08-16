@@ -78,6 +78,32 @@ above:
     rolling buffer at all -- see _is_new_bar_tick -- so a stream replay
     or Pub/Sub reconnect redelivering the same tick can't double-count
     its volume in a still-forming bucket's running accumulation.
+
+Round-3 quant audit (2026-08-16), three more correctness/integrity gaps:
+  - Canonical Trade Geometry: _revalidate_candidate now recalculates
+    stop_price/target_price alongside price/risk_reward_ratio, all via
+    strategy.py's calculate_trade_geometry (the SAME function
+    _build_signal uses) -- a prior version only recalculated the ratio,
+    so a revalidated signal could publish with a stop/target still
+    measured against its original, stale entry price.
+  - Fail-Closed Lock Persistence: a Redis SET failure while ARMING the
+    Post-Loss Lockout or per-ticker cooldown (as opposed to a failure
+    CHECKING one, above) used to only log a warning -- the lock then
+    silently never took effect. _start_loss_lockout/_start_cooldown now
+    fall back to an in-memory, process-local lock for the same ticker
+    and duration when the Redis SET fails (see _arm_fallback_lock /
+    _in_memory_lock_active), enforced on every subsequent
+    _is_loss_locked_out/_is_on_cooldown check until it expires or a
+    later SET actually succeeds.
+  - HTF-Unavailable Trend Gate: trend_aligned=None on a QuantSignal used
+    to mean two different things -- "the trend gate doesn't apply to
+    this candidate" (bearish/pre-market/disabled) AND "the gate applies
+    but the 15m-200-SMA buffer hasn't warmed up yet" -- and both passed
+    the old `trend_aligned is not False` filter identically. A
+    regular-session bullish candidate with a genuinely cold HTF buffer
+    is now rejected as HTF_DATA_UNAVAILABLE instead of silently
+    publishing with zero trend confirmation -- see
+    _trend_gate_applicable.
 """
 from __future__ import annotations
 
@@ -86,7 +112,7 @@ import json
 import logging
 import random
 from collections import deque
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from pydantic import ValidationError
 
@@ -106,7 +132,7 @@ from talonx_quant.schemas import (
 )
 from talonx_quant.session import get_entry_blackout, get_session
 from talonx_quant.store import QuantStateStore
-from talonx_quant.strategy import evaluate_signals
+from talonx_quant.strategy import calculate_trade_geometry, evaluate_signals
 
 logger = logging.getLogger("talonx_quant.consumer")
 
@@ -149,6 +175,21 @@ def _fails_min_volatility(snapshot, config: QuantConfig) -> bool:
         return False
     atr_pct = (snapshot.atr / snapshot.price) * 100
     return atr_pct < config.min_atr_pct
+
+
+def _trend_gate_applicable(signal: QuantSignal, config: QuantConfig) -> bool:
+    """True when the 15m-200-SMA trend gate is actually meant to evaluate
+    this candidate -- config.trend_gate_enabled, BULLISH direction,
+    regular session (mirrors strategy.py's own _trend_aligned
+    applicability check). Used to distinguish "gate doesn't apply here"
+    from "gate applies but htf_sma_200 wasn't available yet" -- both
+    produce trend_aligned=None on the signal, but only the latter should
+    be rejected as HTF_DATA_UNAVAILABLE (see _handle_market_tick)."""
+    return (
+        config.trend_gate_enabled
+        and signal.direction == SignalDirection.BULLISH
+        and signal.session == "regular"
+    )
 
 
 def _opportunity_score(signal: QuantSignal, config: QuantConfig) -> float:
@@ -231,6 +272,7 @@ _GATE_NAMES = {
     "LOW_CONFLUENCE": "confluence_gate",
     "LOW_RISK_REWARD": "rr_gate",
     "TREND_GATE": "trend_gate",
+    "HTF_DATA_UNAVAILABLE": "trend_gate",
     "PREMARKET_LIQUIDITY": "premarket_liquidity_gate",
     "NEWS_CATALYST": "news_catalyst_gate",
     "THROTTLE": "throttle_gate",
@@ -285,6 +327,18 @@ class QuantScanner:
         # symbol, same "recent window, not unbounded history" posture as
         # every other in-process cache here.
         self._recent_bar_keys: dict[str, deque] = {}
+        # Fail-Closed Lock Persistence (2026-08-16 quant audit, round 3):
+        # in-memory fallback for the loss-lockout/cooldown locks
+        # themselves (not just the CHECK, see _handle_risk_check_failure
+        # above) -- if the Redis SET that's supposed to persist a lock
+        # fails, the lock must still be enforced for its intended
+        # duration rather than silently never taking effect. Same
+        # "in-memory fallback when Redis is unavailable" convention as
+        # _recent_bar_keys above; ticker -> the UTC instant the fallback
+        # lock expires. See _start_loss_lockout/_start_cooldown and
+        # _in_memory_lock_active.
+        self._loss_lockout_fallback: dict[str, datetime] = {}
+        self._cooldown_fallback: dict[str, datetime] = {}
         self._client = None
         self._stop_event = asyncio.Event()
         self._signals_published = 0
@@ -295,6 +349,7 @@ class QuantScanner:
         self._signals_suppressed_low_confluence = 0
         self._signals_suppressed_low_risk_reward = 0
         self._signals_suppressed_trend_gate = 0
+        self._signals_suppressed_htf_unavailable = 0
         self._signals_suppressed_premarket_liquidity = 0
         self._signals_suppressed_news_catalyst = 0
         self._signals_suppressed_low_volatility = 0
@@ -334,6 +389,10 @@ class QuantScanner:
     @property
     def signals_suppressed_trend_gate(self) -> int:
         return self._signals_suppressed_trend_gate
+
+    @property
+    def signals_suppressed_htf_unavailable(self) -> int:
+        return self._signals_suppressed_htf_unavailable
 
     @property
     def signals_suppressed_premarket_liquidity(self) -> int:
@@ -1031,11 +1090,39 @@ class QuantScanner:
             )
             return
 
-        # Trend Alignment Gate: drop a BULLISH, regular-session candidate
-        # whose price is at/below the 15m 200 SMA. trend_aligned is None
-        # (not applicable -- bearish, pre-market, or HTF buffer still
-        # warming up) for every candidate this doesn't apply to, which
-        # passes through unfiltered here.
+        # Trend Alignment Gate, HTF-unavailable leg (2026-08-16 quant
+        # audit, round 3): trend_aligned is None both when the gate
+        # genuinely doesn't apply (bearish, pre-market, gate disabled)
+        # AND when it DOES apply but the 15m-200-SMA buffer hasn't warmed
+        # up yet (htf_sma_200 is None) -- the old `is not False` filter
+        # below treated both cases identically, silently letting a
+        # regular-session bullish candidate through with NO trend
+        # confirmation at all whenever the HTF buffer was still cold.
+        # Separated out here as its own gate/reason so a mandatory-gate
+        # candidate with genuinely missing data is rejected and logged
+        # distinctly from one that was actually evaluated and passed.
+        survivors, dropped_for_missing_htf = _partition(
+            survivors, lambda s: not (_trend_gate_applicable(s, self.config) and s.htf_sma_200 is None)
+        )
+        if dropped_for_missing_htf:
+            await self._record_rejection(
+                event.symbol, "HTF_DATA_UNAVAILABLE", len(dropped_for_missing_htf),
+                datetime.now(timezone.utc), dropped_for_missing_htf,
+            )
+        self._signals_suppressed_htf_unavailable += len(dropped_for_missing_htf)
+        await _incr_metric(self._client, "quant", "failed_htf_unavailable", len(dropped_for_missing_htf))
+        if not survivors:
+            logger.info(
+                "Suppressed %d candidate(s) for %s -- 15m 200 SMA buffer still warming up",
+                len(dropped_for_missing_htf), event.symbol,
+            )
+            return
+
+        # Trend Alignment Gate, misaligned leg: drop a BULLISH,
+        # regular-session candidate whose price is at/below the 15m 200
+        # SMA. trend_aligned is None (not applicable, or already handled
+        # by the HTF-unavailable leg above) for every candidate this
+        # doesn't apply to, which passes through unfiltered here.
         survivors, dropped_for_trend = _partition(survivors, lambda s: s.trend_aligned is not False)
         if dropped_for_trend:
             await self._record_rejection(
@@ -1104,7 +1191,25 @@ class QuantScanner:
         # armed.
         self._pending_candidates.extend(survivors)
 
+    def _in_memory_lock_active(self, fallback: dict[str, datetime], ticker: str) -> bool:
+        """Fail-Closed Lock Persistence: True if `ticker` has a still-live
+        in-memory fallback lock (see _start_cooldown/_start_loss_lockout
+        below) -- checked BEFORE the Redis read so a lock this process
+        couldn't persist to Redis is still enforced for its intended
+        duration, purely from local state. Expired entries are pruned on
+        read rather than needing a separate sweep."""
+        key = ticker.upper()
+        expiry = fallback.get(key)
+        if expiry is None:
+            return False
+        if datetime.now(timezone.utc) >= expiry:
+            del fallback[key]
+            return False
+        return True
+
     async def _is_on_cooldown(self, ticker: str) -> bool:
+        if self._in_memory_lock_active(self._cooldown_fallback, ticker):
+            return True
         try:
             return bool(await self._client.exists(f"cooldown:{ticker.upper()}"))
         except Exception as exc:  # noqa: BLE001 -- see _handle_risk_check_failure for the fail-closed policy
@@ -1115,14 +1220,44 @@ class QuantScanner:
             await self._client.set(
                 f"cooldown:{ticker.upper()}", "1", ex=int(self.config.cooldown_seconds)
             )
-        except Exception as exc:  # noqa: BLE001 -- a failed lock shouldn't drop the candidate
-            logger.warning("Failed to set cooldown for %s (%s)", ticker, exc)
+            self._cooldown_fallback.pop(ticker.upper(), None)
+        except Exception as exc:  # noqa: BLE001 -- see the in-memory fallback lock below
+            self._arm_fallback_lock(
+                self._cooldown_fallback, ticker, self.config.cooldown_seconds, "Cooldown", exc,
+            )
 
     async def _is_loss_locked_out(self, ticker: str) -> bool:
+        if self._in_memory_lock_active(self._loss_lockout_fallback, ticker):
+            return True
         try:
             return bool(await self._client.exists(f"loss_lockout:{ticker.upper()}"))
         except Exception as exc:  # noqa: BLE001 -- see _handle_risk_check_failure for the fail-closed policy
             return await self._handle_risk_check_failure(ticker, "Loss-lockout", exc)
+
+    def _arm_fallback_lock(
+        self, fallback: dict[str, datetime], ticker: str, duration_seconds: float,
+        lock_name: str, exc: Exception,
+    ) -> None:
+        """Fail-Closed Lock Persistence (2026-08-16 quant audit, round 3):
+        a Redis SET failure while ARMING a lock (as opposed to a Redis
+        error while CHECKING one, see _handle_risk_check_failure) used to
+        only log a warning and move on -- the lock then silently never
+        took effect, so e.g. a losing trade's mandatory lockout, or a
+        just-published signal's cooldown, could leave that ticker free to
+        trade again immediately. Enforces the SAME lock, for the SAME
+        duration, purely from process-local memory (see
+        _in_memory_lock_active) until either it naturally expires or a
+        LATER SET for this ticker succeeds and clears it (see the
+        `.pop()` calls in _start_cooldown/_start_loss_lockout above).
+        Logged at CRITICAL, matching _handle_risk_check_failure's
+        severity -- this is a risk-control gap, not a routine hiccup."""
+        key = ticker.upper()
+        expiry = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
+        fallback[key] = expiry
+        logger.critical(
+            "%s lock persistence failed for %s (%s); enforcing in-memory fallback lock until %s",
+            lock_name, ticker, exc, expiry.isoformat(),
+        )
 
     async def _handle_risk_check_failure(self, ticker: str, check_name: str, exc: Exception) -> bool:
         """Fail-Closed Risk Management (2026-08-16 quant audit): a Redis
@@ -1160,8 +1295,11 @@ class QuantScanner:
             await self._client.set(
                 f"loss_lockout:{ticker.upper()}", "1", ex=int(self.config.loss_lockout_seconds)
             )
-        except Exception as exc:  # noqa: BLE001 -- a failed lock shouldn't crash the handler
-            logger.warning("Failed to set loss lockout for %s (%s)", ticker, exc)
+            self._loss_lockout_fallback.pop(ticker.upper(), None)
+        except Exception as exc:  # noqa: BLE001 -- see the in-memory fallback lock below
+            self._arm_fallback_lock(
+                self._loss_lockout_fallback, ticker, self.config.loss_lockout_seconds, "Loss-lockout", exc,
+            )
 
     def _latest_close(self, ticker: str) -> float | None:
         """Dynamic R:R Revalidation's current-price source -- the same
@@ -1178,14 +1316,24 @@ class QuantScanner:
         before being ranked/released -- by the time it's actually about
         to publish, its entry price (and therefore its R:R) may have
         drifted from what strategy.py computed when the bar first
-        closed. Re-checks age and re-derives reward/risk against the
-        LATEST buffered close before publishing, rather than trusting
-        stale numbers. Risk stays atr_stop_multiplier x the signal's OWN
-        atr (ATR itself doesn't meaningfully change over a 15-30s
-        window, and re-running full indicator computation here would be
-        wasted work); only reward (which depends on the now-stale entry
-        price) and the resulting ratio are recalculated. Returns None if
-        the candidate should be dropped instead of published."""
+        closed. Re-checks age and re-derives the FULL trade geometry
+        (stop, target, risk, reward, ratio -- via strategy.py's
+        calculate_trade_geometry, the same function _build_signal uses)
+        against the LATEST buffered close before publishing, rather than
+        trusting stale numbers.
+
+        2026-08-16 quant audit (round 3): a prior version of this method
+        only recalculated `price` and `risk_reward_ratio`, leaving
+        stop_price/target_price pinned to the ORIGINAL entry price -- a
+        published signal could show a ratio measured against the new
+        price alongside a stop/target still measured against the old
+        one, an internally inconsistent trade. Routing through
+        calculate_trade_geometry means price/stop/target/ratio always
+        move together. Risk stays atr_stop_multiplier x the signal's OWN
+        atr (ATR itself doesn't meaningfully change over a 15-30s window,
+        and re-running full indicator computation here would be wasted
+        work). Returns None if the candidate should be dropped instead of
+        published."""
         generated_at = _ensure_utc(signal.signal_generated_at)
         age_seconds = (now - generated_at).total_seconds()
         signal_age_ms = age_seconds * 1000.0
@@ -1206,28 +1354,37 @@ class QuantScanner:
             current_price is None or signal.atr is None
             or signal.pivot_resistance is None or signal.pivot_support is None
         ):
-            # Can't recompute reward/risk without a fresh price and the
-            # same ATR/pivot inputs the original R:R used -- publish
+            # Can't recompute geometry without a fresh price and the same
+            # ATR/pivot inputs the original geometry used -- publish
             # as-generated (with signal_age_ms filled in) rather than
             # dropping a candidate purely because fresher data isn't
             # available; strategy.py's own gate already confirmed a
-            # valid R:R at generation time.
+            # valid, internally-consistent geometry at generation time.
             return signal.model_copy(update={"signal_age_ms": signal_age_ms})
 
-        risk = self.config.atr_stop_multiplier * signal.atr
-        if risk <= 0:
-            return signal.model_copy(update={"signal_age_ms": signal_age_ms})
+        geometry = calculate_trade_geometry(
+            current_price, signal.atr, signal.direction,
+            signal.pivot_resistance, signal.pivot_support, self.config,
+        )
+        if geometry is None or geometry.risk_reward_ratio is None:
+            # The pivot level no longer sits on the tradeable side of the
+            # new price (price has drifted through it), or risk resolved
+            # to <= 0 -- can't confirm a valid geometry against the fresh
+            # price, so this is a degraded candidate, not merely a stale
+            # one.
+            logger.info(
+                "Dropping %s %s -- R:R could not be confirmed against current price %.2f during throttle wait",
+                signal.ticker, signal.signal_type.value, current_price,
+            )
+            await self._record_rejection(
+                signal.ticker, "RR_DEGRADED_DURING_THROTTLE", 1, now, [signal],
+            )
+            return None
 
-        if signal.direction == SignalDirection.BULLISH:
-            reward = signal.pivot_resistance - current_price
-        else:
-            reward = current_price - signal.pivot_support
-        recalculated_rr = (reward / risk) if reward > 0 else 0.0
-
-        if recalculated_rr < self.config.min_risk_reward_ratio:
+        if geometry.risk_reward_ratio < self.config.min_risk_reward_ratio:
             logger.info(
                 "Dropping %s %s -- R:R degraded to %.2f during throttle wait (was %.2f, needs >= %.2f)",
-                signal.ticker, signal.signal_type.value, recalculated_rr,
+                signal.ticker, signal.signal_type.value, geometry.risk_reward_ratio,
                 signal.risk_reward_ratio or 0.0, self.config.min_risk_reward_ratio,
             )
             await self._record_rejection(
@@ -1237,7 +1394,9 @@ class QuantScanner:
 
         return signal.model_copy(update={
             "price": current_price,
-            "risk_reward_ratio": recalculated_rr,
+            "stop_price": geometry.stop_price,
+            "target_price": geometry.target_price,
+            "risk_reward_ratio": geometry.risk_reward_ratio,
             "signal_age_ms": signal_age_ms,
         })
 

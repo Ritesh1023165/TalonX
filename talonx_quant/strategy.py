@@ -62,8 +62,24 @@ Requirement-doc gap fixes (2026-08-16):
     executed stop, so a candidate could pass the R:R gate on a different
     number than its actual executed R:R -- see _structural_risk_reward
     and _stop_target_prices.
+
+2026-08-16 quant audit (round 3) -- canonical trade geometry:
+  - calculate_trade_geometry is now the SINGLE function that derives
+    stop_price/target_price/risk/reward/risk_reward_ratio from an entry
+    price -- _structural_risk_reward and _stop_target_prices are thin
+    wrappers around it, and consumer.py's _revalidate_candidate calls it
+    directly. A prior version of _revalidate_candidate recalculated only
+    risk_reward_ratio against a fresher price at throttle-flush time
+    without also recalculating stop_price/target_price, so a published
+    signal's displayed stop/target could reference the ORIGINAL, stale
+    entry price while its ratio referenced the new one -- an internally
+    inconsistent trade geometry. Routing both signal-generation and
+    revalidation through this one function makes that drift structurally
+    impossible.
 """
 from __future__ import annotations
+
+from dataclasses import dataclass
 
 from talonx_quant.config import QuantConfig
 from talonx_quant.indicators import DailyPivots, IndicatorSnapshot
@@ -176,72 +192,116 @@ def _confluence_score(
     return score
 
 
+@dataclass(frozen=True)
+class TradeGeometry:
+    """Everything derived from one entry price via one shared risk
+    distance -- stop, target, risk, reward, and the resulting ratio.
+    Returned as a single unit so a caller can never update the ratio
+    without also updating the stop/target it was measured against (see
+    calculate_trade_geometry's own docstring for the bug this fixes)."""
+
+    stop_price: float
+    target_price: float
+    risk: float
+    reward: float | None
+    risk_reward_ratio: float | None
+
+
+def calculate_trade_geometry(
+    price: float, atr: float | None, direction: SignalDirection,
+    pivot_resistance: float | None, pivot_support: float | None, config: QuantConfig,
+) -> TradeGeometry | None:
+    """Canonical stop/target/risk/reward/R:R calculation -- the SINGLE
+    source of truth used both when a candidate is first built
+    (_build_signal, below) and when consumer.py's _revalidate_candidate
+    re-derives these numbers against a fresher price at throttle-flush
+    time. A 2026-08-16 quant audit caught _revalidate_candidate
+    recalculating risk_reward_ratio against the new price WITHOUT also
+    recalculating stop_price/target_price, so a revalidated signal could
+    publish with a ratio that no longer matched its own displayed/
+    executed stop and target -- the same class of evaluated-vs-executed
+    drift an earlier audit had already fixed for signal generation (see
+    this module's "Harmonized risk distance" note above). Routing both
+    call sites through the exact same function makes that drift
+    structurally impossible.
+
+    stop = atr_stop_multiplier x ATR against the trade (default 1.5x).
+    target = the nearest classic floor-trader pivot level (R1 for
+    BULLISH, S1 for BEARISH) when it sits on the correct side of price,
+    else the atr_reward_multiplier x ATR approximation while pivot data
+    is still warming up. reward/risk_reward_ratio are only populated when
+    the target is the STRUCTURAL pivot level -- the ATR-fallback target
+    doesn't count as a validated reward for gating purposes, matching the
+    prior _structural_risk_reward's fail-closed "insufficient pivot data
+    -> no ratio" posture (a candidate with risk_reward_ratio=None never
+    clears consumer.py's R:R gate).
+
+    Returns None when ATR/price aren't available yet or risk resolves to
+    <= 0 -- same warm-up posture as every other ATR-derived value here."""
+    if atr is None or atr <= 0 or not price:
+        return None
+    risk = config.atr_stop_multiplier * atr
+    if risk <= 0:
+        return None
+
+    if direction == SignalDirection.BULLISH:
+        stop = price - risk
+        if pivot_resistance is not None and pivot_resistance > price:
+            target = pivot_resistance
+            reward = target - price
+        else:
+            target = price + config.atr_reward_multiplier * atr
+            reward = None
+    else:
+        stop = price + risk
+        if pivot_support is not None and pivot_support < price:
+            target = pivot_support
+            reward = price - target
+        else:
+            target = price - config.atr_reward_multiplier * atr
+            reward = None
+
+    risk_reward_ratio = (reward / risk) if reward is not None and reward > 0 else None
+    return TradeGeometry(
+        stop_price=stop, target_price=target, risk=risk,
+        reward=reward, risk_reward_ratio=risk_reward_ratio,
+    )
+
+
 def _structural_risk_reward(
     s: IndicatorSnapshot, direction: SignalDirection, pivots: DailyPivots | None, config: QuantConfig,
 ) -> float | None:
-    """Structural R:R Calculation: reward is the distance from entry to
-    the nearest classic floor-trader pivot level from the prior completed
-    regular session (R1 for a BULLISH candidate, S1 for a BEARISH one --
-    see indicators.compute_daily_pivots), a genuine market-derived target
-    rather than a second ATR multiple; risk is
-    atr_stop_multiplier x ATR (default 1.5x) -- the SAME multiplier
-    _stop_target_prices uses for the EXECUTED dollar stop below. These
-    two must use one shared multiplier: a 2026-08-16 quant audit caught
-    an earlier version of this code gating on a WIDER risk distance
-    (1.5x ATR) than the stop it then actually placed (1.0x ATR) --
-    passing the gate at a nominal 2.0 R:R while the executed trade's real
-    R:R (reward / the tighter 1.0x-ATR stop that was actually live) was
-    3.0, a discrepancy between "what was evaluated" and "what was
-    traded." Returns None -- same fail-closed, "insufficient data -> no
-    signal" posture every other warm-up-dependent check in this module
-    takes -- when ATR/price/pivots aren't available yet, or when the
-    relevant pivot level sits on the WRONG side of entry (e.g. price has
-    already traded through R1, leaving no bullish room left to target)."""
-    if s.atr is None or s.atr <= 0 or not s.price or pivots is None:
-        return None
-    risk = config.atr_stop_multiplier * s.atr
-    if risk <= 0:
-        return None
-    if direction == SignalDirection.BULLISH:
-        reward = pivots.resistance - s.price
-    else:
-        reward = s.price - pivots.support
-    if reward <= 0:
-        return None
-    return reward / risk
+    """Thin wrapper around calculate_trade_geometry -- kept as its own
+    function since it's unit-tested directly (see test_quant_strategy.py)
+    and reads more naturally at its _build_signal call site than
+    unpacking a TradeGeometry there. See calculate_trade_geometry's
+    docstring for the actual calculation and the harmonization/drift
+    history behind it."""
+    geometry = calculate_trade_geometry(
+        s.price, s.atr, direction,
+        None if pivots is None else pivots.resistance,
+        None if pivots is None else pivots.support,
+        config,
+    )
+    return None if geometry is None else geometry.risk_reward_ratio
 
 
 def _stop_target_prices(
     price: float, atr: float | None, direction: SignalDirection, config: QuantConfig,
     pivots: DailyPivots | None,
 ) -> tuple[float | None, float | None]:
-    """Explicit dollar stop/target levels: stop = atr_stop_multiplier x
-    ATR against the trade (default 1.5x -- the SAME multiplier
-    _structural_risk_reward's risk side uses, so the executed stop always
-    matches what the R:R gate actually evaluated; see that function's own
-    docstring for the harmonization fix this is half of); target = the
-    nearest pivot level (R1/S1) when available -- the SAME structural
-    level _structural_risk_reward's reward side uses, so a published
-    signal's displayed/executed target actually matches what cleared the
-    R:R gate -- else the old atr_reward_multiplier x ATR approximation
-    (default 2x) while prior-session pivot data is still warming up.
-    None/None when ATR isn't available yet (insufficient history), same
-    warm-up posture as every other ATR-derived value here."""
-    if atr is None or atr <= 0:
+    """Thin wrapper around calculate_trade_geometry -- see that function's
+    docstring and _structural_risk_reward's for why this stays a separate
+    function rather than being inlined at the _build_signal call site."""
+    geometry = calculate_trade_geometry(
+        price, atr, direction,
+        None if pivots is None else pivots.resistance,
+        None if pivots is None else pivots.support,
+        config,
+    )
+    if geometry is None:
         return None, None
-    stop_distance = config.atr_stop_multiplier * atr
-    fallback_target_distance = config.atr_reward_multiplier * atr
-
-    if direction == SignalDirection.BULLISH:
-        stop = price - stop_distance
-        if pivots is not None and pivots.resistance > price:
-            return stop, pivots.resistance
-        return stop, price + fallback_target_distance
-
-    stop = price + stop_distance
-    if pivots is not None and pivots.support < price:
-        return stop, pivots.support
-    return stop, price - fallback_target_distance
+    return geometry.stop_price, geometry.target_price
 
 
 def _trend_aligned(
