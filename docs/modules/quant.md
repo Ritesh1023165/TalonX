@@ -527,6 +527,40 @@ the normal window on a machine that's otherwise always on. A manual
 other outside-window instant) still leaves the process running with
 trading correctly disabled by round 5's gate.
 
+## 2026-08-16 quant audit (round 7): intra-flush cooldown re-check
+
+**P1 — same-ticker multiple candidates could bypass cooldown within one
+throttle flush.** `strategy.py` deliberately allows multiple independent
+signal TYPES to fire off the same closed bar for the same ticker (a MACD
+cross AND an RSI/volume setup on the same bar, say), so two candidates
+for one ticker could legitimately land in the same throttle batch.
+`_flush_throttle_window`'s publish loop (`consumer.py`) revalidated and
+published each `released` candidate in sequence with no cooldown
+re-check in between -- the FIRST candidate for a ticker would publish
+and arm `cooldown:{TICKER}` (in `_publish_signal`'s Post-Publication
+Cooldown Trigger), but the SECOND candidate for that same ticker, having
+already cleared the cooldown check back when it first entered the queue
+(up to `throttle_window_seconds` earlier, in `_handle_market_tick`),
+sailed straight through to publish too -- two signals for one ticker out
+of a single flush, defeating the per-ticker cooldown entirely.
+
+Fixed with a single `await self._is_on_cooldown(signal.ticker)` re-check
+at the top of the publish loop, immediately before each candidate is
+allowed to proceed toward `_revalidate_candidate`/`_publish_signal` --
+catches a cooldown armed by an EARLIER candidate in the SAME loop
+iteration, not just one that predates the flush. Placed before
+revalidation (not just before publish) so a candidate that's already
+doomed to a `COOLDOWN` rejection skips the wasted current-price/geometry
+re-fetch too. Reuses `_is_on_cooldown` exactly as-is -- same
+fail-closed-on-Redis-error policy (`config.risk_check_fail_closed`) and
+the same in-memory fallback lock as every other cooldown check in this
+module; no new fail-open path, and `GLOBAL_RISK_DEGRADED` still applies
+as a second line of defense if a cooldown-arming Redis write itself
+fails. Throttle ranking/capacity (`released`/`dropped`) is unchanged --
+a cooldown-rejected candidate was still correctly ranked into the
+released batch, it just fails this downstream check, same as an
+existing revalidation failure already could.
+
 ## 2026-08-14 session review: entry blackouts and the volatility gate
 
 Added after combining the execution ledger and dispatch audit trail for

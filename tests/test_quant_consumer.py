@@ -993,6 +993,192 @@ async def test_flush_throttle_window_is_a_noop_when_nothing_pending(scanner):
     assert scanner.signals_published == 0
 
 
+# --- Intra-Flush Cooldown Re-Check (2026-08-16 quant audit, P1) -----------
+# strategy.py can legitimately emit MULTIPLE independent candidates for
+# the SAME ticker off one closed bar (e.g. a MACD cross AND an RSI/volume
+# setup), which can both land in the same throttle batch. Without a
+# re-check immediately before each candidate proceeds, the FIRST to
+# publish arms cooldown:{TICKER} too late to stop a SECOND same-ticker
+# candidate already sitting in that same batch from also publishing --
+# these prove the fix, exercising the real _flush_throttle_window path
+# end to end (not just _is_on_cooldown/_start_cooldown in isolation), so
+# they'd fail against the previous buggy implementation.
+
+def _fake_cooldown_backing_store(client) -> dict:
+    """Wires client.set/.exists to a REAL in-memory dict, unlike
+    _exists_side_effect's fixed canned answer -- needed here so a
+    _start_cooldown() call made by an EARLIER candidate in the same
+    flush is actually visible to a LATER candidate's _is_on_cooldown()
+    check within the same test, proving the fix re-reads current state
+    rather than trusting whatever was true when the batch was queued."""
+    keys: dict[str, str] = {}
+
+    async def fake_set(key, value, ex=None, nx=None):
+        if nx and key in keys:
+            return None
+        keys[key] = value
+        return True
+
+    async def fake_exists(key):
+        return key in keys
+
+    client.set = AsyncMock(side_effect=fake_set)
+    client.exists = AsyncMock(side_effect=fake_exists)
+    return keys
+
+
+@pytest.mark.asyncio
+async def test_flush_throttle_window_blocks_second_same_ticker_candidate_via_cooldown(scanner):
+    """TEST 1 -- same ticker: exactly one AAPL signal published, the
+    second rejected as COOLDOWN, and cooldown:AAPL exists afterward."""
+    _fake_cooldown_backing_store(scanner._client)
+    first = _signal("AAPL", 3.0, signal_type=SignalType.MACD_BULLISH_CROSS)
+    second = _signal("AAPL", 3.0, signal_type=SignalType.RSI_OVERSOLD_VOLUME_SURGE)
+    _seed_close(scanner, "AAPL", 100.0)
+    scanner._pending_candidates = [first, second]
+
+    await scanner._flush_throttle_window()
+
+    published = _signal_publishes(scanner)
+    assert len(published) == 1
+
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    cooldown_rejections = [r for r in rejections if r["reason"] == "COOLDOWN"]
+    assert len(cooldown_rejections) == 1
+    assert cooldown_rejections[0]["ticker"] == "AAPL"
+
+    assert await scanner._is_on_cooldown("AAPL") is True
+
+
+@pytest.mark.asyncio
+async def test_flush_throttle_window_cooldown_recheck_does_not_affect_other_tickers(scanner):
+    """TEST 2 -- mixed tickers: AAPL #1 publishes, AAPL #2 is COOLDOWN-
+    rejected, MSFT #1 publishes untouched."""
+    _fake_cooldown_backing_store(scanner._client)
+    aapl_1 = _signal("AAPL", 3.0, signal_type=SignalType.MACD_BULLISH_CROSS)
+    aapl_2 = _signal("AAPL", 3.0, signal_type=SignalType.RSI_OVERSOLD_VOLUME_SURGE)
+    msft_1 = _signal("MSFT", 3.0, signal_type=SignalType.MACD_BULLISH_CROSS)
+    for ticker in ("AAPL", "MSFT"):
+        _seed_close(scanner, ticker, 100.0)
+    scanner._pending_candidates = [aapl_1, aapl_2, msft_1]
+
+    await scanner._flush_throttle_window()
+
+    published_signals = [json.loads(p) for p in _signal_publishes(scanner)]
+    assert len(published_signals) == 2
+    aapl_published = [s for s in published_signals if s["ticker"] == "AAPL"]
+    msft_published = [s for s in published_signals if s["ticker"] == "MSFT"]
+    assert len(aapl_published) == 1
+    assert len(msft_published) == 1
+
+
+@pytest.mark.asyncio
+async def test_flush_throttle_window_does_not_arm_cooldown_from_a_failed_revalidation(scanner):
+    """TEST 3 -- first candidate fails final revalidation (expired in
+    the throttle queue): it's rejected for ITS OWN reason, cooldown is
+    NOT armed by it (cooldown is intentionally post-PUBLICATION, not
+    post-attempt), and the second, still-valid same-ticker candidate
+    must still be allowed to publish."""
+    _fake_cooldown_backing_store(scanner._client)
+    stale = _signal("AAPL", 3.0, signal_type=SignalType.MACD_BULLISH_CROSS)
+    stale.signal_generated_at = datetime.now(timezone.utc) - timedelta(seconds=60)  # > max_candidate_age_seconds
+    fresh = _signal("AAPL", 3.0, signal_type=SignalType.RSI_OVERSOLD_VOLUME_SURGE)
+    _seed_close(scanner, "AAPL", 100.0)
+    scanner._pending_candidates = [stale, fresh]
+
+    await scanner._flush_throttle_window()
+
+    published_signals = [json.loads(p) for p in _signal_publishes(scanner)]
+    assert len(published_signals) == 1
+    assert published_signals[0]["signal_type"] == SignalType.RSI_OVERSOLD_VOLUME_SURGE.value
+
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert any(r["reason"] == "EXPIRED_IN_THROTTLE_QUEUE" for r in rejections)
+    assert not any(r["reason"] == "COOLDOWN" for r in rejections)  # fresh candidate was never blocked
+
+
+@pytest.mark.asyncio
+async def test_flush_throttle_window_cooldown_recheck_fails_closed_on_redis_error(scanner):
+    """TEST 4 -- Redis failure: the new intra-flush check reuses
+    _is_on_cooldown as-is, so a Redis error fails CLOSED (blocked) by
+    default (config.risk_check_fail_closed) -- no new fail-open path."""
+    scanner._client.exists.side_effect = ConnectionError("redis down")
+    _seed_close(scanner, "AAPL", 100.0)
+    scanner._pending_candidates = [_signal("AAPL", 3.0)]
+
+    await scanner._flush_throttle_window()
+
+    assert _signal_publishes(scanner) == []
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert any(r["reason"] == "RISK_STORE_UNAVAILABLE_FAIL_CLOSED" for r in rejections)
+
+
+@pytest.mark.asyncio
+async def test_flush_throttle_window_cooldown_recheck_respects_explicit_fail_open_config(scanner):
+    """Confirms the ONLY way to get fail-open behavior here is the
+    pre-existing, explicit TALONX_QUANT_RISK_FAIL_CLOSED=false opt-out
+    -- the new check doesn't silently override that deliberate operator
+    choice, in either direction."""
+    scanner.config = replace(scanner.config, risk_check_fail_closed=False)
+    scanner._client.exists.side_effect = ConnectionError("redis down")
+    _seed_close(scanner, "AAPL", 100.0)
+    scanner._pending_candidates = [_signal("AAPL", 3.0)]
+
+    await scanner._flush_throttle_window()
+
+    assert len(_signal_publishes(scanner)) == 1
+
+
+@pytest.mark.asyncio
+async def test_flush_throttle_window_skips_revalidation_when_already_on_cooldown(scanner):
+    """TEST 5 -- existing cooldown before the flush even starts: rejected
+    immediately as COOLDOWN, with NO revalidation (or publish) work done
+    for it at all."""
+    scanner._client.exists.side_effect = _exists_side_effect(on_cooldown=True)
+    revalidate_spy = AsyncMock(wraps=scanner._revalidate_candidate)
+    scanner._revalidate_candidate = revalidate_spy
+    scanner._pending_candidates = [_signal("AAPL", 3.0)]
+
+    await scanner._flush_throttle_window()
+
+    assert _signal_publishes(scanner) == []
+    revalidate_spy.assert_not_awaited()
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert any(r["reason"] == "COOLDOWN" and r["ticker"] == "AAPL" for r in rejections)
+
+
+@pytest.mark.asyncio
+async def test_flush_throttle_window_multiple_same_ticker_candidates_over_cap(scanner):
+    """TEST 6 -- three AAPL candidates plus one MSFT candidate, throttle
+    capacity generous enough to release all four: ranking/capacity
+    itself is untouched (nothing dropped purely for THROTTLE capacity),
+    but only ONE AAPL candidate can actually publish once cooldown is
+    armed by the first."""
+    _fake_cooldown_backing_store(scanner._client)
+    scanner.config = replace(scanner.config, throttle_max_signals=4)
+    aapl_1 = _signal("AAPL", 3.0, signal_type=SignalType.MACD_BULLISH_CROSS)
+    aapl_2 = _signal("AAPL", 3.0, signal_type=SignalType.RSI_OVERSOLD_VOLUME_SURGE)
+    aapl_3 = _signal("AAPL", 3.0, signal_type=SignalType.MA_GOLDEN_CROSS)
+    msft_1 = _signal("MSFT", 3.0, signal_type=SignalType.MACD_BULLISH_CROSS)
+    for ticker in ("AAPL", "MSFT"):
+        _seed_close(scanner, ticker, 100.0)
+    scanner._pending_candidates = [aapl_1, aapl_2, aapl_3, msft_1]
+
+    await scanner._flush_throttle_window()
+
+    published_signals = [json.loads(p) for p in _signal_publishes(scanner)]
+    assert len(published_signals) == 2  # exactly one AAPL, one MSFT
+    assert scanner.signals_suppressed_throttle == 0  # nothing dropped for lack of throttle capacity
+    aapl_published = [s for s in published_signals if s["ticker"] == "AAPL"]
+    msft_published = [s for s in published_signals if s["ticker"] == "MSFT"]
+    assert len(aapl_published) == 1
+    assert len(msft_published) == 1
+
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    cooldown_rejections = [r for r in rejections if r["reason"] == "COOLDOWN"]
+    assert len(cooldown_rejections) == 2  # the other two AAPL candidates
+
+
 @pytest.mark.asyncio
 async def test_flush_throttle_window_prefers_quality_over_a_raw_volume_pump(scanner):
     """2026-08-16 quant-audit regression: the exact scenario the
@@ -1438,6 +1624,7 @@ async def test_throttle_suppression_is_recorded_per_ticker(tmp_path):
     with QuantStateStore(tmp_path / "quant.db") as store:
         scanner = QuantScanner(QuantConfig(throttle_max_signals=1), store=store)
         scanner._client = AsyncMock()
+        scanner._client.exists.side_effect = _exists_side_effect()  # not on cooldown
         _seed_close(scanner, "HIGH", 100.0)  # the one expected to win and publish
         # Two candidates for the SAME dropped ticker in one flush -- the
         # per-ticker count should be 2, not two separate rows.

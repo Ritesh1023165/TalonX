@@ -62,7 +62,14 @@ below):
      if it's aged past config.max_candidate_age_seconds
      (EXPIRED_IN_THROTTLE_QUEUE) or its recalculated R:R has fallen
      below config.min_risk_reward_ratio (RR_DEGRADED_DURING_THROTTLE),
-     rather than publishing a stale entry price/ratio.
+     rather than publishing a stale entry price/ratio. Also re-checked
+     against cooldown:{TICKER} immediately before proceeding (P1 fix,
+     2026-08-16 quant audit) -- strategy.py can legitimately emit
+     multiple independent candidates for the SAME ticker off one closed
+     bar (e.g. a MACD cross AND an RSI/volume setup), and without this
+     re-check the first one to publish would arm cooldown too late to
+     stop a second same-ticker candidate already sitting in this SAME
+     released batch from also publishing (COOLDOWN).
 
 Two further 2026-08-16 quant-audit fixes apply upstream of all of the
 above:
@@ -1763,6 +1770,43 @@ class QuantScanner:
         released, dropped = candidates[: self.config.throttle_max_signals], candidates[self.config.throttle_max_signals :]
         now = datetime.now(timezone.utc)
         for signal in released:
+            # Intra-Flush Cooldown Re-Check (2026-08-16 quant audit, P1):
+            # strategy.py can legitimately emit MULTIPLE independent
+            # candidates for the SAME ticker off the same closed bar
+            # (e.g. a MACD cross AND an RSI/volume setup), which can
+            # both land in `released` together. Without this check, the
+            # FIRST such candidate to publish arms cooldown:{TICKER} (see
+            # _publish_signal's Post-Publication Cooldown Trigger) only
+            # AFTER the second candidate had already been let past the
+            # cooldown check it saw back when it first entered the queue
+            # (_handle_market_tick, up to throttle_window_seconds
+            # earlier) -- letting two signals for the same ticker publish
+            # out of one flush, defeating the whole point of the
+            # per-ticker cooldown. Re-checking HERE, immediately before
+            # each candidate is allowed to proceed toward publication,
+            # catches a cooldown armed by an EARLIER candidate in this
+            # SAME loop (as well as one that already existed before this
+            # flush even started, in which case revalidation/publish
+            # work for this candidate is skipped entirely, not merely
+            # its publish). Reuses _is_on_cooldown as-is -- same
+            # fail-closed-on-Redis-error policy as every other cooldown
+            # check in this module (see _handle_risk_check_failure), no
+            # new fail-open path. Placed BEFORE _revalidate_candidate
+            # (not just before _publish_signal) so a candidate that's
+            # already doomed to a COOLDOWN rejection doesn't also pay
+            # for a wasted current-price/geometry re-fetch.
+            if await self._is_on_cooldown(signal.ticker):
+                self._signals_suppressed_cooldown += 1
+                logger.info(
+                    "Dropping %s %s -- %s entered cooldown earlier in this "
+                    "same throttle flush (or was already on cooldown)",
+                    signal.ticker, signal.signal_type.value, signal.ticker,
+                )
+                await self._record_rejection(
+                    signal.ticker, "COOLDOWN", 1, now, [signal],
+                )
+                continue
+
             revalidated = await self._revalidate_candidate(signal, now)
             if revalidated is None:
                 continue
