@@ -1081,3 +1081,69 @@ async def test_routine_long_term_alert_is_still_gated_by_severity(agent):
     await agent._handle_message(_long_term_message(payload))
 
     agent.telegram_client.send.assert_not_awaited()
+
+
+# --- Rejection Trace Logging ------------------------------------------------
+
+def _rejected_candidate_payload(ticker: str = "AAPL", gate: str = "trend_gate", reason: str = "TREND_GATE") -> dict:
+    return {
+        "ticker": ticker, "gate": gate, "reason": reason,
+        "signal_type": "macd_bullish_cross", "direction": "bullish", "price": 100.0,
+        "confluence_score": 2, "risk_reward_ratio": 1.2, "session": "regular",
+        "rejected_at": "2026-08-16T15:00:00Z",
+    }
+
+
+def _rejected_candidate_message(payload) -> dict:
+    data = payload if isinstance(payload, str) else json.dumps(payload)
+    return {"channel": b"talonx:quant:rejected", "data": data}
+
+
+@pytest.mark.asyncio
+async def test_rejected_candidate_is_persisted_to_the_store(agent):
+    await agent._handle_message(_rejected_candidate_message(_rejected_candidate_payload()))
+
+    rows = agent.store.recent_rejected_candidates()
+    assert len(rows) == 1
+    assert rows[0]["ticker"] == "AAPL"
+    assert rows[0]["gate"] == "trend_gate"
+    assert rows[0]["reason"] == "TREND_GATE"
+
+
+@pytest.mark.asyncio
+async def test_rejected_candidate_increments_the_processed_counter(agent):
+    await agent._handle_message(_rejected_candidate_message(_rejected_candidate_payload()))
+    await agent._handle_message(_rejected_candidate_message(_rejected_candidate_payload(ticker="MSFT")))
+
+    assert agent.rejected_candidates_processed == 2
+
+
+@pytest.mark.asyncio
+async def test_rejected_candidate_does_not_trigger_a_telegram_push(agent):
+    agent.telegram_client.is_configured = True
+    await agent._handle_message(_rejected_candidate_message(_rejected_candidate_payload()))
+
+    agent.telegram_client.send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_invalid_rejected_candidate_is_dropped(agent):
+    await agent._handle_message(_rejected_candidate_message({"ticker": "AAPL"}))  # missing required fields
+
+    assert agent.store.recent_rejected_candidates() == []
+    assert agent.rejected_candidates_processed == 0
+
+
+@pytest.mark.asyncio
+async def test_rejected_candidate_with_minimal_fields_persists(agent):
+    # Bare event -- no signal_type/direction/confluence/RR detail, same
+    # shape LOW_VOLATILITY publishes (fires before any candidate exists).
+    payload = {
+        "ticker": "AAPL", "gate": "volatility_gate", "reason": "LOW_VOLATILITY",
+        "rejected_at": "2026-08-16T15:00:00Z",
+    }
+    await agent._handle_message(_rejected_candidate_message(payload))
+
+    rows = agent.store.recent_rejected_candidates()
+    assert len(rows) == 1
+    assert rows[0]["signal_type"] is None

@@ -100,6 +100,18 @@ class DispatchConfig:
     reports_channel_long_term: str = os.environ.get(
         "TALONX_REDIS_REPORTS_LONG_TERM_CHANNEL", "talonx:reports:longterm"
     )
+    # Rejection Trace Logging: talonx_quant publishes one
+    # RejectedCandidateEvent per candidate a gate drops (confluence,
+    # structural R:R, trend, ATR move/volatility, blackout, cooldown,
+    # loss-lockout, throttle, pre-market liquidity/news-catalyst) --
+    # subscribed here PURELY to persist a durable, per-candidate audit
+    # trail (store.py's rejected_candidates table), since a dropped
+    # candidate otherwise never reaches this module at all (only
+    # PUBLISHED signals do). Same env var name talonx_quant reads on its
+    # side of this boundary.
+    rejected_candidates_channel: str = os.environ.get(
+        "TALONX_REDIS_REJECTED_CANDIDATES_CHANNEL", "talonx:quant:rejected"
+    )
     connect_timeout_seconds: float = _env_float("TALONX_REDIS_CONNECT_TIMEOUT", 5.0)
     socket_timeout_seconds: float = _env_float("TALONX_REDIS_SOCKET_TIMEOUT", 5.0)
     reconnect_backoff_base_seconds: float = _env_float("TALONX_DISPATCH_RECONNECT_BASE", 1.0)

@@ -130,7 +130,7 @@ import asyncio
 import logging
 import os
 import signal
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 from talonx_ingest.config import MarketDataConfig, settings
 from talonx_ingest.earnings import fetch_earnings_calendar
@@ -141,7 +141,9 @@ from talonx_ingest.market_data.run import make_on_event
 from talonx_ingest.market_data.yfinance_poll import YFinancePoller, fetch_extended_hours_quote
 from talonx_ingest.news.pipeline import run_news_ingestion
 from talonx_ingest.pipeline import ingest_earnings_filing, run_ingestion, run_long_term_financials_ingestion
+from talonx_ingest.poller import DEFAULT_REFRESH_WARN_SECONDS, fetch_watchlist_quotes
 from talonx_ingest.processing.chunker import DocumentChunker
+from talonx_ingest.session import is_premarket_window
 from talonx_ingest.storage.ledger import IngestionLedger
 from talonx_ingest.storage.vector_store import VectorStore, get_vector_store
 from talonx_quant.config import QuantConfig
@@ -180,18 +182,6 @@ def _env_int(name: str, default: int) -> int:
         return int(os.environ.get(name, default))
     except (TypeError, ValueError):
         return default
-
-
-def _env_time(name: str, default: str) -> time:
-    """Parses an "HH:MM" env var into a UTC time-of-day. Falls back to
-    `default` (also "HH:MM") on anything unparseable."""
-    raw = os.environ.get(name, default)
-    try:
-        hour, minute = raw.split(":")
-        return time(int(hour), int(minute))
-    except (TypeError, ValueError):
-        default_hour, default_minute = default.split(":")
-        return time(int(default_hour), int(default_minute))
 
 
 def _diff_symbols(old: set[str], new: set[str]) -> tuple[set[str], set[str]]:
@@ -511,7 +501,7 @@ class EarningsFastTrackPoller:
 
 class PreMarketPoller:
     """
-    Pre-Market Radar: extends `fetch_extended_hours_quote` (originally
+    Pre-Market Radar: extends extended-hours quote coverage (originally
     built only for EarningsFastTrackPoller's narrow earnings-window ticker
     set, Requirement 6 above) to the WHOLE active watchlist during the
     pre-market session. Regular hours already get live prices from
@@ -526,18 +516,17 @@ class PreMarketPoller:
     notification pipeline and gates as a regular-session tick -- no
     separate, looser filtering for pre-market moves.
 
-    Deliberately simplified, same posture as EarningsFastTrackPoller's own
-    "session-aware BMO/AMC windowing is skipped" choice above: gates on a
-    flat, configurable UTC time-of-day window
-    (TALONX_PREMARKET_START_UTC/TALONX_PREMARKET_END_UTC) and Mon-Fri
-    only -- no trading-holiday calendar, no per-exchange session lookup
-    for non-US tickers. US pre-market is 4:00-9:30am ET, which is
-    08:00-13:30 UTC during EDT or 09:00-14:30 UTC during EST; the default
-    window (08:00-14:30 UTC) deliberately covers the UNION of both rather
-    than picking one, since this doesn't do DST-awareness -- a bit of
-    slack at either edge is harmless (fetch_extended_hours_quote just
-    returns the latest available bar), a missed hour of real pre-market
-    movement from picking the wrong side of DST would not be.
+    Dynamic ET Timezone: the pre-market window is gated on
+    talonx_ingest.session.is_premarket_window (04:00-09:30 ET via
+    zoneinfo.ZoneInfo("America/New_York")), not a flat, hardcoded
+    UTC-time-of-day range -- the previous implementation's window was
+    sized to cover the UNION of both EDT and EST offsets specifically
+    because it did no DST-awareness, which is a genuine mismatch (up to
+    an hour) between "the flat UTC clock says pre-market" and "it's
+    actually pre-market in New York" depending on the time of year, not
+    just imprecision. See talonx_ingest.session's own docstring for the
+    full rationale. Mon-Fri only -- still no trading-holiday calendar
+    beyond that, same documented tradeoff talonx_quant.session accepts.
 
     Excludes any ticker currently owned by EarningsFastTrackPoller, same
     "avoid double-publishing ticks for one symbol" reasoning
@@ -547,45 +536,36 @@ class PreMarketPoller:
     of its way avoids two independent sources racing ticks for one symbol
     with no ordering/session tiebreak.
 
-    Polls a ROTATING BATCH of at most `batch_size` symbols per tick
-    (TALONX_PREMARKET_BATCH_SIZE, default 5) rather than the whole
-    watchlist at once -- `fetch_extended_hours_quote` goes through
-    yfinance's `history(prepost=True)`, which is backed by curl_cffi;
-    the installed curl_cffi build (0.16.0) has a broken `Curl.__del__`
-    (raises AttributeError on `_ws_recv_buffer` before it can free the
-    native handle in `close()`), so every one of these calls leaks
-    native memory that Python's own GC can't see or reclaim. Hitting
-    the full watchlist every single cycle was confirmed live to OOM the
-    whole machine (both this process and the separate Streamlit
-    dashboard process) within ~15 minutes. Batching bounds how much of
-    that leak accumulates per tick; the full watchlist still gets
-    covered, just spread out over several ticks instead of hit in one
-    burst. The real fix is a curl_cffi upgrade/patch -- this is
-    mitigation, not a cure.
+    Vectorized Multi-Quote Poller: polls the FULL watchlist every tick via
+    talonx_ingest.poller.fetch_watchlist_quotes, a single batched
+    `yf.download(..., group_by="ticker")` call, rather than the previous
+    per-symbol `fetch_extended_hours_quote` loop -- which had to rotate
+    through only a small batch (5 symbols) per tick specifically to bound
+    a curl_cffi memory leak in `yf.Ticker(...).history(prepost=True)`
+    (the installed curl_cffi build, 0.16.0, has a broken `Curl.__del__`
+    that leaks native memory Python's own GC can't see or reclaim; hitting
+    the full watchlist that way was confirmed live to OOM the whole
+    machine within ~15 minutes). One `yf.download` call per tick means one
+    native-handle churn per cycle regardless of watchlist size, not one
+    per symbol -- see fetch_watchlist_quotes' own docstring.
     """
 
     def __init__(
         self, watchlist_store: TickerWatchlistStore, on_event, poll_interval_seconds: float,
-        start_utc: time, end_utc: time, active_earnings_symbols_fn=None, batch_size: int = 5,
+        active_earnings_symbols_fn=None, refresh_warn_seconds: float = DEFAULT_REFRESH_WARN_SECONDS,
     ):
         self._store = watchlist_store
         self._on_event = on_event
         self._poll_interval = poll_interval_seconds
-        self._start_utc = start_utc
-        self._end_utc = end_utc
         self._active_earnings_symbols_fn = active_earnings_symbols_fn
-        self._batch_size = max(1, batch_size)
-        self._cursor = 0
+        self._refresh_warn_seconds = refresh_warn_seconds
         self._stop_event = asyncio.Event()
 
     def stop(self) -> None:
         self._stop_event.set()
 
     def _in_window(self) -> bool:
-        now = datetime.now(timezone.utc)
-        if now.weekday() >= 5:  # Saturday/Sunday -- no trading-holiday calendar beyond this
-            return False
-        return self._start_utc <= now.time() < self._end_utc
+        return is_premarket_window()
 
     def _symbols(self) -> set[str]:
         symbols = set(self._store.list_active_symbols())
@@ -602,38 +582,18 @@ class PreMarketPoller:
             except asyncio.TimeoutError:
                 pass  # normal case: interval elapsed -- poll again if still in window, or check again if not
 
-    def _next_batch(self, symbols: list[str]) -> list[str]:
-        """Rotates through `symbols` (sorted, stable order) `batch_size` at a
-        time, wrapping around -- so repeated calls eventually cover the
-        whole watchlist without ever fetching more than a bounded slice
-        in one tick. Batch length is capped at len(symbols) so a
-        watchlist smaller than batch_size doesn't wrap around onto
-        itself and fetch the same symbol twice in one tick. Cursor is
-        clamped to len(symbols) each call since the watchlist can
-        grow/shrink between ticks."""
-        if not symbols:
-            return []
-        n = len(symbols)
-        size = min(self._batch_size, n)
-        self._cursor %= n
-        batch = [symbols[(self._cursor + i) % n] for i in range(size)]
-        self._cursor = (self._cursor + size) % n
-        return batch
-
     async def _poll_once(self) -> None:
         symbols = sorted(self._symbols())
-        batch = self._next_batch(symbols)
-        if not batch:
+        if not symbols:
             return
-        logger.info("Pre-market poll for %s (of %d tracked)", batch, len(symbols))
-        for symbol in batch:
-            try:
-                quote = await asyncio.to_thread(fetch_extended_hours_quote, symbol)
-            except Exception as exc:  # noqa: BLE001 -- one bad ticker shouldn't kill the poll
-                logger.warning("Pre-market quote fetch failed for %s: %s", symbol, exc)
-                continue
-            if quote is not None:
-                await self._on_event(quote)
+        logger.info("Pre-market vectorized poll for %d tracked symbol(s)", len(symbols))
+        try:
+            quotes = await asyncio.to_thread(fetch_watchlist_quotes, symbols, self._refresh_warn_seconds)
+        except Exception as exc:  # noqa: BLE001 -- a bad cycle shouldn't kill the poller
+            logger.warning("Pre-market vectorized quote fetch failed: %s", exc)
+            return
+        for quote in quotes:
+            await self._on_event(quote)
 
 
 class WatchlistDrivenIngestion:
@@ -1222,12 +1182,10 @@ async def main() -> None:
         premarket_poller = PreMarketPoller(
             watchlist_store, make_on_event(market_publisher),
             _env_float("TALONX_PREMARKET_POLL_INTERVAL_SECONDS", 300.0),
-            _env_time("TALONX_PREMARKET_START_UTC", "08:00"),
-            _env_time("TALONX_PREMARKET_END_UTC", "14:30"),
             active_earnings_symbols_fn=(
                 earnings_fast_track_poller.active_symbols if earnings_fast_track_poller is not None else None
             ),
-            batch_size=_env_int("TALONX_PREMARKET_BATCH_SIZE", 5),
+            refresh_warn_seconds=settings.market_data.premarket_refresh_warn_seconds,
         )
 
     market_data_runner: WatchlistDrivenMarketData | None = None
@@ -1501,9 +1459,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--skip-premarket", action="store_true",
         help="Skip pre-market price monitoring for the whole watchlist "
-             "(TALONX_PREMARKET_START_UTC/END_UTC, default 08:00-14:30 UTC, "
-             "poll every TALONX_PREMARKET_POLL_INTERVAL_SECONDS, default 300s, "
-             "TALONX_PREMARKET_BATCH_SIZE symbols per tick, default 5)",
+             "(04:00-09:30 America/New_York, dynamically DST-aware -- see "
+             "talonx_ingest.session -- poll every "
+             "TALONX_PREMARKET_POLL_INTERVAL_SECONDS, default 300s, "
+             "vectorized full-watchlist refresh warns past "
+             "TALONX_PREMARKET_REFRESH_WARN_SECONDS, default 30s)",
     )
     return parser.parse_args()
 

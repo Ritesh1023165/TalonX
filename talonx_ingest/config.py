@@ -292,6 +292,13 @@ class MarketDataConfig:
     # rather than keep repeating the same doomed request pattern.
     yfinance_session_reset_after_failures: int = _env_int("TALONX_YF_SESSION_RESET_AFTER", 3)
 
+    # Vectorized Multi-Quote Poller (talonx_ingest.poller.fetch_watchlist_quotes):
+    # a full-watchlist pre-market refresh cycle logged at WARNING instead
+    # of INFO once it takes longer than this -- the requirement's own
+    # "50+ tickers refresh in under 30s" target, made visible as a log
+    # signal rather than something that has to be timed externally.
+    premarket_refresh_warn_seconds: float = _env_float("TALONX_PREMARKET_REFRESH_WARN_SECONDS", 30.0)
+
 
 @dataclass(frozen=True)
 class Settings:

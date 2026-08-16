@@ -15,6 +15,12 @@ wrapping Yahoo Finance's undocumented endpoints. This module:
 
 Emits the same `MarketEvent` shape as the WebSocket client (event_type=BAR,
 source=POLLING) so downstream consumers don't need source-specific logic.
+
+Also home to fetch_extended_hours_quote (one symbol's pre/post-market
+quote via `history(prepost=True)`) and fetch_quotes_vectorized (the WHOLE
+watchlist's pre/post-market quotes in a single batched `yf.download`
+call -- see talonx_ingest.poller, which wraps it with timing/logging for
+run_talonx.PreMarketPoller).
 """
 from __future__ import annotations
 
@@ -200,6 +206,89 @@ def _safe_float(value) -> float | None:
     except Exception:  # noqa: BLE001 -- pd.isna choking on an odd type shouldn't crash the caller
         pass
     return float(value)
+
+
+def fetch_quotes_vectorized(symbols: list[str]) -> dict[str, MarketEvent]:
+    """
+    Vectorized Multi-Quote Poller (requirement: refresh the full
+    watchlist, 50+ tickers, in under ~30s during pre-market). Batches
+    EVERY symbol into a single `yf.download(..., group_by="ticker")`
+    call, unlike fetch_extended_hours_quote's per-symbol `yf.Ticker(...)
+    .history(...)` (which run_talonx.PreMarketPoller previously had to
+    rotate through in small batches specifically to bound a curl_cffi
+    memory leak -- see PreMarketPoller's own docstring -- since it opens
+    one native HTTP handle PER SYMBOL PER CALL). One `yf.download` call
+    still fetches each ticker's data internally, but through yfinance's
+    own multi-ticker session machinery rather than N independent
+    `Ticker.history()` calls issued one poll cycle at a time -- fewer
+    native handle teardowns per cycle regardless of watchlist size.
+
+    Blocking -- run via asyncio.to_thread, same convention as every other
+    yfinance call in this package. Returns a dict keyed by uppercased
+    symbol; a symbol with no usable data (delisted, rate-limited, market
+    holiday with no bars) is simply absent from the result rather than
+    raising, so one bad symbol never blocks the rest of the batch.
+    """
+    import yfinance as yf  # imported lazily so this stays optional
+
+    if not symbols:
+        return {}
+
+    upper_symbols = [s.upper() for s in symbols]
+    try:
+        data = yf.download(
+            tickers=" ".join(upper_symbols), period="1d", interval="1m", prepost=True,
+            group_by="ticker", threads=True, progress=False, auto_adjust=False,
+        )
+    except Exception as exc:  # noqa: BLE001 -- an unofficial endpoint, fail soft
+        logger.warning("Vectorized quote fetch failed for %d symbol(s): %s", len(upper_symbols), exc)
+        return {}
+
+    if data is None or data.empty:
+        return {}
+
+    # yfinance's single-ticker vs. multi-ticker return shape isn't
+    # reliably distinguishable by len(symbols) alone across versions --
+    # checking whether the columns actually came back as a MultiIndex
+    # (ticker, field) is the robust signal for whether `data` needs to be
+    # sliced per symbol at all, or is already one flat OHLCV frame.
+    import pandas as pd  # imported lazily, same optionality posture as yfinance
+    is_grouped = isinstance(data.columns, pd.MultiIndex)
+    now_fallback = datetime.now(timezone.utc)
+    results: dict[str, MarketEvent] = {}
+
+    for symbol in upper_symbols:
+        try:
+            symbol_df = data.get(symbol) if is_grouped else data
+            if symbol_df is None or symbol_df.empty:
+                continue
+            symbol_df = symbol_df.dropna(how="all")
+            if symbol_df.empty:
+                continue
+
+            latest = symbol_df.iloc[-1]
+            close = _safe_float(latest.get("Close"))
+            if close is None:
+                continue
+
+            timestamp = symbol_df.index[-1]
+            if hasattr(timestamp, "to_pydatetime"):
+                timestamp = timestamp.to_pydatetime()
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
+
+            results[symbol] = MarketEvent(
+                symbol=symbol, event_type=MarketEventType.BAR, source=DataSource.POLLING,
+                timestamp=timestamp or now_fallback,
+                open=_safe_float(latest.get("Open")), high=_safe_float(latest.get("High")),
+                low=_safe_float(latest.get("Low")), close=close, volume=_safe_float(latest.get("Volume")),
+                raw={},
+            )
+        except Exception as exc:  # noqa: BLE001 -- isolate per-symbol parsing failures
+            logger.warning("Failed to parse vectorized quote for %s: %s", symbol, exc)
+            continue
+
+    return results
 
 
 def fetch_extended_hours_quote(symbol: str) -> MarketEvent | None:

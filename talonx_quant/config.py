@@ -73,6 +73,17 @@ class QuantConfig:
     signals_channel: str = os.environ.get(
         "TALONX_REDIS_SIGNALS_CHANNEL", "talonx:signals:quant"
     )
+    # Rejection Trace Logging: one RejectedCandidateEvent per candidate a
+    # gate drops (confluence, structural R:R, trend, ATR move/volatility,
+    # blackout, cooldown, loss-lockout, throttle, pre-market liquidity/
+    # news-catalyst) -- consumed by talonx_dispatch purely to keep a
+    # durable, per-candidate audit trail (see talonx_dispatch/store.py's
+    # rejected_candidates table), since a dropped candidate otherwise
+    # never reaches that module at all. Same env var name talonx_dispatch
+    # reads on its side of this boundary.
+    rejected_candidates_channel: str = os.environ.get(
+        "TALONX_REDIS_REJECTED_CANDIDATES_CHANNEL", "talonx:quant:rejected"
+    )
     connect_timeout_seconds: float = _env_float("TALONX_REDIS_CONNECT_TIMEOUT", 5.0)
     socket_timeout_seconds: float = _env_float("TALONX_REDIS_SOCKET_TIMEOUT", 5.0)
     reconnect_backoff_base_seconds: float = _env_float("TALONX_QUANT_RECONNECT_BASE", 1.0)
@@ -167,28 +178,30 @@ class QuantConfig:
     # per-ticker cooldown lock or the global throttle.
     confluence_score_min: int = _env_int("TALONX_QUANT_CONFLUENCE_SCORE_MIN", 2)
 
-    # Risk/reward filter. Reward side = atr_reward_multiplier * ATR (a
-    # volatility-scaled profit target). Risk side is intentionally NOT
-    # another ATR multiple -- 1.5x ATR / 0.75x ATR is a constant 2.0
-    # regardless of any market data, which would make the filter a
-    # permanent no-op. Instead the risk side mirrors talonx_paper's own
-    # stop-loss distance (assumed_stop_loss_pct, default matching
-    # TALONX_PAPER_STOP_LOSS_PCT's 0.5% -- talonx_quant stays
-    # config-independent from talonx_paper by design, same "shadow
-    # constant, documented as an approximation" pattern
-    # talonx_dispatch/formatter.py's _VALUATION_EXIT_PREMIUM already
-    # uses for a different cross-module display value), so the ratio
-    # actually varies with each ticker's ATR-to-price relationship.
-    # Phase 2 requirement doc default: reward = 2.0x ATR, stop = 1.0x ATR
-    # (atr_stop_multiplier below) -- both explicit ATR multiples now, so
-    # stop_price/target_price (see schemas.QuantSignal) are real, dollar-
-    # denominated levels rather than just a ratio. min_risk_reward_ratio
-    # stays a live gate (not a permanent no-op) because a signal can still
-    # have atr=None (insufficient history) or the two multipliers can be
-    # tuned independently via env vars.
+    # Dollar stop/target levels attached to a published signal (see
+    # strategy.py's _stop_target_prices) -- stop = atr_stop_multiplier x
+    # ATR against the trade; target = pivot_resistance/support (see
+    # DailyPivots below) when available, else atr_reward_multiplier x ATR
+    # as a fallback while the prior-session pivot data is still warming up.
     atr_reward_multiplier: float = _env_float("TALONX_QUANT_ATR_REWARD_MULTIPLIER", 2.0)
     atr_stop_multiplier: float = _env_float("TALONX_QUANT_ATR_STOP_MULTIPLIER", 1.0)
     assumed_stop_loss_pct: float = _env_float("TALONX_QUANT_ASSUMED_STOP_LOSS_PCT", 0.005)
+
+    # Structural Risk/Reward filter (replaces the old constant-ATR-ratio
+    # gate, which compared two fixed ATR multiples against each other and
+    # was mathematically constant regardless of market data -- see git
+    # history for the prior implementation). Reward is now measured to the
+    # nearest classic floor-trader PIVOT LEVEL (prior completed regular
+    # session's R1/S1 -- see indicators.compute_daily_pivots), a genuine
+    # market-derived target rather than another ATR multiple; risk is
+    # pivot_stop_atr_multiplier x ATR (Requirement default: 1.5x). A
+    # candidate whose prior-session pivot data isn't available yet
+    # (cold start, or the HTF buffer hasn't accumulated a full session)
+    # gets risk_reward_ratio=None and is dropped by this gate -- same
+    # "insufficient data -> no signal" fail-closed posture every other
+    # warm-up-dependent check in this module already takes, rather than
+    # silently falling back to a non-structural approximation.
+    pivot_stop_atr_multiplier: float = _env_float("TALONX_QUANT_PIVOT_STOP_ATR_MULTIPLIER", 1.5)
     min_risk_reward_ratio: float = _env_float("TALONX_QUANT_MIN_RISK_REWARD_RATIO", 1.5)
 
     # --- Minimum volatility gate (2026-08-14 session review: ADC, a

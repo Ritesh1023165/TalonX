@@ -99,19 +99,22 @@ class QuantSignal(BaseModel):
     volume_surge_ratio: float | None = None
 
     # Analyst-review additions (see strategy.py): atr feeds the
-    # risk/reward calculation below; confluence_score (0-3) counts how
-    # many of {MACD cross, RSI extreme, volume surge} agree on this bar,
-    # gating whether this signal survives past consumer.py's
-    # confluence_score_min filter; risk_reward_ratio is
-    # (atr_reward_multiplier * atr) / (assumed_stop_loss_pct * price),
-    # gating consumer.py's min_risk_reward_ratio filter.
+    # risk/reward calculation below; confluence_score (0-3, computed PER
+    # SIGNAL DIRECTION -- Direction-Aware Confluence) counts how many of
+    # {MACD cross, RSI extreme IN THIS DIRECTION, volume surge} agree on
+    # this bar, gating whether this signal survives past consumer.py's
+    # confluence_score_min filter; risk_reward_ratio is the Structural
+    # R:R -- (pivot_resistance/support - price) / (pivot_stop_atr_multiplier
+    # * atr), see strategy.py's _structural_risk_reward -- gating
+    # consumer.py's min_risk_reward_ratio filter.
     atr: float | None = None
     confluence_score: int | None = None
     risk_reward_ratio: float | None = None
 
-    # Phase 2 requirement doc: explicit dollar stop/target (1x/2x ATR),
-    # rather than only the derived ratio above -- see strategy.py's
-    # _stop_target_prices. None when atr is None (insufficient history).
+    # Phase 2 requirement doc: explicit dollar stop/target (1x ATR stop /
+    # pivot-or-2x-ATR target), rather than only the derived ratio above --
+    # see strategy.py's _stop_target_prices. None when atr is None
+    # (insufficient history).
     stop_price: float | None = None
     target_price: float | None = None
 
@@ -122,6 +125,15 @@ class QuantSignal(BaseModel):
     trend_aligned: bool | None = None
     htf_sma_200: float | None = None
 
+    # Structural R:R Calculation: the prior-completed-regular-session
+    # pivot levels (R1/S1) risk_reward_ratio's reward side and
+    # stop_target_prices' target were measured against -- None when
+    # prior-session pivot data wasn't available yet (see
+    # indicators.compute_daily_pivots), same warm-up posture as
+    # htf_sma_200 above.
+    pivot_resistance: float | None = None
+    pivot_support: float | None = None
+
     # Session this candidate's triggering bar fell in -- carried through
     # so downstream consumers (talonx_dispatch's detail reply) can label
     # a push "Pre-Market" vs "Regular" without recomputing it.
@@ -129,6 +141,34 @@ class QuantSignal(BaseModel):
 
     bar_timestamp: datetime
     published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_redis_payload(self) -> str:
+        return self.model_dump_json()
+
+
+# ------------------------------------------------------------------
+# Rejection Trace Logging: published to talonx:quant:rejected whenever a
+# gate in consumer.py drops a candidate BEFORE it would have reached
+# talonx:signals:quant -- talonx_dispatch subscribes to this purely to
+# keep a durable, per-candidate audit trail (its own AuditStore's
+# rejected_candidates table) of exact failure reasons, since a dropped
+# candidate never otherwise reaches that module at all. `gate` is a
+# stable machine-readable identifier (e.g. "trend_gate", "rr_gate") --
+# see consumer.py's _GATE_NAMES for the reason->gate mapping.
+# ------------------------------------------------------------------
+
+class RejectedCandidateEvent(BaseModel):
+    ticker: str
+    gate: str
+    reason: str
+    signal_type: str | None = None
+    direction: SignalDirection | None = None
+    price: float | None = None
+    confluence_score: int | None = None
+    risk_reward_ratio: float | None = None
+    session: str | None = None
+    count: int = 1
+    rejected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_redis_payload(self) -> str:
         return self.model_dump_json()

@@ -119,6 +119,39 @@ tickers → Polygon.io WebSocket (if POLYGON_API_KEY set)
 - **`manager.py`** — the single entrypoint downstream code talks to. It
   never exposes which source is active; consumers only see normalized
   `MarketEvent` objects with a `source` field for observability.
+- **`session.py`** — Dynamic ET Timezone: US-equities session-state
+  classification (`pre_market`/`regular`/`after_hours`/`closed`) via
+  `zoneinfo.ZoneInfo("America/New_York")`, and `is_premarket_window()`
+  (04:00–09:30 ET, Mon–Fri) for `run_talonx.PreMarketPoller`'s window
+  gate. Replaces that poller's previous flat, hardcoded UTC time-of-day
+  range (`TALONX_PREMARKET_START_UTC`/`_END_UTC`, sized to cover the
+  UNION of both EDT and EST offsets since it did no DST-awareness at
+  all) — `astimezone` handles the EDT/EST transition correctly for any
+  calendar date, closing what was a genuine up-to-an-hour
+  misclassification gap, not just imprecision. Self-contained
+  (stdlib-only, no import of `talonx_quant`), same
+  "each module owns its own copy of a session/wire contract" convention
+  every cross-module boundary in this project already follows —
+  `talonx_quant.session` solves the identical problem for the quant
+  module's own bar-session tagging, independently.
+- **`poller.py`** — Vectorized Multi-Quote Poller: `fetch_watchlist_quotes`
+  wraps `yfinance_poll.fetch_quotes_vectorized` (a single batched
+  `yf.download(..., group_by="ticker", prepost=True)` call covering the
+  ENTIRE watchlist) with timing + a slow-cycle warning
+  (`TALONX_PREMARKET_REFRESH_WARN_SECONDS`, default 30s — the
+  requirement's own "50+ tickers refresh in under 30s" target, logged
+  rather than silently regressed). `run_talonx.PreMarketPoller` uses this
+  for its full-watchlist pre-market refresh every tick, replacing its
+  previous rotating-batch-of-5 approach: each per-symbol
+  `fetch_extended_hours_quote` call (still used by
+  `EarningsFastTrackPoller`'s narrower earnings-window ticker set) opens
+  its own native `curl_cffi` HTTP handle via
+  `yf.Ticker(...).history(prepost=True)`, and the installed curl_cffi
+  build (0.16.0) leaks that handle on teardown — hitting the whole
+  watchlist that way, one symbol at a time, was confirmed live to OOM
+  the machine within ~15 minutes, so only a small batch was ever covered
+  per tick. One `yf.download` call per cycle means one native-handle
+  churn regardless of watchlist size, not one per symbol.
 
 ## Redis event publishing (`talonx_ingest.events`)
 

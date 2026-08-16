@@ -174,6 +174,35 @@ CREATE TABLE IF NOT EXISTS paper_trade_notifications (
     timestamp           TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_paper_trade_notifications_timestamp ON paper_trade_notifications (timestamp);
+
+-- Rejection Trace Logging: one row per candidate signal a talonx_quant
+-- gate dropped BEFORE it would have reached talonx:signals:quant (see
+-- consumer.py's _handle_rejected_candidate) -- the exact failure reason
+-- (trend_gate, rr_gate, confluence_gate, etc., see talonx_quant.consumer's
+-- own _GATE_NAMES mapping) for EVERY candidate, not just an aggregated
+-- daily count. talonx_quant's own QuantStateStore.suppression_counts
+-- already tracks a same-shaped (date, ticker, reason) daily UPSERT
+-- counter for its own EOD report -- this table is deliberately a
+-- separate, per-CANDIDATE append-only log in the audit-trail database
+-- instead, since it's specifically meant to be queryable per-candidate
+-- (e.g. "show me every rejection for AAPL in the last hour with its
+-- confluence score"), which an aggregated counter can't answer.
+CREATE TABLE IF NOT EXISTS rejected_candidates (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker              TEXT NOT NULL,
+    gate                TEXT NOT NULL,
+    reason              TEXT NOT NULL,
+    signal_type         TEXT,
+    direction           TEXT,
+    price               REAL,
+    confluence_score    INTEGER,
+    risk_reward_ratio   REAL,
+    session             TEXT,
+    rejected_at         TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rejected_candidates_ticker ON rejected_candidates (ticker);
+CREATE INDEX IF NOT EXISTS idx_rejected_candidates_rejected_at ON rejected_candidates (rejected_at);
+CREATE INDEX IF NOT EXISTS idx_rejected_candidates_reason ON rejected_candidates (reason);
 """
 
 
@@ -613,6 +642,70 @@ class AuditStore:
                  1 if telegram_sent else 0, suppress_reason, timestamp.isoformat()),
             )
             self._conn.commit()
+
+    # ------------------------------------------------------------------
+    # Rejection Trace Logging
+    # ------------------------------------------------------------------
+
+    def record_rejected_candidate(
+        self, ticker: str, gate: str, reason: str, rejected_at: datetime,
+        signal_type: str | None = None, direction: str | None = None, price: float | None = None,
+        confluence_score: int | None = None, risk_reward_ratio: float | None = None,
+        session: str | None = None,
+    ) -> int:
+        with self._lock:
+            cursor = self._conn.execute(
+                """
+                INSERT INTO rejected_candidates (
+                    ticker, gate, reason, signal_type, direction, price,
+                    confluence_score, risk_reward_ratio, session, rejected_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    ticker.upper(), gate, reason, signal_type, direction, price,
+                    confluence_score, risk_reward_ratio, session, rejected_at.isoformat(),
+                ),
+            )
+            self._conn.commit()
+            return cursor.lastrowid
+
+    def recent_rejected_candidates(self, limit: int = 200) -> list[dict]:
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT * FROM rejected_candidates ORDER BY rejected_at DESC, id DESC LIMIT ?", (limit,)
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def rejected_candidates_for_ticker(self, ticker: str, limit: int = 200) -> list[dict]:
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT * FROM rejected_candidates WHERE ticker = ? ORDER BY rejected_at DESC, id DESC LIMIT ?",
+                (ticker.upper(), limit),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def rejected_candidates_between(self, start: datetime, end: datetime) -> list[dict]:
+        """All rejections with start <= rejected_at < end -- same
+        indexed-column date-window read shape as alerts_between, for a
+        Daily Funnel-style report over the per-candidate detail this
+        table carries (rather than just the aggregated daily counters
+        talonx_quant.store.QuantStateStore.suppression_counts_for_date
+        already provides)."""
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT * FROM rejected_candidates WHERE rejected_at >= ? AND rejected_at < ? "
+                "ORDER BY rejected_at, id",
+                (start.isoformat(), end.isoformat()),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def purge_rejected_candidates_older_than(self, cutoff: datetime) -> int:
+        with self._lock:
+            cursor = self._conn.execute(
+                "DELETE FROM rejected_candidates WHERE rejected_at < ?", (cutoff.isoformat(),)
+            )
+            self._conn.commit()
+            return cursor.rowcount
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict:

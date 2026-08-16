@@ -4,10 +4,20 @@ tests/test_run_talonx_premarket.py
 Tests run_talonx.PreMarketPoller. Same "REAL TickerWatchlistStore (tmp_path),
 mock the external yfinance call" boundary as
 test_run_talonx_earnings_fast_track.py uses for EarningsFastTrackPoller.
+
+Covers the 2026-08-16 requirement-doc gap fixes:
+  - Dynamic ET Timezone: _in_window delegates to
+    talonx_ingest.session.is_premarket_window (ZoneInfo-based), not a
+    flat hardcoded UTC window -- mocked at the talonx_ingest.session
+    level, not via run_talonx.datetime, since run_talonx no longer does
+    its own time-of-day comparison.
+  - Vectorized Multi-Quote Poller: _poll_once fetches the WHOLE watchlist
+    in one call to fetch_watchlist_quotes, not a per-symbol rotating
+    batch.
 """
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -27,48 +37,53 @@ def store(tmp_path) -> TickerWatchlistStore:
 def _poller(store, **kwargs) -> PreMarketPoller:
     defaults = dict(
         watchlist_store=store, on_event=AsyncMock(), poll_interval_seconds=300.0,
-        start_utc=time(0, 0), end_utc=time(23, 59),
     )
     defaults.update(kwargs)
     return PreMarketPoller(**defaults)
 
 
-# --- _in_window ------------------------------------------------------
+# --- _in_window (Dynamic ET Timezone) ---------------------------------
 
-def test_in_window_when_within_configured_range_on_a_weekday(store):
-    now = datetime.now(timezone.utc)
-    if now.weekday() >= 5:
-        pytest.skip("weekday-only check -- weekend behavior covered separately below")
-    start = (now - timedelta(minutes=5)).time()
-    end = (now + timedelta(minutes=5)).time()
-    poller = _poller(store, start_utc=start, end_utc=end)
-    assert poller._in_window()
+def test_in_window_delegates_to_is_premarket_window_true(store):
+    poller = _poller(store)
+    with patch("run_talonx.is_premarket_window", return_value=True) as mock_check:
+        assert poller._in_window() is True
+    mock_check.assert_called_once_with()
 
 
-def test_not_in_window_before_start(store):
-    now = datetime.now(timezone.utc)
-    start = (now + timedelta(minutes=5)).time()
-    end = (now + timedelta(minutes=10)).time()
-    poller = _poller(store, start_utc=start, end_utc=end)
-    assert not poller._in_window()
+def test_in_window_delegates_to_is_premarket_window_false(store):
+    poller = _poller(store)
+    with patch("run_talonx.is_premarket_window", return_value=False):
+        assert poller._in_window() is False
 
 
-def test_not_in_window_after_end(store):
-    now = datetime.now(timezone.utc)
-    start = (now - timedelta(minutes=10)).time()
-    end = (now - timedelta(minutes=5)).time()
-    poller = _poller(store, start_utc=start, end_utc=end)
-    assert not poller._in_window()
+def test_in_window_reflects_real_dst_aware_premarket_hours(store):
+    # A known pre-market instant: 2026-08-03 13:00 UTC = 09:00 EDT
+    # (August is EDT, UTC-4) -- squarely inside 04:00-09:30 ET.
+    poller = _poller(store)
+    premarket_instant = datetime(2026, 8, 3, 13, 0, tzinfo=timezone.utc)
+    with patch("talonx_ingest.session.datetime") as mock_datetime:
+        mock_datetime.now.return_value = premarket_instant
+        assert poller._in_window() is True
 
 
-def test_not_in_window_on_a_weekend(store):
-    now = datetime.now(timezone.utc)
-    days_until_saturday = (5 - now.weekday()) % 7
-    saturday = now + timedelta(days=days_until_saturday, hours=1)
-    poller = _poller(store)  # 00:00-23:59 window -- would otherwise always be "in window"
-    with patch("run_talonx.datetime") as mock_datetime:
-        mock_datetime.now.return_value = saturday
-        assert not poller._in_window()
+def test_in_window_false_outside_premarket_hours(store):
+    # 15:00 UTC = 11:00 EDT -- regular session, not pre-market.
+    poller = _poller(store)
+    regular_instant = datetime(2026, 8, 3, 15, 0, tzinfo=timezone.utc)
+    with patch("talonx_ingest.session.datetime") as mock_datetime:
+        mock_datetime.now.return_value = regular_instant
+        assert poller._in_window() is False
+
+
+def test_in_window_false_on_a_weekend(store):
+    poller = _poller(store)
+    # 2026-08-08 is a Saturday; 13:00 UTC is well inside the pre-market
+    # TIME-of-day window, but weekends are always closed.
+    saturday_premarket_time = datetime(2026, 8, 8, 13, 0, tzinfo=timezone.utc)
+    with patch("talonx_ingest.session.datetime") as mock_datetime:
+        mock_datetime.now.return_value = saturday_premarket_time
+        assert poller._in_window() is False
 
 
 # --- _symbols ------------------------------------------------------
@@ -87,50 +102,61 @@ def test_symbols_excludes_active_earnings_symbols(store):
     assert poller._symbols() == {"MSFT"}  # AAPL owned by EarningsFastTrackPoller instead
 
 
-# --- _poll_once ------------------------------------------------------
+# --- _poll_once (Vectorized Multi-Quote Poller) -----------------------
 
 @pytest.mark.asyncio
-async def test_poll_once_publishes_a_quote_per_symbol(store):
+async def test_poll_once_publishes_a_quote_per_symbol_via_one_vectorized_call(store):
     store.add_ticker("AAPL", "Apple Inc.")
-    quote = MarketEvent(
+    store.add_ticker("MSFT", "Microsoft Corporation")
+    aapl_quote = MarketEvent(
         symbol="AAPL", event_type=MarketEventType.BAR, source=DataSource.POLLING,
         timestamp=datetime.now(timezone.utc), close=175.5,
     )
+    msft_quote = MarketEvent(
+        symbol="MSFT", event_type=MarketEventType.BAR, source=DataSource.POLLING,
+        timestamp=datetime.now(timezone.utc), close=410.0,
+    )
     poller = _poller(store)
-    with patch("run_talonx.fetch_extended_hours_quote", return_value=quote):
+    with patch("run_talonx.fetch_watchlist_quotes", return_value=[aapl_quote, msft_quote]) as mock_fetch:
         await poller._poll_once()
-    poller._on_event.assert_awaited_once_with(quote)
+
+    mock_fetch.assert_called_once_with(["AAPL", "MSFT"], poller._refresh_warn_seconds)
+    assert poller._on_event.await_count == 2
+    poller._on_event.assert_any_await(aapl_quote)
+    poller._on_event.assert_any_await(msft_quote)
 
 
 @pytest.mark.asyncio
-async def test_poll_once_skips_a_symbol_with_no_usable_quote(store):
+async def test_poll_once_skips_publishing_when_no_quotes_found(store):
     store.add_ticker("AAPL", "Apple Inc.")
     poller = _poller(store)
-    with patch("run_talonx.fetch_extended_hours_quote", return_value=None):
+    with patch("run_talonx.fetch_watchlist_quotes", return_value=[]):
         await poller._poll_once()
     poller._on_event.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_poll_once_isolates_a_failing_symbol(store):
+async def test_poll_once_does_not_raise_when_the_vectorized_fetch_fails(store):
     store.add_ticker("AAPL", "Apple Inc.")
     store.add_ticker("MSFT", "Microsoft Corporation")
-
-    def _side_effect(symbol):
-        if symbol == "AAPL":
-            raise RuntimeError("yfinance error")
-        return None
-
     poller = _poller(store)
-    with patch("run_talonx.fetch_extended_hours_quote", side_effect=_side_effect) as mock_fetch:
+    with patch("run_talonx.fetch_watchlist_quotes", side_effect=RuntimeError("yfinance error")):
         await poller._poll_once()  # must not raise
-
-    assert mock_fetch.call_count == 2  # both tickers still attempted
+    poller._on_event.assert_not_awaited()
 
 
 @pytest.mark.asyncio
 async def test_poll_once_is_a_noop_with_no_symbols(store):
     poller = _poller(store)
-    with patch("run_talonx.fetch_extended_hours_quote") as mock_fetch:
+    with patch("run_talonx.fetch_watchlist_quotes") as mock_fetch:
         await poller._poll_once()
     mock_fetch.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_poll_once_uses_the_configured_refresh_warn_seconds(store):
+    store.add_ticker("AAPL", "Apple Inc.")
+    poller = _poller(store, refresh_warn_seconds=45.0)
+    with patch("run_talonx.fetch_watchlist_quotes", return_value=[]) as mock_fetch:
+        await poller._poll_once()
+    mock_fetch.assert_called_once_with(["AAPL"], 45.0)

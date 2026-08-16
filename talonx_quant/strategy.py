@@ -19,15 +19,15 @@ rationale -- a live paper-trading review found a 0.33 profit factor and
     clear atr_move_multiplier x ATR(14) -- a signal firing on a routine,
     average-sized bar (not a genuine directional move) was implicated in
     the reviewed whipsaw losses.
-  - confluence_score (0-3) and risk_reward_ratio are bar-level
-    properties (not signal-type-specific), computed once and attached to
-    every signal that fires on that bar -- consumer.py filters on both
+  - confluence_score (0-3) and risk_reward_ratio are computed per
+    SIGNAL (direction-aware -- see the 2026-08-16 gap fixes below) and
+    attached to every signal that fires -- consumer.py filters on both
     before a signal is even allowed to start the per-ticker cooldown.
 
 Phase 2 requirement doc additions:
-  - Explicit $ stop_price/target_price (1x/2x ATR) attached to every
-    signal, not just the derived risk_reward_ratio -- see
-    _stop_target_prices.
+  - Explicit $ stop_price/target_price (1x ATR stop / pivot-or-2x-ATR
+    target) attached to every signal, not just the derived
+    risk_reward_ratio -- see _stop_target_prices.
   - Session-aware volume-surge threshold: pre-market bars (04:00-09:30 ET)
     require a stricter surge ratio than regular-session bars -- see
     session.get_session and _pick_volume_threshold.
@@ -37,11 +37,28 @@ Phase 2 requirement doc additions:
     trend-misaligned bullish candidate happens in consumer.py, same
     "strategy.py computes/attaches, consumer.py gates" split the
     confluence/risk-reward filters already use.
+
+Requirement-doc gap fixes (2026-08-16):
+  - Direction-Aware Confluence: confluence_score is now computed PER
+    SIGNAL DIRECTION, not once per bar. An RSI reading in the extreme
+    zone only counts toward a BULLISH candidate's score if it's OVERSOLD
+    (< rsi_oversold) and toward a BEARISH candidate's score if it's
+    OVERBOUGHT (> rsi_overbought) -- an overbought bar (RSI > 70) earns a
+    bullish candidate ZERO points for that leg, since overbought is
+    bearish evidence, not confluence for going long. See _confluence_score.
+  - Structural R:R Calculation: risk_reward_ratio is now measured against
+    the nearest classic floor-trader pivot level (prior completed
+    regular session's R1/S1, see indicators.compute_daily_pivots) rather
+    than a second ATR multiple -- see _structural_risk_reward.
+  - RSI Reversal Curl: the bullish RSI+volume setup no longer fires the
+    instant RSI dips below rsi_oversold (a falling-knife entry); it
+    waits for RSI to recover back ABOVE rsi_oversold first -- see
+    _check_rsi_volume_setup.
 """
 from __future__ import annotations
 
 from talonx_quant.config import QuantConfig
-from talonx_quant.indicators import IndicatorSnapshot
+from talonx_quant.indicators import DailyPivots, IndicatorSnapshot
 from talonx_quant.schemas import QuantSignal, SignalDirection, SignalType
 from talonx_quant.session import Session, get_session
 
@@ -51,18 +68,19 @@ def evaluate_signals(
     snapshot: IndicatorSnapshot,
     config: QuantConfig,
     htf_sma_200: float | None = None,
+    daily_pivots: DailyPivots | None = None,
 ) -> list[QuantSignal]:
     signals: list[QuantSignal] = []
     session = get_session(snapshot.bar_timestamp)
     volume_threshold = _pick_volume_threshold(session, config)
-    confluence_score = _confluence_score(snapshot, config, volume_threshold)
-    risk_reward_ratio = _risk_reward_ratio(snapshot, config)
 
-    ctx = _SignalContext(session=session, htf_sma_200=htf_sma_200, volume_threshold=volume_threshold)
+    ctx = _SignalContext(
+        session=session, htf_sma_200=htf_sma_200, volume_threshold=volume_threshold, pivots=daily_pivots,
+    )
 
-    _check_rsi_volume_setup(ticker, snapshot, config, signals, confluence_score, risk_reward_ratio, ctx)
-    _check_macd_crossover(ticker, snapshot, config, signals, confluence_score, risk_reward_ratio, ctx)
-    _check_ma_crossover(ticker, snapshot, config, signals, confluence_score, risk_reward_ratio, ctx)
+    _check_rsi_volume_setup(ticker, snapshot, config, signals, ctx)
+    _check_macd_crossover(ticker, snapshot, config, signals, ctx)
+    _check_ma_crossover(ticker, snapshot, config, signals, ctx)
 
     return signals
 
@@ -72,12 +90,16 @@ class _SignalContext:
     -- avoids growing each _check_* function's positional-arg list every
     time a new session-aware input is added."""
 
-    __slots__ = ("session", "htf_sma_200", "volume_threshold")
+    __slots__ = ("session", "htf_sma_200", "volume_threshold", "pivots")
 
-    def __init__(self, session: Session, htf_sma_200: float | None, volume_threshold: float):
+    def __init__(
+        self, session: Session, htf_sma_200: float | None, volume_threshold: float,
+        pivots: DailyPivots | None = None,
+    ):
         self.session = session
         self.htf_sma_200 = htf_sma_200
         self.volume_threshold = volume_threshold
+        self.pivots = pivots
 
 
 def _pick_volume_threshold(session: Session, config: QuantConfig) -> float:
@@ -114,53 +136,94 @@ def _macd_crossed_this_bar(s: IndicatorSnapshot) -> bool:
     return bullish or bearish
 
 
-def _confluence_score(s: IndicatorSnapshot, config: QuantConfig, volume_threshold: float) -> int:
-    """0-3: +1 each for a MACD cross firing THIS bar, RSI currently
-    sitting in its extreme zone (< rsi_oversold or > rsi_overbought,
-    regardless of whether it JUST crossed there), and volume surge above
-    the session-appropriate threshold. A bar-level conviction score, not
-    signal-type-specific -- every signal firing on this bar carries the
-    SAME score."""
+def _confluence_score(
+    s: IndicatorSnapshot, config: QuantConfig, volume_threshold: float, direction: SignalDirection,
+) -> int:
+    """0-3: +1 each for a MACD cross firing THIS bar, RSI sitting in the
+    extreme zone that actually SUPPORTS this candidate's direction, and
+    volume surge above the session-appropriate threshold.
+
+    Direction-Aware Confluence: unlike the old bar-level (direction-
+    agnostic) score, a RSI reading only contributes a point when it
+    agrees with the direction being scored -- oversold (< rsi_oversold)
+    for a BULLISH candidate, overbought (> rsi_overbought) for a BEARISH
+    one. An overbought bar (RSI > 70) earns a BULLISH candidate ZERO
+    points for this leg: being overbought is bearish evidence, not
+    conviction for going long, so it must not silently pad a long
+    setup's score toward the confluence_score_min gate. Computed fresh
+    per signal (not once per bar) since two signals of opposite
+    direction can legitimately fire on the same bar (e.g. a MACD
+    bullish cross and, on a later bar, an MA death cross) and each needs
+    its own direction-appropriate score."""
     score = 0
     if _macd_crossed_this_bar(s):
         score += 1
-    if s.rsi is not None and (s.rsi < config.rsi_oversold or s.rsi > config.rsi_overbought):
-        score += 1
+    if s.rsi is not None:
+        if direction == SignalDirection.BULLISH and s.rsi < config.rsi_oversold:
+            score += 1
+        elif direction == SignalDirection.BEARISH and s.rsi > config.rsi_overbought:
+            score += 1
     if s.volume_surge_ratio is not None and s.volume_surge_ratio > volume_threshold:
         score += 1
     return score
 
 
-def _risk_reward_ratio(s: IndicatorSnapshot, config: QuantConfig) -> float | None:
-    """(atr_reward_multiplier x ATR) / (atr_stop_multiplier x ATR) -- both
-    sides are now explicit ATR multiples (default 2.0x reward / 1.0x
-    stop, the Phase 2 requirement doc's values), so this ratio is a
-    genuine minimum-R:R gate on the two configured multipliers, not a
-    permanent no-op -- see _stop_target_prices for the matching dollar
-    levels attached to the published signal."""
-    if s.atr is None or s.atr <= 0 or not s.price:
+def _structural_risk_reward(
+    s: IndicatorSnapshot, direction: SignalDirection, pivots: DailyPivots | None, config: QuantConfig,
+) -> float | None:
+    """Structural R:R Calculation: reward is the distance from entry to
+    the nearest classic floor-trader pivot level from the prior completed
+    regular session (R1 for a BULLISH candidate, S1 for a BEARISH one --
+    see indicators.compute_daily_pivots), a genuine market-derived target
+    rather than a second ATR multiple; risk is
+    pivot_stop_atr_multiplier x ATR (default 1.5x, the requirement's own
+    figure). Returns None -- same fail-closed, "insufficient data -> no
+    signal" posture every other warm-up-dependent check in this module
+    takes -- when ATR/price/pivots aren't available yet, or when the
+    relevant pivot level sits on the WRONG side of entry (e.g. price has
+    already traded through R1, leaving no bullish room left to target)."""
+    if s.atr is None or s.atr <= 0 or not s.price or pivots is None:
         return None
-    risk = config.atr_stop_multiplier * s.atr
+    risk = config.pivot_stop_atr_multiplier * s.atr
     if risk <= 0:
         return None
-    reward = config.atr_reward_multiplier * s.atr
+    if direction == SignalDirection.BULLISH:
+        reward = pivots.resistance - s.price
+    else:
+        reward = s.price - pivots.support
+    if reward <= 0:
+        return None
     return reward / risk
 
 
 def _stop_target_prices(
     price: float, atr: float | None, direction: SignalDirection, config: QuantConfig,
+    pivots: DailyPivots | None,
 ) -> tuple[float | None, float | None]:
-    """Explicit dollar stop/target levels: stop = 1x ATR against the
-    trade, target = 2x ATR in its favor (defaults; both configurable).
-    None/None when ATR isn't available yet (insufficient history) --
-    same warm-up posture as every other ATR-derived value here."""
+    """Explicit dollar stop/target levels: stop = atr_stop_multiplier x
+    ATR against the trade (default 1x); target = the nearest pivot level
+    (R1/S1) when available -- the SAME structural level
+    _structural_risk_reward's reward side uses, so a published signal's
+    displayed/executed target actually matches what cleared the R:R gate
+    -- else the old atr_reward_multiplier x ATR approximation (default
+    2x) while prior-session pivot data is still warming up. None/None
+    when ATR isn't available yet (insufficient history), same warm-up
+    posture as every other ATR-derived value here."""
     if atr is None or atr <= 0:
         return None, None
     stop_distance = config.atr_stop_multiplier * atr
-    target_distance = config.atr_reward_multiplier * atr
+    fallback_target_distance = config.atr_reward_multiplier * atr
+
     if direction == SignalDirection.BULLISH:
-        return price - stop_distance, price + target_distance
-    return price + stop_distance, price - target_distance
+        stop = price - stop_distance
+        if pivots is not None and pivots.resistance > price:
+            return stop, pivots.resistance
+        return stop, price + fallback_target_distance
+
+    stop = price + stop_distance
+    if pivots is not None and pivots.support < price:
+        return stop, pivots.support
+    return stop, price - fallback_target_distance
 
 
 def _trend_aligned(
@@ -181,28 +244,38 @@ def _trend_aligned(
 
 
 def _check_rsi_volume_setup(
-    ticker: str, s: IndicatorSnapshot, config: QuantConfig, signals: list[QuantSignal],
-    confluence_score: int, risk_reward_ratio: float | None, ctx: _SignalContext,
+    ticker: str, s: IndicatorSnapshot, config: QuantConfig, signals: list[QuantSignal], ctx: _SignalContext,
 ) -> None:
     """
     Edge-triggered, like the MACD/MA crossover checks below: fires only on
-    the bar RSI first crosses the threshold, not on every subsequent bar it
+    the bar RSI first crosses a threshold, not on every subsequent bar it
     remains oversold/overbought. Without this, a stock sitting under RSI 30
     for 5 consecutive bars would fire 5 signals instead of 1 -- a major
     source of the alert chatter this module was tuned to reduce.
+
+    RSI Reversal Curl: the BULLISH leg deliberately does NOT fire the
+    instant RSI first dips below rsi_oversold (a falling-knife entry with
+    no confirmation the selloff has actually stopped) -- it waits for RSI
+    to curl back UP and recover above rsi_oversold first (rsi_prev still
+    below the threshold, rsi now at/above it), then fires on that
+    recovery bar. The BEARISH leg is intentionally left as the original
+    entering-overbought edge trigger -- the RSI Reversal Curl requirement
+    is specifically about a BUY signal waiting for recovery, not a
+    symmetric change to the short side.
     """
     if s.rsi is None or s.rsi_prev is None or s.volume_surge_ratio is None:
         return
     if not _clears_atr_move(s, config):
         return
 
-    crossed_oversold = s.rsi_prev >= config.rsi_oversold and s.rsi < config.rsi_oversold
-    if crossed_oversold and s.volume_surge_ratio > ctx.volume_threshold:
+    recovered_from_oversold = s.rsi_prev < config.rsi_oversold and s.rsi >= config.rsi_oversold
+    if recovered_from_oversold and s.volume_surge_ratio > ctx.volume_threshold:
         signals.append(_build_signal(
             ticker, s, SignalType.RSI_OVERSOLD_VOLUME_SURGE, SignalDirection.BULLISH,
-            f"RSI {s.rsi:.1f} crossed into oversold (< {config.rsi_oversold:.0f}) with "
-            f"{s.volume_surge_ratio:.1f}x volume surge (> {ctx.volume_threshold:.1f}x)",
-            confluence_score, risk_reward_ratio, config, ctx,
+            f"RSI {s.rsi:.1f} curled back above oversold (>= {config.rsi_oversold:.0f}, "
+            f"was {s.rsi_prev:.1f}) with {s.volume_surge_ratio:.1f}x volume surge "
+            f"(> {ctx.volume_threshold:.1f}x)",
+            config, ctx,
         ))
         return  # a bar crosses one direction at most; skip the overbought check
 
@@ -212,13 +285,12 @@ def _check_rsi_volume_setup(
             ticker, s, SignalType.RSI_OVERBOUGHT_VOLUME_SURGE, SignalDirection.BEARISH,
             f"RSI {s.rsi:.1f} crossed into overbought (> {config.rsi_overbought:.0f}) with "
             f"{s.volume_surge_ratio:.1f}x volume surge (> {ctx.volume_threshold:.1f}x)",
-            confluence_score, risk_reward_ratio, config, ctx,
+            config, ctx,
         ))
 
 
 def _check_macd_crossover(
-    ticker: str, s: IndicatorSnapshot, config: QuantConfig, signals: list[QuantSignal],
-    confluence_score: int, risk_reward_ratio: float | None, ctx: _SignalContext,
+    ticker: str, s: IndicatorSnapshot, config: QuantConfig, signals: list[QuantSignal], ctx: _SignalContext,
 ) -> None:
     if None in (s.macd, s.macd_signal_line, s.macd_prev, s.macd_signal_line_prev):
         return
@@ -231,7 +303,7 @@ def _check_macd_crossover(
         signals.append(_build_signal(
             ticker, s, SignalType.MACD_BULLISH_CROSS, SignalDirection.BULLISH,
             f"MACD ({s.macd:.3f}) crossed above signal line ({s.macd_signal_line:.3f})",
-            confluence_score, risk_reward_ratio, config, ctx,
+            config, ctx,
         ))
         return  # a bar crosses one direction at most; skip the bearish check
 
@@ -241,13 +313,12 @@ def _check_macd_crossover(
         signals.append(_build_signal(
             ticker, s, SignalType.MACD_BEARISH_CROSS, SignalDirection.BEARISH,
             f"MACD ({s.macd:.3f}) crossed below signal line ({s.macd_signal_line:.3f})",
-            confluence_score, risk_reward_ratio, config, ctx,
+            config, ctx,
         ))
 
 
 def _check_ma_crossover(
-    ticker: str, s: IndicatorSnapshot, config: QuantConfig, signals: list[QuantSignal],
-    confluence_score: int, risk_reward_ratio: float | None, ctx: _SignalContext,
+    ticker: str, s: IndicatorSnapshot, config: QuantConfig, signals: list[QuantSignal], ctx: _SignalContext,
 ) -> None:
     """
     Hysteresis-gated, on top of the was_below/now_above transition check:
@@ -274,7 +345,7 @@ def _check_ma_crossover(
             ticker, s, SignalType.MA_GOLDEN_CROSS, SignalDirection.BULLISH,
             f"{config.ma_fast_period}-period MA ({s.sma_fast:.2f}) crossed above "
             f"{config.ma_slow_period}-period MA ({s.sma_slow:.2f})",
-            confluence_score, risk_reward_ratio, config, ctx,
+            config, ctx,
         ))
         return
 
@@ -285,7 +356,7 @@ def _check_ma_crossover(
             ticker, s, SignalType.MA_DEATH_CROSS, SignalDirection.BEARISH,
             f"{config.ma_fast_period}-period MA ({s.sma_fast:.2f}) crossed below "
             f"{config.ma_slow_period}-period MA ({s.sma_slow:.2f})",
-            confluence_score, risk_reward_ratio, config, ctx,
+            config, ctx,
         ))
 
 
@@ -295,12 +366,12 @@ def _build_signal(
     signal_type: SignalType,
     direction: SignalDirection,
     message: str,
-    confluence_score: int,
-    risk_reward_ratio: float | None,
     config: QuantConfig,
     ctx: _SignalContext,
 ) -> QuantSignal:
-    stop_price, target_price = _stop_target_prices(s.price, s.atr, direction, config)
+    confluence_score = _confluence_score(s, config, ctx.volume_threshold, direction)
+    risk_reward_ratio = _structural_risk_reward(s, direction, ctx.pivots, config)
+    stop_price, target_price = _stop_target_prices(s.price, s.atr, direction, config, ctx.pivots)
     return QuantSignal(
         ticker=ticker.upper(),
         signal_type=signal_type,
@@ -321,6 +392,8 @@ def _build_signal(
         target_price=target_price,
         trend_aligned=_trend_aligned(s.price, direction, ctx.session, ctx.htf_sma_200, config),
         htf_sma_200=ctx.htf_sma_200,
+        pivot_resistance=None if ctx.pivots is None else ctx.pivots.resistance,
+        pivot_support=None if ctx.pivots is None else ctx.pivots.support,
         session=ctx.session,
         bar_timestamp=s.bar_timestamp,
     )

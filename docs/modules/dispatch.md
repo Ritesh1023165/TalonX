@@ -38,6 +38,14 @@ Telegram (incoming messages, telegram_listener.py's TelegramReplyListener)
       uptime, CPU/RAM, the ingest WebSocket's heartbeat status, and
       today's signal counts from the audit trail (see "Interactive
       health check" below) -- anything else → a usage hint
+
+(concurrently, ALSO subscribed -- talonx:quant:rejected)
+    → parse + validate each message as RejectedCandidateEvent
+    → record it to store.py's rejected_candidates table -- ONE row per
+      candidate a talonx_quant gate dropped (trend_gate, rr_gate,
+      confluence_gate, etc.), never pushed/shown in the main feed, purely
+      a durable audit trail for "why didn't this fire" -- see Rejection
+      Trace Logging below
     → only ever responds to the configured TELEGRAM_CHAT_ID -- a personal,
       single-user bot, not multi-tenant
 
@@ -140,6 +148,34 @@ Streamlit (`streamlit run talonx_dispatch/app.py`)
   string `"NONE"` (not SQL `NULL`) — `NULL` is reserved for a row from
   before a push decision was ever made (or, after a schema migration, a
   pre-existing row from before this column existed at all).
+- **Rejection Trace Logging** (`consumer.py`'s `_handle_rejected_candidate`,
+  `store.py`'s `rejected_candidates` table,
+  `TALONX_REDIS_REJECTED_CANDIDATES_CHANNEL` default `talonx:quant:rejected`)
+  — a genuinely different gap than Smart Dispatch Filtering above:
+  Smart Dispatch Filtering's `suppress_reason` only ever covers an alert
+  that already made it all the way to `talonx:alerts:dispatch` (i.e. quant
+  AND research both fired and were correlated). A candidate `talonx_quant`
+  drops upstream — failed confluence, structural R:R, trend, ATR-move/
+  volatility, an entry blackout, cooldown, loss-lockout, batch throttle,
+  or a pre-market liquidity/news-catalyst gate — never reached this
+  module at all before this feature, so there was no durable record of
+  *why* a candidate never became a signal in the first place, only
+  aggregated daily counters in `talonx_quant`'s OWN local `quant.db`
+  (`QuantStateStore.suppression_counts`, still used for its EOD report).
+  `talonx_quant.consumer.QuantScanner._record_rejection` now publishes
+  one `RejectedCandidateEvent` PER DROPPED CANDIDATE to this channel,
+  independent of and in addition to that local counter; this module
+  subscribes purely to persist a durable, per-candidate row (ticker,
+  `gate` — a stable identifier like `trend_gate`/`rr_gate`, see
+  `talonx_quant.consumer`'s `_GATE_NAMES` — human-readable `reason`,
+  signal_type/direction/price/confluence_score/risk_reward_ratio/session
+  when available, `rejected_at`) to `AuditStore.record_rejected_candidate`.
+  Not pushed to Telegram or shown in the main alert feed — this is an
+  audit/debug trail, queryable via `recent_rejected_candidates()`/
+  `rejected_candidates_for_ticker()`/`rejected_candidates_between()`, not
+  an actionable notification. Swept by the same retention job as
+  `alerts`/`long_term_alerts` (`purge_rejected_candidates_older_than`,
+  `TALONX_DISPATCH_RETENTION_DAYS`).
 - **`formatter.py`** — TWO pure formatting functions, no I/O, trivially
   unit-testable without a bot token. `format_telegram_summary(alert,
   alert_id)` is the actual push: short enough to read at a glance during

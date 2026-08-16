@@ -216,3 +216,161 @@ def test_atr_and_bar_true_range_are_none_when_the_latest_bar_is_the_sessions_fir
 
     assert snapshot.atr is None
     assert snapshot.bar_true_range is None
+
+
+# --- Dual Volume Baselines (pre-market vs. regular session) --------------
+
+def test_volume_baseline_uses_the_full_buffer_when_every_bar_is_the_same_session(config):
+    """Regression guard, mirroring the ATR equivalent above: the default
+    _seed_buffer window (all pre-market) must produce a real
+    volume_avg/volume_surge_ratio -- the session-aware restriction must
+    be a no-op when there's no session boundary in the window."""
+    from talonx_quant.indicators import compute_indicators
+
+    buf = _seed_buffer(config.min_bars_required)
+    df = buf.get_dataframe("AAPL")
+
+    snapshot = compute_indicators(df, config)
+
+    assert snapshot.volume_avg is not None
+    assert snapshot.volume_surge_ratio is not None
+
+
+def test_volume_baseline_resets_at_the_regular_session_open(config):
+    """The buffer's LAST bar is exactly the regular session's FIRST bar
+    (09:30 ET), every bar before it pre-market -- the 20-bar volume
+    baseline must reset to None here (only 1 same-session bar exists),
+    rather than reaching back across the session boundary and blending
+    in pre-market volume -- Dual Volume Baselines."""
+    from talonx_quant.indicators import compute_indicators
+
+    # Same construction as the ATR-reset regression test: 119 minutes
+    # before 13:30 UTC (09:30 ET) puts the last of 120 bars exactly on
+    # the regular-session open.
+    start = datetime(2026, 8, 3, 13, 30, tzinfo=timezone.utc) - timedelta(minutes=config.min_bars_required - 1)
+    buf = _seed_buffer(config.min_bars_required, start=start)
+    df = buf.get_dataframe("AAPL")
+
+    assert df["session"].iloc[-1] == "regular"
+    assert df["session"].iloc[-2] == "pre_market"
+
+    snapshot = compute_indicators(df, config)
+
+    assert snapshot.volume_avg is None
+    assert snapshot.volume_surge_ratio is None
+
+
+def test_volume_baseline_recovers_once_enough_regular_session_bars_accumulate(config):
+    """Same session-crossing setup, but with volume_avg_period bars of
+    regular session AFTER the open -- the baseline should be populated
+    again, computed purely from the regular-session bars."""
+    from talonx_quant.indicators import compute_indicators
+
+    start = datetime(2026, 8, 3, 13, 30, tzinfo=timezone.utc) - timedelta(
+        minutes=config.min_bars_required - config.volume_avg_period - 5
+    )
+    buf = _seed_buffer(config.min_bars_required, start=start)
+    df = buf.get_dataframe("AAPL")
+
+    regular_bars = int((df["session"] == "regular").sum())
+    assert regular_bars >= config.volume_avg_period
+
+    snapshot = compute_indicators(df, config)
+
+    assert snapshot.volume_avg is not None
+    assert snapshot.volume_surge_ratio is not None
+
+
+# --- Structural R:R pivots (prior completed regular-session R1/S1) -------
+
+def test_compute_daily_pivots_returns_none_with_no_prior_session():
+    from talonx_quant.indicators import compute_daily_pivots
+
+    buf = RollingBarBuffer(max_bars_per_symbol=50)
+    start = datetime(2026, 8, 3, 13, 30, tzinfo=timezone.utc)  # 09:30 ET
+    for i in range(10):
+        buf.add_bar(
+            symbol="AAPL", timestamp=start + timedelta(minutes=15 * i),
+            open_=100.0, high=101.0, low=99.0, close=100.5, volume=1000.0,
+        )
+    df = buf.get_dataframe("AAPL")
+
+    pivots = compute_daily_pivots(df, start + timedelta(minutes=15 * 10))
+
+    assert pivots is None
+
+
+def test_compute_daily_pivots_computes_classic_floor_pivot_from_prior_session():
+    from talonx_quant.indicators import compute_daily_pivots
+
+    buf = RollingBarBuffer(max_bars_per_symbol=100)
+    # Prior day's regular session (2026-08-03, 09:30-11:00 ET): high=110, low=90, close=100.
+    prior_start = datetime(2026, 8, 3, 13, 30, tzinfo=timezone.utc)
+    bars = [
+        (prior_start, 100.0, 105.0, 95.0, 100.0),
+        (prior_start + timedelta(minutes=15), 100.0, 110.0, 95.0, 105.0),
+        (prior_start + timedelta(minutes=30), 105.0, 108.0, 90.0, 100.0),  # session high 110, low 90
+    ]
+    for ts, o, h, l, c in bars:
+        buf.add_bar(symbol="AAPL", timestamp=ts, open_=o, high=h, low=l, close=c, volume=1000.0)
+
+    # Next day's regular session (2026-08-04) -- the "current" bar.
+    current_ts = datetime(2026, 8, 4, 14, 0, tzinfo=timezone.utc)
+    buf.add_bar(symbol="AAPL", timestamp=current_ts, open_=101.0, high=102.0, low=100.0, close=101.0, volume=1000.0)
+    df = buf.get_dataframe("AAPL")
+
+    pivots = compute_daily_pivots(df, current_ts)
+
+    # P = (110 + 90 + 100) / 3 = 100; R1 = 2P - low = 110; S1 = 2P - high = 90
+    assert pivots is not None
+    assert pivots.pivot == pytest.approx(100.0)
+    assert pivots.resistance == pytest.approx(110.0)
+    assert pivots.support == pytest.approx(90.0)
+
+
+def test_compute_daily_pivots_ignores_pre_market_bars():
+    from talonx_quant.indicators import compute_daily_pivots
+
+    buf = RollingBarBuffer(max_bars_per_symbol=100)
+    prior_regular_start = datetime(2026, 8, 3, 13, 30, tzinfo=timezone.utc)  # 09:30 ET
+    prior_premarket_start = datetime(2026, 8, 3, 8, 0, tzinfo=timezone.utc)  # 04:00 ET
+
+    # Pre-market bar with an extreme high that must NOT leak into the pivot.
+    buf.add_bar(
+        symbol="AAPL", timestamp=prior_premarket_start, open_=100.0,
+        high=500.0, low=1.0, close=100.0, volume=500.0,
+    )
+    buf.add_bar(
+        symbol="AAPL", timestamp=prior_regular_start, open_=100.0,
+        high=110.0, low=90.0, close=100.0, volume=1000.0,
+    )
+
+    current_ts = datetime(2026, 8, 4, 14, 0, tzinfo=timezone.utc)
+    buf.add_bar(symbol="AAPL", timestamp=current_ts, open_=101.0, high=102.0, low=100.0, close=101.0, volume=1000.0)
+    df = buf.get_dataframe("AAPL")
+
+    pivots = compute_daily_pivots(df, current_ts)
+
+    assert pivots is not None
+    assert pivots.resistance == pytest.approx(110.0)  # not derived from the 500.0 pre-market high
+    assert pivots.support == pytest.approx(90.0)
+
+
+def test_compute_daily_pivots_uses_the_most_recent_prior_session_only():
+    from talonx_quant.indicators import compute_daily_pivots
+
+    buf = RollingBarBuffer(max_bars_per_symbol=100)
+    two_days_ago = datetime(2026, 8, 2, 13, 30, tzinfo=timezone.utc)
+    yesterday = datetime(2026, 8, 3, 13, 30, tzinfo=timezone.utc)
+
+    buf.add_bar(symbol="AAPL", timestamp=two_days_ago, open_=100.0, high=200.0, low=10.0, close=100.0, volume=1000.0)
+    buf.add_bar(symbol="AAPL", timestamp=yesterday, open_=100.0, high=110.0, low=90.0, close=100.0, volume=1000.0)
+
+    current_ts = datetime(2026, 8, 4, 14, 0, tzinfo=timezone.utc)
+    buf.add_bar(symbol="AAPL", timestamp=current_ts, open_=101.0, high=102.0, low=100.0, close=101.0, volume=1000.0)
+    df = buf.get_dataframe("AAPL")
+
+    pivots = compute_daily_pivots(df, current_ts)
+
+    assert pivots is not None
+    assert pivots.resistance == pytest.approx(110.0)  # from yesterday, not the 2-day-old 200.0 high

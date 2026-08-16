@@ -20,6 +20,7 @@ from talonx_dispatch.schemas import (
     ActionableAlert,
     AlertAction,
     AlertSeverity,
+    RejectedCandidateEvent,
     ResearchVerdict,
     SignalDirection,
 )
@@ -102,3 +103,50 @@ def test_actionable_alert_round_trips_through_json():
 def test_severity_rank_orders_info_below_warning_below_critical():
     assert AlertSeverity.INFO.rank < AlertSeverity.WARNING.rank
     assert AlertSeverity.WARNING.rank < AlertSeverity.CRITICAL.rank
+
+
+# --- RejectedCandidateEvent (Rejection Trace Logging) -----------------------
+
+def test_rejected_candidate_event_parses_the_producer_wire_shape():
+    # Mirrors talonx_quant.schemas.RejectedCandidateEvent.to_redis_payload()'s
+    # actual output shape (a datetime serializes to an ISO-8601 string).
+    payload = {
+        "ticker": "aapl", "gate": "rr_gate", "reason": "LOW_RISK_REWARD",
+        "signal_type": "macd_bullish_cross", "direction": "bullish", "price": 100.0,
+        "confluence_score": 2, "risk_reward_ratio": 1.2, "session": "regular",
+        "count": 1, "rejected_at": "2026-08-16T15:00:00Z",
+    }
+
+    event = RejectedCandidateEvent.model_validate(payload)
+
+    assert event.ticker == "aapl"
+    assert event.gate == "rr_gate"
+    assert event.reason == "LOW_RISK_REWARD"
+    assert event.direction == SignalDirection.BULLISH
+
+
+def test_rejected_candidate_event_optional_fields_default_to_none():
+    payload = {
+        "ticker": "AAPL", "gate": "volatility_gate", "reason": "LOW_VOLATILITY",
+        "rejected_at": "2026-08-16T15:00:00Z",
+    }
+
+    event = RejectedCandidateEvent.model_validate(payload)
+
+    assert event.signal_type is None
+    assert event.direction is None
+    assert event.confluence_score is None
+    assert event.risk_reward_ratio is None
+
+
+def test_rejected_candidate_event_round_trips_through_json():
+    payload = {
+        "ticker": "AAPL", "gate": "trend_gate", "reason": "TREND_GATE",
+        "rejected_at": "2026-08-16T15:00:00Z",
+    }
+    event = RejectedCandidateEvent.model_validate(payload)
+
+    reparsed = RejectedCandidateEvent.model_validate(json.loads(event.model_dump_json()))
+
+    assert reparsed.ticker == event.ticker
+    assert reparsed.gate == event.gate

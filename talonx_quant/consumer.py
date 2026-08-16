@@ -54,7 +54,6 @@ import asyncio
 import json
 import logging
 import random
-from collections import Counter
 from datetime import datetime, timezone
 
 from pydantic import ValidationError
@@ -62,13 +61,14 @@ from pydantic import ValidationError
 from talonx_quant import preseed
 from talonx_quant.buffer import RollingBarBuffer
 from talonx_quant.config import QuantConfig
-from talonx_quant.indicators import compute_htf_trend, compute_indicators
+from talonx_quant.indicators import compute_daily_pivots, compute_htf_trend, compute_indicators
 from talonx_quant.schemas import (
     MarketTickEvent,
     NewsArticleIngestedEvent,
     PaperOrderType,
     PaperTradeExecution,
     QuantSignal,
+    RejectedCandidateEvent,
     SignalDirection,
     TickEventType,
 )
@@ -141,6 +141,27 @@ async def _incr_metric(client, stage: str, counter: str, amount: int = 1) -> Non
             await client.expire(key, 2764800)  # 32 days
     except Exception as exc:  # noqa: BLE001 -- telemetry must never break the pipeline
         logger.debug("Metric increment failed for %s: %s", key, exc)
+
+
+# Rejection Trace Logging: stable, machine-readable gate identifiers for
+# each suppress_reason string this module already produces -- published
+# on RejectedCandidateEvent.gate so talonx_dispatch's audit trail can
+# filter/group by gate without parsing the human-readable reason string.
+# Acceptance criteria calls out "trend_gate, rr_gate, etc." by name --
+# those two map 1:1 to TREND_GATE/LOW_RISK_REWARD below.
+_GATE_NAMES = {
+    "LOW_VOLATILITY": "volatility_gate",
+    "OPENING_BLACKOUT": "opening_blackout_gate",
+    "CLOSING_BLACKOUT": "closing_blackout_gate",
+    "LOSS_LOCKOUT": "loss_lockout_gate",
+    "COOLDOWN": "cooldown_gate",
+    "LOW_CONFLUENCE": "confluence_gate",
+    "LOW_RISK_REWARD": "rr_gate",
+    "TREND_GATE": "trend_gate",
+    "PREMARKET_LIQUIDITY": "premarket_liquidity_gate",
+    "NEWS_CATALYST": "news_catalyst_gate",
+    "THROTTLE": "throttle_gate",
+}
 
 
 class QuantScanner:
@@ -734,16 +755,15 @@ class QuantScanner:
         if _fails_min_volatility(snapshot, self.config):
             self._signals_suppressed_low_volatility += 1
             await _incr_metric(self._client, "quant", "failed_min_volatility", 1)
-            if self.store is not None:
-                self.store.record_suppressed(
-                    event.symbol, "LOW_VOLATILITY", 1, datetime.now(timezone.utc)
-                )
+            await self._record_rejection(event.symbol, "LOW_VOLATILITY", 1, datetime.now(timezone.utc))
             return  # ATR% below config.min_atr_pct -- low-beta name, skip momentum evaluation entirely
 
-        htf_sma_200 = compute_htf_trend(
-            self.buffer_htf.get_dataframe(event.symbol), self.config.htf_sma_period
+        df_htf = self.buffer_htf.get_dataframe(event.symbol)
+        htf_sma_200 = compute_htf_trend(df_htf, self.config.htf_sma_period)
+        daily_pivots = compute_daily_pivots(df_htf, snapshot.bar_timestamp)
+        signals = evaluate_signals(
+            event.symbol, snapshot, self.config, htf_sma_200=htf_sma_200, daily_pivots=daily_pivots,
         )
-        signals = evaluate_signals(event.symbol, snapshot, self.config, htf_sma_200=htf_sma_200)
         if not signals:
             return
         await _incr_metric(self._client, "quant", "evaluated", len(signals))
@@ -756,10 +776,9 @@ class QuantScanner:
             # trustworthy yet.
             self._signals_suppressed_opening_blackout += len(signals)
             await _incr_metric(self._client, "quant", "dropped_opening_blackout", len(signals))
-            if self.store is not None:
-                self.store.record_suppressed(
-                    event.symbol, "OPENING_BLACKOUT", len(signals), datetime.now(timezone.utc)
-                )
+            await self._record_rejection(
+                event.symbol, "OPENING_BLACKOUT", len(signals), datetime.now(timezone.utc), signals,
+            )
             logger.info(
                 "Suppressed %d candidate(s) for %s -- opening-range blackout (09:30-09:45 ET)",
                 len(signals), event.symbol,
@@ -778,10 +797,10 @@ class QuantScanner:
                 await _incr_metric(
                     self._client, "quant", "dropped_closing_blackout", len(dropped_for_closing)
                 )
-                if self.store is not None:
-                    self.store.record_suppressed(
-                        event.symbol, "CLOSING_BLACKOUT", len(dropped_for_closing), datetime.now(timezone.utc)
-                    )
+                await self._record_rejection(
+                    event.symbol, "CLOSING_BLACKOUT", len(dropped_for_closing),
+                    datetime.now(timezone.utc), dropped_for_closing,
+                )
                 logger.info(
                     "Suppressed %d BULLISH candidate(s) for %s -- closing-entry blackout (15:30-16:00 ET)",
                     len(dropped_for_closing), event.symbol,
@@ -796,10 +815,9 @@ class QuantScanner:
                 "Suppressed %d signal(s) for %s -- in post-loss lockout",
                 len(signals), event.symbol,
             )
-            if self.store is not None:
-                self.store.record_suppressed(
-                    event.symbol, "LOSS_LOCKOUT", len(signals), datetime.now(timezone.utc)
-                )
+            await self._record_rejection(
+                event.symbol, "LOSS_LOCKOUT", len(signals), datetime.now(timezone.utc), signals,
+            )
             return
 
         if await self._is_on_cooldown(event.symbol):
@@ -808,10 +826,9 @@ class QuantScanner:
                 "Suppressed %d signal(s) for %s -- still in cooldown",
                 len(signals), event.symbol,
             )
-            if self.store is not None:
-                self.store.record_suppressed(
-                    event.symbol, "COOLDOWN", len(signals), datetime.now(timezone.utc)
-                )
+            await self._record_rejection(
+                event.symbol, "COOLDOWN", len(signals), datetime.now(timezone.utc), signals,
+            )
             return
 
         # Confluence + risk/reward filters run BEFORE the cooldown lock
@@ -826,23 +843,21 @@ class QuantScanner:
                 "Suppressed %d candidate(s) for %s -- confluence score below %d",
                 len(signals), event.symbol, self.config.confluence_score_min,
             )
-            if self.store is not None:
-                self.store.record_suppressed(
-                    event.symbol, "LOW_CONFLUENCE", len(signals), datetime.now(timezone.utc)
-                )
+            await self._record_rejection(
+                event.symbol, "LOW_CONFLUENCE", len(signals), datetime.now(timezone.utc), signals,
+            )
             return
 
-        survivors = [
-            s for s in qualifying
-            if s.risk_reward_ratio is not None and s.risk_reward_ratio >= self.config.min_risk_reward_ratio
-        ]
-        dropped_for_rr = len(qualifying) - len(survivors)
-        if dropped_for_rr and self.store is not None:
-            self.store.record_suppressed(
-                event.symbol, "LOW_RISK_REWARD", dropped_for_rr, datetime.now(timezone.utc)
+        survivors, dropped_for_rr = _partition(
+            qualifying,
+            lambda s: s.risk_reward_ratio is not None and s.risk_reward_ratio >= self.config.min_risk_reward_ratio,
+        )
+        if dropped_for_rr:
+            await self._record_rejection(
+                event.symbol, "LOW_RISK_REWARD", len(dropped_for_rr), datetime.now(timezone.utc), dropped_for_rr,
             )
-        self._signals_suppressed_low_risk_reward += dropped_for_rr
-        await _incr_metric(self._client, "quant", "failed_rr_gate", dropped_for_rr)
+        self._signals_suppressed_low_risk_reward += len(dropped_for_rr)
+        await _incr_metric(self._client, "quant", "failed_rr_gate", len(dropped_for_rr))
         if not survivors:
             logger.info(
                 "Suppressed %d candidate(s) for %s -- risk/reward below %.2f:1",
@@ -856,9 +871,9 @@ class QuantScanner:
         # warming up) for every candidate this doesn't apply to, which
         # passes through unfiltered here.
         survivors, dropped_for_trend = _partition(survivors, lambda s: s.trend_aligned is not False)
-        if dropped_for_trend and self.store is not None:
-            self.store.record_suppressed(
-                event.symbol, "TREND_GATE", len(dropped_for_trend), datetime.now(timezone.utc)
+        if dropped_for_trend:
+            await self._record_rejection(
+                event.symbol, "TREND_GATE", len(dropped_for_trend), datetime.now(timezone.utc), dropped_for_trend,
             )
         self._signals_suppressed_trend_gate += len(dropped_for_trend)
         await _incr_metric(self._client, "quant", "failed_trend_gate", len(dropped_for_trend))
@@ -875,9 +890,10 @@ class QuantScanner:
         survivors, dropped_for_liquidity = _partition(
             survivors, lambda s: s.session != "pre_market" or self._clears_premarket_liquidity(s)
         )
-        if dropped_for_liquidity and self.store is not None:
-            self.store.record_suppressed(
-                event.symbol, "PREMARKET_LIQUIDITY", len(dropped_for_liquidity), datetime.now(timezone.utc)
+        if dropped_for_liquidity:
+            await self._record_rejection(
+                event.symbol, "PREMARKET_LIQUIDITY", len(dropped_for_liquidity),
+                datetime.now(timezone.utc), dropped_for_liquidity,
             )
         self._signals_suppressed_premarket_liquidity += len(dropped_for_liquidity)
         await _incr_metric(self._client, "quant", "failed_premarket_liquidity", len(dropped_for_liquidity))
@@ -894,9 +910,9 @@ class QuantScanner:
         survivors, dropped_for_news = _partition(
             survivors, lambda s: s.session != "pre_market" or self._has_recent_news(event.symbol)
         )
-        if dropped_for_news and self.store is not None:
-            self.store.record_suppressed(
-                event.symbol, "NEWS_CATALYST", len(dropped_for_news), datetime.now(timezone.utc)
+        if dropped_for_news:
+            await self._record_rejection(
+                event.symbol, "NEWS_CATALYST", len(dropped_for_news), datetime.now(timezone.utc), dropped_for_news,
             )
         self._signals_suppressed_news_catalyst += len(dropped_for_news)
         if not survivors:
@@ -962,12 +978,57 @@ class QuantScanner:
                 len(released), len(candidates),
                 ", ".join(f"{s.ticker}/{s.signal_type.value}" for s in dropped),
             )
-            if self.store is not None:
-                now = datetime.now(timezone.utc)
-                # dropped can span multiple tickers in one flush -- one
-                # counter increment per ticker, not one blanket call.
-                for ticker, count in Counter(s.ticker for s in dropped).items():
-                    self.store.record_suppressed(ticker, "THROTTLE", count, now)
+            now = datetime.now(timezone.utc)
+            # dropped can span multiple tickers in one flush -- one
+            # rejection record (count + per-candidate detail) per ticker,
+            # not one blanket call.
+            for ticker in {s.ticker for s in dropped}:
+                ticker_signals = [s for s in dropped if s.ticker == ticker]
+                await self._record_rejection(ticker, "THROTTLE", len(ticker_signals), now, ticker_signals)
+
+    async def _record_rejection(
+        self, ticker: str, reason: str, count: int, when: datetime,
+        signals: list[QuantSignal] | None = None,
+    ) -> None:
+        """Rejection Trace Logging: single choke point for BOTH the
+        existing local suppression-count persistence
+        (self.store.record_suppressed, aggregated per UTC day, used by
+        the EOD report) AND publishing one RejectedCandidateEvent PER
+        CANDIDATE to talonx:quant:rejected, consumed by talonx_dispatch
+        for a durable, per-candidate audit trail (its own AuditStore's
+        rejected_candidates table) -- without this, a dropped candidate
+        never reached talonx_dispatch at all, only published signals did.
+
+        `signals` carries the actual QuantSignal candidates being
+        dropped when available (most gates), giving each published
+        RejectedCandidateEvent real signal_type/direction/confluence_score/
+        risk_reward_ratio detail; some gates (e.g. LOW_VOLATILITY) run
+        before any candidate signal is built at all, so `signals` is
+        None there and `count` alone determines how many bare
+        (ticker/reason only) events to publish -- every gate-drop site
+        already had `count` for the store.record_suppressed call, so
+        this doesn't require passing anything new for that case."""
+        if self.store is not None:
+            self.store.record_suppressed(ticker, reason, count, when)
+        if self._client is None:
+            return
+
+        gate = _GATE_NAMES.get(reason, reason.lower())
+        detail: list[QuantSignal | None] = list(signals) if signals is not None else [None] * count
+        for signal in detail:
+            event = RejectedCandidateEvent(
+                ticker=ticker.upper(), gate=gate, reason=reason, rejected_at=when,
+                signal_type=None if signal is None else signal.signal_type.value,
+                direction=None if signal is None else signal.direction,
+                price=None if signal is None else signal.price,
+                confluence_score=None if signal is None else signal.confluence_score,
+                risk_reward_ratio=None if signal is None else signal.risk_reward_ratio,
+                session=None if signal is None else signal.session,
+            )
+            try:
+                await self._client.publish(self.config.rejected_candidates_channel, event.to_redis_payload())
+            except Exception as exc:  # noqa: BLE001 -- a publish failure shouldn't crash the scanner
+                logger.debug("Failed to publish rejection trace for %s (%s): %s", ticker, reason, exc)
 
     async def _publish_signal(self, signal: QuantSignal) -> None:
         try:

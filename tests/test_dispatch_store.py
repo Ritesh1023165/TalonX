@@ -631,3 +631,115 @@ def test_last_telegram_push_persists_across_reopen(tmp_path):
 
     with AuditStore(path) as store2:
         assert store2.load_last_telegram_pushes("intraday")["AAPL"] == (NOW, 100.0)
+
+
+# --- Rejection Trace Logging -----------------------------------------------
+
+def test_record_rejected_candidate_returns_an_id(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        rejection_id = store.record_rejected_candidate(
+            ticker="AAPL", gate="trend_gate", reason="TREND_GATE", rejected_at=NOW,
+        )
+        assert isinstance(rejection_id, int)
+
+
+def test_record_rejected_candidate_persists_full_detail(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_rejected_candidate(
+            ticker="aapl", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW,
+            signal_type="macd_bullish_cross", direction="bullish", price=100.0,
+            confluence_score=2, risk_reward_ratio=1.2, session="regular",
+        )
+
+        rows = store.recent_rejected_candidates()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["ticker"] == "AAPL"  # uppercased, same convention as record_alert
+        assert row["gate"] == "rr_gate"
+        assert row["reason"] == "LOW_RISK_REWARD"
+        assert row["signal_type"] == "macd_bullish_cross"
+        assert row["direction"] == "bullish"
+        assert row["price"] == 100.0
+        assert row["confluence_score"] == 2
+        assert row["risk_reward_ratio"] == 1.2
+        assert row["session"] == "regular"
+
+
+def test_recent_rejected_candidates_orders_newest_first(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_rejected_candidate(ticker="AAPL", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW)
+        store.record_rejected_candidate(
+            ticker="MSFT", gate="trend_gate", reason="TREND_GATE", rejected_at=NOW + timedelta(minutes=5),
+        )
+
+        rows = store.recent_rejected_candidates()
+        assert [r["ticker"] for r in rows] == ["MSFT", "AAPL"]
+
+
+def test_recent_rejected_candidates_respects_limit(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        for i in range(5):
+            store.record_rejected_candidate(
+                ticker="AAPL", gate="cooldown_gate", reason="COOLDOWN", rejected_at=NOW + timedelta(minutes=i),
+            )
+
+        assert len(store.recent_rejected_candidates(limit=2)) == 2
+
+
+def test_rejected_candidates_for_ticker_filters_by_ticker(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_rejected_candidate(ticker="AAPL", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW)
+        store.record_rejected_candidate(ticker="MSFT", gate="trend_gate", reason="TREND_GATE", rejected_at=NOW)
+
+        rows = store.rejected_candidates_for_ticker("aapl")
+        assert len(rows) == 1
+        assert rows[0]["ticker"] == "AAPL"
+
+
+def test_rejected_candidates_between_filters_to_the_window(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_rejected_candidate(
+            ticker="OLD", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW - timedelta(days=2),
+        )
+        store.record_rejected_candidate(ticker="IN", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW)
+
+        rows = store.rejected_candidates_between(NOW - timedelta(hours=1), NOW + timedelta(hours=1))
+        assert [r["ticker"] for r in rows] == ["IN"]
+
+
+def test_purge_rejected_candidates_older_than_deletes_only_stale_rows(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_rejected_candidate(
+            ticker="OLD", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW - timedelta(days=10),
+        )
+        store.record_rejected_candidate(ticker="NEW", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW)
+
+        purged = store.purge_rejected_candidates_older_than(NOW - timedelta(days=5))
+
+        assert purged == 1
+        remaining = store.recent_rejected_candidates()
+        assert [r["ticker"] for r in remaining] == ["NEW"]
+
+
+def test_rejected_candidate_optional_fields_default_to_none(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_rejected_candidate(
+            ticker="AAPL", gate="volatility_gate", reason="LOW_VOLATILITY", rejected_at=NOW,
+        )
+
+        row = store.recent_rejected_candidates()[0]
+        assert row["signal_type"] is None
+        assert row["direction"] is None
+        assert row["confluence_score"] is None
+        assert row["risk_reward_ratio"] is None
+
+
+def test_rejected_candidates_persists_across_reopen(tmp_path):
+    path = tmp_path / "audit.db"
+    with AuditStore(path) as store:
+        store.record_rejected_candidate(ticker="AAPL", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW)
+
+    with AuditStore(path) as store2:
+        rows = store2.recent_rejected_candidates()
+        assert len(rows) == 1
+        assert rows[0]["ticker"] == "AAPL"

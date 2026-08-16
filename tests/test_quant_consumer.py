@@ -80,6 +80,24 @@ def _signal(
     )
 
 
+def _channel_publishes(scanner, channel: str) -> list:
+    """Filters scanner._client.publish's recorded calls down to just the
+    given channel -- since Rejection Trace Logging (req 7), the same
+    mocked `publish` now ALSO receives one call per rejected candidate on
+    config.rejected_candidates_channel, so a bare `publish.assert_not_awaited()`
+    or a blanket await_count check on the signals_channel no longer holds;
+    tests need to distinguish which channel a given publish call targeted."""
+    return [call.args[1] for call in scanner._client.publish.await_args_list if call.args[0] == channel]
+
+
+def _signal_publishes(scanner) -> list:
+    return _channel_publishes(scanner, scanner.config.signals_channel)
+
+
+def _rejection_publishes(scanner) -> list:
+    return _channel_publishes(scanner, scanner.config.rejected_candidates_channel)
+
+
 def _bar_message(symbol: str = "AAPL") -> dict:
     payload = {
         "event_type": "bar",
@@ -199,7 +217,7 @@ async def test_handle_market_tick_suppresses_signals_when_locked_out(scanner, mo
 
     await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
 
-    scanner._client.publish.assert_not_awaited()
+    assert _signal_publishes(scanner) == []
     scanner._client.set.assert_not_awaited()  # neither lock re-armed
     assert scanner.signals_suppressed_loss_lockout == 1
     assert scanner._pending_candidates == []
@@ -222,7 +240,7 @@ async def test_handle_message_suppresses_signals_when_ticker_on_cooldown(scanner
 
     await scanner._handle_message(_bar_message("AAPL"))
 
-    scanner._client.publish.assert_not_awaited()
+    assert _signal_publishes(scanner) == []
     scanner._client.set.assert_not_awaited()  # cooldown not re-armed while already locked
     assert scanner.signals_suppressed_cooldown == 1
     assert scanner._pending_candidates == []
@@ -262,7 +280,7 @@ async def test_handle_message_suppresses_low_confluence_signal(scanner, monkeypa
     await scanner._handle_message(_bar_message("AAPL"))
 
     scanner._client.set.assert_not_awaited()  # cooldown never armed for a filtered-out candidate
-    scanner._client.publish.assert_not_awaited()
+    assert _signal_publishes(scanner) == []
     assert scanner.signals_suppressed_low_confluence == 1
     assert scanner._pending_candidates == []
 
@@ -276,7 +294,7 @@ async def test_handle_message_suppresses_low_risk_reward_signal(scanner, monkeyp
     await scanner._handle_message(_bar_message("AAPL"))
 
     scanner._client.set.assert_not_awaited()
-    scanner._client.publish.assert_not_awaited()
+    assert _signal_publishes(scanner) == []
     assert scanner.signals_suppressed_low_risk_reward == 1
     assert scanner._pending_candidates == []
 
@@ -323,14 +341,16 @@ async def test_flush_throttle_window_releases_top_n_by_volume_surge_ratio(scanne
 
     await scanner._flush_throttle_window()
 
-    published_payloads = [call.args[1] for call in scanner._client.publish.await_args_list]
-    assert scanner._client.publish.await_count == 3
+    published_payloads = _signal_publishes(scanner)
+    assert len(published_payloads) == 3
     assert scanner.signals_suppressed_throttle == 1
     assert scanner.signals_published == 3
     assert scanner._pending_candidates == []
     # The lowest-conviction candidate (no volume_surge_ratio at all) is
-    # the one that should've been dropped.
+    # the one that should've been dropped -- from the PUBLISHED signals,
+    # though it still gets its own THROTTLE rejection trace event.
     assert "NORATIO" not in "".join(published_payloads)
+    assert "NORATIO" in "".join(_rejection_publishes(scanner))
 
 
 @pytest.mark.asyncio
@@ -342,8 +362,8 @@ async def test_flush_throttle_window_ranks_confluence_before_volume_surge(scanne
 
     await scanner._flush_throttle_window()
 
-    published_payloads = [call.args[1] for call in scanner._client.publish.await_args_list]
-    assert scanner._client.publish.await_count == 1
+    published_payloads = _signal_publishes(scanner)
+    assert len(published_payloads) == 1
     assert "HIGHCONF" in "".join(published_payloads)
     assert "LOWCONF" not in "".join(published_payloads)
 
@@ -453,7 +473,7 @@ async def test_handle_message_suppresses_signal_failing_trend_gate(scanner, monk
     await scanner._handle_message(_bar_message("AAPL"))
 
     scanner._client.set.assert_not_awaited()
-    scanner._client.publish.assert_not_awaited()
+    assert _signal_publishes(scanner) == []
     assert scanner.signals_suppressed_trend_gate == 1
     assert scanner._pending_candidates == []
 
@@ -486,7 +506,7 @@ async def test_handle_message_suppresses_premarket_signal_without_liquidity_data
 
     await scanner._handle_message(_bar_message("AAPL"))
 
-    scanner._client.publish.assert_not_awaited()
+    assert _signal_publishes(scanner) == []
     assert scanner.signals_suppressed_premarket_liquidity == 1
     assert scanner._pending_candidates == []
 
@@ -522,7 +542,7 @@ async def test_handle_message_suppresses_premarket_signal_without_recent_news(sc
 
     await scanner._handle_message(_bar_message("AAPL"))
 
-    scanner._client.publish.assert_not_awaited()
+    assert _signal_publishes(scanner) == []
     assert scanner.signals_suppressed_news_catalyst == 1
     assert scanner._pending_candidates == []
 
@@ -1092,9 +1112,11 @@ async def test_handle_market_tick_suppresses_low_volatility_bar_before_evaluatin
     await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
 
     # Gated BEFORE evaluate_signals is even called (skips momentum
-    # evaluation entirely for a low-beta bar), and nothing published.
+    # evaluation entirely for a low-beta bar), and no SIGNAL published
+    # (a bare rejection trace event still is -- see Rejection Trace
+    # Logging tests below).
     assert evaluate_called["n"] == 0
-    scanner._client.publish.assert_not_awaited()
+    assert _signal_publishes(scanner) == []
     assert scanner.signals_suppressed_low_volatility == 1
 
 
@@ -1117,7 +1139,7 @@ async def test_handle_market_tick_suppresses_all_signals_during_opening_blackout
 
     await scanner._handle_market_tick(json.loads(_bar_message("AAPL")["data"]))
 
-    scanner._client.publish.assert_not_awaited()
+    assert _signal_publishes(scanner) == []
     assert scanner.signals_suppressed_opening_blackout == 2
 
 
@@ -1158,3 +1180,96 @@ async def test_handle_market_tick_no_blackout_during_active_session(scanner, mon
 
     assert scanner.signals_suppressed_opening_blackout == 0
     assert scanner.signals_suppressed_closing_blackout == 0
+
+
+# --- Rejection Trace Logging ----------------------------------------------
+
+@pytest.mark.asyncio
+async def test_record_rejection_calls_store_and_publishes_one_event(scanner, tmp_path):
+    scanner.store = QuantStateStore(tmp_path / "quant.db")
+    when = datetime(2026, 8, 16, 15, 0, tzinfo=timezone.utc)
+
+    await scanner._record_rejection("AAPL", "TREND_GATE", 1, when)
+
+    counts = scanner.store.suppression_counts_for_date("2026-08-16")
+    assert len(counts) == 1
+    assert counts[0]["ticker"] == "AAPL"
+    assert counts[0]["reason"] == "TREND_GATE"
+    assert counts[0]["count"] == 1
+
+    rejections = _rejection_publishes(scanner)
+    assert len(rejections) == 1
+    payload = json.loads(rejections[0])
+    assert payload["ticker"] == "AAPL"
+    assert payload["reason"] == "TREND_GATE"
+    assert payload["gate"] == "trend_gate"  # acceptance criteria's own example gate name
+
+
+@pytest.mark.asyncio
+async def test_record_rejection_uses_rr_gate_name_for_low_risk_reward(scanner):
+    await scanner._record_rejection("AAPL", "LOW_RISK_REWARD", 1, datetime.now(timezone.utc))
+
+    payload = json.loads(_rejection_publishes(scanner)[0])
+    assert payload["gate"] == "rr_gate"  # acceptance criteria's own example gate name
+
+
+@pytest.mark.asyncio
+async def test_record_rejection_publishes_one_event_per_candidate_with_full_detail(scanner):
+    dropped = [
+        _signal("AAPL", 3.0, signal_type=SignalType.MACD_BULLISH_CROSS, confluence_score=1),
+        _signal("AAPL", 5.0, signal_type=SignalType.MA_GOLDEN_CROSS, confluence_score=0),
+    ]
+
+    await scanner._record_rejection("AAPL", "LOW_CONFLUENCE", 2, datetime.now(timezone.utc), dropped)
+
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert len(rejections) == 2  # one per candidate, not one aggregated event
+    signal_types = {r["signal_type"] for r in rejections}
+    assert signal_types == {"macd_bullish_cross", "ma_golden_cross"}
+    confluence_scores = {r["confluence_score"] for r in rejections}
+    assert confluence_scores == {0, 1}
+
+
+@pytest.mark.asyncio
+async def test_record_rejection_publishes_bare_events_without_signal_detail(scanner):
+    # LOW_VOLATILITY fires before any candidate signal is built --
+    # `signals` is None, so `count` alone determines how many bare
+    # (ticker/reason only) events are published.
+    await scanner._record_rejection("AAPL", "LOW_VOLATILITY", 1, datetime.now(timezone.utc))
+
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert len(rejections) == 1
+    assert rejections[0]["signal_type"] is None
+    assert rejections[0]["gate"] == "volatility_gate"
+
+
+@pytest.mark.asyncio
+async def test_record_rejection_skips_publish_when_client_is_none(scanner, tmp_path):
+    scanner.store = QuantStateStore(tmp_path / "quant.db")
+    scanner._client = None
+
+    await scanner._record_rejection("AAPL", "TREND_GATE", 1, datetime.now(timezone.utc))  # must not raise
+
+    counts = scanner.store.suppression_counts_for_date(datetime.now(timezone.utc).date().isoformat())
+    assert len(counts) == 1  # local suppression-count persistence still happens
+
+
+@pytest.mark.asyncio
+async def test_record_rejection_tolerates_a_publish_failure(scanner):
+    scanner._client.publish.side_effect = ConnectionError("redis down")
+
+    await scanner._record_rejection("AAPL", "TREND_GATE", 1, datetime.now(timezone.utc))  # must not raise
+
+
+@pytest.mark.asyncio
+async def test_handle_message_low_risk_reward_rejection_uses_rr_gate(scanner, monkeypatch):
+    low_rr = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=1.0)
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [low_rr])
+
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert len(rejections) == 1
+    assert rejections[0]["reason"] == "LOW_RISK_REWARD"
+    assert rejections[0]["gate"] == "rr_gate"

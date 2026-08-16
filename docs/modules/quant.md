@@ -13,13 +13,15 @@ talonx:market:stream (Redis)
           subsequent bar it remains true), AND requiring this bar's own
           true range to clear 1.0x ATR (a routine, average-sized bar
           doesn't count as a real move):
-            - RSI crosses under 30 AND volume > 2x average → bullish (oversold + surge)
+            - RSI curls back ABOVE 30 (was below, recovers) AND volume > 2x average → bullish (oversold reversal + surge)
             - RSI crosses over 70 AND volume > 2x average  → bearish (overbought + surge)
             - MACD line crosses its signal line             → bullish/bearish cross
             - fast MA crosses slow MA, spread >= 0.15% of price → golden/death cross
-        → every signal that fires on a bar carries that bar's confluence_score
-          (0-3: MACD cross + RSI extreme + volume surge) and risk_reward_ratio
-          (ATR-scaled reward / talonx_paper's stop-loss distance)
+        → every signal that fires carries a DIRECTION-AWARE confluence_score
+          (0-3: MACD cross + RSI extreme IN THAT DIRECTION + volume surge --
+          an overbought RSI earns a BULLISH candidate 0 points for that leg)
+          and a structural risk_reward_ratio (distance to the prior session's
+          nearest pivot level / 1.5x ATR)
     → candidate signal(s) for a ticker are DROPPED if that ticker is
       currently in POST-LOSS LOCKOUT (75 min default, armed when
       talonx_paper reports a losing SELL for it) or within its standard
@@ -32,6 +34,10 @@ talonx:market:stream (Redis)
     → every 60s (default), the buffer is ranked by (confluence_score,
       volume_surge_ratio) and only the top 3 (default) are published to
       Redis (talonx:signals:quant) -- the rest are dropped
+    → EVERY dropped candidate, at EVERY gate above, also publishes a
+      RejectedCandidateEvent to talonx:quant:rejected -- talonx_dispatch
+      persists one row per candidate to its rejected_candidates table (see
+      dispatch.md's Rejection Trace Logging section)
 ```
 
 **Noise + signal-quality filters (edge-triggering/hysteresis added after
@@ -57,19 +63,37 @@ for the full before/after):**
   of ATR(14) to count as a genuine directional move rather than routine
   noise on a high-beta name. Applied inside every one of `strategy.py`'s
   own checks, upstream of everything below.
-- **Confluence score** (`strategy.py`, `TALONX_QUANT_CONFLUENCE_SCORE_MIN`,
-  default 2) — a bar-level score, 0-3: +1 each for a MACD cross firing
-  that bar, RSI sitting in its extreme zone, and a volume surge above
-  threshold. Computed once per bar and attached to every signal that
-  fires on it; `consumer.py` drops anything below the minimum before the
-  per-ticker cooldown is armed.
-- **Risk/reward filter** (`strategy.py`, `TALONX_QUANT_ATR_STOP_MULTIPLIER`
-  default 1.0, `TALONX_QUANT_ATR_REWARD_MULTIPLIER` default 2.0,
-  `TALONX_QUANT_MIN_RISK_REWARD_RATIO` default 1.5) — stop and target are
-  both explicit ATR multiples (1x/2x by default), giving every signal a
-  real dollar `stop_price`/`target_price`, not just the ratio. A
-  candidate below the minimum ratio is dropped alongside the confluence
-  filter, before the cooldown lock.
+- **Direction-Aware Confluence score** (`strategy.py`'s `_confluence_score`,
+  `TALONX_QUANT_CONFLUENCE_SCORE_MIN`, default 2) — 0-3, computed PER
+  SIGNAL (not once per bar): +1 for a MACD cross firing that bar, +1 for
+  RSI sitting in the extreme zone that actually SUPPORTS this candidate's
+  direction (oversold for BULLISH, overbought for BEARISH — an
+  **overbought bar earns a BULLISH candidate ZERO points** for this leg,
+  since overbought is bearish evidence, not long conviction), +1 for a
+  volume surge above threshold. `consumer.py` drops anything below the
+  minimum before the per-ticker cooldown is armed.
+- **RSI Reversal Curl** (`strategy.py`'s `_check_rsi_volume_setup`) — the
+  bullish RSI+volume setup no longer fires the instant RSI first dips
+  below `rsi_oversold` (a falling-knife entry with no confirmation the
+  selloff has stopped); it waits for RSI to curl back UP and recover
+  above the threshold first (`rsi_prev` still below it, `rsi` now at/above
+  it), then fires on that recovery bar. The bearish leg (RSI crossing
+  INTO overbought) is unchanged.
+- **Structural R:R filter** (`strategy.py`'s `_structural_risk_reward`,
+  `TALONX_QUANT_PIVOT_STOP_ATR_MULTIPLIER` default 1.5,
+  `TALONX_QUANT_MIN_RISK_REWARD_RATIO` default 1.5) — reward is measured
+  to the nearest classic floor-trader pivot level (the prior COMPLETED
+  regular session's R1 for a bullish candidate, S1 for a bearish one —
+  `P = (H+L+C)/3`, `R1 = 2P-L`, `S1 = 2P-H`, computed by
+  `indicators.compute_daily_pivots` from the 15-min HTF buffer), not a
+  second ATR multiple — a genuine market-derived target, not a
+  configuration-constant ratio. Risk is `pivot_stop_atr_multiplier x ATR`.
+  `risk_reward_ratio` is `None` (fail-closed, gate drops the candidate)
+  until at least one full prior regular session's pivot data is
+  available. `stop_price`/`target_price` (`TALONX_QUANT_ATR_STOP_MULTIPLIER`
+  default 1.0 for the stop) use this SAME pivot level as the target when
+  available, falling back to `TALONX_QUANT_ATR_REWARD_MULTIPLIER` (2.0x
+  ATR) only while pivot data is still warming up.
 - **Post-loss lockout** (`consumer.py`, `TALONX_QUANT_LOSS_LOCKOUT_SECONDS`,
   default 4500 = 75 min) — `QuantScanner` also subscribes to
   `talonx:paper:trades` (talonx_paper's own execution feed) purely to
@@ -188,6 +212,17 @@ the range to reach an ATR-scaled stop/target.
   values for RSI, MACD, and moving averages, not just the latest, since
   edge-triggering/crossover detection needs to know the relationship
   flipped between two consecutive bars, not just where it stands now.
+  **Dual Volume Baselines**: the 20-bar volume-surge baseline
+  (`TALONX_QUANT_VOLUME_AVG_PERIOD`) is restricted to the trailing
+  contiguous run of bars sharing the LATEST bar's session tag (via
+  `buffer.py`'s per-bar session tagging and the same `_same_session_tail`
+  helper the ATR-reset gate already used) — a regular-session bar's
+  volume is never compared against a window still mostly full of thin
+  pre-market volume, or vice versa. Goes back to `None` (fresh warm-up)
+  right at a session transition until 20 same-session bars accumulate,
+  same posture as the ATR reset. `compute_daily_pivots` (Structural R:R,
+  above) also lives here, reading the 15-min HTF buffer's
+  `regular`-session bars only, grouped by America/New_York calendar date.
 - **`strategy.py`** — a single bar update can trigger multiple
   independent signals at once (e.g. an RSI+volume setup and a MACD cross
   on the same bar) — each is evaluated separately rather than collapsed
@@ -207,6 +242,19 @@ the range to reach an ATR-scaled stop/target.
   `failed_min_volatility`, `dropped_opening_blackout`,
   `dropped_closing_blackout`) to Redis, read by the Streamlit dashboard's
   Daily Funnel tab — see [dispatch.md](dispatch.md).
+- **Rejection Trace Logging** (`consumer.py`'s `_record_rejection`,
+  `TALONX_REDIS_REJECTED_CANDIDATES_CHANNEL`, default
+  `talonx:quant:rejected`) — every one of `consumer.py`'s gate-drop sites
+  (confluence, structural R:R, trend, ATR-move/volatility, entry
+  blackouts, cooldown, loss-lockout, batch throttle, pre-market
+  liquidity/news-catalyst) now ALSO publishes one `RejectedCandidateEvent`
+  PER DROPPED CANDIDATE, alongside the existing local aggregated-count
+  persistence (`store.py`'s `suppression_counts`, used by the EOD
+  report). `gate` is a stable identifier matching each reason 1:1 (e.g.
+  `TREND_GATE` → `trend_gate`, `LOW_RISK_REWARD` → `rr_gate` — see
+  `consumer.py`'s `_GATE_NAMES`). Consumed by `talonx_dispatch` purely
+  to persist a durable, per-candidate audit trail — see
+  [dispatch.md](dispatch.md)'s own Rejection Trace Logging section.
 
 ## Long-term (fundamentals) path
 

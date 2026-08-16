@@ -96,6 +96,7 @@ from talonx_dispatch.schemas import (
     LongTermResearchReport,
     LongTermTradeExecution,
     PaperTradeExecution,
+    RejectedCandidateEvent,
 )
 from talonx_dispatch.store import AuditStore
 from talonx_dispatch.telegram_client import TelegramClient, TelegramSendError
@@ -240,6 +241,7 @@ class DispatchAgent:
         self._long_term_telegram_sent = 0
         self._long_term_telegram_failed = 0
         self._long_term_alerts_purged = 0
+        self._rejected_candidates_processed = 0
 
         # Smart Dispatch Filtering: (timestamp, price) of the last
         # SUCCESSFUL push per ticker, kept separate per horizon so a
@@ -338,6 +340,10 @@ class DispatchAgent:
     @property
     def alerts_processed(self) -> int:
         return self._alerts_processed
+
+    @property
+    def rejected_candidates_processed(self) -> int:
+        return self._rejected_candidates_processed
 
     @property
     def telegram_sent(self) -> int:
@@ -474,7 +480,18 @@ class DispatchAgent:
                 "Retention sweep: purged %d long-term alert(s) older than %s (%.0f day(s))",
                 lt_purged, cutoff.isoformat(), self.config.retention_days,
             )
-        return purged + lt_purged
+
+        try:
+            rejected_purged = self.store.purge_rejected_candidates_older_than(cutoff)
+        except Exception as exc:  # noqa: BLE001 -- one bad sweep shouldn't kill the loop
+            logger.error("Rejected-candidates retention sweep failed: %s", exc)
+            rejected_purged = 0
+        if rejected_purged:
+            logger.info(
+                "Retention sweep: purged %d rejected candidate(s) older than %s (%.0f day(s))",
+                rejected_purged, cutoff.isoformat(), self.config.retention_days,
+            )
+        return purged + lt_purged + rejected_purged
 
     async def _earnings_heads_up_loop(self) -> None:
         """Event-Driven Earnings Radar, Requirement 5. Same sleep/wake-on-
@@ -567,6 +584,7 @@ class DispatchAgent:
             self.config.alerts_channel, self.config.paper_trades_channel,
             self.config.alerts_channel_long_term, self.config.paper_trades_channel_long_term,
             self.config.fundamental_signals_channel, self.config.reports_channel_long_term,
+            self.config.rejected_candidates_channel,
         )
         await pubsub.subscribe(*channels)
         logger.info("Subscribed to %s", ", ".join(channels))
@@ -613,6 +631,9 @@ class DispatchAgent:
             return
         if channel == self.config.reports_channel_long_term:
             self._handle_longterm_report(payload)
+            return
+        if channel == self.config.rejected_candidates_channel:
+            self._handle_rejected_candidate(payload)
             return
         if channel != self.config.alerts_channel:
             logger.warning("Dropping message on unexpected channel %s", channel)
@@ -682,6 +703,31 @@ class DispatchAgent:
             )
         except Exception as exc:  # noqa: BLE001 -- a cache-persist failure shouldn't drop the in-memory update
             logger.warning("Failed to persist long-term report cache for %s: %s", report.ticker, exc)
+
+    def _handle_rejected_candidate(self, payload: dict) -> None:
+        """Rejection Trace Logging: persists ONE row per candidate signal
+        a talonx_quant gate dropped -- a durable, per-candidate audit
+        trail (store.py's rejected_candidates table) for exactly the
+        failure reasons the acceptance criteria calls out by name
+        (trend_gate, rr_gate, etc. -- see event.gate). Not pushed to
+        Telegram or shown in the main feed -- this is an audit/debug
+        trail, not an actionable notification."""
+        try:
+            event = RejectedCandidateEvent.model_validate(payload)
+        except ValidationError as exc:
+            logger.warning("Dropping unparseable rejected-candidate event: %s", exc)
+            return
+        self._rejected_candidates_processed += 1
+        try:
+            self.store.record_rejected_candidate(
+                ticker=event.ticker, gate=event.gate, reason=event.reason,
+                rejected_at=event.rejected_at, signal_type=event.signal_type,
+                direction=None if event.direction is None else event.direction.value,
+                price=event.price, confluence_score=event.confluence_score,
+                risk_reward_ratio=event.risk_reward_ratio, session=event.session,
+            )
+        except Exception as exc:  # noqa: BLE001 -- an audit-write failure shouldn't crash the listener
+            logger.warning("Failed to record rejected candidate for %s: %s", event.ticker, exc)
 
     def _company_name(self, ticker: str) -> str | None:
         try:

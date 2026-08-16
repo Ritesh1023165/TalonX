@@ -19,12 +19,16 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import timezone
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 from talonx_quant.config import QuantConfig
 
 logger = logging.getLogger("talonx_quant.indicators")
+
+_ET = ZoneInfo("America/New_York")
 
 
 @dataclass(frozen=True)
@@ -105,21 +109,21 @@ def compute_indicators(df: pd.DataFrame, config: QuantConfig) -> IndicatorSnapsh
     )
     sma_fast_series = df.ta.sma(length=config.ma_fast_period)
     sma_slow_series = df.ta.sma(length=config.ma_slow_period)
-    volume_avg_series = df["volume"].rolling(window=config.volume_avg_period).mean()
-    dollar_volume_series = (df["volume"] * df["close"]).rolling(window=config.volume_avg_period).mean()
 
-    # Session-aware ATR reset (Requirement 3): ATR/bar_true_range are
-    # recomputed from scratch on every call (no persistent running
-    # state to explicitly "reset"), so restricting their INPUT to the
-    # trailing contiguous run of bars sharing the latest bar's session
-    # tag achieves the same effect -- the instant the regular session
-    # opens, pre-market bars fall out of the window on their own, and
-    # ATR/bar_true_range go back to None (a fresh warm-up) until enough
-    # regular-session bars accumulate, rather than blending the thin
-    # pre-market range into the post-open baseline. RSI/MACD/SMA above
-    # are deliberately NOT restricted this way -- only the ATR-based
-    # movement-confirmation/risk-reward inputs need the reset.
+    # Session-aware baseline reset, shared by the ATR gate below AND the
+    # volume-surge baseline (Dual Volume Baselines requirement): both are
+    # restricted to the trailing contiguous run of bars sharing the
+    # LATEST bar's session tag, so a regular-session bar's volume is
+    # never compared against a 20-bar window still mostly full of thin
+    # pre-market volume (or vice versa) -- the instant the session
+    # changes, both baselines go back to None (a fresh warm-up) until
+    # enough same-session bars accumulate, rather than blending two
+    # structurally different liquidity regimes into one average. RSI/MACD/
+    # SMA above are deliberately NOT restricted this way -- only the
+    # ATR-based and volume-based gates need the reset.
     atr_df = _same_session_tail(df)
+    volume_avg_series = atr_df["volume"].rolling(window=config.volume_avg_period).mean()
+    dollar_volume_series = (atr_df["volume"] * atr_df["close"]).rolling(window=config.volume_avg_period).mean()
     # Guard BEFORE calling .ta.atr(), not after: pandas_ta's atr() does
     # NOT return a NaN-filled Series when given fewer than length+1 rows
     # (the behavior compute_indicators previously relied on) -- it
@@ -223,3 +227,68 @@ def compute_htf_trend(df_htf: pd.DataFrame | None, period: int) -> float | None:
     if valid.empty:
         return None
     return float(valid.iloc[-1])
+
+
+@dataclass(frozen=True)
+class DailyPivots:
+    """Classic floor-trader pivot levels (P, R1, S1) from the most
+    recently COMPLETED regular-trading-hours session -- the basis for
+    Structural R:R Calculation (strategy.py's _structural_risk_reward):
+    reward is measured to `resistance`/`support`, not a second, unrelated
+    ATR multiple."""
+    pivot: float
+    resistance: float
+    support: float
+
+
+def _et_date(timestamp) -> object:
+    """The America/New_York calendar date a (tz-aware or naive-assumed-UTC)
+    bar timestamp falls on -- pivots are a per-CALENDAR-DAY concept, so
+    grouping by this (not the raw UTC date, which can shift a late-session
+    bar onto the wrong day) is what correctly separates one session's bars
+    from the next."""
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
+    return timestamp.astimezone(_ET).date()
+
+
+def compute_daily_pivots(df_htf: pd.DataFrame | None, current_timestamp) -> "DailyPivots | None":
+    """
+    Computes P/R1/S1 from the high/low/close of the most recently
+    COMPLETED regular-session's worth of bars in the 15-min HTF buffer
+    (see consumer.py's buffer_htf) -- deliberately NOT the 1-min primary
+    buffer, which is far too small (max_bars_per_symbol, ~200 bars/~3.3h)
+    to ever hold a full prior session; the HTF buffer's ~2-trading-day
+    capacity (htf_max_bars) comfortably does.
+
+    Returns None (fail-closed, same "insufficient data -> no signal"
+    posture as every other warm-up gate in this module) until at least
+    one full prior regular session is present -- e.g. the first session
+    after a cold start, or a df_htf built without buffer.py's session
+    tagging (a hand-built test fixture with no `session` column).
+    """
+    if df_htf is None or df_htf.empty or "session" not in df_htf.columns:
+        return None
+    regular = df_htf[df_htf["session"] == "regular"]
+    if regular.empty:
+        return None
+
+    current_date = _et_date(current_timestamp)
+    session_dates = regular.index.map(_et_date)
+    prior_dates = sorted({d for d in session_dates if d < current_date})
+    if not prior_dates:
+        return None
+
+    last_session = regular[session_dates == prior_dates[-1]]
+    if last_session.empty:
+        return None
+
+    high = float(last_session["high"].max())
+    low = float(last_session["low"].min())
+    close = float(last_session["close"].iloc[-1])
+    pivot = (high + low + close) / 3.0
+    return DailyPivots(
+        pivot=pivot,
+        resistance=(2 * pivot) - low,
+        support=(2 * pivot) - high,
+    )

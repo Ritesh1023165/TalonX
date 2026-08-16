@@ -276,4 +276,32 @@ class LongTermResearchReport(BaseModel):
     dcf_fair_value_per_share: float
     quality_score: int = Field(ge=0, le=10)
     summary: str
+
+
+# ------------------------------------------------------------------
+# Rejection Trace Logging: trimmed mirror of
+# talonx_quant.schemas.RejectedCandidateEvent -- talonx_quant publishes
+# one of these per candidate signal a gate drops BEFORE it would ever
+# reach talonx:signals:quant (confluence, structural R:R, trend, ATR
+# move/volatility, blackout, cooldown, loss-lockout, throttle, pre-market
+# liquidity/news-catalyst -- see talonx_quant/consumer.py's own gate
+# list). Without this, a rejected candidate was invisible to
+# talonx_dispatch entirely: only PUBLISHED signals ever reached this
+# module, so store.py had no durable record of what almost fired and
+# why. Same "each module only knows the wire shape of what it consumes"
+# convention as every other re-declared mirror in this file.
+# ------------------------------------------------------------------
+
+class RejectedCandidateEvent(BaseModel):
+    ticker: str
+    gate: str  # e.g. "confluence_gate", "rr_gate", "trend_gate" -- see talonx_quant.consumer's gate names
+    reason: str  # e.g. "LOW_CONFLUENCE", "LOW_RISK_REWARD", "TREND_GATE"
+    signal_type: str | None = None
+    direction: SignalDirection | None = None
+    price: float | None = None
+    confluence_score: int | None = None
+    risk_reward_ratio: float | None = None
+    session: str | None = None
+    count: int = 1
+    rejected_at: datetime
     is_degraded: bool = False
