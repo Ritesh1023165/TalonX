@@ -48,27 +48,98 @@ python -m talonx_backtest --help
 
 ---
 
-## Run the sample backtest first
+## Run the sample backtests first
 
 Before getting real data, prove the whole pipeline works on your
-machine using the deterministic sample dataset checked into the repo:
+machine using the three deterministic sample datasets checked into the
+repo — **none represent real market performance, and none should be
+cited as evidence of TalonX's real-world profitability.** They are
+integration-test fixtures only. Together they exercise the zero-trade
+path, a single winning trade, and a full win/loss/EOD-flatten mix. See
+[`examples/data/README.md`](../examples/data/README.md) for the full
+breakdown.
+
+### `sample_AAPL_1m.csv` — smoke-test dataset (zero-trade path)
 
 ```powershell
 python -m talonx_backtest --data examples\data\sample_AAPL_1m.csv --symbol AAPL --tz America/New_York --out results\sample
 ```
 
-Then open:
+Proves data loading, data-quality validation, and report generation
+work. **Zero trades is the correct, expected result** here — every
+candidate signal this dataset produces is rejected on confluence, and
+the report/`trades.csv`/`equity_curve.csv` say so explicitly (headers
+only, never an ambiguous empty file — see "Zero-trade output" below).
 
-```text
-results\sample\backtest_results.html
+### `sample_AAPL_trade_1m.csv` — trade/execution dataset (actual-trade path)
+
+```powershell
+python -m talonx_backtest --data examples\data\sample_AAPL_trade_1m.csv --symbol AAPL --tz America/New_York --out results\sample_trade
 ```
 
-in any browser. **`examples/data/sample_AAPL_1m.csv` is synthetic,
-deterministic test data — see [`examples/data/README.md`](../examples/data/README.md).
-It does NOT represent real market performance.** Its only job is to
-prove data loading, validation, strategy evaluation, trade simulation,
-and report generation all work end to end before you invest time
-sourcing real data.
+Specifically engineered (two synthetic "trading days": the first
+establishes pivot levels the R:R gate needs, the second contains an
+engineered run-up-then-reversal that naturally produces a
+`MACD_BEARISH_CROSS` candidate with confluence 2/3 and R:R comfortably
+above 1.5) to clear the **exact, unmodified, frozen production
+`QuantConfig`** — no gate was relaxed to make this happen. Produces one
+executed trade, exiting via `TARGET`, populating `trades.csv`,
+`equity_curve.csv`, and the HTML report's trade metrics/equity curve/
+distribution charts.
+
+### `sample_multi_trade_1m.csv` — multi-scenario dataset (TARGET / STOP / EOD-flatten, win+loss statistics)
+
+```powershell
+python -m talonx_backtest --data examples\data\sample_multi_trade_1m.csv --symbols TSTW,TSTL,TSTE --tz America/New_York --out results\sample_multi
+```
+
+Three independent synthetic symbols in one file, each reusing the SAME
+proven signal setup (confluence 2/3, R:R comfortably above 1.5 — again
+never relaxed) with a different post-entry price path:
+
+| Symbol | Continuation after entry | Exit |
+|---|---|---|
+| `TSTW` | keeps declining | `TARGET` (win) |
+| `TSTL` | sharp reversal back through the stop level | `STOP` (loss, a clean -1R) |
+| `TSTE` | bounded oscillation, held until 15:50 ET | `END_OF_SESSION` (win, via the real EOD-flatten sweep) |
+
+This is the one fixture where profit factor, average loss, drawdown,
+cumulative R, and win/loss statistics are all exercised on real,
+non-degenerate numbers (2 wins, 1 loss) rather than `n/a`/`inf`
+placeholders.
+
+Then open `results\sample\`, `results\sample_trade\`, or
+`results\sample_multi\backtest_results.html` in a browser.
+
+### A note on the three R:R fields on a trade record
+
+`trades.csv`/`trades.json` carry THREE R:R numbers, deliberately kept
+distinct rather than collapsed into one — each answers a different
+question, and none is a bug:
+
+| Field | What it answers | Computed from |
+|---|---|---|
+| `risk_reward_ratio` / `screening_rr` (identical — `screening_rr` is an explicitly-named alias) | "What R:R did the strategy's own gate approve this candidate on?" | `atr_stop_multiplier × ATR`, measured at the moment the signal was revalidated (an audit trail of the STRATEGY's decision — never recalculated against the executed fill) |
+| `execution_rr` | "What R:R was actually available at the price this order filled at?" | `\|target_price − entry_price\| / \|entry_price − stop_price\|`, using the REAL fill price (the next bar's open) against the same fixed stop/target. You can verify this yourself directly from the `entry_price`/`stop_price`/`target_price` columns sitting right next to it. Fixed at entry time — independent of `exit_reason` (a STOP or an EOD-flattened trade still has an `execution_rr`, same as a TARGET one would have). |
+| `gross_R` / `net_R` | "What did this trade ACTUALLY realize?" | The real exit price against the real fill price — depends on `exit_reason`; only equals `execution_rr` when the trade happens to exit at exactly the target price |
+
+Price can (and, in `sample_AAPL_trade_1m.csv`/`sample_multi_trade_1m.csv`,
+deliberately does) move between "signal published" and "order filled" —
+entry is always the NEXT bar's open, never the same bar the signal
+fired on — so `screening_rr` and `execution_rr` are expected to differ;
+neither is recalculated to match the other.
+
+### Zero-trade output is never an ambiguous empty file
+
+An equity curve is inherently anchored to trade *exits* — with zero
+trades there's no real observation to report, so rather than fabricate
+a `0.0 at the start` reading that never happened, `talonx_backtest`
+writes a **header-only, zero-row CSV** for both `trades.csv` and
+`equity_curve.csv` when nothing executed. A zero-byte file would be
+ambiguous (crashed run? truly zero trades?); a headers-only file is
+not. The HTML report and `summary.txt`/`summary.json` state explicitly
+when zero trades occurred and point you at the rejection funnel to see
+why.
 
 ---
 
@@ -198,27 +269,33 @@ dataset is left untouched.
 
 ## Where to get historical 1-minute OHLCV data
 
-`talonx_backtest` does not download data itself. Practical options:
+`talonx_backtest` itself does not download data — but the repo has a
+companion downloader, `scripts/download_historical_1m.py`, that writes
+straight into the CSV layout the engine expects (see "Automating
+downloads" below). Practical sources it supports:
 
-- **A broker/data API you already have access to** (e.g. Alpaca,
-  Interactive Brokers, Polygon.io, IEX Cloud) — most offer a 1-minute
-  historical bars endpoint; export to CSV with the columns above.
-- **`yfinance`** (already a project dependency, used elsewhere in
-  `talonx_quant` for pre-seeding) — its 1-minute history is limited to
-  roughly the trailing 7-30 days depending on the endpoint, which is
-  enough for a short validation run but not a multi-year backtest.
-- **A paid historical-data vendor** (e.g. Polygon.io's flat files,
-  Databento, Tiingo) if you need a multi-year, survivorship-bias-aware
-  1-minute dataset.
+- **Polygon.io REST** (`POLYGON_API_KEY`) — multi-year 1-minute
+  aggregates, paginated automatically.
+- **Alpaca Markets** (`APCA_API_KEY_ID` + `APCA_API_SECRET_KEY`) —
+  same idea, Alpaca's `/v2/stocks/{symbol}/bars` endpoint.
+- **`yfinance` fallback** (already a project dependency, used elsewhere
+  in `talonx_quant` for pre-seeding; needs no account/key) — its
+  1-minute history is limited to roughly the trailing 30 days, enough
+  for a short validation run but not a multi-year backtest.
+- **A broker/data API you already have access to, used manually**
+  (Interactive Brokers, IEX Cloud, etc.) or **a paid vendor's flat
+  files** (Databento, Tiingo) if you need a multi-year,
+  survivorship-bias-aware dataset the downloader script doesn't cover —
+  export to the same CSV schema by hand.
 
-No specific provider is hard-coded into the engine, and the sample
-dataset above needs no API key at all. Whatever the source, the
+No specific provider is hard-coded into the backtest ENGINE, and the
+sample datasets above need no API key at all. Whatever the source, the
 workflow is the same:
 
 ```text
 Data provider
     ↓
-Download
+Download (scripts/download_historical_1m.py, or by hand)
     ↓
 Convert to required CSV format (timestamp,symbol,open,high,low,close,volume)
     ↓
@@ -240,7 +317,7 @@ data/
         2024.csv
         2025.csv
 ```
-or a flat layout:
+or a flat layout (what `scripts/download_historical_1m.py` writes):
 ```text
 data/
     AAPL.csv
@@ -250,6 +327,60 @@ data/
 ```powershell
 python -m talonx_backtest --data data\ --symbols AAPL,MSFT --start 2024-01-01 --end 2025-12-31 --out results\multi
 ```
+
+---
+
+## Automating downloads and multi-regime runs
+
+### `scripts/download_historical_1m.py`
+
+```powershell
+pip install -r scripts\requirements.txt   # requests + polygon-api-client -- optional, only needed for those two providers
+python scripts\download_historical_1m.py --symbols AAPL,MSFT,NVDA,AMZN,GOOGL,META,TSLA,AMD,PYPL,STX --start-date 2024-01-01 --end-date 2026-08-01 --output-dir data\historical_1m
+```
+
+Picks a provider automatically (Polygon if `POLYGON_API_KEY` is set,
+else Alpaca if both `APCA_API_KEY_ID`/`APCA_API_SECRET_KEY` are set,
+else `yfinance`) — or force one with `--provider {polygon,alpaca,yfinance}`.
+`--symbols` also accepts a path to a text file (one ticker per line).
+Retries each provider call with jittered exponential backoff
+(`talonx_ingest.common.backoff`, the same helper the live ingest
+pipeline uses) and fails soft PER SYMBOL — one bad ticker doesn't abort
+the batch. Writes `<output-dir>/<SYMBOL>.csv` and prints a
+`check_data_quality` report for each symbol immediately after writing
+it, so a broken download is visible right away, not just when you later
+try to backtest it.
+
+### `scripts/run_historical_regimes.py`
+
+```powershell
+python scripts\run_historical_regimes.py --data-dir data\historical_1m --symbols AAPL,MSFT,NVDA --out-dir reports
+```
+
+Runs the SAME frozen strategy (via real `python -m talonx_backtest`
+subprocesses — full process isolation between runs, nothing shared)
+across four pre-configured historical date ranges:
+
+| Regime | Period |
+|---|---|
+| `bull_momentum_2024` | 2024-01-01 → 2024-06-30 |
+| `high_vol_pullback_2024` | 2024-07-15 → 2024-09-30 |
+| `range_chop_2025` | 2025-01-01 → 2025-12-31 |
+| `full_period_2024_2026` | 2024-01-01 → 2026-08-01 |
+
+Each regime's full report set lands in `reports/regime_<name>/`
+(`--cost-sensitivity` is included by default; `--no-cost-sensitivity` to
+skip it), and a consolidated `reports/regime_comparison.md`/`.json`
+compares Total Trades, Win Rate, Profit Factor, Expectancy, Max
+Drawdown, and Sharpe/Sortino across all of them side by side. Use
+`--regimes name1,name2` to run a subset.
+
+This is **empirical measurement across time windows, not parameter
+search** — the exact same `QuantConfig` runs in every regime; nothing
+is tuned between them, and a regime with a favorable-looking number is
+never used to justify changing anything. A regime with too few trades
+to be meaningful reports `n/a`, never a fabricated figure — see
+"Statistical confidence" above.
 
 ---
 
@@ -410,6 +541,69 @@ silently drift out of sync with reality.
 - **Automatic optimization**: there is no `--optimize` flag and never
   will be in this engine. It measures the frozen strategy; it does not
   search for a better one.
+
+---
+
+## Sample data generation
+
+All three `examples/data/*.csv` files are generated by short, fixed-seed
+scripts — deterministic (identical output every regeneration), never
+randomness without a fixed seed.
+
+**`sample_AAPL_1m.csv`**: two full regular sessions (09:30-16:00 ET) of
+mild, purely arithmetic price drift (`+0.05`/`-0.03` alternating) —
+deliberately simple, no RNG at all. Warms up the indicator buffer and
+produces a handful of candidate signals, all of which land below
+`confluence_score_min` — proving the validation/reporting pipeline
+without ever needing to satisfy the R:R gate.
+
+**`sample_AAPL_trade_1m.csv`**: two full regular sessions built from a
+`numpy.random.default_rng(42)` (fixed-seed) small random walk for
+realism, with a deliberate structure layered on top:
+1. **Day 1** — random-walk only. Its high/low/close become the prior
+   session's floor-trader pivot levels (P/R1/S1) the R:R gate measures
+   reward against.
+2. **Day 2, first ~20 bars** — random-walk only (clears the 09:30-09:45
+   ET opening blackout).
+3. **Day 2, ~30-bar run-up** — a deliberate upward drift on top of the
+   random walk, pushing RSI toward/above 70 and MACD's fast line above
+   its signal line.
+4. **Day 2, reversal** — a handful of down bars flip the MACD cross;
+   the second reversal bar's own RSI (>70) and the MACD cross together
+   score confluence 2/3 under the **unmodified** `_confluence_score`
+   formula in `talonx_quant/strategy.py` — no threshold was touched to
+   make this land at 2, it's a property of where the run-up peaked.
+5. **The rest of day 2** — continued decline, giving the resulting
+   `MACD_BEARISH_CROSS` short a clean path down to the prior day's
+   pivot support (`TARGET`) rather than back up through its stop.
+
+This was found by iterating the fixed-seed random walk against the
+REAL `talonx_quant.strategy.evaluate_signals`/`indicators.compute_indicators`
+pipeline (not by predicting RSI/MACD values by hand) until a candidate
+naturally cleared every frozen gate — see `tests/test_backtest_sample_data.py::test_trade_dataset_signal_satisfies_the_frozen_strategy_naturally`,
+which asserts the resulting trade's `confluence_score`/`risk_reward_ratio`
+against the live `QuantConfig` defaults, not a relaxed test config.
+
+**`sample_multi_trade_1m.csv`**: three symbols, each independently built
+with the SAME day-1/day-2/run-up/reversal recipe as
+`sample_AAPL_trade_1m.csv` (two are even the exact same fixed seed) —
+they diverge only in what happens to price AFTER entry:
+- `TSTW` — the shared reversal simply continues declining → `TARGET`.
+- `TSTL` — after the shared decline, price reverses sharply upward for
+  12 bars (`+1.5`/bar) — enough to climb back past entry AND past the
+  stop level (entry + 1.5×ATR), not just back to breakeven → `STOP`.
+- `TSTE` — after the shared decline, price holds in a tight, non-
+  compounding oscillation around its own last close (anchor + small
+  noise each bar, not a running random walk, so it can't accidentally
+  drift into the stop or target over a long tail) for ~340 bars, until
+  the real 15:50 ET EOD-flatten sweep force-closes it → `END_OF_SESSION`.
+
+Because the three symbols are independent buffers processed in one
+chronological multi-symbol pass, `TSTE`'s much longer bar sequence also
+demonstrates that EOD-flatten checks EVERY currently-open position at
+each global timestamp, not just symbols with a bar at that instant —
+`TSTL`'s own bar sequence is much shorter, but its position (if still
+open) would be swept by the same global 15:50 ET check.
 
 ---
 

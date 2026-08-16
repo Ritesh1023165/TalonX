@@ -172,3 +172,77 @@ def test_net_pnl_reflects_costs_while_gross_does_not():
     trade = sim.check_exit("AAPL", _dt(1), bar_high=111.0, bar_low=99.0)
     assert trade.gross_pnl == pytest.approx(10.0)
     assert trade.net_pnl < trade.gross_pnl
+
+
+# --- screening_rr vs execution_rr (three distinct, all-correct R:R numbers) ---
+
+def test_screening_rr_is_copied_verbatim_from_the_published_signal():
+    sim = TradeSimulator(ExecutionConfig())
+    signal = _signal(SignalDirection.BULLISH, stop=95.0, target=110.0)
+    signal = signal.model_copy(update={"risk_reward_ratio": 17.18})  # e.g. a stale ATR/revalidation-price-based ratio
+    sim.open_position(signal, entry_timestamp=_dt(0), entry_price_raw=100.0)
+    trade = sim.check_exit("AAPL", _dt(1), bar_high=111.0, bar_low=99.0)
+
+    assert trade.risk_reward_ratio == pytest.approx(17.18)
+    assert trade.screening_rr == trade.risk_reward_ratio  # explicit alias, always identical
+
+
+def test_execution_rr_uses_the_real_fill_price_not_the_screening_reference_price():
+    # entry filled BELOW the price the screening ratio was computed from
+    # (the classic "signal published at 111.70, filled at 110.90 a bar
+    # later" case) -- execution_rr must reflect the REAL fill, not the
+    # stale screening number.
+    sim = TradeSimulator(ExecutionConfig())
+    signal = _signal(SignalDirection.BULLISH, stop=95.0, target=110.0)
+    signal = signal.model_copy(update={"risk_reward_ratio": 17.18})
+    sim.open_position(signal, entry_timestamp=_dt(0), entry_price_raw=100.0)
+    trade = sim.check_exit("AAPL", _dt(1), bar_high=111.0, bar_low=99.0)
+
+    # risk = |entry(100) - stop(95)| = 5; reward = |target(110) - entry(100)| = 10
+    assert trade.execution_rr == pytest.approx(2.0)
+    assert trade.execution_rr != trade.screening_rr
+
+
+def test_execution_rr_is_independent_of_how_the_trade_actually_exited():
+    """execution_rr is a property of entry/stop/target geometry, fixed
+    at entry time -- it must NOT change depending on whether the trade
+    goes on to hit TARGET, STOP, or gets force-closed some other way."""
+    stop_sim = TradeSimulator(ExecutionConfig())
+    target_sim = TradeSimulator(ExecutionConfig())
+    signal = _signal(SignalDirection.BULLISH, stop=95.0, target=110.0)
+
+    stop_sim.open_position(signal, entry_timestamp=_dt(0), entry_price_raw=100.0)
+    stop_trade = stop_sim.check_exit("AAPL", _dt(1), bar_high=101.0, bar_low=94.0)  # hits STOP
+
+    target_sim.open_position(signal, entry_timestamp=_dt(0), entry_price_raw=100.0)
+    target_trade = target_sim.check_exit("AAPL", _dt(1), bar_high=111.0, bar_low=99.0)  # hits TARGET
+
+    assert stop_trade.exit_reason == "STOP"
+    assert target_trade.exit_reason == "TARGET"
+    assert stop_trade.execution_rr == pytest.approx(target_trade.execution_rr) == pytest.approx(2.0)
+    # gross_R, in contrast, DOES depend on how the trade exited:
+    assert stop_trade.gross_R == pytest.approx(-1.0)
+    assert target_trade.gross_R == pytest.approx(2.0)
+
+
+def test_execution_rr_matches_gross_r_exactly_when_target_is_hit_precisely():
+    """The one case where execution_rr and gross_R DO coincide: the
+    trade exits at exactly the target price (a clean TARGET hit with no
+    slippage), since gross_R's realized reward then equals the planned
+    reward execution_rr was computed from."""
+    sim = TradeSimulator(ExecutionConfig())
+    signal = _signal(SignalDirection.BULLISH, stop=95.0, target=110.0)
+    sim.open_position(signal, entry_timestamp=_dt(0), entry_price_raw=100.0)
+    trade = sim.check_exit("AAPL", _dt(1), bar_high=111.0, bar_low=99.0)
+
+    assert trade.exit_reason == "TARGET"
+    assert trade.execution_rr == pytest.approx(trade.gross_R)
+
+
+def test_execution_rr_is_none_when_risk_resolves_to_zero():
+    sim = TradeSimulator(ExecutionConfig())
+    signal = _signal(SignalDirection.BULLISH, stop=100.0, target=110.0)  # stop == entry -> risk resolves to 0
+    sim.open_position(signal, entry_timestamp=_dt(0), entry_price_raw=100.0)
+    trade = sim.check_exit("AAPL", _dt(1), bar_high=111.0, bar_low=99.0)
+
+    assert trade.execution_rr is None

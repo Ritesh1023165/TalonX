@@ -1,0 +1,15 @@
+# Extra dependencies for scripts/download_historical_1m.py -- NOT needed
+# by any of the talonx_* packages themselves, kept isolated here rather
+# than added to talonx_ingest/requirements.txt so a normal TalonX run
+# never needs them. Both are lazily imported inside the script (same
+# "optional dependency" convention talonx_ingest/market_data uses for
+# websockets/yfinance): the script still runs in yfinance-only mode
+# without either installed.
+requests>=2.31
+polygon-api-client>=1.14
+
+# Already required elsewhere (talonx_ingest, talonx_quant) -- listed
+# here too so `pip install -r scripts/requirements.txt` alone is
+# sufficient to run the downloader standalone.
+pandas>=2.0
+yfinance>=0.2.40

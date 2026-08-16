@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import csv
 import json
-from dataclasses import asdict
+from dataclasses import asdict, fields
 from io import StringIO
 from pathlib import Path
 
@@ -79,10 +79,14 @@ def timezone_info_dict(input_timezone: str | None) -> dict:
 
 
 def trades_to_csv(trades: list[Trade]) -> str:
-    if not trades:
-        return ""
+    """Always writes a header row, even with zero trades -- a
+    zero-byte trades.csv is genuinely ambiguous (empty file? crashed
+    run? really zero trades?), whereas a headers-only CSV unambiguously
+    says "this ran, and executed zero trades." Every column comes from
+    portfolio.Trade's own field list, so the header never drifts out of
+    sync with what a populated row actually contains."""
     buf = StringIO()
-    fieldnames = list(trades[0].to_dict().keys())
+    fieldnames = [f.name for f in fields(Trade)]
     writer = csv.DictWriter(buf, fieldnames=fieldnames)
     writer.writeheader()
     for t in trades:
@@ -208,6 +212,9 @@ def _rejection_counts(result: BacktestResult) -> dict[str, int]:
     return dict(sorted(counts.items(), key=lambda kv: -kv[1]))
 
 
+EQUITY_CURVE_FIELDS = ("sequence", "trade_id", "symbol", "exit_timestamp", "gross_R", "net_R", "cumulative_gross_R", "cumulative_net_R")
+
+
 def equity_curve_rows(trades: list[Trade]) -> list[dict]:
     """One row per closed trade, ordered by exit_timestamp (the order
     P&L was actually realized in) -- cumulative_gross_R/cumulative_net_R
@@ -230,11 +237,16 @@ def equity_curve_rows(trades: list[Trade]) -> list[dict]:
 
 
 def equity_curve_to_csv(trades: list[Trade]) -> str:
+    """Always writes a header row, even with zero closed trades -- same
+    "never an ambiguous zero-byte file" reasoning as trades_to_csv. An
+    equity curve is inherently anchored to trade EXITS (each row is "the
+    running R total as of this realized trade"), so with no trades there
+    is no real observation to report -- a header-only, zero-row file is
+    the honest representation, not a fabricated `0.0 at the period
+    start` reading that never actually happened."""
     rows = equity_curve_rows(trades)
-    if not rows:
-        return ""
     buf = StringIO()
-    writer = csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
+    writer = csv.DictWriter(buf, fieldnames=list(EQUITY_CURVE_FIELDS))
     writer.writeheader()
     writer.writerows(rows)
     return buf.getvalue()
@@ -378,22 +390,29 @@ def write_report(
     if cost_sensitivity:
         paths["cost_sensitivity_csv"] = out_dir / f"{prefix}_cost_sensitivity.csv"
 
-    paths["trades_csv"].write_text(trades_to_csv(result.trades), encoding="utf-8")
+    # newline="" on every CSV write: csv.writer already emits its own
+    # "\r\n" row terminators: without newline="", Path.write_text's
+    # platform-default newline translation (on Windows) translates the
+    # "\n" INSIDE that "\r\n" a second time, producing "\r\r\n" -- which
+    # readers/splitlines() see as an extra blank line after every row.
+    # JSON/HTML/plain-text writes are unaffected (no embedded "\r\n") and
+    # keep the platform-default translation.
+    paths["trades_csv"].write_text(trades_to_csv(result.trades), encoding="utf-8", newline="")
     paths["trades_json"].write_text(trades_to_json(result.trades), encoding="utf-8")
     paths["summary_json"].write_text(
         result_summary_json(result, input_timezone=input_timezone, cost_sensitivity=cost_sensitivity),
         encoding="utf-8",
     )
     paths["summary_txt"].write_text(result_summary_text(result, input_timezone=input_timezone), encoding="utf-8")
-    paths["equity_curve_csv"].write_text(equity_curve_to_csv(result.trades), encoding="utf-8")
-    paths["rejected_signals_csv"].write_text(rejected_signals_to_csv(result.rejections), encoding="utf-8")
+    paths["equity_curve_csv"].write_text(equity_curve_to_csv(result.trades), encoding="utf-8", newline="")
+    paths["rejected_signals_csv"].write_text(rejected_signals_to_csv(result.rejections), encoding="utf-8", newline="")
     paths["data_quality_json"].write_text(data_quality_to_json(data_quality), encoding="utf-8")
     paths["results_html"].write_text(
         build_html_report(result, data_quality, input_timezone=input_timezone, cost_sensitivity=cost_sensitivity),
         encoding="utf-8",
     )
     if cost_sensitivity:
-        paths["cost_sensitivity_csv"].write_text(cost_sensitivity_to_csv(cost_sensitivity), encoding="utf-8")
+        paths["cost_sensitivity_csv"].write_text(cost_sensitivity_to_csv(cost_sensitivity), encoding="utf-8", newline="")
     return paths
 
 
@@ -781,7 +800,7 @@ renderCountTable(document.getElementById("rejections"), DATA.rejections_by_reaso
   }
   const cols = ["symbol", "direction", "signal_type", "session", "entry_timestamp", "entry_price", "stop_price",
     "target_price", "exit_timestamp", "exit_price", "exit_reason", "gross_R", "net_R", "holding_seconds",
-    "confluence_score", "risk_reward_ratio", "volume_surge_ratio", "trend_alignment", "mfe_r", "mae_r"];
+    "confluence_score", "screening_rr", "execution_rr", "volume_surge_ratio", "trend_alignment", "mfe_r", "mae_r"];
   const thead = document.querySelector("#trade-table thead");
   const tbody = document.querySelector("#trade-table tbody");
   thead.innerHTML = "<tr>" + cols.map(c => `<th data-col="${c}">${c}</th>`).join("") + "</tr>";

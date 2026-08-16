@@ -69,7 +69,7 @@ def test_loss_lockout_arms_only_on_a_losing_net_pnl(engine):
     losing_trade = Trade(
         trade_id="t", symbol="AAPL", direction="bullish", signal_type=None, session="regular",
         signal_timestamp=_NOW, entry_timestamp=_NOW, entry_price=100.0, stop_price=95.0, target_price=110.0,
-        atr=1.0, risk_reward_ratio=2.0, confluence_score=2, opportunity_score=0.5, volume_surge_ratio=2.0,
+        atr=1.0, risk_reward_ratio=2.0, screening_rr=2.0, execution_rr=2.0, confluence_score=2, opportunity_score=0.5, volume_surge_ratio=2.0,
         trend_alignment=True, exit_timestamp=_NOW, exit_price=95.0, exit_reason="STOP",
         gross_R=-1.0, net_R=-1.05, gross_pnl=-5.0, net_pnl=-5.5, holding_seconds=60.0,
         mfe_price=None, mfe_pct=None, mfe_r=0.1, mae_price=None, mae_pct=None, mae_r=-1.0,
@@ -82,7 +82,7 @@ def test_loss_lockout_does_not_arm_on_a_winning_trade(engine):
     winning_trade = Trade(
         trade_id="t", symbol="AAPL", direction="bullish", signal_type=None, session="regular",
         signal_timestamp=_NOW, entry_timestamp=_NOW, entry_price=100.0, stop_price=95.0, target_price=110.0,
-        atr=1.0, risk_reward_ratio=2.0, confluence_score=2, opportunity_score=0.5, volume_surge_ratio=2.0,
+        atr=1.0, risk_reward_ratio=2.0, screening_rr=2.0, execution_rr=2.0, confluence_score=2, opportunity_score=0.5, volume_surge_ratio=2.0,
         trend_alignment=True, exit_timestamp=_NOW, exit_price=110.0, exit_reason="TARGET",
         gross_R=2.0, net_R=1.9, gross_pnl=10.0, net_pnl=9.5, holding_seconds=60.0,
         mfe_price=None, mfe_pct=None, mfe_r=2.0, mae_price=None, mae_pct=None, mae_r=-0.1,

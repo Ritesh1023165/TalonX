@@ -17,6 +17,7 @@ from talonx_backtest.data import check_dataset_quality
 from talonx_backtest.engine import BacktestConfig, BacktestEngine, BacktestResult, RejectionRecord
 from talonx_backtest.portfolio import Trade
 from talonx_backtest.reports import (
+    EQUITY_CURVE_FIELDS,
     build_html_report,
     data_quality_to_json,
     equity_curve_to_csv,
@@ -72,8 +73,8 @@ def _trade(gross_r=1.0, net_r=0.9, exit_offset=0) -> Trade:
     return Trade(
         trade_id=f"t{exit_offset}", symbol="AAPL", direction="bullish", signal_type="rsi_oversold_volume_surge",
         session="regular", signal_timestamp=_dt(0), entry_timestamp=_dt(0), entry_price=100.0,
-        stop_price=95.0, target_price=110.0, atr=1.0, risk_reward_ratio=2.0, confluence_score=3,
-        opportunity_score=0.5, volume_surge_ratio=3.0, trend_alignment=True,
+        stop_price=95.0, target_price=110.0, atr=1.0, risk_reward_ratio=2.0, screening_rr=2.0, execution_rr=2.0,
+        confluence_score=3, opportunity_score=0.5, volume_surge_ratio=3.0, trend_alignment=True,
         exit_timestamp=_dt(exit_offset), exit_price=105.0, exit_reason="TARGET",
         gross_R=gross_r, net_R=net_r, gross_pnl=gross_r * 5, net_pnl=net_r * 5, holding_seconds=1200.0,
         mfe_price=None, mfe_pct=None, mfe_r=1.5, mae_price=None, mae_pct=None, mae_r=-0.2,
@@ -108,8 +109,14 @@ def test_equity_curve_is_ordered_by_exit_and_cumulates_correctly():
     assert first_row[1] == "t1"
 
 
-def test_equity_curve_empty_for_no_trades():
-    assert equity_curve_to_csv([]) == ""
+def test_equity_curve_is_header_only_not_empty_for_no_trades():
+    # A zero-byte file is ambiguous (empty file? crashed run? really
+    # zero trades?) -- a header-only CSV is not.
+    csv_text = equity_curve_to_csv([])
+    assert csv_text != ""
+    lines = csv_text.strip().splitlines()
+    assert len(lines) == 1
+    assert lines[0].split(",") == list(EQUITY_CURVE_FIELDS)
 
 
 # --- rejected_signals.csv ---
@@ -214,3 +221,25 @@ def test_write_report_writes_all_eight_files(tmp_path):
     assert paths["results_html"].read_text(encoding="utf-8").startswith("<!doctype html>")
     dq = json.loads(paths["data_quality_json"].read_text(encoding="utf-8"))
     assert "AAPL" in dq
+
+
+def test_write_report_csv_files_have_no_spurious_blank_lines(tmp_path):
+    """Regression test: csv.writer emits its own "\\r\\n" row
+    terminators; without newline="" on the write_text() call, Windows'
+    platform-default newline translation re-translates the "\\n" INSIDE
+    that "\\r\\n" a second time (-> "\\r\\r\\n"), which readers/
+    splitlines() see as an extra blank line after every single row.
+    Caught originally by a stricter equity_curve.csv line-count
+    assertion in test_backtest_sample_data.py; this pins the fix
+    directly against write_report's own file output (the in-memory
+    equity_curve_to_csv()/trades_to_csv() string builders never exhibit
+    this bug -- it only happens at the write_text() step)."""
+    result, df = _real_run_result()
+    quality = check_dataset_quality(df)
+    paths = write_report(result, tmp_path, prefix="demo", data_quality=quality)
+
+    for key in ("trades_csv", "equity_curve_csv", "rejected_signals_csv"):
+        text = paths[key].read_bytes().decode("utf-8")
+        assert "\r\r\n" not in text, f"{key} has doubled CSV line terminators"
+        lines = text.splitlines()
+        assert all(line != "" for line in lines), f"{key} has a spurious blank line: {lines!r}"

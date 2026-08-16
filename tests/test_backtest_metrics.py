@@ -22,8 +22,8 @@ def _trade(gross_r: float, net_r: float | None = None, holding_min: float = 20.0
     return Trade(
         trade_id="t", symbol="AAPL", direction="bullish", signal_type="rsi_oversold_volume_surge",
         session="regular", signal_timestamp=_dt(0), entry_timestamp=_dt(0), entry_price=100.0,
-        stop_price=95.0, target_price=110.0, atr=1.0, risk_reward_ratio=2.0, confluence_score=3,
-        opportunity_score=0.5, volume_surge_ratio=3.0, trend_alignment=True,
+        stop_price=95.0, target_price=110.0, atr=1.0, risk_reward_ratio=2.0, screening_rr=2.0, execution_rr=2.0,
+        confluence_score=3, opportunity_score=0.5, volume_surge_ratio=3.0, trend_alignment=True,
         exit_timestamp=_dt(exit_offset), exit_price=105.0, exit_reason="TARGET",
         gross_R=gross_r, net_R=gross_r if net_r is None else net_r,
         gross_pnl=gross_r * 5, net_pnl=(gross_r if net_r is None else net_r) * 5,

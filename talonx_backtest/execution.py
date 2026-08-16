@@ -218,6 +218,17 @@ class TradeSimulator:
         mfe_r = (mfe_dist / position.risk) if position.risk else None
         mae_r = (mae_dist / position.risk) if position.risk else None
 
+        # execution_rr: reward:risk at the price this order ACTUALLY
+        # filled at (position.entry_price_raw), against the same fixed
+        # stop_price/target_price -- independent of exit_reason/how the
+        # trade actually closed. See portfolio.Trade's own docstring for
+        # why this is a distinct number from screening_rr (the
+        # strategy's gate-time R:R, never recalculated against the
+        # fill) and from gross_R/net_R (the ACTUALLY REALIZED outcome).
+        execution_rr = None
+        if position.risk and position.target_price is not None:
+            execution_rr = abs(position.target_price - position.entry_price_raw) / position.risk
+
         holding_seconds = None
         if position.entry_timestamp is not None and timestamp is not None:
             holding_seconds = (timestamp - position.entry_timestamp).total_seconds()
@@ -235,6 +246,8 @@ class TradeSimulator:
             target_price=position.target_price,
             atr=signal.atr,
             risk_reward_ratio=signal.risk_reward_ratio,
+            screening_rr=signal.risk_reward_ratio,
+            execution_rr=execution_rr,
             confluence_score=signal.confluence_score,
             opportunity_score=position.opportunity_score,
             volume_surge_ratio=signal.volume_surge_ratio,

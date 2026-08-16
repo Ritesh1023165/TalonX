@@ -10,6 +10,27 @@ above entry.
 Every field the backtest spec's "Trade lifecycle" section calls for is
 present; a field that couldn't be computed (e.g. gross_R when risk
 resolves to 0) is explicitly None, never a fabricated placeholder.
+
+R:R fields (three, deliberately distinct -- see docs/backtesting.md's
+"risk_reward_ratio vs gross_R/net_R" section for the full explanation):
+  - risk_reward_ratio / screening_rr (identical, screening_rr is just an
+    explicitly-named alias): the STRATEGY's own gate-time R:R, copied
+    verbatim from the published QuantSignal -- risk = atr_stop_multiplier
+    x ATR measured at revalidation time, reward = distance to the pivot
+    target from the REVALIDATION-time reference price. This is the
+    number min_risk_reward_ratio actually gated on; never recalculated
+    against the executed fill, by design -- it's an audit trail of what
+    the strategy approved, not a live-updating figure.
+  - execution_rr: reward:risk using the REAL fill price (entry_price,
+    the next bar's open) against the SAME fixed stop_price/target_price
+    -- "what R:R was actually available at the price this order filled
+    at." Independent of how the trade actually exited (STOP/EOD/DATA_END
+    trades still get an execution_rr; it is NOT the same as gross_R/
+    net_R, which depend on the actual exit price/reason, not the
+    target). A reader can verify this one directly from entry_price/
+    stop_price/target_price columns sitting right next to it, unlike
+    screening_rr's ATR/revalidation-price inputs which aren't otherwise
+    visible on the trade record.
 """
 from __future__ import annotations
 
@@ -32,7 +53,9 @@ class Trade:
     stop_price: float | None
     target_price: float | None
     atr: float | None
-    risk_reward_ratio: float | None
+    risk_reward_ratio: float | None  # == screening_rr; kept for backward compatibility
+    screening_rr: float | None       # explicit alias of risk_reward_ratio -- see module docstring
+    execution_rr: float | None       # reward:risk at the REAL fill price -- see module docstring
     confluence_score: int | None
     opportunity_score: float | None
     volume_surge_ratio: float | None
