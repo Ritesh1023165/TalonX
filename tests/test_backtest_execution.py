@@ -246,3 +246,32 @@ def test_execution_rr_is_none_when_risk_resolves_to_zero():
     trade = sim.check_exit("AAPL", _dt(1), bar_high=111.0, bar_low=99.0)
 
     assert trade.execution_rr is None
+
+
+def test_opportunity_score_is_unaffected_by_execution_rr_divergence():
+    """R:R contributes opportunity_score_rr_weight (30% by default) to
+    the Composite Opportunity Score -- but that score is computed by
+    talonx_quant.consumer._opportunity_score BEFORE entry, from
+    signal.risk_reward_ratio (== screening_rr) alone. TradeSimulator
+    never recomputes it: `opportunity_score` is passed in at
+    open_position() time and copied onto the Trade verbatim. This test
+    proves that end of the chain -- a real fill price that makes
+    execution_rr diverge sharply from screening_rr must NOT change the
+    opportunity_score already carried on the resulting Trade. See
+    test_backtest_engine_state.py for the other end of the chain (the
+    engine computing that score FROM screening_rr in the first place)."""
+    sim = TradeSimulator(ExecutionConfig())
+    signal = _signal(SignalDirection.BULLISH, stop=95.0, target=110.0)
+    signal = signal.model_copy(update={"risk_reward_ratio": 5.0})  # screening_rr, fed to opportunity scoring upstream
+
+    precomputed_score = 0.73  # stands in for consumer._opportunity_score(signal, qc)'s output
+    sim.open_position(signal, entry_timestamp=_dt(0), entry_price_raw=100.0, opportunity_score=precomputed_score)
+    trade = sim.check_exit("AAPL", _dt(1), bar_high=111.0, bar_low=99.0)
+
+    # execution_rr (2.0: reward 10 / risk 5 at the REAL fill) is nowhere
+    # near screening_rr (5.0, what actually fed opportunity scoring) --
+    # yet opportunity_score is untouched by that divergence.
+    assert trade.execution_rr == pytest.approx(2.0)
+    assert trade.screening_rr == pytest.approx(5.0)
+    assert trade.execution_rr != pytest.approx(trade.screening_rr)
+    assert trade.opportunity_score == pytest.approx(precomputed_score)

@@ -2,14 +2,16 @@
 tests/test_download_historical_1m.py
 ------------------------------------------
 scripts/download_historical_1m.py -- provider selection, symbol
-parsing, retry/backoff behavior, and each provider's fetch function.
+parsing, retry/backoff behavior, yfinance 7-day chunking, and each
+provider's fetch function.
 
 Every provider call is MOCKED here (never a real network/API call),
 matching this repo's established convention for yfinance-dependent code
 (see test_yfinance_poller.py/test_yfinance_extended_hours.py: always
-`patch("yfinance.Ticker", ...)`, never a live call in the automated
-suite). time.sleep is also mocked in the retry tests so they run
-instantly regardless of the configured backoff.
+`patch("yfinance...", ...)`, never a live call in the automated suite).
+time.sleep is also mocked in every test that touches it (the retry
+backoff AND the inter-chunk 0.5s pause) so they run instantly
+regardless of the configured delay.
 """
 from __future__ import annotations
 
@@ -22,6 +24,7 @@ import pytest
 
 from scripts.download_historical_1m import (
     DownloadError,
+    _chunk_date_range,
     _parse_symbols,
     _retry,
     download_symbol,
@@ -107,23 +110,48 @@ def test_retry_raises_download_error_after_exhausting_attempts(monkeypatch):
         _retry(always_fails, max_retries=3, base_seconds=0.01, max_seconds=0.01, description="test")
 
 
+# --- _chunk_date_range ---
+
+def test_chunk_date_range_matches_the_documented_example():
+    assert _chunk_date_range("2026-07-20", "2026-08-16") == [
+        ("2026-07-20", "2026-07-27"),
+        ("2026-07-27", "2026-08-03"),
+        ("2026-08-03", "2026-08-10"),
+        ("2026-08-10", "2026-08-16"),
+    ]
+
+
+def test_chunk_date_range_single_chunk_when_span_is_short():
+    assert _chunk_date_range("2026-08-01", "2026-08-02") == [("2026-08-01", "2026-08-02")]
+
+
+def test_chunk_date_range_exact_multiple_of_chunk_size():
+    # 14 days, chunk_days=7 -- two full 7-day chunks, no short remainder.
+    assert _chunk_date_range("2026-08-01", "2026-08-15") == [
+        ("2026-08-01", "2026-08-08"),
+        ("2026-08-08", "2026-08-15"),
+    ]
+
+
+def test_chunk_date_range_handles_start_equal_to_end():
+    assert _chunk_date_range("2026-08-01", "2026-08-01") == [("2026-08-01", "2026-08-01")]
+
+
 # --- fetch_yfinance ---
 
-def _yf_history_df(n=5):
-    ts = pd.date_range("2026-08-01 09:30:00", periods=n, freq="1min", tz="UTC")
+def _yf_download_df(n=5, start="2026-08-01 09:30:00"):
+    ts = pd.date_range(start, periods=n, freq="1min", tz="UTC", name="Datetime")
     return pd.DataFrame({"Open": 100.0, "High": 100.5, "Low": 99.5, "Close": 100.2, "Volume": 1000.0}, index=ts)
 
 
 def test_fetch_yfinance_returns_normalized_bars(monkeypatch):
     monkeypatch.setattr(time, "sleep", lambda _: None)
-    mock_ticker = MagicMock()
-    mock_ticker.history.return_value = _yf_history_df(5)
 
-    with patch("yfinance.Ticker", return_value=mock_ticker) as mock_cls:
+    with patch("yfinance.download", return_value=_yf_download_df(5)) as mock_download:
         bars = fetch_yfinance("AAPL", "2026-08-01", "2026-08-02", max_retries=3)
 
-    mock_cls.assert_called_once_with("AAPL")
-    mock_ticker.history.assert_called_once_with(start="2026-08-01", end="2026-08-02", interval="1m", prepost=True)
+    # single-day span -> exactly one chunk -> exactly one yf.download call
+    mock_download.assert_called_once_with("AAPL", start="2026-08-01", end="2026-08-02", interval="1m", prepost=True, progress=False)
     assert len(bars) == 5
     assert bars[0]["open"] == 100.0
     assert bars[0]["timestamp"].tzinfo is not None
@@ -131,22 +159,70 @@ def test_fetch_yfinance_returns_normalized_bars(monkeypatch):
 
 def test_fetch_yfinance_empty_history_returns_empty_list(monkeypatch):
     monkeypatch.setattr(time, "sleep", lambda _: None)
-    mock_ticker = MagicMock()
-    mock_ticker.history.return_value = pd.DataFrame()
 
-    with patch("yfinance.Ticker", return_value=mock_ticker):
+    with patch("yfinance.download", return_value=pd.DataFrame()):
         bars = fetch_yfinance("AAPL", "2026-08-01", "2026-08-02", max_retries=3)
     assert bars == []
 
 
 def test_fetch_yfinance_warns_on_wide_date_range(monkeypatch, caplog):
     monkeypatch.setattr(time, "sleep", lambda _: None)
-    mock_ticker = MagicMock()
-    mock_ticker.history.return_value = _yf_history_df(1)
-    with patch("yfinance.Ticker", return_value=mock_ticker):
+    with patch("yfinance.download", return_value=pd.DataFrame()):
         with caplog.at_level("WARNING"):
             fetch_yfinance("AAPL", "2024-01-01", "2024-06-30", max_retries=3)
     assert any("30 trailing days" in rec.message for rec in caplog.records)
+
+
+def test_fetch_yfinance_chunks_wide_ranges_into_7_day_windows(monkeypatch):
+    monkeypatch.setattr(time, "sleep", lambda _: None)
+    # 21-day span -> three 7-day chunks
+    frames = [_yf_download_df(2, start=f"2026-07-{d:02d} 09:30:00") for d in (1, 8, 15)]
+
+    with patch("yfinance.download", side_effect=frames) as mock_download:
+        bars = fetch_yfinance("AAPL", "2026-07-01", "2026-07-22", max_retries=3)
+
+    assert mock_download.call_count == 3
+    called_ranges = [(c.kwargs["start"], c.kwargs["end"]) for c in mock_download.call_args_list]
+    assert called_ranges == [("2026-07-01", "2026-07-08"), ("2026-07-08", "2026-07-15"), ("2026-07-15", "2026-07-22")]
+    assert len(bars) == 6  # 2 bars per chunk x 3 chunks, no overlap in this fixture
+
+
+def test_fetch_yfinance_sleeps_half_a_second_between_chunks(monkeypatch):
+    sleep_calls = []
+    monkeypatch.setattr(time, "sleep", lambda s: sleep_calls.append(s))
+    frames = [_yf_download_df(1, start=f"2026-07-{d:02d} 09:30:00") for d in (1, 8, 15)]
+
+    with patch("yfinance.download", side_effect=frames):
+        fetch_yfinance("AAPL", "2026-07-01", "2026-07-22", max_retries=3)
+
+    # 3 chunks -> 2 inter-chunk pauses (never a trailing sleep after the last chunk)
+    assert sleep_calls == [0.5, 0.5]
+
+
+def test_fetch_yfinance_dedupes_and_sorts_across_chunk_boundaries(monkeypatch):
+    monkeypatch.setattr(time, "sleep", lambda _: None)
+    # Chunk 1 ends on a bar that chunk 2 ALSO returns (the shared
+    # boundary date) -- the duplicate must be dropped, not double-counted.
+    shared_ts = pd.Timestamp("2026-07-08 09:30:00", tz="UTC")
+    chunk1 = pd.DataFrame(
+        {"Open": [100.0, 101.0], "High": [100.5, 101.5], "Low": [99.5, 100.5], "Close": [100.2, 101.2], "Volume": [1000.0, 1100.0]},
+        index=pd.DatetimeIndex([pd.Timestamp("2026-07-01 09:30:00", tz="UTC"), shared_ts], name="Datetime"),
+    )
+    chunk2 = pd.DataFrame(
+        {"Open": [999.0, 102.0], "High": [999.0, 102.5], "Low": [999.0, 101.5], "Close": [999.0, 102.2], "Volume": [999.0, 1200.0]},
+        index=pd.DatetimeIndex([shared_ts, pd.Timestamp("2026-07-09 09:30:00", tz="UTC")], name="Datetime"),
+    )
+
+    with patch("yfinance.download", side_effect=[chunk1, chunk2]):
+        bars = fetch_yfinance("AAPL", "2026-07-01", "2026-07-15", max_retries=3)
+
+    timestamps = [b["timestamp"] for b in bars]
+    assert timestamps == sorted(timestamps)
+    assert len(timestamps) == len(set(timestamps))  # no duplicate timestamp survived
+    assert len(bars) == 3  # 2 + 2 raw rows, minus 1 duplicate at the shared boundary
+    # the FIRST chunk's value for the shared bar wins (drop_duplicates keeps the first occurrence)
+    shared_bar = next(b for b in bars if b["timestamp"] == shared_ts)
+    assert shared_bar["open"] == 101.0
 
 
 # --- fetch_polygon ---
@@ -210,9 +286,7 @@ def test_fetch_alpaca_paginates_via_next_page_token(monkeypatch):
 
 def test_download_symbol_returns_none_on_empty_result(monkeypatch):
     monkeypatch.setattr(time, "sleep", lambda _: None)
-    mock_ticker = MagicMock()
-    mock_ticker.history.return_value = pd.DataFrame()
-    with patch("yfinance.Ticker", return_value=mock_ticker):
+    with patch("yfinance.download", return_value=pd.DataFrame()):
         result = download_symbol("AAPL", "2026-08-01", "2026-08-02", "yfinance", max_retries=2)
     assert result is None
 
@@ -221,10 +295,8 @@ def test_main_writes_a_valid_csv_that_passes_data_quality_checks(tmp_path, monke
     from talonx_backtest.data import check_data_quality, load_ohlcv_csv
 
     monkeypatch.setattr(time, "sleep", lambda _: None)
-    mock_ticker = MagicMock()
-    mock_ticker.history.return_value = _yf_history_df(10)
 
-    with patch("yfinance.Ticker", return_value=mock_ticker):
+    with patch("yfinance.download", return_value=_yf_download_df(10)):
         exit_code = main([
             "--symbols", "AAPL", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
             "--output-dir", str(tmp_path), "--provider", "yfinance",
@@ -246,13 +318,7 @@ def test_main_writes_a_valid_csv_that_passes_data_quality_checks(tmp_path, monke
 def test_main_reports_failed_symbols_without_aborting_the_batch(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(time, "sleep", lambda _: None)
 
-    def fake_history(*args, **kwargs):
-        return pd.DataFrame()  # empty for every symbol
-
-    mock_ticker = MagicMock()
-    mock_ticker.history.side_effect = fake_history
-
-    with patch("yfinance.Ticker", return_value=mock_ticker):
+    with patch("yfinance.download", return_value=pd.DataFrame()):  # empty for every symbol
         exit_code = main([
             "--symbols", "AAPL,MSFT", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
             "--output-dir", str(tmp_path), "--provider", "yfinance",

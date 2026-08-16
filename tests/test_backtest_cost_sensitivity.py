@@ -8,20 +8,24 @@ scenario, varying ONLY execution cost. Never selects or highlights a
 of scenarios, strategy untouched between them, cost actually applied,
 higher cost -> lower-or-equal net expectancy).
 
-Deliberately a SMALL, single-day fixture (compute_indicators recomputes
-RSI/MACD/SMA/ATR over the WHOLE buffer on every bar, so a full
-BacktestEngine.run() is roughly O(bars^2) -- a 2-day/780-bar fixture run
-~20+ times across this file's test functions took nearly 9 minutes
-before this was trimmed down). This fixture is far too short to ever
-clear the R:R gate (no prior-session pivots), so it produces zero
-trades -- that's fine, every assertion below only needs the SCENARIO
-MECHANICS to be correct, not actual trades; see
-test_backtest_regression.py/test_backtest_reports.py for tests that
-exercise real trade execution over the fuller fixture.
+Two fixtures, two jobs:
+  - `sample_df` (a SMALL, single-day, deliberately trade-FREE fixture --
+    compute_indicators recomputes RSI/MACD/SMA/ATR over the WHOLE buffer
+    on every bar, so a full BacktestEngine.run() is roughly O(bars^2);
+    a 2-day/780-bar fixture run ~20+ times across this file's test
+    functions took nearly 9 minutes before this was trimmed down) tests
+    scenario MECHANICS only: right number of scenarios, cost actually
+    applied, zero-cost matches a plain run.
+  - `multi_trade_df` (examples/data/sample_multi_trade_1m.csv --
+    TSTW/TSTL/TSTE, TARGET win + STOP loss + END_OF_SESSION win)
+    reliably produces 3 real trades, so it verifies the thing that
+    actually matters: net_R/expectancy genuinely CHANGE (strictly
+    worsen) as cost rises, never a skip for lack of data.
 """
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -29,6 +33,8 @@ import pytest
 from talonx_backtest.analysis import DEFAULT_COST_SCENARIOS_BPS, cost_sensitivity_scenarios
 from talonx_backtest.data import from_dataframe
 from talonx_quant.config import QuantConfig
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def _small_bars(n=140):
@@ -102,3 +108,65 @@ def test_zero_cost_scenario_matches_a_plain_zero_cost_backtest(sample_df, scenar
         assert zero_row["expectancy_r"] is None
     else:
         assert zero_row["expectancy_r"] == pytest.approx(plain_metrics.expectancy_r)
+
+
+# ------------------------------------------------------------------
+# Cost sensitivity against the RELIABLE multi-trade fixture (TSTW/TSTL/
+# TSTE -- TARGET win, STOP loss, END_OF_SESSION win; see
+# examples/data/README.md and docs/backtesting.md's "Sample data
+# generation" section for what these synthetic symbols are and why).
+# Unlike `scenario_rows` above (a tiny, deliberately trade-FREE fixture
+# used purely to test scenario MECHANICS), this section verifies net_R
+# actually CHANGES with cost using a dataset guaranteed to produce real
+# trades -- so "higher cost never improves expectancy" never needs to
+# skip itself for lack of data.
+# ------------------------------------------------------------------
+
+_MULTI_TRADE_CSV = _REPO_ROOT / "examples" / "data" / "sample_multi_trade_1m.csv"
+
+
+@pytest.fixture(scope="module")
+def multi_trade_df():
+    from talonx_backtest.data import load_ohlcv_csv
+    return load_ohlcv_csv(_MULTI_TRADE_CSV, tz="America/New_York")
+
+
+@pytest.fixture(scope="module")
+def multi_trade_scenario_rows(multi_trade_df):
+    """Computed ONCE for the module -- same caching rationale as
+    `scenario_rows` above. eod_flatten_enabled defaults to True (TSTE's
+    entire purpose is exercising that exit path)."""
+    return cost_sensitivity_scenarios(multi_trade_df, QuantConfig())
+
+
+def test_multi_trade_fixture_produces_three_trades_in_every_scenario(multi_trade_scenario_rows):
+    assert [r["trades"] for r in multi_trade_scenario_rows] == [3, 3, 3, 3]
+
+
+def test_multi_trade_net_r_actually_changes_with_cost(multi_trade_scenario_rows):
+    """The concrete "verify net_R changes as expected" check: total_r
+    (summed net_R across all 3 trades) must strictly DECREASE as cost
+    rises -- every trade pays entry+exit cost on both legs regardless of
+    win/loss/exit_reason, so higher bps can never leave it unchanged."""
+    total_rs = [r["total_r"] for r in multi_trade_scenario_rows]
+    assert all(v is not None for v in total_rs)
+    for earlier, later in zip(total_rs, total_rs[1:]):
+        assert later < earlier
+
+
+def test_multi_trade_higher_cost_never_improves_expectancy_without_skipping(multi_trade_scenario_rows):
+    """The same monotonicity check as test_higher_cost_never_improves_expectancy
+    above, but this one never skips -- the fixture reliably produces trades."""
+    expectancies = [r["expectancy_r"] for r in multi_trade_scenario_rows]
+    assert all(v is not None for v in expectancies)
+    for earlier, later in zip(expectancies, expectancies[1:]):
+        assert later < earlier
+
+
+def test_multi_trade_trade_count_and_win_loss_mix_are_cost_invariant(multi_trade_scenario_rows):
+    # Cost changes P&L, never WHETHER a trade wins/loses or how many
+    # exist -- stop_price/target_price are fixed levels; slippage/spread
+    # only move the fill price, not which side of those levels got hit.
+    assert {r["trades"] for r in multi_trade_scenario_rows} == {3}
+    for row in multi_trade_scenario_rows:
+        assert row["win_rate"] == pytest.approx(2 / 3)

@@ -62,6 +62,23 @@ def is_zero_cost_run(result: BacktestResult) -> bool:
     return execution.entry_slippage_bps == 0 and execution.exit_slippage_bps == 0 and execution.spread_bps == 0
 
 
+# 30 matches metrics.py's own documented threshold ("never treat a CI
+# from under ~30 trades as tight") -- Sharpe/Sortino/confidence
+# intervals all lean on a normal-approximation/CLT assumption that
+# isn't trustworthy below roughly this many observations.
+SMALL_SAMPLE_TRADE_THRESHOLD = 30
+
+
+def is_small_sample(trade_count: int) -> bool:
+    """True when there's at least one trade but fewer than
+    SMALL_SAMPLE_TRADE_THRESHOLD -- zero trades already gets its own
+    "no trades were executed" messaging elsewhere, so this is
+    specifically the "statistics exist but shouldn't be over-trusted"
+    case (spec: keep the numbers, just make the caveat impossible to
+    miss)."""
+    return 0 < trade_count < SMALL_SAMPLE_TRADE_THRESHOLD
+
+
 def timezone_info_dict(input_timezone: str | None) -> dict:
     """Spec section 12: the report must show input/internal/session
     timezone explicitly, never leave a reader to infer them. `internal`
@@ -168,6 +185,16 @@ def result_summary_text(result: BacktestResult, input_timezone: str | None = Non
         lines.append("No trades were executed -- see `rejections` for the gate funnel (no fabricated metrics below).")
         return "\n".join(lines)
 
+    if is_small_sample(len(result.trades)):
+        lines += [
+            f"*** SMALL SAMPLE ({len(result.trades)} trade{'s' if len(result.trades) != 1 else ''}) ***",
+            "Sharpe, Sortino, and confidence intervals below are NOT statistically reliable at this",
+            "trade count (normal-approximation/CLT assumptions need roughly 30+ observations) -- treat",
+            "them as illustrative only. Win rate/profit factor/expectancy are exact arithmetic over what",
+            "occurred, but may not represent the strategy's true long-run behavior at this sample size.",
+            "",
+        ]
+
     sets = metric_set(result.trades)
     for label in ("gross", "net"):
         lines.append(f"--- {label.upper()} (before costs)" if label == "gross" else f"--- {label.upper()} (after slippage/spread)")
@@ -194,6 +221,7 @@ def result_summary_json(
         "throttle_fidelity": result.config.throttle_fidelity,
         "execution_assumptions": execution_assumptions_dict(result),
         "zero_cost_baseline_warning": is_zero_cost_run(result),
+        "small_sample_warning": is_small_sample(len(result.trades)),
         "timezone": timezone_info_dict(input_timezone),
         "reproducibility": meta.to_dict(),
         "portfolio_disclaimer": PORTFOLIO_DISCLAIMER,
@@ -339,6 +367,7 @@ def build_html_report(
         },
         "execution_assumptions": execution_assumptions_dict(result),
         "zero_cost_baseline_warning": is_zero_cost_run(result),
+        "small_sample_warning": is_small_sample(len(result.trades)),
         "timezone": timezone_info_dict(input_timezone),
         "reproducibility": meta.to_dict(),
         "portfolio_disclaimer": PORTFOLIO_DISCLAIMER,
@@ -468,6 +497,8 @@ _HTML_TEMPLATE = r"""<!doctype html>
   .warning-banner { background: color-mix(in srgb, var(--neg) 15%, var(--panel)); border: 1px solid var(--neg);
     border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
   .warning-banner .title { font-weight: 700; color: var(--neg); margin-bottom: 4px; }
+  .warning-banner.info { background: color-mix(in srgb, var(--accent) 15%, var(--panel)); border-color: var(--accent); }
+  .warning-banner.info .title { color: var(--accent); }
   .kv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px 20px; font-size: 12.5px; }
   .kv-grid div span.k { color: var(--muted); display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
   .kv-grid div span.v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -484,6 +515,7 @@ _HTML_TEMPLATE = r"""<!doctype html>
 
 <div class="panel" id="metrics-panel">
   <h2>Performance</h2>
+  <div id="small-sample-warning"></div>
   <div class="toggle-group" id="metric-toggle"></div>
   <div class="grid" id="metric-cards"></div>
 </div>
@@ -577,6 +609,26 @@ if (DATA.zero_cost_baseline_warning) {
     Slippage: ${ea.entry_slippage_bps}/${ea.exit_slippage_bps} bps (entry/exit) &nbsp; Spread: ${ea.spread_bps} bps<br>
     These results do NOT represent realistic execution costs. Do not call this "realistic performance" or
     "live expected return" -- run with <code>--cost-sensitivity</code> for a range of non-zero cost assumptions.
+  </div>`;
+}
+
+// ---- small-sample statistical warning ----
+// DATA.small_sample_warning is precomputed in Python (reports.is_small_sample,
+// same "compute the boolean server-side, JS just renders it" pattern as
+// zero_cost_baseline_warning above) -- Sharpe/Sortino/confidence
+// intervals all lean on a normal-approximation/CLT assumption that
+// simply isn't trustworthy yet at a handful of trades. This does NOT
+// hide the numbers (spec: "keep the statistics") -- it just makes sure
+// nobody reads them as settled evidence.
+if (DATA.small_sample_warning) {
+  const n = DATA.meta.trades_executed;
+  document.getElementById("small-sample-warning").innerHTML = `<div class="warning-banner info">
+    <div class="title">⚠ SMALL SAMPLE (${n} trade${n === 1 ? "" : "s"})</div>
+    Sharpe, Sortino, and confidence intervals below rely on a normal-approximation assumption that is NOT
+    reliable at this trade count -- treat them as illustrative only, not statistically meaningful evidence.
+    Win rate, profit factor, and expectancy are still exact arithmetic over the trades that occurred, but a
+    small sample means they may not be representative of the strategy's true long-run behavior either.
+    Numbers are shown as computed, not hidden or adjusted -- read them with that caveat in mind.
   </div>`;
 }
 

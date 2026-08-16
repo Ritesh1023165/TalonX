@@ -39,6 +39,12 @@ reports/
 # checked-in sample INPUT, not generated output).
 /results/
 
+# scripts/download_historical_1m.py's default --output-dir -- downloaded
+# real market data, not something to version (large, regenerable,
+# provider-licensed). Same "examples/data/ IS versioned, this isn't"
+# distinction as /results/ above.
+/data/
+
 # scripts/start_talonx.ps1 / start_dashboard_web.ps1's PID-tracking JSON
 # and redirected stdout/stderr log files -- machine-local runtime state.
 .run/

@@ -18,11 +18,13 @@ forces one):
      lazily imported; needs `pip install -r scripts/requirements.txt`.
   2. Alpaca Markets   (APCA_API_KEY_ID + APCA_API_SECRET_KEY) -- plain
      REST via `requests`, lazily imported.
-  3. yfinance fallback (no key needed) -- same
-     `yf.Ticker(...).history(...)` call talonx_quant/preseed.py already
-     uses, but Yahoo only serves roughly the trailing 30 days of
-     1-minute history; a wider --start-date/--end-date range will
-     simply come back short, logged loudly, not silently.
+  3. yfinance fallback (no key needed) -- `yf.download(...)`, chunked
+     into 7-day sliding windows (see _chunk_date_range) since Yahoo caps
+     1-minute-granularity requests at ~8 days per call; chunks are
+     stitched back together (dedup + re-sort) into one continuous
+     series. Yahoo also only serves roughly the trailing 30 days of
+     1-minute history overall; a wider --start-date/--end-date range
+     will simply come back short, logged loudly, not silently.
 
 Rate limits: every provider call is retried with the SAME jittered
 exponential backoff talonx_ingest.common.backoff already provides
@@ -48,7 +50,6 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -157,6 +158,34 @@ def fetch_alpaca(symbol: str, start_date: str, end_date: str, *, max_retries: in
     return bars
 
 
+_YFINANCE_CHUNK_DAYS = 7
+_YFINANCE_CHUNK_SLEEP_SECONDS = 0.5
+
+
+def _chunk_date_range(start_date: str, end_date: str, chunk_days: int = _YFINANCE_CHUNK_DAYS) -> list[tuple[str, str]]:
+    """Splits [start_date, end_date] into consecutive `chunk_days`-day
+    sliding windows, e.g. 2026-07-20 -> 2026-07-27 -> 2026-08-03 ->
+    2026-08-10 -> 2026-08-16 (the last chunk is whatever is left, not
+    padded out to a full window). Yahoo caps 1-minute-granularity
+    requests at ~8 days ("Only 8 days worth of 1m granularity data are
+    allowed to be fetched per request") -- a single request for
+    anything wider fails outright, so a multi-day/week/month range has
+    to be downloaded in slices and stitched back together."""
+    start = pd.Timestamp(start_date)
+    end = pd.Timestamp(end_date)
+    if end <= start:
+        return [(start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"))]
+
+    chunks: list[tuple[str, str]] = []
+    cursor = start
+    step = pd.Timedelta(days=chunk_days)
+    while cursor < end:
+        chunk_end = min(cursor + step, end)
+        chunks.append((cursor.strftime("%Y-%m-%d"), chunk_end.strftime("%Y-%m-%d")))
+        cursor = chunk_end
+    return chunks
+
+
 def fetch_yfinance(symbol: str, start_date: str, end_date: str, *, max_retries: int) -> list[dict]:
     import yfinance as yf  # lazy import, same as talonx_quant/preseed.py
 
@@ -169,25 +198,54 @@ def fetch_yfinance(symbol: str, start_date: str, end_date: str, *, max_retries: 
             span_days, symbol,
         )
 
-    def _call():
-        history = yf.Ticker(symbol.upper()).history(
-            start=start_date, end=end_date, interval="1m", prepost=True,
-        )
-        if history is None or history.empty:
-            return []
-        bars = []
-        for ts, row in history.iterrows():
-            timestamp = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
-            if timestamp.tzinfo is None:
-                timestamp = timestamp.replace(tzinfo=timezone.utc)
-            bars.append({
-                "timestamp": pd.Timestamp(timestamp).tz_convert("UTC"),
-                "open": float(row["Open"]), "high": float(row["High"]),
-                "low": float(row["Low"]), "close": float(row["Close"]), "volume": float(row["Volume"]),
-            })
-        return bars
+    chunks = _chunk_date_range(start_date, end_date)
+    frames: list[pd.DataFrame] = []
+    for i, (chunk_start, chunk_end) in enumerate(chunks):
+        def _call(chunk_start=chunk_start, chunk_end=chunk_end):
+            return yf.download(
+                symbol.upper(), start=chunk_start, end=chunk_end,
+                interval="1m", prepost=True, progress=False,
+            )
 
-    return _retry(_call, max_retries=max_retries, base_seconds=2.0, max_seconds=30.0, description=f"yfinance fetch for {symbol}")
+        chunk_df = _retry(
+            _call, max_retries=max_retries, base_seconds=2.0, max_seconds=30.0,
+            description=f"yfinance fetch for {symbol} ({chunk_start} -> {chunk_end})",
+        )
+        if chunk_df is not None and not chunk_df.empty:
+            frames.append(chunk_df)
+
+        if i < len(chunks) - 1:
+            time.sleep(_YFINANCE_CHUNK_SLEEP_SECONDS)  # avoid rate limits between chunk requests
+
+    if not frames:
+        return []
+
+    combined = pd.concat(frames)
+    # yf.download can return MultiIndex columns (e.g. ('Open', 'AAPL'))
+    # even for a single ticker in some yfinance versions -- flatten
+    # defensively rather than assuming a plain single-level frame.
+    if isinstance(combined.columns, pd.MultiIndex):
+        combined.columns = combined.columns.get_level_values(0)
+
+    combined = combined.reset_index()
+    timestamp_col = "Datetime" if "Datetime" in combined.columns else combined.columns[0]
+    combined = combined.rename(columns={timestamp_col: "timestamp"})
+    combined["timestamp"] = pd.to_datetime(combined["timestamp"], utc=True)
+
+    # Consecutive chunks share their boundary date, so the SAME bar can
+    # come back in both the outgoing and incoming chunk -- drop exact
+    # duplicate timestamps and restore strict chronological order
+    # before this is treated as one continuous series.
+    combined.drop_duplicates(subset=["timestamp"], inplace=True)
+    combined.sort_values("timestamp", inplace=True)
+
+    bars = []
+    for _, row in combined.iterrows():
+        bars.append({
+            "timestamp": row["timestamp"], "open": float(row["Open"]), "high": float(row["High"]),
+            "low": float(row["Low"]), "close": float(row["Close"]), "volume": float(row["Volume"]),
+        })
+    return bars
 
 
 _PROVIDERS = {"polygon": fetch_polygon, "alpaca": fetch_alpaca, "yfinance": fetch_yfinance}

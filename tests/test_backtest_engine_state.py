@@ -117,6 +117,35 @@ def test_throttle_publishes_only_the_top_ranked_candidates(engine):
     assert {r.ticker for r in throttle_rejections} == {"DDDD", "EEEE"}
 
 
+def test_opportunity_score_matches_the_production_formula_fed_by_screening_rr(engine):
+    """R:R contributes opportunity_score_rr_weight (30% by default) to
+    the Composite Opportunity Score. Confirms engine._flush_throttle
+    computes that score via the SAME talonx_quant.consumer._opportunity_score
+    production function the live system uses, fed by the candidate's own
+    risk_reward_ratio (== screening_rr) -- not anything derived from a
+    later fill price (execution_rr can't even exist yet here; entry
+    hasn't happened). See test_backtest_execution.py's
+    test_opportunity_score_is_unaffected_by_execution_rr_divergence for
+    the other end of this chain (the score surviving unchanged once a
+    real, possibly-divergent fill price is known)."""
+    from talonx_quant.consumer import _opportunity_score
+
+    qc = engine.config.quant_config
+    signal = _signal("AAAA", confluence=3, rr=4.2, volume_surge=6.0, trend_aligned=True)
+    engine._last_close["AAAA"] = signal.price
+
+    expected_score = _opportunity_score(signal, qc)
+    engine._flush_throttle([signal], _NOW)
+
+    assert engine._pending_entry["AAAA"].opportunity_score == pytest.approx(expected_score)
+
+    # sanity: the score is actually sensitive to risk_reward_ratio, not a
+    # constant -- a lower screening_rr (all else equal) scores lower.
+    lower_rr_signal = _signal("BBBB", confluence=3, rr=1.5, volume_surge=6.0, trend_aligned=True)
+    engine._last_close["BBBB"] = lower_rr_signal.price
+    assert _opportunity_score(lower_rr_signal, qc) < expected_score
+
+
 def test_throttle_publish_arms_cooldown_for_released_tickers(engine):
     candidates = [_signal("AAAA", confluence=3, rr=5.0, volume_surge=10.0, trend_aligned=True)]
     engine._last_close["AAAA"] = 100.0

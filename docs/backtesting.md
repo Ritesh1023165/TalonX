@@ -281,7 +281,12 @@ downloads" below). Practical sources it supports:
 - **`yfinance` fallback** (already a project dependency, used elsewhere
   in `talonx_quant` for pre-seeding; needs no account/key) — its
   1-minute history is limited to roughly the trailing 30 days, enough
-  for a short validation run but not a multi-year backtest.
+  for a short validation run but not a multi-year backtest. Yahoo also
+  caps any single 1-minute request at ~8 days, so
+  `scripts/download_historical_1m.py` chunks a wider range into 7-day
+  sliding windows automatically and stitches them back into one
+  deduplicated, sorted series — you never need to chunk a request by
+  hand.
 - **A broker/data API you already have access to, used manually**
   (Interactive Brokers, IEX Cloud, etc.) or **a paid vendor's flat
   files** (Databento, Tiingo) if you need a multi-year,
