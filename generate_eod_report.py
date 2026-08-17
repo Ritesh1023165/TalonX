@@ -65,6 +65,27 @@ DEFAULT_TZ = "America/New_York"
 
 
 @dataclass
+class ValuationSnapshot:
+    """Phase 2's per-ticker "where does this stand right now" snapshot for
+    the Valuation & Margin of Safety Radar section -- built from
+    AuditStore's long_term_alerts table (already the exact denormalized
+    shape needed: quality/moat/price/fair-value all on one row) rather
+    than re-deriving it from talonx_core's ticker_state_long_term, whose
+    report_json/signal_json blobs would need deserializing just to get
+    back to the same numbers. Same "latest row per ticker" idea as the
+    dashboard's render_valuation_radar (talonx_dispatch/app.py) -- this
+    is that same radar, as a point-in-time snapshot for the day's report."""
+    ticker: str
+    action: str
+    current_price: float
+    fair_value: float
+    margin_of_safety_pct: float
+    quality_score: int
+    moat_rating: str
+    last_updated: str
+
+
+@dataclass
 class TickerSection:
     ticker: str
     paper_trading_enabled: bool
@@ -93,6 +114,8 @@ class EODReport:
     ticker_sections: list[TickerSection]
     alerts: list[dict]
     phase2_available: bool = False
+    valuation_snapshots: list[ValuationSnapshot] = field(default_factory=list)
+    long_term_portfolio_summary: dict = field(default_factory=dict)
 
 
 def _day_bounds(date_str: str, tz_name: str) -> tuple[datetime, datetime]:
@@ -132,6 +155,54 @@ def _group_counts(rows: list[dict], reason_key: str) -> dict[str, dict[str, int]
     for row in rows:
         grouped[row["ticker"]][row[reason_key]] = row["count"]
     return grouped
+
+
+def _build_valuation_snapshots(audit_store: AuditStore) -> list[ValuationSnapshot]:
+    """Latest long-term alert per ticker, regardless of report day --
+    unlike the intraday alert log, fundamentals-driven evaluations happen
+    on the order of quarters, so restricting this to just today's alerts
+    would show nothing on most days. A "where things stand now" snapshot
+    is what the Radar name promises, not "what changed today"."""
+    rows = audit_store.recent_long_term(limit=1000)
+    latest_per_ticker: dict[str, dict] = {}
+    for row in rows:  # DESC by correlated_at/id -- first occurrence per ticker is the latest
+        latest_per_ticker.setdefault(row["ticker"], row)
+
+    return [
+        ValuationSnapshot(
+            ticker=row["ticker"],
+            action=row["action"],
+            current_price=row["market_price"],
+            fair_value=row["intrinsic_fair_value"],
+            margin_of_safety_pct=row["margin_of_safety_pct"],
+            quality_score=row["quality_score"],
+            moat_rating=row["moat_rating"],
+            last_updated=row["correlated_at"],
+        )
+        for row in sorted(latest_per_ticker.values(), key=lambda r: r["ticker"])
+    ]
+
+
+def _build_long_term_portfolio_summary(paper_store: PaperTradingStore) -> dict:
+    """Cash/realized-PnL summary plus unrealized PnL/total-contributed
+    computed from the open long-term positions -- same shape the
+    dashboard's render_long_term_portfolio derives, added here rather
+    than inside PaperTradingStore since it's purely a display rollup, not
+    ledger state."""
+    summary = dict(paper_store.get_long_term_portfolio_summary())
+    open_positions = paper_store.get_open_long_term_positions()
+    latest_prices = paper_store.get_latest_prices()
+
+    total_contributed = 0.0
+    unrealized_pnl = 0.0
+    for pos in open_positions:
+        total_contributed += pos["total_contributed_usd"]
+        live_price = latest_prices.get(pos["ticker"], pos["avg_cost_basis"])
+        unrealized_pnl += pos["total_shares"] * (live_price - pos["avg_cost_basis"])
+
+    summary["total_contributed_usd"] = total_contributed
+    summary["unrealized_pnl_usd"] = unrealized_pnl
+    return summary
 
 
 def build_report(
@@ -219,6 +290,8 @@ def build_report(
         ticker_sections=sections,
         alerts=alerts,
         phase2_available=phase2_available,
+        valuation_snapshots=_build_valuation_snapshots(audit_store),
+        long_term_portfolio_summary=_build_long_term_portfolio_summary(paper_store),
     )
 
 
@@ -245,9 +318,45 @@ def render_markdown(report: EODReport) -> str:
         f"- Win rate: {report.portfolio_summary.get('win_rate_pct', 0):.1f}% "
         f"({report.portfolio_summary.get('win_count', 0)}W / {report.portfolio_summary.get('loss_count', 0)}L)",
         "",
-        "## Per-ticker breakdown",
+        "## Long-Term Portfolio summary",
+        "",
+        f"- Cash: ${report.long_term_portfolio_summary.get('current_cash', 0):,.2f}",
+        f"- Open positions: {report.long_term_portfolio_summary.get('open_positions_count', 0)}",
+        f"- Total DCA contributed: ${report.long_term_portfolio_summary.get('total_contributed_usd', 0):,.2f}",
+        f"- Unrealized PnL (open positions): ${report.long_term_portfolio_summary.get('unrealized_pnl_usd', 0):,.2f}",
+        f"- Total realized PnL: ${report.long_term_portfolio_summary.get('total_realized_pnl_usd', 0):,.2f} "
+        f"({report.long_term_portfolio_summary.get('total_realized_pnl_pct', 0):+.2f}%)",
+        f"- Win rate: {report.long_term_portfolio_summary.get('win_rate_pct', 0):.1f}% "
+        f"({report.long_term_portfolio_summary.get('win_count', 0)}W / "
+        f"{report.long_term_portfolio_summary.get('loss_count', 0)}L)",
+        "",
+        "## Valuation & Margin of Safety Radar",
         "",
     ]
+
+    if report.valuation_snapshots:
+        lines.append(
+            "| Ticker | Action | Price | Fair Value | Margin of Safety | Quality | Moat | Last evaluated |"
+        )
+        lines.append("|---|---|---|---|---|---|---|---|")
+        for snap in report.valuation_snapshots:
+            lines.append(
+                f"| {snap.ticker} | {snap.action.replace('_', ' ').title()} | "
+                f"${snap.current_price:,.2f} | ${snap.fair_value:,.2f} | "
+                f"{snap.margin_of_safety_pct:+.1%} | {snap.quality_score}/10 | "
+                f"{snap.moat_rating.title()} | {snap.last_updated} |"
+            )
+    else:
+        lines.append(
+            "_No long-term alerts yet -- tag a ticker LONG_TERM in the watchlist and "
+            "wait for a fundamental signal to clear the threshold and produce a report._"
+        )
+    lines.append("")
+
+    lines.extend([
+        "## Per-ticker breakdown",
+        "",
+    ])
 
     for section in report.ticker_sections:
         lines.append(f"### {section.ticker}")
@@ -324,6 +433,10 @@ def _write_csvs(report: EODReport, out_dir: Path) -> None:
     all_trades = [t for s in report.ticker_sections for t in s.trades]
     if all_trades:
         pd.DataFrame(all_trades).to_csv(out_dir / f"eod_{report.date}_trades.csv", index=False)
+    if report.valuation_snapshots:
+        pd.DataFrame([vars(s) for s in report.valuation_snapshots]).to_csv(
+            out_dir / f"eod_{report.date}_valuation_radar.csv", index=False
+        )
 
 
 def main() -> None:

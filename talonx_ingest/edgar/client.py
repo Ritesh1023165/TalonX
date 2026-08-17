@@ -197,24 +197,32 @@ class EdgarClient:
     # Filing discovery
     # ------------------------------------------------------------------
 
-    async def get_recent_filings(self, company: CompanyRef) -> list[FilingMetadata]:
-        """Fetch the submissions feed and filter to target forms/lookback window."""
+    async def get_recent_filings(
+        self, company: CompanyRef, forms: tuple[str, ...] | None = None,
+    ) -> list[FilingMetadata]:
+        """Fetch the submissions feed and filter to target forms/lookback
+        window. `forms` overrides self.config.target_forms for just this
+        call -- e.g. the Earnings Radar's fast-track poller passing
+        `("8-K", "10-Q")` without touching the GLOBAL target_forms (which
+        stays 10-K/10-Q only, so the regular periodic ingestion loop
+        doesn't start pulling every unrelated 8-K for every ticker)."""
+        target_forms = forms if forms is not None else self.config.target_forms
         url = f"{self.config.submissions_base}/CIK{company.cik}.json"
         data = await self._get(url, as_json=True)
 
         recent = data.get("filings", {}).get("recent", {})
-        forms = recent.get("form", [])
+        forms_list = recent.get("form", [])
         accession_numbers = recent.get("accessionNumber", [])
         filing_dates = recent.get("filingDate", [])
         report_dates = recent.get("reportDate", [])
         primary_docs = recent.get("primaryDocument", [])
         primary_descs = recent.get("primaryDocDescription", [])
 
-        counts: dict[str, int] = {form: 0 for form in self.config.target_forms}
+        counts: dict[str, int] = {form: 0 for form in target_forms}
         results: list[FilingMetadata] = []
 
-        for i, form in enumerate(forms):
-            if form not in self.config.target_forms:
+        for i, form in enumerate(forms_list):
+            if form not in target_forms:
                 continue
             if counts[form] >= self.config.lookback_filings_per_form:
                 continue
@@ -240,6 +248,22 @@ class EdgarClient:
             len(results), company.ticker, company.cik,
         )
         return results
+
+    # ------------------------------------------------------------------
+    # Structured financials (Phase 2 LONG_TERM path) -- XBRL company facts
+    # ------------------------------------------------------------------
+
+    async def get_company_facts(self, company: CompanyRef) -> dict[str, Any]:
+        """Fetches the FULL XBRL "company facts" JSON for a company --
+        every concept it has ever tagged, across every filing. Raw dict,
+        unparsed -- see edgar/financials.py's parse_company_facts for
+        turning this into structured FinancialStatementFacts rows. Reuses
+        self._get() for the exact same auth/rate-limit/retry/error
+        handling as every other EDGAR endpoint this client talks to;
+        `company_facts_base` was already defined in EdgarConfig before
+        this method existed, just never called."""
+        url = f"{self.config.company_facts_base}/CIK{company.cik}.json"
+        return await self._get(url, as_json=True)
 
     # ------------------------------------------------------------------
     # Document fetch

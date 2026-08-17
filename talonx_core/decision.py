@@ -25,10 +25,12 @@ from talonx_core.schemas import (
     ActionableAlert,
     AlertAction,
     AlertSeverity,
+    LongTermActionableAlert,
+    MoatRating,
     ResearchVerdict,
     SignalDirection,
 )
-from talonx_core.state import TickerState
+from talonx_core.state import LongTermTickerState, TickerState
 
 # Severity bands for a CONFIRMED alert, keyed off research confidence.
 # A CONTRADICTED alert is bumped one band up (see _severity_for) --
@@ -220,4 +222,227 @@ def _build_rationale(action: AlertAction, signal, report) -> str:
         f"Quant signal ({signal.direction.value}): {signal.message}. "
         f"Research verdict {relation} the technical setup: {report.verdict.value} "
         f"at {report.confidence:.0%} confidence -- {report.summary}"
+    )
+
+
+# ------------------------------------------------------------------
+# Phase 2 LONG_TERM decision matrix
+#
+#   Fundamental stop (checked FIRST, unconditional -- overrides quality/
+#   valuation entirely): ROIC below WACC for 2 consecutive annual
+#   observations, OR Debt/EBITDA proxy > max_debt_to_ebitda, OR the
+#   economic moat rating was downgraded since the last report.
+#       -> UNDER_PERFORM_REBALANCE
+#
+#   Otherwise, quality + valuation:
+#     price > (1 + valuation_premium_pct) * fair_value
+#       -> TAKE_PROFIT_REBALANCE (no quality gate -- an overvalued
+#          position should be trimmed regardless of how good the
+#          business is)
+#     quality_score >= quality_score_min AND moat in (WIDE, NARROW)
+#       AND price <= (1 - margin_of_safety_pct) * fair_value
+#       -> HIGH_CONVICTION_BUY
+#     quality_score >= quality_score_min AND price within the fair-value
+#       band ((1 - margin_of_safety_pct) * fair_value < price <=
+#       (1 + valuation_premium_pct) * fair_value)
+#       -> HOLD_QUALITY
+#     else -> no alert (LOW_QUALITY_OR_FAIR_VALUE)
+#
+# Same "one real function, two thin public wrappers" shape as the
+# intraday matrix above, and the same suppression-reason-string
+# convention (MISSING_PAIR / STALE_SIGNAL / STALE_REPORT / COOLDOWN /
+# DEGRADED_REPORT / LOW_QUALITY_OR_FAIR_VALUE / NO_STATE_CHANGE).
+# ------------------------------------------------------------------
+
+def evaluate_long_term(
+    state: LongTermTickerState, config: CoreConfig, now: datetime | None = None
+) -> LongTermActionableAlert | None:
+    """Long-term sibling of evaluate() -- see module-level comment above
+    the long-term section for the matrix, and evaluate_long_term_verbose()
+    for the same result plus a suppression reason."""
+    alert, _reason = _evaluate_long_term_with_reason(state, config, now)
+    return alert
+
+
+def evaluate_long_term_verbose(
+    state: LongTermTickerState, config: CoreConfig, now: datetime | None = None
+) -> tuple[LongTermActionableAlert | None, str | None]:
+    """Same decision as evaluate_long_term(), but also returns the
+    suppression reason when the result is None."""
+    return _evaluate_long_term_with_reason(state, config, now)
+
+
+def _evaluate_long_term_with_reason(
+    state: LongTermTickerState, config: CoreConfig, now: datetime | None = None
+) -> tuple[LongTermActionableAlert | None, str | None]:
+    now = now or datetime.now(timezone.utc)
+
+    if state.fundamental_signal is None or state.longterm_report is None:
+        return None, "MISSING_PAIR"
+
+    signal = state.fundamental_signal
+    report = state.longterm_report
+    # Event-Driven Earnings Radar, Requirement 7: an earnings-triggered
+    # signal/report bypasses the standard 30-day cooldown AND the price-
+    # delta no-state-change gate below -- both exist to throttle ROUTINE
+    # quarterly re-evaluations, not the deliberate, rare, and important
+    # re-fire this whole feature exists to produce. Checked on EITHER
+    # input since Stage 1 (8-K, signal-side) and Stage 2 (10-Q, still
+    # signal-side but genuinely fresh) both set it on the signal, while
+    # the resulting report also carries it forward for symmetry.
+    is_earnings_related = signal.is_earnings_related or report.is_earnings_related
+
+    if not _is_fresh(state.fundamental_signal_at, now, config.correlation_window_long_term_seconds):
+        return None, "STALE_SIGNAL"
+    if not _is_fresh(state.longterm_report_at, now, config.correlation_window_long_term_seconds):
+        return None, "STALE_REPORT"
+
+    if not is_earnings_related and state.last_alert_at is not None:
+        elapsed = (now - state.last_alert_at).total_seconds()
+        if elapsed < config.ticker_cooldown_long_term_seconds:
+            return None, "COOLDOWN"
+
+    # A degraded report carries no usable moat/quality/fair-value data
+    # (all placeholder defaults -- see talonx_brain.consumer's degraded
+    # long-term report) -- unlike the intraday path, there's no
+    # quant-only long-term action defined to fall back to, so this is a
+    # clean suppression rather than a DEGRADED_QUANT_ALERT-style
+    # placeholder alert.
+    if report.is_degraded:
+        return None, "DEGRADED_REPORT"
+
+    fair_value = report.dcf_fair_value_per_share
+    price = signal.price
+    if price <= 0:
+        # Defense-in-depth boundary check -- FundamentalFactorSignal
+        # arrives over Redis (a cross-process wire contract, not internal
+        # code this function can trust), and a non-positive price would
+        # make margin_of_safety_pct below read as a nonsense +100% AND
+        # make the HIGH_CONVICTION_BUY price<=threshold check always pass
+        # (0 <= any positive number) -- a false BUY trigger. talonx_quant's
+        # FundamentalScanner is the primary fix (falls back to yfinance's
+        # last close rather than ever publishing price=0.0), this is the
+        # second line of defense.
+        return None, "INVALID_PRICE"
+    moat_downgraded = (
+        state.previous_moat_rating is not None
+        and _moat_rank(report.moat_rating) < _moat_rank(state.previous_moat_rating)
+    )
+    debt_to_ebitda_breach = (
+        signal.debt_to_ebitda_proxy is not None and signal.debt_to_ebitda_proxy > config.max_debt_to_ebitda
+    )
+    roic_streak_breach = state.roic_below_wacc_streak >= 2
+
+    if roic_streak_breach or debt_to_ebitda_breach or moat_downgraded:
+        action = AlertAction.UNDER_PERFORM_REBALANCE
+    elif fair_value <= 0:
+        # No usable fair-value estimate -- can't evaluate the valuation
+        # bands at all (would divide by zero / produce nonsense ratios).
+        return None, "NO_FAIR_VALUE_ESTIMATE"
+    elif price > (1 + config.valuation_premium_pct) * fair_value:
+        action = AlertAction.TAKE_PROFIT_REBALANCE
+    elif (
+        report.quality_score >= config.quality_score_min
+        and report.moat_rating in (MoatRating.WIDE, MoatRating.NARROW)
+        and price <= (1 - config.margin_of_safety_pct) * fair_value
+    ):
+        action = AlertAction.HIGH_CONVICTION_BUY
+    elif (
+        report.quality_score >= config.quality_score_min
+        and (1 - config.margin_of_safety_pct) * fair_value < price
+    ):
+        # Explicitly re-checks the lower band edge -- a deep-discount
+        # name that failed HIGH_CONVICTION_BUY's moat requirement must
+        # NOT fall through to HOLD_QUALITY just because it also clears
+        # the quality bar; it's genuinely below the "fairly priced" band,
+        # just not moat-qualified enough to act on the discount.
+        action = AlertAction.HOLD_QUALITY
+    else:
+        return None, "LOW_QUALITY_OR_FAIR_VALUE"
+
+    if (
+        not is_earnings_related
+        and state.last_alert_action is not None
+        and action == state.last_alert_action
+        and state.last_alert_price is not None
+    ):
+        delta_pct = abs(price - state.last_alert_price) / state.last_alert_price
+        if delta_pct < config.price_delta_retrigger_pct_long_term:
+            return None, "NO_STATE_CHANGE"
+
+    margin_of_safety_pct = (fair_value - price) / fair_value if fair_value > 0 else 0.0
+
+    # Event-Driven Earnings Radar, Requirement 8: "before vs after" fields
+    # for the post-earnings push -- state.previous_fair_value was captured
+    # by update_report() the moment this NEW report overwrote the prior
+    # one (see state.py), so it's already the right "before" value here.
+    # previous_margin_of_safety_pct pairs that prior fair value against
+    # the price AT the last alert (the most recent "before" price this
+    # state actually has), not the current price -- both sides of the
+    # comparison should reflect the SAME point in time.
+    previous_fair_value = state.previous_fair_value
+    previous_margin_of_safety_pct = None
+    if previous_fair_value is not None and previous_fair_value > 0 and state.last_alert_price is not None:
+        previous_margin_of_safety_pct = (previous_fair_value - state.last_alert_price) / previous_fair_value
+
+    return LongTermActionableAlert(
+        ticker=signal.ticker,
+        action=action,
+        severity=_severity_for_long_term(action),
+        rationale=_build_long_term_rationale(
+            action, signal, report, moat_downgraded, debt_to_ebitda_breach, roic_streak_breach,
+        ),
+        summary=report.summary,
+        quality_score=report.quality_score,
+        moat_rating=report.moat_rating,
+        market_price=price,
+        intrinsic_fair_value=fair_value,
+        margin_of_safety_pct=margin_of_safety_pct,
+        previous_fair_value=previous_fair_value,
+        previous_margin_of_safety_pct=previous_margin_of_safety_pct,
+        guidance_revision_notes=report.guidance_revision_notes,
+        revenue_eps_surprise=report.revenue_eps_surprise,
+        is_earnings_related=is_earnings_related,
+        triggering_signal=signal,
+        capital_allocation_assessment=report.capital_allocation_assessment,
+        key_findings=report.key_findings,
+        risk_factors=report.risk_factors,
+        model_used=report.model_used,
+        is_degraded=report.is_degraded,
+        signal_received_at=state.fundamental_signal_at,
+        report_received_at=state.longterm_report_at,
+    ), None
+
+
+def _moat_rank(moat: MoatRating) -> int:
+    return {MoatRating.NONE: 0, MoatRating.NARROW: 1, MoatRating.WIDE: 2}[moat]
+
+
+def _severity_for_long_term(action: AlertAction) -> AlertSeverity:
+    if action in (AlertAction.HIGH_CONVICTION_BUY, AlertAction.UNDER_PERFORM_REBALANCE):
+        return AlertSeverity.CRITICAL
+    if action == AlertAction.TAKE_PROFIT_REBALANCE:
+        return AlertSeverity.WARNING
+    return AlertSeverity.INFO  # HOLD_QUALITY -- informational, no action needed
+
+
+def _build_long_term_rationale(
+    action: AlertAction, signal, report, moat_downgraded: bool, debt_to_ebitda_breach: bool, roic_streak_breach: bool,
+) -> str:
+    if action == AlertAction.UNDER_PERFORM_REBALANCE:
+        reasons = []
+        if roic_streak_breach:
+            reasons.append("ROIC has been below the assumed WACC for 2+ consecutive annual observations")
+        if debt_to_ebitda_breach:
+            reasons.append(f"Debt/EBITDA proxy ({signal.debt_to_ebitda_proxy:.2f}x) exceeds the leverage cap")
+        if moat_downgraded:
+            reasons.append(f"economic moat was downgraded to {report.moat_rating.value}")
+        return (
+            f"Fundamental stop triggered for {signal.ticker}: " + "; ".join(reasons) + ". "
+            f"{report.summary}"
+        )
+    return (
+        f"FY{signal.fiscal_year} fundamentals ({signal.message}) -- quality score "
+        f"{report.quality_score}/10, {report.moat_rating.value} moat. Market price ${signal.price:,.2f} "
+        f"vs. intrinsic fair value ${report.dcf_fair_value_per_share:,.2f}. {report.summary}"
     )

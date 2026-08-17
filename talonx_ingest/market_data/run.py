@@ -76,6 +76,12 @@ def make_on_event(publisher: RedisEventPublisher):
     async def on_event(event: MarketEvent) -> None:
         _print_event(event)
         await publisher.publish_market_tick(_to_tick_event(event))
+        # /ping's WS-status source -- source.value is "websocket" or
+        # "polling" (see TickSource), so a reader can tell Polygon WS
+        # apart from the yfinance-polling fallback, not just "alive".
+        await publisher.write_ws_heartbeat(event.source.value)
+        if event.event_type.value == "bar":
+            await publisher.incr_metric("ingest", "bars_read")
 
     return on_event
 

@@ -12,9 +12,11 @@ from datetime import datetime, timezone
 
 import pytest
 
+from talonx_ingest.edgar.financials import FinancialStatementFacts
 from talonx_ingest.events.schemas import (
     MarketTickEvent,
     NewFilingIngestedEvent,
+    NewFundamentalsIngestedEvent,
     TickEventType,
     TickSource,
 )
@@ -85,6 +87,27 @@ def test_new_filing_ingested_event_serializes_to_valid_json():
     assert payload["ticker"] == "AAPL"
     assert payload["accession_number"] == "0000320193-24-000123"
     assert payload["chunk_count"] == 187
+
+
+def test_new_fundamentals_ingested_event_serializes_to_valid_json():
+    event = NewFundamentalsIngestedEvent(
+        ticker="AAPL",
+        cik="0000320193",
+        facts=[
+            FinancialStatementFacts(ticker="AAPL", cik="0000320193", fiscal_year=2025, revenue=400_000_000_000.0),
+            FinancialStatementFacts(ticker="AAPL", cik="0000320193", fiscal_year=2024, revenue=380_000_000_000.0),
+        ],
+    )
+    payload = json.loads(event.to_redis_payload())
+    assert payload["ticker"] == "AAPL"
+    assert len(payload["facts"]) == 2
+    assert payload["facts"][0]["fiscal_year"] == 2025
+    assert payload["facts"][0]["revenue"] == 400_000_000_000.0
+
+
+def test_new_fundamentals_ingested_event_accepts_an_empty_facts_list():
+    event = NewFundamentalsIngestedEvent(ticker="AAPL", cik="0000320193", facts=[])
+    assert json.loads(event.to_redis_payload())["facts"] == []
 
 
 def test_new_filing_ingested_event_report_date_is_optional():

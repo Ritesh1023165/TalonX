@@ -25,7 +25,7 @@ import pytest
 
 from talonx_core.config import CoreConfig
 from talonx_core.consumer import DecisionEngine
-from talonx_core.state import TickerCorrelator
+from talonx_core.state import LongTermTickerCorrelator, TickerCorrelator
 from talonx_core.store import TickerStateStore
 
 
@@ -250,3 +250,196 @@ async def test_no_store_means_no_persistence_attempted(engine):
     assert engine.store is None
     await engine._handle_message(_message(engine.config.signals_channel, _signal_payload("bullish")))
     assert engine.signals_processed == 1
+
+
+# ==========================================================================
+# Phase 2 LONG_TERM path
+# ==========================================================================
+
+def _fundamental_signal_payload(price: float = 75.0, roic: float = 0.20, debt_to_ebitda: float = 2.0) -> dict:
+    return {
+        "ticker": "AAPL", "fiscal_year": 2025, "roic": roic, "piotroski_f_score": 8,
+        "fcf_yield": 0.05, "altman_z_score": 5.0, "debt_to_ebitda_proxy": debt_to_ebitda,
+        "price": price, "message": "ROIC clears threshold", "computed_at": "2026-08-07T12:00:00Z",
+    }
+
+
+def _long_term_report_payload(quality_score: int = 8, moat: str = "wide", fair_value: float = 100.0) -> dict:
+    return {
+        "ticker": "AAPL",
+        "triggering_signal": _fundamental_signal_payload(),
+        "moat_rating": moat,
+        "capital_allocation_assessment": "disciplined buybacks",
+        "dcf_fair_value_per_share": fair_value,
+        "quality_score": quality_score,
+        "summary": "Durable compounder.",
+        "key_findings": [], "risk_factors": [], "citations": [],
+        "model_used": "gemini-flash-latest",
+        "generated_at": "2026-08-07T12:00:30Z",
+        "published_at": "2026-08-07T12:00:30Z",
+    }
+
+
+@pytest.mark.asyncio
+async def test_fundamental_signal_alone_does_not_publish_a_long_term_alert(engine):
+    await engine._handle_message(
+        _message(engine.config.fundamental_signals_channel, _fundamental_signal_payload())
+    )
+
+    assert engine.fundamentals_processed == 1
+    engine._client.publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_fundamental_signal_then_report_publishes_high_conviction_buy(engine):
+    await engine._handle_message(
+        _message(engine.config.fundamental_signals_channel, _fundamental_signal_payload())
+    )
+    await engine._handle_message(
+        _message(engine.config.reports_channel_long_term, _long_term_report_payload())
+    )
+
+    engine._client.publish.assert_awaited_once()
+    channel, payload = engine._client.publish.await_args.args
+    assert channel == engine.config.alerts_channel_long_term
+    body = json.loads(payload)
+    assert body["ticker"] == "AAPL"
+    assert body["action"] == "high_conviction_buy"
+    assert engine.long_term_alerts_published == 1
+
+
+@pytest.mark.asyncio
+async def test_long_term_report_then_matching_signal_publishes_regardless_of_order(engine):
+    await engine._handle_message(
+        _message(engine.config.reports_channel_long_term, _long_term_report_payload())
+    )
+    await engine._handle_message(
+        _message(engine.config.fundamental_signals_channel, _fundamental_signal_payload())
+    )
+
+    engine._client.publish.assert_awaited_once()
+    body = json.loads(engine._client.publish.await_args.args[1])
+    assert body["action"] == "high_conviction_buy"
+
+
+@pytest.mark.asyncio
+async def test_low_quality_long_term_pair_does_not_publish(engine):
+    await engine._handle_message(
+        _message(engine.config.fundamental_signals_channel, _fundamental_signal_payload())
+    )
+    await engine._handle_message(
+        _message(
+            engine.config.reports_channel_long_term,
+            _long_term_report_payload(quality_score=3, fair_value=100.0),
+        )
+    )
+    engine._client.publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_intraday_and_long_term_pairs_for_the_same_ticker_are_independent(engine):
+    """The core DUAL_HORIZON safety property, exercised through the whole
+    consumer: an intraday CONFIRMED_BULLISH and a long-term
+    HIGH_CONVICTION_BUY for the SAME ticker must both publish, on their
+    OWN channels, without either correlator clobbering the other."""
+    await engine._handle_message(_message(engine.config.signals_channel, _signal_payload("bullish")))
+    await engine._handle_message(
+        _message(engine.config.reports_channel, _report_payload("bullish", confidence=0.9))
+    )
+    await engine._handle_message(
+        _message(engine.config.fundamental_signals_channel, _fundamental_signal_payload())
+    )
+    await engine._handle_message(
+        _message(engine.config.reports_channel_long_term, _long_term_report_payload())
+    )
+
+    assert engine._client.publish.await_count == 2
+    channels_published = {call.args[0] for call in engine._client.publish.await_args_list}
+    assert channels_published == {engine.config.alerts_channel, engine.config.alerts_channel_long_term}
+
+
+@pytest.mark.asyncio
+async def test_long_term_drops_invalid_payload(engine):
+    await engine._handle_message(
+        _message(engine.config.fundamental_signals_channel, {"ticker": "AAPL"})
+    )
+    assert engine.fundamentals_processed == 0
+    engine._client.publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_handling_a_fundamental_signal_persists_it_and_the_stop_state(tmp_path):
+    with TickerStateStore(tmp_path / "core_state.db") as store:
+        engine = DecisionEngine(config=CoreConfig(), store=store)
+        engine._client = AsyncMock()
+
+        await engine._handle_message(
+            _message(engine.config.fundamental_signals_channel, _fundamental_signal_payload())
+        )
+
+        fresh_correlator = LongTermTickerCorrelator()
+        loaded = store.load_into_long_term(fresh_correlator)
+
+    assert loaded == 1
+    state = fresh_correlator.get_or_create("AAPL")
+    assert state.fundamental_signal is not None
+    assert state.roic_below_wacc_streak == 0  # ROIC 0.20 clears assumed_wacc 0.09
+
+
+@pytest.mark.asyncio
+async def test_roic_below_wacc_streak_persists_across_restart(tmp_path):
+    path = tmp_path / "core_state.db"
+    with TickerStateStore(path) as store:
+        engine = DecisionEngine(config=CoreConfig(assumed_wacc=0.30), store=store)
+        engine._client = AsyncMock()
+        # ROIC 0.20 is below an assumed WACC of 0.30 -- streak increments.
+        await engine._handle_message(
+            _message(engine.config.fundamental_signals_channel, _fundamental_signal_payload(roic=0.20))
+        )
+
+    fresh_correlator = LongTermTickerCorrelator()
+    with TickerStateStore(path) as store2:
+        store2.load_into_long_term(fresh_correlator)
+
+    assert fresh_correlator.get_or_create("AAPL").roic_below_wacc_streak == 1
+
+
+@pytest.mark.asyncio
+async def test_long_term_confirmed_alert_persists_cooldown(tmp_path):
+    path = tmp_path / "core_state.db"
+    with TickerStateStore(path) as store:
+        engine = DecisionEngine(config=CoreConfig(), store=store)
+        engine._client = AsyncMock()
+
+        await engine._handle_message(
+            _message(engine.config.fundamental_signals_channel, _fundamental_signal_payload())
+        )
+        await engine._handle_message(
+            _message(engine.config.reports_channel_long_term, _long_term_report_payload())
+        )
+
+    engine._client.publish.assert_awaited_once()
+
+    fresh_correlator = LongTermTickerCorrelator()
+    with TickerStateStore(path) as store2:
+        store2.load_into_long_term(fresh_correlator)
+
+    state = fresh_correlator.get_or_create("AAPL")
+    assert state.last_alert_at is not None
+    assert state.last_alert_action.value == "high_conviction_buy"
+
+
+@pytest.mark.asyncio
+async def test_long_term_suppressed_evaluation_persists_with_long_term_horizon(tmp_path):
+    with TickerStateStore(tmp_path / "core_state.db") as store:
+        engine = DecisionEngine(config=CoreConfig(), store=store)
+        engine._client = AsyncMock()
+
+        await engine._handle_message(
+            _message(engine.config.fundamental_signals_channel, _fundamental_signal_payload())
+        )
+        rows = store.suppression_counts_for_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+
+    assert len(rows) == 1
+    assert rows[0]["reason"] == "MISSING_PAIR"
+    assert rows[0]["horizon"] == "long_term"

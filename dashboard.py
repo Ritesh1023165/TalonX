@@ -8,12 +8,19 @@ per-CATEGORY breakdowns -- one glance at how much data has moved through
 Modules 1-6 and where the activity actually is.
 
 Channels watched:
-    talonx:filings:events   (Module 1 -- NewFilingIngestedEvent)
-    talonx:market:stream    (Module 1 -- MarketTickEvent)
-    talonx:signals:quant    (Module 2 -- QuantSignal)
-    talonx:reports:brain    (Module 3 -- ResearchReport)
-    talonx:alerts:dispatch  (Module 4 -- ActionableAlert)
-    talonx:paper:trades     (Module 6 -- PaperTradeExecution)
+    talonx:filings:events       (Module 1 -- NewFilingIngestedEvent)
+    talonx:market:stream        (Module 1 -- MarketTickEvent)
+    talonx:signals:quant        (Module 2 -- QuantSignal)
+    talonx:reports:brain        (Module 3 -- ResearchReport)
+    talonx:alerts:dispatch      (Module 4 -- ActionableAlert)
+    talonx:paper:trades         (Module 6 -- PaperTradeExecution)
+
+    Phase 2 (LONG_TERM horizon) -- see README.md §3.9:
+    talonx:fundamentals:events  (Module 1 -- NewFundamentalsIngestedEvent)
+    talonx:signals:fundamental  (Module 2 -- FundamentalFactorSignal)
+    talonx:reports:longterm     (Module 3 -- LongTermResearchReport)
+    talonx:alerts:longterm      (Module 4 -- LongTermActionableAlert)
+    talonx:paper:trades:longterm (Module 6 -- LongTermTradeExecution)
 
 The category breakdowns (e.g. "how many of those ResearchReports were
 actual LLM calls vs. cache hits") are derived entirely from fields
@@ -147,6 +154,41 @@ CHANNELS: list[ChannelWatch] = [
         "paper_trades",
         os.environ.get("TALONX_REDIS_PAPER_TRADES_CHANNEL", "talonx:paper:trades"),
         "M6 - Paper trades", "ticker",
+        categorize=_categorize_field("order_type"), category_label="Order type",
+        numeric_field="realized_pnl_usd", numeric_label="Realized PnL ($)",
+    ),
+    # --- Phase 2 (LONG_TERM horizon) -- see README.md §3.9. Same
+    # ChannelWatch shape as the intraday channels above, just pointed at
+    # the long-term wire schemas' equivalent fields; nothing else in this
+    # file needed to change since _render/handle_message/dashboard_web.py
+    # all iterate CHANNELS generically.
+    ChannelWatch(
+        "fundamentals_events",
+        os.environ.get("TALONX_REDIS_FUNDAMENTALS_CHANNEL", "talonx:fundamentals:events"),
+        "M1 - Financials ingested (LT)", "ticker",
+    ),
+    ChannelWatch(
+        "fundamental_signals",
+        os.environ.get("TALONX_REDIS_FUNDAMENTAL_SIGNALS_CHANNEL", "talonx:signals:fundamental"),
+        "M2 - Fundamental signals (LT)", "ticker",
+        categorize=_categorize_field("fiscal_year"), category_label="Fiscal year",
+    ),
+    ChannelWatch(
+        "reports_longterm",
+        os.environ.get("TALONX_REDIS_REPORTS_LONG_TERM_CHANNEL", "talonx:reports:longterm"),
+        "M3 - Long-term reports (LT)", "ticker",
+        categorize=_categorize_field("moat_rating"), category_label="Moat rating",
+    ),
+    ChannelWatch(
+        "alerts_longterm",
+        os.environ.get("TALONX_REDIS_ALERTS_LONG_TERM_CHANNEL", "talonx:alerts:longterm"),
+        "M4 - Long-term alerts (LT)", "ticker",
+        categorize=_categorize_field("action"), category_label="Actions",
+    ),
+    ChannelWatch(
+        "paper_trades_longterm",
+        os.environ.get("TALONX_REDIS_PAPER_TRADES_LONG_TERM_CHANNEL", "talonx:paper:trades:longterm"),
+        "M6 - Long-term paper trades (LT)", "ticker",
         categorize=_categorize_field("order_type"), category_label="Order type",
         numeric_field="realized_pnl_usd", numeric_label="Realized PnL ($)",
     ),

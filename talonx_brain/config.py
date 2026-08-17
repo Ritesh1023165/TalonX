@@ -83,6 +83,17 @@ class BrainConfig:
     filings_channel: str = os.environ.get(
         "TALONX_REDIS_FILINGS_CHANNEL", "talonx:filings:events"
     )
+    # Phase 2 LONG_TERM path -- same env var names talonx_quant/talonx_ingest
+    # read on their sides of each boundary.
+    fundamentals_events_channel: str = os.environ.get(
+        "TALONX_REDIS_FUNDAMENTALS_CHANNEL", "talonx:fundamentals:events"
+    )
+    fundamental_signals_channel: str = os.environ.get(
+        "TALONX_REDIS_FUNDAMENTAL_SIGNALS_CHANNEL", "talonx:signals:fundamental"
+    )
+    reports_channel_long_term: str = os.environ.get(
+        "TALONX_REDIS_REPORTS_LONG_TERM_CHANNEL", "talonx:reports:longterm"
+    )
     connect_timeout_seconds: float = _env_float("TALONX_REDIS_CONNECT_TIMEOUT", 5.0)
     socket_timeout_seconds: float = _env_float("TALONX_REDIS_SOCKET_TIMEOUT", 5.0)
     reconnect_backoff_base_seconds: float = _env_float("TALONX_BRAIN_RECONNECT_BASE", 1.0)
@@ -190,6 +201,17 @@ class BrainConfig:
     # (e.g. generated at 10am shouldn't necessarily still be trusted at
     # 3:59pm). Default 2h.
     cache_base_ttl_seconds: float = _env_float("TALONX_BRAIN_CACHE_BASE_TTL", 7200.0)
+
+    # --- Phase 2 LONG_TERM cache expiry -- flat cap, no market-hours
+    # boundary math (a multi-year holding thesis has no "trading session"
+    # to not outlive). 90 days per the spec's "90-day TTL or until the
+    # next SEC filing" -- the "until next filing" half is satisfied by
+    # invalidate() already being called on both NewFilingIngestedEvent
+    # AND NewFundamentalsIngestedEvent for the long_term cache namespace,
+    # not by any expiry-time logic.
+    cache_base_ttl_long_term_seconds: float = _env_float(
+        "TALONX_BRAIN_CACHE_BASE_TTL_LONG_TERM", 90 * 86400.0
+    )
 
     # --- Persistence (report category counts, for the EOD report) ---
     # Cache-hit/degraded/LLM-call counts were only computable LIVE from

@@ -21,6 +21,17 @@ ChannelStats, REDIS_URL, handle_message) rather than duplicating it --
 the channel-to-ticker-field mapping is the one thing that MUST stay in
 sync between the two tools, so it lives in exactly one place.
 
+Bar buffer warm-up (talonx_quant's RollingBarBuffer pre-seeding/session-
+aware buffering, see docs/bar_buffer_persistence.md) is a SEPARATE data
+source added alongside the Redis channel stats above: it isn't published
+to Redis at all, so a pure pub/sub observer can't see it (same "can't
+count what's never published" limitation dashboard.py's own docstring
+already calls out for suppressed signals). `_buffer_stats_poll` instead
+reads `quant.db`'s `bar_buffer` table directly, read-only WAL mode, same
+technique `scripts/ticker_funnel_report.py` already uses to read a live
+writer's SQLite file safely -- polled independently of the Redis
+consumer and broadcast in the same WebSocket snapshot.
+
 Usage:
     python dashboard_web.py
     python dashboard_web.py --port 9000
@@ -31,12 +42,14 @@ import argparse
 import asyncio
 import json
 import logging
+import sqlite3
 import time
 from pathlib import Path
 
 from aiohttp import WSMsgType, web
 
 from dashboard import CHANNELS, REDIS_URL, ChannelStats, handle_message
+from talonx_quant.config import QuantConfig
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -45,9 +58,94 @@ logger = logging.getLogger("dashboard_web")
 
 STATIC_DIR = Path(__file__).resolve().parent / "dashboard_web_static"
 BROADCAST_INTERVAL_SECONDS = 1.0
+# bar_buffer only changes as often as talonx_quant's own checkpoint
+# interval (60s default) or a one-off pre-seed write -- polling every 10s
+# is plenty responsive without hammering a live writer's SQLite file for
+# no reason.
+BUFFER_POLL_INTERVAL_SECONDS = 10.0
 
 
-def _snapshot(stats: dict[str, ChannelStats], started_at: float) -> dict:
+def _read_buffer_stats(db_path: str, min_bars_required: int, htf_sma_period: int) -> dict:
+    """Blocking -- run via asyncio.to_thread. Opens a FRESH read-only
+    connection every call (quant.db is tiny; this is far simpler than
+    holding a long-lived connection across restarts of the writer
+    process) so it always reflects the latest committed checkpoint.
+    Never raises -- a missing/locked/mid-migration db degrades to
+    `db_unavailable: true` rather than crashing the poll loop."""
+    path = Path(db_path)
+    if not path.is_file():
+        return {"db_unavailable": True, "symbols": [], "session_counts": {}, "summary": {"total": 0, "ready_1m": 0, "ready_15m": 0}}
+
+    try:
+        conn = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True, timeout=2.0)
+        conn.row_factory = sqlite3.Row
+        try:
+            bar_rows = conn.execute(
+                "SELECT symbol, buffer_type, COUNT(*) AS n, MAX(ts) AS newest "
+                "FROM bar_buffer GROUP BY symbol, buffer_type"
+            ).fetchall()
+            session_rows = conn.execute(
+                "SELECT COALESCE(session, 'unknown') AS session, COUNT(*) AS n FROM bar_buffer GROUP BY session"
+            ).fetchall()
+        finally:
+            conn.close()
+    except sqlite3.Error as exc:  # noqa: BLE001 -- best-effort read, never fatal to the dashboard
+        logger.warning("Buffer stats read failed (%s): %s", db_path, exc)
+        return {"db_unavailable": True, "symbols": [], "session_counts": {}, "summary": {"total": 0, "ready_1m": 0, "ready_15m": 0}}
+
+    by_symbol: dict[str, dict] = {}
+    for row in bar_rows:
+        entry = by_symbol.setdefault(row["symbol"], {"symbol": row["symbol"], "bar_1m": 0, "bar_15m": 0})
+        if row["buffer_type"] == "1m":
+            entry["bar_1m"] = row["n"]
+            entry["newest_1m"] = row["newest"]
+        elif row["buffer_type"] == "15m":
+            entry["bar_15m"] = row["n"]
+            entry["newest_15m"] = row["newest"]
+
+    symbols = []
+    ready_1m = ready_15m = 0
+    for symbol in sorted(by_symbol):
+        entry = by_symbol[symbol]
+        is_ready_1m = entry["bar_1m"] >= min_bars_required
+        is_ready_15m = entry["bar_15m"] >= htf_sma_period
+        ready_1m += int(is_ready_1m)
+        ready_15m += int(is_ready_15m)
+        symbols.append({
+            "symbol": symbol,
+            "bar_1m": entry["bar_1m"], "bar_15m": entry["bar_15m"],
+            "ready_1m": is_ready_1m, "ready_15m": is_ready_15m,
+        })
+
+    return {
+        "db_unavailable": False,
+        "min_bars_required": min_bars_required,
+        "htf_sma_period": htf_sma_period,
+        "summary": {"total": len(symbols), "ready_1m": ready_1m, "ready_15m": ready_15m},
+        "session_counts": {row["session"]: row["n"] for row in session_rows},
+        "symbols": symbols,
+    }
+
+
+async def _buffer_stats_poll(app: web.Application) -> None:
+    """Mutates app["buffer_stats"]["data"] in place on every poll tick,
+    rather than reassigning app["buffer_stats"] itself -- aiohttp's
+    Application deprecates `app[key] = ...` once the app has started
+    (app["stats"]'s ChannelStats objects avoid this the same way: they're
+    mutated in place, never reassigned, after on_startup runs)."""
+    stop_event: asyncio.Event = app["stop_event"]
+    config: QuantConfig = app["quant_config"]
+    while not stop_event.is_set():
+        app["buffer_stats"]["data"] = await asyncio.to_thread(
+            _read_buffer_stats, config.db_path, config.min_bars_required, config.htf_sma_period,
+        )
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=BUFFER_POLL_INTERVAL_SECONDS)
+        except asyncio.TimeoutError:
+            pass  # normal case: poll interval elapsed
+
+
+def _snapshot(stats: dict[str, ChannelStats], started_at: float, buffer_stats: dict) -> dict:
     elapsed = time.monotonic() - started_at
     all_tickers: set[str] = set()
     channels = []
@@ -80,6 +178,7 @@ def _snapshot(stats: dict[str, ChannelStats], started_at: float) -> dict:
         "grand_total": grand_total,
         "distinct_tickers": len(all_tickers),
         "channels": channels,
+        "buffer_warmup": buffer_stats,
     }
 
 
@@ -124,7 +223,7 @@ async def _broadcaster(app: web.Application) -> None:
     stop_event: asyncio.Event = app["stop_event"]
     while not stop_event.is_set():
         await asyncio.sleep(BROADCAST_INTERVAL_SECONDS)
-        payload = json.dumps(_snapshot(app["stats"], app["started_at"]))
+        payload = json.dumps(_snapshot(app["stats"], app["started_at"], app["buffer_stats"]["data"]))
         dead = []
         for ws in app["websockets"]:
             try:
@@ -142,7 +241,7 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     logger.info("Dashboard client connected (%d total)", len(request.app["websockets"]))
     try:
         # Immediate snapshot so the page isn't blank until the next broadcast tick.
-        snapshot = _snapshot(request.app["stats"], request.app["started_at"])
+        snapshot = _snapshot(request.app["stats"], request.app["started_at"], request.app["buffer_stats"]["data"])
         await ws.send_str(json.dumps(snapshot))
         async for msg in ws:
             if msg.type == WSMsgType.ERROR:
@@ -160,11 +259,12 @@ async def index_handler(request: web.Request) -> web.FileResponse:
 async def on_startup(app: web.Application) -> None:
     app["redis_task"] = asyncio.create_task(_redis_consumer(app))
     app["broadcast_task"] = asyncio.create_task(_broadcaster(app))
+    app["buffer_poll_task"] = asyncio.create_task(_buffer_stats_poll(app))
 
 
 async def on_cleanup(app: web.Application) -> None:
     app["stop_event"].set()
-    for key in ("redis_task", "broadcast_task"):
+    for key in ("redis_task", "broadcast_task", "buffer_poll_task"):
         task = app[key]
         task.cancel()
         try:
@@ -179,6 +279,18 @@ def build_app() -> web.Application:
     app["websockets"] = set()
     app["started_at"] = time.monotonic()
     app["stop_event"] = asyncio.Event()
+    app["quant_config"] = QuantConfig()
+    # "data" populated on the first _buffer_stats_poll tick (up to
+    # BUFFER_POLL_INTERVAL_SECONDS after startup) -- db_unavailable=true
+    # until then, same "don't block startup on it" posture the Redis
+    # consumer already has (a client connecting before the first poll
+    # just sees an empty buffer panel for a few seconds, not an error).
+    # Wrapped in a dict (mutated in place by _buffer_stats_poll) rather
+    # than reassigning app["buffer_stats"] directly -- see that
+    # function's own docstring.
+    app["buffer_stats"] = {
+        "data": {"db_unavailable": True, "symbols": [], "session_counts": {}, "summary": {"total": 0, "ready_1m": 0, "ready_15m": 0}},
+    }
 
     app.router.add_get("/ws", websocket_handler)
     app.router.add_get("/", index_handler)

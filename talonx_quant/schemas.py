@@ -98,7 +98,206 @@ class QuantSignal(BaseModel):
     volume: float | None = None
     volume_surge_ratio: float | None = None
 
+    # Analyst-review additions (see strategy.py): atr feeds the
+    # risk/reward calculation below; confluence_score (0-3, computed PER
+    # SIGNAL DIRECTION -- Direction-Aware Confluence) counts how many of
+    # {MACD cross, RSI extreme IN THIS DIRECTION, volume surge} agree on
+    # this bar, gating whether this signal survives past consumer.py's
+    # confluence_score_min filter; risk_reward_ratio is the Structural
+    # R:R -- (pivot_resistance/support - price) / (atr_stop_multiplier *
+    # atr) -- the SAME atr_stop_multiplier stop_price is built from, see
+    # strategy.py's _structural_risk_reward -- gating consumer.py's
+    # min_risk_reward_ratio filter.
+    atr: float | None = None
+    confluence_score: int | None = None
+    risk_reward_ratio: float | None = None
+
+    # Phase 2 requirement doc: explicit dollar stop/target (1x ATR stop /
+    # pivot-or-2x-ATR target), rather than only the derived ratio above --
+    # see strategy.py's _stop_target_prices. None when atr is None
+    # (insufficient history).
+    stop_price: float | None = None
+    target_price: float | None = None
+
+    # 15-min 200 SMA higher-timeframe trend gate (regular session, BULLISH
+    # candidates only -- see strategy.py). trend_aligned is None when the
+    # gate doesn't apply to this signal (bearish, pre-market, or the HTF
+    # buffer hasn't warmed up yet), not "failed".
+    trend_aligned: bool | None = None
+    htf_sma_200: float | None = None
+
+    # Structural R:R Calculation: the prior-completed-regular-session
+    # pivot levels (R1/S1) risk_reward_ratio's reward side and
+    # stop_target_prices' target were measured against -- None when
+    # prior-session pivot data wasn't available yet (see
+    # indicators.compute_daily_pivots), same warm-up posture as
+    # htf_sma_200 above.
+    pivot_resistance: float | None = None
+    pivot_support: float | None = None
+
+    # Session this candidate's triggering bar fell in -- carried through
+    # so downstream consumers (talonx_dispatch's detail reply) can label
+    # a push "Pre-Market" vs "Regular" without recomputing it.
+    session: str | None = None
+
+    # Dynamic R:R Revalidation (2026-08-16 quant audit): signal_generated_at
+    # is stamped the instant this candidate is built (strategy.py's
+    # _build_signal), NOT when it's actually published -- consumer.py's
+    # _flush_throttle_window uses it to measure how long a candidate sat
+    # in the throttle buffer before being ranked/released, and drops
+    # anything older than max_candidate_age_seconds rather than
+    # publishing a stale entry price. signal_age_ms is filled in at
+    # publish time (age at the moment of revalidation, in milliseconds)
+    # -- None until a candidate has actually been through that flush.
+    signal_generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    signal_age_ms: float | None = None
+
     bar_timestamp: datetime
+    published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_redis_payload(self) -> str:
+        return self.model_dump_json()
+
+
+# ------------------------------------------------------------------
+# Rejection Trace Logging: published to talonx:quant:rejected whenever a
+# gate in consumer.py drops a candidate BEFORE it would have reached
+# talonx:signals:quant -- talonx_dispatch subscribes to this purely to
+# keep a durable, per-candidate audit trail (its own AuditStore's
+# rejected_candidates table) of exact failure reasons, since a dropped
+# candidate never otherwise reaches that module at all. `gate` is a
+# stable machine-readable identifier (e.g. "trend_gate", "rr_gate") --
+# see consumer.py's _GATE_NAMES for the reason->gate mapping.
+# ------------------------------------------------------------------
+
+class RejectedCandidateEvent(BaseModel):
+    ticker: str
+    gate: str
+    reason: str
+    signal_type: str | None = None
+    direction: SignalDirection | None = None
+    price: float | None = None
+    confluence_score: int | None = None
+    risk_reward_ratio: float | None = None
+    session: str | None = None
+    count: int = 1
+    rejected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_redis_payload(self) -> str:
+        return self.model_dump_json()
+
+
+# ------------------------------------------------------------------
+# Post-Loss Lockout input contract (mirrors
+# talonx_paper.schemas.PaperTradeExecution, DELIBERATELY TRIMMED to just
+# the 3 fields consumer.py's loss-lockout check actually needs -- same
+# "each module only knows the wire shape of what it consumes" convention
+# as MarketTickEvent above; Pydantic's default extra="ignore" means
+# parsing the real, fuller payload still works fine)
+# ------------------------------------------------------------------
+
+class PaperOrderType(str, Enum):
+    BUY = "BUY"
+    SELL = "SELL"
+
+
+class PaperTradeExecution(BaseModel):
+    """Consumed from talonx:paper:trades, talonx_paper's own output
+    contract -- this module only cares whether a SELL closed at a loss."""
+
+    ticker: str
+    order_type: PaperOrderType
+    realized_pnl_usd: float | None = None
+
+
+# ------------------------------------------------------------------
+# Phase 2 LONG_TERM path -- fundamentals input/output contracts
+# ------------------------------------------------------------------
+
+class FinancialStatementFacts(BaseModel):
+    """Mirrors talonx_ingest.edgar.financials.FinancialStatementFacts
+    field-for-field, same re-declared-not-imported convention as
+    MarketTickEvent above -- this module only knows the wire shape
+    published on talonx:fundamentals:events."""
+
+    ticker: str
+    cik: str
+    fiscal_year: int
+    fiscal_period: str = "FY"
+    revenue: float | None = None
+    operating_income: float | None = None
+    net_income: float | None = None
+    operating_cash_flow: float | None = None
+    capex: float | None = None
+    total_debt: float | None = None
+    cash_and_equivalents: float | None = None
+    total_equity: float | None = None
+    total_assets: float | None = None
+    retained_earnings: float | None = None
+    shares_outstanding: float | None = None
+
+
+class NewFundamentalsIngestedEvent(BaseModel):
+    """Mirrors talonx_ingest.events.schemas.NewFundamentalsIngestedEvent --
+    consumed from talonx:fundamentals:events, this module's trigger for
+    the fundamental factor pipeline."""
+
+    ticker: str
+    cik: str
+    facts: list[FinancialStatementFacts]
+    # Event-Driven Earnings Radar Stage 2: True when this ingestion was
+    # triggered by the fast-track poller during the ticker's active
+    # earnings window -- threaded onto the republished FundamentalFactorSignal.
+    is_earnings_related: bool = False
+    published_at: datetime
+
+
+class NewFilingIngestedEvent(BaseModel):
+    """Trimmed mirror of talonx_ingest.events.schemas.NewFilingIngestedEvent
+    -- consumed from talonx:filings:events PURELY to detect a fast-track-
+    confirmed earnings filing (form_type + is_earnings_related); this
+    module never needs the rest of the wire shape (accession/chunk-count/
+    vector-collection details are irrelevant here)."""
+
+    ticker: str
+    form_type: str
+    is_earnings_related: bool = False
+
+
+class NewsArticleIngestedEvent(BaseModel):
+    """Trimmed mirror of talonx_ingest.events.schemas.NewsArticleIngestedEvent
+    -- consumed from talonx:news:events, the pre-market news-catalyst
+    gate's trigger. This module only tracks the most recent published_at
+    per ticker (see consumer.py's _last_news_seen), never article text."""
+
+    ticker: str
+    published_at: datetime
+
+
+class FundamentalFactorSignal(BaseModel):
+    """Published to talonx:signals:fundamental when a ticker's latest
+    fundamental factor scores clear config's thresholds -- the LONG_TERM
+    horizon's equivalent of QuantSignal."""
+
+    ticker: str
+    fiscal_year: int
+    roic: float | None = None
+    piotroski_f_score: int | None = None
+    fcf_yield: float | None = None
+    altman_z_score: float | None = None
+    debt_to_ebitda_proxy: float | None = None
+    price: float  # last known market price used for fcf_yield/altman_z_score
+    message: str
+
+    # Event-Driven Earnings Radar: True when this signal was republished
+    # by FundamentalScanner's earnings-triggered path (fast 8-K-stage
+    # reuse of persisted factors, or a genuinely fresh 10-Q-stage
+    # computation) rather than a routine periodic re-score. Consumers
+    # (talonx_brain, talonx_core) use this to bypass their own cooldowns
+    # and cache-hit shortcuts for exactly this one signal.
+    is_earnings_related: bool = False
+
+    computed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_redis_payload(self) -> str:

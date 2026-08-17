@@ -19,13 +19,21 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from typing import Callable
 
 from pydantic import BaseModel, Field
 
 from talonx_ingest.common.backoff import jittered_backoff_seconds
 
 from talonx_brain.config import BrainConfig
-from talonx_brain.schemas import Citation, CitationSourceType, QuantSignal, ResearchVerdict
+from talonx_brain.schemas import (
+    Citation,
+    CitationSourceType,
+    FundamentalFactorSignal,
+    MoatRating,
+    QuantSignal,
+    ResearchVerdict,
+)
 
 logger = logging.getLogger("talonx_brain.llm")
 
@@ -115,11 +123,87 @@ SYSTEM_PROMPT = (
 )
 
 
+class _LLMFindingsLongTerm(BaseModel):
+    """Phase 2's LONG_TERM structured-output target -- what we ask the LLM
+    to produce from a fundamental factor signal + retrieved 10-K excerpts.
+    A deliberately different shape from _LLMFindings: no bullish/bearish
+    verdict, no single confidence scalar -- moat durability, capital
+    allocation quality, an intrinsic fair-value estimate, and an overall
+    0-10 quality score instead."""
+
+    moat_rating: MoatRating = Field(
+        description=(
+            "Economic moat durability: 'wide' (strong, durable pricing power/switching "
+            "costs/network effects), 'narrow' (some advantage, less durable), or 'none' "
+            "(no meaningful competitive advantage evident in the excerpts)."
+        )
+    )
+    capital_allocation_assessment: str = Field(
+        description="2-4 sentence assessment of management's capital allocation -- reinvestment, buybacks, dividend sustainability, grounded in the excerpts"
+    )
+    dcf_fair_value_per_share: float = Field(
+        description=(
+            "Estimated intrinsic fair value per share, derived from a discounted cash "
+            "flow projection using free cash flow, a reasonable growth assumption, and a "
+            "reasonable discount rate -- state the figure even if only roughly estimable "
+            "from the excerpts provided, but ground the reasoning in them."
+        )
+    )
+    quality_score: int = Field(ge=0, le=10, description="Overall business quality score, 0-10")
+    summary: str = Field(description="2-4 sentence overall summary of the long-term investment case")
+    key_findings: list[str] = Field(
+        default_factory=list,
+        description="Specific facts from the filing excerpts supporting the moat/quality/valuation assessment",
+    )
+    risk_factors: list[str] = Field(
+        default_factory=list,
+        description="Risks grounded in the filing excerpts relevant to a multi-year holding period",
+    )
+    # Event-Driven Earnings Radar: only meaningfully populated when the
+    # retrieved excerpts include a fresh earnings release (8-K) or
+    # quarterly filing (10-Q) -- routine annual-only evaluations leave
+    # these None/empty, which is expected, not a missing-data bug.
+    guidance_revision_notes: str | None = Field(
+        default=None,
+        description=(
+            "If the excerpts include management guidance (revenue/EPS/margin outlook for "
+            "future periods), summarize whether guidance was raised, lowered, reaffirmed, or "
+            "newly issued, and by how much if stated. Null if no guidance is present in the excerpts."
+        ),
+    )
+    revenue_eps_surprise: str | None = Field(
+        default=None,
+        description=(
+            "If the excerpts include actual results compared against prior estimates/consensus "
+            "or prior-year figures, summarize the revenue/EPS beat or miss and its magnitude. "
+            "Null if no such comparison is present in the excerpts."
+        ),
+    )
+
+
+SYSTEM_PROMPT_LONG_TERM = (
+    "You are an equity research analyst assessing a company for a multi-year, "
+    "buy-and-hold value/quality investment thesis -- NOT a short-term trading call. "
+    "You are given a fundamental factor summary (ROIC, Piotroski F-Score, FCF Yield, "
+    "Altman Z-Score) and excerpts retrieved from the company's SEC filings. "
+    "Your job is to evaluate the following using ONLY the excerpts provided -- do not "
+    "invent facts or financials not present in the context: (1) the durability of the "
+    "company's economic moat (pricing power, switching costs, cost advantages, network "
+    "effects), (2) the quality of management's capital allocation (reinvestment, "
+    "buybacks, dividend sustainability), (3) an intrinsic fair-value-per-share "
+    "estimate via a discounted cash flow approach, and (4) IF AND ONLY IF the excerpts "
+    "include a fresh earnings release (8-K) or quarterly filing (10-Q), any management "
+    "guidance revisions and revenue/EPS surprises disclosed there -- leave those two "
+    "fields null when the excerpts don't cover a specific earnings event. Cite specifics "
+    "(numbers, dates, named risks) from the excerpts wherever possible. Be concise and direct."
+)
+
+
 class _BaseResearchChain:
     """
     Shared retry/backoff loop for both providers below. Subclasses only
     need to build self._llm (a langchain chat model already wrapped in
-    .with_structured_output(_LLMFindings)) and pass their own retry
+    .with_structured_output(SOME schema)) and pass their own retry
     knobs -- keeping Gemini's and Ollama's config fields/env-var names
     fully separate (TALONX_BRAIN_GEMINI_* vs TALONX_BRAIN_OLLAMA_*) rather
     than merging them into shared fields, so switching providers can never
@@ -128,6 +212,11 @@ class _BaseResearchChain:
     self._bucket is optional and None for Ollama: proactive rate-limiting
     exists to respect a cloud quota (see _TokenBucket's docstring) -- a
     local model has no such quota to pace against.
+
+    `structured_output_schema`/`prompt_builder` default to the intraday
+    shapes (_LLMFindings/_build_prompt) so every EXISTING caller's
+    behavior is byte-identical -- Phase 2's long-term chains are the only
+    callers that override them (see build_long_term_research_chain).
     """
 
     def __init__(
@@ -141,6 +230,8 @@ class _BaseResearchChain:
         backoff_max_seconds: float,
         provider_label: str,
         model_label: str,
+        structured_output_schema: type[BaseModel] = _LLMFindings,
+        prompt_builder: Callable[..., str] | None = None,
     ):
         self.config = config
         self._llm = llm
@@ -149,6 +240,8 @@ class _BaseResearchChain:
         self._backoff_base_seconds = backoff_base_seconds
         self._backoff_max_seconds = backoff_max_seconds
         self._provider_label = provider_label
+        self._structured_output_schema = structured_output_schema
+        self._prompt_builder = prompt_builder or _build_prompt
         # Public (no leading underscore): consumer.py reads this directly
         # for ResearchReport.model_used, same "assembled by Python code
         # that already has it exactly right" reasoning the module
@@ -163,8 +256,10 @@ class _BaseResearchChain:
         last .env edit."""
         return f"{self._provider_label} ({self.model_used})"
 
-    async def generate(self, signal: QuantSignal, citations: list[Citation]) -> _LLMFindings:
-        prompt = _build_prompt(signal, citations)
+    async def generate(
+        self, signal: QuantSignal | FundamentalFactorSignal, citations: list[Citation]
+    ) -> _LLMFindings | _LLMFindingsLongTerm:
+        prompt = self._prompt_builder(signal, citations)
 
         attempt = 0
         while True:
@@ -187,7 +282,13 @@ class _BaseResearchChain:
 
 
 class GeminiResearchChain(_BaseResearchChain):
-    def __init__(self, config: BrainConfig | None = None):
+    def __init__(
+        self,
+        config: BrainConfig | None = None,
+        *,
+        structured_output_schema: type[BaseModel] = _LLMFindings,
+        prompt_builder: Callable[..., str] | None = None,
+    ):
         config = config or BrainConfig()
         if ChatGoogleGenerativeAI is None:
             raise ImportError(
@@ -206,7 +307,7 @@ class GeminiResearchChain(_BaseResearchChain):
             google_api_key=config.gemini_api_key,
             temperature=config.gemini_temperature,
             max_output_tokens=config.gemini_max_output_tokens,
-        ).with_structured_output(_LLMFindings)
+        ).with_structured_output(structured_output_schema)
 
         super().__init__(
             config,
@@ -217,11 +318,19 @@ class GeminiResearchChain(_BaseResearchChain):
             backoff_max_seconds=config.gemini_backoff_max_seconds,
             provider_label="Gemini",
             model_label=config.gemini_model,
+            structured_output_schema=structured_output_schema,
+            prompt_builder=prompt_builder,
         )
 
 
 class OllamaResearchChain(_BaseResearchChain):
-    def __init__(self, config: BrainConfig | None = None):
+    def __init__(
+        self,
+        config: BrainConfig | None = None,
+        *,
+        structured_output_schema: type[BaseModel] = _LLMFindings,
+        prompt_builder: Callable[..., str] | None = None,
+    ):
         config = config or BrainConfig()
         if ChatOllama is None:
             raise ImportError(
@@ -232,7 +341,7 @@ class OllamaResearchChain(_BaseResearchChain):
             model=config.ollama_model,
             base_url=config.ollama_base_url,
             temperature=config.ollama_temperature,
-        ).with_structured_output(_LLMFindings)
+        ).with_structured_output(structured_output_schema)
 
         super().__init__(
             config,
@@ -243,6 +352,8 @@ class OllamaResearchChain(_BaseResearchChain):
             backoff_max_seconds=config.ollama_backoff_max_seconds,
             provider_label="Ollama",
             model_label=config.ollama_model,
+            structured_output_schema=structured_output_schema,
+            prompt_builder=prompt_builder,
         )
 
 
@@ -258,6 +369,24 @@ def build_research_chain(config: BrainConfig | None = None) -> _BaseResearchChai
         return OllamaResearchChain(config)
     if config.llm_provider == "gemini":
         return GeminiResearchChain(config)
+    raise ValueError(
+        f"Unknown TALONX_BRAIN_LLM_PROVIDER={config.llm_provider!r} -- expected 'gemini' or 'ollama'"
+    )
+
+
+def build_long_term_research_chain(config: BrainConfig | None = None) -> _BaseResearchChain:
+    """Phase 2's LONG_TERM factory -- same provider selection as
+    build_research_chain, but wired to the moat/DCF structured-output
+    schema and prompt instead of the intraday ones."""
+    config = config or BrainConfig()
+    if config.llm_provider == "ollama":
+        return OllamaResearchChain(
+            config, structured_output_schema=_LLMFindingsLongTerm, prompt_builder=_build_long_term_prompt,
+        )
+    if config.llm_provider == "gemini":
+        return GeminiResearchChain(
+            config, structured_output_schema=_LLMFindingsLongTerm, prompt_builder=_build_long_term_prompt,
+        )
     raise ValueError(
         f"Unknown TALONX_BRAIN_LLM_PROVIDER={config.llm_provider!r} -- expected 'gemini' or 'ollama'"
     )
@@ -280,6 +409,37 @@ def _build_prompt(signal: QuantSignal, citations: list[Citation]) -> str:
         f"## Retrieved context ({len(citations)} excerpt(s))\n{context_block}\n\n"
         "Assess whether the context supports, contradicts, or is irrelevant "
         "to this technical setup."
+    )
+
+
+def _build_long_term_prompt(signal: FundamentalFactorSignal, citations: list[Citation]) -> str:
+    context_block = (
+        _format_citations(citations)
+        if citations
+        else "(No relevant SEC filing excerpts were retrieved for this ticker.)"
+    )
+    roic_str = f"{signal.roic:.1%}" if signal.roic is not None else "n/a"
+    fcf_yield_str = f"{signal.fcf_yield:.1%}" if signal.fcf_yield is not None else "n/a"
+    altman_z_str = f"{signal.altman_z_score:.2f}" if signal.altman_z_score is not None else "n/a"
+    earnings_instruction = (
+        "\n\nThis evaluation was triggered by a FRESH EARNINGS EVENT (a new 8-K or 10-Q was just "
+        "filed) -- prioritize the retrieved excerpts from that filing specifically, and populate "
+        "guidance_revision_notes/revenue_eps_surprise if the excerpts support it."
+        if signal.is_earnings_related else ""
+    )
+    return (
+        f"{SYSTEM_PROMPT_LONG_TERM}\n\n"
+        f"## Fundamental factor summary (FY{signal.fiscal_year})\n"
+        f"Ticker: {signal.ticker}\n"
+        f"ROIC: {roic_str}\n"
+        f"Piotroski F-Score: {signal.piotroski_f_score if signal.piotroski_f_score is not None else 'n/a'}/9\n"
+        f"FCF Yield: {fcf_yield_str}\n"
+        f"Altman Z-Score: {altman_z_str}\n"
+        f"Current market price: {signal.price}\n"
+        f"Detail: {signal.message}{earnings_instruction}\n\n"
+        f"## Retrieved filing context ({len(citations)} excerpt(s))\n{context_block}\n\n"
+        "Assess the economic moat, capital allocation quality, and derive an intrinsic "
+        "fair-value-per-share estimate for a multi-year holding thesis."
     )
 
 

@@ -17,8 +17,14 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from talonx_dispatch.formatter import (
+    _short_company_name,
     escape_markdown,
     format_telegram_details,
+    format_telegram_earnings_heads_up,
+    format_telegram_long_term_alert,
+    format_telegram_long_term_details,
+    format_telegram_long_term_trade_execution,
+    format_telegram_post_earnings_alert,
     format_telegram_summary,
     format_telegram_trade_execution,
 )
@@ -26,11 +32,18 @@ from talonx_dispatch.schemas import (
     ActionableAlert,
     AlertAction,
     AlertSeverity,
+    FundamentalFactorSignal,
+    LongTermActionableAlert,
+    LongTermOrderType,
+    LongTermResearchReport,
+    LongTermTradeExecution,
+    MoatRating,
     OrderType,
     PaperTradeExecution,
     ResearchVerdict,
     SignalDirection,
     TriggeringSignalRef,
+    _TriggeringFundamentalSignalRef,
 )
 
 NOW = datetime(2026, 8, 7, 14, 23, 0, tzinfo=timezone.utc)
@@ -73,10 +86,13 @@ def _row(
     rationale: str = "Quant signal (bullish): RSI oversold. Research verdict agrees: bullish at 85% confidence -- Fundamentals support the move.",
     key_findings: list[str] | None = None,
     risk_factors: list[str] | None = None,
+    **technical_overrides,
 ) -> dict:
     """Matches AuditStore.get_by_id()'s return shape (talonx_dispatch/store.py's
-    _row_to_dict) -- a plain dict with string action/severity/verdict, not enums."""
-    return {
+    _row_to_dict) -- a plain dict with string action/severity/verdict, not enums.
+    technical_overrides lets tests set rsi/macd/.../session (all None by
+    default, matching a pre-Phase-2 row or a long-term alert)."""
+    row = {
         "id": alert_id,
         "ticker": "AAPL",
         "action": action.value,
@@ -96,7 +112,12 @@ def _row(
         "telegram_sent": False,
         "telegram_sent_at": None,
         "telegram_error": None,
+        "rsi": None, "macd": None, "macd_signal_line": None, "volume_surge_ratio": None,
+        "atr": None, "stop_price": None, "target_price": None,
+        "trend_aligned": None, "htf_sma_200": None, "session": None,
     }
+    row.update(technical_overrides)
+    return row
 
 
 def test_escape_markdown_escapes_the_four_special_characters():
@@ -107,6 +128,30 @@ def test_escape_markdown_escapes_the_four_special_characters():
 
 def test_escape_markdown_leaves_plain_text_untouched():
     assert escape_markdown("plain text 123") == "plain text 123"
+
+
+# --- _short_company_name (shared Company Name Resolution rule) -------------
+
+def test_short_company_name_drops_a_trailing_parenthetical_first():
+    assert _short_company_name("Alphabet Inc. (Class A)") == "Alphabet Inc."
+
+
+def test_short_company_name_leaves_a_short_plain_name_untouched():
+    assert _short_company_name("Apple Inc.") == "Apple Inc."
+
+
+def test_short_company_name_hard_caps_at_25_chars_when_no_parenthetical_helps():
+    long_name = "International Business Machines Corporation"
+    result = _short_company_name(long_name)
+    assert len(result) <= 25
+    assert result.endswith("…")
+
+
+def test_short_company_name_caps_even_after_dropping_the_parenthetical():
+    long_name = "The Extraordinarily Long Holding Company Name (Class A)"
+    result = _short_company_name(long_name)
+    assert len(result) <= 25
+    assert "(" not in result
 
 
 # --- format_telegram_summary (the actual push) ----------------------------
@@ -125,19 +170,35 @@ def test_summary_includes_the_one_line_quant_trigger():
     assert "MACD crossed above signal line" in text
 
 
-def test_summary_stays_short_and_omits_the_research_writeup():
+def test_summary_includes_a_one_sentence_executive_summary():
+    """The short-push structural contract's Executive Summary line -- a
+    clean one-sentence takeaway from research_summary. Key
+    findings/risks are still never shown -- those belong to the FULL
+    detail reply, not this push."""
     text = format_telegram_summary(_alert(), alert_id=47)
-    # The full research summary/findings/risks never appear in the short push.
-    assert "Fundamentals support the move." not in text
+    assert "Fundamentals support the move." in text
     assert "Key findings" not in text
     assert "Risks" not in text
-    assert len(text) < 400
 
 
 def test_summary_confirmed_bullish_uses_green_circle():
     text = format_telegram_summary(_alert(action=AlertAction.CONFIRMED_BULLISH), alert_id=1)
     assert "\U0001F7E2" in text
     assert "CONFIRMED BULLISH" in text
+
+
+def test_summary_shows_the_intraday_horizon_marker_alongside_the_action_emoji():
+    """The ⚡ horizon marker is ADDITIVE, not a replacement for the
+    existing per-action color coding -- both must be present."""
+    text = format_telegram_summary(_alert(action=AlertAction.CONFIRMED_BULLISH), alert_id=1)
+    assert "\U0001F7E2" in text  # per-action green circle, unchanged
+    assert "⚡" in text  # horizon marker, new
+
+
+def test_summary_includes_a_separator_line():
+    text = format_telegram_summary(_alert(), alert_id=1)
+    lines = text.split("\n")
+    assert lines[1] == "─" * 16
 
 
 def test_summary_degraded_quant_alert_does_not_raise():
@@ -150,9 +211,12 @@ def test_summary_critical_severity_adds_fire_prefix():
     assert text.startswith("\U0001F525")
 
 
-def test_summary_includes_the_triggered_timestamp():
+def test_summary_has_no_timestamp_line():
+    """The short-push structural contract has no timestamp line (unlike
+    format_telegram_details, the full-detail reply, which still shows
+    one) -- intentional, not an oversight."""
     text = format_telegram_summary(_alert(), alert_id=47)
-    assert "2026-08-07 14:23 UTC" in text
+    assert "UTC" not in text
 
 
 def test_summary_includes_company_name_when_given():
@@ -168,6 +232,13 @@ def test_summary_omits_company_name_when_not_given():
 def test_summary_escapes_special_characters_in_company_name():
     text = format_telegram_summary(_alert(), alert_id=47, company_name="Foo_Bar*Corp")
     assert "Foo\\_Bar\\*Corp" in text
+
+
+def test_summary_truncates_a_long_company_name_in_the_header():
+    text = format_telegram_summary(_alert(), alert_id=47, company_name="Alphabet Inc. (Class A)")
+    header = text.split("\n")[0]
+    assert "(Alphabet Inc.)" in header
+    assert "Class A" not in header
 
 
 # --- format_telegram_details (sent back on a reply) ------------------------
@@ -242,6 +313,53 @@ def test_details_formats_the_correlated_at_timestamp():
     assert "2026-08-07 14:23 UTC" in text
 
 
+# --- format_telegram_details: technical-indicator section (Phase 2) --------
+
+def test_details_omits_technical_section_when_all_fields_are_none():
+    # Pre-Phase-2 row / a long-term alert -- nothing to render. (The
+    # default rationale text itself mentions "RSI oversold" in prose, so
+    # this checks for the technical section's own line markers, not the
+    # bare substring "RSI".)
+    text = format_telegram_details(_row())
+    assert "RSI:" not in text
+    assert "SMA Trend" not in text
+    assert "Target:" not in text and "Stop:" not in text
+
+
+def test_details_renders_rsi_macd_and_volume_surge():
+    text = format_telegram_details(_row(rsi=24.3, macd=0.5, macd_signal_line=0.3, volume_surge_ratio=2.8))
+    assert "RSI: 24.3" in text
+    assert "MACD: bullish cross" in text
+    assert "Vol Surge: 2.8x" in text
+
+
+def test_details_renders_bearish_macd_cross():
+    text = format_telegram_details(_row(macd=0.2, macd_signal_line=0.5))
+    assert "MACD: bearish cross" in text
+
+
+def test_details_renders_trend_status_aligned():
+    text = format_telegram_details(_row(htf_sma_200=295.0, trend_aligned=True))
+    assert "15m 200 SMA Trend: Aligned" in text
+    assert "$295.00" in text
+
+
+def test_details_renders_trend_status_not_aligned():
+    text = format_telegram_details(_row(htf_sma_200=320.0, trend_aligned=False))
+    assert "15m 200 SMA Trend: Not Aligned" in text
+
+
+def test_details_renders_stop_and_target_prices():
+    text = format_telegram_details(_row(stop_price=308.21, target_price=320.81))
+    assert "Target: $320.81" in text
+    assert "Stop: $308.21" in text
+
+
+def test_details_omits_stop_target_when_only_one_is_present():
+    text = format_telegram_details(_row(stop_price=308.21, target_price=None))
+    assert "Stop:" not in text and "Target:" not in text
+
+
 # --- format_telegram_trade_execution (paper trading, decoupled push) -------
 
 def _execution(
@@ -311,6 +429,12 @@ def test_trade_execution_includes_company_name_when_given():
     assert "`SPCX` (SpaceX Holdings)" in text
 
 
+def test_trade_execution_truncates_a_long_company_name():
+    text = format_telegram_trade_execution(_execution(), company_name="Alphabet Inc. (Class A)")
+    assert "(Alphabet Inc.)" in text
+    assert "Class A" not in text
+
+
 def test_trade_execution_buy_includes_company_name_and_timestamp():
     execution = PaperTradeExecution(
         trade_id=5, ticker="NVDA", order_type=OrderType.BUY, execution_price=131.50,
@@ -348,3 +472,520 @@ def test_trade_execution_buy_shows_shares_price_and_cash():
     assert "BUY EXECUTED" in text
     assert "131.50" in text
     assert "7,500.00" in text
+
+
+# ==========================================================================
+# Phase 2 LONG_TERM path
+# ==========================================================================
+
+def _long_term_alert(
+    action: AlertAction = AlertAction.HIGH_CONVICTION_BUY, severity: AlertSeverity = AlertSeverity.CRITICAL,
+    summary: str = "Apple's ecosystem lock-in and services growth support a durable moat.",
+) -> LongTermActionableAlert:
+    return LongTermActionableAlert(
+        ticker="AAPL", action=action, severity=severity,
+        rationale="FY2025 fundamentals clear thresholds -- quality score 8/10, wide moat.",
+        summary=summary,
+        quality_score=8, moat_rating=MoatRating.WIDE, market_price=75.0,
+        intrinsic_fair_value=100.0, margin_of_safety_pct=0.25,
+        capital_allocation_assessment="Disciplined buybacks.",
+        key_findings=["Strong recurring revenue"], risk_factors=["Regulatory scrutiny"],
+        model_used="gemini-flash-latest", correlated_at=NOW, published_at=NOW,
+    )
+
+
+def test_long_term_alert_includes_ticker_price_fair_value_and_id():
+    text = format_telegram_long_term_alert(_long_term_alert(), alert_id=12)
+    assert "AAPL" in text
+    assert "75.00" in text
+    assert "100.00" in text
+    # "LT" prefix distinguishes this ID space from the intraday alerts
+    # table's -- both start their own AUTOINCREMENT sequence at 1, so a
+    # bare "#12" would be ambiguous between the two.
+    assert "#LT12" in text
+    assert "Reply with LT12" in text
+
+
+def test_long_term_alert_high_conviction_buy_uses_value_buy_header():
+    text = format_telegram_long_term_alert(_long_term_alert(AlertAction.HIGH_CONVICTION_BUY), alert_id=1)
+    assert "\U0001F3DB" in text
+    assert "VALUE BUY" in text
+
+
+def test_long_term_alert_under_perform_rebalance_uses_red_circle():
+    text = format_telegram_long_term_alert(_long_term_alert(AlertAction.UNDER_PERFORM_REBALANCE), alert_id=1)
+    assert "\U0001F534" in text
+    assert "FUNDAMENTAL STOP" in text
+
+
+def test_long_term_alert_shows_the_horizon_marker_alongside_the_action_emoji():
+    """The 🏛️ horizon marker is ADDITIVE, not a replacement for the
+    existing per-action color coding -- both must be present, and must
+    be two DISTINCT emoji (HIGH_CONVICTION_BUY's own action emoji was
+    changed away from 🏛️ specifically to avoid a literal duplicate)."""
+    text = format_telegram_long_term_alert(_long_term_alert(AlertAction.HIGH_CONVICTION_BUY), alert_id=1)
+    header = text.split("\n")[0]
+    assert "\U0001F7E2" in header  # per-action green circle
+    assert "\U0001F3DB" in header  # horizon marker
+    assert header.count("\U0001F3DB") == 1
+
+
+def test_long_term_alert_includes_a_separator_line():
+    text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1)
+    lines = text.split("\n")
+    assert lines[1] == "─" * 16
+
+
+def test_long_term_alert_has_a_blank_line_before_the_summary():
+    text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1)
+    lines = text.split("\n")
+    summary_index = next(i for i, line in enumerate(lines) if line.startswith("\U0001F4A1 Summary:"))
+    assert lines[summary_index - 1] == ""
+
+
+def test_long_term_alert_shows_discount_quality_and_moat():
+    text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1)
+    assert "25.0% Discount" in text
+    assert "8/10" in text
+    assert "WIDE" in text
+
+
+def test_long_term_alert_shows_target_price():
+    text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1)
+    assert "120.00" in text  # 1.20 * fair_value(100.00)
+
+
+def test_long_term_alert_shows_holding_horizon():
+    text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1)
+    assert "6-24 months" in text
+
+
+def test_long_term_alert_price_above_fair_value_shows_premium_not_discount():
+    alert = _long_term_alert(AlertAction.TAKE_PROFIT_REBALANCE)
+    alert = alert.model_copy(update={"margin_of_safety_pct": -0.15})
+    text = format_telegram_long_term_alert(alert, alert_id=1)
+    assert "15.0% Premium" in text
+    assert "Discount" not in text
+
+
+def test_long_term_alert_zero_price_shows_na_not_bogus_percentage():
+    """Regression coverage for the exact bug a live smoke test caught:
+    price=$0.00 (talonx_ingest hadn't fetched a live tick yet) produced an
+    artificial "Margin of Safety: +100.0%". The primary fix is upstream
+    (FundamentalScanner falls back to yfinance's last close, talonx_core
+    refuses to evaluate price<=0 at all) -- this is the display-layer
+    safety net for any alert that predates that fix."""
+    alert = _long_term_alert().model_copy(update={"market_price": 0.0, "margin_of_safety_pct": 1.0})
+    text = format_telegram_long_term_alert(alert, alert_id=1)
+    assert "N/A" in text
+    assert "100.0%" not in text
+
+
+def test_long_term_alert_unknown_action_does_not_raise():
+    """Regression coverage for the exact KeyError class DEGRADED_QUANT_ALERT
+    hit earlier this project -- .get() with a default must hold for any
+    future new long-term action value too."""
+    text = format_telegram_long_term_alert(_long_term_alert(AlertAction.HOLD_QUALITY), alert_id=1)
+    assert "HOLD" in text
+
+
+def test_long_term_alert_includes_company_name_when_given():
+    text = format_telegram_long_term_alert(_long_term_alert(), alert_id=1, company_name="Apple Inc.")
+    assert "`AAPL` (Apple Inc.)" in text
+
+
+def test_long_term_alert_truncates_a_long_company_name():
+    text = format_telegram_long_term_alert(
+        _long_term_alert(), alert_id=1, company_name="Alphabet Inc. (Class A)",
+    )
+    header = text.split("\n")[0]
+    assert "(Alphabet Inc.)" in header
+    assert "Class A" not in header
+
+
+def test_long_term_alert_strips_internal_formula_checks_from_summary():
+    """Guardrail: the short push must never leak internal threshold
+    checks like "(>= 15%)" or "(>= 7)" -- these come from
+    FundamentalScanner's signal.message, embedded in the FULL rationale
+    text (which the short push deliberately does NOT use anymore)."""
+    alert = _long_term_alert(
+        summary="ROIC 30.7% (>= 15%) and F-Score 7/9 (>= 7) support a durable moat.",
+    )
+    text = format_telegram_long_term_alert(alert, alert_id=1)
+    assert ">=" not in text
+    assert "durable moat" in text
+
+
+def test_long_term_alert_summary_is_truncated_to_one_sentence():
+    alert = _long_term_alert(
+        summary="First sentence stays. Second sentence should be dropped entirely from the short push.",
+    )
+    text = format_telegram_long_term_alert(alert, alert_id=1)
+    assert "First sentence stays." in text
+    assert "Second sentence" not in text
+
+
+def test_long_term_alert_total_length_stays_under_300_chars():
+    """Guardrail: total short-push length must stay under 300 characters
+    even with a long company name and a maximally long summary -- AND
+    the footer (the #LT{id} reply hint) must survive intact. A blind
+    whole-string truncation used to silently swallow the footer whenever
+    a long company name pushed the header over budget; the fix trims
+    only the summary line, so the footer is always the last thing cut."""
+    alert = _long_term_alert(
+        summary="x" * 400,  # far longer than the 120-char summary cap, no sentence break
+    )
+    text = format_telegram_long_term_alert(
+        alert, alert_id=999999, company_name="International Business Machines Corporation",
+    )
+    assert len(text) <= 300
+    assert text.endswith("_Reply with LT999999 for full details_")
+
+
+def test_long_term_alert_falls_back_to_rationale_when_summary_is_empty():
+    alert = _long_term_alert(summary="")
+    text = format_telegram_long_term_alert(alert, alert_id=1)
+    # rationale's own text (minus formula checks, which it has none of here)
+    assert "FY2025 fundamentals clear thresholds" in text
+
+
+def _long_term_row(
+    alert_id: int = 47, action: str = "high_conviction_buy",
+    key_findings: list[str] | None = None, risk_factors: list[str] | None = None,
+) -> dict:
+    """Matches AuditStore.get_long_term_by_id()'s return shape."""
+    return {
+        "id": alert_id, "ticker": "AAPL", "action": action, "severity": "critical",
+        "rationale": "FY2025 fundamentals clear thresholds -- quality score 8/10, wide moat.",
+        "summary": "Apple's ecosystem lock-in and services growth support a durable moat.",
+        "quality_score": 8, "moat_rating": "wide", "market_price": 75.0,
+        "intrinsic_fair_value": 100.0, "margin_of_safety_pct": 0.25,
+        "capital_allocation_assessment": "Disciplined buybacks and reinvestment.",
+        "key_findings": key_findings or [], "risk_factors": risk_factors or [],
+        "model_used": "gemini-flash-latest", "correlated_at": NOW.isoformat(),
+        "received_at": NOW.isoformat(), "telegram_sent": False,
+        "telegram_sent_at": None, "telegram_error": None,
+    }
+
+
+def test_long_term_details_includes_ticker_price_and_id():
+    text = format_telegram_long_term_details(_long_term_row())
+    assert "AAPL" in text
+    assert "75.00" in text
+    assert "100.00" in text
+    assert "#LT47" in text
+
+
+def test_long_term_details_includes_capital_allocation_assessment():
+    text = format_telegram_long_term_details(_long_term_row())
+    assert "Disciplined buybacks and reinvestment." in text
+
+
+def test_long_term_details_includes_key_findings_and_risks_as_bullets():
+    text = format_telegram_long_term_details(
+        _long_term_row(key_findings=["Finding one"], risk_factors=["Risk one"])
+    )
+    assert "Key findings:" in text
+    assert "• Finding one" in text
+    assert "Risks:" in text
+    assert "• Risk one" in text
+
+
+def test_long_term_details_omits_sections_when_lists_empty():
+    text = format_telegram_long_term_details(_long_term_row(key_findings=[], risk_factors=[]))
+    assert "Key findings:" not in text
+    assert "Risks:" not in text
+
+
+def test_long_term_details_under_perform_rebalance_does_not_raise():
+    text = format_telegram_long_term_details(_long_term_row(action="under_perform_rebalance"))
+    assert "FUNDAMENTAL STOP" in text
+
+
+def test_long_term_details_formats_the_correlated_at_timestamp():
+    text = format_telegram_long_term_details(_long_term_row())
+    assert "2026-08-07 14:23 UTC" in text
+
+
+def _long_term_execution(order_type: LongTermOrderType = LongTermOrderType.BUY, **overrides) -> LongTermTradeExecution:
+    defaults = dict(
+        trade_id=7, ticker="AAPL", order_type=order_type, execution_price=100.0,
+        shares=20.0, contribution_cost=2000.0, avg_cost_basis_after=100.0, total_shares_after=20.0,
+        portfolio_cash_after=18000.0, triggering_action=AlertAction.HIGH_CONVICTION_BUY, timestamp=NOW,
+    )
+    defaults.update(overrides)
+    return LongTermTradeExecution(**defaults)
+
+
+def test_long_term_trade_execution_buy_shows_position_opened():
+    text = format_telegram_long_term_trade_execution(_long_term_execution(LongTermOrderType.BUY))
+    assert "POSITION OPENED" in text
+    assert "AAPL" in text
+    assert "20.0000 shares" in text
+    assert "18,000.00" in text
+
+
+def test_long_term_trade_execution_dca_shows_new_avg_cost():
+    execution = _long_term_execution(
+        LongTermOrderType.DCA_CONTRIBUTION, shares=4.5, contribution_cost=500.0,
+        avg_cost_basis_after=110.0, total_shares_after=24.5, triggering_action=AlertAction.DCA_CONTRIBUTION,
+    )
+    text = format_telegram_long_term_trade_execution(execution)
+    assert "DCA CONTRIBUTION" in text
+    assert "110.00" in text
+    assert "24.5000" in text
+
+
+def test_long_term_trade_execution_full_exit_shows_holding_period():
+    execution = _long_term_execution(
+        LongTermOrderType.SELL, shares=20.0, avg_cost_basis_after=None, total_shares_after=None,
+        realized_pnl_usd=200.0, realized_pnl_pct=10.0, holding_period_days=200,
+        triggering_action=AlertAction.UNDER_PERFORM_REBALANCE,
+    )
+    text = format_telegram_long_term_trade_execution(execution)
+    assert "FULL EXIT" in text
+    assert "fundamental stop" in text
+    assert "Held 200 day(s)" in text
+    assert "+$200.00" in text
+    assert "Remaining" not in text
+
+
+def test_long_term_trade_execution_partial_trim_shows_remaining_shares():
+    execution = _long_term_execution(
+        LongTermOrderType.SELL, shares=9.9, avg_cost_basis_after=100.0, total_shares_after=20.1,
+        realized_pnl_usd=198.0, realized_pnl_pct=20.0, holding_period_days=90,
+        triggering_action=AlertAction.TAKE_PROFIT_REBALANCE,
+    )
+    text = format_telegram_long_term_trade_execution(execution)
+    assert "PARTIAL TRIM" in text
+    assert "take-profit rebalance" in text
+    assert "Remaining: 20.1000 shares" in text
+
+
+def test_long_term_trade_execution_negative_pnl_has_no_plus_sign():
+    execution = _long_term_execution(
+        LongTermOrderType.SELL, shares=10.0, avg_cost_basis_after=None, total_shares_after=None,
+        realized_pnl_usd=-50.0, realized_pnl_pct=-5.0, holding_period_days=30,
+        triggering_action=AlertAction.UNDER_PERFORM_REBALANCE,
+    )
+    text = format_telegram_long_term_trade_execution(execution)
+    assert "$-50.00" in text
+    assert "+$-50.00" not in text
+
+
+def test_long_term_trade_execution_includes_company_name():
+    text = format_telegram_long_term_trade_execution(_long_term_execution(), company_name="Apple Inc.")
+    assert "`AAPL` (Apple Inc.)" in text
+
+
+def test_long_term_trade_execution_truncates_a_long_company_name():
+    text = format_telegram_long_term_trade_execution(
+        _long_term_execution(), company_name="Alphabet Inc. (Class A)",
+    )
+    assert "(Alphabet Inc.)" in text
+    assert "Class A" not in text
+
+
+# ==========================================================================
+# Event-Driven Earnings Radar -- format_telegram_earnings_heads_up
+# ==========================================================================
+
+def _fundamental_signal(price: float = 175.50) -> FundamentalFactorSignal:
+    return FundamentalFactorSignal(ticker="GOOGL", fiscal_year=2026, price=price, computed_at=NOW)
+
+
+def _longterm_report(fair_value: float = 210.0, quality_score: int = 9) -> LongTermResearchReport:
+    return LongTermResearchReport(
+        ticker="GOOGL", moat_rating=MoatRating.WIDE, dcf_fair_value_per_share=fair_value,
+        quality_score=quality_score, summary="Durable moat, strong cloud growth.",
+    )
+
+
+def _upcoming_earnings_row(earnings_date: str = "2026-08-13", session: str = "AFTER_MARKET") -> dict:
+    return {"earnings_date": earnings_date, "session": session}
+
+
+def test_earnings_heads_up_includes_ticker_price_and_fair_value():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(), _longterm_report(),
+    )
+    assert "GOOGL" in text
+    assert "175.50" in text
+    assert "210.00" in text
+
+
+def test_earnings_heads_up_uses_radar_footer_tag_not_a_numeric_id():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(), _longterm_report(),
+    )
+    assert "#RADAR" in text
+
+
+def test_earnings_heads_up_shows_reporting_date_and_session():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row("2026-08-13", "AFTER_MARKET"), _fundamental_signal(), _longterm_report(),
+    )
+    assert "Aug 13" in text
+    assert "After-Market" in text
+
+
+def test_earnings_heads_up_before_market_session_label():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row("2026-08-13", "BEFORE_MARKET"), _fundamental_signal(), _longterm_report(),
+    )
+    assert "Before-Market" in text
+
+
+def test_earnings_heads_up_unspecified_session_shows_time_tbd():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row("2026-08-13", "UNSPECIFIED"), _fundamental_signal(), _longterm_report(),
+    )
+    assert "Time TBD" in text
+
+
+def test_earnings_heads_up_shows_quality_and_moat():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(), _longterm_report(),
+    )
+    assert "9/10" in text
+    assert "WIDE" in text
+
+
+def test_earnings_heads_up_computes_margin_of_safety_as_discount():
+    # price 175.50 vs fair value 210.0 -> (210-175.5)/210 = 16.4% discount
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(175.50), _longterm_report(210.0),
+    )
+    assert "16.4%" in text
+    assert "Discount" in text
+
+
+def test_earnings_heads_up_price_above_fair_value_shows_premium():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(250.0), _longterm_report(210.0),
+    )
+    assert "Premium" in text
+
+
+def test_earnings_heads_up_includes_company_name():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(), _longterm_report(),
+        company_name="Alphabet Inc.",
+    )
+    assert "(Alphabet Inc.)" in text
+
+
+def test_earnings_heads_up_stays_under_the_300_char_budget():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(), _longterm_report(),
+        company_name="Alphabet Inc.",
+    )
+    assert len(text) <= 300
+
+
+def test_earnings_heads_up_includes_a_separator_line():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(), _longterm_report(),
+    )
+    assert "─" in text
+
+
+# ==========================================================================
+# Event-Driven Earnings Radar -- format_telegram_post_earnings_alert
+# ==========================================================================
+
+def _post_earnings_alert(
+    market_price: float = 170.0, intrinsic_fair_value: float = 225.0,
+    previous_fair_value: float | None = 210.0, previous_margin_of_safety_pct: float | None = 0.1667,
+    guidance_revision_notes: str | None = "FY26 revenue guidance raised by +2.5%.",
+    action: AlertAction = AlertAction.HIGH_CONVICTION_BUY,
+) -> LongTermActionableAlert:
+    margin_of_safety_pct = (intrinsic_fair_value - market_price) / intrinsic_fair_value
+    return LongTermActionableAlert(
+        ticker="GOOGL", action=action, severity=AlertSeverity.CRITICAL,
+        rationale="Post-earnings re-evaluation.",
+        summary="Q2 Cloud revenue accelerated. Post-earnings dip expands the margin of safety.",
+        quality_score=9, moat_rating=MoatRating.WIDE, market_price=market_price,
+        intrinsic_fair_value=intrinsic_fair_value, margin_of_safety_pct=margin_of_safety_pct,
+        previous_fair_value=previous_fair_value, previous_margin_of_safety_pct=previous_margin_of_safety_pct,
+        guidance_revision_notes=guidance_revision_notes, is_earnings_related=True,
+        triggering_signal=_TriggeringFundamentalSignalRef(roic=0.272, piotroski_f_score=8),
+        capital_allocation_assessment="disciplined", model_used="gemini-flash-latest",
+        correlated_at=NOW, published_at=NOW,
+    )
+
+
+def test_post_earnings_alert_includes_ticker_and_new_fair_value():
+    text = format_telegram_post_earnings_alert(_post_earnings_alert(), alert_id=2)
+    assert "GOOGL" in text
+    assert "225.00" in text
+
+
+def test_post_earnings_alert_shows_fair_value_moved_up_from_previous():
+    text = format_telegram_post_earnings_alert(_post_earnings_alert(), alert_id=2)
+    assert "Up from $210.00" in text
+
+
+def test_post_earnings_alert_shows_fair_value_moved_down_from_previous():
+    text = format_telegram_post_earnings_alert(
+        _post_earnings_alert(intrinsic_fair_value=190.0), alert_id=2,
+    )
+    assert "Down from $210.00" in text
+
+
+def test_post_earnings_alert_omits_fair_value_comparison_without_a_previous_value():
+    text = format_telegram_post_earnings_alert(
+        _post_earnings_alert(previous_fair_value=None, previous_margin_of_safety_pct=None), alert_id=2,
+    )
+    assert "Up from" not in text
+    assert "Down from" not in text
+
+
+def test_post_earnings_alert_computes_the_price_move_percentage():
+    # previous_fair_value=210, previous_margin_of_safety_pct=0.1667 ->
+    # previous_price = 210 * (1 - 0.1667) = 175.0 (approx)
+    # market_price=170 -> (170-175)/175 = -2.86%
+    text = format_telegram_post_earnings_alert(_post_earnings_alert(), alert_id=2)
+    assert "-2.9%" in text or "-2.8%" in text
+
+
+def test_post_earnings_alert_shows_roic_and_f_score():
+    text = format_telegram_post_earnings_alert(_post_earnings_alert(), alert_id=2)
+    assert "27.2%" in text
+    assert "8/9" in text
+
+
+def test_post_earnings_alert_includes_guidance_revision_notes():
+    text = format_telegram_post_earnings_alert(_post_earnings_alert(), alert_id=2)
+    assert "FY26 revenue guidance raised" in text
+
+
+def test_post_earnings_alert_omits_guidance_line_when_absent():
+    text = format_telegram_post_earnings_alert(
+        _post_earnings_alert(guidance_revision_notes=None), alert_id=2,
+    )
+    assert "Guidance:" not in text
+
+
+def test_post_earnings_alert_uses_lt_prefixed_id_and_reply_footer():
+    text = format_telegram_post_earnings_alert(_post_earnings_alert(), alert_id=2)
+    assert "#LT2" in text
+    assert "Reply with LT2" in text
+
+
+def test_post_earnings_alert_includes_company_name():
+    text = format_telegram_post_earnings_alert(_post_earnings_alert(), alert_id=2, company_name="Alphabet Inc.")
+    assert "(Alphabet Inc.)" in text
+
+
+def test_post_earnings_alert_under_perform_shows_fundamental_stop_label():
+    text = format_telegram_post_earnings_alert(
+        _post_earnings_alert(action=AlertAction.UNDER_PERFORM_REBALANCE), alert_id=2,
+    )
+    assert "FUNDAMENTAL STOP" in text
+
+
+def test_post_earnings_alert_handles_missing_triggering_signal_gracefully():
+    alert = _post_earnings_alert().model_copy(update={"triggering_signal": None})
+    text = format_telegram_post_earnings_alert(alert, alert_id=2)  # must not raise
+    assert "n/a" in text

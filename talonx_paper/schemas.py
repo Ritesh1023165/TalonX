@@ -36,6 +36,25 @@ class AlertAction(str, Enum):
     # alert at all.
     STOP_LOSS_EXIT = "stop_loss_exit"
     TAKE_PROFIT_EXIT = "take_profit_exit"
+    # Never a real ActionableAlert.action -- only ever used as
+    # PaperTradeExecution.triggering_action for the daily EOD-flatten
+    # sweep (talonx_paper.consumer's _run_eod_flatten_once), which closes
+    # every open INTRADAY position with no originating alert at all. Must
+    # also be mirrored onto talonx_dispatch.schemas.AlertAction (same
+    # "re-validated against THIS module's mirror" reasoning STOP_LOSS_EXIT/
+    # TAKE_PROFIT_EXIT already document there).
+    EOD_FLAT_LIQUIDATION = "eod_flat_liquidation"
+
+    # --- Phase 2 LONG_TERM decision matrix (talonx_core.decision's
+    # evaluate_long_term) -- disjoint from the intraday actions above.
+    HIGH_CONVICTION_BUY = "high_conviction_buy"
+    HOLD_QUALITY = "hold_quality"
+    TAKE_PROFIT_REBALANCE = "take_profit_rebalance"
+    UNDER_PERFORM_REBALANCE = "under_perform_rebalance"
+    # Never a real LongTermActionableAlert.action -- only ever used as
+    # LongTermTradeExecution.triggering_action for a recurring DCA
+    # contribution, which has no originating alert.
+    DCA_CONTRIBUTION = "dca_contribution"
 
 
 class AlertSeverity(str, Enum):
@@ -53,6 +72,12 @@ class AlertSeverity(str, Enum):
 
 class TriggeringSignalRef(BaseModel):
     price: float
+    # ATR-anchored dollar stop/target (Phase 2 requirement doc) -- mirrored
+    # from talonx_core.schemas.QuantSignal, None when ATR wasn't available
+    # at signal time. See engine.check_stop_take for how these override
+    # the static stop_loss_pct/take_profit_pct config once a position is open.
+    stop_price: float | None = None
+    target_price: float | None = None
 
 
 class ActionableAlert(BaseModel):
@@ -110,6 +135,70 @@ class PaperTradeExecution(BaseModel):
     triggering_action: AlertAction
     session_realized_pnl_usd: float
     session_realized_pnl_pct: float
+
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_redis_payload(self) -> str:
+        return self.model_dump_json()
+
+
+# ------------------------------------------------------------------
+# Phase 2 LONG_TERM path -- DCA-aware ledger input/output contracts
+# ------------------------------------------------------------------
+
+class MoatRating(str, Enum):
+    WIDE = "wide"
+    NARROW = "narrow"
+    NONE = "none"
+
+
+class LongTermActionableAlert(BaseModel):
+    """Trimmed mirror of talonx_core.schemas.LongTermActionableAlert --
+    consumed from talonx:alerts:longterm."""
+
+    ticker: str
+    action: AlertAction
+    quality_score: int
+    moat_rating: MoatRating
+    market_price: float
+    intrinsic_fair_value: float
+    margin_of_safety_pct: float
+    correlated_at: datetime
+
+
+class LongTermOrderType(str, Enum):
+    BUY = "BUY"
+    SELL = "SELL"
+    DCA_CONTRIBUTION = "DCA_CONTRIBUTION"
+
+
+class LongTermTradeExecution(BaseModel):
+    """Published to talonx:paper:trades:longterm once per executed
+    (non-ignored) long-term action -- a sibling to PaperTradeExecution,
+    not a repurposing of it: DCA contributions accumulate an AVERAGE
+    cost basis across possibly-many buys, and a partial rebalance sells
+    only a fraction of the position, neither of which the intraday
+    single-lot model represents."""
+
+    trade_id: int
+    ticker: str
+    order_type: LongTermOrderType
+    execution_price: float
+    shares: float  # shares bought/sold/contributed THIS execution
+    contribution_cost: float  # cash spent (BUY/DCA) or received (SELL, before PnL netting)
+
+    # Populated after every execution -- the position's state post-trade
+    # (0/None if the position was fully closed by a SELL).
+    avg_cost_basis_after: float | None = None
+    total_shares_after: float | None = None
+
+    # Populated for SELL only.
+    realized_pnl_usd: float | None = None
+    realized_pnl_pct: float | None = None
+    holding_period_days: int | None = None
+
+    portfolio_cash_after: float
+    triggering_action: AlertAction  # HIGH_CONVICTION_BUY / TAKE_PROFIT_REBALANCE / UNDER_PERFORM_REBALANCE / DCA_CONTRIBUTION
 
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

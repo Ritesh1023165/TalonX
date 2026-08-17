@@ -15,17 +15,20 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from talonx_core.config import CoreConfig
-from talonx_core.decision import evaluate, evaluate_verbose
+from talonx_core.decision import evaluate, evaluate_long_term, evaluate_long_term_verbose, evaluate_verbose
 from talonx_core.schemas import (
     AlertAction,
     AlertSeverity,
+    FundamentalFactorSignal,
+    LongTermResearchReport,
+    MoatRating,
     QuantSignal,
     ResearchReport,
     ResearchVerdict,
     SignalDirection,
     SignalType,
 )
-from talonx_core.state import TickerState
+from talonx_core.state import LongTermTickerState, TickerState
 
 NOW = datetime(2026, 8, 7, 12, 0, 0, tzinfo=timezone.utc)
 
@@ -382,3 +385,390 @@ def test_verbose_reason_is_none_when_an_alert_is_produced():
     alert, reason = evaluate_verbose(state, CoreConfig(), now=NOW)
     assert alert is not None
     assert reason is None
+
+
+# ==========================================================================
+# Phase 2 LONG_TERM decision matrix (evaluate_long_term)
+# ==========================================================================
+
+def _fundamental_signal(
+    price: float = 100.0, roic: float = 0.20, f_score: int = 8,
+    debt_to_ebitda: float | None = 2.0, is_earnings_related: bool = False,
+) -> FundamentalFactorSignal:
+    return FundamentalFactorSignal(
+        ticker="AAPL", fiscal_year=2025, roic=roic, piotroski_f_score=f_score,
+        fcf_yield=0.05, altman_z_score=5.0, debt_to_ebitda_proxy=debt_to_ebitda,
+        price=price, message="ROIC clears threshold", computed_at=NOW - timedelta(seconds=30),
+        is_earnings_related=is_earnings_related,
+    )
+
+
+def _long_term_report(
+    quality_score: int = 8, moat: MoatRating = MoatRating.WIDE, fair_value: float = 100.0,
+    is_degraded: bool = False, is_earnings_related: bool = False,
+    guidance_revision_notes: str | None = None, revenue_eps_surprise: str | None = None,
+) -> LongTermResearchReport:
+    return LongTermResearchReport(
+        ticker="AAPL", triggering_signal=_fundamental_signal(),
+        moat_rating=moat, capital_allocation_assessment="disciplined",
+        dcf_fair_value_per_share=fair_value, quality_score=quality_score,
+        summary="Durable compounder.", model_used="gemini-flash-latest", is_degraded=is_degraded,
+        is_earnings_related=is_earnings_related, guidance_revision_notes=guidance_revision_notes,
+        revenue_eps_surprise=revenue_eps_surprise,
+        generated_at=NOW - timedelta(seconds=30), published_at=NOW - timedelta(seconds=30),
+    )
+
+
+def test_long_term_missing_pair_no_signal():
+    state = LongTermTickerState(longterm_report=_long_term_report(), longterm_report_at=NOW)
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert alert is None
+    assert reason == "MISSING_PAIR"
+
+
+def test_long_term_missing_pair_no_report():
+    state = LongTermTickerState(fundamental_signal=_fundamental_signal(), fundamental_signal_at=NOW)
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert alert is None
+    assert reason == "MISSING_PAIR"
+
+
+def test_long_term_stale_signal():
+    config = CoreConfig(correlation_window_long_term_seconds=86400.0)
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(), fundamental_signal_at=NOW - timedelta(days=5),
+        longterm_report=_long_term_report(), longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, config, now=NOW)
+    assert alert is None
+    assert reason == "STALE_SIGNAL"
+
+
+def test_long_term_stale_report():
+    config = CoreConfig(correlation_window_long_term_seconds=86400.0)
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(), longterm_report_at=NOW - timedelta(days=5),
+    )
+    alert, reason = evaluate_long_term_verbose(state, config, now=NOW)
+    assert alert is None
+    assert reason == "STALE_REPORT"
+
+
+def test_long_term_cooldown():
+    config = CoreConfig(ticker_cooldown_long_term_seconds=86400.0)
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(), longterm_report_at=NOW,
+        last_alert_at=NOW - timedelta(hours=1),
+    )
+    alert, reason = evaluate_long_term_verbose(state, config, now=NOW)
+    assert alert is None
+    assert reason == "COOLDOWN"
+
+
+def test_long_term_cooldown_is_bypassed_when_earnings_related():
+    """Event-Driven Earnings Radar, Requirement 7: the whole point of the
+    earnings-triggered path is to re-fire even inside the standard 30-day
+    cooldown -- without this bypass, the feature could never actually
+    produce a same-week re-evaluation."""
+    config = CoreConfig(ticker_cooldown_long_term_seconds=86400.0)
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(is_earnings_related=True), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(), longterm_report_at=NOW,
+        last_alert_at=NOW - timedelta(hours=1),
+    )
+    alert, reason = evaluate_long_term_verbose(state, config, now=NOW)
+    assert reason is None
+    assert alert is not None
+
+
+def test_long_term_degraded_report_is_suppressed():
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(is_degraded=True), longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert alert is None
+    assert reason == "DEGRADED_REPORT"
+
+
+def test_long_term_no_fair_value_estimate():
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(fair_value=0.0), longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert alert is None
+    assert reason == "NO_FAIR_VALUE_ESTIMATE"
+
+
+def test_long_term_invalid_price_is_suppressed():
+    """Regression coverage for a bug a live smoke test caught: price=0.0
+    (talonx_ingest hadn't fetched a live tick yet) made margin_of_safety_pct
+    read as a bogus +100% AND would have made the HIGH_CONVICTION_BUY
+    price<=threshold check always pass (0 <= any positive number) -- a
+    false BUY trigger. talonx_quant.fundamental_consumer.FundamentalScanner
+    is the primary fix (falls back to yfinance's last close rather than
+    ever publishing price=0.0); this is the second line of defense, since
+    FundamentalFactorSignal arrives over Redis -- a boundary this function
+    should not blindly trust."""
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=0.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=8, moat=MoatRating.WIDE, fair_value=100.0),
+        longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert alert is None
+    assert reason == "INVALID_PRICE"
+
+
+def test_long_term_high_conviction_buy():
+    # fair_value=100, margin_of_safety_pct=0.20 -> BUY threshold price <= 80
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=75.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=8, moat=MoatRating.WIDE, fair_value=100.0),
+        longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert reason is None
+    assert alert.action == AlertAction.HIGH_CONVICTION_BUY
+    assert alert.severity == AlertSeverity.CRITICAL
+    assert round(alert.margin_of_safety_pct, 2) == 0.25  # (100-75)/100
+    # The LLM's clean summary, carried straight through from the report --
+    # NOT re-derived from the technical rationale (see LongTermActionableAlert
+    # .summary's docstring for why the two are kept separate).
+    assert alert.summary == "Durable compounder."
+
+
+def test_long_term_high_conviction_buy_requires_a_real_moat():
+    # Deep discount + high quality, but NO moat -- should NOT buy.
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=75.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=8, moat=MoatRating.NONE, fair_value=100.0),
+        longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert alert is None
+    assert reason == "LOW_QUALITY_OR_FAIR_VALUE"
+
+
+def test_long_term_hold_quality():
+    # fair_value=100, price=100 -- inside the fair-value band, quality>=7.
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=100.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=7, fair_value=100.0), longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert reason is None
+    assert alert.action == AlertAction.HOLD_QUALITY
+    assert alert.severity == AlertSeverity.INFO
+
+
+def test_long_term_take_profit_rebalance():
+    # fair_value=100, valuation_premium_pct=0.20 -> trim threshold price > 120
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=125.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=9, fair_value=100.0), longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert reason is None
+    assert alert.action == AlertAction.TAKE_PROFIT_REBALANCE
+    assert alert.severity == AlertSeverity.WARNING
+
+
+def test_long_term_take_profit_rebalance_applies_even_to_a_low_quality_name():
+    # No quality gate on TAKE_PROFIT_REBALANCE, per the spec.
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=125.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=3, fair_value=100.0), longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert alert.action == AlertAction.TAKE_PROFIT_REBALANCE
+
+
+def test_long_term_low_quality_produces_no_alert():
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=100.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=5, fair_value=100.0), longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert alert is None
+    assert reason == "LOW_QUALITY_OR_FAIR_VALUE"
+
+
+def test_long_term_under_perform_rebalance_from_roic_streak():
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=100.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=8, fair_value=100.0), longterm_report_at=NOW,
+        roic_below_wacc_streak=2,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert reason is None
+    assert alert.action == AlertAction.UNDER_PERFORM_REBALANCE
+    assert alert.severity == AlertSeverity.CRITICAL
+    assert "WACC" in alert.rationale
+
+
+def test_long_term_under_perform_rebalance_from_debt_to_ebitda():
+    config = CoreConfig(max_debt_to_ebitda=4.0)
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=100.0, debt_to_ebitda=5.5), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=8, fair_value=100.0), longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, config, now=NOW)
+    assert alert.action == AlertAction.UNDER_PERFORM_REBALANCE
+    assert "Debt/EBITDA" in alert.rationale
+
+
+def test_long_term_under_perform_rebalance_from_moat_downgrade():
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=100.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=8, moat=MoatRating.NARROW, fair_value=100.0),
+        longterm_report_at=NOW,
+        previous_moat_rating=MoatRating.WIDE,  # downgraded from WIDE -> NARROW
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert alert.action == AlertAction.UNDER_PERFORM_REBALANCE
+    assert "moat" in alert.rationale.lower()
+
+
+def test_long_term_moat_upgrade_does_not_trigger_the_fundamental_stop():
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=75.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=8, moat=MoatRating.WIDE, fair_value=100.0),
+        longterm_report_at=NOW,
+        previous_moat_rating=MoatRating.NARROW,  # upgraded NARROW -> WIDE, not a downgrade
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert alert.action == AlertAction.HIGH_CONVICTION_BUY  # normal matrix applies
+
+
+def test_long_term_fundamental_stop_overrides_an_otherwise_buyable_setup():
+    # Deep discount + high quality + wide moat (would be HIGH_CONVICTION_BUY),
+    # but the ROIC streak breach must win.
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=75.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=9, moat=MoatRating.WIDE, fair_value=100.0),
+        longterm_report_at=NOW,
+        roic_below_wacc_streak=3,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert alert.action == AlertAction.UNDER_PERFORM_REBALANCE
+
+
+def test_long_term_no_state_change_suppresses_a_repeat_hold():
+    config = CoreConfig(price_delta_retrigger_pct_long_term=0.05)
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=101.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=7, fair_value=100.0), longterm_report_at=NOW,
+        last_alert_action=AlertAction.HOLD_QUALITY, last_alert_price=100.0,
+    )
+    alert, reason = evaluate_long_term_verbose(state, config, now=NOW)
+    assert alert is None
+    assert reason == "NO_STATE_CHANGE"
+
+
+def test_long_term_no_state_change_gate_bypassed_by_a_genuine_action_transition():
+    # Same price/quality as the repeat-HOLD suppression test above, but the
+    # LAST alert was a different action (TAKE_PROFIT_REBALANCE) -- a
+    # genuine transition always bypasses gate 5 regardless of price delta.
+    config = CoreConfig(price_delta_retrigger_pct_long_term=0.05)
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=101.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=7, fair_value=100.0), longterm_report_at=NOW,
+        last_alert_action=AlertAction.TAKE_PROFIT_REBALANCE, last_alert_price=100.0,
+    )
+    alert, reason = evaluate_long_term_verbose(state, config, now=NOW)
+    assert reason is None
+    assert alert.action == AlertAction.HOLD_QUALITY
+
+
+def test_long_term_no_state_change_gate_bypassed_when_earnings_related():
+    # Same repeat-HOLD-at-nearly-the-same-price setup that gets suppressed
+    # by test_long_term_no_state_change_suppresses_a_repeat_hold above --
+    # but earnings-related, so it must fire anyway.
+    config = CoreConfig(price_delta_retrigger_pct_long_term=0.05)
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=101.0, is_earnings_related=True), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=7, fair_value=100.0), longterm_report_at=NOW,
+        last_alert_action=AlertAction.HOLD_QUALITY, last_alert_price=100.0,
+    )
+    alert, reason = evaluate_long_term_verbose(state, config, now=NOW)
+    assert reason is None
+    assert alert.action == AlertAction.HOLD_QUALITY
+
+
+def test_long_term_alert_is_earnings_related_when_either_signal_or_report_flags_it():
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=75.0, is_earnings_related=False), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(fair_value=100.0, is_earnings_related=True), longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert reason is None
+    assert alert.is_earnings_related is True
+
+
+def test_long_term_alert_carries_previous_fair_value_and_margin():
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=170.0, is_earnings_related=True), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(fair_value=225.0), longterm_report_at=NOW,
+        previous_fair_value=210.0, last_alert_price=175.0,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert reason is None
+    assert alert.previous_fair_value == 210.0
+    # (210 - 175) / 210
+    assert round(alert.previous_margin_of_safety_pct, 4) == round((210.0 - 175.0) / 210.0, 4)
+
+
+def test_long_term_alert_previous_fair_value_is_none_without_prior_state():
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=75.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(fair_value=100.0), longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert reason is None
+    assert alert.previous_fair_value is None
+    assert alert.previous_margin_of_safety_pct is None
+
+
+def test_long_term_alert_carries_guidance_and_surprise_fields():
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=75.0, is_earnings_related=True), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(
+            fair_value=100.0, is_earnings_related=True,
+            guidance_revision_notes="FY26 revenue guidance raised by 2.5%.",
+            revenue_eps_surprise="Q2 revenue beat consensus by 3%.",
+        ),
+        longterm_report_at=NOW,
+    )
+    alert, reason = evaluate_long_term_verbose(state, CoreConfig(), now=NOW)
+    assert reason is None
+    assert alert.guidance_revision_notes == "FY26 revenue guidance raised by 2.5%."
+    assert alert.revenue_eps_surprise == "Q2 revenue beat consensus by 3%."
+
+
+def test_long_term_state_change_with_enough_price_movement_still_fires():
+    # Same action as the last alert (HOLD_QUALITY), but price has moved
+    # more than price_delta_retrigger_pct_long_term since then -- passes
+    # gate 5 despite being a "repeat" action.
+    config = CoreConfig(price_delta_retrigger_pct_long_term=0.05)
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=110.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=7, fair_value=100.0), longterm_report_at=NOW,
+        last_alert_action=AlertAction.HOLD_QUALITY, last_alert_price=100.0,
+    )
+    alert, reason = evaluate_long_term_verbose(state, config, now=NOW)
+    assert reason is None
+    assert alert.action == AlertAction.HOLD_QUALITY
+
+
+def test_evaluate_long_term_matches_verbose_result():
+    state = LongTermTickerState(
+        fundamental_signal=_fundamental_signal(price=75.0), fundamental_signal_at=NOW,
+        longterm_report=_long_term_report(quality_score=8, fair_value=100.0), longterm_report_at=NOW,
+    )
+    alert = evaluate_long_term(state, CoreConfig(), now=NOW)
+    assert alert is not None
+    assert alert.action == AlertAction.HIGH_CONVICTION_BUY

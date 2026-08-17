@@ -10,17 +10,19 @@ re-declarations: this module only knows the WIRE format published to
 talonx:alerts:dispatch, so producer and consumer stay independently
 deployable/versionable.
 
-The embedded triggering signal is trimmed to TriggeringSignalRef (ticker,
-signal_type as a plain str, direction, message, price, bar_timestamp) --
-dropping rsi/macd/macd_signal_line/sma_fast/sma_slow/volume/
-volume_surge_ratio, which this module only ever displays, never
-recomputes or branches logic on. `signal_type` is kept as `str` rather
-than talonx_core's SignalType enum for the same reason: a display-only
-consumer doesn't need to reject an unrecognized-but-valid new signal type
-talonx_quant might add later. Pydantic's default `extra="ignore"`
-behavior means the omitted numeric fields are simply dropped on parse,
-not an error, so this stays a strictly valid subset of the real wire
-shape.
+The embedded triggering signal is TriggeringSignalRef (ticker, signal_type
+as a plain str, direction, message, price, bar_timestamp), plus (Phase 2
+requirement doc) rsi/macd/macd_signal_line/volume_surge_ratio/atr/
+stop_price/target_price/trend_aligned/htf_sma_200/session -- the Telegram
+`#ID` detail reply now renders these (see formatter.format_telegram_details),
+closing a real gap: the reply used to show only research fields, never
+the technical setup that actually triggered the alert. `signal_type` is
+kept as `str` rather than talonx_core's SignalType enum for the same
+reason as before: a display-only consumer doesn't need to reject an
+unrecognized-but-valid new signal type talonx_quant might add later.
+Pydantic's default `extra="ignore"` behavior means any still-omitted
+field (sma_fast/sma_slow/volume) is simply dropped on parse, not an
+error, so this stays a strictly valid subset of the real wire shape.
 """
 from __future__ import annotations
 
@@ -56,6 +58,24 @@ class AlertAction(str, Enum):
     # "invalid payload" rather than notify on it.
     STOP_LOSS_EXIT = "stop_loss_exit"
     TAKE_PROFIT_EXIT = "take_profit_exit"
+    # Same reasoning as STOP_LOSS_EXIT/TAKE_PROFIT_EXIT above -- must exist
+    # here too since PaperTradeExecution is re-validated against THIS
+    # module's mirror on talonx:paper:trades. Emitted by talonx_paper's
+    # daily EOD-flatten sweep (15:50 ET); consumer.py's
+    # _handle_trade_execution mutes the Telegram push for this one
+    # specific action (routine, not actionable) but still records it.
+    EOD_FLAT_LIQUIDATION = "eod_flat_liquidation"
+
+    # --- Phase 2 LONG_TERM decision matrix -- disjoint from the
+    # intraday actions above, never mixed on the same alert/channel.
+    HIGH_CONVICTION_BUY = "high_conviction_buy"
+    HOLD_QUALITY = "hold_quality"
+    TAKE_PROFIT_REBALANCE = "take_profit_rebalance"
+    UNDER_PERFORM_REBALANCE = "under_perform_rebalance"
+    # Never a real LongTermActionableAlert.action -- only ever appears as
+    # LongTermTradeExecution.triggering_action for a recurring DCA
+    # contribution, which has no originating alert.
+    DCA_CONTRIBUTION = "dca_contribution"
 
 
 class AlertSeverity(str, Enum):
@@ -76,6 +96,20 @@ class TriggeringSignalRef(BaseModel):
     message: str
     price: float
     bar_timestamp: datetime
+
+    # Technical-detail fields for the Telegram #ID reply (Phase 2
+    # requirement doc) -- None for long-term alerts or any signal that
+    # predates these fields.
+    rsi: float | None = None
+    macd: float | None = None
+    macd_signal_line: float | None = None
+    volume_surge_ratio: float | None = None
+    atr: float | None = None
+    stop_price: float | None = None
+    target_price: float | None = None
+    trend_aligned: bool | None = None
+    htf_sma_200: float | None = None
+    session: str | None = None
 
 
 class ActionableAlert(BaseModel):
@@ -127,3 +161,147 @@ class PaperTradeExecution(BaseModel):
     session_realized_pnl_usd: float
     session_realized_pnl_pct: float
     timestamp: datetime
+
+
+# ------------------------------------------------------------------
+# Phase 2 LONG_TERM path
+# ------------------------------------------------------------------
+
+class MoatRating(str, Enum):
+    WIDE = "wide"
+    NARROW = "narrow"
+    NONE = "none"
+
+
+class _TriggeringFundamentalSignalRef(BaseModel):
+    """Further-trimmed mirror of talonx_core.schemas.FundamentalFactorSignal
+    -- this module only ever displays roic/piotroski_f_score (the post-
+    earnings push's "Fundamental Shift" section), never the rest of the
+    signal, so there's no reason to carry ticker/fiscal_year/price/message/
+    computed_at here too."""
+
+    roic: float | None = None
+    piotroski_f_score: int | None = None
+
+
+class LongTermActionableAlert(BaseModel):
+    """Trimmed mirror of talonx_core.schemas.LongTermActionableAlert --
+    consumed from talonx:alerts:longterm."""
+
+    ticker: str
+    action: AlertAction
+    severity: AlertSeverity
+    rationale: str
+    # The LLM's clean free-text summary, separate from the more technical
+    # `rationale` above -- the SHORT Telegram push uses this; the FULL
+    # detail reply still uses rationale. See talonx_core.schemas' mirror
+    # of this field for why the two are kept separate.
+    summary: str
+
+    quality_score: int
+    moat_rating: MoatRating
+    market_price: float
+    intrinsic_fair_value: float
+    margin_of_safety_pct: float
+
+    # Event-Driven Earnings Radar, Requirement 8: populated only for an
+    # earnings-triggered alert -- see talonx_core.schemas' mirror of this
+    # field for the full "before vs after" rationale. When True,
+    # consumer.py uses format_telegram_post_earnings_alert instead of the
+    # routine format_telegram_long_term_alert, and bypasses both the
+    # severity gate and _evaluate_push_eligibility entirely.
+    previous_fair_value: float | None = None
+    previous_margin_of_safety_pct: float | None = None
+    guidance_revision_notes: str | None = None
+    revenue_eps_surprise: str | None = None
+    is_earnings_related: bool = False
+    triggering_signal: _TriggeringFundamentalSignalRef | None = None
+
+    capital_allocation_assessment: str
+    key_findings: list[str] = Field(default_factory=list)
+    risk_factors: list[str] = Field(default_factory=list)
+    model_used: str
+    is_degraded: bool = False
+
+    correlated_at: datetime
+    published_at: datetime
+
+
+class LongTermOrderType(str, Enum):
+    BUY = "BUY"
+    SELL = "SELL"
+    DCA_CONTRIBUTION = "DCA_CONTRIBUTION"
+
+
+class LongTermTradeExecution(BaseModel):
+    """Trimmed mirror of talonx_paper.schemas.LongTermTradeExecution --
+    consumed from talonx:paper:trades:longterm."""
+
+    trade_id: int
+    ticker: str
+    order_type: LongTermOrderType
+    execution_price: float
+    shares: float
+    contribution_cost: float
+    avg_cost_basis_after: float | None = None
+    total_shares_after: float | None = None
+    realized_pnl_usd: float | None = None
+    realized_pnl_pct: float | None = None
+    holding_period_days: int | None = None
+    portfolio_cash_after: float
+    triggering_action: AlertAction
+    timestamp: datetime
+
+
+# ------------------------------------------------------------------
+# Event-Driven Earnings Radar -- Requirement 5's T-48h heads-up push.
+# Trimmed mirrors of talonx_brain.schemas.FundamentalFactorSignal /
+# LongTermResearchReport, consumed PURELY to keep an in-memory latest-
+# per-ticker cache (see consumer.py) for the heads-up push's price/
+# quality/moat/fair-value fields -- this module never branches decision
+# logic on them, same "wire-format-only" reasoning as every other mirror
+# in this file.
+# ------------------------------------------------------------------
+
+class FundamentalFactorSignal(BaseModel):
+    ticker: str
+    fiscal_year: int
+    price: float
+    computed_at: datetime
+
+
+class LongTermResearchReport(BaseModel):
+    ticker: str
+    moat_rating: MoatRating
+    dcf_fair_value_per_share: float
+    quality_score: int = Field(ge=0, le=10)
+    summary: str
+
+
+# ------------------------------------------------------------------
+# Rejection Trace Logging: trimmed mirror of
+# talonx_quant.schemas.RejectedCandidateEvent -- talonx_quant publishes
+# one of these per candidate signal a gate drops BEFORE it would ever
+# reach talonx:signals:quant (confluence, structural R:R, trend, ATR
+# move/volatility, blackout, cooldown, loss-lockout, throttle, pre-market
+# liquidity/news-catalyst -- see talonx_quant/consumer.py's own gate
+# list). Without this, a rejected candidate was invisible to
+# talonx_dispatch entirely: only PUBLISHED signals ever reached this
+# module, so store.py had no durable record of what almost fired and
+# why. Same "each module only knows the wire shape of what it consumes"
+# convention as every other re-declared mirror in this file.
+# ------------------------------------------------------------------
+
+class RejectedCandidateEvent(BaseModel):
+    ticker: str
+    gate: str  # e.g. "confluence_gate", "rr_gate", "trend_gate" -- see talonx_quant.consumer's gate names
+    reason: str  # e.g. "LOW_CONFLUENCE", "LOW_RISK_REWARD", "TREND_GATE"
+    signal_type: str | None = None
+    direction: SignalDirection | None = None
+    price: float | None = None
+    confluence_score: int | None = None
+    risk_reward_ratio: float | None = None
+    session: str | None = None
+    count: int = 1
+    rejected_at: datetime
+    is_degraded: bool = False

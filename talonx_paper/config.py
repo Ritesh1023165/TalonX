@@ -39,6 +39,20 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    val = os.environ.get(name)
+    if val is None:
+        return default
+    return val.strip().lower() in ("1", "true", "yes", "on")
+
+
 @dataclass(frozen=True)
 class PaperConfig:
     # --- Redis ---
@@ -91,3 +105,39 @@ class PaperConfig:
     # -- tune it using generate_eod_report.py's BELOW_MIN_SEVERITY counts
     # once there's a few real sessions of data (README §5o).
     min_entry_severity: str = os.environ.get("TALONX_PAPER_MIN_ENTRY_SEVERITY", "warning")
+
+    # --- Phase 2 LONG_TERM path (DCA-aware ledger) ---
+    alerts_channel_long_term: str = os.environ.get(
+        "TALONX_REDIS_ALERTS_LONG_TERM_CHANNEL", "talonx:alerts:longterm"
+    )
+    paper_trades_channel_long_term: str = os.environ.get(
+        "TALONX_REDIS_PAPER_TRADES_LONG_TERM_CHANNEL", "talonx:paper:trades:longterm"
+    )
+    # A SEPARATE starting balance/pool from the intraday portfolio above --
+    # fresh-install default only, same "dashboard-set value wins after
+    # first run" caveat as default_initial_balance.
+    default_long_term_initial_balance: float = _env_float("TALONX_PAPER_LT_INITIAL_BALANCE", 20000.0)
+    # The opening HIGH_CONVICTION_BUY's position size -- separate from
+    # dca_contribution_usd below, which only ever adds to an ALREADY-open
+    # position on a recurring schedule.
+    long_term_initial_position_usd: float = _env_float("TALONX_PAPER_LT_INITIAL_POSITION", 2000.0)
+    dca_contribution_usd: float = _env_float("TALONX_PAPER_DCA_CONTRIBUTION", 500.0)
+    # Fixed-interval approximation of "monthly" -- not true calendar-month
+    # scheduling (documented simplification, see the Phase 2 plan).
+    dca_interval_days: float = _env_float("TALONX_PAPER_DCA_INTERVAL_DAYS", 30.0)
+    # Fraction of the position trimmed on a TAKE_PROFIT_REBALANCE alert.
+    rebalance_trim_pct: float = _env_float("TALONX_PAPER_REBALANCE_TRIM_PCT", 0.33)
+
+    # --- Automated End-of-Day flattening (2026-08-14 session review: an
+    # ADC position opened intraday and rode unclosed through market close,
+    # with no automated liquidation routine to catch it) -- INTRADAY
+    # ledger only (this engine's own `positions` table); the LONG_TERM
+    # DCA-aware ledger above is explicitly out of scope, since a
+    # multi-day/DCA position riding overnight is the intended behavior
+    # there, not a bug. Time is expressed in America/New_York local time
+    # (engine.seconds_until_next_eod_flatten converts via ZoneInfo), not a
+    # fixed UTC offset, so the 15:50 ET target doesn't drift an hour off
+    # across the spring/fall DST transition.
+    eod_flatten_enabled: bool = _env_bool("TALONX_PAPER_EOD_FLATTEN_ENABLED", True)
+    eod_flatten_hour_et: int = _env_int("TALONX_PAPER_EOD_FLATTEN_HOUR_ET", 15)
+    eod_flatten_minute_et: int = _env_int("TALONX_PAPER_EOD_FLATTEN_MINUTE_ET", 50)

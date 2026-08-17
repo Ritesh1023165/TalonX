@@ -31,8 +31,9 @@ ticker add/remove here won't be picked up by anything.
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 # `streamlit run` invokes its own console-script entry point rather than
 # `python -m`, so unlike every other entrypoint in this project it does
@@ -44,6 +45,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import altair as alt
 import pandas as pd
+import redis
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
@@ -61,6 +63,16 @@ ACTION_EMOJI = {
     "degraded_quant_alert": "\U0001F6A7",
 }
 SEVERITY_EMOJI = {"critical": "\U0001F525", "warning": "⚠️", "info": "ℹ️"}
+
+# Phase 2 LONG_TERM path -- disjoint action set from ACTION_EMOJI above,
+# never mixed (long-term alerts live in their own table/tab).
+LT_ACTION_EMOJI = {
+    "high_conviction_buy": "\U0001F7E2",
+    "hold_quality": "\U0001F535",
+    "take_profit_rebalance": "\U0001F4B0",
+    "under_perform_rebalance": "\U0001F534",
+}
+MOAT_EMOJI = {"wide": "\U0001F6E1️", "narrow": "\U0001F6A7", "none": "⚠️"}
 
 
 @st.cache_resource
@@ -82,10 +94,29 @@ def get_watchlist_store(db_path: str) -> TickerWatchlistStore:
 
 
 @st.cache_resource
-def get_paper_store(db_path: str, default_initial_balance: float, default_trade_allocation_usd: float) -> PaperTradingStore:
+def get_paper_store(
+    db_path: str, default_initial_balance: float, default_trade_allocation_usd: float,
+    default_long_term_initial_balance: float, default_dca_contribution_usd: float,
+) -> PaperTradingStore:
     # default_* only matter the very first time this file/db is created --
-    # PaperTradingStore._ensure_portfolio_row is a no-op on every later call.
-    return PaperTradingStore(db_path, default_initial_balance, default_trade_allocation_usd)
+    # PaperTradingStore's _ensure_*_row methods are a no-op on every later
+    # call. The long-term pair are this store's Phase 2 additions -- see
+    # its own docstring for why they share this ONE connection/file with
+    # the intraday portfolio instead of a second store.
+    return PaperTradingStore(
+        db_path, default_initial_balance, default_trade_allocation_usd,
+        default_long_term_initial_balance, default_dca_contribution_usd,
+    )
+
+
+@st.cache_resource
+def get_redis_client(redis_url: str) -> redis.Redis:
+    """Stage-Gate Metric Funnel's read side -- a SYNC redis client
+    (unlike every producer module's redis.asyncio, this is a plain
+    Streamlit script rerun, not an event loop) scoped to just the
+    metrics:* key namespace this dashboard reads. Cached the same way
+    every other store/connection on this page is."""
+    return redis.Redis.from_url(redis_url, decode_responses=True)
 
 
 def render_metrics(df: pd.DataFrame) -> None:
@@ -125,8 +156,13 @@ def render_alert_history(store: AuditStore) -> None:
 
 
 EXCHANGE_OPTIONS = ["NASDAQ", "NYSE", "NYSE American (AMEX)", "NASDAQ (US ADR) / Euronext Amsterdam", "NSE", "BSE", "LSE (London Stock Exchange)", "Korea Exchange (KRX)", "NYSE (US ADR) / HKEX", "OTC Markets", "TSX", "LSE", "Other"]
+HORIZON_OPTIONS = ["INTRADAY", "LONG_TERM", "DUAL_HORIZON"]
+HORIZON_LABEL = {"INTRADAY": "\U0001F4C8 Intraday", "LONG_TERM": "\U0001F48E Long-Term", "DUAL_HORIZON": "\U0001F501 Dual"}
 WATCHLIST_PAGE_SIZE = 10
-_SORT_KEYS = {"Symbol": "symbol", "Name": "name", "Exchange": "exchange", "Status": "status", "Added": "added_at"}
+_SORT_KEYS = {
+    "Symbol": "symbol", "Name": "name", "Exchange": "exchange", "Status": "status",
+    "Horizon": "strategy_horizon", "Added": "added_at",
+}
 
 # Color-codes the Pause/Resume/Remove buttons so the three actions read as
 # distinct at a glance. Targets Streamlit's `st-key-<key>` class, which it
@@ -163,12 +199,35 @@ def render_ticker_watchlist(store: TickerWatchlistStore, poll_interval_seconds: 
         st.info("Watchlist is empty -- market data streaming is paused until you add a ticker.")
     else:
         exchanges_present = sorted({t["exchange"] for t in tickers if t["exchange"]})
-        f_col, sort_col, dir_col = st.columns([2, 2, 1])
+        f_col, h_col, p_col, s_col = st.columns([1.6, 1.6, 1.4, 1.2])
         filter_exchanges = f_col.multiselect("Filter by exchange", exchanges_present)
+        filter_horizons = h_col.multiselect("Filter by horizon", HORIZON_OPTIONS)
+        filter_paper = p_col.selectbox("Paper trading", ["All", "Enabled", "Disabled"])
+        filter_status = s_col.selectbox("Status", ["All", "Active", "Paused"])
+
+        sort_col, dir_col = st.columns([2, 1])
         sort_label = sort_col.selectbox("Sort by", list(_SORT_KEYS), key="watchlist_sort_by")
         sort_desc = dir_col.checkbox("Desc", key="watchlist_sort_desc")
 
-        filtered = [t for t in tickers if not filter_exchanges or t["exchange"] in filter_exchanges]
+        def _paper_trading_on(t: dict) -> bool:
+            # A DUAL_HORIZON ticker counts as "Enabled" if EITHER of its two
+            # independently-tracked flags is on -- matching how the inline
+            # checkboxes below present them (one checkbox per applicable
+            # horizon, not one combined flag).
+            return t["paper_trading_enabled"] or t["paper_trading_enabled_long_term"]
+
+        filtered = tickers
+        if filter_exchanges:
+            filtered = [t for t in filtered if t["exchange"] in filter_exchanges]
+        if filter_horizons:
+            filtered = [t for t in filtered if t["strategy_horizon"] in filter_horizons]
+        if filter_paper != "All":
+            want_enabled = filter_paper == "Enabled"
+            filtered = [t for t in filtered if _paper_trading_on(t) == want_enabled]
+        if filter_status != "All":
+            want_active = filter_status == "Active"
+            filtered = [t for t in filtered if (t["status"] == "active") == want_active]
+
         sort_key = _SORT_KEYS[sort_label]
         filtered.sort(key=lambda t: (t[sort_key] or "").lower(), reverse=sort_desc)
 
@@ -190,59 +249,129 @@ def render_ticker_watchlist(store: TickerWatchlistStore, poll_interval_seconds: 
         if not page_rows:
             st.info("No tickers match the current filter.")
         else:
-            h = st.columns([1, 2, 1.4, 1.6, 1.1, 1, 1])
-            for col, label in zip(h, ["Symbol", "Name", "Exchange", "Added", "Status", "", ""]):
+            h = st.columns([1, 1.6, 1.1, 1.3, 1, 1.2, 1.4, 1, 1])
+            for col, label in zip(
+                h, ["Symbol", "Name", "Exchange", "Added", "Status", "Horizon", "Paper Trading", "", ""]
+            ):
                 col.markdown(f"**{label}**")
 
             for row in page_rows:
-                c = st.columns([1, 2, 1.4, 1.6, 1.1, 1, 1])
+                c = st.columns([1, 1.6, 1.1, 1.3, 1, 1.2, 1.4, 1, 1])
                 c[0].write(row["symbol"])
                 c[1].write(row["name"])
                 c[2].write(row["exchange"] or "—")
                 c[3].write(row["added_at"][:19].replace("T", " "))
                 is_active = row["status"] == "active"
                 c[4].write("▶️ Active" if is_active else "⏳ Paused")
+                horizon = row["strategy_horizon"]
+                new_horizon = c[5].selectbox(
+                    "Horizon", HORIZON_OPTIONS, index=HORIZON_OPTIONS.index(horizon),
+                    format_func=lambda h: HORIZON_LABEL[h], key=f"horizon_{row['symbol']}",
+                    label_visibility="collapsed",
+                )
+                if new_horizon != horizon:
+                    store.set_strategy_horizon(row["symbol"], new_horizon)
+                    st.rerun()
+                # A DUAL_HORIZON ticker's two paper-trading engines are
+                # independently toggled flags (see talonx_watchlist/store.py's
+                # set_paper_trading vs. set_paper_trading_long_term docstrings)
+                # -- show one checkbox per horizon this ticker is actually
+                # eligible for, not a single combined flag.
+                with c[6]:
+                    if horizon in ("INTRADAY", "DUAL_HORIZON"):
+                        new_intraday = st.checkbox(
+                            "Intraday", value=row["paper_trading_enabled"],
+                            key=f"paper_intraday_{row['symbol']}",
+                        )
+                        if new_intraday != row["paper_trading_enabled"]:
+                            store.set_paper_trading(row["symbol"], new_intraday)
+                            st.rerun()
+                    if horizon in ("LONG_TERM", "DUAL_HORIZON"):
+                        new_lt = st.checkbox(
+                            "Long-term", value=row["paper_trading_enabled_long_term"],
+                            key=f"paper_lt_{row['symbol']}",
+                        )
+                        if new_lt != row["paper_trading_enabled_long_term"]:
+                            store.set_paper_trading_long_term(row["symbol"], new_lt)
+                            st.rerun()
                 if is_active:
-                    if c[5].button("⏳ Pause", key=f"pause_{row['symbol']}"):
+                    if c[7].button("⏳ Pause", key=f"pause_{row['symbol']}"):
                         store.pause_ticker(row["symbol"])
                         st.rerun()
                 else:
-                    if c[5].button("▶️ Resume", key=f"resume_{row['symbol']}"):
+                    if c[7].button("▶️ Resume", key=f"resume_{row['symbol']}"):
                         store.resume_ticker(row["symbol"])
                         st.rerun()
-                if c[6].button("\U0001F5D1️ Remove", key=f"remove_{row['symbol']}"):
+                if c[8].button("\U0001F5D1️ Remove", key=f"remove_{row['symbol']}"):
                     store.remove_ticker(row["symbol"])
                     st.rerun()
 
     with st.form("add_ticker_form", clear_on_submit=True):
-        c1, c2, c3, c4 = st.columns([1, 2, 1.3, 1])
+        c1, c2, c3, c4, c5 = st.columns([1, 1.8, 1.2, 1.3, 1])
         symbol = c1.text_input("Symbol", placeholder="e.g. NVDA")
         name = c2.text_input("Company name", placeholder="e.g. NVIDIA Corporation")
         exchange = c3.selectbox("Exchange", EXCHANGE_OPTIONS)
-        submitted = c4.form_submit_button("Add ticker (paused)")
+        horizon = c4.selectbox("Horizon", HORIZON_OPTIONS, format_func=lambda h: HORIZON_LABEL[h])
+        submitted = c5.form_submit_button("Add ticker (paused)")
         if submitted:
             if not symbol.strip():
                 st.error("Symbol is required.")
             else:
-                store.add_ticker(symbol, name, exchange, status="paused")
+                store.add_ticker(symbol, name, exchange, status="paused", strategy_horizon=horizon)
                 st.rerun()
 
 
 _TRADE_HISTORY_COLUMNS = {
     "id": "Trade #", "ticker": "Ticker", "order_type": "Type", "execution_price": "Price",
     "shares": "Shares", "entry_price": "Entry", "realized_pnl_usd": "PnL ($)",
-    "realized_pnl_pct": "PnL (%)", "portfolio_cash_after": "Cash after", "timestamp": "Time",
+    "realized_pnl_pct": "PnL (%)", "exit_reason": "Exit Reason",
+    "holding_duration_seconds": "Held (s)", "portfolio_cash_after": "Cash after", "timestamp": "Time",
 }
 
+_MARKET_SESSION_ET = ZoneInfo("America/New_York")
 
-def render_paper_trading(paper_store: PaperTradingStore, watchlist_store: TickerWatchlistStore) -> None:
+
+def _market_session_banner(now_utc: datetime) -> str:
+    """Display-only read of the same clock-time windows talonx_quant's
+    entry-blackout gate and talonx_paper's EOD-flatten sweep act on
+    (09:30/09:45/15:30/16:00 ET) -- duplicated here rather than imported,
+    same "shadow constant, documented as an approximation" pattern
+    talonx_quant.config's assumed_stop_loss_pct already uses for a
+    cross-module display value, since this Streamlit process has no live
+    handle into either module to ask directly."""
+    local_time = now_utc.astimezone(_MARKET_SESSION_ET).time()
+    if time(9, 45) <= local_time < time(15, 30):
+        return "\U0001F7E2 **ACTIVE TRADING**"
+    if time(9, 30) <= local_time < time(9, 45) or time(15, 30) <= local_time < time(16, 0):
+        return "\U0001F7E1 **ENTRY BLACKOUT** — no new entries until the next window"
+    return "\U0001F534 **EOD FLATTENED / CLOSED**"
+
+
+def _highlight_exit_reason(row: pd.Series) -> list[str]:
+    """Row-level highlight for the closed-trades table: EOD_FLAT_LIQUIDATION
+    in blue, STOP_LOSS in red -- BUY rows and other exit reasons get no
+    highlight (Exit Reason is None/NaN for a BUY, matching every other
+    SELL-only column in this table)."""
+    reason = row.get("Exit Reason")
+    if reason == "eod_flat_liquidation":
+        color = "background-color: rgba(59, 130, 246, 0.18)"
+    elif reason == "stop_loss_exit":
+        color = "background-color: rgba(220, 38, 38, 0.18)"
+    else:
+        color = ""
+    return [color] * len(row)
+
+
+def render_paper_trading(paper_store: PaperTradingStore) -> None:
     st.subheader("\U0001F4B0 Paper Trading")
     st.caption(
         "Virtual broker: simulates a BUY on a CONFIRMED_BULLISH alert and a SELL on "
         "CONFIRMED_BEARISH/CONTRADICTED, for tickers enabled below. Only ONE open "
         "position per ticker at a time -- a repeat signal while already in that state "
-        "is ignored, not stacked."
+        "is ignored, not stacked. Settings (allocation, ticker enablement, reset) are "
+        "in the Watchlist & Settings tab."
     )
+    st.markdown(_market_session_banner(datetime.now(timezone.utc)))
 
     summary = paper_store.get_portfolio_summary()
     open_positions = paper_store.get_open_positions()
@@ -267,37 +396,6 @@ def render_paper_trading(paper_store: PaperTradingStore, watchlist_store: Ticker
     )
     m4.metric("Open positions", summary["open_positions_count"])
 
-    with st.expander("⚙️ Settings", expanded=False):
-        s1, s2, s3 = st.columns([1, 1, 1])
-        new_balance = s1.number_input(
-            "Starting balance ($)", min_value=100.0, value=float(summary["initial_balance"]), step=500.0,
-            help="Only takes effect via Reset Portfolio below -- changing this alone doesn't touch the live balance.",
-        )
-        new_allocation = s2.number_input(
-            "Trade allocation ($/position)", min_value=10.0, value=float(summary["trade_allocation_usd"]), step=100.0,
-            help="Fixed $ spent per BUY, capped at whatever cash is actually available.",
-        )
-        if s3.button("Save allocation"):
-            paper_store.update_trade_allocation(new_allocation)
-            st.rerun()
-
-        tracked = [t["symbol"] for t in watchlist_store.list_tickers()]
-        currently_enabled = watchlist_store.list_paper_trading_symbols()
-        enabled = st.multiselect(
-            "Enable paper trading for", options=tracked, default=currently_enabled,
-            help="Only tracked tickers selected here are ever traded by the paper engine.",
-        )
-        if set(enabled) != set(currently_enabled):
-            for symbol in tracked:
-                watchlist_store.set_paper_trading(symbol, symbol in enabled)
-            st.rerun()
-
-        st.divider()
-        confirm_reset = st.checkbox("I understand this clears all open positions and trade history")
-        if st.button("\U0001F504 Reset Portfolio", disabled=not confirm_reset, type="primary"):
-            paper_store.reset_portfolio(new_balance, new_allocation)
-            st.rerun()
-
     if open_positions:
         st.markdown("**Open positions**")
         rows = []
@@ -310,7 +408,7 @@ def render_paper_trading(paper_store: PaperTradingStore, watchlist_store: Ticker
                 "Entry": pos["entry_price"], "Live price": live,
                 "Unrealized PnL ($)": round(u_pnl, 2), "Unrealized PnL (%)": round(u_pnl_pct, 2),
             })
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     else:
         st.info("No open positions.")
 
@@ -344,15 +442,346 @@ def render_paper_trading(paper_store: PaperTradingStore, watchlist_store: Ticker
             )
             .properties(height=250)
         )
-        st.altair_chart(chart, use_container_width=True)
+        st.altair_chart(chart, width="stretch")
 
     st.markdown("**Trade history**")
     display_df = hdf.rename(columns=_TRADE_HISTORY_COLUMNS)
-    st.dataframe(display_df, hide_index=True, use_container_width=True)
+    st.dataframe(display_df.style.apply(_highlight_exit_reason, axis=1), hide_index=True, width="stretch")
     st.download_button(
         "\U0001F4E5 Download trade history (CSV)",
         data=hdf.to_csv(index=False).encode("utf-8"),
         file_name="talonx_paper_trades.csv",
+        mime="text/csv",
+    )
+
+
+def render_paper_trading_settings(paper_store: PaperTradingStore, watchlist_store: TickerWatchlistStore) -> None:
+    """Intraday Module 6 settings -- extracted out of render_paper_trading
+    so Tab 1 (the live monitor) stays read-mostly and every settings
+    control lives together in Tab 3, matching that tab's "Watchlist &
+    Settings" purpose."""
+    summary = paper_store.get_portfolio_summary()
+    with st.expander("\U0001F4B0 Intraday Paper Trading Settings", expanded=False):
+        s1, s2, s3 = st.columns([1, 1, 1])
+        new_balance = s1.number_input(
+            "Starting balance ($)", min_value=100.0, value=float(summary["initial_balance"]), step=500.0,
+            help="Only takes effect via Reset Portfolio below -- changing this alone doesn't touch the live balance.",
+        )
+        new_allocation = s2.number_input(
+            "Trade allocation ($/position)", min_value=10.0, value=float(summary["trade_allocation_usd"]), step=100.0,
+            help="Fixed $ spent per BUY, capped at whatever cash is actually available.",
+        )
+        if s3.button("Save allocation", key="save_intraday_allocation"):
+            paper_store.update_trade_allocation(new_allocation)
+            st.rerun()
+
+        tracked = [t["symbol"] for t in watchlist_store.list_tickers()]
+        currently_enabled = watchlist_store.list_paper_trading_symbols()
+        enabled = st.multiselect(
+            "Enable intraday paper trading for", options=tracked, default=currently_enabled,
+            help="Only tracked tickers selected here are ever traded by the INTRADAY paper engine. "
+                 "Independent of the Long-Term Paper Trading Settings toggle below -- a DUAL_HORIZON "
+                 "ticker can have one enabled without the other.",
+        )
+        if set(enabled) != set(currently_enabled):
+            for symbol in tracked:
+                watchlist_store.set_paper_trading(symbol, symbol in enabled)
+            st.rerun()
+
+        st.divider()
+        confirm_reset = st.checkbox(
+            "I understand this clears all open positions and trade history",
+            key="confirm_reset_intraday",
+        )
+        if st.button(
+            "\U0001F504 Reset Intraday Portfolio", disabled=not confirm_reset, type="primary",
+            key="reset_intraday_portfolio",
+        ):
+            paper_store.reset_portfolio(new_balance, new_allocation)
+            st.rerun()
+
+
+def render_long_term_paper_settings(paper_store: PaperTradingStore, watchlist_store: TickerWatchlistStore) -> None:
+    """Phase 2's sibling to render_paper_trading_settings above -- its own
+    starting balance/DCA amount/rebalance trim %, its own ticker-enablement
+    toggle (a SEPARATE flag from the intraday one -- see
+    talonx_watchlist/store.py's set_paper_trading_long_term), and its own
+    independent Reset button (deliberately NOT the same reset as the
+    intraday portfolio -- the two cash pools are fully separate, see
+    store.py)."""
+    lt_summary = paper_store.get_long_term_portfolio_summary()
+    with st.expander("\U0001F48E Long-Term Paper Trading Settings", expanded=False):
+        s1, s2 = st.columns([1, 1])
+        new_lt_balance = s1.number_input(
+            "Starting balance ($)", min_value=100.0, value=float(lt_summary["initial_balance"]), step=1000.0,
+            help="Only takes effect via Reset Long-Term Portfolio below.",
+            key="lt_new_balance",
+        )
+        new_dca = s2.number_input(
+            "DCA contribution ($/cycle)", min_value=10.0, value=float(lt_summary["dca_contribution_usd"]), step=50.0,
+            help="Added to every currently-open long-term position on each recurring DCA cycle "
+                 "(TALONX_PAPER_DCA_INTERVAL_DAYS, default 30 days).",
+        )
+        if st.button("Save DCA amount"):
+            paper_store.update_dca_contribution_amount(new_dca)
+            st.rerun()
+
+        tracked = [t["symbol"] for t in watchlist_store.list_tickers()]
+        currently_enabled_lt = watchlist_store.list_paper_trading_long_term_symbols()
+        enabled_lt = st.multiselect(
+            "Enable long-term paper trading for", options=tracked, default=currently_enabled_lt,
+            help="Only tracked tickers selected here are ever traded by the LONG-TERM paper engine "
+                 "(and only if they're also tagged LONG_TERM or DUAL_HORIZON -- untagged tickers "
+                 "never receive a long-term alert to act on regardless of this toggle). Independent "
+                 "of the intraday toggle above.",
+        )
+        if set(enabled_lt) != set(currently_enabled_lt):
+            for symbol in tracked:
+                watchlist_store.set_paper_trading_long_term(symbol, symbol in enabled_lt)
+            st.rerun()
+
+        st.divider()
+        confirm_reset = st.checkbox(
+            "I understand this clears all open long-term positions and trade history",
+            key="confirm_reset_long_term",
+        )
+        if st.button(
+            "\U0001F504 Reset Long-Term Portfolio", disabled=not confirm_reset, type="primary",
+            key="reset_long_term_portfolio",
+        ):
+            paper_store.reset_long_term_portfolio(new_lt_balance, new_dca)
+            st.rerun()
+
+
+_LT_TRADE_HISTORY_COLUMNS = {
+    "id": "Trade #", "ticker": "Ticker", "order_type": "Type", "execution_price": "Price",
+    "shares": "Shares", "contribution_cost": "Cost/Proceeds ($)", "avg_cost_basis_after": "Avg cost after",
+    "total_shares_after": "Shares after", "realized_pnl_usd": "PnL ($)", "realized_pnl_pct": "PnL (%)",
+    "holding_period_days": "Held (days)", "portfolio_cash_after": "Cash after", "timestamp": "Time",
+}
+
+
+_EARNINGS_SESSION_LABEL = {
+    "BEFORE_MARKET": "Before-Market",
+    "AFTER_MARKET": "After-Market",
+    "UNSPECIFIED": "Time TBD",
+}
+
+
+def render_upcoming_earnings_calendar(watchlist_store: TickerWatchlistStore) -> None:
+    """Event-Driven Earnings Radar, Requirement 9. Emoji-prefixed urgency
+    (🟢 within 48h / 🟡 within 7 days / ⚪ beyond) -- matching this
+    dashboard's established visual-signaling convention (ACTION_EMOJI/
+    SEVERITY_EMOJI/MOAT_EMOJI), not pandas.Styler cell-coloring, which has
+    no precedent anywhere else in this file."""
+    st.subheader("\U0001F4C5 Upcoming Earnings Calendar")
+    st.caption(
+        "Next known earnings date per LONG_TERM/DUAL_HORIZON ticker, synced weekly from "
+        "yfinance. Session frequently shows as \"Time TBD\" -- yfinance doesn't reliably "
+        "expose Before/After-Market timing."
+    )
+    rows = watchlist_store.list_upcoming_earnings()
+    if not rows:
+        st.info("No upcoming earnings dates synced yet -- runs weekly once a ticker is tagged LONG_TERM.")
+        return
+
+    # One list_tickers() call, not one get_ticker() PER ROW -- each
+    # get_ticker() is its own locked SQLite round-trip (see
+    # TickerWatchlistStore's docstring), and this whole function reruns
+    # every TALONX_DISPATCH_AUTOREFRESH_MS regardless of which tab is
+    # actually visible (Streamlit re-executes every `with tab:` block on
+    # every script rerun, not just the active one).
+    company_names = {t["symbol"]: t["name"] for t in watchlist_store.list_tickers()}
+
+    now = datetime.now(timezone.utc)
+    calendar_rows = []
+    for row in rows:
+        try:
+            earnings_date = datetime.fromisoformat(row["earnings_date"]).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        hours_until = (earnings_date - now).total_seconds() / 3600.0
+        if hours_until <= 48:
+            urgency = "\U0001F7E2"  # green
+        elif hours_until <= 24 * 7:
+            urgency = "\U0001F7E1"  # amber
+        else:
+            urgency = "⚪"
+        company_name = company_names.get(row["ticker"], row["ticker"])
+        calendar_rows.append({
+            "": urgency,
+            "Ticker": row["ticker"],
+            "Company": company_name,
+            "Reporting date": row["earnings_date"],
+            "Session": _EARNINGS_SESSION_LABEL.get(row["session"], "Time TBD"),
+            "Reporting period": row["reporting_period"] or "—",
+            "Heads-up sent": "✅" if row["heads_up_sent"] else "—",
+        })
+    calendar_df = pd.DataFrame(calendar_rows)
+    st.dataframe(calendar_df, hide_index=True, width="stretch")
+
+
+def _last_earnings_event_label(row: dict) -> str:
+    """Event-Driven Earnings Radar, Requirement 9's "Last Earnings Event"
+    column -- fully derivable from the alert row itself (is_earnings_related/
+    previous_fair_value/intrinsic_fair_value/correlated_at), no new
+    storage needed. Blank for a routine (non-earnings) alert, or one that
+    predates this feature (previous_fair_value is None -- nothing to
+    diff against)."""
+    if not row.get("is_earnings_related") or not row.get("previous_fair_value"):
+        return ""
+    previous_fair_value = row["previous_fair_value"]
+    delta_pct = (row["intrinsic_fair_value"] - previous_fair_value) / previous_fair_value * 100.0
+    date = row["correlated_at"][:10]
+    return f"{date}: Fair Value {delta_pct:+.1f}%"
+
+
+def render_valuation_radar(rows: list[dict]) -> None:
+    st.subheader("\U0001F48E Valuation & Margin of Safety Radar")
+    st.caption(
+        "Latest long-term alert per ticker -- current price vs. talonx_brain's DCF fair "
+        "value, quality score (0-10), and moat rating. Only tickers that have cleared the "
+        "fundamental factor threshold and produced at least one long-term alert show up here."
+    )
+    if not rows:
+        st.info("No long-term alerts yet. Tag a ticker LONG_TERM in the watchlist tab and wait for a signal.")
+        return
+
+    latest_per_ticker: dict[str, dict] = {}
+    for row in rows:  # DESC by correlated_at/id -- first occurrence per ticker is the latest
+        latest_per_ticker.setdefault(row["ticker"], row)
+
+    radar_rows = [
+        {
+            "Ticker": row["ticker"],
+            "Action": f"{LT_ACTION_EMOJI.get(row['action'], '')} {row['action'].replace('_', ' ').title()}",
+            "Price": row["market_price"],
+            "Fair value": row["intrinsic_fair_value"],
+            "Margin of safety %": row["margin_of_safety_pct"] * 100,
+            "Quality": row["quality_score"],
+            "Moat": f"{MOAT_EMOJI.get(row['moat_rating'], '')} {row['moat_rating'].title()}",
+            "Last evaluated": row["correlated_at"][:19].replace("T", " "),
+            "Last earnings event": _last_earnings_event_label(row),
+        }
+        for row in latest_per_ticker.values()
+    ]
+    radar_df = pd.DataFrame(radar_rows).sort_values("Margin of safety %", ascending=False)
+    st.dataframe(
+        radar_df, hide_index=True, width="stretch",
+        column_config={
+            "Price": st.column_config.NumberColumn(format="$%.2f"),
+            "Fair value": st.column_config.NumberColumn(format="$%.2f"),
+            "Margin of safety %": st.column_config.NumberColumn(format="%.1f%%"),
+            "Quality": st.column_config.ProgressColumn(min_value=0, max_value=10, format="%d/10"),
+        },
+    )
+
+
+def render_long_term_research_viewer(rows: list[dict]) -> None:
+    st.subheader("\U0001F4DA Long-Term Research")
+    st.caption("The latest moat/capital-allocation/DCF writeup behind each ticker's radar row above.")
+    if not rows:
+        st.info("Nothing yet.")
+        return
+
+    latest_per_ticker: dict[str, dict] = {}
+    for row in rows:
+        latest_per_ticker.setdefault(row["ticker"], row)
+
+    for ticker in sorted(latest_per_ticker):
+        row = latest_per_ticker[ticker]
+        emoji = LT_ACTION_EMOJI.get(row["action"], "")
+        moat = MOAT_EMOJI.get(row["moat_rating"], "")
+        title = (
+            f"{emoji} {ticker} — {row['action'].replace('_', ' ').title()} "
+            f"({moat} {row['moat_rating'].title()} moat, quality {row['quality_score']}/10)"
+        )
+        with st.expander(title, expanded=False):
+            c1, c2, c3 = st.columns(3)
+            c1.write(f"**Price:** ${row['market_price']:,.2f}")
+            c2.write(f"**Fair value:** ${row['intrinsic_fair_value']:,.2f}")
+            c3.write(f"**Margin of safety:** {row['margin_of_safety_pct']:+.1%}")
+
+            st.write(row["rationale"])
+            st.markdown(f"**Capital allocation:** {row['capital_allocation_assessment']}")
+
+            if row["key_findings"]:
+                st.markdown("**Key findings:**")
+                for f in row["key_findings"]:
+                    st.markdown(f"- {f}")
+            if row["risk_factors"]:
+                st.markdown("**Risks:**")
+                for r in row["risk_factors"]:
+                    st.markdown(f"- {r}")
+
+            st.caption(f"{row['model_used']} · {row['correlated_at']}")
+
+
+def render_long_term_portfolio(paper_store: PaperTradingStore) -> None:
+    st.subheader("\U0001F4B0 Long-Term Portfolio")
+    st.caption(
+        "A SEPARATE cash pool and position ledger from the intraday paper portfolio "
+        "(Tab 1) -- HIGH_CONVICTION_BUY opens a position, ongoing conviction is expressed "
+        "via recurring DCA contributions rather than repeated buys, TAKE_PROFIT_REBALANCE "
+        "trims a fraction, UNDER_PERFORM_REBALANCE exits fully."
+    )
+
+    summary = paper_store.get_long_term_portfolio_summary()
+    open_positions = paper_store.get_open_long_term_positions()
+    latest_prices = paper_store.get_latest_prices()
+
+    open_value = 0.0
+    total_contributed = 0.0
+    for pos in open_positions:
+        open_value += pos["total_shares"] * latest_prices.get(pos["ticker"], pos["avg_cost_basis"])
+        total_contributed += pos["total_contributed_usd"]
+    total_value = summary["current_cash"] + open_value
+    total_pnl = total_value - summary["initial_balance"]
+    total_pnl_pct = (total_pnl / summary["initial_balance"] * 100) if summary["initial_balance"] else 0.0
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Portfolio value", f"${total_value:,.2f}", f"{total_pnl:+,.2f} ({total_pnl_pct:+.2f}%)")
+    m2.metric("Cash", f"${summary['current_cash']:,.2f}")
+    m3.metric("Total DCA contributed", f"${total_contributed:,.2f}")
+    m4.metric("Open positions", summary["open_positions_count"])
+
+    if open_positions:
+        st.markdown("**Open positions**")
+        rows = []
+        for pos in open_positions:
+            live = latest_prices.get(pos["ticker"], pos["avg_cost_basis"])
+            u_pnl = pos["total_shares"] * (live - pos["avg_cost_basis"])
+            u_pnl_pct = ((live - pos["avg_cost_basis"]) / pos["avg_cost_basis"] * 100) if pos["avg_cost_basis"] else 0.0
+            rows.append({
+                "Ticker": pos["ticker"], "Shares": round(pos["total_shares"], 4),
+                "Avg cost basis": pos["avg_cost_basis"], "Live price": live,
+                "Total contributed ($)": round(pos["total_contributed_usd"], 2),
+                "First entry": pos["first_entry_at"][:19].replace("T", " "),
+                "Unrealized PnL ($)": round(u_pnl, 2), "Unrealized PnL (%)": round(u_pnl_pct, 2),
+            })
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    else:
+        st.info("No open long-term positions.")
+
+    history = paper_store.get_long_term_trade_history()
+    if not history:
+        st.info("No long-term trades executed yet.")
+        return
+
+    hdf = pd.DataFrame(history)
+
+    st.markdown("**Equity curve**")
+    equity_df = hdf.sort_values("id")[["timestamp", "portfolio_cash_after"]].copy()
+    equity_df["timestamp"] = pd.to_datetime(equity_df["timestamp"])
+    st.area_chart(equity_df.set_index("timestamp").rename(columns={"portfolio_cash_after": "Cash after trade"}))
+
+    st.markdown("**Trade history** (BUY / DCA_CONTRIBUTION / SELL)")
+    display_df = hdf.rename(columns=_LT_TRADE_HISTORY_COLUMNS)
+    st.dataframe(display_df, hide_index=True, width="stretch")
+    st.download_button(
+        "\U0001F4E5 Download long-term trade history (CSV)",
+        data=hdf.to_csv(index=False).encode("utf-8"),
+        file_name="talonx_paper_long_term_trades.csv",
         mime="text/csv",
     )
 
@@ -391,31 +820,185 @@ def render_feed(rows: list[dict], limit: int = 20) -> None:
             st.caption(f"{row['model_used']} · {row['correlated_at']}")
 
 
-def render_audit_trail(df: pd.DataFrame) -> None:
-    st.subheader("Audit trail")
-    if df.empty:
-        st.info("Nothing recorded yet.")
+def _apply_date_range_filter(df: pd.DataFrame, date_col: str, date_range: tuple) -> pd.DataFrame:
+    """st.date_input(value=()) returns an empty tuple until the user picks
+    a date, a 1-tuple after just the start date, and a 2-tuple once both
+    are picked -- handles all three (no filter / single-day / inclusive
+    range). Compared as UTC calendar dates, matching how every timestamp
+    in this project is stored (datetime.now(timezone.utc).isoformat())."""
+    if not date_range:
+        return df
+    dates = pd.to_datetime(df[date_col], utc=True).dt.date
+    start = date_range[0]
+    end = date_range[1] if len(date_range) > 1 else date_range[0]
+    return df[(dates >= start) & (dates <= end)]
+
+
+def _fetch_daily_metrics(client: redis.Redis, date_str: str) -> dict[str, dict[str, int]]:
+    """Reads every `metrics:{date_str}:{module}:{counter}` key written by
+    the 5 producer modules' `_incr_metric` helpers, grouped back into
+    {module: {counter: value}}. Returns {} (not raises) on a Redis
+    outage -- the rest of the dashboard must stay usable even if this
+    one tab's data source is down."""
+    metrics: dict[str, dict[str, int]] = {}
+    try:
+        keys = list(client.scan_iter(match=f"metrics:{date_str}:*", count=200))
+        if not keys:
+            return metrics
+        values = client.mget(keys)
+    except Exception as exc:  # noqa: BLE001 -- a Redis outage shouldn't crash the dashboard
+        st.warning(f"Could not read metrics from Redis: {exc}")
+        return metrics
+
+    for key, value in zip(keys, values):
+        if value is None:
+            continue
+        _, _, module, counter = key.split(":", 3)
+        try:
+            metrics.setdefault(module, {})[counter] = int(value)
+        except ValueError:
+            continue
+    return metrics
+
+
+# Matches the README's funnel formula: Bars Ingested -> Quant Triggers ->
+# LLM Evaluated -> Core Alerts -> Telegram Pushes. "Core Alerts" is
+# computed (sum of the three intraday action_* counters), not a single
+# key -- talonx_core doesn't publish one flat "alerts produced" counter.
+_FUNNEL_STAGES = ["Bars Ingested", "Quant Triggers", "LLM Evaluated", "Core Alerts", "Telegram Pushes"]
+# Single series, magnitude (not identity) -- one hue, not a categorical
+# palette; matches the app's existing accent usage (green/red/amber are
+# already reserved for win/loss/pause elsewhere on this dashboard).
+_FUNNEL_BAR_COLOR = "#2563EB"
+
+
+def _funnel_counts(metrics: dict[str, dict[str, int]]) -> list[dict]:
+    core = metrics.get("core", {})
+    core_alerts = core.get("action_bullish", 0) + core.get("action_bearish", 0) + core.get("action_contradicted", 0)
+    values = [
+        metrics.get("ingest", {}).get("bars_read", 0),
+        metrics.get("quant", {}).get("evaluated", 0),
+        metrics.get("brain", {}).get("received", 0),
+        core_alerts,
+        metrics.get("dispatch", {}).get("pushed_telegram", 0),
+    ]
+    return [{"Stage": stage, "Count": count} for stage, count in zip(_FUNNEL_STAGES, values)]
+
+
+def render_daily_funnel_metrics(client: redis.Redis) -> None:
+    st.subheader("\U0001F4CA Daily Funnel & System Metrics")
+    st.caption(
+        "Stage-gate counters published by every module (ingest → quant → brain → "
+        "core → dispatch) to Redis, keyed per UTC day. Pick a date to see exact throughput "
+        "and drop reasons at each stage."
+    )
+
+    selected_date = st.date_input("Date (UTC)", value=datetime.now(timezone.utc).date(), key="funnel_date")
+    date_str = selected_date.strftime("%Y-%m-%d")
+
+    metrics = _fetch_daily_metrics(client, date_str)
+    if not metrics:
+        st.info(f"No metrics recorded for {date_str} yet.")
         return
 
-    col1, col2, col3 = st.columns(3)
-    tickers = col1.multiselect("Ticker", sorted(df["ticker"].unique()))
-    actions = col2.multiselect("Action", sorted(df["action"].unique()))
-    severities = col3.multiselect("Severity", sorted(df["severity"].unique()))
+    funnel_df = pd.DataFrame(_funnel_counts(metrics))
+    chart = (
+        alt.Chart(funnel_df)
+        .mark_bar(cornerRadiusEnd=4, size=28, color=_FUNNEL_BAR_COLOR)
+        .encode(
+            y=alt.Y("Stage:N", sort=_FUNNEL_STAGES, title=None),
+            x=alt.X("Count:Q", title="Count"),
+            tooltip=["Stage", "Count"],
+        )
+        .properties(height=220)
+    )
+    st.altair_chart(chart, width="stretch")
 
-    filtered = df
-    if tickers:
-        filtered = filtered[filtered["ticker"].isin(tickers)]
-    if actions:
-        filtered = filtered[filtered["action"].isin(actions)]
-    if severities:
-        filtered = filtered[filtered["severity"].isin(severities)]
-
-    display_cols = [
-        "id", "correlated_at", "ticker", "action", "severity",
-        "research_confidence", "price", "telegram_sent",
+    st.markdown("**Stage-gate breakdown (all counters, this date)**")
+    st.caption(
+        "Failed-gate counters (quant:failed_*, dispatch:muted_*) show exactly which check "
+        "dropped a candidate -- cross-reference against the funnel above to see where "
+        "throughput was lost."
+    )
+    breakdown_rows = [
+        {"Module": module, "Counter": counter, "Count": value}
+        for module in sorted(metrics)
+        for counter, value in sorted(metrics[module].items())
     ]
-    st.dataframe(filtered[display_cols], hide_index=True)
-    st.caption(f"{len(filtered)} of {len(df)} alert(s) shown")
+    st.dataframe(pd.DataFrame(breakdown_rows), hide_index=True, width="stretch")
+
+
+def render_audit_trail(df: pd.DataFrame, long_term_rows: list[dict]) -> None:
+    """Unified audit trail with a horizon filter -- a radio toggle rather
+    than one merged table, since the intraday/long-term field sets differ
+    too much to share display columns cleanly (same reasoning that kept
+    alerts/long_term_alerts as separate tables in store.py)."""
+    st.subheader("Audit trail")
+    horizon = st.radio("Horizon", ["Intraday", "Long-Term"], horizontal=True, key="audit_trail_horizon")
+    # Defaults to today (UTC, matching how every timestamp in this project
+    # is stored) rather than showing the full unbounded history -- pass a
+    # (start, end) 2-tuple, not a bare date, so date_input stays in range
+    # mode and _apply_date_range_filter's tuple handling still applies.
+    today = datetime.now(timezone.utc).date()
+
+    if horizon == "Intraday":
+        if df.empty:
+            st.info("Nothing recorded yet.")
+            return
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 1.4])
+        tickers = col1.multiselect("Ticker", sorted(df["ticker"].unique()), key="audit_intraday_ticker")
+        actions = col2.multiselect("Action", sorted(df["action"].unique()), key="audit_intraday_action")
+        severities = col3.multiselect("Severity", sorted(df["severity"].unique()), key="audit_intraday_severity")
+        date_range = col4.date_input(
+            "Date range", value=(today, today), key="audit_intraday_date_range",
+            help="Filters on correlated_at. Clear the field for no date filter.",
+        )
+
+        filtered = df
+        if tickers:
+            filtered = filtered[filtered["ticker"].isin(tickers)]
+        if actions:
+            filtered = filtered[filtered["action"].isin(actions)]
+        if severities:
+            filtered = filtered[filtered["severity"].isin(severities)]
+        filtered = _apply_date_range_filter(filtered, "correlated_at", date_range)
+
+        display_cols = [
+            "id", "correlated_at", "ticker", "action", "severity",
+            "research_confidence", "price", "telegram_sent", "suppress_reason",
+        ]
+        st.dataframe(filtered[display_cols], hide_index=True)
+        st.caption(f"{len(filtered)} of {len(df)} alert(s) shown")
+    else:
+        if not long_term_rows:
+            st.info("Nothing recorded yet.")
+            return
+        lt_df = pd.DataFrame(long_term_rows)
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 1.4])
+        tickers = col1.multiselect("Ticker", sorted(lt_df["ticker"].unique()), key="audit_lt_ticker")
+        actions = col2.multiselect("Action", sorted(lt_df["action"].unique()), key="audit_lt_action")
+        severities = col3.multiselect("Severity", sorted(lt_df["severity"].unique()), key="audit_lt_severity")
+        date_range = col4.date_input(
+            "Date range", value=(today, today), key="audit_lt_date_range",
+            help="Filters on correlated_at. Clear the field for no date filter.",
+        )
+
+        filtered = lt_df
+        if tickers:
+            filtered = filtered[filtered["ticker"].isin(tickers)]
+        if actions:
+            filtered = filtered[filtered["action"].isin(actions)]
+        if severities:
+            filtered = filtered[filtered["severity"].isin(severities)]
+        filtered = _apply_date_range_filter(filtered, "correlated_at", date_range)
+
+        display_cols = [
+            "id", "correlated_at", "ticker", "action", "severity", "quality_score",
+            "moat_rating", "market_price", "intrinsic_fair_value", "margin_of_safety_pct",
+            "telegram_sent", "suppress_reason",
+        ]
+        st.dataframe(filtered[display_cols], hide_index=True)
+        st.caption(f"{len(filtered)} of {len(lt_df)} alert(s) shown")
 
 
 def main() -> None:
@@ -430,6 +1013,7 @@ def main() -> None:
     watchlist_store = get_watchlist_store(watchlist_config.db_path)
     paper_store = get_paper_store(
         paper_config.db_path, paper_config.default_initial_balance, paper_config.default_trade_allocation_usd,
+        paper_config.default_long_term_initial_balance, paper_config.dca_contribution_usd,
     )
 
     st.title("\U0001F4E1 TalonX — Live Dashboard")
@@ -439,26 +1023,67 @@ def main() -> None:
         f"last render {datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}"
     )
 
-    render_ticker_watchlist(watchlist_store, watchlist_config.poll_interval_seconds)
-    st.divider()
+    # A plain st.tabs() would look nicer, but Streamlit renders ALL tab
+    # bodies on every single script rerun -- not just the visible one --
+    # so with a 5s autorefresh that meant every DB query on this page ran
+    # 3x per tick regardless of which tab you were actually looking at.
+    # st.radio only executes the branch that's actually selected, so an
+    # idle session now does ~1/3 the work. Persisted in session_state so
+    # the selection survives the autorefresh rerun.
+    section = st.radio(
+        "View",
+        [
+            "\U0001F4C8 Intraday Monitor", "\U0001F48E Long-Term Radar",
+            "\U0001F4CA Daily Funnel & Metrics", "⚙️ Watchlist & Settings",
+        ],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="active_section",
+    )
 
-    render_paper_trading(paper_store, watchlist_store)
-    st.divider()
+    if section == "\U0001F4C8 Intraday Monitor":
+        rows = store.recent(limit=config.feed_limit)
+        df = pd.DataFrame(rows)
+        render_metrics(df)
+        st.divider()
 
-    rows = store.recent(limit=config.feed_limit)
-    df = pd.DataFrame(rows)
+        left, right = st.columns([1, 2])
+        with left:
+            render_alert_history(store)
+        with right:
+            render_feed(rows)
 
-    render_metrics(df)
-    st.divider()
+        st.divider()
+        render_paper_trading(paper_store)
 
-    left, right = st.columns([1, 2])
-    with left:
-        render_alert_history(store)
-    with right:
-        render_feed(rows)
+    elif section == "\U0001F48E Long-Term Radar":
+        render_upcoming_earnings_calendar(watchlist_store)
+        st.divider()
+        # Fetched ONCE and shared -- both functions below independently
+        # read the identical store.recent_long_term(limit=500) before,
+        # doubling that query (SQL + per-row JSON decode of up to 500
+        # rows) on every single autorefresh tick for no reason.
+        long_term_alert_rows = store.recent_long_term(limit=500)
+        render_valuation_radar(long_term_alert_rows)
+        st.divider()
+        render_long_term_portfolio(paper_store)
+        st.divider()
+        render_long_term_research_viewer(long_term_alert_rows)
 
-    st.divider()
-    render_audit_trail(df)
+    elif section == "\U0001F4CA Daily Funnel & Metrics":
+        redis_client = get_redis_client(config.redis_url)
+        render_daily_funnel_metrics(redis_client)
+
+    else:
+        render_ticker_watchlist(watchlist_store, watchlist_config.poll_interval_seconds)
+        st.divider()
+        render_paper_trading_settings(paper_store, watchlist_store)
+        render_long_term_paper_settings(paper_store, watchlist_store)
+        st.divider()
+        rows = store.recent(limit=config.feed_limit)
+        df = pd.DataFrame(rows)
+        long_term_rows = store.recent_long_term(limit=config.feed_limit)
+        render_audit_trail(df, long_term_rows)
 
 
 if __name__ == "__main__":

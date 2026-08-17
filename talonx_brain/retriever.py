@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 
 from talonx_ingest.config import settings as ingest_settings
-from talonx_ingest.storage.vector_store import VectorStore
+from talonx_ingest.storage.vector_store import VectorStore, get_vector_store
 
 from talonx_brain.config import BrainConfig
 from talonx_brain.schemas import Citation, CitationSourceType
@@ -40,7 +40,13 @@ class ContextRetriever:
         news_store: VectorStore | None = None,
     ):
         self.config = config or BrainConfig()
-        self._filings_store = filings_store or VectorStore()
+        # get_vector_store(): process-wide cache keyed by collection name --
+        # run_talonx.py runs this ResearchAgent in the SAME process as
+        # talonx_ingest's own run_ingestion()/EarningsFastTrackPoller, which
+        # already populate this cache for the default "sec_filings"
+        # collection; reusing it here means the embedding model is shared
+        # rather than a second full copy sitting resident in memory.
+        self._filings_store = filings_store or get_vector_store()
         # Lazily constructed (see _get_news_store) so a real Chroma client
         # for news_feed isn't built when include_news_context is False, or
         # in tests that only care about filings.
@@ -48,17 +54,41 @@ class ContextRetriever:
 
     def _get_news_store(self) -> VectorStore:
         if self._news_store is None:
-            self._news_store = VectorStore(
+            self._news_store = get_vector_store(
                 collection_name=ingest_settings.news.vector_collection_name
             )
         return self._news_store
 
     def retrieve(
-        self, ticker: str, query_text: str, n_results: int | None = None
+        self, ticker: str, query_text: str, n_results: int | None = None,
+        form_type: str | list[str] | None = None,
     ) -> list[Citation]:
+        """`form_type` (e.g. "10-K") is Phase 2's LONG_TERM path narrowing
+        retrieval to annual-report text specifically, skipping 10-Qs --
+        chunker.py already writes form_type into every filing chunk's
+        metadata, so this is a plain equality filter Chroma already
+        supports; the intraday path leaves it None (no filter, matches
+        every form type, exactly today's behavior).
+
+        Also accepts a LIST of form types (e.g. ["10-K", "10-Q", "8-K"])
+        -- the Event-Driven Earnings Radar's post-earnings recalculation
+        needs the freshly-ingested 8-K/10-Q chunks alongside the prior
+        10-K's full-year context, not just one form type in isolation.
+        Chroma's `$in` operator handles this the same way `$and` handles
+        the two-field case below."""
         n = n_results or self.config.retrieval_top_k
+        # Chroma's `where` rejects a raw multi-key dict ({"a": x, "b": y})
+        # -- combining two field filters requires the explicit "$and"
+        # operator form. Single-field filters (the intraday path, and the
+        # news query below) stay a plain dict, which Chroma does accept.
+        if form_type is None:
+            where = {"ticker": ticker.upper()}
+        elif isinstance(form_type, list):
+            where = {"$and": [{"ticker": ticker.upper()}, {"form_type": {"$in": form_type}}]}
+        else:
+            where = {"$and": [{"ticker": ticker.upper()}, {"form_type": form_type}]}
         filing_results = self._filings_store.query(
-            query_text=query_text, n_results=n, where={"ticker": ticker.upper()}
+            query_text=query_text, n_results=n, where=where
         )
         citations = _to_citations(
             filing_results, CitationSourceType.FILING, self.config.excerpt_max_chars

@@ -8,6 +8,7 @@ other local SQLite stores.
 """
 from __future__ import annotations
 
+import sqlite3
 import threading
 from datetime import datetime, timedelta, timezone
 
@@ -15,6 +16,8 @@ from talonx_dispatch.schemas import (
     ActionableAlert,
     AlertAction,
     AlertSeverity,
+    LongTermActionableAlert,
+    MoatRating,
     ResearchVerdict,
     SignalDirection,
     TriggeringSignalRef,
@@ -216,6 +219,86 @@ def test_alerts_between_returns_empty_list_when_nothing_matches(tmp_path):
         assert store.alerts_between(NOW, NOW + timedelta(hours=1)) == []
 
 
+def test_record_alert_leaves_suppress_reason_null_until_a_push_decision_is_made(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_alert(_alert())
+        row = store.get_by_id(alert_id)
+        assert row["suppress_reason"] is None
+
+
+def test_mark_suppressed_records_the_reason(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_alert(_alert())
+        store.mark_suppressed(alert_id, "ACTION_MUTED")
+
+        row = store.get_by_id(alert_id)
+        assert row["suppress_reason"] == "ACTION_MUTED"
+        assert row["telegram_sent"] is False
+
+
+def test_mark_telegram_sent_sets_suppress_reason_to_the_literal_none_value(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_alert(_alert())
+        store.mark_telegram_sent(alert_id)
+
+        row = store.get_by_id(alert_id)
+        assert row["suppress_reason"] == "NONE"
+
+
+def test_mark_telegram_failed_sets_suppress_reason_to_the_literal_none_value(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_alert(_alert())
+        store.mark_telegram_failed(alert_id, "bad token")
+
+        row = store.get_by_id(alert_id)
+        assert row["suppress_reason"] == "NONE"
+
+
+def test_stale_alerts_table_is_dropped_and_recreated_not_migrated_in_place(tmp_path):
+    """Simulates a real pre-existing dispatch_audit.db from before the
+    Phase 2 technical-detail columns (rsi/macd/.../session) were added to
+    `alerts`. Per project direction, this table is dropped and recreated
+    on startup rather than ALTER TABLE'd -- local dev audit data isn't
+    worth an incremental migration for this change, unlike every other
+    table's guard in this file. The pre-existing row does NOT survive;
+    the store must still come up clean and usable afterward."""
+    db_path = tmp_path / "legacy_audit.db"
+
+    legacy_conn = sqlite3.connect(db_path)
+    legacy_conn.execute(
+        "CREATE TABLE alerts ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT NOT NULL, action TEXT NOT NULL, "
+        "severity TEXT NOT NULL, rationale TEXT NOT NULL, quant_direction TEXT NOT NULL, "
+        "research_verdict TEXT NOT NULL, research_confidence REAL NOT NULL, signal_type TEXT NOT NULL, "
+        "price REAL NOT NULL, research_summary TEXT NOT NULL, key_findings_json TEXT NOT NULL, "
+        "risk_factors_json TEXT NOT NULL, model_used TEXT NOT NULL, correlated_at TEXT NOT NULL, "
+        "received_at TEXT NOT NULL, telegram_sent INTEGER NOT NULL DEFAULT 0, "
+        "telegram_sent_at TEXT, telegram_error TEXT)"
+    )
+    legacy_conn.execute(
+        "INSERT INTO alerts (ticker, action, severity, rationale, quant_direction, research_verdict, "
+        "research_confidence, signal_type, price, research_summary, key_findings_json, risk_factors_json, "
+        "model_used, correlated_at, received_at) VALUES ('MSFT', 'confirmed_bullish', 'warning', "
+        "'pre-migration rationale', 'bullish', 'bullish', 0.8, 'macd_bullish_cross', 503.81, "
+        "'summary', '[]', '[]', 'gemini-flash-latest', '2026-08-11T18:51:43+00:00', "
+        "'2026-08-11T18:51:44+00:00')"
+    )
+    legacy_conn.commit()
+    legacy_conn.close()
+
+    with AuditStore(db_path) as store:
+        rows = store.recent()
+        assert rows == []  # dropped, not migrated -- the legacy row is gone
+
+        # Store is fully usable afterward, with the new columns present.
+        alert_id = store.record_alert(_alert())
+        row = store.get_by_id(alert_id)
+        assert row["suppress_reason"] is None
+        assert "rsi" in row
+        store.mark_suppressed(alert_id, "PUSH_COOLDOWN_ACTIVE")
+        assert store.get_by_id(alert_id)["suppress_reason"] == "PUSH_COOLDOWN_ACTIVE"
+
+
 def test_state_persists_across_reopen(tmp_path):
     path = tmp_path / "audit.db"
     with AuditStore(path) as store:
@@ -225,3 +308,438 @@ def test_state_persists_across_reopen(tmp_path):
     # running as separate processes against the same file) -- must survive.
     with AuditStore(path) as store2:
         assert store2.count() == 1
+
+
+# ==========================================================================
+# Phase 2 LONG_TERM path
+# ==========================================================================
+
+def _long_term_alert(
+    ticker: str = "AAPL", action: AlertAction = AlertAction.HIGH_CONVICTION_BUY, correlated_at: datetime = NOW,
+    is_earnings_related: bool = False, previous_fair_value: float | None = None,
+    previous_margin_of_safety_pct: float | None = None, guidance_revision_notes: str | None = None,
+) -> LongTermActionableAlert:
+    return LongTermActionableAlert(
+        ticker=ticker, action=action, severity=AlertSeverity.CRITICAL,
+        rationale="FY2025 fundamentals clear thresholds.",
+        summary="Strong recurring revenue and durable moat support the thesis.",
+        quality_score=8, moat_rating=MoatRating.WIDE, market_price=75.0,
+        intrinsic_fair_value=100.0, margin_of_safety_pct=0.25,
+        capital_allocation_assessment="Disciplined buybacks.",
+        key_findings=["Strong recurring revenue"], risk_factors=["Regulatory scrutiny"],
+        model_used="gemini-flash-latest", correlated_at=correlated_at, published_at=correlated_at,
+        is_earnings_related=is_earnings_related, previous_fair_value=previous_fair_value,
+        previous_margin_of_safety_pct=previous_margin_of_safety_pct,
+        guidance_revision_notes=guidance_revision_notes,
+    )
+
+
+def test_record_long_term_alert_returns_an_id(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(_long_term_alert())
+        assert alert_id == 1
+        assert store.count_long_term() == 1
+
+
+def test_long_term_and_intraday_alerts_are_fully_independent(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_alert(_alert())
+        store.record_long_term_alert(_long_term_alert())
+
+        assert store.count() == 1
+        assert store.count_long_term() == 1
+
+
+def test_get_long_term_by_id_returns_the_stored_row(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(_long_term_alert())
+        row = store.get_long_term_by_id(alert_id)
+
+        assert row["ticker"] == "AAPL"
+        assert row["action"] == "high_conviction_buy"
+        assert row["moat_rating"] == "wide"
+        assert row["quality_score"] == 8
+        assert row["key_findings"] == ["Strong recurring revenue"]
+        assert row["risk_factors"] == ["Regulatory scrutiny"]
+        assert row["telegram_sent"] is False
+
+
+def test_get_long_term_by_id_returns_none_for_unknown_id(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        assert store.get_long_term_by_id(999) is None
+
+
+def test_record_long_term_alert_persists_earnings_radar_fields(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(
+            _long_term_alert(
+                is_earnings_related=True, previous_fair_value=210.0,
+                previous_margin_of_safety_pct=0.1667, guidance_revision_notes="Guidance raised.",
+            )
+        )
+        row = store.get_long_term_by_id(alert_id)
+
+        assert row["is_earnings_related"] is True
+        assert row["previous_fair_value"] == 210.0
+        assert row["previous_margin_of_safety_pct"] == 0.1667
+        assert row["guidance_revision_notes"] == "Guidance raised."
+
+
+def test_record_long_term_alert_earnings_radar_fields_default_correctly(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(_long_term_alert())  # routine, non-earnings alert
+        row = store.get_long_term_by_id(alert_id)
+
+        assert row["is_earnings_related"] is False
+        assert row["previous_fair_value"] is None
+        assert row["previous_margin_of_safety_pct"] is None
+        assert row["guidance_revision_notes"] is None
+
+
+def test_mark_long_term_telegram_sent(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(_long_term_alert())
+        store.mark_long_term_telegram_sent(alert_id)
+
+        row = store.get_long_term_by_id(alert_id)
+        assert row["telegram_sent"] is True
+        assert row["telegram_sent_at"] is not None
+
+
+def test_mark_long_term_telegram_failed(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(_long_term_alert())
+        store.mark_long_term_telegram_failed(alert_id, "bad token")
+
+        row = store.get_long_term_by_id(alert_id)
+        assert row["telegram_sent"] is False
+        assert "bad token" in row["telegram_error"]
+
+
+def test_long_term_alerts_between_filters_to_the_window(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_long_term_alert(_long_term_alert(ticker="OLD", correlated_at=NOW - timedelta(days=10)))
+        store.record_long_term_alert(_long_term_alert(ticker="IN", correlated_at=NOW))
+
+        rows = store.long_term_alerts_between(NOW - timedelta(hours=1), NOW + timedelta(hours=1))
+        assert [r["ticker"] for r in rows] == ["IN"]
+
+
+def test_purge_long_term_older_than_deletes_stale_rows(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_long_term_alert(_long_term_alert(correlated_at=NOW - timedelta(days=10)))
+        store.record_long_term_alert(_long_term_alert(correlated_at=NOW))
+
+        purged = store.purge_long_term_older_than(NOW - timedelta(days=1))
+
+        assert purged == 1
+        assert store.count_long_term() == 1
+
+
+def test_recent_long_term_orders_newest_first(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_long_term_alert(_long_term_alert(ticker="FIRST", correlated_at=NOW - timedelta(hours=1)))
+        store.record_long_term_alert(_long_term_alert(ticker="SECOND", correlated_at=NOW))
+
+        rows = store.recent_long_term()
+        assert [r["ticker"] for r in rows] == ["SECOND", "FIRST"]
+
+
+def test_long_term_state_persists_across_reopen(tmp_path):
+    path = tmp_path / "audit.db"
+    with AuditStore(path) as store:
+        store.record_long_term_alert(_long_term_alert())
+
+    with AuditStore(path) as store2:
+        assert store2.count_long_term() == 1
+
+
+def test_mark_long_term_suppressed_records_the_reason(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(_long_term_alert())
+        store.mark_long_term_suppressed(alert_id, "ACTION_MUTED")
+
+        row = store.get_long_term_by_id(alert_id)
+        assert row["suppress_reason"] == "ACTION_MUTED"
+        assert row["telegram_sent"] is False
+
+
+def test_mark_long_term_telegram_sent_sets_suppress_reason_to_the_literal_none_value(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        alert_id = store.record_long_term_alert(_long_term_alert())
+        store.mark_long_term_telegram_sent(alert_id)
+
+        row = store.get_long_term_by_id(alert_id)
+        assert row["suppress_reason"] == "NONE"
+
+
+def test_migrates_a_long_term_alerts_table_from_before_the_summary_column(tmp_path):
+    """Simulates a real pre-existing dispatch_audit.db from before `summary`
+    was added to long_term_alerts -- AuditStore's first-ever migration.
+    A pre-existing row must survive with summary='' (the DEFAULT), and the
+    store must stay fully usable (a fresh insert populates a real summary)."""
+    db_path = tmp_path / "legacy_audit.db"
+
+    legacy_conn = sqlite3.connect(db_path)
+    legacy_conn.execute(
+        "CREATE TABLE long_term_alerts ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT NOT NULL, action TEXT NOT NULL, "
+        "severity TEXT NOT NULL, rationale TEXT NOT NULL, quality_score INTEGER NOT NULL, "
+        "moat_rating TEXT NOT NULL, market_price REAL NOT NULL, intrinsic_fair_value REAL NOT NULL, "
+        "margin_of_safety_pct REAL NOT NULL, capital_allocation_assessment TEXT NOT NULL, "
+        "key_findings_json TEXT NOT NULL, risk_factors_json TEXT NOT NULL, model_used TEXT NOT NULL, "
+        "correlated_at TEXT NOT NULL, received_at TEXT NOT NULL, "
+        "telegram_sent INTEGER NOT NULL DEFAULT 0, telegram_sent_at TEXT, telegram_error TEXT)"
+    )
+    legacy_conn.execute(
+        "INSERT INTO long_term_alerts (ticker, action, severity, rationale, quality_score, moat_rating, "
+        "market_price, intrinsic_fair_value, margin_of_safety_pct, capital_allocation_assessment, "
+        "key_findings_json, risk_factors_json, model_used, correlated_at, received_at) "
+        "VALUES ('MSFT', 'hold_quality', 'info', 'pre-migration rationale', 8, 'wide', "
+        "503.81, 525.0, 0.04, 'Disciplined buybacks.', '[]', '[]', 'gemini-flash-latest', "
+        "'2026-08-11T18:51:43+00:00', '2026-08-11T18:51:44+00:00')"
+    )
+    legacy_conn.commit()
+    legacy_conn.close()
+
+    with AuditStore(db_path) as store:
+        rows = store.recent_long_term()
+        assert len(rows) == 1
+        assert rows[0]["summary"] == ""  # DEFAULT '' for a pre-migration row
+        assert rows[0]["suppress_reason"] is None  # this migration also predates suppress_reason
+        assert rows[0]["is_earnings_related"] is False  # DEFAULT 0 for a pre-migration row
+        assert rows[0]["previous_fair_value"] is None
+        assert rows[0]["previous_margin_of_safety_pct"] is None
+        assert rows[0]["guidance_revision_notes"] is None
+
+        # And the migrated store is fully usable afterward.
+        store.record_long_term_alert(_long_term_alert(ticker="AAPL"))
+        rows = store.recent_long_term()
+        assert {r["summary"] for r in rows} == {"", "Strong recurring revenue and durable moat support the thesis."}
+
+
+# ==========================================================================
+# WAL checkpoint (fixes the dashboard-slowdown-over-a-session issue --
+# see run_talonx.periodic_wal_checkpoint_loop's own docstring)
+# ==========================================================================
+
+def test_checkpoint_does_not_raise(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_alert(_alert())
+        store.checkpoint()
+        assert store.count() == 1  # data survives, store stays usable
+
+
+# ==========================================================================
+# Restart-survival: latest earnings-context cache (T-48h heads-up push)
+# ==========================================================================
+
+def test_load_latest_earnings_context_is_empty_for_a_fresh_store(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        assert store.load_latest_earnings_context() == []
+
+
+def test_save_and_load_fundamental_signal_cache_round_trips(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.save_latest_fundamental_signal_cache("AAPL", '{"ticker": "AAPL"}', NOW)
+
+        rows = store.load_latest_earnings_context()
+        assert len(rows) == 1
+        assert rows[0]["ticker"] == "AAPL"
+        assert rows[0]["signal_json"] == '{"ticker": "AAPL"}'
+        assert rows[0]["report_json"] is None
+
+
+def test_save_signal_then_report_merges_into_the_same_row(tmp_path):
+    """Signal and report arrive independently (different Redis channels)
+    -- a report write must not clobber an already-cached signal for the
+    same ticker, and vice versa."""
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.save_latest_fundamental_signal_cache("AAPL", '{"a": 1}', NOW)
+        store.save_latest_longterm_report_cache("AAPL", '{"b": 2}', NOW)
+
+        rows = store.load_latest_earnings_context()
+        assert len(rows) == 1  # one row, not two
+        assert rows[0]["signal_json"] == '{"a": 1}'
+        assert rows[0]["report_json"] == '{"b": 2}'
+
+
+def test_save_fundamental_signal_cache_overwrites_not_appends(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.save_latest_fundamental_signal_cache("AAPL", '{"v": 1}', NOW)
+        store.save_latest_fundamental_signal_cache("AAPL", '{"v": 2}', NOW + timedelta(days=1))
+
+        rows = store.load_latest_earnings_context()
+        assert len(rows) == 1
+        assert rows[0]["signal_json"] == '{"v": 2}'
+
+
+def test_earnings_context_cache_persists_across_reopen(tmp_path):
+    path = tmp_path / "audit.db"
+    with AuditStore(path) as store:
+        store.save_latest_fundamental_signal_cache("AAPL", '{"v": 1}', NOW)
+        store.save_latest_longterm_report_cache("MSFT", '{"v": 2}', NOW)
+
+    with AuditStore(path) as store2:
+        rows = {r["ticker"]: r for r in store2.load_latest_earnings_context()}
+        assert rows["AAPL"]["signal_json"] == '{"v": 1}'
+        assert rows["MSFT"]["report_json"] == '{"v": 2}'
+
+
+# ==========================================================================
+# Restart-survival: per-ticker push cooldown (Smart Dispatch Filtering)
+# ==========================================================================
+
+def test_load_last_telegram_pushes_is_empty_for_a_fresh_store(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        assert store.load_last_telegram_pushes("intraday") == {}
+
+
+def test_save_and_load_last_telegram_push_round_trips(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.save_last_telegram_push("AAPL", "intraday", NOW, 123.45)
+
+        pushes = store.load_last_telegram_pushes("intraday")
+        assert pushes["AAPL"] == (NOW, 123.45)
+
+
+def test_last_telegram_push_keeps_horizons_independent(tmp_path):
+    """A DUAL_HORIZON ticker's intraday and long-term push cadences must
+    not clobber each other -- same isolation the in-memory dicts always had."""
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.save_last_telegram_push("AAPL", "intraday", NOW, 100.0)
+        store.save_last_telegram_push("AAPL", "long_term", NOW - timedelta(days=1), 90.0)
+
+        assert store.load_last_telegram_pushes("intraday")["AAPL"] == (NOW, 100.0)
+        assert store.load_last_telegram_pushes("long_term")["AAPL"] == (NOW - timedelta(days=1), 90.0)
+
+
+def test_save_last_telegram_push_overwrites_not_appends(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.save_last_telegram_push("AAPL", "intraday", NOW - timedelta(hours=1), 100.0)
+        store.save_last_telegram_push("AAPL", "intraday", NOW, 105.0)
+
+        pushes = store.load_last_telegram_pushes("intraday")
+        assert len(pushes) == 1
+        assert pushes["AAPL"] == (NOW, 105.0)
+
+
+def test_last_telegram_push_persists_across_reopen(tmp_path):
+    path = tmp_path / "audit.db"
+    with AuditStore(path) as store:
+        store.save_last_telegram_push("AAPL", "intraday", NOW, 100.0)
+
+    with AuditStore(path) as store2:
+        assert store2.load_last_telegram_pushes("intraday")["AAPL"] == (NOW, 100.0)
+
+
+# --- Rejection Trace Logging -----------------------------------------------
+
+def test_record_rejected_candidate_returns_an_id(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        rejection_id = store.record_rejected_candidate(
+            ticker="AAPL", gate="trend_gate", reason="TREND_GATE", rejected_at=NOW,
+        )
+        assert isinstance(rejection_id, int)
+
+
+def test_record_rejected_candidate_persists_full_detail(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_rejected_candidate(
+            ticker="aapl", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW,
+            signal_type="macd_bullish_cross", direction="bullish", price=100.0,
+            confluence_score=2, risk_reward_ratio=1.2, session="regular",
+        )
+
+        rows = store.recent_rejected_candidates()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["ticker"] == "AAPL"  # uppercased, same convention as record_alert
+        assert row["gate"] == "rr_gate"
+        assert row["reason"] == "LOW_RISK_REWARD"
+        assert row["signal_type"] == "macd_bullish_cross"
+        assert row["direction"] == "bullish"
+        assert row["price"] == 100.0
+        assert row["confluence_score"] == 2
+        assert row["risk_reward_ratio"] == 1.2
+        assert row["session"] == "regular"
+
+
+def test_recent_rejected_candidates_orders_newest_first(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_rejected_candidate(ticker="AAPL", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW)
+        store.record_rejected_candidate(
+            ticker="MSFT", gate="trend_gate", reason="TREND_GATE", rejected_at=NOW + timedelta(minutes=5),
+        )
+
+        rows = store.recent_rejected_candidates()
+        assert [r["ticker"] for r in rows] == ["MSFT", "AAPL"]
+
+
+def test_recent_rejected_candidates_respects_limit(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        for i in range(5):
+            store.record_rejected_candidate(
+                ticker="AAPL", gate="cooldown_gate", reason="COOLDOWN", rejected_at=NOW + timedelta(minutes=i),
+            )
+
+        assert len(store.recent_rejected_candidates(limit=2)) == 2
+
+
+def test_rejected_candidates_for_ticker_filters_by_ticker(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_rejected_candidate(ticker="AAPL", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW)
+        store.record_rejected_candidate(ticker="MSFT", gate="trend_gate", reason="TREND_GATE", rejected_at=NOW)
+
+        rows = store.rejected_candidates_for_ticker("aapl")
+        assert len(rows) == 1
+        assert rows[0]["ticker"] == "AAPL"
+
+
+def test_rejected_candidates_between_filters_to_the_window(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_rejected_candidate(
+            ticker="OLD", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW - timedelta(days=2),
+        )
+        store.record_rejected_candidate(ticker="IN", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW)
+
+        rows = store.rejected_candidates_between(NOW - timedelta(hours=1), NOW + timedelta(hours=1))
+        assert [r["ticker"] for r in rows] == ["IN"]
+
+
+def test_purge_rejected_candidates_older_than_deletes_only_stale_rows(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_rejected_candidate(
+            ticker="OLD", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW - timedelta(days=10),
+        )
+        store.record_rejected_candidate(ticker="NEW", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW)
+
+        purged = store.purge_rejected_candidates_older_than(NOW - timedelta(days=5))
+
+        assert purged == 1
+        remaining = store.recent_rejected_candidates()
+        assert [r["ticker"] for r in remaining] == ["NEW"]
+
+
+def test_rejected_candidate_optional_fields_default_to_none(tmp_path):
+    with AuditStore(tmp_path / "audit.db") as store:
+        store.record_rejected_candidate(
+            ticker="AAPL", gate="volatility_gate", reason="LOW_VOLATILITY", rejected_at=NOW,
+        )
+
+        row = store.recent_rejected_candidates()[0]
+        assert row["signal_type"] is None
+        assert row["direction"] is None
+        assert row["confluence_score"] is None
+        assert row["risk_reward_ratio"] is None
+
+
+def test_rejected_candidates_persists_across_reopen(tmp_path):
+    path = tmp_path / "audit.db"
+    with AuditStore(path) as store:
+        store.record_rejected_candidate(ticker="AAPL", gate="rr_gate", reason="LOW_RISK_REWARD", rejected_at=NOW)
+
+    with AuditStore(path) as store2:
+        rows = store2.recent_rejected_candidates()
+        assert len(rows) == 1
+        assert rows[0]["ticker"] == "AAPL"

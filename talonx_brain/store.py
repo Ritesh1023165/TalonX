@@ -27,9 +27,10 @@ CREATE TABLE IF NOT EXISTS report_counts (
     date         TEXT NOT NULL,
     ticker       TEXT NOT NULL,
     category     TEXT NOT NULL,
+    horizon      TEXT NOT NULL DEFAULT 'intraday',
     count        INTEGER NOT NULL DEFAULT 0,
     last_seen_at TEXT NOT NULL,
-    PRIMARY KEY (date, ticker, category)
+    PRIMARY KEY (date, ticker, category, horizon)
 )
 """
 
@@ -40,7 +41,39 @@ class BrainStatsStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.path)
         self._conn.executescript(_SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Adds `horizon` (Phase 2) to a pre-existing report_counts table
+        that predates it. Unlike every other store's idempotent
+        ALTER-TABLE-ADD-COLUMN migration, this one REBUILDS the table --
+        a plain column add would leave the OLD 3-column PRIMARY KEY
+        (date, ticker, category) in place underneath, which would still
+        reject two different-horizon rows for the same date/ticker/
+        category (a real possibility once a DUAL_HORIZON ticker records
+        both an intraday and a long_term report on the same day). Every
+        pre-Phase-2 row is 'intraday' by definition (that's all that
+        existed), so the backfill is unambiguous."""
+        cols = {row[1] for row in self._conn.execute("PRAGMA table_info(report_counts)").fetchall()}
+        if "horizon" not in cols:
+            self._conn.executescript(
+                """
+                ALTER TABLE report_counts RENAME TO report_counts_old;
+                CREATE TABLE report_counts (
+                    date         TEXT NOT NULL,
+                    ticker       TEXT NOT NULL,
+                    category     TEXT NOT NULL,
+                    horizon      TEXT NOT NULL DEFAULT 'intraday',
+                    count        INTEGER NOT NULL DEFAULT 0,
+                    last_seen_at TEXT NOT NULL,
+                    PRIMARY KEY (date, ticker, category, horizon)
+                );
+                INSERT INTO report_counts (date, ticker, category, horizon, count, last_seen_at)
+                    SELECT date, ticker, category, 'intraday', count, last_seen_at FROM report_counts_old;
+                DROP TABLE report_counts_old;
+                """
+            )
 
     def close(self) -> None:
         self._conn.close()
@@ -51,23 +84,23 @@ class BrainStatsStore:
     def __exit__(self, *exc_info) -> None:
         self.close()
 
-    def record_report(self, ticker: str, category: str, when: datetime) -> None:
+    def record_report(self, ticker: str, category: str, when: datetime, horizon: str = "intraday") -> None:
         date = when.date().isoformat()
         self._conn.execute(
             """
-            INSERT INTO report_counts (date, ticker, category, count, last_seen_at)
-            VALUES (?, ?, ?, 1, ?)
-            ON CONFLICT(date, ticker, category) DO UPDATE SET
+            INSERT INTO report_counts (date, ticker, category, horizon, count, last_seen_at)
+            VALUES (?, ?, ?, ?, 1, ?)
+            ON CONFLICT(date, ticker, category, horizon) DO UPDATE SET
                 count = count + 1,
                 last_seen_at = excluded.last_seen_at
             """,
-            (date, ticker.upper(), category, when.isoformat()),
+            (date, ticker.upper(), category, horizon, when.isoformat()),
         )
         self._conn.commit()
 
     def report_counts_for_date(self, date_str: str) -> list[dict]:
         cursor = self._conn.execute(
-            "SELECT date, ticker, category, count, last_seen_at FROM report_counts WHERE date = ? "
+            "SELECT date, ticker, category, horizon, count, last_seen_at FROM report_counts WHERE date = ? "
             "ORDER BY ticker, category",
             (date_str,),
         )

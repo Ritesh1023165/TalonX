@@ -49,7 +49,15 @@ class SignalDirection(str, Enum):
 
 
 class QuantSignal(BaseModel):
-    """Mirrors talonx_quant.schemas.QuantSignal -- consumed from talonx:signals:quant."""
+    """Mirrors talonx_quant.schemas.QuantSignal -- consumed from talonx:signals:quant.
+
+    Widened (Phase 2 requirement doc) to carry atr/stop_price/target_price/
+    trend_aligned/htf_sma_200 through to ActionableAlert.triggering_signal --
+    previously even more trimmed than talonx_quant's own schema (lacked
+    atr/confluence_score/risk_reward_ratio entirely). talonx_paper needs
+    stop_price/target_price for ATR-anchored exits; talonx_dispatch needs
+    all of these plus rsi/macd/volume_surge_ratio for the Telegram detail
+    reply's technical-indicator section."""
 
     ticker: str
     signal_type: SignalType
@@ -64,6 +72,12 @@ class QuantSignal(BaseModel):
     sma_slow: float | None = None
     volume: float | None = None
     volume_surge_ratio: float | None = None
+    atr: float | None = None
+    stop_price: float | None = None
+    target_price: float | None = None
+    trend_aligned: bool | None = None
+    htf_sma_200: float | None = None
+    session: str | None = None
 
     bar_timestamp: datetime
     published_at: datetime | None = None
@@ -125,6 +139,14 @@ class AlertAction(str, Enum):
     # user knows a signal fired even without a research opinion backing it.
     DEGRADED_QUANT_ALERT = "degraded_quant_alert"
 
+    # --- Phase 2 LONG_TERM decision matrix (see decision.py's
+    # evaluate_long_term) -- disjoint from the intraday actions above,
+    # never mixed on the same alert or the same Redis channel.
+    HIGH_CONVICTION_BUY = "high_conviction_buy"
+    HOLD_QUALITY = "hold_quality"
+    TAKE_PROFIT_REBALANCE = "take_profit_rebalance"
+    UNDER_PERFORM_REBALANCE = "under_perform_rebalance"
+
 
 class AlertSeverity(str, Enum):
     INFO = "info"
@@ -154,6 +176,123 @@ class ActionableAlert(BaseModel):
     # When talonx_core itself received each half of the correlated pair --
     # useful for diagnosing how stale a pairing was, independent of the
     # bar_timestamp/generated_at already inside the upstream payloads.
+    signal_received_at: datetime
+    report_received_at: datetime
+
+    correlated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_redis_payload(self) -> str:
+        return self.model_dump_json()
+
+
+# ------------------------------------------------------------------
+# Phase 2 LONG_TERM path -- fundamentals/moat-DCF input contracts and
+# this module's own long-term output contract
+# ------------------------------------------------------------------
+
+class FundamentalFactorSignal(BaseModel):
+    """Mirrors talonx_quant.schemas.FundamentalFactorSignal -- consumed
+    from talonx:signals:fundamental."""
+
+    ticker: str
+    fiscal_year: int
+    roic: float | None = None
+    piotroski_f_score: int | None = None
+    fcf_yield: float | None = None
+    altman_z_score: float | None = None
+    debt_to_ebitda_proxy: float | None = None
+    price: float
+    message: str
+    # Event-Driven Earnings Radar: True for an earnings-triggered
+    # republish -- see talonx_quant.schemas.FundamentalFactorSignal's own
+    # docstring. decision.py bypasses its own cooldown/no-state-change
+    # gates when this is set on either the signal or the report below.
+    is_earnings_related: bool = False
+    computed_at: datetime
+
+
+class MoatRating(str, Enum):
+    WIDE = "wide"
+    NARROW = "narrow"
+    NONE = "none"
+
+
+class LongTermResearchReport(BaseModel):
+    """Trimmed mirror of talonx_brain.schemas.LongTermResearchReport --
+    consumed from talonx:reports:longterm. Omits `citations`, same
+    reasoning as the intraday ResearchReport mirror above: the decision
+    matrix never looks at excerpt text."""
+
+    ticker: str
+    triggering_signal: FundamentalFactorSignal
+    moat_rating: MoatRating
+    capital_allocation_assessment: str
+    dcf_fair_value_per_share: float
+    quality_score: int = Field(ge=0, le=10)
+    summary: str
+    key_findings: list[str] = Field(default_factory=list)
+    risk_factors: list[str] = Field(default_factory=list)
+    model_used: str
+
+    guidance_revision_notes: str | None = None
+    revenue_eps_surprise: str | None = None
+    is_earnings_related: bool = False
+
+    is_stale: bool = False
+    is_degraded: bool = False
+    from_cache: bool = False
+
+    generated_at: datetime
+    published_at: datetime
+
+
+class LongTermActionableAlert(BaseModel):
+    """Published to talonx:alerts:longterm when a correlated fundamental-
+    signal + long-term-report pair clears evaluate_long_term()'s matrix.
+    A SIBLING schema to ActionableAlert, not a repurposing of it -- the
+    fields genuinely differ (margin of safety / quality / moat instead of
+    quant-direction / research-verdict / confidence)."""
+
+    ticker: str
+    action: AlertAction
+    severity: AlertSeverity
+    rationale: str
+    # The LLM's own free-text summary (LongTermResearchReport.summary),
+    # carried separately from `rationale` above -- rationale is the FULL
+    # technical writeup (formula checks, quality/moat/price restated),
+    # meant for format_telegram_long_term_details(); summary is a clean
+    # one-or-two-sentence readout with no internal-threshold noise, meant
+    # for the SHORT Telegram push (format_telegram_long_term_alert), which
+    # needs something safe to truncate to ~120 chars without cutting off
+    # mid-formula or mid-number.
+    summary: str
+
+    quality_score: int = Field(ge=0, le=10)
+    moat_rating: MoatRating
+    market_price: float
+    intrinsic_fair_value: float
+    margin_of_safety_pct: float  # (fair_value - price) / fair_value; negative means overvalued
+
+    # Event-Driven Earnings Radar, Requirement 7/8: populated only for an
+    # earnings-triggered alert (is_earnings_related=True) -- the PRE-
+    # update fair-value/margin-of-safety, captured from the correlator's
+    # state before update_report() overwrites it, same timing
+    # previous_moat_rating already uses. None for a routine alert (no
+    # "before" value to compare against, or not earnings-related at all).
+    previous_fair_value: float | None = None
+    previous_margin_of_safety_pct: float | None = None
+    guidance_revision_notes: str | None = None
+    revenue_eps_surprise: str | None = None
+    is_earnings_related: bool = False
+
+    triggering_signal: FundamentalFactorSignal
+    capital_allocation_assessment: str
+    key_findings: list[str] = Field(default_factory=list)
+    risk_factors: list[str] = Field(default_factory=list)
+    model_used: str
+    is_degraded: bool = False
+
     signal_received_at: datetime
     report_received_at: datetime
 

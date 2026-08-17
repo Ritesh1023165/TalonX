@@ -219,6 +219,115 @@ def test_add_ticker_upsert_does_not_reset_paper_trading_flag(store):
     assert store.list_tickers()[0]["paper_trading_enabled"] is True
 
 
+# --- Long-term paper trading toggle (independent of the intraday one) ------
+
+def test_new_ticker_defaults_long_term_paper_trading_disabled(store):
+    store.add_ticker("AAPL", "Apple Inc.")
+
+    assert store.list_tickers()[0]["paper_trading_enabled_long_term"] is False
+    assert store.list_paper_trading_long_term_symbols() == []
+
+
+def test_set_paper_trading_long_term_enables_and_disables(store):
+    store.add_ticker("AAPL", "Apple Inc.")
+    store.add_ticker("MSFT", "Microsoft Corporation")
+
+    store.set_paper_trading_long_term("aapl", True)  # case-insensitive
+
+    assert store.list_paper_trading_long_term_symbols() == ["AAPL"]
+    assert store.list_tickers()[0]["paper_trading_enabled_long_term"] is True
+
+    store.set_paper_trading_long_term("AAPL", False)
+    assert store.list_paper_trading_long_term_symbols() == []
+
+
+def test_intraday_and_long_term_paper_trading_flags_are_independent(store):
+    store.add_ticker("AAPL", "Apple Inc.", strategy_horizon="DUAL_HORIZON")
+
+    store.set_paper_trading("AAPL", True)
+    store.set_paper_trading_long_term("AAPL", False)
+
+    assert store.list_paper_trading_symbols() == ["AAPL"]
+    assert store.list_paper_trading_long_term_symbols() == []
+
+    store.set_paper_trading("AAPL", False)
+    store.set_paper_trading_long_term("AAPL", True)
+
+    assert store.list_paper_trading_symbols() == []
+    assert store.list_paper_trading_long_term_symbols() == ["AAPL"]
+
+
+def test_add_ticker_upsert_does_not_reset_long_term_paper_trading_flag(store):
+    store.add_ticker("MSFT", "Microsoft Corporation")
+    store.set_paper_trading_long_term("MSFT", True)
+
+    store.add_ticker("MSFT", "Microsoft Corporation", "NASDAQ")  # re-add
+
+    assert store.list_tickers()[0]["paper_trading_enabled_long_term"] is True
+
+
+# --- Strategy horizon (Phase 2's intraday/long-term routing control) ------
+
+def test_new_ticker_defaults_to_intraday_horizon(store):
+    store.add_ticker("AAPL", "Apple Inc.")
+
+    assert store.list_tickers()[0]["strategy_horizon"] == "INTRADAY"
+    assert store.list_by_horizon("INTRADAY") == ["AAPL"]
+    assert store.list_by_horizon("LONG_TERM") == []
+
+
+def test_add_ticker_accepts_an_initial_horizon(store):
+    store.add_ticker("BRK.B", "Berkshire Hathaway", strategy_horizon="LONG_TERM")
+
+    assert store.list_tickers()[0]["strategy_horizon"] == "LONG_TERM"
+    assert store.list_by_horizon("LONG_TERM") == ["BRK.B"]
+    assert store.list_by_horizon("INTRADAY") == []
+
+
+def test_add_ticker_rejects_invalid_horizon(store):
+    with pytest.raises(ValueError):
+        store.add_ticker("AAPL", "Apple Inc.", strategy_horizon="WEEKLY")
+
+
+def test_set_strategy_horizon_changes_routing(store):
+    store.add_ticker("AAPL", "Apple Inc.")
+
+    store.set_strategy_horizon("aapl", "LONG_TERM")  # case-insensitive
+
+    assert store.list_tickers()[0]["strategy_horizon"] == "LONG_TERM"
+    assert store.list_by_horizon("LONG_TERM") == ["AAPL"]
+    assert store.list_by_horizon("INTRADAY") == []
+
+
+def test_set_strategy_horizon_rejects_invalid_value(store):
+    store.add_ticker("AAPL", "Apple Inc.")
+    with pytest.raises(ValueError):
+        store.set_strategy_horizon("AAPL", "NOT_A_HORIZON")
+
+
+def test_dual_horizon_ticker_appears_in_both_lists(store):
+    store.add_ticker("AAPL", "Apple Inc.", strategy_horizon="DUAL_HORIZON")
+    store.add_ticker("NVDA", "NVIDIA Corporation", strategy_horizon="INTRADAY")
+    store.add_ticker("BRK.B", "Berkshire Hathaway", strategy_horizon="LONG_TERM")
+
+    assert store.list_by_horizon("INTRADAY") == ["AAPL", "NVDA"]
+    assert store.list_by_horizon("LONG_TERM") == ["AAPL", "BRK.B"]
+    assert store.list_by_horizon("DUAL_HORIZON") == ["AAPL"]
+
+
+def test_add_ticker_upsert_does_not_reset_strategy_horizon(store):
+    store.add_ticker("AAPL", "Apple Inc.", strategy_horizon="LONG_TERM")
+
+    store.add_ticker("AAPL", "Apple Inc.", "NASDAQ")  # re-add, horizon omitted
+
+    assert store.list_tickers()[0]["strategy_horizon"] == "LONG_TERM"
+
+
+def test_list_by_horizon_rejects_invalid_value(store):
+    with pytest.raises(ValueError):
+        store.list_by_horizon("NOT_A_HORIZON")
+
+
 # --- Migration from the pre-exchange/status schema -----------------------
 
 def test_migrates_a_pre_existing_three_column_database(tmp_path):
@@ -244,13 +353,177 @@ def test_migrates_a_pre_existing_three_column_database(tmp_path):
         assert tickers[0]["exchange"] == ""
         assert tickers[0]["status"] == "active"
         assert tickers[0]["paper_trading_enabled"] is False
+        assert tickers[0]["paper_trading_enabled_long_term"] is False
+        assert tickers[0]["strategy_horizon"] == "INTRADAY"
         assert store.list_active_symbols() == ["MSFT"]
         assert store.list_paper_trading_symbols() == []
+        assert store.list_paper_trading_long_term_symbols() == []
+        assert store.list_by_horizon("INTRADAY") == ["MSFT"]
 
         # And the migrated store is fully usable afterward.
         store.pause_ticker("MSFT")
         assert store.list_active_symbols() == []
         store.set_paper_trading("MSFT", True)
         assert store.list_paper_trading_symbols() == ["MSFT"]
+        store.set_paper_trading_long_term("MSFT", True)
+        assert store.list_paper_trading_long_term_symbols() == ["MSFT"]
+        store.set_strategy_horizon("MSFT", "LONG_TERM")
+        assert store.list_by_horizon("LONG_TERM") == ["MSFT"]
     finally:
         store.close()
+
+
+def test_migrates_a_database_from_before_the_long_term_paper_trading_split(tmp_path):
+    """Narrower migration than the legacy 3-column test above -- simulates
+    a watchlist.db from right before paper_trading_enabled_long_term was
+    added (everything else already present), the migration path an
+    existing Phase 2 install actually hits."""
+    db_path = tmp_path / "pre_split_watchlist.db"
+
+    legacy_conn = sqlite3.connect(db_path)
+    legacy_conn.execute(
+        "CREATE TABLE tickers ("
+        "symbol TEXT PRIMARY KEY, name TEXT NOT NULL, exchange TEXT NOT NULL DEFAULT '', "
+        "status TEXT NOT NULL DEFAULT 'active', paper_trading_enabled INTEGER NOT NULL DEFAULT 0, "
+        "strategy_horizon TEXT NOT NULL DEFAULT 'INTRADAY', added_at TEXT NOT NULL)"
+    )
+    legacy_conn.execute(
+        "INSERT INTO tickers (symbol, name, paper_trading_enabled, strategy_horizon, added_at) "
+        "VALUES ('MSFT', 'Microsoft Corporation', 1, 'DUAL_HORIZON', '2026-01-01T00:00:00+00:00')"
+    )
+    legacy_conn.commit()
+    legacy_conn.close()
+
+    store = TickerWatchlistStore(db_path)
+    try:
+        ticker = store.list_tickers()[0]
+        assert ticker["paper_trading_enabled"] is True  # pre-existing value preserved
+        assert ticker["paper_trading_enabled_long_term"] is False  # new column defaults off
+        assert store.list_paper_trading_symbols() == ["MSFT"]
+        assert store.list_paper_trading_long_term_symbols() == []
+
+        store.set_paper_trading_long_term("MSFT", True)
+        assert store.list_paper_trading_long_term_symbols() == ["MSFT"]
+    finally:
+        store.close()
+
+
+# ==========================================================================
+# Event-Driven Earnings Radar -- upcoming_earnings
+# ==========================================================================
+
+def test_upcoming_earnings_empty_by_default(store):
+    assert store.list_upcoming_earnings() == []
+    assert store.get_upcoming_earnings("AAPL") is None
+
+
+def test_upsert_upcoming_earnings_creates_a_row(store):
+    store.upsert_upcoming_earnings("aapl", "2026-08-13", "AFTER_MARKET", "Q2 2026")
+
+    row = store.get_upcoming_earnings("AAPL")
+    assert row["ticker"] == "AAPL"  # normalized
+    assert row["earnings_date"] == "2026-08-13"
+    assert row["session"] == "AFTER_MARKET"
+    assert row["reporting_period"] == "Q2 2026"
+    assert row["heads_up_sent"] is False
+
+
+def test_upsert_upcoming_earnings_defaults_session_and_period(store):
+    store.upsert_upcoming_earnings("AAPL", "2026-08-13")
+
+    row = store.get_upcoming_earnings("AAPL")
+    assert row["session"] == "UNSPECIFIED"
+    assert row["reporting_period"] == ""
+
+
+def test_upsert_upcoming_earnings_overwrites_not_appends(store):
+    store.upsert_upcoming_earnings("AAPL", "2026-08-13", "AFTER_MARKET", "Q2 2026")
+    store.upsert_upcoming_earnings("AAPL", "2026-11-05", "BEFORE_MARKET", "Q3 2026")
+
+    assert len(store.list_upcoming_earnings()) == 1
+    row = store.get_upcoming_earnings("AAPL")
+    assert row["earnings_date"] == "2026-11-05"
+    assert row["reporting_period"] == "Q3 2026"
+
+
+def test_upsert_resets_heads_up_sent_when_the_date_changes(store):
+    store.upsert_upcoming_earnings("AAPL", "2026-08-13")
+    store.mark_heads_up_sent("AAPL")
+    assert store.get_upcoming_earnings("AAPL")["heads_up_sent"] is True
+
+    store.upsert_upcoming_earnings("AAPL", "2026-11-05")  # rescheduled -- needs its own T-48h alert
+
+    assert store.get_upcoming_earnings("AAPL")["heads_up_sent"] is False
+
+
+def test_upsert_preserves_heads_up_sent_when_the_date_is_unchanged(store):
+    store.upsert_upcoming_earnings("AAPL", "2026-08-13", "AFTER_MARKET", "Q2 2026")
+    store.mark_heads_up_sent("AAPL")
+
+    # A re-sync of the SAME date (e.g. the weekly sync running again with
+    # no actual change) must not clear the flag and cause a duplicate push.
+    store.upsert_upcoming_earnings("AAPL", "2026-08-13", "AFTER_MARKET", "Q2 2026")
+
+    assert store.get_upcoming_earnings("AAPL")["heads_up_sent"] is True
+
+
+def test_list_upcoming_earnings_sorted_by_date(store):
+    store.upsert_upcoming_earnings("LATER", "2026-12-01")
+    store.upsert_upcoming_earnings("SOONER", "2026-08-13")
+
+    rows = store.list_upcoming_earnings()
+    assert [r["ticker"] for r in rows] == ["SOONER", "LATER"]
+
+
+def test_mark_heads_up_sent_on_unknown_ticker_is_a_noop(store):
+    store.mark_heads_up_sent("NOPE")  # must not raise
+    assert store.get_upcoming_earnings("NOPE") is None
+
+
+def test_upcoming_earnings_state_persists_across_reopen(tmp_path):
+    path = tmp_path / "watchlist.db"
+    with TickerWatchlistStore(path) as store:
+        store.upsert_upcoming_earnings("AAPL", "2026-08-13", "AFTER_MARKET", "Q2 2026")
+
+    with TickerWatchlistStore(path) as store2:
+        row = store2.get_upcoming_earnings("AAPL")
+        assert row["earnings_date"] == "2026-08-13"
+
+
+def test_upcoming_earnings_table_created_for_a_pre_existing_legacy_db(tmp_path):
+    """A real pre-existing watchlist.db from before upcoming_earnings
+    existed must gain the table (via CREATE TABLE IF NOT EXISTS in
+    _SCHEMA -- this is a brand-new table, not a new column on an
+    existing one, so no ALTER TABLE migration is needed) and stay fully
+    usable."""
+    db_path = tmp_path / "legacy_watchlist.db"
+
+    legacy_conn = sqlite3.connect(db_path)
+    legacy_conn.execute(
+        "CREATE TABLE tickers (symbol TEXT PRIMARY KEY, name TEXT NOT NULL, added_at TEXT NOT NULL)"
+    )
+    legacy_conn.execute(
+        "INSERT INTO tickers (symbol, name, added_at) VALUES ('MSFT', 'Microsoft Corporation', "
+        "'2026-01-01T00:00:00+00:00')"
+    )
+    legacy_conn.commit()
+    legacy_conn.close()
+
+    store = TickerWatchlistStore(db_path)
+    try:
+        assert store.list_upcoming_earnings() == []
+        store.upsert_upcoming_earnings("MSFT", "2026-08-13")
+        assert store.get_upcoming_earnings("MSFT")["earnings_date"] == "2026-08-13"
+    finally:
+        store.close()
+
+
+# ==========================================================================
+# WAL checkpoint (fixes the dashboard-slowdown-over-a-session issue --
+# see run_talonx.periodic_wal_checkpoint_loop's own docstring)
+# ==========================================================================
+
+def test_checkpoint_does_not_raise(store):
+    store.add_ticker("AAPL", "Apple Inc.")
+    store.checkpoint()
+    assert store.list_symbols() == ["AAPL"]  # data survives, store stays usable

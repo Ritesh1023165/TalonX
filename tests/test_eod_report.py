@@ -20,6 +20,8 @@ from talonx_dispatch.schemas import (
     ActionableAlert,
     AlertAction,
     AlertSeverity,
+    LongTermActionableAlert,
+    MoatRating,
     ResearchVerdict,
     SignalDirection,
     TriggeringSignalRef,
@@ -214,6 +216,92 @@ def test_phase2_ticker_only_present_in_a_stats_store_still_gets_a_section(tmp_pa
 
     section = next(s for s in report.ticker_sections if s.ticker == "ORPHAN")
     assert section.quant_suppressed == {"COOLDOWN": 5}
+
+
+# --- Phase 2: Valuation & Margin of Safety Radar ---------------------------
+
+def _lt_alert(
+    ticker: str, action: AlertAction = AlertAction.HIGH_CONVICTION_BUY,
+    quality_score: int = 8, moat_rating: MoatRating = MoatRating.WIDE,
+    market_price: float = 75.0, intrinsic_fair_value: float = 100.0,
+    margin_of_safety_pct: float = 0.25, correlated_at: datetime = NOON_ET,
+) -> LongTermActionableAlert:
+    return LongTermActionableAlert(
+        ticker=ticker, action=action, severity=AlertSeverity.WARNING,
+        rationale="rationale text", summary="summary text",
+        quality_score=quality_score, moat_rating=moat_rating,
+        market_price=market_price, intrinsic_fair_value=intrinsic_fair_value,
+        margin_of_safety_pct=margin_of_safety_pct,
+        capital_allocation_assessment="Disciplined buybacks.",
+        model_used="gemini-flash-latest", correlated_at=correlated_at, published_at=correlated_at,
+    )
+
+
+def test_valuation_radar_shows_latest_snapshot_per_ticker(tmp_path):
+    audit, paper, watchlist = _stores(tmp_path)
+    earlier = NOON_ET - timedelta(days=90)
+    audit.record_long_term_alert(_lt_alert("AAPL", quality_score=6, correlated_at=earlier))
+    audit.record_long_term_alert(_lt_alert("AAPL", quality_score=9, correlated_at=NOON_ET))
+
+    report = build_report("2026-08-11", audit, paper, watchlist, tz_name=TZ)
+
+    assert len(report.valuation_snapshots) == 1
+    snap = report.valuation_snapshots[0]
+    assert snap.ticker == "AAPL"
+    assert snap.quality_score == 9  # the LATER alert, not the earlier one
+
+
+def test_valuation_radar_not_limited_to_the_report_day(tmp_path):
+    """Fundamentals evaluations happen on the order of quarters -- unlike
+    the intraday alert log, the radar must show the latest known state
+    even if it wasn't updated on the report's own calendar day."""
+    audit, paper, watchlist = _stores(tmp_path)
+    long_ago = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc)
+    audit.record_long_term_alert(_lt_alert("MSFT", correlated_at=long_ago))
+
+    report = build_report("2026-08-11", audit, paper, watchlist, tz_name=TZ)
+
+    assert len(report.valuation_snapshots) == 1
+    assert report.valuation_snapshots[0].ticker == "MSFT"
+
+
+def test_valuation_radar_empty_when_no_long_term_alerts(tmp_path):
+    audit, paper, watchlist = _stores(tmp_path)
+
+    report = build_report("2026-08-11", audit, paper, watchlist, tz_name=TZ)
+
+    assert report.valuation_snapshots == []
+    text = render_markdown(report)
+    assert "No long-term alerts yet" in text
+
+
+def test_long_term_portfolio_summary_includes_contributed_and_unrealized_pnl(tmp_path):
+    audit, paper, watchlist = _stores(tmp_path)
+    paper.execute_long_term_buy("AAPL", shares=10.0, price=100.0, cost=1000.0, timestamp=NOON_ET)
+    paper.update_latest_price("AAPL", 120.0, NOON_ET)
+
+    report = build_report("2026-08-11", audit, paper, watchlist, tz_name=TZ)
+
+    assert report.long_term_portfolio_summary["total_contributed_usd"] == 1000.0
+    assert report.long_term_portfolio_summary["unrealized_pnl_usd"] == 200.0  # 10 * (120 - 100)
+    assert report.long_term_portfolio_summary["open_positions_count"] == 1
+
+
+def test_render_markdown_includes_valuation_radar_and_long_term_portfolio_sections(tmp_path):
+    audit, paper, watchlist = _stores(tmp_path)
+    audit.record_long_term_alert(_lt_alert("AAPL"))
+    paper.execute_long_term_buy("AAPL", shares=10.0, price=100.0, cost=1000.0, timestamp=NOON_ET)
+
+    report = build_report("2026-08-11", audit, paper, watchlist, tz_name=TZ)
+    text = render_markdown(report)
+
+    assert "## Long-Term Portfolio summary" in text
+    assert "## Valuation & Margin of Safety Radar" in text
+    assert "| AAPL | High Conviction Buy |" in text
+    assert "$75.00" in text and "$100.00" in text
+    assert "+25.0%" in text
+    assert "8/10" in text
+    assert "Wide" in text
 
 
 def test_render_markdown_includes_key_sections(tmp_path):

@@ -58,3 +58,201 @@ def test_state_persists_across_reopen(tmp_path):
 
     with QuantStateStore(path) as store2:
         assert store2.suppression_counts_for_date("2026-08-07")[0]["count"] == 1
+
+
+# ==========================================================================
+# Event-Driven Earnings Radar -- latest_fundamental_factors
+# ==========================================================================
+
+def test_get_latest_factors_returns_none_when_unknown(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        assert store.get_latest_factors("AAPL") is None
+
+
+def test_save_and_get_latest_factors_round_trips(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.save_latest_factors("aapl", 2025, 0.21, 8, 0.05, 5.5, 1.2, NOW)
+
+        row = store.get_latest_factors("AAPL")
+        assert row["ticker"] == "AAPL"  # normalized
+        assert row["fiscal_year"] == 2025
+        assert row["roic"] == 0.21
+        assert row["piotroski_f_score"] == 8
+        assert row["fcf_yield"] == 0.05
+        assert row["altman_z_score"] == 5.5
+        assert row["debt_to_ebitda_proxy"] == 1.2
+
+
+def test_save_latest_factors_overwrites_not_appends(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.save_latest_factors("AAPL", 2024, 0.15, 7, 0.03, 4.0, 1.5, NOW)
+        store.save_latest_factors("AAPL", 2025, 0.21, 8, 0.05, 5.5, 1.2, NOW + timedelta(days=90))
+
+        row = store.get_latest_factors("AAPL")
+        assert row["fiscal_year"] == 2025
+        assert row["roic"] == 0.21
+
+
+def test_save_latest_factors_allows_none_values(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.save_latest_factors("AAPL", 2025, None, None, None, None, None, NOW)
+
+        row = store.get_latest_factors("AAPL")
+        assert row["roic"] is None
+        assert row["piotroski_f_score"] is None
+
+
+def test_latest_factors_persist_across_reopen(tmp_path):
+    path = tmp_path / "quant.db"
+    with QuantStateStore(path) as store:
+        store.save_latest_factors("AAPL", 2025, 0.21, 8, 0.05, 5.5, 1.2, NOW)
+
+    with QuantStateStore(path) as store2:
+        assert store2.get_latest_factors("AAPL")["fiscal_year"] == 2025
+
+
+# ==========================================================================
+# Buffer persistence -- bar_buffer (survive a restart without a re-warm-up)
+# ==========================================================================
+
+def _bars(n: int, start: datetime = NOW, step_seconds: int = 60) -> list[dict]:
+    return [
+        {
+            "timestamp": start + timedelta(seconds=step_seconds * i),
+            "open": 100.0 + i, "high": 101.0 + i, "low": 99.0 + i,
+            "close": 100.5 + i, "volume": 1000.0 + i,
+        }
+        for i in range(n)
+    ]
+
+
+def test_load_buffer_returns_empty_list_when_never_checkpointed(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        assert store.load_buffer("AAPL", "1m") == []
+
+
+def test_checkpoint_and_load_buffer_round_trips_in_chronological_order(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        bars = _bars(3)
+        store.checkpoint_buffer("aapl", "1m", bars)
+
+        loaded = store.load_buffer("AAPL", "1m")
+        assert len(loaded) == 3
+        assert loaded[0]["close"] == 100.5
+        assert loaded[-1]["close"] == 102.5
+        assert loaded[0]["timestamp"] == bars[0]["timestamp"].isoformat()
+
+
+def test_checkpoint_buffer_replaces_not_appends(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.checkpoint_buffer("AAPL", "1m", _bars(3))
+        store.checkpoint_buffer("AAPL", "1m", _bars(2, start=NOW + timedelta(hours=1)))
+
+        loaded = store.load_buffer("AAPL", "1m")
+        assert len(loaded) == 2  # old snapshot fully replaced, not merged
+
+
+def test_checkpoint_buffer_keeps_1m_and_15m_independent(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.checkpoint_buffer("AAPL", "1m", _bars(3))
+        store.checkpoint_buffer("AAPL", "15m", _bars(2, step_seconds=900))
+
+        assert len(store.load_buffer("AAPL", "1m")) == 3
+        assert len(store.load_buffer("AAPL", "15m")) == 2
+
+
+def test_checkpoint_buffer_keeps_symbols_independent(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.checkpoint_buffer("AAPL", "1m", _bars(3))
+        store.checkpoint_buffer("MSFT", "1m", _bars(1))
+
+        assert len(store.load_buffer("AAPL", "1m")) == 3
+        assert len(store.load_buffer("MSFT", "1m")) == 1
+
+
+def test_buffered_symbols_lists_only_symbols_with_that_buffer_type(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.checkpoint_buffer("AAPL", "1m", _bars(1))
+        store.checkpoint_buffer("MSFT", "15m", _bars(1))
+
+        assert store.buffered_symbols("1m") == ["AAPL"]
+        assert store.buffered_symbols("15m") == ["MSFT"]
+
+
+def test_checkpoint_buffer_with_empty_list_clears_the_symbol(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.checkpoint_buffer("AAPL", "1m", _bars(3))
+        store.checkpoint_buffer("AAPL", "1m", [])
+
+        assert store.load_buffer("AAPL", "1m") == []
+
+
+def test_buffer_persists_across_reopen(tmp_path):
+    path = tmp_path / "quant.db"
+    with QuantStateStore(path) as store:
+        store.checkpoint_buffer("AAPL", "1m", _bars(3))
+
+    with QuantStateStore(path) as store2:
+        assert len(store2.load_buffer("AAPL", "1m")) == 3
+
+
+def test_checkpoint_and_load_buffer_round_trips_session(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        bars = _bars(1)
+        bars[0]["session"] = "pre_market"
+        store.checkpoint_buffer("AAPL", "1m", bars)
+
+        loaded = store.load_buffer("AAPL", "1m")
+        assert loaded[0]["session"] == "pre_market"
+
+
+def test_checkpoint_buffer_stores_none_session_when_not_given(tmp_path):
+    with QuantStateStore(tmp_path / "quant.db") as store:
+        store.checkpoint_buffer("AAPL", "1m", _bars(1))  # _bars() doesn't set "session"
+
+        loaded = store.load_buffer("AAPL", "1m")
+        assert loaded[0]["session"] is None
+
+
+# --- Schema migration: bar_buffer gained a `session` column (Requirement 3) --
+
+def test_bar_buffer_pre_session_column_table_is_dropped_and_recreated(tmp_path):
+    """A quant.db predating the `session` column (no session field in
+    bar_buffer) must not crash on open -- its bar_buffer table is
+    dropped and recreated empty (a safe reset: bar_buffer is a
+    checkpoint CACHE, not a source of truth -- see
+    _migrate_bar_buffer_schema's own docstring)."""
+    import sqlite3
+
+    path = tmp_path / "quant.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(
+        """
+        CREATE TABLE bar_buffer (
+            symbol TEXT NOT NULL, buffer_type TEXT NOT NULL, ts TEXT NOT NULL,
+            open REAL, high REAL, low REAL, close REAL, volume REAL,
+            PRIMARY KEY (symbol, buffer_type, ts)
+        );
+        """
+    )
+    conn.execute(
+        "INSERT INTO bar_buffer (symbol, buffer_type, ts, open, high, low, close, volume) "
+        "VALUES ('AAPL', '1m', '2026-08-07T12:00:00+00:00', 100.0, 101.0, 99.0, 100.5, 1000.0)"
+    )
+    conn.commit()
+    conn.close()
+
+    with QuantStateStore(path) as store:  # must not raise
+        assert store.load_buffer("AAPL", "1m") == []  # old-schema data dropped, not migrated in place
+        # New-schema writes work fine post-migration.
+        store.checkpoint_buffer("AAPL", "1m", _bars(1))
+        assert len(store.load_buffer("AAPL", "1m")) == 1
+
+
+def test_bar_buffer_migration_is_a_noop_when_table_already_has_session(tmp_path):
+    path = tmp_path / "quant.db"
+    with QuantStateStore(path) as store:
+        store.checkpoint_buffer("AAPL", "1m", _bars(2))
+
+    with QuantStateStore(path) as store2:  # reopening an already-current schema
+        assert len(store2.load_buffer("AAPL", "1m")) == 2  # data survives, not wiped every reopen

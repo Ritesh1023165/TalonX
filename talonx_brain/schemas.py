@@ -145,3 +145,84 @@ class ResearchReport(BaseModel):
 
     def to_redis_payload(self) -> str:
         return self.model_dump_json()
+
+
+# ------------------------------------------------------------------
+# Phase 2 LONG_TERM path -- fundamentals input / moat+DCF output contracts
+# ------------------------------------------------------------------
+
+class FundamentalFactorSignal(BaseModel):
+    """Mirrors talonx_quant.schemas.FundamentalFactorSignal -- consumed
+    from talonx:signals:fundamental, the LONG_TERM horizon's trigger,
+    parallel to QuantSignal's role for the intraday path."""
+
+    ticker: str
+    fiscal_year: int
+    roic: float | None = None
+    piotroski_f_score: int | None = None
+    fcf_yield: float | None = None
+    altman_z_score: float | None = None
+    debt_to_ebitda_proxy: float | None = None
+    price: float
+    message: str
+    # Event-Driven Earnings Radar: True for an earnings-triggered
+    # republish -- see talonx_quant.schemas.FundamentalFactorSignal's own
+    # docstring. Consumer.py's cache-hit shortcut is bypassed when set.
+    is_earnings_related: bool = False
+    computed_at: datetime
+
+
+class MoatRating(str, Enum):
+    """Economic moat classification -- how durable the company's
+    competitive advantage is judged to be, per the spec's Module 3B
+    (pricing power, switching costs, cost advantages, network effects)."""
+
+    WIDE = "wide"
+    NARROW = "narrow"
+    NONE = "none"
+
+
+class LongTermResearchReport(BaseModel):
+    """
+    Published to talonx:reports:longterm once per researched
+    FundamentalFactorSignal -- the LONG_TERM sibling to ResearchReport,
+    deliberately a SEPARATE model rather than an extension of it:
+    verdict/confidence don't map cleanly onto moat/DCF output (there's
+    no "bullish/bearish" binary here, and "confidence" isn't the
+    relevant scalar -- quality_score and the fair-value estimate are).
+    """
+
+    ticker: str
+    triggering_signal: FundamentalFactorSignal
+    moat_rating: MoatRating
+    capital_allocation_assessment: str
+    dcf_fair_value_per_share: float
+    quality_score: int = Field(ge=0, le=10)
+    summary: str
+    key_findings: list[str] = Field(default_factory=list)
+    risk_factors: list[str] = Field(default_factory=list)
+    citations: list[Citation] = Field(default_factory=list)
+    model_used: str
+
+    # Event-Driven Earnings Radar: populated only when the triggering
+    # signal was earnings-related (see _LLMFindingsLongTerm's own
+    # docstring) -- None/empty for a routine annual-only evaluation.
+    guidance_revision_notes: str | None = None
+    revenue_eps_surprise: str | None = None
+    # Propagated straight from triggering_signal.is_earnings_related --
+    # kept as its own top-level field (not just read off the nested
+    # signal) so talonx_core/talonx_dispatch's TRIMMED mirrors of this
+    # schema (which don't embed the full signal) can still see it.
+    is_earnings_related: bool = False
+
+    # Same three flags ResearchReport carries, same meaning -- see its
+    # own docstring above.
+    is_stale: bool = False
+    is_degraded: bool = False
+    from_cache: bool = False
+
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_redis_payload(self) -> str:
+        return self.model_dump_json()
