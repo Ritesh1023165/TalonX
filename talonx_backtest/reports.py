@@ -123,10 +123,15 @@ def metrics_to_dict(m: PerformanceMetrics) -> dict:
     return d
 
 
-def result_summary_text(result: BacktestResult, input_timezone: str | None = None) -> str:
+def result_summary_text(
+    result: BacktestResult,
+    input_timezone: str | None = None,
+    dataset_path: str | Path | None = None,
+    dataset_symbols: list[str] | None = None,
+) -> str:
     assumptions = execution_assumptions_dict(result)
     tz = timezone_info_dict(input_timezone)
-    meta = reproducibility.build_metadata(result.config)
+    meta = reproducibility.build_metadata(result.config, dataset_path=dataset_path, dataset_symbols=dataset_symbols)
 
     lines = [
         "Backtest Summary",
@@ -173,6 +178,7 @@ def result_summary_text(result: BacktestResult, input_timezone: str | None = Non
         f"backtester_version:   {meta.backtester_version}",
         f"strategy_version:     {meta.strategy_version}",
         f"config_hash:          {meta.config_hash}",
+        f"dataset_hash:         {meta.dataset_hash}",
         f"run_timestamp:        {meta.run_timestamp}",
         "",
         "Portfolio disclaimer",
@@ -208,9 +214,11 @@ def result_summary_json(
     result: BacktestResult,
     input_timezone: str | None = None,
     cost_sensitivity: list[dict] | None = None,
+    dataset_path: str | Path | None = None,
+    dataset_symbols: list[str] | None = None,
 ) -> str:
     sets = metric_set(result.trades) if result.trades else {}
-    meta = reproducibility.build_metadata(result.config)
+    meta = reproducibility.build_metadata(result.config, dataset_path=dataset_path, dataset_symbols=dataset_symbols)
     payload = {
         "period": {"start": str(result.start), "end": str(result.end)},
         "symbols": result.symbols,
@@ -344,6 +352,8 @@ def build_html_report(
     data_quality: dict[str, DataQualityReport] | None = None,
     input_timezone: str | None = None,
     cost_sensitivity: list[dict] | None = None,
+    dataset_path: str | Path | None = None,
+    dataset_symbols: list[str] | None = None,
 ) -> str:
     """A single, self-contained HTML file (no external requests, no CDN,
     inline CSS/JS only -- opens directly from disk in any browser) with
@@ -356,7 +366,7 @@ def build_html_report(
     are no trades, the report says so instead of rendering empty charts
     as if they meant something."""
     sets = metric_set(result.trades) if result.trades else {}
-    meta = reproducibility.build_metadata(result.config)
+    meta = reproducibility.build_metadata(result.config, dataset_path=dataset_path, dataset_symbols=dataset_symbols)
     payload = {
         "meta": {
             "period_start": str(result.start), "period_end": str(result.end),
@@ -395,6 +405,8 @@ def write_report(
     data_quality: dict[str, DataQualityReport] | None = None,
     input_timezone: str | None = None,
     cost_sensitivity: list[dict] | None = None,
+    dataset_path: str | Path | None = None,
+    dataset_symbols: list[str] | None = None,
 ) -> dict[str, Path]:
     """Writes the full results/ set into `out_dir` (created if missing):
     trades.csv/json, summary.json/txt, equity_curve.csv,
@@ -429,15 +441,26 @@ def write_report(
     paths["trades_csv"].write_text(trades_to_csv(result.trades), encoding="utf-8", newline="")
     paths["trades_json"].write_text(trades_to_json(result.trades), encoding="utf-8")
     paths["summary_json"].write_text(
-        result_summary_json(result, input_timezone=input_timezone, cost_sensitivity=cost_sensitivity),
+        result_summary_json(
+            result, input_timezone=input_timezone, cost_sensitivity=cost_sensitivity,
+            dataset_path=dataset_path, dataset_symbols=dataset_symbols,
+        ),
         encoding="utf-8",
     )
-    paths["summary_txt"].write_text(result_summary_text(result, input_timezone=input_timezone), encoding="utf-8")
+    paths["summary_txt"].write_text(
+        result_summary_text(
+            result, input_timezone=input_timezone, dataset_path=dataset_path, dataset_symbols=dataset_symbols,
+        ),
+        encoding="utf-8",
+    )
     paths["equity_curve_csv"].write_text(equity_curve_to_csv(result.trades), encoding="utf-8", newline="")
     paths["rejected_signals_csv"].write_text(rejected_signals_to_csv(result.rejections), encoding="utf-8", newline="")
     paths["data_quality_json"].write_text(data_quality_to_json(data_quality), encoding="utf-8")
     paths["results_html"].write_text(
-        build_html_report(result, data_quality, input_timezone=input_timezone, cost_sensitivity=cost_sensitivity),
+        build_html_report(
+            result, data_quality, input_timezone=input_timezone, cost_sensitivity=cost_sensitivity,
+            dataset_path=dataset_path, dataset_symbols=dataset_symbols,
+        ),
         encoding="utf-8",
     )
     if cost_sensitivity:
@@ -579,6 +602,12 @@ _HTML_TEMPLATE = r"""<!doctype html>
 
 <div class="panel">
   <h2>Trades (<span id="trade-count"></span>)</h2>
+  <p class="disclaimer">
+    <strong>screening_rr</strong> = reward:risk at strategy screening/revalidation time (what the
+    confluence/R:R gate actually approved). <strong>execution_rr</strong> = reward:risk using the
+    real filled entry price against the same stop/target. These can legitimately differ -- the
+    actual fill price is not always identical to the screening-time reference price.
+  </p>
   <div class="trade-table-wrap"><table id="trade-table"><thead></thead><tbody></tbody></table></div>
 </div>
 

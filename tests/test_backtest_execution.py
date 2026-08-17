@@ -248,6 +248,74 @@ def test_execution_rr_is_none_when_risk_resolves_to_zero():
     assert trade.execution_rr is None
 
 
+def test_execution_rr_is_correct_for_a_bearish_short_trade():
+    # BEARISH: stop is ABOVE entry, target is BELOW entry -- execution_rr
+    # must still come out positive and correct since both the numerator
+    # and denominator are abs() distances (2026-08-16 infra audit, Part A).
+    sim = TradeSimulator(ExecutionConfig())
+    signal = _signal(SignalDirection.BEARISH, stop=105.0, target=90.0)
+    sim.open_position(signal, entry_timestamp=_dt(0), entry_price_raw=100.0)
+    trade = sim.check_exit("AAPL", _dt(1), bar_high=101.0, bar_low=89.0)  # hits TARGET
+
+    # risk = |entry(100) - stop(105)| = 5; reward = |target(90) - entry(100)| = 10
+    assert trade.exit_reason == "TARGET"
+    assert trade.execution_rr == pytest.approx(2.0)
+    assert trade.execution_rr == pytest.approx(trade.gross_R)  # exact TARGET hit, same coincidence as the bullish case
+
+
+def test_execution_rr_is_none_when_stop_price_is_missing():
+    # force_close, not check_exit -- see the module-level note below on
+    # why check_exit itself cannot safely be called with stop_price=None.
+    sim = TradeSimulator(ExecutionConfig())
+    signal = _signal(SignalDirection.BULLISH, stop=95.0, target=110.0)
+    signal = signal.model_copy(update={"stop_price": None})
+    sim.open_position(signal, entry_timestamp=_dt(0), entry_price_raw=100.0)
+    trade = sim.force_close("AAPL", _dt(1), price_raw=102.0, reason="END_OF_SESSION")
+
+    assert trade.execution_rr is None
+    assert trade.gross_R is None  # risk is None -- no divide-by-zero, no fabricated ratio
+    assert trade.net_R is None
+
+
+def test_check_exit_raises_rather_than_silently_misbehaving_on_a_missing_stop_price():
+    """2026-08-16 infra audit (Part A) finding: open_position()'s own risk
+    calculation defends against signal.stop_price being None (risk
+    resolves to None, never a crash -- see the two tests above), but
+    check_exit -> check_bar_for_exit does a direct float comparison
+    (`bar_low <= stop_price`) with no None-guard, so a None stop_price
+    reaching check_exit crashes with an unhandled TypeError instead of
+    failing safely. NOT reachable via the real engine today -- every
+    signal that reaches open_position() has already survived
+    engine._revalidate/consumer._revalidate_candidate, which only
+    publishes a candidate with a fully-populated TradeGeometry (stop_price
+    is a non-Optional float there) -- but TradeSimulator is a
+    general-purpose, independently-importable module, not exclusively
+    fed by that revalidated path, so the inconsistency is worth pinning
+    down rather than leaving implicit. This test documents the CURRENT
+    (fragile) behavior; it is not a statement that a crash is desired."""
+    sim = TradeSimulator(ExecutionConfig())
+    signal = _signal(SignalDirection.BULLISH, stop=95.0, target=110.0)
+    signal = signal.model_copy(update={"stop_price": None})
+    sim.open_position(signal, entry_timestamp=_dt(0), entry_price_raw=100.0)
+
+    with pytest.raises(TypeError):
+        sim.check_exit("AAPL", _dt(1), bar_high=111.0, bar_low=99.0)
+
+
+def test_execution_rr_is_none_when_target_price_is_missing():
+    sim = TradeSimulator(ExecutionConfig())
+    signal = _signal(SignalDirection.BULLISH, stop=95.0, target=110.0)
+    signal = signal.model_copy(update={"target_price": None})
+    sim.open_position(signal, entry_timestamp=_dt(0), entry_price_raw=100.0)
+    # force_close rather than check_exit -- with target_price=None,
+    # check_bar_for_exit's own target comparison would break first; this
+    # isolates execution_rr's target_price=None guard specifically.
+    trade = sim.force_close("AAPL", _dt(1), price_raw=102.0, reason="END_OF_SESSION")
+
+    assert trade.execution_rr is None
+    assert trade.gross_R == pytest.approx(2.0 / 5.0)  # gross_R is unaffected -- it never uses target_price
+
+
 def test_opportunity_score_is_unaffected_by_execution_rr_divergence():
     """R:R contributes opportunity_score_rr_weight (30% by default) to
     the Composite Opportunity Score -- but that score is computed by

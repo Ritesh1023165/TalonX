@@ -78,7 +78,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--no-progress", action="store_true",
-        help="Disable the periodic 'X% (bars done/total)' progress line printed during a run "
+        help="Disable the periodic 'X%% (bars done/total)' progress line printed during a run "
              "(on by default -- a run over months of data can take minutes with compute_indicators's "
              "per-bar recompute, and a silent process is easy to mistake for hung).",
     )
@@ -179,12 +179,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     progress_callback = None if args.no_progress else _print_progress
 
+    # Computed here (rather than only right before write_report) so the
+    # interim stdout summary below and the final persisted report agree
+    # on the same dataset_hash for this run -- previously this was only
+    # computed after write_report's own call site, so result_summary_text
+    # here had no dataset_path/dataset_symbols to pass to build_metadata
+    # and printed dataset_hash: None even though the CLI already knew
+    # exactly which dataset was loaded.
+    dataset_symbols = [s.strip().upper() for s in args.symbols.split(",")] if args.symbols else None
+
     print("=" * 70)
     print("BACKTEST RESULT")
     print("=" * 70)
     engine = BacktestEngine(config)
     result = engine.run(df, progress_callback=progress_callback, progress_interval_seconds=args.progress_interval)
-    print(result_summary_text(result, input_timezone=args.tz))
+    print(result_summary_text(result, input_timezone=args.tz, dataset_path=args.data, dataset_symbols=dataset_symbols))
 
     cost_sensitivity_rows = None
     if args.cost_sensitivity:
@@ -208,6 +217,7 @@ def main(argv: list[str] | None = None) -> int:
     paths = write_report(
         result, args.out, prefix=args.prefix, data_quality=quality,
         input_timezone=args.tz, cost_sensitivity=cost_sensitivity_rows,
+        dataset_path=args.data, dataset_symbols=dataset_symbols,
     )
     print("Report files written:")
     for label, out_path in paths.items():

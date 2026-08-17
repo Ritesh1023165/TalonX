@@ -21,6 +21,7 @@ import pytest
 from scripts.run_historical_regimes import (
     REGIMES,
     Regime,
+    _cost_sensitivity_summary,
     _discover_symbols,
     build_markdown_table,
     main,
@@ -113,6 +114,276 @@ def test_run_regime_zero_trades_reports_zero_not_none(tmp_path):
     assert row["ran"] is True
     assert row["total_trades"] == 0
     assert row["win_rate"] is None
+
+
+# --- 2026-08-17 Finding C: consolidation gap (small_sample_warning /
+# cost_sensitivity now propagated) + unambiguous failure_reason ---------
+
+def test_run_regime_propagates_small_sample_warning_and_cost_sensitivity(tmp_path):
+    regime = Regime("test_regime", "2024-01-01", "2024-06-30", "test")
+    out_root = tmp_path / "reports"
+    summary_dir = out_root / "regime_test_regime"
+    summary_dir.mkdir(parents=True)
+    cost_rows = [
+        {"cost_bps": 0, "trades": 3, "expectancy_r": -1.0},
+        {"cost_bps": 20, "trades": 3, "expectancy_r": -2.103},
+    ]
+    (summary_dir / "backtest_summary.json").write_text(json.dumps({
+        "metrics": {"net": {
+            "total_trades": 3, "win_rate": 0.0, "profit_factor": 0.0, "expectancy_r": -1.0,
+            "max_drawdown_r": -3.0, "sharpe_per_trade": None, "sortino_per_trade": None,
+        }},
+        "small_sample_warning": True,
+        "cost_sensitivity": cost_rows,
+    }), encoding="utf-8")
+
+    fake_result = MagicMock(returncode=0, stdout="ok", stderr="")
+    with patch("subprocess.run", return_value=fake_result):
+        row = run_regime(regime, tmp_path / "data", ["AAPL"], out_root, cost_sensitivity=True, tz="UTC")
+
+    assert row["small_sample_warning"] is True
+    assert row["cost_sensitivity"] == cost_rows
+    assert row["failure_reason"] is None
+
+
+def test_run_regime_zero_trades_still_carries_small_sample_and_cost_fields(tmp_path):
+    regime = Regime("test_regime", "2024-01-01", "2024-06-30", "test")
+    out_root = tmp_path / "reports"
+    summary_dir = out_root / "regime_test_regime"
+    summary_dir.mkdir(parents=True)
+    (summary_dir / "backtest_summary.json").write_text(json.dumps({
+        "metrics": {}, "small_sample_warning": False, "cost_sensitivity": [],
+    }), encoding="utf-8")
+
+    fake_result = MagicMock(returncode=0, stdout="ok", stderr="")
+    with patch("subprocess.run", return_value=fake_result):
+        row = run_regime(regime, tmp_path / "data", ["AAPL"], out_root, cost_sensitivity=True, tz="UTC")
+
+    assert row["ran"] is True
+    assert row["total_trades"] == 0
+    assert row["small_sample_warning"] is False
+    assert row["cost_sensitivity"] is None  # empty list normalized to None, not fabricated
+
+
+def test_run_regime_distinguishes_process_failure_from_missing_summary(tmp_path):
+    regime = Regime("test_regime", "2024-01-01", "2024-06-30", "test")
+    out_root = tmp_path / "reports"  # no summary file written at all
+
+    process_failed = MagicMock(returncode=1, stdout="", stderr="crash")
+    with patch("subprocess.run", return_value=process_failed):
+        row_a = run_regime(regime, tmp_path / "data", ["AAPL"], out_root, cost_sensitivity=False, tz="UTC")
+    assert row_a["failure_reason"] == "process_failed"
+
+    exit_zero_no_summary = MagicMock(returncode=0, stdout="ok", stderr="")
+    with patch("subprocess.run", return_value=exit_zero_no_summary):
+        row_b = run_regime(regime, tmp_path / "data", ["AAPL"], out_root, cost_sensitivity=False, tz="UTC")
+    assert row_b["failure_reason"] == "missing_summary"
+
+    assert row_a["failure_reason"] != row_b["failure_reason"]  # the actual ambiguity being fixed
+
+
+def _summary_json(**overrides) -> str:
+    base = {
+        "metrics": {"net": {
+            "total_trades": 5, "win_rate": 0.6, "profit_factor": 1.8, "expectancy_r": 0.25,
+            "total_r": 1.25, "max_drawdown_r": -1.2, "sharpe_per_trade": 0.9, "sortino_per_trade": 1.4,
+        }},
+        "small_sample_warning": False,
+        "cost_sensitivity": [],
+    }
+    base.update(overrides)
+    return json.dumps(base)
+
+
+def _run(tmp_path, out_root, summary_text, cost_sensitivity=True, returncode=0):
+    regime = Regime("test_regime", "2024-01-01", "2024-06-30", "test")
+    if summary_text is not None:
+        summary_dir = out_root / "regime_test_regime"
+        summary_dir.mkdir(parents=True, exist_ok=True)
+        (summary_dir / "backtest_summary.json").write_text(summary_text, encoding="utf-8")
+    fake_result = MagicMock(returncode=returncode, stdout="ok", stderr="")
+    with patch("subprocess.run", return_value=fake_result):
+        return run_regime(regime, tmp_path / "data", ["AAPL"], out_root, cost_sensitivity=cost_sensitivity, tz="UTC")
+
+
+# --- 2026-08-17 Task 5.3: unified status field (SUCCESS / SUCCESS_ZERO_TRADES /
+# SUCCESS_SMALL_SAMPLE / FAILED_PROCESS / FAILED_MISSING_SUMMARY / FAILED_INVALID_SUMMARY) ---
+
+def test_status_is_success_for_a_normal_populated_regime(tmp_path):
+    row = _run(tmp_path, tmp_path / "r1", _summary_json())
+    assert row["status"] == "SUCCESS"
+    assert row["total_r"] == 1.25  # newly propagated, from metrics.net.total_r
+
+
+def test_status_is_success_zero_trades_not_a_failure(tmp_path):
+    row = _run(tmp_path, tmp_path / "r2", _summary_json(metrics={}))
+    assert row["ran"] is True  # zero trades is NOT a failure
+    assert row["status"] == "SUCCESS_ZERO_TRADES"
+    assert row["total_trades"] == 0
+
+
+def test_status_is_success_small_sample_when_flagged_and_nonzero_trades(tmp_path):
+    row = _run(tmp_path, tmp_path / "r3", _summary_json(small_sample_warning=True))
+    assert row["status"] == "SUCCESS_SMALL_SAMPLE"
+
+
+def test_status_zero_trades_takes_priority_over_small_sample_flag(tmp_path):
+    # An (unrealistic, but defensively worth pinning) summary claiming
+    # BOTH zero trades AND small_sample_warning=True must resolve to the
+    # more specific SUCCESS_ZERO_TRADES, not SUCCESS_SMALL_SAMPLE.
+    row = _run(tmp_path, tmp_path / "r4", _summary_json(metrics={}, small_sample_warning=True))
+    assert row["status"] == "SUCCESS_ZERO_TRADES"
+
+
+def test_status_is_failed_process_on_nonzero_exit(tmp_path):
+    row = _run(tmp_path, tmp_path / "r5", None, returncode=1)
+    assert row["status"] == "FAILED_PROCESS"
+
+
+def test_status_is_failed_missing_summary_on_exit_zero_no_file(tmp_path):
+    row = _run(tmp_path, tmp_path / "r6", None, returncode=0)
+    assert row["status"] == "FAILED_MISSING_SUMMARY"
+
+
+def test_status_is_failed_invalid_summary_on_malformed_json(tmp_path):
+    row = _run(tmp_path, tmp_path / "r7", "{not valid json")
+    assert row["status"] == "FAILED_INVALID_SUMMARY"
+
+
+# --- cost sensitivity: all scenarios + requested-vs-missing distinction ---
+
+def test_all_four_cost_scenarios_survive_consolidation_with_every_field(tmp_path):
+    cost_rows = [
+        {"cost_bps": 0, "trades": 10, "win_rate": 0.5, "profit_factor": 1.5, "expectancy_r": 0.1, "total_r": 1.0, "max_drawdown_r": -2.0},
+        {"cost_bps": 5, "trades": 10, "win_rate": 0.5, "profit_factor": 1.4, "expectancy_r": 0.05, "total_r": 0.5, "max_drawdown_r": -2.1},
+        {"cost_bps": 10, "trades": 10, "win_rate": 0.5, "profit_factor": 1.3, "expectancy_r": 0.0, "total_r": 0.0, "max_drawdown_r": -2.2},
+        {"cost_bps": 20, "trades": 10, "win_rate": 0.5, "profit_factor": 1.1, "expectancy_r": -0.1, "total_r": -1.0, "max_drawdown_r": -2.4},
+    ]
+    row = _run(tmp_path, tmp_path / "r8", _summary_json(cost_sensitivity=cost_rows))
+    assert row["cost_sensitivity"] == cost_rows  # every row, every field, byte-for-byte, nothing recalculated
+    assert len(row["cost_sensitivity"]) == 4
+
+
+def test_cost_sensitivity_requested_flag_distinguishes_not_requested_from_missing(tmp_path):
+    not_requested = _run(tmp_path, tmp_path / "r9", _summary_json(cost_sensitivity=[]), cost_sensitivity=False)
+    assert not_requested["cost_sensitivity_requested"] is False
+    assert not_requested["cost_sensitivity"] is None
+
+    requested_but_absent = _run(tmp_path, tmp_path / "r10", _summary_json(cost_sensitivity=[]), cost_sensitivity=True)
+    assert requested_but_absent["cost_sensitivity_requested"] is True
+    assert requested_but_absent["cost_sensitivity"] is None
+    # same observable cost_sensitivity value (None) but a DIFFERENT reason, distinguishable via the new flag
+    assert not_requested["cost_sensitivity_requested"] != requested_but_absent["cost_sensitivity_requested"]
+
+
+def test_markdown_cost_sensitivity_section_explains_absence_reasons():
+    rows = [
+        {  # not requested
+            "regime": "not_requested", "start": "2024-01-01", "end": "2024-06-30", "ran": True,
+            "exit_code": 0, "failure_reason": None, "status": "SUCCESS", "total_trades": 1,
+            "win_rate": 1.0, "profit_factor": None, "expectancy_r": 1.0, "total_r": 1.0,
+            "max_drawdown_r": 0.0, "sharpe_per_trade": None, "sortino_per_trade": None,
+            "small_sample_warning": True, "cost_sensitivity": None, "cost_sensitivity_requested": False,
+        },
+        {  # requested but absent from the summary
+            "regime": "requested_missing", "start": "2024-01-01", "end": "2024-06-30", "ran": True,
+            "exit_code": 0, "failure_reason": None, "status": "SUCCESS", "total_trades": 1,
+            "win_rate": 1.0, "profit_factor": None, "expectancy_r": 1.0, "total_r": 1.0,
+            "max_drawdown_r": 0.0, "sharpe_per_trade": None, "sortino_per_trade": None,
+            "small_sample_warning": True, "cost_sensitivity": None, "cost_sensitivity_requested": True,
+        },
+        {  # the regime never ran at all
+            "regime": "never_ran", "start": "2024-01-01", "end": "2024-06-30", "ran": False,
+            "exit_code": 1, "failure_reason": "process_failed", "status": "FAILED_PROCESS",
+            "total_trades": None, "win_rate": None, "profit_factor": None, "expectancy_r": None,
+            "total_r": None, "max_drawdown_r": None, "sharpe_per_trade": None, "sortino_per_trade": None,
+            "small_sample_warning": None, "cost_sensitivity": None, "cost_sensitivity_requested": None,
+        },
+    ]
+    markdown = build_markdown_table(rows)
+
+    assert "### not_requested" in markdown
+    assert "not requested for this run" in markdown
+
+    assert "### requested_missing" in markdown
+    assert "requested for this run, but is absent" in markdown
+
+    assert "### never_ran" in markdown
+    assert "did not produce a usable result" in markdown
+
+
+def test_run_regime_handles_invalid_summary_json_without_crashing(tmp_path):
+    # Previously an unparseable summary.json would raise INSIDE run_regime
+    # and crash the whole multi-regime run -- now it's caught and reported
+    # as this one regime's row.
+    regime = Regime("test_regime", "2024-01-01", "2024-06-30", "test")
+    out_root = tmp_path / "reports"
+    summary_dir = out_root / "regime_test_regime"
+    summary_dir.mkdir(parents=True)
+    (summary_dir / "backtest_summary.json").write_text("{not valid json", encoding="utf-8")
+
+    fake_result = MagicMock(returncode=0, stdout="ok", stderr="")
+    with patch("subprocess.run", return_value=fake_result):
+        row = run_regime(regime, tmp_path / "data", ["AAPL"], out_root, cost_sensitivity=False, tz="UTC")  # must not raise
+
+    assert row["ran"] is False
+    assert row["failure_reason"].startswith("invalid_summary")
+
+
+def test_cost_sensitivity_summary_shows_low_and_high_bps_expectancy():
+    rows = [
+        {"cost_bps": 0, "expectancy_r": -1.0},
+        {"cost_bps": 5, "expectancy_r": -1.276},
+        {"cost_bps": 20, "expectancy_r": -2.103},
+    ]
+    summary = _cost_sensitivity_summary(rows)
+    assert "-1.000 (0bps)" in summary
+    assert "-2.103 (20bps)" in summary
+
+
+def test_cost_sensitivity_summary_is_na_when_not_requested():
+    assert _cost_sensitivity_summary(None) == "n/a"
+    assert _cost_sensitivity_summary([]) == "n/a"
+
+
+def test_markdown_table_shows_small_sample_column_and_a_dedicated_cost_sensitivity_section():
+    # 2026-08-17 consolidated-reporting redesign: cost sensitivity moved
+    # OUT of the compact main table into its own '## Cost Sensitivity'
+    # section (one '### {regime}' sub-table per regime, one row per bps
+    # scenario) -- see _cost_sensitivity_section.
+    rows = [{
+        "regime": "r1", "start": "2024-01-01", "end": "2024-06-30", "ran": True, "exit_code": 0,
+        "failure_reason": None, "status": "SUCCESS_SMALL_SAMPLE", "total_trades": 3, "win_rate": 0.0,
+        "profit_factor": 0.0, "expectancy_r": -1.0, "total_r": -3.0, "max_drawdown_r": -3.0,
+        "sharpe_per_trade": None, "sortino_per_trade": None, "small_sample_warning": True,
+        "cost_sensitivity_requested": True,
+        "cost_sensitivity": [
+            {"cost_bps": 0, "trades": 3, "expectancy_r": -1.0, "profit_factor": 0.0, "max_drawdown_r": -3.0},
+            {"cost_bps": 20, "trades": 3, "expectancy_r": -2.1, "profit_factor": 0.0, "max_drawdown_r": -6.3},
+        ],
+    }]
+    markdown = build_markdown_table(rows)
+
+    # main table: compact, small-sample column present, status visible
+    assert "| yes |" in markdown
+    assert "SUCCESS_SMALL_SAMPLE" in markdown
+
+    # dedicated cost-sensitivity section: every bps scenario, its own sub-table
+    assert "## Cost Sensitivity" in markdown
+    assert "### r1" in markdown
+    assert "| 0 | 3 | -1.000 | 0.00 | -3.00 |" in markdown
+    assert "| 20 | 3 | -2.100 | 0.00 | -6.30 |" in markdown
+
+
+def test_markdown_table_failed_row_shows_the_specific_failure_reason():
+    rows = [{
+        "regime": "r1", "start": "2024-01-01", "end": "2024-06-30", "ran": False, "exit_code": 0,
+        "failure_reason": "missing_summary", "total_trades": None, "win_rate": None, "profit_factor": None,
+        "expectancy_r": None, "max_drawdown_r": None, "sharpe_per_trade": None, "sortino_per_trade": None,
+        "small_sample_warning": None, "cost_sensitivity": None,
+    }]
+    markdown = build_markdown_table(rows)
+    assert "missing_summary" in markdown
 
 
 def test_no_cost_sensitivity_flag_omits_the_cli_flag(tmp_path):

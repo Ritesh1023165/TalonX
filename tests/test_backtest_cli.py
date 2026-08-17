@@ -14,6 +14,7 @@ import pandas as pd
 import pytest
 
 from talonx_backtest import cli
+from talonx_backtest.reproducibility import get_dataset_hash
 
 
 def _write_csv(path, n=150, start="2026-01-05 14:30:00", symbol_col=False, symbol="AAPL"):
@@ -41,6 +42,67 @@ def test_cli_runs_single_csv_and_writes_all_report_files(tmp_path, capsys):
 
     dq = json.loads((out_dir / "backtest_data_quality.json").read_text(encoding="utf-8"))
     assert dq["AAPL"]["rows"] == 150
+
+
+def test_cli_wires_the_real_input_path_through_to_dataset_hash(tmp_path):
+    # 2026-08-17 Task 5.2: proves the actual end-to-end plumbing, not
+    # just reproducibility.py's own unit tests -- a real `python -m
+    # talonx_backtest` run's written summary.json must carry a
+    # dataset_hash that matches independently hashing the same --data
+    # path/--symbols the CLI was actually given.
+    csv_path = tmp_path / "aapl.csv"
+    _write_csv(csv_path)
+    out_dir = tmp_path / "out"
+
+    exit_code = cli.main(["--data", str(csv_path), "--symbol", "AAPL", "--out", str(out_dir)])
+    assert exit_code == 0
+
+    summary = json.loads((out_dir / "backtest_summary.json").read_text(encoding="utf-8"))
+    reported_hash = summary["reproducibility"]["dataset_hash"]
+    assert reported_hash is not None
+    assert reported_hash == get_dataset_hash(csv_path)
+
+
+def test_cli_help_does_not_crash(capsys):
+    # Regression test (2026-08-17, discovered during Task 6): the
+    # --no-progress help string contained a literal "X% (bars..." --
+    # argparse's HelpFormatter treats help text as a %-format template,
+    # so an unescaped "% (" crashed with ValueError: unsupported format
+    # character '(' before --help could ever print anything. Fixed by
+    # escaping it as "%%" (see cli.py); this pins --help to actually
+    # exit 0 and print the flag's help text, not just "not raise".
+    with pytest.raises(SystemExit) as exc_info:
+        cli._build_parser().parse_args(["--help"])
+    assert exc_info.value.code == 0
+    assert "--no-progress" in capsys.readouterr().out
+
+
+def test_cli_interim_stdout_dataset_hash_matches_persisted_summary(tmp_path, capsys):
+    # Regression test (2026-08-17, discovered during Task 6): main()'s
+    # interim result_summary_text() print used to omit dataset_path/
+    # dataset_symbols (only write_report's later call had them), so a
+    # run's live stdout showed "dataset_hash: None" for the same run
+    # whose persisted backtest_summary.json carried the real hash --
+    # same run, two different answers to "what data was this?". Fixed
+    # by computing dataset_symbols once, before the interim print, and
+    # passing it (plus --data) into both call sites.
+    csv_path = tmp_path / "aapl.csv"
+    _write_csv(csv_path)
+    out_dir = tmp_path / "out"
+
+    exit_code = cli.main(["--data", str(csv_path), "--symbol", "AAPL", "--out", str(out_dir)])
+    assert exit_code == 0
+
+    stdout = capsys.readouterr().out
+    interim_lines = [line for line in stdout.splitlines() if line.strip().startswith("dataset_hash:")]
+    assert len(interim_lines) == 1
+    interim_hash = interim_lines[0].split(":", 1)[1].strip()
+    assert interim_hash != "None"
+
+    summary = json.loads((out_dir / "backtest_summary.json").read_text(encoding="utf-8"))
+    persisted_hash = summary["reproducibility"]["dataset_hash"]
+
+    assert interim_hash == persisted_hash == get_dataset_hash(csv_path)
 
 
 def test_cli_errors_cleanly_on_missing_data_path(tmp_path, capsys):

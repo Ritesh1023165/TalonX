@@ -26,8 +26,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Awaitable, Callable
+from zoneinfo import ZoneInfo
 
 from talonx_ingest.common.backoff import jittered_backoff_seconds
 from talonx_ingest.config import MarketDataConfig, settings
@@ -37,14 +38,83 @@ logger = logging.getLogger("talonx_ingest.market_data.yfinance_poll")
 
 EventCallback = Callable[[MarketEvent], Awaitable[None]]
 
+_ET = ZoneInfo("America/New_York")
+
 
 class YFinancePoller:
     def __init__(self, config: MarketDataConfig | None = None):
         self.config = config or settings.market_data
         self._stop_event = asyncio.Event()
+        # Cumulative-to-incremental volume conversion state (see
+        # _incremental_volume's own docstring for the full rationale) --
+        # one (trading_date, last_seen_cumulative_volume) pair per symbol.
+        # Instance-level and empty on construction: a fresh YFinancePoller
+        # (e.g. after a process restart) always starts every symbol as a
+        # genuine "first observation" rather than inheriting stale state
+        # from a previous run.
+        self._volume_state: dict[str, tuple[date, float]] = {}
 
     def stop(self) -> None:
         self._stop_event.set()
+
+    def _incremental_volume(self, symbol: str, cumulative: float | None, now: datetime) -> float | None:
+        """`fast_info.last_volume` is Yahoo's CUMULATIVE (day-to-date)
+        volume for the current trading day, not a per-poll or per-minute
+        figure -- traced directly against the installed yfinance
+        library's own source (yfinance/scrapers/quote.py: `last_volume`
+        reads the LAST ROW of a DAILY-interval `history()` call, i.e.
+        "today's daily bar", whose Volume field is a running total that
+        grows through the session). Blindly using that cumulative number
+        as a BAR event's `volume` -- polled every
+        yfinance_poll_interval_seconds (5s by default, so up to ~12
+        polls can land in one calendar minute) and then SUMMED across
+        every tick landing in the same minute bucket by
+        talonx_quant.consumer._update_1m_buffer (which correctly expects
+        `volume` to be a genuine per-tick INCREMENT, the same contract a
+        real trade-by-trade feed satisfies) -- silently multiplies a
+        single day's cumulative volume by however many polls fell in
+        that minute. Confirmed via direct trace, not assumed.
+
+        This converts the cumulative reading into a genuine incremental
+        delta since the last successful poll for `symbol`, tracked
+        per-symbol on this instance. Returns None (never a fabricated or
+        negative number) when a safe delta can't be computed:
+          - First observation of a symbol (including right after a
+            process restart, since state is instance-level): there is no
+            prior reading to diff against, so a whole day's cumulative
+            volume-so-far is NOT a valid "this poll's volume" -- honestly
+            unknown, not zero, not the full cumulative figure.
+          - A new ET trading day since the last observation: yesterday's
+            cumulative total must never be diffed against today's: the
+            date check re-arms a fresh "first observation" for the new
+            day.
+          - `cumulative` is None (Yahoo returned nothing usable this
+            poll): state is left untouched (this is a genuinely missing
+            poll, not a reset) -- the NEXT successful poll's delta
+            naturally spans the gap correctly, no special-casing needed.
+          - `cumulative` is LESS than the last recorded value on the same
+            day (a same-day volume reset/anomaly): reported as unknown
+            rather than guessed, but the new (lower) reading still
+            becomes the new baseline going forward, so tracking resumes
+            correctly on the next poll instead of staying permanently
+            poisoned against a now-invalid old baseline.
+          - Otherwise: `cumulative - previous` (>= 0 by construction). A
+            repeated/stale poll (Yahoo hasn't updated between two polls
+            5s apart) correctly yields 0.0 -- accurate, not a double
+            count."""
+        today = now.astimezone(_ET).date()
+        previous = self._volume_state.get(symbol)
+
+        delta = None
+        if cumulative is not None and previous is not None:
+            prev_date, prev_cumulative = previous
+            if prev_date == today and cumulative >= prev_cumulative:
+                delta = cumulative - prev_cumulative
+
+        if cumulative is not None:
+            self._volume_state[symbol] = (today, cumulative)
+
+        return delta
 
     async def stream(self, symbols: list[str], on_event: EventCallback) -> None:
         """
@@ -142,6 +212,7 @@ class YFinancePoller:
                 if last_price is None:
                     continue
 
+                cumulative_volume = getattr(info, "last_volume", None)
                 events.append(
                     MarketEvent(
                         symbol=symbol.upper(),
@@ -152,7 +223,12 @@ class YFinancePoller:
                         high=getattr(info, "day_high", None),
                         low=getattr(info, "day_low", None),
                         close=last_price,
-                        volume=getattr(info, "last_volume", None),
+                        # NOT cumulative_volume directly -- see
+                        # _incremental_volume's docstring: fast_info.last_volume
+                        # is today's running cumulative total, and this event's
+                        # volume must be a genuine per-poll INCREMENT (downstream
+                        # aggregation sums it across every tick in a minute).
+                        volume=self._incremental_volume(symbol.upper(), cumulative_volume, now),
                         raw={},
                     )
                 )

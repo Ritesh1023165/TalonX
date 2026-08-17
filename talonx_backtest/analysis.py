@@ -136,7 +136,12 @@ def _rr_bucket(rr: float | None) -> str | None:
 
 
 def by_risk_reward(trades: list[Trade], r_field: str = "net_R") -> dict[str, PerformanceMetrics]:
-    return _group_and_score(trades, lambda t: _rr_bucket(t.risk_reward_ratio), r_field)
+    # screening_rr, not the legacy risk_reward_ratio alias (portfolio.Trade's
+    # own docstring: identical by construction today, but screening_rr is
+    # the canonical, explicitly-named field -- reading it here removes this
+    # function's only remaining dependency on the "kept for backward
+    # compatibility" field.
+    return _group_and_score(trades, lambda t: _rr_bucket(t.screening_rr), r_field)
 
 
 def _volume_bucket(surge: float | None) -> str | None:

@@ -22,12 +22,37 @@ import math
 from dataclasses import dataclass, field
 from datetime import timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 from talonx_quant.session import get_session
 
 _REQUIRED_COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
+_ET = ZoneInfo("America/New_York")
+
+
+def _is_weekend(timestamp: pd.Timestamp) -> bool:
+    """True if `timestamp`'s America/New_York calendar DATE is a
+    Saturday or Sunday. `get_session` (talonx_quant.session) classifies
+    purely by TIME-OF-DAY -- it has no notion of the calendar date at
+    all, so a weekend's 09:30-16:00 ET window is otherwise
+    indistinguishable from a real trading day's. Used only by
+    check_data_quality's gap-classification loop below, so a gap
+    spanning a weekend doesn't have its Saturday/Sunday
+    "regular-session-shaped" minutes counted as unexpected intra-session
+    gaps (2026-08-17 real-data smoke test finding -- a weekend inside a
+    downloaded range was reported as exactly 390 x 2 = 780 false-positive
+    unexpected gap bars, one full regular session's worth per weekend day).
+
+    Deliberately does NOT cover exchange holidays (Thanksgiving,
+    Christmas, etc.) -- this repository has no trading-calendar/holiday
+    source of truth to consult (no calendar library is installed or
+    referenced anywhere in the codebase; checked before writing this).
+    A gap spanning a holiday will still be misclassified as an
+    unexpected intra-session gap until a real calendar is added -- see
+    docs/backtesting.md."""
+    return timestamp.astimezone(_ET).weekday() >= 5  # 5=Saturday, 6=Sunday
 
 
 class DataValidationError(ValueError):
@@ -372,19 +397,21 @@ def check_data_quality(df: pd.DataFrame, symbol: str | None = None) -> DataQuali
 
             # Session-aware classification of EACH missing minute in this
             # gap (spec section 6): only a missing REGULAR-session
-            # (09:30-16:00 ET) minute is flagged UNEXPECTED. Both
-            # "closed" (overnight/weekend/outside the 04:00-16:00 ET
-            # window) AND "pre_market" count as EXPECTED here --
-            # overnight/weekend closure is an obvious market fact, and a
-            # huge fraction of legitimately-sourced 1-minute equity
-            # datasets simply don't include pre-market bars at all (many
-            # vendors don't offer them, or a user only cares about
-            # regular-session evaluation) -- that absence is normal, not
-            # a data defect, so it must not drown out a genuine
-            # regular-session hole in noise.
+            # (09:30-16:00 ET) minute ON AN ACTUAL TRADING DAY is flagged
+            # UNEXPECTED. "closed" (overnight/weekend/outside the
+            # 04:00-16:00 ET window), "pre_market", AND a weekend's own
+            # 09:30-16:00-ET-shaped window (get_session alone can't tell
+            # a Saturday from a Monday -- see _is_weekend) all count as
+            # EXPECTED here -- overnight/weekend closure is an obvious
+            # market fact, and a huge fraction of legitimately-sourced
+            # 1-minute equity datasets simply don't include pre-market
+            # bars at all (many vendors don't offer them, or a user only
+            # cares about regular-session evaluation) -- that absence is
+            # normal, not a data defect, so it must not drown out a
+            # genuine regular-session hole in noise.
             cursor = deduped_sorted.iloc[i - 1] + pd.Timedelta(seconds=interval_seconds)
             for _ in range(missing_here):
-                if get_session(cursor) == "regular":
+                if get_session(cursor) == "regular" and not _is_weekend(cursor):
                     unexpected_gap_bars += 1
                 else:
                     expected_gap_bars += 1

@@ -56,9 +56,32 @@ def test_by_confluence_buckets():
 
 
 def test_by_risk_reward_buckets():
-    trades = [_trade(risk_reward_ratio=1.6), _trade(risk_reward_ratio=2.3), _trade(risk_reward_ratio=3.5)]
+    # Both fields set together -- matches the real invariant execution.py
+    # guarantees (risk_reward_ratio and screening_rr are always identical,
+    # set from the same source at Trade construction), so this exercises
+    # the realistic case rather than the two fields silently diverging
+    # only because this fixture's overrides forgot to keep them in sync.
+    trades = [
+        _trade(risk_reward_ratio=1.6, screening_rr=1.6),
+        _trade(risk_reward_ratio=2.3, screening_rr=2.3),
+        _trade(risk_reward_ratio=3.5, screening_rr=3.5),
+    ]
     result = by_risk_reward(trades)
     assert set(result.keys()) == {"1.5-2.0", "2.0-2.5", "3.0+"}
+
+
+def test_by_risk_reward_buckets_on_screening_rr_not_the_legacy_alias():
+    # 2026-08-17 Finding E: by_risk_reward must read the CANONICAL
+    # screening_rr field, not the legacy risk_reward_ratio alias --
+    # proven by deliberately diverging the two (never happens via the
+    # real engine, which always sets them identically, but this is the
+    # direct proof the bucketing key actually changed).
+    trades = [
+        _trade(risk_reward_ratio=9.9, screening_rr=1.6),  # legacy field says "high", screening_rr says "low"
+        _trade(risk_reward_ratio=9.9, screening_rr=3.5),
+    ]
+    result = by_risk_reward(trades)
+    assert set(result.keys()) == {"1.5-2.0", "3.0+"}  # bucketed by screening_rr, not the legacy 9.9 value
 
 
 def test_by_volume_surge_buckets():

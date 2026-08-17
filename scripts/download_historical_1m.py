@@ -46,10 +46,12 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import sys
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -69,6 +71,77 @@ class DownloadError(Exception):
     """Raised when a provider call fails after exhausting all retries
     for one symbol -- caught by the per-symbol loop in main(), never
     lets one bad ticker abort the whole batch."""
+
+
+# 2026-08-17 real-data smoke test follow-up: the downloader used to
+# collapse "provider call failed" and "provider returned zero bars" into
+# the same None/"failed" bucket, and never compared what was ACTUALLY
+# returned against what was REQUESTED -- see download_symbol/main below.
+# FULL/PARTIAL/EMPTY/FAILED makes those four outcomes explicit and
+# distinct everywhere a caller might look (console output, exit code,
+# download_summary.json).
+_STATUSES = ("FULL", "PARTIAL", "EMPTY", "FAILED")
+
+
+@dataclass
+class DownloadResult:
+    """One symbol's outcome. `df` is the raw fetched bars (None unless
+    status is FULL or PARTIAL) -- excluded from repr/eq since comparing
+    DataFrames via `==` is ambiguous and no caller needs to compare two
+    DownloadResults for equality."""
+
+    symbol: str
+    status: str  # one of _STATUSES
+    requested_start: str
+    requested_end: str
+    actual_start: str | None
+    actual_end: str | None
+    bars: int
+    error: str | None = None
+    df: pd.DataFrame | None = field(default=None, repr=False, compare=False)
+
+
+def _classify_status(df: pd.DataFrame, requested_start: str, requested_end: str) -> str:
+    """FULL vs PARTIAL, purely by comparing the ACTUAL returned calendar-
+    date range against the REQUESTED one -- deliberately no weekend/
+    holiday interpretation (this repo has no trading-calendar source of
+    truth to consult -- see talonx_backtest/data.py's `_is_weekend`
+    docstring for why one wasn't invented there either, and the same
+    reasoning applies here). PARTIAL is a neutral description of
+    "returned less date-range than requested," not an accusation that
+    the shortfall represents missing market data -- a request whose end
+    date hasn't traded yet, or that happens to span a weekend, can
+    legitimately come back PARTIAL under this definition. The caller is
+    expected to read requested/actual side by side, not treat PARTIAL
+    alone as an error (see main()'s exit-code handling, which does NOT
+    fail the run on PARTIAL by itself).
+
+    2026-08-17 timezone/date-boundary audit fix: the actual/requested
+    comparison is done on America/New_York calendar dates, not raw UTC
+    ones -- `requested_start`/`requested_end` are bare "YYYY-MM-DD"
+    strings with no time-of-day component at all, so they already mean
+    "this ET trading day" by construction (the whole point of this
+    downloader's date args); comparing them against a UTC .date() of the
+    ACTUAL bars was the bug. Confirmed reproducible: extended-hours
+    (prepost=True) 1-minute data genuinely trades as late as ~19:59 ET,
+    which during EST (UTC-5, roughly Nov-Mar) is 00:59 UTC the NEXT
+    calendar day -- comparing that against a UTC `requested_end_date`
+    made a request for [D, D+1] where D+1 is ENTIRELY missing read as
+    FULL (D's own last after-hours bar's UTC date coincidentally matched
+    D+1). Converting both bar timestamps to America/New_York before
+    taking .date() removes that spillover -- the requested date strings
+    need no conversion, since they never carried a UTC assumption to
+    begin with. This does NOT touch `df` itself, its stored timestamps,
+    or DownloadResult.actual_start/actual_end (both still raw UTC
+    strings, set independently in download_symbol) -- only the internal
+    date basis this one classification decision uses."""
+    actual_start_date = df["timestamp"].iloc[0].tz_convert("America/New_York").date()
+    actual_end_date = df["timestamp"].iloc[-1].tz_convert("America/New_York").date()
+    requested_start_date = pd.Timestamp(requested_start).date()
+    requested_end_date = pd.Timestamp(requested_end).date()
+    if actual_start_date <= requested_start_date and actual_end_date >= requested_end_date:
+        return "FULL"
+    return "PARTIAL"
 
 
 def _retry(fn, *, max_retries: int, base_seconds: float, max_seconds: float, description: str):
@@ -292,21 +365,36 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def download_symbol(symbol: str, start_date: str, end_date: str, provider: str, max_retries: int) -> pd.DataFrame | None:
+def download_symbol(symbol: str, start_date: str, end_date: str, provider: str, max_retries: int) -> DownloadResult:
     fetch = _PROVIDERS[provider]
     try:
         bars = fetch(symbol, start_date, end_date, max_retries=max_retries)
     except DownloadError as exc:
         logger.warning("Giving up on %s via %s: %s", symbol, provider, exc)
-        return None
+        return DownloadResult(
+            symbol=symbol, status="FAILED", requested_start=start_date, requested_end=end_date,
+            actual_start=None, actual_end=None, bars=0, error=str(exc),
+        )
 
     if not bars:
-        logger.warning("%s: 0 bars returned by %s for %s -> %s", symbol, provider, start_date, end_date)
-        return None
+        reason = f"0 bars returned by {provider} for {start_date} -> {end_date}"
+        logger.warning("%s: %s", symbol, reason)
+        return DownloadResult(
+            symbol=symbol, status="EMPTY", requested_start=start_date, requested_end=end_date,
+            actual_start=None, actual_end=None, bars=0, error=reason,
+        )
 
     df = pd.DataFrame(bars)[list(_BAR_COLUMNS)].sort_values("timestamp").reset_index(drop=True)
-    logger.info("%s: downloaded %d bar(s) via %s (%s -> %s)", symbol, len(df), provider, df["timestamp"].iloc[0], df["timestamp"].iloc[-1])
-    return df
+    status = _classify_status(df, start_date, end_date)
+    actual_start, actual_end = df["timestamp"].iloc[0], df["timestamp"].iloc[-1]
+    logger.info(
+        "%s: downloaded %d bar(s) via %s (%s -> %s) -- %s",
+        symbol, len(df), provider, actual_start, actual_end, status,
+    )
+    return DownloadResult(
+        symbol=symbol, status=status, requested_start=start_date, requested_end=end_date,
+        actual_start=str(actual_start), actual_end=str(actual_end), bars=len(df), df=df,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -323,14 +411,14 @@ def main(argv: list[str] | None = None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     total_bars = 0
-    failed_symbols: list[str] = []
+    results: list[DownloadResult] = []
     for symbol in symbols:
-        df = download_symbol(symbol, args.start_date, args.end_date, provider, args.max_retries)
-        if df is None:
-            failed_symbols.append(symbol)
+        result = download_symbol(symbol, args.start_date, args.end_date, provider, args.max_retries)
+        results.append(result)
+        if result.df is None:
             continue
 
-        normalized = from_dataframe(df, symbol=symbol)
+        normalized = from_dataframe(result.df, symbol=symbol)
         out_path = out_dir / f"{symbol}.csv"
         normalized.to_csv(out_path, index=False)
         total_bars += len(normalized)
@@ -340,10 +428,56 @@ def main(argv: list[str] | None = None) -> int:
         print()
 
     print("=" * 70)
-    print(f"Done: {len(symbols) - len(failed_symbols)}/{len(symbols)} symbol(s) written, {total_bars:,} total bar(s), output -> {out_dir}")
-    if failed_symbols:
-        print(f"Failed/empty: {', '.join(failed_symbols)}")
-    return 1 if failed_symbols and len(failed_symbols) == len(symbols) else 0
+    print("DOWNLOAD RESULT")
+    print("=" * 70)
+    for r in results:
+        print(r.symbol)
+        print(f"  Status:    {r.status}")
+        print(f"  Requested: {r.requested_start} -> {r.requested_end}")
+        print(f"  Returned:  {r.actual_start or 'n/a'} -> {r.actual_end or 'n/a'}")
+        print(f"  Bars:      {r.bars}")
+        if r.error:
+            print(f"  Error:     {r.error}")
+        print()
+
+    # PARTIAL still produced usable data -- it is NOT a fetch failure and
+    # must never be silently folded into either "written" or "failed"
+    # bucket. Only EMPTY/FAILED (no usable data at all) count as failures
+    # for the written-count/exit-code purposes below.
+    hard_failures = [r for r in results if r.status in ("EMPTY", "FAILED")]
+
+    print("=" * 70)
+    print(f"Done: {len(symbols) - len(hard_failures)}/{len(symbols)} symbol(s) written, {total_bars:,} total bar(s), output -> {out_dir}")
+    if hard_failures:
+        print(f"Failed/empty: {', '.join(r.symbol for r in hard_failures)}")
+
+    summary = {
+        "provider": provider,
+        "requested_start": args.start_date,
+        "requested_end": args.end_date,
+        "symbols": {
+            r.symbol: {
+                "status": r.status,
+                "actual_start": r.actual_start,
+                "actual_end": r.actual_end,
+                "bars": r.bars,
+                "error": r.error,
+            }
+            for r in results
+        },
+    }
+    summary_path = out_dir / "download_summary.json"
+    summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    print(f"Summary written -> {summary_path}")
+
+    # 2026-08-16 infra audit (Part B, finding #1) + 2026-08-17
+    # FULL/PARTIAL/EMPTY/FAILED follow-up: exit non-zero whenever ANY
+    # requested symbol is EMPTY or FAILED. PARTIAL is deliberately EXCLUDED
+    # from this -- it produced real, usable data and must not be treated
+    # as a fetch failure (see _classify_status's docstring); it is still
+    # fully visible in both the console output and download_summary.json
+    # above, just not silently upgraded to FULL or downgraded to a failure.
+    return 1 if hard_failures else 0
 
 
 if __name__ == "__main__":

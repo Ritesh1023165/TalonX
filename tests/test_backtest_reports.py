@@ -183,6 +183,20 @@ def test_html_report_zero_trades_does_not_fabricate_metrics():
     assert payload["rejections_by_reason"] == {"LOW_CONFLUENCE": 3}
 
 
+def test_html_report_explains_screening_rr_vs_execution_rr():
+    # 2026-08-17 Finding D: the trade table exposes both R:R fields with
+    # no explanation of the distinction -- a small static legend must be
+    # present near the trade table. Neither field's calculation changes.
+    html = build_html_report(_empty_result())
+    assert "screening_rr" in html
+    assert "execution_rr" in html
+    legend_start = html.index("<strong>screening_rr</strong>")
+    legend_end = html.index("</p>", legend_start)
+    legend = html[legend_start:legend_end]
+    assert "revalidation" in legend.lower()
+    assert "real filled entry price" in legend.lower() or "actual fill" in legend.lower()
+
+
 def test_html_report_never_makes_a_network_request():
     html = build_html_report(_empty_result())
     assert "http://" not in html

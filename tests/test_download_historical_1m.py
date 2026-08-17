@@ -15,6 +15,7 @@ regardless of the configured delay.
 """
 from __future__ import annotations
 
+import json
 import time
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
@@ -24,7 +25,9 @@ import pytest
 
 from scripts.download_historical_1m import (
     DownloadError,
+    DownloadResult,
     _chunk_date_range,
+    _classify_status,
     _parse_symbols,
     _retry,
     download_symbol,
@@ -284,11 +287,15 @@ def test_fetch_alpaca_paginates_via_next_page_token(monkeypatch):
 
 # --- download_symbol / main (end to end, mocked provider) ---
 
-def test_download_symbol_returns_none_on_empty_result(monkeypatch):
+def test_download_symbol_returns_empty_status_on_empty_result(monkeypatch):
     monkeypatch.setattr(time, "sleep", lambda _: None)
     with patch("yfinance.download", return_value=pd.DataFrame()):
         result = download_symbol("AAPL", "2026-08-01", "2026-08-02", "yfinance", max_retries=2)
-    assert result is None
+    assert isinstance(result, DownloadResult)
+    assert result.status == "EMPTY"
+    assert result.df is None
+    assert result.bars == 0
+    assert result.error is not None
 
 
 def test_main_writes_a_valid_csv_that_passes_data_quality_checks(tmp_path, monkeypatch, capsys):
@@ -327,3 +334,301 @@ def test_main_reports_failed_symbols_without_aborting_the_batch(tmp_path, monkey
     assert exit_code == 1  # every symbol failed/empty
     out = capsys.readouterr().out
     assert "Failed/empty: AAPL, MSFT" in out
+
+
+# ------------------------------------------------------------------
+# 2026-08-16 infra audit fix: exit code must reflect ANY symbol
+# failure, not only a total wipeout -- see main()'s own comment at the
+# `return 1 if failed_symbols else 0` line. Three cases below, matching
+# the audit's own TEST 1/2/3.
+# ------------------------------------------------------------------
+
+def test_all_success_exits_zero(tmp_path, monkeypatch):
+    # TEST 1 -- ALL SUCCESS: AAPL/MSFT/NVDA all succeed -> exit code 0.
+    monkeypatch.setattr(time, "sleep", lambda _: None)
+
+    with patch("yfinance.download", return_value=_yf_download_df(5)):
+        exit_code = main([
+            "--symbols", "AAPL,MSFT,NVDA", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
+            "--output-dir", str(tmp_path), "--provider", "yfinance",
+        ])
+
+    assert exit_code == 0
+    for symbol in ("AAPL", "MSFT", "NVDA"):
+        assert (tmp_path / f"{symbol}.csv").is_file()
+
+
+def test_partial_failure_still_processes_remaining_symbols_but_exits_nonzero(tmp_path, monkeypatch, capsys):
+    # TEST 2 -- PARTIAL FAILURE: AAPL/NVDA succeed, MSFT fails (empty
+    # response) -> MSFT's failure is reported, AAPL/NVDA are still
+    # written, and the process exits non-zero (the actual bug this task
+    # fixes -- the OLD `len(failed_symbols) == len(symbols)` condition
+    # would have exited 0 here).
+    monkeypatch.setattr(time, "sleep", lambda _: None)
+
+    def fake_download(symbol, *args, **kwargs):
+        if symbol == "MSFT":
+            return pd.DataFrame()  # empty response -> MSFT fails
+        return _yf_download_df(5)
+
+    with patch("yfinance.download", side_effect=fake_download):
+        exit_code = main([
+            "--symbols", "AAPL,MSFT,NVDA", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
+            "--output-dir", str(tmp_path), "--provider", "yfinance",
+        ])
+
+    assert exit_code != 0
+
+    assert (tmp_path / "AAPL.csv").is_file()
+    assert (tmp_path / "NVDA.csv").is_file()
+    assert not (tmp_path / "MSFT.csv").is_file()
+
+    out = capsys.readouterr().out
+    assert "Failed/empty: MSFT" in out
+    assert "2/3 symbol(s) written" in out
+
+
+def test_all_failure_exits_nonzero(tmp_path, monkeypatch, capsys):
+    # TEST 3 -- ALL FAILURE: AAPL/MSFT/NVDA all fail -> exit code != 0.
+    monkeypatch.setattr(time, "sleep", lambda _: None)
+
+    with patch("yfinance.download", return_value=pd.DataFrame()):
+        exit_code = main([
+            "--symbols", "AAPL,MSFT,NVDA", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
+            "--output-dir", str(tmp_path), "--provider", "yfinance",
+        ])
+
+    assert exit_code != 0
+    out = capsys.readouterr().out
+    assert "Failed/empty: AAPL, MSFT, NVDA" in out
+
+
+# ------------------------------------------------------------------
+# 2026-08-17 FULL/PARTIAL/EMPTY/FAILED status classification (Task 2.2).
+# _classify_status is deliberately a pure date-range comparison -- no
+# weekend/holiday interpretation, see its own docstring.
+# ------------------------------------------------------------------
+
+def _bars_at(*timestamps: str) -> pd.DataFrame:
+    """A minimal yf.download-shaped frame with exactly one bar per given
+    UTC timestamp string -- used to control the actual returned date
+    range precisely, independent of _yf_download_df's fixed 1-minute cadence."""
+    index = pd.DatetimeIndex([pd.Timestamp(t, tz="UTC") for t in timestamps], name="Datetime")
+    return pd.DataFrame({"Open": 100.0, "High": 100.5, "Low": 99.5, "Close": 100.2, "Volume": 1000.0}, index=index)
+
+
+def test_classify_status_full_when_actual_range_covers_the_request():
+    df = pd.DataFrame({"timestamp": [pd.Timestamp("2026-08-01 09:30", tz="UTC"), pd.Timestamp("2026-08-02 09:30", tz="UTC")]})
+    assert _classify_status(df, "2026-08-01", "2026-08-02") == "FULL"
+
+
+def test_classify_status_partial_when_actual_range_falls_short():
+    df = pd.DataFrame({"timestamp": [pd.Timestamp("2026-08-01 09:30", tz="UTC"), pd.Timestamp("2026-08-01 09:40", tz="UTC")]})
+    assert _classify_status(df, "2026-08-01", "2026-08-02") == "PARTIAL"
+
+
+def test_classify_status_est_after_hours_spillover_is_correctly_partial():
+    # SCENARIO A -- 2026-08-17 timezone/date-boundary fix regression test.
+    # Previously CONFIRMED REAL BUG: _classify_status compared raw UTC
+    # calendar dates, but extended-hours 1-minute data (prepost=True)
+    # genuinely trades as late as ~19:59 ET -- during EST (UTC-5,
+    # roughly Nov-Mar), that crosses UTC midnight: 2026-01-15 19:59
+    # America/New_York (2026-01-15's own last after-hours bar) is
+    # 2026-01-16 00:59 UTC.
+    #
+    # A request for 2026-01-15 -> 2026-01-16 (two ET trading days) where
+    # only Jan 15 actually has data (Jan 16 is ENTIRELY missing -- a
+    # full one-day gap) used to be mislabeled FULL, because that last
+    # Jan-15 bar's UTC .date() coincidentally read as 2026-01-16. Now
+    # that the comparison is done on America/New_York calendar dates,
+    # that same bar's ET date correctly reads as 2026-01-15 -- less than
+    # the requested end date -- so this genuinely incomplete response is
+    # now correctly PARTIAL.
+    last_real_bar_utc = pd.Timestamp("2026-01-15 19:59:00", tz="America/New_York").tz_convert("UTC")
+    first_real_bar_utc = pd.Timestamp("2026-01-15 04:00:00", tz="America/New_York").tz_convert("UTC")
+    df = pd.DataFrame({"timestamp": [first_real_bar_utc, last_real_bar_utc]})
+
+    result = _classify_status(df, "2026-01-15", "2026-01-16")
+
+    assert result == "PARTIAL"  # was FULL before the fix -- this is the confirmed defect, now closed
+
+
+def test_classify_status_correctly_partial_for_the_same_scenario_in_edt():
+    # SCENARIO B -- the EDT (summer) counterpart to Scenario A: the
+    # identical "day D+1 entirely missing" scenario, at a time of year
+    # where the after-hours session never crossed UTC midnight to begin
+    # with (19:59 ET = 23:59 UTC same day, EDT is UTC-4). Was already
+    # correctly PARTIAL before the fix, and must remain PARTIAL after
+    # it -- proves the ET-basis change doesn't disturb the case that was
+    # never broken.
+    last_real_bar_utc = pd.Timestamp("2026-07-15 19:59:00", tz="America/New_York").tz_convert("UTC")
+    first_real_bar_utc = pd.Timestamp("2026-07-15 04:00:00", tz="America/New_York").tz_convert("UTC")
+    df = pd.DataFrame({"timestamp": [first_real_bar_utc, last_real_bar_utc]})
+
+    result = _classify_status(df, "2026-07-15", "2026-07-16")
+
+    assert result == "PARTIAL"
+
+
+def test_download_symbol_full_status(monkeypatch):
+    # TEST 1 -- FULL: requested a single day, data covers that whole day.
+    monkeypatch.setattr(time, "sleep", lambda _: None)
+    with patch("yfinance.download", return_value=_bars_at("2026-08-01 09:30", "2026-08-01 09:31")):
+        result = download_symbol("AAPL", "2026-08-01", "2026-08-01", "yfinance", max_retries=2)
+    assert result.status == "FULL"
+    assert result.bars == 2
+    assert result.df is not None
+    assert result.error is None
+
+
+def test_download_symbol_partial_status(monkeypatch):
+    # TEST 2 -- PARTIAL: requested 2 days, data only covers the first.
+    monkeypatch.setattr(time, "sleep", lambda _: None)
+    with patch("yfinance.download", return_value=_yf_download_df(5, start="2026-08-01 09:30:00")):
+        result = download_symbol("AAPL", "2026-08-01", "2026-08-02", "yfinance", max_retries=2)
+    assert result.status == "PARTIAL"
+    assert result.bars == 5
+    assert result.df is not None
+
+
+def test_download_symbol_empty_status(monkeypatch):
+    # TEST 3 -- EMPTY: provider call succeeds but returns zero bars.
+    monkeypatch.setattr(time, "sleep", lambda _: None)
+    with patch("yfinance.download", return_value=pd.DataFrame()):
+        result = download_symbol("AAPL", "2026-08-01", "2026-08-02", "yfinance", max_retries=2)
+    assert result.status == "EMPTY"
+    assert result.bars == 0
+    assert result.df is None
+    assert result.error is not None
+
+
+def test_download_symbol_failed_status(monkeypatch):
+    # TEST 4 -- FAILED: provider call raises on every attempt.
+    monkeypatch.setattr(time, "sleep", lambda _: None)
+    with patch("yfinance.download", side_effect=ConnectionError("simulated network failure")):
+        result = download_symbol("AAPL", "2026-08-01", "2026-08-02", "yfinance", max_retries=2)
+    assert result.status == "FAILED"
+    assert result.bars == 0
+    assert result.df is None
+    assert "simulated network failure" in result.error
+
+
+def test_empty_and_failed_are_not_conflated():
+    # EMPTY and FAILED must remain distinguishable, not merged into one
+    # generic "failure" status.
+    assert "EMPTY" != "FAILED"
+    empty_result = DownloadResult(symbol="A", status="EMPTY", requested_start="x", requested_end="y", actual_start=None, actual_end=None, bars=0)
+    failed_result = DownloadResult(symbol="B", status="FAILED", requested_start="x", requested_end="y", actual_start=None, actual_end=None, bars=0)
+    assert empty_result.status != failed_result.status
+
+
+def test_mixed_full_partial_failed_across_symbols(tmp_path, monkeypatch, capsys):
+    # TEST 5 -- mixed multi-symbol results, matching the task's own
+    # example: AAPL FULL, MSFT PARTIAL, NVDA FAILED. All three must be
+    # attempted, all three explicitly reported, and the process must
+    # exit non-zero because of NVDA alone (MSFT's PARTIAL must not force
+    # a non-zero exit by itself -- see the two exit-code tests below).
+    monkeypatch.setattr(time, "sleep", lambda _: None)
+
+    def fake_download(symbol, *args, **kwargs):
+        if symbol == "AAPL":
+            return _bars_at("2026-08-01 09:30", "2026-08-02 09:30")  # covers the full requested range
+        if symbol == "MSFT":
+            return _yf_download_df(5, start="2026-08-01 09:30:00")  # only day 1 -- PARTIAL
+        if symbol == "NVDA":
+            raise ConnectionError("simulated network failure")
+        raise AssertionError(f"unexpected symbol {symbol}")
+
+    with patch("yfinance.download", side_effect=fake_download):
+        exit_code = main([
+            "--symbols", "AAPL,MSFT,NVDA", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
+            "--output-dir", str(tmp_path), "--provider", "yfinance", "--max-retries", "1",
+        ])
+
+    assert exit_code != 0  # NVDA's failure alone must force a non-zero exit
+
+    out = capsys.readouterr().out
+    assert "Status:    FULL" in out
+    assert "Status:    PARTIAL" in out
+    assert "Status:    FAILED" in out
+
+    # all three were attempted -- AAPL/MSFT wrote real CSVs, NVDA did not
+    assert (tmp_path / "AAPL.csv").is_file()
+    assert (tmp_path / "MSFT.csv").is_file()
+    assert not (tmp_path / "NVDA.csv").is_file()
+
+
+def test_summary_json_is_written_with_the_documented_schema(tmp_path, monkeypatch):
+    # TEST 6 -- summary JSON generation.
+    monkeypatch.setattr(time, "sleep", lambda _: None)
+
+    def fake_download(symbol, *args, **kwargs):
+        if symbol == "AAPL":
+            return _bars_at("2026-08-01 09:30", "2026-08-02 09:30")
+        if symbol == "MSFT":
+            return _yf_download_df(5, start="2026-08-01 09:30:00")
+        if symbol == "NVDA":
+            raise ConnectionError("simulated network failure")
+        raise AssertionError(f"unexpected symbol {symbol}")
+
+    with patch("yfinance.download", side_effect=fake_download):
+        main([
+            "--symbols", "AAPL,MSFT,NVDA", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
+            "--output-dir", str(tmp_path), "--provider", "yfinance", "--max-retries", "1",
+        ])
+
+    summary_path = tmp_path / "download_summary.json"
+    assert summary_path.is_file()
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert summary["provider"] == "yfinance"
+    assert summary["requested_start"] == "2026-08-01"
+    assert summary["requested_end"] == "2026-08-02"
+    assert set(summary["symbols"].keys()) == {"AAPL", "MSFT", "NVDA"}
+
+    assert summary["symbols"]["AAPL"]["status"] == "FULL"
+    assert summary["symbols"]["AAPL"]["bars"] == 2
+    assert summary["symbols"]["AAPL"]["actual_start"] is not None
+
+    assert summary["symbols"]["MSFT"]["status"] == "PARTIAL"
+    assert summary["symbols"]["MSFT"]["bars"] == 5
+
+    assert summary["symbols"]["NVDA"]["status"] == "FAILED"
+    assert summary["symbols"]["NVDA"]["bars"] == 0
+    assert summary["symbols"]["NVDA"]["actual_start"] is None
+    assert summary["symbols"]["NVDA"]["error"] is not None
+
+
+def test_partial_alone_does_not_force_a_nonzero_exit(tmp_path, monkeypatch):
+    # A PARTIAL-only result (no EMPTY/FAILED symbols) must still exit 0
+    # -- PARTIAL must never be silently treated as a fetch failure.
+    monkeypatch.setattr(time, "sleep", lambda _: None)
+    with patch("yfinance.download", return_value=_yf_download_df(5, start="2026-08-01 09:30:00")):
+        exit_code = main([
+            "--symbols", "AAPL", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
+            "--output-dir", str(tmp_path), "--provider", "yfinance",
+        ])
+    assert exit_code == 0
+    summary = json.loads((tmp_path / "download_summary.json").read_text(encoding="utf-8"))
+    assert summary["symbols"]["AAPL"]["status"] == "PARTIAL"
+
+
+def test_task_1_1_exit_code_contract_still_holds_with_the_new_status_field(tmp_path, monkeypatch):
+    # TEST 7 -- existing Task 1.1 exit-code behaviour, re-affirmed now
+    # that failure detection routes through DownloadResult.status instead
+    # of a plain None return: EMPTY/FAILED -> non-zero, no EMPTY/FAILED -> 0.
+    monkeypatch.setattr(time, "sleep", lambda _: None)
+
+    with patch("yfinance.download", return_value=_yf_download_df(5)):
+        all_success_exit = main([
+            "--symbols", "AAPL", "--start-date", "2026-08-01", "--end-date", "2026-08-01",
+            "--output-dir", str(tmp_path / "a"), "--provider", "yfinance",
+        ])
+    assert all_success_exit == 0
+
+    with patch("yfinance.download", return_value=pd.DataFrame()):
+        all_empty_exit = main([
+            "--symbols", "AAPL", "--start-date", "2026-08-01", "--end-date", "2026-08-01",
+            "--output-dir", str(tmp_path / "b"), "--provider", "yfinance",
+        ])
+    assert all_empty_exit != 0
