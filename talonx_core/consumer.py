@@ -222,6 +222,13 @@ class DecisionEngine:
                 signal = QuantSignal.model_validate(payload)
                 state = self.correlator.update_signal(signal)
                 self._signals_processed += 1
+                # 2026-08-18 /ping observability fix: "correlated" below
+                # fires once per handled message regardless of payload type
+                # (signal OR report), so it can't answer "which did Core
+                # actually receive". This is that genuine, type-specific
+                # counter -- incremented exactly here, at the real signal-
+                # ingestion boundary, not derived/guessed from correlated.
+                await _incr_metric(self._client, "core", "signals_received")
                 ticker = signal.ticker
                 if self.store is not None:
                     self.store.save_signal(ticker, signal, state.latest_signal_at)
@@ -229,6 +236,10 @@ class DecisionEngine:
                 report = ResearchReport.model_validate(payload)
                 state = self.correlator.update_report(report)
                 self._reports_processed += 1
+                # Sibling to signals_received above -- the real report-
+                # ingestion boundary, distinct from the combined "correlated"
+                # counter.
+                await _incr_metric(self._client, "core", "reports_received")
                 ticker = report.ticker
                 if self.store is not None:
                     self.store.save_report(ticker, report, state.latest_report_at)

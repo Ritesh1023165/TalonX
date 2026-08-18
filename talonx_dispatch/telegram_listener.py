@@ -57,6 +57,7 @@ from zoneinfo import ZoneInfo
 
 import psutil
 from telegram import Bot, Update
+from telegram.constants import ParseMode
 from telegram.error import TelegramError
 
 from talonx_dispatch.config import DispatchConfig
@@ -277,34 +278,70 @@ class TelegramReplyListener:
         reliable existing source (e.g. watchlist size, BRAIN's own
         reports-generated count -- an in-process-only counter no other
         module can see) is reported as the literal string "unknown",
-        never a fabricated zero."""
+        never a fabricated zero.
+
+        2026-08-18 live-incident correctness fixes:
+          - Sent via _reply(..., plain=True) (parse_mode=None) -- this
+            message embeds dynamic content (the session-state label, e.g.
+            'pre_market') that is NOT guaranteed Markdown-safe; sending it
+            through Markdown parsing previously made Telegram reject the
+            ENTIRE reply with a 400 whenever that content contained an
+            unescaped `_`/`*`/`` ` ``/`[` (confirmed live, byte-for-byte
+            reproducible). Formatted alert pushes/alert-detail replies are
+            unaffected -- their content is already Markdown-escaped.
+          - "Server Status: Active / Healthy" (a hardcoded string, true
+            only of the PROCESS, not the pipeline) is replaced by two
+            separate, honestly-derived lines: Process (this handler ran,
+            so the process is definitionally running) and Pipeline
+            (derived from the SAME market-feed-freshness signal the
+            MARKET section below already computes -- not a new metric).
+          - Metrics day is now stated explicitly as UTC -- every counter
+            below reads a `metrics:{YYYY-MM-DD}:...` key keyed on UTC
+            calendar date (see _get_metric), which silently disagrees with
+            "today" in UK-local time for about an hour after UTC midnight
+            (00:00-01:00 BST) each day."""
         cpu_pct = self._process.cpu_percent(interval=None)
         mem_used_gb = self._process.memory_info().rss / (1024 ** 3)
         mem_total_gb = psutil.virtual_memory().total / (1024 ** 3)
         total_today, pushed_today = self.store.count_alerts_today()
         client = getattr(self.dispatch_agent, "_client", None)
+        _, market_health = await self._market_feed_freshness(client)
 
         lines = [
             "\U0001F3D3 Pong! TalonX Engine Online",
             "─" * 30,
-            "\U0001F7E2 Server Status: Active / Healthy",
+            "\U00002699 Process: RUNNING",
+            f"\U0001F4E1 Pipeline: {self._pipeline_status(client, market_health)}",
+            f"\U0001F4C5 Metrics day: {datetime.now(timezone.utc):%Y-%m-%d} (UTC)",
             f"⏱️ Uptime: {self._format_uptime()}",
             f"\U0001F4BB CPU Usage: {cpu_pct:.1f}%  |  RAM: {mem_used_gb:.1f} GB / {mem_total_gb:.1f} GB",
-            f"\U0001F4CA Today's Signals Pushed: {pushed_today} Pushes ({total_today} Logs)",
+            f"\U0001F4CA Today's Signals Pushed (UTC day): {pushed_today} Pushes ({total_today} Logs)",
             "",
             *await self._market_section(client),
             "",
             *await self._quant_section(client),
             "",
-            *await self._brain_section(client),
-            "",
-            *await self._core_section(client),
-            "",
-            *await self._dispatch_section(client),
+            *await self._signal_lifecycle_section(client),
             "",
             *self._session_section(),
         ]
-        await self._reply("\n".join(lines))
+        await self._reply("\n".join(lines), plain=True)
+
+    def _pipeline_status(self, client, market_health: str) -> str:
+        """Derived entirely from the market-feed-freshness label
+        _market_feed_freshness already computes (healthy/stale/
+        disconnected/unknown) -- no new metric, no new Redis read. This
+        is deliberately a narrow, honestly-scoped signal (data actually
+        flowing in), not a claim that every downstream stage is fine."""
+        if client is None:
+            return "UNKNOWN (no Redis connection)"
+        if "disconnected" in market_health:
+            return "DEGRADED (market feed disconnected)"
+        if "stale" in market_health:
+            return "DEGRADED (market feed stale)"
+        if "unknown" in market_health:
+            return "UNKNOWN (market feed status unavailable)"
+        return "HEALTHY (market feed active)"
 
     def _format_uptime(self) -> str:
         if self.dispatch_agent is None or getattr(self.dispatch_agent, "started_at", None) is None:
@@ -317,15 +354,41 @@ class TelegramReplyListener:
     async def _market_section(self, client) -> list[str]:
         bars_read = await _get_metric(client, "ingest", "bars_read")
         last_event_at, health = await self._market_feed_freshness(client)
+        provider_failed = await _get_metric(client, "ingest", "provider_requests_failed")
+        provider_retries = await _get_metric(client, "ingest", "provider_retries")
+        provider_rate_limited = await _get_metric(client, "ingest", "provider_rate_limited")
+        redis_publish_failed = await _get_metric(client, "ingest", "market_redis_publish_failures")
+        redis_reconnects = await _get_metric(client, "ingest", "market_redis_reconnect_successes")
         return [
             "\U0001F4E1 MARKET",
             f"  Source: {await self._ws_status()}",
-            "  Watchlist size: unknown (no authoritative source is currently exposed to dispatch)",
+            f"  Watchlist size: {self._watchlist_size()}",
             f"  Bars/events received today: {_fmt_metric(bars_read)}",
             f"  Last market event: {last_event_at}",
             f"  Feed status: {health}",
-            "  Feed errors: unknown (not currently counted -- see remaining known issues)",
+            f"  Provider failures today: {_fmt_metric(provider_failed)}",
+            f"  Provider retries today: {_fmt_metric(provider_retries)}",
+            f"  Provider rate limits today: {_fmt_metric(provider_rate_limited)}",
+            f"  Redis publish failures today: {_fmt_metric(redis_publish_failed)}",
+            f"  Redis reconnects today: {_fmt_metric(redis_reconnects)}",
         ]
+
+    def _watchlist_size(self) -> str:
+        """2026-08-18 EOD fix: DispatchAgent already holds the SAME
+        TickerWatchlistStore instance run_talonx.py's main() constructs
+        (see DispatchAgent.__init__ and TelegramReplyListener's
+        dispatch_agent=self wiring) -- no new store, no new wiring, this
+        was simply never read from here before. Counts only ACTIVE symbols
+        (list_active_symbols), matching what market data streaming and
+        quant preseed actually subscribe to, not paused/inactive rows."""
+        watchlist_store = getattr(self.dispatch_agent, "watchlist_store", None)
+        if watchlist_store is None:
+            return "unknown (no watchlist store available)"
+        try:
+            return str(len(watchlist_store.list_active_symbols()))
+        except Exception as exc:  # noqa: BLE001 -- a health-check read must never raise
+            logger.warning("Watchlist size query failed: %s", exc)
+            return "unknown (watchlist query failed)"
 
     async def _market_feed_freshness(self, client) -> tuple[str, str]:
         """Returns (last_event_description, health_label), derived from
@@ -367,61 +430,150 @@ class TelegramReplyListener:
         health = "\U0001F7E2 healthy" if age_seconds < 90 else "\U0001F7E1 stale"
         return last_event_desc, health
 
+    # Fixed display order for the candidate-stage breakdown, matching the
+    # gate pipeline's actual sequence in talonx_quant/consumer.py -- shown
+    # every time (even at a genuine 0) since these are the strategy's
+    # named, expected gates, not incidental noise. Any OTHER reason
+    # actually found in the audit trail today (e.g. GLOBAL_RISK_DEGRADED,
+    # UK_SESSION_CLOSED, THROTTLE, NEWS_CATALYST,
+    # RISK_STORE_UNAVAILABLE_FAIL_CLOSED) is appended afterward, but only
+    # if nonzero -- keeps /ping deterministic and readable while still
+    # surfacing genuinely unexpected activity rather than silently hiding it.
+    _CANDIDATE_REJECTION_DISPLAY_ORDER = (
+        "LOW_CONFLUENCE", "LOW_RISK_REWARD", "OPENING_BLACKOUT", "CLOSING_BLACKOUT",
+        "PREMARKET_PROVIDER_UNSUPPORTED", "PREMARKET_LIQUIDITY", "TREND_GATE",
+        "LOSS_LOCKOUT", "COOLDOWN", "HTF_DATA_UNAVAILABLE", "US_MARKET_SESSION_CLOSED",
+    )
+
     async def _quant_section(self, client) -> list[str]:
         evaluated = await _get_metric(client, "quant", "evaluated")
         published = await _get_metric(client, "quant", "published")
-        rejected_today = self._rejected_candidates_today_count()
-        return [
-            "\U0001F9E0 QUANT",
-            f"  Candidates generated today: {_fmt_metric(evaluated)}",
-            f"  Rejected candidates today: {_fmt_metric(rejected_today)}",
-            f"  Signals published today: {_fmt_metric(published)}",
-        ]
+        bar_level, candidate_breakdown = self._quant_rejection_breakdown_today()
 
-    def _rejected_candidates_today_count(self) -> int | None:
+        lines = [
+            "\U0001F9E0 QUANT",
+            "  Volatility-stage:",
+            f"    LOW_VOLATILITY: {_fmt_metric(bar_level)}",
+            "",
+            f"  Candidates generated today: {_fmt_metric(evaluated)}",
+            "  Candidate-stage:",
+        ]
+        if candidate_breakdown is None:
+            lines.append("    unknown (audit trail query failed)")
+        else:
+            for reason in self._CANDIDATE_REJECTION_DISPLAY_ORDER:
+                lines.append(f"    {reason}: {candidate_breakdown.get(reason, 0):,}")
+            extra_reasons = sorted(
+                (r for r in candidate_breakdown if r not in self._CANDIDATE_REJECTION_DISPLAY_ORDER and candidate_breakdown[r] > 0),
+                key=lambda r: candidate_breakdown[r], reverse=True,
+            )
+            for reason in extra_reasons:
+                lines.append(f"    {reason}: {candidate_breakdown[reason]:,}")
+        lines.append(f"  Signals published today: {_fmt_metric(published)}")
+        return lines
+
+    def _quant_rejection_breakdown_today(self) -> tuple[int | None, dict[str, int] | None]:
         """Reuses the EXISTING talonx:quant:rejected audit trail
         (AuditStore.rejected_candidates_between, already populated by
-        talonx_dispatch.consumer's existing subscription to that
-        channel -- see its own docstring) rather than standing up a
-        second competing counter. None only if the query itself fails
-        (e.g. the audit DB is unavailable) -- never a fabricated 0."""
+        talonx_dispatch.consumer's existing subscription to that channel --
+        see its own docstring) rather than standing up a second competing
+        set of Redis counters -- EVERY rejection reason in
+        talonx_quant/consumer.py already calls self._record_rejection(...),
+        so this table already has complete, authoritative per-reason data
+        (including COOLDOWN and THROTTLE, neither of which has a dedicated
+        Redis counter at all). Returns (bar_level_count, {reason: count})
+        -- LOW_VOLATILITY is split out as the bar-level count (rejected
+        before any candidate signal exists), everything else keyed by its
+        real reason string for the candidate-stage breakdown. (None, None)
+        only if the query itself fails (e.g. the audit DB is unavailable)
+        -- never a fabricated 0/empty dict."""
         try:
             now = datetime.now(timezone.utc)
             start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             end = start + timedelta(days=1)
-            return len(self.store.rejected_candidates_between(start, end))
+            rows = self.store.rejected_candidates_between(start, end)
         except Exception as exc:  # noqa: BLE001 -- a health-check read must never raise
-            logger.warning("Rejected-candidate count query failed: %s", exc)
+            logger.warning("Rejected-candidate breakdown query failed: %s", exc)
+            return None, None
+        bar_level = 0
+        candidate_breakdown: dict[str, int] = {}
+        for row in rows:
+            reason = row.get("reason")
+            if reason == "LOW_VOLATILITY":
+                bar_level += 1
+            elif reason:
+                candidate_breakdown[reason] = candidate_breakdown.get(reason, 0) + 1
+        return bar_level, candidate_breakdown
+
+    async def _signal_lifecycle_section(self, client) -> list[str]:
+        """2026-08-18 /ping observability completion: replaces the previous
+        separate BRAIN/CORE/DISPATCH sections with one unified funnel,
+        QUANT published -> ... -> Telegram pushed, so /ping directly answers
+        "where do published signals go" instead of requiring three section
+        headers to be mentally stitched together. Every counter here reads
+        an existing or newly-added `metrics:{date}:{stage}:{counter}` key --
+        brain_received/reports_generated (talonx_brain/consumer.py),
+        core_signals_received/reports_received/action_bullish/
+        action_bearish/action_contradicted (talonx_core/consumer.py),
+        dispatch_received/muted_*/pushed_telegram (talonx_dispatch/
+        consumer.py) -- none of these are new invented semantics, only
+        reports_generated/signals_received/reports_received are genuinely
+        new counters (see their own docstrings for why brain_llm_calls
+        specifically must NOT be used as a reports_generated proxy)."""
+        published = await _get_metric(client, "quant", "published")
+        brain_received = await _get_metric(client, "brain", "received")
+        brain_reports = await _get_metric(client, "brain", "reports_generated")
+        core_signals = await _get_metric(client, "core", "signals_received")
+        core_reports = await _get_metric(client, "core", "reports_received")
+        # action_contradicted is quant/brain DISAGREEING -- the opposite of
+        # actionable, not a third kind of actionable alert. Reported
+        # separately so "Core actionable" only ever counts bullish/bearish
+        # (the two outcomes that actually reach dispatch as an
+        # ActionableAlert -- see talonx_core/consumer.py).
+        core_actionable = await _sum_metrics(client, "core", ["action_bullish", "action_bearish"])
+        core_contradicted = await _get_metric(client, "core", "action_contradicted")
+        dispatch_received = await _get_metric(client, "dispatch", "received")
+        dispatch_suppressed = await _sum_metrics(
+            client, "dispatch", ["muted_contradictions", "muted_confidence", "muted_cooldown"]
+        )
+        telegram_pushed = await _get_metric(client, "dispatch", "pushed_telegram")
+
+        lines = [
+            "\U0001F504 SIGNAL LIFECYCLE",
+            f"  Quant published: {_fmt_metric(published)}",
+            f"  Brain received: {_fmt_metric(brain_received)}",
+            f"  Brain reports generated: {_fmt_metric(brain_reports)}",
+            f"  Core signals received: {_fmt_metric(core_signals)}",
+            f"  Core reports received: {_fmt_metric(core_reports)}",
+            f"  Core actionable: {_fmt_metric(core_actionable)} (bullish + bearish)",
+            f"  Core contradicted: {_fmt_metric(core_contradicted)}",
+            f"  Dispatch received: {_fmt_metric(dispatch_received)}",
+            f"  Dispatch suppressed: {_fmt_metric(dispatch_suppressed)}",
+            f"  Telegram pushed: {_fmt_metric(telegram_pushed)}",
+        ]
+        telegram_failed = self._telegram_send_failures_since_process_start()
+        if telegram_failed is not None:
+            lines.append(f"  Telegram send failures (since process start): {telegram_failed:,}")
+        return lines
+
+    def _telegram_send_failures_since_process_start(self) -> int | None:
+        """DispatchAgent already tracks this in-process (self._telegram_failed
+        / self._long_term_telegram_failed, incremented in
+        _maybe_send_telegram/_maybe_send_long_term_telegram's TelegramSendError
+        handlers) -- trivially readable via the SAME dispatch_agent reference
+        /ping already uses for uptime/watchlist, no new counter needed. Unlike
+        every other figure in this reply, this is scoped to the CURRENT
+        process's uptime, not the UTC calendar day (it isn't a
+        `metrics:{date}:...` Redis key) -- labeled accordingly at the call
+        site rather than silently implying it's a daily total. None only if
+        dispatch_agent itself isn't wired up (no live process to read from)."""
+        if self.dispatch_agent is None:
             return None
-
-    async def _brain_section(self, client) -> list[str]:
-        received = await _get_metric(client, "brain", "received")
-        return [
-            "\U0001F9E9 BRAIN",
-            f"  Quant signals received today: {_fmt_metric(received)}",
-            "  Reports generated today: unknown (brain's own report counter is in-process only, "
-            "not published to a Redis metric another module can read)",
-        ]
-
-    async def _core_section(self, client) -> list[str]:
-        actionable = await _sum_metrics(client, "core", ["action_bullish", "action_bearish", "action_contradicted"])
-        return [
-            "\U0001F52C CORE",
-            "  Research reports received today: unknown (core's 'correlated' counter includes both "
-            "signals and reports combined, not reports alone)",
-            f"  Actionable alerts today: {_fmt_metric(actionable)}",
-        ]
-
-    async def _dispatch_section(self, client) -> list[str]:
-        received = await _get_metric(client, "dispatch", "received")
-        suppressed = await _sum_metrics(client, "dispatch", ["muted_contradictions", "muted_confidence", "muted_cooldown"])
-        pushed = await _get_metric(client, "dispatch", "pushed_telegram")
-        return [
-            "\U0001F4EC DISPATCH",
-            f"  Alerts received today: {_fmt_metric(received)}",
-            f"  Suppressed today: {_fmt_metric(suppressed)}",
-            f"  Telegram pushed today: {_fmt_metric(pushed)}",
-        ]
+        failed = getattr(self.dispatch_agent, "telegram_failed", None)
+        long_term_failed = getattr(self.dispatch_agent, "long_term_telegram_failed", None)
+        if failed is None or long_term_failed is None:
+            return None
+        return failed + long_term_failed
 
     def _session_section(self) -> list[str]:
         now_utc = datetime.now(timezone.utc)
@@ -452,9 +604,14 @@ class TelegramReplyListener:
         label = "Polygon.io" if source == "websocket" else "yfinance polling" if source == "polling" else source
         return f"Connected ({label})" if label else "Connected"
 
-    async def _reply(self, text: str) -> None:
+    async def _reply(self, text: str, plain: bool = False) -> None:
+        """`plain=True` sends with parse_mode=None -- required for any
+        reply containing dynamic/arbitrary content not guaranteed to be
+        valid Markdown (see _handle_ping, which uses this). `plain=False`
+        (default) preserves existing behavior for callers whose content
+        is already Markdown-safe (the alert-ID detail-lookup formatters)."""
         try:
-            await self.telegram_client.send(text)
+            await self.telegram_client.send(text, parse_mode=None if plain else ParseMode.MARKDOWN)
             self._replies_sent += 1
         except TelegramSendError as exc:
             logger.error("Failed to send Telegram reply: %s", exc)

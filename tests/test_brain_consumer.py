@@ -248,6 +248,73 @@ async def test_llm_failure_with_cached_entry_falls_back_to_stale(agent):
     cache.set.assert_not_awaited()  # never re-cache a stale/degraded result
 
 
+# --- 2026-08-18 /ping observability completion: brain_reports_generated --
+# a genuine "report produced" Redis counter, deliberately NOT tied to
+# llm_calls (see the EOD audit's finding: fallback paths can produce a
+# report without ever calling the LLM chain successfully, so llm_calls
+# alone would silently undercount). Must fire for every report origin that
+# actually reaches _publish_report/_publish_long_term_report, and must NOT
+# fire when no report is produced at all. ---------------------------------
+
+@pytest.mark.asyncio
+async def test_llm_success_increments_reports_generated_and_signals_received(agent):
+    await agent._handle_message(_msg(agent, _signal_payload()))
+
+    received_calls = [c for c in agent._client.incrby.await_args_list if "brain:received" in c.args[0]]
+    generated_calls = [c for c in agent._client.incrby.await_args_list if "brain:reports_generated" in c.args[0]]
+    assert len(received_calls) == 1
+    assert len(generated_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_llm_fallback_report_still_increments_reports_generated(agent):
+    # Fallback path (LLM call fails, no cache to fall back on -> degraded
+    # report) -- must increment reports_generated even though llm_calls
+    # was NOT the thing that ultimately produced this report.
+    agent.llm_chain.generate.side_effect = RuntimeError("Gemini exploded")
+
+    await agent._handle_message(_msg(agent, _signal_payload()))
+
+    body = json.loads(agent._client.publish.await_args.args[1])
+    assert body["is_degraded"] is True
+    generated_calls = [c for c in agent._client.incrby.await_args_list if "brain:reports_generated" in c.args[0]]
+    assert len(generated_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_cold_start_bypass_report_still_increments_reports_generated(agent):
+    # Cold-start (no retrieval context at all) never calls the LLM either,
+    # yet still produces and publishes a real report.
+    agent.retriever.retrieve.return_value = []
+
+    await agent._handle_message(_msg(agent, _signal_payload()))
+
+    body = json.loads(agent._client.publish.await_args.args[1])
+    assert body["verdict"] == "insufficient_context"
+    generated_calls = [c for c in agent._client.incrby.await_args_list if "brain:reports_generated" in c.args[0]]
+    assert len(generated_calls) == 1
+    llm_call_metrics = [c for c in agent._client.incrby.await_args_list if "brain:llm_calls" in c.args[0]]
+    assert len(llm_call_metrics) == 0  # confirms this report did NOT come from an LLM call
+
+
+@pytest.mark.asyncio
+async def test_no_report_produced_does_not_increment_reports_generated(agent):
+    # An unexpected failure BEFORE any report object exists (e.g. the
+    # retrieval layer itself crashes, not just the LLM) -- _handle_message's
+    # outer try/except logs and skips, no report is ever published.
+    agent.retriever.retrieve.side_effect = RuntimeError("ChromaDB unreachable")
+
+    await agent._handle_message(_msg(agent, _signal_payload()))
+
+    agent._client.publish.assert_not_awaited()
+    generated_calls = [c for c in agent._client.incrby.await_args_list if "brain:reports_generated" in c.args[0]]
+    assert len(generated_calls) == 0
+    # The signal WAS received (counted before generation was attempted) --
+    # only report production failed, not signal receipt.
+    received_calls = [c for c in agent._client.incrby.await_args_list if "brain:received" in c.args[0]]
+    assert len(received_calls) == 1
+
+
 # --- Cache-first (Requirement 2) -----------------------------------------
 
 @pytest.mark.asyncio
@@ -582,6 +649,12 @@ async def test_long_term_llm_failure_with_no_cache_publishes_degraded_report(age
     assert body["is_degraded"] is True
     assert body["moat_rating"] == "none"
     assert agent.long_term_reports_published == 1
+    # Long-term fallback reports share the SAME brain:reports_generated
+    # Redis key the intraday path increments -- one combined "reports
+    # produced" total across both horizons, matching how "received"
+    # already combines both.
+    generated_calls = [c for c in agent._client.incrby.await_args_list if "brain:reports_generated" in c.args[0]]
+    assert len(generated_calls) == 1
 
 
 @pytest.mark.asyncio

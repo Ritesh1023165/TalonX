@@ -827,6 +827,74 @@ async def test_freshly_constructed_scanner_allows_publication_when_started_mid_w
     assert scanner.signals_suppressed_uk_session_closed == 0
 
 
+# --- US Market Closed Session Rejection (2026-08-18 correctness fix, ------
+# code-review finding #5) -- session=="closed" (outside 04:00-16:00 ET)
+# previously had NO dedicated gate: every other check below is either
+# unconditional or specifically keyed on "pre_market", so a closed-session
+# candidate could reach evaluation/scoring/publication on the same footing
+# as a genuine regular-session one. Deliberately a SEPARATE concept from
+# the UK operating window above (is_operating_window_open) -- these tests
+# use is_operating_window_open's default autouse True stub (see the
+# scanner fixture) so only the US-session gate under test is exercised.
+
+@pytest.mark.asyncio
+async def test_handle_message_suppresses_all_signals_when_us_market_closed(scanner, monkeypatch):
+    candidate = _premarket_signal(session="closed")
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [candidate],
+    )
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert _signal_publishes(scanner) == []
+    assert scanner.signals_suppressed_us_session_closed == 1
+    assert scanner._pending_candidates == []
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert any(r["reason"] == "US_MARKET_SESSION_CLOSED" for r in rejections)
+
+
+@pytest.mark.asyncio
+async def test_handle_message_allows_regular_session_signal_through_us_session_gate(scanner, monkeypatch):
+    # session="regular" (the default _signal() bar_timestamp is 15:00 UTC = 11:00 ET)
+    candidate = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=2.0)
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [candidate],
+    )
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert scanner.signals_suppressed_us_session_closed == 0
+    assert len(scanner._pending_candidates) == 1
+
+
+@pytest.mark.asyncio
+async def test_handle_message_allows_premarket_session_signal_through_us_session_gate(scanner, monkeypatch):
+    """A pre_market candidate must NOT be caught by the closed-session
+    gate -- it should proceed to the premarket-specific gates instead
+    (provider-capability/liquidity/news), unaffected by this fix."""
+    candidate = _premarket_signal()  # session="pre_market"
+    scanner._latest_quotes["AAPL"] = (99.0, 100.0, datetime.now(timezone.utc))
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [candidate],
+    )
+    monkeypatch.setattr(scanner, "_clears_premarket_liquidity", lambda s: True)
+    scanner._last_news_seen["AAPL"] = datetime.now(timezone.utc)
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert scanner.signals_suppressed_us_session_closed == 0
+    assert len(scanner._pending_candidates) == 1
+
+
 # --- Restart semantics (2026-08-16 quant audit, round 4, Requirement 4/13) -
 # TalonX is a host process (scripts/start_talonx.ps1, Task Scheduler),
 # stopped and restarted daily -- these confirm a BRAND-NEW QuantScanner
@@ -1760,9 +1828,20 @@ async def test_handle_message_suppresses_bearish_regular_session_signal_via_tren
 
 
 @pytest.mark.asyncio
-async def test_handle_message_suppresses_premarket_signal_without_liquidity_data(scanner, monkeypatch):
-    # session="pre_market", no buffered bars and no cached quote --
-    # fail-closed: dollar volume and spread can't be confirmed.
+async def test_handle_message_suppresses_premarket_signal_with_no_quote_capability(scanner, monkeypatch):
+    # 2026-08-18 correctness fix (code-review finding #2): session=
+    # "pre_market", no buffered bars and NO cached quote AT ALL -- e.g.
+    # running on yfinance, which never emits QUOTE events (only
+    # polygon_ws.py does; see talonx_ingest/market_data/yfinance_poll.py).
+    # This is now PREMARKET_PROVIDER_UNSUPPORTED specifically (the
+    # provider genuinely cannot supply the required quote capability),
+    # distinct from PREMARKET_LIQUIDITY (a quote WAS available but failed
+    # the freshness/spread/dollar-volume check -- see the sibling test
+    # below). Renamed from
+    # test_handle_message_suppresses_premarket_signal_without_liquidity_data,
+    # which asserted the old, less specific classification this fix
+    # replaces -- the gate itself is unchanged (still fail-closed,
+    # candidate still rejected either way).
     candidate = _premarket_signal()
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
@@ -1774,13 +1853,46 @@ async def test_handle_message_suppresses_premarket_signal_without_liquidity_data
     await scanner._handle_message(_bar_message("AAPL"))
 
     assert _signal_publishes(scanner) == []
-    assert scanner.signals_suppressed_premarket_liquidity == 1
+    assert scanner.signals_suppressed_premarket_provider_unsupported == 1
+    assert scanner.signals_suppressed_premarket_liquidity == 0
     assert scanner._pending_candidates == []
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert any(r["reason"] == "PREMARKET_PROVIDER_UNSUPPORTED" for r in rejections)
+
+
+@pytest.mark.asyncio
+async def test_handle_message_suppresses_premarket_signal_with_quote_but_fails_liquidity(scanner, monkeypatch):
+    """A quote IS available (e.g. a Polygon-configured deployment) but
+    _clears_premarket_liquidity itself rejects it (stale/wide spread/low
+    dollar volume) -- this is the genuine PREMARKET_LIQUIDITY case, still
+    distinct from the no-quote-at-all case above."""
+    candidate = _premarket_signal()
+    scanner._latest_quotes["AAPL"] = (99.0, 100.0, datetime.now(timezone.utc))
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [candidate],
+    )
+    monkeypatch.setattr(scanner, "_clears_premarket_liquidity", lambda s: False)
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert _signal_publishes(scanner) == []
+    assert scanner.signals_suppressed_premarket_provider_unsupported == 0
+    assert scanner.signals_suppressed_premarket_liquidity == 1
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert any(r["reason"] == "PREMARKET_LIQUIDITY" for r in rejections)
 
 
 @pytest.mark.asyncio
 async def test_handle_message_passes_premarket_signal_when_liquidity_and_news_clear(scanner, monkeypatch):
     candidate = _premarket_signal()
+    # A quote must be present to clear the new provider-capability gate
+    # (see test_handle_message_suppresses_premarket_signal_with_no_quote_capability
+    # above) before _clears_premarket_liquidity (monkeypatched below) is
+    # ever reached.
+    scanner._latest_quotes["AAPL"] = (99.0, 100.0, datetime.now(timezone.utc))
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
         consumer_module, "evaluate_signals",
@@ -1792,6 +1904,7 @@ async def test_handle_message_passes_premarket_signal_when_liquidity_and_news_cl
     await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
+    assert scanner.signals_suppressed_premarket_provider_unsupported == 0
     assert scanner.signals_suppressed_premarket_liquidity == 0
     assert scanner.signals_suppressed_news_catalyst == 0
     assert len(scanner._pending_candidates) == 1
@@ -1800,6 +1913,7 @@ async def test_handle_message_passes_premarket_signal_when_liquidity_and_news_cl
 @pytest.mark.asyncio
 async def test_handle_message_suppresses_premarket_signal_without_recent_news(scanner, monkeypatch):
     candidate = _premarket_signal()
+    scanner._latest_quotes["AAPL"] = (99.0, 100.0, datetime.now(timezone.utc))
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
         consumer_module, "evaluate_signals",
@@ -1820,6 +1934,7 @@ async def test_handle_message_suppresses_premarket_signal_without_recent_news(sc
 async def test_handle_message_suppresses_premarket_signal_with_stale_news(scanner, monkeypatch):
     from datetime import timedelta
     candidate = _premarket_signal()
+    scanner._latest_quotes["AAPL"] = (99.0, 100.0, datetime.now(timezone.utc))
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
         consumer_module, "evaluate_signals",

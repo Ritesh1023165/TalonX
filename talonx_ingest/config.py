@@ -158,6 +158,12 @@ class RedisConfig:
     ws_heartbeat_ttl_seconds: int = _env_int("TALONX_REDIS_WS_HEARTBEAT_TTL_SECONDS", 120)
     connect_timeout_seconds: float = _env_float("TALONX_REDIS_CONNECT_TIMEOUT", 5.0)
     socket_timeout_seconds: float = _env_float("TALONX_REDIS_SOCKET_TIMEOUT", 5.0)
+    # RedisEventPublisher's background reconnect loop (2026-08-18
+    # correctness fix, code-review finding #3) -- same naming/default
+    # convention as talonx_quant/talonx_brain/talonx_dispatch's own
+    # reconnect_backoff_base_seconds/reconnect_backoff_max_seconds.
+    reconnect_backoff_base_seconds: float = _env_float("TALONX_REDIS_RECONNECT_BASE", 1.0)
+    reconnect_backoff_max_seconds: float = _env_float("TALONX_REDIS_RECONNECT_MAX", 30.0)
 
 
 @dataclass(frozen=True)

@@ -400,6 +400,8 @@ _GATE_NAMES = {
     "GLOBAL_RISK_DEGRADED": "risk_degraded_gate",
     "FINAL_REVALIDATION_DATA_UNAVAILABLE": "throttle_revalidation_gate",
     "UK_SESSION_CLOSED": "uk_session_gate",
+    "US_MARKET_SESSION_CLOSED": "us_session_gate",
+    "PREMARKET_PROVIDER_UNSUPPORTED": "premarket_provider_gate",
 }
 
 
@@ -485,6 +487,8 @@ class QuantScanner:
         self._risk_degraded: bool = False
         self._signals_suppressed_risk_degraded = 0
         self._signals_suppressed_uk_session_closed = 0
+        self._signals_suppressed_us_session_closed = 0
+        self._signals_suppressed_premarket_provider_unsupported = 0
         self._client = None
         self._stop_event = asyncio.Event()
         self._signals_published = 0
@@ -547,6 +551,14 @@ class QuantScanner:
     @property
     def signals_suppressed_uk_session_closed(self) -> int:
         return self._signals_suppressed_uk_session_closed
+
+    @property
+    def signals_suppressed_us_session_closed(self) -> int:
+        return self._signals_suppressed_us_session_closed
+
+    @property
+    def signals_suppressed_premarket_provider_unsupported(self) -> int:
+        return self._signals_suppressed_premarket_provider_unsupported
 
     @property
     def risk_degraded(self) -> bool:
@@ -1210,6 +1222,33 @@ class QuantScanner:
             )
             return
 
+        # US Market Closed Session Rejection (2026-08-18 correctness fix,
+        # code-review finding #5): session=="closed" (outside 04:00-16:00
+        # ET -- talonx_quant.session.get_session) previously had NO
+        # dedicated gate below -- every check from here on is either
+        # unconditional or specifically keyed on "pre_market", so a
+        # closed-session candidate (e.g. from a still-polling yfinance
+        # source overnight) could reach evaluation/scoring/publication on
+        # the same footing as a genuine regular-session one. This is a
+        # SEPARATE, orthogonal concept from the UK operating window check
+        # above (is_operating_window_open): that gates WHEN TalonX itself
+        # is allowed to publish (an operator schedule); this gates
+        # WHETHER the US equities market is even open right now,
+        # regardless of TalonX's own schedule. All signals from one
+        # evaluate_signals() call share the same triggering bar and
+        # therefore the same .session (see strategy.py/schemas.py).
+        if signals and signals[0].session == "closed":
+            self._signals_suppressed_us_session_closed += len(signals)
+            await _incr_metric(self._client, "quant", "dropped_us_session_closed", len(signals))
+            await self._record_rejection(
+                event.symbol, "US_MARKET_SESSION_CLOSED", len(signals), datetime.now(timezone.utc), signals,
+            )
+            logger.info(
+                "Suppressed %d candidate(s) for %s -- US equities market session is closed",
+                len(signals), event.symbol,
+            )
+            return
+
         blackout = get_entry_blackout(snapshot.bar_timestamp)
         if blackout == "opening":
             # Opening Range Blackout (09:30-09:45 ET): ALL candidates
@@ -1357,6 +1396,37 @@ class QuantScanner:
         # Pre-market liquidity gate: dollar volume + bid-ask spread, both
         # fail-closed (missing/stale data = gate not cleared, not assumed
         # to pass). Regular-session/closed candidates are untouched.
+        #
+        # 2026-08-18 correctness fix (code-review finding #2): a provider
+        # that has NEVER delivered a genuine bid/ask QUOTE event for this
+        # ticker (yfinance -- see talonx_ingest/market_data/yfinance_poll.py,
+        # which only ever emits BAR events; only polygon_ws.py constructs
+        # QUOTE events with bid/ask) is distinguished here from one that
+        # HAS delivered a quote but it fails the freshness/spread/dollar-
+        # volume check. Both outcomes still REJECT the candidate -- this
+        # gate remains exactly as fail-closed as before, no pass/fail
+        # behavior changes -- but the audit trail now says WHY:
+        # PREMARKET_PROVIDER_UNSUPPORTED (no quote capability at all,
+        # e.g. running on yfinance) vs PREMARKET_LIQUIDITY (a quote WAS
+        # available and was genuinely too thin/stale/wide, or dollar
+        # volume was too low).
+        survivors, dropped_for_provider = _partition(
+            survivors, lambda s: s.session != "pre_market" or self._latest_quotes.get(s.ticker.upper()) is not None
+        )
+        if dropped_for_provider:
+            await self._record_rejection(
+                event.symbol, "PREMARKET_PROVIDER_UNSUPPORTED", len(dropped_for_provider),
+                datetime.now(timezone.utc), dropped_for_provider,
+            )
+        self._signals_suppressed_premarket_provider_unsupported += len(dropped_for_provider)
+        await _incr_metric(self._client, "quant", "failed_premarket_provider_unsupported", len(dropped_for_provider))
+        if not survivors:
+            logger.info(
+                "Suppressed %d candidate(s) for %s -- pre-market quote capability unavailable from current provider",
+                len(dropped_for_provider), event.symbol,
+            )
+            return
+
         survivors, dropped_for_liquidity = _partition(
             survivors, lambda s: s.session != "pre_market" or self._clears_premarket_liquidity(s)
         )

@@ -155,6 +155,13 @@ class BacktestResult:
     end: pd.Timestamp | None
     symbols: list[str]
     bars_processed: int = 0
+    # Research telemetry (Task 10) -- always empty unless BacktestEngine
+    # was constructed with research_telemetry=True; see that flag's own
+    # docstring. Purely observational, never consulted by any gate/
+    # decision, so a caller that ignores these two fields sees identical
+    # behavior/artifacts to before this feature existed.
+    volatility_telemetry: list[dict] = field(default_factory=list)
+    candidate_telemetry: list[dict] = field(default_factory=list)
 
 
 class BacktestEngine:
@@ -162,8 +169,22 @@ class BacktestEngine:
     backtest run (state is not reusable across runs -- create a new
     instance)."""
 
-    def __init__(self, config: BacktestConfig | None = None):
+    def __init__(self, config: BacktestConfig | None = None, research_telemetry: bool = False):
+        """`research_telemetry` (Task 10, default False): opt-in capture
+        of two OBSERVATIONAL-ONLY lists (volatility_telemetry,
+        candidate_telemetry -- see their append sites below) for
+        research into per-symbol gate behavior. Purely additive: every
+        value captured is read from an object the gate pipeline already
+        computed (IndicatorSnapshot, QuantSignal, _fails_min_volatility's
+        own return value) -- nothing is recalculated with different
+        logic, no gate/threshold/ordering changes, and the existing
+        signal_log/trades/rejections outputs are completely untouched by
+        this flag. When False (the default), neither list is ever
+        appended to, so behavior and cost are identical to before this
+        flag existed -- see
+        tests/test_backtest_research_telemetry.py's parity test."""
         self.config = config or BacktestConfig()
+        self.research_telemetry = research_telemetry
         qc = self.config.quant_config
 
         self.buffer = RollingBarBuffer(qc.max_bars_per_symbol)
@@ -184,8 +205,18 @@ class BacktestEngine:
         # regression fixture): a candidate's own reported price/RSI/R:R
         # here must never depend on a bar with a LATER timestamp than
         # the candidate itself. Not used by the engine's own control
-        # flow.
+        # flow. UNCONDITIONAL (pre-dates research_telemetry) --
+        # tests/test_backtest_regression.py and test_backtest_lookahead.py
+        # assert exact equality against this list's dict shape, so it
+        # must never be extended/changed; candidate_telemetry below is a
+        # deliberately separate list for Task 10's richer fields instead.
         self.signal_log: list[dict] = []
+        # Task 10 research telemetry -- see research_telemetry docstring
+        # above. One row per bar with a valid indicator snapshot
+        # (volatility_telemetry) / one row per raw candidate signal
+        # (candidate_telemetry), only when research_telemetry=True.
+        self.volatility_telemetry: list[dict] = []
+        self.candidate_telemetry: list[dict] = []
         self.signals_generated = 0
         self.signals_published = 0
         self.bars_processed = 0
@@ -260,6 +291,8 @@ class BacktestEngine:
             end=ordered["timestamp"].iloc[-1],
             symbols=symbols,
             bars_processed=self.bars_processed,
+            volatility_telemetry=self.volatility_telemetry,
+            candidate_telemetry=self.candidate_telemetry,
         )
 
     # ------------------------------------------------------------------
@@ -315,7 +348,21 @@ class BacktestEngine:
         if snapshot is None:
             return  # warm-up -- identical "insufficient data -> no signal" posture as live
 
-        if _fails_min_volatility(snapshot, qc):
+        fails_volatility = _fails_min_volatility(snapshot, qc)
+        if self.research_telemetry:
+            # Same formula _fails_min_volatility itself uses internally
+            # (talonx_quant/consumer.py) -- copied for DISPLAY only, not
+            # a second implementation the gate could diverge from; the
+            # actual gate decision below still comes from
+            # fails_volatility, the one value both this telemetry row
+            # and the reject-or-continue branch share.
+            atr_pct = (snapshot.atr / snapshot.price * 100) if (snapshot.atr is not None and snapshot.price) else None
+            self.volatility_telemetry.append({
+                "timestamp": timestamp, "symbol": symbol, "price": snapshot.price,
+                "atr": snapshot.atr, "atr_pct": atr_pct,
+                "volatility_threshold": qc.min_atr_pct, "passes_volatility": not fails_volatility,
+            })
+        if fails_volatility:
             self._reject(symbol, "LOW_VOLATILITY", 1, timestamp)
             return
 
@@ -332,6 +379,29 @@ class BacktestEngine:
                 "direction": s.direction.value, "price": s.price, "rsi": s.rsi,
                 "confluence_score": s.confluence_score, "risk_reward_ratio": s.risk_reward_ratio,
             })
+        if self.research_telemetry:
+            # Every raw candidate, same point in the pipeline as
+            # signal_log above (before ANY gate) -- so rejected AND
+            # eventually-published candidates are both represented.
+            # Every field is read directly off the QuantSignal `s`
+            # strategy.py already built; confluence_score is the
+            # AGGREGATE 0-3 int strategy.py computes (its own
+            # RSI-zone/MACD-cross/volume-threshold sub-conditions are
+            # local, unexposed values inside _confluence_score -- not
+            # reconstructed here, see docs/backtesting.md's Task 10
+            # note). trend_aligned is the one genuinely-exposed
+            # per-signal gate boolean (None when the trend gate doesn't
+            # apply to this signal, not "failed" -- same meaning as
+            # everywhere else it's used).
+            for s in signals:
+                self.candidate_telemetry.append({
+                    "timestamp": timestamp, "symbol": symbol, "direction": s.direction.value,
+                    "signal_type": s.signal_type.value, "session": s.session, "price": s.price,
+                    "rsi": s.rsi, "macd": s.macd, "macd_signal_line": s.macd_signal_line,
+                    "volume_surge_ratio": s.volume_surge_ratio,
+                    "confluence_score": s.confluence_score, "risk_reward_ratio": s.risk_reward_ratio,
+                    "trend_component": s.trend_aligned,
+                })
 
         blackout = get_entry_blackout(snapshot.bar_timestamp)
         if blackout == "opening":

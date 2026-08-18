@@ -63,6 +63,45 @@ def test_cli_wires_the_real_input_path_through_to_dataset_hash(tmp_path):
     assert reported_hash == get_dataset_hash(csv_path)
 
 
+def test_cli_research_telemetry_off_by_default_writes_no_telemetry_files(tmp_path):
+    csv_path = tmp_path / "aapl.csv"
+    _write_csv(csv_path)
+    out_dir = tmp_path / "out"
+
+    exit_code = cli.main(["--data", str(csv_path), "--symbol", "AAPL", "--out", str(out_dir)])
+
+    assert exit_code == 0
+    assert not (out_dir / "backtest_research_volatility_telemetry.csv").exists()
+    assert not (out_dir / "backtest_research_candidate_telemetry.csv").exists()
+    # existing artifact set is unaffected by this flag's mere existence
+    assert (out_dir / "backtest_trades.csv").exists()
+
+
+def test_cli_research_telemetry_flag_writes_telemetry_files(tmp_path, capsys):
+    csv_path = tmp_path / "aapl.csv"
+    _write_csv(csv_path)
+    out_dir = tmp_path / "out"
+
+    exit_code = cli.main([
+        "--data", str(csv_path), "--symbol", "AAPL", "--out", str(out_dir), "--research-telemetry",
+    ])
+
+    assert exit_code == 0
+    vol_path = out_dir / "backtest_research_volatility_telemetry.csv"
+    cand_path = out_dir / "backtest_research_candidate_telemetry.csv"
+    assert vol_path.exists()
+    assert cand_path.exists()
+
+    vol_df = pd.read_csv(vol_path)
+    assert len(vol_df) > 0  # flat fixture still clears warm-up and gets evaluated every bar
+    assert list(vol_df.columns) == [
+        "timestamp", "symbol", "price", "atr", "atr_pct", "volatility_threshold", "passes_volatility",
+    ]
+
+    captured = capsys.readouterr()
+    assert "Research telemetry written" in captured.out
+
+
 def test_cli_help_does_not_crash(capsys):
     # Regression test (2026-08-17, discovered during Task 6): the
     # --no-progress help string contained a literal "X% (bars..." --

@@ -205,7 +205,10 @@ class WatchlistDrivenMarketData:
     once -- rather than calling stream([]), which raises ValueError.
     """
 
-    def __init__(self, watchlist_store: TickerWatchlistStore, on_event, poll_interval_seconds: float):
+    def __init__(
+        self, watchlist_store: TickerWatchlistStore, on_event, poll_interval_seconds: float,
+        metrics_publisher=None,
+    ):
         self._store = watchlist_store
         self._on_event = on_event
         self._poll_interval = poll_interval_seconds
@@ -214,6 +217,10 @@ class WatchlistDrivenMarketData:
         self._task: asyncio.Task | None = None
         self._current_symbols: set[str] = set()
         self._was_idle_empty = False
+        # 2026-08-18 /ping observability fix: forwarded to each
+        # MarketDataManager this reconciler constructs -- see
+        # MarketDataManager.__init__'s own docstring. Optional/additive.
+        self._metrics_publisher = metrics_publisher
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -255,7 +262,7 @@ class WatchlistDrivenMarketData:
             return
 
         self._was_idle_empty = False
-        self._manager = MarketDataManager()
+        self._manager = MarketDataManager(metrics_publisher=self._metrics_publisher)
         self._task = asyncio.create_task(
             self._manager.stream(sorted(new_symbols), self._on_event), name="market_data_stream"
         )
@@ -1200,6 +1207,7 @@ async def main() -> None:
         )
         market_data_runner = WatchlistDrivenMarketData(
             watchlist_store, make_on_event(market_publisher), watchlist_config.poll_interval_seconds,
+            metrics_publisher=market_publisher,
         )
 
     reactive_ingestion: WatchlistDrivenIngestion | None = None
