@@ -309,14 +309,17 @@ class BacktestEngine:
         # high/low can immediately close it" (spec section 6).
         pending = self._pending_entry.pop(symbol, None)
         if pending is not None and (self.config.allow_overlapping_trades or not self.simulator.has_open(symbol)):
-            self.simulator.open_position(
-                pending.signal, timestamp, float(row["open"]),
-                opportunity_score=pending.opportunity_score,
-            )
-            trade = self.simulator.check_exit(symbol, timestamp, float(row["high"]), float(row["low"]))
-            if trade is not None:
-                self.trades.append(trade)
-                self._maybe_arm_loss_lockout(symbol, trade, timestamp)
+            fill_price = float(row["open"])
+            fill_signal = self._finalize_fill_geometry(pending.signal, fill_price, timestamp)
+            if fill_signal is not None:
+                self.simulator.open_position(
+                    fill_signal, timestamp, fill_price,
+                    opportunity_score=pending.opportunity_score,
+                )
+                trade = self.simulator.check_exit(symbol, timestamp, float(row["high"]), float(row["low"]))
+                if trade is not None:
+                    self.trades.append(trade)
+                    self._maybe_arm_loss_lockout(symbol, trade, timestamp)
         elif self.simulator.has_open(symbol):
             trade = self.simulator.check_exit(symbol, timestamp, float(row["high"]), float(row["low"]))
             if trade is not None:
@@ -554,6 +557,62 @@ class BacktestEngine:
             "risk_reward_ratio": geometry.risk_reward_ratio,
             "signal_age_ms": age_seconds * 1000.0,
         })
+
+    def _finalize_fill_geometry(self, signal: QuantSignal, fill_price: float, now: pd.Timestamp) -> QuantSignal | None:
+        """2026-08-19 correctness fix (Task 13 defect): _revalidate above
+        re-derives stop_price/target_price against the bar-close price at
+        THROTTLE-FLUSH time, but the actual fill happens a full bar later,
+        at bar N+1's OPEN (see _process_symbol_bar's own docstring on the
+        "signal at bar N -> entry at bar N+1's open" convention). Between
+        those two prices, a real gap can leave the revalidated stop_price
+        on the WRONG SIDE of the price the position actually fills at --
+        execution.py's risk calc uses abs(entry_price_raw - stop_price),
+        which silently tolerates this rather than rejecting it, so the
+        resulting "STOP" exit was actually a favorable move mislabeled as
+        a loss-side exit (always net_R=+1.0 exactly -- confirmed via Task
+        13's audit against 6 real historical trades).
+
+        Deliberately NARROW: only recomputes when the pre-existing
+        geometry has ALREADY been invalidated by the fill price (fails the
+        required stop < entry < target / target < entry < stop invariant).
+        The far more common case -- fill price differs slightly from the
+        revalidation price but stop/target still correctly bracket it --
+        is left completely untouched, preserving the existing, intentional
+        "execution_rr can legitimately diverge from screening_rr due to
+        normal fill-price drift" behavior (see
+        tests/test_backtest_execution.py::
+        test_execution_rr_uses_the_real_fill_price_not_the_screening_reference_price).
+
+        When recomputation IS needed, this reuses calculate_trade_geometry
+        (the exact same function _revalidate already calls) anchored to the
+        REAL fill price, and applies the SAME min_risk_reward_ratio gate a
+        fresh candidate would have to clear -- rejecting (never silently
+        keeping invalid geometry) if the gap is severe enough that even a
+        freshly-anchored trade wouldn't qualify. screening_rr (signal.
+        risk_reward_ratio) is deliberately NEVER overwritten here -- it is
+        documented (execution.py) as the strategy's gate-time R:R, never
+        recalculated against the fill; only the actual protective
+        stop/target levels the position trades against are re-anchored.
+        Returns None (and records a GEOMETRY_INVALIDATED_AT_FILL rejection)
+        if no valid geometry exists even at the real fill price."""
+        if signal.stop_price is None or signal.target_price is None:
+            return signal  # nothing to validate against -- unchanged, pre-existing behavior (see test_execution_rr_is_none_when_stop_price_is_missing)
+
+        if signal.direction == SignalDirection.BULLISH:
+            geometry_valid = signal.stop_price < fill_price < signal.target_price
+        else:
+            geometry_valid = signal.target_price < fill_price < signal.stop_price
+        if geometry_valid:
+            return signal
+
+        qc = self.config.quant_config
+        geometry = calculate_trade_geometry(
+            fill_price, signal.atr, signal.direction, signal.pivot_resistance, signal.pivot_support, qc,
+        )
+        if geometry is None or geometry.risk_reward_ratio is None or geometry.risk_reward_ratio < qc.min_risk_reward_ratio:
+            self._reject(signal.ticker.upper(), "GEOMETRY_INVALIDATED_AT_FILL", 1, now)
+            return None
+        return signal.model_copy(update={"stop_price": geometry.stop_price, "target_price": geometry.target_price})
 
     # ------------------------------------------------------------------
     # EOD flatten / data-end finalization
