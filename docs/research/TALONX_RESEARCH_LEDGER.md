@@ -2738,3 +2738,68 @@ machinery).
 first, then perform the full replay/parity comparison this task was supposed to perform. This is a re-run
 of the same task, not a new one; the mismatch was an operational process-management issue, not a code
 defect, so no code fix is implied.
+
+---
+
+## Task 25C Re-attempt — Deterministic Replay Against the Genuinely Frozen Dataset (2026-08-20)
+
+**Previous**: `INPUT_CAPTURE_MUTATED`.
+
+**New evidence**: a follow-up process inventory (PowerShell `Get-CimInstance`, `tasklist` via two
+independent tools) found zero remaining `python.exe` processes — the four real Windows workers identified
+during the first attempt had already been terminated. A mandatory two-check hash-stability test (108
+seconds apart) found all 8 checked capture files byte-identical across both checks.
+
+**Correction**: the dataset is genuinely frozen. New canonical snapshot established: **10,529 bars, 3,300
+gate rejections (3,293 LOW_VOLATILITY, 6 LOW_CONFLUENCE, 1 TREND_GATE), 0 published candidates, 0 paper-state
+transitions** — explicitly superseding, not deleting, the earlier invalid 9,946-bar snapshot. Full detail:
+`results/task25_live_shadow_2026-08-20/corrected_capture_manifest.json` and
+`capture_freeze_verification.json`.
+
+**Replay performed**: 10,521 of 10,529 rows (8 rows with null OHLV at the exact instant of market open
+excluded, not repaired) fed through the existing `BacktestEngine`, `QuantConfig()` production defaults,
+cold-start buffer (no pre-seed, per the explicit no-backfill instruction). **Determinism confirmed** — two
+independent runs produced an identical SHA-256 fingerprint over the full signal log, rejection list, and
+trade list.
+
+**Session/blackout parity**: confirmed — all 10 boundary spot-checks (09:30/09:45/15:30/15:50/16:00 ET, ±1s)
+matched documented rules exactly.
+
+**Published-signal parity**: confirmed and meaningfully robust — live 0 published, replay 0 published/0
+trades, despite replay generating 737 raw candidates (vs. live's heavily-suppressed rate) and reaching gate
+stages live rarely got to. This independently strengthens confidence in the zero-publication result, since
+it held under a materially *less* restrictive replay condition.
+
+**First divergence, root-caused**: `AAPL, 2026-08-20T13:15:00Z` — live rejected as `LOW_VOLATILITY`; replay's
+buffer wasn't warm yet. Traced conclusively via `run_talonx_stderr.log`: `run_talonx.py` pre-seeded **120
+bars of real historical 1-minute data per symbol via yfinance at process startup**, before the capture
+script began subscribing — this state is genuinely absent from `live_bars.csv` and cannot be reproduced
+without a fresh historical fetch (fabrication, explicitly forbidden). A direct diagnostic measurement
+confirmed replay's own `atr_pct` (1.15%–4.98% across sampled symbols) never fell below the 0.25%
+`min_atr_pct` threshold, while live rejected 99.8% of all gate-checked bars as `LOW_VOLATILITY` — the gate
+formula and threshold are identical, shared code; this is a missing-initial-state divergence, not a logic
+bug. Essentially every downstream candidate/gate-count difference (replay's much higher raw-candidate rate,
+its LOW_CONFLUENCE/TREND_GATE/LOW_RISK_REWARD/CLOSING_BLACKOUT/US_MARKET_SESSION_CLOSED events) traces to
+this single cause, independently corroborated via a gate-ordering sanity check. One residual is honestly
+unresolved: why live's low-ATR reading persisted the entire session rather than tapering once pre-seed bars
+should have rolled out of the buffer — not conclusively re-derivable without inspecting the terminated
+process's actual runtime state, recorded as an open question rather than assumed away.
+
+**What remains unexercised**: unchanged — bullish entry fill, bearish signal exit, live fill geometry, EOD
+flatten of a real position, stop/target lifecycle all remain `NOT_EXERCISED_ON_REAL_SIGNAL`.
+
+**No profitability interpretation.** No P&L/R/expectancy/win-rate computed. No Task 22 OOS outcomes
+inspected; frozen spec hash `9c15d11c021dddbd` untouched. No production code changed — the replay itself
+was a standalone diagnostic script, left uncommitted per instruction.
+
+**Focused tests** (§20): 99 passed, 0 failed (long-only lifecycle, live/backtest contract, session
+classification, fill geometry, lookahead, reproducibility/determinism).
+
+**Final decision**: `INCONCLUSIVE_DUE_TO_MISSING_INITIAL_STATE`. Not `PARITY_BROKEN` (no logic/config/
+gate-ordering defect found anywhere checked); not `PARITY_CONFIRMED` (the dominant gate layer, 99.8% of
+live's actual decisions, could not be verified at all).
+
+**Next recommended action (not started)**: do not re-run Task 25C against this same dataset — the missing
+initial state cannot be recovered from it. If future indicator/gate-level parity is wanted, a future live
+capture should additionally record (read-only) each symbol's pre-seeded buffer contents at startup — a
+capture-tooling suggestion, not started here.
