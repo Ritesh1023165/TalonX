@@ -1,0 +1,161 @@
+{
+  "spec_name": "task21_frozen_early_failure_spec",
+  "frozen_date_utc": "2026-08-20",
+  "status": "FROZEN - do not modify for this OOS experiment; any change is a new hypothesis",
+  "discovery_period": {
+    "start": "2025-08-15",
+    "end": "2026-08-14"
+  },
+  "oos_period": {
+    "start": "2026-08-17",
+    "note": "onward, as defined in Task 18's OOS protocol"
+  },
+  "source_artifacts": {
+    "task20_excursion_audit_script_sha256_16": "9e55ce8fc54948eb",
+    "task21_early_failure_audit_script_sha256_16": "4908396d295aa63a",
+    "task20_trade_paths_csv_sha256_16": "90fe73c028fb289f",
+    "task21_early_features_csv_sha256_16": "eb6d6aa6a858a0f8"
+  },
+  "discovery_dataset_hash": "5e5412a960bf",
+  "git_commit_at_freeze": "2a5e8855ecf0c337db755577909c74923cb6c2c1",
+  "path_class_definitions": {
+    "IMMEDIATE_FAILURE": "STOP exit with max running favorable excursion (MFE) < 0.25R over the full trade life -- Task 20 definition, unchanged",
+    "DEEP_RETRACE_WINNER": "TARGET or profitable END_OF_SESSION exit that crossed back through breakeven (0R) at some point after first reaching +0.5R favorable excursion, then still finished positive -- Task 20 definition, unchanged"
+  },
+  "model_family": {
+    "note": "Task 21 did not designate a single primary horizon -- all 5 pre-registered horizons were evaluated as a fixed family. T=10 is excluded here because Task 21 itself could not fit a stable model at that horizon (only 4 positive cases survived). The remaining 4 horizons (1/2/3/5 min) are frozen as co-equal family members -- OOS evaluation must report all 4 and interpret them jointly (multiple-testing-aware), never cherry-pick the best-performing one after seeing OOS results.",
+    "model_type": "logistic regression, unregularized (penalty=None), scikit-learn",
+    "label_definition": "IMMEDIATE_FAILURE = 1, DEEP_RETRACE_WINNER = 0",
+    "input_features_exact_order": [
+      "current_R",
+      "running_MAE_R",
+      "consecutive_adverse_bars"
+    ],
+    "feature_formulas": {
+      "current_R": "direction-adjusted (entry_price to bar_close) / risk_dollars_per_share, using the last bar's close at or before horizon T",
+      "running_MAE_R": "cumulative minimum of direction-adjusted adverse excursion (bar low, direction-adjusted) / risk, from entry through horizon T (<=0 by construction)",
+      "consecutive_adverse_bars": "longest run of consecutive close-to-close adverse bars (direction-adjusted) from entry through horizon T"
+    },
+    "direction_normalization": "bullish: high_R=(high-entry)/risk, low_R=(low-entry)/risk, close_R=(close-entry)/risk; bearish: high_R=(entry-low)/risk, low_R=(entry-high)/risk, close_R=(entry-close)/risk -- risk is always risk_dollars_per_share = abs(entry_price - stop_price), identical to the denominator gross_R itself uses",
+    "preprocessing": "each feature standardized (z-score) using the DISCOVERY-period mean/std frozen below -- OOS features must be standardized with these SAME frozen mean/std values, never refit on OOS data",
+    "classification_mapping": "predict_proba[:,1] >= 0.5 -> classified IMMEDIATE_FAILURE; < 0.5 -> classified DEEP_RETRACE_WINNER-like (no separate classification threshold was chosen in Task 21 beyond the standard 0.5 decision boundary; Task 21's false-protection analysis in section 10 used a DIFFERENT, purely descriptive single-feature median-midpoint threshold, NOT this model's output -- that descriptive threshold is recorded separately below and is not treated as a frozen model decision rule)"
+  },
+  "task21_descriptive_false_protection_thresholds": {
+    "note": "Task 21 Section 10 used the single best-discriminating feature per horizon with a DESCRIPTIVE median-midpoint threshold -- NOT a fitted model, NOT optimized, reported for completeness only. Not part of the frozen logistic model family above.",
+    "1": {
+      "feature": "distance_to_stop_R",
+      "threshold_descriptive_midpoint": 0.769325
+    },
+    "2": {
+      "feature": "current_R",
+      "threshold_descriptive_midpoint": -0.099016
+    },
+    "3": {
+      "feature": "favorable_bars",
+      "threshold_descriptive_midpoint": 1.5
+    },
+    "5": {
+      "feature": "favorable_bars",
+      "threshold_descriptive_midpoint": 2.25
+    }
+  },
+  "horizon_models": {
+    "1": {
+      "horizon_minutes": 1,
+      "n_discovery": 65,
+      "n_immediate_failure": 31,
+      "n_deep_retrace_winner": 34,
+      "standardization_mean": [
+        -0.08498599588153383,
+        -0.5417098230006684,
+        1.123076923076923
+      ],
+      "standardization_std": [
+        0.6859525320706739,
+        0.42117690056491375,
+        0.7546306749803521
+      ],
+      "coefficients": [
+        -3.1562541579739416,
+        -0.36432023259834395,
+        -0.7098330932883924
+      ],
+      "intercept": -0.4482295899149411,
+      "discovery_auc_insample": 0.8823529411764706
+    },
+    "2": {
+      "horizon_minutes": 2,
+      "n_discovery": 55,
+      "n_immediate_failure": 21,
+      "n_deep_retrace_winner": 34,
+      "standardization_mean": [
+        0.090176653177815,
+        -0.5374259000180784,
+        1.3272727272727274
+      ],
+      "standardization_std": [
+        0.9754506024077717,
+        0.4298008240762065,
+        0.9733642774053943
+      ],
+      "coefficients": [
+        -5.2349658353327895,
+        0.134562429874336,
+        -0.6936095325789522
+      ],
+      "intercept": -1.702136304874202,
+      "discovery_auc_insample": 0.9047619047619048
+    },
+    "3": {
+      "horizon_minutes": 3,
+      "n_discovery": 48,
+      "n_immediate_failure": 14,
+      "n_deep_retrace_winner": 34,
+      "standardization_mean": [
+        0.29863476810036593,
+        -0.5278934922754651,
+        1.5208333333333333
+      ],
+      "standardization_std": [
+        1.1796485582877114,
+        0.4927688556254836,
+        1.0799225152245364
+      ],
+      "coefficients": [
+        -4.4301568118231005,
+        0.30212374178075446,
+        -0.4294610765545171
+      ],
+      "intercept": -2.236611333607545,
+      "discovery_auc_insample": 0.9128151260504201
+    },
+    "5": {
+      "horizon_minutes": 5,
+      "n_discovery": 42,
+      "n_immediate_failure": 8,
+      "n_deep_retrace_winner": 34,
+      "standardization_mean": [
+        0.6165667448212471,
+        -0.4551856293121767,
+        1.6666666666666667
+      ],
+      "standardization_std": [
+        1.330242033149299,
+        0.34692707752741386,
+        0.9677334015667416
+      ],
+      "coefficients": [
+        -4.504811944346728,
+        0.10776823389914955,
+        -0.8752078655296064
+      ],
+      "intercept": -3.277658440430788,
+      "discovery_auc_insample": 0.8933823529411764
+    }
+  },
+  "code_version_fingerprint": {
+    "engine": "talonx_backtest (frozen production strategy, min_atr_pct=0.20%)",
+    "feature_extraction_reused_from": "research/scripts/task21_early_failure_audit.py: build_r_series() + horizon_features()"
+  },
+  "frozen_spec_hash": "9c15d11c021dddbd"
+}
