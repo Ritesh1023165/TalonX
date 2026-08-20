@@ -2553,34 +2553,61 @@ touched. The live pipeline itself (`run_talonx.py`) was started with its periodi
 jobs skipped (irrelevant to intraday quant/paper decisions) but every intraday-relevant module (market
 data, quant, brain, core, dispatch, paper trading) running with completely unmodified logic.
 
-**Commit SHA used**: `1e28647c3f04b9a07d00f7c8f0a7bb1143c80f91` (post-Task-25A-push).
+**Commit SHA used**: `1e28647c3f04b9a07d00f7c8f0a7bb1143c80f91` (recorded at capture start, post-Task-25A-push);
+the ledger/script commit `c1fcc9eb158cd66571a75226000857a7693991c5` landed after capture had already started
+and changed no module the capture observes. Strategy fingerprint (`get_strategy_version()`): `88529b8a3fa1`.
+Default `QuantConfig` fingerprint (`config_hash`): `9174f5232c20`. Neither changed during the session.
 
 **Symbols**: 8 of the 10 requested research symbols are present in the current production watchlist and
 were captured — AAPL, MSFT, NVDA, AMD, TSLA, GOOGL, PYPL, STX. **AMZN and META are not in the current
 watchlist and were not added** (per instruction, not changing the production watchlist for this
-experiment) — never captured, never backfilled from downloaded history. Full artifact list and a live
-snapshot as of 09:19 ET: `results/task25_live_shadow_2026-08-20/` (`live_session_manifest.json`,
-`live_bars.csv`, `live_indicator_trace.csv`, `live_candidate_trace.csv`, `live_gate_trace.csv`,
-`live_quant_outputs.csv`, `live_paper_state_transitions.csv`, `live_runtime_events.csv`,
-`live_data_quality.json`, `live_shadow_summary.md`).
+experiment) — never captured, never backfilled from downloaded history. Full artifact list:
+`results/task25_live_shadow_2026-08-20/` (`live_session_manifest.json`, `live_bars.csv`,
+`live_indicator_trace.csv`, `live_candidate_trace.csv`, `live_gate_trace.csv`, `live_quant_outputs.csv`,
+`live_paper_state_transitions.csv`, `live_runtime_events.csv`, `live_data_quality.json`,
+`live_shadow_summary.md`) — file SHA-256 hashes recorded in `live_session_manifest.json`.
 
-**Status at last snapshot (2026-08-20T13:19Z / 09:19 ET, pre-market, Window A in progress)**: 16 bars
-captured across all 8 symbols; 0 candidates published; 6 gate rejections, all `LOW_VOLATILITY`; 0 paper
-state transitions (nothing has reached talonx_core/talonx_paper yet); 0 special events flagged (none of the
-task's flagged scenarios A-G have occurred yet — expected, given zero candidates so far); 0 runtime
-incidents (no Redis disconnects, no handler errors, no out-of-order/duplicate bars); one honestly-reported
-data-quality observation (bars arriving roughly every ~5 minutes rather than every 12s poll, and
-pre-market volume reporting as 0.0) recorded in `live_data_quality.json`, not explained away. **Window B
-(15:15-16:05 ET) has not yet been reached.**
+**Exact start/end**: started `2026-08-20T13:05:37Z` (09:05:37 ET / 14:05:37 London), stopped
+`2026-08-20T20:12:54Z` (16:12:54 ET / 21:12:54 London) — covering both Window A (premarket → opening →
+normal session) and Window B (15:15-16:05 ET closing window) in full. Stopped via SIGINT first (matching
+`run_talonx.py`'s documented Ctrl+C path), escalated to SIGTERM after neither process logged a clean
+shutdown message within 8s (a known git-bash-to-Windows-python.exe signal-delivery limitation on this
+host); both confirmed gone within 5s of SIGTERM. Every capture row is flushed to disk immediately on write,
+so no already-processed event was lost, but no explicit clean-shutdown log line was captured — recorded
+honestly, not claimed. Shutdown reason: `NORMAL_SESSION_COMPLETE` (the trading day had already fully
+elapsed at stop time).
+
+**Final counts**: 9,946 bars (all 8 symbols); 3,116 gate rejections (3,109 `LOW_VOLATILITY`, 6
+`LOW_CONFLUENCE`, 1 `TREND_GATE` — the 7 non-volatility rejections all on STX, 09:46-11:06 ET, none near the
+closing blackout or EOD-flatten checkpoint); **0 candidates published all session**; 0 paper-state
+transitions; 0 special events flagged (none of scenarios A-G occurred, since no candidate was ever
+published).
+
+**Runtime stability**: 0 Redis disconnects, 0 handler errors, 0 out-of-order bars, 0 duplicate bars, 0
+paper-store poll errors, 0 process restarts, no host sleep/interruption. 32 premarket bar-cadence gap
+observations, all before 09:30 ET regular-session open, zero after.
+
+**Data-fidelity observations** (classified `DATA_PROVIDER_OBSERVATION`, not strategy bugs, provider
+behavior not modified): (A) premarket bars arrived sparsely (~270-465s gaps per symbol) despite the 12s
+poll interval; (B) premarket volume reported as 0.0 for every bar; (C) no cadence anomaly after 09:30 ET
+regular-session open.
+
+**Scenarios not exercised**: `SIGNAL_LIFECYCLE_OBSERVATION` = INCONCLUSIVE, `REAL_SIGNAL_LIVE_BACKTEST_PARITY`
+= NOT_EXERCISED, `LIVE_FILL_GEOMETRY_OBSERVATION` = NOT_EXERCISED — no qualifying signal was published for
+these 8 symbols today under production-default thresholds, so no lifecycle behavior (bearish-while-flat,
+bearish-while-long, blackout handling, EOD flatten of a real position, live fill geometry) could be
+observed from a real signal. **No inference about strategy quality is drawn from this** — it is an honest
+result about today's specific market conditions/symbol set, not a capture defect (infrastructure and data
+flow are both GREEN) and not a profitability judgment.
+
+**No profitability interpretation**: no total R, P&L, profit factor, expectancy, win rate, or "did today's
+signal work" judgment is recorded anywhere in this capture.
 
 **Task 22 status**: unchanged, `OOS_SUSPENDED_PENDING_CANONICAL_LONG_ONLY_BASELINE`. Frozen spec hash
 `9c15d11c021dddbd` untouched; no new OOS outcomes inspected.
 
-**No replay performed**: today's captured bars have deliberately NOT been replayed through the backtester
-in this task — Task 25B (live fill-geometry reconciliation) remains unresolved, and the captured data is
-being preserved for a later, fully-reviewed replay rather than an interim one.
+**No replay performed**: today's 9,946 captured bars have deliberately NOT been replayed through the
+backtester — that is planned as a later task, after Task 25B (live fill-geometry reconciliation) is
+resolved.
 
-**This is a partial, in-progress capture at the time of this ledger entry** — both the live pipeline and
-the capture script remain running in the background for continued observation; a fuller update (through
-market open, normal morning, and ideally the 15:15-16:05 ET window) requires a later check-in and is not
-recorded as complete here.
+**Final decision**: `LIVE_SHADOW_CAPTURE_COMPLETE`.
