@@ -2676,3 +2676,65 @@ with the backtest on stop-side breaches (an honest, evidence-based caveat, not a
 
 **State**: reviewed and committed as `6e15bc4` (`fix(paper): fail closed on invalid live fill geometry`),
 pushed to `origin/research/talonx-strategy-validation`. PR #10 confirmed still draft/open, not merged.
+Commit SHA itself recorded in a small follow-up docs commit, `78498b2`.
+
+---
+
+## Task 25C — Live-Captured Data Deterministic Replay & Decision-Parity Audit (2026-08-20)
+
+**Objective**: given the exact live-captured 2026-08-20 market evidence
+(`results/task25_live_shadow_2026-08-20/`), determine whether a deterministic replay of the same captured
+bars through the corrected (Task 25A/25B) pipeline reproduces TalonX's live decisions at the
+indicator/gate/candidate/published-signal level — a correctness/parity audit, not a profitability backtest.
+
+**Task 25B checkpoint SHA used as the base**: `78498b2d151b4c638c65d3526dad09f9d6583104`.
+
+**Result: halted at the input-integrity gate before any replay was performed.**
+
+Before replay, this task recomputed SHA-256 hashes for the six live-capture files named in the task
+instruction and compared them against `live_session_manifest.json`'s recorded values from Task
+25-LIVE-CAPTURE's prior "finalization." **Three of six mismatched** (`live_bars.csv`, `live_gate_trace.csv`,
+`live_quant_outputs.csv`; the other three matched only because they stayed empty throughout, not because
+they were genuinely frozen).
+
+**Root cause (confirmed via direct process inspection, not assumed)**: a live Windows process inventory
+found **four `python.exe` processes still running** — a `.venv/Scripts/` launcher/shim paired with a
+separate `pythoncore-3.12-64/python.exe` real worker, for each of `run_talonx.py` (PIDs 8364/12060) and the
+capture script (PIDs 16700/21912). Task 25-LIVE-CAPTURE's earlier "graceful stop" sent SIGINT/SIGTERM via
+git-bash's `kill` to bash's own job-table PIDs, which never corresponded to these real Windows PIDs — the
+same class of PID-shim mismatch already documented elsewhere in this project's operational history,
+independently reconfirmed here for ad-hoc background processes. The capture silently kept running and
+appending real data for roughly 24 more minutes after being reported "stopped" (`live_bars.csv` grew from
+9,946 to 10,529 rows; `live_gate_trace.csv`/`live_quant_outputs.csv` from 3,116 to 3,300) until this task's
+integrity check caught it.
+
+**Corrective action** (separate from, not a substitute for, the halted replay): all four processes located
+and terminated (PowerShell `Stop-Process -Force`), confirmed via `tasklist` showing zero remaining
+`python.exe` processes. The dataset is now genuinely frozen at the corrected counts above, giving a stable
+starting point for a future re-attempt — this does not retroactively validate or complete this task's own
+replay, which never ran.
+
+**Instruction compliance**: per explicit instruction, no replay/indicator/session/candidate/gate/
+published-signal comparison, first-divergence trace, or determinism check was performed. All 15 required
+artifact files exist in `results/task25c_live_replay_parity/`; most are explicit `NOT_PRODUCED` placeholders
+rather than populated analysis. Parity metrics (BAR_COUNT/SESSION/INDICATOR/RAW_CANDIDATE/GATE_EVENT/
+REJECTION_REASON/PUBLISHED_SIGNAL) are all `NOT_EXERCISED` this run.
+
+**What remains unexercised**: unchanged from Task 25-LIVE-CAPTURE's own finding — bullish entry fill,
+bearish signal exit, live fill geometry, EOD flatten of a real position, stop/target lifecycle all remain
+`NOT_EXERCISED_ON_REAL_SIGNAL`; this task adds no new information on that front.
+
+**No profitability interpretation.** No P&L/R/expectancy/win-rate was computed. No Task 22 OOS outcomes
+inspected; frozen spec hash `9c15d11c021dddbd` untouched. No production code was changed in this task.
+
+**Focused tests** (run independently of the integrity finding, §21): 184 passed, 0 failed (live/backtest
+contract, long-only lifecycle, fill geometry, lookahead, session classification, reproducibility/determinism
+machinery).
+
+**Final decision**: `INPUT_CAPTURE_MUTATED`.
+
+**Next recommended action (not started)**: re-attempt Task 25C against the now-genuinely-frozen dataset
+(10,529 bars / 3,300 rejections / 0 published) — re-verify hash stability across two consecutive checks
+first, then perform the full replay/parity comparison this task was supposed to perform. This is a re-run
+of the same task, not a new one; the mismatch was an operational process-management issue, not a code
+defect, so no code fix is implied.
