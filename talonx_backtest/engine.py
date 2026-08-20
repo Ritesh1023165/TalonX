@@ -59,6 +59,28 @@ the final report's "Known Limitations" section):
     one historical minute is treated as one throttle window and flushed
     immediately, rather than continuously every 15s. See
     BacktestConfig.throttle_fidelity.
+
+Position lifecycle -- LONG_ONLY (Task 24/25A canonical requirement,
+corrected 2026-08-20; previously this engine opened a genuine short on
+every BEARISH signal, contradicting live/paper's own semantics -- see
+results/task24_requirements_parity_audit/long_short_flow.md and
+results/task25a_long_only_parity_fix/task25a_summary.md):
+    FLAT   + qualifying BULLISH -> schedule a LONG entry (_pending_entry),
+             filled at the next bar's open, same as before.
+    LONG   + qualifying BULLISH -> no additional/overlapping position
+             (unless allow_overlapping_trades) -- unchanged.
+    FLAT   + qualifying BEARISH -> no position opened. Recorded as
+             "NO_ACTIVE_POSITION", the same reason talonx_paper.
+             decide_trade uses for the identical case -- never silently
+             dropped.
+    LONG   + qualifying BEARISH -> schedules an alert-driven exit
+             (_pending_exit), filled at the next bar's open (same
+             next-bar convention as an entry, to avoid lookahead on the
+             exit price), exit_reason="SIGNAL_EXIT" -- distinct from
+             STOP/TARGET/END_OF_SESSION/DATA_END. Mirrors talonx_paper's
+             CONFIRMED_BEARISH/CONTRADICTED -> SELL.
+This engine never opens a short; TradeSimulator.open_position raises if
+ever handed a non-BULLISH signal, as a fail-closed invariant check.
 """
 from __future__ import annotations
 
@@ -137,6 +159,18 @@ class _PendingEntry:
 
 
 @dataclass
+class _PendingExit:
+    """A published BEARISH/CONTRADICTED signal awaiting execution at its
+    symbol's next bar -- the LONG_ONLY-lifecycle counterpart of
+    _PendingEntry (Task 25A). Carries only the triggering signal; unlike
+    an entry, an alert-driven exit doesn't need an opportunity_score
+    (it never competes for throttle ranking against other exits -- see
+    _flush_throttle)."""
+
+    signal: QuantSignal
+
+
+@dataclass
 class RejectionRecord:
     ticker: str
     reason: str
@@ -195,6 +229,7 @@ class BacktestEngine:
         self._cooldown_until: dict[str, pd.Timestamp] = {}
         self._loss_lockout_until: dict[str, pd.Timestamp] = {}
         self._pending_entry: dict[str, _PendingEntry] = {}
+        self._pending_exit: dict[str, _PendingExit] = {}
         self._flattened_dates: set = set()
 
         self.trades: list[Trade] = []
@@ -306,20 +341,47 @@ class BacktestEngine:
         # --- Trade lifecycle: entry / exit checks come BEFORE this bar's
         # data feeds indicator computation, matching "a signal published
         # off bar N enters at bar N+1's open, then bar N+1's own
-        # high/low can immediately close it" (spec section 6).
-        pending = self._pending_entry.pop(symbol, None)
-        if pending is not None and (self.config.allow_overlapping_trades or not self.simulator.has_open(symbol)):
+        # high/low can immediately close it" (spec section 6). LONG_ONLY
+        # lifecycle (Task 25A): a pending SIGNAL_EXIT (from a BEARISH/
+        # CONTRADICTED candidate scheduled while long) is resolved
+        # FIRST, at this bar's open, before any new entry -- an exit
+        # frees the symbol up for a same-bar re-entry, never the reverse.
+        pending_exit = self._pending_exit.pop(symbol, None)
+        if pending_exit is not None and self.simulator.has_open(symbol):
             fill_price = float(row["open"])
-            fill_signal = self._finalize_fill_geometry(pending.signal, fill_price, timestamp)
-            if fill_signal is not None:
-                self.simulator.open_position(
-                    fill_signal, timestamp, fill_price,
-                    opportunity_score=pending.opportunity_score,
-                )
-                trade = self.simulator.check_exit(symbol, timestamp, float(row["high"]), float(row["low"]))
-                if trade is not None:
-                    self.trades.append(trade)
-                    self._maybe_arm_loss_lockout(symbol, trade, timestamp)
+            trade = self.simulator.close_on_signal_exit(symbol, timestamp, fill_price, pending_exit.signal)
+            if trade is not None:
+                self.trades.append(trade)
+                self._maybe_arm_loss_lockout(symbol, trade, timestamp)
+        elif pending_exit is not None:
+            # Something else (EOD flatten, most commonly) already closed
+            # this symbol between scheduling and fill time -- nothing to
+            # exit. Never silently dropped, same reason talonx_paper
+            # uses for the identical "no active position" case.
+            self._reject(symbol, "NO_ACTIVE_POSITION", 1, timestamp)
+
+        pending = self._pending_entry.pop(symbol, None)
+        if pending is not None:
+            local_date = timestamp.astimezone(_ET).date()
+            if local_date in self._flattened_dates:
+                # Task 24 finding: the once-per-day EOD-flatten guard
+                # does not by itself prevent a NEW position from opening
+                # after that day's flatten checkpoint has already run.
+                # Task 25A closes that gap explicitly: no new entry may
+                # open for a date once it has been flattened.
+                self._reject(symbol, "POST_EOD_FLATTEN_NO_NEW_ENTRY", 1, timestamp)
+            elif self.config.allow_overlapping_trades or not self.simulator.has_open(symbol):
+                fill_price = float(row["open"])
+                fill_signal = self._finalize_fill_geometry(pending.signal, fill_price, timestamp)
+                if fill_signal is not None:
+                    self.simulator.open_position(
+                        fill_signal, timestamp, fill_price,
+                        opportunity_score=pending.opportunity_score,
+                    )
+                    trade = self.simulator.check_exit(symbol, timestamp, float(row["high"]), float(row["low"]))
+                    if trade is not None:
+                        self.trades.append(trade)
+                        self._maybe_arm_loss_lockout(symbol, trade, timestamp)
         elif self.simulator.has_open(symbol):
             trade = self.simulator.check_exit(symbol, timestamp, float(row["high"]), float(row["low"]))
             if trade is not None:
@@ -405,6 +467,19 @@ class BacktestEngine:
                     "confluence_score": s.confluence_score, "risk_reward_ratio": s.risk_reward_ratio,
                     "trend_component": s.trend_aligned,
                 })
+
+        # US Market Closed Session Rejection (Task 24 P1 / Task 25A parity
+        # fix): live's consumer.py rejects a bar whose session tag is
+        # "closed" before any other gate (matching the 2026-08-18
+        # correctness fix there) -- this engine had no equivalent check
+        # at all, so a dataset containing closed-session rows could sail
+        # straight through every downstream gate. Same position in the
+        # pipeline as live (right after evaluate_signals, before the
+        # blackout gates); same "check signals[0], they all share one
+        # session tag" shortcut live uses.
+        if signals and signals[0].session == "closed":
+            self._reject(symbol, "US_MARKET_SESSION_CLOSED", len(signals), timestamp)
+            return
 
         blackout = get_entry_blackout(snapshot.bar_timestamp)
         if blackout == "opening":
@@ -504,9 +579,25 @@ class BacktestEngine:
             if revalidated is None:
                 continue
 
+            # Publication itself (and the cooldown it arms) happens
+            # regardless of direction, matching live's _publish_signal --
+            # talonx_quant has no concept of position state, so it
+            # publishes a fully gate-checked BEARISH signal exactly the
+            # same way it publishes a BULLISH one. What differs is what
+            # a LONG_ONLY consumer does with it next (Task 24/25A): a
+            # BULLISH signal always schedules an entry; a BEARISH one
+            # only schedules an exit if a long is currently open, and is
+            # otherwise recorded as NO_ACTIVE_POSITION -- never queued
+            # as a new (short) position the way this engine used to.
             self.signals_published += 1
             self._arm_cooldown(symbol, timestamp)
-            self._pending_entry[symbol] = _PendingEntry(signal=revalidated, opportunity_score=score)
+
+            if revalidated.direction == SignalDirection.BULLISH:
+                self._pending_entry[symbol] = _PendingEntry(signal=revalidated, opportunity_score=score)
+            elif self.simulator.has_open(symbol):
+                self._pending_exit[symbol] = _PendingExit(signal=revalidated)
+            else:
+                self._reject(symbol, "NO_ACTIVE_POSITION", 1, timestamp)
 
         if dropped:
             by_ticker: dict[str, int] = {}

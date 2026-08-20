@@ -63,7 +63,7 @@ class Trade:
 
     exit_timestamp: object | None
     exit_price: float | None
-    exit_reason: str | None  # TARGET / STOP / END_OF_SESSION / DATA_END
+    exit_reason: str | None  # TARGET / STOP / END_OF_SESSION / DATA_END / SIGNAL_EXIT
 
     gross_R: float | None
     net_R: float | None
@@ -77,6 +77,15 @@ class Trade:
     mae_price: float | None
     mae_pct: float | None
     mae_r: float | None
+
+    # Task 25A: populated only when exit_reason == "SIGNAL_EXIT" -- the
+    # BEARISH/CONTRADICTED QuantSignal's own type/direction that
+    # triggered an alert-driven exit of an existing long, kept distinct
+    # from the entry's own signal_type/direction above so a reader can
+    # always tell what opened a trade apart from what alert-driven
+    # signal (if any, as opposed to STOP/TARGET/EOD) closed it.
+    exit_signal_type: str | None = None
+    exit_signal_direction: str | None = None
 
     def to_dict(self) -> dict:
         d = dict(self.__dict__)

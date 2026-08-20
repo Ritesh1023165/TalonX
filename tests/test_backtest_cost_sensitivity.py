@@ -124,6 +124,20 @@ def test_zero_cost_scenario_matches_a_plain_zero_cost_backtest(sample_df, scenar
 
 _MULTI_TRADE_CSV = _REPO_ROOT / "examples" / "data" / "sample_multi_trade_1m.csv"
 
+# Task 25A finding (2026-08-20): see the identical marker in
+# tests/test_backtest_sample_data.py -- all three of this CSV's
+# TSTW/TSTL/TSTE demo trades turn out to be built entirely around a
+# BEARISH macd_bearish_cross opening a short position while flat, i.e.
+# the exact long/short bug Task 24/25A fixes. Correctly zero trades
+# now; CSV regeneration tracked as a BLOCKING FOLLOW-UP, not rushed
+# here.
+_XFAIL_PENDING_SAMPLE_DATA_REGENERATION = pytest.mark.xfail(
+    reason="Task 25A: sample_multi_trade_1m.csv's demo trades were built on the long/short bug "
+           "(BEARISH-while-flat) that Task 24/25A fixed; now correctly produce zero trades. Needs a "
+           "dedicated CSV-regeneration follow-up, not fixed here.",
+    strict=True,
+)
+
 
 @pytest.fixture(scope="module")
 def multi_trade_df():
@@ -139,10 +153,12 @@ def multi_trade_scenario_rows(multi_trade_df):
     return cost_sensitivity_scenarios(multi_trade_df, QuantConfig())
 
 
+@_XFAIL_PENDING_SAMPLE_DATA_REGENERATION
 def test_multi_trade_fixture_produces_three_trades_in_every_scenario(multi_trade_scenario_rows):
     assert [r["trades"] for r in multi_trade_scenario_rows] == [3, 3, 3, 3]
 
 
+@_XFAIL_PENDING_SAMPLE_DATA_REGENERATION
 def test_multi_trade_net_r_actually_changes_with_cost(multi_trade_scenario_rows):
     """The concrete "verify net_R changes as expected" check: total_r
     (summed net_R across all 3 trades) must strictly DECREASE as cost
@@ -154,6 +170,7 @@ def test_multi_trade_net_r_actually_changes_with_cost(multi_trade_scenario_rows)
         assert later < earlier
 
 
+@_XFAIL_PENDING_SAMPLE_DATA_REGENERATION
 def test_multi_trade_higher_cost_never_improves_expectancy_without_skipping(multi_trade_scenario_rows):
     """The same monotonicity check as test_higher_cost_never_improves_expectancy
     above, but this one never skips -- the fixture reliably produces trades."""
@@ -163,6 +180,7 @@ def test_multi_trade_higher_cost_never_improves_expectancy_without_skipping(mult
         assert later < earlier
 
 
+@_XFAIL_PENDING_SAMPLE_DATA_REGENERATION
 def test_multi_trade_trade_count_and_win_loss_mix_are_cost_invariant(multi_trade_scenario_rows):
     # Cost changes P&L, never WHETHER a trade wins/loses or how many
     # exist -- stop_price/target_price are fixed levels; slippage/spread

@@ -2306,3 +2306,182 @@ trade, still `OOS_ACCUMULATING`) — no additional OOS outcomes were inspected.
 review checkpoint, not a merge request, and not marked ready for review/merge.
 
 **No prior research conclusion in this ledger was altered by this checkpoint.**
+
+---
+
+## Task 24 — First-Principles Requirements & Live-vs-Backtest Parity Audit (2026-08-20)
+
+**Purpose**: Establish what TalonX is supposed to do (from requirements-level evidence, never from
+profitability) and compare that against the live/paper implementation, the historical backtester, tests,
+and documentation. No strategy parameters, confluence weights, or volume thresholds were changed; no new
+historical backtest was run; no additional Task-22 OOS outcomes were inspected; no production code was
+changed. Full detail in `results/task24_requirements_parity_audit/` (11 artifacts: `fill_geometry_audit.md`,
+`long_short_flow.md`, `closing_eod_audit.md`, `confluence_semantics.md`, `volume_baseline_audit.md`,
+`live_vs_backtest_traceability.csv`, `gate_order_parity.csv`, `test_coverage_audit.csv`,
+`research_impact.csv`, `task24_summary.md`, `task24_summary.json`).
+
+**Canonical requirement determined from evidence**: the strategy is **LONG_ONLY**. A BEARISH/CONTRADICTED
+signal is intended as an exit trigger for an existing long position, never a new short entry — established
+independently by `README.md`'s BUY/SELL-only vocabulary, `docs/modules/quant.md`'s closing-blackout
+rationale comment, `docs/modules/paper.md`'s flat/long-only state diagram, `talonx_paper`'s actual
+implementation (no code path opens a short), and the dedicated test
+`test_confirmed_bearish_flat_is_ignored`.
+
+**Critical finding — long/short semantic mismatch confirmed as a BUG, not a documented divergence**:
+`talonx_backtest` opens genuine new short positions on BEARISH `QuantSignal`s (`TradeSimulator.open_position`
+treats direction symmetrically; PnL formula applies `direction_sign = -1.0` for BEARISH). No document
+anywhere describes this as an intentional research design choice, and no backtest test affirmatively
+asserts it as a deliberate contract. From existing artifacts only (no rerun): 133 of 181 trades (73.5%) and
+94.96% of gross positive R in the corrected 0bps baseline (Task 13B/14 artifacts) are attributable to this
+trade type.
+
+**Compounding finding**: the backtest's EOD-flatten sweep only fires once per calendar date; a position
+opened during 15:50–16:00 ET via the long/short bug can structurally survive un-flattened until the
+following day's checkpoint. Reachable only through the same root-cause bug, not an independent overnight
+exposure path.
+
+**Other confirmed findings**: `US_MARKET_SESSION_CLOSED` gate present in live, absent and undocumented in
+backtest (P1); `talonx_paper` has no equivalent of the backtest's `_finalize_fill_geometry` fill-price
+reconciliation (P1, new finding, live-side gap); RSI-curl trigger and RSI-confluence conditions are
+structurally mutually exclusive on the same bar, with no documentation either way
+(P2, `REQUIREMENT_AMBIGUOUS`); MACD-cross confluence scoring is deliberately direction-agnostic and
+consistently documented (`INTENDED`, not a defect); volume-surge-ratio's denominator includes the current
+bar (confirmed mechanically — 19×100+300bp example yields ≈2.727x, not 3.00x) — this is shared code used
+identically by live and backtest, so not a parity issue, but the convention is undocumented and unpinned by
+any test (P3).
+
+**Task 13B fill-geometry fix**: re-confirmed unchanged (`git diff 2a5e885` = 0 lines) and `CORRECT` — all 9
+dedicated tests still pass.
+
+**Final decision**: `MULTIPLE_MATERIAL_CORRECTNESS_ISSUES`.
+
+**Recommended next task (not started)**: Task 25 — Long-Only Backtest Engine Correction & Full Historical
+Re-Validation — fix `talonx_backtest`'s BEARISH-signal handling to match the LONG_ONLY requirement
+(exit-only, mirroring `talonx_paper.decide_trade`), add regression tests, then re-run the full historical
+backtest and Task 20/21/22-style validation from scratch on the corrected engine.
+
+### Revision to prior conclusions (Tasks 14, 16–20, 22)
+
+> **Previous conclusion**: Task 14's cost-sensitivity total-R/expectancy/profit-factor figures, and the
+> economic-viability conclusions of Tasks 16–20 and Task 22's OOS accumulation, were treated as
+> characterizations of the TalonX strategy's live economic performance (combined across all trades).
+>
+> **New evidence**: Task 24 established that ~95% of the gross positive R in these direction-undecomposed
+> figures comes from `talonx_backtest`-opened short positions — a trade type confirmed, from first-principles
+> requirements evidence, not to exist in the live/paper system as built (`talonx_paper` is long-only; see
+> `long_short_flow.md`).
+>
+> **Updated conclusion**: These prior findings are reclassified from economic evidence to
+> `NOT_YET_VALID_AS_LIVE_ECONOMIC_EVIDENCE` (see `results/task24_requirements_parity_audit/research_impact.csv`
+> for the full per-task breakdown). This does not discard the underlying research — the *implementation*
+> measurements within these tasks (e.g., that the shared gate/signal-generation code behaves as coded) remain
+> valid — only the direction-undecomposed economic/profitability conclusions are affected, pending re-derivation
+> on a long-only-corrected backtest engine (Task 25, recommended above).
+>
+> **Reason**: the long/short semantic mismatch was not previously known; Task 24 was the first task to
+> independently determine the canonical requirement from evidence (rather than from returns) and trace it
+> against the actual implementation.
+
+---
+
+## Task 25A — Long-Only Backtest Parity Correction (2026-08-20)
+
+**Objective**: Correct the defect Task 24 identified — `talonx_backtest` opening a genuine short position on
+every BEARISH `QuantSignal` — so the backtest's trade lifecycle matches the canonical LONG_ONLY requirement
+(BULLISH-while-flat opens a long; BULLISH-while-long is a no-op; BEARISH/CONTRADICTED-while-long closes the
+long; BEARISH/CONTRADICTED-while-flat is a no-op, never a new short). Full detail in
+`results/task25a_long_only_parity_fix/` (9 artifacts: `task25a_summary.md`, `task25a_summary.json`,
+`state_machine_matrix.csv`, `live_backtest_contract.csv`, `closing_eod_tests.csv`,
+`closed_session_tests.csv`, `fill_geometry_live_gap.md`, `test_results.txt`, `research_impact.md`).
+
+**Task 24 defect being corrected**: see this ledger's own Task 24 entry above and
+`results/task24_requirements_parity_audit/long_short_flow.md` — `TradeSimulator.open_position` treated
+BULLISH/BEARISH symmetrically and applied a `direction_sign=-1.0` short-PnL formula to BEARISH candidates.
+
+**Canonical requirement**: LONG_ONLY (unchanged from Task 24's determination — re-derived from evidence, not
+from returns).
+
+**Files changed**: `talonx_backtest/engine.py` (LONG_ONLY lifecycle, new `US_MARKET_SESSION_CLOSED` and
+`POST_EOD_FLATTEN_NO_NEW_ENTRY` gates, `_PendingExit`), `talonx_backtest/execution.py`
+(`TradeSimulator.close_on_signal_exit`, `_close` gained an optional `exit_signal` parameter),
+`talonx_backtest/portfolio.py` (`Trade.exit_signal_type`/`exit_signal_direction`, both default `None`). No
+changes to `talonx_quant/*` or `talonx_paper/*`.
+
+**Exact lifecycle before**: any qualifying `QuantSignal` (BULLISH or BEARISH) that survived the gate pipeline
+and was flat-eligible opened a new `OpenPosition` with `direction` copied straight from the signal;
+`execution.py`'s PnL formula (`direction_sign = 1.0 if BULLISH else -1.0`) then profited a BEARISH position on
+a price decline — a genuine simulated short.
+
+**Exact lifecycle after**: a BULLISH signal behaves exactly as before (opens/no-ops on an existing long). A
+BEARISH/CONTRADICTED signal is now routed by `_flush_throttle` based on current position state: if a long is
+open, it schedules an alert-driven `_pending_exit`, filled at the next bar's open (`exit_reason="SIGNAL_EXIT"`,
+never a synthetic STOP/TARGET); if flat, it is recorded as `NO_ACTIVE_POSITION` (the same reason
+`talonx_paper.decide_trade` uses for the identical case) and opens nothing.
+`TradeSimulator.open_position`/`check_bar_for_exit`/`_close`'s direction-symmetric math were deliberately kept
+generic rather than guarded/deleted — the invariant is enforced entirely by `_flush_throttle`'s routing, which
+is the only call site that ever populates `_pending_entry`/`_pending_exit`.
+
+**Tests**: 2 new files — `tests/test_backtest_long_only_lifecycle.py` (13 tests: full FLAT/LONG ×
+BULLISH/BEARISH matrix, closing-blackout integration, post-EOD-flatten no-re-entry, closed-session parity,
+next-bar-open no-lookahead proof) and `tests/test_live_backtest_contract.py` (3 tests: a permanent
+`talonx_paper.decide_trade`-vs-backtest position-state-sequence parity regression). Required pre-existing
+focused suite + both new files: 75/75 passed. Full `tests/ -k backtest`: 261 passed, 1 skipped (pre-existing,
+unrelated), **15 xfailed (strict, new)**, 0 failed — see below.
+
+**New finding (independent corroborating evidence)**: all four of the project's own canonical example-data
+demo trades — `examples/data/sample_AAPL_trade_1m.csv`'s one documented trade and
+`examples/data/sample_multi_trade_1m.csv`'s TSTW/TSTL/TSTE three-trade win/loss/EOD demo — turn out to have
+been built entirely around the same long/short bug (a BEARISH `macd_bearish_cross` opening a short while
+flat). Under the corrected lifecycle they now correctly produce zero trades. The 15 tests depending on this
+are marked `pytest.mark.xfail(strict=True, reason=...)` rather than left silently failing; CSV regeneration
+under the frozen production `QuantConfig` (requires real 200-bar/15-min HTF trend-gate warmup —
+`_trend_gate_applicable` is itself BULLISH-only, further independent evidence for the LONG_ONLY reading) is
+tracked as a follow-up, not rushed in this task.
+
+**Remaining ambiguities**: left untouched per instruction — RSI-curl-vs-RSI-confluence self-exclusion, MACD
+direction-agnostic confluence scoring, volume-surge-ratio denominator documentation. No `talonx_quant`
+threshold, weight, or gate-ordering value was changed.
+
+**Live fill-geometry conclusion**: `talonx_paper` still has no equivalent of `_finalize_fill_geometry`.
+Investigated (not fixed): the required ATR/pivot data is present on `alert.triggering_signal`, but
+`talonx_paper` has no `QuantConfig`/`min_risk_reward_ratio` wired in at all — a real architectural gap, not a
+same-function fix. Marked `BLOCKING_FOLLOW_UP`; see `fill_geometry_live_gap.md` for the investigation and the
+smallest-fix sketch (Task 25B, recommended below).
+
+**No historical performance result**: no full historical replay was run; no PF/expectancy/total-R was
+computed or compared in this task, by design (Task 25A proves implementation correctness only).
+
+**Task 22 status update** (conceptual only — no new OOS outcomes inspected, frozen spec hash
+`9c15d11c021dddbd` untouched): `OOS_SUSPENDED_PENDING_CANONICAL_LONG_ONLY_BASELINE` — the Task 21/22
+hypothesis was derived from a historical population containing a large majority of simulated shorts canonical
+TalonX never opens.
+
+**Decision**: `LONG_ONLY_FIX_VALIDATED_WITH_REMAINING_P1_GAPS`.
+
+**Next task (recommended, not started)**: Task 25B — Live Fill-Geometry Reconciliation (wire
+`QuantConfig`/`min_risk_reward_ratio` into `talonx_paper`, port `_finalize_fill_geometry`'s logic into
+`_execute_buy`, add dedicated tests).
+
+**State**: not committed, not pushed — diff returned for review per instruction.
+
+### Revision to prior conclusion (historical backtester validity)
+
+> **Previous conclusion**: The historical backtester (`talonx_backtest`) represented TalonX's intraday
+> execution behavior faithfully enough that its trade records could be treated as a proxy for how the live
+> strategy would have traded historically.
+>
+> **New evidence**: Task 24 proved BEARISH signals opened new short positions in the backtester but are
+> exit-only in live/paper (`talonx_paper`); Task 25A corrected the backtester's lifecycle to match, and in
+> doing so confirmed the scale of the prior mismatch directly (73.5% of trades, 94.96% of gross positive R in
+> the pre-fix 0bps baseline came from the now-removed short-opening path) and found it had also silently
+> shaped the project's own canonical example datasets.
+>
+> **Updated conclusion**: Historical economic results produced by the pre-Task-25A backtester cannot represent
+> canonical TalonX live economics and must not be cited as such going forward. Results produced by the
+> corrected (post-Task-25A) engine are implementation-correct for the LONG_ONLY lifecycle, but no full
+> historical re-run has yet been performed on it (see "No historical performance result" above) — a fresh
+> economic evaluation remains a future task (Task 25 summary's original recommendation, still pending), not
+> something this correctness-only task attempted to supply.
+>
+> **Reason**: trade lifecycle mismatch, not parameter/threshold performance — the defect was in *what
+> counted as a trade*, not in how well any given trade was scored or gated.
