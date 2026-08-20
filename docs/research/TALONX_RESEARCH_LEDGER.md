@@ -2258,3 +2258,51 @@ specification with zero changes to features, coefficients, horizons, or threshol
 `research/scripts/task22_oos_evaluate.py` unchanged against an updated OOS data pull once the sample
 plausibly approaches 40 trades. Do not shorten the minimum, do not inspect intermediate AUC for early
 signal, and do not retrain or recalibrate before then.
+
+---
+
+## Checkpoint — Durable Research Review Checkpoint (2026-08-20)
+
+**Purpose**: *"Freeze current evidence before first-principles correctness re-audit."* Not a strategy
+experiment — no parameters, logic, or the frozen Task 21 specification were touched. Pushed the current
+validated local state to GitHub as a reviewable branch/PR ahead of Task 24 (full requirements/data/
+implementation/live-backtest-parity/execution-correctness audit).
+
+**Checkpoint commit**: `268f59efcfa253cafe09b7c2bba0d3656ba62bf6`
+**Branch**: `research/talonx-strategy-validation` (pushed to `origin`, new remote branch — this branch had
+never been pushed before this checkpoint; `origin/main` confirmed as a clean ancestor of the checkpoint
+commit, no rebase/force needed)
+**Date**: 2026-08-20
+
+**What was included** (staged individually, path by path — no `git add -A`/`.`): `docs/research/
+TALONX_RESEARCH_LEDGER.md` (this file, Task 1.1–22 backfilled + contemporaneous), `docs/research/
+task21_frozen_early_failure_spec.json` (frozen spec, `frozen_spec_hash 9c15d11c021dddbd` — unaltered),
+and the 9 deterministic research scripts `research/scripts/task15_risk_distance_audit.py` through
+`research/scripts/task22_oos_evaluate.py` + `task22_freeze_spec.py`. This commit also carries the two
+prior local-only commits it sits on top of (`0682693` live-pipeline hardening, `2a5e885` the Task 13B
+fill-geometry fix) — both confirmed present in the working tree and **absent from `origin/main`** at
+checkpoint time (`git diff origin/main..HEAD` — 24 files, +2372/−110 lines, including `talonx_backtest/
+engine.py`'s `_finalize_fill_geometry` and its dedicated 9-test file `tests/test_backtest_fill_geometry.py`,
+neither of which exist on `origin/main`).
+
+**What remained ignored/uncommitted**: `logs/` (6 small stdout/timestamp files from Task 14's background
+cost-sensitivity replays — transient operational logs superseded by the proper `results/task14_cost_
+sensitivity/` artifacts, which are deliberately `.gitignore`d by long-standing project convention along
+with all of `data/`, `results/`, and `reports/`). No secrets, `.env`, credentials, or raw market datasets
+were staged or committed.
+
+**Focused tests run** (not the full suite; documentation-only files did not require a strategy replay):
+`pytest tests/test_backtest_fill_geometry.py` (9), `tests/test_backtest_execution.py` (28), `tests/
+test_backtest_lookahead.py` (4), `tests/test_backtest_reproducibility.py` (31), `tests/test_backtest_
+engine_state.py tests/test_backtest_regression.py` (18), `tests/test_backtest_cli.py tests/test_backtest_
+research_telemetry.py` (26) — **116/116 passed, 0 failed**. Task 22's leakage/determinism checks were
+re-run against the existing (not re-fetched) OOS data and frozen spec: `leakage_ok=True`,
+`determinism_ok=True`, feature-hash-identical across two independent runs, sample unchanged (still 1 OOS
+trade, still `OOS_ACCUMULATING`) — no additional OOS outcomes were inspected.
+
+**Remote verification**: `origin/research/talonx-strategy-validation` confirmed identical to local HEAD
+(`268f59e...`) post-push. Draft PR opened: **#10**, `research/talonx-strategy-validation` → `main`,
+`isDraft: true`, titled "Research checkpoint: TalonX validation through Task 23" — explicitly marked as a
+review checkpoint, not a merge request, and not marked ready for review/merge.
+
+**No prior research conclusion in this ledger was altered by this checkpoint.**
