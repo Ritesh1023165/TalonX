@@ -2674,5 +2674,5 @@ OOS outcomes inspected; frozen spec hash `9c15d11c021dddbd` untouched.
 deterministically tested, and never persists an invalid position, but does not achieve full outcome parity
 with the backtest on stop-side breaches (an honest, evidence-based caveat, not a failure).
 
-**State**: implementation complete, **not committed, not pushed** — diff summary returned for review per
-instruction.
+**State**: reviewed and committed as `6e15bc4` (`fix(paper): fail closed on invalid live fill geometry`),
+pushed to `origin/research/talonx-strategy-validation`. PR #10 confirmed still draft/open, not merged.
