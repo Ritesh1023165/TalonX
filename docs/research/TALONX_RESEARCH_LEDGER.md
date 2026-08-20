@@ -2485,3 +2485,102 @@ TalonX never opens.
 >
 > **Reason**: trade lifecycle mismatch, not parameter/threshold performance — the defect was in *what
 > counted as a trade*, not in how well any given trade was scored or gated.
+
+---
+
+## Task 25A.1 — Durable Long-Only Correction Checkpoint (2026-08-20)
+
+**Purpose**: finalize, review, and durably commit/push the Task 25A long-only backtest correction after
+three targeted lifecycle-risk reviews, before moving to live shadow capture.
+
+**Pre-commit integrity**: HEAD confirmed at the expected checkpoint (`77769d259e9131047e505c3df8eb64c1aec32e27`)
+before any staging; `git status --short` clean apart from untracked `logs/`.
+
+**Three lifecycle risks reviewed, each with new deterministic regression coverage**:
+
+1. **Pending SIGNAL_EXIT vs. same-bar STOP/TARGET ordering** — confirmed correct by construction (the
+   pending-exit branch in `_process_symbol_bar` runs and closes the position, using only the bar's open,
+   strictly before the stop/target `check_exit` branch further down even has a chance to run, since that
+   branch is gated on `has_open`, already `False` by then). Proven with two new tests, one where a STOP
+   would have hit later in the same bar and one where a TARGET would have — SIGNAL_EXIT wins both times,
+   using the bar's open price, not the stop/target level or the bar's high/low.
+2. **Duplicate/multiple bearish signals** — confirmed correct: the existing intra-flush cooldown recheck
+   (unchanged, shared machinery) rejects a second same-bar BEARISH candidate before it can overwrite
+   `_pending_exit`; a bearish candidate arriving on the fill bar of an already-resolved exit is rejected
+   (`COOLDOWN` while still armed, `NO_ACTIVE_POSITION` once cleared) — never a duplicate close. Proven with
+   two new tests.
+3. **Loss-lockout semantics** — confirmed already correct (no code change needed): `_maybe_arm_loss_lockout`
+   is a generic, direction-agnostic `net_pnl < 0` check that was never short-vs-long-aware in the first
+   place; a BEARISH-while-flat no-op never creates a `Trade` at all, so it can never arm lockout; a losing
+   `SIGNAL_EXIT` arms it exactly like a losing STOP would; a profitable `SIGNAL_EXIT` does not; and with
+   shorts no longer openable at all, there is no code path left that could produce a losing short to arm
+   risk state from. Proven with four new tests, including a structural confirmation that every trade's
+   direction is BULLISH by construction.
+
+8 new tests added to `tests/test_backtest_long_only_lifecycle.py` (21 total in that file). Full required
+suite + both new lifecycle/contract files: 83/83 passed. Full `tests/ -k backtest`: 272 passed, 1 skipped
+(pre-existing, unrelated), 15 xfailed (same set as Task 25A, all `strict=True` with a precise reason
+referencing this correction, none hiding an unrelated failure), 0 failed.
+
+**Committed**: `1e28647c3f04b9a07d00f7c8f0a7bb1143c80f91` — `fix(backtest): align intraday lifecycle with
+long-only paper semantics`. Staged individually (never `git add -A`/`.`): `talonx_backtest/engine.py`,
+`execution.py`, `portfolio.py`, the two new test files, three adjusted test files, and this ledger.
+Reviewed staged diff for secrets before committing (none found). `results/`, `data/`, `logs/` excluded (all
+`.gitignore`'d project-wide, per long-standing convention).
+
+**Pushed**: `origin/research/talonx-strategy-validation` (`77769d2..1e28647`). Draft PR #10 confirmed
+updated to the new commit, still open, still draft — not merged.
+
+**No strategy/threshold/gate-ordering value was changed.** No new historical replay was run. No Task 22
+OOS outcomes were inspected.
+
+---
+
+## Task 25-LIVE-CAPTURE — Live Shadow Evidence Capture — 2026-08-20
+
+**Purpose**: correctness/parity evidence only — capturing today's live TalonX behavior as a flight-recorder
+dataset for later deterministic replay against the corrected (Task 25A) backtest engine, once Task 25B
+(live fill-geometry reconciliation) is also resolved. **No profitability interpretation** — no total R,
+P&L, profit factor, expectancy, win rate, or "did today's signal work" judgment is recorded anywhere in
+this capture, by design.
+
+**Method**: a new, read-only observational script (`scripts/task25_live_shadow_capture.py`) subscribes to
+the Redis channels every TalonX module already publishes to (`talonx:market:stream`,
+`talonx:signals:quant`, `talonx:quant:rejected`, `talonx:alerts:dispatch`, `talonx:paper:trades`,
+`talonx:ingest:ws_heartbeat`) and periodically polls (read-only) `talonx_paper`'s existing SQLite store for
+ignored-decision rows not otherwise published. No production module was modified; no trading logic was
+touched. The live pipeline itself (`run_talonx.py`) was started with its periodic filing/earnings-ingestion
+jobs skipped (irrelevant to intraday quant/paper decisions) but every intraday-relevant module (market
+data, quant, brain, core, dispatch, paper trading) running with completely unmodified logic.
+
+**Commit SHA used**: `1e28647c3f04b9a07d00f7c8f0a7bb1143c80f91` (post-Task-25A-push).
+
+**Symbols**: 8 of the 10 requested research symbols are present in the current production watchlist and
+were captured — AAPL, MSFT, NVDA, AMD, TSLA, GOOGL, PYPL, STX. **AMZN and META are not in the current
+watchlist and were not added** (per instruction, not changing the production watchlist for this
+experiment) — never captured, never backfilled from downloaded history. Full artifact list and a live
+snapshot as of 09:19 ET: `results/task25_live_shadow_2026-08-20/` (`live_session_manifest.json`,
+`live_bars.csv`, `live_indicator_trace.csv`, `live_candidate_trace.csv`, `live_gate_trace.csv`,
+`live_quant_outputs.csv`, `live_paper_state_transitions.csv`, `live_runtime_events.csv`,
+`live_data_quality.json`, `live_shadow_summary.md`).
+
+**Status at last snapshot (2026-08-20T13:19Z / 09:19 ET, pre-market, Window A in progress)**: 16 bars
+captured across all 8 symbols; 0 candidates published; 6 gate rejections, all `LOW_VOLATILITY`; 0 paper
+state transitions (nothing has reached talonx_core/talonx_paper yet); 0 special events flagged (none of the
+task's flagged scenarios A-G have occurred yet — expected, given zero candidates so far); 0 runtime
+incidents (no Redis disconnects, no handler errors, no out-of-order/duplicate bars); one honestly-reported
+data-quality observation (bars arriving roughly every ~5 minutes rather than every 12s poll, and
+pre-market volume reporting as 0.0) recorded in `live_data_quality.json`, not explained away. **Window B
+(15:15-16:05 ET) has not yet been reached.**
+
+**Task 22 status**: unchanged, `OOS_SUSPENDED_PENDING_CANONICAL_LONG_ONLY_BASELINE`. Frozen spec hash
+`9c15d11c021dddbd` untouched; no new OOS outcomes inspected.
+
+**No replay performed**: today's captured bars have deliberately NOT been replayed through the backtester
+in this task — Task 25B (live fill-geometry reconciliation) remains unresolved, and the captured data is
+being preserved for a later, fully-reviewed replay rather than an interim one.
+
+**This is a partial, in-progress capture at the time of this ledger entry** — both the live pipeline and
+the capture script remain running in the background for continued observation; a fuller update (through
+market open, normal morning, and ideally the 15:15-16:05 ET window) requires a later check-in and is not
+recorded as complete here.
