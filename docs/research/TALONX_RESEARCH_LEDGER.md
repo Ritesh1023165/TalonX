@@ -2611,3 +2611,68 @@ backtester — that is planned as a later task, after Task 25B (live fill-geomet
 resolved.
 
 **Final decision**: `LIVE_SHADOW_CAPTURE_COMPLETE`.
+
+---
+
+## Task 25B — Live Fill-Geometry Reconciliation (2026-08-20)
+
+**Task 24 P1 finding being addressed**: `talonx_backtest` re-anchors a position's stop/target to the actual
+fill price when a gap invalidates the pre-fill geometry (`_finalize_fill_geometry`, Task 13B);
+`talonx_paper` had no equivalent — stop/target were persisted verbatim from the screening `QuantSignal`,
+never validated against the actual (spread-shifted) fill price.
+
+**Architecture traced first** (full detail: `results/task25b_live_fill_geometry/live_fill_architecture.md`):
+`talonx_paper`'s own wire contract (`TriggeringSignalRef`) carries only `price`/`stop_price`/`target_price`
+— no `atr`, no `pivot_resistance`/`pivot_support` — and `talonx_paper` imports nothing from `talonx_quant`
+anywhere in the codebase, a project-wide, deliberate convention every live module honors (confirmed via
+grep across `talonx_core`/`talonx_brain`/`talonx_dispatch` too; the one documented exception anywhere is
+`talonx_backtest`, an explicit research-replay tool). Pydantic's default `extra="ignore"` silently drops
+`atr`/pivot fields from the wire payload even though `talonx_core` publishes them, because
+`TriggeringSignalRef` never declares them. Safe canonical recomputation is therefore genuinely unavailable
+without either a first-of-its-kind live-module cross-import (breaking the established boundary) or
+duplicating the geometry formula (explicitly forbidden).
+
+**Selected solution**: fail-closed validation against the ORIGINAL screening-time stop/target bracket, no
+live-side recomputation — the task's own "Option C" fallback. New pure function
+`talonx_paper/engine.py::fill_geometry_is_valid(fill_price, stop_price, target_price)`, wired into
+`talonx_paper/consumer.py::_execute_buy` before any sizing/persistence step; rejects
+(`FILL_GEOMETRY_INVALID`, via the existing `record_ignored` audit path) rather than persisting an invalid
+position.
+
+**Alternatives rejected**: (A) direct reuse of `calculate_trade_geometry` — would break the project's only
+consistently-honored live-module boundary; (B) carry geometry metadata into execution and recompute — still
+requires the formula itself, which duplication is forbidden from reproducing.
+
+**Files changed**: `talonx_paper/engine.py`, `talonx_paper/consumer.py`, `tests/test_paper_engine.py` (8
+new tests), `tests/test_paper_consumer.py` (5 new tests). No changes to `talonx_quant/*`,
+`talonx_backtest/*`, `talonx_core/*`, `talonx_dispatch/*`; no strategy/threshold/long-only/blackout/EOD/
+frozen-spec value touched.
+
+**Tests**: 146 passed (new fill-geometry tests + fill_geometry.py + live/backtest contract + long-only
+lifecycle + execution). Full paper+backtest sweep: 442 passed, 1 skipped (pre-existing), 15 xfailed
+(unchanged set), 0 failed.
+
+**Geometry contract parity result** (6 identical signal+fill scenarios run through both
+`BacktestEngine._finalize_fill_geometry` and `fill_geometry_is_valid` directly — real code, not
+hypothetical; see `results/task25b_live_fill_geometry/geometry_contract_matrix.csv`): **PARITY** on 3/6
+(fill-inside-bracket; a target-breach where backtest's own recompute also fails its R:R gate; missing-data
+passthrough) and **DIVERGENT** on 3/6 (stop-side breaches, including one exact-boundary and one severe gap)
+where `talonx_backtest` safely re-anchors using still-valid pivot data and `talonx_paper`, lacking that
+data, rejects the identical fill outright. `talonx_paper` is strictly more conservative in every divergent
+case — it never opens a worse-than-screened position, but forgoes some entries the backtest would accept.
+
+**Remaining gaps** (full detail: `results/task25b_live_fill_geometry/remaining_gaps.md`): no live-side
+recomputation capability (architecturally unavailable without a real design change, not an oversight);
+spec tests D/F from the task's own list don't literally apply under this architecture (documented why);
+screening-vs-execution R:R distinction doesn't apply (`talonx_paper` has no R:R field at all); `execute_sell`
+(exits) deliberately untouched, matching the backtest's own entry-only scope.
+
+**No performance analysis performed** — no P&L/R/expectancy/win-rate was computed or compared. No Task 22
+OOS outcomes inspected; frozen spec hash `9c15d11c021dddbd` untouched.
+
+**Final decision**: `LIVE_FILL_GEOMETRY_VALIDATED_WITH_CAVEATS` — the fix is correct, safe, fail-closed,
+deterministically tested, and never persists an invalid position, but does not achieve full outcome parity
+with the backtest on stop-side breaches (an honest, evidence-based caveat, not a failure).
+
+**State**: implementation complete, **not committed, not pushed** — diff summary returned for review per
+instruction.

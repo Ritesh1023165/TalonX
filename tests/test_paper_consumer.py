@@ -24,11 +24,16 @@ NOW = datetime(2026, 8, 10, 14, 37, 0, tzinfo=timezone.utc)
 
 def _alert_payload(
     ticker: str = "NVDA", action: str = "confirmed_bullish", price: float = 131.50,
-    severity: str = "warning",
+    severity: str = "warning", stop_price: float | None = None, target_price: float | None = None,
 ) -> dict:
+    triggering_signal = {"price": price}
+    if stop_price is not None:
+        triggering_signal["stop_price"] = stop_price
+    if target_price is not None:
+        triggering_signal["target_price"] = target_price
     return {
         "ticker": ticker, "action": action, "severity": severity,
-        "triggering_signal": {"price": price},
+        "triggering_signal": triggering_signal,
         "correlated_at": NOW.isoformat(),
     }
 
@@ -160,6 +165,98 @@ async def test_buy_with_insufficient_cash_is_ignored(engine):
     assert engine.trades_ignored == 1
     engine.store.record_ignored.assert_called_once()
     assert engine.store.record_ignored.call_args.args[1] == "INSUFFICIENT_CASH"
+
+
+# --- Fill-geometry reconciliation (Task 25B) ---------------------------------
+
+@pytest.mark.asyncio
+async def test_buy_with_fill_inside_bracket_opens_unchanged(engine):
+    """Case 1 -- fill still bracketed by the original stop/target: accept
+    the fill, preserve the original geometry, open the position."""
+    engine.store.get_position.return_value = None
+    engine.store.get_portfolio_summary.return_value = {"current_cash": 10000.0, "trade_allocation_usd": 2500.0}
+    engine.store.execute_buy.return_value = _execution(OrderType.BUY)
+
+    await engine._handle_message(_msg(engine.config, _alert_payload(
+        action="confirmed_bullish", price=101.0, stop_price=98.0, target_price=105.0,
+    )))
+
+    engine.store.execute_buy.assert_called_once()
+    kwargs = engine.store.execute_buy.call_args.kwargs
+    assert kwargs["stop_price"] == 98.0
+    assert kwargs["target_price"] == 105.0  # geometry preserved verbatim, not recomputed
+    engine._client.publish.assert_awaited_once()
+    assert engine.trades_executed == 1
+    engine.store.record_ignored.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_buy_with_fill_crossing_target_fails_closed(engine):
+    """Fill (105.50) >= target (105.0) -- no safe canonical recomputation
+    is available (see engine.fill_geometry_is_valid's docstring), so this
+    fails closed: no position opens, never a partial/invalid one."""
+    engine.store.get_position.return_value = None
+
+    await engine._handle_message(_msg(engine.config, _alert_payload(
+        action="confirmed_bullish", price=105.50, stop_price=98.0, target_price=105.0,
+    )))
+
+    engine.store.get_portfolio_summary.assert_not_called()  # H: never even reaches sizing
+    engine.store.execute_buy.assert_not_called()
+    engine._client.publish.assert_not_awaited()
+    assert engine.trades_ignored == 1
+    assert engine.trades_executed == 0
+    engine.store.record_ignored.assert_called_once()
+    assert engine.store.record_ignored.call_args.args[1] == "FILL_GEOMETRY_INVALID"
+
+
+@pytest.mark.asyncio
+async def test_buy_with_fill_crossing_stop_fails_closed(engine):
+    """Fill (97.50) <= stop (98.0) -- same fail-closed path."""
+    engine.store.get_position.return_value = None
+
+    await engine._handle_message(_msg(engine.config, _alert_payload(
+        action="confirmed_bullish", price=97.50, stop_price=98.0, target_price=105.0,
+    )))
+
+    engine.store.execute_buy.assert_not_called()
+    engine._client.publish.assert_not_awaited()
+    assert engine.trades_ignored == 1
+    engine.store.record_ignored.assert_called_once()
+    assert engine.store.record_ignored.call_args.args[1] == "FILL_GEOMETRY_INVALID"
+
+
+@pytest.mark.asyncio
+async def test_buy_with_missing_stop_or_target_passes_through_unchanged(engine):
+    """Missing bracket data (e.g. ATR wasn't available at signal time) is
+    NOT a fail-closed condition -- nothing to validate against, same
+    pre-existing posture as _finalize_fill_geometry's identical case."""
+    engine.store.get_position.return_value = None
+    engine.store.get_portfolio_summary.return_value = {"current_cash": 10000.0, "trade_allocation_usd": 2500.0}
+    engine.store.execute_buy.return_value = _execution(OrderType.BUY)
+
+    await engine._handle_message(_msg(engine.config, _alert_payload(
+        action="confirmed_bullish", price=131.50, stop_price=None, target_price=None,
+    )))
+
+    engine.store.execute_buy.assert_called_once()
+    engine.store.record_ignored.assert_not_called()
+    assert engine.trades_executed == 1
+
+
+@pytest.mark.asyncio
+async def test_buy_fill_geometry_rejection_leaves_no_partial_state(engine):
+    """I: after a FILL_GEOMETRY_INVALID rejection, no position/execution
+    record exists anywhere -- store.execute_buy is never called, so
+    there is nothing for the store to have partially written."""
+    engine.store.get_position.return_value = None
+
+    await engine._handle_message(_msg(engine.config, _alert_payload(
+        action="confirmed_bullish", price=105.50, stop_price=98.0, target_price=105.0,
+    )))
+
+    engine.store.execute_buy.assert_not_called()
+    assert engine.store.get_position.return_value is None  # still flat -- nothing changed it
 
 
 # --- SELL ----------------------------------------------------------------
