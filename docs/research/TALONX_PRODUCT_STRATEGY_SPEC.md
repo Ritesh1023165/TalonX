@@ -1,55 +1,69 @@
 # TalonX Product & Strategy Specification
 
-**Status: DRAFT v0.2 — produced by Task 31 (2026-08-21), refined by Task 32 (2026-08-21), pending owner
-review and sign-off.** This document is intended to become the product-level strategy authority for TalonX,
-sitting below explicit future owner decisions and above individual research tasks. Every section below is
-marked with one of four markers:
+**Status: v0.3 — core specification CONFIRMED by explicit owner decision (Task 33, 2026-08-21).** This
+document is the product-level strategy authority for TalonX. Every section below is marked with one of five
+markers:
 
-- **CONFIRMED** — an existing, verified requirement or already-implemented/tested behavior (`VERIFIED_FACT`
-  or `EXISTING_REQUIREMENT` in the underlying traceability tables). Not reopened without contradictory
-  evidence.
-- **PROVISIONAL** — a Claude recommendation awaiting owner sign-off (`RECOMMENDED_DEFAULT_PENDING_OWNER`).
-  Not to be treated as decided.
-- **OWNER_DECISION_PENDING** — a genuinely open question with no recommended default, or a recommendation
-  explicitly not yet accepted by an actual human owner — see `docs/research/TALONX_OWNER_DECISIONS.md` for
-  the compact decision form covering these.
+- **CONFIRMED** — an existing, verified requirement, an already-implemented/tested behavior, or a
+  conceptual requirement explicitly answered by the product owner (`VERIFIED_FACT`, `EXISTING_REQUIREMENT`,
+  or `OWNER_CONFIRMED` in the underlying traceability tables). Not reopened without contradictory evidence
+  or a new owner decision.
+- **CONFIRMED (concept) / RESEARCH_REQUIRED (implementation)** — the owner has answered WHAT is intended;
+  engineering/measurement work remains to determine HOW to implement it safely. This is not an open owner
+  decision — see `results/task33_owner_spec_finalization/specification_status.md` for why this distinction
+  matters.
+- **PROVISIONAL** — a Claude recommendation not yet addressed by the owner. Not to be treated as decided.
+- **OWNER_DECISION_PENDING** — a genuinely open question with no recommended default, not yet answered.
 - **TECHNICAL_CONSTRAINT** — a fact about the system's current limits (e.g., an unresolved verification gap)
   that is not an owner decision at all.
 
 Nothing in this document changes production code, thresholds, or gate order — it is a specification, not an
 implementation. It does not stand alone — each section links to its full supporting analysis in
-`results/task31_owner_specification/` and `results/task32_owner_decision_capture/`, which should be read for
-complete evidence and reasoning. **No owner answer has been recorded anywhere in this document as of v0.2**
-— every item marked PROVISIONAL or OWNER_DECISION_PENDING remains exactly that until
-`docs/research/TALONX_OWNER_DECISIONS.md` is filled in by an actual human owner.
+`results/task31_owner_specification/`, `results/task32_owner_decision_capture/`, and
+`results/task33_owner_spec_finalization/`, which should be read for complete evidence and reasoning. **All 9
+priority owner decisions (FREQ-001, CONF-001, SIG-001/002/003, ATR-TRIGGER-001, ATR-REGIME-001, ATR-RISK-001,
+COST-001) have now been answered explicitly by the product owner** — see
+`docs/research/TALONX_OWNER_DECISIONS.md` for the verbatim answers and their implementation-alignment
+consequences.
 
 ---
 
-## 1. Product identity — **PROVISIONAL**
+## 1. Product identity — **CONFIRMED**
 
-> TalonX is a high-precision intraday opportunity scanner over a broad, liquid-equity watchlist (50+
-> symbols targeted). It prioritizes quality over frequency, may produce zero-signal days as a normal and
-> accepted outcome, opens only long positions, uses bearish signals as exits from an existing long (never as
-> new short entries), and closes all exposure intraday (no overnight positions).
+> TalonX is a high-precision but REGULAR intraday opportunity scanner over a broad, liquid-equity watchlist
+> (50+ symbols targeted). It prioritizes quality over raw frequency but is intended to surface a useful
+> recurring flow of opportunities across the full watchlist — a few good opportunities per week, not a
+> guaranteed daily quota. It is not intended to generate multiple trades every day, and it is not
+> intentionally designed as an ultra-rare scanner. Zero-signal days are acceptable. It opens only long
+> positions, uses bearish signals as exits from an existing long (never as new short entries), and closes
+> all exposure intraday (no overnight positions).
 
-Full evidence and traceability: `results/task31_owner_specification/operating_model_spec.md`. Decision box
-awaiting sign-off there.
+Confirmed directly by the owner's FREQ-001 answer (`REGULAR_OPPORTUNITY`), which supersedes Task 31's
+provisional "high-precision... prioritizes quality over frequency" wording — the qualitative frequency intent
+is now part of the canonical identity statement itself, not a separate open question. No numeric weekly
+quota is stated, per the owner's own qualitative "a few good opportunities per week" framing. Full evidence:
+`docs/research/TALONX_OWNER_DECISIONS.md` FREQ-001, `results/task31_owner_specification/operating_model_
+spec.md`.
 
-## 2. Intended user experience — **PROVISIONAL** (frequency) / **CONFIRMED** (zero-day acceptability)
+## 2. Intended user experience — **CONFIRMED** (zero-day acceptability and qualitative cadence) /
+**CONFIRMED (concept) / RESEARCH_REQUIRED (measurement)** (whether current behavior delivers it)
 
-Zero-signal days are a normal, accepted, and even deliberately engineered-for outcome — `docs/modules/
-dispatch.md`'s explicit "mobile notification fatigue" concern, with no corresponding concern about
-inactivity anywhere in this project's history — **CONFIRMED**. A user watching Telegram daily should
-currently expect no alert on the large majority of days (~90%, measured from Task 26's canonical trades).
-The TARGET frequency a user should experience is **OWNER_DECISION_REQUIRED** — see §11 below and
-`results/task31_owner_specification/frequency_spec.md`.
+Zero-signal days are a normal, accepted outcome — **CONFIRMED**, both from prior evidence (`docs/modules/
+dispatch.md`'s "mobile notification fatigue" concern) and now directly from the owner's FREQ-001 answer. The
+qualitative cadence a user should experience is **CONFIRMED**: "a few good opportunities per week" across
+the full watchlist, not daily, not silent for long stretches. Whether CURRENT implementation delivers this
+at PRODUCTION scale (35-50+ symbols) is unresolved — `INSUFFICIENT_COVERAGE_TO_COMPARE`, since the only
+measured data (26 trades/year, 85 signals/year) comes from the 10-symbol research subset, not the intended
+production watchlist. See `results/task33_owner_spec_finalization/frequency_alignment.md`.
 
-## 3. Watchlist — **PROVISIONAL**
+## 3. Watchlist — **CONFIRMED** (scale target) / **OWNER_DECISION_PENDING** (breadth-vs-frequency policy,
+lower priority, not part of the P1-P5 set)
 
 Documented production engineering target: 50+ symbols (commit `7b7d815`). Observed practice: ~35-39 symbols.
-Proposed normal operating range: 35-50+. Whether watchlist breadth is meant to increase opportunity
-frequency, or only coverage while quality thresholds stay constant, is an open policy choice — full detail
-in `results/task31_owner_specification/watchlist_spec.md`.
+Normal operating range: 35-50+ — **CONFIRMED** as part of the product identity statement (§1). Whether
+watchlist breadth is meant to increase opportunity frequency, or only coverage while quality thresholds stay
+constant, remains an open policy choice not addressed by the P1-P5 priority decisions — full detail in
+`results/task31_owner_specification/watchlist_spec.md`.
 
 ## 4. Trade direction — **CONFIRMED**
 
@@ -61,19 +75,36 @@ FLAT + BEARISH  -> no short entry (rejected, NO_ACTIVE_POSITION)
 `LONG_ONLY_CONFIRMED` — already implemented (Task 25A/25A.1), tested, and structurally proven (Task 26's
 zero-short invariant check on all 26 canonical trades). Not proposed for change by this document.
 
-## 5. Signal families — **PROVISIONAL**
+## 5. Signal families — **CONFIRMED**
 
-RSI reversal, MACD crossover, and MA crossover are each documented as standalone, complete setups but
-currently behave as a cross-family confirmation network. Recommended: classify all three as candidate
-generators requiring another family's confirmation, formalizing existing behavior rather than proposing a
-change. Full matrix: `results/task31_owner_specification/signal_family_spec.md`.
+RSI reversal, MACD crossover, and MA crossover are all **`CANDIDATE_REQUIRING_CONFIRMATION`** — confirmed
+directly by the owner's SIG-001/002/003 answers. None should be treated as a final, standalone signal merely
+because its trigger occurred. Confirmation may come from a different technical dimension (volume, RSI state,
+MACD event, trend where conceptually appropriate) rather than necessarily another signal family firing — the
+three families are not required to share identical implementation mechanics. Distinguish the TRIGGER FAMILY
+(which technical event generated the candidate) from the CONFIRMATION COMPONENT (what independent evidence
+validates it) — these are different roles, not interchangeable. Implementation alignment: MA is `ALIGNED`
+already; RSI and MACD are `REQUIREMENT_INTERPRETATION_NEEDED` (see §6). Full matrix:
+`results/task33_owner_spec_finalization/family_confluence_alignment.csv`.
 
-## 6. Confluence philosophy — **PROVISIONAL**
+## 6. Confluence philosophy — **CONFIRMED** (concept) / interpretation needed (2 of 3 families)
 
-Recommended: "trigger + one independent confirmation." Matches MACD and RSI-curl's current behavior exactly;
-MA crossover currently behaves closer to a stricter policy (needs two independent confirmations, has zero
-self-credit) — flagged as an open inconsistency, not corrected here. Full analysis: `results/task31_owner_
-specification/confluence_spec.md`.
+**`TRIGGER_PLUS_ONE_CONFIRMATION`** — confirmed directly by the owner's CONF-001 answer. A valid setup
+consists conceptually of a signal-family trigger PLUS at least one independent confirmation; confluence is a
+hard quality gate, not merely a ranking input. The trigger itself must NOT automatically be interpreted as
+an additional confirmation unless its family contract explicitly says so.
+
+**Traced against current implementation** (`results/task33_owner_spec_finalization/family_confluence_
+alignment.csv`): MA crossover is `ALIGNED` (zero self-credit, genuinely independent confirmation required,
+no ambiguity). RSI reversal and MACD crossover are both `REQUIREMENT_INTERPRETATION_NEEDED` — RSI curl's
+trigger bundles a volume-surge precondition that confluence then re-scores as if independently arrived at;
+MACD's trigger check and its own confluence credit are the literal same boolean, evaluated once and counted
+twice. Neither is proven to violate the owner's contract, but neither is proven to comply with it either —
+this is exactly the kind of case the owner instructed be traced rather than assumed. Notably, if MACD's
+trigger self-credit were disallowed outright, MACD could never publish at all under the current
+`confluence_score_min=2` threshold (the remaining two legs, RSI-extreme and volume-surge, have never
+co-occurred on a MACD-cross bar in the entire dataset — 0 of 4,725 candidates). This is flagged for
+follow-up owner interpretation, not resolved here.
 
 ## 7. Gate policy — **PROVISIONAL**
 
@@ -106,67 +137,87 @@ Opening blackout (09:30-09:45 ET, both directions), closing blackout (15:30-16:0
 only — exits always allowed), premarket/regular/closed session classification, and EOD flatten (15:50 ET)
 are all existing, tested production behavior. Not modified by this document.
 
-## 11. Signal-frequency objective — **OWNER_DECISION_PENDING** (no recommended default offered)
+## 11. Signal-frequency objective — **CONFIRMED** (concept) / **RESEARCH_REQUIRED** (measurement at
+production scale)
 
-No historical target trade/signal frequency was ever specified, across this entire project's history
-(exhaustive search, Task 30). Measured baseline: 26 trades/year, 85 signals/year, 10-symbol universe. Whether
-this is acceptable, too low, or too high cannot be judged without a target. Operating-category framework
-(`RARE_HIGH_CONVICTION` / `REGULAR_OPPORTUNITY` / `ACTIVE_INTRADAY` / `CUSTOM`) proposed for owner selection,
-deliberately with no recommended default (see `docs/research/TALONX_OWNER_DECISIONS.md` FREQ-001) — the
-evidence is genuinely split between two defensible categories and any default here would functionally become
-the missing historical requirement by fiat.
+`REGULAR_OPPORTUNITY` — confirmed directly by the owner's FREQ-001 answer (see §1/§2). Measured baseline
+(10-symbol research subset, not production scale): 26 trades/year, 85 signals/year. Current alignment:
+`INSUFFICIENT_COVERAGE_TO_COMPARE` — no measurement exists yet at the intended 35-50+ symbol production
+scale, so whether current gate-stack behavior actually delivers "a few good opportunities per week" cannot
+yet be determined. This is now a well-defined, answerable product-fit question rather than an undefined one.
+Resolving it requires a multi-week live observation period at production scale, not a new backtest or
+parameter experiment. See `results/task33_owner_spec_finalization/frequency_alignment.md`.
 
-## 12. Cost-tolerance requirement — **OWNER_DECISION_PENDING** (no recommended default offered)
+## 12. Cost-tolerance requirement — **CONFIRMED** (execution-model components) / **RESEARCH_REQUIRED**
+(numeric threshold)
 
-No document states a target cost tolerance. System design (tight stops, short holds) implies a need for low
-absolute tolerance, but no specific number can be defended without knowing the intended execution venue —
-8 unresolved execution-environment sub-questions, see `results/task32_owner_decision_capture/execution_
-environment_questions.md`. Classified `COST_TOLERANCE_REQUIREMENT_UNDEFINED`. Task 26's own 0/5/10/20bps
-cost-sensitivity result is retained strictly as evidence of `CURRENT_CANONICAL_EDGE_NOT_COST_ROBUST_UNDER_
-TESTED_ASSUMPTIONS` — not used to select a threshold. See `docs/research/TALONX_OWNER_DECISIONS.md` COST-001.
+Confirmed execution-model components (owner's COST-001 answer): liquid US equities, realistic spread
+represented, realistic slippage represented, paper/live market-order-style execution assumptions acceptable
+for current research. The exact numeric deployability threshold (bps) remains
+`NUMERIC_TOLERANCE_PENDING` — 6 of 8 execution-environment sub-questions (broker/venue, order type, fill
+latency, etc.) are still open, see `results/task32_owner_decision_capture/execution_environment_questions.
+md`. Task 26's own 0/5/10/20bps cost-sensitivity result is retained strictly as evidence of
+`CURRENT_CANONICAL_EDGE_NOT_COST_ROBUST_UNDER_TESTED_ASSUMPTIONS` — explicitly not used to select a
+threshold, per the owner's own instruction. **Any future claim of `PRODUCTION_EDGE_CONFIRMED` remains
+blocked until the numeric tolerance is established.** See `docs/research/TALONX_OWNER_DECISIONS.md` COST-001,
+`results/task33_owner_spec_finalization/cost_requirement_status.md`.
 
-## 13. ATR semantics — mixed, by use case (see below)
+## 13. ATR semantics — all three use cases now owner-confirmed conceptually; one has a proven implementation
+gap
 
 **Current implementation — CONFIRMED (`VERIFIED_FACT`)**: ATR(14) is computed on 14 one-minute bars,
 continuous across session boundaries, identical between live and backtest at the mechanism level.
-`ATR_INTRADAY_14_CONFIRMED` for CURRENT behavior — this describes what the code does, not what was intended.
+`ATR_INTRADAY_14_CONFIRMED` for CURRENT behavior.
 
-**Per-use-case intent** (resolved separately, per Task 32's explicit instruction not to ask one global
-timeframe question):
-- **ATR-USE-2, `atr_move_multiplier`** (bar-movement gate) — **PROVISIONAL**: current 1-minute timeframe
-  classified `SEMANTICALLY_COHERENT` (definitionally correct, since the object evaluated IS a 1-minute bar);
-  Claude recommends accepting current behavior as-is (`SHORT_TERM_INTRADAY_ATR`) — the highest-confidence of
-  the three ATR recommendations, not yet owner-accepted.
-- **ATR-USE-1, `min_atr_pct`** (volatility floor) — **OWNER_DECISION_PENDING**, no recommended default:
-  `REQUIREMENT_AMBIGUOUS` — could plausibly be intended as intraday-scale (current) or daily-regime-scale;
-  not resolved by any historical document. See `docs/research/TALONX_OWNER_DECISIONS.md` ATR-REGIME-001.
-- **ATR-USE-3, stop/target geometry** (`atr_stop_multiplier`/`atr_reward_multiplier`) — **OWNER_DECISION_
-  PENDING, no recommended default, highest-priority open ATR item.** `TIMEFRAME_MISMATCH` hypothesis: a stop
-  sized to 1.5x of 1-minute-scale ATR is plausibly, though not proven causally, too tight for the confirmed
-  minutes-to-hours holding horizon (§9), and is consistent with — though not proven to cause — Task 26's own
-  observed fast-STOP-exit pattern (median 4 minutes vs. 14 min/2.6 hr for TARGET/EOD exits). Six risk-model
-  options (A-F) presented with trade-offs, none recommended by default, per explicit instruction not to
-  default to a daily-ATR reading merely by TA convention. See `results/task32_owner_decision_capture/
-  atr_risk_model_options.md` and `docs/research/TALONX_OWNER_DECISIONS.md` ATR-RISK-001.
+**Per-use-case contract (all three owner-confirmed, per `docs/research/TALONX_OWNER_DECISIONS.md`)**:
+
+- **ATR-USE-2, `atr_move_multiplier`** (bar-movement gate) — **CONFIRMED**: owner accepted current
+  implementation as-is (`SHORT_TERM_INTRADAY_ATR`). Implementation alignment: `ALIGNED`. No follow-up.
+- **ATR-USE-1, `min_atr_pct`** (volatility/regime qualification) — **CONFIRMED (concept) / RESEARCH_
+  REQUIRED (implementation)**: owner confirmed `MULTI_TIMEFRAME` — the qualification should reflect broader
+  market/instrument volatility context while still allowing short-term intraday information where
+  appropriate; no numeric period/threshold chosen. Implementation alignment:
+  `CURRENT_IMPLEMENTATION_INCOMPLETE_FOR_CONFIRMED_REQUIREMENT` — not a historical bug, since this
+  requirement was only just defined; no broader-timeframe context exists anywhere in the current gate. 5
+  design questions defined for future research, none answered, lower priority than ATR-USE-3 below. See
+  `results/task33_owner_spec_finalization/next_controlled_research_design.md`.
+- **ATR-USE-3, stop/target geometry** — **CONFIRMED (concept) / RESEARCH_REQUIRED (implementation),
+  HIGHEST-PRIORITY IMPLEMENTATION GAP IN THIS SPECIFICATION.** Owner confirmed `MARKET_STRUCTURE_PRIMARY` —
+  the stop should primarily reflect market-structure invalidation (pivots/swing levels/support-resistance);
+  ATR is permitted only as fallback, buffer, or minimum-noise allowance, never as the dominant unconditional
+  source. **A direct code trace found the current implementation is `MISALIGNED`** — not a hypothesis, a
+  proven fact: `calculate_trade_geometry` (`talonx_quant/strategy.py:211-269`) computes `stop = price - 1.5
+  x ATR(14, 1-minute)` UNCONDITIONALLY for every candidate; there is categorically no structural-stop code
+  path anywhere in this function. Structural pivot data is used exclusively on the TARGET/reward side, never
+  the stop/risk side — the inverse of the confirmed contract. This upgrades Task 31's `TIMEFRAME_MISMATCH`
+  hypothesis (based on the STOP-exit-timing pattern: Task 26 median 4 minutes vs. 14 min/2.6 hr for
+  TARGET/EOD exits) to a confirmed structural gap now that a concrete contract exists to trace against. See
+  `results/task33_owner_spec_finalization/current_stop_geometry_flow.md`.
 
 **Live/backtest parity — TECHNICAL_CONSTRAINT (not an owner decision)**: `PARTIAL_PARITY` — computation
 mechanism proven identical by shared code; end-to-end numerical parity remains unverified due to Task 25C's
 unresolved warmup-seed-capture gap.
 
-**Production posture while open**: `RUN_OBSERVATIONAL_SHADOW_ONLY` — see `results/task32_owner_decision_
-capture/atr_live_policy.md`. No real capital is at risk under this posture (TalonX runs on `talonx_paper`,
-simulated execution).
+**Production posture while implementation work remains open**: `RUN_OBSERVATIONAL_SHADOW_ONLY` — see
+`results/task32_owner_decision_capture/atr_live_policy.md`. No real capital is at risk under this posture
+(TalonX runs on `talonx_paper`, simulated execution).
 
-**No code was changed.** Full detail: `results/task31_owner_specification/atr_current_implementation.md`,
-`atr_semantics_matrix.csv`, `atr_parity_audit.md`, `atr_future_change_scope.md`,
-`results/task32_owner_decision_capture/atr_use_case_decisions.csv`, `atr_risk_model_options.md`.
+**No code was changed in Tasks 31-33.** Full detail: `results/task31_owner_specification/atr_current_
+implementation.md`, `atr_semantics_matrix.csv`, `atr_parity_audit.md`, `atr_future_change_scope.md`,
+`results/task32_owner_decision_capture/atr_use_case_decisions.csv`, `atr_risk_model_options.md`,
+`results/task33_owner_spec_finalization/atr_use_case_contract.csv`, `current_stop_geometry_flow.md`,
+`next_controlled_research_design.md` (Task 34 — Structural Stop Geometry Contract Audit — designed, not
+started).
 
-## 14. Risk/exit philosophy — **CONFIRMED** (mechanism) / cross-references §13 (geometry basis)
+## 14. Risk/exit philosophy — **CONFIRMED** (mechanism) / **MISALIGNED** (geometry basis, per §13)
 
 STOP/TARGET/SIGNAL_EXIT/END_OF_SESSION exit paths, post-loss lockout (75 min), and per-ticker cooldown (20
-min) are existing, tested production behavior. The GEOMETRY basis for the stop distance specifically is the
-open ATR question in §13 — this section describes the MECHANISM (confirmed), not whether its current
-calibration is optimal (open).
+min) are existing, tested production behavior — the MECHANISM is `CONFIRMED`. The GEOMETRY basis for the
+stop distance specifically is now a confirmed gap, not an open question: per §13's `MARKET_STRUCTURE_
+PRIMARY` contract, traced against the code, the stop is `MISALIGNED` — 100% ATR-derived, 0% structural, for
+every candidate that has ever executed. The mechanism (stop/target/exit-path plumbing) works correctly; the
+GEOMETRY FORMULA it currently uses does not yet match the confirmed risk philosophy. See
+`results/task33_owner_spec_finalization/current_stop_geometry_flow.md`.
 
 ## 15. Evidence standard — **PROVISIONAL**
 
@@ -178,13 +229,17 @@ number is forced. Current n=26 baseline meets 1 of 8 dimensions fully (reproduci
 
 ## 16. Open owner decisions
 
-**Canonical decision form: `docs/research/TALONX_OWNER_DECISIONS.md`** (Task 32) — 9 items in priority
-order (FREQ-001, CONF-001, SIG-001/002/003, ATR-REGIME-001, ATR-TRIGGER-001, ATR-RISK-001, COST-001), each
-with question / why it matters / verified current behavior / options / evidence / Claude recommendation
-(where offered) / OWNER ANSWER (currently `PENDING` for all) / status. Supersedes Task 31's
-`decision_register.csv` (15 rows, broader but less prioritized) as the primary working document — that file
-remains as supporting evidence, not superseded in content, only in role as the day-to-day form. See also
-`results/task32_owner_decision_capture/future_experiment_blockers.csv` for what each open decision blocks.
+**All 9 priority (P1-P5) owner decisions are now `OWNER_CONFIRMED`** — see
+`docs/research/TALONX_OWNER_DECISIONS.md` for the verbatim answers (FREQ-001, CONF-001, SIG-001/002/003,
+ATR-TRIGGER-001, ATR-REGIME-001, ATR-RISK-001, COST-001). What remains open is narrower in scope: (a) two
+implementation-interpretation questions within the already-confirmed confluence philosophy (RSI/MACD trigger
+self-credit, §6), (b) lower-priority items not part of the P1-P5 set (watchlist breadth-vs-frequency policy,
+§3; per-gate hard/soft sign-off, §7; Opportunity Score policy acceptance, §8), and (c) `RESEARCH_REQUIRED`
+implementation work for the concepts the owner already confirmed (multi-timeframe volatility design,
+structural stop-geometry formula design, cost-model numeric threshold). See
+`results/task33_owner_spec_finalization/owner_decisions_captured.csv` for the complete before/after status
+of all 9 priority items, and `results/task32_owner_decision_capture/future_experiment_blockers.csv` for what
+each remaining open item blocks.
 
 ## 17. Version / change-control policy — **PROVISIONAL**
 
@@ -200,8 +255,15 @@ from it.
 ---
 
 **Revision history**: v0.1 (DRAFT) — created by Task 31, 2026-08-21, committed at checkpoint
-`4c6ef7e6691be4dd144cb7c1e1e3644d5e664e45`. v0.2 (DRAFT) — refined by Task 32, 2026-08-21: split several
-PROVISIONAL markers into the more precise OWNER_DECISION_PENDING/TECHNICAL_CONSTRAINT taxonomy, resolved ATR
-semantics per-use-case rather than as a single item, added the canonical `TALONX_OWNER_DECISIONS.md` form.
-Not yet committed/pushed, pending review — see `docs/research/TALONX_RESEARCH_LEDGER.md`'s Task 32 entry for
-the corresponding checkpoint SHA once committed.
+`4c6ef7e6691be4dd144cb7c1e1e3644d5e664e45`. v0.2 (DRAFT) — refined by Task 32, 2026-08-21, committed at
+checkpoint `baa0cc6efecababf2da519b7455700165e842c10`: split several PROVISIONAL markers into the more
+precise OWNER_DECISION_PENDING/TECHNICAL_CONSTRAINT taxonomy, resolved ATR semantics per-use-case rather
+than as a single item, added the canonical `TALONX_OWNER_DECISIONS.md` form. **v0.3 — Task 33, 2026-08-21:
+all 9 P1-P5 priority owner decisions captured and promoted to CONFIRMED (product identity, frequency
+objective, confluence philosophy, signal-family roles, all three ATR use-case contracts, cost-model
+components); traced current implementation against each and found ATR-USE-3 (stop/target geometry)
+`MISALIGNED` — a proven, code-traced structural gap (§13/§14), the highest-priority open implementation item
+in this specification. RSI/MACD confluence self-credit flagged as needing narrower interpretation, not a new
+open-ended decision.** Not yet committed/pushed, pending review — see
+`docs/research/TALONX_RESEARCH_LEDGER.md`'s Task 33 entry for the corresponding checkpoint SHA once
+committed.

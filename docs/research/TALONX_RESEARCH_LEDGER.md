@@ -3511,3 +3511,123 @@ decision-capture artifacts, `docs/research/TALONX_OWNER_DECISIONS.md`, the updat
 `docs/research/TALONX_PRODUCT_STRATEGY_SPEC.md`, and this ledger entry — **not committed, not pushed**, per
 instruction. No production strategy changes. PR #10 remains draft. All 14 required artifacts written to
 `results/task32_owner_decision_capture/`.
+
+---
+
+## Task 33 — Owner Decisions Captured & Product Specification Finalized (2026-08-21)
+
+**Objective**: record the product owner's actual answers to Task 32's nine priority decisions as canonical
+product requirements, promote the corresponding Task 31/32 provisional items to CONFIRMED, compare current
+implementation against the newly confirmed requirements, identify the single highest-priority mismatch, and
+design (not execute) the next controlled experiment. Specification and research design only.
+
+**Task 32 checkpoint**: reviewed the Task 32 diff (three files, no production changes), staged individually,
+committed as **`baa0cc6efecababf2da519b7455700165e842c10`**
+(`docs(research): capture pending owner decision framework`), pushed to
+`research/talonx-strategy-validation`. PR #10 confirmed draft/open.
+
+**Integrity**: HEAD unchanged at `baa0cc6efecababf2da519b7455700165e842c10` throughout. Task26 dataset hash
+`5e5412a960bf`, QuantConfig hash `9174f5232c20`, strategy fingerprint `88529b8a3fa1` — all untouched. No
+production behavior modified.
+
+**All 9 explicit owner decisions recorded verbatim** in `docs/research/TALONX_OWNER_DECISIONS.md` (every
+`OWNER ANSWER` field filled in, every status changed `OPEN` → `OWNER_CONFIRMED`):
+
+- **FREQ-001**: `REGULAR_OPPORTUNITY` — a regular intraday opportunity scanner across the production
+  watchlist, "a few good opportunities per week," not active/high-frequency, not so rare that silence
+  defines the product. Zero-signal days acceptable.
+- **CONF-001**: `TRIGGER_PLUS_ONE_CONFIRMATION` — trigger + at least one independent confirmation; hard
+  quality gate, not ranking; trigger must not automatically count as its own confirmation.
+- **SIG-001/002/003**: all three families (RSI reversal, MACD crossover, MA crossover) confirmed
+  `CANDIDATE_REQUIRING_CONFIRMATION` — candidate generators, not standalone strategies; confirmation may
+  come from any technical dimension, not necessarily another signal family.
+- **ATR-TRIGGER-001**: accept current implementation — `SHORT_TERM_INTRADAY_ATR` for the bar-movement gate.
+- **ATR-REGIME-001**: `MULTI_TIMEFRAME` — the volatility/regime qualification should reflect broader
+  market/instrument context while still allowing short-term intraday information; no numeric period chosen.
+- **ATR-RISK-001**: `MARKET_STRUCTURE_PRIMARY` — stop/risk geometry should primarily reflect market-
+  structure invalidation (pivots/swing levels); ATR permitted only as fallback/buffer/minimum-noise
+  allowance; no numeric buffer formula chosen.
+- **COST-001**: execution-model components confirmed (liquid US equities, spread+slippage represented,
+  market-order-style acceptable); exact bps threshold explicitly deferred.
+
+**Product identity** (now `CONFIRMED`): "TalonX is a high-precision but REGULAR intraday opportunity scanner
+over a broad, liquid-equity watchlist (50+ symbols targeted). It prioritizes quality over raw frequency but
+is intended to surface a useful recurring flow of opportunities across the full watchlist — a few good
+opportunities per week, not a guaranteed daily quota. Not intended to generate multiple trades every day,
+and not intentionally designed as an ultra-rare scanner. Zero-signal days are acceptable."
+
+**Frequency alignment**: `INSUFFICIENT_COVERAGE_TO_COMPARE` — the 10-symbol canonical baseline (26 trades/
+year) does not represent the intended 35-50+ symbol production scale; the only production-scale data point
+(a single 35-symbol live day, 0 published) is too small to judge. A suggestive, explicitly-unverified
+arithmetic extrapolation using only already-published Task 26/27 rates puts production-scale frequency
+plausibly within "a few opportunities per week," but this is not a measurement.
+
+**Confluence contract traced by family** (`family_confluence_alignment.csv`): MA crossover `ALIGNED` (zero
+self-credit, cleanest case). RSI reversal and MACD crossover both `REQUIREMENT_INTERPRETATION_NEEDED` — RSI's
+trigger bundles a volume precondition that confluence re-scores as if independent; MACD's trigger check and
+its own confluence credit are the literal same boolean. Notable trace: if MACD's trigger self-credit were
+disallowed, MACD could never publish at all under `confluence_score_min=2` (the remaining two legs have
+co-occurred zero times across 4,725 real candidates). Flagged for owner interpretation, not resolved
+unilaterally.
+
+**Signal-family roles**: all three confirmed `CANDIDATE_REQUIRING_CONFIRMATION`; TRIGGER FAMILY (which
+technical event generated the candidate) distinguished from CONFIRMATION COMPONENT (the independent evidence
+validating it) — confirmation need not come from a different signal family.
+
+**ATR-USE-2 (trigger movement)**: `SHORT_TERM_INTRADAY_ATR` accepted as-is — `ALIGNED`, no follow-up.
+
+**ATR-USE-1 (`min_atr_pct`, regime)**: `MULTI_TIMEFRAME` confirmed conceptually —
+`CURRENT_IMPLEMENTATION_INCOMPLETE_FOR_CONFIRMED_REQUIREMENT` (not a historical bug; the requirement was
+only just defined). 5 future design questions recorded, none answered, lower priority than ATR-USE-3.
+
+**ATR-USE-3 (stop/target geometry) — the highest-priority finding of this task**: `MARKET_STRUCTURE_PRIMARY`
+confirmed conceptually. A direct code trace of `calculate_trade_geometry`
+(`talonx_quant/strategy.py:211-269`) found `stop = price - 1.5 x ATR(14, 1-minute)` computed UNCONDITIONALLY
+for every candidate — there is categorically no structural-stop code path anywhere in this function.
+Structural pivot data is used exclusively on the TARGET side, never the stop side. Classified `MISALIGNED` —
+this upgrades Task 31's unproven `TIMEFRAME_MISMATCH` hypothesis to a proven, code-traced structural gap now
+that a concrete owner-confirmed contract exists to trace against.
+
+**Highest-priority implementation/research mismatch**: ATR-USE-3 (stop/target geometry), selected via a
+5-criteria scoring against three other candidates (confluence-vs-philosophy, min_atr_pct-vs-multi-timeframe,
+frequency-vs-REGULAR_OPPORTUNITY) — highest correctness severity, highest trade-validity/risk impact
+(every executed trade's risk, no exceptions), a real prerequisite relationship to future edge-evaluation
+work, fully testable via pure observational audit with zero tuning.
+
+**Next controlled task designed, not started**: Task 34 — Structural Stop Geometry Contract Audit. Measure,
+for all 26 Task 26 canonical trades (and ideally all eligible published bullish signals), the relationship
+between entry price, structural anchor, ATR distance, and actual stop — explicitly no alternative stop
+simulation, no alternative P&L. Would establish whether the mismatch affects most trades or only rare
+fallback cases before any formula redesign is attempted.
+
+**Cost model**: `OWNER_CONFIRMED_EXECUTION_ASSUMPTIONS` + `NUMERIC_TOLERANCE_PENDING` (both hold
+simultaneously) — does not block specification finalization; unconditionally blocks any future
+`PRODUCTION_EDGE_CONFIRMED` claim.
+
+**Live observability**: traced actual `QuantSignal`/`Trade`/exported-CSV schemas directly — ATR value, stop,
+and target are already captured everywhere; pivot/structure data is captured at signal generation but
+DROPPED before reaching the trade record or exported CSV (confirmed by direct column inspection); ATR's
+timeframe is never explicitly labeled anywhere; no field records which geometry path was taken. Classified
+`OBSERVABILITY_GAP` — required fields defined, no instrumentation implemented.
+
+**Task 22 status**: unchanged, `DEFER_UNTIL_SAMPLE_GROWS`. Outcomes not inspected. Owner decisions do not
+make the old Task 21-derived classifier (built on the contaminated mixed long/short population) valid again
+— a separate issue, unaffected by the product spec being finalized.
+
+**Live policy**: unchanged, `RUN_OBSERVATIONAL_SHADOW_ONLY`. No capital at risk (paper execution). No live
+observations used to tune anything.
+
+**No tuning/code changes**: no threshold, formula, or gate was changed anywhere in this task.
+
+**Final specification status**: `CORE_PRODUCT_SPEC_CONFIRMED` — all five P1-P5 blocking decisions
+conceptually resolved by explicit owner answers; remaining open items correctly downgraded to
+`RESEARCH_REQUIRED` (multi-timeframe volatility design, structural stop formula design, cost bps) or narrow
+interpretation clarifications (RSI/MACD self-credit), not fresh open-ended owner decisions.
+
+**Next recommended action (not started)**: Task 34 — Structural Stop Geometry Contract Audit, per the design
+above. No formula change, no alternative P&L, until this measurement exists.
+
+**State**: Task 32 checkpoint committed and pushed (`baa0cc6efecababf2da519b7455700165e842c10`). Task 33
+decision updates (`docs/research/TALONX_OWNER_DECISIONS.md`, `TALONX_PRODUCT_STRATEGY_SPEC.md` v0.3), and
+this ledger entry — **not committed, not pushed**, per instruction. No production strategy changes. PR #10
+remains draft. All 13 required artifacts written to `results/task33_owner_spec_finalization/`.

@@ -1,14 +1,11 @@
 # TalonX Owner Decisions
 
-**Status: DRAFT — produced by Task 32 (2026-08-21).** A compact, human-readable decision form for the
-product owner. Every `OWNER ANSWER` field below is deliberately left blank (`PENDING`) because no actual
-human owner instruction exists yet — Claude has not answered on the owner's behalf anywhere in this
-document. Recommendations are labeled as recommendations, never as decisions. Once the owner fills in an
-answer, update this document (do not delete the question/evidence context — append the answer and change
-Status) and propagate the resolution to `docs/research/TALONX_PRODUCT_STRATEGY_SPEC.md`.
-
-Full supporting analysis for every item below lives in `results/task32_owner_decision_capture/` (built on
-`results/task31_owner_specification/`, not re-derived).
+**Status: v0.2 — owner answers captured by Task 33 (2026-08-21).** All 9 items below now carry an explicit
+`OWNER ANSWER`, recorded verbatim from the product owner's actual instruction, not inferred or rewritten
+into different semantics. Where Claude had offered a recommendation, the owner answer is compared against
+it explicitly rather than silently assumed to match. Full traceability of the implementation-alignment
+consequences of each answer lives in `results/task33_owner_spec_finalization/` (built on
+`results/task31_owner_specification/` and `results/task32_owner_decision_capture/`, neither redone).
 
 ---
 
@@ -40,9 +37,15 @@ measured output.
 default, since the evidence is genuinely split between two defensible categories and any default here would
 functionally become the missing historical requirement by fiat.
 
-**OWNER ANSWER**: PENDING
+**OWNER ANSWER**: `REGULAR_OPPORTUNITY` — TalonX should be a regular intraday opportunity scanner across the
+production watchlist. Not an active high-frequency intraday system, and not so rare that very long silent
+periods define the product. Intent: "a few good opportunities per week across the broad watchlist," not a
+guaranteed daily signal quota. Zero-signal days remain acceptable.
 
-**Status**: OPEN
+**Status**: `OWNER_CONFIRMED`. Implementation alignment: `INSUFFICIENT_COVERAGE_TO_COMPARE` — the 10-symbol
+canonical research subset does not represent the intended 35-50+ symbol production scale; no direct
+measurement exists yet at production scale. See `results/task33_owner_spec_finalization/frequency_alignment.
+md`. Follow-up: `RESEARCH_REQUIRED` (multi-week live observation at production scale, not a new backtest).
 
 ---
 
@@ -70,9 +73,17 @@ currently implemented (the smallest gap between stated policy and actual behavio
 matches the plain reading of the confluence gate's own reactive origin story (Task 24/27/28). This is a
 recommendation only — not adopted as fact anywhere in this document.
 
-**OWNER ANSWER**: PENDING
+**OWNER ANSWER**: `TRIGGER_PLUS_ONE_CONFIRMATION` (A) — a valid setup consists conceptually of a
+signal-family trigger PLUS at least one independent confirmation. Confluence is a hard quality gate, not
+merely ranking. The trigger itself must NOT automatically be interpreted as an additional confirmation
+unless its family contract explicitly says so.
 
-**Status**: OPEN
+**Status**: `OWNER_CONFIRMED`. Matches Claude's recommendation. Implementation alignment: MIXED by family —
+MA `ALIGNED`; RSI and MACD `REQUIREMENT_INTERPRETATION_NEEDED`, since both currently rely on some form of
+trigger-bundled evidence counting toward confluence, which the owner's "do not automatically interpret the
+trigger as confirmation" caution directly implicates. See `results/task33_owner_spec_finalization/family_
+confluence_alignment.csv` for the exact trace. Follow-up: narrow interpretation clarification, not a new
+open-ended decision.
 
 ---
 
@@ -91,9 +102,12 @@ structural self-exclusion of its own RSI confluence leg).
 **Claude recommendation**: `CANDIDATE_REQUIRING_CONFIRMATION` (B) — formalizes existing behavior exactly, no
 code change implied. Recommendation only.
 
-**OWNER ANSWER**: PENDING
+**OWNER ANSWER**: `CANDIDATE_REQUIRING_CONFIRMATION`. RSI reversal is a candidate generator, not a
+standalone publishing strategy. Confirmation may come from a different technical dimension (volume, RSI
+state, MACD event, trend where appropriate) rather than necessarily another signal family firing — this
+does not require identical implementation mechanics across families.
 
-**Status**: OPEN
+**Status**: `OWNER_CONFIRMED`. Matches Claude's recommendation and current implementation exactly.
 
 ---
 
@@ -112,9 +126,15 @@ auto-credits), but still fails confluence 91.9% of the time absent a coincident 
 though this family has the strongest case of the three for `INDEPENDENT_PUBLISHABLE_SETUP` if the owner
 wants to treat families asymmetrically (permitted under E in CONF-001). Recommendation only.
 
-**OWNER ANSWER**: PENDING
+**OWNER ANSWER**: `CANDIDATE_REQUIRING_CONFIRMATION`. Same as SIG-001 — MACD is a candidate generator, not a
+standalone publishing strategy, per the owner's general framing that all three families require confirmation
+under the confirmed confluence philosophy.
 
-**Status**: OPEN
+**Status**: `OWNER_CONFIRMED`. Implementation alignment: matches the current OUTCOME (MACD rarely publishes
+alone), but the MECHANISM by which that outcome is achieved (MACD's own trigger doubling as its own
+confluence credit) is exactly the pattern CONF-001's owner answer cautions against assuming automatically —
+see `results/task33_owner_spec_finalization/family_confluence_alignment.csv`. Follow-up: same interpretation
+question as CONF-001, not a new decision.
 
 ---
 
@@ -133,9 +153,11 @@ legs.
 **Claude recommendation**: `CANDIDATE_REQUIRING_CONFIRMATION` (B) — already matches current implementation
 exactly, no change implied. Recommendation only.
 
-**OWNER ANSWER**: PENDING
+**OWNER ANSWER**: `CANDIDATE_REQUIRING_CONFIRMATION`. Same framing as SIG-001/SIG-002.
 
-**Status**: OPEN
+**Status**: `OWNER_CONFIRMED`. Implementation alignment: `ALIGNED` — already matches exactly, the cleanest
+case of the three families (zero self-credit, genuinely independent confirmation required). No follow-up
+needed.
 
 ---
 
@@ -160,9 +182,16 @@ an almost non-restrictive floor).
 **Claude recommendation**: none offered — classified `REQUIREMENT_AMBIGUOUS` with no historical evidence
 resolving which was intended; both readings are legitimate designs for an intraday scanner.
 
-**OWNER ANSWER**: PENDING
+**OWNER ANSWER**: `MULTI_TIMEFRAME`. The volatility/regime qualification should reflect broader
+market/instrument volatility context while still allowing short-term intraday information where appropriate.
+Conceptual only — no numeric period or threshold chosen; `ATR(14)/price >= 0.25%` on 1-minute bars alone
+must NOT be assumed to be the final intended product definition.
 
-**Status**: OPEN
+**Status**: `OWNER_CONFIRMED` (conceptually) / `RESEARCH_REQUIRED` (for implementation). Implementation
+alignment: `CURRENT_IMPLEMENTATION_INCOMPLETE_FOR_CONFIRMED_REQUIREMENT` — not a historical bug, since this
+requirement was only just defined by this decision; no broader-timeframe context exists anywhere in the
+current gate. Follow-up: 5 design questions defined in `results/task33_owner_spec_finalization/next_
+controlled_research_design.md`, none answered; lower priority than ATR-RISK-001.
 
 ---
 
@@ -184,9 +213,12 @@ uses.
 recommendation with the highest confidence of the three, since no plausible alternative timeframe would be
 more conceptually correct for this specific use case. Recommendation only, not yet owner-accepted.
 
-**OWNER ANSWER**: PENDING
+**OWNER ANSWER**: Accept current implementation. Trigger-movement ATR remains `ATR(14)` over recent
+1-minute bars, answering "did the trigger minute move enough relative to recent minute-level volatility?"
+No change requested.
 
-**Status**: OPEN
+**Status**: `OWNER_CONFIRMED`. Matches Claude's recommendation exactly. Implementation alignment: `ALIGNED`.
+No follow-up needed.
 
 ---
 
@@ -215,9 +247,23 @@ time ~4 minutes vs. TARGET/EOD-exit medians of ~14 minutes / ~2.6 hours.
 because that is the conventional TA reading of "ATR 14," and not to select any other option without owner
 input on intended trade horizon philosophy. All six options remain open.
 
-**OWNER ANSWER**: PENDING
+**OWNER ANSWER**: `MARKET_STRUCTURE_PRIMARY` (D). Stop/risk geometry should primarily represent market-
+structure invalidation (pivots, structural swing levels, support/resistance-derived invalidation). ATR may
+be used as a fallback when no structural anchor is available, a buffer beyond a structural level, or a
+minimum-noise allowance — but short-term 1-minute ATR should NOT independently dominate the stop distance
+when valid market structure exists. No numeric ATR period/buffer formula chosen — that is deferred to a
+later research task.
 
-**Status**: OPEN
+**Status**: `OWNER_CONFIRMED` (conceptually) / `RESEARCH_REQUIRED` (for implementation). Implementation
+alignment: **`MISALIGNED`** — a direct code trace
+(`results/task33_owner_spec_finalization/current_stop_geometry_flow.md`) found the current stop is `price -
+1.5 x ATR(14, 1-minute)`, UNCONDITIONALLY, for every candidate — there is categorically no structural-stop
+code path anywhere in `calculate_trade_geometry` today; structural pivot data is used exclusively on the
+TARGET side, never the stop side. This upgrades Task 31's `TIMEFRAME_MISMATCH` HYPOTHESIS to a confirmed,
+code-traced FACT now that a concrete contract exists to trace against. **This is the single highest-priority
+implementation/research mismatch identified across Tasks 31-33.** Follow-up: Task 34 (Structural Stop
+Geometry Contract Audit) designed, not started — a pure measurement task, no formula changes, no alternative
+P&L, per `results/task33_owner_spec_finalization/next_controlled_research_design.md`.
 
 ---
 
@@ -242,13 +288,24 @@ SHOULD be required.
 a cost threshold from Task26"). No format recommendation offered either, since it depends on unresolved
 execution-environment answers.
 
-**OWNER ANSWER**: PENDING
+**OWNER ANSWER**: Accepted provisional execution assumptions: liquid US equities, realistic spread
+represented, realistic slippage represented, paper/live market-order-style execution assumptions acceptable
+for current research. The exact deployability bps threshold remains to be established later from a
+defensible execution model — do NOT reverse-engineer it from Task 26's cost-sensitivity result.
 
-**Status**: OPEN
+**Status**: `OWNER_CONFIRMED_EXECUTION_ASSUMPTIONS` + `NUMERIC_TOLERANCE_PENDING` (both hold simultaneously
+— this is the intended state, not a contradiction). Does not block specification finalization. Blocks,
+unconditionally, any future claim of `PRODUCTION_EDGE_CONFIRMED` until the numeric tolerance is established.
+Follow-up: `RESEARCH_REQUIRED` — broker/venue selection and an empirical fill model, per
+`results/task33_owner_spec_finalization/cost_requirement_status.md`.
 
 ---
 
 ## Revision history
 
-v0.1 (DRAFT) — created by Task 32, 2026-08-21. Not yet committed/pushed, pending review — see
-`docs/research/TALONX_RESEARCH_LEDGER.md`'s Task 32 entry for the corresponding checkpoint SHA.
+v0.1 (DRAFT) — created by Task 32, 2026-08-21, committed at checkpoint
+`baa0cc6efecababf2da519b7455700165e842c10`. v0.2 — all 9 owner answers captured by Task 33, 2026-08-21;
+every item promoted from `OPEN` to `OWNER_CONFIRMED`, with implementation-alignment findings and follow-up
+status recorded for each. Not yet committed/pushed, pending review — see
+`docs/research/TALONX_RESEARCH_LEDGER.md`'s Task 33 entry for the corresponding checkpoint SHA once
+committed.
