@@ -3631,3 +3631,91 @@ above. No formula change, no alternative P&L, until this measurement exists.
 decision updates (`docs/research/TALONX_OWNER_DECISIONS.md`, `TALONX_PRODUCT_STRATEGY_SPEC.md` v0.3), and
 this ledger entry — **not committed, not pushed**, per instruction. No production strategy changes. PR #10
 remains draft. All 13 required artifacts written to `results/task33_owner_spec_finalization/`.
+
+---
+
+## Task 34 — Structural Stop Geometry Contract Audit (2026-08-21)
+
+**Objective**: measure how the existing 26 canonical Task 26 trades relate to actual market structure,
+before any stop-formula change is designed. Geometry/requirements/measurement audit only — no stop
+optimization, no alternative P&L, no parameter sweep.
+
+**Task 33 checkpoint**: reviewed the Task 33 diff (three files, no production changes), staged individually,
+committed as **`4f175599e35d046d646f901cd2923ec831ca7d0b`** (`docs(research): finalize TalonX core product
+specification`), pushed to `research/talonx-strategy-validation`. PR #10 confirmed draft/open.
+
+**Integrity**: HEAD `4f175599e35d046d646f901cd2923ec831ca7d0b`, git status clean. Task26 dataset hash
+`5e5412a960bf`, QuantConfig hash `9174f5232c20`, strategy fingerprint `88529b8a3fa1` — unchanged. Task26
+trade artifact hashes recorded (`task26_trades.csv`/`.json`). No production strategy behavior changed.
+
+**Owner-confirmed `MARKET_STRUCTURE_PRIMARY` requirement**: stop/risk geometry should primarily answer "at
+what price is the trade thesis structurally invalid," with ATR permitted only as fallback/buffer/minimum-
+noise allowance, never as the unconditional dominant source.
+
+**Current stop implementation (restated, re-verified)**: `stop = price - 1.5 x ATR(14, 1-minute)`,
+unconditional, for every candidate — no structural-stop code path exists anywhere in
+`calculate_trade_geometry`.
+
+**Structural source definition** (fixed before measuring, no new indicator): classic floor-trader daily
+pivot support (S1), via the existing `compute_daily_pivots` function — the same, unmodified, shared
+live/backtest code already used for the TARGET side. Eligibility: `pivot_support is not None AND
+pivot_support < entry_price`.
+
+**Pivot causality result**: `CAUSAL_AT_SIGNAL_TIME`, proven directly from source — `compute_daily_pivots`
+uses only the prior COMPLETED regular session, strictly excluding the current session's own bars. No future
+bars used, zero exceptions found.
+
+**Structural availability**: 22/26 trades (84.6%) had a valid structural anchor; 4/26 (15.4%) did not — a
+legitimate, bounded, owner-anticipated ATR-fallback case.
+
+**ATR stop vs. structure distribution — the headline finding**: of the 22 trades with structure, **100%
+(22/22)** classified `ATR_STOP_INSIDE_STRUCTURE` — the current ATR stop sits strictly tighter than the
+structural invalidation level in every measurable case. Zero trades had the stop at or beyond structure.
+Median structural distance was ~13.3 ATR units away (range ~1.75-32), implying the current stop is, on
+median, roughly 8.9x tighter than structure.
+
+**STOP-trade thesis result**: of 18 STOP exits, 15/18 (83.3%) fired while the structural level remained
+INTACT (never breached); zero STOP exits coincided with an actual structural breach; 3/18 had no structure
+available. Cross-checked against MAE (observed low up to canonical exit, no extension): 0/22 trades with
+structure ever had their MAE reach the structural level — structure was never breached in any of the 26
+canonical trades, winners or losers.
+
+**Target-side asymmetry**: 100% of the 26 trades' targets were structural (pivot-based) — every trade
+therefore carries a mixed-timescale geometry contract (stop = 1-minute ATR, target = market structure),
+classified `PRODUCT_SPEC_MISALIGNMENT`.
+
+**Symbol concentration**: pattern is broad across every traded symbol (STX, AMD, PYPL, NVDA, TSLA) — a
+uniform 100% ATR-stop-inside-structure rate wherever structure exists, not driven by STX alone despite STX's
+15/26 trade concentration.
+
+**Implementability**: `IMPLEMENTABLE_WITH_EXISTING_CAUSAL_DATA` — `pivot_support` is already a parameter of
+`calculate_trade_geometry`, already causal, already shared identically between live and backtest; no new
+indicator or state extension required. Only the fallback buffer formula remains an explicit future design
+choice.
+
+**Live/backtest parity requirements defined, not implemented**: structural level, structural level type,
+structural source timestamp, ATR value, ATR timeframe label, fallback reason, selected stop, geometry path —
+minimum schema for a future implementation to avoid Task 33's observability gap recurring.
+
+**No alternative stop P&L**: no hypothetical winner count, expectancy, PF, or max-DD was calculated anywhere.
+**No parameter tuning**: no ATR multiplier, pivot lookback, or buffer value was swept or proposed.
+
+**Determinism**: core geometry extraction run twice independently from frozen inputs; output SHA-256 matched
+exactly both times, 26 rows both times, zero mismatches.
+
+**Tests**: no new tests written; 17 existing, directly relevant tests run (4 pivot + 13 structural
+R:R/geometry), 17/17 passed.
+
+**Final decision**: `CURRENT_ATR_STOPS_SYSTEMATICALLY_MISALIGNED_WITH_STRUCTURE` — the mismatch is broad and
+systematic (100% of measurable cases), not limited to a small subset.
+
+**Next recommended action (not started)**: Task 35 — Deterministic Market-Structure-Primary Stop
+Implementation. Smallest implementation change (reuse the existing `pivot_support` parameter for the
+bullish stop, mirroring the existing bearish-target logic); deterministic tests first; explicit ATR fallback
+conditions only; preserve all unrelated parameters; live/paper/backtest parity per the defined minimum
+schema; no economic comparison within that implementation task.
+
+**State**: Task 33 checkpoint committed and pushed (`4f175599e35d046d646f901cd2923ec831ca7d0b`). Task 34
+measurement artifacts and this ledger entry — **not committed, not pushed**, per instruction. No production
+strategy changes. PR #10 remains draft. All 20 required artifacts written to
+`results/task34_structural_stop_geometry/`.
