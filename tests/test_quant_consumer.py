@@ -76,6 +76,14 @@ def _signal(
     # _flush_throttle_window-level test -- that still additionally
     # requires the ticker have a buffered close price (see _seed_close)
     # for _revalidate_candidate's `current_price` to resolve.
+    #
+    # pivot_support(101) is deliberately >= price(100) -- Task 35's
+    # MARKET_STRUCTURE_PRIMARY stop contract treats a lower pivot_support
+    # as a valid structural stop anchor, which would silently change the
+    # effective risk (and therefore risk_reward_ratio) these throttle/
+    # cooldown-focused tests build on; keeping it invalid here isolates
+    # them from that behavior (tests that specifically exercise the
+    # structural-stop path build their own pivots directly).
     return QuantSignal(
         ticker=ticker,
         signal_type=signal_type,
@@ -87,7 +95,7 @@ def _signal(
         risk_reward_ratio=risk_reward_ratio,
         atr=2.0,
         pivot_resistance=110.0,
-        pivot_support=90.0,
+        pivot_support=101.0,
         bar_timestamp=datetime(2026, 8, 7, 15, 0, tzinfo=timezone.utc),
     )
 
@@ -1419,7 +1427,7 @@ def test_opportunity_score_is_the_sum_of_configured_weights_at_full_marks(config
 
 def _revalidatable_signal(
     ticker: str = "AAPL", price: float = 100.0, atr: float = 2.0,
-    pivot_resistance: float = 110.0, pivot_support: float = 90.0,
+    pivot_resistance: float = 110.0, pivot_support: float = 101.0,  # >= price -- see _signal's own note
     direction: SignalDirection = SignalDirection.BULLISH,
     signal_generated_at: datetime | None = None,
 ) -> QuantSignal:
@@ -1485,7 +1493,11 @@ async def test_revalidate_candidate_drops_when_rr_degraded_by_price_drift(scanne
 @pytest.mark.asyncio
 async def test_revalidate_candidate_updates_price_and_rr_on_success(scanner):
     now = datetime.now(timezone.utc)
-    signal = _revalidatable_signal(price=100.0, atr=2.0, pivot_resistance=110.0, pivot_support=90.0)
+    # pivot_support(105) deliberately >= the revalidated price(101) -- this
+    # test is about the price/R:R UPDATE mechanics, not Task 35's
+    # structural-stop path (see test_revalidate_candidate_structural_stop_
+    # survives_revalidation below for that).
+    signal = _revalidatable_signal(price=100.0, atr=2.0, pivot_resistance=110.0, pivot_support=105.0)
     _seed_close(scanner, "AAPL", 101.0)  # small, harmless drift
 
     result = await scanner._revalidate_candidate(signal, now)
@@ -1501,6 +1513,55 @@ async def test_revalidate_candidate_updates_price_and_rr_on_success(scanner):
     # original, stale entry price.
     assert result.stop_price == pytest.approx(101.0 - 3.0)  # price - atr_stop_multiplier(1.5)*atr(2.0)
     assert result.target_price == pytest.approx(110.0)  # pivot resistance, unchanged
+
+
+@pytest.mark.asyncio
+async def test_revalidate_candidate_structural_stop_survives_revalidation(scanner):
+    """Task 35 §20 case A: a candidate whose structural stop was valid at
+    screening and remains valid at the revalidated price must keep using
+    the structural stop (and the geometry_path/fallback_reason fields
+    must move together with it, not be left stale from generation time)."""
+    now = datetime.now(timezone.utc)
+    # support(96) chosen so the resulting structural R:R (9/5=1.8) still
+    # clears min_risk_reward_ratio(1.5) -- this test is about the geometry
+    # PATH surviving revalidation, not about the R:R-rejection case (see
+    # test_rr_rejection_case_correct_geometry_fails_where_old_atr_geometry_would_have_passed
+    # in test_quant_strategy.py for that).
+    signal = _revalidatable_signal(price=100.0, atr=2.0, pivot_resistance=110.0, pivot_support=96.0)
+    _seed_close(scanner, "AAPL", 101.0)  # small drift; support(96) still < 101
+
+    result = await scanner._revalidate_candidate(signal, now)
+
+    assert result is not None
+    assert result.stop_price == pytest.approx(96.0)  # structural, not 101 - 3 = 98
+    assert result.geometry_path == "STRUCTURAL_PRIMARY"
+    assert result.fallback_reason is None
+    assert result.structural_level == pytest.approx(96.0)
+    # reward = 110 - 101 = 9; risk = 101 - 96 = 5 (NOT the ATR risk of 3)
+    assert result.risk_reward_ratio == pytest.approx(9.0 / 5.0)
+
+
+@pytest.mark.asyncio
+async def test_revalidate_candidate_drops_when_price_drifts_through_structural_level(scanner):
+    """Task 35 §20 case B: structure was valid at screening (support=90 <
+    screening price=100) but the revalidated price has since dropped to
+    89 -- BELOW the structural level. Must NOT silently keep the
+    now-invalid structural stop; re-derives fresh (ATR fallback here,
+    since the same support is no longer below the new price), and must
+    never open/publish an inverted (stop > price) geometry."""
+    now = datetime.now(timezone.utc)
+    signal = _revalidatable_signal(price=100.0, atr=2.0, pivot_resistance=110.0, pivot_support=90.0)
+    _seed_close(scanner, "AAPL", 89.0)  # price has drifted BELOW the old structural level
+
+    result = await scanner._revalidate_candidate(signal, now)
+
+    # reward = 110 - 89 = 21; ATR-fallback risk = 1.5*2 = 3 -> ratio = 7.0, clears the gate
+    assert result is not None
+    assert result.stop_price == pytest.approx(89.0 - 3.0)  # ATR fallback, NOT the stale structural(90) which
+    # would sit ABOVE the new price -- an inverted, nonsensical long stop.
+    assert result.geometry_path == "ATR_FALLBACK"
+    assert result.fallback_reason == "STRUCTURE_NOT_BELOW_ENTRY"
+    assert result.stop_price < result.price < result.target_price
 
 
 @pytest.mark.asyncio
@@ -1572,7 +1633,9 @@ async def test_revalidate_candidate_rejects_when_pivots_missing(scanner):
 
 @pytest.mark.asyncio
 async def test_flush_throttle_window_publishes_the_revalidated_price(scanner):
-    signal = _revalidatable_signal(price=100.0, atr=2.0, pivot_resistance=110.0, pivot_support=90.0)
+    # pivot_support(105) deliberately >= the revalidated price(103) -- see
+    # the note in test_revalidate_candidate_updates_price_and_rr_on_success.
+    signal = _revalidatable_signal(price=100.0, atr=2.0, pivot_resistance=110.0, pivot_support=105.0)
     _seed_close(scanner, "AAPL", 103.0)
     scanner._pending_candidates = [signal]
 

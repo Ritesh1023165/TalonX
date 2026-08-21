@@ -119,6 +119,23 @@ class QuantSignal(BaseModel):
     stop_price: float | None = None
     target_price: float | None = None
 
+    # Task 35 (owner-confirmed ATR-RISK-001: MARKET_STRUCTURE_PRIMARY) --
+    # which path calculate_trade_geometry actually used for THIS signal's
+    # stop: "STRUCTURAL_PRIMARY" (stop_price == the prior-session S1 pivot
+    # support) or "ATR_FALLBACK" (stop_price == 1.5x ATR, unchanged
+    # formula). fallback_reason is populated only on the fallback path
+    # (NO_STRUCTURAL_SUPPORT / STRUCTURE_INVALID_OR_NONFINITE /
+    # STRUCTURE_NOT_BELOW_ENTRY). structural_level/structural_level_type
+    # record the specific structural anchor used when geometry_path is
+    # STRUCTURAL_PRIMARY (currently always the prior-session S1 pivot --
+    # see strategy.py's calculate_trade_geometry). All None for BEARISH
+    # signals (the owner's contract is scoped to LONG stops only) and for
+    # any signal where geometry itself couldn't be computed (atr missing).
+    geometry_path: str | None = None
+    fallback_reason: str | None = None
+    structural_level: float | None = None
+    structural_level_type: str | None = None
+
     # 15-min 200 SMA higher-timeframe trend gate (regular session, BULLISH
     # candidates only -- see strategy.py). trend_aligned is None when the
     # gate doesn't apply to this signal (bearish, pre-market, or the HTF

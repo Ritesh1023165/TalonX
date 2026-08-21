@@ -159,19 +159,44 @@ for the full before/after):**
   `P = (H+L+C)/3`, `R1 = 2P-L`, `S1 = 2P-H`, computed by
   `indicators.compute_daily_pivots` from the 15-min HTF buffer), not a
   second ATR multiple — a genuine market-derived target, not a
-  configuration-constant ratio. Risk is `atr_stop_multiplier x ATR` —
-  **the SAME multiplier `stop_price` is built from** (harmonized
-  2026-08-16 after a quant audit caught the gate evaluating against a
-  DIFFERENT, wider risk distance — the old separate
-  `pivot_stop_atr_multiplier`, 1.5x — than the stop actually executed
-  with — the old `atr_stop_multiplier`, 1.0x — so a trade could pass the
-  R:R gate at a nominal ratio while its actual executed R:R, measured
-  against the real stop, was materially different). `risk_reward_ratio` is
-  `None` (fail-closed, gate drops the candidate) until at least one full
-  prior regular session's pivot data is available. `target_price` uses
-  the SAME pivot level `risk_reward_ratio`'s reward side does when
-  available, falling back to `TALONX_QUANT_ATR_REWARD_MULTIPLIER` (2.0x
-  ATR) only while pivot data is still warming up.
+  configuration-constant ratio. `risk_reward_ratio` is `None` (fail-closed,
+  gate drops the candidate) until at least one full prior regular
+  session's pivot data is available. `target_price` uses the SAME pivot
+  level `risk_reward_ratio`'s reward side does when available, falling
+  back to `TALONX_QUANT_ATR_REWARD_MULTIPLIER` (2.0x ATR) only while pivot
+  data is still warming up.
+
+  **LONG stop geometry is market-structure-primary** (Task 35,
+  owner-confirmed ATR-RISK-001: `MARKET_STRUCTURE_PRIMARY` — corrects
+  Task 34's `CURRENT_ATR_STOPS_SYSTEMATICALLY_MISALIGNED_WITH_STRUCTURE`
+  finding). For a BULLISH candidate, `calculate_trade_geometry` uses the
+  same prior-session `S1` pivot support already computed for the target
+  side as the PRIMARY stop anchor whenever it is a valid, finite, positive
+  number strictly below the candidate's price — `stop_price` is that
+  level LITERALLY, with no buffer subtracted around it
+  (`STRUCTURAL_BUFFER_REQUIREMENT_NOT_DEFINED`: no existing repository
+  requirement defines one, and inventing one would be parameter tuning,
+  not spec alignment — see `results/task34_structural_stop_geometry/` and
+  `results/task35_structural_stop_implementation/`). Only when no valid
+  structural support exists does the stop fall back to the unmodified
+  `atr_stop_multiplier x ATR(14, 1-minute)` formula — every `QuantSignal`
+  records which path was used (`geometry_path`: `STRUCTURAL_PRIMARY` or
+  `ATR_FALLBACK`) and, on the fallback path, why (`fallback_reason`:
+  `NO_STRUCTURAL_SUPPORT` / `STRUCTURE_INVALID_OR_NONFINITE` /
+  `STRUCTURE_NOT_BELOW_ENTRY`). `risk` (and therefore `risk_reward_ratio`)
+  is always derived from the ACTUAL selected stop (`price - stop_price`),
+  never a stale ATR-only figure — correcting the stop can therefore
+  legitimately change whether a candidate clears the R:R gate, a
+  consequence of correctness, not a parameter change. BEARISH is
+  unchanged (still `atr_stop_multiplier x ATR`, unconditional) — the
+  owner's contract is scoped to LONG stops, since a BEARISH signal never
+  opens a new position under the LONG_ONLY lifecycle (Task 25A).
+  **`atr_move_multiplier`'s trigger-movement semantics and `min_atr_pct`'s
+  regime/volatility-floor semantics are both entirely unchanged and
+  out of scope here** — the former was owner-confirmed as-is
+  (ATR-TRIGGER-001), the latter remains a separate, not-yet-implemented
+  future task (ATR-REGIME-001: `MULTI_TIMEFRAME`, conceptually confirmed,
+  no implementation chosen).
 - **Post-loss lockout** (`consumer.py`, `TALONX_QUANT_LOSS_LOCKOUT_SECONDS`,
   default 4500 = 75 min) — `QuantScanner` also subscribes to
   `talonx:paper:trades` (talonx_paper's own execution feed) purely to

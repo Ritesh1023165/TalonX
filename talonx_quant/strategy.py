@@ -80,12 +80,24 @@ Requirement-doc gap fixes (2026-08-16):
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from talonx_quant.config import QuantConfig
 from talonx_quant.indicators import DailyPivots, IndicatorSnapshot
 from talonx_quant.schemas import QuantSignal, SignalDirection, SignalType
 from talonx_quant.session import Session, get_session
+
+# Task 35 (owner-confirmed ATR-RISK-001: MARKET_STRUCTURE_PRIMARY) -- stable
+# geometry-path / fallback-reason markers, mirroring the plain-string
+# convention this module already uses for exit_reason/SignalType.value
+# elsewhere rather than introducing a new enum type for a simple label.
+GEOMETRY_PATH_STRUCTURAL_PRIMARY = "STRUCTURAL_PRIMARY"
+GEOMETRY_PATH_ATR_FALLBACK = "ATR_FALLBACK"
+
+FALLBACK_REASON_NO_STRUCTURAL_SUPPORT = "NO_STRUCTURAL_SUPPORT"
+FALLBACK_REASON_STRUCTURE_NOT_BELOW_ENTRY = "STRUCTURE_NOT_BELOW_ENTRY"
+FALLBACK_REASON_STRUCTURE_INVALID_OR_NONFINITE = "STRUCTURE_INVALID_OR_NONFINITE"
 
 
 def evaluate_signals(
@@ -199,13 +211,23 @@ class TradeGeometry:
     distance -- stop, target, risk, reward, and the resulting ratio.
     Returned as a single unit so a caller can never update the ratio
     without also updating the stop/target it was measured against (see
-    calculate_trade_geometry's own docstring for the bug this fixes)."""
+    calculate_trade_geometry's own docstring for the bug this fixes).
+
+    Task 35 additions (owner-confirmed ATR-RISK-001: MARKET_STRUCTURE_
+    PRIMARY): geometry_path/fallback_reason/structural_level/
+    structural_level_type record WHICH stop path this geometry actually
+    used and why -- observability fields, not inputs to any downstream
+    decision beyond the stop/risk values themselves."""
 
     stop_price: float
     target_price: float
     risk: float
     reward: float | None
     risk_reward_ratio: float | None
+    geometry_path: str
+    fallback_reason: str | None
+    structural_level: float | None
+    structural_level_type: str | None
 
 
 def calculate_trade_geometry(
@@ -226,7 +248,6 @@ def calculate_trade_geometry(
     call sites through the exact same function makes that drift
     structurally impossible.
 
-    stop = atr_stop_multiplier x ATR against the trade (default 1.5x).
     target = the nearest classic floor-trader pivot level (R1 for
     BULLISH, S1 for BEARISH) when it sits on the correct side of price,
     else the atr_reward_multiplier x ATR approximation while pivot data
@@ -237,16 +258,73 @@ def calculate_trade_geometry(
     -> no ratio" posture (a candidate with risk_reward_ratio=None never
     clears consumer.py's R:R gate).
 
+    Task 35 stop geometry (owner-confirmed ATR-RISK-001: MARKET_STRUCTURE_
+    PRIMARY, Task 34's CURRENT_ATR_STOPS_SYSTEMATICALLY_MISALIGNED_WITH_
+    STRUCTURE finding) -- BULLISH ONLY, mirroring the existing bullish
+    target logic's own structural-first/ATR-fallback shape:
+      1. STRUCTURAL_PRIMARY: if pivot_support is finite, > 0, and strictly
+         below `price`, the stop IS pivot_support -- no buffer is
+         subtracted around it (Task 34 found no existing repository
+         requirement defines one; inventing one here would be parameter
+         tuning, not spec alignment -- see docs/modules/quant.md's
+         STRUCTURAL_BUFFER_REQUIREMENT_NOT_DEFINED note).
+      2. ATR_FALLBACK: otherwise, stop = price - atr_stop_multiplier x ATR
+         (the unmodified, pre-existing formula -- fallback_reason records
+         exactly why structure wasn't used: NO_STRUCTURAL_SUPPORT (pivot_
+         support is None or non-finite), STRUCTURE_INVALID_OR_NONFINITE
+         (a finite value that isn't a usable positive price), or
+         STRUCTURE_NOT_BELOW_ENTRY (a valid, finite, positive pivot that
+         simply isn't on the correct side of -- or is exactly equal to --
+         the current price; equality is deliberately treated as invalid,
+         since a stop at entry would be a zero-risk trade).
+    `risk` is always price - stop (recomputed from whichever stop was
+    actually selected), so risk_reward_ratio always reflects the REAL
+    selected geometry, never a stale ATR-only figure -- see the R:R
+    Contract note in docs/modules/quant.md.
+
+    BEARISH is unchanged (still atr_stop_multiplier x ATR, unconditional)
+    -- the owner's MARKET_STRUCTURE_PRIMARY contract is scoped to LONG
+    trades only (Task 25A's LONG_ONLY lifecycle means a BEARISH signal
+    never opens a new position; its stop/target are computed but not
+    economically load-bearing the way a BULLISH candidate's are).
+
     Returns None when ATR/price aren't available yet or risk resolves to
     <= 0 -- same warm-up posture as every other ATR-derived value here."""
     if atr is None or atr <= 0 or not price:
         return None
-    risk = config.atr_stop_multiplier * atr
-    if risk <= 0:
+    atr_risk = config.atr_stop_multiplier * atr
+    if atr_risk <= 0:
         return None
 
     if direction == SignalDirection.BULLISH:
-        stop = price - risk
+        structural_valid = (
+            pivot_support is not None
+            and math.isfinite(pivot_support)
+            and pivot_support > 0
+            and pivot_support < price
+        )
+        if structural_valid:
+            stop = pivot_support
+            geometry_path = GEOMETRY_PATH_STRUCTURAL_PRIMARY
+            fallback_reason = None
+            structural_level = pivot_support
+            structural_level_type = "prior_session_S1_pivot"
+        else:
+            stop = price - atr_risk
+            geometry_path = GEOMETRY_PATH_ATR_FALLBACK
+            structural_level = None
+            structural_level_type = None
+            if pivot_support is None:
+                fallback_reason = FALLBACK_REASON_NO_STRUCTURAL_SUPPORT
+            elif not math.isfinite(pivot_support) or pivot_support <= 0:
+                fallback_reason = FALLBACK_REASON_STRUCTURE_INVALID_OR_NONFINITE
+            else:
+                fallback_reason = FALLBACK_REASON_STRUCTURE_NOT_BELOW_ENTRY
+
+        risk = price - stop
+        if risk <= 0:
+            return None  # defensive -- unreachable given the checks above, never propagate invalid geometry
+
         if pivot_resistance is not None and pivot_resistance > price:
             target = pivot_resistance
             reward = target - price
@@ -254,7 +332,12 @@ def calculate_trade_geometry(
             target = price + config.atr_reward_multiplier * atr
             reward = None
     else:
-        stop = price + risk
+        stop = price + atr_risk
+        risk = atr_risk
+        geometry_path = GEOMETRY_PATH_ATR_FALLBACK
+        fallback_reason = None
+        structural_level = None
+        structural_level_type = None
         if pivot_support is not None and pivot_support < price:
             target = pivot_support
             reward = price - target
@@ -266,6 +349,8 @@ def calculate_trade_geometry(
     return TradeGeometry(
         stop_price=stop, target_price=target, risk=risk,
         reward=reward, risk_reward_ratio=risk_reward_ratio,
+        geometry_path=geometry_path, fallback_reason=fallback_reason,
+        structural_level=structural_level, structural_level_type=structural_level_type,
     )
 
 
@@ -455,8 +540,16 @@ def _build_signal(
     ctx: _SignalContext,
 ) -> QuantSignal:
     confluence_score = _confluence_score(s, config, ctx.volume_threshold, direction)
-    risk_reward_ratio = _structural_risk_reward(s, direction, ctx.pivots, config)
-    stop_price, target_price = _stop_target_prices(s.price, s.atr, direction, config, ctx.pivots)
+    pivot_resistance = None if ctx.pivots is None else ctx.pivots.resistance
+    pivot_support = None if ctx.pivots is None else ctx.pivots.support
+    # Task 35: a single calculate_trade_geometry call (was two separate
+    # wrapper calls computing the identical geometry twice) -- also the
+    # only place geometry_path/fallback_reason/structural_level need to be
+    # read out, so one call now serves both the existing stop/target/R:R
+    # fields and the new observability fields without duplicating the
+    # underlying calculation. _structural_risk_reward/_stop_target_prices
+    # remain unchanged for their own direct unit tests.
+    geometry = calculate_trade_geometry(s.price, s.atr, direction, pivot_resistance, pivot_support, config)
     return QuantSignal(
         ticker=ticker.upper(),
         signal_type=signal_type,
@@ -472,13 +565,17 @@ def _build_signal(
         volume_surge_ratio=s.volume_surge_ratio,
         atr=s.atr,
         confluence_score=confluence_score,
-        risk_reward_ratio=risk_reward_ratio,
-        stop_price=stop_price,
-        target_price=target_price,
+        risk_reward_ratio=None if geometry is None else geometry.risk_reward_ratio,
+        stop_price=None if geometry is None else geometry.stop_price,
+        target_price=None if geometry is None else geometry.target_price,
+        geometry_path=None if geometry is None else geometry.geometry_path,
+        fallback_reason=None if geometry is None else geometry.fallback_reason,
+        structural_level=None if geometry is None else geometry.structural_level,
+        structural_level_type=None if geometry is None else geometry.structural_level_type,
         trend_aligned=_trend_aligned(s.price, direction, ctx.session, ctx.htf_sma_200, config),
         htf_sma_200=ctx.htf_sma_200,
-        pivot_resistance=None if ctx.pivots is None else ctx.pivots.resistance,
-        pivot_support=None if ctx.pivots is None else ctx.pivots.support,
+        pivot_resistance=pivot_resistance,
+        pivot_support=pivot_support,
         session=ctx.session,
         bar_timestamp=s.bar_timestamp,
     )

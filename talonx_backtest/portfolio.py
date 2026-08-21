@@ -87,6 +87,17 @@ class Trade:
     exit_signal_type: str | None = None
     exit_signal_direction: str | None = None
 
+    # Task 35 (owner-confirmed ATR-RISK-001: MARKET_STRUCTURE_PRIMARY) --
+    # which stop path this trade actually opened with, at fill time (after
+    # _finalize_fill_geometry's reconciliation, the final, definitive
+    # selection -- see execution.py's _close). Mirrors QuantSignal's own
+    # fields of the same name; see strategy.py's calculate_trade_geometry
+    # for what each value means.
+    geometry_path: str | None = None
+    fallback_reason: str | None = None
+    structural_level: float | None = None
+    structural_level_type: str | None = None
+
     def to_dict(self) -> dict:
         d = dict(self.__dict__)
         for key in ("signal_timestamp", "entry_timestamp", "exit_timestamp"):

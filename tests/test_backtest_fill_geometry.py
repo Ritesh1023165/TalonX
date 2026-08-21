@@ -95,16 +95,41 @@ def test_long_gap_through_stop_recomputes_geometry_anchored_to_fill(engine):
     # Revalidated at price=100 (stop=98.5), but the ACTUAL fill gapped down
     # to 98.0 -- BELOW the revalidated stop -- exactly the Task 13 defect
     # pattern (a real PYPL case: stop 69.6173 > fill 69.37 for a bullish trade).
+    # pivot_support(99.0) is deliberately >= the fill price(98.0) -- Task 35's
+    # structural stop is invalid AT THE FILL (even though it would have
+    # been valid at the original screening price of 100), so this test
+    # continues to exercise the ATR-fallback recompute path (Task 13's own
+    # concern); see test_long_gap_through_stop_recomputes_to_structural_
+    # anchor_when_valid_at_fill below for the structural-recompute case.
     signal = _signal(SignalDirection.BULLISH, price=100.0, stop_price=98.5, target_price=110.0,
-                      pivot_resistance=110.0, pivot_support=90.0, atr=1.0)
+                      pivot_resistance=110.0, pivot_support=99.0, atr=1.0)
     result = engine._finalize_fill_geometry(signal, fill_price=98.0, now=_NOW)
 
     assert result is not None
     # New stop anchored to the REAL fill: 98.0 - 1.5*1.0 = 96.5
     assert result.stop_price == pytest.approx(96.5)
+    assert result.geometry_path == "ATR_FALLBACK"
     # Target still the pivot (110.0 > fill, still structurally valid)
     assert result.target_price == pytest.approx(110.0)
     # Required invariant holds by construction:
+    assert result.stop_price < 98.0 < result.target_price
+    assert engine.rejections == []
+
+
+def test_long_gap_through_stop_recomputes_to_structural_anchor_when_valid_at_fill(engine):
+    """Task 35 sibling of the test above: when a valid structural support
+    DOES exist below the real fill, the fill-time recompute must select
+    it (not the ATR fallback) -- proving _finalize_fill_geometry's shared
+    calculate_trade_geometry call correctly re-applies the full Task 35
+    contract, not just the pre-Task-35 ATR-only formula."""
+    signal = _signal(SignalDirection.BULLISH, price=100.0, stop_price=98.5, target_price=110.0,
+                      pivot_resistance=110.0, pivot_support=90.0, atr=1.0)
+    result = engine._finalize_fill_geometry(signal, fill_price=98.0, now=_NOW)
+
+    assert result is not None
+    assert result.stop_price == pytest.approx(90.0)  # structural, not 98.0 - 1.5*1.0 = 96.5
+    assert result.geometry_path == "STRUCTURAL_PRIMARY"
+    assert result.target_price == pytest.approx(110.0)
     assert result.stop_price < 98.0 < result.target_price
     assert engine.rejections == []
 
@@ -180,8 +205,12 @@ def test_no_stop_exit_can_become_plus_one_r_from_a_wrong_side_stop(engine):
     net_R<=0), or be rejected outright."""
     import pandas as pd
 
+    # pivot_support(99.0) deliberately >= the fill price(98.0) -- see the
+    # note in test_long_gap_through_stop_recomputes_geometry_anchored_to_fill;
+    # keeps this test on the ATR-fallback recompute path it was designed
+    # around (Task 13's defect), isolated from Task 35's structural path.
     signal = _signal(SignalDirection.BULLISH, price=100.0, stop_price=98.5, target_price=110.0,
-                      pivot_resistance=110.0, pivot_support=90.0, atr=1.0)
+                      pivot_resistance=110.0, pivot_support=99.0, atr=1.0)
     engine._pending_entry["AAPL"] = _PendingEntry(signal=signal, opportunity_score=0.5)
 
     # Fill bar: opens at 98.0 (gapped through the stale stop), then

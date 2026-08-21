@@ -1819,6 +1819,16 @@ class QuantScanner:
             "target_price": geometry.target_price,
             "risk_reward_ratio": geometry.risk_reward_ratio,
             "signal_age_ms": signal_age_ms,
+            # Task 35: the geometry re-derived above may have picked a
+            # DIFFERENT path than the one recorded at signal generation
+            # (e.g. price drifted through the structural level between
+            # generation and this final pre-publish revalidation) -- these
+            # must move together with stop_price/target_price/ratio, same
+            # reasoning as the rest of this update dict.
+            "geometry_path": geometry.geometry_path,
+            "fallback_reason": geometry.fallback_reason,
+            "structural_level": geometry.structural_level,
+            "structural_level_type": geometry.structural_level_type,
         })
 
     async def _flush_throttle_window(self) -> None:

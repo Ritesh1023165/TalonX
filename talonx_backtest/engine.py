@@ -255,6 +255,14 @@ class BacktestEngine:
         self.signals_generated = 0
         self.signals_published = 0
         self.bars_processed = 0
+        # Task 35 fallback accounting -- counts the geometry_path actually
+        # used at OPEN time (after fill-time reconciliation, the final,
+        # definitive selection -- see _process_symbol_bar's pending-entry
+        # branch), keyed by geometry_path, plus a fallback_reason
+        # breakdown for the ATR_FALLBACK count. Descriptive counters only,
+        # not a gate or a tuning metric.
+        self.geometry_path_counts: dict[str, int] = {}
+        self.fallback_reason_counts: dict[str, int] = {}
         self._last_close: dict[str, float] = {}
         self._last_timestamp: dict[str, pd.Timestamp] = {}
 
@@ -374,6 +382,17 @@ class BacktestEngine:
                 fill_price = float(row["open"])
                 fill_signal = self._finalize_fill_geometry(pending.signal, fill_price, timestamp)
                 if fill_signal is not None:
+                    # Task 35 fallback accounting -- the geometry actually
+                    # opened with, after fill-time reconciliation (the
+                    # final, definitive selection for this trade).
+                    if fill_signal.direction == SignalDirection.BULLISH and fill_signal.geometry_path:
+                        self.geometry_path_counts[fill_signal.geometry_path] = (
+                            self.geometry_path_counts.get(fill_signal.geometry_path, 0) + 1
+                        )
+                        if fill_signal.fallback_reason:
+                            self.fallback_reason_counts[fill_signal.fallback_reason] = (
+                                self.fallback_reason_counts.get(fill_signal.fallback_reason, 0) + 1
+                            )
                     self.simulator.open_position(
                         fill_signal, timestamp, fill_price,
                         opportunity_score=pending.opportunity_score,
@@ -647,6 +666,12 @@ class BacktestEngine:
             "target_price": geometry.target_price,
             "risk_reward_ratio": geometry.risk_reward_ratio,
             "signal_age_ms": age_seconds * 1000.0,
+            # Task 35: keep geometry_path/fallback_reason/structural_level
+            # in lockstep with the stop/target/ratio re-derived above.
+            "geometry_path": geometry.geometry_path,
+            "fallback_reason": geometry.fallback_reason,
+            "structural_level": geometry.structural_level,
+            "structural_level_type": geometry.structural_level_type,
         })
 
     def _finalize_fill_geometry(self, signal: QuantSignal, fill_price: float, now: pd.Timestamp) -> QuantSignal | None:
@@ -703,7 +728,17 @@ class BacktestEngine:
         if geometry is None or geometry.risk_reward_ratio is None or geometry.risk_reward_ratio < qc.min_risk_reward_ratio:
             self._reject(signal.ticker.upper(), "GEOMETRY_INVALIDATED_AT_FILL", 1, now)
             return None
-        return signal.model_copy(update={"stop_price": geometry.stop_price, "target_price": geometry.target_price})
+        return signal.model_copy(update={
+            "stop_price": geometry.stop_price, "target_price": geometry.target_price,
+            # Task 35: this recompute path is the ACTUAL fill-anchored
+            # geometry -- must overwrite the screening-time geometry_path/
+            # fallback_reason too, since re-anchoring to the real fill
+            # price can select a different path than screening did (e.g.
+            # a gap that puts price below where structure was valid at
+            # screening now makes it invalid, or vice versa).
+            "geometry_path": geometry.geometry_path, "fallback_reason": geometry.fallback_reason,
+            "structural_level": geometry.structural_level, "structural_level_type": geometry.structural_level_type,
+        })
 
     # ------------------------------------------------------------------
     # EOD flatten / data-end finalization

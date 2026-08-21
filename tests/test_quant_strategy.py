@@ -23,6 +23,7 @@ override these two fields.
 """
 from __future__ import annotations
 
+import math
 from datetime import datetime, timezone
 
 import pytest
@@ -30,7 +31,17 @@ import pytest
 from talonx_quant.config import QuantConfig
 from talonx_quant.indicators import DailyPivots, IndicatorSnapshot
 from talonx_quant.schemas import SignalDirection, SignalType
-from talonx_quant.strategy import _confluence_score, _structural_risk_reward, evaluate_signals
+from talonx_quant.strategy import (
+    FALLBACK_REASON_NO_STRUCTURAL_SUPPORT,
+    FALLBACK_REASON_STRUCTURE_INVALID_OR_NONFINITE,
+    FALLBACK_REASON_STRUCTURE_NOT_BELOW_ENTRY,
+    GEOMETRY_PATH_ATR_FALLBACK,
+    GEOMETRY_PATH_STRUCTURAL_PRIMARY,
+    _confluence_score,
+    _structural_risk_reward,
+    calculate_trade_geometry,
+    evaluate_signals,
+)
 
 
 def _snapshot(**overrides) -> IndicatorSnapshot:
@@ -470,9 +481,13 @@ def test_boundary_bearish_current_just_above_threshold_does_not_fire_curl(config
 # --- Structural R:R Calculation --------------------------------------------
 
 def test_structural_rr_uses_pivot_resistance_and_atr_stop_multiplier(config):
-    # reward = resistance(110) - price(100) = 10; risk = atr_stop_multiplier(1.5) * atr(2) = 3
+    # reward = resistance(110) - price(100) = 10; risk = atr_stop_multiplier(1.5) * atr(2) = 3.
+    # support(105) is deliberately >= price(100) -- invalid as a structural
+    # stop anchor (Task 35), so this specifically exercises the ATR-
+    # fallback stop path; see the "Structural Stop Geometry" section below
+    # for the STRUCTURAL_PRIMARY case.
     snap = _snapshot(price=100.0, atr=2.0)
-    pivots = _pivots(resistance=110.0, support=90.0)
+    pivots = _pivots(resistance=110.0, support=105.0)
 
     ratio = _structural_risk_reward(snap, SignalDirection.BULLISH, pivots, config)
 
@@ -521,6 +536,10 @@ def test_structural_rr_varies_with_pivot_distance_not_a_constant(config):
 
 
 def test_signal_carries_structural_risk_reward_and_pivots(config):
+    # Task 35: support(90) < price(100) is now a VALID structural stop
+    # anchor -- risk = price(100) - support(90) = 10, not the ATR risk(3)
+    # this test asserted pre-Task-35. reward is unchanged (resistance(110)
+    # - price(100) = 10), so ratio is now 10/10 = 1.0.
     snap = _snapshot(rsi=32.0, rsi_prev=28.0, volume_surge_ratio=3.0, atr=2.0, bar_true_range=2.0, price=100.0)
     pivots = _pivots(resistance=110.0, support=90.0)
 
@@ -528,9 +547,11 @@ def test_signal_carries_structural_risk_reward_and_pivots(config):
 
     assert len(signals) == 1
     assert signals[0].atr == 2.0
-    assert signals[0].risk_reward_ratio == pytest.approx(10.0 / 3.0)
+    assert signals[0].risk_reward_ratio == pytest.approx(10.0 / 10.0)
     assert signals[0].pivot_resistance == pytest.approx(110.0)
     assert signals[0].pivot_support == pytest.approx(90.0)
+    assert signals[0].stop_price == pytest.approx(90.0)
+    assert signals[0].geometry_path == "STRUCTURAL_PRIMARY"
 
 
 def test_signal_risk_reward_is_none_without_pivots(config):
@@ -553,9 +574,15 @@ def test_gated_risk_reward_matches_the_actually_executed_stop_distance(config):
     separate atr_stop_multiplier (1.0x ATR): a $6 pivot target against a
     $2 ATR gated at R:R=2.0 (6 / (1.5*2)=3) but would have EXECUTED at
     R:R=3.0 (6 / (1.0*2)=2) -- passing the >=1.5 gate on a materially
-    different number than the trade actually risked."""
+    different number than the trade actually risked.
+
+    support(101) is deliberately >= price(100), invalid as a Task 35
+    structural stop anchor, so this specifically exercises the ATR-
+    fallback stop path -- see
+    test_gated_risk_reward_matches_the_actually_executed_stop_distance_under_structural_stop
+    below for the same invariant proven under STRUCTURAL_PRIMARY."""
     snap = _snapshot(rsi=32.0, rsi_prev=28.0, volume_surge_ratio=3.0, atr=2.0, bar_true_range=2.0, price=100.0)
-    pivots = _pivots(resistance=106.0, support=90.0)
+    pivots = _pivots(resistance=106.0, support=101.0)
 
     signals = evaluate_signals("AAPL", snap, config, daily_pivots=pivots)
 
@@ -572,8 +599,11 @@ def test_gated_risk_reward_matches_the_actually_executed_stop_distance(config):
 # --- Explicit $ stop/target -------------------------------------------------
 
 def test_bullish_signal_target_uses_pivot_resistance_when_available(config):
+    # support(101) is deliberately >= price(100), invalid as a Task 35
+    # structural stop anchor, isolating this test's own focus (target
+    # selection) from the stop-selection behavior covered separately below.
     snap = _snapshot(rsi=32.0, rsi_prev=28.0, volume_surge_ratio=3.0, price=100.0, atr=2.0, bar_true_range=2.0)
-    pivots = _pivots(resistance=108.0, support=90.0)
+    pivots = _pivots(resistance=108.0, support=101.0)
 
     signals = evaluate_signals("AAPL", snap, config, daily_pivots=pivots)
 
@@ -613,6 +643,215 @@ def test_bearish_signal_falls_back_to_atr_target_without_pivots(config):
     assert len(signals) == 1
     assert signals[0].stop_price == pytest.approx(103.0)
     assert signals[0].target_price == pytest.approx(96.0)
+
+
+# --- Structural Stop Geometry (Task 35: owner-confirmed ATR-RISK-001,
+# MARKET_STRUCTURE_PRIMARY) --------------------------------------------
+#
+# Requirement-proving, not merely implementation-locking: LONG stop
+# geometry must primarily reflect market-structure invalidation (the
+# existing, causal prior-session S1 pivot support), falling back to the
+# unmodified 1.5x-ATR formula ONLY when no valid structural anchor
+# exists. Task 34 proved the PRIOR (ATR-only, unconditional) behavior was
+# systematically misaligned with this now-confirmed contract; these tests
+# lock the corrected behavior in directly against calculate_trade_geometry,
+# with no dependency on any results/ artifact at runtime. No structural
+# buffer is applied -- Task 34 found no existing repository requirement
+# defines one (see docs/modules/quant.md's STRUCTURAL_BUFFER_REQUIREMENT_
+# NOT_DEFINED note); pivot_support is used LITERALLY as the stop.
+
+def test_geometry_case_a_valid_structure_below_entry_is_used_as_the_stop(config):
+    # entry=100, pivot_support=95 (valid, < entry) -- ATR fallback would
+    # have been 100 - 1.5*2 = 97, but structure takes priority.
+    geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=None, pivot_support=95.0, config=config,
+    )
+
+    assert geometry is not None
+    assert geometry.stop_price == pytest.approx(95.0)
+    assert geometry.geometry_path == GEOMETRY_PATH_STRUCTURAL_PRIMARY
+    assert geometry.fallback_reason is None
+    assert geometry.structural_level == pytest.approx(95.0)
+    assert geometry.structural_level_type == "prior_session_S1_pivot"
+
+
+def test_geometry_case_b_no_structure_falls_back_to_atr_with_explicit_reason(config):
+    geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=None, pivot_support=None, config=config,
+    )
+
+    assert geometry is not None
+    assert geometry.stop_price == pytest.approx(97.0)  # 100 - 1.5*2, unmodified ATR fallback formula
+    assert geometry.geometry_path == GEOMETRY_PATH_ATR_FALLBACK
+    assert geometry.fallback_reason == FALLBACK_REASON_NO_STRUCTURAL_SUPPORT
+    assert geometry.structural_level is None
+    assert geometry.structural_level_type is None
+
+
+def test_geometry_case_c_structure_above_entry_is_rejected_not_used(config):
+    # pivot_support(101) > entry(100) -- on the wrong side, must NOT be
+    # used as a long stop (a stop above entry is nonsensical for a long).
+    geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=None, pivot_support=101.0, config=config,
+    )
+
+    assert geometry is not None
+    assert geometry.stop_price == pytest.approx(97.0)  # ATR fallback, unmodified formula
+    assert geometry.geometry_path == GEOMETRY_PATH_ATR_FALLBACK
+    assert geometry.fallback_reason == FALLBACK_REASON_STRUCTURE_NOT_BELOW_ENTRY
+
+
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), float("-inf")])
+def test_geometry_case_d_non_finite_structure_never_propagates_invalid_geometry(config, bad_value):
+    geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=None, pivot_support=bad_value, config=config,
+    )
+
+    assert geometry is not None
+    assert math.isfinite(geometry.stop_price)  # never NaN/Inf, regardless of the bad input
+    assert geometry.stop_price == pytest.approx(97.0)  # ATR fallback, unmodified formula
+    assert geometry.geometry_path == GEOMETRY_PATH_ATR_FALLBACK
+    assert geometry.fallback_reason == FALLBACK_REASON_STRUCTURE_INVALID_OR_NONFINITE
+
+
+def test_geometry_case_e_structure_exactly_equal_to_entry_is_invalid(config):
+    # A stop AT entry would be a zero-risk trade -- must be rejected, not
+    # silently accepted as "technically below or equal."
+    geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=None, pivot_support=100.0, config=config,
+    )
+
+    assert geometry is not None
+    assert geometry.stop_price == pytest.approx(97.0)  # ATR fallback, not a zero-risk stop at entry
+    assert geometry.geometry_path == GEOMETRY_PATH_ATR_FALLBACK
+    assert geometry.fallback_reason == FALLBACK_REASON_STRUCTURE_NOT_BELOW_ENTRY
+    assert geometry.risk > 0
+
+
+def test_geometry_case_f_structure_far_below_entry_is_used_literally_not_clamped(config):
+    # A structural level far away (large risk) must still be used AS-IS --
+    # this task does not add a buffer or a "too far, fall back to ATR"
+    # rule. The downstream R:R gate, not this function, is what may
+    # eventually reject a candidate whose risk is this large.
+    geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=None, pivot_support=50.0, config=config,
+    )
+
+    assert geometry is not None
+    assert geometry.stop_price == pytest.approx(50.0)  # used literally, not clamped toward the ATR(97) stop
+    assert geometry.geometry_path == GEOMETRY_PATH_STRUCTURAL_PRIMARY
+    assert geometry.risk == pytest.approx(50.0)  # 100 - 50, far larger than the ATR risk (3) would have been
+
+
+def test_geometry_bearish_direction_is_unchanged_by_task_35(config):
+    # The owner's MARKET_STRUCTURE_PRIMARY contract is scoped to LONG
+    # trades only -- BEARISH must remain exactly the pre-Task-35 ATR-only
+    # formula, unconditionally, even when a valid-looking pivot_support
+    # sits below price (which would be irrelevant for a bearish stop
+    # anyway -- bearish uses pivot_support only for its TARGET, unchanged).
+    geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BEARISH,
+        pivot_resistance=None, pivot_support=95.0, config=config,
+    )
+
+    assert geometry is not None
+    assert geometry.stop_price == pytest.approx(103.0)  # 100 + 1.5*2, unchanged formula
+    assert geometry.geometry_path == GEOMETRY_PATH_ATR_FALLBACK
+    assert geometry.fallback_reason is None  # bearish never "attempts" structural, so never "falls back" either
+    assert geometry.structural_level is None
+
+
+# --- R:R recalculation under the selected stop path (Task 35 §18-19) ------
+
+def test_rr_uses_structural_risk_not_atr_risk_when_structural_stop_selected(config):
+    # Same entry/target/ATR in both cases; only the stop source differs.
+    atr_geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=110.0, pivot_support=101.0, config=config,  # support invalid -> ATR fallback
+    )
+    structural_geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=110.0, pivot_support=95.0, config=config,  # support valid -> structural
+    )
+
+    assert atr_geometry.stop_price == pytest.approx(97.0)
+    assert atr_geometry.risk == pytest.approx(3.0)  # 1.5 * 2.0
+    assert atr_geometry.risk_reward_ratio == pytest.approx(10.0 / 3.0)
+
+    assert structural_geometry.stop_price == pytest.approx(95.0)
+    assert structural_geometry.risk == pytest.approx(5.0)  # 100 - 95, NOT the ATR risk
+    assert structural_geometry.risk_reward_ratio == pytest.approx(10.0 / 5.0)
+
+    # Same target/reward in both cases; the structural stop's wider risk
+    # produces a strictly LOWER R:R here -- proving the engine uses the
+    # ACTUAL selected geometry, not a stale ATR-only figure.
+    assert structural_geometry.risk_reward_ratio < atr_geometry.risk_reward_ratio
+
+
+def test_gated_risk_reward_matches_the_actually_executed_stop_distance_under_structural_stop(config):
+    # Sibling of test_gated_risk_reward_matches_the_actually_executed_stop_distance
+    # above, proving the SAME invariant (the R:R gate's implied risk
+    # distance must equal price - stop_price exactly) holds when the
+    # selected stop is STRUCTURAL, not just under the ATR-fallback path.
+    snap = _snapshot(rsi=32.0, rsi_prev=28.0, volume_surge_ratio=3.0, atr=2.0, bar_true_range=2.0, price=100.0)
+    pivots = _pivots(resistance=106.0, support=90.0)  # support valid -> STRUCTURAL_PRIMARY
+
+    signals = evaluate_signals("AAPL", snap, config, daily_pivots=pivots)
+
+    assert len(signals) == 1
+    signal = signals[0]
+    assert signal.geometry_path == GEOMETRY_PATH_STRUCTURAL_PRIMARY
+    executed_risk_distance = signal.price - signal.stop_price
+    assert executed_risk_distance == pytest.approx(10.0)  # 100 - 90, NOT the ATR risk (3)
+    reward_distance = signal.pivot_resistance - signal.price
+    assert signal.risk_reward_ratio == pytest.approx(reward_distance / executed_risk_distance)
+
+
+def test_rr_rejection_case_correct_geometry_fails_where_old_atr_geometry_would_have_passed(config):
+    """Task 35 §19 -- essential correctness-not-tuning proof: a candidate
+    whose OLD (ATR-only, pre-Task-35) geometry would have cleared
+    min_risk_reward_ratio(1.5), but whose CORRECTED (structural) geometry
+    does not, must actually be rejected end-to-end at evaluate_signals's
+    own output (via a fails-below-threshold risk_reward_ratio, which
+    consumer.py/backtest's LOW_RISK_REWARD gate then drops) -- proving
+    this implementation is not quietly preserving the old candidate/
+    signal count."""
+    price, atr = 100.0, 2.0
+    # OLD (pre-Task-35) geometry: risk = 1.5*2 = 3, reward = target(107)-100 = 7 -> R:R = 7/3 = 2.33 (PASSES 1.5)
+    old_atr_only_geometry = calculate_trade_geometry(
+        price=price, atr=atr, direction=SignalDirection.BULLISH,
+        pivot_resistance=107.0, pivot_support=101.0, config=config,  # support invalid at old-geometry time (unused)
+    )
+    assert old_atr_only_geometry.risk_reward_ratio == pytest.approx(7.0 / 3.0)
+    assert old_atr_only_geometry.risk_reward_ratio >= config.min_risk_reward_ratio
+
+    # CORRECTED (Task 35) geometry: same entry/target/ATR, but a valid
+    # structural support sits far below entry -- risk = 100-80 = 20,
+    # reward is still 7 -> R:R = 7/20 = 0.35 (FAILS 1.5).
+    corrected_geometry = calculate_trade_geometry(
+        price=price, atr=atr, direction=SignalDirection.BULLISH,
+        pivot_resistance=107.0, pivot_support=80.0, config=config,
+    )
+    assert corrected_geometry.geometry_path == GEOMETRY_PATH_STRUCTURAL_PRIMARY
+    assert corrected_geometry.risk_reward_ratio == pytest.approx(7.0 / 20.0)
+    assert corrected_geometry.risk_reward_ratio < config.min_risk_reward_ratio
+
+    # End-to-end: evaluate_signals must publish the LOWER, correct ratio
+    # on the signal object -- the actual gate rejection based on
+    # min_risk_reward_ratio happens downstream (consumer.py/backtest), but
+    # this is the exact number that gate reads.
+    snap = _snapshot(rsi=32.0, rsi_prev=28.0, volume_surge_ratio=3.0, atr=atr, bar_true_range=2.0, price=price)
+    pivots = _pivots(resistance=107.0, support=80.0)
+    signals = evaluate_signals("AAPL", snap, config, daily_pivots=pivots)
+    assert len(signals) == 1
+    assert signals[0].risk_reward_ratio == pytest.approx(7.0 / 20.0)
+    assert signals[0].risk_reward_ratio < config.min_risk_reward_ratio
 
 
 def test_stop_and_target_are_none_when_atr_missing(config):

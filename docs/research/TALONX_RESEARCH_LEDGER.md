@@ -3719,3 +3719,116 @@ schema; no economic comparison within that implementation task.
 measurement artifacts and this ledger entry — **not committed, not pushed**, per instruction. No production
 strategy changes. PR #10 remains draft. All 20 required artifacts written to
 `results/task34_structural_stop_geometry/`.
+
+---
+
+## Task 35 — Deterministic Market-Structure-Primary Stop Implementation (2026-08-21)
+
+**Objective**: implement the smallest deterministic correction needed to make LONG stop geometry conform to
+the owner-confirmed `MARKET_STRUCTURE_PRIMARY` contract (ATR-RISK-001). Correctness/spec-alignment, not
+optimization — no rule chosen from historical outcomes, no economic evaluation performed. **The first task
+in this entire research track to modify production strategy code.**
+
+**Task 34 checkpoint**: reviewed the Task 34 diff (ledger entry only, no production code; final decision
+confirmed `CURRENT_ATR_STOPS_SYSTEMATICALLY_MISALIGNED_WITH_STRUCTURE`, all 20 artifacts present), staged
+individually, committed as **`6133672c2e15a2c89a7dd27ebc3e9f0fea46d5bc`**
+(`docs(research): record structural stop geometry audit`), pushed to `research/talonx-strategy-validation`.
+PR #10 confirmed draft/open.
+
+**Integrity**: HEAD `6133672c2e15a2c89a7dd27ebc3e9f0fea46d5bc` before any code change. Task26 dataset hash
+`5e5412a960bf`, QuantConfig hash `9174f5232c20` — unchanged. Strategy fingerprint before:
+`88529b8a3fa1`; after: `acd08feb59a7` (an expected consequence of a real `strategy.py` change, not itself
+economically significant). Pre-modification SHA-256 hashes recorded for all touched files
+(`talonx_quant/strategy.py`, `schemas.py`, `consumer.py`; `talonx_backtest/engine.py`, `execution.py`,
+`portfolio.py`; `talonx_paper/schemas.py`).
+
+**Old stop behavior**: `stop = price - 1.5 x ATR(14, 1-minute)`, unconditional, for every BULLISH candidate —
+no structural input, ever (Task 34's finding).
+
+**New stop behavior**: `calculate_trade_geometry` (`talonx_quant/strategy.py`) now selects, for BULLISH
+candidates only, the prior-session S1 pivot support (the existing, causal, unmodified
+`compute_daily_pivots`) as the stop LITERALLY — no buffer subtracted (Task 34 found none defined;
+`STRUCTURAL_BUFFER_REQUIREMENT_NOT_DEFINED`, not invented here) — whenever it is finite, positive, and
+strictly below price. Otherwise falls back to the unmodified `1.5x ATR` formula with an explicit
+`fallback_reason` (`NO_STRUCTURAL_SUPPORT` / `STRUCTURE_INVALID_OR_NONFINITE` / `STRUCTURE_NOT_BELOW_ENTRY`).
+`risk` is always `price - (the actual selected stop)`, so `risk_reward_ratio` always reflects real geometry.
+BEARISH direction, target selection, `atr_move_multiplier` (trigger movement), and `min_atr_pct` (regime) are
+all byte-for-byte unchanged.
+
+**Structural source**: unchanged from Task 34 — classic floor-trader prior-session S1 pivot
+(`compute_daily_pivots`), no new indicator. **Causal validity rule**: `pivot_support is not None AND
+math.isfinite(pivot_support) AND pivot_support > 0 AND pivot_support < price`, re-evaluated fresh at every
+geometry computation (screening, throttle-flush revalidation, actual fill) — never cached from an earlier
+decision. **ATR fallback rule**: unmodified `1.5x ATR` formula, fires only when the validity rule fails,
+three mutually-exclusive, explicit reasons recorded.
+
+**R:R recalculation**: `risk` now derives from whichever stop was actually selected, not a stale ATR-only
+figure — proven with an explicit rejection case
+(`test_rr_rejection_case_correct_geometry_fails_where_old_atr_geometry_would_have_passed`): a candidate
+whose OLD geometry would have cleared `min_risk_reward_ratio=1.5` (R:R=2.33) now correctly fails (R:R=0.35)
+once its risk is measured against the real, wider structural stop — the implementation does not preserve the
+old candidate/signal count artificially.
+
+**Fill reconciliation**: `talonx_backtest.engine._finalize_fill_geometry` (Task 13's fill-anchored recompute)
+and `talonx_quant.consumer._revalidate_candidate` both re-invoke the shared `calculate_trade_geometry`
+against the current price at that moment, so the selected path can legitimately change between screening and
+fill (5 cases proven: structure survives revalidation; price drifts through structure, falls back cleanly;
+backtest fill-gap preserves the ATR path when structure is invalid at the real fill; backtest fill-gap
+correctly selects structure when valid at the real fill; the Task 13 "no artificially favorable STOP
+mislabel" invariant holds under the new code path too).
+
+**Live/paper/backtest parity**: every path a trade can be represented on was traced and updated
+consistently — signal generation, live pre-publish revalidation, backtest throttle-flush revalidation,
+backtest fill-time reconciliation, and the canonical `Trade` record all carry the four new fields
+(`geometry_path`, `fallback_reason`, `structural_level`, `structural_level_type`) in lockstep, via one
+shared `calculate_trade_geometry` call everywhere — zero formula duplication. `talonx_paper`'s
+`fill_geometry_is_valid` confirmed unchanged BY TRACING (not assumed): it validates `stop_price <
+fill_price < target_price` generically, with no dependency on how `stop_price` was derived, so it already
+works correctly for a structural stop with zero code change. `talonx_paper.TriggeringSignalRef` (wire
+schema) extended with the four new fields, mirroring its own existing `stop_price`/`target_price` pattern —
+the data was already on the wire (`talonx_core.ActionableAlert.triggering_signal: QuantSignal`, unchanged)
+and only needed unlocking on the reduced consumer-side schema.
+
+**Observability/schema changes**: `QuantSignal`, `Trade` (`talonx_backtest.portfolio`), and
+`TriggeringSignalRef` (`talonx_paper.schemas`) all gained the four new fields, closing exactly the gap
+Task 33/34 identified (pivot data previously dropped between signal generation and the trade record). Two
+deliberate, documented scope boundaries, neither affecting correctness: `talonx_paper`'s SQLite
+`trade_history` persistence and `talonx_dispatch`'s Telegram/audit-trail formatting were NOT extended (see
+`results/task35_structural_stop_implementation/schema_observability_changes.md`).
+
+**Tests**: 15 new tests (10 in `test_quant_strategy.py` — geometry cases A-F plus bearish-unaffected, 2 R:R
+invariant tests, 1 rejection proof; 2 in `test_quant_consumer.py`; 2 in
+`test_backtest_fill_geometry.py`/lifecycle files) plus 12 existing tests' shared fixtures adjusted (with
+inline comments explaining why) to isolate their original, still-valid purpose from the new structural-stop
+behavior — zero test weakened or deleted. Focused suite: **478 passed, 1 skipped, 15 xfailed (pre-existing,
+unrelated), 0 failed.** Full-repository suite: **1724 passed, 1 skipped, 15 xfailed, 3 failed** — all 3
+failures independently verified pre-existing and unrelated to Task 35 (one is the exact same already-known
+Task 25A LONG_ONLY-lifecycle demo-CSV issue `test_backtest_sample_data.py` already xfails, re-confirmed by
+running the identical CSV through the identical already-xfailed code path; two are `talonx_ingest`
+yfinance-polling tests, a module untouched anywhere in this diff). Determinism proven directly on the core
+geometry function (two independent runs, identical SHA-256, zero mismatches).
+
+**No tuning**: no threshold named in the governing instruction's do-not-change list was touched — confirmed
+directly by the diff. No `structural_stop_enabled` config flag or any other toggle was introduced. **No
+P&L analysis**: no total R, expectancy, win rate, PF, max DD, or "did the strategy improve" claim appears
+anywhere in this task's artifacts.
+
+**What remains open**: the exact ATR-REGIME-001 (`min_atr_pct` multi-timeframe) implementation remains a
+separate, not-yet-started future task, unaffected by this change. `talonx_paper`'s SQLite persistence and
+`talonx_dispatch` formatting are documented, deliberate scope boundaries for a future task if paper-side
+historical audit or Telegram surfacing of geometry path is wanted. A new canonical baseline has NOT been
+established under the corrected geometry — Task 26's n=26 population is now based on the OLD, superseded
+stop formula and should not be treated as representing the corrected strategy's behavior going forward.
+
+**Final decision**: `STRUCTURAL_STOP_IMPLEMENTATION_VALIDATED` — implemented, tested, deterministic, fully
+traced for parity, zero regressions in scope, zero economic claims made.
+
+**Next recommended action (not started)**: Task 36 — Canonical Long-Only Baseline Re-establishment After
+Structural Stop Correction. Re-run the full Task 26 dataset with the corrected stop geometry: freeze
+implementation/config first, establish new dataset/config/code hashes, compare the resulting trade
+population carefully against Task 26's (treating any difference as a new canonical strategy version, not an
+error), run realistic cost sensitivity, do not tune parameters.
+
+**State**: Task 34 checkpoint committed and pushed (`6133672c2e15a2c89a7dd27ebc3e9f0fea46d5bc`). Task 35
+code/test/documentation changes and this ledger entry — **not committed, not pushed**, per instruction. PR
+#10 remains draft. All 14 required artifacts written to `results/task35_structural_stop_implementation/`.

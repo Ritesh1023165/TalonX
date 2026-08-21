@@ -38,7 +38,14 @@ def _signal(direction: SignalDirection, bar_timestamp: datetime) -> QuantSignal:
         volume_surge_ratio=5.0, trend_aligned=True,
         htf_sma_200=90.0 if direction == SignalDirection.BULLISH else None,
         stop_price=stop, target_price=target,
-        pivot_resistance=price + 10.0, pivot_support=price - 10.0,
+        # pivot_resistance widened to price+20 (was +10) -- pivot_support
+        # (price-10) is now also a valid Task 35 structural stop anchor
+        # for BULLISH candidates; the wider resistance keeps the
+        # resulting structural R:R (2.0) clearing min_risk_reward_ratio
+        # (1.5) at revalidation, same as the pre-Task-35 ATR-based R:R
+        # did -- this file is about live/backtest position-state parity,
+        # not R:R/geometry specifics.
+        pivot_resistance=price + 20.0, pivot_support=price - 10.0,
         session="regular", bar_timestamp=bar_timestamp, signal_generated_at=bar_timestamp,
     )
 

@@ -54,7 +54,15 @@ def _signal(
         # (never checked on) BEARISH.
         htf_sma_200=90.0 if direction == SignalDirection.BULLISH else None,
         stop_price=stop, target_price=target,
-        pivot_resistance=price + 10.0, pivot_support=price - 10.0,
+        # pivot_support(price-10) stays valid for BEARISH's target (this
+        # fixture is used for both directions) and is ALSO now a valid
+        # Task 35 structural stop anchor for BULLISH -- pivot_resistance
+        # is widened to price+20 (was +10) so the resulting structural
+        # R:R (reward 20 / risk 10 = 2.0) still clears min_risk_reward_
+        # ratio(1.5) at _revalidate time, same as the pre-Task-35 ATR-
+        # based R:R(6.67) did; this file is about long-only lifecycle
+        # state transitions, not R:R/geometry specifics.
+        pivot_resistance=price + 20.0, pivot_support=price - 10.0,
         session=session, bar_timestamp=bar_timestamp, signal_generated_at=bar_timestamp,
     )
 
