@@ -3161,3 +3161,126 @@ code/test/documentation changes (`talonx_quant/config.py`, `docs/modules/quant.m
 `tests/test_quant_strategy.py`, `tests/test_quant_consumer.py`) and this ledger entry — **not committed, not
 pushed**, per instruction. PR #10 remains draft. All 6 required artifacts written to
 `results/task29_rsi_contract_lock/`.
+
+---
+
+## Task 30 — Strategy Operating Objective & Selectivity Review (2026-08-21)
+
+**Objective**: stop asking "how do we get more trades" and instead answer "what is TalonX supposed to be as
+a product, and does current strategy behavior match that?" A product/research-design task — no parameter
+tuning, no new backtest, no threshold relaxation.
+
+**Task 29 checkpoint**: reviewed the Task 29 uncommitted diff (5 files: `talonx_quant/config.py`
+comments-only, `docs/modules/quant.md` docs-only, `tests/test_quant_strategy.py`,
+`tests/test_quant_consumer.py`, the ledger's Task 29 entry) — re-confirmed zero behavioral strategy code
+changes. Staged each file individually (not `git add -A`), committed as
+**`3c97d9d16b401ea207b57ddd25eae4eea037e552`** (`test(quant): lock state-based RSI confluence contract`),
+pushed to `research/talonx-strategy-validation`. PR #10 confirmed draft/open after push.
+
+**Task 30 integrity**: HEAD unchanged at `3c97d9d16b401ea207b57ddd25eae4eea037e552` throughout this task's
+own analysis. Task26 dataset hash `5e5412a960bf`, QuantConfig hash `9174f5232c20`, strategy fingerprint
+`88529b8a3fa1` — all untouched. No production strategy modification made.
+
+**Evidence reviewed**: README (current + initial-commit versions), all `docs/modules/*.md` and top-level
+docs, `docs/performance.md`'s full noise-filter history, full git history (origin commit, watchlist/
+conviction/alert/scanner commit-message greps), config comments, and the prior research ledger. Full table
+in `results/task30_operating_objective_review/objective_evidence.csv` (17 rows).
+
+**Key finding — no stated frequency target anywhere**: exhaustive search found zero instances of a developer
+or researcher ever writing down a target trade/signal frequency, at any point in this project's history. The
+system's ORIGINAL design (initial commit) was structurally loose (no ATR-move gate, no confluence score, no
+R:R filter); its natural, pre-filtering rate was observed at ~20 Telegram pushes/hour (commit `2b4e838`)
+before Smart Dispatch Filtering existed. Every major selectivity gate now in the stack was added reactively,
+fixing a specific named incident (alert chatter, a 0.33 profit-factor paper session, a 3-consecutive-SMCI-
+loss streak, a stop-out incident) — never implementing a pre-declared rarity target.
+
+**Intended operating model**: Model C (active trading) is clearly rejected — every documented decision moved
+away from it. Model A (rare high-conviction) matches CURRENT OBSERVED behavior closely but has no evidence
+of being the original DESIGN TARGET. Model B (regular opportunity scanner) is circumstantially favored by
+the intended 50+-symbol watchlist scale (commit `7b7d815`) and "scanner"/"opportunity" self-description, but
+doesn't match current measured output. Best fit: **Model D (hybrid)** — a system that started structurally
+like C, was reactively narrowed toward A's observed behavior, while never abandoning B's stated watchlist
+ambition; these three signals were never reconciled in any document. Full comparison in
+`operating_model_comparison.csv` and `current_vs_operating_models.csv`.
+
+**Frequency objective**: resolved from evidence — zero-signal days are acceptable and expected
+(`docs/modules/dispatch.md`'s explicit, named "mobile notification fatigue" concern, with no corresponding
+concern anywhere about inactivity). NOT resolved from evidence — the target signal/trade frequency itself,
+marked `OWNER_DECISION_REQUIRED`. Measured current output (descriptive, not a target): 26 trades/year (2.6/
+symbol-year), 85 published/year (8.5/symbol-year), ~9.9% of trading days produce at least one executed entry
+portfolio-wide, 5/10 historical-universe symbols produced zero trades all year, 0 published on the 35-symbol
+2026-08-20 live day. Full detail in `current_signal_frequency.csv` and `live_user_experience.md`.
+
+**Signal-family philosophy**: each family's own docs/naming describe it as a complete, standalone setup
+(RSI = reversal, MACD = momentum transition, MA = regime change), but the implementation functions as a
+cross-family confirmation network (MA needs 2 external legs with zero self-credit; RSI curl and MACD each
+need ~1 more, most of the time) — never reconciled in any document (`signal_family_roles.md`). Confluence's
+own product-level philosophy is undocumented; current behavior is closest to "trigger + one confirmation"
+for MACD/RSI-curl and closer to "no single-indicator alert" for MA — an unexplained cross-family
+inconsistency (`confluence_philosophy.md`).
+
+**Hard vs. soft gate findings**: 14 gates classified in `gate_policy_classification.csv`. Every quality/
+selectivity gate (ATR-move, min_atr_pct, MA spread, confluence, trend, R:R, loss lockout) is a hard pass/fail
+filter in its own documentation, despite most having reactive, incident-specific origins rather than being
+designed as universal invariants from the start. Only cooldown and the batch throttle are clearly
+`OPERATIONAL_GATE`/`RANKING_FACTOR`.
+
+**Opportunity Score role**: classified `POSSIBLE_OVER_FILTERING_DESIGN` (`opportunity_score_role.md`) —
+confluence (35% weight) and trend (15% weight), half the score's total weight, have their post-gate
+discriminating range severely compressed by the exact hard gates that already decided eligibility (confluence
+can only be 2 or 3 of its 0-3 range among survivors; trend can only be 0.5 or 1.0). R:R (30%) and volume
+(20%) retain full variance. An unexamined interaction between two independently-added mechanisms, not a
+documented two-stage design.
+
+**Watchlist role**: intended production scale is 50+ symbols (coverage-oriented), but the current
+implementation empirically behaves as "quality threshold dominates regardless of symbol count" (reusing
+Task 27's live-day-vs-history finding) — whether more symbols were meant to produce more opportunities was
+never validated against the gate stack's actual behavior (`watchlist_role.md`).
+
+**Execution-architecture consistency**: classified `REQUIREMENT_AMBIGUOUS` — the substantial
+cooldown/throttle/lifecycle machinery is defensible either as "correctness matters regardless of trade
+volume" or as "provisioned for a concurrency level the gate stack rarely produces"; evidence doesn't resolve
+which (`execution_architecture_consistency.md`).
+
+**Cost-tolerance requirement**: classified `COST_TOLERANCE_REQUIREMENT_UNDEFINED` — tight ATR-based stop
+geometry and short holding periods imply a need for low cost tolerance, but no document states a number.
+Task 26's 0→5bps edge-erosion result is a measured OUTCOME under a fixed testing grid, not evidence of an
+intended requirement — not tuned around here (`cost_tolerance_requirement.md`).
+
+**Statistical evidence standard**: proposed six qualitative dimensions without inventing exact numbers — CI
+on expectancy excludes zero, multi-regime coverage, non-concentrated symbol contribution, cost robustness,
+OOS validation, formal concentration limits. The n=26 canonical baseline currently clears none of the six
+conclusively (`statistical_evidence_standard.md`).
+
+**Task 22 relevance** (conceptual only, outcomes not inspected): classified `INSUFFICIENT_CANONICAL_SAMPLE`
+— the early-failure-detection question remains conceptually relevant to any operating model, but the
+corrected long-only population (n=26) is too small to rederive a secondary classifier on with statistical
+validity, independent of Task 22's own original findings. Downstream of the same n=26 sample-size gap
+identified above (`task22_relevance.md`).
+
+**Product/strategy gaps**: 15-row table (`product_strategy_gap_analysis.csv`). Dominant pattern:
+`PRODUCT_REQUIREMENT_UNDEFINED` (frequency target, confluence philosophy, signal-family-independence
+expectation) rather than a confirmed mismatch; a smaller set show `NO_GAP` (zero-signal-day acceptability,
+watchlist scale, holding period, precision-vs-coverage placement); remainder are specifically classified
+(`POSSIBLE_OVER_FILTERING_DESIGN`, `COST_ROBUSTNESS_GAP`, `RESEARCH_EVIDENCE_INSUFFICIENT` x2,
+`OBSERVABILITY_GAP` x2).
+
+**No tuning performed**: no threshold was changed, tested, or proposed anywhere in this task; no alternate
+P&L was computed; Task 22 outcomes were not inspected.
+
+**Final decision**: `MULTIPLE_PRODUCT_REQUIREMENTS_UNDEFINED` — more than one distinct dimension (frequency
+target, cost tolerance, confluence philosophy, signal-family independence expectation) is simultaneously
+undefined by repository evidence, not just one overall objective statement; several other dimensions (zero-
+day acceptability, watchlist scale, holding period, horizon) WERE resolved confidently from evidence, so this
+is not a blanket "insufficient research" finding either.
+
+**Next recommended action (not started)**: Task 31 — Owner Specification Session: resolve the explicitly
+undefined items (target signal/trade frequency range, cost-tolerance threshold, intended confluence
+philosophy, intended signal-family independence vs. confirmation-network behavior) into a signed-off written
+product specification. Not a code task — no parameter changes, no new backtest, until that specification
+exists.
+
+**State**: Task 29 checkpoint committed and pushed (`3c97d9d16b401ea207b57ddd25eae4eea037e552`). Task 30
+research artifacts and this ledger entry — **not committed, not pushed**, per instruction. No production
+strategy changes. PR #10 remains draft. All 18 required artifacts written to
+`results/task30_operating_objective_review/`.
