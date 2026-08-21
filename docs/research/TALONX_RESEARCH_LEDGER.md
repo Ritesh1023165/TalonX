@@ -3412,3 +3412,102 @@ task — no implementation should begin until this capture is complete.
 specification artifacts, `docs/research/TALONX_PRODUCT_STRATEGY_SPEC.md`, and this ledger entry — **not
 committed, not pushed**, per instruction. No production strategy changes. PR #10 remains draft. All 21
 required artifacts written to `results/task31_owner_specification/`.
+
+---
+
+## Task 32 — Owner Decision Capture (2026-08-21)
+
+**Objective**: turn the most important unresolved Task 31 owner decisions into explicit, version-controlled
+product requirements. A decision-capture task — no code changes, no tuning, no backtest.
+
+**Task 31 checkpoint**: reviewed the Task 31 diff (two files: `docs/research/TALONX_PRODUCT_STRATEGY_SPEC.md`
+new, ledger's Task 31 entry — no production changes), staged individually, committed as
+**`4c6ef7e6691be4dd144cb7c1e1e3644d5e664e45`** (`docs(research): add TalonX product strategy specification`),
+pushed to `research/talonx-strategy-validation`. PR #10 confirmed draft/open.
+
+**Task 32 integrity**: HEAD unchanged at `4c6ef7e6691be4dd144cb7c1e1e3644d5e664e45` throughout. Task26
+dataset hash `5e5412a960bf`, QuantConfig hash `9174f5232c20`, strategy fingerprint `88529b8a3fa1` — all
+untouched. No production behavior modified.
+
+**Confirmed inherited requirements (not reopened)**: long-only trade-direction contract, session behavior
+(blackouts, EOD flatten), holding horizon — all already evidence-backed/tested in prior tasks, restated here
+as `CONFIRMED`, no contradictory evidence found.
+
+**Unresolved owner decisions — 9 items, all `owner_answer=PENDING`, none silently treated as approved**:
+
+- **FREQ-001 (opportunity-frequency objective)**: `OWNER_DECISION_PENDING`, no default recommended — the
+  evidence is genuinely split between `RARE_HIGH_CONVICTION` (matches current measured output: 26 trades/
+  year, ~9.9% of trading days with an entry, 5/10 symbols zero trades) and `REGULAR_OPPORTUNITY` (matches
+  the 50+-symbol watchlist engineering ambition) — recommending either would functionally invent the missing
+  historical requirement.
+- **CONF-001 (confluence philosophy)**: `OWNER_DECISION_PENDING`. Claude recommends `TRIGGER_PLUS_ONE_
+  CONFIRMATION` (matches MACD/RSI-curl's current behavior exactly, smallest gap of any option; MA crossover
+  flagged as inconsistent) — recommendation only, not accepted.
+- **SIG-001/002/003 (signal-family independence)**: `OWNER_DECISION_PENDING` for RSI reversal, MACD
+  crossover, MA crossover individually. Claude recommends `CANDIDATE_REQUIRING_CONFIRMATION` for all three
+  (formalizes current behavior, zero code-change implied); asymmetric per-family classification explicitly
+  permitted if preferred.
+- **ATR-TRIGGER-001 (`atr_move_multiplier`)**: `OWNER_DECISION_PENDING`, but Claude's highest-confidence ATR
+  recommendation — accept current `SHORT_TERM_INTRADAY_ATR` behavior as-is (`SEMANTICALLY_COHERENT`, both
+  sides of the comparison are definitionally same-timeframe).
+- **ATR-REGIME-001 (`min_atr_pct`)**: `OWNER_DECISION_PENDING`, no default recommended — `REQUIREMENT_
+  AMBIGUOUS` between intraday-scale (current) and daily-regime-scale intent.
+- **ATR-RISK-001 (stop/target geometry)**: `OWNER_DECISION_PENDING`, **highest-priority open ATR item**, no
+  default recommended. Six risk-model options (A-F: short-term intraday / slower intraday / daily /
+  market-structure-primary / multi-timeframe / custom) presented with trade-offs; `DAILY_ATR` explicitly NOT
+  recommended merely by TA convention, per instruction — the choice must follow from TalonX's own confirmed
+  minutes-to-hours trade horizon. `TIMEFRAME_MISMATCH` hypothesis (Task 31) restated as evidence, not proof:
+  consistent with, not proven to cause, Task 26's STOP-exit median of 4 minutes vs. TARGET/EOD medians of 14
+  min/2.6 hr. Risk principles captured for whichever option is eventually chosen (stop outside normal noise,
+  structural-invalidation compatibility, live/backtest parity requirement, mandatory new canonical baseline
+  before any future OOS evaluation).
+- **COST-001 (cost-tolerance / execution model)**: `OWNER_DECISION_PENDING`, no bps number recommended. 8
+  execution-environment sub-questions itemized (broker/venue, order type, spread, slippage, commissions,
+  fill latency, liquidity assumption, premarket cost distinction) — 2 resolvable from evidence (liquid US
+  equities; spread already modeled), 6 open. Task 26's 0/5/10/20bps result retained strictly as evidence
+  (`CURRENT_CANONICAL_EDGE_NOT_COST_ROBUST_UNDER_TESTED_ASSUMPTIONS`), explicitly not used to select a
+  threshold.
+
+**ATR live policy**: `RUN_OBSERVATIONAL_SHADOW_ONLY`, carried forward unchanged from Task 31, until
+ATR-REGIME-001 and ATR-RISK-001 are resolved. Capital-risk distinction made explicit: TalonX runs on
+`talonx_paper` (simulated execution) — no real capital is at risk under this posture regardless.
+
+**Opportunity Score and gate-policy status**: purpose (`ranks already-qualified signals only`) confirmed as
+a factual description of current code; whether the owner ACCEPTS this as ongoing policy is a separate,
+still-open question. Per-gate hard/soft classifications from Task 31 retained as Claude's proposed
+classification only, not upgraded to owner-accepted status.
+
+**Product identity**: left `PROVISIONAL` — no owner response exists; not made canonical merely because
+Claude recommended the wording.
+
+**Experiment blockers**: 10-row matrix mapping each open decision to the specific future research it blocks
+(`results/task32_owner_decision_capture/future_experiment_blockers.csv`) — prevents unscoped experimentation
+once answers start arriving.
+
+**No tuning/code changes**: no threshold value (confluence count, ATR percentage, volume multiple, MA
+spread, etc.) was proposed anywhere in this task, even conditionally on a chosen category — threshold design
+is explicitly reserved for a future, separately-scoped task once owner decisions land.
+
+**Task 22 status**: unchanged, `DEFER_UNTIL_SAMPLE_GROWS`. Outcomes not inspected, not resumed, not used to
+solve the product-definition problem.
+
+**New/updated artifacts**: `docs/research/TALONX_OWNER_DECISIONS.md` (new — the canonical, prioritized,
+human-readable decision form, 9 items, every `OWNER ANSWER` field literally blank/`PENDING`).
+`docs/research/TALONX_PRODUCT_STRATEGY_SPEC.md` updated to v0.2 (introduces the CONFIRMED / PROVISIONAL /
+OWNER_DECISION_PENDING / TECHNICAL_CONSTRAINT taxonomy; splits Opportunity Score and ATR sections into their
+more precise per-item markers).
+
+**Final decision**: `CRITICAL_OWNER_DECISIONS_PENDING` — no actual owner answer was captured anywhere in
+this task; every P1-P5 priority item remains genuinely open, and no Claude recommendation is treated as a
+decision.
+
+**Next recommended action (not started)**: `OWNER_DECISION_REQUIRED` — return
+`docs/research/TALONX_OWNER_DECISIONS.md` to the actual human product owner for the 9 prioritized answers
+(FREQ-001 and ATR-RISK-001 first, as the two with no recommended default and the largest downstream research
+impact). No strategy-experiment task should start until at least those are captured.
+
+**State**: Task 31 checkpoint committed and pushed (`4c6ef7e6691be4dd144cb7c1e1e3644d5e664e45`). Task 32
+decision-capture artifacts, `docs/research/TALONX_OWNER_DECISIONS.md`, the updated
+`docs/research/TALONX_PRODUCT_STRATEGY_SPEC.md`, and this ledger entry — **not committed, not pushed**, per
+instruction. No production strategy changes. PR #10 remains draft. All 14 required artifacts written to
+`results/task32_owner_decision_capture/`.
