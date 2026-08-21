@@ -301,6 +301,172 @@ def test_confluence_score_is_computed_per_signal_direction(config):
     assert signals[0].confluence_score == 2
 
 
+# --- RSI-Curl / Confluence Contract (Task 28: RSI_CONFLUENCE_STATE_BASED_CONFIRMED) ---
+#
+# Requirement-proving, not merely implementation-locking: these tests exist
+# because Task 24 and Task 27 found that an RSI-curl candidate's own RSI
+# value can never satisfy its own confluence RSI leg (the trigger fires on
+# the RECOVERY bar -- RSI >= 30 bullish / <= 70 bearish -- while the
+# confluence leg requires the opposite, still-extreme state -- RSI < 30 /
+# > 70). Task 28's full requirements-archaeology investigation (see
+# results/task28_rsi_confluence_requirement/) confirmed this is INTENDED
+# behavior (RSI_CONFLUENCE_STATE_BASED_CONFIRMED): the confluence RSI leg
+# is documented, consistently and repeatedly, to measure CURRENT state, not
+# the reversal EVENT. These tests lock that confirmed contract in so a
+# future change to _confluence_score or _check_rsi_volume_setup that
+# silently makes an RSI-curl candidate's own RSI value count towards its
+# own score is caught as a requirement violation, not treated as a bug fix.
+# The requirement is fully readable from the test bodies below; no test
+# reads a results/ artifact file at runtime.
+
+def test_bullish_curl_with_volume_and_no_macd_is_capped_at_confluence_one(config):
+    # Contract case A: RSI curl + volume, no coincident MACD cross.
+    # RSI leg = 0 (state-based: current RSI 31 is not < 30, even though the
+    # curl itself required the RECOVERY from 28 -> 31). Volume leg = 1.
+    # MACD leg = 0 (no cross this bar). Total = 1, one point short of
+    # confluence_score_min=2 -- this candidate cannot publish on its own.
+    snap = _snapshot(rsi=31.0, rsi_prev=28.0, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    rsi_signals = [s for s in signals if s.signal_type == SignalType.RSI_OVERSOLD_VOLUME_SURGE]
+    assert len(rsi_signals) == 1
+    assert rsi_signals[0].direction == SignalDirection.BULLISH
+    assert rsi_signals[0].confluence_score == 1
+    assert rsi_signals[0].confluence_score < config.confluence_score_min
+
+
+def test_bullish_curl_with_volume_and_coincident_macd_reaches_confluence_two(config):
+    # Contract case B: same RSI curl as above, PLUS a same-bar MACD
+    # bullish cross -- the only way an RSI-curl candidate can reach
+    # confluence_score_min=2, since its own RSI leg is structurally
+    # unavailable (see test above) and volume alone only supplies 1.
+    snap = _snapshot(
+        rsi=31.0, rsi_prev=28.0, volume_surge_ratio=3.0,
+        macd=0.05, macd_signal_line=0.02, macd_prev=-0.01, macd_signal_line_prev=0.01,
+    )
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    rsi_signals = [s for s in signals if s.signal_type == SignalType.RSI_OVERSOLD_VOLUME_SURGE]
+    assert len(rsi_signals) == 1
+    assert rsi_signals[0].confluence_score == 2
+    assert rsi_signals[0].confluence_score >= config.confluence_score_min
+    # The coincident MACD_BULLISH_CROSS also fires independently on this
+    # bar (Task 27 §9's same-bar coincidence case) -- not asserted further
+    # here, already covered by test_multiple_signal_types_can_fire_on_the_same_bar.
+
+
+def test_bearish_curl_with_volume_and_no_macd_is_capped_at_confluence_one(config):
+    # Contract case C: bearish mirror of case A.
+    snap = _snapshot(rsi=69.0, rsi_prev=72.0, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    rsi_signals = [s for s in signals if s.signal_type == SignalType.RSI_OVERBOUGHT_VOLUME_SURGE]
+    assert len(rsi_signals) == 1
+    assert rsi_signals[0].direction == SignalDirection.BEARISH
+    assert rsi_signals[0].confluence_score == 1
+    assert rsi_signals[0].confluence_score < config.confluence_score_min
+
+
+def test_bearish_curl_with_volume_and_coincident_macd_reaches_confluence_two(config):
+    # Contract case D: bearish mirror of case B.
+    snap = _snapshot(
+        rsi=69.0, rsi_prev=72.0, volume_surge_ratio=3.0,
+        macd=-0.05, macd_signal_line=-0.02, macd_prev=0.01, macd_signal_line_prev=-0.01,
+    )
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    rsi_signals = [s for s in signals if s.signal_type == SignalType.RSI_OVERBOUGHT_VOLUME_SURGE]
+    assert len(rsi_signals) == 1
+    assert rsi_signals[0].confluence_score == 2
+    assert rsi_signals[0].confluence_score >= config.confluence_score_min
+
+
+# --- RSI-Curl / Confluence Contract: exact 30/70 boundary (Task 28 §5/§7) --
+#
+# Task 28's rsi_truth_table.csv identified these exact boundary cases had
+# no prior test coverage. The curl trigger and the confluence leg use
+# DIFFERENT boundary conventions on purpose: the trigger's `rsi_prev` check
+# is strict (< / >), its `rsi` check is inclusive (>= / <=); the confluence
+# leg's check is strict on the current bar (< / >) in both directions. This
+# is what makes the two conditions complementary (never simultaneously
+# true) at every point along the boundary, including exactly at 30.0/70.0.
+
+def test_boundary_bullish_recovery_exactly_at_oversold_threshold_fires_curl(config):
+    # 29.9 -> 30.0: curr (30.0) clears the inclusive >= 30 recovery check.
+    snap = _snapshot(rsi=30.0, rsi_prev=29.9, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+    rsi_signals = [s for s in signals if s.signal_type == SignalType.RSI_OVERSOLD_VOLUME_SURGE]
+
+    assert len(rsi_signals) == 1
+    # Confluence leg is strict (< 30): exactly 30.0 does NOT qualify.
+    assert rsi_signals[0].confluence_score == 1  # volume only
+
+
+def test_boundary_bullish_prev_at_threshold_is_not_a_recovery(config):
+    # 30.0 -> 31.0: rsi_prev (30.0) fails the STRICT < 30 "was oversold"
+    # check -- prev was already AT the threshold, not below it, so this is
+    # not a qualifying recovery (there was nothing to recover from).
+    snap = _snapshot(rsi=31.0, rsi_prev=30.0, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    assert [s for s in signals if s.signal_type == SignalType.RSI_OVERSOLD_VOLUME_SURGE] == []
+
+
+def test_boundary_bullish_current_just_shy_of_threshold_does_not_fire_curl(config):
+    # 28.0 -> 29.9: curr (29.9) has not yet reached the inclusive >= 30
+    # recovery threshold -- still oversold, no curl.
+    snap = _snapshot(rsi=29.9, rsi_prev=28.0, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    assert [s for s in signals if s.signal_type == SignalType.RSI_OVERSOLD_VOLUME_SURGE] == []
+    # The confluence leg, checked in isolation, WOULD score this state
+    # (still oversold, 29.9 < 30) -- but no candidate exists to attach it
+    # to since no trigger fired. RSI leg (1) + volume leg (1) = 2.
+    # Demonstrates the two checks are evaluated on entirely separate
+    # conditions, not just "the same value seen twice".
+    assert _confluence_score(snap, config, config.volume_surge_ratio_threshold, SignalDirection.BULLISH) == 2
+
+
+def test_boundary_bearish_recovery_exactly_at_overbought_threshold_fires_curl(config):
+    # 70.1 -> 70.0: curr (70.0) clears the inclusive <= 70 recovery check.
+    snap = _snapshot(rsi=70.0, rsi_prev=70.1, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+    rsi_signals = [s for s in signals if s.signal_type == SignalType.RSI_OVERBOUGHT_VOLUME_SURGE]
+
+    assert len(rsi_signals) == 1
+    assert rsi_signals[0].confluence_score == 1  # volume only; strict > 70 confluence leg does not qualify at 70.0
+
+
+def test_boundary_bearish_prev_at_threshold_is_not_a_recovery(config):
+    # 70.0 -> 69.0: rsi_prev (70.0) fails the STRICT > 70 "was overbought"
+    # check -- prev was already AT the threshold, not above it.
+    snap = _snapshot(rsi=69.0, rsi_prev=70.0, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    assert [s for s in signals if s.signal_type == SignalType.RSI_OVERBOUGHT_VOLUME_SURGE] == []
+
+
+def test_boundary_bearish_current_just_above_threshold_does_not_fire_curl(config):
+    # 72.0 -> 70.1: curr (70.1) has not yet reached the inclusive <= 70
+    # recovery threshold -- still overbought, no curl.
+    snap = _snapshot(rsi=70.1, rsi_prev=72.0, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    assert [s for s in signals if s.signal_type == SignalType.RSI_OVERBOUGHT_VOLUME_SURGE] == []
+    # RSI leg (1, still overbought at 70.1 > 70) + volume leg (1) = 2.
+    assert _confluence_score(snap, config, config.volume_surge_ratio_threshold, SignalDirection.BEARISH) == 2
+
+
 # --- Structural R:R Calculation --------------------------------------------
 
 def test_structural_rr_uses_pivot_resistance_and_atr_stop_multiplier(config):

@@ -121,6 +121,36 @@ for the full before/after):**
   in a trending bull market RSI can sit elevated for hours, and shorting
   the first touch fights the trend rather than confirming a genuine
   reversal.
+  **RSI curl vs. RSI confluence, confirmed contract** (Task 28
+  `RSI_CONFLUENCE_STATE_BASED_CONFIRMED`, 2026-08-21): the curl defines a
+  trigger EVENT (RSI has just exited the extreme zone: `rsi_prev<30 AND
+  rsi>=30` bullish / `rsi_prev>70 AND rsi<=70` bearish), while the
+  confluence RSI leg above measures current STATE (`rsi<30` bullish /
+  `rsi>70` bearish) — complementary conditions by design, so an RSI-curl
+  candidate's own RSI value can never satisfy its own confluence RSI leg.
+  This is intentional, not a bug or an accidental limitation: it keeps
+  the trigger's own bundled evidence (reversal + volume, both already
+  required to fire at all) from being counted twice toward its own score.
+  Effective requirement: RSI reversal + volume alone produces a candidate
+  with confluence=1 (volume only); with `confluence_score_min=2`, a
+  same-bar MACD cross is the only other component available to an
+  RSI-curl candidate, so one is required for that candidate to clear this
+  gate. See `results/task28_rsi_confluence_requirement/` and
+  `results/task29_rsi_contract_lock/` for the full requirements analysis,
+  and `tests/test_quant_strategy.py`'s "RSI-Curl / Confluence Contract"
+  section for the regression tests that lock this in.
+- **Signal-family confluence contracts are NOT mathematically symmetric**
+  (each family's relationship to its own confluence score is a separate,
+  independently-defined contract, not one shared rule applied three ways):
+  a MACD-cross candidate's own crossover event automatically supplies its
+  MACD confluence point (the trigger check and the confluence-leg check
+  are the same underlying condition); an MA-cross candidate's own
+  crossover contributes **zero** points (there is no dedicated MA
+  confluence component at all); an RSI-curl candidate's own reversal
+  event contributes zero points via the RSI leg specifically (state-based
+  by design, above) but does contribute one point via the volume leg,
+  since volume surge is already required for the trigger to fire. Do not
+  assume any one family's behavior generalizes to another.
 - **Structural R:R filter** (`strategy.py`'s `_structural_risk_reward`,
   `TALONX_QUANT_ATR_STOP_MULTIPLIER` default 1.5,
   `TALONX_QUANT_MIN_RISK_REWARD_RATIO` default 1.5) — reward is measured
@@ -709,6 +739,18 @@ the range to reach an ATR-scaled stop/target.
   `consumer.py`'s `_GATE_NAMES`). Consumed by `talonx_dispatch` purely
   to persist a durable, per-candidate audit trail — see
   [dispatch.md](dispatch.md)'s own Rejection Trace Logging section.
+  **Reading the rejection counts** (clarified Task 27/29, 2026-08-21):
+  both the local aggregated `suppression_counts` and the per-candidate
+  `RejectedCandidateEvent` record only the FIRST gate that dropped a
+  given candidate, in the fixed gate order above — a `LOW_CONFLUENCE`
+  count means confluence was the first gate that rejected those
+  candidates; it does NOT mean they would otherwise have passed every
+  later gate (R:R, trend, entry blackouts, etc.). Some candidates
+  counted under an earlier gate would also have independently failed a
+  downstream one; see
+  `results/task27_strategy_feasibility_audit/first_failure_vs_all_failures.csv`
+  for a worked example. This does not change gate order or the metrics
+  themselves, only how the counts should be read.
 
 ## Long-term (fundamentals) path
 

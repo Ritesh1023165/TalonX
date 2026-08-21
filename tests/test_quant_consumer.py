@@ -950,6 +950,76 @@ async def test_handle_message_suppresses_low_confluence_signal(scanner, monkeypa
     assert scanner._pending_candidates == []
 
 
+# --- RSI-Curl / Confluence Contract at the consumer gate (Task 28/29:
+# RSI_CONFLUENCE_STATE_BASED_CONFIRMED) -------------------------------------
+#
+# Requirement-proving, not merely implementation-locking: proves the
+# confirmed RSI-curl/confluence contract (see
+# results/task28_rsi_confluence_requirement/ and the analogous strategy-
+# level tests in test_quant_strategy.py) actually reaches the real
+# confluence gate in QuantScanner._handle_message, using the exact
+# confluence_score values a real RSI-curl candidate has under the
+# confirmed, state-based scoring: 1 with volume alone (no same-bar MACD
+# cross), 2 once a same-bar MACD cross also coincides. evaluate_signals
+# itself is stubbed here (this file's established boundary -- see the
+# module docstring), so this test does NOT recompute confluence_score; it
+# proves the CONSUMER'S gate correctly acts on the confirmed value, not
+# that strategy.py computes it (that is proven separately and directly in
+# test_quant_strategy.py's RSI-Curl / Confluence Contract tests). No
+# results/ artifact is read at runtime -- the confirmed values are
+# transcribed directly into this test.
+
+@pytest.mark.asyncio
+async def test_handle_message_suppresses_rsi_curl_signal_at_its_confirmed_confluence_of_one(scanner, monkeypatch):
+    # Task 28 contract case A/C: RSI curl + volume, no same-bar MACD cross
+    # -> confluence_score=1 (volume leg only; the RSI leg is structurally
+    # 0 on an RSI-curl signal's own trigger bar, confirmed intentional).
+    # One point short of confluence_score_min=2 -- must be rejected here.
+    rsi_curl_alone = _signal(
+        "AAPL", 3.0, signal_type=SignalType.RSI_OVERBOUGHT_VOLUME_SURGE,
+        direction=SignalDirection.BEARISH, confluence_score=1, risk_reward_ratio=2.0,
+    )
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [rsi_curl_alone])
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert _cooldown_set_calls(scanner) == []
+    assert _signal_publishes(scanner) == []
+    assert scanner.signals_suppressed_low_confluence == 1
+    assert scanner._pending_candidates == []
+
+
+@pytest.mark.asyncio
+async def test_handle_message_does_not_suppress_rsi_curl_signal_at_its_confirmed_confluence_of_two(scanner, monkeypatch):
+    # Task 28 contract case B/D: same RSI curl, plus a same-bar MACD cross
+    # -> confluence_score=2, clears confluence_score_min=2. Direction is
+    # BEARISH specifically so this test isolates the confluence gate alone
+    # -- the trend gate never applies to bearish candidates (a separate,
+    # already-confirmed fact, see results/task27_strategy_feasibility_audit/
+    # direction_asymmetry.csv), so reaching _pending_candidates here can
+    # only mean the confluence gate itself let it through, not that some
+    # other gate happened to be satisfied too.
+    rsi_curl_plus_macd = _signal(
+        "AAPL", 3.0, signal_type=SignalType.RSI_OVERBOUGHT_VOLUME_SURGE,
+        direction=SignalDirection.BEARISH, confluence_score=2, risk_reward_ratio=2.0,
+    )
+    rsi_curl_plus_macd.session = "regular"
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [rsi_curl_plus_macd])
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert scanner.signals_suppressed_low_confluence == 0
+    # Proceeds to the pending-candidate stage -- proves it cleared the
+    # confluence gate specifically. Not asserting a final publish: per
+    # Task 29's own scope, an unrelated gate is allowed to still apply.
+    assert len(scanner._pending_candidates) == 1
+    assert scanner._pending_candidates[0].confluence_score == 2
+
+
 @pytest.mark.asyncio
 async def test_handle_message_suppresses_low_risk_reward_signal(scanner, monkeypatch):
     low_rr = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=1.0)  # below min_risk_reward_ratio=1.5

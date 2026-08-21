@@ -3095,3 +3095,69 @@ is acceptable as a product/research objective given this now-confirmed and docum
 research artifacts and this ledger entry — **not committed, not pushed**, per instruction. No strategy code
 changed. PR #10 remains draft. All 10 required artifacts written to
 `results/task28_rsi_confluence_requirement/`.
+
+---
+
+## Task 29 — Lock Confirmed RSI-Confluence Contract (2026-08-21)
+
+**Objective**: make Task 28's confirmed requirement (`RSI_CONFLUENCE_STATE_BASED_CONFIRMED`) permanent and
+explicit in tests, correct stale/ambiguous documentation, and prevent a future developer from accidentally
+"fixing" the confirmed behavior. No strategy behavior change, no performance experiments.
+
+**Task 28 checkpoint**: before this task's changes, confirmed HEAD `d497c8c7cfa0c7915ba44411f5b23a44826291a8`,
+git status showing only the Task 28 ledger entry modified plus untracked `logs/`, and all 11 Task 28
+artifacts present in `results/task28_rsi_confluence_requirement/`. Staged only the ledger file (not
+`git add -A`), committed as **`820332bfb9c1479e8a7cedcc38d104a7324ce1fa`**
+(`docs(research): record RSI confluence requirements resolution`), pushed to
+`research/talonx-strategy-validation`. PR #10 confirmed still draft/open after push.
+
+**No strategy code change**: `talonx_quant/strategy.py` untouched. The only production file touched is
+`talonx_quant/config.py`, and only its comments — verified via `git diff` that zero non-comment, non-blank
+lines changed.
+
+**Requirement-proving tests added** (12 total, all classified `REQUIREMENT_PROVING`, none reading a
+`results/` artifact at runtime — see `results/task29_rsi_contract_lock/requirement_test_matrix.csv`):
+- 4 in `tests/test_quant_strategy.py` for contract cases A-D (bullish/bearish RSI curl, with/without a
+  coincident MACD cross), via the real `evaluate_signals`, asserting `confluence_score==1` without MACD and
+  `==2` with — exactly matching the confirmed contract.
+- 6 exact 30/70 boundary tests (29.9→30.0, 30.0→31.0, 28.0→29.9 bullish; 70.1→70.0, 70.0→69.0, 72.0→70.1
+  bearish), each asserting both the curl-fires boolean and the confluence RSI-state leg value — confirms the
+  trigger's inclusive recovery check and the confluence leg's strict current-state check are complementary
+  at every point, including exactly at 30.0/70.0.
+- 2 in `tests/test_quant_consumer.py` through the real `QuantScanner._handle_message` gate path (consistent
+  with this file's own established boundary of stubbing `evaluate_signals`, so the injected confluence
+  values are the exact values the strategy-level tests above independently prove): confluence=1 rejected
+  `LOW_CONFLUENCE`, confluence=2 clears the gate and reaches `_pending_candidates` (bearish direction used
+  deliberately to isolate the confluence gate from the trend gate, which never applies to bearish
+  candidates).
+
+**Documentation corrections applied** (not merely proposed, per this task's explicit instruction):
+`talonx_quant/config.py:244-262` — corrected the stale "computed once per bar" phrase and added an explicit
+note on the confirmed RSI-curl self-exclusion. `docs/modules/quant.md` — three additions: the RSI Reversal
+Curl bullet now states the curl/confluence interaction explicitly and confirms it is intentional, not a bug;
+a new bullet states the three signal families' confluence contracts are NOT mathematically symmetric; the
+Rejection Trace Logging section now clarifies rejection counts are first-failure-only. No threshold, weight,
+or gate order changed in either file.
+
+**Zero strategy behavior change**: confirmed both structurally (the `config.py` diff touches only comment
+and blank lines) and empirically (full regression, below).
+
+**Regression result**: 447 passed, 1 skipped, 15 xfailed, 0 failed
+(`results/task29_rsi_contract_lock/test_results.txt`). `test_quant_strategy.py`: 54/54 (44 pre-existing + 10
+new). `test_quant_consumer.py`: 157/157 (155 pre-existing + 2 new). No Task 26 rerun; no P&L, expectancy, PF,
+or trade-count figure calculated anywhere in this task.
+
+**What remains open**: whether the confirmed contract's real-world consequence (92.3% of RSI-curl candidates
+permanently capped at confluence=1, per Task 27/28) is the desired PRODUCT behavior — explicitly reserved for
+Task 30.
+
+**Final decision**: `RSI_CONTRACT_LOCKED_AND_DOCUMENTED`.
+
+**Next recommended action (not started)**: Task 30 — Strategy Operating Objective & Selectivity Review, per
+the user's own stated plan; must not begin with parameter changes.
+
+**State**: Task 28 checkpoint committed and pushed (`820332bfb9c1479e8a7cedcc38d104a7324ce1fa`). Task 29
+code/test/documentation changes (`talonx_quant/config.py`, `docs/modules/quant.md`,
+`tests/test_quant_strategy.py`, `tests/test_quant_consumer.py`) and this ledger entry — **not committed, not
+pushed**, per instruction. PR #10 remains draft. All 6 required artifacts written to
+`results/task29_rsi_contract_lock/`.

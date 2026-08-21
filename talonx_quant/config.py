@@ -241,12 +241,27 @@ class QuantConfig:
     # RSI/MACD/MA logic), not a separate downstream filter.
     atr_move_multiplier: float = _env_float("TALONX_QUANT_ATR_MOVE_MULTIPLIER", 1.0)
 
-    # Confluence score: +1 each for a MACD cross firing this bar, RSI
-    # currently in its extreme zone (< rsi_oversold or > rsi_overbought),
-    # and volume_surge_ratio > volume_surge_ratio_threshold -- computed
-    # once per bar (0-3) and attached to every signal that fires on it.
-    # A signal below this score is suppressed before it ever reaches the
-    # per-ticker cooldown lock or the global throttle.
+    # Confluence score: +1 each for a MACD cross firing this bar, +1 when
+    # current RSI is in the direction-supporting extreme STATE (< rsi_
+    # oversold for a bullish candidate, > rsi_overbought for a bearish
+    # one), +1 for volume_surge_ratio > volume_surge_ratio_threshold --
+    # computed fresh PER SIGNAL DIRECTION (not once per bar: two opposite-
+    # direction signals on the same bar get their own scores) and attached
+    # to every signal that fires. A signal below this score is suppressed
+    # before it ever reaches the per-ticker cooldown lock or the global
+    # throttle.
+    #
+    # RSI-curl self-exclusion (confirmed intentional, Task 28
+    # RSI_CONFLUENCE_STATE_BASED_CONFIRMED, 2026-08-21): RSI_OVERSOLD_
+    # VOLUME_SURGE / RSI_OVERBOUGHT_VOLUME_SURGE fire on the RECOVERY bar
+    # (RSI has just exited the extreme zone), so the RSI component above
+    # is intentionally zero on that same trigger bar -- the trigger and
+    # the confluence leg check opposite, complementary conditions on
+    # purpose. Such a candidate's score is therefore volume(1) alone
+    # unless a same-bar MACD cross also coincides (-> 2, clearing this
+    # gate). See results/task28_rsi_confluence_requirement/ and
+    # tests/test_quant_strategy.py's "RSI-Curl / Confluence Contract"
+    # section for the full requirements analysis and regression coverage.
     confluence_score_min: int = _env_int("TALONX_QUANT_CONFLUENCE_SCORE_MIN", 2)
 
     # Structural Risk/Reward filter (replaces the old constant-ATR-ratio
