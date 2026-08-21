@@ -2992,3 +2992,106 @@ with the strategy owner — a requirements decision, not a code change, not para
 
 **State**: results/diff returned for review — **not committed, not pushed**, per instruction. All 15
 required artifacts written to `results/task27_strategy_feasibility_audit/`.
+
+---
+
+## Task 28 — RSI Curl / Confluence Requirements Resolution (2026-08-21)
+
+**Objective**: resolve the INTENDED meaning of the RSI confluence leg (state-based vs. event-based) for the
+structural self-exclusion Task 24 and Task 27 both classified `REQUIREMENT_AMBIGUOUS`. A requirements/design
+task — no parameter tuning, no performance experiment, no P&L calculation, no code change unless the evidence
+strongly supported one.
+
+**Task 27 checkpoint**: before this task's analysis, reviewed `git status`/`git diff` (only
+`TALONX_RESEARCH_LEDGER.md` modified — the Task 26 and Task 27 entries, 189 insertions; no production
+strategy code touched), staged only that file (not `git add -A`), committed as `d497c8c7cfa0c7915ba44411f5b23a44826291a8`
+("docs(research): record Task 26 canonical baseline and Task 27 feasibility audit"), pushed to
+`research/talonx-strategy-validation`. PR #10 confirmed still draft/open after push.
+
+**Task 28 integrity**: HEAD `d497c8c7cfa0c7915ba44411f5b23a44826291a8` (unchanged through this task — no
+further commits), git status clean apart from untracked `logs/`. Task26 dataset hash `5e5412a960bf`,
+`QuantConfig` hash `9174f5232c20`, strategy fingerprint `88529b8a3fa1` — all unchanged, not touched. No
+strategy code modified during requirements analysis.
+
+**Requirements archaeology**: reviewed README, `docs/modules/quant.md`, all other `docs/*.md`, `config.py`,
+`strategy.py` docstrings, full git history (origin commit `7b7d815`, 2026-08-16, which introduced BOTH
+direction-aware confluence AND the RSI reversal curl as two unlinked commit-message bullets with zero
+cross-reference; and follow-up correctness-audit commit `f2f0840`, which also missed the interaction), all
+RSI/confluence tests, and the prior Task 24/27 ledger entries. Full evidence table (12 sources) in
+`results/task28_rsi_confluence_requirement/requirements_evidence.csv`.
+
+**Finding**: every direct statement of what the confluence RSI leg measures (`config.py:244-249`,
+`strategy.py`'s `_confluence_score` docstring, `docs/modules/quant.md:104-112`) is consistent, repeated,
+present-tense state language ("RSI currently/sitting in the extreme zone"), with explicit general-purpose
+rationale ("must not silently pad a long setup's score"). Every direct statement of what the RSI-curl
+trigger means uses event/confirmation language, but never discusses confluence, and neither side ever
+discusses the interaction with the other.
+
+**Truth table** (`rsi_truth_table.csv`, 12 boundary cases including the exact 30.0/70.0 threshold edge,
+computed via the real `_confluence_score` function): confirms exceptionlessly — every one of the 6 fired-curl
+rows has `rsi_confluence_leg_current_behavior=0` and `rsi_confluence_leg_event_interpretation=1`, zero
+counter-examples.
+
+**Signal-family consistency** (`signal_family_consistency.md`): MACD's apparent self-credit is a degenerate
+coincidence (its trigger and confluence-leg condition are the literal same boolean), not a general policy. MA
+crossover — a closer precedent, also edge-triggered — gets **zero** self-credit unconditionally, and this is
+never flagged as a bug anywhere in this repository. RSI curl already gets partial self-credit via volume
+(guaranteed by its own trigger definition), just not via the RSI leg specifically.
+
+**Double-counting analysis** (`double_counting_analysis.md`): the system already operates on a
+"trigger + one additional confirmation" model (per the MACD precedent). RSI curl's trigger already bundles
+reversal + volume, and its volume leg already supplies that one automatic credit. A second automatic credit
+via the RSI event leg, for the same underlying trigger firing, would be closer to double-crediting a single
+trigger across two legs than to filling a genuine gap.
+
+**RSI signal contract** (`rsi_signal_contract.md`): answer **B** — RSI reversal + volume only creates a
+candidate; a same-bar MACD-cross coincidence is mathematically mandatory for publication under
+`confluence_score_min=2`, given the confirmed state-based leg. A direct, calculable consequence of
+already-confirmed rules, never previously written down; flagged as a naming/expectation mismatch worth the
+strategy owner's attention (the signal's own name implies RSI+volume should be sufficient).
+
+**Historical descriptive impact** (`historical_impact_without_pnl.csv`, built entirely from Task 27's
+existing `rsi_curl_audit.csv`, no new engine run): of 194 real RSI-curl candidates, 194/194 have volume=1,
+0/194 have the RSI state leg=1, 15/194 (7.7%) have a same-bar MACD coincidence and reach confluence=2 today,
+179/194 (92.3%) are permanently capped at confluence=1. No P&L, trade-count, or hypothetical-execution claim
+made.
+
+**Test contract audit** (`test_contract_audit.csv`, 11 rows): 7 of 8 existing RSI/confluence tests classified
+`IMPLEMENTATION_LOCKING` (lock in current behavior without stating why it's intended); 1
+`REQUIREMENT_PROVING` (but for the MACD family, not RSI). 4 `MISSING` categories, most notably: no test
+anywhere fires an RSI-curl signal and asserts its resulting `confluence_score`, and no test uses the exact
+30.0/70.0 boundary values.
+
+**Documentation issues** (`documentation_corrections.md`): `STALE_DOC` at `config.py:244-249` ("computed once
+per bar" — should read "computed fresh per signal direction"), with a proposed new explicit note on the
+RSI-curl self-exclusion consequence; proposed cross-reference addition to `docs/modules/quant.md`'s RSI
+Reversal Curl bullet; proposed clarification to `docs/modules/quant.md`'s Rejection Trace Logging section
+that rejection counts are first-failure-only, not independent-gate-failure counts. None applied — text-only,
+returned for review.
+
+**What is proven vs. ambiguous**: proven — the RSI confluence leg's documented definition is state-based,
+consistently, across three independent sources, with explicit rationale; the structural self-exclusion is a
+correct, deterministic consequence of that definition; no implementation bug exists. Remains ambiguous —
+whether the specific consequence for RSI-curl candidates (92.3% capped, mandatory unrelated MACD coincidence)
+was ever a deliberately *wanted* product outcome, as opposed to an uncalculated by-product of two features
+shipped in the same commit; this is a product judgment, explicitly out of this task's scope.
+
+**Final requirement decision**: `RSI_CONFLUENCE_STATE_BASED_CONFIRMED` — strongly supported by consistent,
+repeated, authoritative documentation of the leg's own definition, reinforced by the double-counting analysis
+and the MA-crossover precedent (zero self-credit is already an accepted pattern elsewhere in this same
+strategy).
+
+**Code change required**: **NO**. Current code already matches the confirmed requirement exactly. Per the
+task's rule for a state-based confirmation, the previously undocumented consequence is now written down
+explicitly (`rsi_signal_contract.md`, plus proposed — not applied — doc corrections above), rather than any
+threshold/formula/gate change.
+
+**Next recommended action (not started)**: document/lock the requirement with tests (add an end-to-end test
+firing a real RSI-curl signal and asserting its resulting `confluence_score` at both the interior and exact
+30.0/70.0 boundary), then separately reassess whether the strategy's extreme selectivity (Task 27's finding)
+is acceptable as a product/research objective given this now-confirmed and documented constraint.
+
+**State**: Task 27 checkpoint committed and pushed (`d497c8c7cfa0c7915ba44411f5b23a44826291a8`). Task 28
+research artifacts and this ledger entry — **not committed, not pushed**, per instruction. No strategy code
+changed. PR #10 remains draft. All 10 required artifacts written to
+`results/task28_rsi_confluence_requirement/`.
