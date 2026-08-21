@@ -3284,3 +3284,131 @@ exists.
 research artifacts and this ledger entry — **not committed, not pushed**, per instruction. No production
 strategy changes. PR #10 remains draft. All 18 required artifacts written to
 `results/task30_operating_objective_review/`.
+
+---
+
+## Task 31 — Owner Specification Session & ATR Semantics Decision (2026-08-21)
+
+**Objective**: create the explicit TalonX product/strategy specification that has been missing, and
+separately resolve ATR timeframe/semantic intent before any future ATR-related implementation or tuning. An
+owner-decision task — no strategy code changes, no tuning, no backtest.
+
+**Task 30 checkpoint**: reviewed the Task 30 diff (123 insertions, ledger only, no production changes),
+staged individually, committed as **`c3ede492b3965788412ca021a81e0e449aabc70f`**
+(`docs(research): record operating objective review`), pushed to `research/talonx-strategy-validation`. PR
+#10 confirmed draft/open.
+
+**Task 31 integrity**: HEAD unchanged at `c3ede492b3965788412ca021a81e0e449aabc70f` throughout this task's
+own analysis. Task26 dataset hash `5e5412a960bf`, QuantConfig hash `9174f5232c20`, strategy fingerprint
+`88529b8a3fa1` — all untouched. No production behavior modified.
+
+**Methodology**: every requirement tagged `EXISTING_REQUIREMENT` / `OWNER_DECISION_REQUIRED` /
+`RECOMMENDED_DEFAULT_PENDING_OWNER` / `TECHNICAL_CONSTRAINT` — no recommendation presented as historical
+fact. `decision_register.csv` (15 rows) records every open item with `owner_answer=PENDING`, never silently
+treated as approved.
+
+**Product identity** (PROVISIONAL, proposed): "TalonX is a high-precision intraday opportunity scanner over
+a broad, liquid-equity watchlist (50+ symbols targeted). It prioritizes quality over frequency, may produce
+zero-signal days as a normal and accepted outcome, opens only long positions, uses bearish signals as exits
+from an existing long (never as new short entries), and closes all exposure intraday." Long-only contract:
+`LONG_ONLY_CONFIRMED` (already implemented/tested, Task 25A — not an open question).
+
+**Frequency decision/status**: `OWNER_DECISION_REQUIRED` for a target — no historical target trade/signal
+frequency was ever specified anywhere in this project's history (Task 30's exhaustive search, re-confirmed).
+Zero-signal-day acceptability is `CONFIRMED` from evidence (`docs/modules/dispatch.md`'s explicit
+"notification fatigue" concern, no inactivity concern found anywhere). Measured baseline (not a target): 26
+trades/year, 85 signals/year, 10-symbol universe.
+
+**Watchlist decision**: 35-50+ symbols proposed as the normal operating range (documented 50+ engineering
+target, ~35-39 observed in practice). Whether breadth is meant to scale opportunity frequency or only
+coverage remains an open policy choice.
+
+**Signal-family independence decision**: all three families (RSI reversal, MACD crossover, MA crossover)
+recommended to be classified as candidate-generators-requiring-confirmation, formalizing existing behavior
+(MA needs 2 external legs with zero self-credit; RSI curl and MACD each need ~1 more, most of the time) —
+matches the current implementation exactly, no code change implied.
+
+**Confluence philosophy**: "trigger + one independent confirmation" (A) recommended — matches MACD and
+RSI-curl's current behavior; MA crossover currently behaves closer to a stricter policy (zero self-credit,
+needs two independent confirmations), flagged as an inconsistency, not corrected.
+
+**Gate-policy decisions**: 14 gates reclassified using a MANDATORY_SAFETY_GATE / MANDATORY_QUALITY_GATE /
+RANKING_FACTOR / SOFT_PREFERENCE / OPERATIONAL_CONTROL / REMOVE_FROM_PRODUCT_CONTRACT /
+OWNER_DECISION_REQUIRED taxonomy (`gate_policy_spec.csv`) — loss lockout reclassified from Task 30's
+"quality gate" label to `MANDATORY_SAFETY_GATE` (risk management, not setup-quality judgment).
+
+**Opportunity Score role**: purpose `CONFIRMED` — ranks already-qualified signals only, never participates
+in eligibility. Redundancy finding acknowledged (`POSSIBLE_OVER_FILTERING_DESIGN`: confluence 35% + trend
+15% weight components have severely compressed post-gate discriminating range) — weights unchanged.
+
+**Cost-tolerance decision/status**: `COST_TOLERANCE_REQUIREMENT_UNDEFINED`. System design (tight ATR-based
+stops, short holding periods) implies a need for low absolute tolerance, but no specific bps number can be
+defended without knowing the intended execution venue — information not present in this repository.
+
+**ATR current semantics (VERIFIED EXISTING FACT)**: ATR(14) is computed on **14 one-minute bars** (not
+daily candles), via `pandas_ta`'s Wilder-smoothed `ta.atr(length=14)` over the primary `RollingBarBuffer`
+(same buffer RSI/MACD/SMA already use), continuous across session boundaries (not reset daily, fixed
+2026-08-16 audit commit `f2f0840`), premarket bars contribute, identical between live and backtest at the
+mechanism level (`talonx_backtest` imports and calls the exact same `compute_indicators` function). The
+`min_atr_pct=0.25%` default is numerically consistent only with a 1-minute-scale ATR% reading — as a
+classical daily-ATR% reading it would be an almost non-restrictive floor, contradicting both the gate's
+stated purpose and its ~93.7% observed rejection rate (Task 27).
+
+**ATR intended semantics/status**: no historical document ever discusses daily-vs-intraday ATR as a
+considered choice — the 1-minute interval was inherited from the pre-existing bar pipeline, not deliberately
+selected for ATR specifically. Per-use-case: `atr_move_multiplier` is `SEMANTICALLY_COHERENT` (both sides of
+the comparison are definitionally same-timeframe); `min_atr_pct` is `REQUIREMENT_AMBIGUOUS`; **stop/target
+geometry (`atr_stop_multiplier`) is `TIMEFRAME_MISMATCH`** — the highest-priority open finding. A stop sized
+to 1.5x of 1-minute-scale ATR is plausibly, though not proven causally, too tight for the confirmed
+minutes-to-hours holding horizon, and is consistent with (not proven to cause) Task 26's own observed
+exit-timing asymmetry (STOP median 4 min vs. TARGET/EOD median 14 min/2.6 hr). Two files
+(`talonx_quant/buffer.py`, `docs/bar_buffer_persistence.md`) were found to actively contradict the current
+continuous-ATR behavior (stale, describe pre-audit session-reset behavior) — flagged, not corrected.
+
+**Live/backtest ATR parity**: `PARTIAL_PARITY` — the computation mechanism is proven identical by shared
+code (not merely observed similar); end-to-end numerical parity remains unverified due to Task 25C's
+previously-identified, unresolved warmup-seed-capture gap. Not re-attempted in this task.
+
+**Today's live-session recommendation**: `RUN_OBSERVATIONAL_SHADOW_ONLY` — per this task's own governing
+decision rule ("if internally coherent but requirement intent ambiguous, prefer running existing validated
+behavior observationally"), both conditions (coherent implementation, ambiguous intent) confirmed true.
+
+**Statistical evidence standard**: an 8-dimension policy proposed (sufficient trade count via CI excluding
+zero, multi-regime coverage, non-concentrated symbols, cost robustness, OOS validation, formal concentration
+limits, deterministic reproducibility, confidence-interval reporting) — no arbitrary trade-count number
+forced. Current n=26 baseline meets 1 of 8 dimensions fully (reproducibility).
+
+**Task 22 policy**: `DEFER_UNTIL_SAMPLE_GROWS` — outcomes not inspected; decision based solely on the same
+n=26 sample-size constraint that also blocks the primary edge claim, independent of Task 22's own original
+findings.
+
+**Open owner decisions**: 15 items in `decision_register.csv`, all `owner_answer=PENDING`. Highest priority:
+target signal/trade frequency, cost-tolerance requirement, ATR stop-distance intended timeframe.
+
+**No tuning/code changes**: no threshold, formula, or gate was changed, tested against alternatives, or
+proposed for change anywhere in this task. 21 existing ATR-relevant tests run (16 `test_quant_indicators.py`
++ 5 ATR/volatility cases in `test_quant_consumer.py`), 21/21 passed, 0 new tests written (existing coverage
+was sufficient to verify current behavior deterministically).
+
+**Central artifact**: `docs/research/TALONX_PRODUCT_STRATEGY_SPEC.md` created (17 sections, each marked
+CONFIRMED or PROVISIONAL) — intended to become the product-level strategy authority below explicit future
+owner decisions.
+
+**Final decision**: `MULTIPLE_OWNER_DECISIONS_STILL_REQUIRED` — too many first-order decisions remain open
+for a "confirmed" label; this is a specification proposal awaiting sign-off, not a finished spec with minor
+items pending.
+
+**ATR decision (reported separately)**: `ATR_INTRADAY_14_CONFIRMED` for CURRENT implementation only —
+intent for 2 of 3 use cases (`min_atr_pct`, stop geometry) remains `OWNER_DECISION_REQUIRED`, not folded
+into this label.
+
+**Next recommended action (not started)**: Task 32 — Owner Decision Capture: convene the actual product
+owner to work through `decision_register.csv`'s 15 open items (priority order: target frequency, cost
+tolerance, ATR stop-distance intent, then the remainder), recording real answers in place of `PENDING` and
+updating `TALONX_PRODUCT_STRATEGY_SPEC.md`'s PROVISIONAL sections to CONFIRMED as each resolves. Not a code
+task — no implementation should begin until this capture is complete.
+
+**State**: Task 30 checkpoint committed and pushed (`c3ede492b3965788412ca021a81e0e449aabc70f`). Task 31
+specification artifacts, `docs/research/TALONX_PRODUCT_STRATEGY_SPEC.md`, and this ledger entry — **not
+committed, not pushed**, per instruction. No production strategy changes. PR #10 remains draft. All 21
+required artifacts written to `results/task31_owner_specification/`.
