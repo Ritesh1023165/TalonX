@@ -175,10 +175,24 @@ def _macd_crossed_this_bar(s: IndicatorSnapshot) -> bool:
 
 def _confluence_score(
     s: IndicatorSnapshot, config: QuantConfig, volume_threshold: float, direction: SignalDirection,
+    signal_type: SignalType,
 ) -> int:
-    """0-3: +1 each for a MACD cross firing THIS bar, RSI sitting in the
-    extreme zone that actually SUPPORTS this candidate's direction, and
-    volume surge above the session-appropriate threshold.
+    """0-3: +1 each for an INDEPENDENT MACD cross firing THIS bar, RSI
+    sitting in the extreme zone that actually SUPPORTS this candidate's
+    direction, and volume surge above the session-appropriate threshold.
+
+    No-Self-Credit (2026-08-22 requirement-alignment fix, Task 47/49):
+    the owner's confluence contract is TRIGGER + ONE INDEPENDENT
+    CONFIRMATION. For a candidate whose own trigger IS the MACD cross
+    (signal_type MACD_BULLISH_CROSS/MACD_BEARISH_CROSS), that same cross
+    can no longer also count as this candidate's confirmation leg --
+    Task 47 measured a 100% self-credit rate before this fix, since
+    _macd_crossed_this_bar's condition is identical to the trigger
+    condition that created the candidate in the first place. A
+    non-MACD-triggered candidate (RSI/MA) that happens to coincide with
+    an independent MACD cross on the same bar is unaffected -- that IS a
+    genuinely independent confirmation, exactly the case this leg exists
+    to reward.
 
     Direction-Aware Confluence: unlike the old bar-level (direction-
     agnostic) score, a RSI reading only contributes a point when it
@@ -193,7 +207,8 @@ def _confluence_score(
     bullish cross and, on a later bar, an MA death cross) and each needs
     its own direction-appropriate score."""
     score = 0
-    if _macd_crossed_this_bar(s):
+    own_trigger_is_macd = signal_type in (SignalType.MACD_BULLISH_CROSS, SignalType.MACD_BEARISH_CROSS)
+    if _macd_crossed_this_bar(s) and not own_trigger_is_macd:
         score += 1
     if s.rsi is not None:
         if direction == SignalDirection.BULLISH and s.rsi < config.rsi_oversold:
@@ -539,7 +554,7 @@ def _build_signal(
     config: QuantConfig,
     ctx: _SignalContext,
 ) -> QuantSignal:
-    confluence_score = _confluence_score(s, config, ctx.volume_threshold, direction)
+    confluence_score = _confluence_score(s, config, ctx.volume_threshold, direction, signal_type)
     pivot_resistance = None if ctx.pivots is None else ctx.pivots.resistance
     pivot_support = None if ctx.pivots is None else ctx.pivots.support
     # Task 35: a single calculate_trade_geometry call (was two separate

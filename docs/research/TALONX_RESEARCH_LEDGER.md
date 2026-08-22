@@ -4884,3 +4884,71 @@ implementation task.
 **State**: Task 47 checkpoint committed and pushed (`6589974`). This Task 48 ledger entry and all
 `results/task48_bullish_stateful_trace/` artifacts — **not committed, not pushed**, per instruction. PR #10
 remains draft.
+
+## Task 49 — Minimal MACD Confluence Self-Credit Correction + Bounded Validation (2026-08-22)
+
+**Objective**: correct the proven MACD confluence self-credit requirement violation (Task 47), validate
+correctness, measure impact on the existing Task 46 population. Requirement-correctness fix, not an
+optimization for more trades.
+
+**Task 48 checkpoint**: committed and pushed as `ed63a52` before Task 49 began. PR #10 confirmed draft/open.
+
+**Proven MACD requirement mismatch**: `_confluence_score()` (`talonx_quant/strategy.py`) awarded a MACD leg
+whenever `_macd_crossed_this_bar(s)` was true, with no awareness of which family triggered the candidate —
+for a MACD-triggered candidate that condition is always true by construction (it IS the trigger condition),
+so the leg always self-credited (100% rate, Task 47).
+
+**Exact code correction**: `_confluence_score` gained one parameter (`signal_type`) and one clause
+(`and not own_trigger_is_macd`) on its existing MACD-leg condition — excludes the leg specifically when
+`signal_type` is `MACD_BULLISH_CROSS`/`MACD_BEARISH_CROSS`. RSI leg, volume leg, `confluence_score_min`,
+and every other gate/threshold byte-for-byte unchanged. One call site (`_build_signal`) updated to pass the
+`signal_type` it already had in scope.
+
+**Tests**: 9 new requirement-proving tests (cases A-H + the positive "both legs" case) added to
+`tests/test_quant_strategy.py`; 9 pre-existing calls updated for the new signature; 1 pre-existing
+`evaluate_signals`-based assertion updated to its corrected expected value (2→1). Result: **75 passed, 0
+failed** in that file. `tests/test_backtest_research_telemetry.py`'s fixture needed strengthening (its
+volume never cleared the production threshold, so after the fix no candidate in it could reach
+`confluence_score_min` at all) — its test-local `volume_surge_ratio_threshold` was lowered to match what the
+fixture's own data actually produces; **12 passed, 0 failed**. One **pre-existing, unrelated** failure
+identified via `git stash` bisection (fails identically with none of this task's changes applied):
+`test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset` — its sole
+candidate is BEARISH, which can never open a trade under LONG_ONLY regardless of confluence; not fixed here,
+flagged as out of scope. Full repository suite result: see Task 49 artifacts' `test_results.txt`.
+
+**Before/after candidate impact**: reconstructed from Task 46's saved `signal_log` (6,506 candidates), BEFORE
+state reconciled exactly to Task 47/48's canonical counts. Closed-form AFTER derivation (proven identity:
+`confluence_score_after = confluence_score_before - 1` for MACD family, unchanged for RSI/MA) validated
+directly against the raw data. Confluence pass count: 844→16 overall; bullish 403→12 (12.53%→0.37%); bearish
+441→4 (13.41%→0.12%). MACD family: bullish pass 391→0, bearish pass 438→1.
+
+**RSI/MA no-drift proof**: `confluence_score_before == confluence_score_after` for all 263 RSI/MA candidates
+— proven exactly, not sampled.
+
+**Bullish attrition after correction**: LOW_CONFLUENCE remains dominant and becomes MORE dominant —
+87.47%→99.63% (all-failure basis) — the expected, correct consequence of removing self-credit from the
+family supplying ~95% of raw triggers. No gate tuned in response.
+
+**Unresolved Task 48 five status**: all 5 (AMD ×4, STX ×1) drop from `confluence_score=2` to `1` and are no
+longer strategy-gate-clean under the corrected rule. This explains their FUTURE non-publication but does
+NOT retroactively explain Task 48's original fidelity gap (measured under the OLD, pre-fix formula, where
+they genuinely scored 2) — `INSUFFICIENT_STATE_EVIDENCE` preserved for that original question.
+
+**Whether Task 50 replay is justified**: **Yes.** The corrected population differs materially (bullish clean
+24→0, bearish clean 206→2 on this exact historical sample); only a stateless-gate proxy has been measured,
+never the actual stateful engine under the corrected rule; replay would now also be cheap given how sparse
+the clean population is.
+
+**Final decision**: `MACD_SELF_CREDIT_CORRECTED_AND_VALIDATED`.
+
+**No other strategy changes**: confirmed — RSI confluence semantics, MA logic, `confluence_score_min`,
+volatility regime, trend gate, HTF logic, session/blackout, cooldown/throttle, R:R, stop/target all
+untouched. No P&L computed. No historical expansion. Task 22 not inspected. No capital used.
+
+**Next recommended action (not started)**: Task 50 — Bounded Corrected-Confluence Engine Replay: re-run the
+same Task 46 experimental population (35 symbols, 3 windows) through the actual backtest engine with this
+fix applied, measuring real publication/lifecycle behavior under the corrected confluence rule.
+
+**State**: Task 48 checkpoint committed and pushed (`ed63a52`). This Task 49 ledger entry, code change
+(`talonx_quant/strategy.py`), tests, and all `results/task49_macd_self_credit_fix/` artifacts — **not
+committed, not pushed**, per instruction. PR #10 remains draft.

@@ -254,7 +254,10 @@ def test_signal_fires_when_bar_true_range_exactly_equals_atr_multiple(config):
 def test_confluence_bullish_counts_oversold_rsi(config):
     snap = _snapshot(rsi=22.0)  # oversold -- supports a BULLISH read
 
-    assert _confluence_score(snap, config, config.volume_surge_ratio_threshold, SignalDirection.BULLISH) == 1
+    assert _confluence_score(
+        snap, config, config.volume_surge_ratio_threshold, SignalDirection.BULLISH,
+        SignalType.RSI_OVERSOLD_VOLUME_SURGE,
+    ) == 1
 
 
 def test_confluence_bullish_scores_zero_for_overbought_rsi(config):
@@ -262,35 +265,54 @@ def test_confluence_bullish_scores_zero_for_overbought_rsi(config):
     # must earn a BULLISH candidate ZERO points for the RSI leg.
     snap = _snapshot(rsi=75.0)
 
-    assert _confluence_score(snap, config, config.volume_surge_ratio_threshold, SignalDirection.BULLISH) == 0
+    assert _confluence_score(
+        snap, config, config.volume_surge_ratio_threshold, SignalDirection.BULLISH,
+        SignalType.RSI_OVERSOLD_VOLUME_SURGE,
+    ) == 0
 
 
 def test_confluence_bearish_counts_overbought_rsi(config):
     snap = _snapshot(rsi=75.0)  # overbought -- supports a BEARISH read
 
-    assert _confluence_score(snap, config, config.volume_surge_ratio_threshold, SignalDirection.BEARISH) == 1
+    assert _confluence_score(
+        snap, config, config.volume_surge_ratio_threshold, SignalDirection.BEARISH,
+        SignalType.RSI_OVERBOUGHT_VOLUME_SURGE,
+    ) == 1
 
 
 def test_confluence_bearish_scores_zero_for_oversold_rsi(config):
     snap = _snapshot(rsi=22.0)
 
-    assert _confluence_score(snap, config, config.volume_surge_ratio_threshold, SignalDirection.BEARISH) == 0
+    assert _confluence_score(
+        snap, config, config.volume_surge_ratio_threshold, SignalDirection.BEARISH,
+        SignalType.RSI_OVERBOUGHT_VOLUME_SURGE,
+    ) == 0
 
 
 def test_confluence_score_counts_all_three_factors_bullish(config):
+    # Non-MACD-triggered (RSI) candidate with a COINCIDENT, INDEPENDENT MACD
+    # cross on the same bar -- exactly the case the No-Self-Credit fix (Task
+    # 49) is meant to keep crediting: the MACD leg here is NOT the
+    # candidate's own trigger, so it remains a legitimate confirmation.
     snap = _snapshot(
-        macd=0.05, macd_signal_line=0.02, macd_prev=-0.01, macd_signal_line_prev=0.01,  # MACD cross
+        macd=0.05, macd_signal_line=0.02, macd_prev=-0.01, macd_signal_line_prev=0.01,  # independent MACD cross
         rsi=25.0,  # oversold -- supports BULLISH
         volume_surge_ratio=3.0,  # above threshold
     )
 
-    assert _confluence_score(snap, config, config.volume_surge_ratio_threshold, SignalDirection.BULLISH) == 3
+    assert _confluence_score(
+        snap, config, config.volume_surge_ratio_threshold, SignalDirection.BULLISH,
+        SignalType.RSI_OVERSOLD_VOLUME_SURGE,
+    ) == 3
 
 
 def test_confluence_score_is_zero_when_nothing_qualifies(config):
     snap = _snapshot(rsi=50.0, volume_surge_ratio=1.0)
 
-    assert _confluence_score(snap, config, config.volume_surge_ratio_threshold, SignalDirection.BULLISH) == 0
+    assert _confluence_score(
+        snap, config, config.volume_surge_ratio_threshold, SignalDirection.BULLISH,
+        SignalType.RSI_OVERSOLD_VOLUME_SURGE,
+    ) == 0
 
 
 def test_confluence_score_is_computed_per_signal_direction(config):
@@ -307,9 +329,190 @@ def test_confluence_score_is_computed_per_signal_direction(config):
 
     assert len(signals) == 1
     assert signals[0].signal_type == SignalType.MACD_BULLISH_CROSS
-    # MACD cross (1) + volume surge (1) + RSI leg (0, overbought doesn't
-    # support a bullish read) = 2, not 3.
-    assert signals[0].confluence_score == 2
+    # No-Self-Credit (Task 49): this candidate's own trigger IS the MACD
+    # cross, so that leg no longer counts as its confirmation. MACD leg (0,
+    # self-credit excluded) + volume surge (1) + RSI leg (0, overbought
+    # doesn't support a bullish read) = 1, not 3 (and not 2, pre-Task-49).
+    assert signals[0].confluence_score == 1
+
+
+# --- No-Self-Credit Contract (Task 49: TRIGGER + ONE INDEPENDENT CONFIRMATION) --
+#
+# Requirement-proving tests for the 2026-08-22 fix: a MACD-triggered
+# candidate's own MACD cross may no longer count as its own confluence
+# confirmation. Task 47 measured a 100% self-credit rate before this fix
+# (every MACD_BULLISH_CROSS/MACD_BEARISH_CROSS candidate's own trigger
+# condition was identical to _confluence_score's MACD leg condition). These
+# tests lock the corrected contract: a MACD candidate now needs BOTH an
+# independent RSI-extreme reading AND a volume surge to reach
+# confluence_score_min=2 (2 points), since its own MACD leg contributes 0 --
+# unlike before, where the MACD leg alone plus any one other leg sufficed.
+
+def test_case_a_macd_trigger_alone_does_not_satisfy_confluence(config):
+    # MACD cross only -- no RSI extreme in the supporting direction, no
+    # volume surge. Self-credit excluded -> score 0, nowhere near threshold.
+    snap = _snapshot(
+        macd=0.05, macd_signal_line=0.02, macd_prev=-0.01, macd_signal_line_prev=0.01,
+        rsi=50.0, volume_surge_ratio=None,
+    )
+
+    signals = evaluate_signals("AAPL", snap, config)
+    macd_signals = [s for s in signals if s.signal_type == SignalType.MACD_BULLISH_CROSS]
+
+    assert len(macd_signals) == 1
+    assert macd_signals[0].confluence_score == 0
+    assert macd_signals[0].confluence_score < config.confluence_score_min
+
+
+def test_case_b_macd_trigger_plus_rsi_alone_is_still_below_threshold(config):
+    # MACD cross + an independent oversold RSI reading, but no volume surge.
+    # RSI leg (1) is a genuine independent confirmation, but MACD's own leg
+    # is excluded (0) -- one leg alone is not enough to clear
+    # confluence_score_min=2 for a MACD-triggered candidate post-fix (it
+    # would have been enough pre-fix, when the MACD leg self-credited).
+    snap = _snapshot(
+        macd=0.05, macd_signal_line=0.02, macd_prev=-0.01, macd_signal_line_prev=0.01,
+        rsi=25.0, volume_surge_ratio=None,
+    )
+
+    signals = evaluate_signals("AAPL", snap, config)
+    macd_signals = [s for s in signals if s.signal_type == SignalType.MACD_BULLISH_CROSS]
+
+    assert len(macd_signals) == 1
+    assert macd_signals[0].confluence_score == 1
+    assert macd_signals[0].confluence_score < config.confluence_score_min
+
+
+def test_case_c_macd_trigger_plus_ma_state_does_not_add_a_confluence_leg(config):
+    # _confluence_score has no MA-state leg at all (only MACD/RSI/volume) --
+    # a coincident MA crossover fires as its OWN independent signal (Task
+    # 27's same-bar coincidence case) but contributes nothing to the MACD
+    # candidate's own score. Documents actual implementation semantics
+    # rather than fabricating an MA confluence leg that doesn't exist.
+    snap = _snapshot(
+        macd=0.05, macd_signal_line=0.02, macd_prev=-0.01, macd_signal_line_prev=0.01,
+        price=500.0, sma_fast=138.0, sma_slow=137.0, sma_fast_prev=136.5, sma_slow_prev=137.0,
+        rsi=50.0, volume_surge_ratio=None,
+    )
+
+    signals = evaluate_signals("AAPL", snap, config)
+    macd_signals = [s for s in signals if s.signal_type == SignalType.MACD_BULLISH_CROSS]
+    ma_signals = [s for s in signals if s.signal_type == SignalType.MA_GOLDEN_CROSS]
+
+    assert len(macd_signals) == 1
+    assert len(ma_signals) == 1  # fires independently, same bar
+    assert macd_signals[0].confluence_score == 0  # MA state is not a confluence leg
+
+
+def test_case_d_macd_trigger_plus_volume_alone_is_still_below_threshold(config):
+    # MACD cross + volume surge, no RSI extreme. Volume leg (1) alone is not
+    # enough post-fix, symmetric with case B.
+    snap = _snapshot(
+        macd=0.05, macd_signal_line=0.02, macd_prev=-0.01, macd_signal_line_prev=0.01,
+        rsi=50.0, volume_surge_ratio=3.0,
+    )
+
+    signals = evaluate_signals("AAPL", snap, config)
+    macd_signals = [s for s in signals if s.signal_type == SignalType.MACD_BULLISH_CROSS]
+
+    assert len(macd_signals) == 1
+    assert macd_signals[0].confluence_score == 1
+    assert macd_signals[0].confluence_score < config.confluence_score_min
+
+
+def test_case_macd_trigger_plus_rsi_and_volume_reaches_threshold(config):
+    # The ONLY way a MACD-triggered candidate can reach confluence_score_min
+    # (2) post-fix: BOTH remaining legs (RSI + volume), since its own MACD
+    # leg contributes 0. Bearish mirror included for symmetry.
+    snap = _snapshot(
+        macd=0.05, macd_signal_line=0.02, macd_prev=-0.01, macd_signal_line_prev=0.01,
+        rsi=25.0, volume_surge_ratio=3.0,
+    )
+
+    signals = evaluate_signals("AAPL", snap, config)
+    macd_signals = [s for s in signals if s.signal_type == SignalType.MACD_BULLISH_CROSS]
+
+    assert len(macd_signals) == 1
+    assert macd_signals[0].confluence_score == 2
+    assert macd_signals[0].confluence_score >= config.confluence_score_min
+
+    bear_snap = _snapshot(
+        macd=-0.05, macd_signal_line=-0.02, macd_prev=0.01, macd_signal_line_prev=-0.01,
+        rsi=75.0, volume_surge_ratio=3.0,
+    )
+    bear_signals = evaluate_signals("AAPL", bear_snap, config)
+    bear_macd_signals = [s for s in bear_signals if s.signal_type == SignalType.MACD_BEARISH_CROSS]
+    assert len(bear_macd_signals) == 1
+    assert bear_macd_signals[0].confluence_score == 2
+
+
+def test_case_e_macd_own_confirmation_is_structurally_impossible(config):
+    # "MACD trigger + independent MACD confirmation" cannot exist as a
+    # fixture: _macd_crossed_this_bar (the would-be confirmation condition)
+    # IS the exact condition _check_macd_crossover uses to fire the trigger
+    # in the first place -- there is no code path where a bar produces a
+    # MACD_BULLISH_CROSS/MACD_BEARISH_CROSS trigger without also making
+    # _macd_crossed_this_bar True for that same candidate. This test
+    # documents that structural impossibility directly rather than
+    # fabricating a fixture that could never occur in the real pipeline:
+    # every MACD-triggered candidate's own_trigger_is_macd branch always
+    # takes the self-credit-excluded path, unconditionally.
+    snap = _snapshot(macd=0.05, macd_signal_line=0.02, macd_prev=-0.01, macd_signal_line_prev=0.01)
+
+    signals = evaluate_signals("AAPL", snap, config)
+    macd_signals = [s for s in signals if s.signal_type == SignalType.MACD_BULLISH_CROSS]
+
+    assert len(macd_signals) == 1
+    # The trigger firing at all is definitional proof _macd_crossed_this_bar
+    # was True for this candidate -- yet its own MACD leg still contributes 0.
+    assert macd_signals[0].confluence_score == 0
+
+
+def test_case_f_rsi_triggered_candidate_confluence_unchanged(config):
+    # RSI-triggered candidates were never self-crediting (Task 28/33: the
+    # curl-recovery trigger condition and the confluence RSI-extreme-state
+    # condition are structurally disjoint) -- this fix must not touch them.
+    # Same fixture/assertions as the pre-existing
+    # test_bullish_curl_with_volume_and_coincident_macd_reaches_confluence_two.
+    snap = _snapshot(
+        rsi=31.0, rsi_prev=28.0, volume_surge_ratio=3.0,
+        macd=0.05, macd_signal_line=0.02, macd_prev=-0.01, macd_signal_line_prev=0.01,
+    )
+
+    signals = evaluate_signals("AAPL", snap, config)
+    rsi_signals = [s for s in signals if s.signal_type == SignalType.RSI_OVERSOLD_VOLUME_SURGE]
+
+    assert len(rsi_signals) == 1
+    # Independent MACD leg (1, not this candidate's own trigger) + volume
+    # (1) = 2 -- unchanged from pre-fix behavior.
+    assert rsi_signals[0].confluence_score == 2
+
+
+def test_case_g_ma_triggered_candidate_confluence_unchanged(config):
+    # MA-triggered candidates were already ALIGNED (Task 33) -- _confluence_
+    # score has no MA-state leg to self-credit from in the first place. This
+    # fix must not touch them either: an MA candidate's score is driven
+    # purely by (independent) MACD/RSI/volume state, exactly as before.
+    snap = _snapshot(
+        price=500.0, sma_fast=138.0, sma_slow=137.0, sma_fast_prev=136.5, sma_slow_prev=137.0,
+        macd=0.05, macd_signal_line=0.02, macd_prev=-0.01, macd_signal_line_prev=0.01,  # independent MACD cross
+        rsi=25.0, volume_surge_ratio=3.0,
+    )
+
+    signals = evaluate_signals("MSFT", snap, config)
+    ma_signals = [s for s in signals if s.signal_type == SignalType.MA_GOLDEN_CROSS]
+
+    assert len(ma_signals) == 1
+    # MACD leg (1, independent) + RSI leg (1, oversold supports bullish) +
+    # volume leg (1) = 3 -- identical to pre-fix behavior (MA never
+    # self-credited, so nothing here changes).
+    assert ma_signals[0].confluence_score == 3
+
+
+def test_case_h_confluence_threshold_itself_is_unchanged(config):
+    # The fix touches ONLY how the MACD leg is awarded, never
+    # confluence_score_min itself.
+    assert QuantConfig().confluence_score_min == 2
 
 
 # --- RSI-Curl / Confluence Contract (Task 28: RSI_CONFLUENCE_STATE_BASED_CONFIRMED) ---
@@ -442,7 +645,10 @@ def test_boundary_bullish_current_just_shy_of_threshold_does_not_fire_curl(confi
     # to since no trigger fired. RSI leg (1) + volume leg (1) = 2.
     # Demonstrates the two checks are evaluated on entirely separate
     # conditions, not just "the same value seen twice".
-    assert _confluence_score(snap, config, config.volume_surge_ratio_threshold, SignalDirection.BULLISH) == 2
+    assert _confluence_score(
+        snap, config, config.volume_surge_ratio_threshold, SignalDirection.BULLISH,
+        SignalType.RSI_OVERSOLD_VOLUME_SURGE,
+    ) == 2
 
 
 def test_boundary_bearish_recovery_exactly_at_overbought_threshold_fires_curl(config):
@@ -475,7 +681,10 @@ def test_boundary_bearish_current_just_above_threshold_does_not_fire_curl(config
 
     assert [s for s in signals if s.signal_type == SignalType.RSI_OVERBOUGHT_VOLUME_SURGE] == []
     # RSI leg (1, still overbought at 70.1 > 70) + volume leg (1) = 2.
-    assert _confluence_score(snap, config, config.volume_surge_ratio_threshold, SignalDirection.BEARISH) == 2
+    assert _confluence_score(
+        snap, config, config.volume_surge_ratio_threshold, SignalDirection.BEARISH,
+        SignalType.RSI_OVERBOUGHT_VOLUME_SURGE,
+    ) == 2
 
 
 # --- Structural R:R Calculation --------------------------------------------
