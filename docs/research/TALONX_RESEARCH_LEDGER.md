@@ -4061,3 +4061,91 @@ Explicitly measurement-only: no new threshold proposed, no config change, no re-
 **State**: Task 36 checkpoint committed and pushed (`f280d5555ae81e96f90c11d4aaee0cb0f3fa5051`). This Task 37
 ledger entry and all `results/task37_fast_universe_feasibility/` artifacts — **not committed, not pushed**,
 per instruction. PR #10 remains draft.
+
+**2026-08-22 update (Task 38)**: this Task 37 ledger entry was committed as `df266c9c74e0afe41f99a51a327d3357dd6a11df`
+(`docs(research): record production-universe feasibility check`) and pushed at the start of Task 38.
+`results/task37_fast_universe_feasibility/` artifacts remain untracked (repo-wide `/results/` gitignored).
+PR #10 confirmed still draft/open.
+
+## Task 38 — LOW_VOLATILITY Gate Diagnostic (2026-08-22)
+
+**Objective**: measurement-only diagnosis of why LOW_VOLATILITY rejects ~88% of bars (Task 37), and whether
+the current 1-minute ATR% gate is semantically suitable for the owner-confirmed `MULTI_TIMEFRAME`
+volatility-regime requirement (Task 33, `ATR-REGIME-001`). No code, config, or threshold changed.
+
+**Task 37 checkpoint**: committed and pushed as `df266c9c74e0afe41f99a51a327d3357dd6a11df`
+(`docs(research): record production-universe feasibility check`) before Task 38 began.
+
+**Integrity**: HEAD `df266c9c74e0afe41f99a51a327d3357dd6a11df`, QuantConfig `9174f5232c20`, BacktestConfig
+`19654e22ffd5`, strategy version `acd08feb59a7` — all identical to Task 36/37 (confirmed frozen, zero code
+changes for this task). Reused Task 37's exact 35-symbol universe and 3 windows (2025-08-29→09-12,
+2026-02-06→02-20, 2026-07-20→07-31) and already-downloaded data — zero new data fetched.
+
+**Formula confirmed** (full trace in `atr_formula_trace.md`): `ATR(14, pandas_ta, 1-minute
+RollingBarBuffer, 200-bar cap, continuous across session boundaries) / current bar close >= 0.25%`, strict
+`<`/inclusive `>=`, 120-bar warm-up (silently skipped, no gate evaluation at all). Critically, gate ordering
+places `_fails_min_volatility` BEFORE `evaluate_signals` in `engine.py::_process_symbol_bar` — a
+volatility-failing bar never even attempts RSI/MACD/MA trigger detection, so the live `signal_log` can never
+contain a volatility-failing candidate by construction. Not called a bug — the code does exactly what it
+says.
+
+**Method**: rather than a second full engine re-run (which cannot answer step 7's question, since
+`evaluate_signals` is gated behind the volatility check in production), a lightweight diagnostic replay
+reused the exact frozen buffer/aggregator/indicator/signal functions (`RollingBarBuffer`,
+`HtfBarAggregator`, `get_session`, `compute_indicators`, `compute_htf_trend`, `compute_daily_pivots`,
+`evaluate_signals`, `_fails_min_volatility` — zero formula reimplementation) but called `evaluate_signals` on
+**every** bar regardless of the volatility outcome, to measure raw candidate density independent of the
+gate. Smoke-tested (500 bars, ~84min projected) before the full run (105.5 min, single bounded pass, not
+multi-hour). Fidelity validated exactly: the replay's candidates-passing-volatility count (2,473) matches
+Task 37's actual published `signals_generated` (2,473) precisely.
+
+**ATR% distribution** (587,868 post-warm-up bars): median 0.093%, p90 0.248%, p95 0.329% — the 0.25%
+threshold sits almost exactly at the 90th percentile. Every symbol's median is below 0.25%, including the
+most volatile name (STX, 0.207%).
+
+**Session split**: pass rate 54.6% in the 09:30-09:45 opening blackout vs. 9.4% regular/8.9% pre-market/7.1%
+closed/3.1% closing-blackout — passes cluster in a window ALSO independently blocked by `OPENING_BLACKOUT`.
+
+**Price/symbol effect**: weak, likely non-causal correlation (r=0.135 level, r=0.080 pass rate); no
+causality inferred from price alone.
+
+**Candidate-level analysis (the central finding)**: 27,039 raw RSI/MACD/MA triggers exist unconditionally
+in the sample; only 9.15% (2,473) would clear the volatility gate. MACD (25,927 candidates) and RSI (1,069)
+fail 90.9%/94.3% of the time; MA-crossover (43, rarer/larger inherent move) passes 97.7%. **The gate is not
+primarily filtering quiet/dead bars — it discards the large majority of genuine trigger events.** Rejected
+candidates are mostly structurally short of the threshold (43% fall 50-75% short), not narrow misses.
+
+**Broader-timeframe context** (descriptive, same source bars, no new formula): 15-min median ATR% 0.42%
+(82% clear 0.25), 60-min median 0.84% (99.9% clear it); daily ATR not computable from a 10-trading-day
+sample window. The same symbols/periods show normal-to-high volatility at broader timeframes — it is
+specifically the 1-minute reading that rarely crosses 0.25%.
+
+**Current gate semantics**: `EXTREME_1MIN_VOLATILITY_FILTER` (not `SHORT_TERM_NOISE_FILTER` — active
+triggers fail it >90% of the time; not `BROADER_REGIME_PROXY` — every symbol fails at 1-minute scale
+regardless of 15/60-min activity).
+
+**Dominant-gate validation at candidate level**: 90.85% candidate-level rejection, essentially identical to
+the 90.22% bar-level rate — confirms LOW_VOLATILITY remains dominant at candidate level, not a bar-counting
+artifact.
+
+**Requirement alignment**: `MISALIGNED` — the gate applies a single 1-minute-bar reading as if it were a
+regime-level filter, directly confirming the `TIMEFRAME_MISMATCH` hypothesis first raised (unproven) in
+Task 31. Requirements for a future replacement (contract-level only, no formula proposed):
+comparable-across-price, reflects broader tradability regime, retains short-term trigger relevance, causal
+and live-computable, identical live/backtest semantics, defined premarket/extended-hours behavior,
+deterministic, no future-bar dependency. Full reasoning: `requirement_alignment.md`.
+
+**No tuning**: zero code/config changes; 0.25% untouched; no alternative threshold or P&L computed; no
+full-year 35-symbol run; no Task 22 inspection.
+
+**Determinism**: no stochastic state; fidelity proven by the exact 2,473/2,473 cross-check against Task
+37's independently-published output. Focused test suite reused: 237 passed, 0 failed.
+
+**Final decision**: `CURRENT_VOLATILITY_GATE_MISALIGNED_WITH_PRODUCT_REQUIREMENT`.
+
+**Next recommended action (not started)**: Task 39 — design (not tune, not P&L-optimize) the multi-timeframe
+volatility-regime contract/formula, per the requirements listed above. Contract-design only.
+
+**State**: Task 37 checkpoint committed and pushed (`df266c9c74e0afe41f99a51a327d3357dd6a11df`). This Task
+38 ledger entry and all `results/task38_low_volatility_diagnostic/` artifacts — **not committed, not
+pushed**, per instruction. PR #10 remains draft.
