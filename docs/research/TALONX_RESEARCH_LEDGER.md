@@ -3956,3 +3956,108 @@ geometry-coherence investigation (option A) would have enough trades to act on.
 **State**: Task 35 checkpoint committed (`5da8617d691221cdc54f4f1866f8d888847ffa5c`). This Task 36 ledger
 entry and all `results/task36_structural_stop_canonical_baseline/` artifacts — **not committed, not
 pushed**, per instruction. PR #10 remains draft.
+
+**2026-08-22 update (Task 37)**: this Task 36 ledger entry was committed as `f280d5555ae81e96f90c11d4aaee0cb0f3fa5051`
+(`docs(research): record corrected canonical baseline`) and pushed at the start of Task 37, per that task's
+checkpoint-first instruction. `results/task36_structural_stop_canonical_baseline/` artifacts remain
+untracked (repo-wide `/results/` is gitignored by design, confirmed — no results directory has ever been
+committed in this repo's history). PR #10 confirmed still draft/open.
+
+## Task 37 — Fast Production-Universe Feasibility Check (2026-08-22)
+
+**Objective**: cheaply determine whether expanding from Task 36's 10-symbol universe toward the product's
+intended 35-50+ symbol production universe (Task 33's `REGULAR_OPPORTUNITY` objective) would plausibly create
+a meaningful recurring opportunity flow — a feasibility gate deciding whether an expensive full 35-50 symbol,
+full-year backtest is worth running, NOT that expensive run itself.
+
+**Task 36 checkpoint**: committed and pushed as `f280d5555ae81e96f90c11d4aaee0cb0f3fa5051`
+(`docs(research): record corrected canonical baseline`) before any Task 37 work began.
+
+**Frozen strategy**: zero code changes. HEAD `f280d5555ae81e96f90c11d4aaee0cb0f3fa5051` is docs-only;
+QuantConfig hash `9174f5232c20`, BacktestConfig hash `19654e22ffd5`, strategy version `acd08feb59a7` — all
+three identical to Task 36's values, confirmed at run start.
+
+**Universe**: 35 symbols — Task 36's original 10 (AAPL, MSFT, NVDA, AMZN, META, AMD, TSLA, GOOGL, PYPL, STX)
+plus 25 additional large/liquid Nasdaq-100 names (ADBE, ADI, AMAT, AVGO, BKNG, CMCSA, COST, CSCO, GILD, HON,
+INTC, INTU, ISRG, KLAC, LRCX, MDLZ, MU, NFLX, PANW, PEP, QCOM, REGN, SBUX, TXN, VRTX), chosen from a fixed
+alphabetical reference list before any Task 37 result was viewed — not cherry-picked. See
+`universe_manifest.csv`.
+
+**Sample windows**: three fixed, non-overlapping 10-trading-day windows selected mechanically from AAPL's
+actual trading-day calendar (positional slices with a 10-day buffer at each end, split into early/middle/late
+thirds) before any strategy result was viewed: A_early 2025-08-29→2025-09-12, B_middle 2026-02-06→2026-02-20,
+C_late 2026-07-20→2026-07-31 — 30 trading days total (~6 weeks). See `window_manifest.csv`. The 10 original
+symbols were sliced from their existing full-year local CSVs (zero network cost, guaranteed data-origin
+consistency with Task 36); the 25 new symbols were freshly downloaded via the same Alpaca provider Task 7B
+used, all 25/25 returning `FULL` status with no failures.
+
+**Runtime policy**: estimated ~793K bars / ~1.6h before launching (41.7% of Task 36's workload, ~12% of a
+hypothetical full 35-symbol year) — within the 1-2h MEDIUM budget, no STOP triggered. Actual: 600,363 bars,
+75.4 minutes (31.5% of Task 36's workload, 9.1% of a hypothetical full 35-symbol year) — came in under
+estimate. A second pass (`research_telemetry=False`, 75.5 min) re-ran the identical frozen strategy on the
+identical data solely to recover per-symbol funnel detail the first pass had discarded — not a second,
+different evaluation; the two passes cross-checked as an exact MATCH on signals_generated/published/trades
+for all 3 windows, which doubles as this task's determinism evidence (see below).
+
+**Data quality**: all 35 symbols × 3 windows clean, zero critical corruption.
+
+**Signal funnel** (aggregate, 600,363 bars): raw candidates 2,473 (0.41% of bars); **LOW_VOLATILITY 530,360
+(88.34% of ALL bars)** — overwhelmingly dominant, evaluated bar-level before any candidate exists, no
+overlapping-failure ambiguity since nothing else is evaluated first; LOW_CONFLUENCE 1,548 (0.26%, the
+distant second); LOW_RISK_REWARD 94 (0.016%); TREND_GATE 4; blackouts 507 combined; published bullish 1;
+published bearish (NO_ACTIVE_POSITION, while flat) 18; executed longs 1. Full per-symbol breakdown in
+`symbol_summary.csv` — LOW_VOLATILITY dominates for every one of the 35 symbols individually (range ~8,400 to
+~27,000 rejected bars per symbol); COST alone produced zero raw candidates across its entire sample.
+
+**Zero-short invariant**: CONFIRMED — the single executed trade is `direction == bullish`.
+
+**Main product question**: across ~6 sampled weeks — executable longs/week ≈ **0.167** (1 trade / 6 weeks);
+published bullish signals/week ≈ 0.167 (identical, 100% publish→execute conversion, same clean pattern as
+Task 26/36); 29 of 30 sampled trading days had zero entries, 1 day had exactly 1 entry, 0 days had 2 or 3+;
+only 1 of 35 symbols (BKNG) ever produced a trade, 34 produced zero. Against the `REGULAR_OPPORTUNITY`
+objective ("a few good opportunities/week across the production watchlist"), this is not close — observed
+frequency is roughly two orders of magnitude below even the low end of "a few/week."
+
+**Frequency classification**: `LIKELY_TOO_SPARSE`.
+
+**Bottleneck**: `LOW_VOLATILITY`, not `MULTIPLE` — no other gate is remotely comparable in magnitude (next
+largest, LOW_CONFLUENCE, is 340x smaller). Because LOW_VOLATILITY is evaluated before `evaluate_signals` runs
+at all, this is a clean first-failure measurement with no known overlapping-failure ambiguity to account for
+(unlike candidate-level gates such as LOW_RISK_REWARD, where Task 27/33 established that first-failure
+counts under-attribute rejections to gates evaluated later in priority order). No new threshold proposed.
+
+**Economics (light only, n=1 — NOT STATISTICALLY SUFFICIENT FOR EDGE CLAIM)**: 1 trade, gross_R -1.0, 5bps
+net_R -1.24, 0 wins / 1 loss (STOP exit, BKNG, 2026-07-30).
+
+**Geometry**: 0 STRUCTURAL_PRIMARY, 1 ATR_FALLBACK (`STRUCTURE_NOT_BELOW_ENTRY`), 0 invalid geometry. Not
+meaningful at n=1; no alternative-stop analysis performed.
+
+**Determinism**: two independent full runs (differing only in `research_telemetry` on/off, extracting
+different downstream detail) matched exactly on signals_generated/published/trades across all 3 windows —
+stronger evidence than a bounded-subset replay would have been, at zero additional cost since the second pass
+was independently required. A third, separate bounded-subset replay was deliberately skipped as redundant.
+Focused test suite reused (not re-derived): 274 passed, 0 failed
+(`test_quant_strategy/consumer/backtest_fill_geometry/backtest_long_only_lifecycle/live_backtest_contract/backtest_engine_state`).
+Strategy-code determinism itself was already proven in Task 35 (core geometry function) and Task 36 (bounded
+subset, full-year data) — not re-proven from scratch here.
+
+**No tuning**: zero code changes; no threshold named in the governing instruction's do-not-change list was
+touched, confirmed by the frozen config/strategy hashes matching Task 36 exactly. No Task 22 inspection.
+
+**Decision gate**: condition B applies — the strategy is extremely sparse AND one gate (LOW_VOLATILITY)
+overwhelmingly dominates (in fact the same underlying cause explains both). Per the governing instruction,
+this means do NOT recommend an overnight full 35-50 symbol/full-year run; recommend a focused diagnostic of
+the dominant bottleneck first.
+
+**Final decision**: `DOMINANT_GATE_REQUIRES_DIAGNOSTIC`.
+
+**Next recommended action (not started)**: a focused, measurement-only diagnostic of the LOW_VOLATILITY gate
+across the 35-symbol universe — e.g. the distribution of realized ATR% relative to `min_atr_pct` per symbol,
+whether the rejection is concentrated in extended-hours bars vs. the regular session, and whether it is
+uniform across symbols or concentrated in specific names/sectors (COST rejected 100% of its sampled bars).
+Explicitly measurement-only: no new threshold proposed, no config change, no re-run of the expensive
+35-symbol backtest until this diagnostic explains the dominant gate's behavior.
+
+**State**: Task 36 checkpoint committed and pushed (`f280d5555ae81e96f90c11d4aaee0cb0f3fa5051`). This Task 37
+ledger entry and all `results/task37_fast_universe_feasibility/` artifacts — **not committed, not pushed**,
+per instruction. PR #10 remains draft.
