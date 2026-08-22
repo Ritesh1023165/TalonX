@@ -112,6 +112,23 @@ class QuantSignal(BaseModel):
     confluence_score: int | None = None
     risk_reward_ratio: float | None = None
 
+    # Task 51: independent-confirmation telemetry -- optional/defaulted for
+    # backward wire compatibility (a consumer on an older schema version
+    # simply never sees these keys; an older serialized payload deserializes
+    # fine with all four None). Only populated when config.confluence_contract
+    # is INDEPENDENT_CONFIRMATION_EXPERIMENTAL (see strategy.py's
+    # evaluate_independent_confirmations) -- always None under LEGACY, which
+    # continues to use confluence_score/confluence_score_min exactly as
+    # before Task 51. confirmation_count IS confluence_score under the
+    # experimental contract (same field, redefined meaning -- see
+    # evaluate_independent_confirmations's own docstring), duplicated here
+    # explicitly so a consumer never has to infer which semantics apply.
+    confirmation_count: int | None = None
+    confirmation_macd: bool | None = None
+    confirmation_rsi: bool | None = None
+    confirmation_volume: bool | None = None
+    confirmation_contract: str | None = None
+
     # Phase 2 requirement doc: explicit dollar stop/target (1x ATR stop /
     # pivot-or-2x-ATR target), rather than only the derived ratio above --
     # see strategy.py's _stop_target_prices. None when atr is None

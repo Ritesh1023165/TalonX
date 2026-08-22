@@ -46,6 +46,27 @@ class VolatilityGateMode(str, Enum):
     MULTITIMEFRAME_EXPERIMENTAL = "MULTITIMEFRAME_EXPERIMENTAL"
 
 
+class ConfluenceContract(str, Enum):
+    """Task 51: which confluence/confirmation implementation is authoritative
+    for candidate scoring. Exactly two modes, mirroring VolatilityGateMode's
+    own LEGACY/EXPERIMENTAL split above.
+
+    LEGACY (the default, and the ONLY mode talonx_quant.consumer.QuantScanner
+    -- live/paper-shadow -- will ever accept; it fails fast at construction
+    otherwise) is byte-for-byte the pre-Task-51 behavior: strategy.py's
+    _confluence_score (Task 49's MACD-no-self-credit fix included), gated by
+    confluence_score_min in consumer.py/talonx_backtest.engine.
+
+    INDEPENDENT_CONFIRMATION_EXPERIMENTAL is research/backtest-only
+    (talonx_backtest.BacktestEngine): strategy.py's
+    evaluate_independent_confirmations becomes authoritative instead --
+    TRIGGER + AT LEAST ONE independent, directionally-supportive
+    confirmation, family-aware (see that function's own docstring).
+    Eligibility becomes confirmation_count >= 1, not confluence_score_min."""
+    LEGACY = "LEGACY"
+    INDEPENDENT_CONFIRMATION_EXPERIMENTAL = "INDEPENDENT_CONFIRMATION_EXPERIMENTAL"
+
+
 def _load_dotenv() -> None:
     """
     Loads the shared .env file at the repo root, if present. `override=False`:
@@ -342,6 +363,15 @@ class QuantConfig:
     # of the two defined enum members.
     volatility_gate_mode: VolatilityGateMode = VolatilityGateMode(
         os.environ.get("TALONX_QUANT_VOLATILITY_GATE_MODE", VolatilityGateMode.CURRENT_1M.value)
+    )
+
+    # --- Task 51: confluence/confirmation contract (research/backtest
+    # experimental switch) --- default MUST stay LEGACY; talonx_quant.
+    # consumer.QuantScanner (live/paper-shadow) fails fast at construction
+    # if this is ever anything else -- see that class's own __init__ guard,
+    # same fail-closed posture as volatility_gate_mode above.
+    confluence_contract: ConfluenceContract = ConfluenceContract(
+        os.environ.get("TALONX_QUANT_CONFLUENCE_CONTRACT", ConfluenceContract.LEGACY.value)
     )
 
     # --- 15-minute 200 SMA higher-timeframe trend gate ---

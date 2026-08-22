@@ -236,7 +236,7 @@ from pydantic import ValidationError
 from talonx_quant import preseed
 from talonx_quant.aggregation import HtfBarAggregator
 from talonx_quant.buffer import RollingBarBuffer
-from talonx_quant.config import QuantConfig, VolatilityGateMode
+from talonx_quant.config import ConfluenceContract, QuantConfig, VolatilityGateMode
 from talonx_quant.indicators import (
     VolatilityRegimeSnapshot, classify_regime_shadow_disagreement, compute_daily_pivots, compute_htf_trend,
     compute_indicators, compute_volatility_regime, evaluate_regime,
@@ -353,6 +353,26 @@ def _trend_gate_applicable(signal: QuantSignal, config: QuantConfig) -> bool:
     )
 
 
+def _confluence_eligible(signal: QuantSignal, config: QuantConfig) -> bool:
+    """Task 51: the ONE authoritative LOW_CONFLUENCE eligibility check,
+    shared by talonx_quant.consumer (live) and talonx_backtest.engine
+    (research) -- same "reuse, don't duplicate" architecture as
+    _trend_gate_applicable/_opportunity_score above.
+
+    LEGACY: confluence_score/confluence_score_min, byte-for-byte the
+    pre-Task-51 threshold check -- unchanged, zero-drift.
+
+    INDEPENDENT_CONFIRMATION_EXPERIMENTAL: the owner's contract read
+    literally (TRIGGER + AT LEAST ONE independent confirmation) --
+    confirmation_count >= 1, NOT compared against confluence_score_min
+    (that threshold is a LEGACY-only concept; strategy.py's _build_signal
+    already sets confluence_score = confirmation_count under this
+    contract, so this reduces to `>= 1` directly, no threshold sweep)."""
+    if config.confluence_contract == ConfluenceContract.INDEPENDENT_CONFIRMATION_EXPERIMENTAL:
+        return (signal.confluence_score or 0) >= 1
+    return (signal.confluence_score or 0) >= config.confluence_score_min
+
+
 def _opportunity_score(signal: QuantSignal, config: QuantConfig) -> float:
     """Composite Opportunity Score (2026-08-16 quant audit, P1): the
     throttle window's ranking key, replacing the old
@@ -465,6 +485,17 @@ class QuantScanner:
                 f"QuantScanner (live/paper-shadow execution) only supports "
                 f"volatility_gate_mode=CURRENT_1M -- got "
                 f"{self.config.volatility_gate_mode!r}. MULTITIMEFRAME_EXPERIMENTAL "
+                f"is research/backtest-only (talonx_backtest.BacktestEngine)."
+            )
+        # Task 51: same fail-closed posture, same reason -- a mis-set env var
+        # must never let live/paper-shadow trading silently run under an
+        # experimental, unvalidated confirmation contract. INDEPENDENT_
+        # CONFIRMATION_EXPERIMENTAL is research/backtest-only.
+        if self.config.confluence_contract != ConfluenceContract.LEGACY:
+            raise ValueError(
+                f"QuantScanner (live/paper-shadow execution) only supports "
+                f"confluence_contract=LEGACY -- got "
+                f"{self.config.confluence_contract!r}. INDEPENDENT_CONFIRMATION_EXPERIMENTAL "
                 f"is research/backtest-only (talonx_backtest.BacktestEngine)."
             )
         self.store = store
@@ -1600,7 +1631,7 @@ class QuantScanner:
         # below is started -- a low-conviction candidate that never
         # becomes a real signal must not still burn the ticker's cooldown
         # slot and block a later, better one.
-        qualifying = [s for s in signals if (s.confluence_score or 0) >= self.config.confluence_score_min]
+        qualifying = [s for s in signals if _confluence_eligible(s, self.config)]
         if not qualifying:
             self._signals_suppressed_low_confluence += len(signals)
             await _incr_metric(self._client, "quant", "failed_confluence", len(signals))

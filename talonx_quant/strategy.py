@@ -83,7 +83,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from talonx_quant.config import QuantConfig
+from talonx_quant.config import ConfluenceContract, QuantConfig
 from talonx_quant.indicators import DailyPivots, IndicatorSnapshot
 from talonx_quant.schemas import QuantSignal, SignalDirection, SignalType
 from talonx_quant.session import Session, get_session
@@ -160,17 +160,33 @@ def _clears_atr_move(s: IndicatorSnapshot, config: QuantConfig) -> bool:
     return s.bar_true_range >= config.atr_move_multiplier * s.atr
 
 
+def _macd_bullish_crossed_this_bar(s: IndicatorSnapshot) -> bool:
+    """True if MACD crossed ABOVE its signal line on this bar -- the exact
+    condition _check_macd_crossover uses to fire MACD_BULLISH_CROSS."""
+    if None in (s.macd, s.macd_signal_line, s.macd_prev, s.macd_signal_line_prev):
+        return False
+    return s.macd_prev <= s.macd_signal_line_prev and s.macd > s.macd_signal_line
+
+
+def _macd_bearish_crossed_this_bar(s: IndicatorSnapshot) -> bool:
+    """True if MACD crossed BELOW its signal line on this bar -- the exact
+    condition _check_macd_crossover uses to fire MACD_BEARISH_CROSS."""
+    if None in (s.macd, s.macd_signal_line, s.macd_prev, s.macd_signal_line_prev):
+        return False
+    return s.macd_prev >= s.macd_signal_line_prev and s.macd < s.macd_signal_line
+
+
 def _macd_crossed_this_bar(s: IndicatorSnapshot) -> bool:
     """True if EITHER direction of MACD/signal-line cross happened on
     this bar -- used both by _check_macd_crossover (to decide whether to
-    emit its own signal) and by _confluence_score (to count a MACD cross
-    as a conviction factor for ANY signal firing this bar, e.g. an RSI
-    setup with a coincident MACD cross scores higher than one without)."""
-    if None in (s.macd, s.macd_signal_line, s.macd_prev, s.macd_signal_line_prev):
-        return False
-    bullish = s.macd_prev <= s.macd_signal_line_prev and s.macd > s.macd_signal_line
-    bearish = s.macd_prev >= s.macd_signal_line_prev and s.macd < s.macd_signal_line
-    return bullish or bearish
+    emit its own signal) and by _confluence_score/LEGACY contract (to
+    count a MACD cross as a conviction factor for ANY signal firing this
+    bar, e.g. an RSI setup with a coincident MACD cross scores higher
+    than one without). Direction-AGNOSTIC on purpose -- this is the
+    pre-Task-51 LEGACY formula, frozen for zero-drift; the Task 51
+    EXPERIMENTAL contract uses the direction-aware halves above instead
+    (see evaluate_independent_confirmations)."""
+    return _macd_bullish_crossed_this_bar(s) or _macd_bearish_crossed_this_bar(s)
 
 
 def _confluence_score(
@@ -218,6 +234,85 @@ def _confluence_score(
     if s.volume_surge_ratio is not None and s.volume_surge_ratio > volume_threshold:
         score += 1
     return score
+
+
+@dataclass(frozen=True)
+class ConfirmationState:
+    """Task 51: structured result of evaluate_independent_confirmations --
+    which independent confirmation legs a candidate has, under the
+    INDEPENDENT_CONFIRMATION_EXPERIMENTAL contract. confirmation_count is
+    what confluence_score is set to under that contract (see _build_signal);
+    confirmation_components is a stable, human-readable audit trail (e.g.
+    for RejectedCandidateEvent/shadow telemetry) of exactly which legs
+    fired, independent of the numeric count alone."""
+    macd_confirmed: bool
+    rsi_confirmed: bool
+    volume_confirmed: bool
+    confirmation_count: int
+    confirmation_components: tuple[str, ...]
+
+
+def evaluate_independent_confirmations(
+    s: IndicatorSnapshot, signal_type: SignalType, direction: SignalDirection,
+    volume_threshold: float, config: QuantConfig,
+) -> ConfirmationState:
+    """Task 51 authoritative family-aware confirmation model for the
+    INDEPENDENT_CONFIRMATION_EXPERIMENTAL contract: TRIGGER + AT LEAST ONE
+    independent, directionally-supportive confirmation, for every family
+    (RSI/MACD/MA) -- the owner's contract read literally, not as a numeric
+    threshold. This is the ONE authoritative implementation of that
+    contract; talonx_backtest's engine reuses this function unchanged
+    (same "reuse the same strategy.py, do not duplicate formulas"
+    architecture every other gate in this module already follows).
+
+    Family self-credit exclusion (generalizes Task 47/49's MACD-specific
+    fix to every family): a candidate's own trigger family can never count
+    as its own confirmation leg, regardless of which family that is --
+    - MACD-triggered: the MACD leg is excluded (that IS the trigger).
+    - RSI-triggered: the RSI leg is excluded. Structurally this was
+      already true before Task 51 (Task 28/33: the curl-recovery trigger
+      condition and the confluence RSI-extreme-state condition are
+      disjoint), kept explicit here so the exclusion doesn't rely on that
+      coincidence remaining true forever.
+    - MA-triggered: _confluence_score never had an MA-state leg to begin
+      with -- nothing to exclude, MA can draw on all three legs below.
+
+    Direction-aware MACD (Task 51 fix to the LEGACY formula's direction-
+    agnostic weakness): a BULLISH candidate can only be confirmed by a
+    BULLISH MACD cross, a BEARISH candidate only by a BEARISH one -- see
+    _macd_bullish_crossed_this_bar/_macd_bearish_crossed_this_bar. Under
+    the OLD (LEGACY) _macd_crossed_this_bar, a bearish MACD cross could
+    confirm a bullish RSI/MA candidate on the same bar, which is not
+    "directionally supportive" by any reading of the owner's contract.
+
+    Volume is shared, family-agnostic confirmation evidence for every
+    family (it never fires a trigger of its own, so it is never excluded
+    for self-credit) -- same direction-aware volume_threshold every other
+    volume check in this module uses (session-appropriate surge ratio)."""
+    own_trigger_is_macd = signal_type in (SignalType.MACD_BULLISH_CROSS, SignalType.MACD_BEARISH_CROSS)
+    own_trigger_is_rsi = signal_type in (SignalType.RSI_OVERSOLD_VOLUME_SURGE, SignalType.RSI_OVERBOUGHT_VOLUME_SURGE)
+
+    if direction == SignalDirection.BULLISH:
+        macd_directional = _macd_bullish_crossed_this_bar(s)
+    else:
+        macd_directional = _macd_bearish_crossed_this_bar(s)
+    macd_confirmed = macd_directional and not own_trigger_is_macd
+
+    rsi_directional = s.rsi is not None and (
+        (direction == SignalDirection.BULLISH and s.rsi < config.rsi_oversold)
+        or (direction == SignalDirection.BEARISH and s.rsi > config.rsi_overbought)
+    )
+    rsi_confirmed = rsi_directional and not own_trigger_is_rsi
+
+    volume_confirmed = s.volume_surge_ratio is not None and s.volume_surge_ratio > volume_threshold
+
+    components = tuple(
+        name for name, ok in (("macd", macd_confirmed), ("rsi", rsi_confirmed), ("volume", volume_confirmed)) if ok
+    )
+    return ConfirmationState(
+        macd_confirmed=macd_confirmed, rsi_confirmed=rsi_confirmed, volume_confirmed=volume_confirmed,
+        confirmation_count=len(components), confirmation_components=components,
+    )
 
 
 @dataclass(frozen=True)
@@ -446,30 +541,48 @@ def _check_rsi_volume_setup(
     shorting the first touch fights the trend rather than confirming a
     genuine reversal, the same false-signal risk the bullish leg was
     already fixed for.
+
+    Trigger/confirmation separation (Task 51): under LEGACY, volume surge
+    remains a hard PREREQUISITE for the trigger to fire at all -- byte-
+    for-byte the pre-Task-51 behavior, frozen for zero-drift. Under
+    INDEPENDENT_CONFIRMATION_EXPERIMENTAL, the curl ALONE creates the
+    candidate (the SignalType enum values keep their legacy
+    *_VOLUME_SURGE names for wire compatibility -- see schemas.SignalType
+    -- but no longer imply volume was present at trigger time under this
+    contract); volume becomes purely a confirmation leg, evaluated by
+    evaluate_independent_confirmations downstream in _build_signal, never
+    double-required here.
     """
-    if s.rsi is None or s.rsi_prev is None or s.volume_surge_ratio is None:
+    if s.rsi is None or s.rsi_prev is None:
         return
     if not _clears_atr_move(s, config):
         return
+    experimental = config.confluence_contract == ConfluenceContract.INDEPENDENT_CONFIRMATION_EXPERIMENTAL
+    if not experimental and s.volume_surge_ratio is None:
+        return  # LEGACY: volume required for the trigger itself, exactly as before Task 51
+
+    volume_confirmed = s.volume_surge_ratio is not None and s.volume_surge_ratio > ctx.volume_threshold
+    if s.volume_surge_ratio is not None:
+        vol_desc = f"with {s.volume_surge_ratio:.1f}x volume surge (> {ctx.volume_threshold:.1f}x)"
+    else:
+        vol_desc = "(no volume surge -- EXPERIMENTAL curl-only trigger)"
 
     recovered_from_oversold = s.rsi_prev < config.rsi_oversold and s.rsi >= config.rsi_oversold
-    if recovered_from_oversold and s.volume_surge_ratio > ctx.volume_threshold:
+    if recovered_from_oversold and (experimental or volume_confirmed):
         signals.append(_build_signal(
             ticker, s, SignalType.RSI_OVERSOLD_VOLUME_SURGE, SignalDirection.BULLISH,
             f"RSI {s.rsi:.1f} curled back above oversold (>= {config.rsi_oversold:.0f}, "
-            f"was {s.rsi_prev:.1f}) with {s.volume_surge_ratio:.1f}x volume surge "
-            f"(> {ctx.volume_threshold:.1f}x)",
+            f"was {s.rsi_prev:.1f}) {vol_desc}",
             config, ctx,
         ))
         return  # a bar crosses one direction at most; skip the overbought check
 
     recovered_from_overbought = s.rsi_prev > config.rsi_overbought and s.rsi <= config.rsi_overbought
-    if recovered_from_overbought and s.volume_surge_ratio > ctx.volume_threshold:
+    if recovered_from_overbought and (experimental or volume_confirmed):
         signals.append(_build_signal(
             ticker, s, SignalType.RSI_OVERBOUGHT_VOLUME_SURGE, SignalDirection.BEARISH,
             f"RSI {s.rsi:.1f} curled back below overbought (<= {config.rsi_overbought:.0f}, "
-            f"was {s.rsi_prev:.1f}) with {s.volume_surge_ratio:.1f}x volume surge "
-            f"(> {ctx.volume_threshold:.1f}x)",
+            f"was {s.rsi_prev:.1f}) {vol_desc}",
             config, ctx,
         ))
 
@@ -554,7 +667,20 @@ def _build_signal(
     config: QuantConfig,
     ctx: _SignalContext,
 ) -> QuantSignal:
-    confluence_score = _confluence_score(s, config, ctx.volume_threshold, direction, signal_type)
+    # Task 51: contract dispatch. LEGACY keeps _confluence_score exactly as
+    # Task 49 left it (byte-for-byte, zero-drift) -- confirmation_* fields
+    # stay None, never populated under LEGACY. EXPERIMENTAL uses the new
+    # family-aware model instead; confluence_score is REDEFINED to be
+    # confirmation_count under this contract (see evaluate_independent_
+    # confirmations's own docstring) -- same field, different, explicitly
+    # documented meaning, disambiguated for any reader by the also-attached
+    # confirmation_contract field.
+    confirmation_state: ConfirmationState | None = None
+    if config.confluence_contract == ConfluenceContract.INDEPENDENT_CONFIRMATION_EXPERIMENTAL:
+        confirmation_state = evaluate_independent_confirmations(s, signal_type, direction, ctx.volume_threshold, config)
+        confluence_score = confirmation_state.confirmation_count
+    else:
+        confluence_score = _confluence_score(s, config, ctx.volume_threshold, direction, signal_type)
     pivot_resistance = None if ctx.pivots is None else ctx.pivots.resistance
     pivot_support = None if ctx.pivots is None else ctx.pivots.support
     # Task 35: a single calculate_trade_geometry call (was two separate
@@ -580,6 +706,11 @@ def _build_signal(
         volume_surge_ratio=s.volume_surge_ratio,
         atr=s.atr,
         confluence_score=confluence_score,
+        confirmation_count=None if confirmation_state is None else confirmation_state.confirmation_count,
+        confirmation_macd=None if confirmation_state is None else confirmation_state.macd_confirmed,
+        confirmation_rsi=None if confirmation_state is None else confirmation_state.rsi_confirmed,
+        confirmation_volume=None if confirmation_state is None else confirmation_state.volume_confirmed,
+        confirmation_contract=config.confluence_contract.value if confirmation_state is not None else None,
         risk_reward_ratio=None if geometry is None else geometry.risk_reward_ratio,
         stop_price=None if geometry is None else geometry.stop_price,
         target_price=None if geometry is None else geometry.target_price,

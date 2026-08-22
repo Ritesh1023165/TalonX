@@ -5023,3 +5023,86 @@ MA-triggered candidates, informed by this task's evidence.
 **State**: Task 49 checkpoint committed and pushed (`83aee8b`). This Task 50 ledger entry and all
 `results/task50_corrected_confluence_replay/` artifacts — **not committed, not pushed**, per instruction.
 PR #10 remains draft.
+
+## Task 51 — Family-Aware Independent Confirmation Contract + Monday Candidate Plumbing (2026-08-22)
+
+**Objective**: implement the owner's contract literally (TRIGGER + AT LEAST ONE independent,
+directionally-supportive confirmation) for RSI/MACD/MA as one coherent, contract-selectable design;
+prepare Monday shadow-comparison plumbing without touching the frozen baseline. Requirement alignment,
+not tuning.
+
+**Task 50 checkpoint**: committed and pushed as `671bdc7` before Task 51 began. PR #10 confirmed draft/open.
+
+**Direct code-review findings** (re-verified against live code): post-Task-49 a MACD candidate needed RSI+
+volume BOTH (2 confirmations, not 1); MA could draw wrong-direction MACD credit (direction-agnostic bug);
+RSI double-required-then-recredited volume; RSI's own state was already structurally self-exclusive
+(Task 28/33, unaffected).
+
+**Final family-aware contract**: `talonx_quant.config.ConfluenceContract` (`LEGACY` default / research-only
+`INDEPENDENT_CONFIRMATION_EXPERIMENTAL`, fail-closed on unknown values, `QuantScanner` fails fast on
+non-LEGACY exactly like `volatility_gate_mode`). One authoritative function,
+`strategy.evaluate_independent_confirmations`, reused unchanged by `talonx_backtest.BacktestEngine`. MACD:
+own leg excluded, valid confirmations RSI or volume. MA: no own leg to exclude, valid confirmations
+same-direction MACD/RSI/volume. RSI: own leg excluded, valid confirmations volume or same-direction MACD.
+Eligibility `confirmation_count >= 1` via a new shared `consumer._confluence_eligible` helper — no
+threshold sweep, LEGACY's `confluence_score_min` untouched.
+
+**RSI trigger/volume separation**: `_check_rsi_volume_setup` now contract-branches — LEGACY keeps volume
+as a hard trigger prerequisite (byte-for-byte unchanged), EXPERIMENTAL fires the curl alone with volume
+becoming confirmation-only, never double-counted. Legacy `SignalType.RSI_*_VOLUME_SURGE` enum values
+retained unchanged for wire compatibility.
+
+**Directional MACD correction**: new `_macd_bullish_crossed_this_bar`/`_macd_bearish_crossed_this_bar`
+helpers fix a real, pre-existing bug — concretely demonstrated a bullish MA + coincident bearish MACD cross
+scored `1` under LEGACY (wrong) vs `0` under EXPERIMENTAL (correct).
+
+**Confirmation-count semantics**: `confluence_score` redefined to `confirmation_count` under EXPERIMENTAL
+(same field, disambiguated by a new `confirmation_contract` field). Five new always-optional `QuantSignal`
+fields added (`confirmation_count/macd/rsi/volume/contract`), all `None` under LEGACY.
+
+**Opportunity Score**: audited, unchanged. The existing `/3.0` normalization is correct despite differing
+per-family confirmation ceilings (MACD/RSI max 2, MA max 3) — per-family self-normalization would have
+introduced exactly the ranking bias the task warned against. No weights touched.
+
+**Schema compatibility**: no breaking wire change — `SignalType` unchanged, five new fields additive/
+optional, proven via round-trip serialization AND an old-payload-with-keys-stripped parse test.
+
+**Legacy zero-drift**: proven exactly via `git stash` on a deterministic 260-bar fixture — SHA-256 digest
+over the full engine output byte-identical before/after (`ed973a9677ca63a0` both times). Corroborated by
+486 passing focused-regression tests (0 changed) and a full-suite delta of exactly +26 (the new test file
+alone).
+
+**Task 46 static rescore**: MACD confirmation pass matches Task 49/50 exactly (391 bullish/438 bearish).
+**Sanity guard triggered and reported honestly, not tuned away**: RSI confirmation pass showed 100%
+(152/152, 93/93) — flagged as a dataset survivorship-bias artifact (the reused Task 46/50 population was
+generated under the OLD volume-required trigger, so every RSI candidate already had volume; NOT
+representative of a true EXPERIMENTAL raw population). MACD leg also not reconstructable for non-MACD
+families from saved telemetry (macd_prev unavailable) — RSI/MA counts are a lower bound. Strategy-gate-clean
+proxy (lower bound, caveated): bullish=34, bearish=263 — explicitly NOT to be read as a Task 52 projection.
+
+**Monday A/B capability**: broker safety reconfirmed — no order-placement code exists anywhere in the
+repository. Shadow telemetry (this task's `confirmation_*` fields) is sufficient for Monday post-close
+comparison. True dual-portfolio execution needs exactly one small change: a `state_namespace` field threaded
+into `consumer.py`'s two hardcoded cooldown/loss-lockout Redis key f-strings (signal channels and paper
+`db_path` are already independently configurable).
+
+**Tests**: 26 new requirement-proving tests (cases A-Z), 0 failed. 486-test focused regression, 0 failed.
+Full suite: 1836 passed, 1 pre-existing unrelated failure (reconfirmed, same root cause as Task 49/50), 1
+skipped, 15 xfailed.
+
+**Final decision**: `IMPLEMENTED_WITH_MONDAY_AB_PLUMBING_PENDING`.
+
+**No tuning**: confirmed — no threshold sweep, no volatility/trend/HTF/session/cooldown/R:R/stop/target
+change, frozen provisional regime thresholds untouched. Task 22 not inspected. No capital used.
+
+**Next recommended action (not started)**: Task 52 — Bounded Historical A/B Validation + Monday Candidate
+Freeze: replay exact Task 46 validation data under both contracts with a FRESH replay (not reused saved
+data, since EXPERIMENTAL's RSI trigger now fires on a materially larger raw population), compare baseline
+vs candidate publication/trades/economics/costs, and if sane, freeze both configs for Monday plus finalize
+the parallel shadow runbook (including the `state_namespace` plumbing).
+
+**State**: Task 50 checkpoint committed and pushed (`671bdc7`). This Task 51 ledger entry, code change
+(`talonx_quant/config.py`, `talonx_quant/schemas.py`, `talonx_quant/strategy.py`,
+`talonx_quant/consumer.py`, `talonx_backtest/engine.py`), tests, and all
+`results/task51_independent_confirmation/` artifacts — **not committed, not pushed**, per instruction. PR
+#10 remains draft.

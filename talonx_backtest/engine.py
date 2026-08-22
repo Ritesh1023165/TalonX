@@ -98,6 +98,7 @@ from talonx_quant.buffer import RollingBarBuffer
 from talonx_quant.config import QuantConfig
 from talonx_quant.consumer import (
     _GATE_NAMES,
+    _confluence_eligible,
     _evaluate_active_volatility_gate,
     _fails_min_volatility,
     _opportunity_score,
@@ -611,7 +612,7 @@ class BacktestEngine:
             self._reject(symbol, "COOLDOWN", len(signals), timestamp)
             return
 
-        qualifying = [s for s in signals if (s.confluence_score or 0) >= qc.confluence_score_min]
+        qualifying = [s for s in signals if _confluence_eligible(s, qc)]
         if not qualifying:
             self._reject(symbol, "LOW_CONFLUENCE", len(signals), timestamp)
             return
