@@ -4952,3 +4952,74 @@ fix applied, measuring real publication/lifecycle behavior under the corrected c
 **State**: Task 48 checkpoint committed and pushed (`ed63a52`). This Task 49 ledger entry, code change
 (`talonx_quant/strategy.py`), tests, and all `results/task49_macd_self_credit_fix/` artifacts — **not
 committed, not pushed**, per instruction. PR #10 remains draft.
+
+## Task 50 — Bounded Corrected-Confluence Engine Replay (2026-08-22)
+
+**Objective**: replay Task 49's corrected confluence rule through the actual backtest engine on the exact
+Task 46 population, to measure real gate funnel/publication/lifecycle behavior (not a stateless proxy)
+before deciding whether the confluence architecture needs redesign.
+
+**Task 49 checkpoint**: committed and pushed as `83aee8b` before Task 50 began. PR #10 confirmed draft/open.
+
+**Exact Task 46 population reuse**: `quant_config_hash=1eb58828ad69` and `backtest_config_hash=7096a993d034`
+match Task 46's experimental run exactly; `strategy_version=efd8558ce2a0` intentionally differs (Task 49's
+fix is active). Same 35-symbol universe, same 3 frozen windows, same `data/historical_1m/
+task46_validation_windows/` directory — no redownload, no substitution, no extension. Data integrity:
+105/105 CSVs present, none modified since Task 46 (mtime-verified).
+
+**Pre-run prediction** (recorded before viewing outcomes): LOW_CONFLUENCE expected to dominate; very few
+published signals expected; zero/few bullish executable entries expected; no profitability claim.
+
+**Corrected engine funnel**: 309,838 bars (exact match to Task 46), 63.5 min runtime (vs. Task 46's 62.6 min
+for the identical pass — no performance regression). Raw candidates generated: 6,506 (exact match to Task
+46-49's canonical population). **0 signals published, 0 trades executed** — across all windows, all
+symbols, both directions. `LOW_VOLATILITY_REGIME` 150,877 (bar-level, matches Task 46 exactly),
+`LOW_CONFLUENCE` 4,861 first-failure (74.7% of signal-level rejections), `US_MARKET_SESSION_CLOSED` 1,265,
+`CLOSING_BLACKOUT` 201, `OPENING_BLACKOUT` 160, `LOW_RISK_REWARD` 5, `HTF_DATA_UNAVAILABLE` 3,
+`PREMARKET_LIQUIDITY` 2, `TREND_GATE`/`COOLDOWN`/`THROTTLE`/`LOSS_LOCKOUT` all 0 (nothing ever survives far
+enough to reach them).
+
+**Task 49 proxy reconciliation**: exact match on every dimension. `confluence_score` distribution
+(0=5,432, 1=1,058, 2=16) matches Task 49's closed-form prediction of 16 exactly. Family × direction
+confluence-pass counts match the proxy in every cell (bullish RSI 12/MACD 0/MA 0, bearish RSI 3/MACD 1/MA
+0). All 16 confluence-qualifying candidates individually traced to their exact real terminal rejection (6
+CLOSING_BLACKOUT, 5 LOW_RISK_REWARD, 3 HTF_DATA_UNAVAILABLE, 2 PREMARKET_LIQUIDITY) — zero unexplained. One
+apparent discrepancy during reconciliation (a candidate expected to fail R:R that the engine didn't count
+there) was traced to its true cause (closing-blackout eliminates it first in the real gate order) and
+documented, not hidden.
+
+**Publication/execution counts**: 0 published (0 bullish, 0 bearish-flat), 0 trades — vs. Task 46's pre-fix
+139 published (0 bullish) and Task 46 CURRENT_1M's 7 published (0 bullish). Product-frequency comparison:
+trades/week, entry days, symbols-with-trades all 0 across all three configurations on this sample.
+
+**Economics**: `ECONOMICS_NOT_MEASURABLE` — 0 trades at every cost level, no figure fabricated.
+
+**Dominant blocker assessment**: `CONFLUENCE_ARCHITECTURE_STRUCTURALLY_OVERSELECTIVE`. Both required
+criteria met: (1) essentially no executable opportunity flow — 0 published/trades, and all 16 confluence
+survivors eliminated downstream too; (2) LOW_CONFLUENCE dominance is broad (12 distinct tickers, all 3
+windows), not one isolated event. Mechanism: MACD (96% of raw triggers) now needs RSI-extreme AND volume
+simultaneously (previously either sufficed via self-credit); RSI/MA have too small a raw population to
+compensate.
+
+**Correctness invariants**: LONG_ONLY, no-bearish-entry, no-lookahead, structural-stop/R:R/target logic,
+and the experimental volatility gate all verified unaffected (trivially, given 0 trades, and via a 147-test
+focused regression pass, 0 failures). CURRENT_1M/Monday path not exercised this run (exactly one
+experimental pass, per instruction) but its own regression-equivalence test passed.
+
+**MACD fix status**: NOT reverted. Task 47 proved the self-credit removal was a genuine requirement fix;
+this task's conclusion is about the broader confirmation-contract design, not a reason to restore invalid
+self-confirmation.
+
+**Final decision**: `CONFLUENCE_ARCHITECTURE_REDESIGN_REQUIRED`.
+
+**No tuning**: confirmed — no confluence threshold, confirmation-leg, RSI/MA logic, volatility/trend/HTF/
+session/cooldown/R:R/stop/target change, window/symbol expansion, or parameter sweep. Task 22 not
+inspected. No capital used.
+
+**Next recommended action (not started)**: Task 51 — Independent Confirmation Contract Redesign
+(DESIGN ONLY): separately define valid independent confirmation for RSI-triggered, MACD-triggered, and
+MA-triggered candidates, informed by this task's evidence.
+
+**State**: Task 49 checkpoint committed and pushed (`83aee8b`). This Task 50 ledger entry and all
+`results/task50_corrected_confluence_replay/` artifacts — **not committed, not pushed**, per instruction.
+PR #10 remains draft.
