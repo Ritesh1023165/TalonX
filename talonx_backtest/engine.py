@@ -104,8 +104,8 @@ from talonx_quant.consumer import (
     _trend_gate_applicable,
 )
 from talonx_quant.indicators import (
-    VolatilityRegimeSnapshot, compute_daily_pivots, compute_htf_trend, compute_indicators,
-    compute_volatility_regime,
+    VolatilityRegimeSnapshot, classify_regime_shadow_disagreement, compute_daily_pivots, compute_htf_trend,
+    compute_indicators, compute_volatility_regime, evaluate_regime,
 )
 from talonx_quant.schemas import QuantSignal, SignalDirection
 from talonx_quant.session import get_entry_blackout, get_session
@@ -272,6 +272,11 @@ class BacktestEngine:
         # observational-only convention.
         self.volatility_regime_snapshots: dict[str, VolatilityRegimeSnapshot] = {}
         self.regime_telemetry: list[dict] = []
+        # Task 42: shadow comparison of the EXISTING min_atr_pct decision
+        # against the new Contract B evaluator -- opt-in (research_
+        # telemetry=True), same convention as regime_telemetry above.
+        # Never consulted by any gate/signal decision.
+        self.regime_shadow_comparisons: list[dict] = []
         self.signals_generated = 0
         self.signals_published = 0
         self.bars_processed = 0
@@ -500,6 +505,22 @@ class BacktestEngine:
                 "timestamp": timestamp, "symbol": symbol, "price": snapshot.price,
                 "atr": snapshot.atr, "atr_pct": atr_pct,
                 "volatility_threshold": qc.min_atr_pct, "passes_volatility": not fails_volatility,
+            })
+            # Task 42: shadow comparison, EXISTING decision (fails_volatility,
+            # already computed above, unchanged) vs. the new Contract B
+            # evaluator -- observability only, gated by the same
+            # research_telemetry flag as every other row in this block.
+            # Never read by the reject-or-continue branch immediately below.
+            regime_result = evaluate_regime(regime_snapshot)
+            old_passes = not fails_volatility
+            self.regime_shadow_comparisons.append({
+                "timestamp": timestamp, "symbol": symbol,
+                "current_atr_pct_1m": atr_pct, "current_passes_min_atr_pct": old_passes,
+                "new_regime_ready": regime_result.ready, "new_regime_eligible": regime_result.eligible,
+                "regime_reason": regime_result.reason,
+                "atr_pct_15m": regime_result.atr_pct_15m, "atr_pct_60m": regime_result.atr_pct_60m,
+                "regime_as_of": regime_result.as_of,
+                "disagreement_category": classify_regime_shadow_disagreement(old_passes, regime_result),
             })
         if fails_volatility:
             self._reject(symbol, "LOW_VOLATILITY", 1, timestamp)

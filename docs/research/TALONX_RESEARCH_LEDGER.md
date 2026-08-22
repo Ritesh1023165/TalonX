@@ -4386,3 +4386,72 @@ behavior change (proven the same `git stash` before/after technique Task 40 used
 **State**: Task 40 checkpoint committed and pushed (`9b58470f883b8aeb45dce0173972e045e9518aba`). This Task
 41 ledger entry and all `results/task41_volatility_eligibility/` artifacts — **not committed, not pushed**,
 per instruction. PR #10 remains draft.
+
+**2026-08-22 update (Task 42)**: this Task 41 ledger entry was committed as `7829afe`
+(`docs(research): define multi-timeframe volatility eligibility contract`) and pushed at the start of Task
+42. `results/task41_volatility_eligibility/` artifacts remain untracked (repo-wide `/results/` gitignored).
+PR #10 confirmed still draft/open.
+
+## Task 42 — Multi-Timeframe Volatility Eligibility Evaluator + Shadow Observability (2026-08-22)
+
+**Objective**: implement the Task 41 Contract B evaluator and shadow comparison telemetry ONLY — must not
+block/allow any signal. Enables Monday shadow mode to compare the current 1m LOW_VOLATILITY decision against
+the new 15m+60m regime decision with zero trading-behavior change.
+
+**Task 41 checkpoint**: committed and pushed as `7829afe` before Task 42 began.
+
+**Evaluator implementation**: `talonx_quant.indicators.evaluate_regime(snapshot) -> RegimeEligibilityResult`
+— one authoritative function, called identically by `talonx_backtest.engine` and `talonx_quant.consumer`.
+Result: `eligible`, `ready`, `reason`, `atr_pct_15m`, `atr_pct_60m`, `threshold_15m`, `threshold_60m`,
+`as_of`. Exactly the 5 required stable reasons.
+
+**Provisional calibration values**: `PROVISIONAL_REGIME_15M_THRESHOLD_PCT = 0.329`,
+`PROVISIONAL_REGIME_60M_THRESHOLD_PCT = 0.839` — Task 41's measured 15m aggregate P25 / 60m aggregate median,
+named with an explicit `PROVISIONAL_` prefix, module-level comment citing Task 41/42, deliberately NOT
+represented as `QuantConfig` fields (which would read as production-tunable). No threshold sweep.
+
+**NOT wired into eligibility** (verified, not assumed): `min_atr_pct=0.25%` remains byte-for-byte unchanged,
+the sole active gate. `evaluate_regime`'s output is consulted only by shadow telemetry.
+
+**Readiness**: preserves and tightens Task 40's semantics — `ready=False` (never a fabricated value) when
+either leg is unwarmed OR either `atr_pct` is `None` despite warm-up. No 15m-only fallback exists, directly
+tested. 60m-not-ready → `REGIME_STATE_NOT_READY`, exactly as required.
+
+**Shadow telemetry**: every required field captured, plus 5-category disagreement classification
+(`BOTH_PASS`/`BOTH_FAIL`/`OLD_FAIL_NEW_PASS`/`OLD_PASS_NEW_FAIL`/`NEW_NOT_READY`, the last taking priority).
+Backtest: opt-in `BacktestEngine.regime_shadow_comparisons` list (mirrors Task 40's `regime_telemetry`
+convention). Live: Redis per-stage metric counters (`_incr_metric`, the same mechanism already feeding
+`talonx_dispatch`'s Daily Funnel dashboard) + structured `logger.info` lines — deliberately no unbounded
+in-memory list on the live side (long-running process) and no Telegram noise. `/ping` exposure deliberately
+deferred (optional per instruction).
+
+**Live/backtest parity**: one shared `evaluate_regime`/`classify_regime_shadow_disagreement` pair, no
+per-path wrapper; live path verified to run without error against Task 40's already-parity-tested buffers.
+
+**Zero behavior change — proven, not assumed**: same `git stash` before/after technique Task 40 used —
+`diff` exit code 0, zero lines of difference across trades/signals/rejections/signal_log. One consumer.py
+line was refactored (bare `_fails_min_volatility()` call extracted into a variable for telemetry reuse) —
+directly confirmed behavior-neutral by this same proof.
+
+**Tests**: 22 new tests (`tests/test_regime_eligibility_evaluator.py`) covering threshold logic, all
+readiness combinations, no-fallback behavior, exact boundary, NaN handling, all 5 disagreement
+classifications, determinism, and live/backtest parity. Focused suite (this file + 10 existing files,
+including Task 40's own suite): **332 passed, 0 failed** (88.4s). Full repository suite not re-attempted,
+per Task 40's own established precedent (exceeds the LIGHT-MEDIUM budget).
+
+**Monday shadow report**: full specification written (`monday_shadow_report_spec.md`) — not a filled-in
+report, since no live shadow session has run yet. Defines top-line metrics, the 5-category disagreement
+breakdown, and per-symbol breakdown for a future task to compute once real telemetry accumulates.
+
+**No historical backtest / no P&L / no tuning**: confirmed — all correctness evidence from small
+deterministic fixtures and unit tests; `min_atr_pct` not touched/replaced/bypassed; no confluence/stop/R:R
+change; no Task 22 inspection.
+
+**Final decision**: `REGIME_SHADOW_EVALUATOR_VALIDATED`.
+
+**Next recommended action (not started)**: Task 43 — Monday Shadow Readiness & Fast Regime Comparison
+Validation. Do NOT wire the new regime into production eligibility yet.
+
+**State**: Task 41 checkpoint committed and pushed (`7829afe`). This Task 42 code changes, tests, ledger
+entry, and all `results/task42_regime_shadow/` artifacts — **not committed, not pushed**, per instruction.
+PR #10 remains draft.

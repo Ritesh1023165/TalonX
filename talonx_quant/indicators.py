@@ -311,6 +311,124 @@ def compute_volatility_regime(
     )
 
 
+# ------------------------------------------------------------------
+# Task 42: shadow-only regime ELIGIBILITY evaluator -- Contract B
+# (SLOW_REGIME_WITH_FAST_CONFIRMATION), calibrated in Task 41 against
+# the Task 38 35-symbol/30-day sample's own measured ATR% distributions
+# (60m aggregate median, 15m aggregate P25) -- NOT searched/swept, and
+# explicitly NOT permanent production constants. `PROVISIONAL_` prefix
+# is deliberate: these are research calibration values for shadow
+# comparison only, expected to be revisited (or replaced by a properly
+# owner-reviewed constant) before ever gating a real signal. See
+# docs/research/TALONX_RESEARCH_LEDGER.md Task 41/42 entries.
+#
+# min_atr_pct (talonx_quant.consumer._fails_min_volatility) remains the
+# ONLY currently-active volatility gate -- evaluate_regime below is
+# observability-only and must never be consulted by any eligibility
+# decision (see that requirement enforced by
+# tests/test_regime_eligibility_evaluator.py's before/after proof).
+# ------------------------------------------------------------------
+
+PROVISIONAL_REGIME_15M_THRESHOLD_PCT = 0.329
+PROVISIONAL_REGIME_60M_THRESHOLD_PCT = 0.839
+
+REGIME_ELIGIBLE = "REGIME_ELIGIBLE"
+REGIME_STATE_NOT_READY = "REGIME_STATE_NOT_READY"
+REGIME_15M_BELOW_THRESHOLD = "REGIME_15M_BELOW_THRESHOLD"
+REGIME_60M_BELOW_THRESHOLD = "REGIME_60M_BELOW_THRESHOLD"
+REGIME_BOTH_BELOW_THRESHOLD = "REGIME_BOTH_BELOW_THRESHOLD"
+
+
+@dataclass(frozen=True)
+class RegimeEligibilityResult:
+    """Task 42: the OUTPUT of evaluate_regime -- a pure, deterministic
+    read of a VolatilityRegimeSnapshot against the Contract B thresholds
+    above. Shadow/telemetry only; `eligible` here is NEVER consulted by
+    any gate/signal-generation code path (see the module-level note
+    above)."""
+    eligible: bool
+    ready: bool
+    reason: str
+    atr_pct_15m: float | None
+    atr_pct_60m: float | None
+    threshold_15m: float
+    threshold_60m: float
+    as_of: pd.Timestamp
+
+
+def evaluate_regime(snapshot: VolatilityRegimeSnapshot) -> RegimeEligibilityResult:
+    """Task 42: the ONE authoritative Contract B evaluator, called
+    identically by talonx_backtest.engine and talonx_quant.consumer for
+    shadow telemetry only.
+
+    `ready` here means "this evaluation could actually be performed" --
+    stricter than snapshot.ready_15m/ready_60m alone (which are pure
+    warm-up flags, see Task 40): a leg can be warm-up-ready yet still
+    have atr_pct=None (the zero/negative/NaN-price edge case
+    _regime_leg_atr already handles) -- if that happens, the evaluation
+    genuinely cannot be determined, so `ready=False` here too, same
+    REGIME_STATE_NOT_READY reason, and `eligible` is always False in
+    that state -- NEVER a fabricated True/False. 60m is the binding
+    (Contract B) leg conceptually, but this function requires BOTH legs
+    determinable before evaluating either threshold -- there is no
+    15m-only fallback path (per Task 42's explicit instruction)."""
+    determinable = (
+        snapshot.ready_15m and snapshot.ready_60m
+        and snapshot.atr_pct_15m is not None and snapshot.atr_pct_60m is not None
+    )
+    if not determinable:
+        return RegimeEligibilityResult(
+            eligible=False, ready=False, reason=REGIME_STATE_NOT_READY,
+            atr_pct_15m=snapshot.atr_pct_15m, atr_pct_60m=snapshot.atr_pct_60m,
+            threshold_15m=PROVISIONAL_REGIME_15M_THRESHOLD_PCT,
+            threshold_60m=PROVISIONAL_REGIME_60M_THRESHOLD_PCT, as_of=snapshot.as_of,
+        )
+
+    below_15m = snapshot.atr_pct_15m < PROVISIONAL_REGIME_15M_THRESHOLD_PCT
+    below_60m = snapshot.atr_pct_60m < PROVISIONAL_REGIME_60M_THRESHOLD_PCT
+    if below_15m and below_60m:
+        reason = REGIME_BOTH_BELOW_THRESHOLD
+    elif below_15m:
+        reason = REGIME_15M_BELOW_THRESHOLD
+    elif below_60m:
+        reason = REGIME_60M_BELOW_THRESHOLD
+    else:
+        reason = REGIME_ELIGIBLE
+
+    return RegimeEligibilityResult(
+        eligible=(reason == REGIME_ELIGIBLE), ready=True, reason=reason,
+        atr_pct_15m=snapshot.atr_pct_15m, atr_pct_60m=snapshot.atr_pct_60m,
+        threshold_15m=PROVISIONAL_REGIME_15M_THRESHOLD_PCT,
+        threshold_60m=PROVISIONAL_REGIME_60M_THRESHOLD_PCT, as_of=snapshot.as_of,
+    )
+
+
+REGIME_SHADOW_BOTH_PASS = "BOTH_PASS"
+REGIME_SHADOW_BOTH_FAIL = "BOTH_FAIL"
+REGIME_SHADOW_OLD_FAIL_NEW_PASS = "OLD_FAIL_NEW_PASS"
+REGIME_SHADOW_OLD_PASS_NEW_FAIL = "OLD_PASS_NEW_FAIL"
+REGIME_SHADOW_NEW_NOT_READY = "NEW_NOT_READY"
+
+
+def classify_regime_shadow_disagreement(old_passes: bool, regime_result: RegimeEligibilityResult) -> str:
+    """Task 42: compares the EXISTING, unchanged min_atr_pct decision
+    (`old_passes` -- the same `not fails_volatility` value the live
+    reject-or-continue branch already uses) against the new shadow-only
+    Contract B evaluator's result. Pure classification, consulted by
+    nothing except telemetry -- never influences `old_passes` or any
+    signal/trade decision. NEW_NOT_READY takes priority: an
+    undetermined new-gate read is not a real agree/disagree signal."""
+    if not regime_result.ready:
+        return REGIME_SHADOW_NEW_NOT_READY
+    if old_passes and regime_result.eligible:
+        return REGIME_SHADOW_BOTH_PASS
+    if old_passes and not regime_result.eligible:
+        return REGIME_SHADOW_OLD_PASS_NEW_FAIL
+    if not old_passes and regime_result.eligible:
+        return REGIME_SHADOW_OLD_FAIL_NEW_PASS
+    return REGIME_SHADOW_BOTH_FAIL
+
+
 @dataclass(frozen=True)
 class DailyPivots:
     """Classic floor-trader pivot levels (P, R1, S1) from the most

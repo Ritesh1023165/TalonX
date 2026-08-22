@@ -238,8 +238,8 @@ from talonx_quant.aggregation import HtfBarAggregator
 from talonx_quant.buffer import RollingBarBuffer
 from talonx_quant.config import QuantConfig
 from talonx_quant.indicators import (
-    VolatilityRegimeSnapshot, compute_daily_pivots, compute_htf_trend, compute_indicators,
-    compute_volatility_regime,
+    VolatilityRegimeSnapshot, classify_regime_shadow_disagreement, compute_daily_pivots, compute_htf_trend,
+    compute_indicators, compute_volatility_regime, evaluate_regime,
 )
 from talonx_quant.schemas import (
     MarketTickEvent,
@@ -1235,7 +1235,28 @@ class QuantScanner:
             self.config.atr_period, snapshot.bar_timestamp,
         )
 
-        if _fails_min_volatility(snapshot, self.config):
+        fails_volatility = _fails_min_volatility(snapshot, self.config)
+
+        # Task 42: shadow comparison, EXISTING decision (fails_volatility,
+        # unchanged) vs. the new Contract B evaluator -- observability
+        # only. Never consulted below; `fails_volatility` alone still
+        # drives the reject-or-continue branch that follows. Recorded via
+        # this project's existing per-stage Redis metric counters
+        # (_incr_metric, already feeding talonx_dispatch's Daily Funnel
+        # dashboard) plus a structured log line -- no Telegram/user-facing
+        # surface touched, matching Task 42's observability-only scope.
+        regime_result = evaluate_regime(self._latest_regime_snapshot[event.symbol.upper()])
+        old_passes = not fails_volatility
+        disagreement = classify_regime_shadow_disagreement(old_passes, regime_result)
+        await _incr_metric(self._client, "quant", f"regime_shadow_{disagreement}", 1)
+        logger.info(
+            "regime_shadow symbol=%s current_pass=%s new_ready=%s new_eligible=%s reason=%s "
+            "atr_pct_15m=%s atr_pct_60m=%s disagreement=%s",
+            event.symbol, old_passes, regime_result.ready, regime_result.eligible, regime_result.reason,
+            regime_result.atr_pct_15m, regime_result.atr_pct_60m, disagreement,
+        )
+
+        if fails_volatility:
             self._signals_suppressed_low_volatility += 1
             await _incr_metric(self._client, "quant", "failed_min_volatility", 1)
             await self._record_rejection(event.symbol, "LOW_VOLATILITY", 1, datetime.now(timezone.utc))
