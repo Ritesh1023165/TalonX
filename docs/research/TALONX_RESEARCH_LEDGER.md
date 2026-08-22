@@ -4455,3 +4455,75 @@ Validation. Do NOT wire the new regime into production eligibility yet.
 **State**: Task 41 checkpoint committed and pushed (`7829afe`). This Task 42 code changes, tests, ledger
 entry, and all `results/task42_regime_shadow/` artifacts — **not committed, not pushed**, per instruction.
 PR #10 remains draft.
+
+**2026-08-22 update (Task 43)**: this Task 42 change set (code + tests + ledger entry) was committed as
+`2602152176c38494ddf5f7ad73b05851fd81524f` (`feat(quant): add shadow multi-timeframe volatility evaluator`)
+and pushed at the start of Task 43, after re-confirming the 22-test `test_regime_eligibility_evaluator.py`
+suite still passes. `results/task42_regime_shadow/` artifacts remain untracked (repo-wide `/results/`
+gitignored). PR #10 confirmed still draft/open.
+
+## Task 43 — Monday Shadow Readiness & Fast Regime Comparison Validation (2026-08-22)
+
+**Objective**: freeze and validate a Monday shadow-ready build. No strategy behavior change. Pure
+investigation/documentation task — zero code written.
+
+**Task 42 checkpoint**: committed and pushed as `2602152176c38494ddf5f7ad73b05851fd81524f` before Task 43
+began.
+
+**Frozen Monday build**: HEAD `2602152176c38494ddf5f7ad73b05851fd81524f`, tracked tree 100% clean.
+QuantConfig `76bf7a395614`, BacktestConfig `4a78bafa104e`, strategy `c9b095afc319`, regime evaluator module
+hash `153a37a05a5aa0a0`.
+
+**No capital path**: `SHADOW_ONLY_CONFIRMED` — a dedicated 5-point code audit (broker API calls, paper→live
+switch, fill-simulation mechanism, entrypoint gating, broker SDK dependencies) found zero reachable
+capital-order path in the run/startup import graph. `talonx_paper` is pure in-memory/SQLite simulation;
+`run_talonx.py` wires up only `PaperTradingEngine`/`LongTermPaperEngine`; no live-broker SDK exists in any
+`requirements.txt`.
+
+**Watchlist**: discovered a real, existing, already-operational production `TickerWatchlistStore` (35 active
+symbols, last modified 2026-08-18) — used this instead of Task 37's separate research sample, per
+instruction's own escape clause. No strategy change from Task 37's findings applied to Monday's build.
+
+**Startup/warm-up**: 1m/15m buffers have real prior persisted checkpoints (last bar 2026-08-20) — Monday is
+a warm restart for these, correctly falling back to existing preseed/backfill for fast readiness. The
+**60-minute leg has no persisted checkpoint at all** (its mechanism postdates that prior run) — a true cold
+start, most likely `NOT_READY` for most/all of Monday (needs >14 continuous hours). Confirmed expected
+behavior, not a defect — `evaluate_regime` never fabricates a value.
+
+**Warmup capture gap assessment**: the persisted raw bars (1m/15m/60m, generic `buffer_type`-keyed store)
+are already sufficient to exactly reconstruct ATR values, readiness, and full regime snapshots, since
+`compute_volatility_regime`/`evaluate_regime` are pure, deterministic functions of those bars. **No new code
+was needed or written** — Task 40's existing capture mechanism is already sufficient for replay.
+
+**Live telemetry**: all required SYSTEM/PER-SYMBOL/VOLATILITY-COMPARISON/GEOMETRY items confirmed present —
+pre-existing infrastructure (system health, funnel, rejections, paper lifecycle, geometry) plus Task 42's own
+8 volatility-comparison fields. Zero gaps requiring new code.
+
+**`/ping`**: confirmed unmodified since before Task 40, still read-only. New regime-shadow counters
+deliberately not added to Telegram output (consistent with Task 42's reasoning) — live in Redis/logs only.
+
+**Offline report smoke test**: all 6 required sections (system health, signal funnel, old-vs-new regime
+comparison, per-symbol disagreement, paper lifecycle, geometry) produced successfully from a deterministic
+fixture, zero P&L anywhere.
+
+**Tests**: 515 focused tests passed, 0 failed, across quant strategy/consumer/indicators/buffer, Task 40/42's
+own volatility-state/evaluator suites, paper engine/consumer/store, backtest geometry/telemetry/
+regression/lookahead/lifecycle. Zero new failures.
+
+**GO/NO-GO**: every directly-verifiable check passes. Redis/live-feed reachability are inherent
+live-environment preconditions this research sandbox cannot confirm — already the explicit first steps of
+the written runbook, not blockers this review discovered.
+
+**No strategy changes**: confirmed — zero code changes in this task; `min_atr_pct` untouched; no
+confluence/stop/R:R change; no historical backtest; no Task 22 inspection.
+
+**Final decision**: `MONDAY_SHADOW_GO_WITH_OBSERVABILITY_CAVEAT` — caveat: the 60-minute regime leg will
+most likely remain `NOT_READY` for most/all of Monday (expected, non-blocking); the full 15m+60m comparison
+needs several consecutive days of continuous operation to become statistically meaningful.
+
+**Next action (exactly one)**: Monday live SHADOW/PAPER observation only, per the written runbook. Do NOT
+wire the new regime into production eligibility.
+
+**State**: Task 42 checkpoint committed and pushed (`2602152176c38494ddf5f7ad73b05851fd81524f`). This Task
+43 readiness artifacts and ledger entry — **not committed, not pushed**, per instruction. PR #10 remains
+draft.
