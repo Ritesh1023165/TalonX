@@ -4600,3 +4600,67 @@ eligibility.
 **State**: Task 43 checkpoint committed and pushed (`7da9af4`). This Task 44 code changes, tests, ledger
 entry, and all `results/task44_60m_warmup_bootstrap/` artifacts — **not committed, not pushed**, per
 instruction. PR #10 remains draft.
+
+**2026-08-22 update (Task 45)**: this Task 44 change set (code + tests + ledger entry) was committed as
+`65b2e65` (`feat(quant): bootstrap 60m volatility state causally`) and pushed at the start of Task 45, after
+re-confirming its 14-test suite passes. `results/task44_60m_warmup_bootstrap/` artifacts remain untracked
+(repo-wide `/results/` gitignored). PR #10 confirmed still draft/open.
+
+## Task 45 — Experimental Multi-Timeframe Volatility Gate Wiring + Correctness Validation (2026-08-22)
+
+**Objective**: add an explicit experimental research/backtest mode that can use the 15m+60m regime instead
+of the current `min_atr_pct` gate. Default/live behavior must remain unchanged. Implementation +
+correctness only — no historical backtest, no economic conclusion.
+
+**Task 44 checkpoint**: committed and pushed as `65b2e65` before Task 45 began.
+
+**Mode design**: `talonx_quant.config.VolatilityGateMode` — exactly two members, `CURRENT_1M` (default) and
+`MULTITIMEFRAME_EXPERIMENTAL`, constructed via `VolatilityGateMode(os.environ.get(...))` which itself raises
+immediately on any invalid value (fail-closed at config-module-import time).
+
+**Default/current invariant (mandatory, proven)**: `CURRENT_1M` reuses `_fails_min_volatility` and the
+`"LOW_VOLATILITY"` rejection string byte-for-byte unchanged — proven via the same `git stash` before/after
+technique Tasks 40/42/44 used (`diff` exit code 0) plus a dedicated unit-level regression test.
+
+**Experimental wiring**: one shared dispatch function,
+`talonx_quant.consumer._evaluate_active_volatility_gate`, called identically by `engine.py` and
+`consumer.py`, containing zero threshold logic of its own — both inputs computed upstream by the unchanged
+`_fails_min_volatility`/`evaluate_regime`. Active condition:
+`ready_15m AND ready_60m AND atr_pct_15m >= 0.329 AND atr_pct_60m >= 0.839`.
+
+**Readiness/rejection semantics**: a single new canonical rejection reason, `"LOW_VOLATILITY_REGIME"` — the
+strategy rejection enum was not exploded; `evaluate_regime`'s 5 existing detail reasons preserved
+separately. Experimental mode: either leg not ready → `REGIME_STATE_NOT_READY`, no fallback, no fabricated
+value. `CURRENT_1M` mode: regime readiness has zero effect on eligibility.
+
+**Evaluation order**: exactly one step swapped (the volatility predicate); trigger generation, confluence,
+trend, blackout, R:R, and stop/target logic remain unmoved, unaware a mode selection exists — proven via a
+mode-agnostic `evaluate_signals` unit test.
+
+**Live safety**: two independent layers — `VolatilityGateMode`'s own constructor rejects invalid values at
+import time; `QuantScanner.__init__` (the live/paper-shadow execution class, per Task 43's capital-path
+audit) explicitly raises if `volatility_gate_mode != CURRENT_1M`, before any market tick is processed.
+`BacktestEngine` deliberately unrestricted.
+
+**Fingerprinting**: `config_hash` differs correctly between modes (`QuantConfig` `24fb06bdafa1` vs.
+`1eb58828ad69`; `BacktestConfig` `becc5011a543` vs. `7096a993d034`); `strategy_version` (file-content-based)
+stays a single explainable value (`a33b43f3794a`) shared by both modes, exactly as expected.
+
+**Deterministic fixtures**: all 7 required (A: old pass/new fail, B: old fail/new pass, C: both pass, D:
+both fail, E: not ready, F: exact 15m boundary, G: exact 60m boundary) — pass.
+
+**Tests**: 22 new tests (`tests/test_volatility_gate_mode.py`), 22 passed, 0 failed. Broader focused
+regression (19 files, 551 tests): 0 failures.
+
+**No economic conclusion**: confirmed — no 35-symbol historical run, no profitability/PF/cost-sensitivity/
+threshold-comparison analysis anywhere in this task.
+
+**Final decision**: `EXPERIMENTAL_REGIME_GATE_IMPLEMENTED_AND_VALIDATED`.
+
+**Next recommended action (not started)**: Task 46 — Fast 35-Symbol Experimental Regime Validation, using a
+bounded, mechanically selected validation sample, measuring funnel/frequency/economics without threshold
+tuning.
+
+**State**: Task 44 checkpoint committed and pushed (`65b2e65`). This Task 45 code changes, tests, ledger
+entry, and all `results/task45_experimental_regime_gate/` artifacts — **not committed, not pushed**, per
+instruction. PR #10 remains draft.

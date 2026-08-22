@@ -236,7 +236,7 @@ from pydantic import ValidationError
 from talonx_quant import preseed
 from talonx_quant.aggregation import HtfBarAggregator
 from talonx_quant.buffer import RollingBarBuffer
-from talonx_quant.config import QuantConfig
+from talonx_quant.config import QuantConfig, VolatilityGateMode
 from talonx_quant.indicators import (
     VolatilityRegimeSnapshot, classify_regime_shadow_disagreement, compute_daily_pivots, compute_htf_trend,
     compute_indicators, compute_volatility_regime, evaluate_regime,
@@ -296,6 +296,46 @@ def _fails_min_volatility(snapshot, config: QuantConfig) -> bool:
         return False
     atr_pct = (snapshot.atr / snapshot.price) * 100
     return atr_pct < config.min_atr_pct
+
+
+def _evaluate_active_volatility_gate(
+    fails_volatility_1m: bool, regime_result, config: QuantConfig,
+) -> tuple[bool, str, str | None]:
+    """Task 45: the ONE authoritative dispatch between the two mutually
+    exclusive volatility ELIGIBILITY implementations -- called identically
+    by talonx_backtest.engine and talonx_quant.consumer, with both already-
+    computed inputs (fails_volatility_1m from _fails_min_volatility above,
+    regime_result from talonx_quant.indicators.evaluate_regime) passed in
+    rather than recomputed, so this function contains zero threshold logic
+    of its own.
+
+    Returns (gate_fails, canonical_strategy_rejection_reason,
+    detail_reason_or_None).
+
+    CURRENT_1M (the default): returns fails_volatility_1m UNCHANGED and the
+    pre-Task-45 "LOW_VOLATILITY" rejection string -- byte-for-byte the
+    same decision and reason as before this function existed (proven in
+    results/task45_experimental_regime_gate/current_mode_regression.json).
+
+    MULTITIMEFRAME_EXPERIMENTAL: returns `not regime_result.eligible` and
+    the new "LOW_VOLATILITY_REGIME" canonical reason, with
+    regime_result.reason (one of evaluate_regime's 5 stable values --
+    REGIME_ELIGIBLE/REGIME_STATE_NOT_READY/REGIME_15M_BELOW_THRESHOLD/
+    REGIME_60M_BELOW_THRESHOLD/REGIME_BOTH_BELOW_THRESHOLD) preserved
+    separately as the detail reason, never collapsed into the canonical
+    one. No 15m-only or 1m fallback exists if the regime state isn't
+    ready -- evaluate_regime's own eligible=False already covers that.
+
+    Fails CLOSED (raises) on any other value -- this should be
+    structurally unreachable, since VolatilityGateMode's own constructor
+    already rejects an invalid config value at QuantConfig-construction
+    time, but this function does not silently assume that guard always
+    ran first."""
+    if config.volatility_gate_mode == VolatilityGateMode.CURRENT_1M:
+        return fails_volatility_1m, "LOW_VOLATILITY", None
+    if config.volatility_gate_mode == VolatilityGateMode.MULTITIMEFRAME_EXPERIMENTAL:
+        return (not regime_result.eligible), "LOW_VOLATILITY_REGIME", regime_result.reason
+    raise ValueError(f"Unknown volatility_gate_mode: {config.volatility_gate_mode!r}")
 
 
 def _trend_gate_applicable(signal: QuantSignal, config: QuantConfig) -> bool:
@@ -411,6 +451,22 @@ _GATE_NAMES = {
 class QuantScanner:
     def __init__(self, config: QuantConfig | None = None, store: QuantStateStore | None = None):
         self.config = config or QuantConfig()
+        # Task 45 live-safety guard: QuantScanner is the live/paper-shadow
+        # execution path (Monday's known-safe build) -- MULTITIMEFRAME_
+        # EXPERIMENTAL is research/backtest-only (talonx_backtest.
+        # BacktestEngine has no such restriction). Fails fast HERE, at
+        # construction, before any market tick is ever processed, rather
+        # than relying solely on the default value or on
+        # _evaluate_active_volatility_gate's own defense-in-depth check --
+        # a mis-set env var must never let live trading silently run under
+        # an experimental, unvalidated gate.
+        if self.config.volatility_gate_mode != VolatilityGateMode.CURRENT_1M:
+            raise ValueError(
+                f"QuantScanner (live/paper-shadow execution) only supports "
+                f"volatility_gate_mode=CURRENT_1M -- got "
+                f"{self.config.volatility_gate_mode!r}. MULTITIMEFRAME_EXPERIMENTAL "
+                f"is research/backtest-only (talonx_backtest.BacktestEngine)."
+            )
         self.store = store
         self.buffer = RollingBarBuffer(self.config.max_bars_per_symbol)
         # 15-min 200 SMA higher-timeframe trend gate: a second, coarser
@@ -1375,11 +1431,20 @@ class QuantScanner:
             regime_result.atr_pct_15m, regime_result.atr_pct_60m, disagreement,
         )
 
-        if fails_volatility:
+        # Task 45: mode-aware ACTIVE gate decision -- QuantScanner's own
+        # __init__ guard (see below) already refuses to construct with any
+        # mode other than CURRENT_1M, so this is CURRENT_1M-only in
+        # practice on the live path; still routed through the same shared
+        # dispatch talonx_backtest.engine uses (defense in depth, and one
+        # authoritative decision point instead of two).
+        gate_fails, rejection_reason, _detail_reason = _evaluate_active_volatility_gate(
+            fails_volatility, regime_result, self.config,
+        )
+        if gate_fails:
             self._signals_suppressed_low_volatility += 1
             await _incr_metric(self._client, "quant", "failed_min_volatility", 1)
-            await self._record_rejection(event.symbol, "LOW_VOLATILITY", 1, datetime.now(timezone.utc))
-            return  # ATR% below config.min_atr_pct -- low-beta name, skip momentum evaluation entirely
+            await self._record_rejection(event.symbol, rejection_reason, 1, datetime.now(timezone.utc))
+            return  # ATR% below config.min_atr_pct (CURRENT_1M) -- low-beta name, skip momentum evaluation entirely
 
         df_htf = self.buffer_htf.get_dataframe(event.symbol)
         htf_sma_200 = compute_htf_trend(df_htf, self.config.htf_sma_period)

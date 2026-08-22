@@ -19,9 +19,31 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+
+class VolatilityGateMode(str, Enum):
+    """Task 45: which volatility ELIGIBILITY implementation is authoritative
+    for candidate generation. Exactly two modes, no more -- see
+    docs/research/TALONX_RESEARCH_LEDGER.md's Task 45 entry for why a third
+    variant was deliberately not added.
+
+    CURRENT_1M (the default, and the ONLY mode talonx_quant.consumer.
+    QuantScanner -- live/paper-shadow -- will ever accept; it fails fast at
+    construction otherwise) is byte-for-byte the pre-Task-45 behavior:
+    talonx_quant.consumer._fails_min_volatility, unchanged.
+
+    MULTITIMEFRAME_EXPERIMENTAL is research/backtest-only (talonx_backtest.
+    BacktestEngine): the Task 41/42 Contract B evaluator
+    (talonx_quant.indicators.evaluate_regime) becomes the active gate
+    instead. Provisional research calibration thresholds -- see
+    talonx_quant.indicators.PROVISIONAL_REGIME_15M_THRESHOLD_PCT/
+    PROVISIONAL_REGIME_60M_THRESHOLD_PCT."""
+    CURRENT_1M = "CURRENT_1M"
+    MULTITIMEFRAME_EXPERIMENTAL = "MULTITIMEFRAME_EXPERIMENTAL"
 
 
 def _load_dotenv() -> None:
@@ -310,6 +332,17 @@ class QuantConfig:
     # every RSI/MACD/MA check already requires ATR via _clears_atr_move,
     # so an unwarmed symbol produces zero signals downstream regardless.
     min_atr_pct: float = _env_float("TALONX_QUANT_MIN_ATR_PCT", 0.25)
+
+    # --- Task 45: volatility gate mode (research/backtest experimental
+    # switch) --- default MUST stay CURRENT_1M; talonx_quant.consumer.
+    # QuantScanner (live/paper-shadow) fails fast at construction if this
+    # is ever anything else -- see that class's own __init__ guard. The
+    # VolatilityGateMode(...) call below raises immediately (fail-closed,
+    # not a silent fallback) if the env var holds anything other than one
+    # of the two defined enum members.
+    volatility_gate_mode: VolatilityGateMode = VolatilityGateMode(
+        os.environ.get("TALONX_QUANT_VOLATILITY_GATE_MODE", VolatilityGateMode.CURRENT_1M.value)
+    )
 
     # --- 15-minute 200 SMA higher-timeframe trend gate ---
     # A second, coarser RollingBarBuffer (see consumer.py's buffer_htf),

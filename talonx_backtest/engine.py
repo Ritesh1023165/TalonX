@@ -98,6 +98,7 @@ from talonx_quant.buffer import RollingBarBuffer
 from talonx_quant.config import QuantConfig
 from talonx_quant.consumer import (
     _GATE_NAMES,
+    _evaluate_active_volatility_gate,
     _fails_min_volatility,
     _opportunity_score,
     _partition,
@@ -493,6 +494,14 @@ class BacktestEngine:
             })
 
         fails_volatility = _fails_min_volatility(snapshot, qc)
+        # Task 45: regime_result must be available regardless of
+        # research_telemetry -- MULTITIMEFRAME_EXPERIMENTAL mode's active
+        # gate decision below depends on it, and the gate itself must not
+        # require telemetry to be enabled. Moved out of the
+        # research_telemetry block below (was Task 42's own placement);
+        # evaluate_regime is a cheap, pure computation, so this has no
+        # behavior/cost implication for CURRENT_1M runs.
+        regime_result = evaluate_regime(regime_snapshot)
         if self.research_telemetry:
             # Same formula _fails_min_volatility itself uses internally
             # (talonx_quant/consumer.py) -- copied for DISPLAY only, not
@@ -511,7 +520,6 @@ class BacktestEngine:
             # evaluator -- observability only, gated by the same
             # research_telemetry flag as every other row in this block.
             # Never read by the reject-or-continue branch immediately below.
-            regime_result = evaluate_regime(regime_snapshot)
             old_passes = not fails_volatility
             self.regime_shadow_comparisons.append({
                 "timestamp": timestamp, "symbol": symbol,
@@ -522,8 +530,16 @@ class BacktestEngine:
                 "regime_as_of": regime_result.as_of,
                 "disagreement_category": classify_regime_shadow_disagreement(old_passes, regime_result),
             })
-        if fails_volatility:
-            self._reject(symbol, "LOW_VOLATILITY", 1, timestamp)
+
+        # Task 45: mode-aware ACTIVE gate decision -- the ONE dispatch
+        # point, shared unchanged with talonx_quant.consumer. CURRENT_1M
+        # (the default) reuses fails_volatility byte-for-byte, proven in
+        # results/task45_experimental_regime_gate/current_mode_regression.json.
+        gate_fails, rejection_reason, _detail_reason = _evaluate_active_volatility_gate(
+            fails_volatility, regime_result, qc,
+        )
+        if gate_fails:
+            self._reject(symbol, rejection_reason, 1, timestamp)
             return
 
         df_htf = self.buffer_htf.get_dataframe(symbol)
