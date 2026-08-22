@@ -3832,3 +3832,127 @@ error), run realistic cost sensitivity, do not tune parameters.
 **State**: Task 34 checkpoint committed and pushed (`6133672c2e15a2c89a7dd27ebc3e9f0fea46d5bc`). Task 35
 code/test/documentation changes and this ledger entry — **not committed, not pushed**, per instruction. PR
 #10 remains draft. All 14 required artifacts written to `results/task35_structural_stop_implementation/`.
+
+## Task 36 — Canonical Long-Only Baseline Re-establishment After Structural Stop Correction (2026-08-22)
+
+**Objective**: re-run the full Task 26 dataset under the Task 35 corrected `MARKET_STRUCTURE_PRIMARY` stop
+geometry and characterize the resulting trade population as a new canonical reference — explicitly NOT an
+"improvement/regression" comparison against Task 26, since the two populations rest on different, mutually
+incompatible stop-geometry contracts.
+
+**Task 35 checkpoint**: committed and already on branch as **`5da8617d691221cdc54f4f1866f8d888847ffa5c`**
+(`fix(quant): use market-structure-primary long stops`) prior to this task's own work beginning.
+
+**Integrity**: QuantConfig hash `9174f5232c20` — unchanged from Task 26. BacktestConfig hash `19654e22ffd5`
+— unchanged from Task 26. Strategy fingerprint `acd08feb59a7` — changed as expected (Task 35's code change).
+Dataset hash `5e5412a960bf` — confirmed identical to Task 26's dataset. Focused test gate: 478 passed, 0
+failed, re-confirmed before launching the run. Data quality: all 10 symbols clean, zero critical corruption
+(identical dataset to Task 26).
+
+**Run**: full 1,903,044-bar / 10-symbol dataset, `research_telemetry=True`. Completed in 233.8 minutes.
+**A first launch attempt was lost mid-run** (killed when the executing session was torn down, ~85.7%
+complete, no output artifacts written) and had to be relaunched from scratch; a duplicate-launch race during
+the relaunch was caught and killed before any output was produced. The run reported here is a single, clean,
+uncontaminated execution — config/dataset/strategy hashes above were re-verified identical to the aborted
+attempt's logged values before treating this run as canonical.
+
+**Signal funnel**: `signals_generated`=5,021 (identical to Task 27's candidate count — candidate generation
+is untouched by Task 35). `LOW_RISK_REWARD` first-failure rejections rose from Task 26's 136 to **181**
+(+45, +33%) — the only gate whose count could mechanically shift under Task 35, since bearish geometry and
+all upstream directional-agnostic gates (confluence, blackout windows, trend, session) are byte-for-byte
+unchanged. `signals_published`=67 (60 bearish `NO_ACTIVE_POSITION` — matches Task 26's 59 almost exactly — +
+7 bullish). **Every one of the 7 bullish-published signals became an executed trade** (100% publish→execute
+conversion, same clean pattern Task 26 showed at 26/26) — the population collapse happened entirely upstream
+of publish, at the RR gate, not from any new throttle/fill-time rejection (`GEOMETRY_INVALIDATED_AT_FILL`
+and `RR_DEGRADED_DURING_THROTTLE`: 0 occurrences, same as Task 26).
+
+**Geometry-path distribution** (executed trades): 3 `STRUCTURAL_PRIMARY`, 4 `ATR_FALLBACK`. All 4 fallbacks
+share the same reason: `STRUCTURE_NOT_BELOW_ENTRY` (structure existed but was at/above the entry price at
+the moment geometry was computed) — `NO_STRUCTURAL_SUPPORT` and `STRUCTURE_INVALID_OR_NONFINITE` were never
+observed among executed trades.
+
+**R:R population effect**: candidate-level RR≥1.5 count fell from Task 27's 3,360 to 2,709 (-19%,
+first-pass check, not gate-priority-ordered). Executed trade count fell from 26 to 7 (-73%). The gap between
+these two figures is expected and not further investigated here (out of scope for a characterization task) —
+gate evaluation order means a candidate that also fails an earlier gate (confluence, blackout, etc.) is never
+attributed to RR in the first-failure accounting even if it would also have failed RR.
+
+**Zero-short invariant**: CONFIRMED — all 7 executed trades `direction == bullish`.
+
+**Executed trade count**: 7 (down from Task 26's 26).
+
+**Geometry validity audit**: 7/7 trades pass the correct invariant (`stop < entry < target`, plus exact
+`stop == structural_level` for the 3 `STRUCTURAL_PRIMARY` trades). An initial validity check incorrectly
+flagged the 4 `ATR_FALLBACK` trades as invalid by re-deriving `entry_price - 1.5×atr` and comparing exactly
+— this ignored `engine.py::_finalize_fill_geometry`'s deliberately narrow behavior (documented in Task 13/35):
+it only re-anchors stop/target when the fill price actually breaks the bracket invariant, otherwise leaving
+stop/target at their revalidation-time values even as `entry_price` (the real fill) drifts slightly from
+that reference — the same pre-existing mechanism that lets `execution_rr` diverge from `screening_rr`. Fixed
+before drawing any conclusion from it; not a Task 35 defect.
+
+**Exit-path breakdown**: STOP=4, END_OF_SESSION=3, TARGET=0, SIGNAL_EXIT=0.
+
+**Canonical 0bps performance** (n=7 — explicitly too small for a standalone edge claim, reported for the
+record): win rate 42.9% (Wilson 95% CI [15.8%, 75.0%]); mean expectancy -0.139R (approx. 95% CI
+[-1.03R, +0.75R]); gross total -0.976R; profit factor 0.756; max drawdown -2.946R; median trade -1.0R.
+
+**Cost sensitivity** (same cost-invariant-population method as Task 26 — gate/geometry decisions use raw
+pre-cost prices, so the 7-trade population is identical across all four scenarios): PF 0.756 (0bps) → 0.547
+(5bps) → 0.402 (10bps, wins drop 3→2) → 0.216 (20bps). Already sub-1.0 profit factor at 0bps.
+
+**Structural-primary vs. fallback characteristics**: the 3 `STRUCTURAL_PRIMARY` trades sit a median 3.74 ATR
+units (0.96% of entry price, $4.08 median) below entry — materially wider than the old unconditional 1.5×ATR
+stop. Execution R:R for structural trades (median 5.85) is proportionally lower than for ATR-fallback trades
+(median 15.73), though both remain comfortably above the 1.5 gate for the 7 trades that did clear it.
+
+**Symbol concentration**: only 2 of 10 symbols ever traded — AMD (4 trades, 57.1%) and STX (3 trades, all
+losers). 8 symbols (AAPL, MSFT, NVDA, AMZN, META, TSLA, GOOGL, PYPL) recorded zero trades across the full
+one-year dataset. AMD accounts for 66.9% of gross positive R; STX's 3 trades are all STOP-outs with zero
+winners.
+
+**Holding-time distribution**: overall median 5,820s (97 min), mean 6,506s. STOP exits are fast (median
+330s / 5.5 min); END_OF_SESSION exits are much longer (median 7,740s / 129 min) — consistent with a stop
+that, when it fires, fires close to entry in wall-clock terms.
+
+**Task 26 → Task 36 trade-level reconciliation** (26 Task 26 trades classified): `TRADE_RETAINED`=4,
+`GEOMETRY_CHANGED_ONLY`=3 (same entry, different stop under the new contract), `OLD_TRADE_NO_LONGER_PUBLISHED`
+=19, `NEW_TRADE_APPEARS`=0. 4+3=7 accounts for every Task 36 trade; 19 accounts for the rest of Task 26's 26 —
+fully reconciled both directions.
+
+**Frequency vs. `REGULAR_OPPORTUNITY` product objective (Task 33)**: `INSUFFICIENT_COVERAGE_TO_COMPARE` —
+this run covers 10 of the 35-50+ symbols the product objective implies; a frequency judgment against a
+10-symbol, 2-symbol-active population would not be meaningful.
+
+**Statistical evidence assessment**: sample size n=7 is smaller than Task 26's already-flagged-thin n=26;
+multi-regime coverage is a full year but concentrated in 2 symbols out of 10 (severe concentration, not
+generalized); cost robustness fails outright (PF already <1.0 gross, before any cost is applied); no OOS
+validation performed (Task 22 correctly not inspected, per instruction); reproducibility confirmed via
+config/dataset/strategy hashes and (see below) a determinism re-run. Overall: population is real, valid, and
+correctly reconciled, but far too small and concentrated to support any edge claim in either direction.
+
+**Determinism**: bounded 70,320-bar (2-week × 10-symbol) subset run twice; SHA-256 fingerprint over
+`{signal_log, rejections, trades (incl. geometry_path/stop_price), signals_generated/published,
+geometry_path_counts, fallback_reason_counts, bars_processed}`. Both runs produced identical hashes
+(`085919ff38ef4e833c06d96aa65d81a85e63dcc7da5c82432d2a441d4edbed21`), 54 signals generated, 0 trades in each
+run — the subset window itself contains no executed trades, but determinism is proven by hash equality
+across two independent runs of identical code/config/data, not by the subset having trades.
+
+**Task 22**: not inspected, per instruction — sample inadequacy (n=7) makes any OOS comparison premature
+regardless.
+
+**Final decision**: `CORRECTED_CANONICAL_BASELINE_ESTABLISHED_INSUFFICIENT_SAMPLE` — the corrected geometry
+run is mechanically valid (deterministic, zero-short invariant holds, 100% publish→execute conversion,
+geometry audit passes, fully reconciled against Task 26), but n=7 trades concentrated in 2 of 10 symbols with
+a sub-1.0 gross profit factor is far too small and concentrated to establish or reject an edge. `COST_ROBUST`
+is explicitly not selected — the population is cost-fragile, not cost-robust.
+
+**Next recommended action (not started)**: **Task 37, option C** — expand the historical dataset to the
+product objective's intended 35-50+ symbol universe before drawing any further performance conclusion. The
+2-symbol concentration here (8 of 10 already-included symbols traded zero times in a full year) suggests the
+10-symbol universe itself, not just the stop-geometry correction, is the binding constraint on sample size —
+expanding symbol coverage is the highest-leverage next step before any cost-model refinement (option B) or
+geometry-coherence investigation (option A) would have enough trades to act on.
+
+**State**: Task 35 checkpoint committed (`5da8617d691221cdc54f4f1866f8d888847ffa5c`). This Task 36 ledger
+entry and all `results/task36_structural_stop_canonical_baseline/` artifacts — **not committed, not
+pushed**, per instruction. PR #10 remains draft.
