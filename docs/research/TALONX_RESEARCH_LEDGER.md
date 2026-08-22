@@ -4664,3 +4664,69 @@ tuning.
 **State**: Task 44 checkpoint committed and pushed (`65b2e65`). This Task 45 code changes, tests, ledger
 entry, and all `results/task45_experimental_regime_gate/` artifacts — **not committed, not pushed**, per
 instruction. PR #10 remains draft.
+
+**2026-08-22 update (Task 46)**: this Task 45 change set (code + tests + ledger entry) was committed as
+`23db3fc` (`feat(quant): add experimental multi-timeframe volatility gate`) and pushed at the start of Task
+46, after re-confirming its 22-test suite passes. `results/task45_experimental_regime_gate/` artifacts
+remain untracked (repo-wide `/results/` gitignored). PR #10 confirmed still draft/open.
+
+## Task 46 — Fast 35-Symbol Experimental Regime Validation (2026-08-22)
+
+**Objective**: bounded out-of-development comparison of CURRENT_1M vs. MULTITIMEFRAME_EXPERIMENTAL on
+identical data — a GO/NO-GO gate for a broader Task 47 run. Measurement only, no tuning.
+
+**Task 45 checkpoint**: committed and pushed as `23db3fc` before Task 46 began.
+
+**Window selection (declared before viewing any outcome)**: same real trading-day calendar Task 38/41 used,
+at different (20%/60%/80% vs. Task 38/41's ~4%/48%/92%) percentage marks — programmatically verified
+non-overlapping with the development windows. X_early (2025-10-27→10-31), Y_middle (2026-03-23→03-27),
+Z_late (2026-06-03→06-09), 15 trading days total. Width mechanically reduced from 10 to 5 trading days
+(runtime-budget decision, declared before running) to keep the required two full engine passes within the
+60-120 min target — actual combined runtime came in at 120.9 min (58.3 + 62.6), higher than the 77.8 min
+estimate but both runs completed without needing a mid-run reduction.
+
+**Universe/data**: same reviewed 35-symbol universe as Task 37/38/41; 10 originals sliced from existing
+local full-year data (zero new download), 25 additional symbols freshly downloaded via Alpaca (75/75
+FULL, zero failures). Data quality clean, zero critical corruption, all symbols present in all windows.
+
+**Identical execution confirmed**: `config_hash` differs only as expected (`24fb06bdafa1` vs.
+`1eb58828ad69`) — the sole config difference is `volatility_gate_mode`.
+
+**Headline result — zero executed trades in BOTH modes**: CURRENT_1M: 1,295 raw triggers, 7 published (all
+bearish-while-flat), 0 trades. EXPERIMENTAL: 6,506 raw triggers (5x), 139 published (~20x, all
+bearish-while-flat), 0 trades. LOW_VOLATILITY(_REGIME) remains dominant in both (85.7% of bars vs. 48.7% — a
+real, substantial reduction, consistent with Task 41's offline coverage measurement) but LOW_CONFLUENCE
+scaled up proportionally with the larger surviving candidate pool (847 → 4,209). The wider funnel did not
+produce a single bullish published signal in either mode across this 3-week sample.
+
+**Detail-reason breakdown not captured**: `REGIME_STATE_NOT_READY`/`15M_BELOW`/`60M_BELOW`/`BOTH_BELOW` were
+not persisted in this run's saved output (canonical `LOW_VOLATILITY_REGIME` reason only) — flagged as a
+capture gap for a future run script, not re-run to avoid an additional ~60 min pass, since it would not
+change the core zero-trades finding.
+
+**Product-frequency test**: 0.0 trades/week in both modes; 0/15 entry days, 0/35 symbols traded in either
+mode. Success explicitly not declared on the upstream funnel movement alone.
+
+**Economics/cost/statistical uncertainty/concentration/window-robustness**: all N/A — zero trades in both
+modes at every cost level and in every window; no figure fabricated or approximated from an empty sample.
+The zero-trade outcome IS consistently repeated across all 3 windows in both modes.
+
+**Structural/risk invariants**: no trades occurred so none could be violated by this run; independently
+proven unchanged by Task 45's own 551-test regression pass.
+
+**Cost robustness classification**: `INSUFFICIENT_SAMPLE`.
+
+**No tuning**: confirmed — all thresholds/gates/costs frozen exactly as Task 45 left them; window selection
+frozen before any outcome was viewed; no Task 22 inspection.
+
+**Final decision**: `INSUFFICIENT_SAMPLE` — neither advancing to Task 47's broader validation nor rejecting
+the experimental gate is supported; there is no trade-level data yet to judge economics on.
+
+**Next recommended action (not started)**: Task 47 (bounded) — extend the out-of-development validation
+sample (revert to/exceed the original 10-trading-day window width and/or add windows) specifically to reach
+a nonzero executed-trade count in at least one mode before attempting any economic comparison again. Still
+bounded, still zero tuning.
+
+**State**: Task 45 checkpoint committed and pushed (`23db3fc`). This Task 46 ledger entry and all
+`results/task46_fast_regime_validation/` artifacts — **not committed, not pushed**, per instruction. PR #10
+remains draft.
