@@ -323,6 +323,18 @@ class QuantConfig:
     htf_max_bars: int = _env_int("TALONX_QUANT_HTF_MAX_BARS", 210)
     trend_gate_enabled: bool = _env_bool("TALONX_QUANT_TREND_GATE_ENABLED", True)
 
+    # --- Multi-timeframe volatility REGIME state (Task 40) ---
+    # Observability-only 15m/60m ATR% readings, distinct from the 1-min
+    # trigger-bar ATR gate above (min_atr_pct) which this does NOT
+    # replace or feed into. The 15m leg reuses htf_bar_interval_minutes/
+    # htf_max_bars/buffer_htf above unchanged (no separate config); this
+    # section adds ONLY the new 60-minute leg's buffer sizing.
+    # Deliberately continuous (no rth_only knob here, unlike
+    # rth_only_htf_sma below) -- Task 39's design decision, not a
+    # runtime-tunable choice.
+    regime_60m_bar_interval_minutes: int = _env_int("TALONX_QUANT_REGIME_60M_BAR_INTERVAL_MINUTES", 60)
+    regime_60m_max_bars: int = _env_int("TALONX_QUANT_REGIME_60M_MAX_BARS", 60)
+
     # --- Pre-market session rules (04:00-09:30 America/New_York) ---
     # Stricter volume-surge bar than the regular-session default above,
     # plus a liquidity gate (dollar volume + bid-ask spread) and a news-

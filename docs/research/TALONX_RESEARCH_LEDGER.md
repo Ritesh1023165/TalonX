@@ -4236,3 +4236,83 @@ step, must NOT touch the unchanged 1-minute trigger test.
 **State**: Task 38 checkpoint committed and pushed (`4599d5948c26d5af0758e97e3dad53412b520f89`). This Task
 39 ledger entry and all `results/task39_multitimeframe_volatility_design/` artifacts — **not committed, not
 pushed**, per instruction. PR #10 remains draft.
+
+**2026-08-22 update (Task 40)**: this Task 39 ledger entry was committed as `c394c2d9689113419cb9cd430132775aa06c3411`
+(`docs(research): define multi-timeframe volatility regime contract`) and pushed at the start of Task 40.
+`results/task39_multitimeframe_volatility_design/` artifacts remain untracked (repo-wide `/results/`
+gitignored). PR #10 confirmed still draft/open.
+
+## Task 40 — Multi-Timeframe Volatility State Implementation & Parity (2026-08-22)
+
+**Objective**: implement Task 39's designed two-rung volatility-regime STATE (15m reuse + new 60m
+buffer/aggregator) with live/backtest parity and observability — explicitly NOT an eligibility gate. First
+strategy-code implementation task since Task 35.
+
+**Task 39 checkpoint**: committed and pushed as `c394c2d9689113419cb9cd430132775aa06c3411`
+(`docs(research): define multi-timeframe volatility regime contract`) before Task 40 began.
+
+**Files changed**: `talonx_backtest/engine.py` (+57/-2), `talonx_quant/config.py` (+12/-0),
+`talonx_quant/consumer.py` (+81/-2), `talonx_quant/indicators.py` (+79/-0), new
+`tests/test_volatility_regime.py` (17 tests). Purely additive — the only 2 deleted lines anywhere in the
+diff are a single import statement reformatted (confirmed by grepping the diff for `^-` lines), zero existing
+logic removed or reordered. `talonx_quant/buffer.py`, `talonx_quant/aggregation.py`,
+`talonx_quant/schemas.py` byte-for-byte unchanged (SHA-256 confirmed) — proving genuine reuse, not
+duplication.
+
+**Regime snapshot**: new `talonx_quant.indicators.VolatilityRegimeSnapshot` (`atr_15m`, `atr_pct_15m`,
+`ready_15m`, `atr_60m`, `atr_pct_60m`, `ready_60m`, `as_of` — no PASS/FAIL field), computed by one
+authoritative `compute_volatility_regime` function called identically by both `engine.py` and `consumer.py`.
+
+**15m implementation**: reuses the existing `buffer_htf`/`htf_aggregator` entirely unchanged — zero new
+state, regular-session-only semantics preserved.
+
+**60m implementation**: one new `RollingBarBuffer` + one new `HtfBarAggregator(60, rth_only=False)` instance
+— same proven classes, zero new bucketing/ATR formula, deliberately continuous per Task 39's session policy.
+New config: `regime_60m_bar_interval_minutes` (60), `regime_60m_max_bars` (60).
+
+**Readiness semantics**: `ready_15m`/`ready_60m` report `False` honestly until each leg's own `>atr_period`
+bar requirement is met — never a fake/zero value. Empirically confirmed on a 260-bar (~4.3h) fixture:
+`ready_15m=True`, `ready_60m=False` (needs >14h). Zero signals blocked by regime state in Task 40.
+
+**Live/backtest parity**: both paths call the identical `compute_volatility_regime` against buffers built by
+the identical `RollingBarBuffer`/`HtfBarAggregator` classes — no separate wrapper. Directly tested
+(numerical equality) via a bar sequence fed through both `BacktestEngine`'s per-bar path and `QuantScanner`'s
+per-tick path independently.
+
+**Observability**: `BacktestEngine.volatility_regime_snapshots`/`.regime_telemetry` (opt-in via
+`research_telemetry=True`, mirroring the existing `volatility_telemetry` convention),
+`QuantScanner._latest_regime_snapshot` — none reach `QuantSignal`, `Trade`, `TriggeringSignalRef`, or
+Telegram/dispatch. Alert eligibility untouched.
+
+**Warm-up capture**: extended the existing, already `buffer_type`-agnostic `checkpoint_buffer`/`load_buffer`
+store mechanism to the 60-minute leg (checkpoint write + minimal no-gap-limit reload) — zero store schema
+change needed. Deliberately deferred: a yfinance historical-backfill fallback for the 60m leg (analogous to
+`_preseed_htf_if_needed`) — a materially larger separate feature, exact schema/gap documented in
+`warmup_state_requirements.md` rather than built now.
+
+**Zero strategy behavior change — proven, not assumed**: captured the TRUE pre-Task40 code via `git stash`
+(reverting all 4 modified files), ran an identical small deterministic fixture, `git stash pop`ped to
+restore, ran the identical fixture again, and diffed the two result sets. **`diff` exit code 0 — zero lines
+of difference** across trades, signals_generated, signals_published, bars_processed, rejections, and the
+full raw signal_log.
+
+**Tests**: 17 new tests (`tests/test_volatility_regime.py`) covering 15m/60m aggregation and readiness, ATR%
+calculation, invalid/zero/negative/NaN denominator handling, closed-bar causality, session behavior,
+deterministic repeated state, live/backtest numerical parity, and the before/after proof. Focused suite (this
+file + 9 existing files covering every touched code path): **310 passed, 0 failed** (63.7s). Full-repository
+suite attempted but not completed — exceeded a 5-minute timeout at ~12-13% progress (~60+ min extrapolated);
+deliberately not awaited to honor the 30-90 minute LIGHT-MEDIUM budget, an explicitly flagged residual gap,
+not a hidden one.
+
+**No tuning**: `min_atr_pct` (0.25%) not removed, not bypassed, byte-for-byte unchanged. 15m/60m legs not
+wired into any eligibility path. No confluence/stop/R:R changes. No historical replay. No Task 22 inspection.
+
+**Final decision**: `MULTITIMEFRAME_STATE_IMPLEMENTED_AND_PARITY_VALIDATED`.
+
+**Next recommended action (not started)**: Task 41 — Multi-Timeframe Volatility Eligibility Contract
+Calibration. Determine the combination rule and numeric thresholds for the 15m/60m legs using volatility
+distributions and product semantics, explicitly NOT P&L optimization.
+
+**State**: Task 39 checkpoint committed and pushed (`c394c2d9689113419cb9cd430132775aa06c3411`). This Task
+40 code changes, tests, ledger entry, and all `results/task40_volatility_state/` artifacts — **not
+committed, not pushed**, per instruction. PR #10 remains draft.

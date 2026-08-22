@@ -103,7 +103,10 @@ from talonx_quant.consumer import (
     _partition,
     _trend_gate_applicable,
 )
-from talonx_quant.indicators import compute_daily_pivots, compute_htf_trend, compute_indicators
+from talonx_quant.indicators import (
+    VolatilityRegimeSnapshot, compute_daily_pivots, compute_htf_trend, compute_indicators,
+    compute_volatility_regime,
+)
 from talonx_quant.schemas import QuantSignal, SignalDirection
 from talonx_quant.session import get_entry_blackout, get_session
 from talonx_quant.strategy import calculate_trade_geometry, evaluate_signals
@@ -224,6 +227,15 @@ class BacktestEngine:
         self.buffer = RollingBarBuffer(qc.max_bars_per_symbol)
         self.buffer_htf = RollingBarBuffer(qc.htf_max_bars)
         self.htf_aggregator = HtfBarAggregator(qc.htf_bar_interval_minutes, rth_only=qc.rth_only_htf_sma)
+        # Task 40: multi-timeframe volatility REGIME state (observability
+        # only -- see compute_volatility_regime's own docstring). The 15m
+        # leg reuses buffer_htf/htf_aggregator above unchanged; this is
+        # ONLY the new 60-minute leg, built from the exact same, already-
+        # proven RollingBarBuffer/HtfBarAggregator classes -- deliberately
+        # continuous (rth_only=False) per Task 39's session-policy design,
+        # not a runtime-tunable knob.
+        self.buffer_60m = RollingBarBuffer(qc.regime_60m_max_bars)
+        self.aggregator_60m = HtfBarAggregator(qc.regime_60m_bar_interval_minutes, rth_only=False)
         self.simulator = TradeSimulator(self.config.execution)
 
         self._cooldown_until: dict[str, pd.Timestamp] = {}
@@ -252,6 +264,14 @@ class BacktestEngine:
         # (candidate_telemetry), only when research_telemetry=True.
         self.volatility_telemetry: list[dict] = []
         self.candidate_telemetry: list[dict] = []
+        # Task 40: latest multi-timeframe VolatilityRegimeSnapshot per
+        # symbol (observability -- never consulted by any gate/decision).
+        # regime_telemetry (one row per bar with a valid 1-min snapshot,
+        # same population as volatility_telemetry) is captured ONLY when
+        # research_telemetry=True, matching that flag's existing
+        # observational-only convention.
+        self.volatility_regime_snapshots: dict[str, VolatilityRegimeSnapshot] = {}
+        self.regime_telemetry: list[dict] = []
         self.signals_generated = 0
         self.signals_published = 0
         self.bars_processed = 0
@@ -423,6 +443,20 @@ class BacktestEngine:
                 high=finalized["high"], low=finalized["low"], close=finalized["close"],
                 volume=finalized["volume"],
             )
+        # Task 40: 60-minute regime leg -- identical pattern to the 15m
+        # block immediately above, just a second HtfBarAggregator/
+        # RollingBarBuffer pair at a different interval. No new bucketing
+        # logic.
+        finalized_60m = self.aggregator_60m.update(
+            symbol=symbol, timestamp=timestamp, open_=float(row["open"]), high=float(row["high"]),
+            low=float(row["low"]), close=float(row["close"]), volume=float(row["volume"]),
+        )
+        if finalized_60m is not None:
+            self.buffer_60m.add_bar(
+                symbol=symbol, timestamp=finalized_60m["timestamp"], open_=finalized_60m["open"],
+                high=finalized_60m["high"], low=finalized_60m["low"], close=finalized_60m["close"],
+                volume=finalized_60m["volume"],
+            )
         self._last_close[symbol] = float(row["close"])
         self._last_timestamp[symbol] = timestamp
 
@@ -431,6 +465,27 @@ class BacktestEngine:
         snapshot = compute_indicators(df_1m, qc)
         if snapshot is None:
             return  # warm-up -- identical "insufficient data -> no signal" posture as live
+
+        # Task 40: regime snapshot computed for EVERY post-warm-up bar,
+        # unconditionally -- deliberately BEFORE the volatility gate below
+        # so it is available regardless of that gate's outcome (this is
+        # observability state, not an eligibility input; see
+        # compute_volatility_regime's docstring). Reuses buffer_htf's
+        # dataframe exactly as compute_htf_trend/compute_daily_pivots
+        # already do -- no new 15m read path.
+        regime_snapshot = compute_volatility_regime(
+            self.buffer_htf.get_dataframe(symbol), self.buffer_60m.get_dataframe(symbol),
+            qc.atr_period, timestamp,
+        )
+        self.volatility_regime_snapshots[symbol] = regime_snapshot
+        if self.research_telemetry:
+            self.regime_telemetry.append({
+                "timestamp": timestamp, "symbol": symbol,
+                "atr_15m": regime_snapshot.atr_15m, "atr_pct_15m": regime_snapshot.atr_pct_15m,
+                "ready_15m": regime_snapshot.ready_15m,
+                "atr_60m": regime_snapshot.atr_60m, "atr_pct_60m": regime_snapshot.atr_pct_60m,
+                "ready_60m": regime_snapshot.ready_60m,
+            })
 
         fails_volatility = _fails_min_volatility(snapshot, qc)
         if self.research_telemetry:

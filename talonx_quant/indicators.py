@@ -233,6 +233,85 @@ def compute_htf_trend(df_htf: pd.DataFrame | None, period: int) -> float | None:
 
 
 @dataclass(frozen=True)
+class VolatilityRegimeSnapshot:
+    """Task 40 (multi-timeframe volatility regime STATE -- see
+    docs/research/TALONX_RESEARCH_LEDGER.md Task 39/40 entries):
+    observability-only readings of ATR(atr_period) on two coarser
+    timeframes (15-minute, 60-minute), alongside the SAME 1-minute
+    ATR(14)/price >= min_atr_pct gate this does NOT touch or replace.
+
+    Deliberately NOT wired into any eligibility decision -- there is no
+    PASS/FAIL field here on purpose. `ready_15m`/`ready_60m` report
+    warm-up state honestly (True only once that leg's ATR is actually
+    computable); `atr_pct_15m`/`atr_pct_60m` can independently be None
+    even when `ready` is True, if the leg's own latest close is
+    missing/non-positive (see `_regime_leg_atr`'s zero/invalid-price
+    handling) -- warm-up and price-validity are kept as separate
+    concerns, never conflated into one boolean."""
+    atr_15m: float | None
+    atr_pct_15m: float | None
+    ready_15m: bool
+    atr_60m: float | None
+    atr_pct_60m: float | None
+    ready_60m: bool
+    as_of: pd.Timestamp
+
+
+def _regime_leg_atr(df: pd.DataFrame | None, atr_period: int) -> tuple[float | None, float | None, bool]:
+    """One leg (one timeframe) of a VolatilityRegimeSnapshot. Reuses the
+    EXACT same `df.ta.atr(length=atr_period)` call compute_indicators
+    already uses for the 1-minute case -- no second ATR formula.
+    `df` is expected already closed-bar-only (whatever RollingBarBuffer
+    it came from only ever holds finalized HtfBarAggregator buckets), so
+    this never needs its own causality check.
+
+    Denominator (documented, single convention for BOTH timeframes):
+    this leg's OWN latest buffered bar's close -- not the primary
+    1-minute snapshot's price. Each timeframe is normalized against its
+    own most recent reading, avoiding a subtle cross-buffer staleness
+    coupling (e.g. a 15m leg whose own last close is meaningfully older
+    than the freshest 1-minute tick).
+
+    `ready` is strictly about WARM-UP (enough bars for a real ATR
+    value) -- kept separate from price validity: a leg can be `ready`
+    with `atr_pct=None` if its latest close happens to be missing,
+    zero, or negative (defensive; not expected in real data)."""
+    if df is None or len(df) <= atr_period:
+        return None, None, False
+    atr_series = df.ta.atr(length=atr_period)
+    if atr_series is None:
+        return None, None, False
+    valid = atr_series.dropna()
+    if valid.empty:
+        return None, None, False
+    atr = float(valid.iloc[-1])
+    price = df["close"].iloc[-1]
+    atr_pct = None
+    if price is not None and pd.notna(price) and price > 0:
+        atr_pct = atr / float(price) * 100
+    return atr, atr_pct, True
+
+
+def compute_volatility_regime(
+    df_15m: pd.DataFrame | None, df_60m: pd.DataFrame | None, atr_period: int, as_of: pd.Timestamp,
+) -> VolatilityRegimeSnapshot:
+    """Task 40: the ONE authoritative calculation path for both the
+    15-minute leg (reusing the existing 15m HTF buffer's dataframe
+    unchanged) and the 60-minute leg (a new, equally-causal buffer) --
+    called identically by talonx_backtest.engine and talonx_quant.consumer
+    so live and backtest can never independently drift. Observability
+    only: callers must not use this to gate signal eligibility (Task 40
+    scope; see min_atr_pct, unchanged, for the only currently-active
+    volatility gate)."""
+    atr_15m, atr_pct_15m, ready_15m = _regime_leg_atr(df_15m, atr_period)
+    atr_60m, atr_pct_60m, ready_60m = _regime_leg_atr(df_60m, atr_period)
+    return VolatilityRegimeSnapshot(
+        atr_15m=atr_15m, atr_pct_15m=atr_pct_15m, ready_15m=ready_15m,
+        atr_60m=atr_60m, atr_pct_60m=atr_pct_60m, ready_60m=ready_60m, as_of=as_of,
+    )
+
+
+@dataclass(frozen=True)
 class DailyPivots:
     """Classic floor-trader pivot levels (P, R1, S1) from the most
     recently COMPLETED regular-trading-hours session -- the basis for

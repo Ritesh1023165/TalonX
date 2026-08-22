@@ -237,7 +237,10 @@ from talonx_quant import preseed
 from talonx_quant.aggregation import HtfBarAggregator
 from talonx_quant.buffer import RollingBarBuffer
 from talonx_quant.config import QuantConfig
-from talonx_quant.indicators import compute_daily_pivots, compute_htf_trend, compute_indicators
+from talonx_quant.indicators import (
+    VolatilityRegimeSnapshot, compute_daily_pivots, compute_htf_trend, compute_indicators,
+    compute_volatility_regime,
+)
 from talonx_quant.schemas import (
     MarketTickEvent,
     NewsArticleIngestedEvent,
@@ -422,6 +425,17 @@ class QuantScanner:
         self._htf_aggregator = HtfBarAggregator(
             self.config.htf_bar_interval_minutes, rth_only=self.config.rth_only_htf_sma,
         )
+        # Task 40: multi-timeframe volatility REGIME state (observability
+        # only -- see compute_volatility_regime's docstring). The 15m leg
+        # reuses buffer_htf/_htf_aggregator above unchanged; this is ONLY
+        # the new 60-minute leg, built from the exact same, already-proven
+        # classes -- deliberately continuous (rth_only=False), per Task
+        # 39's session-policy design, not a runtime-tunable knob.
+        self.buffer_60m = RollingBarBuffer(self.config.regime_60m_max_bars)
+        self._aggregator_60m = HtfBarAggregator(self.config.regime_60m_bar_interval_minutes, rth_only=False)
+        # Latest snapshot per symbol -- observability only, never consulted
+        # by any gate/eligibility decision.
+        self._latest_regime_snapshot: dict[str, VolatilityRegimeSnapshot] = {}
         # True Calendar-Aligned 1-Minute Candle Aggregation (Requirement 1):
         # raw poll-cycle BAR events (12s cadence by default) accumulate here,
         # floor-bucketed to the minute, and the running OHLCV is written
@@ -726,6 +740,12 @@ class QuantScanner:
             bars = self.buffer_htf.get_bars(symbol)
             if bars:
                 self.store.checkpoint_buffer(symbol, "15m", bars)
+        # Task 40: 60-minute regime leg -- same generic, buffer_type-keyed
+        # checkpoint mechanism above, no store schema change needed.
+        for symbol in self.buffer_60m.known_symbols():
+            bars = self.buffer_60m.get_bars(symbol)
+            if bars:
+                self.store.checkpoint_buffer(symbol, "60m", bars)
 
     async def _load_buffers_from_store(self) -> None:
         """Reloads both RollingBarBuffers from their last checkpoint --
@@ -788,6 +808,32 @@ class QuantScanner:
                     "backfilling via yfinance", symbol, gap_seconds, self.config.htf_backfill_gap_seconds,
                 )
             await self._preseed_htf_if_needed(symbol, force=force_backfill)
+
+        # Task 40: 60-minute regime leg -- minimal reload only (no gap
+        # limit, mirroring the 15m block's own "no gap limit" reload
+        # above). Deliberately does NOT add a yfinance historical-backfill
+        # path analogous to _preseed_htf_if_needed -- that is a materially
+        # larger, separate feature, explicitly out of scope for Task 40's
+        # "smallest implementation possible" instruction. See
+        # results/task40_volatility_state/warmup_state_requirements.md
+        # for the exact remaining-gap classification. Until that future
+        # task exists, a fresh process simply re-warms this leg from live
+        # ticks over the following ~2 continuous days (>14 60-min bars),
+        # same as any other cold-started buffer before its own checkpoint
+        # mechanism existed.
+        for symbol in self.store.buffered_symbols("60m"):
+            bars = self.store.load_buffer(symbol, "60m")
+            for bar in bars:
+                self.buffer_60m.add_bar(
+                    symbol=symbol, timestamp=datetime.fromisoformat(bar["timestamp"]),
+                    open_=bar["open"], high=bar["high"], low=bar["low"],
+                    close=bar["close"], volume=bar["volume"], session=bar.get("session"),
+                )
+            if bars:
+                logger.info(
+                    "Reloaded %d 60-min regime bar(s) for %s from checkpoint (no gap limit, no backfill)",
+                    len(bars), symbol,
+                )
 
     async def preseed_symbols(self, symbols: list[str]) -> None:
         """Public entrypoint for run_talonx.py's watchlist-driven pre-seed
@@ -1000,6 +1046,26 @@ class QuantScanner:
                 volume=finalized["volume"],
             )
 
+    def _update_regime_buffer_60m(self, event: MarketTickEvent) -> None:
+        """Task 40: the 60-minute regime leg's bucketing -- identical
+        pattern to _update_htf_buffer above (same HtfBarAggregator/
+        RollingBarBuffer classes, a different interval/rth_only), just
+        for the new buffer_60m. Deliberately continuous (rth_only=False,
+        set at construction) rather than RTH-only like the 15m trend
+        buffer -- Task 39's session-policy design."""
+        symbol = event.symbol.upper()
+        finalized = self._aggregator_60m.update(
+            symbol=symbol, timestamp=event.timestamp,
+            open_=event.open, high=event.high, low=event.low,
+            close=event.close, volume=event.volume,
+        )
+        if finalized is not None:
+            self.buffer_60m.add_bar(
+                symbol=symbol, timestamp=finalized["timestamp"], open_=finalized["open"],
+                high=finalized["high"], low=finalized["low"], close=finalized["close"],
+                volume=finalized["volume"],
+            )
+
     def _update_1m_buffer(self, event: MarketTickEvent) -> None:
         """True Calendar-Aligned 1-Minute Candle Aggregation (Requirement
         1): floor-buckets incoming BAR events to the minute and builds a
@@ -1143,6 +1209,7 @@ class QuantScanner:
 
         self._update_1m_buffer(event)
         self._update_htf_buffer(event)
+        self._update_regime_buffer_60m(event)
         self._bars_processed += 1
 
         if not bar_just_closed:
@@ -1155,6 +1222,18 @@ class QuantScanner:
         snapshot = compute_indicators(df, self.config)
         if snapshot is None:
             return  # not enough history yet for this symbol
+
+        # Task 40: regime snapshot computed for EVERY closed bar,
+        # unconditionally -- deliberately BEFORE the volatility gate below
+        # so it is available regardless of that gate's outcome
+        # (observability state, not an eligibility input; see
+        # compute_volatility_regime's docstring). Reuses buffer_htf's
+        # dataframe exactly as compute_htf_trend/compute_daily_pivots
+        # already do below -- no new 15m read path.
+        self._latest_regime_snapshot[event.symbol.upper()] = compute_volatility_regime(
+            self.buffer_htf.get_dataframe(event.symbol), self.buffer_60m.get_dataframe(event.symbol),
+            self.config.atr_period, snapshot.bar_timestamp,
+        )
 
         if _fails_min_volatility(snapshot, self.config):
             self._signals_suppressed_low_volatility += 1
