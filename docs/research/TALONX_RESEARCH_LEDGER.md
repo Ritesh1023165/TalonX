@@ -4808,3 +4808,79 @@ and stateful cooldown remain separate, unresolved contributors requiring their o
 **State**: Task 46 checkpoint committed and pushed (`43f48bb`). This Task 47 ledger entry and all
 `results/task47_bullish_attrition/` artifacts — **not committed, not pushed**, per instruction. PR #10
 remains draft.
+
+## Task 48 — Bullish Clean-Survivor Publication / Cooldown Trace (2026-08-22)
+
+**Objective**: explain candidate-by-candidate why Task 47's 24 bullish strategy-gate-clean candidates did
+not publish. Stateful publication diagnostic only — no confluence/cooldown/threshold changes.
+
+**Task 47 checkpoint**: committed and pushed as `6589974` before Task 48 began. PR #10 confirmed draft/open.
+
+**24-candidate population proof**: reconstructed exactly from Task 46's saved `signal_log` using Task 47's
+own strategy-gate-clean definition — **24 bullish / 206 bearish, both validated by assertion.**
+
+**Publication state machine traced from live code** (`talonx_backtest/engine.py:582-718` — the module that
+actually produced Task 46's numbers, not the Redis-backed live `consumer.py`): `US_MARKET_SESSION_CLOSED` →
+`OPENING_BLACKOUT` → `CLOSING_BLACKOUT`(bullish) → `LOSS_LOCKOUT` → `COOLDOWN`(1st check, pre-confluence) →
+`LOW_CONFLUENCE` → `LOW_RISK_REWARD` → `HTF_DATA_UNAVAILABLE` → `TREND_GATE` → `PREMARKET_LIQUIDITY`
+(unconditional, no quote feed) → per-bar throttle pool (all 35 symbols) → rank by Composite Opportunity
+Score, release top `throttle_max_signals=3` → `COOLDOWN`(2nd check) → revalidate → publish → arm cooldown
+(`cooldown_seconds=1200`, any direction, per-symbol).
+
+**Fidelity validation**: a full deterministic replay of all 6,506 candidates in time order reproduced Task
+46's 139 published bearish signals **exactly** (139/139, terminal reasons: 139 published, 57
+`PREMARKET_LIQUIDITY`, 8 `THROTTLE_ACTIVE`, 2 `COOLDOWN_ACTIVE`) — proving the state-machine reconstruction
+is faithful. For bullish: 19/24 resolved cleanly as `PREMARKET_LIQUIDITY` (stateless, unconditional in this
+no-quote-feed engine); the remaining 5 (all AMD/STX, regular session) were **not** blocked by
+`COOLDOWN_ACTIVE` or `THROTTLE_ACTIVE` in the reconstruction (0/24 stateful suppressions measured) yet
+Task 46's actual run published 0 bullish, not 5 — an honestly-reported, unresolved discrepancy. Leading
+(unconfirmed) hypothesis: this task's `TREND_GATE`/HTF-SMA200 reconstruction (calendar-aligned resample) does
+not exactly reproduce the live `HtfBarAggregator`'s session-anchored bucketing — the one gate that differs
+between bullish/bearish and the one not exactly replicated. Classified `INSUFFICIENT_STATE_EVIDENCE`, not
+asserted as fact; rebuilding the exact aggregator was judged to exceed this task's LIGHT budget.
+
+**Suppression reasons**: no bullish candidate was classified `COOLDOWN_ACTIVE`, `THROTTLE_ACTIVE`,
+`DUPLICATE_SUPPRESSED`, `STATE_MACHINE_SUPPRESSED`, or `PREVIOUS_BEARISH_PUBLISH_STATE` — none of the
+requested stateful terminal reasons actually fired for any of the 24.
+
+**Preceding-event attribution**: only 2 candidates in the entire population were ever terminated by
+`COOLDOWN_ACTIVE` (both bearish, suppressed by a prior bearish publish on the same symbol, 840s/240s
+earlier). Zero bullish suppressions traced to any preceding event — Task 47's "bearish publishes consume
+future bullish opportunities" hypothesis is **not supported** by this population.
+
+**Counterfactual measurement**: bullish published count is identical (5) whether cooldown, throttle, or
+both are removed — stateful gating was never the constraint for bullish in this sample. Bearish published
+count rises modestly (139→149) as constraints relax, confirming those mechanisms bind meaningfully on the
+higher-frequency bearish side but have zero measured bearing on bullish. No P&L computed.
+
+**Cooldown contract assessment**: per-symbol, direction-agnostic, armed on any publish (executable or
+informational) regardless of direction — architecturally capable of bearish-flat telemetry suppressing a
+bullish entry opportunity, but zero such instances observed in this population. Classified `AMBIGUOUS` (not
+`ALIGNED` — no requirement affirmatively endorses this; not `REQUIREMENT_MISALIGNMENT` — no measured harm).
+
+**Long-only product interpretation**: bearish publications are exit/telemetry information under LONG_ONLY,
+never entries; the design lets that telemetry consume the same per-symbol lock slot a genuine new long
+opportunity would need. A real asymmetry-of-consequence, but not proven to have cost a trade here.
+
+**Whether zero bullish is explained**: `ZERO_BULLISH_NOT_EXPLAINED_BY_STATEFUL_GATING` — stateful
+publication gating explains 0 of the 24 candidates' non-publication; 19 are stateless-gate explained, 5
+remain unresolved with a stateless (not stateful) leading hypothesis.
+
+**Final decision**: `STATEFUL_PUBLICATION_BEHAVIOR_AMBIGUOUS`.
+
+**Next-fix priority**: `FIX_MACD_CONFLUENCE_SELF_CREDIT_FIRST` — the stateful mechanism has no proven
+defect to fix (0 confirmed cross-direction suppressions); MACD self-credit remains a proven, large-magnitude,
+low-risk-to-fix requirement violation from Task 47.
+
+**No strategy changes**: confirmed — no cooldown/throttle/confluence/volatility/trigger/trend/R:R/threshold
+change made; no P&L computed; no extended historical run; Task 22 not inspected; no capital used.
+
+**Next recommended action (not started)**: implement the Task 47-recommended MACD confluence self-credit
+correction (require the confirmation leg to be independent of the candidate's own trigger family) plus a
+measurement-only before/after re-check against Task 46's saved `signal_log`. The cooldown/throttle
+direction-agnostic design remains a flagged, unresolved product question for the owner, not an
+implementation task.
+
+**State**: Task 47 checkpoint committed and pushed (`6589974`). This Task 48 ledger entry and all
+`results/task48_bullish_stateful_trace/` artifacts — **not committed, not pushed**, per instruction. PR #10
+remains draft.
