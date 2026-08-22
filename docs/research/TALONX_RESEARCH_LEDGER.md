@@ -4149,3 +4149,90 @@ volatility-regime contract/formula, per the requirements listed above. Contract-
 **State**: Task 37 checkpoint committed and pushed (`df266c9c74e0afe41f99a51a327d3357dd6a11df`). This Task
 38 ledger entry and all `results/task38_low_volatility_diagnostic/` artifacts — **not committed, not
 pushed**, per instruction. PR #10 remains draft.
+
+**2026-08-22 update (Task 39)**: this Task 38 ledger entry was committed as `4599d5948c26d5af0758e97e3dad53412b520f89`
+(`docs(research): record low-volatility gate diagnostic`) and pushed at the start of Task 39.
+`results/task38_low_volatility_diagnostic/` artifacts remain untracked (repo-wide `/results/` gitignored).
+PR #10 confirmed still draft/open.
+
+## Task 39 — Multi-Timeframe Volatility Regime Contract Design (2026-08-22)
+
+**Objective**: design (not implement, not tune, not P&L-test) ONE clear, causal, live-computable
+multi-timeframe volatility-regime contract, responding directly to Task 38's `MISALIGNED` finding. Design
+only — no strategy code touched, no historical data processed, no full engine replay.
+
+**Task 38 checkpoint**: committed and pushed as `4599d5948c26d5af0758e97e3dad53412b520f89`
+(`docs(research): record low-volatility gate diagnostic`) before Task 39 began.
+
+**Purpose statement (fixed first)**: "Is this symbol currently in a sufficiently active volatility regime
+for the intraday strategy, relative to both recent intraday conditions and its broader normal volatility?" —
+explicitly separate from the existing, unchanged 1-minute trigger-bar ATR test (`atr_move_multiplier`),
+which remains valid.
+
+**Models considered**: Model A (Absolute Multi-Timeframe, normalized ATR% on 2+ timeframes) — **selected**.
+Model B (Relative-to-Self, percentile vs. own historical baseline) — conceptually the best fit for
+cross-symbol comparability, but requires new persistent (20-60+ day) cross-restart state this system does
+not have anywhere today — deferred. Model D (Normalized Ratio, short-term vs. broader baseline) — same
+persistent-state gap as B, smaller in degree — deferred. Model C (Regime+Trigger separation) is not a
+competing formula, it is the architectural principle already fixed by the purpose statement.
+
+**Product-suggested formula reviewed as an option only, NOT adopted**: `ATR_14m / (ATR_14D / sqrt(390))`.
+Explicitly assessed whether `sqrt(time)` scaling is appropriate for ATR specifically (not just standard
+deviation) and found three distortions: (1) microstructure noise floor inflates 1-minute ATR beyond pure
+diffusion scaling, (2) daily ATR partly reflects overnight gap risk with no intraday analog, (3) intraday
+volatility is U-shaped, not flat — directly evidenced by Task 38's own session-split data (54.6% opening-window
+pass rate vs. ~9% for the rest of the regular session). Needs empirical validation before trusting the
+equivalence; recorded as a future candidate, not selected.
+
+**Selected contract**: two-rung Absolute Multi-Timeframe — a **15-minute ATR% leg reusing the existing HTF
+buffer entirely unchanged** (`RollingBarBuffer(210)` + `HtfBarAggregator(15, rth_only=True)`, the same buffer
+already feeding `compute_htf_trend`/`compute_daily_pivots`), plus a **new 60-minute ATR% leg** (one new
+`RollingBarBuffer` + one new `HtfBarAggregator(60, rth_only=False)` instance — same generic, already-proven
+classes, zero new formulas, zero new bucketing logic). Both legs use the identical `pandas_ta.atr(length=14)`
+call already relied on for the 1-minute case. The two legs are reported **separately** (not blended) as a
+small `VolatilityRegimeSnapshot` — how they combine into a pass/fail rule and what numeric thresholds apply
+are explicitly deferred to Task 40+. Daily timeframe **excluded** — Task 38 already proved it isn't
+computable from available warm-up state without new persistent storage. **Redundancy check confirmed**: this
+does NOT merely duplicate `current_bar_TR >= 1×ATR(14,1m)` — structurally different timeframe, different
+underlying bars, different question.
+
+**Session policy**: regime state changes continuously (never resets at a session boundary, matching the
+existing 1-minute ATR's own 2026-08-16 precedent); each leg simply holds its last value between its own bar
+closes. 15-minute leg stays regular-session-only (inherited convention, goes stale pre-market/after-hours);
+60-minute leg is deliberately built continuous, staying live through pre-market/after-hours. Opening/closing
+blackouts remain separate, untouched entry-timing gates — not special-cased in the regime read itself.
+
+**`min_atr_pct` (0.25%) disposition**: `RETIRE_WHEN_NEW_REGIME_IMPLEMENTED` — not `RETAIN_AS_COMPONENT` (a
+1-minute-calibrated number is a category error against a 15m/60m quantity) and not `REINTERPRET` (no
+evidence-based reinterpretation exists without fresh calibration, which this task must not do). This is a
+straightforward architectural consequence, not `OWNER_DECISION_REQUIRED` — what IS owner/future-task
+decision-required is the eventual new numeric threshold(s) and the two-leg combination rule.
+
+**Implementation feasibility**: smallest possible — one leg fully reused, one leg added via the same,
+already-proven `RollingBarBuffer`/`HtfBarAggregator` classes and the same ATR formula, inheriting live/backtest
+parity automatically via `aggregation.py`'s existing design guarantee. New state required only for the
+60-minute buffer/aggregator pair.
+
+**Warm-up/parity**: 15-min leg needs >14 bars (~3.5 regular-session hours) for a first reading, ~42-70 bars
+(~2-3 trading days) to stabilize; 60-min leg (new) needs >14 bars (~2 continuous days) for a first reading,
+~42-70 bars (~1-2 trading weeks) to stabilize; no daily bars needed (excluded). Connected explicitly to the
+existing warm-up-capture gap: every buffer in this system is in-memory-only and cold-starts on restart today
+— the new 60-minute buffer inherits this identical, already-known characteristic; not solved here, flagged
+for whatever future task builds cross-restart persistence generally.
+
+**No economic test**: no hypothetical signal count, trade count, R, PF, or threshold alternative computed.
+
+**No tuning**: zero strategy code changed; `atr_move_multiplier` untouched; no threshold search; no Task 22
+inspection; no full engine replay — reused Task 38's already-published evidence and existing source/docs
+throughout.
+
+**Final decision**: `MULTITIMEFRAME_VOLATILITY_CONTRACT_DEFINED`.
+
+**Next recommended action (not started)**: Task 40 — minimal implementation of the two-rung regime snapshot
+(15-minute reuse + new 60-minute buffer/aggregator) plus focused tests only. Must NOT run the historical
+backtest, must NOT choose eligibility thresholds or a combination rule without a separate explicit decision
+step, must NOT touch the unchanged 1-minute trigger test.
+
+**State**: Task 38 checkpoint committed and pushed (`4599d5948c26d5af0758e97e3dad53412b520f89`). This Task
+39 ledger entry and all `results/task39_multitimeframe_volatility_design/` artifacts — **not committed, not
+pushed**, per instruction. PR #10 remains draft.
