@@ -4730,3 +4730,81 @@ bounded, still zero tuning.
 **State**: Task 45 checkpoint committed and pushed (`23db3fc`). This Task 46 ledger entry and all
 `results/task46_fast_regime_validation/` artifacts — **not committed, not pushed**, per instruction. PR #10
 remains draft.
+
+## Task 47 — Bullish Signal Path & Confluence Attrition Diagnostic (2026-08-22)
+
+**Objective**: explain precisely why zero bullish signals survived to executable long trades in Task 46's
+MULTITIMEFRAME_EXPERIMENTAL run. Diagnostic only — no strategy tuning.
+
+**Task 46 checkpoint**: committed and pushed as `43f48bb` (`docs(research): record fast experimental regime
+validation`) before Task 47 began. PR #10 confirmed draft/open.
+
+**Population analyzed**: Task 46's `_signal_log_multitimeframe_experimental.parquet` — 6,506 raw,
+post-regime-gate candidates (3,217 bullish / 3,289 bearish). Canonical count validation against Task 46's
+own saved distributions: **PASS** (direction, `signal_type`, `confluence_score`, and `risk_reward_ratio`
+null counts all match exactly). All gate semantics traced from live code (`strategy.py`, `consumer.py`,
+`session.py`, `indicators.py`), not documentation. A focused test pass (session/blackout/confluence/trend
+suites) came back 123 passed, 0 failed.
+
+**Bullish vs bearish funnel**: LOW_CONFLUENCE is the single largest attrition point for bullish candidates
+(87.5% all-failure basis, first-failure 2,063/3,217) but is nearly symmetric across direction
+(confluence-eligible: 12.5% bullish vs. 13.4% bearish) — it is not the source of the directional asymmetry.
+The asymmetry comes from bullish-exclusive gates: HTF_DATA_UNAVAILABLE (43.3% all-failure),
+TREND_GATE (11.2%), and CLOSING_BLACKOUT (bullish-only, bearish exits always allowed through).
+
+**Primary bullish attrition causes (ranked)**: (1) LOW_CONFLUENCE, largest single gate, symmetric across
+direction; (2) LOW_RISK_REWARD (46.0% all-failure); (3) HTF_DATA_UNAVAILABLE (43.3%, bullish-only); (4)
+US_MARKET_SESSION_CLOSED (19.4%, an unconditional session-closed drop not previously isolated in Task 46's
+saved output); (5) TREND_GATE (11.2%, bullish-only, smaller in isolation than HTF unavailability).
+
+**Confluence family alignment**: MACD is **MISALIGNED** — measured 100% self-credit rate across all 6,243
+MACD-triggered candidates (`_macd_crossed_this_bar` credits the same crossover that fired the trigger),
+confirming Task 33's earlier finding on an independent population. RSI is **AMBIGUOUS/leaning
+INTENDED_SELECTIVITY** — its own confluence leg is structurally near-unreachable for RSI-triggered
+candidates (0% true rate measured, both directions) because the trigger fires on RSI *recovering out of*
+the extreme zone while the confluence leg requires RSI still *inside* it; RSI candidates depend entirely on
+incidental MACD/volume co-occurrence to reach threshold. MA remains **ALIGNED** (carried forward from Task
+33, sample too small here for new evidence).
+
+**Trend gate contribution**: secondary, not primary — TREND_GATE itself rejected only 13 bullish candidates
+first-failure / 359 all-failure basis, smaller than HTF_DATA_UNAVAILABLE or LOW_CONFLUENCE. Trend/HTF
+reconstruction was only exact for the 10/35 symbols with sufficient full-year lookback (200x15-min RTH bars
+needs ~50 trading days, unavailable from the other 25 symbols' window-local-only data) — documented gap,
+not force-approximated.
+
+**R:R contribution**: not a source of directional asymmetry — bullish `rr_available` (83.4%) was actually
+higher than bearish's (65.6%), consistent with `calculate_trade_geometry`'s fail-closed
+`risk_reward_ratio=None`-unless-structural-target posture explaining the 25.6% null rate observed in Task
+46 (not a bug).
+
+**Directional asymmetry source**: the interaction of (a) already-severe, roughly-symmetric confluence
+attrition, (b) bullish-exclusive TREND_GATE/HTF_DATA_UNAVAILABLE/CLOSING_BLACKOUT, and (c) a **stateful
+COOLDOWN/throttle-window mechanism** (armed on every publish regardless of direction, `consumer.py:2229-
+2261`) that disproportionately absorbs bullish's much rarer survivors given bearish's ~8.6x higher
+strategy-gate-clean pass rate (206 vs. 24) on shared tickers. This stateful gap was evidenced directly:
+strategy-gate-clean counts (206 bearish, 24 bullish) both exceed Task 46's actual published counts (139
+bearish, 0 bullish) — not reconstructable further without a full temporal replay.
+
+**Requirement vs implementation classification**: MACD self-credit = `REQUIREMENT_MISALIGNMENT` (proven,
+actionable). RSI's near-unreachable own-leg = `AMBIGUOUS`/leaning `INTENDED_SELECTIVITY` (a product-intent
+question, not a code defect). Bullish-exclusive TREND_GATE/HTF_DATA_UNAVAILABLE/CLOSING_BLACKOUT =
+`INTENDED_SELECTIVITY` (documented, deliberate LONG_ONLY risk design). The final zero-bullish-published
+outcome via stateful cooldown interaction = `INSUFFICIENT_EVIDENCE` (not itself tested).
+
+**Final decision**: `MULTIPLE_INTERACTING_GATES_REQUIRE_FIX` — no single gate explains the zero-bullish
+outcome; it is produced by the interaction of symmetric confluence attrition, bullish-exclusive directional
+gates, and asymmetric stateful cooldown absorption. Full reasoning: `next_bottleneck.md`.
+
+**No tuning**: confirmed — no threshold, trigger, confluence logic, trend gate, blackout, structural stop,
+R:R, symbol, or Task 46 window was changed; no new historical replay run; Task 22 not inspected; no capital
+used.
+
+**Next recommended action (not started)**: minimal, bounded correction — remove MACD's confluence
+self-credit (require the confirmation leg to be independent of the candidate's own trigger family) in
+`_confluence_score`, plus a measurement-only before/after re-check against Task 46's already-saved
+`signal_log` (no new engine replay). Does not promise a nonzero bullish trade count — the directional gates
+and stateful cooldown remain separate, unresolved contributors requiring their own dedicated diagnostics.
+
+**State**: Task 46 checkpoint committed and pushed (`43f48bb`). This Task 47 ledger entry and all
+`results/task47_bullish_attrition/` artifacts — **not committed, not pushed**, per instruction. PR #10
+remains draft.
