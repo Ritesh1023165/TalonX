@@ -578,6 +578,14 @@ class BacktestEngine:
                     "volume_surge_ratio": s.volume_surge_ratio,
                     "confluence_score": s.confluence_score, "risk_reward_ratio": s.risk_reward_ratio,
                     "trend_component": s.trend_aligned,
+                    # Task 52: surface Task 51's confirmation telemetry directly (None under
+                    # LEGACY, populated under INDEPENDENT_CONFIRMATION_EXPERIMENTAL) -- avoids
+                    # the macd_prev-unavailable reconstruction limitation Task 51's static
+                    # rescore had to document as a caveat; a fresh replay captures the real
+                    # per-candidate confirmation state directly off the QuantSignal itself.
+                    "confirmation_count": s.confirmation_count, "confirmation_macd": s.confirmation_macd,
+                    "confirmation_rsi": s.confirmation_rsi, "confirmation_volume": s.confirmation_volume,
+                    "confirmation_contract": s.confirmation_contract,
                 })
 
         # US Market Closed Session Rejection (Task 24 P1 / Task 25A parity

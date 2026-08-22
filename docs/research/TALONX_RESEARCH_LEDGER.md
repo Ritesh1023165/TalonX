@@ -5106,3 +5106,88 @@ the parallel shadow runbook (including the `state_namespace` plumbing).
 `talonx_quant/consumer.py`, `talonx_backtest/engine.py`), tests, and all
 `results/task51_independent_confirmation/` artifacts — **not committed, not pushed**, per instruction. PR
 #10 remains draft.
+
+## Task 52 — Fresh Historical A/B Validation + Conditional Monday Candidate Freeze (2026-08-22)
+
+**Objective**: clean historical A/B comparison of frozen BASELINE (`CURRENT_1M`+`LEGACY`) vs. CANDIDATE
+(`MULTITIMEFRAME_EXPERIMENTAL`+`INDEPENDENT_CONFIRMATION_EXPERIMENTAL`) from a FRESH engine replay (not
+reused saved candidate logs), reaching a documented GO/NO-GO decision.
+
+**Task 51 checkpoint**: committed and pushed as `393f533` before Task 52 began. PR #10 confirmed draft/open.
+
+**Exact baseline/candidate contracts**: baseline `quant_config_hash=78b656491f2a`, candidate
+`fdf4922d0728` — only `volatility_gate_mode`/`confluence_contract` differ. Both ran against byte-identical
+raw market data (dataset hashes match Task 46/50's own recorded values exactly), same 35-symbol universe,
+same 3 windows (X_early/Y_middle/Z_late, 15 trading days), same engine commit, same execution assumptions.
+
+**Data/window selection rule**: reused Task 46's raw market data and mechanically-selected, out-of-
+development windows unchanged — no redownload, no window replacement, no cherry-picking. Data quality:
+105/105 CSVs unmodified since Task 50, zero critical corruption.
+
+**Runtime**: estimated 120-130 min (from Task 46/50's measured rate), actual 121.9 min (58.8 baseline +
+63.1 candidate) — no mechanical reduction needed.
+
+**Fresh replay confirmed**: candidate raw population 8,607 (fresh) vs. 6,506 (old, saved) — genuinely larger,
+not reused, exactly as Task 51's RSI trigger change predicted.
+
+**Full A/B funnel**: baseline 1,295 raw → 1 published → 0 trades. Candidate 8,607 raw → **203 published** →
+0 trades. `LOW_VOLATILITY_REGIME` (150,877, bar-level) matches Task 46/50 exactly. `TREND_GATE` fired 0
+times in the candidate run (never reached).
+
+**Confirmation distribution / RSI fresh-population result**: confluence/confirmation pass rate is now
+DIRECTION-SYMMETRIC and healthy — bullish 618/4,475 (13.8%), bearish 576/4,132 (13.9%). MACD confluence-
+eligible counts match Task 51's static prediction exactly (391 bullish/438 bearish) — cross-validated.
+**RSI's TRUE fresh pass rate directly resolves Task 51's flagged survivorship-bias gap**: 2,346 raw curls
+(vs. 245 in the old volume-pre-filtered dataset), true pass rate 16.1% bullish/14.7% bearish — nowhere near
+the misleading ~100% the biased static check showed. 1,981/2,346 curls (84.4%) correctly have zero
+confirmation and do not publish.
+
+**Frequency**: 0 long entries, 0 trades/week, 0/15 entry days, 0/35 symbols with a trade — in both modes.
+
+**Economics/cost sensitivity/family economics/symbol concentration/window robustness/attribution**: all
+`ECONOMICS_NOT_MEASURABLE`/trivially empty — 0 trades in both modes.
+
+**Correctness checks**: GREEN. 163 focused-regression tests, 0 failed. No invariant violated; several
+unexercised only because 0 trades occurred (R:R/blackout gates independently confirmed ACTIVE via real,
+nonzero rejection counts).
+
+**Candidate GO/NO-GO rationale — the central finding**: confluence/confirmation is NO LONGER the blocker
+(symmetric, healthy pass rates, matching Task 51's predictions exactly). The real blocker: **all 618 bullish
+confluence-eligible candidates have `trend_component=None`** — the 15m-200-SMA trend gate never once
+produced a valid reading in this entire study. Root cause (direct arithmetic): a 5-trading-day window
+supplies at most 130 regular-session 15-min bars; the trend gate needs 200 — structurally guaranteed never
+to warm up within one window, for any symbol, under EITHER contract. This is a **pre-existing methodology
+limitation of the window width first introduced in Task 46** (mechanical runtime-budget reduction from 10
+to 5 trading days), invisible until now because every prior bullish confluence-survivor population (0-24)
+was too small to expose it. Not a confluence-contract defect.
+
+**A/B namespace/plumbing**: NOT implemented — gated on the candidate passing the historical credibility
+gate, which it did not (criterion B, "nonzero executable long opportunity flow," fails: 0 bullish trades in
+both modes).
+
+**Monday frozen SHA/config fingerprints**: NO freeze performed. Monday continues on the BASELINE only
+(`CURRENT_1M`+`LEGACY`), already structurally enforced (`QuantScanner` fails fast on any other config).
+Reference fingerprints recorded for continuity only, not as a freeze: see `monday_freeze_manifest.json`.
+
+**Monday execution-isolation level**: N/A (candidate not deployed). Had the gate passed, the honest
+classification would have been `PARALLEL_DECISION_SHADOW_READY` at best (signal channels/paper `db_path`
+already independently configurable; cooldown/loss-lockout key collision remains unresolved).
+
+**Unresolved risks**: the trend-gate/window-warmup limitation affects ALL prior Task 46-52 bullish-trade
+measurements identically — every "zero bullish trades" finding since Task 46 should be read with this
+caveat in mind, not just Task 52's.
+
+**Final decision**: `VALIDATION_BLOCKED`.
+
+**No tuning**: confirmed — no threshold sweep, no confluence tuning beyond Task 51's frozen contract, no
+volatility tuning, no symbol cherry-picking, no window replacement after outcomes, no stop/target/R:R
+changes. Task 22 not inspected. No capital used.
+
+**Next recommended action (not started)**: widen the validation windows, or add an HTF lookback preseed to
+`talonx_backtest.BacktestEngine` (mirroring live's own historical preseed mechanism), then re-run this exact
+same A/B comparison.
+
+**State**: Task 51 checkpoint committed and pushed (`393f533`). This Task 52 ledger entry, the one additive
+telemetry-field change (`talonx_backtest/engine.py`'s `candidate_telemetry` dict), and all
+`results/task52_historical_ab_freeze/` artifacts — **not committed, not pushed**, per instruction. PR #10
+remains draft.

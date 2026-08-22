@@ -106,6 +106,41 @@ trigger self-credit were disallowed outright, MACD could never publish at all un
 co-occurred on a MACD-cross bar in the entire dataset — 0 of 4,725 candidates). This is flagged for
 follow-up owner interpretation, not resolved here.
 
+> **SUPERSEDED (2026-08-22, Tasks 47/49/51/52)** — history preserved above, never overwritten.
+>
+> **PREVIOUS**: RSI and MACD both `REQUIREMENT_INTERPRETATION_NEEDED`; MACD self-credit flagged but not
+> corrected (disallowing it outright was believed to make MACD unable to ever publish, per the 0/4,725
+> co-occurrence figure above).
+>
+> **NEW EVIDENCE**: Task 47 measured MACD's self-credit rate directly at 100% across 6,243 candidates on an
+> independent, later dataset — confirming the earlier flag, not merely repeating it. Task 49 implemented the
+> literal fix (a MACD-triggered candidate's own cross can no longer count as its own confirmation leg) and
+> proved via `git stash` byte-identical digest that every OTHER path (RSI, MA, thresholds) was unaffected.
+> Task 51 generalized this into one explicit, selectable `ConfluenceContract` (`LEGACY` frozen /
+> `INDEPENDENT_CONFIRMATION_EXPERIMENTAL` research-only): MACD needs RSI-or-volume, MA needs same-direction-
+> MACD-or-RSI-or-volume, RSI needs volume-or-same-direction-MACD, each excluding only its own trigger family
+> — plus a direction-aware MACD fix (a bearish cross can no longer confirm a bullish candidate, and vice
+> versa; concretely demonstrated to have been silently happening under the old direction-agnostic formula).
+> Task 52's fresh engine replay confirms the earlier fear (MACD "could never publish") did NOT materialize
+> once RSI/volume were both genuinely reachable as independent legs: MACD confluence-eligible count is 391
+> bullish/438 bearish out of 6,243 fresh raw candidates (12.8%/13.7%) — a real, working confirmation path.
+>
+> **UPDATED CONCLUSION**: MACD crossover is now `ALIGNED` (self-credit removed, direction-aware, matches the
+> owner's `TRIGGER_PLUS_ONE_CONFIRMATION` contract literally, under `INDEPENDENT_CONFIRMATION_EXPERIMENTAL`).
+> RSI reversal is also now `ALIGNED` under the same contract — its volume precondition was separated from
+> its trigger (Task 51), resolving the double-count Task 33 flagged; Task 52's fresh replay further resolved
+> a DIFFERENT, later-discovered measurement gap (Task 51's own static re-score of old, volume-pre-filtered
+> data had shown a misleading ~100% RSI pass rate — the fresh replay's true rate is 14.7-16.1%, confirming
+> the contract is genuinely selective, not permissive). MA remains `ALIGNED`, unchanged throughout. The
+> `LEGACY` contract (byte-identical to this section's original pre-Task-49 description) remains the sole
+> configuration permitted in the live/paper-shadow path — this section's original text describes LEGACY
+> accurately to this day; the update applies only to the research-only `INDEPENDENT_CONFIRMATION_EXPERIMENTAL`
+> contract.
+>
+> **REASON**: owner-directed trace-not-assume investigation (Tasks 47-51) plus Task 52's fresh, real-engine
+> economic validation — not a policy change, a resolution of the exact interpretation gap this section
+> originally flagged as open.
+
 ## 7. Gate policy — **PROVISIONAL**
 
 14 gates classified using a MANDATORY_SAFETY_GATE / MANDATORY_QUALITY_GATE / RANKING_FACTOR /
