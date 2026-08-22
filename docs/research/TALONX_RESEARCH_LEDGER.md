@@ -4316,3 +4316,73 @@ distributions and product semantics, explicitly NOT P&L optimization.
 **State**: Task 39 checkpoint committed and pushed (`c394c2d9689113419cb9cd430132775aa06c3411`). This Task
 40 code changes, tests, ledger entry, and all `results/task40_volatility_state/` artifacts — **not
 committed, not pushed**, per instruction. PR #10 remains draft.
+
+**2026-08-22 update (Task 41)**: this Task 40 change set (code + tests + ledger entry) was committed as
+`9b58470f883b8aeb45dce0173972e045e9518aba` (`feat(quant): add multi-timeframe volatility regime state`) and
+pushed at the start of Task 41, after re-confirming the 17-test `test_volatility_regime.py` suite still
+passes. `results/task40_volatility_state/` artifacts remain untracked (repo-wide `/results/` gitignored).
+PR #10 confirmed still draft/open.
+
+## Task 41 — Multi-Timeframe Volatility Eligibility Contract Calibration (2026-08-22)
+
+**Objective**: define ONE eligibility contract for the Task 40 15m + 60m volatility regime state, calibrated
+by market semantics/distribution — explicitly NOT P&L optimization. No implementation, no trades, no
+threshold sweep.
+
+**Task 40 checkpoint**: committed and pushed as `9b58470f883b8aeb45dce0173972e045e9518aba` before Task 41
+began.
+
+**Integrity**: HEAD `9b58470f883b8aeb45dce0173972e045e9518aba`, QuantConfig `76bf7a395614`, BacktestConfig
+`4a78bafa104e`, strategy version `6d0d49c8b0ca` — all match Task 40's recorded values exactly. Source data:
+Task 38's already-downloaded 35-symbol/30-day window data and already-computed 27,039-row candidate-level
+replay, both reused with zero re-download and zero engine replay.
+
+**Distributions** (15m/60m ATR%, cross-symbol aggregate): 15-minute median 0.422% (p25 0.329%, p90 0.655%);
+60-minute median 0.839% (p25 0.735%, p90 1.190%). Regular session consistently higher than pre-market/closed
+at both timeframes. Full per-symbol/per-session breakdown: `regime_distributions.csv`.
+
+**Three contracts compared** (market meaning/stability/symbol-fairness/session/readiness, NOT trade count):
+A (BOTH_ACTIVE, symmetric median AND) — 33.97% coverage, 34/35 symbols; B (SLOW_REGIME_WITH_FAST_CONFIRMATION,
+60m median AND 15m P25) — 38.93% coverage, 34/35 symbols; C (EITHER_ACTIVE, symmetric median OR) — 50.73%
+coverage, 35/35 symbols, but rejected specifically because it is satisfiable by a single timeframe alone,
+reintroducing the same single-timeframe-dependency weakness Task 38 found in the old 1-minute-only gate.
+
+**Coverage check** (measurement only, no P&L, no trades, no downstream gates executed): current unchanged
+1-minute gate passes 9.15% of the same 27,039 raw candidates. All three candidates widen this
+dramatically; Contract B's 38.93% (RSI 36.39%/MACD 38.95%/MA 93.02%) is a 4.3x improvement while remaining
+meaningfully selective. Full detail: `trigger_coverage.csv`.
+
+**Selected contract: B (SLOW_REGIME_WITH_FAST_CONFIRMATION)** —
+`eligible = ready_60m AND ready_15m AND (atr_pct_60m >= 0.839) AND (atr_pct_15m >= 0.329)`. Thresholds are
+this task's own directly-measured percentiles (60m aggregate median, 15m aggregate P25) — not searched or
+swept. 60m plays the primary regime-determinant role; 15m plays a confirmation role — matching the fixed
+purpose statement's own two-part framing exactly. Selected over A (too symmetric, blurs the regime/
+confirmation distinction) and C (see rejection reason above, despite higher raw coverage).
+
+**Readiness policy**: 60m is the binding leg; `REGIME_STATE_NOT_READY` (never a fabricated eligible/
+ineligible default) unless both legs are warmed up. Measured: 92.63% both-ready, 7.01% 15m-only-ready, 0.00%
+60m-only-ready (structural — 60m always warms up slower under Task 40's buffer sizing), 0.36% neither-ready.
+
+**Session policy**: 15m leg stays regular-session-only (Task 40, unchanged); 60m (the binding leg) stays
+continuous, so Contract B eligibility remains determinable through pre-market/after-hours. Opening/closing
+blackouts are NOT duplicated inside the regime logic — remain separate, untouched entry-timing gates.
+
+**`min_atr_pct` (0.25%) disposition**: `RETAIN_TEMPORARILY_FOR_MIGRATION` — confirms Task 39's
+`RETIRE_WHEN_NEW_REGIME_IMPLEMENTED` finding as the eventual target, recognizing "implemented" so far means
+observability STATE only (Task 40), not an active eligibility gate. 0.25% stays exactly as-is through Task
+42's implementation and a shadow observation period; retirement is a future task's decision.
+
+**No P&L / no tuning / no threshold sweep**: confirmed throughout — no trade simulated, no downstream gate
+executed, no candidate/RR/PF/expectancy computed, both thresholds are named already-observed distribution
+percentiles, not a search. No confluence/stop/R:R change. No full-year run. No Task 22 inspection.
+
+**Final decision**: `VOLATILITY_ELIGIBILITY_CONTRACT_DEFINED`.
+
+**Next recommended action (not started)**: Task 42 — implement the selected Contract B eligibility function
++ focused tests only. Must NOT run historical P&L, must NOT wire the result into any actual signal-
+eligibility decision (observability only, matching Task 40's own precedent), must produce zero signal/trade
+behavior change (proven the same `git stash` before/after technique Task 40 used).
+
+**State**: Task 40 checkpoint committed and pushed (`9b58470f883b8aeb45dce0173972e045e9518aba`). This Task
+41 ledger entry and all `results/task41_volatility_eligibility/` artifacts — **not committed, not pushed**,
+per instruction. PR #10 remains draft.
