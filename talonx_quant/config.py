@@ -335,6 +335,18 @@ class QuantConfig:
     regime_60m_bar_interval_minutes: int = _env_int("TALONX_QUANT_REGIME_60M_BAR_INTERVAL_MINUTES", 60)
     regime_60m_max_bars: int = _env_int("TALONX_QUANT_REGIME_60M_MAX_BARS", 60)
 
+    # --- Task 44: 60m regime bootstrap ---
+    # Same yfinance 1-minute source (preseed.fetch_1m_history) the
+    # existing 1m/15m preseed paths already use -- reused, not a second
+    # data-loading system. "5d" was chosen empirically (not a strategy
+    # threshold): it comfortably clears both the bare atr_period+1 (14)
+    # bars needed for a first ATR reading AND the ~3-5x-period (42-70
+    # bars) Wilder-smoothing convergence window the regime leg's own
+    # existing atr_period already implies -- see
+    # results/task44_60m_warmup_bootstrap/bootstrap_history_coverage.csv
+    # for the measured bar counts this period actually returns.
+    regime_60m_bootstrap_period: str = os.environ.get("TALONX_QUANT_REGIME_60M_BOOTSTRAP_PERIOD", "5d")
+
     # --- Pre-market session rules (04:00-09:30 America/New_York) ---
     # Stricter volume-surge bar than the regular-session default above,
     # plus a liquidity gate (dollar volume + bid-ask spread) and a news-

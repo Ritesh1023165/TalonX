@@ -436,6 +436,16 @@ class QuantScanner:
         # Latest snapshot per symbol -- observability only, never consulted
         # by any gate/eligibility decision.
         self._latest_regime_snapshot: dict[str, VolatilityRegimeSnapshot] = {}
+        # Task 44: 60m historical bootstrap bookkeeping. _bootstrapped_60m
+        # guards against re-fetching for a symbol already handled this
+        # process lifetime (mirrors _preseeded_1m's own convention).
+        # _bootstrap_60m_cutoff records the last (minute-floored)
+        # timestamp bootstrap fed into the 60m aggregator, per symbol --
+        # any live tick at or before this cutoff is skipped by
+        # _update_regime_buffer_60m (causality/dedup guard, see that
+        # method), never fed a second time.
+        self._bootstrapped_60m: set[str] = set()
+        self._bootstrap_60m_cutoff: dict[str, datetime] = {}
         # True Calendar-Aligned 1-Minute Candle Aggregation (Requirement 1):
         # raw poll-cycle BAR events (12s cadence by default) accumulate here,
         # floor-bucketed to the minute, and the running OHLCV is written
@@ -848,6 +858,7 @@ class QuantScanner:
             symbol = symbol.upper()
             await self._preseed_1m_if_needed(symbol)
             await self._preseed_htf_if_needed(symbol)
+            await self._bootstrap_60m_if_needed(symbol)
 
     async def _preseed_1m_if_needed(self, symbol: str) -> None:
         if not self.config.historical_preseed_enabled:
@@ -1046,18 +1057,20 @@ class QuantScanner:
                 volume=finalized["volume"],
             )
 
-    def _update_regime_buffer_60m(self, event: MarketTickEvent) -> None:
-        """Task 40: the 60-minute regime leg's bucketing -- identical
-        pattern to _update_htf_buffer above (same HtfBarAggregator/
-        RollingBarBuffer classes, a different interval/rth_only), just
-        for the new buffer_60m. Deliberately continuous (rth_only=False,
-        set at construction) rather than RTH-only like the 15m trend
-        buffer -- Task 39's session-policy design."""
-        symbol = event.symbol.upper()
+    def _feed_60m_bar(
+        self, symbol: str, timestamp: datetime, open_: float | None, high: float | None,
+        low: float | None, close: float | None, volume: float | None,
+    ) -> None:
+        """Task 40/44: the ONE authoritative 60-minute aggregation step --
+        identical HtfBarAggregator.update() -> (if finalized)
+        RollingBarBuffer.add_bar() pair, called by BOTH the live tick path
+        (_update_regime_buffer_60m below) and the historical bootstrap
+        path (_bootstrap_60m_if_needed) with the exact same one-bar-at-
+        a-time semantics. No second aggregation/ATR formula exists for
+        either caller."""
+        symbol = symbol.upper()
         finalized = self._aggregator_60m.update(
-            symbol=symbol, timestamp=event.timestamp,
-            open_=event.open, high=event.high, low=event.low,
-            close=event.close, volume=event.volume,
+            symbol=symbol, timestamp=timestamp, open_=open_, high=high, low=low, close=close, volume=volume,
         )
         if finalized is not None:
             self.buffer_60m.add_bar(
@@ -1065,6 +1078,112 @@ class QuantScanner:
                 high=finalized["high"], low=finalized["low"], close=finalized["close"],
                 volume=finalized["volume"],
             )
+
+    def _update_regime_buffer_60m(self, event: MarketTickEvent) -> None:
+        """Task 40: the 60-minute regime leg's bucketing -- identical
+        pattern to _update_htf_buffer above (same HtfBarAggregator/
+        RollingBarBuffer classes, a different interval/rth_only), just
+        for the new buffer_60m. Deliberately continuous (rth_only=False,
+        set at construction) rather than RTH-only like the 15m trend
+        buffer -- Task 39's session-policy design.
+
+        Task 44 causality/dedup guard: if a historical bootstrap already
+        fed this symbol's 60m aggregator up through some cutoff minute,
+        any live tick whose OWN minute is at or before that cutoff is
+        skipped here -- bootstrap bars must never be re-processed as live
+        bars (see _bootstrap_60m_if_needed's own docstring). This is the
+        ONLY new behavior on the live path; the aggregation call itself
+        (_feed_60m_bar) is byte-for-byte the same as before Task 44."""
+        symbol = event.symbol.upper()
+        cutoff = self._bootstrap_60m_cutoff.get(symbol)
+        if cutoff is not None and event.timestamp.replace(second=0, microsecond=0) <= cutoff:
+            return
+        self._feed_60m_bar(
+            symbol, event.timestamp, event.open, event.high, event.low, event.close, event.volume,
+        )
+
+    async def _bootstrap_60m_if_needed(self, symbol: str) -> None:
+        """Task 44: removes the 60m cold-start observability caveat by
+        feeding CAUSAL historical 1-minute bars through the exact same
+        aggregation path live bars use (_feed_60m_bar -- no separate ATR/
+        aggregation formula). Source: preseed.fetch_1m_history, the SAME
+        function _run_1m_preseed already uses for the 1-minute buffer --
+        no second data-loading system.
+
+        Restart-priority rule (do not double-seed): if buffer_60m already
+        has more than atr_period bars for this symbol (from a prior
+        checkpoint reload -- see _load_buffers_from_store's 60m block,
+        scheduled as an earlier asyncio task and, as its very first
+        awaited step, practically likely (not strictly guaranteed by
+        asyncio's own scheduling) to complete before preseed_symbols
+        runs -- or an earlier bootstrap this process lifetime), this
+        returns immediately without any network call. Otherwise it
+        (re)fetches the full configured historical window and feeds it
+        through _feed_60m_bar bar-by-bar. Correctness does not depend on
+        that ordering being guaranteed: RollingBarBuffer.add_bar's own
+        upsert-by-timestamp semantics (buffer.py) make re-feeding
+        idempotent even in the rare case both paths race -- the same
+        historical timestamp is simply replaced with an identical value,
+        never duplicated; the only cost of the race is a possibly-
+        redundant fetch, never an incorrect final state.
+
+        Causality: `bars` are, by construction, all strictly at-or-before
+        the fetch's own wall-clock moment, which happens during startup
+        preseed, necessarily before this process's live tick loop begins
+        -- no live/future bar can ever be included. After feeding, the
+        LAST bar's own (already minute-aligned) timestamp is recorded as
+        this symbol's dedup cutoff, consulted by
+        _update_regime_buffer_60m so no live tick can ever re-process a
+        bootstrapped minute."""
+        if not self.config.historical_preseed_enabled:
+            return
+        symbol = symbol.upper()
+        if symbol in self._bootstrapped_60m:
+            return
+        self._bootstrapped_60m.add(symbol)
+        if self.buffer_60m.bar_count(symbol) > self.config.atr_period:
+            return  # already enough bars (checkpoint or an earlier bootstrap) -- no network call needed
+
+        try:
+            bars = await asyncio.to_thread(
+                preseed.fetch_1m_history, symbol, self.config.regime_60m_bootstrap_period,
+            )
+        except Exception as exc:  # noqa: BLE001 -- bootstrap is best-effort, never fatal (same posture as preseed.py)
+            logger.warning("60-minute regime bootstrap fetch failed for %s: %s", symbol, exc)
+            return
+        if not bars:
+            logger.info(
+                "60-minute regime bootstrap returned no data for %s -- falling back to live accumulation "
+                "(regime state will honestly report NOT_READY until enough live bars accumulate)", symbol,
+            )
+            return
+
+        bars = sorted(bars, key=lambda b: b["timestamp"])
+        # Discard any in-flight accumulator this symbol may already have
+        # (e.g. a live tick that arrived before this bootstrap ran, or a
+        # thin partial checkpoint fed through _feed_60m_bar rather than
+        # buffer_60m.add_bar directly) -- otherwise re-feeding this known-
+        # clean historical range could double-accumulate into whatever
+        # bucket was already forming. Already-finalized bars sitting in
+        # buffer_60m are untouched by this reset (RollingBarBuffer.
+        # add_bar's own upsert-by-timestamp keeps those correct
+        # regardless); only the aggregator's not-yet-finalized in-flight
+        # state is cleared.
+        self._aggregator_60m.reset(symbol)
+        for bar in bars:
+            self._feed_60m_bar(
+                symbol, bar["timestamp"], bar["open"], bar["high"], bar["low"], bar["close"], bar["volume"],
+            )
+        cutoff = bars[-1]["timestamp"].replace(second=0, microsecond=0)
+        self._bootstrap_60m_cutoff[symbol] = cutoff
+        logger.info(
+            "60-minute regime bootstrap: fed %d historical 1-min bar(s) for %s (%s -> %s), "
+            "buffer_60m now %d bar(s), dedup cutoff=%s",
+            len(bars), symbol, bars[0]["timestamp"], bars[-1]["timestamp"],
+            self.buffer_60m.bar_count(symbol), cutoff,
+        )
+        if self.store is not None:
+            self.store.checkpoint_buffer(symbol, "60m", self.buffer_60m.get_bars(symbol))
 
     def _update_1m_buffer(self, event: MarketTickEvent) -> None:
         """True Calendar-Aligned 1-Minute Candle Aggregation (Requirement

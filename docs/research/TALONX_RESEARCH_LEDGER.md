@@ -4527,3 +4527,76 @@ wire the new regime into production eligibility.
 **State**: Task 42 checkpoint committed and pushed (`2602152176c38494ddf5f7ad73b05851fd81524f`). This Task
 43 readiness artifacts and ledger entry — **not committed, not pushed**, per instruction. PR #10 remains
 draft.
+
+**2026-08-22 update (Task 44)**: this Task 43 ledger entry was committed as `7da9af4`
+(`docs(research): record Monday shadow readiness`) and pushed at the start of Task 44.
+`results/task43_monday_shadow_readiness/` artifacts remain untracked (repo-wide `/results/` gitignored).
+PR #10 confirmed still draft/open.
+
+## Task 44 — 60m Shadow-Regime Historical Warmup Bootstrap (2026-08-22)
+
+**Objective**: remove the 60m cold-start observability caveat by bootstrapping the existing 60m
+aggregator/ATR state from causal historical 1m bars before live processing. Zero trading behavior change.
+
+**Task 43 checkpoint**: committed and pushed as `7da9af4` before Task 44 began.
+
+**Root cause of cold start**: Task 40's 60m leg had no historical-backfill path (a deliberate, documented
+scope decision) — only live ticks could ever warm it, requiring >14 continuous hours.
+
+**Bootstrap architecture**: reuses `talonx_quant.preseed.fetch_1m_history` (the SAME function the existing
+1-minute buffer preseed already uses — no second data-loading system), feeding historical bars through a
+newly-extracted shared `_feed_60m_bar` step that both the live tick path and the new bootstrap path call
+identically (`HtfBarAggregator.update()` → `RollingBarBuffer.add_bar()`) — one authoritative aggregation
+path, no second ATR formula. `regime_60m_bootstrap_period="5d"` chosen empirically (measured: "1d"=957 bars,
+"5d"=4,785 bars, "7d"=6,704 bars) — not a new stability threshold, just a data-sourcing decision that
+comfortably clears the existing >14-bar readiness rule and the ~42-70 bar Wilder-convergence window.
+
+**Causality/dedup rules**: bootstrap bars are, by construction, always at-or-before the fetch's own
+wall-clock moment. A new `_bootstrap_60m_cutoff` skips any live tick at-or-before the last bootstrapped
+minute. **A real bug was found and fixed during testing**: re-feeding a historical range overlapping an
+already-partially-forming bucket double-counted volume (the aggregator's `+=` accumulation cannot itself
+distinguish a legitimate new tick from an overlapping re-feed) — fixed by adding a small, additive
+`HtfBarAggregator.reset(symbol)` method, called before the bootstrap feed loop, caught by
+`test_checkpoint_bootstrap_overlap_is_idempotent_via_upsert`.
+
+**Insufficient history**: fails honestly — `ready_60m=False`, `REGIME_STATE_NOT_READY`, no 15m-only
+fallback, no fabricated ATR, no zero, no borrowed state.
+
+**Restart priority**: a valid persisted checkpoint (>14 bars) skips the network fetch entirely; otherwise
+bootstrap, made idempotent even under a partial-checkpoint overlap via the new `reset()` call.
+
+**Parity result — the central proof**: continuous live feed vs. bootstrap-prefix-plus-live-suffix produce
+byte-identical 60m state, `VolatilityRegimeSnapshot`, and `evaluate_regime` result. **PASS.**
+
+**Immediate Monday readiness coverage (honest, real measurement)**: against the actual 35-symbol production
+watchlist, an early concurrent measurement returned 18/35 ready; a later sequential measurement (matching
+production's real `preseed_symbols()` loop exactly) returned 0/35 ready, all `NO_HISTORY_RETURNED` — this
+reflects yfinance rate-limiting accumulated across this long research session in this sandbox (confirmed via
+an independent retry that failed identically), **not a code defect** — the bootstrap correctly reported
+`NOT_READY` for every affected symbol rather than crashing or fabricating a value. AAPL and others were
+fetched successfully multiple times earlier in the same session before the rate limit was reached, proving
+the fetch mechanism itself works. Flagged as a real operational risk for Monday's evidence capture, not a
+correctness blocker.
+
+**Zero behavior change**: `git stash` before/after (same technique as Task 40/42) — `diff` exit code 0,
+byte-for-byte identical trades/signals/rejections/signal_log. `talonx_backtest/engine.py` has zero diff
+lines in this task (a backtest always has its full dataset from the start).
+
+**Tests**: 14 new tests (`tests/test_60m_bootstrap.py`), 14 passed, 0 failed. Broader focused regression (17
+files, 529 tests): 0 failures.
+
+**Monday safety reconfirmed**: no real broker path, new regime still observability only, active gate still
+`min_atr_pct=0.25%`, unchanged.
+
+**Final decision**: `60M_BOOTSTRAP_VALIDATED_WITH_PARTIAL_SYMBOL_READINESS` — mechanism fully validated via
+deterministic tests; live 35-symbol measurement in this sandbox showed rate-limit-constrained readiness
+rather than a clean fully-ready result.
+
+**Next recommended action (not started)**: Task 45 — Monday Run Manifest + Evidence Fingerprinting, should
+include live 60m-readiness telemetry as part of Monday's evidence capture so the actual production-day
+outcome (not this sandbox's constrained measurement) is what gets reported. Do not modify strategy
+eligibility.
+
+**State**: Task 43 checkpoint committed and pushed (`7da9af4`). This Task 44 code changes, tests, ledger
+entry, and all `results/task44_60m_warmup_bootstrap/` artifacts — **not committed, not pushed**, per
+instruction. PR #10 remains draft.
