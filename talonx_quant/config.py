@@ -19,9 +19,31 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+
+class VolatilityGateMode(str, Enum):
+    """Task 45: which volatility ELIGIBILITY implementation is authoritative
+    for candidate generation. Exactly two modes, no more -- see
+    docs/research/TALONX_RESEARCH_LEDGER.md's Task 45 entry for why a third
+    variant was deliberately not added.
+
+    CURRENT_1M (the default, and the ONLY mode talonx_quant.consumer.
+    QuantScanner -- live/paper-shadow -- will ever accept; it fails fast at
+    construction otherwise) is byte-for-byte the pre-Task-45 behavior:
+    talonx_quant.consumer._fails_min_volatility, unchanged.
+
+    MULTITIMEFRAME_EXPERIMENTAL is research/backtest-only (talonx_backtest.
+    BacktestEngine): the Task 41/42 Contract B evaluator
+    (talonx_quant.indicators.evaluate_regime) becomes the active gate
+    instead. Provisional research calibration thresholds -- see
+    talonx_quant.indicators.PROVISIONAL_REGIME_15M_THRESHOLD_PCT/
+    PROVISIONAL_REGIME_60M_THRESHOLD_PCT."""
+    CURRENT_1M = "CURRENT_1M"
+    MULTITIMEFRAME_EXPERIMENTAL = "MULTITIMEFRAME_EXPERIMENTAL"
 
 
 def _load_dotenv() -> None:
@@ -241,12 +263,27 @@ class QuantConfig:
     # RSI/MACD/MA logic), not a separate downstream filter.
     atr_move_multiplier: float = _env_float("TALONX_QUANT_ATR_MOVE_MULTIPLIER", 1.0)
 
-    # Confluence score: +1 each for a MACD cross firing this bar, RSI
-    # currently in its extreme zone (< rsi_oversold or > rsi_overbought),
-    # and volume_surge_ratio > volume_surge_ratio_threshold -- computed
-    # once per bar (0-3) and attached to every signal that fires on it.
-    # A signal below this score is suppressed before it ever reaches the
-    # per-ticker cooldown lock or the global throttle.
+    # Confluence score: +1 each for a MACD cross firing this bar, +1 when
+    # current RSI is in the direction-supporting extreme STATE (< rsi_
+    # oversold for a bullish candidate, > rsi_overbought for a bearish
+    # one), +1 for volume_surge_ratio > volume_surge_ratio_threshold --
+    # computed fresh PER SIGNAL DIRECTION (not once per bar: two opposite-
+    # direction signals on the same bar get their own scores) and attached
+    # to every signal that fires. A signal below this score is suppressed
+    # before it ever reaches the per-ticker cooldown lock or the global
+    # throttle.
+    #
+    # RSI-curl self-exclusion (confirmed intentional, Task 28
+    # RSI_CONFLUENCE_STATE_BASED_CONFIRMED, 2026-08-21): RSI_OVERSOLD_
+    # VOLUME_SURGE / RSI_OVERBOUGHT_VOLUME_SURGE fire on the RECOVERY bar
+    # (RSI has just exited the extreme zone), so the RSI component above
+    # is intentionally zero on that same trigger bar -- the trigger and
+    # the confluence leg check opposite, complementary conditions on
+    # purpose. Such a candidate's score is therefore volume(1) alone
+    # unless a same-bar MACD cross also coincides (-> 2, clearing this
+    # gate). See results/task28_rsi_confluence_requirement/ and
+    # tests/test_quant_strategy.py's "RSI-Curl / Confluence Contract"
+    # section for the full requirements analysis and regression coverage.
     confluence_score_min: int = _env_int("TALONX_QUANT_CONFLUENCE_SCORE_MIN", 2)
 
     # Structural Risk/Reward filter (replaces the old constant-ATR-ratio
@@ -296,6 +333,17 @@ class QuantConfig:
     # so an unwarmed symbol produces zero signals downstream regardless.
     min_atr_pct: float = _env_float("TALONX_QUANT_MIN_ATR_PCT", 0.25)
 
+    # --- Task 45: volatility gate mode (research/backtest experimental
+    # switch) --- default MUST stay CURRENT_1M; talonx_quant.consumer.
+    # QuantScanner (live/paper-shadow) fails fast at construction if this
+    # is ever anything else -- see that class's own __init__ guard. The
+    # VolatilityGateMode(...) call below raises immediately (fail-closed,
+    # not a silent fallback) if the env var holds anything other than one
+    # of the two defined enum members.
+    volatility_gate_mode: VolatilityGateMode = VolatilityGateMode(
+        os.environ.get("TALONX_QUANT_VOLATILITY_GATE_MODE", VolatilityGateMode.CURRENT_1M.value)
+    )
+
     # --- 15-minute 200 SMA higher-timeframe trend gate ---
     # A second, coarser RollingBarBuffer (see consumer.py's buffer_htf),
     # incrementally aggregated from the same 1-min BAR events that feed
@@ -307,6 +355,30 @@ class QuantConfig:
     htf_sma_period: int = _env_int("TALONX_QUANT_HTF_SMA_PERIOD", 200)
     htf_max_bars: int = _env_int("TALONX_QUANT_HTF_MAX_BARS", 210)
     trend_gate_enabled: bool = _env_bool("TALONX_QUANT_TREND_GATE_ENABLED", True)
+
+    # --- Multi-timeframe volatility REGIME state (Task 40) ---
+    # Observability-only 15m/60m ATR% readings, distinct from the 1-min
+    # trigger-bar ATR gate above (min_atr_pct) which this does NOT
+    # replace or feed into. The 15m leg reuses htf_bar_interval_minutes/
+    # htf_max_bars/buffer_htf above unchanged (no separate config); this
+    # section adds ONLY the new 60-minute leg's buffer sizing.
+    # Deliberately continuous (no rth_only knob here, unlike
+    # rth_only_htf_sma below) -- Task 39's design decision, not a
+    # runtime-tunable choice.
+    regime_60m_bar_interval_minutes: int = _env_int("TALONX_QUANT_REGIME_60M_BAR_INTERVAL_MINUTES", 60)
+    regime_60m_max_bars: int = _env_int("TALONX_QUANT_REGIME_60M_MAX_BARS", 60)
+
+    # --- Task 44: 60m regime bootstrap ---
+    # Same yfinance 1-minute source (preseed.fetch_1m_history) the
+    # existing 1m/15m preseed paths already use -- reused, not a second
+    # data-loading system. "5d" was chosen empirically (not a strategy
+    # threshold): it comfortably clears both the bare atr_period+1 (14)
+    # bars needed for a first ATR reading AND the ~3-5x-period (42-70
+    # bars) Wilder-smoothing convergence window the regime leg's own
+    # existing atr_period already implies -- see
+    # results/task44_60m_warmup_bootstrap/bootstrap_history_coverage.csv
+    # for the measured bar counts this period actually returns.
+    regime_60m_bootstrap_period: str = os.environ.get("TALONX_QUANT_REGIME_60M_BOOTSTRAP_PERIOD", "5d")
 
     # --- Pre-market session rules (04:00-09:30 America/New_York) ---
     # Stricter volume-surge bar than the regular-session default above,

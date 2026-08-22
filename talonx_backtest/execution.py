@@ -144,6 +144,17 @@ class TradeSimulator:
         self, signal, entry_timestamp, entry_price_raw: float,
         opportunity_score: float | None = None,
     ) -> OpenPosition:
+        """Generic, direction-symmetric execution primitive -- TradeSimulator
+        itself has no opinion on which directions a caller should open
+        (see check_bar_for_exit/_close's own direction_sign handling,
+        both still fully bidirectional and independently tested). The
+        TalonX-specific LONG_ONLY invariant (Task 24/25A: a BEARISH/
+        CONTRADICTED QuantSignal must only ever close an existing long,
+        never open a new position) is enforced one layer up, in
+        engine.py's _flush_throttle -- only a BULLISH signal is ever
+        routed into a _PendingEntry / this method in the first place.
+        Kept generic here deliberately, not a destructive refactor of a
+        reusable, already-tested execution primitive."""
         symbol = signal.ticker.upper()
         entry_price_net = apply_entry_cost(entry_price_raw, signal.direction, self.config)
         risk = abs(entry_price_raw - signal.stop_price) if signal.stop_price is not None else None
@@ -194,7 +205,22 @@ class TradeSimulator:
             return None
         return self._close(symbol, timestamp, price_raw, reason)
 
-    def _close(self, symbol: str, timestamp, exit_price_raw: float, reason: str) -> "Trade":
+    def close_on_signal_exit(self, symbol: str, timestamp, price_raw: float, exit_signal) -> "Trade | None":
+        """Closes `symbol`'s open long (if any) because a BEARISH/
+        CONTRADICTED alert-driven exit signal fired -- distinct from
+        STOP/TARGET (intrabar bracket struck) and END_OF_SESSION/
+        DATA_END (forced flatten); see Task 24's long_short_flow.md and
+        Task 25A's canonical LONG_ONLY lifecycle. `exit_signal` is the
+        QuantSignal that triggered the exit; recorded on the resulting
+        Trade (exit_signal_type/exit_signal_direction) so the record
+        never conflates an alert-driven reversal with a price-driven
+        stop/target/EOD exit. TalonX never opens a new short here --
+        this only ever closes an existing long."""
+        if symbol.upper() not in self._open:
+            return None
+        return self._close(symbol, timestamp, price_raw, "SIGNAL_EXIT", exit_signal=exit_signal)
+
+    def _close(self, symbol: str, timestamp, exit_price_raw: float, reason: str, exit_signal=None) -> "Trade":
         from talonx_backtest.portfolio import Trade  # local import: avoids a portfolio<->execution cycle
 
         position = self._open.pop(symbol.upper())
@@ -255,6 +281,12 @@ class TradeSimulator:
             exit_timestamp=timestamp,
             exit_price=exit_price_raw,
             exit_reason=reason,
+            exit_signal_type=None if exit_signal is None else exit_signal.signal_type.value,
+            exit_signal_direction=None if exit_signal is None else exit_signal.direction.value,
+            geometry_path=getattr(signal, "geometry_path", None),
+            fallback_reason=getattr(signal, "fallback_reason", None),
+            structural_level=getattr(signal, "structural_level", None),
+            structural_level_type=getattr(signal, "structural_level_type", None),
             gross_R=gross_R,
             net_R=net_R,
             gross_pnl=gross_pnl,

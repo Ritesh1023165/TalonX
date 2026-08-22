@@ -33,6 +33,7 @@ from zoneinfo import ZoneInfo
 from talonx_ingest.common.backoff import jittered_backoff_seconds
 from talonx_ingest.config import MarketDataConfig, settings
 from talonx_ingest.market_data.models import DataSource, MarketEvent, MarketEventType
+from talonx_ingest.session import is_premarket_window
 
 logger = logging.getLogger("talonx_ingest.market_data.yfinance_poll")
 
@@ -41,8 +42,20 @@ EventCallback = Callable[[MarketEvent], Awaitable[None]]
 _ET = ZoneInfo("America/New_York")
 
 
+def _looks_like_rate_limited(exc: Exception) -> bool:
+    """Narrow, best-effort heuristic -- yfinance/Yahoo's undocumented
+    endpoints don't raise a single stable exception type for rate-limiting
+    (observed as a bare KeyError deep in scraper parsing just as often as an
+    HTTP error -- see _reset_yfinance_session's own docstring), so this
+    checks both the exception's type name and its message for the tell-tale
+    "429"/"rate limit" signature rather than trying to catch a specific
+    class that may not be the one actually raised."""
+    haystack = f"{type(exc).__name__} {exc}".lower()
+    return "429" in haystack or "rate limit" in haystack or "too many requests" in haystack
+
+
 class YFinancePoller:
-    def __init__(self, config: MarketDataConfig | None = None):
+    def __init__(self, config: MarketDataConfig | None = None, metrics_publisher=None):
         self.config = config or settings.market_data
         self._stop_event = asyncio.Event()
         # Cumulative-to-incremental volume conversion state (see
@@ -53,9 +66,40 @@ class YFinancePoller:
         # genuine "first observation" rather than inheriting stale state
         # from a previous run.
         self._volume_state: dict[str, tuple[date, float]] = {}
+        # 2026-08-18 /ping observability fix: optional -- duck-typed to
+        # RedisEventPublisher.incr_metric's signature (async
+        # incr_metric(stage, counter, amount=1)), same "None means additive,
+        # not required" posture every other optional Redis dependency in
+        # this codebase already has. In-process counters below are always
+        # tracked regardless, so tests never need a real/mocked Redis
+        # client to verify this module's own failure-detection logic.
+        self._metrics_publisher = metrics_publisher
+        self._requests_failed = 0
+        self._retries = 0
+        self._rate_limited = 0
+
+    @property
+    def requests_failed(self) -> int:
+        return self._requests_failed
+
+    @property
+    def retries(self) -> int:
+        return self._retries
+
+    @property
+    def rate_limited(self) -> int:
+        return self._rate_limited
 
     def stop(self) -> None:
         self._stop_event.set()
+
+    async def _flush_provider_metric(self, counter: str, amount: int) -> None:
+        if self._metrics_publisher is None or amount <= 0:
+            return
+        try:
+            await self._metrics_publisher.incr_metric("ingest", counter, amount)
+        except Exception as exc:  # noqa: BLE001 -- a metrics-write failure must not break polling
+            logger.debug("Provider metric flush failed for %s: %s", counter, exc)
 
     def _incremental_volume(self, symbol: str, cumulative: float | None, now: datetime) -> float | None:
         """`fast_info.last_volume` is Yahoo's CUMULATIVE (day-to-date)
@@ -138,10 +182,23 @@ class YFinancePoller:
         consecutive_failures = 0
 
         while not self._stop_event.is_set():
+            # Snapshotted before the call and diffed after -- _fetch_snapshots
+            # runs synchronously off-thread (asyncio.to_thread) and increments
+            # self._requests_failed/self._rate_limited directly as PLAIN
+            # instance-attribute writes (never awaits, never touches Redis;
+            # to_thread runs one call at a time so there's no concurrent-
+            # write hazard). This delta is what gets flushed to Redis here,
+            # back on the event loop, without changing _fetch_snapshots's
+            # return type (still a plain list[MarketEvent], so every
+            # existing test that monkeypatches or calls it directly is
+            # unaffected).
+            failed_before, rate_limited_before = self._requests_failed, self._rate_limited
             try:
                 snapshots = await asyncio.to_thread(self._fetch_snapshots, symbols)
             except Exception as exc:  # noqa: BLE001 -- keep polling alive regardless
                 consecutive_failures += 1
+                self._retries += 1
+                await self._flush_provider_metric("provider_retries", 1)
                 self._maybe_reset_session(consecutive_failures)
                 wait = jittered_backoff_seconds(
                     consecutive_failures,
@@ -155,12 +212,38 @@ class YFinancePoller:
                 await asyncio.sleep(wait)
                 continue
 
-            for event in snapshots:
-                await on_event(event)
+            await self._flush_provider_metric("provider_requests_failed", self._requests_failed - failed_before)
+            await self._flush_provider_metric("provider_rate_limited", self._rate_limited - rate_limited_before)
+
+            # 2026-08-18 correctness fix (code-review findings #2/#4):
+            # fast_info (this poller's price source) does NOT reflect
+            # pre/post-market trading -- see fetch_extended_hours_quote's
+            # own docstring, and run_talonx.PreMarketPoller's, which exists
+            # specifically because of this gap. Left unsuppressed, this
+            # continuous poller would keep republishing the STALE prior
+            # regular-session price as a fresh-timestamped BAR event every
+            # cycle throughout pre-market, racing PreMarketPoller's genuine
+            # premarket bars (fetch_quotes_vectorized, which DOES capture
+            # real pre/post-market prices) on the SAME talonx:market:stream
+            # channel for the SAME symbols -- two uncoordinated, disagreeing
+            # price sources feeding the same quant buffer. _fetch_snapshots
+            # itself is still called every cycle above (not skipped) so
+            # _incremental_volume's per-symbol cumulative-volume tracking
+            # stays continuous -- only the STALE/non-representative event
+            # publication is suppressed here, not the underlying fetch.
+            # PreMarketPoller is the sole authoritative price source for
+            # the pre-market window; this poller resumes publishing the
+            # instant the window ends (regular-session behavior is
+            # completely unchanged).
+            if not is_premarket_window():
+                for event in snapshots:
+                    await on_event(event)
 
             failure_rate = 1.0 - (len(snapshots) / len(symbols) if symbols else 1.0)
             if len(symbols) >= 3 and failure_rate >= self.config.yfinance_degraded_cycle_failure_rate:
                 consecutive_failures += 1
+                self._retries += 1
+                await self._flush_provider_metric("provider_retries", 1)
                 self._maybe_reset_session(consecutive_failures)
                 wait = jittered_backoff_seconds(
                     consecutive_failures,
@@ -193,6 +276,19 @@ class YFinancePoller:
         Blocking call, run off the event loop via asyncio.to_thread.
         Uses `fast_info` per ticker for lightweight last-price/volume data
         rather than full `.history()`, which is much slower per call.
+
+        Return type deliberately unchanged (still a plain list[MarketEvent],
+        not a tuple) -- self._requests_failed/self._rate_limited below are
+        incremented as plain instance-attribute writes instead, so every
+        existing caller/test that monkeypatches or calls this directly
+        keeps working unmodified; stream() diffs those two counters
+        before/after this call to compute what to flush to Redis (see its
+        own docstring). Only a genuine per-symbol EXCEPTION counts as a
+        failure -- a ticker object simply missing, or fast_info legitimately
+        having no last_price this poll (e.g. between updates), is ordinary
+        "no new data yet", not a provider failure (same distinction
+        stream()'s existing failure_rate calculation already makes at the
+        whole-cycle level).
         """
         import yfinance as yf  # imported lazily so this stays optional
 
@@ -234,6 +330,9 @@ class YFinancePoller:
                 )
             except Exception as exc:  # noqa: BLE001 -- isolate per-symbol failures
                 logger.warning("yfinance fetch failed for %s: %s", symbol, exc)
+                self._requests_failed += 1
+                if _looks_like_rate_limited(exc):
+                    self._rate_limited += 1
                 continue
 
         return events

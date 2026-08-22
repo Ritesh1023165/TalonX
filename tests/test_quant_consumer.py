@@ -76,6 +76,14 @@ def _signal(
     # _flush_throttle_window-level test -- that still additionally
     # requires the ticker have a buffered close price (see _seed_close)
     # for _revalidate_candidate's `current_price` to resolve.
+    #
+    # pivot_support(101) is deliberately >= price(100) -- Task 35's
+    # MARKET_STRUCTURE_PRIMARY stop contract treats a lower pivot_support
+    # as a valid structural stop anchor, which would silently change the
+    # effective risk (and therefore risk_reward_ratio) these throttle/
+    # cooldown-focused tests build on; keeping it invalid here isolates
+    # them from that behavior (tests that specifically exercise the
+    # structural-stop path build their own pivots directly).
     return QuantSignal(
         ticker=ticker,
         signal_type=signal_type,
@@ -87,7 +95,7 @@ def _signal(
         risk_reward_ratio=risk_reward_ratio,
         atr=2.0,
         pivot_resistance=110.0,
-        pivot_support=90.0,
+        pivot_support=101.0,
         bar_timestamp=datetime(2026, 8, 7, 15, 0, tzinfo=timezone.utc),
     )
 
@@ -827,6 +835,74 @@ async def test_freshly_constructed_scanner_allows_publication_when_started_mid_w
     assert scanner.signals_suppressed_uk_session_closed == 0
 
 
+# --- US Market Closed Session Rejection (2026-08-18 correctness fix, ------
+# code-review finding #5) -- session=="closed" (outside 04:00-16:00 ET)
+# previously had NO dedicated gate: every other check below is either
+# unconditional or specifically keyed on "pre_market", so a closed-session
+# candidate could reach evaluation/scoring/publication on the same footing
+# as a genuine regular-session one. Deliberately a SEPARATE concept from
+# the UK operating window above (is_operating_window_open) -- these tests
+# use is_operating_window_open's default autouse True stub (see the
+# scanner fixture) so only the US-session gate under test is exercised.
+
+@pytest.mark.asyncio
+async def test_handle_message_suppresses_all_signals_when_us_market_closed(scanner, monkeypatch):
+    candidate = _premarket_signal(session="closed")
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [candidate],
+    )
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert _signal_publishes(scanner) == []
+    assert scanner.signals_suppressed_us_session_closed == 1
+    assert scanner._pending_candidates == []
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert any(r["reason"] == "US_MARKET_SESSION_CLOSED" for r in rejections)
+
+
+@pytest.mark.asyncio
+async def test_handle_message_allows_regular_session_signal_through_us_session_gate(scanner, monkeypatch):
+    # session="regular" (the default _signal() bar_timestamp is 15:00 UTC = 11:00 ET)
+    candidate = _signal("AAPL", 3.0, confluence_score=3, risk_reward_ratio=2.0)
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [candidate],
+    )
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert scanner.signals_suppressed_us_session_closed == 0
+    assert len(scanner._pending_candidates) == 1
+
+
+@pytest.mark.asyncio
+async def test_handle_message_allows_premarket_session_signal_through_us_session_gate(scanner, monkeypatch):
+    """A pre_market candidate must NOT be caught by the closed-session
+    gate -- it should proceed to the premarket-specific gates instead
+    (provider-capability/liquidity/news), unaffected by this fix."""
+    candidate = _premarket_signal()  # session="pre_market"
+    scanner._latest_quotes["AAPL"] = (99.0, 100.0, datetime.now(timezone.utc))
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [candidate],
+    )
+    monkeypatch.setattr(scanner, "_clears_premarket_liquidity", lambda s: True)
+    scanner._last_news_seen["AAPL"] = datetime.now(timezone.utc)
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert scanner.signals_suppressed_us_session_closed == 0
+    assert len(scanner._pending_candidates) == 1
+
+
 # --- Restart semantics (2026-08-16 quant audit, round 4, Requirement 4/13) -
 # TalonX is a host process (scripts/start_talonx.ps1, Task Scheduler),
 # stopped and restarted daily -- these confirm a BRAND-NEW QuantScanner
@@ -880,6 +956,76 @@ async def test_handle_message_suppresses_low_confluence_signal(scanner, monkeypa
     assert _signal_publishes(scanner) == []
     assert scanner.signals_suppressed_low_confluence == 1
     assert scanner._pending_candidates == []
+
+
+# --- RSI-Curl / Confluence Contract at the consumer gate (Task 28/29:
+# RSI_CONFLUENCE_STATE_BASED_CONFIRMED) -------------------------------------
+#
+# Requirement-proving, not merely implementation-locking: proves the
+# confirmed RSI-curl/confluence contract (see
+# results/task28_rsi_confluence_requirement/ and the analogous strategy-
+# level tests in test_quant_strategy.py) actually reaches the real
+# confluence gate in QuantScanner._handle_message, using the exact
+# confluence_score values a real RSI-curl candidate has under the
+# confirmed, state-based scoring: 1 with volume alone (no same-bar MACD
+# cross), 2 once a same-bar MACD cross also coincides. evaluate_signals
+# itself is stubbed here (this file's established boundary -- see the
+# module docstring), so this test does NOT recompute confluence_score; it
+# proves the CONSUMER'S gate correctly acts on the confirmed value, not
+# that strategy.py computes it (that is proven separately and directly in
+# test_quant_strategy.py's RSI-Curl / Confluence Contract tests). No
+# results/ artifact is read at runtime -- the confirmed values are
+# transcribed directly into this test.
+
+@pytest.mark.asyncio
+async def test_handle_message_suppresses_rsi_curl_signal_at_its_confirmed_confluence_of_one(scanner, monkeypatch):
+    # Task 28 contract case A/C: RSI curl + volume, no same-bar MACD cross
+    # -> confluence_score=1 (volume leg only; the RSI leg is structurally
+    # 0 on an RSI-curl signal's own trigger bar, confirmed intentional).
+    # One point short of confluence_score_min=2 -- must be rejected here.
+    rsi_curl_alone = _signal(
+        "AAPL", 3.0, signal_type=SignalType.RSI_OVERBOUGHT_VOLUME_SURGE,
+        direction=SignalDirection.BEARISH, confluence_score=1, risk_reward_ratio=2.0,
+    )
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [rsi_curl_alone])
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert _cooldown_set_calls(scanner) == []
+    assert _signal_publishes(scanner) == []
+    assert scanner.signals_suppressed_low_confluence == 1
+    assert scanner._pending_candidates == []
+
+
+@pytest.mark.asyncio
+async def test_handle_message_does_not_suppress_rsi_curl_signal_at_its_confirmed_confluence_of_two(scanner, monkeypatch):
+    # Task 28 contract case B/D: same RSI curl, plus a same-bar MACD cross
+    # -> confluence_score=2, clears confluence_score_min=2. Direction is
+    # BEARISH specifically so this test isolates the confluence gate alone
+    # -- the trend gate never applies to bearish candidates (a separate,
+    # already-confirmed fact, see results/task27_strategy_feasibility_audit/
+    # direction_asymmetry.csv), so reaching _pending_candidates here can
+    # only mean the confluence gate itself let it through, not that some
+    # other gate happened to be satisfied too.
+    rsi_curl_plus_macd = _signal(
+        "AAPL", 3.0, signal_type=SignalType.RSI_OVERBOUGHT_VOLUME_SURGE,
+        direction=SignalDirection.BEARISH, confluence_score=2, risk_reward_ratio=2.0,
+    )
+    rsi_curl_plus_macd.session = "regular"
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(consumer_module, "evaluate_signals", lambda ticker, snap, config, **kwargs: [rsi_curl_plus_macd])
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert scanner.signals_suppressed_low_confluence == 0
+    # Proceeds to the pending-candidate stage -- proves it cleared the
+    # confluence gate specifically. Not asserting a final publish: per
+    # Task 29's own scope, an unrelated gate is allowed to still apply.
+    assert len(scanner._pending_candidates) == 1
+    assert scanner._pending_candidates[0].confluence_score == 2
 
 
 @pytest.mark.asyncio
@@ -1281,7 +1427,7 @@ def test_opportunity_score_is_the_sum_of_configured_weights_at_full_marks(config
 
 def _revalidatable_signal(
     ticker: str = "AAPL", price: float = 100.0, atr: float = 2.0,
-    pivot_resistance: float = 110.0, pivot_support: float = 90.0,
+    pivot_resistance: float = 110.0, pivot_support: float = 101.0,  # >= price -- see _signal's own note
     direction: SignalDirection = SignalDirection.BULLISH,
     signal_generated_at: datetime | None = None,
 ) -> QuantSignal:
@@ -1347,7 +1493,11 @@ async def test_revalidate_candidate_drops_when_rr_degraded_by_price_drift(scanne
 @pytest.mark.asyncio
 async def test_revalidate_candidate_updates_price_and_rr_on_success(scanner):
     now = datetime.now(timezone.utc)
-    signal = _revalidatable_signal(price=100.0, atr=2.0, pivot_resistance=110.0, pivot_support=90.0)
+    # pivot_support(105) deliberately >= the revalidated price(101) -- this
+    # test is about the price/R:R UPDATE mechanics, not Task 35's
+    # structural-stop path (see test_revalidate_candidate_structural_stop_
+    # survives_revalidation below for that).
+    signal = _revalidatable_signal(price=100.0, atr=2.0, pivot_resistance=110.0, pivot_support=105.0)
     _seed_close(scanner, "AAPL", 101.0)  # small, harmless drift
 
     result = await scanner._revalidate_candidate(signal, now)
@@ -1363,6 +1513,55 @@ async def test_revalidate_candidate_updates_price_and_rr_on_success(scanner):
     # original, stale entry price.
     assert result.stop_price == pytest.approx(101.0 - 3.0)  # price - atr_stop_multiplier(1.5)*atr(2.0)
     assert result.target_price == pytest.approx(110.0)  # pivot resistance, unchanged
+
+
+@pytest.mark.asyncio
+async def test_revalidate_candidate_structural_stop_survives_revalidation(scanner):
+    """Task 35 §20 case A: a candidate whose structural stop was valid at
+    screening and remains valid at the revalidated price must keep using
+    the structural stop (and the geometry_path/fallback_reason fields
+    must move together with it, not be left stale from generation time)."""
+    now = datetime.now(timezone.utc)
+    # support(96) chosen so the resulting structural R:R (9/5=1.8) still
+    # clears min_risk_reward_ratio(1.5) -- this test is about the geometry
+    # PATH surviving revalidation, not about the R:R-rejection case (see
+    # test_rr_rejection_case_correct_geometry_fails_where_old_atr_geometry_would_have_passed
+    # in test_quant_strategy.py for that).
+    signal = _revalidatable_signal(price=100.0, atr=2.0, pivot_resistance=110.0, pivot_support=96.0)
+    _seed_close(scanner, "AAPL", 101.0)  # small drift; support(96) still < 101
+
+    result = await scanner._revalidate_candidate(signal, now)
+
+    assert result is not None
+    assert result.stop_price == pytest.approx(96.0)  # structural, not 101 - 3 = 98
+    assert result.geometry_path == "STRUCTURAL_PRIMARY"
+    assert result.fallback_reason is None
+    assert result.structural_level == pytest.approx(96.0)
+    # reward = 110 - 101 = 9; risk = 101 - 96 = 5 (NOT the ATR risk of 3)
+    assert result.risk_reward_ratio == pytest.approx(9.0 / 5.0)
+
+
+@pytest.mark.asyncio
+async def test_revalidate_candidate_drops_when_price_drifts_through_structural_level(scanner):
+    """Task 35 §20 case B: structure was valid at screening (support=90 <
+    screening price=100) but the revalidated price has since dropped to
+    89 -- BELOW the structural level. Must NOT silently keep the
+    now-invalid structural stop; re-derives fresh (ATR fallback here,
+    since the same support is no longer below the new price), and must
+    never open/publish an inverted (stop > price) geometry."""
+    now = datetime.now(timezone.utc)
+    signal = _revalidatable_signal(price=100.0, atr=2.0, pivot_resistance=110.0, pivot_support=90.0)
+    _seed_close(scanner, "AAPL", 89.0)  # price has drifted BELOW the old structural level
+
+    result = await scanner._revalidate_candidate(signal, now)
+
+    # reward = 110 - 89 = 21; ATR-fallback risk = 1.5*2 = 3 -> ratio = 7.0, clears the gate
+    assert result is not None
+    assert result.stop_price == pytest.approx(89.0 - 3.0)  # ATR fallback, NOT the stale structural(90) which
+    # would sit ABOVE the new price -- an inverted, nonsensical long stop.
+    assert result.geometry_path == "ATR_FALLBACK"
+    assert result.fallback_reason == "STRUCTURE_NOT_BELOW_ENTRY"
+    assert result.stop_price < result.price < result.target_price
 
 
 @pytest.mark.asyncio
@@ -1434,7 +1633,9 @@ async def test_revalidate_candidate_rejects_when_pivots_missing(scanner):
 
 @pytest.mark.asyncio
 async def test_flush_throttle_window_publishes_the_revalidated_price(scanner):
-    signal = _revalidatable_signal(price=100.0, atr=2.0, pivot_resistance=110.0, pivot_support=90.0)
+    # pivot_support(105) deliberately >= the revalidated price(103) -- see
+    # the note in test_revalidate_candidate_updates_price_and_rr_on_success.
+    signal = _revalidatable_signal(price=100.0, atr=2.0, pivot_resistance=110.0, pivot_support=105.0)
     _seed_close(scanner, "AAPL", 103.0)
     scanner._pending_candidates = [signal]
 
@@ -1760,9 +1961,20 @@ async def test_handle_message_suppresses_bearish_regular_session_signal_via_tren
 
 
 @pytest.mark.asyncio
-async def test_handle_message_suppresses_premarket_signal_without_liquidity_data(scanner, monkeypatch):
-    # session="pre_market", no buffered bars and no cached quote --
-    # fail-closed: dollar volume and spread can't be confirmed.
+async def test_handle_message_suppresses_premarket_signal_with_no_quote_capability(scanner, monkeypatch):
+    # 2026-08-18 correctness fix (code-review finding #2): session=
+    # "pre_market", no buffered bars and NO cached quote AT ALL -- e.g.
+    # running on yfinance, which never emits QUOTE events (only
+    # polygon_ws.py does; see talonx_ingest/market_data/yfinance_poll.py).
+    # This is now PREMARKET_PROVIDER_UNSUPPORTED specifically (the
+    # provider genuinely cannot supply the required quote capability),
+    # distinct from PREMARKET_LIQUIDITY (a quote WAS available but failed
+    # the freshness/spread/dollar-volume check -- see the sibling test
+    # below). Renamed from
+    # test_handle_message_suppresses_premarket_signal_without_liquidity_data,
+    # which asserted the old, less specific classification this fix
+    # replaces -- the gate itself is unchanged (still fail-closed,
+    # candidate still rejected either way).
     candidate = _premarket_signal()
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
@@ -1774,13 +1986,46 @@ async def test_handle_message_suppresses_premarket_signal_without_liquidity_data
     await scanner._handle_message(_bar_message("AAPL"))
 
     assert _signal_publishes(scanner) == []
-    assert scanner.signals_suppressed_premarket_liquidity == 1
+    assert scanner.signals_suppressed_premarket_provider_unsupported == 1
+    assert scanner.signals_suppressed_premarket_liquidity == 0
     assert scanner._pending_candidates == []
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert any(r["reason"] == "PREMARKET_PROVIDER_UNSUPPORTED" for r in rejections)
+
+
+@pytest.mark.asyncio
+async def test_handle_message_suppresses_premarket_signal_with_quote_but_fails_liquidity(scanner, monkeypatch):
+    """A quote IS available (e.g. a Polygon-configured deployment) but
+    _clears_premarket_liquidity itself rejects it (stale/wide spread/low
+    dollar volume) -- this is the genuine PREMARKET_LIQUIDITY case, still
+    distinct from the no-quote-at-all case above."""
+    candidate = _premarket_signal()
+    scanner._latest_quotes["AAPL"] = (99.0, 100.0, datetime.now(timezone.utc))
+    monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
+    monkeypatch.setattr(
+        consumer_module, "evaluate_signals",
+        lambda ticker, snap, config, **kwargs: [candidate],
+    )
+    monkeypatch.setattr(scanner, "_clears_premarket_liquidity", lambda s: False)
+
+    await scanner._handle_message(_priming_bar_message("AAPL"))
+    await scanner._handle_message(_bar_message("AAPL"))
+
+    assert _signal_publishes(scanner) == []
+    assert scanner.signals_suppressed_premarket_provider_unsupported == 0
+    assert scanner.signals_suppressed_premarket_liquidity == 1
+    rejections = [json.loads(p) for p in _rejection_publishes(scanner)]
+    assert any(r["reason"] == "PREMARKET_LIQUIDITY" for r in rejections)
 
 
 @pytest.mark.asyncio
 async def test_handle_message_passes_premarket_signal_when_liquidity_and_news_clear(scanner, monkeypatch):
     candidate = _premarket_signal()
+    # A quote must be present to clear the new provider-capability gate
+    # (see test_handle_message_suppresses_premarket_signal_with_no_quote_capability
+    # above) before _clears_premarket_liquidity (monkeypatched below) is
+    # ever reached.
+    scanner._latest_quotes["AAPL"] = (99.0, 100.0, datetime.now(timezone.utc))
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
         consumer_module, "evaluate_signals",
@@ -1792,6 +2037,7 @@ async def test_handle_message_passes_premarket_signal_when_liquidity_and_news_cl
     await scanner._handle_message(_priming_bar_message("AAPL"))
     await scanner._handle_message(_bar_message("AAPL"))
 
+    assert scanner.signals_suppressed_premarket_provider_unsupported == 0
     assert scanner.signals_suppressed_premarket_liquidity == 0
     assert scanner.signals_suppressed_news_catalyst == 0
     assert len(scanner._pending_candidates) == 1
@@ -1800,6 +2046,7 @@ async def test_handle_message_passes_premarket_signal_when_liquidity_and_news_cl
 @pytest.mark.asyncio
 async def test_handle_message_suppresses_premarket_signal_without_recent_news(scanner, monkeypatch):
     candidate = _premarket_signal()
+    scanner._latest_quotes["AAPL"] = (99.0, 100.0, datetime.now(timezone.utc))
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
         consumer_module, "evaluate_signals",
@@ -1820,6 +2067,7 @@ async def test_handle_message_suppresses_premarket_signal_without_recent_news(sc
 async def test_handle_message_suppresses_premarket_signal_with_stale_news(scanner, monkeypatch):
     from datetime import timedelta
     candidate = _premarket_signal()
+    scanner._latest_quotes["AAPL"] = (99.0, 100.0, datetime.now(timezone.utc))
     monkeypatch.setattr(consumer_module, "compute_indicators", lambda df, config: _snapshot_stub())
     monkeypatch.setattr(
         consumer_module, "evaluate_signals",

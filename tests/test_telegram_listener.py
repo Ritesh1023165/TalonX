@@ -208,10 +208,18 @@ async def test_telegram_send_failure_is_logged_not_raised(listener, store, teleg
 
 # --- /ping (Interactive System Health Check) --------------------------------
 
-def _dispatch_agent(started_at=None, redis_client=None):
+def _dispatch_agent(
+    started_at=None, redis_client=None, active_symbols=None,
+    telegram_failed=0, long_term_telegram_failed=0,
+):
     agent = MagicMock()
     agent.started_at = started_at or (datetime.now(timezone.utc) - timedelta(hours=14, minutes=22))
     agent._client = redis_client
+    agent.watchlist_store.list_active_symbols.return_value = (
+        [] if active_symbols is None else active_symbols
+    )
+    agent.telegram_failed = telegram_failed
+    agent.long_term_telegram_failed = long_term_telegram_failed
     return agent
 
 
@@ -365,11 +373,40 @@ async def test_ping_market_section_reports_bars_read_metric(listener, store, tel
 
 
 @pytest.mark.asyncio
-async def test_ping_market_section_watchlist_size_is_always_unknown(listener, store, telegram_client):
+async def test_ping_market_section_reports_watchlist_size_from_dispatch_agent_store(listener, store, telegram_client):
+    # 2026-08-18 EOD fix: DispatchAgent already holds the same
+    # TickerWatchlistStore run_talonx.py constructs -- renamed from
+    # test_ping_market_section_watchlist_size_is_always_unknown, which
+    # asserted the old (confirmed-gap) always-unknown behavior.
     store.count_alerts_today.return_value = (0, 0)
-    listener.dispatch_agent = _dispatch_agent(redis_client=_redis_with_metrics())
+    listener.dispatch_agent = _dispatch_agent(
+        redis_client=_redis_with_metrics(), active_symbols=["AAPL", "MSFT", "STX"]
+    )
 
     await listener._handle_update(_update(1, "/ping"))
+
+    reply = telegram_client.send.await_args.args[0]
+    assert "Watchlist size: 3" in reply
+
+
+@pytest.mark.asyncio
+async def test_ping_market_section_watchlist_size_unknown_without_dispatch_agent(listener, store, telegram_client):
+    store.count_alerts_today.return_value = (0, 0)
+    # listener.dispatch_agent stays None -- no watchlist store to read.
+
+    await listener._handle_update(_update(1, "/ping"))
+
+    reply = telegram_client.send.await_args.args[0]
+    assert "Watchlist size: unknown" in reply
+
+
+@pytest.mark.asyncio
+async def test_ping_market_section_watchlist_size_unknown_on_query_failure(listener, store, telegram_client):
+    store.count_alerts_today.return_value = (0, 0)
+    listener.dispatch_agent = _dispatch_agent(redis_client=_redis_with_metrics())
+    listener.dispatch_agent.watchlist_store.list_active_symbols.side_effect = RuntimeError("db locked")
+
+    await listener._handle_update(_update(1, "/ping"))  # must not raise
 
     reply = telegram_client.send.await_args.args[0]
     assert "Watchlist size: unknown" in reply
@@ -444,22 +481,42 @@ async def test_ping_quant_section_reports_candidates_and_published(listener, sto
 
 
 @pytest.mark.asyncio
-async def test_ping_quant_section_reuses_the_rejected_candidates_audit_table(listener, store, telegram_client):
-    # Part 6: reuse the EXISTING talonx:quant:rejected audit trail rather
-    # than inventing a second mechanism.
+async def test_ping_quant_section_shows_full_funnel_breakdown(listener, store, telegram_client):
+    # 2026-08-18 /ping observability completion: the two-number bar/
+    # candidate split (from the earlier EOD fix) is now a full per-reason
+    # breakdown -- renamed from
+    # test_ping_quant_section_splits_bar_level_from_candidate_level_rejections,
+    # which only asserted the two combined counts.
     store.count_alerts_today.return_value = (0, 0)
-    store.rejected_candidates_between.return_value = [{"id": i} for i in range(37)]
+    store.rejected_candidates_between.return_value = (
+        [{"id": i, "reason": "LOW_VOLATILITY"} for i in range(30)]
+        + [{"id": i, "reason": "LOW_CONFLUENCE"} for i in range(30, 35)]
+        + [{"id": 35, "reason": "CLOSING_BLACKOUT"}]
+        + [{"id": 36, "reason": "LOW_RISK_REWARD"}]
+        + [{"id": 37, "reason": "THROTTLE"}]  # a real reason outside the fixed display order
+    )
     listener.dispatch_agent = _dispatch_agent(redis_client=_redis_with_metrics())
 
     await listener._handle_update(_update(1, "/ping"))
 
     reply = telegram_client.send.await_args.args[0]
-    assert "Rejected candidates today: 37" in reply
+    assert "LOW_VOLATILITY: 30" in reply
+    assert "LOW_CONFLUENCE: 5" in reply
+    assert "CLOSING_BLACKOUT: 1" in reply
+    assert "LOW_RISK_REWARD: 1" in reply
+    # Fixed-order reasons with zero activity are still shown (known, real zeros).
+    assert "OPENING_BLACKOUT: 0" in reply
+    assert "COOLDOWN: 0" in reply
+    assert "US_MARKET_SESSION_CLOSED: 0" in reply
+    # A real reason outside the fixed display list is appended since nonzero.
+    assert "THROTTLE: 1" in reply
+    assert "Rejected candidates today" not in reply
+    assert "Bar-level volatility rejections today" not in reply
     assert store.rejected_candidates_between.call_count == 1
 
 
 @pytest.mark.asyncio
-async def test_ping_quant_section_rejected_count_unknown_on_audit_query_failure(listener, store, telegram_client):
+async def test_ping_quant_section_breakdown_unknown_on_audit_query_failure(listener, store, telegram_client):
     store.count_alerts_today.return_value = (0, 0)
     store.rejected_candidates_between.side_effect = RuntimeError("db locked")
     listener.dispatch_agent = _dispatch_agent(redis_client=_redis_with_metrics())
@@ -467,28 +524,41 @@ async def test_ping_quant_section_rejected_count_unknown_on_audit_query_failure(
     await listener._handle_update(_update(1, "/ping"))  # must not raise
 
     reply = telegram_client.send.await_args.args[0]
-    assert "Rejected candidates today: unknown" in reply
+    assert "LOW_VOLATILITY: unknown" in reply
+    assert "unknown (audit trail query failed)" in reply
 
 
 @pytest.mark.asyncio
-async def test_ping_brain_reports_generated_is_always_unknown(listener, store, telegram_client):
-    # brain's own report counter is in-process only -- not a Redis metric
-    # any other module (including dispatch) can read.
+async def test_ping_signal_lifecycle_reports_brain_reports_generated(listener, store, telegram_client):
+    # 2026-08-18 /ping observability completion: brain_reports_generated is
+    # now a genuine Redis counter (see talonx_brain/consumer.py) --
+    # renamed from test_ping_brain_reports_generated_is_always_unknown,
+    # which asserted the old (confirmed-gap) always-unknown behavior.
     store.count_alerts_today.return_value = (0, 0)
-    redis_client = _redis_with_metrics(metrics={_today_key("brain", "received"): "22"})
+    redis_client = _redis_with_metrics(metrics={
+        _today_key("brain", "received"): "22",
+        _today_key("brain", "reports_generated"): "19",
+    })
     listener.dispatch_agent = _dispatch_agent(redis_client=redis_client)
 
     await listener._handle_update(_update(1, "/ping"))
 
     reply = telegram_client.send.await_args.args[0]
-    assert "Quant signals received today: 22" in reply
-    assert "Reports generated today: unknown" in reply
+    assert "Brain received: 22" in reply
+    assert "Brain reports generated: 19" in reply
 
 
 @pytest.mark.asyncio
-async def test_ping_core_section_sums_actionable_alert_counters(listener, store, telegram_client):
+async def test_ping_signal_lifecycle_separates_trade_action_from_contradicted(listener, store, telegram_client):
+    # 2026-08-18 correctness fix (code-review finding #7), now living in the
+    # unified lifecycle section: action_contradicted is quant/brain
+    # DISAGREEING -- the opposite of actionable, not a third kind of
+    # actionable alert. Renamed from
+    # test_ping_core_section_separates_trade_action_from_contradicted.
     store.count_alerts_today.return_value = (0, 0)
     redis_client = _redis_with_metrics(metrics={
+        _today_key("core", "signals_received"): "6",
+        _today_key("core", "reports_received"): "4",
         _today_key("core", "action_bullish"): "5",
         _today_key("core", "action_bearish"): "3",
         _today_key("core", "action_contradicted"): "2",
@@ -498,12 +568,16 @@ async def test_ping_core_section_sums_actionable_alert_counters(listener, store,
     await listener._handle_update(_update(1, "/ping"))
 
     reply = telegram_client.send.await_args.args[0]
-    assert "Actionable alerts today: 10" in reply
-    assert "Research reports received today: unknown" in reply
+    assert "Core signals received: 6" in reply
+    assert "Core reports received: 4" in reply
+    assert "Core actionable: 8 (bullish + bearish)" in reply
+    assert "Core contradicted: 2" in reply
+    assert "Actionable alerts today" not in reply
+    assert "Research reports received today: unknown" not in reply
 
 
 @pytest.mark.asyncio
-async def test_ping_dispatch_section_reports_received_suppressed_pushed(listener, store, telegram_client):
+async def test_ping_signal_lifecycle_reports_dispatch_received_suppressed_pushed(listener, store, telegram_client):
     store.count_alerts_today.return_value = (0, 0)
     redis_client = _redis_with_metrics(metrics={
         _today_key("dispatch", "received"): "40",
@@ -517,9 +591,45 @@ async def test_ping_dispatch_section_reports_received_suppressed_pushed(listener
     await listener._handle_update(_update(1, "/ping"))
 
     reply = telegram_client.send.await_args.args[0]
-    assert "Alerts received today: 40" in reply
-    assert "Suppressed today: 7" in reply
-    assert "Telegram pushed today: 33" in reply
+    assert "Dispatch received: 40" in reply
+    assert "Dispatch suppressed: 7" in reply
+    assert "Telegram pushed: 33" in reply
+
+
+@pytest.mark.asyncio
+async def test_ping_signal_lifecycle_reports_telegram_send_failures(listener, store, telegram_client):
+    store.count_alerts_today.return_value = (0, 0)
+    listener.dispatch_agent = _dispatch_agent(
+        redis_client=_redis_with_metrics(), telegram_failed=2, long_term_telegram_failed=1,
+    )
+
+    await listener._handle_update(_update(1, "/ping"))
+
+    reply = telegram_client.send.await_args.args[0]
+    assert "Telegram send failures (since process start): 3" in reply
+
+
+@pytest.mark.asyncio
+async def test_ping_market_section_reports_provider_and_redis_publisher_metrics(listener, store, telegram_client):
+    store.count_alerts_today.return_value = (0, 0)
+    redis_client = _redis_with_metrics(metrics={
+        _today_key("ingest", "provider_requests_failed"): "2",
+        _today_key("ingest", "provider_retries"): "1",
+        _today_key("ingest", "provider_rate_limited"): "0",
+        _today_key("ingest", "market_redis_publish_failures"): "0",
+        _today_key("ingest", "market_redis_reconnect_successes"): "1",
+    })
+    listener.dispatch_agent = _dispatch_agent(redis_client=redis_client)
+
+    await listener._handle_update(_update(1, "/ping"))
+
+    reply = telegram_client.send.await_args.args[0]
+    assert "Provider failures today: 2" in reply
+    assert "Provider retries today: 1" in reply
+    assert "Provider rate limits today: 0" in reply
+    assert "Redis publish failures today: 0" in reply
+    assert "Redis reconnects today: 1" in reply
+    assert "Feed errors: unknown" not in reply
 
 
 @pytest.mark.asyncio

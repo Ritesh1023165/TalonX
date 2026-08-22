@@ -52,21 +52,64 @@ if (Test-Path $pidFile) {
 }
 
 # Ensure Redis (docker-compose.yaml's talonx-redis) is up -- idempotent,
-# safe to run every time; a no-op if it's already running. Only a
-# warning on failure, not fatal: run_talonx.py itself already degrades
-# gracefully (logs once, keeps running) when Redis isn't reachable.
+# safe to run every time; a no-op if it's already running.
+#
+# 2026-08-18 correctness fix (code-review finding #3/#7): previously a
+# Redis startup failure here was only a Write-Warning, and the script
+# proceeded to launch run_talonx.py regardless. That combined badly with
+# RedisEventPublisher's OLD behavior (a failed connect() left it
+# permanently disconnected, no retry -- separately fixed in
+# talonx_ingest/events/publisher.py) to silently disable the live event
+# bus for a whole session with no warning beyond a log line easy to miss
+# in a hidden/scheduled-task run. `docker compose up -d` returning also
+# does NOT mean the container is actually ready to accept connections yet
+# (it returns once the container is CREATED, not once its healthcheck
+# passes) -- so this now waits, bounded, for the container's own
+# healthcheck (docker-compose.yaml's `redis-cli ping`) to report healthy,
+# and ABORTS this script (does not launch run_talonx.py/Streamlit at all)
+# if Redis isn't healthy within that window. This is fail-CLOSED for the
+# NORMAL live startup path specifically -- run_talonx.py itself still
+# degrades gracefully if Redis is lost mid-session (a separate, already-
+# fixed concern), this only prevents KNOWINGLY starting a live session
+# without its event bus in the first place.
 Write-Host "Ensuring Redis container is up..."
 Push-Location $repoRoot
+$dockerUpFailed = $false
 try {
     docker compose up -d talonx-redis 2>&1 | ForEach-Object { Write-Host "  $_" }
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "docker compose returned a non-zero exit code -- is Docker Desktop running?"
+        $dockerUpFailed = $true
     }
 } catch {
-    Write-Warning "Could not start the Redis container via Docker (is Docker Desktop running?). Continuing anyway -- $_"
+    Write-Host "Could not run 'docker compose up' (is Docker Desktop running?) -- $_"
+    $dockerUpFailed = $true
 } finally {
     Pop-Location
 }
+if ($dockerUpFailed) {
+    Write-Error "Aborting startup: 'docker compose up -d talonx-redis' failed -- not launching TalonX without its Redis event bus. Is Docker Desktop running?"
+    exit 1
+}
+
+$redisReady = $false
+$maxWaitSeconds = 30
+$waited = 0
+$health = "unknown"
+Write-Host "Waiting for Redis to become healthy (up to ${maxWaitSeconds}s)..."
+while ($waited -lt $maxWaitSeconds) {
+    $health = docker inspect --format='{{.State.Health.Status}}' talonx-redis 2>$null
+    if ($health -eq "healthy") {
+        $redisReady = $true
+        break
+    }
+    Start-Sleep -Seconds 2
+    $waited += 2
+}
+if (-not $redisReady) {
+    Write-Error "Aborting startup: Redis did not become healthy within ${maxWaitSeconds}s (last status: '$health'). Not launching TalonX without a working Redis event bus -- check 'docker compose logs talonx-redis' and retry once it's healthy."
+    exit 1
+}
+Write-Host "Redis is healthy."
 
 # PYTHONUNBUFFERED, in addition to python's own -u flag below, so log
 # files fill in near-real-time instead of sitting in Python's default

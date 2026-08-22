@@ -153,6 +153,39 @@ def apply_spread(price: float, spread_bps: float, side: Literal["BUY", "SELL"]) 
     return price + half_spread if side == "BUY" else price - half_spread
 
 
+def fill_geometry_is_valid(fill_price: float, stop_price: float | None, target_price: float | None) -> bool:
+    """Task 25B (Task 24 P1 finding): the live-side counterpart of
+    talonx_backtest.engine._finalize_fill_geometry's fill-vs-bracket
+    check -- for a LONG entry (talonx_paper is long-only, see Task 25A),
+    the actual fill must land strictly inside the screening-time
+    stop/target bracket: stop_price < fill_price < target_price.
+
+    Deliberately does NOT recompute a new bracket the way the backtest
+    does. Architecture trace (see results/task25b_live_fill_geometry/
+    live_fill_architecture.md): talonx_paper's own wire contract
+    (TriggeringSignalRef) never carries atr/pivot_resistance/
+    pivot_support -- only price/stop_price/target_price -- and
+    talonx_paper imports nothing from talonx_quant anywhere (a
+    project-wide, deliberate wire-boundary convention every live module
+    honors; only talonx_backtest, an explicit research exception, is
+    granted direct reuse of talonx_quant.strategy.calculate_trade_geometry).
+    Widening the wire contract and crossing that boundary to recompute
+    geometry live-side would be a real architecture change, not a
+    same-function fix, and duplicating the formula is explicitly
+    forbidden. This function therefore implements the fail-closed
+    fallback the spec itself sanctions: validate against the ORIGINAL
+    screening-time bracket, and reject the fill outright (never persist
+    an invalid position) if it doesn't hold -- see
+    PaperTradingEngine._execute_buy's FILL_GEOMETRY_INVALID branch.
+
+    Returns True (nothing to validate) when either bound is missing --
+    unchanged, pre-existing "nothing to validate against" posture,
+    matching _finalize_fill_geometry's own identical convention."""
+    if stop_price is None or target_price is None:
+        return True
+    return stop_price < fill_price < target_price
+
+
 def seconds_until_next_eod_flatten(now: datetime, hour_et: int, minute_et: int) -> float:
     """Seconds from `now` until the next occurrence of hour_et:minute_et
     America/New_York local time -- today if that moment hasn't passed yet,

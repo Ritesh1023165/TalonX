@@ -23,6 +23,7 @@ override these two fields.
 """
 from __future__ import annotations
 
+import math
 from datetime import datetime, timezone
 
 import pytest
@@ -30,7 +31,17 @@ import pytest
 from talonx_quant.config import QuantConfig
 from talonx_quant.indicators import DailyPivots, IndicatorSnapshot
 from talonx_quant.schemas import SignalDirection, SignalType
-from talonx_quant.strategy import _confluence_score, _structural_risk_reward, evaluate_signals
+from talonx_quant.strategy import (
+    FALLBACK_REASON_NO_STRUCTURAL_SUPPORT,
+    FALLBACK_REASON_STRUCTURE_INVALID_OR_NONFINITE,
+    FALLBACK_REASON_STRUCTURE_NOT_BELOW_ENTRY,
+    GEOMETRY_PATH_ATR_FALLBACK,
+    GEOMETRY_PATH_STRUCTURAL_PRIMARY,
+    _confluence_score,
+    _structural_risk_reward,
+    calculate_trade_geometry,
+    evaluate_signals,
+)
 
 
 def _snapshot(**overrides) -> IndicatorSnapshot:
@@ -301,12 +312,182 @@ def test_confluence_score_is_computed_per_signal_direction(config):
     assert signals[0].confluence_score == 2
 
 
+# --- RSI-Curl / Confluence Contract (Task 28: RSI_CONFLUENCE_STATE_BASED_CONFIRMED) ---
+#
+# Requirement-proving, not merely implementation-locking: these tests exist
+# because Task 24 and Task 27 found that an RSI-curl candidate's own RSI
+# value can never satisfy its own confluence RSI leg (the trigger fires on
+# the RECOVERY bar -- RSI >= 30 bullish / <= 70 bearish -- while the
+# confluence leg requires the opposite, still-extreme state -- RSI < 30 /
+# > 70). Task 28's full requirements-archaeology investigation (see
+# results/task28_rsi_confluence_requirement/) confirmed this is INTENDED
+# behavior (RSI_CONFLUENCE_STATE_BASED_CONFIRMED): the confluence RSI leg
+# is documented, consistently and repeatedly, to measure CURRENT state, not
+# the reversal EVENT. These tests lock that confirmed contract in so a
+# future change to _confluence_score or _check_rsi_volume_setup that
+# silently makes an RSI-curl candidate's own RSI value count towards its
+# own score is caught as a requirement violation, not treated as a bug fix.
+# The requirement is fully readable from the test bodies below; no test
+# reads a results/ artifact file at runtime.
+
+def test_bullish_curl_with_volume_and_no_macd_is_capped_at_confluence_one(config):
+    # Contract case A: RSI curl + volume, no coincident MACD cross.
+    # RSI leg = 0 (state-based: current RSI 31 is not < 30, even though the
+    # curl itself required the RECOVERY from 28 -> 31). Volume leg = 1.
+    # MACD leg = 0 (no cross this bar). Total = 1, one point short of
+    # confluence_score_min=2 -- this candidate cannot publish on its own.
+    snap = _snapshot(rsi=31.0, rsi_prev=28.0, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    rsi_signals = [s for s in signals if s.signal_type == SignalType.RSI_OVERSOLD_VOLUME_SURGE]
+    assert len(rsi_signals) == 1
+    assert rsi_signals[0].direction == SignalDirection.BULLISH
+    assert rsi_signals[0].confluence_score == 1
+    assert rsi_signals[0].confluence_score < config.confluence_score_min
+
+
+def test_bullish_curl_with_volume_and_coincident_macd_reaches_confluence_two(config):
+    # Contract case B: same RSI curl as above, PLUS a same-bar MACD
+    # bullish cross -- the only way an RSI-curl candidate can reach
+    # confluence_score_min=2, since its own RSI leg is structurally
+    # unavailable (see test above) and volume alone only supplies 1.
+    snap = _snapshot(
+        rsi=31.0, rsi_prev=28.0, volume_surge_ratio=3.0,
+        macd=0.05, macd_signal_line=0.02, macd_prev=-0.01, macd_signal_line_prev=0.01,
+    )
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    rsi_signals = [s for s in signals if s.signal_type == SignalType.RSI_OVERSOLD_VOLUME_SURGE]
+    assert len(rsi_signals) == 1
+    assert rsi_signals[0].confluence_score == 2
+    assert rsi_signals[0].confluence_score >= config.confluence_score_min
+    # The coincident MACD_BULLISH_CROSS also fires independently on this
+    # bar (Task 27 §9's same-bar coincidence case) -- not asserted further
+    # here, already covered by test_multiple_signal_types_can_fire_on_the_same_bar.
+
+
+def test_bearish_curl_with_volume_and_no_macd_is_capped_at_confluence_one(config):
+    # Contract case C: bearish mirror of case A.
+    snap = _snapshot(rsi=69.0, rsi_prev=72.0, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    rsi_signals = [s for s in signals if s.signal_type == SignalType.RSI_OVERBOUGHT_VOLUME_SURGE]
+    assert len(rsi_signals) == 1
+    assert rsi_signals[0].direction == SignalDirection.BEARISH
+    assert rsi_signals[0].confluence_score == 1
+    assert rsi_signals[0].confluence_score < config.confluence_score_min
+
+
+def test_bearish_curl_with_volume_and_coincident_macd_reaches_confluence_two(config):
+    # Contract case D: bearish mirror of case B.
+    snap = _snapshot(
+        rsi=69.0, rsi_prev=72.0, volume_surge_ratio=3.0,
+        macd=-0.05, macd_signal_line=-0.02, macd_prev=0.01, macd_signal_line_prev=-0.01,
+    )
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    rsi_signals = [s for s in signals if s.signal_type == SignalType.RSI_OVERBOUGHT_VOLUME_SURGE]
+    assert len(rsi_signals) == 1
+    assert rsi_signals[0].confluence_score == 2
+    assert rsi_signals[0].confluence_score >= config.confluence_score_min
+
+
+# --- RSI-Curl / Confluence Contract: exact 30/70 boundary (Task 28 §5/§7) --
+#
+# Task 28's rsi_truth_table.csv identified these exact boundary cases had
+# no prior test coverage. The curl trigger and the confluence leg use
+# DIFFERENT boundary conventions on purpose: the trigger's `rsi_prev` check
+# is strict (< / >), its `rsi` check is inclusive (>= / <=); the confluence
+# leg's check is strict on the current bar (< / >) in both directions. This
+# is what makes the two conditions complementary (never simultaneously
+# true) at every point along the boundary, including exactly at 30.0/70.0.
+
+def test_boundary_bullish_recovery_exactly_at_oversold_threshold_fires_curl(config):
+    # 29.9 -> 30.0: curr (30.0) clears the inclusive >= 30 recovery check.
+    snap = _snapshot(rsi=30.0, rsi_prev=29.9, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+    rsi_signals = [s for s in signals if s.signal_type == SignalType.RSI_OVERSOLD_VOLUME_SURGE]
+
+    assert len(rsi_signals) == 1
+    # Confluence leg is strict (< 30): exactly 30.0 does NOT qualify.
+    assert rsi_signals[0].confluence_score == 1  # volume only
+
+
+def test_boundary_bullish_prev_at_threshold_is_not_a_recovery(config):
+    # 30.0 -> 31.0: rsi_prev (30.0) fails the STRICT < 30 "was oversold"
+    # check -- prev was already AT the threshold, not below it, so this is
+    # not a qualifying recovery (there was nothing to recover from).
+    snap = _snapshot(rsi=31.0, rsi_prev=30.0, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    assert [s for s in signals if s.signal_type == SignalType.RSI_OVERSOLD_VOLUME_SURGE] == []
+
+
+def test_boundary_bullish_current_just_shy_of_threshold_does_not_fire_curl(config):
+    # 28.0 -> 29.9: curr (29.9) has not yet reached the inclusive >= 30
+    # recovery threshold -- still oversold, no curl.
+    snap = _snapshot(rsi=29.9, rsi_prev=28.0, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    assert [s for s in signals if s.signal_type == SignalType.RSI_OVERSOLD_VOLUME_SURGE] == []
+    # The confluence leg, checked in isolation, WOULD score this state
+    # (still oversold, 29.9 < 30) -- but no candidate exists to attach it
+    # to since no trigger fired. RSI leg (1) + volume leg (1) = 2.
+    # Demonstrates the two checks are evaluated on entirely separate
+    # conditions, not just "the same value seen twice".
+    assert _confluence_score(snap, config, config.volume_surge_ratio_threshold, SignalDirection.BULLISH) == 2
+
+
+def test_boundary_bearish_recovery_exactly_at_overbought_threshold_fires_curl(config):
+    # 70.1 -> 70.0: curr (70.0) clears the inclusive <= 70 recovery check.
+    snap = _snapshot(rsi=70.0, rsi_prev=70.1, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+    rsi_signals = [s for s in signals if s.signal_type == SignalType.RSI_OVERBOUGHT_VOLUME_SURGE]
+
+    assert len(rsi_signals) == 1
+    assert rsi_signals[0].confluence_score == 1  # volume only; strict > 70 confluence leg does not qualify at 70.0
+
+
+def test_boundary_bearish_prev_at_threshold_is_not_a_recovery(config):
+    # 70.0 -> 69.0: rsi_prev (70.0) fails the STRICT > 70 "was overbought"
+    # check -- prev was already AT the threshold, not above it.
+    snap = _snapshot(rsi=69.0, rsi_prev=70.0, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    assert [s for s in signals if s.signal_type == SignalType.RSI_OVERBOUGHT_VOLUME_SURGE] == []
+
+
+def test_boundary_bearish_current_just_above_threshold_does_not_fire_curl(config):
+    # 72.0 -> 70.1: curr (70.1) has not yet reached the inclusive <= 70
+    # recovery threshold -- still overbought, no curl.
+    snap = _snapshot(rsi=70.1, rsi_prev=72.0, volume_surge_ratio=3.0)
+
+    signals = evaluate_signals("AAPL", snap, config)
+
+    assert [s for s in signals if s.signal_type == SignalType.RSI_OVERBOUGHT_VOLUME_SURGE] == []
+    # RSI leg (1, still overbought at 70.1 > 70) + volume leg (1) = 2.
+    assert _confluence_score(snap, config, config.volume_surge_ratio_threshold, SignalDirection.BEARISH) == 2
+
+
 # --- Structural R:R Calculation --------------------------------------------
 
 def test_structural_rr_uses_pivot_resistance_and_atr_stop_multiplier(config):
-    # reward = resistance(110) - price(100) = 10; risk = atr_stop_multiplier(1.5) * atr(2) = 3
+    # reward = resistance(110) - price(100) = 10; risk = atr_stop_multiplier(1.5) * atr(2) = 3.
+    # support(105) is deliberately >= price(100) -- invalid as a structural
+    # stop anchor (Task 35), so this specifically exercises the ATR-
+    # fallback stop path; see the "Structural Stop Geometry" section below
+    # for the STRUCTURAL_PRIMARY case.
     snap = _snapshot(price=100.0, atr=2.0)
-    pivots = _pivots(resistance=110.0, support=90.0)
+    pivots = _pivots(resistance=110.0, support=105.0)
 
     ratio = _structural_risk_reward(snap, SignalDirection.BULLISH, pivots, config)
 
@@ -355,6 +536,10 @@ def test_structural_rr_varies_with_pivot_distance_not_a_constant(config):
 
 
 def test_signal_carries_structural_risk_reward_and_pivots(config):
+    # Task 35: support(90) < price(100) is now a VALID structural stop
+    # anchor -- risk = price(100) - support(90) = 10, not the ATR risk(3)
+    # this test asserted pre-Task-35. reward is unchanged (resistance(110)
+    # - price(100) = 10), so ratio is now 10/10 = 1.0.
     snap = _snapshot(rsi=32.0, rsi_prev=28.0, volume_surge_ratio=3.0, atr=2.0, bar_true_range=2.0, price=100.0)
     pivots = _pivots(resistance=110.0, support=90.0)
 
@@ -362,9 +547,11 @@ def test_signal_carries_structural_risk_reward_and_pivots(config):
 
     assert len(signals) == 1
     assert signals[0].atr == 2.0
-    assert signals[0].risk_reward_ratio == pytest.approx(10.0 / 3.0)
+    assert signals[0].risk_reward_ratio == pytest.approx(10.0 / 10.0)
     assert signals[0].pivot_resistance == pytest.approx(110.0)
     assert signals[0].pivot_support == pytest.approx(90.0)
+    assert signals[0].stop_price == pytest.approx(90.0)
+    assert signals[0].geometry_path == "STRUCTURAL_PRIMARY"
 
 
 def test_signal_risk_reward_is_none_without_pivots(config):
@@ -387,9 +574,15 @@ def test_gated_risk_reward_matches_the_actually_executed_stop_distance(config):
     separate atr_stop_multiplier (1.0x ATR): a $6 pivot target against a
     $2 ATR gated at R:R=2.0 (6 / (1.5*2)=3) but would have EXECUTED at
     R:R=3.0 (6 / (1.0*2)=2) -- passing the >=1.5 gate on a materially
-    different number than the trade actually risked."""
+    different number than the trade actually risked.
+
+    support(101) is deliberately >= price(100), invalid as a Task 35
+    structural stop anchor, so this specifically exercises the ATR-
+    fallback stop path -- see
+    test_gated_risk_reward_matches_the_actually_executed_stop_distance_under_structural_stop
+    below for the same invariant proven under STRUCTURAL_PRIMARY."""
     snap = _snapshot(rsi=32.0, rsi_prev=28.0, volume_surge_ratio=3.0, atr=2.0, bar_true_range=2.0, price=100.0)
-    pivots = _pivots(resistance=106.0, support=90.0)
+    pivots = _pivots(resistance=106.0, support=101.0)
 
     signals = evaluate_signals("AAPL", snap, config, daily_pivots=pivots)
 
@@ -406,8 +599,11 @@ def test_gated_risk_reward_matches_the_actually_executed_stop_distance(config):
 # --- Explicit $ stop/target -------------------------------------------------
 
 def test_bullish_signal_target_uses_pivot_resistance_when_available(config):
+    # support(101) is deliberately >= price(100), invalid as a Task 35
+    # structural stop anchor, isolating this test's own focus (target
+    # selection) from the stop-selection behavior covered separately below.
     snap = _snapshot(rsi=32.0, rsi_prev=28.0, volume_surge_ratio=3.0, price=100.0, atr=2.0, bar_true_range=2.0)
-    pivots = _pivots(resistance=108.0, support=90.0)
+    pivots = _pivots(resistance=108.0, support=101.0)
 
     signals = evaluate_signals("AAPL", snap, config, daily_pivots=pivots)
 
@@ -447,6 +643,215 @@ def test_bearish_signal_falls_back_to_atr_target_without_pivots(config):
     assert len(signals) == 1
     assert signals[0].stop_price == pytest.approx(103.0)
     assert signals[0].target_price == pytest.approx(96.0)
+
+
+# --- Structural Stop Geometry (Task 35: owner-confirmed ATR-RISK-001,
+# MARKET_STRUCTURE_PRIMARY) --------------------------------------------
+#
+# Requirement-proving, not merely implementation-locking: LONG stop
+# geometry must primarily reflect market-structure invalidation (the
+# existing, causal prior-session S1 pivot support), falling back to the
+# unmodified 1.5x-ATR formula ONLY when no valid structural anchor
+# exists. Task 34 proved the PRIOR (ATR-only, unconditional) behavior was
+# systematically misaligned with this now-confirmed contract; these tests
+# lock the corrected behavior in directly against calculate_trade_geometry,
+# with no dependency on any results/ artifact at runtime. No structural
+# buffer is applied -- Task 34 found no existing repository requirement
+# defines one (see docs/modules/quant.md's STRUCTURAL_BUFFER_REQUIREMENT_
+# NOT_DEFINED note); pivot_support is used LITERALLY as the stop.
+
+def test_geometry_case_a_valid_structure_below_entry_is_used_as_the_stop(config):
+    # entry=100, pivot_support=95 (valid, < entry) -- ATR fallback would
+    # have been 100 - 1.5*2 = 97, but structure takes priority.
+    geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=None, pivot_support=95.0, config=config,
+    )
+
+    assert geometry is not None
+    assert geometry.stop_price == pytest.approx(95.0)
+    assert geometry.geometry_path == GEOMETRY_PATH_STRUCTURAL_PRIMARY
+    assert geometry.fallback_reason is None
+    assert geometry.structural_level == pytest.approx(95.0)
+    assert geometry.structural_level_type == "prior_session_S1_pivot"
+
+
+def test_geometry_case_b_no_structure_falls_back_to_atr_with_explicit_reason(config):
+    geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=None, pivot_support=None, config=config,
+    )
+
+    assert geometry is not None
+    assert geometry.stop_price == pytest.approx(97.0)  # 100 - 1.5*2, unmodified ATR fallback formula
+    assert geometry.geometry_path == GEOMETRY_PATH_ATR_FALLBACK
+    assert geometry.fallback_reason == FALLBACK_REASON_NO_STRUCTURAL_SUPPORT
+    assert geometry.structural_level is None
+    assert geometry.structural_level_type is None
+
+
+def test_geometry_case_c_structure_above_entry_is_rejected_not_used(config):
+    # pivot_support(101) > entry(100) -- on the wrong side, must NOT be
+    # used as a long stop (a stop above entry is nonsensical for a long).
+    geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=None, pivot_support=101.0, config=config,
+    )
+
+    assert geometry is not None
+    assert geometry.stop_price == pytest.approx(97.0)  # ATR fallback, unmodified formula
+    assert geometry.geometry_path == GEOMETRY_PATH_ATR_FALLBACK
+    assert geometry.fallback_reason == FALLBACK_REASON_STRUCTURE_NOT_BELOW_ENTRY
+
+
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), float("-inf")])
+def test_geometry_case_d_non_finite_structure_never_propagates_invalid_geometry(config, bad_value):
+    geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=None, pivot_support=bad_value, config=config,
+    )
+
+    assert geometry is not None
+    assert math.isfinite(geometry.stop_price)  # never NaN/Inf, regardless of the bad input
+    assert geometry.stop_price == pytest.approx(97.0)  # ATR fallback, unmodified formula
+    assert geometry.geometry_path == GEOMETRY_PATH_ATR_FALLBACK
+    assert geometry.fallback_reason == FALLBACK_REASON_STRUCTURE_INVALID_OR_NONFINITE
+
+
+def test_geometry_case_e_structure_exactly_equal_to_entry_is_invalid(config):
+    # A stop AT entry would be a zero-risk trade -- must be rejected, not
+    # silently accepted as "technically below or equal."
+    geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=None, pivot_support=100.0, config=config,
+    )
+
+    assert geometry is not None
+    assert geometry.stop_price == pytest.approx(97.0)  # ATR fallback, not a zero-risk stop at entry
+    assert geometry.geometry_path == GEOMETRY_PATH_ATR_FALLBACK
+    assert geometry.fallback_reason == FALLBACK_REASON_STRUCTURE_NOT_BELOW_ENTRY
+    assert geometry.risk > 0
+
+
+def test_geometry_case_f_structure_far_below_entry_is_used_literally_not_clamped(config):
+    # A structural level far away (large risk) must still be used AS-IS --
+    # this task does not add a buffer or a "too far, fall back to ATR"
+    # rule. The downstream R:R gate, not this function, is what may
+    # eventually reject a candidate whose risk is this large.
+    geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=None, pivot_support=50.0, config=config,
+    )
+
+    assert geometry is not None
+    assert geometry.stop_price == pytest.approx(50.0)  # used literally, not clamped toward the ATR(97) stop
+    assert geometry.geometry_path == GEOMETRY_PATH_STRUCTURAL_PRIMARY
+    assert geometry.risk == pytest.approx(50.0)  # 100 - 50, far larger than the ATR risk (3) would have been
+
+
+def test_geometry_bearish_direction_is_unchanged_by_task_35(config):
+    # The owner's MARKET_STRUCTURE_PRIMARY contract is scoped to LONG
+    # trades only -- BEARISH must remain exactly the pre-Task-35 ATR-only
+    # formula, unconditionally, even when a valid-looking pivot_support
+    # sits below price (which would be irrelevant for a bearish stop
+    # anyway -- bearish uses pivot_support only for its TARGET, unchanged).
+    geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BEARISH,
+        pivot_resistance=None, pivot_support=95.0, config=config,
+    )
+
+    assert geometry is not None
+    assert geometry.stop_price == pytest.approx(103.0)  # 100 + 1.5*2, unchanged formula
+    assert geometry.geometry_path == GEOMETRY_PATH_ATR_FALLBACK
+    assert geometry.fallback_reason is None  # bearish never "attempts" structural, so never "falls back" either
+    assert geometry.structural_level is None
+
+
+# --- R:R recalculation under the selected stop path (Task 35 §18-19) ------
+
+def test_rr_uses_structural_risk_not_atr_risk_when_structural_stop_selected(config):
+    # Same entry/target/ATR in both cases; only the stop source differs.
+    atr_geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=110.0, pivot_support=101.0, config=config,  # support invalid -> ATR fallback
+    )
+    structural_geometry = calculate_trade_geometry(
+        price=100.0, atr=2.0, direction=SignalDirection.BULLISH,
+        pivot_resistance=110.0, pivot_support=95.0, config=config,  # support valid -> structural
+    )
+
+    assert atr_geometry.stop_price == pytest.approx(97.0)
+    assert atr_geometry.risk == pytest.approx(3.0)  # 1.5 * 2.0
+    assert atr_geometry.risk_reward_ratio == pytest.approx(10.0 / 3.0)
+
+    assert structural_geometry.stop_price == pytest.approx(95.0)
+    assert structural_geometry.risk == pytest.approx(5.0)  # 100 - 95, NOT the ATR risk
+    assert structural_geometry.risk_reward_ratio == pytest.approx(10.0 / 5.0)
+
+    # Same target/reward in both cases; the structural stop's wider risk
+    # produces a strictly LOWER R:R here -- proving the engine uses the
+    # ACTUAL selected geometry, not a stale ATR-only figure.
+    assert structural_geometry.risk_reward_ratio < atr_geometry.risk_reward_ratio
+
+
+def test_gated_risk_reward_matches_the_actually_executed_stop_distance_under_structural_stop(config):
+    # Sibling of test_gated_risk_reward_matches_the_actually_executed_stop_distance
+    # above, proving the SAME invariant (the R:R gate's implied risk
+    # distance must equal price - stop_price exactly) holds when the
+    # selected stop is STRUCTURAL, not just under the ATR-fallback path.
+    snap = _snapshot(rsi=32.0, rsi_prev=28.0, volume_surge_ratio=3.0, atr=2.0, bar_true_range=2.0, price=100.0)
+    pivots = _pivots(resistance=106.0, support=90.0)  # support valid -> STRUCTURAL_PRIMARY
+
+    signals = evaluate_signals("AAPL", snap, config, daily_pivots=pivots)
+
+    assert len(signals) == 1
+    signal = signals[0]
+    assert signal.geometry_path == GEOMETRY_PATH_STRUCTURAL_PRIMARY
+    executed_risk_distance = signal.price - signal.stop_price
+    assert executed_risk_distance == pytest.approx(10.0)  # 100 - 90, NOT the ATR risk (3)
+    reward_distance = signal.pivot_resistance - signal.price
+    assert signal.risk_reward_ratio == pytest.approx(reward_distance / executed_risk_distance)
+
+
+def test_rr_rejection_case_correct_geometry_fails_where_old_atr_geometry_would_have_passed(config):
+    """Task 35 §19 -- essential correctness-not-tuning proof: a candidate
+    whose OLD (ATR-only, pre-Task-35) geometry would have cleared
+    min_risk_reward_ratio(1.5), but whose CORRECTED (structural) geometry
+    does not, must actually be rejected end-to-end at evaluate_signals's
+    own output (via a fails-below-threshold risk_reward_ratio, which
+    consumer.py/backtest's LOW_RISK_REWARD gate then drops) -- proving
+    this implementation is not quietly preserving the old candidate/
+    signal count."""
+    price, atr = 100.0, 2.0
+    # OLD (pre-Task-35) geometry: risk = 1.5*2 = 3, reward = target(107)-100 = 7 -> R:R = 7/3 = 2.33 (PASSES 1.5)
+    old_atr_only_geometry = calculate_trade_geometry(
+        price=price, atr=atr, direction=SignalDirection.BULLISH,
+        pivot_resistance=107.0, pivot_support=101.0, config=config,  # support invalid at old-geometry time (unused)
+    )
+    assert old_atr_only_geometry.risk_reward_ratio == pytest.approx(7.0 / 3.0)
+    assert old_atr_only_geometry.risk_reward_ratio >= config.min_risk_reward_ratio
+
+    # CORRECTED (Task 35) geometry: same entry/target/ATR, but a valid
+    # structural support sits far below entry -- risk = 100-80 = 20,
+    # reward is still 7 -> R:R = 7/20 = 0.35 (FAILS 1.5).
+    corrected_geometry = calculate_trade_geometry(
+        price=price, atr=atr, direction=SignalDirection.BULLISH,
+        pivot_resistance=107.0, pivot_support=80.0, config=config,
+    )
+    assert corrected_geometry.geometry_path == GEOMETRY_PATH_STRUCTURAL_PRIMARY
+    assert corrected_geometry.risk_reward_ratio == pytest.approx(7.0 / 20.0)
+    assert corrected_geometry.risk_reward_ratio < config.min_risk_reward_ratio
+
+    # End-to-end: evaluate_signals must publish the LOWER, correct ratio
+    # on the signal object -- the actual gate rejection based on
+    # min_risk_reward_ratio happens downstream (consumer.py/backtest), but
+    # this is the exact number that gate reads.
+    snap = _snapshot(rsi=32.0, rsi_prev=28.0, volume_surge_ratio=3.0, atr=atr, bar_true_range=2.0, price=price)
+    pivots = _pivots(resistance=107.0, support=80.0)
+    signals = evaluate_signals("AAPL", snap, config, daily_pivots=pivots)
+    assert len(signals) == 1
+    assert signals[0].risk_reward_ratio == pytest.approx(7.0 / 20.0)
+    assert signals[0].risk_reward_ratio < config.min_risk_reward_ratio
 
 
 def test_stop_and_target_are_none_when_atr_missing(config):
