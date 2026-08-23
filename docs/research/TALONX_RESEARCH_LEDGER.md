@@ -5713,3 +5713,29 @@ behavior change occurred. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`; PR #
 **Scope/deployment**: no historical replay, independent validation, data download, capital, broker action,
 or production integration occurred. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`; PR #10 remains
 draft and unmerged.
+
+## Task 61 — FPRC_V1 Independent Validation #1 (2026-08-23)
+
+> **PREVIOUS**: Task 60 implemented and froze the isolated FPRC_V1 research/shadow candidate with
+> implementation fingerprint `be91c38047cf9aa9dbb6c8a948eaf52dd64ed4b16c7d8a70359388b58e5c2a64`.
+> Its independent validation had not started, no edge had been claimed, and deployment remained
+> `MONDAY_DECISION_SHADOW_ONLY`.
+>
+> **NEW EVIDENCE**: Using XNYS calendar version 4.13.2, Task 61 mechanically resolved the first 60 sessions
+> strictly after 2026-07-09 into N1 (2026-07-10 through 2026-08-06), N2 (2026-08-07 through 2026-09-03),
+> and N3 (2026-09-04 through 2026-10-02), with their immediately preceding ten-session causal warmups.
+> On the attempt date, 2026-08-23, N1 was complete, N2 had 11 of 20 completed evaluation sessions, and N3
+> had zero of 20; N3 also had only one of ten completed warmup sessions. Complete 35-symbol Alpaca coverage
+> therefore could not yet exist. The frozen fingerprint and Task 60 zero-drift/isolation/parity proofs still
+> passed, and 15 focused FPRC_V1/Task61 tests passed.
+>
+> **UPDATED CONCLUSION**: `VALIDATION_BLOCKED`.
+>
+> **REASON**: the preregistered temporal-completeness gate failed before provider access. The protocol
+> forbids partial coverage, replacement dates, or a reduced replay, so Task 61 stopped without an Alpaca
+> request, strategy replay, outcome unblinding, economic computation, or tuning. This is a calendar/data-
+> availability block and provides no evidence for either replication or rejection.
+
+**Scope/deployment**: the exact windows are frozen for a later resume. No market data was downloaded, no
+historical validation was run, and no production behavior or capital changed. Deployment remains
+`MONDAY_DECISION_SHADOW_ONLY`; PR #10 remains draft and unmerged.
