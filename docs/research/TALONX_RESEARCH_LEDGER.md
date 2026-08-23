@@ -5775,3 +5775,47 @@ historical validation was run, and no production behavior or capital changed. De
 **Scope/deployment**: no rule, threshold, symbol, provider, cost, exit, window, or post-outcome filter was
 changed; no variant replay, diagnosis, redesign, capital, or production action occurred. Task 61's blocked
 history remains intact. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`; PR #10 remains draft and unmerged.
+
+## Task 62 — Define, Implement, and Freeze One New Alpha Candidate (2026-08-23)
+
+> **PREVIOUS**: Tasks 53-58 showed that the mixed RSI/MACD/MA candidate was economically unsupported and
+> depended on unstable/concentrated payoff behavior. Task 59 required a new architecture. Task 61R then
+> independently rejected FPRC_V1: its broad 205-trade sample had near-zero gross expectancy and materially
+> negative 5bps economics. FPRC_V1 cannot be tuned, and deployment remained `MONDAY_DECISION_SHADOW_ONLY`.
+>
+> **NEW EVIDENCE**: Task 62 specified exactly one materially different candidate,
+> `OPENING_RANGE_PARTICIPATION_BREAKOUT_V1` (`ORPB_V1`). Its first-principles hypothesis is that the first
+> accepted upside break of the 30-minute opening price-discovery range, on participation strictly above the
+> opening six-bar median and immediate 1-minute persistence, represents information-driven demand capable of
+> continuation. RSI/MACD/MA, VWAP reclaim, ATR gates, and external telemetry do not affect eligibility.
+>
+> ORPB_V1 is implemented in a separate opt-in namespace with one shared research/shadow controller. The
+> contract freezes six completed opening 5-minute bars, first-break-only participation, exact next-bar
+> confirmation/fill, breakout-low-minus-one-tick stop, no target, next-open exit after a completed 5-minute
+> close back at/below the opening-range high, hard stop-first handling, 15:50 flatten, 0.20R estimated/actual-
+> fill feasibility, long-only safety controls, capacity three, and cost-first deterministic ranking. Twelve
+> focused tests passed for causality, first-attempt consumption, next-bar semantics, cost recheck, stop/exit
+> ordering, telemetry isolation, state isolation, capacity, lockout, and research/shadow parity.
+>
+> The full suite produced 1,879 passes, one skip, 15 expected xfails, and the same single untouched legacy
+> sample-fixture failure documented in Task 60. No existing strategy, indicator, consumer, config, backtest,
+> execution, or FPRC file differs from base `e64288e`; current-candidate zero drift passes.
+>
+> A future outcome-blind validation is frozen on the latest 60 XNYS sessions strictly before Task61R's
+> earliest context access: O1 2025-02-07 through 2025-03-07, O2 2025-03-10 through 2025-04-04, and O3
+> 2025-04-07 through 2025-05-05, each with ten-session state-only warmup. The entire package precedes every
+> Task37-61R evaluation and Task61R warmup/evaluation. A boundary-only Alpaca audit passed 35/35 without
+> persisting bars, instantiating the candidate, generating signals, computing returns, or starting validation.
+> The protocol requires positive gross and >=+0.10R 5bps expectancy, PF >=1.20, positive bootstrap lower
+> bound, window/symbol/top-winner robustness, <=0.20R fill feasibility, sufficient breadth, and correctness.
+> Any failure retires ORPB_V1 without tuning O1-O3.
+>
+> **UPDATED CONCLUSION**: `ORPB_V1_IMPLEMENTED_AND_FROZEN_FOR_VALIDATION`.
+>
+> **REASON**: ORPB_V1 supplies one explicit, non-indicator, non-VWAP-reclaim gross-alpha mechanism while
+> retaining TalonX's proven causal/execution/safety infrastructure. Implementation and freeze evidence support
+> an independent test, not an edge claim. No historical ORPB validation has started.
+
+**Scope/deployment**: no ORPB market replay, signal, trade, return, threshold search, variant, capital, broker
+action, or production integration occurred. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`; PR #10 remains
+draft and unmerged.

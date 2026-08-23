@@ -1,0 +1,27 @@
+{
+  "availability_audit": "PASS",
+  "candidate_name": "OPENING_RANGE_PARTICIPATION_BREAKOUT_V1",
+  "candidate_short_name": "ORPB_V1",
+  "current_candidate_zero_drift": true,
+  "deployment": "MONDAY_DECISION_SHADOW_ONLY",
+  "economic_hypothesis": "The first accepted upside break of the 30-minute opening price-discovery range, on above-opening-median participation and immediate persistence, carries information-driven continuation edge.",
+  "frozen_fingerprint": "b1e283bd36eb0cb2ecc5303b104ec2bd8defc60f6eacef4879e7711d560d113f",
+  "implementation": "PASS",
+  "isolation": true,
+  "task": 62,
+  "tests": {
+    "focused": {
+      "failed": 0,
+      "passed": 12
+    },
+    "full_suite": {
+      "baseline_exception": "tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset; same untouched LOW_CONFLUENCE sample-fixture failure documented in Task60",
+      "failed": 1,
+      "passed": 1879,
+      "skipped": 1,
+      "xfailed": 15
+    }
+  },
+  "validation_protocol_frozen": true,
+  "validation_started": false
+}
