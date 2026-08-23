@@ -1,0 +1,63 @@
+{
+  "blocker": {
+    "classification": "VALIDATION_BLOCKED",
+    "failed_global_gates": [
+      "all_windows_coverage_quality_readiness"
+    ],
+    "opening_range_failures": [
+      {
+        "sessions": [
+          "2025-02-10",
+          "2025-02-11"
+        ],
+        "symbol": "BKNG",
+        "window": "O1"
+      },
+      {
+        "sessions": [
+          "2025-02-07"
+        ],
+        "symbol": "KLAC",
+        "window": "O1"
+      },
+      {
+        "sessions": [
+          "2025-03-26"
+        ],
+        "symbol": "BKNG",
+        "window": "O2"
+      },
+      {
+        "sessions": [
+          "2025-04-25",
+          "2025-04-30"
+        ],
+        "symbol": "BKNG",
+        "window": "O3"
+      }
+    ],
+    "outcomes_unblinded": false,
+    "reason": "Alpaca data cannot form exactly six completed opening 5-minute bars for every frozen symbol and evaluation session",
+    "replay_started": false
+  },
+  "bootstrap_95_ci": null,
+  "classification": "VALIDATION_BLOCKED",
+  "cost_feasibility_pass": null,
+  "deployment": "MONDAY_DECISION_SHADOW_ONLY",
+  "five_bps_expectancy_R": null,
+  "five_bps_profit_factor": null,
+  "gross_expectancy_R": null,
+  "mandatory_criteria": "FAIL",
+  "replay_started": false,
+  "replication_required": false,
+  "symbols_traded": null,
+  "task": 63,
+  "top3_sensitivity_5bps_expectancy_R": null,
+  "trades": null,
+  "trades_by_window": {
+    "O1": null,
+    "O2": null,
+    "O3": null
+  },
+  "window_5bps_expectancy": null
+}

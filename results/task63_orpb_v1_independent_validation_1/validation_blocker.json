@@ -1,0 +1,41 @@
+{
+  "classification": "VALIDATION_BLOCKED",
+  "failed_global_gates": [
+    "all_windows_coverage_quality_readiness"
+  ],
+  "opening_range_failures": [
+    {
+      "sessions": [
+        "2025-02-10",
+        "2025-02-11"
+      ],
+      "symbol": "BKNG",
+      "window": "O1"
+    },
+    {
+      "sessions": [
+        "2025-02-07"
+      ],
+      "symbol": "KLAC",
+      "window": "O1"
+    },
+    {
+      "sessions": [
+        "2025-03-26"
+      ],
+      "symbol": "BKNG",
+      "window": "O2"
+    },
+    {
+      "sessions": [
+        "2025-04-25",
+        "2025-04-30"
+      ],
+      "symbol": "BKNG",
+      "window": "O3"
+    }
+  ],
+  "outcomes_unblinded": false,
+  "reason": "Alpaca data cannot form exactly six completed opening 5-minute bars for every frozen symbol and evaluation session",
+  "replay_started": false
+}

@@ -5819,3 +5819,30 @@ history remains intact. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`; PR #10
 **Scope/deployment**: no ORPB market replay, signal, trade, return, threshold search, variant, capital, broker
 action, or production integration occurred. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`; PR #10 remains
 draft and unmerged.
+
+## Task 63 — ORPB_V1 Independent Validation #1 (2026-08-23)
+
+> **PREVIOUS**: Task 62 implemented and froze `OPENING_RANGE_PARTICIPATION_BREAKOUT_V1` (`ORPB_V1`) at
+> fingerprint `b1e283bd36eb0cb2ecc5303b104ec2bd8defc60f6eacef4879e7711d560d113f`. Its outcome-blind O1-O3
+> protocol required complete Alpaca coverage for all 35 symbols and exactly six completed opening 5-minute
+> bars on every evaluation session before any signal generation.
+>
+> **NEW EVIDENCE**: Alpaca returned and persisted `FULL` date-range packages for all 35 frozen symbols from
+> 2025-01-24 through 2025-05-05 (1,307,932 raw bars). Fingerprint/source hashes, current-candidate/FPRC/ORPB
+> zero drift, Alpaca-only provider identity, critical-corruption checks, causal warmup state isolation, and
+> all 12 focused correctness/causality/parity proofs passed. Session coverage was 35/35 in O1, O2, and O3.
+>
+> The mandatory opening-range readiness gate did not pass. BKNG lacked at least one entire required opening
+> 5-minute bucket on 2025-02-10, 2025-02-11, 2025-03-26, 2025-04-25, and 2025-04-30; KLAC lacked one on
+> 2025-02-07. Completeness therefore measured 33/35 symbols in O1 and 34/35 in O2 and O3. The gate failure
+> reproduced on a second deterministic audit of the persisted package.
+>
+> **UPDATED CONCLUSION**: `VALIDATION_BLOCKED`.
+>
+> **REASON**: the frozen protocol prohibits partial coverage, symbol removal, replacement data, or replay
+> when any symbol/session cannot form exactly six completed opening-range bars. Task 63 stopped before ORPB
+> signal generation, outcome unblinding, trade construction, return computation, or economic classification.
+
+**Scope/deployment**: no replay, tuning, variant, extra window, post-outcome filter, capital, or production
+action occurred. ORPB_V1 remains economically unclassified. Deployment remains
+`MONDAY_DECISION_SHADOW_ONLY`; PR #10 remains draft and unmerged.
