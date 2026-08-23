@@ -527,6 +527,38 @@ silently drift out of sync with reality.
 
 ---
 
+## Causal pre-roll/warmup (Task 53)
+
+`BacktestEngine.run(df, warmup_df=None)` — an optional second frame, causally strictly earlier
+than `df` (evaluation), that reconstructs 1m/15m/60m market-state buffers
+(`RollingBarBuffer`/`HtfBarAggregator`) BEFORE the first evaluation bar, via the same buffer/
+aggregator objects and update path evaluation itself uses (`_feed_market_state`).
+
+**Evaluation-window vs. warmup-history — an important distinction, not interchangeable.**
+`df` is the sample being measured: every trade, rejection, and frequency/economics statistic comes
+from it, and only it. `warmup_df` exists ONLY to make indicator/HTF/regime state honestly ready at
+the first evaluation bar — it is fed through a state-only path (`_warmup_symbol_bar`) that never
+generates a candidate, rejection, signal, trade, or cooldown/loss-lockout event, and is counted in
+a wholly separate `warmup_bars_processed` metric, never mixed into `bars_processed` or any
+trade/economics figure. **No economic conclusion should ever be drawn from warmup data** — it
+produces no trades by construction.
+
+**Why an isolated short evaluation window is invalid for 200-period 15-minute SMA readiness**: the
+trend gate needs `htf_sma_period=200` completed 15-minute regular-session bars —
+`200 × 15min ÷ (6.5h/day × 60min/h) ≈ 7.7 trading days`. A backtest run over a window narrower than
+that, with no preceding warmup, can NEVER produce a valid trend reading for any symbol — the HTF
+buffer simply hasn't accumulated enough bars yet, regardless of strategy quality. This was
+discovered in Task 52 (a 5-trading-day evaluation window produced 0/618 valid bullish trend
+readings) and confirmed as the true cause once resolved: Task 53's 10-trading-day warmup, added to
+the SAME 5-day evaluation windows, brought that to 466/702 valid readings and enabled the first
+executed trades that population had ever produced. See `results/task52_historical_ab_freeze/` and
+`results/task53_preroll_ab_validation/` for the full before/after evidence.
+
+`run(df)` with no `warmup_df` (the default) remains byte-for-byte the pre-Task-53 behavior — see
+`tests/test_backtest_preroll.py`.
+
+---
+
 ## What this backtester does NOT do
 
 - **Portfolio-level simulation**: no starting capital, position sizing,

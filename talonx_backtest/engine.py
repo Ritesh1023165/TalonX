@@ -194,6 +194,12 @@ class BacktestResult:
     end: pd.Timestamp | None
     symbols: list[str]
     bars_processed: int = 0
+    # Task 53: count of PRE-ROLL/WARMUP rows fed through _warmup_symbol_bar
+    # (market-state buffers only -- see that method's own docstring). Zero
+    # unless run() was called with warmup_df. Reported separately so a
+    # caller can never mistake it for an evaluation bar -- bars_processed
+    # above is unaffected by warmup, by construction.
+    warmup_bars_processed: int = 0
     # Research telemetry (Task 10) -- always empty unless BacktestEngine
     # was constructed with research_telemetry=True; see that flag's own
     # docstring. Purely observational, never consulted by any gate/
@@ -282,6 +288,12 @@ class BacktestEngine:
         self.signals_generated = 0
         self.signals_published = 0
         self.bars_processed = 0
+        # Task 53: causal pre-roll/warmup bar count -- tracked SEPARATELY
+        # from bars_processed (evaluation-only). See _warmup_symbol_bar's
+        # own docstring: warmup rows update market-state buffers ONLY, so
+        # they must never be counted toward evaluation metrics
+        # (bars_processed/trades-per-week denominators/P&L accounting).
+        self.warmup_bars_processed = 0
         # Task 35 fallback accounting -- counts the geometry_path actually
         # used at OPEN time (after fill-time reconciliation, the final,
         # definitive selection -- see _process_symbol_bar's pending-entry
@@ -302,12 +314,37 @@ class BacktestEngine:
         df: pd.DataFrame,
         progress_callback: Callable[[int, int], None] | None = None,
         progress_interval_seconds: float = 2.0,
+        warmup_df: pd.DataFrame | None = None,
     ) -> BacktestResult:
         """`df`: normalized columns [timestamp, symbol, open, high, low,
         close, volume], tz-aware UTC (see talonx_backtest.data). Must
         already be sorted/deduped -- this engine does not repair data
         (see data.sort_and_dedupe); pass through check_dataset_quality
         first.
+
+        `warmup_df` (Task 53, optional, same column contract as `df`):
+        PRE-ROLL/WARMUP data, causally strictly earlier than `df` --
+        reconstructs 1m/15m/60m market-state buffers (RollingBarBuffer/
+        HtfBarAggregator, the SAME objects/functions evaluation uses) so
+        indicators/HTF-SMA/regime state can be genuinely ready at the
+        FIRST evaluation bar, instead of every isolated evaluation window
+        starting cold. Fed through _warmup_symbol_bar -- state-only: never
+        generates candidates, rejections, signals, trades, cooldown,
+        loss-lockout, or throttle activity, and never counts toward
+        bars_processed/evaluation metrics (see warmup_bars_processed on
+        the returned BacktestResult instead). `run(df)` with no
+        `warmup_df` (the default) is byte-for-byte the pre-Task-53
+        behavior -- see tests/test_backtest_preroll.py's own backward-
+        compatibility proof.
+
+        Causality is enforced, not assumed: raises ValueError if any
+        warmup_df row's timestamp is >= any df row's timestamp (no future
+        bars, no evaluation-window leakage) -- see step 6's own boundary
+        contract. No trade/pending-entry/pending-exit/cooldown/loss-
+        lockout state can carry from warmup into evaluation, because
+        _warmup_symbol_bar never touches any of those structures --
+        warmup is indicator-state initialization only, never a shadow
+        replay of the strategy itself.
 
         `progress_callback`, if given, is called as `callback(bars_done,
         bars_total)` -- throttled to at most once every
@@ -319,12 +356,29 @@ class BacktestEngine:
         called at least once at completion (bars_done == bars_total),
         even for a run so fast the interval never elapses. A None
         callback (the default) costs nothing extra -- no timing calls,
-        no branches taken in the hot per-bar loop beyond the None check."""
+        no branches taken in the hot per-bar loop beyond the None check.
+        `bars_total`/progress reporting cover EVALUATION bars only --
+        warmup is not part of that count."""
+        if warmup_df is not None and not warmup_df.empty and not df.empty:
+            max_warmup_ts = warmup_df["timestamp"].max()
+            min_eval_ts = df["timestamp"].min()
+            if max_warmup_ts >= min_eval_ts:
+                raise ValueError(
+                    f"warmup_df must be strictly earlier than df (no future bars, no evaluation-"
+                    f"window leakage): max warmup timestamp {max_warmup_ts} >= "
+                    f"min evaluation timestamp {min_eval_ts}"
+                )
+
         if df.empty:
             return BacktestResult(
                 trades=[], rejections=[], signals_generated=0, signals_published=0,
                 config=self.config, start=None, end=None, symbols=[],
             )
+
+        if warmup_df is not None and not warmup_df.empty:
+            warmup_ordered = warmup_df.sort_values(["timestamp", "symbol"], kind="mergesort")
+            for _, row in warmup_ordered.iterrows():
+                self._warmup_symbol_bar(row["symbol"], row["timestamp"], row)
 
         ordered = df.sort_values(["timestamp", "symbol"], kind="mergesort")
         symbols = sorted(ordered["symbol"].unique().tolist())
@@ -361,6 +415,7 @@ class BacktestEngine:
             end=ordered["timestamp"].iloc[-1],
             symbols=symbols,
             bars_processed=self.bars_processed,
+            warmup_bars_processed=self.warmup_bars_processed,
             volatility_telemetry=self.volatility_telemetry,
             candidate_telemetry=self.candidate_telemetry,
         )
@@ -368,6 +423,63 @@ class BacktestEngine:
     # ------------------------------------------------------------------
     # Per-bar processing
     # ------------------------------------------------------------------
+
+    def _feed_market_state(self, symbol: str, timestamp: pd.Timestamp, row) -> None:
+        """Task 53: the ONE place a closed historical bar is fed into the
+        SAME buffers live uses (RollingBarBuffer/HtfBarAggregator, 1m/15m/
+        60m) -- factored out of _process_symbol_bar so the exact same code
+        path can be reused, unchanged, by both normal evaluation
+        (_process_symbol_bar) and state-only warmup (_warmup_symbol_bar).
+        Pure market-state update: no candidate generation, no gates, no
+        trade lifecycle, no cooldown/loss-lockout, no bars_processed
+        increment (callers own that decision -- evaluation counts it,
+        warmup counts it separately, see warmup_bars_processed)."""
+        symbol = symbol.upper()
+        self.buffer.add_bar(
+            symbol=symbol, timestamp=timestamp, open_=float(row["open"]), high=float(row["high"]),
+            low=float(row["low"]), close=float(row["close"]), volume=float(row["volume"]),
+            session=get_session(timestamp),
+        )
+        finalized = self.htf_aggregator.update(
+            symbol=symbol, timestamp=timestamp, open_=float(row["open"]), high=float(row["high"]),
+            low=float(row["low"]), close=float(row["close"]), volume=float(row["volume"]),
+        )
+        if finalized is not None:
+            self.buffer_htf.add_bar(
+                symbol=symbol, timestamp=finalized["timestamp"], open_=finalized["open"],
+                high=finalized["high"], low=finalized["low"], close=finalized["close"],
+                volume=finalized["volume"],
+            )
+        # Task 40: 60-minute regime leg -- identical pattern to the 15m
+        # block immediately above, just a second HtfBarAggregator/
+        # RollingBarBuffer pair at a different interval. No new bucketing
+        # logic.
+        finalized_60m = self.aggregator_60m.update(
+            symbol=symbol, timestamp=timestamp, open_=float(row["open"]), high=float(row["high"]),
+            low=float(row["low"]), close=float(row["close"]), volume=float(row["volume"]),
+        )
+        if finalized_60m is not None:
+            self.buffer_60m.add_bar(
+                symbol=symbol, timestamp=finalized_60m["timestamp"], open_=finalized_60m["open"],
+                high=finalized_60m["high"], low=finalized_60m["low"], close=finalized_60m["close"],
+                volume=finalized_60m["volume"],
+            )
+        self._last_close[symbol] = float(row["close"])
+        self._last_timestamp[symbol] = timestamp
+
+    def _warmup_symbol_bar(self, symbol: str, timestamp: pd.Timestamp, row) -> None:
+        """Task 53: state-only pre-roll. Updates 1m/15m/60m market-state
+        buffers (via _feed_market_state, byte-identical to what evaluation
+        does) and NOTHING else -- explicitly does NOT: generate candidates,
+        record rejections, publish signals, open/close trades, arm
+        cooldown/loss-lockout, enter the throttle queue, or increment
+        bars_processed (see warmup_bars_processed instead). No pending
+        entry/exit, no open position, and no cooldown/loss-lockout can
+        exist after warmup -- none of those dicts are ever touched here,
+        so there is nothing to carry across the warmup/evaluation
+        boundary by construction, not by a separate reset step."""
+        self._feed_market_state(symbol, timestamp, row)
+        self.warmup_bars_processed += 1
 
     def _process_symbol_bar(self, symbol: str, timestamp: pd.Timestamp, row, candidates: list[QuantSignal]) -> None:
         symbol = symbol.upper()
@@ -435,37 +547,7 @@ class BacktestEngine:
                 self._maybe_arm_loss_lockout(symbol, trade, timestamp)
 
         # --- Feed the closed historical bar into the SAME buffers live uses.
-        self.buffer.add_bar(
-            symbol=symbol, timestamp=timestamp, open_=float(row["open"]), high=float(row["high"]),
-            low=float(row["low"]), close=float(row["close"]), volume=float(row["volume"]),
-            session=get_session(timestamp),
-        )
-        finalized = self.htf_aggregator.update(
-            symbol=symbol, timestamp=timestamp, open_=float(row["open"]), high=float(row["high"]),
-            low=float(row["low"]), close=float(row["close"]), volume=float(row["volume"]),
-        )
-        if finalized is not None:
-            self.buffer_htf.add_bar(
-                symbol=symbol, timestamp=finalized["timestamp"], open_=finalized["open"],
-                high=finalized["high"], low=finalized["low"], close=finalized["close"],
-                volume=finalized["volume"],
-            )
-        # Task 40: 60-minute regime leg -- identical pattern to the 15m
-        # block immediately above, just a second HtfBarAggregator/
-        # RollingBarBuffer pair at a different interval. No new bucketing
-        # logic.
-        finalized_60m = self.aggregator_60m.update(
-            symbol=symbol, timestamp=timestamp, open_=float(row["open"]), high=float(row["high"]),
-            low=float(row["low"]), close=float(row["close"]), volume=float(row["volume"]),
-        )
-        if finalized_60m is not None:
-            self.buffer_60m.add_bar(
-                symbol=symbol, timestamp=finalized_60m["timestamp"], open_=finalized_60m["open"],
-                high=finalized_60m["high"], low=finalized_60m["low"], close=finalized_60m["close"],
-                volume=finalized_60m["volume"],
-            )
-        self._last_close[symbol] = float(row["close"])
-        self._last_timestamp[symbol] = timestamp
+        self._feed_market_state(symbol, timestamp, row)
 
         qc = self.config.quant_config
         df_1m = self.buffer.get_dataframe(symbol)

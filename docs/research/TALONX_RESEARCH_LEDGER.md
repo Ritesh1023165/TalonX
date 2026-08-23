@@ -5191,3 +5191,106 @@ same A/B comparison.
 telemetry-field change (`talonx_backtest/engine.py`'s `candidate_telemetry` dict), and all
 `results/task52_historical_ab_freeze/` artifacts — **not committed, not pushed**, per instruction. PR #10
 remains draft.
+
+## Task 53 — Causal Backtest Pre-Roll Warmup + Task 52 A/B Revalidation + Monday Candidate Decision (2026-08-23)
+
+**Objective**: add a causal pre-roll/warmup mechanism to `BacktestEngine`, prove continuous-history vs.
+pre-roll+evaluation parity, re-run Task 52's exact A/B windows with real HTF/regime warmup, and reach the
+actual Monday candidate GO/NO-GO decision Task 52's window-width limitation had blocked.
+
+**Task 52 checkpoint**: committed and pushed as `7c2e4a3` before Task 53 began. PR #10 confirmed draft/open.
+
+> **PREVIOUS** (Task 52): `VALIDATION_BLOCKED` — a 5-trading-day evaluation window, with no preceding
+> warmup, structurally could never accumulate the 200 completed 15-minute bars the trend gate needs
+> (max ~130 available). All 618 bullish confluence-eligible candidates had zero valid trend readings. Not
+> a confluence-contract defect — a validation-methodology limitation.
+>
+> **NEW EVIDENCE** (Task 53): implemented `BacktestEngine.run(df, warmup_df=...)` — a causal pre-roll that
+> reconstructs 1m/15m/60m market-state buffers from 10 preceding trading days, state-only (no candidates/
+> rejections/trades/cooldown during warmup), proven to reconstruct EXACTLY the same state a continuous run
+> would produce (buffer/indicator/HTF-SMA/pivot/regime equality, not approximate). Pre-run readiness gate:
+> 35/35 symbols HTF/regime/1m-ready in all 3 windows before the expensive replay was launched. Re-ran
+> Task 52's EXACT windows/symbols/contracts, only adding preceding causal warmup rows.
+>
+> **UPDATED CONCLUSION**: `HTF_DATA_UNAVAILABLE` fell from 188 (Task 52) to **0** (Task 53);
+> `TREND_GATE` went from never-reached (0) to a real, active, discriminating gate (143 rejections,
+> 206/466 valid regular-session bullish readings passing). **The candidate now executes 34 real long
+> trades** (baseline: still 0) — Task 52's diagnosis is fully confirmed correct, and the underlying question
+> ("can the corrected confirmation contract produce executable opportunities at all?") is now answered:
+> **yes**. However, economics on this n=34 sample are NOT clean: 0bps expectancy +0.012R (noise-level), 5bps
+> expectancy −0.33R (clearly negative at realistic cost), 91% of positive R from the top 3 trades, only 1 of
+> 3 windows net positive and that window's result rests on one outlier trade. Final decision:
+> `CANDIDATE_FREQUENCY_RECOVERED_ECONOMICS_UNCLEAR` — not a clean GO, not a rejection either.
+>
+> **REASON**: the Task 52 conclusion (`VALIDATION_BLOCKED`) remains permanently correct as a description of
+> THAT run's limitation — it is not overwritten, only superseded by Task 53's methodology fix and its own,
+> separate economic finding on the corrected population.
+
+**Pre-roll implementation**: `_feed_market_state` (factored out of pre-existing buffer-feeding code, logic
+unchanged) + `_warmup_symbol_bar` (state-only, separate `warmup_bars_processed` counter) + causality
+enforcement (`ValueError` if warmup isn't strictly earlier than evaluation). Warmup requirement derived from
+actual dependencies (200 completed 15m bars ⇒ ~7.7 trading days floor; chose 10 trading days for boundary
+margin, fixed before any coverage was inspected). Backward compatible: `run(df)` with no `warmup_df` is
+byte-for-byte unchanged (full regression suite passing with zero test updates needed beyond the new file).
+
+**Continuous vs. split parity — the central proof**: EXACT equality (not approximate) across 1m buffer,
+`IndicatorSnapshot`, 15m HTF buffer, `htf_sma_200`, daily pivots, 60m buffer, `VolatilityRegimeSnapshot`,
+`evaluate_regime` result, between a continuous run and a warmup+evaluation split run at the same cutoff.
+Zero evaluation contamination (bars_processed excludes warmup exactly; zero signals/rejections/trades before
+the evaluation boundary; no cooldown/loss-lockout/pending state carries across).
+
+**Pre-run readiness gate**: 10 preceding trading days of raw market data (75/75 fresh Alpaca downloads for
+25 non-original symbols, sliced from existing full-year local data for the other 10) — 35/35 symbols reached
+HTF-SMA/60m-regime/1m-indicator readiness in all 3 windows. Gate passed; the ~2.5-hour A/B replay was
+launched only after this confirmation.
+
+**A/B headline**: baseline 1,418 raw/1 published/**0 trades**. Candidate 10,141 raw/302 published/**34
+trades** (≈11.3 trades/week, 12/15 entry days, 16/35 symbols). Runtime 147.4 min total (68.4 baseline + 79.0
+candidate), within the 2-3h target including warmup overhead (warmup itself is cheap — state-only, no
+`compute_indicators` call).
+
+**Task 52 diagnosis confirmed**: bullish confluence-eligible 618→702 (comparable); valid trend readings
+0→466; `HTF_DATA_UNAVAILABLE` 188→0; `TREND_GATE` 0→143 (now a genuinely functioning gate).
+
+**New dominant bottleneck**: `LOW_CONFLUENCE` (`CONFIRMATION`) — 6,315 rejections, unchanged in kind from
+every prior task, over 10x the next-largest gate. Not tuned in response.
+
+**Economics/cost sensitivity**: 0bps expectancy +0.012R/trade (PF 1.02, noise-level); 5bps expectancy
+−0.33R/trade (PF 0.66, clearly negative); 10bps expectancy −0.68R/trade (PF 0.47). RSI-family trades net
+positive (+6.21R); MACD-family trades net negative (−5.78R); MA family 0 trades (too small a raw population,
+unchanged). Symbol concentration: top-1 trade-count share 14.7%, but top-1 POSITIVE-R share 57.1%, top-3
+91.1%. Window robustness: X_early −9.74R, Y_middle −0.07R, Z_late +10.23R (dominated by one +13.44R ADI
+trade — remove it and all 3 windows are flat-to-negative).
+
+**Correctness**: GREEN. All 34 trades BULLISH-only (LONG_ONLY preserved), valid structural/ATR-fallback
+geometry, no R:R below threshold. 9 new pre-roll tests + 197-test focused regression + full suite (1845
+passed, 1 pre-existing unrelated failure reconfirmed, 1 skipped, 15 xfailed) all green.
+
+**Live/backtest warmup parity**: live already has 3 causal preseed mechanisms (1m/15m/60m); backtest
+pre-roll now uses the same buffer/aggregator architecture. One honest gap: live's default 15m preseed
+lookback (~1 month) is roughly double Task 53's 10-trading-day choice — both clear the mathematical
+readiness floor (35/35 empirically confirmed), so this is a safety-margin difference, not a readiness
+failure. No correction made.
+
+**Candidate GO/NO-GO rationale**: 2 of 8 Monday GO criteria explicitly fail (5bps economics turn negative;
+extreme concentration/window dependence). Not a clean GO. Not a rejection either — n=34 is too small to
+confidently declare the strategy good or bad, and 0bps is genuinely positive.
+
+**Final decision**: `CANDIDATE_FREQUENCY_RECOVERED_ECONOMICS_UNCLEAR`.
+
+**A/B state-isolation plumbing / Monday freeze**: NOT implemented, NOT performed — correctly gated on a
+clean GO, which was not reached. Precisely scoped for a future task if the economics gate later clears
+(one `state_namespace` field + 4 Redis-key call sites in `consumer.py`).
+
+**No tuning**: confirmed — no confluence/volatility/trend-threshold/R:R/stop-target change; warmup window
+width and evaluation windows/symbols fixed before any outcome was viewed. Task 22 not inspected. No capital
+used.
+
+**Next recommended action (not started)**: owner decision — either (a) accept decision-shadow risk despite
+unclear economics and implement the scoped `state_namespace` plumbing, or (b) gather a larger validation
+sample before deciding, still with zero tuning.
+
+**State**: Task 52 checkpoint committed and pushed (`7c2e4a3`). This Task 53 ledger entry, the pre-roll
+implementation (`talonx_backtest/engine.py`), new test file (`tests/test_backtest_preroll.py`), doc updates
+(`docs/backtesting.md`), and all `results/task53_preroll_ab_validation/` artifacts — **not committed, not
+pushed**, per instruction. PR #10 remains draft.
