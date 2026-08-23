@@ -1,0 +1,14 @@
+{
+  "window": "H3_late",
+  "elapsed_minutes": 209.79550453821818,
+  "warmup_bars": 222569,
+  "evaluation_bars": 441263,
+  "signals_generated": 14964,
+  "signals_published": 414,
+  "trades": 42,
+  "fingerprints": {
+    "strategy": "2ae6216bca70",
+    "quant": "fdf4922d0728",
+    "backtest": "0c7dd13d75c4"
+  }
+}

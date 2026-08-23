@@ -1,49 +1,28 @@
-# Task 56 — Independent Family Holdout Validation
+# Task 56 — Independent Family Holdout Validation (resumed)
 
-**Classification:** `VALIDATION_BLOCKED`
+**Classification:** `FAMILY_EFFECT_WEAKENED`
 
-**Deployment:** `MONDAY_DECISION_SHADOW_ONLY`
+This completed run resumed the exact protocol frozen at `8de8d49` after the earlier infrastructure-only `VALIDATION_BLOCKED` attempt. The earlier blocker remains historical evidence and is not interpreted as a strategy result.
 
-## PREVIOUS
+## Family results
 
-Task 55 classified the repeated RSI-positive/MACD-negative direction as `FAMILY_EFFECT_TENTATIVE`. It
-survived multiple retrospective composition controls but remained non-causal, winner-tail sensitive, and
-insufficient to authorize any family enable/disable or production action. Task 56's protocol was frozen at
-commit `8de8d49` to test that direction on three independent 20-trading-day evaluation windows.
+| Family | Trades | W/L | Gross total R | Gross expectancy | Gross PF | 5bps total R | 5bps expectancy | 5bps PF |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| RSI | 44 | 15/28 | 0.723 | 0.016 | 1.033 | -10.544 | -0.240 | 0.650 |
+| MACD | 61 | 19/42 | -1.258 | -0.021 | 0.966 | -26.058 | -0.427 | 0.542 |
 
-## NEW EVIDENCE
+## Comparative replication vs absolute edge
 
-The frozen Task 56 candidate fingerprints reproduced at the protocol checkpoint:
+RSI exceeded MACD in 2/3 windows gross and 2/3 windows at 5bps. Common-symbol support: False. RSI top-three-winner removal comparative survival: False.
 
-- strategy `2ae6216bca70`
-- quant config `fdf4922d0728`
-- backtest config `0c7dd13d75c4`
+Absolute edge: RSI gross positive=True, RSI 5bps positive=False; MACD gross negative=True, MACD 5bps negative=True. Comparative replication does not make RSI production-ready.
 
-The first declared Alpaca download was attempted for exactly the 25 additional symbols and H1 package
-(2025-12-11 through 2026-01-26). Every request was forced through an unreachable sandbox proxy at
-`127.0.0.1:9`. The execution policy rejected the required network-elevated rerun. The failed attempt wrote
-zero symbol files and no download summary.
+## Interpretability and deployment
 
-Local inventory reconfirmed that the original 10 symbols have full-year data and that existing local slices
-can causally initialize all 35 symbols for each frozen warmup. Those facts do not satisfy the mandatory gate:
-the additional 25 symbols still lack complete independent evaluation packages.
+Interpretability floor: PASS. MA trades: 0. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`; no capital or family enable/disable action is authorized.
 
-Per the frozen protocol, no reduced universe, substituted provider, replacement dates, or partial replay was
-allowed. Data quality and complete-package readiness could not be evaluated, so the expensive candidate-only
-replay was not started. All prespecified family diagnostics are explicitly `NOT_RUN_VALIDATION_BLOCKED`; no
-zero-trade or economic value is fabricated.
+## Correctness
 
-## UPDATED CONCLUSION
-
-`VALIDATION_BLOCKED`
-
-## REASON
-
-The mandatory 35-symbol dataset-coverage gate failed because the declared Alpaca packages could not be
-downloaded in this execution environment. Without complete frozen holdout data, the Task 55 family direction
-cannot be independently tested. This is an infrastructure/data-access block, not evidence for or against RSI
-or MACD economics.
-
-Deployment remains `MONDAY_DECISION_SHADOW_ONLY`. No capital, tuning, family action, or strategy/config
-change occurred.
-
+Replay integrity checks found zero duplicate trade IDs, non-bullish trades, timestamp-order violations,
+invalid stop/target geometry, or sub-1.5 screening R:R trades. The focused execution/data/reproducibility
+regression suite passed 71/71 tests.
