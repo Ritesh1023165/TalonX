@@ -5377,3 +5377,64 @@ particularly on the persistent RSI-positive/MACD-negative family split (confirme
 **State**: Task 53 checkpoint committed and pushed (`a1d0097`). This Task 54 ledger entry and all
 `results/task54_extended_candidate_validation/` artifacts — **not committed, not pushed**, per instruction.
 PR #10 remains draft.
+
+## Task 55 — RSI vs MACD Family Economics Diagnostic (2026-08-23)
+
+**Objective**: determine whether the RSI-positive/MACD-negative family split observed in Tasks 53 and 54
+survives fixed composition controls, without changing the strategy or treating a retrospective diagnostic
+as causal evidence.
+
+> **PREVIOUS** (Task 54): economic classification `EDGE_WEAK_AND_COST_SENSITIVE`; deployment decision
+> `MONDAY_DECISION_SHADOW_ONLY`. Task 54 observed an RSI-positive/MACD-negative family split, but authorized
+> no family enable/disable action.
+>
+> **NEW EVIDENCE** (Task 55): a read-only diagnostic over the committed Task 53 and Task 54 trades, with no
+> new backtest, download, tuning, or strategy change. The combined sample contains 123 trades: 56 RSI and
+> 67 MACD. RSI produced +34.779R gross, +0.621R/trade gross expectancy, PF 1.94, and +15.846R at 5bps.
+> MACD produced −13.268R gross, −0.198R/trade gross expectancy, PF 0.69, and −53.145R at 5bps. RSI exceeded
+> MACD in 4/6 windows gross and 5/6 windows at 5bps.
+>
+> **UPDATED CONCLUSION**: `FAMILY_EFFECT_TENTATIVE`.
+>
+> **REASON**: the repeated family direction survives multiple prespecified composition controls, but does
+> not establish causality or a robust production-grade RSI edge. RSI remains winner-tail sensitive and
+> strict matched evidence is too thin.
+
+**Composition controls**: the 17-symbol common-support subset retains 53/56 RSI trades (94.6%) and 62/67
+MACD trades (92.5%) and preserves the split: RSI +37.779R gross and +19.739R at 5bps versus MACD −12.110R
+gross and −51.353R at 5bps. The dominant mid-session bucket also preserves the split: RSI +37.845R gross
+and +21.467R at 5bps versus MACD −19.562R gross and −54.575R at 5bps. Stop rate does not explain RSI's
+advantage (RSI 37/56, 66.1%; MACD 42/67, 62.7%), and holding duration alone does not explain it: both
+families lose in the ≤15-minute and 15–60-minute buckets and gain in the >60-minute bucket, while RSI's
+advantage is concentrated in larger surviving/non-stop winners.
+
+**Outlier and loss-tail sensitivity**: removing RSI's top 3 gross winners leaves only +3.070R gross and
+turns the 5bps total negative (−13.738R); removing its top 5 turns gross negative (−8.866R). MACD remains
+gross negative after removing its worst 1, 3, or 5 losers (−12.268R, −10.268R, and −8.268R respectively),
+so its weakness is not driven by a small extreme gross-loss tail.
+
+**Cost geometry**: MACD bears a higher mean cost in R at 5bps (0.595R/trade versus RSI 0.338R/trade),
+consistent with tighter stop-risk geometry (median stop risk 0.331% of entry versus RSI 0.431%). This
+amplifies MACD's net weakness but does not create it: MACD is already negative gross.
+
+**Matched evidence**: unweighted common strata are mixed (RSI mean exceeds MACD in 9/20 eligible strata),
+while trade-weighted common-support economics materially favor RSI (RSI 24 trades, +25.671R gross and
++18.184R at 5bps; MACD 36 trades, −11.377R gross and −38.299R at 5bps). Loose nearest-time matching also
+favors RSI, but its temporal gaps are too large for a causal claim. Strict same-day matching yields only
+3 pairs and is classified `MATCHED_SAMPLE_TOO_THIN`.
+
+**Final decision**: `FAMILY_EFFECT_TENTATIVE`. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`. No family
+enable/disable action or production behavior change is authorized.
+
+**Limitations**: retrospective reuse of Task 53/54 outcomes; only 123 trades; RSI upper-tail dependence;
+cross-trade dependence is not modeled by the descriptive trade-level bootstrap; strict temporal matching
+is underpowered. The result supports an independent, outcome-blind holdout replication, not strategy
+promotion.
+
+**Evidence**: `results/task55_family_economics_diagnostic/` — `task55_summary.md`, `task55_summary.json`,
+`task55_conclusion.md`, `family_economics.csv`, `common_symbol_economics.csv`,
+`family_outlier_sensitivity.csv`, `matched_strata.csv`, `matched_common_support_economics.csv`, and the
+supporting time/exit/holding/cost/pairing tables.
+
+**Next recommended action (not started)**: Task 56 — Independent Family Holdout Validation, using frozen,
+non-overlapping historical windows and the exact Task 54 candidate without tuning.
