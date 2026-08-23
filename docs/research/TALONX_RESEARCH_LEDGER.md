@@ -5529,3 +5529,52 @@ or outcome-driven filter occurred.
 
 **Final decision**: `FAMILY_EFFECT_WEAKENED`. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`. No live
 family enable/disable action and no capital are authorized.
+
+## Task 57 — Execution Friction vs Trade Geometry Diagnostic (2026-08-23)
+
+> **PREVIOUS**: Task 56 classified the independent holdout family comparison as
+> `FAMILY_EFFECT_WEAKENED`. RSI remained slightly positive gross but negative at 5bps; MACD remained
+> negative at both costs. Deployment stayed `MONDAY_DECISION_SHADOW_ONLY` with no family or capital action.
+>
+> **NEW EVIDENCE**: a deterministic, analysis-only diagnostic combined the committed Task 53 (34), Task 54
+> (89), and Task 56 (105) trade ledgers while preserving task/window provenance. All 228 trades mapped
+> exactly to RSI (100) or MACD (128), with zero duplicate source keys and zero MA trades. The declared
+> entry/exit/stop formula reproduced the frozen 5bps totals exactly within floating-point tolerance: Task 53
+> -11.310R, Task 54 -25.989R, Task 56 -36.603R; Task 56's stored native equivalent matched to 3.8e-12R.
+>
+> Combined economics were gross +20.976R (+0.092R/trade, PF 1.150) versus 5bps -73.901R
+> (-0.324R/trade, PF 0.659). Mean/median cost burden was 0.416R/0.252R. RSI was gross +0.355R/trade and
+> 5bps +0.053R/trade, with median stop risk 0.466% and mean/median cost 0.302R/0.215R. MACD was already
+> gross -0.113R/trade and fell to -0.619R/trade at 5bps, with tighter median stop risk 0.338% and higher
+> mean/median cost 0.505R/0.296R. RSI exceeded MACD within four of six adequately supported predeclared
+> stop-risk buckets, but not the 0.15-0.25% or >=0.75% buckets; the approximate geometry control supports a
+> non-universal family difference, not a causal or production claim.
+>
+> Task 56 RSI weakening was not caused by tighter geometry: median stop risk widened from 0.431% to 0.551%
+> and mean cost fell from 0.338R to 0.256R. Win rate was effectively unchanged (33.9% to 34.1%), while
+> average winning R collapsed from 3.778R to 1.507R; costs then overwhelmed the near-zero gross expectancy
+> (+0.016R). Task 56 MACD improved gross (-0.198R to -0.021R) and cost burden (0.595R to 0.407R) versus
+> Tasks 53+54 but remained slightly gross-negative. The top 1/3/5/10 cost-R trades contributed
+> 15.7%/19.7%/23.0%/29.4% of total cost drag. Removing the ten highest-cost trades left RSI slightly
+> negative at 5bps (-0.032R/trade) and MACD decisively negative (-0.458R/trade), so pathology did not
+> dominate the failure.
+>
+> **UPDATED CONCLUSION**: `BOTH_GROSS_AND_COST_WEAK`.
+>
+> **REASON**: gross quality is weak in aggregate and MACD is gross-negative even before costs, while the
+> observed 5bps burden is large enough to erase the modest combined gross expectancy. Reasonable-risk
+> trades (>=0.35% stop risk, a descriptive aggregation of frozen buckets rather than an approved filter)
+> produced +0.139R gross expectancy but only +0.009R at 5bps—neither a robust gross edge nor a pure
+> geometry-only failure. Extreme trades amplify cost drag but do not explain it alone.
+
+**Break-even description**: combined RSI gross expectancy +0.355R exceeded its mean 5bps burden 0.302R by
+only +0.053R; implied zero-mean-net maximum was 11.76 round-trip bps under the observed geometry. Combined
+MACD gross expectancy was -0.113R against a 0.505R burden, so no non-negative execution cost can make its
+observed mean break even. In Task 56 alone, RSI gross +0.016R was far below its 0.256R burden (implied
+0.64 round-trip bps); MACD gross was already negative. These are descriptive calculations, not a lower-cost
+assumption or recommendation.
+
+**Scope/validation**: no replay, parameter search, threshold/family/stop/cost/symbol change, production
+behavior change, or capital use. All 17 artifacts reproduced byte-identically across two runs. Protected
+strategy/config files remained unchanged. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`; no ex-post
+geometry exclusion is authorized as a filter.

@@ -1,0 +1,46 @@
+{
+  "all_frozen_totals_match": true,
+  "counts_match": true,
+  "duplicate_source_trade_keys": 0,
+  "expected_counts": {
+    "Task53": 34,
+    "Task54": 89,
+    "Task56": 105
+  },
+  "family_counts": {
+    "Task53": {
+      "MACD": 17,
+      "RSI": 17
+    },
+    "Task54": {
+      "MACD": 50,
+      "RSI": 39
+    },
+    "Task56": {
+      "MACD": 61,
+      "RSI": 44
+    }
+  },
+  "frozen_5bps_totals": {
+    "Task53": -11.309635850554516,
+    "Task54": -25.989167959459053,
+    "Task56": -36.60254308916701
+  },
+  "native_task56_max_abs_difference": 3.785416424761934e-12,
+  "reproduced_5bps_totals": {
+    "Task53": -11.309635850554516,
+    "Task54": -25.989167959459053,
+    "Task56": -36.602543089173984
+  },
+  "source_counts": {
+    "Task53": 34,
+    "Task54": 89,
+    "Task56": 105
+  },
+  "source_sha256": {
+    "Task53": "72db7a33b2cc2487eafac6a9c5c630e8189c6fac84d250c045e59bd81b70708a",
+    "Task54": "2cbe75bcf1e5262cf27cce3a9d1b31529284c8b765537f8454a1dd7ad73e109f",
+    "Task56": "2a9ae0af16529be244c58037015102789f5d97bff0b4c21e6933bc2cbf3a661f"
+  },
+  "unmapped_families": []
+}
