@@ -1,0 +1,48 @@
+{
+  "task": "Task 56 - Independent Family Holdout Validation",
+  "protocol_commit": "8de8d4990c932830f09271bf45fa2326afc4e676",
+  "classification": "VALIDATION_BLOCKED",
+  "deployment_state": "MONDAY_DECISION_SHADOW_ONLY",
+  "scientific_question_answered": false,
+  "reason": "The frozen 35-symbol dataset could not be completed because this execution environment could not reach Alpaca and prohibited the required network-elevated retry. The protocol's mandatory data-coverage gate failed before replay.",
+  "frozen_windows_unchanged": true,
+  "frozen_candidate_unchanged": true,
+  "strategy_version": "2ae6216bca70",
+  "quant_config_hash": "fdf4922d0728",
+  "backtest_config_hash": "0c7dd13d75c4",
+  "downloads": {
+    "declared_symbol_window_packages": 75,
+    "completed_symbol_window_packages": 0,
+    "files_written": 0
+  },
+  "pre_replay_validation": {
+    "dataset_coverage_35_of_35": false,
+    "data_quality": "NOT_RUN_INCOMPLETE_DATASET",
+    "warmup_readiness_complete_packages": "NOT_RUN_INCOMPLETE_DATASET",
+    "estimated_runtime_hours_if_unblocked": 4.8
+  },
+  "replay": {
+    "started": false,
+    "candidate_only": true,
+    "trades": null
+  },
+  "prespecified_diagnostics": {
+    "rsi_vs_macd_0bps_5bps": "NOT_RUN_VALIDATION_BLOCKED",
+    "window_consistency": "NOT_RUN_VALIDATION_BLOCKED",
+    "common_symbol_support": "NOT_RUN_VALIDATION_BLOCKED",
+    "symbol_breadth_concentration": "NOT_RUN_VALIDATION_BLOCKED",
+    "time_of_day": "NOT_RUN_VALIDATION_BLOCKED",
+    "exit_holding_behavior": "NOT_RUN_VALIDATION_BLOCKED",
+    "winner_sensitivity_top1_top3_top5": "NOT_RUN_VALIDATION_BLOCKED",
+    "worst_loser_sensitivity": "NOT_RUN_VALIDATION_BLOCKED",
+    "cost_in_R_stop_risk_geometry": "NOT_RUN_VALIDATION_BLOCKED",
+    "ma_activity": "NOT_RUN_VALIDATION_BLOCKED"
+  },
+  "interpretability_floor": {
+    "applied": true,
+    "result": "NOT_EVALUABLE_NO_REPLAY"
+  },
+  "family_action_authorized": false,
+  "capital_used": false
+}
+
