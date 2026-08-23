@@ -5294,3 +5294,86 @@ sample before deciding, still with zero tuning.
 implementation (`talonx_backtest/engine.py`), new test file (`tests/test_backtest_preroll.py`), doc updates
 (`docs/backtesting.md`), and all `results/task53_preroll_ab_validation/` artifacts — **not committed, not
 pushed**, per instruction. PR #10 remains draft.
+
+## Task 54 — Overnight Extended Candidate Validation (2026-08-23)
+
+**Objective**: run one larger, frozen, candidate-only historical validation (production-scale, ~60
+evaluation trading days across 3 windows) to determine whether Task 53's weak economics (n=34) were
+small-sample noise or evidence of no repeatable edge.
+
+**Task 53 checkpoint**: committed and pushed as `a1d0097` before Task 54 began. Clean tracked-tree status
+confirmed. Candidate config hash `fdf4922d0728`/strategy fingerprint `2ae6216bca70` — identical to Task 53's
+own candidate, confirming the exact same frozen contract.
+
+> **PREVIOUS** (Task 53): `CANDIDATE_FREQUENCY_RECOVERED_ECONOMICS_UNCLEAR` — n=34 trades, 0bps barely
+> positive (expectancy +0.012R, noise-level), 5bps clearly negative (−0.33R), 91% of positive R from the top
+> 3 trades, only 1/3 windows profitable and that window rested on a single outlier trade.
+>
+> **NEW EVIDENCE** (Task 54): a fresh, frozen, candidate-only replay over 3 mechanically-selected 20-
+> trading-day windows (~60 eval days total, 10-day pre-roll each, same warmup mechanism, 35/35 symbols
+> ready before the ~4.6h replay was launched) produced **89 executed trades** — 2.6x Task 53's sample. 0bps:
+> expectancy +0.237R, PF 1.37 (genuinely positive point estimate, but bootstrap 95% CI is [−0.19, +0.71] —
+> includes zero). 5bps: total R −25.99, expectancy −0.29R, PF 0.73 (still clearly negative in aggregate).
+> Outlier sensitivity: removing the top 3 winning trades flips 0bps total R negative. Trade concentration
+> improved dramatically (top-3 positive-R share 91.1% → **32.3%**). Window profitability improved (0/3 → 2/3
+> windows profitable even at 5bps — only one window, W1, remains a clear net drag at every cost level). A
+> genuine, consistent family split persists: RSI trades (39, PF 2.19, positive even at 5bps: +15.30) vs.
+> MACD trades (50, PF 0.78, sharply negative at 5bps: −41.29) — the same direction as Task 53's smaller
+> sample, now confirmed at scale. Only 1/89 trades (1.1%) exited via TARGET — positive outcomes are
+> dominated by END_OF_SESSION/SIGNAL_EXIT, not disciplined target hits.
+>
+> **UPDATED CONCLUSION**: the larger sample **did not resolve** the core cost-robustness question
+> (aggregate 5bps remains solidly negative; bootstrap CI still includes zero) but **substantially de-risked**
+> the specific small-sample/outlier-concentration concern Task 53 flagged. Economic classification:
+> `EDGE_WEAK_AND_COST_SENSITIVE` (gross near-flat/positive, realistic costs destroy it). Final decision:
+> `MONDAY_DECISION_SHADOW_ONLY` — not a clean GO (correctness is GREEN but economics remain unproven), not a
+> rejection either (there is a real, larger-than-noise signal, especially in the RSI family, worth
+> continued measurement-only observation).
+>
+> **REASON**: the Task 53 conclusion is not overwritten — it accurately describes what a 34-trade sample
+> showed. Task 54 answers the specific question Task 53 raised (is this noise or a real pattern?) with a
+> nuanced result: some of Task 53's most alarming specifics (91% concentration, 0/3 windows at 5bps) were
+> indeed small-sample artifacts, but the fundamental cost-sensitivity finding was not — it persists and
+> strengthens with more data.
+
+**Dataset design**: production-scale 35-symbol universe, 3 windows (W1: eval 2025-09-29→10-24, W2: eval
+2025-11-26→12-24, W3: eval 2026-04-21→05-18), each with 10 trading days of causal pre-roll (Task 53's proven
+mechanism). Selection rule fixed before any outcome was viewed: 15%/50%/85% marks on the real ET-localized
+251-trading-day calendar, searched outward for the nearest 30-day block avoiding Task 37/38/41's development
+windows and Task 46/52/53's evaluation slices. **A genuine calendar bug (UTC-date instead of ET-localized
+trading-day extraction, spuriously including weekend dates) was found by a sanity check and fixed before any
+download** — the two downloads made under the buggy dates were discarded and redone under the corrected
+dates; no buggy data reached the replay.
+
+**Data quality**: 75/75 fresh Alpaca downloads (25 symbols × 3 windows) all `FULL` status; 10 original
+symbols sliced from existing full-year local data. 35/35 symbols with complete coverage in all 3 windows.
+
+**Runtime**: estimated ~160 min from Task 53's throughput; actual 278.3 min (~4.6h), within the ≤8h budget,
+no mechanical reduction needed.
+
+**Readiness gate**: 35/35 symbols HTF-SMA/60m-regime/1m-indicator ready at the first evaluation bar in all 3
+windows, confirmed via a cheap state-only preload before the expensive replay was launched.
+
+**Funnel/dominant bottleneck**: unchanged in kind — `LOW_VOLATILITY_REGIME` and `LOW_CONFLUENCE` remain the
+two largest gates by far; `HTF_DATA_UNAVAILABLE` stayed at 0 (pre-roll continues working correctly at
+production scale); `TREND_GATE` 205 real rejections.
+
+**Correctness**: GREEN. 100% of 89 trades BULLISH-only, 0 invalid geometry, 0 R:R below threshold, 0
+warmup-originated economics, no cross-window state leakage (fresh `BacktestEngine()` per window). 95-test
+focused regression, 0 failed; full suite not re-run (no code changed since Task 53's 1845-passed baseline).
+
+**Monday A/B plumbing / freeze**: NOT implemented, NOT performed — the "materially strengthens" bar for the
+conditional plumbing work was not met (economics remain unresolved at the aggregate level).
+
+**Final decision**: `MONDAY_DECISION_SHADOW_ONLY`. Economic classification: `EDGE_WEAK_AND_COST_SENSITIVE`.
+
+**No tuning**: confirmed — no threshold/parameter/family/symbol change; window selection fixed before any
+outcome was viewed. Task 22 not inspected. No capital used.
+
+**Next recommended action (not started)**: continue decision-shadow observation to accumulate live evidence,
+particularly on the persistent RSI-positive/MACD-negative family split (confirmed in both Task 53 and Task
+54) — consider a future bounded diagnostic isolating family-level economics before any broader claim.
+
+**State**: Task 53 checkpoint committed and pushed (`a1d0097`). This Task 54 ledger entry and all
+`results/task54_extended_candidate_validation/` artifacts — **not committed, not pushed**, per instruction.
+PR #10 remains draft.
