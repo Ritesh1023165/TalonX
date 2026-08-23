@@ -1,0 +1,11 @@
+{
+  "alpha_fingerprint_unchanged": "PASS",
+  "clean_coverage_percent": 99.71428571428571,
+  "clean_symbol_sessions": 2094,
+  "data_not_ready_symbol_sessions": 6,
+  "expected_symbol_sessions": 2100,
+  "no_fabrication_interpolation": "PASS",
+  "readiness_correction_frozen_before_outcomes": "PASS",
+  "task": "63P_PRE_OUTCOME_FREEZE",
+  "validation_started": false
+}
