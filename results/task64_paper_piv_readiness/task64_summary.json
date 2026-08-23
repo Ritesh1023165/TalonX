@@ -1,0 +1,17 @@
+{
+  "base_commit": "843eafba98ce4a8cbb07a21eb09b9b8cb4bffd3f",
+  "branch": "research/talonx-strategy-validation",
+  "conclusion": "PAPER_PIV_BLOCKED",
+  "current_strategy_zero_drift": true,
+  "focused_tests": "22 passed",
+  "full_suite": "1905 passed, 1 skipped, 15 xfailed, 1 known pre-existing calibrated-sample failure",
+  "no_real_capital": true,
+  "orpb_alpha_fingerprint": "b1e283bd36eb0cb2ecc5303b104ec2bd8defc60f6eacef4879e7711d560d113f",
+  "orpb_alpha_fingerprint_unchanged": true,
+  "paper_account_guard": "PASS",
+  "paper_account_probe": "PASS_ZERO_ORDERS_ZERO_POSITIONS_RECONCILED",
+  "preflight": "FAIL_SIP_HTTP_403",
+  "session_readiness_validator": "PASS",
+  "sip_readiness": "FAIL",
+  "telegram_reachability": "PASS"
+}

@@ -5912,3 +5912,27 @@ remains `MONDAY_DECISION_SHADOW_ONLY`; PR #10 remains draft and unmerged.
 history is unchanged. No tuning, variant replay, threshold/date/symbol/provider/exit change, replacement
 analysis, capital, or production action occurred. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`; PR #10
 remains draft and unmerged.
+
+## Task 64 — Paper PIV Readiness (2026-08-23)
+
+> **PREVIOUS**: ORPB_V1 was independently rejected; Task 63P proved reusable per-symbol-session readiness
+> semantics with fail-closed isolation and no data synthesis.
+>
+> **NEW EVIDENCE**: Platform readiness was generalized into a strategy-neutral 30-minute opening-session
+> validator. A separately namespaced PAPER-only control plane added immutable Alpaca paper routing,
+> positive account verification, persistent idempotent order intents, lifecycle telemetry, explicit cleanup,
+> restart reconciliation, kill switch, EOD flatten/reporting, and failure-isolated Telegram projection.
+> Twenty-two focused tests passed. Protected strategy files have zero diff and the ORPB alpha fingerprint
+> remains `b1e283bd36eb0cb2ecc5303b104ec2bd8defc60f6eacef4879e7711d560d113f`.
+>
+> The live non-ordering preflight positively verified the Alpaca PAPER account, zero paper orders, zero paper
+> positions, matched internal/broker state, the frozen 35-symbol universe, and Telegram reachability. The
+> explicit Alpaca `feed=sip` latest-trade request returned HTTP 403. No order, cleanup, or session start ran.
+>
+> **UPDATED CONCLUSION**: `PAPER_PIV_BLOCKED`.
+>
+> **REASON**: SIP accessibility is mandatory and preflight is fail-closed. Paper execution remains disabled
+> until an approved release receives `PIV_READY`; IEX/live-money fallback is impossible and prohibited.
+
+**Scope/deployment**: no alpha change, optimization, strategy replay, paper order, cleanup mutation, live
+endpoint, or capital action occurred. Real capital remains disabled; PR #10 remains draft and unmerged.
