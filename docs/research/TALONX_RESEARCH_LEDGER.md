@@ -5678,3 +5678,38 @@ any proposed rule requires a new preregistered independent validation. Deploymen
 **Scope/deployment**: read-only evidence synthesis and specification only. No correlation mining, threshold
 search, parameter sweep, backtest, data download, signal generation, implementation, capital, or production
 behavior change occurred. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`; PR #10 remains draft/unmerged.
+
+## Task 60 — FPRC_V1 Implementation and Freeze (2026-08-23)
+
+> **PREVIOUS**: Task 59 concluded `REDESIGN_SIGNAL_ARCHITECTURE` and preregistered exactly one successor,
+> `FAILED_PULLBACK_RECLAIM_CONTINUATION_V1` (`FPRC_V1`). The specification authorized no implementation or
+> replay at that time. The current candidate remained economically unsupported but technically coherent;
+> deployment remained `MONDAY_DECISION_SHADOW_ONLY` with no capital or production action.
+>
+> **NEW EVIDENCE**: Task 60 implemented FPRC_V1 as an opt-in, separately namespaced completed-bar state
+> machine and no-broker shadow/research execution controller. It adds causal regular-session VWAP; two-or-more
+> below-VWAP pullback state; reclaim and exact next-bar persistence; one-tick-below-local-low stop; no target;
+> completed-5m-below-VWAP next-open thesis exit; hard stop and 15:50 flatten; estimated and actual-entry-fill
+> 5bps feasibility capped at 0.20R; cost-first deterministic capacity; and telemetry-only RSI/MACD/MA/ATR.
+> Existing long-only, pre-roll, cooldown, lockout, capacity, and next-bar conventions are preserved.
+>
+> Twelve focused causality/isolation/parity tests passed. The complete suite produced 1,857 passes, one skip,
+> 15 expected failures, and one legacy sample-fixture failure: untouched current-candidate code generated one
+> signal but rejected it as `LOW_CONFLUENCE` where the fixture expected one trade. The failure reproduced with
+> normal Numba JIT and is unrelated to FPRC_V1. No existing strategy, indicator, consumer, config, backtest
+> engine, or execution file differs from base `af3bc97d`; the current strategy fingerprint remains
+> `2ae6216bca70`. The frozen FPRC_V1 implementation fingerprint is
+> `be91c38047cf9aa9dbb6c8a948eaf52dd64ed4b16c7d8a70359388b58e5c2a64`.
+>
+> **UPDATED CONCLUSION**: FPRC_V1 implementation and isolation **PASS** and are frozen for a separately
+> authorized future independent validation. Validation has not started, and the current candidate remains
+> unchanged.
+>
+> **REASON**: the frozen Task 59 contract is represented directly in one isolated shared semantic path, its
+> eligibility inputs cannot be changed by telemetry, and synthetic tests prove causal sequencing, fill-time
+> feasibility, risk/exit ordering, operational controls, state isolation, and shadow/research parity. The
+> implementation evidence supports freezing code, not claiming an edge.
+
+**Scope/deployment**: no historical replay, independent validation, data download, capital, broker action,
+or production integration occurred. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`; PR #10 remains
+draft and unmerged.
