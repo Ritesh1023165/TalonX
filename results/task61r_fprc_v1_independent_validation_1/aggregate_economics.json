@@ -1,0 +1,25 @@
+{
+  "gross_0bps": {
+    "expectancy_R": -0.003284592893532709,
+    "flats": 1,
+    "losses": 152,
+    "max_drawdown_R": 8.179361421967197,
+    "profit_factor": 0.9840082608289215,
+    "total_R": -0.6733415431742054,
+    "trades": 205,
+    "wins": 52
+  },
+  "mean_actual_fill_feasibility_cost_R_5bps": 0.14108376742054188,
+  "mean_cost_R_5bps": 0.1410821251240951,
+  "median_cost_R_5bps": 0.14448198198198317,
+  "net_5bps": {
+    "expectancy_R": -0.14436671801762782,
+    "flats": 0,
+    "losses": 162,
+    "max_drawdown_R": 29.688902191191215,
+    "profit_factor": 0.5375509234835696,
+    "total_R": -29.595177193613704,
+    "trades": 205,
+    "wins": 43
+  }
+}

@@ -5739,3 +5739,39 @@ draft and unmerged.
 **Scope/deployment**: the exact windows are frozen for a later resume. No market data was downloaded, no
 historical validation was run, and no production behavior or capital changed. Deployment remains
 `MONDAY_DECISION_SHADOW_ONLY`; PR #10 remains draft and unmerged.
+
+## Task 61R — Corrected Temporal Protocol + FPRC_V1 Independent Validation #1 (2026-08-23)
+
+> **PREVIOUS**: Task 61 was `VALIDATION_BLOCKED` solely because its mechanically frozen N1-N3 evaluation
+> extended through future sessions ending 2026-10-02. It made no Alpaca request, ran no replay, and
+> unblinded no outcomes. FPRC_V1 remained frozen at implementation fingerprint
+> `be91c38047cf9aa9dbb6c8a948eaf52dd64ed4b16c7d8a70359388b58e5c2a64`.
+>
+> **NEW EVIDENCE**: Before outcome access, Task 61R corrected only the temporal rule and committed the
+> correction at `2020eff`. XNYS 4.13.2 mechanically selected the latest 60 consecutive sessions strictly
+> before TalonX's earliest canonical historical exposure on 2025-08-15: V1 2025-05-20 through 2025-06-17,
+> V2 2025-06-18 through 2025-07-17, and V3 2025-07-18 through 2025-08-14, each with the immediately preceding
+> ten-session state-only warmup. The conservative Task37-58 contamination audit found zero overlap, including
+> zero overlap with the Task53-58 evidence used to design FPRC_V1.
+>
+> Alpaca returned `FULL` packages for all 35 symbols (1,257,750 raw bars). Every mandatory pre-replay gate
+> passed: exact 35/35 warmup/evaluation session coverage, zero critical corruption, 35/35 first-bar 1m/VWAP/
+> 15m-SMA200/FPRC readiness in V1/V2/V3, frozen fingerprints, code-level causality/isolation/parity proofs,
+> and current-candidate zero drift. The one authorized replay produced 205 identical-accounting trades:
+> 68/72/65 across V1/V2/V3 and 32 symbols. The interpretability floor passed.
+>
+> Gross expectancy was -0.003285R/trade. At 5bps per side, expectancy was -0.144367R, PF was 0.537551,
+> and the fixed-seed 10,000-resample bootstrap 95% interval was [-0.225457R, -0.055401R]. All three windows
+> were negative at 5bps (-0.166139R, -0.026659R, -0.251973R), and removing the top three gross winners left
+> -0.187913R/trade. Actual-fill feasibility passed (mean 0.141084R; maximum 0.199563R, within 0.20R).
+>
+> **UPDATED CONCLUSION**: `FPRC_V1_REJECTED`.
+>
+> **REASON**: although support, breadth, cost feasibility, concentration, and technical correctness passed,
+> the frozen candidate failed the mandatory gross-margin, 5bps expectancy, PF, bootstrap, window-robustness,
+> and top-three-winner sensitivity criteria. The preregistered hard rejection rule therefore applies and no
+> replication is authorized.
+
+**Scope/deployment**: no rule, threshold, symbol, provider, cost, exit, window, or post-outcome filter was
+changed; no variant replay, diagnosis, redesign, capital, or production action occurred. Task 61's blocked
+history remains intact. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`; PR #10 remains draft and unmerged.
