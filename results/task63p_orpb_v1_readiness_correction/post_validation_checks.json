@@ -1,0 +1,38 @@
+{
+  "all_checks_passed": true,
+  "analysis_only_no_replay": true,
+  "checks": {
+    "all_pre_replay_gates_passed": true,
+    "alpha_fingerprint_unchanged": true,
+    "bootstrap_reproduced": true,
+    "every_actual_fill_cost_feasible": true,
+    "gross_metrics_reproduced": true,
+    "identical_0bps_5bps_trade_accounting": true,
+    "mandatory_rejection_reproduced": true,
+    "net_metrics_reproduced": true,
+    "no_data_not_ready_trades": true,
+    "protected_code_zero_drift": true,
+    "replay_started_only_after_gates": true,
+    "single_replay_manifest": true,
+    "task62_63_63r_history_unchanged": true
+  },
+  "reproduced": {
+    "bootstrap_95_ci": [
+      -0.5788469027753699,
+      0.15163209913133757
+    ],
+    "gross": {
+      "expectancy_R": -0.1312468864801576,
+      "profit_factor": 0.7642757411102338,
+      "total_R": -6.037356778087249,
+      "trades": 46
+    },
+    "net_5bps": {
+      "expectancy_R": -0.2431619210022293,
+      "profit_factor": 0.6259099259686194,
+      "total_R": -11.185448366102548,
+      "trades": 46
+    }
+  },
+  "task": "63P"
+}

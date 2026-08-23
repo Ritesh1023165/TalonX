@@ -1,0 +1,12 @@
+{
+  "all_exits_are_frozen_paths": true,
+  "all_stops_below_entry": true,
+  "breakout_to_confirmation_exactly_one_minute": true,
+  "confirmation_to_fill_is_next_available_bar": true,
+  "frozen_code_tests_green": true,
+  "hard_stop_never_worse_than_minus_one_R": true,
+  "identical_trade_cost_accounting": true,
+  "no_data_end_exits": true,
+  "no_data_not_ready_candidate_order_or_trade": true,
+  "orpb_alpha_fingerprint_unchanged": true
+}

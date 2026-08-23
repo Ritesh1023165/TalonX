@@ -5876,3 +5876,39 @@ action occurred. ORPB_V1 remains economically unclassified. Deployment remains
 **Scope/deployment**: Task 63 history is unchanged. No ORPB replay, trade, return, tuning, variant, extra
 window, capital, or production action occurred. ORPB_V1 remains economically unclassified. Deployment
 remains `MONDAY_DECISION_SHADOW_ONLY`; PR #10 remains draft and unmerged.
+
+## Task 63P — Correct ORPB Data-Readiness Semantics + Execute Validation (2026-08-23)
+
+> **PREVIOUS**: Task 63 and Task 63R were `VALIDATION_BLOCKED` because global all-symbol/all-session
+> readiness was too strict despite genuine isolated Alpaca SIP gaps. Both attempts stopped before ORPB
+> signal generation, trades, returns, economic metrics, or outcome unblinding. Task 63R proved a uniform SIP
+> source and exactly six incomplete evaluation symbol-sessions.
+>
+> **NEW EVIDENCE**: Before outcome access, Task 63P froze and committed a production-compatible,
+> timestamp-only, per-symbol-session fail-closed readiness layer at `f0f2796`. The 35-symbol universe and all
+> ORPB alpha/execution/economic semantics remained unchanged. Of 2,100 expected symbol-sessions, 2,094 were
+> clean and the six previously documented BKNG/KLAC cases were `DATA_NOT_READY` (99.714286% clean). No bar
+> was fabricated, interpolated, filled, or borrowed; post-10:00 data, prices, signals, and outcomes cannot
+> affect readiness. Sixteen focused readiness/ORPB causality tests passed.
+>
+> Every corrected pre-replay gate then passed with no unexpected readiness exception or broader corruption.
+> The one authorized replay produced 46 trades across 26 symbols: 13 in O1, 10 in O2, and 23 in O3. There
+> were nine gross winners and 37 losses. Gross expectancy was -0.131247R/trade (PF 0.764276). At 5bps per
+> side, expectancy was -0.243162R/trade, PF was 0.625910, and the fixed-seed 10,000-resample bootstrap 95%
+> interval was [-0.578847R, 0.151632R]. All windows were negative (-0.384916R, -0.251195R, -0.159547R), and
+> removing the top three gross winners left -0.488420R/trade. Actual-fill cost feasibility passed (mean
+> 0.111981R; maximum 0.196667R).
+>
+> **UPDATED CONCLUSION**: `ORPB_V1_REJECTED`.
+>
+> **REASON**: ORPB_V1 failed mandatory support (total/per-window trades and winner/loss counts), positive
+> gross expectancy, gross cost margin, 5bps expectancy/PF, bootstrap lower bound, window robustness,
+> top-three-winner sensitivity, and positive-R symbol concentration. Technical correctness, breadth across
+> symbols, maximum trade-share concentration, readiness isolation, and cost feasibility passed, but any
+> mandatory failure requires rejection and stop.
+
+**Scope/deployment**: the ORPB alpha fingerprint remains
+`b1e283bd36eb0cb2ecc5303b104ec2bd8defc60f6eacef4879e7711d560d113f`. Task 62, Task 63, and Task 63R
+history is unchanged. No tuning, variant replay, threshold/date/symbol/provider/exit change, replacement
+analysis, capital, or production action occurred. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`; PR #10
+remains draft and unmerged.
