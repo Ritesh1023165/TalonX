@@ -1,0 +1,391 @@
+{
+  "task": "Task 58 - RSI Winner-Magnitude / Payoff Regime Diagnostic",
+  "classification": "PRIOR_WINNERS_CONCENTRATED",
+  "deployment": "MONDAY_DECISION_SHADOW_ONLY",
+  "strategy_action": "NONE \u2014 explanatory diagnostic only",
+  "input_git_checkpoint": "d8f88e1e490c7a8cb45afa4914c17ef04bcda80e",
+  "fingerprints": {
+    "strategy": "2ae6216bca70",
+    "quant_config": "fdf4922d0728",
+    "backtest_config": "0c7dd13d75c4"
+  },
+  "source_trade_paths": {
+    "Task53": "results/task53_preroll_ab_validation/_trades_candidate.csv",
+    "Task54": "results/task54_extended_candidate_validation/_trades.csv",
+    "Task56": "results/task56_independent_family_holdout/raw_trades_all.csv"
+  },
+  "source_trade_sha256": {
+    "results/task53_preroll_ab_validation/_trades_candidate.csv": "72db7a33b2cc2487eafac6a9c5c630e8189c6fac84d250c045e59bd81b70708a",
+    "results/task54_extended_candidate_validation/_trades.csv": "2cbe75bcf1e5262cf27cce3a9d1b31529284c8b765537f8454a1dd7ad73e109f",
+    "results/task56_independent_family_holdout/raw_trades_all.csv": "2a9ae0af16529be244c58037015102789f5d97bff0b4c21e6933bc2cbf3a661f"
+  },
+  "local_bar_file_sha256": {
+    "data/historical_1m/task53_warmup_windows/X_early/STX.csv": "11ccc1de18fb872984494ba048268afa58466110bac60293befec279628bac5d",
+    "data/historical_1m/task46_validation_windows/X_early/STX.csv": "415d50d31a35775fe9de231e63a95eb6641bd28788ae461a9fd4e7f370fdb8f6",
+    "data/historical_1m/task53_warmup_windows/X_early/QCOM.csv": "bb8fa799fa9a097396b0217c527bf38bfb30f3bdeab080669bad2b3b580251c3",
+    "data/historical_1m/task46_validation_windows/X_early/QCOM.csv": "98826e07afea34b216aaecade817c9285473a0674d90b7178a5c6b22daf621f1",
+    "data/historical_1m/task53_warmup_windows/X_early/KLAC.csv": "5de0a02ed15535f2d1343b38387f465ef4e27fd28de0e21058bbc63304927bb4",
+    "data/historical_1m/task46_validation_windows/X_early/KLAC.csv": "430be7a06f8a5e31df73425a3a39701324d7bac044b1515b4368dac31dd56ede",
+    "data/historical_1m/task53_warmup_windows/X_early/AMAT.csv": "795dbe7232f43afc427c2b45796b4f1fc56bb884fcece24226753f106d8efec8",
+    "data/historical_1m/task46_validation_windows/X_early/AMAT.csv": "fee1f7a490ea4f6e2ede1b55165c1eb3b220e29a2baa981661150313444c108c",
+    "data/historical_1m/task53_warmup_windows/X_early/AMZN.csv": "b374a9a21ecec70b6787416cd692b3029794595c4ea45328cd9723bd9c8dc861",
+    "data/historical_1m/task46_validation_windows/X_early/AMZN.csv": "f236b4e3b6bd87acfe4f2dbd7a96ab27f5e5185b4b1149dbececfe2c8441ad20",
+    "data/historical_1m/task53_warmup_windows/X_early/GOOGL.csv": "8f403ea7237cce41780ba5f8f289d523e51aeb0571b1d03c9da6e79925a6e6dd",
+    "data/historical_1m/task46_validation_windows/X_early/GOOGL.csv": "fb5698fe3fbdde496aa21f93e90982deb68f3f92250188c8bb33f5eb5d908202",
+    "data/historical_1m/task53_warmup_windows/X_early/MU.csv": "f304e97e89fea952df14375482917cc15d511cd2fe9941acc9c3abf4ef7dd4f2",
+    "data/historical_1m/task46_validation_windows/X_early/MU.csv": "a81f3748fb6951d1009a8f19108b160f53d6c09e6abe823da1689b4b8a4f210f",
+    "data/historical_1m/task53_warmup_windows/X_early/LRCX.csv": "8b787fe0132ecdc1c551988cf37d4217e466a19425109d78d8c21eef28b78ae8",
+    "data/historical_1m/task46_validation_windows/X_early/LRCX.csv": "4e87fcaf094cb8ea681c4de65533a58764442f4e1949901dc74f4face692b0a1",
+    "data/historical_1m/task53_warmup_windows/Y_middle/AMD.csv": "6d820e9e5fa46f0d27bfa5eabc25ab80fede92a0211aa6eb906fbbeb4cb8a5a7",
+    "data/historical_1m/task46_validation_windows/Y_middle/AMD.csv": "c48463d0a6de7f6480ab2cf5384e4f99585acb6195841608b76ee5cf4f71848f",
+    "data/historical_1m/task53_warmup_windows/Z_late/ADBE.csv": "86e001e08c09921561f927545eb5a2e14f754e11915b2a2c0e23f24c6075c248",
+    "data/historical_1m/task46_validation_windows/Z_late/ADBE.csv": "331363c8a7631e3e39ef4e7535072d496e9da5761ddf43168a65d71fd6f374a6",
+    "data/historical_1m/task53_warmup_windows/Z_late/ADI.csv": "cde399fbc5c5c24bf95df42fa7bd1dc0eff9c46d3730ee37550c3b328240b94d",
+    "data/historical_1m/task46_validation_windows/Z_late/ADI.csv": "b3137247c7cfa797beb29ca814ea4c3657a8c915d8f264a90aae4813ebeae93c",
+    "data/historical_1m/task53_warmup_windows/Z_late/KLAC.csv": "d63bbda6e5b22510fa0e5d9f1e9bbae0bd6f2b7c6656bafdf28612a3332ede1e",
+    "data/historical_1m/task46_validation_windows/Z_late/KLAC.csv": "8faab7d98564dd11d92151f5364331cec7ff3bd0612eceebb4b70c0c35341aa6",
+    "data/historical_1m/task53_warmup_windows/Z_late/CSCO.csv": "623d03566b25e00b75929070d5bfd1994c4d49b34df1e19512c37adb158019d0",
+    "data/historical_1m/task46_validation_windows/Z_late/CSCO.csv": "a6ddfe9e4505513f4ef2a9616ca703de03c24c163c119b9fd62572c125c8d735",
+    "data/historical_1m/task53_warmup_windows/Z_late/VRTX.csv": "63440c2c9d7948e39df792d8ffe33d69956d261b800e682f5925369e68864b25",
+    "data/historical_1m/task46_validation_windows/Z_late/VRTX.csv": "2d0bc0e04899cfda44459731f32338bf46e30c0901978c1021e186698b04f93b",
+    "data/historical_1m/task54_extended_windows/W1/AMAT.csv": "201428c09767eee70b850c7cfd52804d2e00d094d91af5a220a7f12bef925a73",
+    "data/historical_1m/task54_extended_windows/W1/STX.csv": "d4dce3ef0f3253a9b8d020bc5a85abf9ccb6bf2599f1375937533d93b4ed3441",
+    "data/historical_1m/task54_extended_windows/W1/LRCX.csv": "c223297d535148fa9cc2b0233b35b1978d2e454b8a3091985e63a47cb2070026",
+    "data/historical_1m/task54_extended_windows/W1/MU.csv": "ee50d42a19a1d1f19c9950740f564af1001a75383036cff1efc9679391783e74",
+    "data/historical_1m/task54_extended_windows/W1/INTC.csv": "cb4121a0e7f953dfe13acb3c8dd88762b046e75081a830485232f60c2e8bb213",
+    "data/historical_1m/task54_extended_windows/W1/AVGO.csv": "93a0dab93481b6bba6c2f0ada116a87ea88ee7631974848ecc1ff437c682de07",
+    "data/historical_1m/task54_extended_windows/W1/KLAC.csv": "5c4edd682a9fb69dd6c96706142b514ab6e5934781cf356032844889c35cd4b0",
+    "data/historical_1m/task54_extended_windows/W2/INTC.csv": "c543ecbbf4549a78d3ac1dbec5c90ba04c7c9f3bc3f38f91e0d3f94ffb8f1d1e",
+    "data/historical_1m/task54_extended_windows/W2/AMAT.csv": "74064762053e55e4b63fad27dc69d2501f308c8330b064b26fee094736781795",
+    "data/historical_1m/task54_extended_windows/W2/AVGO.csv": "3175cd7b1756f8f514d26e2124097271c33268484238dd539b60aa13d813a9e5",
+    "data/historical_1m/task54_extended_windows/W2/LRCX.csv": "80639341711f330b54536b7977ce7b942ded63968b2534aae30057102343dc11",
+    "data/historical_1m/task54_extended_windows/W2/STX.csv": "26e0e770793dea05a619a77b22f829f85ec6d37d1ab1a7307905adeaaf71d3e5",
+    "data/historical_1m/task54_extended_windows/W3/AMAT.csv": "64b6e583e29910e6eb7d6b7f88b1b378108416ec2228ff567f76a1da16f345dd",
+    "data/historical_1m/task54_extended_windows/W3/KLAC.csv": "42b7bcbf1cc007211623196b5885dd52056d2e35f7c175175e21ea47979e4390",
+    "data/historical_1m/task54_extended_windows/W3/TXN.csv": "e00ad3ba777af1f1a100804481e86a32d7b2b5da37f9396403c3e8ba2c9e745d",
+    "data/historical_1m/task54_extended_windows/W3/INTC.csv": "53fbeba73fb3da6ac51d4f7f7f2abe0f8b0fd26f64087304553271e9d74a68a7",
+    "data/historical_1m/task54_extended_windows/W3/STX.csv": "2629a81a7d419dd8bad5562644eab519fee365c50a76f380a62f1cda03dba657",
+    "data/historical_1m/task54_extended_windows/W3/AMZN.csv": "55559ddd34c1ecbe874955b7529e251b70cc569a7d06f0d51bdb2f5cff3632aa",
+    "data/historical_1m/task54_extended_windows/W3/MU.csv": "9e739f27ac7b624fed77084695d5498ecb3ee6794dde2c6753f66c045ce3c78e",
+    "data/historical_1m/task54_extended_windows/W3/PANW.csv": "3e1704d2fc9eddfb75de603f13db15ecbd0ecb85f84eac3ab2bd850f8a578184",
+    "data/historical_1m/task54_extended_windows/W3/QCOM.csv": "0fc2664a08de76535cd7208cc52ebee2f4125de9d314f4946b66a3fdce32c0da",
+    "data/historical_1m/task54_extended_windows/W3/INTU.csv": "f98aabe2e803b1176446e9ffead3166bc71a04d613340974ca6edd0848a52f44",
+    "data/historical_1m/task54_extended_windows/W3/AVGO.csv": "fdbc14805148b25bfa1dc59cae6230c5e44a35f0a8462edbd41c949dcfdb0458",
+    "data/historical_1m/task54_extended_windows/W3/AMD.csv": "16b4380278c729d84ecce5a99fec5b72a2207691ced3abaeab7a85b408dda53c",
+    "data/historical_1m/task54_extended_windows/W3/LRCX.csv": "0b2761e5f258021d0774871735e7d4a0e6afccff199f29e22a591826dc59afc3",
+    "data/historical_1m/task54_extended_windows/W3/TSLA.csv": "7aa387228a11b452e0bb9f05c22fa300ad4239dd89eed7375c85fc3cc23a5c98",
+    "data/historical_1m/task56_holdout/H1_early/INTC.csv": "d90d0a4cefbc6ab3a0bcbff8ea2ec16286b4abd692bb5bf3f327e5727433a56e",
+    "data/historical_1m/task56_holdout/H1_early/KLAC.csv": "4e73613663cede7fd38159e29b64348b9a0305cefcb4d850fa52bbdfed06e716",
+    "data/historical_1m/task56_holdout/H1_early/AMAT.csv": "6a1be266ca3c22995e2c953869aba34fc822fcb225a499c14bc5a870849793f2",
+    "data/historical_1m/task56_holdout/H1_early/VRTX.csv": "c00615a9e8a51b50865873a23199b751222ce85eea19286ed6bf58dee1a91bdf",
+    "data/historical_1m/task56_holdout/H1_early/LRCX.csv": "8daa56bed4e855a04e925431f322a6f7fa8693d4ecb5f42890b09bf4ee4d6993",
+    "data/historical_1m/task56_holdout/H1_early/PANW.csv": "54a6c33e7c298ea7ad3eb79b6e486d3b78cc7384a9424b4d4241c6166e9cb44b",
+    "data/historical_1m/task7b_alpaca_long_history/AMD.csv": "595249d9b6ec242376243e2c016af90bee189ed0a506dd87a7e197c7f38a880d",
+    "data/historical_1m/task56_holdout/H2_middle/AMAT.csv": "ebbcd667411f2ddc7b773ab49bcec23e62a2cf2b9abc746214ceb5303d80e1b9",
+    "data/historical_1m/task56_holdout/H2_middle/BKNG.csv": "b52db4fa4ce7594b4885961500845f06b95d0b12416506092c9ea009dafb9606",
+    "data/historical_1m/task56_holdout/H2_middle/INTU.csv": "d256539121be774cb4e6d6dc8db40bf5ffeb9f95ed6baf3c1f5aedffe2e9f74e",
+    "data/historical_1m/task7b_alpaca_long_history/STX.csv": "201a483a9f7c06c72fe62bf286350cc48a85a64a7a827e010bc6fd15b199614f",
+    "data/historical_1m/task56_holdout/H2_middle/LRCX.csv": "dabce29771686e5d2ecf43a2e6bcc576ca113180ded7629341f044e6d44cf29e",
+    "data/historical_1m/task56_holdout/H3_late/AMAT.csv": "7c96930b2fb0b6c427f8b5e90de52d3479023d181afdfe502671220b65b6e8e0",
+    "data/historical_1m/task56_holdout/H3_late/ADI.csv": "9a7a1ab394dbcacb9c093409b424f83d2897f3c8820ad2133da71fda62b157b1",
+    "data/historical_1m/task56_holdout/H3_late/PANW.csv": "e20b96c96bf742495c20082d36f05195197e4dbbb65a04cdc1998595999794a3",
+    "data/historical_1m/task56_holdout/H3_late/GILD.csv": "247735befa9f0e1da3741f76f623e8822f810ebe9bb563148f70a00beebfa6dd",
+    "data/historical_1m/task56_holdout/H3_late/VRTX.csv": "5129cb0353eba7249e7a400c94eea7f85b6e419092113e4d40cb739bed88b724",
+    "data/historical_1m/task56_holdout/H3_late/AVGO.csv": "4b3dff8f7297fcd733052ce5afa1e150515d80f5a8f020277d306e36c621947b",
+    "data/historical_1m/task56_holdout/H3_late/BKNG.csv": "89876285d065c2db7265decdd52ea4dd47b242af6e75824832b5675e469f61ee",
+    "data/historical_1m/task56_holdout/H3_late/MU.csv": "a19a16c7845a6299762448af7a0a4cc6af10b12e2a5af8a8d099f487de5d3020",
+    "data/historical_1m/task56_holdout/H3_late/LRCX.csv": "12c1674b93b653ff474cda5acb3cf20dc743dc83ae6c24c923fae328311a9b55",
+    "data/historical_1m/task56_holdout/H3_late/KLAC.csv": "b3476627ea355280d45852f8ab81527f508a0fd53bde4708b31b5cf44a18e004",
+    "data/historical_1m/task56_holdout/H3_late/CMCSA.csv": "c974f82157aea7add421585e2fc7d8c90c5d0157ebc0b89caa33dc7e54b2456c",
+    "data/historical_1m/task56_holdout/H3_late/ADBE.csv": "81500307ff1cdc941001431c1477579cc6f6c11d0629a9512ea6ebe6b92685b8",
+    "data/historical_1m/task7b_alpaca_long_history/META.csv": "e778c8dfe4a863ef5a3cf6a34e26e3d5947ffafcfa7dd7876ff3e135c9b13988",
+    "data/historical_1m/task56_holdout/H3_late/INTU.csv": "f60882ee3dfa10e1d49a9a4223de8c415f768969e0d07860b3a849e491dd3646"
+  },
+  "dataset_group_sha256": {
+    "Task53/X_early": "1b6d2286b9f95e2d5f4b94215fa82d562ec4e11a0fe4a0a35f708a343046573e",
+    "Task53/Y_middle": "21815026356946eac3a8bb3977ca4573da67a7e23eee8704b932e9968cfda866",
+    "Task53/Z_late": "682f9e946ec3fe51c349ff5903ac860036a34280f14ea3a60bde79676a34f29d",
+    "Task54/W1": "b7d459276357f01b491a463f2f1c297b24a3bd5f768b4a6bff1915b0c09717f1",
+    "Task54/W2": "92a7e5e4fd44ca900989344a8f67017e367a6da6991f375d671273dc4700bff4",
+    "Task54/W3": "8d30e4a751f0b71f76f2c4955b0db787bdfd886759013746acf73303cfb91c1b",
+    "Task56/H1_early": "10ac440f5f4ff6825f8f156b2778b622a9cb4ff3e7b3cf39189f82019d5f5d53",
+    "Task56/H2_middle": "b40578ea52438b7e86cadb9317dcd5277469c2ba3caf3be29bff39f47ffd5c99",
+    "Task56/H3_late": "a022c54638563d44411e25d94533d73b323530b9aa1cdd18c381dbcd63378b42"
+  },
+  "prior_economics": {
+    "N": 56,
+    "winners": 19,
+    "losses": 37,
+    "flats": 0,
+    "win_rate": 0.3392857142857143,
+    "gross_total_R": 34.7785122869317,
+    "gross_expectancy_R": 0.6210448622666375,
+    "gross_PF": 1.9399597915386946,
+    "median_R": -1.0,
+    "p25_R": -1.0,
+    "p75_R": 1.0171267919989517,
+    "mean_winning_R": 3.7778164361543,
+    "median_winning_R": 2.7702697664110465,
+    "mean_losing_R": -1.0,
+    "max_winner_R": 13.439597315440796,
+    "top3_winner_mean_R": 10.569660085283479,
+    "top5_winner_mean_R": 8.728961132549998,
+    "positive_R_top3_concentration": 0.44176145820764673,
+    "stop_rate": 0.6607142857142857,
+    "signal_exit_rate": 0.14285714285714285,
+    "end_of_session_rate": 0.19642857142857142,
+    "target_rate": 0.0,
+    "holding_minutes_mean": 73.51785714285714,
+    "holding_minutes_median": 25.5,
+    "total_R_5bps": 15.846314187535532
+  },
+  "task56_economics": {
+    "N": 44,
+    "winners": 15,
+    "losses": 28,
+    "flats": 1,
+    "win_rate": 0.3409090909090909,
+    "gross_total_R": 0.7226350248619948,
+    "gross_expectancy_R": 0.016423523292318064,
+    "gross_PF": 1.0330178097785379,
+    "median_R": -0.313758595781246,
+    "p25_R": -1.0,
+    "p75_R": 0.41935229184859063,
+    "mean_winning_R": 1.507256953462792,
+    "median_winning_R": 0.7409200968522905,
+    "mean_losing_R": -0.7816506884671387,
+    "max_winner_R": 5.467750550323512,
+    "top3_winner_mean_R": 3.8896959992603004,
+    "top5_winner_mean_R": 3.2777207819866057,
+    "positive_R_top3_concentration": 0.5161291165814909,
+    "stop_rate": 0.45454545454545453,
+    "signal_exit_rate": 0.18181818181818182,
+    "end_of_session_rate": 0.36363636363636365,
+    "target_rate": 0.0,
+    "holding_minutes_mean": 89.27272727272727,
+    "holding_minutes_median": 64.5,
+    "total_R_5bps": -10.544234787014368
+  },
+  "decomposition": {
+    "gross_expectancy_R": {
+      "prior": 0.6210448622666375,
+      "task56": 0.016423523292318064,
+      "change": -0.6046213389743194
+    },
+    "win_rate": {
+      "prior": 0.3392857142857143,
+      "task56": 0.3409090909090909,
+      "change": 0.0016233766233765823
+    },
+    "mean_winning_R": {
+      "prior": 3.7778164361543,
+      "task56": 1.507256953462792,
+      "change": -2.2705594826915076
+    },
+    "median_winning_R": {
+      "prior": 2.7702697664110465,
+      "task56": 0.7409200968522905,
+      "change": -2.029349669558756
+    },
+    "winner_2R_plus_rate": {
+      "prior": 0.17857142857142858,
+      "task56": 0.11363636363636363,
+      "change": -0.06493506493506494
+    },
+    "winner_4R_plus_rate": {
+      "prior": 0.10714285714285714,
+      "task56": 0.022727272727272728,
+      "change": -0.08441558441558442
+    },
+    "winner_median_MFE_R": {
+      "prior": 4.23965074682896,
+      "task56": 2.199525168500723,
+      "change": -2.0401255783282366
+    },
+    "winner_median_realization_ratio": {
+      "prior": 0.7084130019120479,
+      "task56": 0.7175843694493725,
+      "change": 0.009171367537324615
+    },
+    "median_holding_minutes": {
+      "prior": 25.5,
+      "task56": 64.5,
+      "change": 39.0
+    },
+    "end_of_session_rate": {
+      "prior": 0.19642857142857142,
+      "task56": 0.36363636363636365,
+      "change": 0.16720779220779222
+    },
+    "signal_exit_rate": {
+      "prior": 0.14285714285714285,
+      "task56": 0.18181818181818182,
+      "change": 0.038961038961038974
+    },
+    "median_price_vs_sma200_pct": {
+      "prior": 2.1288069421722344,
+      "task56": 2.565836079162953,
+      "change": 0.43702913699071866
+    },
+    "median_atr_pct_15m": {
+      "prior": 0.807204324537913,
+      "task56": 0.655284822225433,
+      "change": -0.15191950231247997
+    },
+    "median_atr_pct_60m": {
+      "prior": 1.2230191044282819,
+      "task56": 1.0801236881414953,
+      "change": -0.1428954162867866
+    },
+    "open_entry_share": {
+      "prior": 0.23214285714285715,
+      "task56": 0.1590909090909091,
+      "change": -0.07305194805194806
+    },
+    "median_minutes_to_1600": {
+      "prior": 245.5,
+      "task56": 172.0,
+      "change": -73.5
+    },
+    "top_symbol_trade_share": {
+      "prior": 0.17857142857142858,
+      "task56": 0.11363636363636363,
+      "change": -0.06493506493506494
+    },
+    "median_stop_risk_pct": {
+      "prior": 0.4305968398609795,
+      "task56": 0.551483244127011,
+      "change": 0.12088640426603148
+    },
+    "winner_median_stop_risk_pct": {
+      "prior": 0.460749349730073,
+      "task56": 0.5572632184162185,
+      "change": 0.09651386868614553
+    },
+    "winner_median_MFE_price_pct": {
+      "prior": 1.6153205661948358,
+      "task56": 0.9407436344509176,
+      "change": -0.6745769317439182
+    },
+    "median_forward_60m_MFE_R": {
+      "prior": 1.5507856665056805,
+      "task56": 0.7165872275279241,
+      "change": -0.8341984389777564
+    },
+    "expectancy_change_frequency_component": {
+      "prior": null,
+      "task56": null,
+      "change": 0.030483468240510066
+    },
+    "expectancy_change_winner_size_component": {
+      "prior": null,
+      "task56": null,
+      "change": -0.7740543690993775
+    },
+    "expectancy_change_loser_size_component": {
+      "prior": null,
+      "task56": null,
+      "change": 0.1389495618845481
+    },
+    "exit_path_composition_effect": {
+      "prior": null,
+      "task56": null,
+      "change": 0.9899925257512259
+    },
+    "within_exit_path_payoff_effect": {
+      "prior": null,
+      "task56": null,
+      "change": -1.5946138647255452
+    }
+  },
+  "concentration": {
+    "prior_2R_plus_count": 10,
+    "tasks": 2,
+    "windows": 4,
+    "symbols": 8,
+    "top_symbol_large_winner_R_share": 0.219152167253903,
+    "top_two_window_share_of_prior_2R_plus_R": 0.7544997390720122,
+    "prior_expectancy_after_top3_winner_removal": 0.05791569869964643
+  },
+  "validation": {
+    "source_reproduction": [
+      {
+        "task": "Task53",
+        "actual": {
+          "n": 17,
+          "gross": 6.205053729136223,
+          "gross_expectancy": 0.3650031605374249,
+          "winners": 4,
+          "win_rate": 0.23529411764705882,
+          "average_winning_R": 4.801263432284056,
+          "average_losing_R": -1.0,
+          "net5": 0.5431955058463398
+        },
+        "expected": {
+          "n": 17,
+          "gross": 6.205053729136223,
+          "net5": 0.5431955058463391
+        },
+        "passed": true
+      },
+      {
+        "task": "Task54",
+        "actual": {
+          "n": 39,
+          "gross": 28.573458557795476,
+          "gross_expectancy": 0.7326527835332174,
+          "winners": 15,
+          "win_rate": 0.38461538461538464,
+          "average_winning_R": 3.504897237186364,
+          "average_losing_R": -1.0,
+          "net5": 15.303118681689195
+        },
+        "expected": {
+          "n": 39,
+          "gross": 28.573458557795476,
+          "net5": 15.303118681690709
+        },
+        "passed": true
+      },
+      {
+        "task": "Task56",
+        "actual": {
+          "n": 44,
+          "gross": 0.7226350248619948,
+          "gross_expectancy": 0.016423523292318064,
+          "winners": 15,
+          "win_rate": 0.3409090909090909,
+          "average_winning_R": 1.507256953462792,
+          "average_losing_R": -0.7816506884671387,
+          "net5": -10.544234787014368
+        },
+        "expected": {
+          "n": 44,
+          "gross": 0.7226350248619953,
+          "net5": -10.544234787013044
+        },
+        "passed": true
+      }
+    ],
+    "all_source_reproduction_passed": true,
+    "rsi_counts": {
+      "Task53": 17,
+      "Task54": 39,
+      "Task56": 44
+    },
+    "duplicate_source_trades": 0,
+    "family_mapping": "signal_type prefix rsi_ => RSI; 100/100",
+    "max_abs_mfe_price_reconstruction_diff": 9.999999997489795e-05,
+    "max_abs_mae_price_reconstruction_diff": 0.0,
+    "mfe_mae_price_precision_tolerance": 0.00011,
+    "mfe_mae_causally_bounded": true,
+    "forward_horizons_never_cross_session_close": true,
+    "strategy_replay_occurred": false,
+    "new_market_data_downloaded": false,
+    "strategy_or_config_modified_by_script": false,
+    "deterministic_reproduction": {
+      "verified": true,
+      "method": "two consecutive full runs; 17/17 artifact SHA-256 hashes identical"
+    }
+  }
+}

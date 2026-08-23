@@ -5578,3 +5578,52 @@ assumption or recommendation.
 behavior change, or capital use. All 17 artifacts reproduced byte-identically across two runs. Protected
 strategy/config files remained unchanged. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`; no ex-post
 geometry exclusion is authorized as a filter.
+
+## Task 58 — RSI Winner-Magnitude / Payoff Regime Diagnostic (2026-08-23)
+
+> **PREVIOUS**: Task 57 classified the combined execution-friction/geometry evidence as
+> `BOTH_GROSS_AND_COST_WEAK`. It isolated Task 56 RSI's change to winner magnitude: Tasks 53+54 averaged
+> 3.778R per winner versus 1.507R in Task 56, while win rate was nearly unchanged and stop/cost geometry
+> improved. Deployment remained `MONDAY_DECISION_SHADOW_ONLY` with no strategy or capital action.
+>
+> **NEW EVIDENCE**: a deterministic, observational diagnostic reproduced all 100 committed RSI trades:
+> Task 53 17 trades, +6.205R gross (+0.365R/trade), four winners (23.5%), +0.543R at 5bps; Task 54 39
+> trades, +28.573R gross (+0.733R/trade), 15 winners (38.5%), +15.303R at 5bps; Task 56 44 trades,
+> +0.723R gross (+0.016R/trade), 15 winners (34.1%), -10.544R at 5bps. There were zero duplicate source
+> trades. The prior-to-holdout expectancy change (-0.605R/trade) decomposed into +0.030R from frequency,
+> -0.774R from winner size, and +0.139R from smaller losses: winner magnitude was decisive.
+>
+> Prior 2R+/4R+ rates were 17.9%/10.7% versus Task 56's 11.4%/2.3%. Removing only the three largest
+> prior winners reduced prior expectancy from +0.621R to +0.058R, close to Task 56's +0.016R; removing
+> five made it negative. W3 and Z_late supplied 75.5% of prior 2R+ R. The payoff tail was not a single-name
+> artifact: prior 2R+ winners spanned both tasks, four task/windows, and eight symbols, the largest symbol
+> supplied 21.9% of 2R+ R, and every leave-one-symbol-out prior expectancy remained positive.
+>
+> Canonical winner MFE fell from a 4.240R median to 2.200R, while median realized/MFE efficiency stayed
+> essentially unchanged (0.708 versus 0.718). Median observational 60-minute forward favorable excursion
+> fell from 1.551R to 0.717R and to-session-close excursion from 3.161R to 0.906R. Thus Task 56 generally
+> did not offer comparable continuation; the exits did not merely discard an otherwise-present excursion.
+> Positive END_OF_SESSION payoffs fell from the prior multi-R scale to 1.199R mean in Task 56, even as the
+> EOD share rose from 19.6% to 36.4%, supporting changed continuation magnitude as well as exit mix.
+>
+> All entries were trend-aligned and regime-ready/eligible under the frozen system semantics. Task 56 was
+> somewhat shallower in accepted volatility (median 15m ATR 0.655% versus 0.807%; 60m 1.080% versus
+> 1.223%), but this was not a stable large-winner separator: Task 54's 2R+ trades were deeper in volatility,
+> while Task 53's two 2R+ trades were not. Task 56 was farther above the 15m SMA200 and had wider median
+> stop risk, so neither weak HTF alignment nor tight stop/cost geometry explains the payoff tail. Wider risk
+> modestly reduced R scaling, while lower price and R excursions supplied the stronger evidence.
+>
+> **UPDATED CONCLUSION**: `PRIOR_WINNERS_CONCENTRATED`.
+>
+> **REASON**: the apparent prior RSI edge depended heavily on a small winner tail concentrated in W3 and
+> Z_late. Task 56 preserved winner frequency but did not reproduce comparable 4R+ continuation. Although
+> lower accepted volatility is plausible context, it failed the required separate Task 53/54/56
+> reproducibility check and cannot support a stable large-winner regime claim or candidate filter.
+
+**Scope/validation**: committed trades and already-downloaded Alpaca bars only; no strategy replay, market
+download, new signal, parameter search, ML, filter, or production change. Canonical MFE/MAE was independently
+checked against entry-through-actual-exit bars with exit-path-correct bounds; all fixed forward horizons were
+clipped before 16:00 ET. The sole price reconstruction difference was 0.0001 from source CSV precision.
+Protected strategy/config files remained unchanged. This explanatory result authorizes no strategy action;
+any proposed rule requires a new preregistered independent validation. Deployment remains
+`MONDAY_DECISION_SHADOW_ONLY`.
