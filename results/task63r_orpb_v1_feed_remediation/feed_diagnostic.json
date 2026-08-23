@@ -1,0 +1,310 @@
+{
+  "cases": [
+    {
+      "iex": {
+        "feed_parameter": "iex",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:30",
+          "09:35"
+        ],
+        "regular_session_bars": 13,
+        "regular_session_sha256": "04c23ad7557eb705a80f60d68b38f89de2241062ffe5ae515c45022639076148"
+      },
+      "omitted": {
+        "feed_parameter": "omitted",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:30",
+          "09:35",
+          "09:45",
+          "09:50"
+        ],
+        "regular_session_bars": 137,
+        "regular_session_sha256": "b983671075e4193b0dc0b348d1023e92085adcf969d088a5a4fd609004f95d45"
+      },
+      "persisted": {
+        "opening_buckets": [
+          "09:30",
+          "09:35",
+          "09:45",
+          "09:50"
+        ],
+        "regular_session_bars": 137,
+        "regular_session_sha256": "b983671075e4193b0dc0b348d1023e92085adcf969d088a5a4fd609004f95d45"
+      },
+      "session": "2025-02-10",
+      "sip": {
+        "feed_parameter": "sip",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:30",
+          "09:35",
+          "09:45",
+          "09:50"
+        ],
+        "regular_session_bars": 137,
+        "regular_session_sha256": "b983671075e4193b0dc0b348d1023e92085adcf969d088a5a4fd609004f95d45"
+      },
+      "symbol": "BKNG"
+    },
+    {
+      "iex": {
+        "feed_parameter": "iex",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:35",
+          "09:40",
+          "09:50"
+        ],
+        "regular_session_bars": 24,
+        "regular_session_sha256": "88902363eb939b56eed93789489913e8cae1d22667749be141be433a39fb9fcd"
+      },
+      "omitted": {
+        "feed_parameter": "omitted",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:30",
+          "09:35",
+          "09:40",
+          "09:50",
+          "09:55"
+        ],
+        "regular_session_bars": 138,
+        "regular_session_sha256": "a2164704c2172393dd99d31f4733ab1b5bbbd2f13489d98cfff7b4abfcb6cfe7"
+      },
+      "persisted": {
+        "opening_buckets": [
+          "09:30",
+          "09:35",
+          "09:40",
+          "09:50",
+          "09:55"
+        ],
+        "regular_session_bars": 138,
+        "regular_session_sha256": "a2164704c2172393dd99d31f4733ab1b5bbbd2f13489d98cfff7b4abfcb6cfe7"
+      },
+      "session": "2025-02-11",
+      "sip": {
+        "feed_parameter": "sip",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:30",
+          "09:35",
+          "09:40",
+          "09:50",
+          "09:55"
+        ],
+        "regular_session_bars": 138,
+        "regular_session_sha256": "a2164704c2172393dd99d31f4733ab1b5bbbd2f13489d98cfff7b4abfcb6cfe7"
+      },
+      "symbol": "BKNG"
+    },
+    {
+      "iex": {
+        "feed_parameter": "iex",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:30"
+        ],
+        "regular_session_bars": 19,
+        "regular_session_sha256": "a163e133df885a714dba4f322cce313aedaa91121ef43046ea0033a5a469356f"
+      },
+      "omitted": {
+        "feed_parameter": "omitted",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:30",
+          "09:40",
+          "09:45"
+        ],
+        "regular_session_bars": 110,
+        "regular_session_sha256": "2d751aa791874c7de108aa18b47eec7bb5152f05f42a389ee732477196e18cda"
+      },
+      "persisted": {
+        "opening_buckets": [
+          "09:30",
+          "09:40",
+          "09:45"
+        ],
+        "regular_session_bars": 110,
+        "regular_session_sha256": "2d751aa791874c7de108aa18b47eec7bb5152f05f42a389ee732477196e18cda"
+      },
+      "session": "2025-03-26",
+      "sip": {
+        "feed_parameter": "sip",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:30",
+          "09:40",
+          "09:45"
+        ],
+        "regular_session_bars": 110,
+        "regular_session_sha256": "2d751aa791874c7de108aa18b47eec7bb5152f05f42a389ee732477196e18cda"
+      },
+      "symbol": "BKNG"
+    },
+    {
+      "iex": {
+        "feed_parameter": "iex",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:35"
+        ],
+        "regular_session_bars": 19,
+        "regular_session_sha256": "271e9b142ee63c6b7a53a33b1a848ed1c0c6ec6ba7179d5f35904ced7c6df039"
+      },
+      "omitted": {
+        "feed_parameter": "omitted",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:30",
+          "09:35",
+          "09:40",
+          "09:45",
+          "09:50"
+        ],
+        "regular_session_bars": 128,
+        "regular_session_sha256": "b48e58312d0e1a57702d829c7dc98e4c34d820634765f2e451eaa78401f7fa6b"
+      },
+      "persisted": {
+        "opening_buckets": [
+          "09:30",
+          "09:35",
+          "09:40",
+          "09:45",
+          "09:50"
+        ],
+        "regular_session_bars": 128,
+        "regular_session_sha256": "b48e58312d0e1a57702d829c7dc98e4c34d820634765f2e451eaa78401f7fa6b"
+      },
+      "session": "2025-04-25",
+      "sip": {
+        "feed_parameter": "sip",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:30",
+          "09:35",
+          "09:40",
+          "09:45",
+          "09:50"
+        ],
+        "regular_session_bars": 128,
+        "regular_session_sha256": "b48e58312d0e1a57702d829c7dc98e4c34d820634765f2e451eaa78401f7fa6b"
+      },
+      "symbol": "BKNG"
+    },
+    {
+      "iex": {
+        "feed_parameter": "iex",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:35",
+          "09:40"
+        ],
+        "regular_session_bars": 31,
+        "regular_session_sha256": "3694ae0d4943c0ac3ee1ae867f7b28e77134e740668bc42d167ed9cb1b62c105"
+      },
+      "omitted": {
+        "feed_parameter": "omitted",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:30",
+          "09:35",
+          "09:40",
+          "09:45",
+          "09:55"
+        ],
+        "regular_session_bars": 191,
+        "regular_session_sha256": "7d7be2766e69249355597c2db98cb65cfa3a4903867385bc025c6fb0a6d3e66b"
+      },
+      "persisted": {
+        "opening_buckets": [
+          "09:30",
+          "09:35",
+          "09:40",
+          "09:45",
+          "09:55"
+        ],
+        "regular_session_bars": 191,
+        "regular_session_sha256": "7d7be2766e69249355597c2db98cb65cfa3a4903867385bc025c6fb0a6d3e66b"
+      },
+      "session": "2025-04-30",
+      "sip": {
+        "feed_parameter": "sip",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:30",
+          "09:35",
+          "09:40",
+          "09:45",
+          "09:55"
+        ],
+        "regular_session_bars": 191,
+        "regular_session_sha256": "7d7be2766e69249355597c2db98cb65cfa3a4903867385bc025c6fb0a6d3e66b"
+      },
+      "symbol": "BKNG"
+    },
+    {
+      "iex": {
+        "feed_parameter": "iex",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:40"
+        ],
+        "regular_session_bars": 56,
+        "regular_session_sha256": "3725d80bedae0a29b82192dedf2b9a84d7409ddbc25914ca82185bc8e09be275"
+      },
+      "omitted": {
+        "feed_parameter": "omitted",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:30",
+          "09:35",
+          "09:40",
+          "09:45",
+          "09:50"
+        ],
+        "regular_session_bars": 274,
+        "regular_session_sha256": "7ec31e1ea4940f41ec1e71a23d5a8dbd9ed7b69dc3caec960217930ba11ba237"
+      },
+      "persisted": {
+        "opening_buckets": [
+          "09:30",
+          "09:35",
+          "09:40",
+          "09:45",
+          "09:50"
+        ],
+        "regular_session_bars": 274,
+        "regular_session_sha256": "7ec31e1ea4940f41ec1e71a23d5a8dbd9ed7b69dc3caec960217930ba11ba237"
+      },
+      "session": "2025-02-07",
+      "sip": {
+        "feed_parameter": "sip",
+        "http_status": 200,
+        "opening_buckets": [
+          "09:30",
+          "09:35",
+          "09:40",
+          "09:45",
+          "09:50"
+        ],
+        "regular_session_bars": 274,
+        "regular_session_sha256": "7ec31e1ea4940f41ec1e71a23d5a8dbd9ed7b69dc3caec960217930ba11ba237"
+      },
+      "symbol": "KLAC"
+    }
+  ],
+  "diagnostic_only": true,
+  "feed_matches": {
+    "iex": false,
+    "omitted": true,
+    "sip": true
+  },
+  "implicit_omitted_matches_persisted": true,
+  "orpb_outcomes_inspected": false,
+  "persisted_task63_feed": "SIP",
+  "sip_available": true,
+  "task": "63R"
+}

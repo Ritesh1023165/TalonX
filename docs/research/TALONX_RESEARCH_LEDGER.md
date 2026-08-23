@@ -5846,3 +5846,33 @@ draft and unmerged.
 **Scope/deployment**: no replay, tuning, variant, extra window, post-outcome filter, capital, or production
 action occurred. ORPB_V1 remains economically unclassified. Deployment remains
 `MONDAY_DECISION_SHADOW_ONLY`; PR #10 remains draft and unmerged.
+
+## Task 63R — Resolve ORPB Alpaca Feed Coverage + Resume Validation (2026-08-23)
+
+> **PREVIOUS**: Task 63 was `VALIDATION_BLOCKED` before signal generation because the persisted Alpaca
+> package could not form all six frozen opening 5-minute buckets for BKNG on five evaluation sessions and
+> KLAC on one. No ORPB signal, trade, return, or outcome was unblinded; ORPB_V1 remained frozen at
+> `b1e283bd36eb0cb2ecc5303b104ec2bd8defc60f6eacef4879e7711d560d113f`.
+>
+> **NEW EVIDENCE**: A provider-semantics-only diagnostic reproducibly refetched all six affected cases with
+> Alpaca's feed parameter omitted, `feed=iex`, and `feed=sip`. SIP access was available. For every case, the
+> persisted Task 63 regular-session payload hash exactly matched both the omitted-feed and explicit-SIP
+> payloads; it did not match IEX. Task 63 therefore already used SIP despite the omitted parameter.
+>
+> The explicit-SIP refetch reproduced every missing opening bucket: BKNG remained incomplete on 2025-02-10,
+> 2025-02-11, 2025-03-26, 2025-04-25, and 2025-04-30, and KLAC remained incomplete on 2025-02-07. No bar was
+> fabricated or interpolated. A uniform-feed manifest records `feed=sip`, all 35 source hashes, and the
+> download/feed-diagnostic hashes. The separate Task 63R full gate rerun passed SIP identity, 35/35 package,
+> fingerprint/hash, zero-drift, corruption, state-isolation, and 12 focused causality/parity proof gates,
+> but reproduced opening-range completeness of 33/35 in O1 and 34/35 in O2 and O3.
+>
+> **UPDATED CONCLUSION**: `VALIDATION_BLOCKED`.
+>
+> **REASON**: the uniform Alpaca SIP source itself does not publish enough 1-minute bars to construct every
+> required frozen opening bucket. The protocol forbids interpolation, another provider, symbol removal, or
+> a relaxed six-bucket gate, so validation again stops before signal generation and outcome access. Resolving
+> the implicit feed was a provider/data-definition correction, not strategy tuning.
+
+**Scope/deployment**: Task 63 history is unchanged. No ORPB replay, trade, return, tuning, variant, extra
+window, capital, or production action occurred. ORPB_V1 remains economically unclassified. Deployment
+remains `MONDAY_DECISION_SHADOW_ONLY`; PR #10 remains draft and unmerged.
