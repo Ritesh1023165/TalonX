@@ -5627,3 +5627,54 @@ clipped before 16:00 ET. The sole price reconstruction difference was 0.0001 fro
 Protected strategy/config files remained unchanged. This explanatory result authorizes no strategy action;
 any proposed rule requires a new preregistered independent validation. Deployment remains
 `MONDAY_DECISION_SHADOW_ONLY`.
+
+## Task 59 — Current Candidate Final Triage + Next Architecture Specification (2026-08-23)
+
+> **PREVIOUS**: Task 57 concluded `BOTH_GROSS_AND_COST_WEAK`, and Task 58 concluded
+> `PRIOR_WINNERS_CONCENTRATED`. The current candidate had technically valid causal plumbing but only
+> +0.092R/trade gross and -0.324R/trade at 5bps across 228 trades. Task 56's independent RSI result was
+> near zero gross and negative after costs; MACD remained gross-negative; the stronger prior RSI result
+> depended heavily on a small multi-R payoff tail. Deployment remained `MONDAY_DECISION_SHADOW_ONLY`.
+>
+> **NEW EVIDENCE**: Task 59 traced the current code path end to end without a replay: deduplicated closed
+> bars and causal 1m/15m/60m state; RSI/MACD/MA event triggers; experimental 15m/60m ATR eligibility;
+> family-aware same-bar independent confirmation; session, blackout, cooldown, loss-lockout, pivot R:R,
+> 15m SMA200, and pre-market gates; composite opportunity ranking and throttle; dynamic/fill-time geometry
+> revalidation; next-bar entry; hard bracket, opposite-family, and 15:50 exits. This contract is technically
+> coherent, shared between live/research paths where intended, and supported by the correctness evidence.
+>
+> The economic assumptions layered onto that plumbing are unsupported. Three heterogeneous trigger families
+> share confirmation, geometry, ranking, and exits without evidence that they represent one edge. Task54's
+> accepted trades all had exactly one confirmation, leaving no accepted-trade contrast for its incremental
+> value. MACD combined gross expectancy was -0.113R and -0.619R at 5bps; MA produced zero trades. All Task58
+> RSI entries were trend-aligned and volatility-regime eligible, but those states did not distinguish a stable
+> large-winner regime. Prior-session structural R:R screened technically valid trades without ensuring realized
+> payoff, and execution friction erased the weak aggregate gross edge even outside extreme-cost pathology.
+>
+> One successor was specified from first principles, not optimized against Tasks53–58:
+> `FAILED_PULLBACK_RECLAIM_CONTINUATION_V1`. Its hypothesis is that, inside an established uptrend, a brief
+> break below regular-session VWAP followed by an immediate reclaim and next-bar price persistence represents
+> absorbed supply and continuation sufficient to clear setup-local invalidation and 5bps friction. RSI/MACD/MA
+> and 15m/60m ATR thresholds become telemetry, not eligibility. The stop is one tick below the local pullback
+> low, no fixed profit target caps continuation, a completed 5m close back below VWAP expresses thesis failure,
+> and estimated/actual-fill 5bps burden must not exceed 0.20R.
+>
+> The untouched evaluation is preregistered as the first 60 complete XNYS trading days after 2026-07-09,
+> three consecutive 20-day windows with causal 10-day pre-roll, the same 35 symbols, Alpaca only, and one
+> frozen candidate. Mandatory criteria include >=60 trades, >=15/window, >=10 symbols, >=+0.15R 5bps
+> expectancy, PF >=1.25, positive bootstrap lower bound, window/symbol/top-winner robustness, and <=0.20R
+> actual-fill cost burden. Any failure after unblinding retires FPRC_V1; no threshold adjustment, sample
+> extension, gate change, or variant replay is allowed on those windows. A first pass still requires a second
+> untouched 60-day replication before any owner production decision.
+>
+> **UPDATED CONCLUSION**: `REDESIGN_SIGNAL_ARCHITECTURE`.
+>
+> **REASON**: the current candidate has enough independent, interpretable evidence to reject continued
+> threshold/family iteration, but its causal data, execution, risk-control, and diagnostic infrastructure is
+> worth retaining. RSI alone is not sufficiently robust to preserve as the next entry architecture. One new
+> hypothesis-specific architecture with cost-aware feasibility is justified; the current candidate itself is
+> not production-ready.
+
+**Scope/deployment**: read-only evidence synthesis and specification only. No correlation mining, threshold
+search, parameter sweep, backtest, data download, signal generation, implementation, capital, or production
+behavior change occurred. Deployment remains `MONDAY_DECISION_SHADOW_ONLY`; PR #10 remains draft/unmerged.
