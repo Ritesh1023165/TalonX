@@ -126,6 +126,20 @@ def test_preflight_ready_when_iex_mode_valid(tmp_path):
     assert status == "PIV_READY" and all(c.passed for c in checks)
 
 
+def test_warmup_capability_check_skipped_when_decision_path_disabled(tmp_path):
+    flight, _, _ = preflight(tmp_path, {"iex": 200}, feed_mode="IEX_PAPER_PIV", decision_path_enabled=False)
+    _, checks = flight.run()
+    warmup = next(c for c in checks if c.name == "warmup_mechanism_capability")
+    assert warmup.passed and "not required" in warmup.detail
+
+
+def test_warmup_capability_check_passes_when_yfinance_importable(tmp_path):
+    flight, _, _ = preflight(tmp_path, {"iex": 200}, feed_mode="IEX_PAPER_PIV", decision_path_enabled=True)
+    _, checks = flight.run()
+    warmup = next(c for c in checks if c.name == "warmup_mechanism_capability")
+    assert warmup.passed  # yfinance is an installed dependency in this environment
+
+
 def test_preflight_fails_closed_on_unknown_feed_mode(tmp_path):
     flight, transport, _ = preflight(tmp_path, {"iex": 200, "sip": 200}, feed_mode="LIVE_SIP")
     status, checks = flight.run()

@@ -114,6 +114,15 @@ class Preflight:
                 return False, f"PIV_TEST_DECISION_PATH=true but Redis unreachable at {self.config.redis_url}: {type(exc).__name__}: {exc}"
             return bool(pong), f"PIV_TEST_DECISION_PATH=true, decision engine reachable via Redis at {self.config.redis_url}"
         check("decision_path_mode", decision_path)
+        def warmup_capability() -> tuple[bool, str]:
+            if not self.config.decision_path_enabled:
+                return True, "PIV_TEST_DECISION_PATH=false -- warmup not required"
+            try:
+                import yfinance  # noqa: F401 -- capability smoke test only, no network call here
+            except Exception as exc:
+                return False, f"warmup mechanism (yfinance) unavailable: {type(exc).__name__}: {exc}"
+            return True, "yfinance importable -- full 35-symbol preseed+verify runs at session start, not preflight"
+        check("warmup_mechanism_capability", warmup_capability)
         check("timezone_and_xnys", lambda: (ZoneInfo("America/New_York").key == "America/New_York", "XNYS/ET configured"))
         check("universe_loaded", lambda: (len(self.config.universe) == 35 and len(set(self.config.universe)) == 35, f"{len(self.config.universe)} symbols"))
         check("stale_detection_armed", lambda: (self.config.stale_seconds > 0, f"{self.config.stale_seconds}s"))

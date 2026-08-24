@@ -147,6 +147,7 @@ async def test_decision_engine_only_called_for_ready_symbols(tmp_path):
     batches.append({"AAPL": bar_row(to_utc_iso(live_tick)), "MSFT": bar_row(to_utc_iso(live_tick))})
 
     fake_engine = AsyncMock()
+    fake_engine.warmup_ready_symbols = {"AAPL", "MSFT"}  # both warmup-ready -- this test isolates the readiness-validator gate
     run, transport, bus = runner(tmp_path, batches, decision_engine=fake_engine)
     ticks = [datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i) for i in range(30)]
     ticks.append(live_tick)

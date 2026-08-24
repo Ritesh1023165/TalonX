@@ -46,6 +46,7 @@ from talonx_quant.schemas import QuantSignal, SignalDirection
 from .broker import PaperGuardError
 from .events import EventBus, PivEvent
 from .lifecycle import PaperLifecycle
+from .warmup import WarmupCheck, preseed_and_verify
 
 PIV_QUANTITY = 1.0
 
@@ -76,10 +77,22 @@ class DecisionEngine:
         self._subscribed = False
         self.positions: dict[str, OpenDecisionPosition] = {}
         self.natural_signal_count = 0
+        self.warmup_checks: list[WarmupCheck] = []
+        self.warmup_ready_symbols: set[str] = set()
 
-    async def start(self) -> None:
+    async def start(self, universe: list[str] | None = None) -> list[WarmupCheck]:
+        """Causal pre-market hydration, then subscribe to the scanner's own
+        signal channel. universe=None skips warmup entirely (e.g. a test
+        that doesn't need it) -- callers driving a real session must always
+        pass the configured PIV universe. See warmup.py's module docstring
+        for the causality argument and why this must run before any live
+        bar is fed to the scanner."""
+        if universe is not None:
+            self.warmup_checks = await preseed_and_verify(self.scanner, universe, self.config.htf_sma_period)
+            self.warmup_ready_symbols = {c.symbol for c in self.warmup_checks if c.ready}
         await self._pubsub.subscribe(self.config.signals_channel)
         self._subscribed = True
+        return self.warmup_checks
 
     async def stop(self) -> None:
         if self._subscribed:

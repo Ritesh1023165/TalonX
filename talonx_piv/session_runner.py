@@ -166,7 +166,13 @@ class SessionRunner:
             self._finalize_readiness(session, now)
 
         if self.decision_engine is not None and self._ready_symbols:
-            ready_bars = {s: b for s, b in new_bars.items() if s in self._ready_symbols}
+            # A symbol must be BOTH session-readiness READY (opening-data
+            # complete) AND warmup-ready (scanner has enough causal history
+            # to compute indicators / HTF trend) before it ever reaches the
+            # decision engine -- two independent fail-closed gates, neither
+            # weakens the other.
+            decision_eligible = self._ready_symbols & self.decision_engine.warmup_ready_symbols
+            ready_bars = {s: b for s, b in new_bars.items() if s in decision_eligible}
             if ready_bars:
                 await self.decision_engine.on_bars(ready_bars)
 
@@ -186,6 +192,12 @@ class SessionRunner:
         if result.ran:
             self._probe_position_open = True
 
+    def _write_warmup_report(self, warmup_checks: list) -> None:
+        import json
+        path = self.config.state_dir / "warmup_verification.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps([c.to_dict() for c in warmup_checks], indent=2, sort_keys=True), encoding="utf-8")
+
     def _close_probe(self) -> None:
         closed = close_piv_lifecycle_probe(self.events, self.lifecycle)
         if closed is not None:
@@ -197,7 +209,15 @@ class SessionRunner:
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         if self.decision_engine is not None:
-            await self.decision_engine.start()
+            warmup_checks = await self.decision_engine.start(list(self.config.universe))
+            self._write_warmup_report(warmup_checks)
+            if self.config.universe and not self.decision_engine.warmup_ready_symbols:
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", reason="WARMUP_CATASTROPHIC_FAILURE_ZERO_SYMBOLS_READY",
+                    status="DECISION_PATH_CANNOT_SAFELY_PROCEED",
+                ))
+                await self.decision_engine.stop()
+                return
         try:
             self.events.emit(PivEvent.build("PAPER_SESSION_STARTED", status="LIVE_RUNNER_LOOP_STARTED"))
             while True:
