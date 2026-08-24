@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 import requests
 
 from .broker import AlpacaPaperClient
-from .config import PivConfig
+from .config import CANONICAL_ALPHA_FEED_MODES, FEED_MODE_PARAM, FEED_MODES, PivConfig
 from .events import EventBus, PivEvent
 from .readiness import SessionReadinessValidator
 
@@ -31,7 +31,8 @@ def config_hash(config: PivConfig) -> str:
         "paper_trading": config.paper_trading, "real_capital": config.real_capital,
         "broker_endpoint": config.broker_endpoint, "data_endpoint": config.data_endpoint,
         "stale_seconds": config.stale_seconds, "entry_cutoff_et": config.entry_cutoff_et,
-        "eod_flatten_et": config.eod_flatten_et, "universe": config.universe, "version": "TASK64_V1",
+        "eod_flatten_et": config.eod_flatten_et, "universe": config.universe, "feed_mode": config.feed_mode,
+        "version": "TASK64_V1",
     }
     return hashlib.sha256(json.dumps(safe, sort_keys=True).encode()).hexdigest()
 
@@ -79,15 +80,29 @@ class Preflight:
             matched = internal == broker_symbols
             return matched, f"internal={sorted(internal)} broker={sorted(broker_symbols)}"
         check("internal_broker_reconciled", reconcile)
-        def sip() -> tuple[bool, str]:
+        def market_data_feed() -> tuple[bool, str]:
+            mode = self.config.feed_mode
+            if mode not in FEED_MODES:
+                return False, f"unknown feed_mode={mode!r}; must be one of {FEED_MODES}"
+            # Explicit, mode-pinned feed param only -- never omitted, never
+            # retried against a different feed on failure. A RESEARCH_SIP
+            # preflight that gets a 403 on sip must fail closed, not
+            # silently probe iex, and vice versa.
+            feed_param = FEED_MODE_PARAM[mode]
             url = f"{self.config.data_endpoint}/v2/stocks/AAPL/trades/latest"
-            response = self.transport.get(url, headers=self.broker.headers, params={"feed": "sip"}, timeout=15)
+            response = self.transport.get(url, headers=self.broker.headers, params={"feed": feed_param}, timeout=15)
             trade = response.json().get("trade") or {}
             raw_timestamp = str(trade.get("t") or "")
             parsed = datetime.fromisoformat(raw_timestamp.replace("Z", "+00:00")) if raw_timestamp else None
             valid = response.status_code == 200 and parsed is not None and parsed.tzinfo is not None
-            return valid, f"HTTP {response.status_code} feed=sip timestamp={raw_timestamp}"
-        check("alpaca_sip_accessible", sip)
+            return valid, f"HTTP {response.status_code} feed_mode={mode} feed={feed_param} timestamp={raw_timestamp}"
+        check("market_data_feed_accessible", market_data_feed)
+        def feed_classification() -> tuple[bool, str]:
+            mode = self.config.feed_mode
+            canonical = mode in CANONICAL_ALPHA_FEED_MODES
+            label = "CANONICAL_ALPHA_EVIDENCE" if canonical else "OPERATIONAL_PIV_ONLY_NOT_ALPHA_EVIDENCE"
+            return mode in FEED_MODES, f"feed_mode={mode} classification={label}"
+        check("feed_mode_classification", feed_classification)
         check("timezone_and_xnys", lambda: (ZoneInfo("America/New_York").key == "America/New_York", "XNYS/ET configured"))
         check("universe_loaded", lambda: (len(self.config.universe) == 35 and len(set(self.config.universe)) == 35, f"{len(self.config.universe)} symbols"))
         check("stale_detection_armed", lambda: (self.config.stale_seconds > 0, f"{self.config.stale_seconds}s"))
@@ -112,6 +127,10 @@ class Preflight:
         return status, checks
 
     @staticmethod
-    def write_report(path: Path, status: str, checks: list[Check]) -> None:
+    def write_report(path: Path, status: str, checks: list[Check], feed_mode: str | None = None) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"generated_at": datetime.now(timezone.utc).isoformat(), "status": status, "checks": [asdict(c) for c in checks]}, indent=2, sort_keys=True), encoding="utf-8")
+        payload = {"generated_at": datetime.now(timezone.utc).isoformat(), "status": status, "checks": [asdict(c) for c in checks]}
+        if feed_mode is not None:
+            payload["feed_mode"] = feed_mode
+            payload["canonical_alpha_evidence"] = feed_mode in CANONICAL_ALPHA_FEED_MODES
+        path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")

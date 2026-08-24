@@ -39,6 +39,12 @@ class PaperLifecycle:
             return LifecycleState()
         return LifecycleState(**json.loads(self.state_path.read_text(encoding="utf-8")))
 
+    def reload(self) -> None:
+        """Re-read persisted state from disk -- lets a long-running session
+        loop observe a kill-switch activated by a separate CLI invocation
+        in another terminal, which writes to the same state_path."""
+        self.state = self._load()
+
     def _save(self) -> None:
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         self.state_path.write_text(json.dumps(asdict(self.state), sort_keys=True, indent=2), encoding="utf-8")

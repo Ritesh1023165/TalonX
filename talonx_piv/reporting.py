@@ -11,7 +11,7 @@ ANOMALY_CLASSES = (
 )
 
 
-def build_session_report(event_path: Path, reconciliation: dict) -> dict:
+def build_session_report(event_path: Path, reconciliation: dict, feed_mode: str | None = None) -> dict:
     rows = []
     if event_path.exists():
         rows = [json.loads(line) for line in event_path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -22,8 +22,11 @@ def build_session_report(event_path: Path, reconciliation: dict) -> dict:
     if execution_drift: classification = "EXECUTION_DRIFT"
     elif data_issues: classification = "DATA_ISSUE"
     elif counts["BROKER_ERROR"]: classification = "REVIEW_REQUIRED"
+    resolved_feed_mode = feed_mode or (rows[0].get("feed_mode") if rows else None)
     return {
         "classification": classification,
+        "feed_mode": resolved_feed_mode,
+        "canonical_alpha_evidence": resolved_feed_mode == "RESEARCH_SIP",
         "data_feed_health": {"data_not_ready": counts["DATA_NOT_READY"], "stale_data": counts["STALE_DATA"]},
         "expected_strategy_signals": counts["SIGNAL"], "actual_strategy_signals": counts["SIGNAL"],
         "rejections": counts["PAPER_ORDER_REJECTED"], "paper_order_intents": counts["ORDER_INTENT"],

@@ -18,11 +18,15 @@ from .events import EventBus, PivEvent
 from .lifecycle import PaperLifecycle, paper_cleanup
 from .preflight import Preflight
 from .reporting import build_session_report
+from .session_runner import SessionRunner
 from .telegram import sender
 
 
 def runtime(config: PivConfig):
-    bus = EventBus(config.state_dir / "piv_events.jsonl", sender(config.telegram_token, config.telegram_chat_id))
+    bus = EventBus(
+        config.state_dir / "piv_events.jsonl", sender(config.telegram_token, config.telegram_chat_id),
+        feed_mode=config.feed_mode,
+    )
     broker = AlpacaPaperClient(config)
     lifecycle = PaperLifecycle(config.state_dir / "lifecycle_state.json", broker, bus)
     return bus, broker, lifecycle
@@ -34,6 +38,7 @@ def parser() -> argparse.ArgumentParser:
     preflight = sub.add_parser("preflight"); preflight.add_argument("--approved-sha", required=True)
     cleanup = sub.add_parser("cleanup"); cleanup.add_argument("--confirm-paper-cleanup", action="store_true")
     start = sub.add_parser("start"); start.add_argument("--approved-sha", required=True); start.add_argument("--confirm-paper-session-start", action="store_true")
+    start.add_argument("--no-live-loop", action="store_true", help="Flip session_enabled and return immediately without running the live data/strategy loop (Task64 behavior).")
     kill = sub.add_parser("kill-switch"); kill.add_argument("--cancel-paper-orders", action="store_true")
     sub.add_parser("eod")
     return root
@@ -49,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "preflight":
             status, checks = Preflight(config, broker, bus).run()
-            Preflight.write_report(config.state_dir / "latest_preflight.json", status, checks)
+            Preflight.write_report(config.state_dir / "latest_preflight.json", status, checks, config.feed_mode)
             print(status)
             return 0 if status == "PIV_READY" else 2
         if args.command == "cleanup":
@@ -59,9 +64,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "start":
             bus.emit(PivEvent.build("STARTUP", status="PAPER MODE / NO REAL CAPITAL"))
             status, checks = Preflight(config, broker, bus).run()
-            Preflight.write_report(config.state_dir / "latest_preflight.json", status, checks)
+            Preflight.write_report(config.state_dir / "latest_preflight.json", status, checks, config.feed_mode)
             lifecycle.start_session(status == "PIV_READY", args.confirm_paper_session_start)
             print("PAPER_SESSION_STARTED")
+            if args.no_live_loop:
+                return 0
+            SessionRunner(config, bus, lifecycle, broker.transport).run()
             return 0
         broker.verify_paper_identity()
         if args.command == "kill-switch":
@@ -70,8 +78,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "eod":
             result = lifecycle.eod_flatten()
+            result["feed_mode"] = config.feed_mode
             (config.state_dir / "latest_reconciliation.json").write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
-            report = build_session_report(bus.path, result)
+            report = build_session_report(bus.path, result, config.feed_mode)
             (config.state_dir / "latest_session_report.json").write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
             print(json.dumps(result, sort_keys=True))
             return 0 if result["matched"] and not result["broker_open_orders"] and not result["broker_positions"] else 2

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -35,6 +35,7 @@ class PivEvent:
     status: str | None = None
     paper: bool = True
     real_capital: bool = False
+    feed_mode: str | None = None
 
     @classmethod
     def build(cls, event: str, **fields: object) -> "PivEvent":
@@ -46,9 +47,13 @@ class PivEvent:
 class EventBus:
     """Local telemetry is authoritative; Telegram can never alter processing."""
 
-    def __init__(self, path: Path, telegram_send: Callable[[str], bool] | None = None) -> None:
+    def __init__(
+        self, path: Path, telegram_send: Callable[[str], bool] | None = None,
+        feed_mode: str = "RESEARCH_SIP",
+    ) -> None:
         self.path = path
         self.telegram_send = telegram_send
+        self.feed_mode = feed_mode
         self._telegram_seen: set[str] = set()
         self.telegram_attempts = 0
         self.telegram_failures = 0
@@ -62,6 +67,8 @@ class EventBus:
     @staticmethod
     def format_telegram(event: PivEvent) -> str:
         fields = ["PAPER / NO REAL CAPITAL", event.timestamp, event.event]
+        if event.feed_mode is not None:
+            fields.append(f"feed_mode={event.feed_mode}")
         for name in ("symbol", "correlation_id", "price", "quantity", "reason", "status"):
             value = getattr(event, name)
             if value is not None:
@@ -69,6 +76,8 @@ class EventBus:
         return " | ".join(fields)
 
     def emit(self, event: PivEvent) -> bool:
+        if event.feed_mode is None:
+            event = replace(event, feed_mode=self.feed_mode)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(asdict(event), sort_keys=True) + "\n")
