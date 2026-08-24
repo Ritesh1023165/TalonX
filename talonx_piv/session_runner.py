@@ -230,7 +230,18 @@ class SessionRunner:
                 if (stop_at is not None and now >= stop_at) or local.time() >= self.flatten_time:
                     break
                 if local.time() >= OPEN:
-                    await self.process_tick(now)
+                    try:
+                        await self.process_tick(now)
+                    except Exception as exc:  # noqa: BLE001 -- an isolated tick failure (e.g. a transient
+                        # Alpaca REST timeout) must never kill an hours-long live session; the loop must
+                        # survive it and keep polling, same "one bad cycle shouldn't take down a long-
+                        # running process" posture already used elsewhere in this codebase (run_talonx.py's
+                        # periodic loops). Confirmed live: an unhandled requests.exceptions.ReadTimeout from
+                        # fetch_bars_latest() crashed the whole process ~34 minutes into today's session.
+                        self.events.emit(PivEvent.build(
+                            "BROKER_ERROR", reason=f"TICK_FAILED_{type(exc).__name__}: {exc}",
+                            status="TICK_SKIPPED_LOOP_CONTINUES",
+                        ))
                 await sleep(self.poll_interval_seconds)
             if self._probe_position_open:
                 self._close_probe()

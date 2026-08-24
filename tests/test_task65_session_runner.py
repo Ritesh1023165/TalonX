@@ -203,6 +203,39 @@ async def test_duplicate_bar_not_reprocessed(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_isolated_tick_failure_does_not_kill_the_session_loop(tmp_path):
+    """Confirmed live 2026-08-24: an unhandled requests.exceptions.ReadTimeout
+    from fetch_bars_latest() crashed the whole multi-hour session after
+    ~34 minutes. A transient per-tick failure must be recorded and skipped,
+    not propagate out of run()'s loop."""
+    run, transport, bus = runner(tmp_path, [])
+    calls = []
+    first = True
+
+    async def flaky_tick(now):
+        nonlocal first
+        calls.append(now)
+        if first:
+            first = False
+            raise TimeoutError("simulated transient network timeout")
+
+    run.process_tick = flaky_tick  # type: ignore[method-assign]
+    ticks = iter([
+        datetime(2026, 8, 24, 9, 31, tzinfo=ET).astimezone(ZoneInfo("UTC")),
+        datetime(2026, 8, 24, 9, 32, tzinfo=ET).astimezone(ZoneInfo("UTC")),
+        datetime(2026, 8, 24, 16, 0, tzinfo=ET).astimezone(ZoneInfo("UTC")),  # past flatten_time -- ends the loop
+    ])
+
+    async def fake_sleep(seconds):
+        pass
+
+    await run.run(clock=lambda: next(ticks), sleep=fake_sleep)
+    assert len(calls) == 2  # both the failing tick AND the next one ran -- loop survived
+    events = bus.path.read_text(encoding="utf-8")
+    assert '"event": "BROKER_ERROR"' in events and "TICK_FAILED_TimeoutError" in events
+
+
+@pytest.mark.asyncio
 async def test_kill_switch_stops_loop_without_processing_further_ticks(tmp_path):
     run, transport, bus = runner(tmp_path, [])
     run.lifecycle.activate_kill_switch()
