@@ -23,6 +23,25 @@ from .preflight import Preflight
 from .reporting import build_session_report
 from .session_runner import SessionRunner
 from .telegram import sender
+from .telegram_inbound import build_piv_telegram_listener
+
+
+async def run_session(runner: SessionRunner, listener) -> None:
+    """Runs SessionRunner.run() as the main task; the inbound Telegram
+    listener (if any) runs concurrently as a background task, started
+    first so /ping is answerable from the moment the session begins, and
+    always stopped in `finally` regardless of how the main run ends --
+    its own internal retry-forever loop (see TelegramReplyListener.run's
+    except/backoff) means nothing it does can crash the session, but the
+    reverse must also hold: a session crash/kill-switch stop must not
+    leave the listener polling forever in the background."""
+    listener_task = asyncio.create_task(listener.run()) if listener is not None else None
+    try:
+        await runner.run()
+    finally:
+        if listener_task is not None:
+            listener.stop()
+            await listener_task
 
 
 def runtime(config: PivConfig):
@@ -44,6 +63,7 @@ def parser() -> argparse.ArgumentParser:
     start.add_argument("--no-live-loop", action="store_true", help="Flip session_enabled and return immediately without running the live data/strategy loop (Task64 behavior).")
     start.add_argument("--no-decision-path", action="store_true", help="Run the live feed/readiness loop without the strategy decision path wired in (Task65 plumbing-only behavior).")
     start.add_argument("--confirm-piv-lifecycle-probe", action="store_true", help="Enable the operator-confirmed PIV_LIFECYCLE_PROBE fallback (only fires if no natural STRATEGY order lifecycle occurred by the predeclared cutoff).")
+    start.add_argument("--no-telegram-inbound", action="store_true", help="Do not start the inbound Telegram /ping listener (use if a separate run_talonx.py process is already polling the SAME bot token -- only one poller per token is allowed).")
     kill = sub.add_parser("kill-switch"); kill.add_argument("--cancel-paper-orders", action="store_true")
     sub.add_parser("eod")
     return root
@@ -83,7 +103,8 @@ def main(argv: list[str] | None = None) -> int:
                 config, bus, lifecycle, broker.transport, decision_engine=decision_engine,
                 probe_enabled=args.confirm_piv_lifecycle_probe,
             )
-            asyncio.run(runner.run())
+            listener = None if args.no_telegram_inbound else build_piv_telegram_listener(config.state_dir)
+            asyncio.run(run_session(runner, listener))
             return 0
         broker.verify_paper_identity()
         if args.command == "kill-switch":

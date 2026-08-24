@@ -106,3 +106,28 @@ See **[docs/architecture-overview.md](docs/architecture-overview.md)**
 for the full annotated directory tree. `.env` lives at the repo root and
 is shared by every module; run all commands from `C:\workspace\TalonX`
 (the repo root), not from inside a `talonx_*` package folder.
+
+## Paper PIV (strategy validation harness)
+
+**`talonx_piv`** is a separate, paper-only order-lifecycle validation
+harness for the strategy this repo has already implemented -- not one of
+the six modules above, and not started by `run_talonx.py`. It drives the
+real `talonx_quant.consumer.QuantScanner` against live (or explicitly
+research-frozen SIP) market data with immutable Alpaca-paper-only
+execution, fail-closed opening-readiness gating, and an operator kill
+switch -- see **[`results/task64_paper_piv_readiness/piv_runbook.md`](results/task64_paper_piv_readiness/piv_runbook.md)**
+for the current runbook and `py -3.12 -m talonx_piv.cli --help` for its
+commands. Real-capital execution is not implemented anywhere in this
+repository.
+
+## Research status & history
+
+**[`docs/research/TALONX_RESEARCH_LEDGER.md`](docs/research/TALONX_RESEARCH_LEDGER.md)**
+is the canonical, append-only history of every research/validation task,
+in chronological order -- read it for what's been tried, what was
+rejected and why (including the retired ORPB_V1/FPRC_V1 candidates), and
+the current infrastructure/alpha status. For a machine-readable snapshot
+of the most recent PIV task and what to do next, see the newest
+`results/task*_piv/claude_handoff_next.md`. Alpha is currently
+**UNPROVEN** -- nothing in this repo should be read as a live-trading
+profitability claim.

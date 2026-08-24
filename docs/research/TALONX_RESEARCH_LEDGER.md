@@ -5991,3 +5991,51 @@ endpoint, or capital action occurred. Real capital remains disabled; PR #10 rema
 retired. Every event today (natural-path or probe) is tagged `alpha_evidence=false`; alpha remains
 UNPROVEN. Real capital remains structurally unsupported; PR #10 remains draft and unmerged. Next major
 task: broad development-only alpha discovery (see `results/task65_piv/next_alpha_discovery_plan.md`).
+
+## Task 66A — Repository Cleanup + Infrastructure Hardening (2026-08-24)
+
+> **PREVIOUS**: Task 65/65B reached `V1_PIV_OPERATIONALLY_VALIDATED` but left two open items: (1) a
+> genuine engine defect (an unhandled Alpaca REST timeout crashing the session) was found and fixed
+> live, and (2) fixing it required a mid-session restart that exposed a second, real limitation --
+> `SessionReadinessValidator` state was in-memory only, so the restart made every symbol read
+> `DATA_NOT_READY` regardless of true data quality, and the natural strategy decision path was never
+> exercised end-to-end against a readiness-eligible symbol in one continuous live run. Separately, the
+> PIV runtime was found to omit the inbound Telegram `/ping` health-check listener that the full
+> `run_talonx.py` application already provides.
+>
+> **NEW EVIDENCE**: `talonx_piv/readiness.py` gained atomic, fail-closed persistence
+> (`to_state`/`restore_state`/`save_readiness_state`/`load_readiness_state`,
+> `session_readiness_state.json`) restoring a finalized READY/DATA_NOT_READY decision exactly as-is
+> across a restart, or a still-PENDING symbol's raw pre-10:00 observations so live accumulation
+> continues correctly -- never fabricating a bar, never accepting previous-day or malformed state,
+> never letting one corrupt symbol entry become eligible while others in the same file restore
+> correctly. 18 focused tests, including one reproducing today's actual incident timeline. The
+> existing `talonx_dispatch.telegram_listener.TelegramReplyListener` (already designed for a
+> standalone `dispatch_agent=None` degrade path) was wired into the PIV runtime as a concurrent
+> background task with a PIV-scoped audit DB -- not a second/duplicate listener -- closing the
+> inbound-`/ping` gap; a new `talonx_piv/runtime_manifest.py` documents all 13 expected PIV runtime
+> components and a `runtime_parity` preflight check now reports `RUNTIME_PARITY_PASS`/`_FAIL`
+> explicitly. A conservative, evidence-based repository review found no file meeting the bar for
+> deletion (zero imports/references, confirmed superseded, confirmed generated, confirmed duplicate,
+> confirmed unreachable) -- three genuine gaps were fixed instead: an untracked `logs/` directory
+> added to `.gitignore`, a Task-64-era handoff doc marked superseded in place (original content
+> unchanged) pointing to the current canonical handoff, and README updated to reference `talonx_piv`
+> and this ledger, neither of which it previously mentioned. Zero files deleted; zero research
+> artifacts moved, renamed, or altered.
+>
+> **UPDATED CONCLUSION**: `INFRASTRUCTURE_HARDENING_COMPLETE`, `FULL_E2E_PIV_READY`.
+>
+> **REASON**: both open Task 65B items are now fixed and covered by focused tests (18 for readiness
+> persistence, 8 for runtime parity/Telegram inbound), the full regression suite grew from 1958 to
+> 1984 passing tests with zero new failures (one known pre-existing failure, unchanged), both ORPB_V1
+> and FPRC_V1 implementation fingerprints are reconfirmed unchanged, and every protected
+> `talonx_quant/*` file has zero diff. This is infrastructure evidence only -- no live session was
+> run as part of this task, so a clean, uninterrupted, full end-to-end PAPER PIV session is not yet
+> claimed; that requires the next actual PAPER session (see
+> `results/task66a_repo_hardening/next_e2e_piv_handoff.md`).
+
+**Scope/deployment**: no alpha change, tuning, or ORPB/FPRC replay occurred; both remain rejected and
+retired. No profitability conclusion is made or implied -- this task is infrastructure/repository
+hardening only. Real capital remains structurally unsupported; PR #10 remains draft and unmerged. Next
+action: one clean, full end-to-end PAPER PIV session (not started by this task), then broad
+development-only alpha discovery.

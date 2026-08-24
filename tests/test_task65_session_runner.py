@@ -236,6 +236,31 @@ async def test_isolated_tick_failure_does_not_kill_the_session_loop(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_readiness_survives_simulated_process_restart(tmp_path):
+    """End-to-end wiring proof: a fresh SessionRunner (simulating a new
+    process after a crash/restart) sharing the same state_dir restores
+    the prior run's READY decision instead of re-deriving DATA_NOT_READY
+    from a cold, empty validator -- the exact defect fixed in Task 66A."""
+    ts = to_utc_iso(datetime(2026, 8, 24, 9, 30, tzinfo=ET))
+    run1, _, bus1 = runner(tmp_path, [{"AAPL": bar_row(ts)}])
+    await run1.process_tick(datetime(2026, 8, 24, 9, 30, tzinfo=ET).astimezone(ZoneInfo("UTC")))
+    for i in range(1, 30):
+        minute = datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i)
+        run1.validator.observe("AAPL", SESSION, minute)
+    run1._finalize_readiness(SESSION, datetime(2026, 8, 24, 10, 0, tzinfo=ET))
+    assert run1._ready_symbols == {"AAPL"}
+    assert (run1.config.state_dir / "session_readiness_state.json").exists()
+
+    # Fresh SessionRunner, fresh validator instance, SAME state_dir -- simulates a real restart.
+    run2, _, bus2 = runner(tmp_path, [])
+    late = datetime(2026, 8, 24, 14, 41, tzinfo=ET).astimezone(ZoneInfo("UTC"))  # long after 10:00, like today's incident
+    await run2.process_tick(late)
+    assert run2._ready_symbols == {"AAPL"}
+    events2 = bus2.path.read_text(encoding="utf-8")
+    assert '"event": "SESSION_READINESS_STATE_RESTORED"' in events2
+
+
+@pytest.mark.asyncio
 async def test_kill_switch_stops_loop_without_processing_further_ticks(tmp_path):
     run, transport, bus = runner(tmp_path, [])
     run.lifecycle.activate_kill_switch()

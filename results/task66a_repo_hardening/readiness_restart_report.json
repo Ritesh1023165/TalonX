@@ -1,0 +1,51 @@
+{
+  "defect_fixed": "SessionReadinessValidator state was in-memory only; a process restart after 10:00 ET caused every symbol to read DATA_NOT_READY regardless of the true opening-minute data quality (confirmed live 2026-08-24, Task 65B run 2: 0/35 READY on restart, restoring 35/35 warmup-ready but zero decision-eligible symbols).",
+  "implementation": {
+    "module": "talonx_piv/readiness.py",
+    "new_public_api": [
+      "SessionReadinessValidator.to_state(session) -> dict",
+      "SessionReadinessValidator.restore_state(state, session) -> RestoreOutcome",
+      "save_readiness_state(path, state) -- atomic (temp file + os.replace)",
+      "load_readiness_state(path) -> dict | None -- raises ReadinessStateError on malformed JSON, never conflates missing with corrupt"
+    ],
+    "persisted_file": "session_readiness_state.json under the PIV runtime state directory",
+    "schema_version": 1,
+    "wiring": "talonx_piv/session_runner.py: restore_state() called once per session-date rollover (covers both a genuine new trading day and a mid-day process restart, since both look identical to a fresh SessionRunner instance); to_state() persisted after every tick that observed new bars and after every finalize_readiness() call."
+  },
+  "contract_guarantees": {
+    "readiness_persists_across_restart": true,
+    "ready_remains_ready": true,
+    "data_not_ready_remains_data_not_ready": true,
+    "no_future_data_used": true,
+    "previous_day_state_rejected": true,
+    "malformed_state_fails_closed": true,
+    "partial_corrupt_symbol_cannot_become_eligible": true,
+    "synthetic_data_ever_created": false,
+    "idempotent_restore": true,
+    "atomic_write": true
+  },
+  "telemetry_events_added": [
+    "SESSION_READINESS_STATE_RESTORED", "SESSION_READINESS_STATE_MISSING",
+    "SESSION_READINESS_STATE_INVALID", "SESSION_READINESS_STATE_STALE"
+  ],
+  "tests": {
+    "file": "tests/test_task66a_readiness_persistence.py",
+    "count": 17,
+    "scenarios_covered": [
+      "READY survives restart", "DATA_NOT_READY survives restart",
+      "restart after 10:00 ET retains previously established eligibility (the exact live incident)",
+      "previous-day state is rejected", "malformed state fails closed (5 parametrized shapes)",
+      "missing state file reports MISSING (not INVALID)", "corrupt JSON raises ReadinessStateError",
+      "a corrupt individual symbol entry cannot become eligible while other symbols in the same state restore correctly",
+      "no synthetic data is created across a persist/restore round trip",
+      "idempotent repeated restore", "persistence survives a normal save->new-process->load->restore cycle",
+      "session reset next trading day works correctly (stale rejection + fresh observation)",
+      "a PENDING (not-yet-finalized) symbol restores its raw observations so live accumulation continues correctly"
+    ]
+  },
+  "integration_test": {
+    "file": "tests/test_task65_session_runner.py::test_readiness_survives_simulated_process_restart",
+    "description": "End-to-end: a fresh SessionRunner instance sharing the same state_dir as a finalized-READY prior run restores that decision and emits SESSION_READINESS_STATE_RESTORED, without re-deriving DATA_NOT_READY from a cold validator."
+  },
+  "opening_completeness_requirement_unchanged": "30-minute (09:30-09:59 ET) full-opening-data requirement is untouched; persistence only preserves the outcome of that unchanged evaluation across a restart, never relaxes it."
+}

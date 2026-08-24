@@ -1,5 +1,13 @@
 # Tomorrow 08:00 UK Handoff
 
+> **SUPERSEDED (Task 66A, 2026-08-24).** This document is preserved as historical evidence of Task 64's
+> handoff state and must not be edited to reflect later events. It predates Task 65/65B (feed mode, real
+> decision path, causal warmup, crash-resilience fix, PIV_LIFECYCLE_PROBE) and Task 66A (restart-safe
+> readiness persistence, restored Telegram inbound `/ping`, this cleanup). For current status, use
+> **[`results/task65_piv/claude_handoff_next.md`](../task65_piv/claude_handoff_next.md)** (session outcome)
+> and **[`results/task64_paper_piv_readiness/piv_runbook.md`](piv_runbook.md)** (current runbook, kept
+> up to date in place rather than superseded).
+
 Branch: `research/talonx-strategy-validation`. Approved release is the Task 64 commit containing this document; verify its SHA equals the completion handoff with `git rev-parse HEAD`. Deployment is `PAPER_PIV_BLOCKED` until every preflight check passes. REAL CAPITAL IS DISABLED. ORPB_V1 and FPRC_V1 are rejected; do not tune, replicate, promote, or invent alpha.
 
 ## Environment

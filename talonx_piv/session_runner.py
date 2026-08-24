@@ -38,7 +38,7 @@ from .decision_engine import DecisionEngine
 from .events import EventBus, PivEvent
 from .lifecycle import PaperLifecycle
 from .lifecycle_probe import close_piv_lifecycle_probe, run_piv_lifecycle_probe
-from .readiness import READY_AT, SessionReadinessValidator
+from .readiness import READY_AT, ReadinessStateError, SessionReadinessValidator, load_readiness_state, save_readiness_state
 
 ET = ZoneInfo("America/New_York")
 OPEN = time(9, 30)
@@ -111,6 +111,41 @@ class SessionRunner:
             )
         return result
 
+    @property
+    def _readiness_state_path(self):
+        return self.config.state_dir / "session_readiness_state.json"
+
+    def _restore_readiness(self, session: date) -> None:
+        """Restore-safe by construction: a symbol's persisted READY/
+        DATA_NOT_READY decision is honored as-is (the validator's own
+        _final short-circuit already prevents any later re-evaluation or
+        causal transition -- restoring into _final reproduces exactly the
+        behavior a never-restarted process would have had). A symbol still
+        PENDING at the time of a crash instead restores its raw pre-10:00
+        observations, so live accumulation continues correctly from where
+        it left off rather than restarting cold."""
+        try:
+            state = load_readiness_state(self._readiness_state_path)
+        except ReadinessStateError as exc:
+            self.events.emit(PivEvent.build("SESSION_READINESS_STATE_INVALID", reason=str(exc), status="MALFORMED_JSON"))
+            return
+        outcome = self.validator.restore_state(state, session)
+        if outcome.missing:
+            self.events.emit(PivEvent.build("SESSION_READINESS_STATE_MISSING", status="NO_PRIOR_STATE_FOUND"))
+        elif outcome.invalid:
+            self.events.emit(PivEvent.build("SESSION_READINESS_STATE_INVALID", status="MALFORMED_OR_UNSUPPORTED_SCHEMA"))
+        elif outcome.stale:
+            self.events.emit(PivEvent.build("SESSION_READINESS_STATE_STALE", status="PERSISTED_STATE_IS_FOR_A_DIFFERENT_SESSION_DATE"))
+        else:
+            self.events.emit(PivEvent.build(
+                "SESSION_READINESS_STATE_RESTORED",
+                status=f"restored={len(outcome.restored_symbols)} invalid_symbols={len(outcome.invalid_symbols)}",
+                reason=",".join(outcome.invalid_symbols) or None,
+            ))
+
+    def _persist_readiness(self, session: date) -> None:
+        save_readiness_state(self._readiness_state_path, self.validator.to_state(session))
+
     def _finalize_readiness(self, session: date, now: datetime) -> None:
         self._ready_symbols = set()
         for symbol in self.config.universe:
@@ -123,6 +158,7 @@ class SessionRunner:
                     "DATA_NOT_READY", symbol=symbol, reason=telemetry.reason,
                     status=f"missing_minutes={len(telemetry.missing_minutes)}",
                 ))
+        self._persist_readiness(session)
 
     def _check_stale(self, now: datetime) -> None:
         for symbol in self.config.universe:
@@ -144,6 +180,12 @@ class SessionRunner:
             self._session, self._ready_symbols = session, None
             self._last_bar_ts.clear(); self._last_seen_wall.clear(); self._stale_flagged.clear(); self._last_bar.clear()
             self._probe_attempted = self._probe_position_open = False
+            # Restore before anything else this session: restored entries land in
+            # the validator's own _final/_observed state, so the existing
+            # finalize-trigger below (now >= READY_AT and _ready_symbols is None)
+            # transparently reuses them via evaluate()'s short-circuit -- no
+            # separate seeding needed, and no risk of double-finalizing.
+            self._restore_readiness(session)
 
         fetched = self.fetch_bars_latest()
         new_bars: dict[str, Bar] = {}
@@ -161,6 +203,8 @@ class SessionRunner:
             local_time = bar.timestamp.astimezone(ET).time()
             if OPEN <= local_time < READY_AT:
                 self.validator.observe(symbol, session, bar.timestamp)
+        if new_bars:
+            self._persist_readiness(session)
 
         if now.astimezone(ET).time() >= READY_AT and self._ready_symbols is None:
             self._finalize_readiness(session, now)

@@ -49,6 +49,12 @@ reports/
 # and redirected stdout/stderr log files -- machine-local runtime state.
 .run/
 
+# Task 66A: ad hoc local log/console-capture output (e.g. one-off
+# research-script runs redirected to a file) -- generated, machine-local,
+# not something to version. Same distinction as reports//results/data/
+# above: canonical evidence lives under results/, this is scratch.
+/logs/
+
 # ------------------------------------------------------------------
 # Claude Code local settings (machine-specific permission allowlist,
 # not shared config)

@@ -1,0 +1,60 @@
+{
+  "branch": "research/talonx-strategy-validation",
+  "starting_sha": "e2d696722731f772088b7d95727303eed03723a4",
+  "readiness_restart_hardening": {
+    "persistence_implemented": true,
+    "ready_survives_restart": true,
+    "data_not_ready_survives_restart": true,
+    "previous_day_state_rejected": true,
+    "malformed_state_fail_closed": true,
+    "synthetic_bars_created": false,
+    "restart_after_10_eligibility_preserved": true,
+    "tests_passed": 18
+  },
+  "runtime_parity": {
+    "normal_runtime_components": 6,
+    "normal_runtime_note": "run_talonx.py's 6 modules (ingest, quant, brain, core, dispatch, paper) plus watchlist-driven reconcilers",
+    "piv_runtime_components_tracked": 13,
+    "previously_omitted_components": ["telegram_inbound_command_listener", "health_metrics_status (the /ping reply itself)"],
+    "telegram_inbound_ping_restored": true,
+    "telegram_outbound": "PASS (unchanged, Task 64)",
+    "duplicate_telegram_listener": false,
+    "runtime_parity_preflight_check": "RUNTIME_PARITY_PASS",
+    "full_e2e_topology_ready": true
+  },
+  "repository_cleanup": {
+    "files_deleted": 0,
+    "files_archived_or_moved": 0,
+    "files_marked_superseded_in_place": 1,
+    "docs_consolidated": 2,
+    "dead_flags_or_code_removed": 0,
+    "gitignore_gaps_fixed": 1,
+    "canonical_research_evidence_lost": false,
+    "cleanup_inventory_path": "results/task66a_repo_hardening/cleanup_inventory.json"
+  },
+  "safety": {
+    "paper_only_guard": "PASS",
+    "real_capital_execution_supported": false,
+    "paper_open_orders_at_end": 0,
+    "paper_open_positions_at_end": 0,
+    "active_piv_runners_at_end": 0
+  },
+  "strategy_integrity": {
+    "protected_alpha_files_unchanged": true,
+    "orpb_fingerprint_unchanged": true,
+    "fprc_fingerprint_unchanged": true,
+    "alpha_tuning_performed": false
+  },
+  "tests": {
+    "focused_total": 101,
+    "full_regression_passed": 1984,
+    "full_regression_failed": 1,
+    "new_failures": 0,
+    "known_pre_existing_failures": ["tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset"]
+  },
+  "conclusion": {
+    "infrastructure": "INFRASTRUCTURE_HARDENING_COMPLETE / FULL_E2E_PIV_READY",
+    "alpha_status": "UNPROVEN",
+    "next_action": "ONE CLEAN FULL END-TO-END PAPER PIV SESSION (not executed automatically by this task)"
+  }
+}

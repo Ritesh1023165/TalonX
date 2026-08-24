@@ -17,6 +17,8 @@ from .broker import AlpacaPaperClient
 from .config import CANONICAL_ALPHA_FEED_MODES, FEED_MODE_PARAM, FEED_MODES, PivConfig
 from .events import EventBus, PivEvent
 from .readiness import SessionReadinessValidator
+from .runtime_manifest import runtime_parity_status
+from .telegram_inbound import telegram_inbound_capable
 
 
 @dataclass(frozen=True)
@@ -123,6 +125,14 @@ class Preflight:
                 return False, f"warmup mechanism (yfinance) unavailable: {type(exc).__name__}: {exc}"
             return True, "yfinance importable -- full 35-symbol preseed+verify runs at session start, not preflight"
         check("warmup_mechanism_capability", warmup_capability)
+        def telegram_inbound() -> tuple[bool, str]:
+            return telegram_inbound_capable(self.config.state_dir)
+        check("telegram_inbound_capability", telegram_inbound)
+        def runtime_parity() -> tuple[bool, str]:
+            status, coverage = runtime_parity_status()
+            missing = [c.component for c in coverage if not c.present_in_piv_runtime]
+            return status == "RUNTIME_PARITY_PASS", f"{status} missing={missing or 'none'}"
+        check("runtime_parity", runtime_parity)
         check("timezone_and_xnys", lambda: (ZoneInfo("America/New_York").key == "America/New_York", "XNYS/ET configured"))
         check("universe_loaded", lambda: (len(self.config.universe) == 35 and len(set(self.config.universe)) == 35, f"{len(self.config.universe)} symbols"))
         check("stale_detection_armed", lambda: (self.config.stale_seconds > 0, f"{self.config.stale_seconds}s"))
