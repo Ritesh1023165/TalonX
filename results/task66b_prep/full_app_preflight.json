@@ -1,14 +1,14 @@
 {
   "checks": [
     {
-      "detail": "c431901f69f55ca12e94c366129e6f5dbe1d8f71",
+      "detail": "9b3ae0c4f990b48fe311f2f7ef4a25d702aaac83",
       "name": "expected_sha",
       "passed": true
     },
     {
-      "detail": "M generate_eod_report.py\n M run_talonx.py",
+      "detail": "clean",
       "name": "tracked_tree_clean",
-      "passed": false
+      "passed": true
     },
     {
       "detail": "0 matching process(es): none",
@@ -111,11 +111,11 @@
       "passed": true
     },
     {
-      "detail": "2026-08-24T21:14:30.543610+00:00",
+      "detail": "2026-08-24T21:33:59.279216+00:00",
       "name": "current_time_reported",
       "passed": true
     }
   ],
-  "generated_at": "2026-08-24T21:14:30.543610+00:00",
-  "status": "FULL_APP_E2E_BLOCKED"
+  "generated_at": "2026-08-24T21:33:59.279216+00:00",
+  "status": "FULL_APP_E2E_READY"
 }
