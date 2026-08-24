@@ -61,6 +61,12 @@ class AlpacaPaperClient:
         response.raise_for_status()
         return list(response.json())
 
+    def get_order(self, order_id: str) -> dict[str, Any]:
+        self._require_verified()
+        response = self.transport.get(f"{PAPER_ENDPOINT}/v2/orders/{order_id}", headers=self.headers, timeout=15)
+        response.raise_for_status()
+        return dict(response.json())
+
     def positions(self) -> list[dict[str, Any]]:
         self._require_verified()
         response = self.transport.get(f"{PAPER_ENDPOINT}/v2/positions", headers=self.headers, timeout=15)

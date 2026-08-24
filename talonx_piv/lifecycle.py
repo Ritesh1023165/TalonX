@@ -58,7 +58,10 @@ class PaperLifecycle:
         self._save()
         self.events.emit(PivEvent.build("PAPER_SESSION_STARTED", status="PAPER MODE / NO REAL CAPITAL"))
 
-    def order_intent(self, signal_id: str, symbol: str, side: str, quantity: float, client_order_id: str | None = None) -> dict[str, Any]:
+    def order_intent(
+        self, signal_id: str, symbol: str, side: str, quantity: float, client_order_id: str | None = None,
+        source: str | None = None, alpha_evidence: bool | None = None,
+    ) -> dict[str, Any]:
         intent_id = stable_id("intent", signal_id, symbol, side, quantity)
         if intent_id in self.state.intents:
             self.events.emit(PivEvent.build("BROKER_ERROR", symbol=symbol, correlation_id=intent_id, reason="DUPLICATE_ORDER_INTENT"))
@@ -69,39 +72,93 @@ class PaperLifecycle:
             "symbol": symbol, "side": side, "qty": str(quantity), "type": "market",
             "time_in_force": "day", "client_order_id": client_order_id or intent_id,
         }
-        self.state.intents[intent_id] = {"signal_id": signal_id, "payload": payload, "status": "ORDER_INTENT"}
+        self.state.intents[intent_id] = {
+            "signal_id": signal_id, "payload": payload, "status": "ORDER_INTENT",
+            "source": source, "alpha_evidence": alpha_evidence,
+        }
         self._save()
-        self.events.emit(PivEvent.build("ORDER_INTENT", symbol=symbol, signal_id=signal_id, order_intent_id=intent_id, correlation_id=intent_id, quantity=quantity))
+        self.events.emit(PivEvent.build(
+            "ORDER_INTENT", symbol=symbol, signal_id=signal_id, order_intent_id=intent_id, correlation_id=intent_id,
+            quantity=quantity, source=source, alpha_evidence=alpha_evidence,
+        ))
         result = self.broker.submit_order(payload)
         broker_id = str(result.get("id") or "")
         if not broker_id:
             self.state.intents[intent_id]["status"] = "REJECTED"
             self._save()
-            self.events.emit(PivEvent.build("PAPER_ORDER_REJECTED", symbol=symbol, order_intent_id=intent_id, correlation_id=intent_id, reason="MISSING_BROKER_ORDER_ID"))
+            self.events.emit(PivEvent.build(
+                "PAPER_ORDER_REJECTED", symbol=symbol, order_intent_id=intent_id, correlation_id=intent_id,
+                reason="MISSING_BROKER_ORDER_ID", source=source, alpha_evidence=alpha_evidence,
+            ))
             raise PaperGuardError("paper broker did not return an order id")
         self.state.intents[intent_id]["status"] = "SUBMITTED"
-        self.state.orders[broker_id] = {"intent_id": intent_id, "symbol": symbol, "status": "SUBMITTED", "filled_qty": 0.0}
+        self.state.orders[broker_id] = {
+            "intent_id": intent_id, "symbol": symbol, "status": "SUBMITTED", "filled_qty": 0.0,
+            "source": source, "alpha_evidence": alpha_evidence,
+        }
         self._save()
-        self.events.emit(PivEvent.build("PAPER_ORDER_SUBMITTED", symbol=symbol, order_intent_id=intent_id, broker_order_id=broker_id, correlation_id=intent_id, quantity=quantity))
+        self.events.emit(PivEvent.build(
+            "PAPER_ORDER_SUBMITTED", symbol=symbol, order_intent_id=intent_id, broker_order_id=broker_id,
+            correlation_id=intent_id, quantity=quantity, source=source, alpha_evidence=alpha_evidence,
+        ))
         return result
 
     def apply_broker_update(self, broker_order_id: str, status: str, filled_qty: float = 0.0, fill_price: float | None = None) -> None:
         order = self.state.orders[broker_order_id]
         order.update(status=status, filled_qty=filled_qty, fill_price=fill_price)
         intent_id, symbol = order["intent_id"], order["symbol"]
+        source, alpha_evidence = order.get("source"), order.get("alpha_evidence")
         event = {
             "accepted": "PAPER_ORDER_ACCEPTED", "partially_filled": "PARTIAL_FILL",
             "filled": "FILLED", "rejected": "PAPER_ORDER_REJECTED", "canceled": "PAPER_ORDER_CANCELLED",
         }.get(status)
         if event:
-            self.events.emit(PivEvent.build(event, symbol=symbol, correlation_id=intent_id, order_intent_id=intent_id, broker_order_id=broker_order_id, quantity=filled_qty, price=fill_price, status=status))
+            self.events.emit(PivEvent.build(
+                event, symbol=symbol, correlation_id=intent_id, order_intent_id=intent_id,
+                broker_order_id=broker_order_id, quantity=filled_qty, price=fill_price, status=status,
+                source=source, alpha_evidence=alpha_evidence,
+            ))
         if status in {"partially_filled", "filled"} and filled_qty > 0:
             position_id = stable_id("position", intent_id, symbol)
             first = position_id not in self.state.positions
-            self.state.positions[position_id] = {"symbol": symbol, "quantity": filled_qty, "price": fill_price, "status": "OPEN"}
+            self.state.positions[position_id] = {
+                "symbol": symbol, "quantity": filled_qty, "price": fill_price, "status": "OPEN",
+                "source": source, "alpha_evidence": alpha_evidence,
+            }
             if first:
-                self.events.emit(PivEvent.build("POSITION_OPENED", symbol=symbol, correlation_id=intent_id, broker_order_id=broker_order_id, position_id=position_id, quantity=filled_qty, price=fill_price))
+                self.events.emit(PivEvent.build(
+                    "POSITION_OPENED", symbol=symbol, correlation_id=intent_id, broker_order_id=broker_order_id,
+                    position_id=position_id, quantity=filled_qty, price=fill_price, source=source, alpha_evidence=alpha_evidence,
+                ))
         self._save()
+
+    def poll_order_until_terminal(self, broker_order_id: str, *, timeout_seconds: float = 20.0, poll_interval_seconds: float = 1.0, sleep=None) -> dict[str, Any]:
+        """Poll the live PAPER broker for this order's status and apply each
+        observed transition via apply_broker_update, until a terminal status
+        (filled/rejected/canceled) or timeout_seconds elapses. Nothing in the
+        live path previously called apply_broker_update at all -- Task 64's
+        tests only ever called it directly -- so without this, a real
+        PAPER_ORDER_SUBMITTED would never progress to an ack/fill/position in
+        a live session."""
+        import time as _time
+        sleep = sleep or _time.sleep
+        elapsed = 0.0
+        last: dict[str, Any] = {}
+        seen_status: str | None = None
+        terminal = {"filled", "rejected", "canceled", "expired"}
+        while elapsed <= timeout_seconds:
+            last = self.broker.get_order(broker_order_id)
+            status = str(last.get("status") or "")
+            filled_qty = float(last.get("filled_qty") or 0.0)
+            fill_price = float(last["filled_avg_price"]) if last.get("filled_avg_price") else None
+            if status and status != seen_status:
+                seen_status = status
+                self.apply_broker_update(broker_order_id, status, filled_qty, fill_price)
+            if status in terminal:
+                break
+            sleep(poll_interval_seconds)
+            elapsed += poll_interval_seconds
+        return last
 
     def activate_kill_switch(self, cancel_orders: bool = False) -> None:
         self.state.kill_switch = True

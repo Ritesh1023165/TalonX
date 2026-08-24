@@ -1,11 +1,16 @@
-"""Task 65 -- SessionRunner: readiness gating, no synthesized data, no feed
-fallback, stale-data detection, and a deterministic (not probabilistic)
-guarantee of zero orders -- no decision path is wired in today, see
-session_runner.py's module docstring for why."""
+"""Task 65B -- SessionRunner: readiness gating, no synthesized data, no feed
+fallback, stale-data detection, kill-switch, and decision-path wiring
+(enabled -> decision_engine.on_bars called only for READY symbols; disabled
+-> zero orders deterministically, matching the original Task65 plumbing-only
+behavior -- see Part E test #1, "old decision path disabled state is
+detected")."""
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from unittest.mock import AsyncMock
 from zoneinfo import ZoneInfo
+
+import pytest
 
 from talonx_piv.broker import AlpacaPaperClient
 from talonx_piv.config import PAPER_ENDPOINT, PivConfig
@@ -26,8 +31,6 @@ class Response:
 
 
 class BarsTransport:
-    """Serves one canned response per fetch_bars_latest() call, in order."""
-
     def __init__(self, batches: list[dict[str, dict]]):
         self.batches = list(batches)
         self.feed_params_used: list[str] = []
@@ -65,7 +68,7 @@ def config(tmp_path, **overrides):
     return PivConfig(**values)
 
 
-def runner(tmp_path, batches, **overrides):
+def runner(tmp_path, batches, decision_engine=None, **overrides):
     cfg = config(tmp_path, **overrides)
     transport = BarsTransport(batches)
     broker = AlpacaPaperClient(cfg, transport)
@@ -73,15 +76,15 @@ def runner(tmp_path, batches, **overrides):
     bus = EventBus(tmp_path / "events.jsonl", feed_mode=cfg.feed_mode)
     life = PaperLifecycle(tmp_path / "state.json", broker, bus)
     life.start_session(True, True)
-    return SessionRunner(cfg, bus, life, transport), transport, bus
+    return SessionRunner(cfg, bus, life, transport, decision_engine=decision_engine), transport, bus
 
 
 def to_utc_iso(local: datetime) -> str:
     return local.astimezone(ZoneInfo("UTC")).isoformat().replace("+00:00", "Z")
 
 
-def test_missing_opening_minute_marks_symbol_data_not_ready(tmp_path):
-    # AAPL gets all 30 opening minutes; MSFT is missing minute 09:35.
+@pytest.mark.asyncio
+async def test_missing_opening_minute_marks_symbol_data_not_ready(tmp_path):
     batches = []
     skip_time = datetime(2026, 8, 24, 9, 35, tzinfo=ET).time()
     for i in range(30):
@@ -98,7 +101,7 @@ def test_missing_opening_minute_marks_symbol_data_not_ready(tmp_path):
     ticks = [datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i) for i in range(30)]
     ticks.append(ready_tick)
     for tick in ticks:
-        run.process_tick(tick.astimezone(ZoneInfo("UTC")))
+        await run.process_tick(tick.astimezone(ZoneInfo("UTC")))
 
     assert run._ready_symbols == {"AAPL"}
     events = bus.path.read_text(encoding="utf-8")
@@ -106,21 +109,21 @@ def test_missing_opening_minute_marks_symbol_data_not_ready(tmp_path):
     assert '"event": "DATA_NOT_READY"' in events and '"symbol": "MSFT"' in events
 
 
-def test_no_decision_path_zero_orders_regardless_of_ticks(tmp_path):
-    # A full, otherwise-clean session (all 30 opening minutes + 15 more
-    # live-window ticks for both symbols) must still submit exactly zero
-    # orders -- deterministic by construction, not "no signal happened to
-    # fire this run."
+@pytest.mark.asyncio
+async def test_decision_path_disabled_zero_orders_matching_old_behavior(tmp_path):
+    """Old decision-path-disabled state (decision_engine=None) is fully
+    reachable and deterministic -- zero orders regardless of how many ticks
+    run, not 'no signal happened to fire this run'."""
     batches = []
     for i in range(45):
         minute = datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i)
         ts = to_utc_iso(minute)
         batches.append({"AAPL": bar_row(ts, 100 + i), "MSFT": bar_row(ts, 200 + i)})
 
-    run, transport, bus = runner(tmp_path, batches)
+    run, transport, bus = runner(tmp_path, batches, decision_engine=None)
     for i in range(45):
         tick = datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i)
-        run.process_tick(tick.astimezone(ZoneInfo("UTC")))
+        await run.process_tick(tick.astimezone(ZoneInfo("UTC")))
 
     assert run._ready_symbols == {"AAPL", "MSFT"}
     assert transport.orders == []
@@ -129,7 +132,35 @@ def test_no_decision_path_zero_orders_regardless_of_ticks(tmp_path):
     assert '"event": "ORDER_INTENT"' not in events
 
 
-def test_stale_data_flagged_once_when_no_new_bar_arrives(tmp_path):
+@pytest.mark.asyncio
+async def test_decision_engine_only_called_for_ready_symbols(tmp_path):
+    skip_time = datetime(2026, 8, 24, 9, 35, tzinfo=ET).time()
+    batches = []
+    for i in range(30):
+        minute = datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i)
+        ts = to_utc_iso(minute)
+        row = {"AAPL": bar_row(ts)}
+        if minute.time() != skip_time:
+            row["MSFT"] = bar_row(ts)
+        batches.append(row)
+    live_tick = datetime(2026, 8, 24, 10, 1, tzinfo=ET)
+    batches.append({"AAPL": bar_row(to_utc_iso(live_tick)), "MSFT": bar_row(to_utc_iso(live_tick))})
+
+    fake_engine = AsyncMock()
+    run, transport, bus = runner(tmp_path, batches, decision_engine=fake_engine)
+    ticks = [datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i) for i in range(30)]
+    ticks.append(live_tick)
+    for tick in ticks:
+        await run.process_tick(tick.astimezone(ZoneInfo("UTC")))
+
+    assert run._ready_symbols == {"AAPL"}  # MSFT missing a minute -> not ready
+    fake_engine.on_bars.assert_awaited()
+    called_bars = fake_engine.on_bars.await_args.args[0]
+    assert "MSFT" not in called_bars and "AAPL" in called_bars
+
+
+@pytest.mark.asyncio
+async def test_stale_data_flagged_once_when_no_new_bar_arrives(tmp_path):
     base = datetime(2026, 8, 24, 10, 1, tzinfo=ET).astimezone(ZoneInfo("UTC"))
     run, transport, bus = runner(tmp_path, [])
     run._session = SESSION
@@ -142,38 +173,45 @@ def test_stale_data_flagged_once_when_no_new_bar_arrives(tmp_path):
     assert len(stale_events) == 1
 
 
-def test_feed_param_pinned_no_fallback(tmp_path):
+@pytest.mark.asyncio
+async def test_feed_param_pinned_no_fallback(tmp_path):
     ts = to_utc_iso(datetime(2026, 8, 24, 9, 30, tzinfo=ET))
     run, transport, bus = runner(tmp_path, [{"AAPL": bar_row(ts)}], feed_mode="IEX_PAPER_PIV")
-    run.process_tick(datetime(2026, 8, 24, 9, 30, tzinfo=ET).astimezone(ZoneInfo("UTC")))
+    await run.process_tick(datetime(2026, 8, 24, 9, 30, tzinfo=ET).astimezone(ZoneInfo("UTC")))
     assert run._last_bar_ts and transport.feed_params_used == ["iex"]
 
 
-def test_missing_symbol_in_response_is_not_synthesized(tmp_path):
+@pytest.mark.asyncio
+async def test_missing_symbol_in_response_is_not_synthesized(tmp_path):
     ts = to_utc_iso(datetime(2026, 8, 24, 9, 30, tzinfo=ET))
     run, transport, bus = runner(tmp_path, [{"AAPL": bar_row(ts)}])  # MSFT absent
-    run.process_tick(datetime(2026, 8, 24, 9, 30, tzinfo=ET).astimezone(ZoneInfo("UTC")))
+    await run.process_tick(datetime(2026, 8, 24, 9, 30, tzinfo=ET).astimezone(ZoneInfo("UTC")))
     assert "MSFT" not in run._last_bar_ts
     assert "AAPL" in run._last_bar_ts
 
 
-def test_duplicate_bar_not_reprocessed(tmp_path):
+@pytest.mark.asyncio
+async def test_duplicate_bar_not_reprocessed(tmp_path):
     ts = to_utc_iso(datetime(2026, 8, 24, 9, 30, tzinfo=ET))
     run, transport, bus = runner(tmp_path, [{"AAPL": bar_row(ts)}, {"AAPL": bar_row(ts)}])
     tick = datetime(2026, 8, 24, 9, 30, tzinfo=ET).astimezone(ZoneInfo("UTC"))
-    run.process_tick(tick)
+    await run.process_tick(tick)
     first_seen = run._last_seen_wall["AAPL"]
-    run.process_tick(tick + timedelta(seconds=30))
-    assert run._last_seen_wall["AAPL"] == first_seen  # duplicate timestamp never advanced last-seen
+    await run.process_tick(tick + timedelta(seconds=30))
+    assert run._last_seen_wall["AAPL"] == first_seen
 
 
-def test_kill_switch_stops_loop_without_processing_further_ticks(tmp_path):
+@pytest.mark.asyncio
+async def test_kill_switch_stops_loop_without_processing_further_ticks(tmp_path):
     run, transport, bus = runner(tmp_path, [])
     run.lifecycle.activate_kill_switch()
     calls = []
-    run.process_tick = lambda now: calls.append(now)  # type: ignore[method-assign]
+
+    async def fake_tick(now):
+        calls.append(now)
+    run.process_tick = fake_tick  # type: ignore[method-assign]
     ticks = iter([datetime(2026, 8, 24, 9, 31, tzinfo=ET).astimezone(ZoneInfo("UTC"))])
-    run.run(clock=lambda: next(ticks), sleep=lambda s: None)
+    await run.run(clock=lambda: next(ticks), sleep=AsyncMock())
     assert calls == []
     events = bus.path.read_text(encoding="utf-8")
     assert '"event": "KILL_SWITCH"' in events

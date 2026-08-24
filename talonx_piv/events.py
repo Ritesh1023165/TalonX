@@ -36,6 +36,8 @@ class PivEvent:
     paper: bool = True
     real_capital: bool = False
     feed_mode: str | None = None
+    source: str | None = None  # "STRATEGY" | "PIV_LIFECYCLE_PROBE" -- see talonx_piv/decision_engine.py, lifecycle_probe.py
+    alpha_evidence: bool | None = None  # always False when set -- today's traffic is operational PIV test traffic only
 
     @classmethod
     def build(cls, event: str, **fields: object) -> "PivEvent":
@@ -69,6 +71,10 @@ class EventBus:
         fields = ["PAPER / NO REAL CAPITAL", event.timestamp, event.event]
         if event.feed_mode is not None:
             fields.append(f"feed_mode={event.feed_mode}")
+        if event.source is not None:
+            fields.append(f"source={event.source}")
+        if event.alpha_evidence is not None:
+            fields.append(f"alpha_evidence={event.alpha_evidence}")
         for name in ("symbol", "correlation_id", "price", "quantity", "reason", "status"):
             value = getattr(event, name)
             if value is not None:

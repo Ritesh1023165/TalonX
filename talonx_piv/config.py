@@ -50,3 +50,5 @@ class PivConfig:
     eod_flatten_et: str = "15:50"
     universe: tuple[str, ...] = DEFAULT_UNIVERSE
     feed_mode: str = field(default_factory=_feed_mode)
+    decision_path_enabled: bool = field(default_factory=lambda: _truthy("TALONX_PIV_DECISION_PATH", "true"))
+    redis_url: str = field(default_factory=lambda: os.getenv("TALONX_REDIS_URL", "redis://localhost:6379"))

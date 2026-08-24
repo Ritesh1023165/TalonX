@@ -32,7 +32,7 @@ def config_hash(config: PivConfig) -> str:
         "broker_endpoint": config.broker_endpoint, "data_endpoint": config.data_endpoint,
         "stale_seconds": config.stale_seconds, "entry_cutoff_et": config.entry_cutoff_et,
         "eod_flatten_et": config.eod_flatten_et, "universe": config.universe, "feed_mode": config.feed_mode,
-        "version": "TASK64_V1",
+        "decision_path_enabled": config.decision_path_enabled, "version": "TASK64_V1",
     }
     return hashlib.sha256(json.dumps(safe, sort_keys=True).encode()).hexdigest()
 
@@ -103,6 +103,17 @@ class Preflight:
             label = "CANONICAL_ALPHA_EVIDENCE" if canonical else "OPERATIONAL_PIV_ONLY_NOT_ALPHA_EVIDENCE"
             return mode in FEED_MODES, f"feed_mode={mode} classification={label}"
         check("feed_mode_classification", feed_classification)
+        def decision_path() -> tuple[bool, str]:
+            if not self.config.decision_path_enabled:
+                return True, "PIV_TEST_DECISION_PATH=false -- plumbing-only mode"
+            try:
+                import redis
+                client = redis.Redis.from_url(self.config.redis_url, socket_connect_timeout=5)
+                pong = client.ping()
+            except Exception as exc:
+                return False, f"PIV_TEST_DECISION_PATH=true but Redis unreachable at {self.config.redis_url}: {type(exc).__name__}: {exc}"
+            return bool(pong), f"PIV_TEST_DECISION_PATH=true, decision engine reachable via Redis at {self.config.redis_url}"
+        check("decision_path_mode", decision_path)
         check("timezone_and_xnys", lambda: (ZoneInfo("America/New_York").key == "America/New_York", "XNYS/ET configured"))
         check("universe_loaded", lambda: (len(self.config.universe) == 35 and len(set(self.config.universe)) == 35, f"{len(self.config.universe)} symbols"))
         check("stale_detection_armed", lambda: (self.config.stale_seconds > 0, f"{self.config.stale_seconds}s"))
