@@ -5936,3 +5936,58 @@ remains draft and unmerged.
 
 **Scope/deployment**: no alpha change, optimization, strategy replay, paper order, cleanup mutation, live
 endpoint, or capital action occurred. Real capital remains disabled; PR #10 remains draft and unmerged.
+
+## Task 65 / 65B — Complete Paper PIV: Decision Path, Warmup, Crash Resilience (2026-08-24)
+
+> **PREVIOUS**: Task 64 built the PAPER-only safety harness (preflight, order lifecycle, reconciliation,
+> Telegram) but nothing drove it from real market data; `cli.py start` only flipped a session flag. Task 65
+> reached `PIV_READY` for live IEX and the 35-symbol universe, but the strategy decision path was
+> intentionally left disconnected, so a scheduled session would only have tested feed/readiness/telemetry/
+> reconciliation plumbing.
+>
+> **NEW EVIDENCE**: The decision path was restored via `talonx_piv/decision_engine.py`, which drives the
+> real, unmodified `talonx_quant.consumer.QuantScanner` in-process -- its live ingestion entrypoint, its own
+> throttle flush, its own confluence/risk-reward/trend-alignment/cooldown gating, observed via a real Redis
+> subscription to its own signal channel. ORPB_V1 was never used (rejected/retired at Task 63P; live use
+> would be a forbidden replay). A predeclared, disabled-by-default `PIV_LIFECYCLE_PROBE` (15:00 ET cutoff)
+> was added to guarantee full order-lifecycle coverage on a zero-natural-signal day.
+>
+> Before the first live run, tracing the actual runtime path found `WARMUP_DEFECT_FOUND`: `QuantScanner`
+> started completely cold (needs 120 1-minute bars; the HTF trend gate drops every regular-session bullish
+> candidate while the 200-bar 15-minute SMA is unavailable, which could never warm from live-only
+> accumulation within one day). Fixed by reusing `QuantScanner.preseed_symbols()` unmodified before any live
+> bar is consumed, with independent per-symbol verification and fail-closed exclusion of any symbol that
+> cannot be sufficiently hydrated. Verified live against real yfinance data: causal (zero fetched bars after
+> fetch-time), and reached 35/35 symbols ready by the second live run.
+>
+> The first live run (commit `fbc0a0d`, ~09:31-10:33 ET) crashed on an unhandled `requests.exceptions.
+> ReadTimeout` from the Alpaca REST poll -- confirmed live, zero orders/positions open at crash time. Fixed
+> (commit `b935588`: an isolated tick failure is now logged and skipped, not fatal), re-tested (75 focused +
+> full regression clean), and restarted same-day. The second run (~14:41-15:50 ET) ran to the configured EOD
+> flatten with zero further failures and reached 35/35 warmup-ready symbols, but produced zero natural
+> strategy signals: `SessionReadinessValidator`'s in-memory readiness state does not survive a process
+> restart, so every symbol read `DATA_NOT_READY` for the restarted run despite full warmup, and the decision
+> engine never received a readiness-eligible symbol. At the predeclared 15:00 ET cutoff, with no natural
+> order lifecycle observed, `PIV_LIFECYCLE_PROBE` fired exactly as designed: one AAPL buy/sell round trip
+> through the real PAPER broker (filled 311.47 / 311.40), full submit-ack-fill-position-exit-reconciliation
+> path exercised. EOD reconciled clean (`matched=true`, zero residual orders/positions). Both ORPB_V1 and
+> FPRC_V1 implementation fingerprints reconfirmed unchanged; zero diff on every protected file across the
+> entire day.
+>
+> **UPDATED CONCLUSION**: `V1_PIV_OPERATIONALLY_VALIDATED`.
+>
+> **REASON**: live IEX ingestion, readiness/staleness detection, causal warmup, and the real decision engine
+> were all active and correctly gated; the isolated `PIV_LIFECYCLE_PROBE` exercised the full broker order
+> lifecycle per the predeclared fallback rule after zero natural signals occurred; duplicate protection,
+> broker/internal reconciliation, Telegram isolation, and EOD all passed clean; no unexplained orders, no
+> real-capital capability, no protected-file drift. Caveat carried forward explicitly: the natural strategy
+> decision-to-order handoff was not exercised against a readiness-eligible symbol in live conditions today --
+> verified only via tests and standalone smoke tests, not one continuous live run -- because a genuine,
+> now-fixed engine defect forced a mid-session restart that exposed a second, real, still-open limitation
+> (`SessionReadinessValidator` state does not persist across a restart). Recommended before the next PIV
+> session: persist readiness state to disk, or restrict restarts to before 10:00 ET.
+
+**Scope/deployment**: no alpha change, tuning, or ORPB/FPRC replay occurred; both remain rejected and
+retired. Every event today (natural-path or probe) is tagged `alpha_evidence=false`; alpha remains
+UNPROVEN. Real capital remains structurally unsupported; PR #10 remains draft and unmerged. Next major
+task: broad development-only alpha discovery (see `results/task65_piv/next_alpha_discovery_plan.md`).
