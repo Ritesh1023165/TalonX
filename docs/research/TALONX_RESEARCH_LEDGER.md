@@ -6039,3 +6039,63 @@ retired. No profitability conclusion is made or implied -- this task is infrastr
 hardening only. Real capital remains structurally unsupported; PR #10 remains draft and unmerged. Next
 action: one clean, full end-to-end PAPER PIV session (not started by this task), then broad
 development-only alpha discovery.
+
+## Task 66B-PREP — Full Application E2E Readiness Audit + Deterministic Startup Hardening (2026-08-24)
+
+> **PREVIOUS**: Task 66A left the PIV runtime `FULL_E2E_PIV_READY`, and an attempt to run that PIV
+> session (Task 66B) found the market had already closed for the day (16:39 ET start, past the 16:00
+> ET close) -- deferred to the next trading day. Before that session ran, the validation target
+> changed: tomorrow's E2E validation is now the **normal** `run_talonx.py` application (Market ->
+> Quant -> Brain -> Core -> Dispatch -> Paper -> Telegram), not the narrower `talonx_piv` harness --
+> which had never been audited or preflight-checked as its own runtime, and had one known startup
+> race (`WatchlistDrivenQuantPreseed`'s initial preseed racing live market data/`quant_scanner.run()`
+> with no ordering guarantee).
+>
+> **NEW EVIDENCE**: Traced `run_talonx.py`'s `main()` directly and documented all 20 runtime
+> components (`talonx_ops/runtime_manifest.py`), including an explicit table of how this runtime
+> differs from PIV (market-data provider, broker/paper execution path, Brain/Core/Dispatch
+> participation, readiness/staleness architecture, reconciliation architecture) -- the two are not
+> merged. Closed the preseed race: `talonx_quant/preseed_ordering.py::run_initial_preseed()` is now
+> awaited directly in `main()` before any asyncio task exists, reusing `QuantScanner.preseed_symbols()`
+> unmodified and verifying per-symbol readiness against the scanner's own real buffer state and
+> configured thresholds; `WatchlistDrivenQuantPreseed` gained `already_preseeded_symbols` so its own
+> initial pass doesn't repeat that work, with its reactive loop for later additions unchanged --
+> verified against real yfinance data (AAPL/MSFT both reached full hydration) and 12 focused tests. A
+> new `talonx_ops/preflight.py` (`FULL_APP_E2E_READY`/`_BLOCKED`, 23 checks, read-only) audits the
+> normal application specifically, including a hard requirement (Part 4) that Brain must be genuinely
+> operational for tomorrow's validation -- production's own graceful-degrade philosophy is unchanged,
+> this is a stricter validation-time bar layered on top. `talonx_ops/provider_status.py` makes the
+> configured market-data provider and the local-simulated (never Alpaca) paper execution path
+> explicit in logs, the preflight report, and a new best-effort `runtime_metadata.json` that
+> `generate_eod_report.py` now optionally surfaces in a new "Run metadata" section. A read-only
+> `talonx_ops/comparator.py` reconciles PIV-vs-full-app evidence across 13 pipeline stages (only 4
+> ever populable from PIV, the rest correctly reported `NOT_APPLICABLE_TO_PIV`) -- smoke-tested
+> against today's real PIV evidence, honestly reporting zero matches since no full-app run has
+> happened yet. Telegram inbound `/ping` needed no restoration -- `DispatchAgent` already owns a
+> fully-wired `TelegramReplyListener(dispatch_agent=self)`, verified by reading the code, not built.
+> Two real defects were found and fixed during this task's own live smoke-testing (both caught by the
+> new tooling working as intended, not by inspection): a `SyntaxError` in `generate_eod_report.py`
+> introduced while adding the metadata section (unbalanced list literal), and a comparator bug that
+> initially attributed hollow "full-app evidence" to every watchlist ticker regardless of actual
+> pipeline activity. One stale scheduled job (the previous task's PIV-runtime market-open cron, now
+> targeting the wrong runtime per the objective change) was found and removed under this task's
+> cleanup authority; zero active TalonX/PIV processes were found.
+>
+> **UPDATED CONCLUSION**: `FULL_APP_E2E_READY` (once this task's own commit lands -- the only
+> preflight blocker at dirty-tree time was `tracked_tree_clean` on this task's own uncommitted work).
+>
+> **REASON**: 45 new focused tests all pass (preseed ordering, preflight, comparator, provider/
+> metadata explicitness), the 101 pre-existing PIV/Task66A tests are unaffected, and the full
+> regression suite grew from 1984 to 2029 passing tests with zero new failures (the same one known
+> pre-existing failure, unchanged). Both ORPB_V1 and FPRC_V1 implementation fingerprints are
+> reconfirmed unchanged, every protected `talonx_quant/*` file has zero diff, and no alpha tuning,
+> replay, or reinterpretation occurred. This is readiness/infrastructure evidence only -- no live
+> session was run or scheduled as part of this task, so a clean, full end-to-end PAPER validation of
+> the normal application is not yet claimed; that requires the next actual session (see
+> `results/task66b_prep/tomorrow_full_app_handoff.md`).
+
+**Scope/deployment**: no alpha change, tuning, or ORPB/FPRC replay occurred; both remain rejected and
+retired. No profitability conclusion is made or implied -- this task is readiness/infrastructure work
+only. Real capital remains structurally unsupported; PR #10 remains draft and unmerged. Next action:
+one clean, full end-to-end PAPER validation session using `run_talonx.py` (not started or scheduled by
+this task; target ~07:00 ET/~12:00 UK), then broad development-only alpha discovery.

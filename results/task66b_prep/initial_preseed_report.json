@@ -1,0 +1,36 @@
+{
+  "evaluated_at": "2026-08-24T21:21:10.616233+00:00",
+  "is_blocked": false,
+  "ready_count": 2,
+  "ready_symbols": [
+    "AAPL",
+    "MSFT"
+  ],
+  "requested_count": 2,
+  "requested_symbols": [
+    "AAPL",
+    "MSFT"
+  ],
+  "statuses": [
+    {
+      "bar_count_15m_htf": 200,
+      "bar_count_1m": 120,
+      "htf_sma_available": true,
+      "ready": true,
+      "reason": "SUFFICIENT_1M_AND_HTF_HISTORY",
+      "required_15m_bars": 200,
+      "required_1m_bars": 120,
+      "symbol": "AAPL"
+    },
+    {
+      "bar_count_15m_htf": 200,
+      "bar_count_1m": 120,
+      "htf_sma_available": true,
+      "ready": true,
+      "reason": "SUFFICIENT_1M_AND_HTF_HISTORY",
+      "required_15m_bars": 200,
+      "required_1m_bars": 120,
+      "symbol": "MSFT"
+    }
+  ]
+}

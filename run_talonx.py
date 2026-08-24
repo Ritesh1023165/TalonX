@@ -149,6 +149,7 @@ from talonx_ingest.storage.vector_store import VectorStore, get_vector_store
 from talonx_quant.config import QuantConfig
 from talonx_quant.consumer import QuantScanner
 from talonx_quant.fundamental_consumer import FundamentalScanner
+from talonx_quant.preseed_ordering import run_initial_preseed
 from talonx_quant.store import QuantStateStore
 from talonx_brain.config import BrainConfig
 from talonx_brain.consumer import ResearchAgent
@@ -162,6 +163,9 @@ from talonx_paper.consumer import LongTermPaperEngine, PaperTradingEngine
 from talonx_paper.store import PaperTradingStore
 from talonx_watchlist.config import WatchlistConfig
 from talonx_watchlist.store import TickerWatchlistStore
+
+from talonx_ops.provider_status import configured_market_data_provider, paper_execution_path_label
+from talonx_ops.runtime_metadata import write_runtime_metadata
 
 logging.basicConfig(
     level=logging.INFO,
@@ -718,14 +722,28 @@ class WatchlistDrivenQuantPreseed:
     its own module docstring's "self-contained at the code level"
     convention) -- this class is the one place that bridges the two,
     driving QuantScanner.preseed_symbols() from here instead.
+
+    `already_preseeded_symbols` (Task 66B-PREP): main() now awaits
+    talonx_quant.preseed_ordering.run_initial_preseed() for the startup
+    watchlist BEFORE any task -- including this one -- is created, so live
+    market data / quant_scanner.run() can never reach QuantScanner ahead of
+    that hydration. Symbols already covered by that call are passed in here
+    so run()'s own "initial preseed" step below doesn't repeat it -- it
+    still runs for whatever's left (e.g. a ticker added to the watchlist
+    during that earlier await) and its REACTIVE preseed loop for symbols
+    added/resumed after startup is completely unchanged.
     """
 
-    def __init__(self, watchlist_store: TickerWatchlistStore, quant_scanner: QuantScanner, poll_interval_seconds: float):
+    def __init__(
+        self, watchlist_store: TickerWatchlistStore, quant_scanner: QuantScanner, poll_interval_seconds: float,
+        already_preseeded_symbols: set[str] | None = None,
+    ):
         self._store = watchlist_store
         self._scanner = quant_scanner
         self._poll_interval = poll_interval_seconds
         self._stop_event = asyncio.Event()
         self._known_active_symbols: set[str] = set()
+        self._already_preseeded_symbols = set(already_preseeded_symbols or ())
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -733,9 +751,10 @@ class WatchlistDrivenQuantPreseed:
     async def run(self) -> None:
         initial = sorted(self._store.list_active_symbols())
         self._known_active_symbols = set(initial)
-        if initial:
-            logger.info("Pre-seeding talonx_quant buffers for the current watchlist: %s", initial)
-            await self._scanner.preseed_symbols(initial)
+        pending_initial = [s for s in initial if s.upper() not in self._already_preseeded_symbols]
+        if pending_initial:
+            logger.info("Pre-seeding talonx_quant buffers for the current watchlist: %s", pending_initial)
+            await self._scanner.preseed_symbols(pending_initial)
 
         while not self._stop_event.is_set():
             try:
@@ -1081,6 +1100,31 @@ async def main() -> None:
         # docstring) -- shares the SAME quant_store/config the technical
         # scanner uses.
         fundamental_scanner = FundamentalScanner(config=quant_config, store=quant_store)
+
+    # Task 66B-PREP: deterministic startup ordering -- awaited HERE, before
+    # any asyncio task exists, so it fully completes (or fails per-symbol)
+    # before market data streaming / quant_scanner.run() can start. See
+    # talonx_quant/preseed_ordering.py's own docstring for the race this
+    # closes. Zero-ready is reported, never fatal here -- QuantScanner's
+    # existing live-accumulation fallback still applies unchanged; this is
+    # ordering only, not a new requirement on strategy readiness.
+    initial_preseed_report = None
+    if quant_scanner is not None:
+        initial_watchlist_symbols = sorted(watchlist_store.list_active_symbols())
+        if initial_watchlist_symbols:
+            logger.info(
+                "Running initial Quant preseed for %s before starting live market data / "
+                "quant_scanner.run() ...", initial_watchlist_symbols,
+            )
+            initial_preseed_report = await run_initial_preseed(quant_scanner, initial_watchlist_symbols)
+            logger.info(
+                "Initial Quant preseed complete: %d/%d symbol(s) ready%s",
+                len(initial_preseed_report.ready_symbols), len(initial_watchlist_symbols),
+                " -- ZERO READY" if initial_preseed_report.is_blocked else "",
+            )
+        else:
+            logger.info("Watchlist is empty at startup -- skipping initial Quant preseed (nothing to seed).")
+
     market_publisher = RedisEventPublisher()
 
     research_agent: ResearchAgent | None = None
@@ -1198,6 +1242,13 @@ async def main() -> None:
     market_data_runner: WatchlistDrivenMarketData | None = None
     long_term_price_runner: LongTermPriceRunner | None = None
     if not args.skip_market_data:
+        # Task 66B-PREP explicitness (Part 5): which provider WILL be used
+        # is knowable statically from config, before MarketDataManager
+        # constructs anything -- log it plainly rather than only inside
+        # MarketDataManager.stream()'s own log line, so it's visible even
+        # to someone scanning startup logs for "did this use Polygon or
+        # yfinance today" without reading module internals.
+        logger.info("Market data provider (configured): %s", configured_market_data_provider())
         long_term_price_runner = LongTermPriceRunner(
             watchlist_store, make_on_event(market_publisher), watchlist_config.poll_interval_seconds,
             _env_float("TALONX_LT_PRICE_POLL_INTERVAL", 86400.0),
@@ -1218,6 +1269,9 @@ async def main() -> None:
     if quant_scanner is not None:
         quant_preseed = WatchlistDrivenQuantPreseed(
             watchlist_store, quant_scanner, watchlist_config.poll_interval_seconds,
+            already_preseeded_symbols=(
+                set(initial_preseed_report.requested_symbols) if initial_preseed_report is not None else None
+            ),
         )
 
     # Gated on quant_store specifically (not just not args.skip_quant) --
@@ -1277,6 +1331,31 @@ async def main() -> None:
         "enabled" if paper_trading_engine is not None else "disabled",
         "enabled" if long_term_paper_engine is not None else "disabled",
     )
+    if paper_trading_engine is not None or long_term_paper_engine is not None:
+        # Task 66B-PREP explicitness (Part 6): this is talonx_paper's own
+        # local simulated ledger (SQLite), never Alpaca -- unlike talonx_piv,
+        # which submits real (paper-mode) orders to Alpaca's broker
+        # endpoint. Stated explicitly here so a log/EOD reader never
+        # conflates the two execution paths.
+        logger.info("Paper execution path: %s", paper_execution_path_label())
+
+    # Task 66B-PREP (Parts 5/6/10): best-effort, additive, never fatal --
+    # gives generate_eod_report.py something concrete to attribute a report
+    # to (which provider/execution path/commit actually ran this session),
+    # and distinguishes a normal run_talonx.py run from a talonx_piv one.
+    try:
+        write_runtime_metadata(
+            run_mode="FULL_APP",
+            market_data_provider_configured=configured_market_data_provider() if market_data_runner is not None else "DISABLED",
+            paper_execution_path=paper_execution_path_label(),
+            quant_enabled=quant_scanner is not None,
+            brain_enabled=research_agent is not None,
+            core_enabled=decision_engine is not None,
+            dispatch_enabled=dispatch_agent is not None,
+            paper_trading_enabled=paper_trading_engine is not None,
+        )
+    except Exception as exc:  # noqa: BLE001 -- pure observability, never blocks startup
+        logger.warning("Failed to write runtime metadata (non-fatal): %s", exc)
 
     tasks = []
     if market_data_runner is not None:

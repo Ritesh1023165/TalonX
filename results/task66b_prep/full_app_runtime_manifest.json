@@ -1,0 +1,178 @@
+{
+  "component_count": 20,
+  "components": [
+    {
+      "asyncio_task_name": "market_data",
+      "degrade_behavior": "Polygon WebSocket if POLYGON_API_KEY set, else yfinance polling -- automatic fallback on auth failure/exhausted reconnects, never fatal.",
+      "module": "talonx_ingest.market_data.manager.MarketDataManager",
+      "name": "market_data_stream",
+      "notes": "See talonx_ops.provider_status.configured_market_data_provider() for which one is configured.",
+      "skip_flag": "--skip-market-data"
+    },
+    {
+      "asyncio_task_name": "long_term_price_poll",
+      "degrade_behavior": "Started alongside market_data_stream; daily-cadence yfinance poll for LONG_TERM-only tickers.",
+      "module": "run_talonx.LongTermPriceRunner (wraps YFinancePoller)",
+      "name": "long_term_price_poll",
+      "notes": "Excludes DUAL_HORIZON tickers (already covered by market_data_stream) and any ticker currently owned by earnings_fast_track.",
+      "skip_flag": "--skip-market-data"
+    },
+    {
+      "asyncio_task_name": "earnings_fast_track",
+      "degrade_behavior": "Best-effort per-ticker; one bad ticker/poll cycle logged and skipped, never fatal.",
+      "module": "run_talonx.EarningsFastTrackPoller",
+      "name": "earnings_fast_track",
+      "notes": "8-K/10-Q fast-track ingestion + extended-hours quote for tickers in their earnings window.",
+      "skip_flag": "--skip-earnings-fast-track"
+    },
+    {
+      "asyncio_task_name": "premarket_poller",
+      "degrade_behavior": "Only active 04:00-09:30 America/New_York (DST-aware); idle outside that window, never fatal.",
+      "module": "run_talonx.PreMarketPoller",
+      "name": "premarket_poller",
+      "notes": "Vectorized full-watchlist yfinance quote poll -- feeds the same talonx:market:stream channel.",
+      "skip_flag": "--skip-premarket"
+    },
+    {
+      "asyncio_task_name": null,
+      "degrade_behavior": "Awaited directly in main(), not a task -- zero-ready is reported, never fatal to startup.",
+      "module": "talonx_quant.preseed_ordering.run_initial_preseed",
+      "name": "quant_preseed_initial",
+      "notes": "Task 66B-PREP addition: causal, awaited BEFORE market_data_stream/quant_scanner tasks exist.",
+      "skip_flag": "--skip-quant"
+    },
+    {
+      "asyncio_task_name": "quant_scanner",
+      "degrade_behavior": "No optional-dependency degrade -- always runs unless explicitly skipped.",
+      "module": "talonx_quant.consumer.QuantScanner",
+      "name": "quant_scanner",
+      "notes": "Real technical strategy engine (evaluate_signals()) -- same class talonx_piv drives directly.",
+      "skip_flag": "--skip-quant"
+    },
+    {
+      "asyncio_task_name": "fundamental_scanner",
+      "degrade_behavior": "Sibling to quant_scanner; same skip flag, no independent degrade.",
+      "module": "talonx_quant.fundamental_consumer.FundamentalScanner",
+      "name": "fundamental_scanner",
+      "notes": "LONG_TERM/DUAL_HORIZON fundamental-factor scanner -- separate cooldown/throttle semantics.",
+      "skip_flag": "--skip-quant"
+    },
+    {
+      "asyncio_task_name": "quant_preseed",
+      "degrade_behavior": "Best-effort per newly-added/resumed ticker; fail-closed per symbol via preseed_symbols().",
+      "module": "run_talonx.WatchlistDrivenQuantPreseed",
+      "name": "quant_preseed_reactive",
+      "notes": "Reactive-only after startup (Task 66B-PREP moved the initial pass ahead of task creation).",
+      "skip_flag": "--skip-quant"
+    },
+    {
+      "asyncio_task_name": "research_agent",
+      "degrade_behavior": "Degrades to fully disabled (ImportError/ValueError caught in main()) if the configured LLM provider isn't ready -- pipeline runs normally without it. NOT acceptable for tomorrow's E2E validation -- see talonx_ops.preflight's hard brain_operational check.",
+      "module": "talonx_brain.consumer.ResearchAgent",
+      "name": "research_agent",
+      "notes": "Gemini or Ollama, per TALONX_BRAIN_LLM_PROVIDER.",
+      "skip_flag": "--skip-brain"
+    },
+    {
+      "asyncio_task_name": "decision_engine",
+      "degrade_behavior": "No optional-dependency degrade -- always runs unless explicitly skipped.",
+      "module": "talonx_core.consumer.DecisionEngine",
+      "name": "decision_engine",
+      "notes": "Correlates QuantSignals + ResearchReports per ticker into ActionableAlerts.",
+      "skip_flag": "--skip-core"
+    },
+    {
+      "asyncio_task_name": "dispatch_agent",
+      "degrade_behavior": "Degrades to fully disabled if its audit DB can't be opened (rare).",
+      "module": "talonx_dispatch.consumer.DispatchAgent",
+      "name": "dispatch_agent",
+      "notes": "Records ActionableAlerts to SQLite audit trail; pushes to Telegram if configured.",
+      "skip_flag": "--skip-dispatch"
+    },
+    {
+      "asyncio_task_name": "telegram_reply_listener",
+      "degrade_behavior": "Started by DispatchAgent.run() only if telegram_client.is_configured; otherwise simply absent (not a separate degrade path) -- Telegram itself is optional.",
+      "module": "talonx_dispatch.telegram_listener.TelegramReplyListener",
+      "name": "telegram_reply_listener",
+      "notes": "Already constructed WITH a real dispatch_agent (not the dispatch_agent=None degrade path talonx_piv needs) -- /ping reports real uptime/CPU/RAM/pipeline-funnel metrics. No restoration work was needed here, unlike PIV in Task 66A -- this was verified, not built, in this task.",
+      "skip_flag": "--skip-dispatch"
+    },
+    {
+      "asyncio_task_name": "paper_trading_engine",
+      "degrade_behavior": "Whole talonx_paper block (both engines) degrades to disabled if its shared store can't open.",
+      "module": "talonx_paper.consumer.PaperTradingEngine",
+      "name": "paper_trading_engine",
+      "notes": "Local simulated ledger (SQLite) -- never Alpaca. See talonx_ops.provider_status.",
+      "skip_flag": "--skip-paper-trading"
+    },
+    {
+      "asyncio_task_name": "long_term_paper_engine",
+      "degrade_behavior": "Same shared-store degrade as paper_trading_engine.",
+      "module": "talonx_paper.consumer.LongTermPaperEngine",
+      "name": "long_term_paper_engine",
+      "notes": "DCA + rebalance loop for LONG_TERM/DUAL_HORIZON tickers.",
+      "skip_flag": "--skip-long-term-paper"
+    },
+    {
+      "asyncio_task_name": "periodic_ingestion",
+      "degrade_behavior": "One bad cycle logged and skipped, loop continues.",
+      "module": "run_talonx.periodic_ingestion_loop",
+      "name": "periodic_ingestion",
+      "notes": "SEC filing + news ingestion, immediate on startup then every --interval-hours.",
+      "skip_flag": "--skip-ingestion"
+    },
+    {
+      "asyncio_task_name": "periodic_long_term_financials",
+      "degrade_behavior": "One bad cycle logged and skipped, loop continues.",
+      "module": "run_talonx.periodic_long_term_financials_loop",
+      "name": "periodic_long_term_financials",
+      "notes": "SEC XBRL structured financials for LONG_TERM/DUAL_HORIZON tickers.",
+      "skip_flag": "--skip-ingestion"
+    },
+    {
+      "asyncio_task_name": "periodic_earnings_calendar_sync",
+      "degrade_behavior": "Per-ticker fetch failure skipped, cycle continues.",
+      "module": "run_talonx.periodic_earnings_calendar_sync_loop",
+      "name": "periodic_earnings_calendar_sync",
+      "notes": "Weekly (interval_hours from process start, not wall-clock) earnings-date sync.",
+      "skip_flag": "--skip-earnings-sync"
+    },
+    {
+      "asyncio_task_name": "reactive_ingestion",
+      "degrade_behavior": "Per-ticker failure logged, ticker still marked known (relies on periodic loop as retry).",
+      "module": "run_talonx.WatchlistDrivenIngestion",
+      "name": "reactive_ingestion",
+      "notes": "Immediate filing/news/financials ingestion for newly added/resumed/re-tagged tickers.",
+      "skip_flag": "--skip-ingestion"
+    },
+    {
+      "asyncio_task_name": "reconcile_long_term_factors",
+      "degrade_behavior": "Best-effort, self-healing on next restart if it also fails.",
+      "module": "run_talonx.reconcile_missing_long_term_factors",
+      "name": "reconcile_long_term_factors",
+      "notes": "One-shot startup fix for a confirmed lost-event race (NewFundamentalsIngestedEvent).",
+      "skip_flag": "--skip-ingestion (also requires quant_store)"
+    },
+    {
+      "asyncio_task_name": "periodic_wal_checkpoint",
+      "degrade_behavior": "Per-store checkpoint failure logged, loop continues -- always runs if any other task does.",
+      "module": "run_talonx.periodic_wal_checkpoint_loop",
+      "name": "periodic_wal_checkpoint",
+      "notes": "Pure maintenance (SQLite WAL checkpoint); no functional effect on the pipeline.",
+      "skip_flag": null
+    }
+  ],
+  "out_of_scope_components": [
+    "talonx_dispatch/app.py (Streamlit dashboard -- separate process, run alongside, never inside this asyncio loop; see its own module docstring)",
+    "talonx_backtest (offline research tooling, not a live runtime component)"
+  ],
+  "runtime_graph_stages": [
+    "market-data provider (Polygon WS or yfinance) + pre-market/long-term pollers",
+    "quant preseed (initial, causal) -> talonx_quant.QuantScanner + FundamentalScanner",
+    "talonx_brain.ResearchAgent (Gemini/Ollama + ChromaDB retrieval)",
+    "talonx_core.DecisionEngine (correlates Quant + Brain per ticker)",
+    "talonx_dispatch.DispatchAgent (audit trail + Telegram outbound/inbound)",
+    "talonx_paper.PaperTradingEngine / LongTermPaperEngine (local simulated ledger)",
+    "generate_eod_report.py (offline, run separately after EOD)"
+  ]
+}
