@@ -5,7 +5,7 @@
     "method": "EventBus.emit() -> sender(telegram_token, chat_id) on STARTUP/PREFLIGHT_PASS/PAPER_SESSION_STARTED events",
     "preflight_check": "telegram_reachable: HTTP 200 (see preflight_result.json)",
     "events_observed_in_piv_events_jsonl": ["STARTUP", "PREFLIGHT_PASS", "PAPER_SESSION_STARTED"],
-    "delivery_confirmed_in_telegram_app": "PENDING_HUMAN_CONFIRMATION -- this task cannot visually inspect the user's Telegram client; asked the user directly to confirm receipt."
+    "delivery_confirmed_in_telegram_app": "CONFIRMED -- user reported receiving the /ping reply below at 13:29:37 BST, implying the Telegram integration end-to-end (bot token, chat id, both send and receive paths) is genuinely live, not just preflight-reachable."
   },
   "inbound": {
     "listener": "talonx_dispatch.telegram_listener.TelegramReplyListener, reused via talonx_piv.telegram_inbound.build_piv_telegram_listener (Task 69P fix, commit 7fb1b238ecebbb5bc54827055fea7ea584b456c1)",
@@ -13,12 +13,25 @@
     "started_with_session": true,
     "no_telegram_inbound_flag_used": false,
     "piv_context_fields_added": ["mode (PAPER / NO REAL CAPITAL)", "feed_provider (accurately derived from feed_mode=IEX_PAPER_PIV -> 'Alpaca IEX (PAPER PIV operational feed)')", "universe_size (35)"],
-    "live_round_trip_confirmed": "PENDING_HUMAN_ACTION -- a real inbound /ping requires an actual Telegram message sent by the user (this task cannot originate an incoming user-side Telegram message itself, only outbound bot sends); the user was asked directly to send /ping and report the response."
+    "live_round_trip_confirmed": "CONFIRMED 2026-08-25T12:29:37Z (13:29:37 BST) -- user sent /ping, received a full reply within the same long-poll turn (RUNTIME_PARITY_FAIL_TELEGRAM_INBOUND does NOT apply)."
+  },
+  "actual_ping_reply_observed": {
+    "process": "RUNNING",
+    "pipeline": "DEGRADED (market feed disconnected) -- see caveat below, this is NOT the PIV feed",
+    "uptime": "0h 35m",
+    "piv_block": {"mode": "PAPER / NO REAL CAPITAL", "live_feed_provider": "Alpaca IEX (PAPER PIV operational feed)", "configured_universe": 35},
+    "market_block": {"source": "Disconnected", "watchlist_size": "unknown (no watchlist store available)", "bars_events_today": 0, "feed_status": "disconnected"},
+    "quant_block": "all zero (candidates/signals) -- expected, session is still pre_market",
+    "session_block": {"us_market_session": "pre_market", "uk_time": "13:29:37 BST", "regular_session": false}
   },
   "yfinance_false_report_check": {
     "concern": "Task 69P explicitly warned against falsely reporting yfinance when the live feed is Alpaca IEX.",
-    "finding": "The general-app /ping's MARKET section reads talonx_ingest's own Redis metrics/WS-heartbeat, which PIV's SessionRunner does not write to (PIV gets bars directly via Alpaca IEX, bypassing talonx_ingest entirely) -- with dispatch_agent's `_client` now wired to the SAME Redis client DecisionEngine/QuantScanner use, these ingest-specific fields will most likely show 0/absent (honestly reflecting that the general ingest pipeline is not running), not a stale 'yfinance polling' label, since PIV never touched those specific Redis keys in the first place. The new piv_info block explicitly states the correct provider (Alpaca IEX) so a human reading the reply sees the accurate answer regardless of what the ingest-specific fields show.",
-    "verified_live": "To be confirmed against the actual /ping reply text once the user sends it."
+    "finding": "CONFIRMED CORRECT, verified against the actual live reply above: the new PIV block explicitly states 'Live feed provider: Alpaca IEX (PAPER PIV operational feed)' -- nowhere in the reply does the word 'yfinance' appear. The pre-existing MARKET section's 'Source: Disconnected' / 'Pipeline: DEGRADED (market feed disconnected)' are ALSO not false -- they are honestly reporting on talonx_ingest's OWN WS heartbeat/Redis metrics, which PIV's SessionRunner genuinely does not write to (PIV reads Alpaca IEX bars directly, bypassing talonx_ingest entirely, exactly as the runtime parity audit found). No false data anywhere; the labeling is real but potentially confusing to a reader who doesn't know 'Pipeline'/'Source' refer specifically to the general-app ingest pipeline, not to PIV's own feed."
   },
-  "classification_pending": "Will be finalized once the user confirms outbound receipt and inbound /ping round-trip; provisional classification if unconfirmed by market open: RUNTIME_PARITY_FAIL_TELEGRAM_INBOUND (not yet earned -- infrastructure is in place and tested, only live human confirmation is outstanding)."
+  "labeling_caveat_not_a_defect": {
+    "observation": "A human glancing only at 'Process: RUNNING' / 'Pipeline: DEGRADED (market feed disconnected)' near the top of the reply could mistakenly read this as 'the whole system is broken', when in fact PIV's own Alpaca IEX feed and QuantScanner are running fine (confirmed via warmup_verification.json: 17/35 symbols warmup-ready with live_provider=ALPACA_IEX) -- the DEGRADED label is scoped ONLY to talonx_ingest's WS heartbeat, a pipeline PIV does not use.",
+    "why_not_fixed_now": "Per Task 69P's own instructions ('do not alter behavior mid-session unless it is an actual defect'; 'Minimal code change only if necessary') and to avoid destabilizing a session already running cleanly, this is documented rather than patched further -- it is a legacy label scoped to a different subsystem, not a false report, and the NEW PIV block (added by this task's fix) already gives the accurate, PIV-specific answer directly beneath it.",
+    "anomaly_classification": "PARITY_OK (with a documented labeling caveat) -- not ENGINE_DEFECT, since no data is false, only potentially ambiguous to a reader unfamiliar with the two pipelines' separation. Recommended as a low-priority daytime/next-task follow-up: either relabel 'Pipeline'/'Source' to make the ingest-pipeline scoping explicit (e.g. 'Ingest Pipeline: ...') or suppress that block entirely for a piv_info-carrying dispatch_agent."
+  },
+  "classification": "RUNTIME_PARITY_TELEGRAM_OK -- both outbound and inbound confirmed live, feed provider accurately reported, no false data. RUNTIME_PARITY_FAIL_TELEGRAM_INBOUND does not apply."
 }
