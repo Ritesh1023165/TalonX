@@ -1,0 +1,32 @@
+{
+  "task": "67A Stage 0 - data readiness for alpha phenomenon discovery",
+  "started_utc": "2026-08-24T22:15:00Z",
+  "worktree": "c:\\workspace\\TalonX-alpha-phenomenon-discovery",
+  "status": "COMPLETE",
+  "deliverables": {
+    "data_inventory.json": "done",
+    "exposure_boundary_audit.json": "done",
+    "data_split_contract.json_and_.md": "done",
+    "data_guard_module_and_test": "done",
+    "benchmark_inventory.json": "done",
+    "shared_tooling_manifest_and_module": "done",
+    "protected_files_fingerprint_manifest.json": "done (bonus artifact, not explicitly required but supports the 'verify sha256 unchanged' instruction)"
+  },
+  "key_outputs": {
+    "research/task67a_lib/research_stats.py": "8 shared statistical utilities, seed_control_convention documented",
+    "research/task67a_lib/data_guard.py": "DataSplitGuard / DataRole / BlockedDataRoleAccessError / UnmaterializedRoleError",
+    "research/scripts/task67a_build_data_inventory.py": "rebuilds data_inventory.json from whatever is under data/historical_1m/ -- rerunnable",
+    "tests/test_task67a_research_stats.py": "19 tests, all passing",
+    "tests/test_task67a_data_guard.py": "11 tests (8 synthetic-fixture + 3 real-contract integration), all passing",
+    "data/historical_1m/task67a_development/": "35/35 symbols, 2026-05-15..2026-08-14, 1,376,385 bars, FULL status, 0 quality defects",
+    "data/historical_1m/task67a_benchmarks/": "SPY + 7 sector ETFs (XLK/XLY/XLC/XLP/XLV/XLI/XLF), same range, 8/8 FULL status, 0 quality defects"
+  },
+  "notes": [
+    "CRITICAL environment gap found and handled: data/historical_1m/ did not exist at all in this worktree (gitignored, not copied by git worktree add). See errors.jsonl entry 1. Canonical worktree c:\\workspace\\TalonX was NEVER read or written to work around this -- instead: audited prior exposure from git-tracked files only, then freshly downloaded what Stage 1 actually needs.",
+    "exposure_boundary_audit.json (built by a background research agent reading only git-tracked research/scripts/*.py, results/task*/*.json|*.md, and docs/research/TALONX_RESEARCH_LEDGER.md) found that EVERY calendar date from 2025-01-24 through 2026-08-14 has some prior-task exposure for at least a symbol subset, plus 2026-08-20 and 2026-08-24 (today) were touched live. This means a genuinely clean VALIDATION/REPLICATION reserve could not be materialized tonight -- see data_split_contract.md's 'honest headline' section. DEVELOPMENT was drawn from the already-exposed 2026-05-15..2026-08-14 range (acceptable per the discovery plan's Discovery-phase reuse rule); VALIDATION (2026-08-25..2026-09-22) and REPLICATION (2026-09-23..2026-10-21) are reserved by calendar date only, deliberately NOT materialized, enforced via data_guard.py's UnmaterializedRoleError until a later task downloads them once those sessions have actually traded.",
+    "One real bug caught and fixed during test-writing: research_stats.bootstrap_ci's vectorized fast path (np.mean/median/std/sum applied to the full (n_resamples, n) resample matrix) was missing axis=1, collapsing every resample to an identical scalar. Fixed; covered by test_bootstrap_ci_contains_true_mean_on_symmetric_data.",
+    "One low-severity caller-side issue hit and resolved: scripts/download_historical_1m.py does not call load_dotenv() itself, so APCA_API_KEY_ID/APCA_API_SECRET_KEY had to be explicitly exported from .env before invoking it. No script code was modified.",
+    "Protected files (talonx_quant/strategy.py, indicators.py, consumer.py, config.py, fprc_v1.py, orpb_v1.py, fprc_v1_shadow.py, orpb_v1_shadow.py) were never opened for writing at any point -- sha256 fingerprints captured in protected_files_fingerprint_manifest.json.",
+    "Only new files were added; no existing file (including research/scripts/task60_freeze_fprc_v1.py or any other existing research script) was modified. Nothing was committed or pushed -- git add was never run, per instructions."
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "task": "67A Stage 0 - benchmark data inventory (Relative Strength family)",
+  "purpose": "Family 4 (Relative-strength continuation vs. SPY/sector, per results/task65_piv/next_alpha_discovery_plan.md) needs a market benchmark (SPY) and, where practical, sector benchmarks for the 35-symbol universe. No prior task in this repo ever downloaded SPY or any sector ETF -- confirmed via exposure_boundary_audit.json's full research-ledger/script sweep finding no SPY/XLK/XLY/etc. reference anywhere.",
+  "spy": {
+    "obtained": true,
+    "provider": "alpaca",
+    "feed": "RESEARCH_SIP (omitted feed param -> account default; confirmed SIP for this account, see results/task63r_orpb_v1_feed_remediation/feed_diagnostic.json sip_available=true)",
+    "date_range_requested": {"start": "2026-05-15", "end": "2026-08-14"},
+    "date_range_actual": {"start": "2026-05-15 08:00:00+00:00", "end": "2026-08-14 23:59:00+00:00"},
+    "note_on_date_range": "DEVELOPMENT range ONLY, per the task instructions ('never VALIDATION/REPLICATION ranges'). SPY for VALIDATION (2026-08-25..2026-09-22) and REPLICATION (2026-09-23..2026-10-21) must be downloaded alongside those roles' symbol data when/if a family is selected and those roles are materialized -- see data_split_contract.md.",
+    "rows": 56893,
+    "sessions_present_et_dates": 63,
+    "is_clean": true,
+    "unexpected_intra_session_gap_bars": 1170,
+    "file": "data/historical_1m/task67a_benchmarks/SPY.csv",
+    "dataset_fingerprint_sha256_of_whole_benchmarks_dir": "488f78d39ad3f8232026aafdbdaea3fc3792db45afa40d03173e1f47f5bdaf5c",
+    "full_quality_detail": "See results/task67a_phenomenon_discovery/data_inventory.json -> datasets.task67a_benchmarks.per_symbol (symbol=SPY) for the complete DataQualityReport-equivalent breakdown (duplicates/out-of-order/NaN/Inf/invalid-OHLC, all zero)."
+  },
+  "sector_etfs": {
+    "obtained": true,
+    "attempted": ["XLK", "XLY", "XLC", "XLP", "XLV", "XLI", "XLF"],
+    "all_succeeded": true,
+    "provider": "alpaca (same RESEARCH_SIP as SPY)",
+    "date_range": "Same DEVELOPMENT range as SPY (2026-05-15..2026-08-14)",
+    "mapping_methodology": "Standard GICS sector classification for each of the 35 universe symbols, mapped to the corresponding SPDR Select Sector ETF that tracks that GICS sector (the conventional, widely-used sector-benchmark pairing -- e.g. XLK for Information Technology, XLY for Consumer Discretionary). This mapping is NOT sourced from any live feed or file already in this repo (none exists -- confirmed via grep for XLK/XLY/XLC/sector/GICS across the whole repo before writing this, zero hits) -- it reflects each company's well-established, long-standing public GICS sector membership. These are large, long-established companies whose sector classification is stable and not a judgment call this task invented; still, this mapping should be treated as a documented ASSUMPTION, not ground truth pulled from an authoritative source inside this repo, and re-verified against a live sector-classification feed before any production use.",
+    "mapping": {
+      "XLK": {"sector": "Information Technology", "symbols": ["AAPL", "MSFT", "NVDA", "AMD", "ADBE", "ADI", "AMAT", "AVGO", "CSCO", "INTC", "INTU", "KLAC", "LRCX", "MU", "PANW", "QCOM", "TXN", "STX"]},
+      "XLY": {"sector": "Consumer Discretionary", "symbols": ["AMZN", "TSLA", "BKNG", "SBUX"]},
+      "XLC": {"sector": "Communication Services", "symbols": ["META", "GOOGL", "CMCSA", "NFLX"]},
+      "XLP": {"sector": "Consumer Staples", "symbols": ["COST", "MDLZ", "PEP"]},
+      "XLV": {"sector": "Health Care", "symbols": ["GILD", "ISRG", "REGN", "VRTX"]},
+      "XLI": {"sector": "Industrials", "symbols": ["HON"]},
+      "XLF": {"sector": "Financials", "symbols": ["PYPL"], "note": "PayPal Holdings is classified under GICS Financials (Financial Services industry group, Transaction & Payment Processing Services sub-industry), not Technology, despite being a payments/software company -- this is the standard, well-documented GICS classification, not an idiosyncratic choice."},
+      "coverage_check": "18+4+4+3+4+1+1 = 35 symbols mapped, matches the full 35-symbol universe with none left unmapped and none double-mapped."
+    },
+    "per_etf_quality": {
+      "XLK": {"rows": 32374, "sessions": 63, "is_clean": true, "unexpected_intra_session_gap_bars": 1170},
+      "XLY": {"rows": 25553, "sessions": 63, "is_clean": true, "unexpected_intra_session_gap_bars": 1170},
+      "XLC": {"rows": 25267, "sessions": 63, "is_clean": true, "unexpected_intra_session_gap_bars": 1178},
+      "XLP": {"rows": 26917, "sessions": 63, "is_clean": true, "unexpected_intra_session_gap_bars": 1171},
+      "XLV": {"rows": 27756, "sessions": 63, "is_clean": true, "unexpected_intra_session_gap_bars": 1170},
+      "XLI": {"rows": 26135, "sessions": 63, "is_clean": true, "unexpected_intra_session_gap_bars": 1170},
+      "XLF": {"rows": 32076, "sessions": 63, "is_clean": true, "unexpected_intra_session_gap_bars": 1170}
+    },
+    "files": "data/historical_1m/task67a_benchmarks/{XLK,XLY,XLC,XLP,XLV,XLI,XLF}.csv",
+    "full_quality_detail": "See results/task67a_phenomenon_discovery/data_inventory.json -> datasets.task67a_benchmarks.per_symbol for the complete per-ETF DataQualityReport-equivalent breakdown."
+  },
+  "outcome_for_family_4": "RELATIVE-STRENGTH FAMILY IS NOT DATA-BLOCKED. Both SPY (market-level) and full 7-way sector ETF coverage (every one of the 35 universe symbols has a defensible sector benchmark) were obtained cleanly for the DEVELOPMENT range on the first attempt -- no INSUFFICIENT_DATA fallback is needed tonight. A later Stage 1 script implementing Family 4 can compute both a market-relative (vs. SPY) and a sector-relative (vs. the mapped XL* ETF) signal for every symbol in the universe.",
+  "caveats_for_stage_1": [
+    "The sector mapping above is a documented assumption (standard GICS classification), not pulled from a live feed inside this repo -- re-verify before any production use, though it should not meaningfully affect a Stage 1 discovery-phase screen for large, stably-classified mega-cap names.",
+    "SPY/sector data exists ONLY for the DEVELOPMENT range (2026-05-15..2026-08-14) tonight, per instructions. VALIDATION/REPLICATION SPY/sector data does not exist yet (those roles are entirely unmaterialized, per data_split_contract.json) and must be downloaded alongside those roles' symbol data in a later task.",
+    "unexpected_intra_session_gap_bars is nonzero (~1170-1180 per instrument) but proportionally small and consistent across every instrument including SPY itself (the most liquid ETF in existence) -- almost certainly a benign artifact of Alpaca's bar-emission behavior (see data_inventory.json's missing_bars_note), not a defect specific to any one symbol."
+  ]
+}

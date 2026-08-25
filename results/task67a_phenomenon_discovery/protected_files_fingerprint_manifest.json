@@ -1,0 +1,26 @@
+{
+  "task": "67A Stage 0 - protected files fingerprint manifest",
+  "purpose": "Per-file sha256 for every protected file this task must not modify, computed fresh at both the start and end of Task 67A Stage 0's work, so an unchanged value at the end is verifiable evidence rather than an assertion.",
+  "method": "sha256(raw file bytes), individually per file -- deliberately NOT a single combined hash (unlike research/scripts/task60_freeze_fprc_v1.py's EXPECTED_FINGERPRINT, which concatenates fprc_v1.py+fprc_v1_shadow.py+a spec doc into one hash). Individual hashes are more useful here: they let a later check identify EXACTLY which file changed, if any, rather than only that 'something in the set changed'.",
+  "protected_files": {
+    "talonx_quant/strategy.py": "bc73da8199920977e16b263f73ff80861645a3b44c5a8d0e0632a02a2a7867f0",
+    "talonx_quant/indicators.py": "153a37a05a5aa0a06743b9e4dea62e2b12aa81edf762dda7280d413e62d2abcc",
+    "talonx_quant/consumer.py": "39bd02792ecc12ebbf9957169e6536b7040953360acb912639cc9d2e0174f2b1",
+    "talonx_quant/config.py": "9eac608cacc7af602d731ec1c730f7f9590690a574d520aca5a11060227c9921",
+    "talonx_quant/fprc_v1.py": "44770f763970ab2de303e28a7d5264c173b7819f4bacabc3378b66756661e2fc",
+    "talonx_quant/orpb_v1.py": "1518f6d7af215a2a63373fd170f84ae6596bf01c802c21501d2694a9b17ef5e7",
+    "talonx_quant/fprc_v1_shadow.py": "2e0feb4d7cac366417f389069fac7c0f49dd30705712bd8b998db6e7b930dd42",
+    "talonx_quant/orpb_v1_shadow.py": "67375274d1c3225ce9e9d36ea20163f7faee55b39b97c9f0b5b1160c3cf11a55"
+  },
+  "shadow_variants_not_found": [
+    "talonx_quant/strategy_shadow.py",
+    "talonx_quant/indicators_shadow.py",
+    "talonx_quant/consumer_shadow.py",
+    "talonx_quant/config_shadow.py"
+  ],
+  "shadow_variants_not_found_note": "These simply do not exist in this repo (confirmed via os.path.exists before hashing, not silently skipped) -- only fprc_v1_shadow.py and orpb_v1_shadow.py have shadow counterparts. Not a defect; the task briefing said 'and their _shadow variants' as a general pattern, not a claim that every protected file has one.",
+  "other_protected_paths_not_modified": ["talonx_brain/", "talonx_core/", "talonx_dispatch/", "talonx_paper/"],
+  "other_protected_paths_verification_method": "git status --short over the whole worktree at the end of this task's work (see final summary) -- confirms zero changes anywhere under these four package directories, not just the individually-hashed files above.",
+  "computed_utc": "2026-08-24T23:45:00Z",
+  "verification": "Re-run the sha256 computation above at the end of this task's work; all eight values must be byte-identical, since no code in results/task67a_phenomenon_discovery/, research/task67a_lib/, research/scripts/task67a_*, or tests/test_task67a_*.py ever imports, edits, or writes to any of these paths."
+}

@@ -1,0 +1,98 @@
+{
+  "task": "67A Stage 0",
+  "purpose": "Generic (family-agnostic) statistical/utility toolkit for the 6-family Task 67A phenomenon discovery screen, so each family's Stage 1 script does not re-implement bootstrap/concentration/dedup/matching/MFE-MAE/forward-return logic from scratch.",
+  "module": {
+    "path": "research/task67a_lib/research_stats.py",
+    "sha256": "142947569f8e9225daa2c3e115b05c85d105ac67caa6e31f8a6aada7d7a04a2f",
+    "import_path": "research.task67a_lib.research_stats",
+    "python_requires": ">=3.10 (uses PEP 604 X | Y union syntax)",
+    "third_party_dependencies": ["numpy", "pandas"],
+    "no_init_py": "Deliberate: this repo uses implicit PEP 420 namespace packages everywhere (research/, research/scripts/, talonx_quant/, etc. all lack __init__.py). research/task67a_lib/ follows the same convention."
+  },
+  "provenance": {
+    "extracted_and_generalized_from": [
+      {
+        "source": "research/scripts/task55_family_economics_diagnostic.py",
+        "functions_borrowed_from": ["bootstrap_descriptive (percentile bootstrap, seeded np.random.default_rng, 95% quantile CI over resampled means)", "matched_control (coarse-stratum common support + greedy bounded nearest-time one-to-one pairing)"],
+        "generalized_into": ["bootstrap_ci / bootstrap_ci_clustered", "matched_control_sample"]
+      },
+      {
+        "source": "research/scripts/task58_rsi_payoff_regime_diagnostic.py",
+        "functions_borrowed_from": ["excursion_and_forward (MFE/MAE reconstruction from raw OHLC bars between entry/exit; HORIZONS forward-excursion loop bounded by session close)", "econ (top3/top5 winner concentration share)"],
+        "generalized_into": ["compute_mfe_mae", "forward_return_horizons", "concentration_metrics"]
+      }
+    ],
+    "written_fresh_no_prior_hand_rolled_equivalent_found": [
+      "dedup_events (event clustering/de-duplication)",
+      "effect_surface (broad-binned parameter-stability surface)",
+      "cross_family_overlap (same-symbol-time / same-symbol-day overlap between two event sets)"
+    ],
+    "note": "Checked (grep -i 'bootstrap|concentration|matched_control|dedup|clustering') across research/scripts/*.py before writing; only task55 and task58 had reusable logic, per the Task 67A briefing's own pointer."
+  },
+  "functions": [
+    {
+      "name": "bootstrap_ci",
+      "purpose": "Percentile bootstrap CI for any statistic over an i.i.d.-resampled 1D sample.",
+      "method": "Draw n_resamples (default 10,000) bootstrap resamples with replacement (same size as input), compute `statistic` on each, take the [(1-ci_level)/2, 1-(1-ci_level)/2] quantiles as the CI. point_estimate is computed on the ORIGINAL sample, not the resample mean.",
+      "determinism": "seed: int (default DEFAULT_SEED=670067) -> fresh numpy.random.default_rng(seed) every call.",
+      "small_n_honesty": "n < min_n (default MIN_N_FOR_SUMMARY=5) -> insufficient_n=True, ci withheld (None), caveat explains why.",
+      "tests": ["test_bootstrap_ci_is_deterministic_given_same_seed", "test_bootstrap_ci_different_seeds_can_differ", "test_bootstrap_ci_contains_true_mean_on_symmetric_data", "test_bootstrap_ci_flags_insufficient_n"]
+    },
+    {
+      "name": "bootstrap_ci_clustered",
+      "purpose": "Block/cluster bootstrap resampling whole GROUPS (e.g. symbol, or an event cluster from dedup_events) rather than individual rows, respecting within-group dependence.",
+      "determinism": "Same seed convention as bootstrap_ci.",
+      "small_n_honesty": "n_groups < min_groups (default 5) -> insufficient_n=True.",
+      "tests": ["test_bootstrap_ci_clustered_deterministic_and_respects_groups"]
+    },
+    {
+      "name": "concentration_metrics",
+      "purpose": "top1/top3 symbol share, best-day share, best-period share of total POSITIVE value_col -- generalizes Task 58's winner-tail concentration and Task 55's top-winner-sensitivity checks.",
+      "small_n_honesty": "n_positive_rows < min_n (default 5) or total_positive<=0 -> insufficient_n=True, shares withheld.",
+      "tests": ["test_concentration_metrics_correctness_synthetic", "test_concentration_metrics_flags_insufficient_n"]
+    },
+    {
+      "name": "dedup_events",
+      "purpose": "Generic event clustering/de-duplication: within each group_keys group, merges runs of events whose consecutive time gap <= min_gap_minutes into one cluster; marks one representative row per cluster (first or last).",
+      "output_columns": ["_cluster_id", "_cluster_rank", "_cluster_representative"],
+      "tests": ["test_dedup_events_clusters_close_events_and_marks_one_representative", "test_dedup_events_respects_group_keys_independently"]
+    },
+    {
+      "name": "matched_control_sample",
+      "purpose": "Generic two-group (treatment/control) matched-control sampling: coarse-stratum common support restricted to match_keys combinations present in BOTH groups, plus optional greedy bounded nearest-time one-to-one pairing.",
+      "determinism": "Algorithm itself is non-stochastic (greedy nearest-time assignment); seed accepted/stored for interface consistency with the rest of the module.",
+      "tests": ["test_matched_control_sample_pairs_within_stratum_only", "test_matched_control_sample_no_common_support_returns_empty_pairs"]
+    },
+    {
+      "name": "effect_surface",
+      "purpose": "Broad-binned (default tertiles, NOT a fine grid -- deliberately coarse per the discovery plan's 'isolated optima are the strongest overfitting tell' guidance) parameter-stability surface: metric mean/median/std/n per bin combination.",
+      "tests": ["test_effect_surface_basic_sanity"]
+    },
+    {
+      "name": "cross_family_overlap",
+      "purpose": "Same-symbol-time (within a tolerance) and same-symbol-day overlap between two families' event sets, reported directionally from both sides (a_covered_by_b and b_covered_by_a).",
+      "tests": ["test_cross_family_overlap_correctness_synthetic", "test_cross_family_overlap_empty_input_does_not_error"]
+    },
+    {
+      "name": "compute_mfe_mae",
+      "purpose": "MFE/MAE from raw OHLC bars between entry/exit timestamps, long or short, matching Task 58's exact reconstruction definition (excursion boundary always includes entry price itself).",
+      "tests": ["test_compute_mfe_mae_long_correctness_synthetic", "test_compute_mfe_mae_short_mirrors_long", "test_compute_mfe_mae_raises_on_empty_window"]
+    },
+    {
+      "name": "forward_return_horizons",
+      "purpose": "Causal forward-looking return/excursion at a list of minute horizons (or None = to session close), bounded to never cross session close, matching Task 58's HORIZONS/forward_horizons_never_cross_session_close invariant.",
+      "tests": ["test_forward_return_horizons_basic_and_session_close_bound", "test_forward_return_horizons_zero_bars_returns_none_close_return"]
+    }
+  ],
+  "seed_control_convention": {
+    "constant": "DEFAULT_SEED = 670067 (module-level constant in research_stats.py)",
+    "rule": "Every stochastic function takes an explicit seed: int kwarg defaulting to DEFAULT_SEED; internally builds numpy.random.default_rng(seed) fresh, never touches global numpy random state (np.random.seed is never called). Same seed + same input + same params => bit-identical output (verified by the determinism tests above running the same call twice and asserting equality).",
+    "caller_guidance": "A Stage 1 script running several independent bootstraps (e.g. one per family) in the same process should pass distinct explicit seeds (e.g. DEFAULT_SEED + a per-family integer offset) so resamples are not accidentally correlated across families."
+  },
+  "test_location": "tests/test_task67a_research_stats.py (follows this repo's existing flat tests/test_taskNN_*.py convention -- confirmed via tests/ directory listing, no per-task subdirectory convention exists).",
+  "test_run_result": {
+    "command": "python -m pytest tests/test_task67a_research_stats.py -q",
+    "result": "19 passed",
+    "note": "One bug was caught and fixed during this run: bootstrap_ci's vectorized fast path (np.mean/median/std/sum applied directly to the (n_resamples, n) resample matrix) was missing axis=1, which collapsed every resample to the identical scalar (ci_low==ci_high==point_estimate). Fixed by passing axis=1 explicitly; test_bootstrap_ci_contains_true_mean_on_symmetric_data (which failed under the bug) now passes."
+  }
+}

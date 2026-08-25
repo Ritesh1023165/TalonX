@@ -1,0 +1,581 @@
+{
+  "method": "Built entirely from git-tracked files in this isolated worktree (c:/workspace/TalonX-alpha-phenomenon-discovery, branch research/talonx-alpha-phenomenon-discovery). data/historical_1m/ is gitignored and was NOT copied into this worktree by `git worktree add`, so no raw CSV or download_summary.json under data/ could be read directly. Every symbol/date-range claim below is sourced from: (1) docs/research/TALONX_RESEARCH_LEDGER.md (append-only, one section per task; dates/symbols quoted or paraphrased with line numbers cited), (2) results/task*/**/*.json manifest/freeze/readiness files that were committed to git (these often embed the exact download package start/end, per-window warmup/evaluation session lists, and full symbol lists used as protocol provenance), and (3) research/scripts/task*.py hardcoded DATA_DIR path constants (only tasks 15-63 have scripts checked into research/scripts/; tasks 1-14, 24-54, 59-60, 64-66B have no separate script file in this worktree and were reconstructed from ledger prose and results/ JSON alone). Where a script or manifest file was not found, the corresponding field is 'unknown' with a note in gaps_and_uncertainty rather than an inferred/guessed value.",
+  "prior_activities": [
+    {
+      "activity": "Task 1.1 - Downloader partial-failure exit-code semantics (unit-test/logic only)",
+      "symbols": "none - deterministic exit-code unit test, no market data downloaded",
+      "date_range": "unknown - not applicable (no market data involved)",
+      "data_directory_referenced": "none",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:25-82", "detail": "Task 1.1 section: tests scripts/download_historical_1m.py exit-code logic against synthetic/mocked download results, not real market data."}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 2 - Real yfinance 1-minute smoke test",
+      "symbols": ["AAPL", "AMD", "META", "NVDA", "TSLA"],
+      "date_range": {"start": "2026-08-10", "end": "2026-08-14"},
+      "data_directory_referenced": "unknown - provider yfinance, reports/yfinance_recent_run/ (gitignored, not present in this worktree)",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:93-97", "detail": "### Inputs: 'Symbols: AAPL, AMD, META, NVDA, TSLA ... Requested/actual period: 2026-08-10 08:00 UTC -> 2026-08-14 23:59 UTC'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 2.1 - Weekend-gap misclassification fix (logic-only, validated against existing downloaded data)",
+      "symbols": "unknown - not specified as a standalone data pull",
+      "date_range": "unknown - reused existing downloaded data, no new range cited",
+      "data_directory_referenced": "unknown",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:161-162", "detail": "### Inputs: 'N/A (deterministic logic fix, confirmed against real downloaded data).'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 2.2 - Downloader status semantics (FULL/PARTIAL/EMPTY/FAILED), AAPL/MSFT/NVDA mixed-outcome test",
+      "symbols": ["AAPL", "MSFT", "NVDA"],
+      "date_range": "unknown - test used mixed real/synthetic outcomes for status classification, no single cited calendar window",
+      "data_directory_referenced": "unknown",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:264-266", "detail": "'TEST 5' test_mixed_full_partial_failed_across_symbols: AAPL FULL, MSFT PARTIAL, NVDA FAILED in one main() call."}
+      ],
+      "confidence": "medium"
+    },
+    {
+      "activity": "Task 3 - Controlled AAPL real-market baseline",
+      "symbols": ["AAPL"],
+      "date_range": {"start": "2026-08-07", "end": "2026-08-14"},
+      "data_directory_referenced": "unknown - results/task3_aapl_baseline/ (gitignored, not present in this worktree)",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:320-322", "detail": "'Symbol: AAPL only. Period: 2026-08-07 08:00:00 UTC -> 2026-08-14 23:59:00 UTC.'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 4 - 10-symbol trade-lifecycle discovery",
+      "symbols": ["AAPL", "AMD", "AMZN", "GOOGL", "META", "MSFT", "NVDA", "PYPL", "STX", "TSLA"],
+      "date_range": {"start": "2026-07-27", "end": "2026-08-14"},
+      "data_directory_referenced": "unknown",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:373-376", "detail": "'Symbols: AAPL, AMD, AMZN, GOOGL, META, MSFT, NVDA, PYPL, STX, TSLA. Period: 2026-07-27 08:00:00 UTC -> 2026-08-14 23:59:00 UTC.'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 6 - Empirical baseline (short-window smoke test)",
+      "symbols": "10-symbol universe (same set introduced at Task 4; not individually re-listed in this section)",
+      "date_range": {"start": "2026-07-27", "end": "2026-08-14"},
+      "data_directory_referenced": "unknown",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:577-579", "detail": "'Period: 2026-07-27 08:00:00 UTC -> 2026-08-14 23:59:00 UTC (137,648 bars)'"}
+      ],
+      "confidence": "medium"
+    },
+    {
+      "activity": "Task 7B - Long-history dataset download (Alpaca SIP) - the canonical 10-symbol full-year discovery dataset",
+      "symbols": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX"],
+      "date_range": {"start": "2025-08-15", "end": "2026-08-14"},
+      "data_directory_referenced": "data/historical_1m/task7b_alpaca_long_history/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:644-674", "detail": "'Requested range: 2025-08-15 -> 2026-08-14'; per-symbol actual range table (all 2025-08-15 08:00 UTC or 08:19 UTC through 2026-08-14 23:59 UTC; STX starts 2025-08-15 13:03 UTC); dataset hash 5e5412a960bf."}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 8 - Frozen 0.25% baseline (full replay over the Task 7B dataset)",
+      "symbols": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX"],
+      "date_range": {"start": "2025-08-15", "end": "2026-08-14"},
+      "data_directory_referenced": "data/historical_1m/task7b_alpaca_long_history/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:724-732", "detail": "'Period: 2025-08-15 13:03:00 UTC -> 2026-08-14 23:58:00 UTC (1,901,714 bars)', dataset_hash=5e5412a960bf, config_hash=19654e22ffd5."}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 9 - STX dominance investigation",
+      "symbols": "unknown - no primary artifact recovered",
+      "date_range": "unknown - no primary artifact recovered",
+      "data_directory_referenced": "unknown",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:794-852", "detail": "Ledger explicitly states 'NOT_RECOVERED_FROM_ARTIFACT' for Inputs/Work Performed/Evidence - no results/task9*/reports/task9* directory and no git history entry exists anywhere in the repo. Conclusion only reconstructed from a Task 13 retrospective quote."}
+      ],
+      "confidence": "low"
+    },
+    {
+      "activity": "Task 10 - Research telemetry (opt-in per-bar/per-signal telemetry, smoke run)",
+      "symbols": "same 10-symbol universe (AAPL, MSFT, NVDA, AMZN, META, AMD, TSLA, GOOGL, PYPL, STX)",
+      "date_range": {"start": "2025-09-15", "end": "2025-09-25"},
+      "data_directory_referenced": "slice of data/historical_1m/task7b_alpaca_long_history/ (dataset_hash=5e5412a960bf matches Task 7B/8)",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:866-870", "detail": "### Inputs: 'Symbols: same 10-symbol universe; Period (this smoke run): 2025-09-15 08:00:00 UTC -> 2025-09-25 23:59:00 UTC (63,854 bars)', dataset_hash=5e5412a960bf (same as Task 7B/8)."}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 11 - ATR distribution / pass-rate analysis (3 chronological windows A/B/C)",
+      "symbols": "10-symbol universe (dataset_hash matches Task 7B)",
+      "date_range": "3 separate windows - see date_ranges_timeline (Window A 2025-11-10 to 2025-11-21; Window B 2026-02-09 to 2026-02-20; Window C 2026-06-08 to 2026-06-18)",
+      "data_directory_referenced": "slice of data/historical_1m/task7b_alpaca_long_history/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:940-942", "detail": "'Window A: 2025-11-10 09:00 UTC -> 2025-11-21 00:00 UTC ...; Window B: 2026-02-09 09:00 UTC -> 2026-02-20 00:00 UTC ...; Window C: 2026-06-08 08:00 UTC -> 2026-06-18 23:59 UTC ...'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 12 - Post-hoc ATR threshold grid (reuses Task 8/11 dataset, no new download)",
+      "symbols": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX"],
+      "date_range": {"start": "2025-08-15", "end": "2026-08-14"},
+      "data_directory_referenced": "data/historical_1m/task7b_alpaca_long_history/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:1015", "detail": "### Inputs section present at this line, reusing Task 8's frozen dataset/hash (post-hoc grid over already-generated trade ledgers, no new replay range)."}
+      ],
+      "confidence": "medium"
+    },
+    {
+      "activity": "Task 13 - ATR threshold experiment (0/5/10/20bps replay over full Task 7B dataset)",
+      "symbols": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX"],
+      "date_range": {"start": "2025-08-15", "end": "2026-08-14"},
+      "data_directory_referenced": "data/historical_1m/task7b_alpaca_long_history/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:1281-1284", "detail": "### Inputs: 'Dataset: data/historical_1m/task7b_alpaca_long_history/, hash 5e5412a960bf; Symbols: AAPL, MSFT, NVDA, AMZN, META, AMD, TSLA, GOOGL, PYPL, STX; Range: 2025-08-15 13:03 UTC -> 2026-08-14 23:58 UTC (1,901,714 bars/run)'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 13B - Execution geometry fix validation (STX/PYPL focused re-derivation from raw bars)",
+      "symbols": ["STX", "PYPL"],
+      "date_range": {"start": "2025-08-15", "end": "2026-08-14"},
+      "data_directory_referenced": "data/historical_1m/task7b_alpaca_long_history/{STX,PYPL}.csv",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:1490-1491", "detail": "'direct reads of data/historical_1m/task7b_alpaca_long_history/{SYMBOL}.csv'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 13C - Execution realism audit (deep-dive on one extreme STX trade)",
+      "symbols": ["STX", "PYPL"],
+      "date_range": {"start": "2025-08-15", "end": "2026-08-14"},
+      "data_directory_referenced": "data/historical_1m/task7b_alpaca_long_history/STX.csv, PYPL.csv",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:1545-1546", "detail": "'raw data data/historical_1m/task7b_alpaca_long_history/STX.csv, PYPL.csv'"},
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:1499", "detail": "'deep dive on the most extreme case (STX bearish, signal 2026-03-24 22:40 UTC, entry 22:47 UTC, +30.27R)' - single trade within the full Task7B year."}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 14 - Cost sensitivity + after-hours attribution",
+      "symbols": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX"],
+      "date_range": {"start": "2025-08-15", "end": "2026-08-14"},
+      "data_directory_referenced": "data/historical_1m/task7b_alpaca_long_history/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:1563", "detail": "### Inputs section (same dataset/hash as Task 13, cost-sensitivity re-run cited at line 1585 on the same STX trade)."}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "RSI/MACD/MA indicator research diagnostics (Task 15 Risk-Distance, Task 16 Entry-Risk, Task 17 Gross-Edge, Task 18 Volume-Confounding, Task 19 Exit-Path, Task 20 Excursion, Task 21 Early-Failure) - all analysis-only over the frozen Task 7B/13B/14 trade ledgers, no new downloads",
+      "symbols": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX"],
+      "date_range": {"start": "2025-08-15", "end": "2026-08-14"},
+      "data_directory_referenced": "data/historical_1m/task7b_alpaca_long_history/ (hash 5e5412a960bf, reproduced/reused across all of Tasks 15-21)",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:1649-1650", "detail": "Task 15 'Dataset/hash: data/historical_1m/task7b_alpaca_long_history/, hash 5e5412a960bf (reproduced independently, matched)' - same pattern quoted/reused verbatim in Tasks 16-21's own Dataset/hash lines."},
+        {"file": "research/scripts/task15_risk_distance_audit.py, task16_entry_risk_audit.py, task17_gross_edge_audit.py, task18_volume_confounding.py, task19_exit_path_audit.py, task20_excursion_audit.py, task21_early_failure_audit.py", "detail": "Present in research/scripts/ but built purely as analysis-only scripts over existing trade-ledger CSVs, not new downloaders."}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 22 - Freeze & OOS early-failure validation protocol (discovery period reconfirmed + genuine out-of-sample slice)",
+      "symbols": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX"],
+      "date_range": {"start": "2026-08-17", "end": "2026-08-19"},
+      "data_directory_referenced": "data/historical_1m/task22_oos/ (separate directory from the discovery dataset; OOS dataset hash e78ab77afe36; discovery dataset task7b_alpaca_long_history untouched/reconfirmed unchanged)",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:2203", "detail": "'DISCOVERY PERIOD: 2025-08-15 through 2026-08-14. OOS PERIOD: 2026-08-17 onward.'"},
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:2218-2222", "detail": "'OOS data: 2026-08-17 through 2026-08-19 (3 trading days) ... Written to a separate directory (data/historical_1m/task22_oos/); the discovery dataset was never touched (5e5412a960bf reconfirmed unchanged). OOS dataset hash: e78ab77afe36.'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 24 - First-principles requirements & live-vs-backtest parity audit (documentation/code audit, no new data pull cited)",
+      "symbols": "unknown - not specified as a data-pull task",
+      "date_range": "unknown",
+      "data_directory_referenced": "unknown",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:2312", "detail": "Section header only found via grep; not deep-read in this audit (time-boxed) - no date/symbol tokens surfaced for this task by the historical_1m or date-pattern greps run across the full ledger."}
+      ],
+      "confidence": "low"
+    },
+    {
+      "activity": "Task 25-LIVE-CAPTURE / 25A / 25A.1 / 25B / 25C / 25C-reattempt - Live shadow evidence capture and deterministic replay (real-time captured live market data, NOT a stored historical_1m CSV window)",
+      "symbols": "unknown - not enumerated by symbol in the greps run; captured via a live shadow session, not a symbol-list download",
+      "date_range": {"start": "2026-08-20", "end": "2026-08-20"},
+      "data_directory_referenced": "results/task25_live_shadow_2026-08-20/ (live_session_manifest.json, live_bars.csv, corrected_capture_manifest.json - NOT under data/historical_1m/)",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:2565-2571", "detail": "'results/task25_live_shadow_2026-08-20/ ... Exact start/end: started 2026-08-20T13:05:37Z ... stopped 2026-08-20T20:12:54Z'"},
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:2685-2686,2773", "detail": "Task 25C/25C-reattempt: 'the exact live-captured 2026-08-20 market evidence'; 'AAPL, 2026-08-20T13:15:00Z - live rejected as LOW_VOLATILITY'"}
+      ],
+      "confidence": "medium"
+    },
+    {
+      "activity": "Task 26 - Canonical corrected long-only historical baseline",
+      "symbols": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX"],
+      "date_range": {"start": "2025-08-15", "end": "2026-08-14"},
+      "data_directory_referenced": "data/historical_1m/task7b_alpaca_long_history/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:2826", "detail": "'...PYPL/STX), 2025-08-15 to 2026-08-14, Alpaca SIP, no redownload/extension/substitution/repair.'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 27 - Strategy feasibility & gate interaction audit (compares live 2026-08-20 day vs. historical baseline)",
+      "symbols": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX"],
+      "date_range": "combines the 2026-08-20 live day (see Task 25) with the 2025-08-15 to 2026-08-14 historical baseline (Task 7B/26)",
+      "data_directory_referenced": "data/historical_1m/task7b_alpaca_long_history/ + results/task25_live_shadow_2026-08-20/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:2965", "detail": "'Live-day vs. historical comparison (live_day_vs_history.csv): 2026-08-20 live day (52 candidates, 0 ...) '"}
+      ],
+      "confidence": "medium"
+    },
+    {
+      "activity": "Task 28-35 - RSI-confluence contract, owner decision sessions, structural stop geometry (spec/design/decision tasks, no new market-data pull cited by the date/historical_1m greps)",
+      "symbols": "unknown - design/decision-capture tasks, not data-pull tasks",
+      "date_range": "unknown",
+      "data_directory_referenced": "none newly referenced (reuses Task 7B dataset for any illustrative examples)",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:2998-3836", "detail": "Task 28 (RSI curl resolution), 29 (lock contract), 30 (selectivity review, references the 2026-08-20 live day at line 3212), 31 (ATR semantics decision), 32/33 (owner decisions), 34/35 (structural stop geometry design+implementation) - all code/spec/decision tasks; the historical_1m and YYYY-MM-DD greps surfaced no new dataset pulls beyond references back to the 2026-08-20 live day and pre-existing Task 7B data."}
+      ],
+      "confidence": "medium"
+    },
+    {
+      "activity": "Task 36 - Canonical long-only baseline re-establishment after structural stop correction",
+      "symbols": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX"],
+      "date_range": {"start": "2025-08-15", "end": "2026-08-14"},
+      "data_directory_referenced": "data/historical_1m/task7b_alpaca_long_history/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:3836-3966", "detail": "Task 36 re-runs the frozen full-year baseline after the Task 35 structural-stop implementation; Task 37's own text (line 3980) explicitly calls Task 36's universe 'Task 36's original 10' matching the Task 7B ten-symbol set."}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 37 - Fast production-universe feasibility check (first 35-symbol expansion, 3 mechanically-selected 10-trading-day windows: A_early/B_middle/C_late)",
+      "symbols": "35-symbol PIV universe (see piv_universe.json) - Task 36's original 10 (AAPL, MSFT, NVDA, AMZN, META, AMD, TSLA, GOOGL, PYPL, STX) plus 25 additional Nasdaq-100 names (ADBE, ADI, AMAT, AVGO, BKNG, CMCSA, COST, CSCO, GILD, HON, INTC, INTU, ISRG, KLAC, LRCX, MDLZ, MU, NFLX, PANW, PEP, QCOM, REGN, SBUX, TXN, VRTX)",
+      "date_range": "3 windows - see date_ranges_timeline (A_early 2025-08-29 to 2025-09-12; B_middle 2026-02-06 to 2026-02-20; C_late 2026-07-20 to 2026-07-31)",
+      "data_directory_referenced": "unknown exact path - ledger does not cite a data/historical_1m/taskNN_... directory string for this download; results dir is results/task37_fast_universe_feasibility/ (not present in this worktree, gitignored). The 10 original symbols were sliced from the existing Task 7B full-year CSVs; the 25 new symbols were freshly downloaded via Alpaca.",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:3980-3992", "detail": "'Universe: 35 symbols - Task 36's original 10 ... plus 25 additional large/liquid Nasdaq-100 names ...'; 'A_early 2025-08-29->2025-09-12, B_middle 2026-02-06->2026-02-20, C_late 2026-07-20->2026-07-31 - 30 trading days total'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 38 - LOW_VOLATILITY gate diagnostic (reuses Task 37's exact windows/data, zero new fetch)",
+      "symbols": "same 35-symbol universe as Task 37",
+      "date_range": "same 3 windows as Task 37 (A_early 2025-08-29 to 2025-09-12; B_middle 2026-02-06 to 2026-02-20; C_late 2026-07-20 to 2026-07-31)",
+      "data_directory_referenced": "unknown exact path (reuses Task 37's already-downloaded data, zero new data fetched)",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:4081-4082", "detail": "'Reused Task 37's exact 35-symbol universe and 3 windows (2025-08-29->09-12, 2026-02-06->02-20, 2026-07-20->07-31) and already-downloaded data - zero new data fetched.'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 39-42 - Multi-timeframe volatility regime contract design, implementation, calibration, evaluator/shadow wiring (code/design tasks; Task 41 reuses Task 37/38's same windows per Task 46's retrospective reference to 'Task 38/41's ~4%/48%/92% marks')",
+      "symbols": "same 35-symbol universe (where a dataset is used at all)",
+      "date_range": "same 3 windows as Task 37/38 (A_early 2025-08-29 to 2025-09-12; B_middle 2026-02-06 to 2026-02-20; C_late 2026-07-20 to 2026-07-31), for Task 41 specifically; Tasks 39/40/42 are largely code-only",
+      "data_directory_referenced": "unknown exact path",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:4680-4682", "detail": "Task 46 text: 'same real trading-day calendar Task 38/41 used, at different (20%/60%/80% vs. Task 38/41's ~4%/48%/92%) percentage marks' - confirms Task 41 used the identical window set as Task 37/38."}
+      ],
+      "confidence": "medium"
+    },
+    {
+      "activity": "Task 43 - Monday shadow readiness & fast regime comparison validation (pure audit/documentation, zero code, zero new backtest; references the live production TickerWatchlistStore, not a historical_1m download)",
+      "symbols": "35 active symbols from the live production TickerWatchlistStore (not separately enumerated in the ledger text found)",
+      "date_range": "unknown - references a live watchlist 'last modified 2026-08-18' and persisted buffer checkpoints 'last bar 2026-08-20', not a downloaded historical CSV window",
+      "data_directory_referenced": "none (live/persisted state, not data/historical_1m/)",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:4483-4487", "detail": "'discovered a real, existing, already-operational production TickerWatchlistStore (35 active symbols, last modified 2026-08-18) ... 1m/15m buffers have real prior persisted checkpoints (last bar 2026-08-20)'"}
+      ],
+      "confidence": "medium"
+    },
+    {
+      "activity": "Task 44 - 60m shadow-regime historical warmup bootstrap (live/dynamic yfinance preseed fetch of a trailing N-day window relative to run time, NOT a fixed stored historical_1m dataset)",
+      "symbols": "the 35-symbol production watchlist",
+      "date_range": "unknown - dynamic trailing window ('5d' bootstrap period measured empirically, i.e. approximately the 5 trading days immediately preceding the 2026-08-22 run date) fetched live via talonx_quant.preseed.fetch_1m_history at run time, not a fixed calendar range recorded in the ledger",
+      "data_directory_referenced": "none (live fetch via talonx_quant.preseed.fetch_1m_history, not data/historical_1m/)",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:4546-4551", "detail": "'reuses talonx_quant.preseed.fetch_1m_history ... regime_60m_bootstrap_period=\"5d\" chosen empirically (measured: \"1d\"=957 bars, \"5d\"=4,785 bars, \"7d\"=6,704 bars)'"}
+      ],
+      "confidence": "medium"
+    },
+    {
+      "activity": "Task 45 - Experimental multi-timeframe volatility gate wiring + correctness validation (code/regression only, no new data pull cited)",
+      "symbols": "unknown",
+      "date_range": "unknown",
+      "data_directory_referenced": "none newly cited",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:4609", "detail": "Section header located via grep; no historical_1m or YYYY-MM-DD tokens surfaced in the full-ledger grep for this task beyond commit-hash references."}
+      ],
+      "confidence": "low"
+    },
+    {
+      "activity": "Task 46 - Fast 35-symbol experimental regime validation (X_early/Y_middle/Z_late windows) - this is the canonical dataset reused by Tasks 47-53",
+      "symbols": "35-symbol PIV universe (10 original sliced from existing full-year local data + 25 additional freshly downloaded via Alpaca, 75/75 FULL)",
+      "date_range": "3 windows - see date_ranges_timeline (X_early 2025-10-27 to 2025-10-31; Y_middle 2026-03-23 to 2026-03-27; Z_late 2026-06-03 to 2026-06-09)",
+      "data_directory_referenced": "data/historical_1m/task46_validation_windows/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:4682-4690", "detail": "'X_early (2025-10-27->10-31), Y_middle (2026-03-23->03-27), Z_late (2026-06-03->06-09), 15 trading days total.' ... '10 originals sliced from existing local full-year data (zero new download), 25 additional symbols freshly downloaded via Alpaca (75/75 FULL, zero failures).'"},
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:4965-4967", "detail": "Task 49 text: 'same data/historical_1m/task46_validation_windows/ directory - no redownload, no substitution, no extension.'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 47/48 - Bullish signal path & confluence attrition diagnostic; bullish clean-survivor publication/cooldown trace (reuse Task 46's exact data)",
+      "symbols": "35-symbol PIV universe (same as Task 46)",
+      "date_range": "same 3 windows as Task 46 (X_early 2025-10-27 to 2025-10-31; Y_middle 2026-03-23 to 2026-03-27; Z_late 2026-06-03 to 2026-06-09)",
+      "data_directory_referenced": "data/historical_1m/task46_validation_windows/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:4734,4812", "detail": "Section headers located via grep; both tasks explicitly build on Task 46's raw candidate/rejection population per surrounding ledger narrative (Task 47 'Bullish Signal Path' directly extends Task 46's funnel; Task 48 extends Task 47)."}
+      ],
+      "confidence": "medium"
+    },
+    {
+      "activity": "Task 49 - Minimal MACD confluence self-credit correction + bounded validation (explicitly same data/window as Task 46)",
+      "symbols": "35-symbol PIV universe",
+      "date_range": "same 3 windows as Task 46 (X_early 2025-10-27 to 2025-10-31; Y_middle 2026-03-23 to 2026-03-27; Z_late 2026-06-03 to 2026-06-09)",
+      "data_directory_referenced": "data/historical_1m/task46_validation_windows/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:4965-4967", "detail": "'Same 35-symbol universe, same 3 frozen windows, same data/historical_1m/task46_validation_windows/ directory - no redownload, no substitution, no extension.'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 50 - Bounded corrected-confluence engine replay (same Task 46 windows)",
+      "symbols": "35-symbol PIV universe",
+      "date_range": "same 3 windows as Task 46",
+      "data_directory_referenced": "data/historical_1m/task46_validation_windows/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5120-5121", "detail": "Task 52 text: 'Both ran against byte-identical raw market data (dataset hashes match Task 46/50's own recorded values exactly)' confirms Task 50 used the identical Task 46 dataset."}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 51 - Family-aware independent confirmation contract + Monday candidate plumbing (code/contract task, uses Task 46 data for any illustrative static checks)",
+      "symbols": "35-symbol PIV universe",
+      "date_range": "same 3 windows as Task 46 (implied by continuity; not independently re-confirmed)",
+      "data_directory_referenced": "data/historical_1m/task46_validation_windows/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5140-5142", "detail": "Task 52 text references 'Task 51's flagged survivorship-bias gap' and 'MACD confluence-eligible counts match Task 51's static prediction exactly' - Task 51 operated on the same fresh/static candidate population as Tasks 50/52."}
+      ],
+      "confidence": "medium"
+    },
+    {
+      "activity": "Task 52 - Fresh historical A/B validation + conditional Monday candidate freeze (explicitly reuses Task 46's raw data/windows, fresh engine replay)",
+      "symbols": "35-symbol PIV universe",
+      "date_range": "same 3 windows as Task 46 (X_early 2025-10-27 to 2025-10-31; Y_middle 2026-03-23 to 2026-03-27; Z_late 2026-06-03 to 2026-06-09)",
+      "data_directory_referenced": "data/historical_1m/task46_validation_windows/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5123-5125", "detail": "'Data/window selection rule: reused Task 46's raw market data and mechanically-selected, out-of-development windows unchanged - no redownload, no window replacement, no cherry-picking.'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 53 - Causal backtest pre-roll warmup + Task 52 A/B revalidation (adds 10 trading days of causal warmup preceding each of Task 46/52's exact evaluation windows)",
+      "symbols": "35-symbol PIV universe (75/75 fresh Alpaca downloads for the 25 non-original symbols' warmup rows; 10 original symbols sliced from existing full-year local data)",
+      "date_range": "same 3 evaluation windows as Task 46/52, each preceded by a 10-trading-day causal warmup slice not separately dated in the ledger text found (warmup end = evaluation start - 1 trading day for each of X_early/Y_middle/Z_late)",
+      "data_directory_referenced": "unknown exact directory name for the warmup rows - results dir is results/task53_preroll_ab_validation/ (not present in this worktree, gitignored); underlying evaluation data remains data/historical_1m/task46_validation_windows/",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5213,5242-5244", "detail": "'Re-ran Task 52's EXACT windows/symbols/contracts, only adding preceding causal warmup rows.' ... 'Pre-run readiness gate: 10 preceding trading days of raw market data (75/75 fresh Alpaca downloads for 25 non-original symbols, sliced from existing full-year local data for the other 10)'"}
+      ],
+      "confidence": "medium"
+    },
+    {
+      "activity": "Task 54 - Overnight extended candidate validation (production-scale, W1/W2/W3, 20-trading-day evaluation windows each with 10-day causal pre-roll)",
+      "symbols": "35-symbol PIV universe (75/75 fresh Alpaca downloads: 25 symbols x 3 windows; 10 original symbols sliced from existing full-year local data)",
+      "date_range": "3 windows - see date_ranges_timeline (W1 eval 2025-09-29 to 2025-10-24; W2 eval 2025-11-26 to 2025-12-24; W3 eval 2026-04-21 to 2026-05-18), each with a 10-trading-day causal pre-roll immediately preceding",
+      "data_directory_referenced": "unknown exact directory name - results dir is results/task54_extended_candidate_validation/ (present in this worktree but data/historical_1m path not cited by name in the ledger text found)",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5339-5349", "detail": "'Dataset design: production-scale 35-symbol universe, 3 windows (W1: eval 2025-09-29->10-24, W2: eval 2025-11-26->12-24, W3: eval 2026-04-21->05-18), each with 10 trading days of causal pre-roll ... Data quality: 75/75 fresh Alpaca downloads (25 symbols x 3 windows) all FULL status; 10 original symbols sliced from existing full-year local data.'"},
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5377-5378", "detail": "'all results/task54_extended_candidate_validation/ artifacts'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 55 - RSI vs MACD family economics diagnostic (read-only re-analysis of the already-committed Task 53 + Task 54 trade ledgers; no new download/replay)",
+      "symbols": "combination of Task 53's and Task 54's symbols (35-symbol PIV universe)",
+      "date_range": "union of Task 53's and Task 54's date ranges (see those entries) - no new data pulled",
+      "data_directory_referenced": "none - analysis-only over results/task53_preroll_ab_validation/ and results/task54_extended_candidate_validation/ trade CSVs",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5391-5392", "detail": "'a read-only diagnostic over the committed Task 53 and Task 54 trades, with no new backtest, download, tuning, or strategy change. The combined sample contains 123 trades: 56 RSI and 67 MACD.'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 56 - Independent family holdout validation (H1_early/H2_middle/H3_late) - first attempt VALIDATION_BLOCKED (no Alpaca connectivity), resumed and completed",
+      "symbols": "35-symbol PIV universe (10 original local full-year: AAPL, MSFT, NVDA, AMZN, META, AMD, TSLA, GOOGL, PYPL, STX; 25 additional freshly downloaded: ADBE, ADI, AMAT, AVGO, BKNG, CMCSA, COST, CSCO, GILD, HON, INTC, INTU, ISRG, KLAC, LRCX, MDLZ, MU, NFLX, PANW, PEP, QCOM, REGN, SBUX, TXN, VRTX)",
+      "date_range": "3 windows - see date_ranges_timeline (H1_early warmup 2025-12-11 to 2025-12-24 / evaluation 2025-12-26 to 2026-01-26; H2_middle warmup 2026-02-06 to 2026-02-20 / evaluation 2026-02-23 to 2026-03-20; H3_late warmup 2026-05-27 to 2026-06-09 / evaluation 2026-06-10 to 2026-07-09)",
+      "data_directory_referenced": "not cited by an explicit data/historical_1m/taskNN path string in the ledger; downloads described as '25 additional symbols x 3 frozen windows (75 symbol-window packages)' via Alpaca, provenance recorded in results/task56_independent_family_holdout/holdout_manifest.json (present in this worktree, git-tracked)",
+      "evidence": [
+        {"file": "results/task56_independent_family_holdout/holdout_manifest.json", "detail": "windows.H1_early.warmup_start=2025-12-11, warmup_end=2025-12-24, evaluation_start=2025-12-26, evaluation_end=2026-01-26; windows.H2_middle.warmup_start=2026-02-06, warmup_end=2026-02-20, evaluation_start=2026-02-23, evaluation_end=2026-03-20; windows.H3_late.warmup_start=2026-05-27, warmup_end=2026-06-09, evaluation_start=2026-06-10, evaluation_end=2026-07-09; universe.original_10_local_full_year + universe.additional_25_requiring_complete_packages (35 total)"},
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5454-5455,5494-5500", "detail": "'the first declared download was attempted for exactly the 25 additional symbols and H1 package (2025-12-11 through 2026-01-26)' ... resumed: 'exactly the missing 25 symbols x three frozen windows (75 symbol-window packages) were acquired with FULL provider status.'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 57 - Execution friction vs. trade geometry diagnostic (analysis-only over committed Task 53+54+56 trade ledgers, 228 total trades, no new data)",
+      "symbols": "union of Task 53/54/56 symbols (35-symbol PIV universe)",
+      "date_range": "union of Task 53/54/56 date ranges - no new data pulled",
+      "data_directory_referenced": "none - analysis-only",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5539-5540", "detail": "'a deterministic, analysis-only diagnostic combined the committed Task 53 (34), Task 54 (89), and Task 56 (105) trade ledgers while preserving task/window provenance. All 228 trades mapped ...'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 58 - RSI winner-magnitude / payoff regime diagnostic (analysis-only, reuses the same combined 228-trade population as Task 57)",
+      "symbols": "union of Task 53/54/56 symbols (35-symbol PIV universe)",
+      "date_range": "union of Task 53/54/56 date ranges - no new data pulled",
+      "data_directory_referenced": "none - analysis-only",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5582", "detail": "Section header located via grep; task58_summary.md/json present in results/task58_rsi_payoff_regime_diagnostic/ (git-tracked in this worktree) built on the same trade ledgers as Task 57."}
+      ],
+      "confidence": "medium"
+    },
+    {
+      "activity": "Task 59 - Candidate architecture triage + next validation protocol specification (defines, but does not yet execute, FPRC_V1's original/uncorrected validation window)",
+      "symbols": "35-symbol PIV universe (planned)",
+      "date_range": {"start": "2026-07-10", "end": "2026-10-02", "note": "PLANNED ONLY, never executed at these dates - this was the original protocol later found to be a temporal-lookahead violation and corrected by Task 61R to 2025-05-06 through 2025-08-14"},
+      "data_directory_referenced": "n/a - protocol design document only (results/task59_candidate_architecture_triage/next_validation_protocol.md)",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5662", "detail": "'The untouched evaluation is preregistered as the first 60 complete XNYS trading days after 2026-07-09' - this is the pre-correction protocol definition, superseded by Task 61R (see below)."}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 60 - FPRC_V1 implementation and freeze (code freeze, no replay/data pull)",
+      "symbols": "n/a - implementation freeze only",
+      "date_range": "n/a",
+      "data_directory_referenced": "none",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5682", "detail": "Section header; results/task60_fprc_v1_implementation_freeze/task60_implementation_freeze.json is a code-fingerprint freeze artifact, not a data-download record."}
+      ],
+      "confidence": "medium"
+    },
+    {
+      "activity": "Task 61 - FPRC_V1 independent validation #1, ORIGINAL/SUPERSEDED attempt (used the Task 59 protocol dates, later found to be a temporal-lookahead violation - N2/N3 extended past the actual attempt date and were not fully traded yet)",
+      "symbols": "35-symbol PIV universe",
+      "date_range": {"start": "2026-07-10", "end": "2026-10-02", "note": "SUPERSEDED/INVALID - N1 2026-07-10 to 2026-08-06, N2 2026-08-07 to 2026-09-03, N3 2026-09-04 to 2026-10-02; on the 2026-08-23 attempt date N2 was only 11/20 sessions complete and N3 had not started. This attempt was corrected and replaced by Task 61R (see below); do not treat 2026-09-2026-10 as genuinely-traded/available data."},
+      "data_directory_referenced": "results/task61_fprc_v1_independent_validation_1/ (superseded)",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5725-5727", "detail": "'strictly after 2026-07-09 into N1 (2026-07-10 through 2026-08-06), N2 (2026-08-07 through 2026-09-03), and N3 (2026-09-04 through 2026-10-02) ... On the attempt date, 2026-08-23, N1 was complete, N2 had 11 of 20 completed evaluation sessions, and N3 [had not started]'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 61R - Corrected temporal protocol + FPRC_V1 independent validation #1 (CANONICAL/CORRECT version; V1/V2/V3 windows placed entirely BEFORE the earliest documented TalonX canonical exposure of 2025-08-15)",
+      "symbols": "35-symbol PIV universe (AAPL, MSFT, NVDA, AMZN, META, AMD, TSLA, GOOGL, PYPL, STX, ADBE, ADI, AMAT, AVGO, BKNG, CMCSA, COST, CSCO, GILD, HON, INTC, INTU, ISRG, KLAC, LRCX, MDLZ, MU, NFLX, PANW, PEP, QCOM, REGN, SBUX, TXN, VRTX)",
+      "date_range": {"start": "2025-05-06", "end": "2025-08-14"},
+      "data_directory_referenced": "data/historical_1m/task61r_fprc_v1_validation",
+      "evidence": [
+        {"file": "results/task61r_fprc_v1_independent_validation_1/corrected_window_manifest.json", "detail": "download_package.start=2025-05-06, download_package.end=2025-08-14, download_package.symbols=35; windows: V1 warmup_start=2025-05-06/evaluation_start=2025-05-20/evaluation_end=2025-06-17; V2 warmup_start=2025-06-04/evaluation_start=2025-06-18/evaluation_end=2025-07-17; V3 warmup_start=2025-07-03/evaluation_start=2025-07-18/evaluation_end=2025-08-14; earliest_documented_talonx_exposure.date=2025-08-15"},
+        {"file": "research/scripts/task61r_download_alpaca.py:18", "detail": "DATA_DIR = ROOT / \"data/historical_1m/task61r_fprc_v1_validation\""},
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5752-5753", "detail": "'before TalonX's earliest canonical historical exposure on 2025-08-15: V1 2025-05-20 through 2025-06-17, V2 2025-06-18 through 2025-07-17, and V3 2025-07-18 through 2025-08-14, each with the immediately preceding ten-session causal warmups.'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 62 - Define, implement, and freeze one new alpha candidate (ORPB_V1) - includes freezing its own validation protocol (O1/O2/O3), all strictly before Task 61R's earliest context access of 2025-05-06",
+      "symbols": "35-symbol PIV universe",
+      "date_range": {"start": "2025-01-24", "end": "2025-05-05"},
+      "data_directory_referenced": "n/a for Task 62 itself (protocol freeze only, validation_started=false); the download/replay happens in Task 63/63P using data/historical_1m/task63_orpb_v1_validation",
+      "evidence": [
+        {"file": "results/task62_new_alpha_candidate/freeze_manifest.json", "detail": "contamination_audit.candidate_package_start=2025-01-24, contamination_audit.candidate_evaluation_end=2025-05-05, contamination_audit.earliest_task37_61r_context_boundary=2025-05-06, contamination_audit.overlap_with_task61r_warmup_or_evaluation=false, status=PASS; windows: O1 warmup_start=2025-01-24/evaluation_start=2025-02-07/evaluation_end=2025-03-07; O2 warmup_start=2025-02-24/evaluation_start=2025-03-10/evaluation_end=2025-04-04; O3 warmup_start=2025-03-24/evaluation_start=2025-04-07/evaluation_end=2025-05-05; selection_rule='latest 60 consecutive XNYS sessions strictly before Task61R's earliest context access on 2025-05-06'"},
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5805-5806", "detail": "'earliest context access: O1 2025-02-07 through 2025-03-07, O2 2025-03-10 through 2025-04-04, and O3 2025-04-07 through 2025-05-05, each with ten-session state-only warmup. The entire package precedes every [prior exposure].'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 63 - ORPB_V1 independent validation #1 (original attempt - VALIDATION_BLOCKED, incomplete symbol coverage for BKNG/KLAC on specific opening-bucket sessions)",
+      "symbols": "35-symbol PIV universe (33/35 complete in O1, 34/35 in O2 and O3 due to BKNG/KLAC gaps)",
+      "date_range": {"start": "2025-01-24", "end": "2025-05-05"},
+      "data_directory_referenced": "data/historical_1m/task63_orpb_v1_validation",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5831,5836-5837", "detail": "'2025-01-24 through 2025-05-05 (1,307,932 raw bars) ... BKNG lacked a complete 5-minute bucket on 2025-02-10, 2025-02-11, 2025-03-26, 2025-04-25, and 2025-04-30; KLAC lacked one on 2025-02-07. Completeness therefore measured 33/35 symbols in O1 and 34/35 in O2 and O3.'"},
+        {"file": "research/scripts/task63_download_alpaca.py:18", "detail": "DATA_DIR = ROOT / \"data/historical_1m/task63_orpb_v1_validation\""}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 63R - Resolve ORPB Alpaca feed coverage (explicit-SIP refetch attempt over the same O1/O2/O3 window/symbols; gaps persisted, still VALIDATION_BLOCKED)",
+      "symbols": "35-symbol PIV universe (same gaps: BKNG on 2025-02-10/02-11/03-26/04-25/04-30, KLAC on 2025-02-07)",
+      "date_range": {"start": "2025-01-24", "end": "2025-05-05"},
+      "data_directory_referenced": "data/historical_1m/task63_orpb_v1_validation",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5862-5863", "detail": "'The explicit-SIP refetch reproduced every missing opening bucket: BKNG remained incomplete on 2025-02-10, 2025-02-11, 2025-03-26, 2025-04-25, and 2025-04-30, and KLAC remained incomplete on 2025-02-07. No bar was [fabricated]'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 63P - Correct ORPB data-readiness semantics + execute validation (final/canonical ORPB_V1 validation run; DATA_NOT_READY symbol-sessions excluded per-symbol rather than blocking the whole window; 99.71% clean coverage, 2094/2100 symbol-sessions clean)",
+      "symbols": "35-symbol PIV universe (AAPL, ADBE, ADI, AMAT, AMD, AMZN, AVGO, BKNG, CMCSA, COST, CSCO, GILD, GOOGL, HON, INTC, INTU, ISRG, KLAC, LRCX, MDLZ, META, MSFT, MU, NFLX, NVDA, PANW, PEP, PYPL, QCOM, REGN, SBUX, STX, TSLA, TXN, VRTX)",
+      "date_range": {"start": "2025-01-24", "end": "2025-05-05"},
+      "data_directory_referenced": "data/historical_1m/task63_orpb_v1_validation",
+      "evidence": [
+        {"file": "results/task63p_orpb_v1_readiness_correction/readiness_freeze.json", "detail": "evaluation_sessions=60, clean_symbol_sessions=2094/2100 (99.714%), exact_data_not_ready lists the 6 BKNG/KLAC gap sessions from O1/O2/O3, feed=sip, provider=Alpaca, source_file_sha256 for all 35 symbols"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 64 - Paper PIV readiness (infrastructure/safety-harness build: preflight, order lifecycle, reconciliation, Telegram; no historical market-data replay)",
+      "symbols": "35-symbol PIV universe (talonx_piv.config.DEFAULT_UNIVERSE, frozen at Task 64)",
+      "date_range": "n/a - infrastructure build, no backtest data pull",
+      "data_directory_referenced": "none",
+      "evidence": [
+        {"file": "results/task65_piv/piv_universe.json", "detail": "'selection_rule: Identity: the existing, already-frozen 35-symbol PIV universe (talonx_piv.config.DEFAULT_UNIVERSE), unchanged from Task 64.'"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 65 / 65B - Complete paper PIV: decision path, warmup, crash resilience - LIVE paper-trading session against real-time Alpaca/IEX market data (not a stored historical_1m CSV window; one AAPL buy/sell round trip actually executed in the PAPER broker)",
+      "symbols": "35-symbol PIV universe; one live AAPL round trip executed via PIV_LIFECYCLE_PROBE",
+      "date_range": {"start": "2026-08-24", "end": "2026-08-24"},
+      "data_directory_referenced": "none under data/historical_1m/ - live IEX feed + Alpaca paper broker, captured in results/task65_piv/ (iex_piv_feed_report.json, decision_path_report.json, session_event_summary.json, reconciliation_summary.json)",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5963-5973", "detail": "'The first live run (commit fbc0a0d, ~09:31-10:33 ET) crashed ... restarted same-day. The second run (~14:41-15:50 ET) ran to the configured EOD flatten ... PIV_LIFECYCLE_PROBE fired exactly as designed: one AAPL buy/sell round trip through the real PAPER broker (filled 311.47 / 311.40)'"},
+        {"file": "results/task65_piv/piv_universe.json", "detail": "'captured live before market open on 2026-08-24' (iex_piv_feed_report.json evidence)"}
+      ],
+      "confidence": "high"
+    },
+    {
+      "activity": "Task 66A / 66B-PREP - Repository cleanup + infrastructure hardening; full-application E2E readiness audit (code/infra audits, no new market-data exposure)",
+      "symbols": "n/a",
+      "date_range": "n/a",
+      "data_directory_referenced": "none",
+      "evidence": [
+        {"file": "docs/research/TALONX_RESEARCH_LEDGER.md:5995,6043", "detail": "Section headers located via grep; both are repository/infrastructure hardening tasks with no historical_1m or new market-data references found."}
+      ],
+      "confidence": "medium"
+    }
+  ],
+  "date_ranges_timeline": [
+    {"symbols_or_universe": "35-symbol PIV universe", "start": "2025-01-24", "end": "2025-05-05", "source": "Task 62/63/63R/63P (ORPB_V1 development+validation, O1/O2/O3), data/historical_1m/task63_orpb_v1_validation"},
+    {"symbols_or_universe": "35-symbol PIV universe", "start": "2025-05-06", "end": "2025-08-14", "source": "Task 61R (FPRC_V1 corrected validation, V1/V2/V3), data/historical_1m/task61r_fprc_v1_validation"},
+    {"symbols_or_universe": "10-symbol universe (AAPL, MSFT, NVDA, AMZN, META, AMD, TSLA, GOOGL, PYPL, STX)", "start": "2025-08-15", "end": "2026-08-14", "source": "Task 7B long-history download + Tasks 8-21, 26, 36 (canonical 10-symbol full-year discovery dataset), data/historical_1m/task7b_alpaca_long_history/"},
+    {"symbols_or_universe": "35-symbol universe", "start": "2025-08-29", "end": "2025-09-12", "source": "Task 37/38/41 window A_early (development windows)"},
+    {"symbols_or_universe": "35-symbol universe", "start": "2025-09-29", "end": "2025-10-24", "source": "Task 54 window W1 evaluation (+ 10-day causal pre-roll immediately before)"},
+    {"symbols_or_universe": "35-symbol universe", "start": "2025-10-27", "end": "2025-10-31", "source": "Task 46/47/48/49/50/51/52/53 window X_early, data/historical_1m/task46_validation_windows/"},
+    {"symbols_or_universe": "35-symbol universe", "start": "2025-11-26", "end": "2025-12-24", "source": "Task 54 window W2 evaluation (+ 10-day causal pre-roll immediately before)"},
+    {"symbols_or_universe": "35-symbol universe", "start": "2025-12-11", "end": "2025-12-24", "source": "Task 56 window H1_early warmup"},
+    {"symbols_or_universe": "35-symbol universe", "start": "2025-12-26", "end": "2026-01-26", "source": "Task 56 window H1_early evaluation"},
+    {"symbols_or_universe": "35-symbol universe", "start": "2026-02-06", "end": "2026-02-20", "source": "Task 37/38/41 window B_middle (development) AND Task 56 window H2_middle warmup (same calendar range, different task)"},
+    {"symbols_or_universe": "35-symbol universe", "start": "2026-02-23", "end": "2026-03-20", "source": "Task 56 window H2_middle evaluation"},
+    {"symbols_or_universe": "35-symbol universe", "start": "2026-03-23", "end": "2026-03-27", "source": "Task 46/47/48/49/50/51/52/53 window Y_middle, data/historical_1m/task46_validation_windows/"},
+    {"symbols_or_universe": "35-symbol universe", "start": "2026-04-21", "end": "2026-05-18", "source": "Task 54 window W3 evaluation (+ 10-day causal pre-roll immediately before)"},
+    {"symbols_or_universe": "35-symbol universe", "start": "2026-05-27", "end": "2026-06-09", "source": "Task 56 window H3_late warmup"},
+    {"symbols_or_universe": "35-symbol universe", "start": "2026-06-03", "end": "2026-06-09", "source": "Task 46/47/48/49/50/51/52/53 window Z_late, data/historical_1m/task46_validation_windows/"},
+    {"symbols_or_universe": "35-symbol universe", "start": "2026-06-10", "end": "2026-07-09", "source": "Task 56 window H3_late evaluation"},
+    {"symbols_or_universe": "35-symbol universe", "start": "2026-07-20", "end": "2026-07-31", "source": "Task 37/38/41 window C_late (development windows)"},
+    {"symbols_or_universe": "10-symbol universe", "start": "2026-08-17", "end": "2026-08-19", "source": "Task 22 out-of-sample slice, data/historical_1m/task22_oos/"},
+    {"symbols_or_universe": "10-symbol universe (live shadow capture, not CSV)", "start": "2026-08-20", "end": "2026-08-20", "source": "Task 25-LIVE-CAPTURE / 25A-25C live shadow session, results/task25_live_shadow_2026-08-20/"},
+    {"symbols_or_universe": "35-symbol universe (live paper session, not CSV)", "start": "2026-08-24", "end": "2026-08-24", "source": "Task 65/65B live paper PIV session (real-time IEX/Alpaca feed + one live PAPER order round trip)"},
+    {"symbols_or_universe": "35-symbol universe", "start": "2026-07-10", "end": "2026-10-02", "source": "Task 61 ORIGINAL/SUPERSEDED protocol - INVALID, never fully executed (temporal-lookahead violation caught and corrected by Task 61R; 2026-09 and 2026-10 dates were not yet traded as of the 2026-08-23 attempt date and must NOT be treated as available/clean history)"}
+  ],
+  "gaps_and_uncertainty": "1) data/historical_1m/ is entirely absent from this worktree (gitignored, not copied by git worktree add), so every claim here is reconstructed secondhand from committed prose/JSON, not verified against raw CSVs or download_summary.json sidecars - a download_summary.json would have had exact per-symbol actual-vs-requested bar ranges and is simply not available here. 2) research/scripts/ only contains scripts for Tasks 15-22 and 55-63; Tasks 1-14, 23-54 (except where results/ JSON survived, e.g. Task 56/61R/62/63P), and 59-60/64-66B have no dedicated script file in this worktree, so those entries rely entirely on ledger prose, which is generally precise but occasionally paraphrases rather than quoting exact figures. 3) Task 9's primary artifact is explicitly declared NOT_RECOVERED_FROM_ARTIFACT in the ledger itself (no results/task9*/reports/task9* directory and no git history entry exists anywhere in the repo per the ledger's own forensic note) - its symbols/dates are unknowable from tracked files, not merely unresearched. 4) Tasks 24, 28-35, 39, 40, 42, 45, 60, 66A, 66B-PREP are largely code/spec/decision/infra tasks; the systematic date-pattern and historical_1m greps run across the FULL ledger text (all 6101 lines) surfaced no new market-data date ranges for these beyond what's already captured for adjacent data-bearing tasks, but a full line-by-line read of every one of these sections was not performed (time-boxed) - it is possible a minor illustrative data reference was missed inside prose I did not read in full. 5) Task 37's and Task 53's and Task 54's exact data/historical_1m/taskNN_.../ directory path strings were not found verbatim anywhere in the ledger text searched (only the results/ output directory names were confirmed) - the prompt's suggested names (task37_universe_windows, task53_warmup_windows, task54_extended_windows) do NOT match the ledger's actual results/ directory names (task37_fast_universe_feasibility, task53_preroll_ab_validation, task54_extended_candidate_validation) and the underlying data/historical_1m/ path names for these three are simply unconfirmed - treat as 'a directory exists but its exact name is unknown', not as evidence the data itself doesn't exist. 6) Task 44's 60-minute bootstrap window is a DYNAMIC trailing fetch relative to whenever the task ran (empirically '5d' worth of bars, run on 2026-08-22), not a fixed recorded calendar range - it is listed for completeness but is a poor candidate for 'contamination' in the traditional backtest sense since it's a live/rolling preseed, not a stored, reusable dataset. 7) MOST IMPORTANT FOR THE NEXT PHASE: the combination of Task 7B (2025-08-15 to 2026-08-14, 10 symbols) and Task 62/63 ORPB (2025-01-24 to 2025-05-05, 35 symbols) and Task 61R FPRC (2025-05-06 to 2025-08-14, 35 symbols) together means EVERY calendar date from 2025-01-24 through 2026-08-14 has been touched by at least one prior task for at least the original 10-symbol subset, and essentially the entire 2025-08-15 to 2026-08-14 span has been touched for the full 35-symbol universe too (via Task 7B's 10-symbol year plus the many 35-symbol windows carved out of that same year by Tasks 37/38/41/46-58). September 2025 specifically: 2025-09-01 through 2025-09-30 falls inside Task 7B's 10-symbol full-year window (2025-08-15 to 2026-08-14) AND overlaps Task 37/38/41's A_early window tail (2025-08-29 to 2025-09-12) AND Task 10's telemetry slice (2025-09-15 to 2025-09-25) AND Task 54's W1 pre-roll (10 trading days immediately before 2025-09-29) - so no part of September 2025 is clean for any symbol in the 10-symbol set, and the 2025-08-29 to 2025-09-12 slice is not clean for the 35-symbol set either. The only genuinely untouched territory found in any tracked file is: (a) before 2025-01-24 (no prior task's evidence reaches that far back), and (b) after 2026-08-14 for the 10-symbol/task7b-derived dataset specifically - though the 35-symbol universe's Task 54 W3 evaluation reaches to 2026-05-18 and Task 56 H3_late evaluation reaches to 2026-07-09, so for the full 35-symbol universe the latest confirmed touched date is 2026-07-09 (H3_late) to 2026-08-14 (Task 7B's 10-symbol year, which several 35-symbol windows are carved from/sliced against). Task 61's SUPERSEDED/INVALID protocol nominally named dates through 2026-10-02 but that data was never actually downloaded/replayed (validation was corrected to earlier dates by Task 61R before any Alpaca request for N1/N2/N3 was made) - so 2026-08-15 through 2026-10-02 has NOT been downloaded or replayed by any prior task, but part of it (2026-08-15 to 2026-08-23) had already occurred in the story's timeline by the time of Task 61's attempt and so may not be 'clean' in the sense of being unknown to whoever ran these tasks, even though no CSV was pulled. Also note Task 65's live PIV session on 2026-08-24 (today, per the task prompt's own current-date context) has already touched that specific day live. A genuinely clean, unambiguous window for the next alpha-discovery phase should start no earlier than 2026-08-15 (the day after Task 7B's dataset ends) and, to be conservative given Task 65's live 2026-08-24 exposure, arguably no earlier than 2026-08-25."
+}

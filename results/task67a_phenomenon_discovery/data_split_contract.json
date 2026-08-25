@@ -1,0 +1,84 @@
+{
+  "task": "67A Stage 0 - data split contract",
+  "declared_before_any_phenomenon_result_exists": true,
+  "declared_utc": "2026-08-24T23:30:00Z",
+  "universe": {
+    "name": "35-symbol PIV universe",
+    "source": "results/task65_piv/piv_universe.json (talonx_piv.config.DEFAULT_UNIVERSE, Task 64 identity, unchanged)",
+    "symbols": [
+      "AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX",
+      "ADBE", "ADI", "AMAT", "AVGO", "BKNG", "CMCSA", "COST", "CSCO", "GILD", "HON",
+      "INTC", "INTU", "ISRG", "KLAC", "LRCX", "MDLZ", "MU", "NFLX", "PANW", "PEP",
+      "QCOM", "REGN", "SBUX", "TXN", "VRTX"
+    ]
+  },
+  "provider": {
+    "name": "alpaca",
+    "feed": "RESEARCH_SIP (omitted feed param -> account default; confirmed SIP for this account in results/task63r_orpb_v1_feed_remediation/feed_diagnostic.json, sip_available=true, implicit_omitted_matches_persisted=true, resolved feed=SIP)",
+    "downloader": "scripts/download_historical_1m.py --provider alpaca"
+  },
+  "roles": {
+    "DEVELOPMENT": {
+      "purpose": "Stage 1 (6-family phenomenon discovery screen) exploratory iteration. Per results/task65_piv/next_alpha_discovery_plan.md's data-discipline table: 'Iteration allowed; nothing here is held out.'",
+      "materialized": true,
+      "data_dir": "data/historical_1m/task67a_development",
+      "symbols": [
+        "AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX",
+        "ADBE", "ADI", "AMAT", "AVGO", "BKNG", "CMCSA", "COST", "CSCO", "GILD", "HON",
+        "INTC", "INTU", "ISRG", "KLAC", "LRCX", "MDLZ", "MU", "NFLX", "PANW", "PEP",
+        "QCOM", "REGN", "SBUX", "TXN", "VRTX"
+      ],
+      "date_range": {"start": "2026-05-15", "end": "2026-08-14"},
+      "rationale": "This calendar window (like almost the entire 2025-08-15..2026-08-14 span, per exposure_boundary_audit.json) has ALREADY been touched by prior research (Task 7B's 10-symbol full year covers all of it; Task 56 H3_late (2026-05-27..2026-07-09) is fully inside it for the 35-symbol universe too). This is DELIBERATE and acceptable ONLY for the DEVELOPMENT role: the discovery-phase data-discipline rule explicitly permits reuse/iteration ('nothing here is held out'); the constraint that actually matters is that VALIDATION/REPLICATION stay clean of Stage 1 iteration, not that DEVELOPMENT be virgin data. A genuinely never-touched window large enough for 35 symbols x ~3 months simply does not exist anywhere in this repo's historical horizon (see exposure_boundary_audit.json's finding: every date from 2025-01-24 through 2026-08-14 has SOME prior-task exposure for at least a symbol subset) -- see data_split_contract.md for the full reasoning and why VALIDATION/REPLICATION had to be handled differently as a result.",
+      "exposure_acknowledged": "See results/task67a_phenomenon_discovery/exposure_boundary_audit.json for exactly which prior activities touched which parts of this range (RSI/MACD/MA research via Task 7B's underlying year; Task 56 H3_late holdout for 2026-05-27..2026-07-09; various Task 37/46/54-derived windows may overlap partially). Not claimed clean; claimed acceptable for DEVELOPMENT-only use.",
+      "download_log": "results/task67a_phenomenon_discovery/_development_download.log",
+      "download_summary_sidecar": "data/historical_1m/task67a_development/download_summary.json",
+      "dataset_fingerprint_sha256": "becad22265f487a2dd26f417bf9cd924ed1e0f996c9d78aff6a99f69e97298e1 (data_inventory.json is the authoritative source and method -- this copy could drift if the directory changes without re-running research/scripts/task67a_build_data_inventory.py)",
+      "actual_bars_downloaded": 1376385,
+      "quality_summary": "35/35 FULL status, 0 duplicate/out-of-order/NaN/Inf/invalid-OHLC/negative-volume rows across the entire dataset -- see data_inventory.json for the complete per-symbol DataQualityReport-equivalent breakdown."
+    },
+    "VALIDATION": {
+      "purpose": "Confirms whichever family(ies) survive the Stage 1 discovery comparison. Per the discovery plan: 'Untouched until a family is selected from discovery.' Must be genuinely clean of ALL prior exposure (not just Stage 1's own iteration), per this task's deliverable instructions.",
+      "materialized": false,
+      "data_dir": "data/historical_1m/task67a_validation",
+      "symbols": [
+        "AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX",
+        "ADBE", "ADI", "AMAT", "AVGO", "BKNG", "CMCSA", "COST", "CSCO", "GILD", "HON",
+        "INTC", "INTU", "ISRG", "KLAC", "LRCX", "MDLZ", "MU", "NFLX", "PANW", "PEP",
+        "QCOM", "REGN", "SBUX", "TXN", "VRTX"
+      ],
+      "date_range": {"start": "2026-08-25", "end": "2026-09-22"},
+      "date_range_status": "FORWARD_RESERVED_APPROXIMATE",
+      "rationale": "exposure_boundary_audit.json found that literally every calendar date from 2025-01-24 through 2026-08-14 has been touched by at least one prior task for at least a symbol subset, PLUS 2026-08-20 (Task 25 live shadow capture) and 2026-08-24 (today; Task 65/65B live paper-PIV session, one real PAPER AAPL round trip) were touched live. The audit's own conclusion: 'A genuinely clean, unambiguous window ... should start no earlier than 2026-08-25.' Since 2026-08-25 onward had NOT YET TRADED as of this task running (2026-08-24), this role cannot be materialized tonight -- there is no way to download data that does not exist yet. It is reserved by CALENDAR DATE RANGE ONLY, to be downloaded/materialized by a dedicated LATER task once these sessions have actually occurred and settled. This is a forward-looking reservation, not a fabricated backward-looking holdout -- see data_split_contract.md for why this is the honest choice.",
+      "trading_day_count_caveat": "~20 trading days is an approximate calendar-based estimate (4-5 weeks, minus the 2026-09-07 Labor Day holiday). This repo has no trading-calendar source of truth (see talonx_backtest/data.py's _is_weekend docstring, which explicitly notes the same gap) -- exact trading days must be confirmed against actual market data when this role is materialized, not assumed from this estimate.",
+      "materialization_instructions": "When ready to validate a surviving family: (1) confirm current date is on/after 2026-09-23 (i.e. this whole range has actually traded and settled), (2) run scripts/download_historical_1m.py --symbols <this role's symbols> --start-date 2026-08-25 --end-date 2026-09-22 --output-dir data/historical_1m/task67a_validation --provider alpaca, (3) set this role's materialized=true and fill in a fingerprint/hash exactly like DEVELOPMENT's data_inventory.json entry, (4) construct a DataSplitGuard(allowed_roles=(DataRole.VALIDATION,)) for the validation-phase script -- never widen Stage 1's guard to include this role."
+    },
+    "REPLICATION": {
+      "purpose": "Final independent confirmation, strictly after VALIDATION passes. Per the discovery plan: 'Separate from validation, untouched until validation passes.'",
+      "materialized": false,
+      "data_dir": "data/historical_1m/task67a_replication",
+      "symbols": [
+        "AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX",
+        "ADBE", "ADI", "AMAT", "AVGO", "BKNG", "CMCSA", "COST", "CSCO", "GILD", "HON",
+        "INTC", "INTU", "ISRG", "KLAC", "LRCX", "MDLZ", "MU", "NFLX", "PANW", "PEP",
+        "QCOM", "REGN", "SBUX", "TXN", "VRTX"
+      ],
+      "date_range": {"start": "2026-09-23", "end": "2026-10-21"},
+      "date_range_status": "FORWARD_RESERVED_APPROXIMATE",
+      "rationale": "Same forward-reservation logic as VALIDATION, immediately following it with zero gap-overlap risk and zero pre-existing exposure (this range is entirely in the future relative to both 'today' 2026-08-24 and every prior task's exposure). Disjoint from both DEVELOPMENT (2026-05-15..2026-08-14) and VALIDATION (2026-08-25..2026-09-22) by construction.",
+      "trading_day_count_caveat": "Same caveat as VALIDATION: ~20 trading days is an approximate calendar estimate, not a confirmed trading-calendar count.",
+      "materialization_instructions": "Same procedure as VALIDATION's materialization_instructions, substituting this role's date range, AND only after VALIDATION has been run and passed per the discovery plan's validation->replication sequencing -- do not materialize REPLICATION data prematurely just because it is calendar-available; premature materialization creates exactly the kind of unnecessary early exposure this whole contract exists to prevent."
+    }
+  },
+  "no_overlap_check": {
+    "development_vs_validation": "2026-08-14 < 2026-08-25: no overlap",
+    "validation_vs_replication": "2026-09-22 < 2026-09-23: no overlap",
+    "development_vs_replication": "2026-08-14 < 2026-09-23: no overlap"
+  },
+  "enforcement": {
+    "module": "research/task67a_lib/data_guard.py",
+    "classes": ["DataRole", "DataSplitGuard", "BlockedDataRoleAccessError", "UnmaterializedRoleError"],
+    "stage1_pattern": "research.task67a_lib.data_guard.get_stage1_guard() returns a DataSplitGuard(allowed_roles=(DataRole.DEVELOPMENT,)) -- any Stage 1 code path that asks it for VALIDATION or REPLICATION raises BlockedDataRoleAccessError before any file I/O occurs. Asking for VALIDATION/REPLICATION even from a differently-scoped guard that DOES allow them raises UnmaterializedRoleError today, since materialized=false for both -- so no code anywhere in this repo can currently load VALIDATION/REPLICATION data even if it tried, because it does not exist on disk yet.",
+    "tests": "tests/test_task67a_data_guard.py (8 tests, synthetic fixture) -- proves BOTH the permission layer (BlockedDataRoleAccessError) and the not-yet-materialized layer (UnmaterializedRoleError) independently."
+  }
+}

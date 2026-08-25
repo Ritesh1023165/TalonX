@@ -1,0 +1,200 @@
+2026-08-24 23:34:47,292 [INFO] scripts.download_historical_1m: Provider: alpaca | Symbols: SPY, XLK, XLY, XLC, XLP, XLV, XLI, XLF | Range: 2026-05-15 -> 2026-08-14
+2026-08-24 23:34:53,943 [INFO] scripts.download_historical_1m: SPY: downloaded 56893 bar(s) via alpaca (2026-05-15 08:00:00+00:00 -> 2026-08-14 23:59:00+00:00) -- FULL
+2026-08-24 23:35:00,361 [INFO] scripts.download_historical_1m: XLK: downloaded 32374 bar(s) via alpaca (2026-05-15 08:00:00+00:00 -> 2026-08-14 23:35:00+00:00) -- FULL
+2026-08-24 23:35:05,535 [INFO] scripts.download_historical_1m: XLY: downloaded 25553 bar(s) via alpaca (2026-05-15 08:00:00+00:00 -> 2026-08-14 20:11:00+00:00) -- FULL
+2026-08-24 23:35:11,000 [INFO] scripts.download_historical_1m: XLC: downloaded 25267 bar(s) via alpaca (2026-05-15 13:28:00+00:00 -> 2026-08-14 20:00:00+00:00) -- FULL
+2026-08-24 23:35:15,914 [INFO] scripts.download_historical_1m: XLP: downloaded 26917 bar(s) via alpaca (2026-05-15 08:00:00+00:00 -> 2026-08-14 23:49:00+00:00) -- FULL
+2026-08-24 23:35:21,087 [INFO] scripts.download_historical_1m: XLV: downloaded 27756 bar(s) via alpaca (2026-05-15 08:12:00+00:00 -> 2026-08-14 23:43:00+00:00) -- FULL
+2026-08-24 23:35:26,541 [INFO] scripts.download_historical_1m: XLI: downloaded 26135 bar(s) via alpaca (2026-05-15 08:00:00+00:00 -> 2026-08-14 21:19:00+00:00) -- FULL
+2026-08-24 23:35:32,417 [INFO] scripts.download_historical_1m: XLF: downloaded 32076 bar(s) via alpaca (2026-05-15 08:00:00+00:00 -> 2026-08-14 23:54:00+00:00) -- FULL
+Data-quality report: SPY
+  Rows:                    56,893
+  Range:                   2026-05-15 08:00:00+00:00 -> 2026-08-14 23:59:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    75107 (2703 gap(s))
+    Expected (session closed):    73937
+    Unexpected (inside session):  1170
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: XLK
+  Rows:                    32,374
+  Range:                   2026-05-15 08:00:00+00:00 -> 2026-08-14 23:35:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    99602 (4641 gap(s))
+    Expected (session closed):    98432
+    Unexpected (inside session):  1170
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: XLY
+  Rows:                    25,553
+  Range:                   2026-05-15 08:00:00+00:00 -> 2026-08-14 20:11:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    106219 (740 gap(s))
+    Expected (session closed):    105049
+    Unexpected (inside session):  1170
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: XLC
+  Rows:                    25,267
+  Range:                   2026-05-15 13:28:00+00:00 -> 2026-08-14 20:00:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    106166 (531 gap(s))
+    Expected (session closed):    104988
+    Unexpected (inside session):  1178
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: XLP
+  Rows:                    26,917
+  Range:                   2026-05-15 08:00:00+00:00 -> 2026-08-14 23:49:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    105073 (1777 gap(s))
+    Expected (session closed):    103902
+    Unexpected (inside session):  1171
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: XLV
+  Rows:                    27,756
+  Range:                   2026-05-15 08:12:00+00:00 -> 2026-08-14 23:43:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    104216 (2367 gap(s))
+    Expected (session closed):    103046
+    Unexpected (inside session):  1170
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: XLI
+  Rows:                    26,135
+  Range:                   2026-05-15 08:00:00+00:00 -> 2026-08-14 21:19:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    105705 (1171 gap(s))
+    Expected (session closed):    104535
+    Unexpected (inside session):  1170
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: XLF
+  Rows:                    32,076
+  Range:                   2026-05-15 08:00:00+00:00 -> 2026-08-14 23:54:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    99919 (4549 gap(s))
+    Expected (session closed):    98749
+    Unexpected (inside session):  1170
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+======================================================================
+DOWNLOAD RESULT
+======================================================================
+SPY
+  Status:    FULL
+  Requested: 2026-05-15 -> 2026-08-14
+  Returned:  2026-05-15 08:00:00+00:00 -> 2026-08-14 23:59:00+00:00
+  Bars:      56893
+
+XLK
+  Status:    FULL
+  Requested: 2026-05-15 -> 2026-08-14
+  Returned:  2026-05-15 08:00:00+00:00 -> 2026-08-14 23:35:00+00:00
+  Bars:      32374
+
+XLY
+  Status:    FULL
+  Requested: 2026-05-15 -> 2026-08-14
+  Returned:  2026-05-15 08:00:00+00:00 -> 2026-08-14 20:11:00+00:00
+  Bars:      25553
+
+XLC
+  Status:    FULL
+  Requested: 2026-05-15 -> 2026-08-14
+  Returned:  2026-05-15 13:28:00+00:00 -> 2026-08-14 20:00:00+00:00
+  Bars:      25267
+
+XLP
+  Status:    FULL
+  Requested: 2026-05-15 -> 2026-08-14
+  Returned:  2026-05-15 08:00:00+00:00 -> 2026-08-14 23:49:00+00:00
+  Bars:      26917
+
+XLV
+  Status:    FULL
+  Requested: 2026-05-15 -> 2026-08-14
+  Returned:  2026-05-15 08:12:00+00:00 -> 2026-08-14 23:43:00+00:00
+  Bars:      27756
+
+XLI
+  Status:    FULL
+  Requested: 2026-05-15 -> 2026-08-14
+  Returned:  2026-05-15 08:00:00+00:00 -> 2026-08-14 21:19:00+00:00
+  Bars:      26135
+
+XLF
+  Status:    FULL
+  Requested: 2026-05-15 -> 2026-08-14
+  Returned:  2026-05-15 08:00:00+00:00 -> 2026-08-14 23:54:00+00:00
+  Bars:      32076
+
+======================================================================
+Done: 8/8 symbol(s) written, 252,971 total bar(s), output -> data\historical_1m\task67a_benchmarks
+Summary written -> data\historical_1m\task67a_benchmarks\download_summary.json
+EXIT_CODE=0

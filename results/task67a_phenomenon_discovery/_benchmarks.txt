@@ -1,0 +1,8 @@
+SPY
+XLK
+XLY
+XLC
+XLP
+XLV
+XLI
+XLF
