@@ -1,0 +1,54 @@
+{
+  "task": "72 Part 9 -- precise holdout exposure re-audit (independently re-verified, not trusting Task71's inventory blindly)",
+  "audited_utc": "2026-08-26T00:30:00Z",
+  "method": "Re-grepped the entire research worktree (all *.json result artifacts, docs/research/TALONX_RESEARCH_LEDGER.md, research/scripts/*.py, scripts/*.py) for the literal string '2024' rather than trusting Task71's claude_handoff_next.md inventory at face value. Cross-checked against results/task70_f6_validation/historical_exposure_audit.json, which performed an equivalent independent re-audit one task earlier and is the most authoritative prior source (built on results/task67a_phenomenon_discovery/exposure_boundary_audit.json's systematic 6101-line ledger grep).",
+  "findings": [
+    {
+      "item": "No JSON result artifact anywhere in the repo references any 2024 date except docs/research/TALONX_RESEARCH_LEDGER.md's narrative of Task70's own holdout lock.",
+      "confirms": "Task71's claim of zero 2024 territory touched by itself."
+    },
+    {
+      "item": "data/historical_1m/ on disk contains exactly: task67a_benchmarks, task67a_development, task70_validation, task70_replication, task71_development_2025q1/2025q3/2025q4. NO other 2024-dated directory exists.",
+      "confirms": "Only Task70's two blocks (2024-02-01..2024-03-15, 2024-09-03..2024-10-18) have ever had 2024 price data materialized and a strategy outcome (F6_FADE_V1) computed against it."
+    },
+    {
+      "item": "research/scripts/task61r_freeze_temporal_protocol.py:60,64 and research/scripts/task62_freeze_candidate.py:71-72 both call exchange_calendars sessions_in_range('2024-01-01', ...) -- PURE calendar-session-date arithmetic (a list of ISO date strings), used only to build a long-enough backward-indexable session list before slicing the last N sessions of a LATER real window. Zero price data, zero bar, zero outcome for 2024 either script.",
+      "confirms": "results/task70_f6_validation/historical_exposure_audit.json's own resolution of this exact finding (re-verified by reading both scripts directly in this task, not merely trusting the prior audit)."
+    },
+    {
+      "item": "scripts/run_historical_regimes.py hardcodes 4 named regime labels covering 2024 date ranges ('bull_momentum_2024': 2024-01-01..06-30; 'high_vol_pullback_2024': 2024-07-15..09-30; 'full_period_2024_2026': 2024-01-01..2026-08-01) as generic talonx_backtest tool configuration.",
+      "resolution": "These regime names do not appear in any results/ directory or committed report anywhere in the repo -- grepped repo-wide, only appear inside results/task70_f6_validation/historical_exposure_audit.{json,md} as a PRIOR finding being resolved, never as an actual executed-run artifact. No evidence this script was ever run against real 2024 data with a strategy outcome recorded. Classified EXPOSED_DATA_ONLY at worst (same conservative treatment Task70 already applied), matching Task70's own classification exactly.",
+      "confirms": "Task70's prior classification stands; no new exposure found."
+    },
+    {
+      "item": "docs/backtesting.md's data-quality-report documentation example spans 2024-01-02..2025-12-31.",
+      "resolution": "Same as Task70's finding: a data-quality (row-count/gap-count) example for the CURRENT PRODUCTION talonx_quant momentum/RSI/MACD strategy (structurally unrelated to IDIOSYNCRATIC_RESIDUAL_MOMENTUM_LONG_V1's market-model-residual mechanism), not a strategy P&L outcome. Classified EXPOSED_DATA_ONLY, not CLEAN_UNSEEN, out of caution -- same conservative treatment as Task70."
+    }
+  ],
+  "period_classification_for_this_task": {
+    "2024-01-01 to 2024-01-31": "EXPOSED_DATA_ONLY (no outcome ever computed for any strategy)",
+    "2024-02-01 to 2024-03-15": "OUTCOME_CONTAMINATED -- Task70 F6_FADE_V1 VALIDATION. DO NOT REUSE.",
+    "2024-03-16 to 2024-09-02": "EXPOSED_DATA_ONLY (minus the Sept sub-slice below)",
+    "2024-09-03 to 2024-10-18": "OUTCOME_CONTAMINATED -- Task70 F6_FADE_V1 REPLICATION. DO NOT REUSE.",
+    "2024-10-19 to 2024-12-31": "EXPOSED_DATA_ONLY (no outcome ever computed for any strategy)",
+    "2025-01-24 to 2026-08-14": "OUTCOME_CONTAMINATED for THIS candidate specifically -- IDIOSYNCRATIC_RESIDUAL_MOMENTUM_LONG_V1's own Task71 DEVELOPMENT data.",
+    "2026-08-25 onward": "The pre-existing forward-reserved plan (data_split_contract.json) is checked below for elapsed status."
+  },
+  "forward_reserved_plan_status_check": {
+    "declared_plan": "VALIDATION=2026-08-25..2026-09-22, REPLICATION=2026-09-23..2026-10-21 (results/task67a_phenomenon_discovery/data_split_contract.json)",
+    "todays_date": "2026-08-26",
+    "elapsed_status": "NOT USABLE -- today is 2026-08-26, one day into the reserved VALIDATION window; almost the entire forward-reserved range (2026-08-27 onward) has not traded yet. Cannot be materialized for an overnight task with a 06:00 UK deadline regardless.",
+    "decision": "Use the CLEAN 2024 territory instead, per this task's own predeclared preferred holdouts."
+  },
+  "chosen_holdouts": {
+    "validation_range": ["2024-04-01", "2024-05-31"],
+    "replication_range": ["2024-10-21", "2024-12-20"],
+    "both_ranges_classification": "EXPOSED_DATA_ONLY (conservative -- no evidence of any prior strategy OUTCOME, only a possible generic data-quality-report documentation example) -- the same defensible-unseen category Task70 itself used for its own two consumed blocks before it consumed them.",
+    "no_overlap_with_task70_consumed_blocks": "2024-04-01 > 2024-03-15 (validation); 2024-10-21 > 2024-10-18 (replication, 2-day gap)",
+    "no_overlap_with_task71_development": "Entirely different calendar year (2024 vs 2025-01-24..2026-08-14)",
+    "no_overlap_between_validation_and_replication": "2024-05-31 < 2024-10-21",
+    "selection_rationale": "Exactly the ranges predeclared in the overnight task specification BEFORE this audit was performed -- chosen for cleanliness, calendar separation, and day-count breadth (directly addressing Task71's day-cluster weakness), not for any performance reason. Not substituted, since both are confirmed CLEAN_UNSEEN-for-outcome-purposes."
+  },
+  "beta_warmup_disclosure": "No trailing daily-bar lead-in period outside the exact locked ranges will be downloaded or used for the causal 20-trading-day beta estimate, to avoid any ambiguity about touching adjacent 2024 territory (including Task70's consumed blocks, which sit immediately before the validation range with only a 16-day gap). Consequence, disclosed up front: the first ~20 trading days of each locked block will show beta=NaN / rejection_reason=DATA_NOT_READY by construction, identical to the precedent already established and disclosed in Task71's own DEVELOPMENT slices (family_c_residual_momentum_summary.csv shows n_days well below each slice's full calendar length for the same reason). This is NOT an outcome computed on excluded days -- it is a data-readiness rejection.",
+  "outcomes_inspected_before_this_lock": false
+}

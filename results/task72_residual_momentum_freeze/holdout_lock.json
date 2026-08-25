@@ -1,0 +1,30 @@
+{
+  "task": "72 Part 10 -- holdout lock, committed and pushed BEFORE any holdout outcome is computed",
+  "declared_utc": "2026-08-26T00:35:00Z",
+  "strategy_fingerprint": "f3764b6794f2e00cc5262f73d241b5274ebf544dd65cc96e7a7ab175d7c6025a",
+  "outcomes_inspected": false,
+  "provider": "alpaca",
+  "feed": "SIP (account default, matching Task71/Task70 research provider)",
+  "universe": [
+    "AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX",
+    "ADBE", "ADI", "AMAT", "AVGO", "BKNG", "CMCSA", "COST", "CSCO", "GILD", "HON",
+    "INTC", "INTU", "ISRG", "KLAC", "LRCX", "MDLZ", "MU", "NFLX", "PANW", "PEP",
+    "QCOM", "REGN", "SBUX", "TXN", "VRTX"
+  ],
+  "benchmark_symbol": "SPY",
+  "validation": {
+    "start": "2024-04-01",
+    "end": "2024-05-31",
+    "data_dir": "data/historical_1m/task72_validation",
+    "materialized": false
+  },
+  "replication": {
+    "start": "2024-10-21",
+    "end": "2024-12-20",
+    "data_dir": "data/historical_1m/task72_replication",
+    "materialized": false
+  },
+  "selection_rationale": "See holdout_exposure_audit.{json,md} -- exactly the ranges predeclared in the overnight task specification, confirmed CLEAN (EXPOSED_DATA_ONLY, no prior strategy outcome, not Task70's consumed blocks, not Task71's own development range), chosen for cleanliness/separation/day-count breadth, not for any performance reason.",
+  "guard_module": "research/task72_residual_momentum/holdout_guard.py -- LockedRangeGuard constructed with exactly these two (start, end) tuples; any other range raises HoldoutViolationError before any file I/O.",
+  "next_step": "Materialize (download) both ranges via scripts/download_historical_1m.py --provider alpaca, then run the frozen strategy against VALIDATION exactly once."
+}

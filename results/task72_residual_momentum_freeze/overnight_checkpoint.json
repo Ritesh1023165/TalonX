@@ -1,16 +1,16 @@
 {
   "task": "72/73 overnight",
-  "stage": "STRATEGY_FROZEN",
-  "timestamp_utc": "2026-08-26T00:20:00Z",
+  "stage": "HOLDOUT_LOCKED",
+  "timestamp_utc": "2026-08-26T00:40:00Z",
   "branch": "research/talonx-alpha-phenomenon-discovery",
   "head_sha": "727daaa00dbfe475362542f196100a4ffe2de42f",
 
   "freeze_complete": true,
-  "freeze_commit": "PENDING_THIS_COMMIT",
+  "freeze_commit": "916d1e93184b00c76386012529a6e0cb17a8642b",
 
-  "holdout_audit_complete": false,
-  "holdout_lock_complete": false,
-  "holdout_lock_commit": null,
+  "holdout_audit_complete": true,
+  "holdout_lock_complete": true,
+  "holdout_lock_commit": "PENDING_THIS_COMMIT",
 
   "validation_data_complete": false,
   "validation_complete": false,
@@ -20,5 +20,5 @@
   "replication_complete": false,
   "replication_classification": null,
 
-  "next_action": "Strategy frozen: IDIOSYNCRATIC_RESIDUAL_MOMENTUM_LONG_V1 (threshold=0.75%, horizon=180m, stop=2.5%), fingerprint f3764b6794f2e00cc5262f73d241b5274ebf544dd65cc96e7a7ab175d7c6025a computed and recorded. 12 focused tests pass. Validation protocol (15 criteria) pre-registered. Proceeding to Part 9/10: holdout exposure re-audit and lock, to be committed and pushed BEFORE any holdout outcome is computed."
+  "next_action": "Holdout re-audit complete (2024 confirmed EXPOSED_DATA_ONLY except Task70's two consumed blocks; Task71's own development range separately excluded). Locked VALIDATION=2024-04-01..2024-05-31, REPLICATION=2024-10-21..2024-12-20 -- exactly the predeclared preferred ranges, no substitution needed. Zero outcomes inspected before this lock. NEXT: materialize (download) both ranges via scripts/download_historical_1m.py --provider alpaca for the 35-symbol universe + SPY, then run the frozen strategy against VALIDATION exactly once. If context resets: this lock is final and committed -- do NOT re-audit or re-select holdout ranges, proceed directly to data materialization using the ranges recorded in holdout_lock.json."
 }
