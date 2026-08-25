@@ -334,7 +334,7 @@ class TelegramReplyListener:
             "\U0001F3D3 Pong! TalonX Engine Online",
             "─" * 30,
             "\U00002699 Process: RUNNING",
-            f"\U0001F4E1 Pipeline: {self._pipeline_status(client, market_health)}{pipeline_suffix}",
+            f"\U0001F4E1 Pipeline: {self._pipeline_status(client, market_health, piv_info)}{pipeline_suffix}",
             f"\U0001F4C5 Metrics day: {datetime.now(timezone.utc):%Y-%m-%d} (UTC)",
             f"⏱️ Uptime: {self._format_uptime()}",
             f"\U0001F4BB CPU Usage: {cpu_pct:.1f}%  |  RAM: {mem_used_gb:.1f} GB / {mem_total_gb:.1f} GB",
@@ -365,20 +365,51 @@ class TelegramReplyListener:
         info = getattr(self.dispatch_agent, "piv_info", None)
         if info is None:
             return []
-        return [
+        lines = [
             "\U0001F9EA PIV",
             f"  Mode: {info.get('mode', 'unknown')}",
             f"  Live feed provider: {info.get('feed_provider', 'unknown')}",
             f"  Configured universe: {info.get('universe_size', 'unknown')}",
-            "",
         ]
+        # Task 69Q Part 8 -- unified PIV /ping view: session identity, live
+        # feed/readiness state, the full quant funnel, radar WATCH count,
+        # and natural-vs-probe traffic, all read from the SAME mutable dict
+        # SessionRunner updates in place (see telegram_inbound.build_piv_info).
+        # Only rendered for a PIV caller (info is not None) -- byte-for-byte
+        # unchanged output for the general app.
+        optional_fields = (
+            ("session_id", "Session ID"), ("runtime_sha", "Runtime SHA"), ("config_hash", "Config hash"),
+            ("feed_health", "Feed health"),
+            ("warmup_ready_count", "Warmup ready"), ("session_ready_count", "Session ready"),
+            ("stale_count", "Currently stale"),
+            ("quant_evaluation_cycles", "Quant evaluation cycles"), ("quant_candidates", "Quant candidates"),
+            ("quant_published", "Quant published"), ("quant_rejected", "Quant rejected"),
+            ("quant_unaccounted", "Quant unaccounted candidates"),
+            ("radar_watch_count", "Radar WATCH count (observational, not alpha)"),
+            ("natural_orders", "Natural orders"), ("natural_fills", "Natural fills"),
+            ("probe_orders", "Probe orders (PIV_LIFECYCLE_PROBE, alpha_evidence=false)"),
+            ("probe_fills", "Probe fills (PIV_LIFECYCLE_PROBE, alpha_evidence=false)"),
+            ("eod_status", "EOD/reconciliation"),
+        )
+        for key, label in optional_fields:
+            if key in info:
+                lines.append(f"  {label}: {info[key]}")
+        lines.append("")
+        return lines
 
-    def _pipeline_status(self, client, market_health: str) -> str:
+    def _pipeline_status(self, client, market_health: str, piv_info: dict | None = None) -> str:
         """Derived entirely from the market-feed-freshness label
         _market_feed_freshness already computes (healthy/stale/
-        disconnected/unknown) -- no new metric, no new Redis read. This
-        is deliberately a narrow, honestly-scoped signal (data actually
-        flowing in), not a claim that every downstream stage is fine."""
+        disconnected/unknown) -- no new metric, no new Redis read -- UNLESS
+        this is a PIV caller (piv_info is not None), in which case the
+        headline reflects PIV's OWN live-feed health (SessionRunner-updated
+        `feed_health`), never the general talonx_ingest subsystem's, which
+        a PIV session never writes to at all (Task69P live finding: /ping
+        showed DEGRADED/Disconnected purely because that OTHER subsystem
+        was idle, while PIV's actual Alpaca feed was healthy). General-app
+        behavior (piv_info is None) is unchanged."""
+        if piv_info is not None:
+            return piv_info.get("feed_health", "UNKNOWN (PIV feed status pending)")
         if client is None:
             return "UNKNOWN (no Redis connection)"
         if "disconnected" in market_health:

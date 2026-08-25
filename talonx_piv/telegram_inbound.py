@@ -51,6 +51,34 @@ class _PivPingContext:
     long_term_telegram_failed: int = 0
 
 
+def build_piv_info(
+    feed_mode: str | None = None, universe: tuple[str, ...] = (),
+    session_id: str | None = None, runtime_sha: str | None = None, config_hash: str | None = None,
+) -> dict:
+    """Task 69Q Part 8 -- the single mutable dict shared by cli.py between
+    SessionRunner (which updates it live: feed health, warmup/session-ready
+    counts, quant funnel, natural-vs-probe order/fill counts, radar WATCH
+    count) and the /ping listener (which only reads it) so /ping reflects
+    the CURRENT running session, not just its startup snapshot. All
+    optional fields default to "unknown"/0 so the very first /ping right
+    after startup still renders every line."""
+    return {
+        "mode": "PAPER / NO REAL CAPITAL",
+        "feed_provider": _feed_provider_label(feed_mode),
+        "universe_size": len(universe) if universe else "unknown",
+        "session_id": session_id or "unknown",
+        "runtime_sha": runtime_sha or "unknown",
+        "config_hash": config_hash or "unknown",
+        "feed_health": "UNKNOWN (session starting up)",
+        "warmup_ready_count": "unknown", "session_ready_count": "unknown", "stale_count": 0,
+        "quant_evaluation_cycles": 0, "quant_candidates": 0, "quant_published": 0,
+        "quant_rejected": 0, "quant_unaccounted": 0,
+        "radar_watch_count": 0,
+        "natural_orders": 0, "natural_fills": 0, "probe_orders": 0, "probe_fills": 0,
+        "eod_status": "PENDING (session in progress)",
+    }
+
+
 def build_piv_telegram_listener(
     state_dir: Path,
     *,
@@ -58,6 +86,7 @@ def build_piv_telegram_listener(
     started_at: datetime | None = None,
     feed_mode: str | None = None,
     universe: tuple[str, ...] = (),
+    piv_info: dict | None = None,
 ) -> TelegramReplyListener:
     """PIV-scoped audit DB (under the PIV runtime state dir, not
     ~/.talonx/dispatch_audit.db) so this never shares or corrupts a
@@ -77,11 +106,7 @@ def build_piv_telegram_listener(
     posture."""
     config = DispatchConfig(audit_db_path=str(state_dir / "piv_telegram_audit.db"))
     store = AuditStore(config.audit_db_path)
-    piv_info = {
-        "mode": "PAPER / NO REAL CAPITAL",
-        "feed_provider": _feed_provider_label(feed_mode),
-        "universe_size": len(universe) if universe else "unknown",
-    }
+    piv_info = piv_info if piv_info is not None else build_piv_info(feed_mode, universe)
     agent = _PivPingContext(
         _client=redis_client, started_at=started_at, piv_info=piv_info,
     )
