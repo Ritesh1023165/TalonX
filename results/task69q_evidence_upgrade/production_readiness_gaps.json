@@ -1,0 +1,59 @@
+{
+  "gaps": [
+    {
+      "id": "PRG-01", "severity": "MEDIUM", "title": "No per-session/per-date directory layout",
+      "detail": "piv_events.jsonl, lifecycle_state.json, warmup_verification.json, session_readiness_state.json, and the Telegram audit DB all still live directly under config.state_dir, shared across every session ever run there. Task69Q made every event/report FILTERABLE by session_id/trading_date_et (session_telemetry_contract.json), but did not migrate to results/runtime/<trading_date>/<session_id>/ physical separation -- that touches every reader of state_dir in the codebase and is a bigger, separately-reviewable change.",
+      "status": "DEFERRED", "recommended_task": "a dedicated storage-layout task, not bundled with alpha/notification work"
+    },
+    {
+      "id": "PRG-02", "severity": "LOW", "title": "unaccounted_candidates cannot be independently cross-verified against a third ground-truth counter",
+      "detail": "The quant funnel's candidates=published+rejected+errored is definitionally reconciled by construction (see quant_funnel_contract.json) -- there is no third, wholly independent 'candidates evaluated' counter inside QuantScanner to cross-check against. unaccounted_candidates therefore only detects pub/sub delivery loss between publish and this subscriber's drain, not a hypothetical internal QuantScanner accounting bug that would need protected-file changes to observe.",
+      "status": "ACCEPTED_LIMITATION", "recommended_task": "none -- would require touching protected talonx_quant/consumer.py to add a true internal counter, which is out of scope by the task's own protected-files rule"
+    },
+    {
+      "id": "PRG-03", "severity": "LOW", "title": "'pending' quant funnel category is always 0 by design assumption",
+      "detail": "Assumes QuantScanner's per-tick throttle-window flush is always fully synchronous with no cross-tick deferred candidate state. True today; would need revisiting if QuantScanner's publish timing model changes.",
+      "status": "ACCEPTED_LIMITATION_DOCUMENTED", "recommended_task": "revisit only if talonx_quant.consumer's throttle/publish timing model changes"
+    },
+    {
+      "id": "PRG-04", "severity": "MEDIUM", "title": "Session identity file (session_identity.json) is single-slot, not itself session-scoped",
+      "detail": "config.state_dir/session_identity.json is overwritten by every `start` invocation -- a SECOND session started the same day before the first one's `eod` runs would silently overwrite the file eod later reads. Acceptable for the current one-session-per-day operating model; would break under overlapping/concurrent sessions.",
+      "status": "DEFERRED", "recommended_task": "resolve together with PRG-01's storage-layout migration"
+    },
+    {
+      "id": "PRG-05", "severity": "LOW", "title": "estimated_transaction_cost is hardcoded to 0.0",
+      "detail": "Alpaca paper trading has no commissions; execution_economics_contract.json documents this is a placeholder for a future real cost model, not a bug.",
+      "status": "DEFERRED", "recommended_task": "Task70+ if/when a real cost model becomes relevant to profitability conclusions"
+    },
+    {
+      "id": "PRG-06", "severity": "LOW", "title": "Pre-market radar has no relative-strength-vs-universe or developing-setup detection",
+      "detail": "Only single-symbol gap_pct vs previous close is computed today. Relative strength (ranking across the universe) and a 'developing setup' concept both require design work this task's scope did not cover, and the latter risks inventing an unvalidated pre-market strategy if done carelessly -- deliberately not attempted.",
+      "status": "DEFERRED", "recommended_task": "only after a real pre-market strategy concept is separately researched/validated, per PERMANENT PRODUCT TARGET #3"
+    },
+    {
+      "id": "PRG-07", "severity": "MEDIUM", "title": "Alpaca-historical warmup fetch is prototyped but not integrated into the live warmup path",
+      "detail": "talonx_piv/alpaca_historical_warmup.py's fetch_1m_bars() is verified against the real Alpaca API (see warmup_provider_assessment.json) and unit-tested, but is NOT wired into talonx_quant.consumer.QuantScanner's RollingBarBuffer/buffer_htf -- that requires bar-format/HTF-aggregation correctness work and a decision on default-vs-flagged rollout.",
+      "status": "DEFERRED", "recommended_task": "a focused warmup-provider-migration task, informed by this task's entitlement verification"
+    },
+    {
+      "id": "PRG-08", "severity": "LOW", "title": "Live/offline replay parity framework not built, per Part 11's own instruction",
+      "detail": "Part 11 explicitly asked for a minimum-evidence DESIGN, implemented only if low-risk, and to defer the rest here. Needed eventually per evaluated symbol: input bar timestamps/hash, strategy/config fingerprint, decision timestamp, candidate result, rejection reason or publication, direction, entry reference, exit/stop semantics. Task69Q's session_identity.py (config_hash, runtime_sha) and decision_engine.py's funnel/rejection-breakdown capture are useful building blocks for this, but no replay-comparison tool exists yet.",
+      "status": "DESIGN_ONLY_AS_INSTRUCTED", "recommended_task": "a dedicated live/offline parity task once a second live session's evidence exists to compare against"
+    },
+    {
+      "id": "PRG-09", "severity": "LOW", "title": "Position lifecycle restart edge case: open_position_by_symbol is not backfilled for a pre-Task69Q state file",
+      "detail": "A lifecycle_state.json saved before this task's changes has no open_position_by_symbol key; PaperLifecycle._load() tolerates this (dataclass default_factory), but a position that was OPEN in such an old file before restart will not be correctly recognized as closeable by symbol until its NEXT full open cycle. Not exploitable today (no old-format file exists with an open position in this repo's evidence), but worth knowing.",
+      "status": "ACCEPTED_LIMITATION_DOCUMENTED", "recommended_task": "none required unless an old-format state file with an open position is ever resumed"
+    },
+    {
+      "id": "PRG-10", "severity": "LOW", "title": "Stale pre-existing test assertion fixed as a drive-by (test_task66a_runtime_parity.py)",
+      "detail": "test_build_piv_telegram_listener_uses_piv_scoped_audit_db asserted dispatch_agent is None, contradicting Task69P's own already-shipped behavior (dispatch_agent is a _PivPingContext shim, not None). Confirmed pre-existing (failed identically before this task's changes via git stash). Fixed as part of this task since it directly touches the same function this task extended.",
+      "status": "FIXED_THIS_TASK"
+    },
+    {
+      "id": "PRG-11", "severity": "INFORMATIONAL", "title": "Pre-existing unrelated test failure confirmed NOT caused by this task",
+      "detail": "tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset fails identically with and without this task's changes (verified via git stash) -- a historical-regime backtest data/environment issue unrelated to talonx_piv.",
+      "status": "PRE_EXISTING_NOT_IN_SCOPE"
+    }
+  ]
+}

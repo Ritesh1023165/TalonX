@@ -25,6 +25,14 @@ class LifecycleState:
     intents: dict[str, dict[str, Any]] = field(default_factory=dict)
     orders: dict[str, dict[str, Any]] = field(default_factory=dict)
     positions: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Task 69Q Part 5: maps symbol -> the position_id currently OPEN for it,
+    # so a sell fill can be recognized as CLOSING that same logical position
+    # rather than becoming an unrelated second "opened" record (see
+    # apply_broker_update). Absent/empty on an old state file -- a session
+    # resumed mid-position from a pre-Task69Q file simply won't have this
+    # entry until its next full open+close cycle, which is an acceptable,
+    # documented restart edge case (positions dict itself remains authoritative).
+    open_position_by_symbol: dict[str, str] = field(default_factory=dict)
 
 
 class PaperLifecycle:
@@ -61,6 +69,16 @@ class PaperLifecycle:
     def order_intent(
         self, signal_id: str, symbol: str, side: str, quantity: float, client_order_id: str | None = None,
         source: str | None = None, alpha_evidence: bool | None = None,
+        # Task 69Q Part 6 -- execution economics, optional/best-effort. For an
+        # entry: reference_price is the signal's trigger price, stop_price is
+        # the strategy's defined stop (None if the strategy defines no stop --
+        # gross_r/net_r then stay None rather than being fabricated). For an
+        # exit: reference_price is the expected exit reference (e.g. the stop
+        # or target price that triggered it), stop_price is not meaningful and
+        # should be omitted.
+        reference_price: float | None = None, stop_price: float | None = None,
+        signal_timestamp: str | None = None, strategy_id: str | None = None,
+        horizon: str | None = None,
     ) -> dict[str, Any]:
         intent_id = stable_id("intent", signal_id, symbol, side, quantity)
         if intent_id in self.state.intents:
@@ -75,6 +93,8 @@ class PaperLifecycle:
         self.state.intents[intent_id] = {
             "signal_id": signal_id, "payload": payload, "status": "ORDER_INTENT",
             "source": source, "alpha_evidence": alpha_evidence,
+            "reference_price": reference_price, "stop_price": stop_price,
+            "signal_timestamp": signal_timestamp, "strategy_id": strategy_id, "horizon": horizon,
         }
         self._save()
         self.events.emit(PivEvent.build(
@@ -119,17 +139,84 @@ class PaperLifecycle:
                 source=source, alpha_evidence=alpha_evidence,
             ))
         if status in {"partially_filled", "filled"} and filled_qty > 0:
-            position_id = stable_id("position", intent_id, symbol)
-            first = position_id not in self.state.positions
-            self.state.positions[position_id] = {
-                "symbol": symbol, "quantity": filled_qty, "price": fill_price, "status": "OPEN",
-                "source": source, "alpha_evidence": alpha_evidence,
-            }
-            if first:
+            # Task 69Q Part 5: a fill is an EXIT (closes the symbol's tracked
+            # open position) iff this order is a sell AND open_position_by_
+            # symbol has a tracked OPEN position for this symbol -- otherwise
+            # it's an entry/open, same as before. This is what prevents an
+            # exit fill from emitting a second, misleading POSITION_OPENED
+            # (confirmed live in Task69P's raw events: the 19:01:30Z exit fill
+            # produced POSITION_OPENED instead of POSITION_CLOSED).
+            intent = self.state.intents.get(intent_id, {})
+            side = intent.get("payload", {}).get("side")
+            reference_price = intent.get("reference_price")
+            stop_price = intent.get("stop_price")
+            strategy_id = intent.get("strategy_id")
+            horizon = intent.get("horizon")
+            now_iso = datetime.now(timezone.utc).isoformat()
+            existing_position_id = self.state.open_position_by_symbol.get(symbol)
+
+            if side == "sell" and existing_position_id is not None and existing_position_id in self.state.positions:
+                position = self.state.positions[existing_position_id]
+                entry_price = position.get("price")
+                entry_quantity = position.get("quantity") or filled_qty
+                entry_time = position.get("entry_time")
+                exit_slippage_abs = (fill_price - reference_price) if (fill_price is not None and reference_price is not None) else None
+                exit_slippage_bps = (exit_slippage_abs / reference_price * 10000) if (exit_slippage_abs is not None and reference_price) else None
+                gross_pnl = ((fill_price - entry_price) * entry_quantity) if (fill_price is not None and entry_price is not None) else None
+                # PAPER broker models zero commissions/fees; net_pnl equals
+                # gross_pnl today. estimated_transaction_cost is carried
+                # explicitly (rather than omitted) so a future real cost model
+                # only has to change this one value, not the schema.
+                estimated_transaction_cost = 0.0 if gross_pnl is not None else None
+                net_pnl = (gross_pnl - estimated_transaction_cost) if gross_pnl is not None else None
+                holding_seconds = None
+                if entry_time is not None:
+                    try:
+                        holding_seconds = (datetime.fromisoformat(now_iso) - datetime.fromisoformat(entry_time)).total_seconds()
+                    except ValueError:
+                        holding_seconds = None
+                position_stop = position.get("stop_price")
+                gross_r = net_r = None
+                if position_stop is not None and entry_price is not None and entry_price != position_stop and gross_pnl is not None:
+                    denom = (entry_price - position_stop) * entry_quantity
+                    if denom:
+                        gross_r, net_r = gross_pnl / denom, net_pnl / denom
+                position.update(
+                    status="CLOSED", exit_price=fill_price, exit_quantity=filled_qty,
+                    exit_reference_price=reference_price, gross_pnl=gross_pnl, net_pnl=net_pnl,
+                    holding_seconds=holding_seconds,
+                )
+                del self.state.open_position_by_symbol[symbol]
                 self.events.emit(PivEvent.build(
-                    "POSITION_OPENED", symbol=symbol, correlation_id=intent_id, broker_order_id=broker_order_id,
-                    position_id=position_id, quantity=filled_qty, price=fill_price, source=source, alpha_evidence=alpha_evidence,
+                    "POSITION_CLOSED", symbol=symbol, correlation_id=intent_id, broker_order_id=broker_order_id,
+                    position_id=existing_position_id, quantity=filled_qty, price=fill_price,
+                    source=source, alpha_evidence=alpha_evidence, reference_price=reference_price,
+                    slippage_abs=exit_slippage_abs, slippage_bps=exit_slippage_bps,
+                    gross_pnl=gross_pnl, net_pnl=net_pnl, estimated_transaction_cost=estimated_transaction_cost,
+                    holding_seconds=holding_seconds, gross_r=gross_r, net_r=net_r,
+                    horizon=horizon or position.get("horizon"), strategy_id=strategy_id or position.get("strategy_id"),
                 ))
+            else:
+                position_id = stable_id("position", intent_id, symbol)
+                first = position_id not in self.state.positions
+                entry_slippage_abs = (fill_price - reference_price) if (fill_price is not None and reference_price is not None) else None
+                entry_slippage_bps = (entry_slippage_abs / reference_price * 10000) if (entry_slippage_abs is not None and reference_price) else None
+                self.state.positions[position_id] = {
+                    "symbol": symbol, "quantity": filled_qty, "price": fill_price, "status": "OPEN",
+                    "source": source, "alpha_evidence": alpha_evidence, "entry_time": now_iso,
+                    "reference_price": reference_price, "stop_price": stop_price,
+                    "strategy_id": strategy_id, "horizon": horizon,
+                }
+                if side == "buy":
+                    self.state.open_position_by_symbol[symbol] = position_id
+                if first:
+                    self.events.emit(PivEvent.build(
+                        "POSITION_OPENED", symbol=symbol, correlation_id=intent_id, broker_order_id=broker_order_id,
+                        position_id=position_id, quantity=filled_qty, price=fill_price, source=source,
+                        alpha_evidence=alpha_evidence, reference_price=reference_price,
+                        slippage_abs=entry_slippage_abs, slippage_bps=entry_slippage_bps,
+                        strategy_id=strategy_id, horizon=horizon,
+                    ))
         self._save()
 
     def poll_order_until_terminal(self, broker_order_id: str, *, timeout_seconds: float = 20.0, poll_interval_seconds: float = 1.0, sleep=None) -> dict[str, Any]:

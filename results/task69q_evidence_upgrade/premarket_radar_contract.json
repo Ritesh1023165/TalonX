@@ -1,0 +1,41 @@
+{
+  "contract": "PREMARKET_RADAR_CONTRACT",
+  "permanent_product_target": {
+    "canonical_premarket_start": "04:00 America/New_York",
+    "uk_time_currently": "09:00 UK/BST in August 2026 (DST-dependent -- never hardcoded; see below)",
+    "rule": "Never hardcode a UK clock time for US-market semantics. All session boundaries are computed in America/New_York (talonx_piv/premarket_radar.py: PREMARKET_START = time(4,0), REGULAR_OPEN = time(9,30), both compared against a tz-aware datetime converted to ZoneInfo('America/New_York')).",
+    "three_premarket_concepts": {
+      "A_system_preparation": "IMPLEMENTED -- startup/preflight/warmup can run ahead of the radar window; see next_live_session_plan.md Part 10.",
+      "B_market_radar_analysis": "IMPLEMENTED THIS TASK -- see below.",
+      "C_actionable_premarket_trading": "NOT IMPLEMENTED, DELIBERATELY DISABLED -- no separately researched/frozen/validated pre-market trading strategy exists. premarket_radar.py has no import of broker.py or lifecycle.py at all, so it is structurally incapable of submitting an order regardless of any future config change to this module alone."
+    }
+  },
+  "module": "talonx_piv/premarket_radar.py",
+  "data_sources_used": "Only Alpaca's existing /v2/stocks/snapshots endpoint (prevDailyBar.c for previous-session close, latestTrade.p/dailyBar.c for current price, dailyBar.v for volume) -- the same transport/feed-param pattern session_runner.fetch_bars_latest already uses for the regular session. No new provider, no new strategy.",
+  "observations_supported_today": {
+    "gap_pct": "((latest_price - prev_close) / prev_close) * 100 -- the only metric computed",
+    "data_status": "READY | DATA_NOT_READY (missing prevDailyBar/latestTrade -- fails closed, never fabricated)",
+    "bias": "BULLISH | BEARISH | None -- purely a label derived from gap_pct crossing +/-GAP_WATCH_THRESHOLD_PCT (1.0%, a display/dedup boundary, NOT a validated trading threshold, NEVER tuned from any observed session's outcome)",
+    "reason_codes": "PREMARKET_GAP_UP / PREMARKET_GAP_DOWN / PREMARKET_DATA_UNAVAILABLE / PREMARKET_LIQUIDITY_UNAVAILABLE"
+  },
+  "observations_NOT_supported_today_documented_gap": {
+    "relative_strength_vs_universe": "not computed -- would require ranking all 35 symbols' gap_pct against each other; deferred, see production_readiness_gaps.json PRG-06",
+    "developing_setup_watch_status": "not computed -- would require a real pre-market technical-setup definition (e.g. consolidation/breakout), which does not exist as a validated strategy; NOT invented for this task",
+    "confidence_percentages": "deliberately never produced, per task instructions"
+  },
+  "event_semantics": {
+    "PREMARKET_WATCH": "emitted only on a bias TRANSITION (new bias, or a change from BULLISH<->BEARISH), never every tick -- PremarketRadarEngine.evaluate() tracks last-seen bias per symbol",
+    "PREMARKET_WATCH_CLEARED": "emitted when a symbol's gap closes back under the threshold after having a WATCH bias",
+    "notification_class": "PREMARKET_RADAR (see notification_contract.json)",
+    "alpha_evidence": "always false",
+    "status_field_used_for": "the bias label (BULLISH/BEARISH) -- NEVER 'ACTIONABLE'; premarket_radar.py has no concept of actionability at all"
+  },
+  "wiring": "talonx_piv/session_runner.py's run() loop calls process_premarket_tick(now) instead of the regular process_tick(now) when premarket_radar.is_premarket(now) is true and OPEN has not yet been reached -- wholly separate code path from the regular-session decision engine, additive, does not alter any existing regular-session behavior or test.",
+  "safety_invariant_tests": [
+    "tests/test_task69q_evidence_upgrade.py::test_premarket_radar_module_never_imports_broker_or_lifecycle",
+    "tests/test_task69q_evidence_upgrade.py::test_is_premarket_window_is_et_not_uk_local",
+    "tests/test_task69q_evidence_upgrade.py::test_classify_gap_up_is_watch_bullish_never_a_trade_recommendation",
+    "tests/test_task69q_evidence_upgrade.py::test_classify_missing_data_is_data_not_ready",
+    "tests/test_task69q_evidence_upgrade.py::test_radar_engine_only_emits_on_bias_transition_not_every_tick"
+  ]
+}

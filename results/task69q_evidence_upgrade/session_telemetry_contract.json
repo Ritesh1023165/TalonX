@@ -1,0 +1,32 @@
+{
+  "contract": "SESSION_TELEMETRY_CONTRACT",
+  "problem": "piv_events.jsonl is a single append-only file that can span multiple trading dates (confirmed: 2026-08-23/24/25 in one file) with no built-in way to scope a report to exactly one session/date.",
+  "decision": "Stamp every PivEvent with session_id/trading_date_et at emit time, and make report generation take an explicit trading_date_et filter, rather than restructuring on-disk storage into per-session directories. This preserves the append-only audit history (useful for cross-session investigation) while making single-session/date reports reliable.",
+  "why_not_a_directory_migration": "results/runtime/<trading_date>/<session_id>/ was considered (and remains the PREFERRED target layout for a future task) but is a bigger, riskier change: every reader of config.state_dir (preflight, lifecycle_state.json, warmup_verification.json, session_readiness_state.json, latest_reconciliation.json, latest_session_report.json, the Telegram audit DB) would need path updates in the same change. Deferred -- see production_readiness_gaps.json PRG-04.",
+  "every_runtime_session_now_carries": {
+    "session_id": "piv_<trading_date_et>_<HHMMSS ET>_<config_hash[:8]> -- see talonx_piv/session_identity.py build_session_identity()",
+    "trading_date_et": "America/New_York calendar date, computed from the session start UTC timestamp",
+    "runtime_start_utc": "ISO8601 UTC timestamp of session construction",
+    "runtime_sha": "git rev-parse HEAD at session start, best-effort ('unknown' if git is unavailable -- never blocks startup)",
+    "config_hash": "sha256[:12] of (feed_mode, universe, entry_cutoff_et, eod_flatten_et, decision_path_enabled, paper_trading, real_capital) -- excludes secrets and paths",
+    "feed_mode": "RESEARCH_SIP | IEX_PAPER_PIV"
+  },
+  "persisted_at": "config.state_dir/session_identity.json, written once at `cli.py start`",
+  "event_schema_additions": {
+    "PivEvent.session_id": "stamped by EventBus.emit if not already set by the caller",
+    "PivEvent.trading_date_et": "stamped by EventBus.emit via events.trading_date_for(timestamp) if not already set",
+    "PivEvent.notification_class": "stamped by EventBus.emit via events.notification_class_for(event, source) if not already set -- see notification_contract.json"
+  },
+  "reporting_changes": {
+    "function": "talonx_piv.reporting.build_session_report(event_path, reconciliation, feed_mode=None, *, trading_date_et=None, session_id=None, quant_funnel=None)",
+    "behavior": "When trading_date_et is given, every count in the report is computed only over rows whose trading_date_et matches -- this is what prevents e.g. 2026-08-24 and 2026-08-25 activity from being silently summed. Omitting it preserves the old whole-file behavior for any existing caller.",
+    "cli_wiring": "talonx_piv/cli.py's `eod` command now reads session_identity.json (written by `start`) to recover the live session's own session_id/trading_date_et, and quant_funnel_report.json (written by SessionRunner at end of run) to fold in Part 3's funnel accounting."
+  },
+  "backward_compatibility": "A pre-Task69Q piv_events.jsonl has no session_id/trading_date_et fields on its old rows; build_session_report's trading_date_et filter simply excludes rows lacking a matching (i.e. any) trading_date_et field, so old data is invisible to a date-scoped report but remains fully readable by the unfiltered whole-file mode.",
+  "tests": [
+    "tests/test_task69q_evidence_upgrade.py::test_trading_date_for_uses_america_new_york_not_utc",
+    "tests/test_task69q_evidence_upgrade.py::test_event_bus_stamps_session_id_and_trading_date",
+    "tests/test_task69q_evidence_upgrade.py::test_build_session_report_scopes_to_one_trading_date_and_never_mixes_days",
+    "tests/test_task69q_evidence_upgrade.py::test_session_identity_is_deterministic_for_same_config"
+  ]
+}
