@@ -1,0 +1,29 @@
+[
+  {
+    "name": "trend60_slope_consistent",
+    "description": "|60m trailing return (causal_trailing_return-equivalent via causal_price_at_offset)| >= 0.4% AND all three constituent 20m sub-windows (0-20m, 20-40m, 40-60m ago) agree in sign with the 60m trend. Direction = sign of the 60m return.",
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 60,
+    "seed": 670167
+  },
+  {
+    "name": "trend90_subwindow_agreement",
+    "description": "|90m trailing return| >= 0.5% AND at least 5 of the 6 constituent 15m sub-windows agree in sign with the 90m trend. Direction = sign of the 90m return.",
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 90,
+    "seed": 670168
+  },
+  {
+    "name": "multiwindow_agreement_30_60_90",
+    "description": "30m, 60m, and 90m trailing returns (causal_trailing_return) all share the same sign, with |90m return| >= 0.4%. Direction = shared sign.",
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 90,
+    "seed": 670169
+  }
+]

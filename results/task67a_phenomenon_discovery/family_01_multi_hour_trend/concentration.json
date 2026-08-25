@@ -1,0 +1,56 @@
+{
+  "trend60_slope_consistent": {
+    "n_rows": 5544,
+    "n_positive_rows": 2669,
+    "total_positive_value": 1473.0787754525788,
+    "insufficient_n": false,
+    "n_symbols": 35,
+    "top1_symbol": "STX",
+    "top1_symbol_share": 0.04599938352402088,
+    "top3_symbol_share": 0.13559461453944213,
+    "top3_symbols": [
+      "STX",
+      "INTC",
+      "MU"
+    ],
+    "n_days": 63,
+    "best_day": "2026-07-27 00:00:00+00:00",
+    "best_day_share": 0.0316214206162774
+  },
+  "trend90_subwindow_agreement": {
+    "n_rows": 3609,
+    "n_positive_rows": 1802,
+    "total_positive_value": 1144.456857634251,
+    "insufficient_n": false,
+    "n_symbols": 35,
+    "top1_symbol": "STX",
+    "top1_symbol_share": 0.0647274913431008,
+    "top3_symbol_share": 0.16128707267718748,
+    "top3_symbols": [
+      "STX",
+      "LRCX",
+      "MU"
+    ],
+    "n_days": 63,
+    "best_day": "2026-07-27 00:00:00+00:00",
+    "best_day_share": 0.03021877733374986
+  },
+  "multiwindow_agreement_30_60_90": {
+    "n_rows": 3033,
+    "n_positive_rows": 1364,
+    "total_positive_value": 705.0467774234353,
+    "insufficient_n": false,
+    "n_symbols": 35,
+    "top1_symbol": "CMCSA",
+    "top1_symbol_share": 0.053751983292653856,
+    "top3_symbol_share": 0.1371318961321457,
+    "top3_symbols": [
+      "CMCSA",
+      "MDLZ",
+      "MU"
+    ],
+    "n_days": 63,
+    "best_day": "2026-06-29 00:00:00+00:00",
+    "best_day_share": 0.0357996070802944
+  }
+}

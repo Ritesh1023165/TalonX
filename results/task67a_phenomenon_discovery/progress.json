@@ -28,5 +28,29 @@
     "One low-severity caller-side issue hit and resolved: scripts/download_historical_1m.py does not call load_dotenv() itself, so APCA_API_KEY_ID/APCA_API_SECRET_KEY had to be explicitly exported from .env before invoking it. No script code was modified.",
     "Protected files (talonx_quant/strategy.py, indicators.py, consumer.py, config.py, fprc_v1.py, orpb_v1.py, fprc_v1_shadow.py, orpb_v1_shadow.py) were never opened for writing at any point -- sha256 fingerprints captured in protected_files_fingerprint_manifest.json.",
     "Only new files were added; no existing file (including research/scripts/task60_freeze_fprc_v1.py or any other existing research script) was modified. Nothing was committed or pushed -- git add was never run, per instructions."
-  ]
+  ],
+  "stage1_families_1_2_3": {
+    "task": "67B Step 2 - Stage 1 phenomenon-discovery screening, families 1-3 (multi-hour trend persistence, structural pullback, volatility/range expansion)",
+    "started_utc": "2026-08-25T07:38:00Z",
+    "status": "IN_PROGRESS",
+    "scope": "Families 1, 2, 3 only. Families 4-6 and cross-family synthesis are a separate later agent's scope -- not touched here.",
+    "shared_infrastructure_added": {
+      "research/task67a_lib/family_runner.py": "New shared, family-agnostic orchestration module (dedup -> horizon/MFE-MAE -> matched-control pairing via nearest-time-within-stratum -> per-horizon clustered-bootstrap excess -> concentration -> effect-surface stability check -> economic classification -> data sufficiency -> VerdictInputs/determine_verdict). Built entirely from already-tested research_stats.py/screening_framework.py primitives (imported, not reimplemented). screening_framework.py and research_stats.py themselves were NOT modified.",
+      "tests/test_task67a_family_runner.py": "3 tests: end-to-end smoke test on synthetic pure-random-walk data (asserts the pipeline never falsely verdicts PHENOMENON_PRESENT on data with no real phenomenon by construction), zero-candidate-events robustness, dedup-gap invariant."
+    },
+    "families": {
+      "family_01_multi_hour_trend": {
+        "status": "COMPLETE",
+        "script": "research/scripts/task67a_family01_multi_hour_trend.py",
+        "tests": "tests/test_task67a_family01_multi_hour_trend.py (10 tests)",
+        "definitions": ["trend60_slope_consistent", "trend90_subwindow_agreement", "multiwindow_agreement_30_60_90"],
+        "verdicts": {"trend60_slope_consistent": "WEAK_SIGNAL", "trend90_subwindow_agreement": "WEAK_SIGNAL", "multiwindow_agreement_30_60_90": "WEAK_SIGNAL"},
+        "headline": "All three continuation-of-trend definitions are ECONOMICALLY_TOO_SMALL at the 10bps round-trip friction bar; excess-vs-matched-control is actually NEGATIVE at 60m/120m horizons for 2 of 3 definitions (mild statistically-detectable MEAN REVERSION after a strong same-direction 60-90m move, not continuation) -- a real, non-cherry-picked negative-for-the-hypothesis finding, not dropped.",
+        "runtime_wall_clock": "~3m20s for all 3 definitions on the full 35-symbol/62-day DEVELOPMENT set",
+        "committed": true
+      },
+      "family_02_structural_pullback": {"status": "PENDING"},
+      "family_03_range_expansion": {"status": "PENDING"}
+    }
+  }
 }
