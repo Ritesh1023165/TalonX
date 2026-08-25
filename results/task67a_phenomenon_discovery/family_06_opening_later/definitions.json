@@ -1,0 +1,29 @@
+[
+  {
+    "name": "opening_return_magnitude",
+    "description": "Signal = symbol's own 13:30->14:00 UTC opening-to-close return of the opening window. Condition: |signal| >= global top-tertile cutoff of |signal| across the dataset. Direction = sign(signal). Decision timestamp = first bar at/after 14:00 UTC. Tests continuation vs. mean-reversion of a strong ABSOLUTE opening move into the later session.",
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 1200,
+    "seed": 670667
+  },
+  {
+    "name": "opening_relative_strength_vs_spy",
+    "description": "Signal = symbol's opening-30m return MINUS SPY's opening-30m return, same day (simple raw relative strength, deliberately simpler than a beta-adjusted approach). Condition: |signal| >= global top-tertile cutoff of |signal|. Direction = sign(signal). Decision timestamp = first bar at/after 14:00 UTC. Tests whether RELATIVE (vs. SPY), not absolute, opening strength carries continuation information -- compare against definition A in summary.md.",
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 1200,
+    "seed": 670668
+  },
+  {
+    "name": "opening_relative_volume",
+    "description": "Signal = symbol's opening-30m cumulative volume / that symbol's leave-one-day-out median opening-30m volume (median computed from all OTHER DEVELOPMENT days for that symbol). Condition: relative_volume >= global top-tertile cutoff. Direction = sign of that SAME day's opening-30m return (definition A's signal) -- an explicitly documented simplification conflating volume-magnitude (condition) with direction-source (borrowed from A). Decision timestamp = first bar at/after 14:00 UTC.",
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 1200,
+    "seed": 670669
+  }
+]

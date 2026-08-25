@@ -1,0 +1,450 @@
+{
+  "family": "family_06_opening_later",
+  "question": "Does what happens in the first 30 minutes of RTH (13:30-14:00 UTC) carry information about the LATER session, when used purely as a signal (not traded itself)? The decision/entry timestamp is always placed strictly after the opening window (14:00 UTC).",
+  "data": {
+    "role": "DEVELOPMENT",
+    "n_symbols_universe": 35,
+    "n_trading_days": 62,
+    "date_range": [
+      "2026-05-15",
+      "2026-08-14"
+    ]
+  },
+  "friction_assumption_bps": {
+    "one_way": 5.0,
+    "round_trip": 10.0
+  },
+  "definitions": {
+    "opening_return_magnitude": {
+      "description": "Signal = symbol's own 13:30->14:00 UTC opening-to-close return of the opening window. Condition: |signal| >= global top-tertile cutoff of |signal| across the dataset. Direction = sign(signal). Decision timestamp = first bar at/after 14:00 UTC. Tests continuation vs. mean-reversion of a strong ABSOLUTE opening move into the later session.",
+      "dedup_group_keys": [
+        "symbol"
+      ],
+      "dedup_min_gap_minutes": 1200,
+      "seed": 670667,
+      "n_raw_events": 735,
+      "n_dedup_events": 735,
+      "n_symbols": 35,
+      "n_days": 63,
+      "per_horizon": {
+        "15m": {
+          "horizon_minutes": 15,
+          "n_events": 735,
+          "n_matched_pairs": 735,
+          "raw_mean_pct": -0.026253896765041973,
+          "raw_median_pct": -0.030236780118877402,
+          "positive_return_freq": 0.4816326530612245,
+          "matched_control_mean_pct": 0.04978055802795671,
+          "excess_mean_pct": -0.0760344547929987,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.0760344547929987,
+            "ci_low": -0.14427475496159212,
+            "ci_high": -0.004685634949720232,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670682,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "30m": {
+          "horizon_minutes": 30,
+          "n_events": 735,
+          "n_matched_pairs": 735,
+          "raw_mean_pct": 0.021799494550684,
+          "raw_median_pct": 0.0,
+          "positive_return_freq": 0.4993197278911565,
+          "matched_control_mean_pct": 0.07135848708899412,
+          "excess_mean_pct": -0.049558992538310136,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.049558992538310136,
+            "ci_low": -0.1489936403246939,
+            "ci_high": 0.04902721472666895,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670697,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "60m": {
+          "horizon_minutes": 60,
+          "n_events": 735,
+          "n_matched_pairs": 735,
+          "raw_mean_pct": -0.07788040867580899,
+          "raw_median_pct": -0.07431490942870254,
+          "positive_return_freq": 0.47210884353741495,
+          "matched_control_mean_pct": 0.07820708467151181,
+          "excess_mean_pct": -0.15608749334732078,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.15608749334732078,
+            "ci_low": -0.28383445757557585,
+            "ci_high": -0.030570431642388637,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670727,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "120m": {
+          "horizon_minutes": 120,
+          "n_events": 735,
+          "n_matched_pairs": 735,
+          "raw_mean_pct": -0.08745210278219129,
+          "raw_median_pct": -0.14406528883142872,
+          "positive_return_freq": 0.45850340136054424,
+          "matched_control_mean_pct": 0.08700138656646426,
+          "excess_mean_pct": -0.17445348934865554,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.17445348934865554,
+            "ci_low": -0.30261424191443276,
+            "ci_high": -0.04275333813557849,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670787,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        }
+      },
+      "mfe_pct_median": 0.9459653146051263,
+      "mae_pct_median": 1.0490463215258994,
+      "concentration": {
+        "n_rows": 735,
+        "n_positive_rows": 347,
+        "total_positive_value": 362.6613049975147,
+        "insufficient_n": false,
+        "n_symbols": 35,
+        "top1_symbol": "MU",
+        "top1_symbol_share": 0.0926237082918922,
+        "top3_symbol_share": 0.2439133208468251,
+        "top3_symbols": [
+          "MU",
+          "AMD",
+          "AMAT"
+        ],
+        "n_days": 62,
+        "best_day": "2026-07-15 00:00:00+00:00",
+        "best_day_share": 0.0746727079891233
+      },
+      "effect_surface_instability": false,
+      "effect_surface_instability_reason": "3 populated cells (n>=5): same_sign_frac=0.67 (overall sign=-), max|mean|/median|mean|=1.19.",
+      "economic_classification": "POTENTIALLY_TRADEABLE",
+      "data_sufficiency": "ADEQUATE",
+      "verdict": "PHENOMENON_PRESENT",
+      "verdict_reasoning": "Coherent direction across horizons, matched-control support present, non-trivial economic scale, adequate event count/breadth (temporal AND symbol), stable effect surface, and the clustered-bootstrap CI for excess excludes zero.",
+      "verdict_inputs": {
+        "coherent_direction": true,
+        "matched_control_support": true,
+        "nontrivial_economic_scale": true,
+        "adequate_event_count": true,
+        "temporal_breadth": true,
+        "symbol_breadth": true,
+        "stable_effect_surface": true,
+        "asymmetric_mfe_mae": false,
+        "concentration_low": true,
+        "excess_ci_excludes_zero": true,
+        "data_sufficiency": "ADEQUATE"
+      },
+      "main_weakness": "Checks failing: asymmetric_mfe_mae"
+    },
+    "opening_relative_strength_vs_spy": {
+      "description": "Signal = symbol's opening-30m return MINUS SPY's opening-30m return, same day (simple raw relative strength, deliberately simpler than a beta-adjusted approach). Condition: |signal| >= global top-tertile cutoff of |signal|. Direction = sign(signal). Decision timestamp = first bar at/after 14:00 UTC. Tests whether RELATIVE (vs. SPY), not absolute, opening strength carries continuation information -- compare against definition A in summary.md.",
+      "dedup_group_keys": [
+        "symbol"
+      ],
+      "dedup_min_gap_minutes": 1200,
+      "seed": 670668,
+      "n_raw_events": 735,
+      "n_dedup_events": 735,
+      "n_symbols": 35,
+      "n_days": 63,
+      "per_horizon": {
+        "15m": {
+          "horizon_minutes": 15,
+          "n_events": 735,
+          "n_matched_pairs": 735,
+          "raw_mean_pct": -0.013854070248584174,
+          "raw_median_pct": -0.02132552791136243,
+          "positive_return_freq": 0.48299319727891155,
+          "matched_control_mean_pct": 0.09147412613911204,
+          "excess_mean_pct": -0.10532819638769621,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.10532819638769621,
+            "ci_low": -0.18949574950481693,
+            "ci_high": -0.015537779295714206,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670683,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "30m": {
+          "horizon_minutes": 30,
+          "n_events": 735,
+          "n_matched_pairs": 735,
+          "raw_mean_pct": 0.043725689837706354,
+          "raw_median_pct": 0.015087148131977179,
+          "positive_return_freq": 0.508843537414966,
+          "matched_control_mean_pct": 0.09217436684726399,
+          "excess_mean_pct": -0.048448677009557635,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.048448677009557635,
+            "ci_low": -0.16377184661473632,
+            "ci_high": 0.05951730589219566,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670698,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "60m": {
+          "horizon_minutes": 60,
+          "n_events": 735,
+          "n_matched_pairs": 735,
+          "raw_mean_pct": -0.04863079643132334,
+          "raw_median_pct": -0.06481931615621499,
+          "positive_return_freq": 0.4748299319727891,
+          "matched_control_mean_pct": 0.08046205442143431,
+          "excess_mean_pct": -0.12909285085275765,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.12909285085275765,
+            "ci_low": -0.24629417402709955,
+            "ci_high": -0.006083690620501309,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670728,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "120m": {
+          "horizon_minutes": 120,
+          "n_events": 735,
+          "n_matched_pairs": 735,
+          "raw_mean_pct": -0.07931331623949515,
+          "raw_median_pct": -0.1137749715562585,
+          "positive_return_freq": 0.46530612244897956,
+          "matched_control_mean_pct": 0.11239311154033042,
+          "excess_mean_pct": -0.1917064277798256,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.1917064277798256,
+            "ci_low": -0.32262522788807063,
+            "ci_high": -0.05701840299935771,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670788,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        }
+      },
+      "mfe_pct_median": 0.9162560288601129,
+      "mae_pct_median": 0.9971194327498243,
+      "concentration": {
+        "n_rows": 735,
+        "n_positive_rows": 349,
+        "total_positive_value": 358.72039587274014,
+        "insufficient_n": false,
+        "n_symbols": 35,
+        "top1_symbol": "MU",
+        "top1_symbol_share": 0.08236899148593789,
+        "top3_symbol_share": 0.2223658446310635,
+        "top3_symbols": [
+          "MU",
+          "AMAT",
+          "AMD"
+        ],
+        "n_days": 62,
+        "best_day": "2026-07-15 00:00:00+00:00",
+        "best_day_share": 0.07549306378620588
+      },
+      "effect_surface_instability": false,
+      "effect_surface_instability_reason": "3 populated cells (n>=5): same_sign_frac=0.67 (overall sign=-), max|mean|/median|mean|=1.49.",
+      "economic_classification": "POTENTIALLY_TRADEABLE",
+      "data_sufficiency": "ADEQUATE",
+      "verdict": "PHENOMENON_PRESENT",
+      "verdict_reasoning": "Coherent direction across horizons, matched-control support present, non-trivial economic scale, adequate event count/breadth (temporal AND symbol), stable effect surface, and the clustered-bootstrap CI for excess excludes zero.",
+      "verdict_inputs": {
+        "coherent_direction": true,
+        "matched_control_support": true,
+        "nontrivial_economic_scale": true,
+        "adequate_event_count": true,
+        "temporal_breadth": true,
+        "symbol_breadth": true,
+        "stable_effect_surface": true,
+        "asymmetric_mfe_mae": false,
+        "concentration_low": true,
+        "excess_ci_excludes_zero": true,
+        "data_sufficiency": "ADEQUATE"
+      },
+      "main_weakness": "Checks failing: asymmetric_mfe_mae"
+    },
+    "opening_relative_volume": {
+      "description": "Signal = symbol's opening-30m cumulative volume / that symbol's leave-one-day-out median opening-30m volume (median computed from all OTHER DEVELOPMENT days for that symbol). Condition: relative_volume >= global top-tertile cutoff. Direction = sign of that SAME day's opening-30m return (definition A's signal) -- an explicitly documented simplification conflating volume-magnitude (condition) with direction-source (borrowed from A). Decision timestamp = first bar at/after 14:00 UTC.",
+      "dedup_group_keys": [
+        "symbol"
+      ],
+      "dedup_min_gap_minutes": 1200,
+      "seed": 670669,
+      "n_raw_events": 731,
+      "n_dedup_events": 731,
+      "n_symbols": 35,
+      "n_days": 63,
+      "per_horizon": {
+        "15m": {
+          "horizon_minutes": 15,
+          "n_events": 731,
+          "n_matched_pairs": 731,
+          "raw_mean_pct": -0.06541771928636979,
+          "raw_median_pct": -0.04350128612498452,
+          "positive_return_freq": 0.4692202462380301,
+          "matched_control_mean_pct": 0.09022719239890985,
+          "excess_mean_pct": -0.15564491168527964,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.15564491168527964,
+            "ci_low": -0.21882169261874915,
+            "ci_high": -0.09548394903732026,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670684,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "30m": {
+          "horizon_minutes": 30,
+          "n_events": 731,
+          "n_matched_pairs": 731,
+          "raw_mean_pct": -0.016058559635212685,
+          "raw_median_pct": -0.0045754026354277565,
+          "positive_return_freq": 0.49247606019151846,
+          "matched_control_mean_pct": 0.0870564925533743,
+          "excess_mean_pct": -0.10311505218858698,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.10311505218858698,
+            "ci_low": -0.17499721247557073,
+            "ci_high": -0.031953924850142354,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670699,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "60m": {
+          "horizon_minutes": 60,
+          "n_events": 731,
+          "n_matched_pairs": 731,
+          "raw_mean_pct": -0.08279304981509981,
+          "raw_median_pct": -0.10969889544559071,
+          "positive_return_freq": 0.46785225718194257,
+          "matched_control_mean_pct": 0.0651499713890409,
+          "excess_mean_pct": -0.1479430212041407,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.1479430212041407,
+            "ci_low": -0.26635541130590595,
+            "ci_high": -0.02826973130929725,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670729,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "120m": {
+          "horizon_minutes": 120,
+          "n_events": 731,
+          "n_matched_pairs": 731,
+          "raw_mean_pct": -0.10062993845061978,
+          "raw_median_pct": -0.0920957738352837,
+          "positive_return_freq": 0.46238030095759236,
+          "matched_control_mean_pct": 0.029830569578751322,
+          "excess_mean_pct": -0.13046050802937112,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.13046050802937112,
+            "ci_low": -0.2646223540826944,
+            "ci_high": -0.0022125476904036297,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670789,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        }
+      },
+      "mfe_pct_median": 0.8273532152842502,
+      "mae_pct_median": 0.982891842970877,
+      "concentration": {
+        "n_rows": 731,
+        "n_positive_rows": 342,
+        "total_positive_value": 320.03454779119204,
+        "insufficient_n": false,
+        "n_symbols": 35,
+        "top1_symbol": "QCOM",
+        "top1_symbol_share": 0.07417870762246896,
+        "top3_symbol_share": 0.19229577067493983,
+        "top3_symbols": [
+          "QCOM",
+          "KLAC",
+          "AMAT"
+        ],
+        "n_days": 61,
+        "best_day": "2026-06-29 00:00:00+00:00",
+        "best_day_share": 0.06886768023906413
+      },
+      "effect_surface_instability": false,
+      "effect_surface_instability_reason": "3 populated cells (n>=5): same_sign_frac=1.00 (overall sign=-), max|mean|/median|mean|=1.11.",
+      "economic_classification": "POTENTIALLY_TRADEABLE",
+      "data_sufficiency": "ADEQUATE",
+      "verdict": "PHENOMENON_PRESENT",
+      "verdict_reasoning": "Coherent direction across horizons, matched-control support present, non-trivial economic scale, adequate event count/breadth (temporal AND symbol), stable effect surface, and the clustered-bootstrap CI for excess excludes zero.",
+      "verdict_inputs": {
+        "coherent_direction": true,
+        "matched_control_support": true,
+        "nontrivial_economic_scale": true,
+        "adequate_event_count": true,
+        "temporal_breadth": true,
+        "symbol_breadth": true,
+        "stable_effect_surface": true,
+        "asymmetric_mfe_mae": false,
+        "concentration_low": true,
+        "excess_ci_excludes_zero": true,
+        "data_sufficiency": "ADEQUATE"
+      },
+      "main_weakness": "Checks failing: asymmetric_mfe_mae"
+    }
+  },
+  "family_rollup": "3/3 PHENOMENON_PRESENT, 0/3 WEAK_SIGNAL, 0/3 PHENOMENON_NOT_OBSERVED, 0/3 INSUFFICIENT_DATA -- definitions are NOT averaged into one number; each is reported independently, per the brief.",
+  "continuation_vs_reversal_finding": "Definition A's 60m excess forward return is NEGATIVE (-0.1561%), i.e. strong opens tend to MEAN-REVERT (reversal) into the later session, on this dataset/definition.",
+  "relative_vs_absolute_finding": "Definition A (absolute) 60m excess = -0.1561%; Definition B (relative-to-SPY) 60m excess = -0.1291%. The larger-magnitude excess is definition A (absolute)'s -- see summary.md's side-by-side table for the full horizon comparison and each definition's verdict/economic classification before drawing any conclusion about which (if either) is the cleaner effect.",
+  "total_raw_events": 2201,
+  "total_dedup_events": 2201
+}

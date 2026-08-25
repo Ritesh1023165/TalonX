@@ -1,0 +1,56 @@
+{
+  "opening_return_magnitude": {
+    "n_rows": 735,
+    "n_positive_rows": 347,
+    "total_positive_value": 362.6613049975147,
+    "insufficient_n": false,
+    "n_symbols": 35,
+    "top1_symbol": "MU",
+    "top1_symbol_share": 0.0926237082918922,
+    "top3_symbol_share": 0.2439133208468251,
+    "top3_symbols": [
+      "MU",
+      "AMD",
+      "AMAT"
+    ],
+    "n_days": 62,
+    "best_day": "2026-07-15 00:00:00+00:00",
+    "best_day_share": 0.0746727079891233
+  },
+  "opening_relative_strength_vs_spy": {
+    "n_rows": 735,
+    "n_positive_rows": 349,
+    "total_positive_value": 358.72039587274014,
+    "insufficient_n": false,
+    "n_symbols": 35,
+    "top1_symbol": "MU",
+    "top1_symbol_share": 0.08236899148593789,
+    "top3_symbol_share": 0.2223658446310635,
+    "top3_symbols": [
+      "MU",
+      "AMAT",
+      "AMD"
+    ],
+    "n_days": 62,
+    "best_day": "2026-07-15 00:00:00+00:00",
+    "best_day_share": 0.07549306378620588
+  },
+  "opening_relative_volume": {
+    "n_rows": 731,
+    "n_positive_rows": 342,
+    "total_positive_value": 320.03454779119204,
+    "insufficient_n": false,
+    "n_symbols": 35,
+    "top1_symbol": "QCOM",
+    "top1_symbol_share": 0.07417870762246896,
+    "top3_symbol_share": 0.19229577067493983,
+    "top3_symbols": [
+      "QCOM",
+      "KLAC",
+      "AMAT"
+    ],
+    "n_days": 61,
+    "best_day": "2026-06-29 00:00:00+00:00",
+    "best_day_share": 0.06886768023906413
+  }
+}
