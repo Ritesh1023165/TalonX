@@ -6099,3 +6099,82 @@ retired. No profitability conclusion is made or implied -- this task is readines
 only. Real capital remains structurally unsupported; PR #10 remains draft and unmerged. Next action:
 one clean, full end-to-end PAPER validation session using `run_talonx.py` (not started or scheduled by
 this task; target ~07:00 ET/~12:00 UK), then broad development-only alpha discovery.
+
+## Task 69P — Full Runtime PIV Session (2026-08-25)
+
+> Ran a full end-to-end PAPER session on `research/talonx-strategy-validation` and classified it
+> `V1_PIV_OPERATIONALLY_VALIDATED`: full PAPER runtime works end-to-end, Alpaca IEX live data works,
+> warmup/readiness/stale protection works fail-closed, QuantScanner runs, Redis works, Telegram
+> inbound/outbound works, PAPER broker lifecycle works, EOD reconciliation finishes flat. 35 configured
+> symbols, 17 warmup-ready, 15 session-ready, 14 decision-eligible; zero natural signals; one approved,
+> operator-confirmed `PIV_LIFECYCLE_PROBE` exercised the full order lifecycle since no natural one fired;
+> zero residual broker state; F6_FADE_V1 not integrated; zero alpha evidence. See
+> `results/task69p_full_runtime_piv/` for the full evidence set. (This entry backfilled by Task 69Q,
+> which deeply reviewed this evidence — see below — since Task69P did not itself add a ledger entry.)
+
+## Task 69Q — Post-Task69P Evidence Closure + Pre-Market/Runtime Notification Upgrade (2026-08-25)
+
+> **PURPOSE**: Task69P's full-day review exposed observability/data-quality gaps that would weaken
+> future PAPER profitability evidence if left unfixed, plus a product gap (TalonX going silent from
+> startup until 10:00 ET with nothing to show the operator). This task closed both, without touching
+> strategy semantics, F6, or real capital.
+>
+> **DEEP REVIEW**: All 13 of Task69P's headline claims independently reconfirmed against raw evidence
+> (not just its own summaries) — see `results/task69q_evidence_upgrade/task69p_deep_review.{json,md}`.
+> Found four previously-undocumented gaps beyond the checklist: no candidate-rejection accounting trail;
+> an exit fill emitting a second, misleading `POSITION_OPENED` instead of `POSITION_CLOSED` (broker
+> exposure was always correct/flat — a naming/state defect, not a financial one); `piv_events.jsonl`
+> silently spanning multiple trading dates in one append-only file with no session/date field; and
+> `/ping`'s headline Pipeline status reading an unrelated general-ingest subsystem instead of PIV's own
+> feed. All four fixed this task. A fifth (yfinance warmup failing 18/35 symbols) was assessed with a
+> verified remediation path (a real, read-only Alpaca API call confirmed the account's existing IEX
+> entitlement also covers historical bars, returning hundreds of bars for symbols yfinance failed on)
+> but not migrated — the buffer-integration work is deferred (PRG-07).
+>
+> **NEW EVIDENCE / CODE**: `talonx_piv/events.py` gained `session_id`/`trading_date_et`/
+> `notification_class` fields (auto-stamped by `EventBus.emit`) and execution-economics fields;
+> `talonx_piv/session_identity.py` (new) gives every session a canonical id/config-hash/runtime-sha;
+> `reporting.build_session_report` can now filter to exactly one `trading_date_et` and splits
+> `natural_strategy` from `piv_test_traffic` explicitly. `talonx_piv/decision_engine.py` now taps
+> QuantScanner's existing `rejected_candidates_channel` alongside `signals_channel` (zero changes to
+> protected `talonx_quant/*`) to reconcile `candidates = published + rejected + pending + errored` with
+> an explicit `unaccounted_candidates` check, and plumbs `reference_price`/`stop_price`/`horizon` into
+> `PaperLifecycle.order_intent()` so `talonx_piv/lifecycle.py` can compute real execution economics
+> (slippage, gross/net PnL, gross/net R — only when a stop is actually defined, never fabricated) on
+> every fill, alongside the `POSITION_CLOSED` fix. `talonx_piv/premarket_radar.py` (new) adds
+> observational, ET-canonical (04:00 ET, never UK-clock-driven) `PREMARKET_WATCH`/`_CLEARED`
+> notifications computed only from data already available (gap vs previous close via Alpaca's snapshot
+> endpoint) — structurally incapable of placing an order (no import of `broker.py`/`lifecycle.py` at
+> all). `talonx_dispatch/telegram_listener.py`'s `/ping` Pipeline headline is now PIV-aware (fixed the
+> confirmed general-ingest-conflation finding) and its PIV section shows a live-updated unified view
+> (session id, feed health, funnel counts, natural/probe traffic, radar WATCH count). A rate-limited
+> (≤1/30min) `STATUS_HEARTBEAT` ("No actionable trades. Engine active.") fires during a quiet regular
+> session. `talonx_piv/alpaca_historical_warmup.py` (new, prototype only, not wired into the live warmup
+> path) proves the Alpaca-historical-bars fetch works against the real account/entitlement.
+>
+> **PERMANENT PRODUCT RECORD**: `docs/research/TALONX_PIV_RUNTIME_PRODUCT_TARGET.md` (new) records the
+> ET-canonical session clock, the pre-market three-concepts split (system prep + radar analysis live,
+> actionable pre-market trading deliberately disabled until a validated strategy exists), the target
+> ticker-decision contract shape, and the six-category notification taxonomy, so this direction survives
+> across future tasks.
+>
+> **UPDATED CONCLUSION**: All fixes are additive/non-invasive to `talonx_quant/{strategy,indicators,
+> consumer,config}.py` (zero diff, confirmed) and to F6_FADE_V1/ORPB_V1/FPRC_V1 (unchanged, not
+> integrated). 29 new focused tests pass; two pre-existing test issues fixed as drive-bys (one fixture,
+> one stale assertion predating this task, both confirmed via `git stash` to be independent of this
+> task's changes); full regression: 2060 passed, 1 pre-existing unrelated failure (also confirmed via
+> `git stash`), 1 skipped, 15 xfailed. No real-capital capability introduced. WATCH cannot submit an
+> order (tested at the AST-import level, not just behaviorally). See
+> `results/task69q_evidence_upgrade/` for every contract/gap document.
+>
+> **REASON**: this closes the evidence-quality and operator-visibility gaps Task69P's own review
+> surfaced, without touching alpha/strategy content, so the next live PAPER session's data is actually
+> trustworthy for profitability measurement. See
+> `results/task69q_evidence_upgrade/production_readiness_gaps.json` for every deferred item and
+> `next_live_session_plan.md` for the next session's plan (prepared, not started).
+
+**Scope/deployment**: no alpha change, tuning, threshold adjustment, or ORPB/FPRC/F6_FADE_V1 replay
+occurred in Task69Q; all three remain exactly as before. Real capital remains structurally unsupported.
+Next action: Task70 — accelerated frozen-alpha validation / historical holdout assessment is the
+immediate priority; the next live PAPER session (plan recorded, not started) can run in parallel on
+market days.
