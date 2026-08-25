@@ -317,6 +317,7 @@ class TelegramReplyListener:
             f"\U0001F4BB CPU Usage: {cpu_pct:.1f}%  |  RAM: {mem_used_gb:.1f} GB / {mem_total_gb:.1f} GB",
             f"\U0001F4CA Today's Signals Pushed (UTC day): {pushed_today} Pushes ({total_today} Logs)",
             "",
+            *self._piv_section(),
             *await self._market_section(client),
             "",
             *await self._quant_section(client),
@@ -326,6 +327,28 @@ class TelegramReplyListener:
             *self._session_section(),
         ]
         await self._reply("\n".join(lines), plain=True)
+
+    def _piv_section(self) -> list[str]:
+        """Additive, opt-in block for a PAPER PIV-context caller only
+        (talonx_piv.telegram_inbound.build_piv_telegram_listener passes a
+        `dispatch_agent` shim exposing `piv_info` -- the general
+        run_talonx.py DispatchAgent never sets this attribute, so
+        `getattr(..., None)` is None there and this returns [] --
+        byte-for-byte unchanged /ping output for the general app).
+        Exists because none of the fields below (mode, live feed
+        provider, configured universe) have any other line anywhere in
+        this reply -- everything else here is talonx_ingest/quant/brain/
+        core/dispatch-shaped, not PIV-shaped."""
+        info = getattr(self.dispatch_agent, "piv_info", None)
+        if info is None:
+            return []
+        return [
+            "\U0001F9EA PIV",
+            f"  Mode: {info.get('mode', 'unknown')}",
+            f"  Live feed provider: {info.get('feed_provider', 'unknown')}",
+            f"  Configured universe: {info.get('universe_size', 'unknown')}",
+            "",
+        ]
 
     def _pipeline_status(self, client, market_health: str) -> str:
         """Derived entirely from the market-feed-freshness label

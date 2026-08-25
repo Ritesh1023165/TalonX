@@ -21,21 +21,83 @@ inbound listener conflicts.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from talonx_dispatch.config import DispatchConfig
 from talonx_dispatch.store import AuditStore
 from talonx_dispatch.telegram_listener import TelegramReplyListener
 
 
-def build_piv_telegram_listener(state_dir: Path) -> TelegramReplyListener:
+@dataclass
+class _PivPingContext:
+    """Minimal `dispatch_agent`-shaped shim (Task 69P Telegram parity
+    fix): TelegramReplyListener's /ping only reads `._client` (Redis,
+    for uptime-independent quant/redis-backed metrics),
+    `.started_at` (uptime), `.watchlist_store` (PIV has none -- stays
+    None, already handled as "unknown" by the existing code), and now
+    `.piv_info` (a small dict this class alone introduces -- see
+    telegram_listener.TelegramReplyListener._piv_section). Nothing here
+    changes any existing DispatchAgent code path; this is a new,
+    separate, PIV-only object."""
+
+    _client: Any = None
+    started_at: datetime | None = None
+    watchlist_store: Any = None
+    piv_info: dict | None = None
+    telegram_failed: int = 0
+    long_term_telegram_failed: int = 0
+
+
+def build_piv_telegram_listener(
+    state_dir: Path,
+    *,
+    redis_client: Any = None,
+    started_at: datetime | None = None,
+    feed_mode: str | None = None,
+    universe: tuple[str, ...] = (),
+) -> TelegramReplyListener:
     """PIV-scoped audit DB (under the PIV runtime state dir, not
     ~/.talonx/dispatch_audit.db) so this never shares or corrupts a
-    separately-running full application's own audit trail. dispatch_agent
-    is deliberately None -- see module docstring."""
+    separately-running full application's own audit trail.
+
+    `dispatch_agent` is a `_PivPingContext` shim (not None, as of Task
+    69P) -- reusing the EXISTING TelegramReplyListener/`_handle_ping`
+    implementation unmodified in its general-app behavior (see
+    telegram_listener.py's own additive `_piv_section` gate), while
+    giving /ping real values for uptime, quant/redis-backed metrics
+    (QuantScanner shares this SAME `redis_client`, writing to the same
+    `metrics:{date}:quant:*` keys `_quant_section` already reads), and
+    the PAPER-mode/feed-provider/universe fields this task requires that
+    no other existing /ping field covers. All optional/keyword-only with
+    safe defaults so a caller that doesn't pass them still gets a valid
+    (mostly "unknown") listener, matching the pre-existing degrade
+    posture."""
     config = DispatchConfig(audit_db_path=str(state_dir / "piv_telegram_audit.db"))
     store = AuditStore(config.audit_db_path)
-    return TelegramReplyListener(store, config, dispatch_agent=None)
+    piv_info = {
+        "mode": "PAPER / NO REAL CAPITAL",
+        "feed_provider": _feed_provider_label(feed_mode),
+        "universe_size": len(universe) if universe else "unknown",
+    }
+    agent = _PivPingContext(
+        _client=redis_client, started_at=started_at, piv_info=piv_info,
+    )
+    return TelegramReplyListener(store, config, dispatch_agent=agent)
+
+
+def _feed_provider_label(feed_mode: str | None) -> str:
+    """Human-readable label for the ACTUAL live feed this PIV session is
+    using -- never a hardcoded/stale provider name. `feed_mode` is
+    PivConfig.feed_mode ("RESEARCH_SIP" or "IEX_PAPER_PIV", see
+    talonx_piv/config.py's FEED_MODES/FEED_MODE_PARAM)."""
+    if feed_mode == "IEX_PAPER_PIV":
+        return "Alpaca IEX (PAPER PIV operational feed)"
+    if feed_mode == "RESEARCH_SIP":
+        return "Alpaca SIP (research/canonical feed)"
+    return f"unknown (feed_mode={feed_mode!r})" if feed_mode else "unknown (feed_mode not set)"
 
 
 def telegram_inbound_capable(state_dir: Path) -> tuple[bool, str]:

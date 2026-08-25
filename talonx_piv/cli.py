@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 import sys
 
@@ -95,6 +96,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.no_live_loop:
                 return 0
             decision_engine = None
+            redis_client = None
             if config.decision_path_enabled and not args.no_decision_path:
                 import redis.asyncio as redis_asyncio
                 redis_client = redis_asyncio.from_url(os.environ.get("TALONX_REDIS_URL", "redis://localhost:6379"))
@@ -103,7 +105,10 @@ def main(argv: list[str] | None = None) -> int:
                 config, bus, lifecycle, broker.transport, decision_engine=decision_engine,
                 probe_enabled=args.confirm_piv_lifecycle_probe,
             )
-            listener = None if args.no_telegram_inbound else build_piv_telegram_listener(config.state_dir)
+            listener = None if args.no_telegram_inbound else build_piv_telegram_listener(
+                config.state_dir, redis_client=redis_client, started_at=datetime.now(timezone.utc),
+                feed_mode=config.feed_mode, universe=config.universe,
+            )
             asyncio.run(run_session(runner, listener))
             return 0
         broker.verify_paper_identity()
