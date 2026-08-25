@@ -1,0 +1,32 @@
+{
+  "task": "68A Step 6 - read-only holdout feasibility audit (NOT an F6 performance check)",
+  "explicit_prohibition_observed": "No F6_FADE_V1 return/PnL was computed on any candidate period below. This audit reuses ONLY the exposure classification already established in results/task67a_phenomenon_discovery/exposure_boundary_audit.json and data_split_contract.json (built during Task 67A/67B) -- it does not open, read, or score any candidate period's price data.",
+  "candidates": [
+    {
+      "date_range": "2026-08-25 to 2026-09-22",
+      "prior_download_exposure": "NONE -- per data_split_contract.json, this range was deliberately never materialized/downloaded (data does not exist on disk); it is the already-reserved VALIDATION role.",
+      "prior_strategy_outcome_exposure": "NONE -- no prior task (FPRC_V1, ORPB_V1, or any Task 67 family) ever evaluated any strategy against this range, since the range had not traded as of when DEVELOPMENT/VALIDATION/REPLICATION were split (2026-08-24).",
+      "family6_specific_exposure": "NONE -- Family 6 discovery (Task 67B) ran exclusively on the DEVELOPMENT range (2026-05-15..2026-08-14); this range was never touched by any Family 6 definition, threshold derivation, or the F6_FADE_V1 threshold-freeze computation performed in this task (Task 68A), which also used DEVELOPMENT data only.",
+      "classification": "POTENTIALLY_DEFENSIBLE",
+      "reason": "This is the existing, already-formally-reserved VALIDATION role -- the correct, pre-registered next step per validation_protocol.json. Materializing it before 2026-09-23 (i.e. before the whole range has actually traded) would violate the data-split contract and must not be done."
+    },
+    {
+      "date_range": "2026-09-23 to 2026-10-21",
+      "prior_download_exposure": "NONE -- reserved REPLICATION role, entirely in the future relative to both today (2026-08-25) and the DEVELOPMENT range.",
+      "prior_strategy_outcome_exposure": "NONE, for the same reason as above.",
+      "family6_specific_exposure": "NONE, for the same reason as above.",
+      "classification": "POTENTIALLY_DEFENSIBLE",
+      "reason": "Correctly sequenced AFTER validation, per validation_protocol.json's explicit replication_gate -- forbidden to use unless Task 69 returns VALIDATION_PASS on the 2026-08-25..2026-09-22 window first."
+    },
+    {
+      "date_range": "2025-08-15 to 2026-05-14 (the Task 7B 10-symbol full-year window, excluding the DEVELOPMENT sub-range already used)",
+      "prior_download_exposure": "HEAVY -- per exposure_boundary_audit.json, this is Task 7B's canonical dataset, replayed directly by Tasks 8-21/26/36, and the source several later 35-symbol windows (Task 37/38/41/46/53/54/56/58) were carved/sliced from.",
+      "prior_strategy_outcome_exposure": "HEAVY -- FPRC_V1 and ORPB_V1 development/validation both drew from overlapping portions of this broader window (per exposure_boundary_audit.json's date-by-date exposure table).",
+      "family6_specific_exposure": "NONE directly (Family 6 itself never ran here), but the underlying price data has been extensively inspected by prior RSI/MACD/MA/FPRC/ORPB research, which is exactly the kind of general-purpose contamination Task 67A's audit found could not be avoided anywhere in this repo's pre-2026-08-15 history.",
+      "classification": "CONTAMINATED",
+      "reason": "Reusing this window for F6 validation/replication would violate the 'genuinely unseen' requirement even though Family 6 itself never scored it -- prior extensive human/model attention to this exact price data is a soft form of contamination the data-split contract was designed to avoid. Not considered a candidate."
+    }
+  ],
+  "conclusion": "Two genuinely defensible candidates already exist and are already correctly sequenced: VALIDATION (2026-08-25..2026-09-22, usable once fully traded, i.e. not before 2026-09-23) then REPLICATION (2026-09-23..2026-10-21, gated on VALIDATION_PASS). No further historical-window archaeology was performed or needed within this task's time budget -- the forward-reserved windows from Task 67A/67B already satisfy Step 6's requirement of identifying >=2 candidates without any new investigation.",
+  "deferred": "A deeper audit of whether any OTHER historical window (pre-2025-01-24, if any exists in this account's data entitlement) might be defensible was not attempted -- deferred, per the task's own time-boxing guidance ('do not spend hours on archaeology'; 'if uncertain by 13:30, leave as UNKNOWN and defer'). Not expected to be needed given the two already-reserved windows above are sufficient for the Task 69 -> replication sequence."
+}

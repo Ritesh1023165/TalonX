@@ -1,0 +1,25 @@
+{
+  "task": "68A development-only implementation verification",
+  "purpose": "Proves F6_FADE_V1 executes correctly on real DEVELOPMENT data -- NOT a re-discovery search, NOT a validation/backtest result, NOT used to retune the frozen rule.",
+  "strategy_fingerprint": "6beb8eebe50053aae27cab90226534b5d4392c46bd6e9c094873f7ad37466084",
+  "development_period": {
+    "start": "2026-05-15",
+    "end": "2026-08-14"
+  },
+  "n_candidate_symbol_days": 2205,
+  "n_trades_generated": 735,
+  "n_rejections": 1470,
+  "rejection_reason_counts": {
+    "OPENING_MOVE_BELOW_THRESHOLD": 1470
+  },
+  "n_symbols_traded": 35,
+  "n_days_traded": 63,
+  "n_long": 360,
+  "n_short": 375,
+  "gross_return_mean_pct": 0.059554175125481335,
+  "net_return_mean_pct_at_10bps": -0.040445824874518685,
+  "positive_net_return_frequency": 0.49115646258503404,
+  "determinism_check_rerun_identical": true,
+  "note_on_counts_vs_task67b": "n_trades (735 minus a small number of NO_NEXT_BAR_FOR_ENTRY/NO_VALID_EXIT rejections from the added one-bar entry delay) is expected to be close to but not exactly Task 67B's screening n=735, since F6_FADE_V1 deliberately adds a one-bar entry delay (Step 1F causal-safety requirement) that Task 67B's own screening did not apply. This is an intentional, documented divergence, not a bug -- see f6_fade_v1_spec.json entry_rule.",
+  "not_a_validation_result": "This is DEVELOPMENT-data implementation verification only. No conclusion about profitability should be drawn from gross/net_return_mean_pct above -- see validation_protocol.json for the actual pre-registered Task 69 test."
+}

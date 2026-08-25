@@ -1,0 +1,15 @@
+{
+  "strategy_id": "F6_FADE_V1",
+  "strategy_version": "1.0.0",
+  "fingerprint_method": "sha256 over canonical (sorted-key, compact-separator) JSON of every f6_fade_v1_spec.json top-level field EXCEPT the provenance/prose fields listed in fingerprint.py's _EXCLUDED_FIELDS.",
+  "excluded_fields": [
+    "cost_rationale",
+    "development_dataset_identity_or_hash",
+    "holding_period_rationale",
+    "selection_rationale",
+    "source_task67b_sha",
+    "spec_created_at"
+  ],
+  "fingerprint": "6beb8eebe50053aae27cab90226534b5d4392c46bd6e9c094873f7ad37466084",
+  "spec_path": "C:\\workspace\\TalonX-alpha-phenomenon-discovery\\results\\task68_f6_freeze\\f6_fade_v1_spec.json"
+}

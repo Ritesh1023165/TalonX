@@ -1,0 +1,48 @@
+{
+  "task": "68A - Freeze and implement F6_FADE_V1",
+  "status": "COMPLETE",
+  "strategy_id": "F6_FADE_V1",
+  "strategy_fingerprint": "6beb8eebe50053aae27cab90226534b5d4392c46bd6e9c094873f7ad37466084",
+  "source_task67b_sha": "926fb01d6992684d67ca70a2c5cf5a678be2bf92",
+  "selected_definition": "opening_return_magnitude (Family 6 definition A)",
+  "spec_files": ["f6_fade_v1_spec.json", "f6_fade_v1_spec.md", "f6_fade_v1_fingerprint.json"],
+  "implementation": {
+    "location": "research/task68_f6/ (strategy.py, evaluator.py, fingerprint.py)",
+    "isolated_from_production": true,
+    "no_protected_files_modified": true
+  },
+  "tests": {
+    "focused_new": "tests/test_task68_f6_fade_v1.py, 20/20 passing",
+    "combined_with_task67_suite": "144/144 passing (tests/test_task67a_*.py + tests/test_task68_f6_fade_v1.py)",
+    "broader_regression": "not attempted -- deferred per Task 67B's already-documented environment gap (no project venv in this worktree; unrelated to Task 68A code) and per this task's own instruction not to run large suites before the live session"
+  },
+  "development_verification": {
+    "file": "development_implementation_verification.json",
+    "n_trades": 735,
+    "matches_task67b_screening_count": true,
+    "determinism_confirmed": true,
+    "gross_direction_consistent_with_discovery": true,
+    "net_at_10bps_slightly_negative": "consistent with Task 67B's own POTENTIALLY_TRADEABLE-but-thin-vs-friction classification -- expected, not debugged/retuned"
+  },
+  "validation_protocol": {
+    "files": ["validation_protocol.json", "validation_protocol.md"],
+    "dataset_role": "UNSEEN_HOLDOUT = VALIDATION (2026-08-25..2026-09-22), not materializable before 2026-09-23",
+    "pass_fail_inconclusive_criteria_pre_registered": true
+  },
+  "holdout_feasibility": {
+    "file": "holdout_feasibility.json",
+    "candidates_identified": 2,
+    "f6_returns_computed_on_candidates": false,
+    "note": "Both candidates are the already-reserved VALIDATION/REPLICATION windows from Task 67A/67B; no new archaeology was needed"
+  },
+  "integrity": {
+    "validation_outcome_accessed": false,
+    "replication_outcome_accessed": false,
+    "protected_files_changed": false,
+    "runtime_worktree_changed": false,
+    "fprc_orpb_changed": false,
+    "synthetic_data_used": "only in tests/test_task68_f6_fade_v1.py's synthetic fixtures -- never in development_implementation_verification.json, which used only real DataSplitGuard-gated DEVELOPMENT bars",
+    "real_capital_supported": false
+  },
+  "alpha_status": "UNPROVEN"
+}

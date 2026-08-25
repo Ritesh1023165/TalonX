@@ -1,0 +1,60 @@
+{
+  "strategy_id": "F6_FADE_V1",
+  "strategy_version": "1.0.0",
+  "family": "family_06_opening_later",
+  "research_role": "FROZEN_CANDIDATE_AWAITING_VALIDATION",
+  "development_period": {"start": "2026-05-15", "end": "2026-08-14"},
+  "universe": [
+    "AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX",
+    "ADBE", "ADI", "AMAT", "AVGO", "BKNG", "CMCSA", "COST", "CSCO", "GILD", "HON",
+    "INTC", "INTU", "ISRG", "KLAC", "LRCX", "MDLZ", "MU", "NFLX", "PANW", "PEP",
+    "QCOM", "REGN", "SBUX", "TXN", "VRTX"
+  ],
+  "opening_window_et": {"start": "09:30", "end": "10:00", "note": "13:30-14:00 UTC; frozen in UTC clock time (see timezone_rule), ET shown for readability only"},
+  "opening_measure_formula": "opening_return = (window_close - window_open) / window_open, where window_open = the FIRST bar's own `open` print inside [13:30, 14:00) UTC and window_close = the LAST bar's own `close` print inside that same window, for a given (symbol, trading_day). Window requires >= 20 bars (of a nominal 30) or the day/symbol fails closed with DATA_NOT_READY. Identical formula to Task 67B family_06_opening_later's `_opening_window_agg` / definition A (research/scripts/task67a_family06_opening_later.py).",
+  "selected_family6_definition": "opening_return_magnitude (definition A)",
+  "selection_rationale": "Chosen over definition B (opening_relative_strength_vs_spy) and definition C (opening_relative_volume) because: (1) simplest causal implementation -- single-symbol signal, no cross-asset (SPY) alignment dependency, no leave-one-day-out volume normalization dependency, both of which add extra failure surface and extra data requirements a frozen live rule would rather avoid; (2) broadest/cleanest evidence -- all three defs reached PHENOMENON_PRESENT with the same qualitative (mean-reversion) finding, and per family_06's own summary.json `relative_vs_absolute_finding`, definition A had the marginally LARGER-magnitude 60m excess (-0.1561% vs definition B's -0.1291%) while both were CI-excluding-zero and stable; (3) NOT selected because it produced the single best DEVELOPMENT return -- it is not the best-performing cell in any parameter sweep (no sweep was run), it is the simplest, most broadly corroborated, and least fragile of three independently-PRESENT definitions.",
+  "signal_threshold": {
+    "value": 0.013391316345271645,
+    "unit": "absolute fraction of opening_return (i.e. 1.3391316345271644%)",
+    "derivation": "The exact 2/3 (top-tertile) quantile of |opening_return| across all (symbol, trading_day) pairs in the DEVELOPMENT dataset with a valid (>=20-bar) opening window, computed via research/scripts/task67a_family06_opening_later.py's exact SIGNAL_TOP_TERTILE_QUANTILE=2/3 logic, reproduced and verified to yield the same n=735 qualifying events reported in Task 67B. FROZEN as this fixed numeric constant -- F6_FADE_V1 does NOT recompute a quantile from whatever dataset it is later run against; that would be a different, non-causal, dataset-dependent procedure (a live/validation run cannot know its own future distribution). Condition: |opening_return| >= 0.013391316345271645."
+  },
+  "signal_direction_semantics": {
+    "raw_open_direction": "sign(opening_return)",
+    "trade_direction": "FADE (opposite of raw_open_direction): opening_return > 0 (strong up-open) => SHORT; opening_return < 0 (strong down-open) => LONG.",
+    "symmetry_basis": "Task 67B's reported statistic pools both up-open and down-open events into ONE direction-adjusted excess figure (via a sign(opening_return)-based continuation-direction adjustment that is symmetric by construction), and that pooled statistic is coherently NEGATIVE (mean-reversion) across all 4 horizons with the 60m/120m clustered-bootstrap CI excluding zero. This structurally supports a symmetric fade rule for both directions -- it is not an invented extension. LIMITATION (documented, not resolved here): Task 67B did not separately report an up-open-only vs down-open-only subgroup breakdown, so per-sign symmetry is inherited from the pooling convention, not independently confirmed subgroup-by-subgroup. Task 69's validation output should include a signed breakdown if practical, as a check on this assumption -- not a requirement for VALIDATION_PASS."
+  },
+  "decision_time_et": "10:00 ET (2026-08-25 is within US DST / EDT, UTC-4)",
+  "decision_time_utc": "14:00:00 UTC",
+  "decision_time_uk": "15:00 BST (2026-08-25 is within UK DST / BST, UTC+1)",
+  "decision_time_rule": "The frozen anchor is the UTC CLOCK TIME 14:00:00, not the ET/UK labels (which are DST-dependent and shown for human readability only). decision_bar = the first bar with timestamp >= 14:00:00 UTC for a given (symbol, trading_day) -- exactly the 14:00 UTC bar whenever 1-minute coverage is continuous there, the next available bar on a rare data-gap day (identical rule to Task 67B family_06). The opening-window signal itself is fully determined by 14:00:00 UTC (the window [13:30,14:00) UTC has already closed), so the decision uses only completed, causal information -- it does not need to wait for decision_bar itself to close.",
+  "entry_rule": {
+    "entry_bar": "The bar STRICTLY AFTER decision_bar for the same (symbol, trading_day) -- i.e. entry is delayed one additional bar past the decision anchor, even though the underlying signal was already fully known at 14:00:00 UTC. This is a deliberate, more conservative divergence from Task 67B's own screening convention (which used the decision bar's OWN close as entry_price, a same-bar assumption) -- required by Task 68A Step 1F ('No same-bar lookahead... Entry must be next tradable bar/open after decision if decision uses bar close').",
+    "rejection_if_missing": "NO_NEXT_BAR_FOR_ENTRY if no bar exists after decision_bar for that (symbol, trading_day) (e.g. decision_bar is the session's last bar)."
+  },
+  "entry_price_semantics": "entry_price = entry_bar's own `open` print (the first tradable price after the decision is fully causally available).",
+  "exit_rule": {
+    "policy": "FIXED_TIME_EXIT",
+    "target": "entry_timestamp + 60 minutes",
+    "mechanism": "exit_bar = the LAST bar with timestamp <= min(entry_timestamp + 60min, session_close_utc_for_that_day) -- i.e. a fixed 60-minute causal time exit, capped at RTH close (20:00 UTC) so no position is ever held past session end. exit_price = exit_bar's own `close` print. exit_reason = 'FIXED_60M_EXIT' (normal) or 'SESSION_CLOSE_EXIT' (capped by RTH close, only possible for a decision very late in the session).",
+    "rejection_if_missing": "NO_VALID_EXIT if no bar exists in (entry_timestamp, exit_target] at all."
+  },
+  "holding_period_minutes": 60,
+  "holding_period_rationale": "60m chosen over 120m: Task 67B's own results show BOTH 60m (excess -0.1561%, CI [-0.284%,-0.031%]) and 120m (excess -0.1745%, CI [-0.303%,-0.043%]) exclude zero with a coherent sign, so either is discovery-consistent. 60m is preferred for ROBUSTNESS/SIMPLICITY, not because it produced a better DEVELOPMENT number (120m's raw excess magnitude is nominally LARGER, so this choice is explicitly NOT a best-P&L pick): a shorter fixed exposure window is a simpler, lower-inventory-risk rule, the incremental excess gained by holding an extra 60 minutes (-0.174% vs -0.156%, ~0.018 percentage points) is modest relative to more than doubling market exposure duration, and a shorter horizon leaves more of each RTH session available for the one-trade-per-symbol-per-session rule to apply without approaching session close.",
+  "overnight_allowed": false,
+  "stop_rule": "NONE. Task 67B's discovery phase never established or tested any stop-loss / protective-exit mechanism -- MFE/MAE were computed only as descriptive diagnostics (using trailing_vol_60m as a generic R-unit for that diagnostic), not as a causal, validated risk unit. Per Task 68A Step 1H, no stop is invented or tuned here merely to improve results. F6_FADE_V1 is a pure fixed-time-exit rule with no protective stop.",
+  "sizing_rule": "NORMALIZED_NOTIONAL_1_UNIT -- no risk-based position sizing model was established during discovery (no defensible causal risk unit exists per stop_rule above), so all returns are reported as a percentage/bps of entry notional (1 normalized unit, no leverage), not as R-multiples.",
+  "max_positions_per_symbol_session": 1,
+  "pyramiding_allowed": false,
+  "dedup_rule": "At most one candidate signal per (symbol, trading_day): decision_bar is anchored to a single fixed clock time (14:00 UTC) per day, so at most one candidate naturally exists per symbol per day already (matching Task 67B family_06's own dedup_min_gap_minutes=1200 formality). A DUPLICATE_SIGNAL rejection reason exists defensively in the output contract for the pathological case of a symbol/day generating more than one candidate row.",
+  "data_readiness_rule": "Fail closed at every stage: (1) opening window must have >= 20 bars of the nominal 30 in [13:30,14:00) UTC, else DATA_NOT_READY; (2) decision_bar must exist, else DATA_NOT_READY; (3) entry_bar (next bar after decision_bar) must exist, else NO_NEXT_BAR_FOR_ENTRY; (4) exit_bar must exist, else NO_VALID_EXIT.",
+  "missing_data_rule": "No interpolation, no forward-fill, no synthetic/fabricated prices anywhere in this pipeline. A missing/insufficient input produces an explicit rejection row (data_ready=false, rejection_reason set), never a fabricated trade.",
+  "primary_cost_bps": 10.0,
+  "diagnostic_cost_bps": [0.0, 5.0, 10.0],
+  "cost_rationale": "Reused unchanged from the Task 67 screening convention (research/task67a_lib/screening_framework.py's ROUND_TRIP_FRICTION_BPS=10.0, ONE_WAY_FRICTION_BPS=5.0) -- a deliberately conservative reference for these liquid large/mega-cap names, not re-derived or loosened here.",
+  "timezone_rule": "All internal timestamps are UTC, tz-aware, throughout the evaluator (input bars, decision_timestamp, entry_timestamp, exit_timestamp). The strategy's operative anchor (14:00:00 UTC) is a fixed UTC clock time -- ET/UK labels in this spec are descriptive only, computed for the 2026-08-25 DST regime (US EDT = UTC-4, UK BST = UTC+1) and are NOT re-derived per-date by the evaluator; if ever applied outside this DST alignment, the UTC anchor remains authoritative and unchanged.",
+  "calendar_rule": "No synthetic trading-calendar assumptions -- trading days are exactly whatever (symbol, date) pairs are present in the input bars. A symbol/day with no data is simply absent from the candidate set, not treated as a holiday/non-trading day by any external calendar source (this repo has no trading-calendar source of truth, per data_split_contract.json's prior finding).",
+  "spec_created_at": "2026-08-25T11:24:00Z",
+  "source_task67b_sha": "926fb01d6992684d67ca70a2c5cf5a678be2bf92",
+  "development_dataset_identity_or_hash": "becad22265f487a2dd26f417bf9cd924ed1e0f996c9d78aff6a99f69e97298e1 (data/historical_1m/task67a_development/, per results/task67a_phenomenon_discovery/data_split_contract.json's dataset_fingerprint_sha256 -- reused, not recomputed)"
+}
