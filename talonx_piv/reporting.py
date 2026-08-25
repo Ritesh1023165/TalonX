@@ -11,10 +11,22 @@ ANOMALY_CLASSES = (
 )
 
 
-def build_session_report(event_path: Path, reconciliation: dict, feed_mode: str | None = None) -> dict:
+def build_session_report(
+    event_path: Path, reconciliation: dict, feed_mode: str | None = None,
+    *, trading_date_et: str | None = None, session_id: str | None = None,
+    quant_funnel: dict | None = None,
+) -> dict:
+    """trading_date_et (Task 69Q Part 2): when given, scopes every count
+    below to just that America/New_York calendar date -- piv_events.jsonl
+    is append-only and can span multiple trading dates (confirmed in
+    Task69P's raw evidence), so a report built without this filter risks
+    silently mixing e.g. 2026-08-24 and 2026-08-25 activity. Omit it only
+    for legacy/whole-file callers that intentionally want the full history."""
     rows = []
     if event_path.exists():
         rows = [json.loads(line) for line in event_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if trading_date_et is not None:
+        rows = [row for row in rows if row.get("trading_date_et") == trading_date_et]
     counts = Counter(row["event"] for row in rows)
     data_issues = counts["DATA_NOT_READY"] + counts["STALE_DATA"]
     execution_drift = len(reconciliation.get("unexpected_broker_symbols", [])) + len(reconciliation.get("missing_broker_symbols", []))
@@ -23,7 +35,24 @@ def build_session_report(event_path: Path, reconciliation: dict, feed_mode: str 
     elif data_issues: classification = "DATA_ISSUE"
     elif counts["BROKER_ERROR"]: classification = "REVIEW_REQUIRED"
     resolved_feed_mode = feed_mode or (rows[0].get("feed_mode") if rows else None)
-    return {
+
+    # Task 69Q Part 4: natural (source=STRATEGY) vs PIV probe traffic must
+    # never be conflated into one statistic -- see events.py's source field.
+    execution_event_types = {
+        "ORDER_INTENT", "PAPER_ORDER_SUBMITTED", "PAPER_ORDER_ACCEPTED", "PAPER_ORDER_REJECTED",
+        "PAPER_ORDER_CANCELLED", "PARTIAL_FILL", "FILLED", "POSITION_OPENED", "POSITION_CLOSED",
+    }
+    natural_rows = [row for row in rows if row.get("source") == "STRATEGY"]
+    probe_rows = [row for row in rows if row.get("source") == "PIV_LIFECYCLE_PROBE"]
+    natural_counts = Counter(row["event"] for row in natural_rows if row["event"] in execution_event_types)
+    probe_counts = Counter(row["event"] for row in probe_rows if row["event"] in execution_event_types)
+    closed_natural = [row for row in natural_rows if row.get("event") == "POSITION_CLOSED"]
+    gross_pnls = [row["gross_pnl"] for row in closed_natural if row.get("gross_pnl") is not None]
+    net_pnls = [row["net_pnl"] for row in closed_natural if row.get("net_pnl") is not None]
+
+    result = {
+        "session_id": session_id,
+        "trading_date_et": trading_date_et,
         "classification": classification,
         "feed_mode": resolved_feed_mode,
         "canonical_alpha_evidence": resolved_feed_mode == "RESEARCH_SIP",
@@ -40,4 +69,21 @@ def build_session_report(event_path: Path, reconciliation: dict, feed_mode: str 
         "telegram_delivery_status": "see runtime counters/logs",
         "broker_internal_reconciliation": reconciliation,
         "paper_pnl": None, "gross_R": None, "cost_R": None,
+        "natural_strategy": {
+            "candidates_published": counts["SIGNAL"] if not natural_rows else sum(1 for r in natural_rows if r["event"] == "SIGNAL"),
+            "orders": natural_counts["PAPER_ORDER_SUBMITTED"], "fills": natural_counts["FILLED"] + natural_counts["PARTIAL_FILL"],
+            "positions_opened": natural_counts["POSITION_OPENED"], "positions_closed": natural_counts["POSITION_CLOSED"],
+            "gross_pnl": sum(gross_pnls) if gross_pnls else (0.0 if closed_natural else None),
+            "net_pnl": sum(net_pnls) if net_pnls else (0.0 if closed_natural else None),
+        },
+        "piv_test_traffic": {
+            "orders": probe_counts["PAPER_ORDER_SUBMITTED"], "fills": probe_counts["FILLED"] + probe_counts["PARTIAL_FILL"],
+            "positions_opened": probe_counts["POSITION_OPENED"], "positions_closed": probe_counts["POSITION_CLOSED"],
+            "alpha_evidence": False,
+        },
     }
+    if quant_funnel is not None:
+        result["quant_funnel"] = quant_funnel
+        if quant_funnel.get("unaccounted_candidates", 0):
+            result["quant_funnel_flag"] = "UNACCOUNTED_CANDIDATES_DETECTED"
+    return result
