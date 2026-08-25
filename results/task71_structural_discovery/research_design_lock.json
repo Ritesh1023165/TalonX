@@ -1,0 +1,86 @@
+{
+  "lock": "TASK71_RESEARCH_DESIGN_LOCK",
+  "locked_before_any_new_outcome": true,
+  "locked_at_utc": "2026-08-25T00:00:00Z",
+  "purpose": "Constrain Task71 discovery to a predeclared, bounded search before any new family outcome is computed -- prevents an unconstrained hunt for whatever looks profitable and bounds multiple-testing exposure by construction.",
+  "families": [
+    {
+      "id": "FAMILY_A", "name": "AVWAP_FLOW_STATE",
+      "hypothesis": "Price behavior relative to a causally-computed session-anchored VWAP differentiates continuation from exhaustion/reversion.",
+      "directions_no_pooling": ["AVWAP_CONTINUATION_LONG", "AVWAP_CONTINUATION_SHORT", "AVWAP_REVERSION_LONG", "AVWAP_REVERSION_SHORT"],
+      "decision_time_et": "11:00",
+      "decision_time_rationale": "~90 minutes of causal AVWAP formation after 09:30 ET open -- enough for the anchor to be economically meaningful, still well before the 13:30 dynamic-cutoff ceiling for a 120m/180m horizon capped at 15:50 ET flatten.",
+      "variables": ["distance_from_avwap_normalized_by_intraday_realized_vol", "extension_direction", "volume_expansion_vs_trailing_average"],
+      "predeclared_threshold_bands": [1.0, 2.0],
+      "threshold_unit": "vol-normalized distance from session AVWAP (distance / trailing-20-bar realized volatility of 1m returns, in units of that volatility)",
+      "not_hardcoded": "No single sigma value is treated as THE threshold -- both bands are evaluated and a response surface (not a single point) is reported."
+    },
+    {
+      "id": "FAMILY_B", "name": "OVERNIGHT_GAP_CONTINUATION",
+      "honest_naming_note": "NOT called PEAD -- see event_data_audit.json Part 17. This repo has no verified, causal, timestamped historical earnings-surprise dataset; using 'PEAD' would imply event attribution this data cannot support.",
+      "hypothesis": "An overnight gap (session close -> next session open, using premarket data where available) persists/continues into the regular session, independent of the specific catalyst.",
+      "directions_no_pooling": ["GAP_CONTINUATION_LONG", "GAP_CONTINUATION_SHORT"],
+      "decision_time_et": "09:30 (regular open)",
+      "variables": ["gap_magnitude_pct", "premarket_return_pct", "premarket_volume_vs_trailing_average", "gap_relative_to_spy"],
+      "predeclared_gap_threshold_bands_pct": [1.0, 2.0],
+      "horizons_minutes_or_label": [120, 180, "EOD", "NEXT_DAY_CLOSE", "3_DAY_CLOSE"],
+      "horizon_note": "next-day/3-day horizons are MULTI_DAY -- reported and diagnosed completely separately from intraday statistics, per Part 8/19."
+    },
+    {
+      "id": "FAMILY_C", "name": "IDIOSYNCRATIC_RESIDUAL_MOMENTUM",
+      "hypothesis": "Stock-specific residual movement beyond market-model-implied movement (R_stock - beta*R_SPY) persists over subsequent minutes/hours.",
+      "directions_no_pooling": ["RESIDUAL_MOMENTUM_LONG", "RESIDUAL_MOMENTUM_SHORT"],
+      "beta_estimation": "Trailing 20-trading-day daily-close-to-close OLS beta vs SPY, estimated using ONLY data strictly before the trading day being evaluated -- recomputed once per (symbol, day), never using same-day or future data.",
+      "decision_time_et": "11:00",
+      "residual_measurement_window": "09:30-11:00 ET same-day residual (stock's actual 09:30->11:00 return minus beta * SPY's 09:30->11:00 return)",
+      "variables": ["residual_magnitude_pct", "volume_confirmation"],
+      "predeclared_threshold_bands_pct": [0.75, 1.5],
+      "threshold_unit": "absolute residual return, percent",
+      "horizons_minutes_or_label": [60, 120, 180, "EOD"]
+    },
+    {
+      "id": "FAMILY_D", "name": "FAILED_STRUCTURAL_BREAK",
+      "honest_naming_note": "Called FAILED_STRUCTURAL_BREAK, not 'liquidity trap' -- no order-book/liquidity mechanics data exists to support that label.",
+      "hypothesis": "A failed penetration of a meaningful prior structural level (prior-day high/low) produces a reversal.",
+      "directions_no_pooling": ["FAILED_BREAK_REVERSAL_LONG", "FAILED_BREAK_REVERSAL_SHORT"],
+      "structural_levels": ["prior_trading_day_high", "prior_trading_day_low"],
+      "variables": ["penetration_depth_pct", "time_beyond_level_minutes", "reclaim_confirmed"],
+      "predeclared_reclaim_confirmation_window_minutes": [15, 30],
+      "horizons_minutes_or_label": [30, 60, 120]
+    }
+  ],
+  "fifth_family_declared": false,
+  "fifth_family_note": "The forensic audit (Part 1) did not surface a materially new structural opportunity beyond A-D that isn't already a variant of one of them -- no fifth family is declared. This decision is made HERE, before any Family A-D outcome is computed, per Part 6's own requirement not to add families after seeing weak results.",
+  "cost_levels_bps": [0, 5, 10, 15, 20],
+  "long_short_separation": "MANDATORY, no pooling anywhere in this task -- see Part 10.",
+  "development_datasets": {
+    "policy": "Broaden DEVELOPMENT using already-contaminated historical periods (2025-01-24..2026-08-14) only -- see development_universe_audit.json for the exact slices selected and their provenance. The remaining clean 2024 territory is NEVER touched in Task71.",
+    "existing_slice_reused": "data/historical_1m/task67a_development/ (2026-05-15..2026-08-14, 35 symbols, already on disk, F6's own original DEVELOPMENT window)",
+    "new_slices_to_materialize": "see development_data_manifest.json for exact dates -- selected for calendar/regime diversity across the already-contaminated 2025-01-24..2026-08-14 range, NOT for their content (no outcome is computed before slice selection)."
+  },
+  "stability_tests": [
+    "time_stability: early/middle/late (and any materially distinct regime slice) segments per Part 15 -- sign consistency preferred over magnitude",
+    "parameter_stability: response surface across both predeclared threshold bands per family -- prefer broad same-sign plateau, downrank an isolated single-band winner",
+    "dependence_diagnostics: cluster-by-symbol AND cluster-by-day bootstrap CIs (research_stats.bootstrap_ci_clustered) for every promising cell -- report the WEAKER interpretation if they materially differ",
+    "concentration_diagnostics: top1/top3 symbol and day contribution (research_stats.concentration_metrics) for every promising cell",
+    "regime_conditioning: SPY-direction/SPY-realized-vol context reported as a DEVELOPMENT response-surface variable, never as a post-hoc rescue filter"
+  ],
+  "nomination_criteria_ref": "See Part 21 of the task instructions -- reproduced verbatim in candidate_ranking.md's own header. All 15 conditions apply; none are loosened here or later.",
+  "complexity_penalty": {
+    "method": "For every family/direction combination surviving to candidate_ranking.csv, record number_of_required_conditions, number_of_tuned_numeric_parameters, number_of_data_sources. A combination requiring materially more conditions/parameters/sources than a comparable alternative is downranked, not automatically rejected.",
+    "not_a_hard_gate": true
+  },
+  "number_of_family_parameter_hypotheses_predeclared": {
+    "FAMILY_A": "4 directions x 2 threshold bands x 3 horizons (30/60/120m) = 24 cells",
+    "FAMILY_B": "2 directions x 2 gap-threshold bands x 5 horizons (120m/180m/EOD/next-day/3-day) = 20 cells",
+    "FAMILY_C": "2 directions x 2 threshold bands x 4 horizons (60/120/180m/EOD) = 16 cells",
+    "FAMILY_D": "2 directions x 2 reclaim-window bands x 3 horizons (30/60/120m) = 12 cells",
+    "total_predeclared_cells": 72,
+    "note": "This is the full predeclared grid size for the multiple-testing count in multiple_testing_summary.json -- every cell that is actually computed is counted, whether or not it looks promising. No cell is silently dropped from the count after seeing its result."
+  },
+  "candidate_count_limit": "AT MOST ONE primary candidate (PRIMARY_CANDIDATE_READY_TO_FREEZE) may be produced. AT MOST ONE additional RESEARCH_LEAD_ONLY may be recorded. No third candidate of any kind is prepared for holdout testing.",
+  "holdout_protection_rule": {
+    "rule": "Task70's consumed 2024 blocks (2024-02-01..2024-03-15, 2024-09-03..2024-10-18) and ALL remaining clean 2024 territory are NEVER accessed, downloaded, or outcome-computed in Task71. Only an inventory of remaining candidate future holdout periods is produced (see task71_summary.md) -- no outcome is ever computed against them.",
+    "enforcement": "research/task71_lib/holdout_guard.py -- a DevelopmentOnlyGuard raising immediately if any 2024 date is requested by Task71 code, tested in tests/test_task71_holdout_guard.py."
+  }
+}
