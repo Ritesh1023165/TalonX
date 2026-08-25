@@ -1,0 +1,49 @@
+{
+  "task": "70",
+  "purpose": "Accelerated F6_FADE_V1 profitability validation + holdout audit",
+  "research_branch": "research/talonx-alpha-phenomenon-discovery",
+  "starting_sha": "d9dd42123790ad73ab9cc93cef5bafc351737b72",
+  "runtime_branch": "research/talonx-strategy-validation",
+  "runtime_modified_by_this_task": false,
+  "f6_fingerprint_expected": "6beb8eebe50053aae27cab90226534b5d4392c46bd6e9c094873f7ad37466084",
+  "f6_fingerprint_confirmed": true,
+  "f6_changed": false,
+  "f6_integrated_into_production": false,
+  "real_capital_introduced": false,
+  "synthetic_data_used": false,
+  "exposure_audit_conclusion": "Calendar year 2024 is EXPOSED_DATA_ONLY at worst (no strategy outcome of any kind ever computed against it in this repo's tracked history); this is the defensible unseen window. Everything from 2025-01-24 onward is OUTCOME_CONTAMINATED by ORPB_V1/FPRC_V1/production-strategy research; F6's own development window (2026-05-15..2026-08-14) is F6-specifically contaminated by construction.",
+  "holdout_lock": {
+    "validation_period": ["2024-02-01", "2024-03-15"],
+    "replication_period": ["2024-09-03", "2024-10-18"],
+    "locked_before_any_outcome": true,
+    "commit": "9096165 (TASK70 HOLDOUT SELECTION LOCK)"
+  },
+  "validation_result": {
+    "trades": 43, "symbols": 20, "days": 10,
+    "gross_expectancy": 0.004381101882943162, "net_expectancy_10bps": 0.0033811018829431622,
+    "profit_factor_10bps": 2.0454908867635355, "bootstrap_ci_low_by_symbol": -0.0007064395740471451,
+    "classification": "VALIDATION_PASS",
+    "caveat": "Narrow pass: session_coverage exactly at the 10-day minimum floor, bootstrap CI lower bound close to (though inside) the pre-registered zero-adjacent floor."
+  },
+  "replication_result": {
+    "trades": 182, "symbols": 33, "days": 34,
+    "gross_expectancy": -0.0012369898483631336, "net_expectancy_10bps": -0.002236989848363133,
+    "profit_factor_10bps": 0.5620662074578688, "bootstrap_ci_low_by_symbol": -0.0031946493114048415,
+    "bootstrap_ci_high_by_symbol": -0.001225655832694025,
+    "classification": "REPLICATION_FAIL",
+    "note": "Broader sample than validation; gross direction reversed; bootstrap CI entirely negative; not concentrated; no integrity issue."
+  },
+  "development_reproduced": {
+    "trades": 735, "symbols": 35, "days": 63,
+    "gross_expectancy": 0.0005955417512548133, "net_expectancy_10bps": -0.00040445824874518684,
+    "note": "Reproduced via the same frozen evaluator for comparability; matches the task's own stated development warning sign (net at 10bps slightly negative) almost exactly."
+  },
+  "final_classification": "F6_ALPHA_REJECTED",
+  "final_classification_reasoning": "Two of three independent periods (development, replication) show a net-negative, cost-adjusted result. Replication -- the larger, more statistically powerful of the two holdout tests -- decisively contradicts the hypothesis with a bootstrap CI entirely on the negative side, on a broad (not concentrated), integrity-clean sample. The one positive result (validation) is the thinnest of the three and sits at the pre-registered minimum sample-size floor. The long/short profitable side flips across all three periods (short-favored in development, long-favored in validation, neither in replication), which is itself evidence against a stable structural effect. Per the task's own non-negotiable rule, this is treated as a rejection, not explained away or rescued.",
+  "production_gap": "F6_FADE_V1 has no stop_rule (frozen as NONE). Independent of today's rejection, any future fade-family candidate intended for production would need a defensibly-derived stop/risk rule (bias+entry+stop+exit/horizon), developed and frozen using DEVELOPMENT data only, never derived from validation/replication outcomes.",
+  "tests_run": [
+    "tests/test_task68_f6_fade_v1.py", "tests/test_task67a_family06_opening_later.py",
+    "tests/test_task67a_data_guard.py", "tests/test_task67a_research_stats.py", "tests/test_task67a_screening_framework.py"
+  ],
+  "tests_result": "89 passed, 0 failed"
+}

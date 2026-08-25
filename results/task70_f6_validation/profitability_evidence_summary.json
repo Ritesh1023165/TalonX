@@ -1,0 +1,64 @@
+{
+  "rows": [
+    {
+      "role": "DEVELOPMENT",
+      "period": "2026-05-15..2026-08-14",
+      "trades": 735,
+      "symbols": 35,
+      "days": 63,
+      "gross_expectancy": 0.0005955417512548133,
+      "net_expectancy_10bps": -0.00040445824874518684,
+      "PF_10bps": 0.9285244869578859,
+      "bootstrap_ci_low": -0.001179784359001227,
+      "bootstrap_ci_high": 0.00038231136408292416,
+      "max_drawdown": -1.3971703263413389,
+      "top3_winners_removed_expectancy": -0.0006361219641680042,
+      "long_expectancy": -0.0019924508027286416,
+      "short_expectancy": 0.0011200146030789294,
+      "classification": "N/A (discovery/threshold-derivation period, not a holdout test)"
+    },
+    {
+      "role": "VALIDATION",
+      "period": "2024-02-01..2024-03-15",
+      "trades": 43,
+      "symbols": 20,
+      "days": 10,
+      "gross_expectancy": 0.004381101882943162,
+      "net_expectancy_10bps": 0.0033811018829431622,
+      "PF_10bps": 2.0454908867635355,
+      "bootstrap_ci_low": -0.0007064395740471451,
+      "bootstrap_ci_high": 0.006942294622642634,
+      "max_drawdown": -0.034508845834989005,
+      "top3_winners_removed_expectancy": 0.0019281597687072116,
+      "long_expectancy": 0.004595171330417386,
+      "short_expectancy": -0.0006253272937217766,
+      "classification": "VALIDATION_PASS"
+    },
+    {
+      "role": "REPLICATION",
+      "period": "2024-09-03..2024-10-18",
+      "trades": 182,
+      "symbols": 33,
+      "days": 34,
+      "gross_expectancy": -0.0012369898483631336,
+      "net_expectancy_10bps": -0.002236989848363133,
+      "PF_10bps": 0.5620662074578688,
+      "bootstrap_ci_low": -0.0031946493114048415,
+      "bootstrap_ci_high": -0.001225655832694025,
+      "max_drawdown": -0.5153327735401146,
+      "top3_winners_removed_expectancy": -0.0027339664449681014,
+      "long_expectancy": -0.0034741906697370174,
+      "short_expectancy": 9.994503645420345e-05,
+      "classification": "REPLICATION_FAIL"
+    }
+  ],
+  "comparison": {
+    "validation_vs_development": "Validation's net_expectancy_10bps (+0.338%) is BETTER than development's (-0.040%) -- but validation's own sample is smaller/narrower (43 trades/20 symbols/10 days vs development's 735/35/63) and sits at the minimum acceptable breadth floor.",
+    "replication_vs_development_and_validation": "Replication's net_expectancy_10bps (-0.224%) is WORSE than both development and validation, and its gross_expectancy REVERSES SIGN relative to both (development +0.060%, validation +0.438%, replication -0.124%) on the broadest sample of the three (182 trades/33 symbols/34 days).",
+    "directional_agreement": "Replication does NOT agree directionally with validation or development. This is the decisive negative signal.",
+    "economic_edge_after_costs": "Development and replication are both net-negative at 10bps; only validation (the narrowest, most boundary-hugging sample) is net-positive. The one period with the LEAST statistical power is the only one supporting the hypothesis.",
+    "concentration": "None of the three periods show single-symbol/single-day domination (all top1 shares well under 40%) -- concentration is not what's driving the negative replication result.",
+    "symmetry": "Long/short asymmetry is UNSTABLE across periods: development favors short (+0.112% short vs -0.199% long), validation favors long (+0.460% long vs -0.063% short), replication favors neither (both near/below zero, long -0.347%, short +0.0001%). This instability is itself evidence against a robust, structural fade effect -- a real effect should show a more consistent directional signature across independent periods."
+  },
+  "conclusion": "The body of evidence across THREE independent periods (development warning sign, validation narrow/boundary pass, replication decisive and broad-sample failure with reversed sign) does not collectively support a credible, robust, cost-adjusted edge. See task70_summary.md for the final F6_ALPHA_REJECTED classification and reasoning."
+}

@@ -1,0 +1,36 @@
+{
+  "bootstrap_ci_clustered_by_symbol": {
+    "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence.",
+    "ci_high": 0.00038231136408292416,
+    "ci_level": 0.95,
+    "ci_low": -0.001179784359001227,
+    "insufficient_n": false,
+    "method": "clustered_percentile_bootstrap",
+    "n": 35,
+    "n_resamples": 10000,
+    "point_estimate": -0.00040445824874518684,
+    "seed": 670067
+  },
+  "gross_expectancy": 0.0005955417512548133,
+  "long_count": 360,
+  "long_expectancy": -0.0019924508027286416,
+  "max_drawdown_net_return_units": -1.3971703263413389,
+  "net_expectancy_10bps": -0.00040445824874518684,
+  "number_of_candidates": 2205,
+  "number_of_trades": 735,
+  "period": {
+    "end": "2026-08-14",
+    "start": "2026-05-15"
+  },
+  "profit_factor_10bps": 0.9285244869578859,
+  "role": "DEVELOPMENT",
+  "session_coverage": 63,
+  "short_count": 375,
+  "short_expectancy": 0.0011200146030789294,
+  "symbol_coverage": 35,
+  "top1_day_contribution": 0.06401016238828303,
+  "top1_symbol_contribution": 0.10974190981946341,
+  "top3_symbol_contribution": 0.2655058177995529,
+  "top3_winners_removed_expectancy": -0.0006361219641680042,
+  "win_rate": 0.49115646258503404
+}

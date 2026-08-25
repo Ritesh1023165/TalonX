@@ -6099,3 +6099,103 @@ retired. No profitability conclusion is made or implied -- this task is readines
 only. Real capital remains structurally unsupported; PR #10 remains draft and unmerged. Next action:
 one clean, full end-to-end PAPER validation session using `run_talonx.py` (not started or scheduled by
 this task; target ~07:00 ET/~12:00 UK), then broad development-only alpha discovery.
+
+## Task 67A/67B/68A — Phenomenon Discovery, Family Screening, F6_FADE_V1 Freeze (2026-08-24/25)
+
+> Not individually backfilled here in detail (no ledger entry was added at the time these ran) --
+> summarized because Task 70 (below) builds directly on their artifacts. Task 67A (Stage 0):
+> declared a data-split contract (`results/task67a_phenomenon_discovery/data_split_contract.json`)
+> and a systematic, ledger-wide exposure audit (`exposure_boundary_audit.json`) BEFORE any Stage 1
+> result existed -- materialized a DEVELOPMENT dataset (2026-05-15..2026-08-14, 35 symbols, Alpaca,
+> 1,376,385 bars, 35/35 FULL) and left VALIDATION/REPLICATION as forward-reserved, unmaterialized
+> calendar ranges (2026-08-25 onward) enforced by a `DataSplitGuard`. Task 67B: ran a 6-family
+> phenomenon screen against DEVELOPMENT only; Family 6 (opening-window move -> later-session,
+> `family_06_opening_later`) reached PHENOMENON_PRESENT with a coherent mean-reversion/fade finding
+> across 3 definitions and 4 horizons (735 raw==deduplicated events, 60m excess -0.1561%, CI
+> excluding zero). Task 68A: froze the surviving candidate as **F6_FADE_V1** -- opening_return
+> (09:30-10:00 ET) threshold 0.013391316345271645 (frozen 2/3 quantile of |opening_return| in
+> DEVELOPMENT), FADE direction, decision at 10:00 ET, entry next-bar-open (no same-bar lookahead,
+> a deliberate divergence from Task67B's own screening convention), fixed 60m exit capped at
+> session close, NO stop, 10bps primary cost / 0/5/10bps diagnostics, normalized-notional sizing.
+> Fingerprint `6beb8eebe50053aae27cab90226534b5d4392c46bd6e9c094873f7ad37466084`
+> (`results/task68_f6_freeze/f6_fade_v1_fingerprint.json`, sha256 over the spec minus
+> provenance/prose fields). Also pre-registered `validation_protocol.json` -- an 8-criterion
+> VALIDATION_PASS/FAIL/INCONCLUSIVE bar and a REPLICATION-only-if-VALIDATION_PASS gate, declared
+> before any validation outcome existed. **Not integrated into any production runtime path.**
+
+## Task 70 — Accelerated F6_FADE_V1 Profitability Validation + Holdout Audit (2026-08-25)
+
+> **PURPOSE**: Answer whether frozen F6_FADE_V1 has a credible, cost-adjusted profitable edge
+> outside its development data -- the primary remaining research question after Task69P (runtime
+> operationally validated) and Task69Q (evidence-quality/notification gaps closed).
+>
+> **PART 1**: Reconfirmed the research worktree (`research/talonx-alpha-phenomenon-discovery`,
+> HEAD = the Task68A freeze commit itself, tree clean) and independently RECOMPUTED F6's
+> fingerprint from the spec (not just read the stored file) -- matched exactly. Frozen
+> implementation trivially unchanged (HEAD *is* the freeze commit).
+>
+> **PART 2 (exposure audit)**: Built on Task 67A's own pre-F6 exposure audit rather than
+> re-deriving it. Resolved two loose ends: two frozen-candidate protocol scripts'
+> `sessions_in_range("2024-01-01", ...)` calls are pure trading-calendar-date arithmetic (zero
+> price data, zero outcome, ever touches 2024); and generic `talonx_backtest`
+> documentation/config examples naming 2024 date ranges never show a strategy P&L outcome, only a
+> data-quality (row-count) report, for a structurally unrelated (momentum, not fade) strategy
+> family in any case. **Conclusion: calendar year 2024 is EXPOSED_DATA_ONLY at worst -- the
+> defensible unseen window** the task's own instructions anticipated ("older history, especially
+> 2024"). The pre-existing forward-reserved plan (2026-08-25 onward) cannot be materialized: it
+> hasn't traded yet as of this task's own timestamp.
+>
+> **PART 3 (holdout lock)**: Locked `VALIDATION=2024-02-01..2024-03-15` /
+> `REPLICATION=2024-09-03..2024-10-18` -- selected on cleanliness, live-confirmed data availability
+> (read-only Alpaca API checks across all 35 universe symbols), adequate session count, temporal
+> separation, and calendar diversity, ALL before any F6 outcome existed. Committed and pushed as
+> `TASK70 HOLDOUT SELECTION LOCK` before materializing or evaluating anything.
+>
+> **PART 4-7 (materialization + validation)**: Downloaded both windows (Alpaca, all 35 symbols,
+> account-default feed confirmed SIP) -- 35/35 FULL each, zero duplicate/out-of-order/NaN/Inf/
+> invalid-OHLC/negative-volume/future-timestamp rows. Re-verified the fingerprint immediately
+> before running, then ran the UNMODIFIED evaluator exactly once against VALIDATION, applying
+> `validation_protocol.json`'s pre-registered 8-criterion pass_logic verbatim: 43 trades / 20
+> symbols / 10 days, net_expectancy_10bps=+0.338%, gross_expectancy=+0.438% (fade-consistent),
+> PF=2.05, bootstrap CI (clustered by symbol) [-0.071%,+0.694%], top1_symbol=22.4%/top1_day=29.6%
+> (both <=40%), top-3-winners-removed=+0.193% (still positive), zero causal violations.
+> **VALIDATION_PASS** -- narrow (session_coverage exactly at the 10-day floor, bootstrap CI close
+> to zero) but genuine, no criterion loosened.
+>
+> **PART 8 (replication)**: Ran the same unmodified evaluator exactly once against REPLICATION
+> (VALIDATION_PASS was the precondition). Result: 182 trades / 33 symbols / 34 days -- a BROADER
+> sample than validation -- net_expectancy_10bps=-0.224%, gross_expectancy=-0.124% (direction
+> REVERSED vs. both development and validation), PF=0.56, negative at every cost level including
+> 0bps, bootstrap CI **entirely negative** ([-0.319%,-0.123%]), not concentrated
+> (top1_symbol=16.2%/top1_day=20.4%), removing the best 3 winners makes it WORSE, zero
+> causal/integrity violations, data clean. **REPLICATION_FAIL** -- decisive, not attributed to
+> noise, concentration, sample size, or data quality (none of which the evidence supports).
+>
+> **PART 9 (synthesis)**: Reproduced DEVELOPMENT's own numbers via the same frozen evaluator for
+> comparability (735 trades, gross +0.060%, net -0.040% -- matches the task's own stated
+> development warning sign almost exactly). Cross-period finding: the profitable side of the
+> trade FLIPS across all three independent periods (short-favored in development, long-favored in
+> validation, neither in replication) -- itself evidence against a stable structural effect, not
+> just an unlucky replication draw.
+>
+> **PART 10 (final classification)**: **F6_ALPHA_REJECTED.** Two of three independent periods
+> are net-negative after cost; the larger, more statistically powerful holdout test (replication)
+> decisively and broadly contradicts the hypothesis. Per the task's own non-negotiable rule, this
+> is reported as a rejection -- no threshold loosened, no rescue attempted, no post-hoc regime
+> filter or symbol exclusion considered.
+>
+> **PARTS 11-14**: Recorded F6's product gap (no stop_rule -- moot now, but noted for any future
+> fade-family successor, which must derive its stop from DEVELOPMENT data only). Live PAPER
+> deployment plan NOT executed (F6 failed). Runtime warmup note carried forward per Task69Q,
+> runtime worktree untouched. 10-day plan pivots to new DEVELOPMENT-only phenomenon discovery.
+>
+> **TESTS**: `test_task68_f6_fade_v1.py`, `test_task67a_family06_opening_later.py`,
+> `test_task67a_data_guard.py`, `test_task67a_research_stats.py`,
+> `test_task67a_screening_framework.py` -- 89 passed, 0 failed, run once (Part 5), not repeated
+> after seeing validation/replication numbers.
+
+**Scope/deployment**: F6_FADE_V1 changed: NO. F6_FADE_V1 integrated into any production runtime:
+NO. Real capital: NO. Synthetic data: NO. Runtime worktree (`research/talonx-strategy-validation`)
+touched: NO. Next action: new DEVELOPMENT-phase phenomenon/candidate discovery (Task67-style family
+screening), diagnostically informed by F6's cross-period directional instability but not
+re-litigating F6 itself; see `results/task70_f6_validation/claude_handoff_next.md`.
