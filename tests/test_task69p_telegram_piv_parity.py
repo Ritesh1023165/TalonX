@@ -102,3 +102,47 @@ def test_uptime_and_client_wired_through_shim(tmp_path):
 def test_universe_size_unknown_when_empty(tmp_path):
     listener = build_piv_telegram_listener(tmp_path)  # no universe passed
     assert listener.dispatch_agent.piv_info["universe_size"] == "unknown"
+
+
+# --- 2026-08-25 live-incident follow-up: Pipeline/MARKET label clarification ---
+
+@pytest.mark.asyncio
+async def test_handle_ping_pipeline_line_annotated_for_piv_context(tmp_path):
+    """Regression pin for the live finding: /ping's 'Pipeline: DEGRADED
+    (market feed disconnected)' line is scoped to talonx_ingest, which PIV
+    never uses -- for a piv_info-carrying listener it must be annotated so
+    a reader doesn't mistake it for whole-system health."""
+    listener = _listener(tmp_path, feed_mode="IEX_PAPER_PIV", universe=("AAPL",) * 5)
+    sent = {}
+
+    async def _fake_reply(text, plain=False):
+        sent["text"] = text
+
+    listener._reply = _fake_reply
+    await listener._handle_ping()
+    assert "Pipeline: " in sent["text"]
+    assert "NOT used by this PIV session" in sent["text"]
+    assert "MARKET" in sent["text"]
+
+
+@pytest.mark.asyncio
+async def test_handle_ping_general_app_unaffected_by_annotation():
+    """The general app's real DispatchAgent (no piv_info) must see NO
+    annotation suffix at all -- confirms the fix is additive/opt-in."""
+    class _FakeGeneralDispatchAgent:
+        started_at = None
+        watchlist_store = None
+        _client = None
+
+    config = DispatchConfig()
+    store = AuditStore(":memory:")
+    listener = TelegramReplyListener(store, config, dispatch_agent=_FakeGeneralDispatchAgent())
+    sent = {}
+
+    async def _fake_reply(text, plain=False):
+        sent["text"] = text
+
+    listener._reply = _fake_reply
+    await listener._handle_ping()
+    assert "NOT used by this PIV session" not in sent["text"]
+    assert "scoped to the general ingest pipeline" not in sent["text"]

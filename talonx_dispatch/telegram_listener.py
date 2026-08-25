@@ -307,18 +307,41 @@ class TelegramReplyListener:
         client = getattr(self.dispatch_agent, "_client", None)
         _, market_health = await self._market_feed_freshness(client)
 
+        # 2026-08-25 live-incident clarification (Task 69P): the MARKET/
+        # Pipeline lines below read talonx_ingest's OWN Redis WS-heartbeat
+        # and metrics:{date}:ingest:* keys -- a PIV session's SessionRunner
+        # never writes to them (it calls Alpaca's REST bars/latest directly,
+        # bypassing talonx_ingest entirely), so they correctly show "no
+        # data" from THAT subsystem's point of view even while PIV's own
+        # live feed (see the PIV block above) is healthy. Confirmed live:
+        # independently querying the same bars/latest endpoint PIV uses
+        # showed fresh (<=120s old) bars for the large majority of the
+        # universe while /ping showed "DEGRADED"/"Disconnected" -- not
+        # false data, but a whole-system-health claim from a
+        # single-subsystem-scoped signal. This suffix is additive/opt-in
+        # (piv_info is None for the general app) -- no existing behavior
+        # changes for run_talonx.py's own DispatchAgent.
+        piv_info = getattr(self.dispatch_agent, "piv_info", None)
+        pipeline_suffix = (
+            " [scoped to the general ingest pipeline, NOT used by this PIV session -- see PIV block below for the actual live feed status]"
+            if piv_info is not None else ""
+        )
+        market_lines = await self._market_section(client)
+        if piv_info is not None and market_lines:
+            market_lines[0] = f"{market_lines[0]}  [see note above Pipeline: this section is scoped to the general ingest pipeline, not used by PIV]"
+
         lines = [
             "\U0001F3D3 Pong! TalonX Engine Online",
             "─" * 30,
             "\U00002699 Process: RUNNING",
-            f"\U0001F4E1 Pipeline: {self._pipeline_status(client, market_health)}",
+            f"\U0001F4E1 Pipeline: {self._pipeline_status(client, market_health)}{pipeline_suffix}",
             f"\U0001F4C5 Metrics day: {datetime.now(timezone.utc):%Y-%m-%d} (UTC)",
             f"⏱️ Uptime: {self._format_uptime()}",
             f"\U0001F4BB CPU Usage: {cpu_pct:.1f}%  |  RAM: {mem_used_gb:.1f} GB / {mem_total_gb:.1f} GB",
             f"\U0001F4CA Today's Signals Pushed (UTC day): {pushed_today} Pushes ({total_today} Logs)",
             "",
             *self._piv_section(),
-            *await self._market_section(client),
+            *market_lines,
             "",
             *await self._quant_section(client),
             "",
