@@ -1,0 +1,26 @@
+{
+  "assessment": "TASK71_PROVIDER_SEMANTICS_AUDIT",
+  "research_provider": "Alpaca, account-default feed -- confirmed SIP (consolidated tape) per results/task67a_phenomenon_discovery/data_split_contract.json and results/task63r_orpb_v1_feed_remediation/feed_diagnostic.json (explicit no-param/feed=sip/feed=iex hash comparison proved account default == SIP).",
+  "live_paper_provider": "Alpaca IEX (talonx_piv's IEX_PAPER_PIV feed mode -- single-exchange, not consolidated).",
+  "why_this_matters": "SIP aggregates trades across ALL US exchanges/ATSs; IEX is one exchange's own trade prints only. Any feature built from VOLUME (raw volume, relative volume, volume-confirmation gates) will read structurally differently on SIP vs IEX -- IEX volume is a fraction of true consolidated volume and its ratio to SIP volume varies by symbol/time, not a fixed conversion factor. Price-only features (VWAP computed from trade prices, gap magnitude, structural levels) are comparatively more portable since IEX's own trade prints still reflect real transacted prices, just from a narrower slice of the market -- though minute-level completeness (whether every 1-minute bucket has a print at all) can differ between a full-consolidated-tape feed and a single-exchange feed, especially pre-market.",
+  "per_family_classification": {
+    "FAMILY_A_AVWAP": {
+      "classification": "PROVIDER_SENSITIVE",
+      "reason": "AVWAP is volume-weighted by construction (cumsum(price*volume)/cumsum(volume)) -- the anchor price itself shifts with which trades are included. A SIP-computed AVWAP and an IEX-computed AVWAP for the same symbol/session are NOT the same number. Distance-from-AVWAP thresholds calibrated on SIP data cannot be assumed to transfer to an IEX-computed AVWAP without separate calibration."
+    },
+    "FAMILY_B_OVERNIGHT_GAP": {
+      "classification": "PROVIDER_SENSITIVE",
+      "reason": "Premarket volume/liquidity features are explicitly volume-based and IEX's premarket coverage is materially thinner than SIP's (confirmed pattern from Task69Q's own runtime work). Gap MAGNITUDE (price-only, close-to-open) is comparatively more portable, but premarket-volume-confirmation variables are not."
+    },
+    "FAMILY_C_RESIDUAL_MOMENTUM": {
+      "classification": "PROVIDER_PORTABLE_WITH_CAVEAT",
+      "reason": "The core signal (stock return minus beta*SPY return) is a PRICE-only construction -- close-to-close returns should be reasonably consistent between SIP and IEX for the same liquid mega-cap names, since a name with genuinely deep IEX-visible liquidity will have prices that track the consolidated tape closely even if volume figures differ. The optional 'volume confirmation' secondary variable, if used, would be PROVIDER_SENSITIVE the same way Family A/B are."
+    },
+    "FAMILY_D_FAILED_STRUCTURAL_BREAK": {
+      "classification": "PROVIDER_PORTABLE_WITH_CAVEAT",
+      "reason": "Structural levels (prior-day high/low) and penetration/reclaim are PRICE-only. Portable in principle, with the same caveat as Family C: a level computed from SIP's consolidated high/low could differ slightly from an IEX-only high/low if IEX's trade prints don't reach the same extremes the full tape does. The 'volume state' secondary variable is PROVIDER_SENSITIVE."
+    }
+  },
+  "task71_research_provider_policy": "All Task71 DEVELOPMENT work uses Alpaca SIP consistently (same provider/feed convention as every prior task in this program) -- research parameters here are NOT normalized or recalibrated to any assumed IEX-equivalent scale. This is deliberate, per the task's own instruction: 'Do NOT normalize SIP research parameters into IEX assumptions during Task71.'",
+  "future_runtime_portability_requirement": "Any candidate eventually integrated into the PAPER runtime (a FUTURE task, not Task71/72/73) must either (A) obtain equivalent consolidated-tape semantics for its live feed, or (B) separately calibrate/validate any volume-sensitive feature specifically against IEX data before relying on it live. This requirement is recorded here for that future task, not resolved now."
+}

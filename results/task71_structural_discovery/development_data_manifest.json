@@ -1,0 +1,1168 @@
+{
+  "all_slices_clean": true,
+  "role": "DEVELOPMENT_BROADENED",
+  "slices": {
+    "2025_q1_orpb_era": {
+      "all_clean": true,
+      "data_dir": "data\\historical_1m\\task71_development_2025q1",
+      "dataset_hash_sha256": "efeccf93e369",
+      "per_symbol": {
+        "AAPL": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:59:00+00:00",
+          "rows": 21711,
+          "trading_sessions": 29
+        },
+        "ADBE": {
+          "first_timestamp": "2025-02-03 09:18:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:59:00+00:00",
+          "rows": 12435,
+          "trading_sessions": 29
+        },
+        "ADI": {
+          "first_timestamp": "2025-02-03 12:04:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 22:08:00+00:00",
+          "rows": 11805,
+          "trading_sessions": 29
+        },
+        "AMAT": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:32:00+00:00",
+          "rows": 13186,
+          "trading_sessions": 29
+        },
+        "AMD": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:59:00+00:00",
+          "rows": 23865,
+          "trading_sessions": 29
+        },
+        "AMZN": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:59:00+00:00",
+          "rows": 23112,
+          "trading_sessions": 29
+        },
+        "AVGO": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:58:00+00:00",
+          "rows": 20984,
+          "trading_sessions": 29
+        },
+        "BKNG": {
+          "first_timestamp": "2025-02-03 14:30:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 20:52:00+00:00",
+          "rows": 5187,
+          "trading_sessions": 29
+        },
+        "CMCSA": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:43:00+00:00",
+          "rows": 12993,
+          "trading_sessions": 29
+        },
+        "COST": {
+          "first_timestamp": "2025-02-03 09:09:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:33:00+00:00",
+          "rows": 11708,
+          "trading_sessions": 29
+        },
+        "CSCO": {
+          "first_timestamp": "2025-02-03 09:03:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:56:00+00:00",
+          "rows": 13879,
+          "trading_sessions": 29
+        },
+        "GILD": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:28:00+00:00",
+          "rows": 12327,
+          "trading_sessions": 29
+        },
+        "GOOGL": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:59:00+00:00",
+          "rows": 21650,
+          "trading_sessions": 29
+        },
+        "HON": {
+          "first_timestamp": "2025-02-03 11:58:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 22:08:00+00:00",
+          "rows": 12011,
+          "trading_sessions": 29
+        },
+        "INTC": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:59:00+00:00",
+          "rows": 25991,
+          "trading_sessions": 29
+        },
+        "INTU": {
+          "first_timestamp": "2025-02-03 14:30:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 20:00:00+00:00",
+          "rows": 11279,
+          "trading_sessions": 29
+        },
+        "ISRG": {
+          "first_timestamp": "2025-02-03 09:14:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 22:16:00+00:00",
+          "rows": 10977,
+          "trading_sessions": 29
+        },
+        "KLAC": {
+          "first_timestamp": "2025-02-03 13:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 20:00:00+00:00",
+          "rows": 9537,
+          "trading_sessions": 29
+        },
+        "LRCX": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:28:00+00:00",
+          "rows": 13571,
+          "trading_sessions": 29
+        },
+        "MDLZ": {
+          "first_timestamp": "2025-02-03 09:03:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 21:13:00+00:00",
+          "rows": 12241,
+          "trading_sessions": 29
+        },
+        "META": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:59:00+00:00",
+          "rows": 18467,
+          "trading_sessions": 29
+        },
+        "MSFT": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:59:00+00:00",
+          "rows": 18806,
+          "trading_sessions": 29
+        },
+        "MU": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:58:00+00:00",
+          "rows": 18744,
+          "trading_sessions": 29
+        },
+        "NFLX": {
+          "first_timestamp": "2025-02-03 09:13:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:31:00+00:00",
+          "rows": 12923,
+          "trading_sessions": 29
+        },
+        "NVDA": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:59:00+00:00",
+          "rows": 27810,
+          "trading_sessions": 29
+        },
+        "PANW": {
+          "first_timestamp": "2025-02-03 09:02:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:59:00+00:00",
+          "rows": 13240,
+          "trading_sessions": 29
+        },
+        "PEP": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:52:00+00:00",
+          "rows": 12930,
+          "trading_sessions": 29
+        },
+        "PYPL": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:59:00+00:00",
+          "rows": 16764,
+          "trading_sessions": 29
+        },
+        "QCOM": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:56:00+00:00",
+          "rows": 14161,
+          "trading_sessions": 29
+        },
+        "REGN": {
+          "first_timestamp": "2025-02-03 12:19:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 20:51:00+00:00",
+          "rows": 9292,
+          "trading_sessions": 29
+        },
+        "SBUX": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:03:00+00:00",
+          "rows": 13051,
+          "trading_sessions": 29
+        },
+        "STX": {
+          "first_timestamp": "2025-02-03 12:03:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 20:11:00+00:00",
+          "rows": 11436,
+          "trading_sessions": 29
+        },
+        "TSLA": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:59:00+00:00",
+          "rows": 27421,
+          "trading_sessions": 29
+        },
+        "TXN": {
+          "first_timestamp": "2025-02-03 11:47:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:11:00+00:00",
+          "rows": 11922,
+          "trading_sessions": 29
+        },
+        "VRTX": {
+          "first_timestamp": "2025-02-03 09:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-03-14 23:49:00+00:00",
+          "rows": 10696,
+          "trading_sessions": 29
+        }
+      },
+      "requested_end": "2025-03-14",
+      "requested_start": "2025-02-03",
+      "total_bars": 538112
+    },
+    "2025_q3_fprc_era": {
+      "all_clean": true,
+      "data_dir": "data\\historical_1m\\task71_development_2025q3",
+      "dataset_hash_sha256": "a51b01dc7844",
+      "per_symbol": {
+        "AAPL": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:59:00+00:00",
+          "rows": 22090,
+          "trading_sessions": 28
+        },
+        "ADBE": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:13:00+00:00",
+          "rows": 12032,
+          "trading_sessions": 28
+        },
+        "ADI": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 20:07:00+00:00",
+          "rows": 10823,
+          "trading_sessions": 28
+        },
+        "AMAT": {
+          "first_timestamp": "2025-06-02 08:10:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:38:00+00:00",
+          "rows": 11931,
+          "trading_sessions": 28
+        },
+        "AMD": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:59:00+00:00",
+          "rows": 23645,
+          "trading_sessions": 28
+        },
+        "AMZN": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:59:00+00:00",
+          "rows": 20842,
+          "trading_sessions": 28
+        },
+        "AVGO": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:57:00+00:00",
+          "rows": 17979,
+          "trading_sessions": 28
+        },
+        "BKNG": {
+          "first_timestamp": "2025-06-02 13:30:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 20:30:00+00:00",
+          "rows": 3183,
+          "trading_sessions": 28
+        },
+        "CMCSA": {
+          "first_timestamp": "2025-06-02 08:44:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:52:00+00:00",
+          "rows": 11642,
+          "trading_sessions": 28
+        },
+        "COST": {
+          "first_timestamp": "2025-06-02 12:20:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:03:00+00:00",
+          "rows": 10894,
+          "trading_sessions": 28
+        },
+        "CSCO": {
+          "first_timestamp": "2025-06-02 08:26:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:58:00+00:00",
+          "rows": 12686,
+          "trading_sessions": 28
+        },
+        "GILD": {
+          "first_timestamp": "2025-06-02 08:22:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:35:00+00:00",
+          "rows": 11363,
+          "trading_sessions": 28
+        },
+        "GOOGL": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:59:00+00:00",
+          "rows": 20531,
+          "trading_sessions": 28
+        },
+        "HON": {
+          "first_timestamp": "2025-06-02 12:02:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:14:00+00:00",
+          "rows": 10778,
+          "trading_sessions": 28
+        },
+        "INTC": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:58:00+00:00",
+          "rows": 22684,
+          "trading_sessions": 28
+        },
+        "INTU": {
+          "first_timestamp": "2025-06-02 13:30:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 21:21:00+00:00",
+          "rows": 9819,
+          "trading_sessions": 28
+        },
+        "ISRG": {
+          "first_timestamp": "2025-06-02 13:12:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 21:01:00+00:00",
+          "rows": 10004,
+          "trading_sessions": 28
+        },
+        "KLAC": {
+          "first_timestamp": "2025-06-02 12:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 20:00:00+00:00",
+          "rows": 8872,
+          "trading_sessions": 28
+        },
+        "LRCX": {
+          "first_timestamp": "2025-06-02 08:04:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:45:00+00:00",
+          "rows": 11924,
+          "trading_sessions": 28
+        },
+        "MDLZ": {
+          "first_timestamp": "2025-06-02 08:48:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 20:50:00+00:00",
+          "rows": 11023,
+          "trading_sessions": 28
+        },
+        "META": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:59:00+00:00",
+          "rows": 15663,
+          "trading_sessions": 28
+        },
+        "MSFT": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:35:00+00:00",
+          "rows": 15246,
+          "trading_sessions": 28
+        },
+        "MU": {
+          "first_timestamp": "2025-06-02 08:03:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:59:00+00:00",
+          "rows": 19011,
+          "trading_sessions": 28
+        },
+        "NFLX": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:45:00+00:00",
+          "rows": 11645,
+          "trading_sessions": 28
+        },
+        "NVDA": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:59:00+00:00",
+          "rows": 26568,
+          "trading_sessions": 28
+        },
+        "PANW": {
+          "first_timestamp": "2025-06-02 08:15:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:59:00+00:00",
+          "rows": 11839,
+          "trading_sessions": 28
+        },
+        "PEP": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:19:00+00:00",
+          "rows": 12597,
+          "trading_sessions": 28
+        },
+        "PYPL": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:59:00+00:00",
+          "rows": 13292,
+          "trading_sessions": 28
+        },
+        "QCOM": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:57:00+00:00",
+          "rows": 12436,
+          "trading_sessions": 28
+        },
+        "REGN": {
+          "first_timestamp": "2025-06-02 09:49:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 21:42:00+00:00",
+          "rows": 9269,
+          "trading_sessions": 28
+        },
+        "SBUX": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:38:00+00:00",
+          "rows": 12033,
+          "trading_sessions": 28
+        },
+        "STX": {
+          "first_timestamp": "2025-06-02 12:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 21:36:00+00:00",
+          "rows": 11176,
+          "trading_sessions": 28
+        },
+        "TSLA": {
+          "first_timestamp": "2025-06-02 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 23:59:00+00:00",
+          "rows": 26468,
+          "trading_sessions": 28
+        },
+        "TXN": {
+          "first_timestamp": "2025-06-02 12:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 22:49:00+00:00",
+          "rows": 11169,
+          "trading_sessions": 28
+        },
+        "VRTX": {
+          "first_timestamp": "2025-06-02 13:30:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-07-11 20:30:00+00:00",
+          "rows": 9488,
+          "trading_sessions": 28
+        }
+      },
+      "requested_end": "2025-07-11",
+      "requested_start": "2025-06-02",
+      "total_bars": 492645
+    },
+    "2025_q4_task46_56_era": {
+      "all_clean": true,
+      "data_dir": "data\\historical_1m\\task71_development_2025q4",
+      "dataset_hash_sha256": "e2a34c50a60e",
+      "per_symbol": {
+        "AAPL": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:57:00+00:00",
+          "rows": 20736,
+          "trading_sessions": 29
+        },
+        "ADBE": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:59:00+00:00",
+          "rows": 13683,
+          "trading_sessions": 29
+        },
+        "ADI": {
+          "first_timestamp": "2025-10-27 11:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 21:57:00+00:00",
+          "rows": 11401,
+          "trading_sessions": 29
+        },
+        "AMAT": {
+          "first_timestamp": "2025-10-27 08:32:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:30:00+00:00",
+          "rows": 12792,
+          "trading_sessions": 29
+        },
+        "AMD": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:59:00+00:00",
+          "rows": 24320,
+          "trading_sessions": 29
+        },
+        "AMZN": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:54:00+00:00",
+          "rows": 23078,
+          "trading_sessions": 29
+        },
+        "AVGO": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:58:00+00:00",
+          "rows": 21709,
+          "trading_sessions": 29
+        },
+        "BKNG": {
+          "first_timestamp": "2025-10-27 13:30:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:49:00+00:00",
+          "rows": 10409,
+          "trading_sessions": 29
+        },
+        "CMCSA": {
+          "first_timestamp": "2025-10-27 08:01:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:59:00+00:00",
+          "rows": 13720,
+          "trading_sessions": 29
+        },
+        "COST": {
+          "first_timestamp": "2025-10-27 11:24:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:34:00+00:00",
+          "rows": 12707,
+          "trading_sessions": 29
+        },
+        "CSCO": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:27:00+00:00",
+          "rows": 14077,
+          "trading_sessions": 29
+        },
+        "GILD": {
+          "first_timestamp": "2025-10-27 11:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 22:17:00+00:00",
+          "rows": 11779,
+          "trading_sessions": 29
+        },
+        "GOOGL": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:59:00+00:00",
+          "rows": 22869,
+          "trading_sessions": 29
+        },
+        "HON": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 21:48:00+00:00",
+          "rows": 11610,
+          "trading_sessions": 29
+        },
+        "INTC": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:59:00+00:00",
+          "rows": 25007,
+          "trading_sessions": 29
+        },
+        "INTU": {
+          "first_timestamp": "2025-10-27 13:30:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 21:49:00+00:00",
+          "rows": 11433,
+          "trading_sessions": 29
+        },
+        "ISRG": {
+          "first_timestamp": "2025-10-27 09:22:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 22:08:00+00:00",
+          "rows": 11681,
+          "trading_sessions": 29
+        },
+        "KLAC": {
+          "first_timestamp": "2025-10-27 13:30:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 22:58:00+00:00",
+          "rows": 10725,
+          "trading_sessions": 29
+        },
+        "LRCX": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:49:00+00:00",
+          "rows": 12969,
+          "trading_sessions": 29
+        },
+        "MDLZ": {
+          "first_timestamp": "2025-10-27 08:05:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:32:00+00:00",
+          "rows": 11845,
+          "trading_sessions": 29
+        },
+        "META": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:59:00+00:00",
+          "rows": 23861,
+          "trading_sessions": 29
+        },
+        "MSFT": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:58:00+00:00",
+          "rows": 22095,
+          "trading_sessions": 29
+        },
+        "MU": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:53:00+00:00",
+          "rows": 22314,
+          "trading_sessions": 29
+        },
+        "NFLX": {
+          "first_timestamp": "2025-10-27 08:05:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:59:00+00:00",
+          "rows": 22755,
+          "trading_sessions": 29
+        },
+        "NVDA": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:59:00+00:00",
+          "rows": 27486,
+          "trading_sessions": 29
+        },
+        "PANW": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:43:00+00:00",
+          "rows": 12737,
+          "trading_sessions": 29
+        },
+        "PEP": {
+          "first_timestamp": "2025-10-27 08:24:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 22:00:00+00:00",
+          "rows": 12053,
+          "trading_sessions": 29
+        },
+        "PYPL": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:55:00+00:00",
+          "rows": 18058,
+          "trading_sessions": 29
+        },
+        "QCOM": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:52:00+00:00",
+          "rows": 14796,
+          "trading_sessions": 29
+        },
+        "REGN": {
+          "first_timestamp": "2025-10-27 12:08:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 22:20:00+00:00",
+          "rows": 11196,
+          "trading_sessions": 29
+        },
+        "SBUX": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:16:00+00:00",
+          "rows": 13253,
+          "trading_sessions": 29
+        },
+        "STX": {
+          "first_timestamp": "2025-10-27 08:02:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:34:00+00:00",
+          "rows": 13070,
+          "trading_sessions": 29
+        },
+        "TSLA": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:59:00+00:00",
+          "rows": 27179,
+          "trading_sessions": 29
+        },
+        "TXN": {
+          "first_timestamp": "2025-10-27 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 23:30:00+00:00",
+          "rows": 12040,
+          "trading_sessions": 29
+        },
+        "VRTX": {
+          "first_timestamp": "2025-10-27 13:30:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2025-12-05 22:32:00+00:00",
+          "rows": 11023,
+          "trading_sessions": 29
+        }
+      },
+      "requested_end": "2025-12-05",
+      "requested_start": "2025-10-27",
+      "total_bars": 572466
+    },
+    "2026_q3_f6_era": {
+      "all_clean": true,
+      "data_dir": "data\\historical_1m\\task67a_development",
+      "dataset_hash_sha256": "b8787cb099be",
+      "per_symbol": {
+        "AAPL": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:59:00+00:00",
+          "rows": 53558,
+          "trading_sessions": 63
+        },
+        "ADBE": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:53:00+00:00",
+          "rows": 36885,
+          "trading_sessions": 63
+        },
+        "ADI": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:47:00+00:00",
+          "rows": 28053,
+          "trading_sessions": 63
+        },
+        "AMAT": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:59:00+00:00",
+          "rows": 41534,
+          "trading_sessions": 63
+        },
+        "AMD": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:59:00+00:00",
+          "rows": 51297,
+          "trading_sessions": 63
+        },
+        "AMZN": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:59:00+00:00",
+          "rows": 49290,
+          "trading_sessions": 63
+        },
+        "AVGO": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:59:00+00:00",
+          "rows": 51872,
+          "trading_sessions": 63
+        },
+        "BKNG": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:08:00+00:00",
+          "rows": 31823,
+          "trading_sessions": 63
+        },
+        "CMCSA": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:48:00+00:00",
+          "rows": 31058,
+          "trading_sessions": 63
+        },
+        "COST": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:11:00+00:00",
+          "rows": 28177,
+          "trading_sessions": 63
+        },
+        "CSCO": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:59:00+00:00",
+          "rows": 32806,
+          "trading_sessions": 63
+        },
+        "GILD": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:34:00+00:00",
+          "rows": 25684,
+          "trading_sessions": 63
+        },
+        "GOOGL": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:59:00+00:00",
+          "rows": 55222,
+          "trading_sessions": 63
+        },
+        "HON": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 21:27:00+00:00",
+          "rows": 25955,
+          "trading_sessions": 63
+        },
+        "INTC": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:59:00+00:00",
+          "rows": 59971,
+          "trading_sessions": 63
+        },
+        "INTU": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:19:00+00:00",
+          "rows": 33077,
+          "trading_sessions": 63
+        },
+        "ISRG": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:17:00+00:00",
+          "rows": 27999,
+          "trading_sessions": 63
+        },
+        "KLAC": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:58:00+00:00",
+          "rows": 44097,
+          "trading_sessions": 63
+        },
+        "LRCX": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 22:54:00+00:00",
+          "rows": 33543,
+          "trading_sessions": 63
+        },
+        "MDLZ": {
+          "first_timestamp": "2026-05-15 08:02:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 20:43:00+00:00",
+          "rows": 25482,
+          "trading_sessions": 63
+        },
+        "META": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:59:00+00:00",
+          "rows": 50556,
+          "trading_sessions": 63
+        },
+        "MSFT": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:59:00+00:00",
+          "rows": 56850,
+          "trading_sessions": 63
+        },
+        "MU": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:59:00+00:00",
+          "rows": 60324,
+          "trading_sessions": 63
+        },
+        "NFLX": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:59:00+00:00",
+          "rows": 49231,
+          "trading_sessions": 63
+        },
+        "NVDA": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:59:00+00:00",
+          "rows": 59497,
+          "trading_sessions": 63
+        },
+        "PANW": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:46:00+00:00",
+          "rows": 29968,
+          "trading_sessions": 63
+        },
+        "PEP": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 22:37:00+00:00",
+          "rows": 28119,
+          "trading_sessions": 63
+        },
+        "PYPL": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:59:00+00:00",
+          "rows": 33936,
+          "trading_sessions": 63
+        },
+        "QCOM": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:47:00+00:00",
+          "rows": 41115,
+          "trading_sessions": 63
+        },
+        "REGN": {
+          "first_timestamp": "2026-05-15 13:25:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 20:00:00+00:00",
+          "rows": 24113,
+          "trading_sessions": 63
+        },
+        "SBUX": {
+          "first_timestamp": "2026-05-15 08:01:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 21:23:00+00:00",
+          "rows": 26566,
+          "trading_sessions": 63
+        },
+        "STX": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:58:00+00:00",
+          "rows": 37367,
+          "trading_sessions": 63
+        },
+        "TSLA": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 23:59:00+00:00",
+          "rows": 58805,
+          "trading_sessions": 63
+        },
+        "TXN": {
+          "first_timestamp": "2026-05-15 08:00:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 22:30:00+00:00",
+          "rows": 27519,
+          "trading_sessions": 63
+        },
+        "VRTX": {
+          "first_timestamp": "2026-05-15 08:27:00+00:00",
+          "has_critical_corruption": false,
+          "is_clean": true,
+          "last_timestamp": "2026-08-14 20:13:00+00:00",
+          "rows": 25036,
+          "trading_sessions": 63
+        }
+      },
+      "requested_end": "2026-08-14",
+      "requested_start": "2026-05-15",
+      "total_bars": 1376385
+    }
+  },
+  "total_bars_all_slices": 2979608,
+  "universe_symbols": 35
+}

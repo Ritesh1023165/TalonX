@@ -1,0 +1,35 @@
+{
+  "assessment": "TASK71_SURVIVORSHIP_UNIVERSE_AUDIT",
+  "universe": "same static 35-symbol canonical universe used throughout this entire research program (talonx_piv.config.DEFAULT_UNIVERSE)",
+  "listing_date_check": {
+    "method": "Reasoned from general knowledge of each company's public-listing history (no corporate-actions/listing-date data source exists in this repo to query programmatically) -- flagged as NOT independently verified against a data source, only against general knowledge.",
+    "conclusion": "All 35 symbols were large, publicly-listed, liquid mega/large-cap names throughout the entire 2024-2026 research horizon used by this program. The most recently listed among them (PYPL, spun off from eBay in 2015; AVGO's current corporate form dates to 2016; PANW listed 2012) all predate 2024 by nearly a decade or more. No IPO/listing-date gap exists for any symbol within any period this program has used or plans to use."
+  },
+  "corporate_actions_check": {
+    "method": "Not independently verified against a splits/dividends data source -- none exists in this repo. Bars are downloaded with adjustment=raw (unadjusted).",
+    "known_risk": "A material stock split within any DEVELOPMENT/VALIDATION/REPLICATION window would appear as a single-bar price discontinuity, which check_data_quality's invalid_ohlc_relationship/invalid_prices checks would NOT necessarily catch (a 4-for-1 split still produces valid, positive, correctly-ordered OHLC, just at a different scale) -- this is a genuine blind spot.",
+    "mitigation": "None applied -- documented honestly rather than fabricating a corporate-actions calendar. If a future task adds a splits data source, it should re-check all periods this program has used.",
+    "residual_risk_classification": "UNRESOLVED_DATA_INTEGRITY_CAVEAT -- not fabricated away, carried forward in task71_summary.md."
+  },
+  "current_universe_backcast_bias": {
+    "present": true,
+    "classification": "CURRENT_UNIVERSE_BACKCAST_BIAS",
+    "explanation": "The 35-symbol universe is TODAY's liquid, large/mega-cap set (Nasdaq-100-adjacent), applied retroactively to 2024-2026 history. No historical index-constituent reconstruction was attempted -- doing so would require a historical-membership data source this repo does not have, and fabricating one would be worse than acknowledging the gap. This means: (a) any symbol that would have been dropped from a liquid/mega-cap universe during 2024-2026 due to underperformance is NOT in this universe and never was tested -- a form of survivorship bias favoring names that stayed large/liquid; (b) conversely, no symbol that entered mega-cap status only recently is included either (the set is static, not point-in-time). This does NOT necessarily invalidate the research -- the goal is currently-tradeable liquid names for an eventual PAPER/live universe, not a historically representative sample -- but it DOES mean any 'this effect exists across the market' claim should be read as 'this effect exists across today's liquid mega-cap set,' not a market-wide claim.",
+    "confidence_impact": "Recorded as a confidence caveat on any Task71 candidate nomination, not a disqualifying defect."
+  },
+  "sector_concentration": {
+    "method": "Manual sector tagging (no sector-classification data source in this repo -- reasoned from general knowledge).",
+    "tally": {
+      "technology_semiconductors": ["NVDA", "AMD", "AVGO", "QCOM", "KLAC", "LRCX", "AMAT", "MU", "ADI", "INTC", "TXN"],
+      "technology_software_platforms": ["MSFT", "GOOGL", "META", "ADBE", "INTU", "PANW", "CSCO", "NFLX"],
+      "technology_hardware_consumer": ["AAPL"],
+      "consumer_discretionary_ecommerce_travel": ["AMZN", "TSLA", "BKNG", "SBUX", "SBUX", "PYPL"],
+      "consumer_staples": ["COST", "PEP", "CMCSA"],
+      "healthcare_biotech": ["GILD", "ISRG", "REGN", "VRTX"],
+      "industrials_conglomerate": ["HON"],
+      "storage_hardware": ["STX"],
+      "food_beverage": ["MDLZ"]
+    },
+    "conclusion": "Roughly 19-20 of 35 symbols (>50%) are technology/semiconductor names -- a material sector concentration. Any cross-sectional finding (e.g. 'top1_symbol_contribution <=40%') can still mask a SECTOR-level concentration if the effect is really a tech/semi-sector phenomenon expressed across many correlated names, not a genuinely idiosyncratic one. This is exactly why Family C (residual momentum) computes a market-model residual (vs SPY) -- controlling for at least the market-wide component -- though a sector-level control (vs. XLK) was not built out in Task71 due to time/scope, and is recorded as a residual limitation."
+  }
+}

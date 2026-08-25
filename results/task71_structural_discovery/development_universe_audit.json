@@ -1,0 +1,39 @@
+{
+  "audit": "TASK71_DEVELOPMENT_DATA_RESET",
+  "policy": "Broaden DEVELOPMENT using ONLY already-contaminated (2025-01-24..2026-08-14) historical periods. Clean 2024 holdout territory is never touched. Selection made on regime-diversity/calendar grounds, not on any new outcome (no Task71 family has been evaluated yet at the time this file was written).",
+  "already_contaminated_range_available": "2025-01-24 to 2026-08-14 (per Task70's historical_exposure_audit.json, OUTCOME_CONTAMINATED by ORPB_V1/FPRC_V1/production-strategy research and F6's own development)",
+  "already_on_disk_slice": {
+    "data_dir": "data/historical_1m/task67a_development",
+    "period": ["2026-05-15", "2026-08-14"],
+    "symbols": 35, "bars": 1376385,
+    "regime_label": "late-2026 / F6-development era",
+    "provenance": "results/task67a_phenomenon_discovery/data_split_contract.json"
+  },
+  "new_slices_selected": [
+    {
+      "regime_label": "early-2025 / ORPB-development era",
+      "period": ["2025-02-03", "2025-03-14"],
+      "rationale": "Falls inside the ORPB_V1 development+validation window (2025-01-24..2025-05-05, already OUTCOME_CONTAMINATED) -- a distinct calendar quarter/regime from the 2026 summer slice already on disk.",
+      "data_dir": "data/historical_1m/task71_development_2025q1"
+    },
+    {
+      "regime_label": "mid-2025 / FPRC-development era",
+      "period": ["2025-06-02", "2025-07-11"],
+      "rationale": "Falls inside the FPRC_V1 validation window (2025-05-06..2025-08-14, already OUTCOME_CONTAMINATED) -- a third distinct calendar quarter.",
+      "data_dir": "data/historical_1m/task71_development_2025q3"
+    },
+    {
+      "regime_label": "late-2025 / Task46-56 era",
+      "period": ["2025-10-27", "2025-12-05"],
+      "rationale": "Falls inside the Task46-53/54/56 windows (already OUTCOME_CONTAMINATED for the 35-symbol universe) -- a fourth distinct calendar quarter, giving four non-adjacent regime slices spanning ~15 months without downloading the full continuous range.",
+      "data_dir": "data/historical_1m/task71_development_2025q4"
+    }
+  ],
+  "no_overlap_with_2024_holdout": "All four slices are entirely within 2025-2026; none touch calendar year 2024 (Task70's consumed blocks or the remaining clean territory).",
+  "regimes_covered": [
+    "early 2025 (post-holiday, pre-spring)", "early-summer 2025", "autumn/pre-holiday 2025",
+    "summer 2026 (F6's own development era)"
+  ],
+  "why_not_the_full_continuous_range": "The task prefers a broader pool for regime diversity, not necessarily every single day of the contaminated range. Four well-separated ~6-week slices give meaningful cross-regime stability testing (Part 15) at a fraction of the download/compute cost of the full ~19-month continuous range, while still being drawn exclusively from already-contaminated territory.",
+  "corporate_action_note": "Alpaca bars are requested with adjustment=raw (unadjusted), matching the existing scripts/download_historical_1m.py convention used throughout this program. No split/dividend adjustment is applied. A material stock split within any of these four windows would appear as a single-bar price discontinuity; none of the 35 universe symbols is known to have had a split announced during 2025-2026 as of this task's own knowledge, but this was NOT independently verified against a corporate-actions data source (none exists in this repo) -- flagged as a residual, unresolved data-integrity caveat, not fabricated away."
+}
