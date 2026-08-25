@@ -1,0 +1,2 @@
+n_rows,n_positive_rows,total_positive_value,insufficient_n,n_symbols,top1_symbol,top1_symbol_share,top3_symbol_share,top3_symbols,n_days,best_day,best_day_share,top3_day_share
+43,29,0.28444873750943617,False,16,TSLA,0.22418003679958312,0.4606396631950629,"['TSLA', 'MU', 'AVGO']",8,2024-03-11,0.29575792693089725,0.6590241196270488

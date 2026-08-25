@@ -1,0 +1,504 @@
+{
+  "data_dir": "data\\historical_1m\\task70_validation",
+  "dataset_hash_sha256": "30a64179e8e4",
+  "feed": "account_default (omitted -- confirmed SIP per data_split_contract.json precedent)",
+  "overall_status": "FULL",
+  "per_symbol": {
+    "AAPL": {
+      "actual_range": [
+        "2024-02-01 00:00:00+00:00",
+        "2024-03-15 23:59:00+00:00"
+      ],
+      "bars_returned": 24047,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "ADBE": {
+      "actual_range": [
+        "2024-02-01 00:35:00+00:00",
+        "2024-03-15 23:59:00+00:00"
+      ],
+      "bars_returned": 13482,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "ADI": {
+      "actual_range": [
+        "2024-02-01 14:27:00+00:00",
+        "2024-03-15 20:21:00+00:00"
+      ],
+      "bars_returned": 12423,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 31
+    },
+    "AMAT": {
+      "actual_range": [
+        "2024-02-01 09:12:00+00:00",
+        "2024-03-15 23:48:00+00:00"
+      ],
+      "bars_returned": 14312,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 31
+    },
+    "AMD": {
+      "actual_range": [
+        "2024-02-01 00:02:00+00:00",
+        "2024-03-15 23:59:00+00:00"
+      ],
+      "bars_returned": 25591,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "AMZN": {
+      "actual_range": [
+        "2024-02-01 00:00:00+00:00",
+        "2024-03-15 23:59:00+00:00"
+      ],
+      "bars_returned": 22954,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "AVGO": {
+      "actual_range": [
+        "2024-02-01 00:28:00+00:00",
+        "2024-03-15 23:58:00+00:00"
+      ],
+      "bars_returned": 13469,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "BKNG": {
+      "actual_range": [
+        "2024-02-01 14:30:00+00:00",
+        "2024-03-15 20:10:00+00:00"
+      ],
+      "bars_returned": 6015,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 31
+    },
+    "CMCSA": {
+      "actual_range": [
+        "2024-02-01 00:02:00+00:00",
+        "2024-03-15 21:43:00+00:00"
+      ],
+      "bars_returned": 13182,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "COST": {
+      "actual_range": [
+        "2024-02-01 00:10:00+00:00",
+        "2024-03-15 23:29:00+00:00"
+      ],
+      "bars_returned": 12888,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "CSCO": {
+      "actual_range": [
+        "2024-02-01 00:09:00+00:00",
+        "2024-03-15 22:52:00+00:00"
+      ],
+      "bars_returned": 14563,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "GILD": {
+      "actual_range": [
+        "2024-02-01 00:37:00+00:00",
+        "2024-03-15 21:53:00+00:00"
+      ],
+      "bars_returned": 12867,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "GOOGL": {
+      "actual_range": [
+        "2024-02-01 00:01:00+00:00",
+        "2024-03-15 23:59:00+00:00"
+      ],
+      "bars_returned": 21220,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "HON": {
+      "actual_range": [
+        "2024-02-01 00:51:00+00:00",
+        "2024-03-15 21:57:00+00:00"
+      ],
+      "bars_returned": 12435,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "INTC": {
+      "actual_range": [
+        "2024-02-01 00:00:00+00:00",
+        "2024-03-15 23:59:00+00:00"
+      ],
+      "bars_returned": 21910,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "INTU": {
+      "actual_range": [
+        "2024-02-01 13:45:00+00:00",
+        "2024-03-15 23:46:00+00:00"
+      ],
+      "bars_returned": 11397,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 31
+    },
+    "ISRG": {
+      "actual_range": [
+        "2024-02-01 00:28:00+00:00",
+        "2024-03-15 20:20:00+00:00"
+      ],
+      "bars_returned": 11606,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "KLAC": {
+      "actual_range": [
+        "2024-02-01 14:20:00+00:00",
+        "2024-03-15 20:20:00+00:00"
+      ],
+      "bars_returned": 10384,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 31
+    },
+    "LRCX": {
+      "actual_range": [
+        "2024-02-01 13:57:00+00:00",
+        "2024-03-15 21:52:00+00:00"
+      ],
+      "bars_returned": 10953,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 31
+    },
+    "MDLZ": {
+      "actual_range": [
+        "2024-02-01 14:26:00+00:00",
+        "2024-03-15 20:05:00+00:00"
+      ],
+      "bars_returned": 12414,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 31
+    },
+    "META": {
+      "actual_range": [
+        "2024-02-01 00:08:00+00:00",
+        "2024-03-15 23:59:00+00:00"
+      ],
+      "bars_returned": 19297,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "MSFT": {
+      "actual_range": [
+        "2024-02-01 00:01:00+00:00",
+        "2024-03-15 23:59:00+00:00"
+      ],
+      "bars_returned": 19911,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "MU": {
+      "actual_range": [
+        "2024-02-01 10:01:00+00:00",
+        "2024-03-15 23:59:00+00:00"
+      ],
+      "bars_returned": 16848,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 31
+    },
+    "NFLX": {
+      "actual_range": [
+        "2024-02-01 00:11:00+00:00",
+        "2024-03-15 21:59:00+00:00"
+      ],
+      "bars_returned": 13748,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "NVDA": {
+      "actual_range": [
+        "2024-02-01 00:01:00+00:00",
+        "2024-03-15 23:59:00+00:00"
+      ],
+      "bars_returned": 27611,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "PANW": {
+      "actual_range": [
+        "2024-02-01 00:25:00+00:00",
+        "2024-03-15 23:43:00+00:00"
+      ],
+      "bars_returned": 16395,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "PEP": {
+      "actual_range": [
+        "2024-02-01 13:03:00+00:00",
+        "2024-03-15 23:59:00+00:00"
+      ],
+      "bars_returned": 13052,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 31
+    },
+    "PYPL": {
+      "actual_range": [
+        "2024-02-01 00:08:00+00:00",
+        "2024-03-15 23:47:00+00:00"
+      ],
+      "bars_returned": 18239,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "QCOM": {
+      "actual_range": [
+        "2024-02-01 00:00:00+00:00",
+        "2024-03-15 23:43:00+00:00"
+      ],
+      "bars_returned": 14970,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "REGN": {
+      "actual_range": [
+        "2024-02-01 14:30:00+00:00",
+        "2024-03-15 20:05:00+00:00"
+      ],
+      "bars_returned": 7705,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 31
+    },
+    "SBUX": {
+      "actual_range": [
+        "2024-02-01 00:53:00+00:00",
+        "2024-03-15 23:58:00+00:00"
+      ],
+      "bars_returned": 13400,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "STX": {
+      "actual_range": [
+        "2024-02-01 00:15:00+00:00",
+        "2024-03-15 20:05:00+00:00"
+      ],
+      "bars_returned": 12129,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "TSLA": {
+      "actual_range": [
+        "2024-02-01 00:01:00+00:00",
+        "2024-03-15 23:59:00+00:00"
+      ],
+      "bars_returned": 28191,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 32
+    },
+    "TXN": {
+      "actual_range": [
+        "2024-02-01 13:30:00+00:00",
+        "2024-03-15 21:17:00+00:00"
+      ],
+      "bars_returned": 12765,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 31
+    },
+    "VRTX": {
+      "actual_range": [
+        "2024-02-01 12:02:00+00:00",
+        "2024-03-15 23:17:00+00:00"
+      ],
+      "bars_returned": 11195,
+      "requested_range": [
+        "2024-02-01",
+        "2024-03-15"
+      ],
+      "status": "FULL",
+      "trading_sessions": 31
+    }
+  },
+  "provider": "alpaca",
+  "requested_end": "2024-03-15",
+  "requested_start": "2024-02-01",
+  "role": "VALIDATION",
+  "universe": [
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "AMZN",
+    "META",
+    "AMD",
+    "TSLA",
+    "GOOGL",
+    "PYPL",
+    "STX",
+    "ADBE",
+    "ADI",
+    "AMAT",
+    "AVGO",
+    "BKNG",
+    "CMCSA",
+    "COST",
+    "CSCO",
+    "GILD",
+    "HON",
+    "INTC",
+    "INTU",
+    "ISRG",
+    "KLAC",
+    "LRCX",
+    "MDLZ",
+    "MU",
+    "NFLX",
+    "PANW",
+    "PEP",
+    "QCOM",
+    "REGN",
+    "SBUX",
+    "TXN",
+    "VRTX"
+  ]
+}

@@ -1,0 +1,141 @@
+{
+  "all_criteria_pass": true,
+  "average_loss": -0.009932954038777156,
+  "average_win": 0.0098085771554978,
+  "bootstrap_ci_clustered_by_session_date_secondary": {
+    "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence.",
+    "ci_high": 0.006532796568539377,
+    "ci_level": 0.95,
+    "ci_low": -0.0013625072217928926,
+    "insufficient_n": false,
+    "method": "clustered_percentile_bootstrap",
+    "n": 10,
+    "n_resamples": 10000,
+    "point_estimate": 0.0033811018829431622,
+    "seed": 670067
+  },
+  "bootstrap_ci_clustered_by_symbol": {
+    "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence.",
+    "ci_high": 0.006942294622642634,
+    "ci_level": 0.95,
+    "ci_low": -0.0007064395740471451,
+    "insufficient_n": false,
+    "method": "clustered_percentile_bootstrap",
+    "n": 20,
+    "n_resamples": 10000,
+    "point_estimate": 0.0033811018829431622,
+    "seed": 670067
+  },
+  "causal_violations_decision_after_or_at_entry": 0,
+  "classification": "VALIDATION_PASS",
+  "cost_sensitivity": {
+    "0bps": {
+      "expectancy": 0.004381101882943162,
+      "profit_factor": 2.489730199341082,
+      "total_return": 0.18838738096655597
+    },
+    "10bps": {
+      "expectancy": 0.0033811018829431622,
+      "profit_factor": 2.0454908867635355,
+      "total_return": 0.14538738096655598
+    },
+    "5bps": {
+      "expectancy": 0.0038811018829431627,
+      "profit_factor": 2.2595589139387586,
+      "total_return": 0.166887380966556
+    }
+  },
+  "dataset_hash": "30a64179e8e4",
+  "decision_to_entry_seconds": {
+    "max": 60.0,
+    "median": 60.0,
+    "min": 60.0
+  },
+  "exit_reason_counts": {
+    "FIXED_60M_EXIT": 43
+  },
+  "gross_expectancy": 0.004381101882943162,
+  "gross_total_return": 0.18838738096655597,
+  "holding_seconds": {
+    "max": 3600.0,
+    "median": 3600.0,
+    "min": 3600.0
+  },
+  "long_count": 33,
+  "long_expectancy": 0.004595171330417386,
+  "mae_median_pct": 0.004551015414729664,
+  "max_drawdown_net_return_units": -0.034508845834989005,
+  "median_trade": 0.005854345165238706,
+  "mfe_median_pct": 0.01221898968526846,
+  "net_expectancy_10bps": 0.0033811018829431622,
+  "net_total_return_10bps": 0.14538738096655598,
+  "number_of_candidates": 1217,
+  "number_of_trades": 43,
+  "pass_criteria_evaluation": {
+    "1_net_expectancy_positive_10bps": {
+      "pass": true,
+      "threshold": "> 0",
+      "value": 0.0033811018829431622
+    },
+    "2_gross_direction_consistent_with_discovery": {
+      "gross_expectancy": 0.004381101882943162,
+      "note": "per-sign asymmetry (long +0.46pct, short -0.06pct) explicitly documented in spec as informational, not a pass/fail requirement",
+      "pass": true
+    },
+    "3_no_single_symbol_or_day_domination": {
+      "pass": true,
+      "threshold": "<=0.40 each",
+      "top1_day": 0.29575792693089725,
+      "top1_symbol": 0.22418003679958312
+    },
+    "4_top3_winners_removed_not_destroyed": {
+      "floor": -0.0033811018829431622,
+      "pass": true,
+      "value": 0.0019281597687072116
+    },
+    "5_sample_size_floor": {
+      "pass": true,
+      "sessions": 10,
+      "symbols": 20,
+      "thresholds": ">=30/>=10/>=10",
+      "trades": 43
+    },
+    "6_bootstrap_ci_not_grossly_negative": {
+      "ci_low_by_symbol": -0.0007064395740471451,
+      "floor": -0.001,
+      "pass": true
+    },
+    "7_realistic_costs_dont_erase_edge": {
+      "pass": true,
+      "result_10bps": 0.0033811018829431622,
+      "result_5bps": 0.0038811018829431627
+    },
+    "8_no_causal_or_integrity_violation": {
+      "causal_violations": 0,
+      "fingerprint_match": true,
+      "pass": true
+    }
+  },
+  "period": {
+    "end": "2024-03-15",
+    "start": "2024-02-01"
+  },
+  "profit_factor_10bps": 2.0454908867635355,
+  "rejection_reason_counts": {
+    "DATA_NOT_READY": 791,
+    "OPENING_MOVE_BELOW_THRESHOLD": 383
+  },
+  "role": "VALIDATION",
+  "session_coverage": 10,
+  "short_count": 10,
+  "short_expectancy": -0.0006253272937217766,
+  "strategy_fingerprint": "6beb8eebe50053aae27cab90226534b5d4392c46bd6e9c094873f7ad37466084",
+  "strategy_fingerprint_match": true,
+  "symbol_coverage": 20,
+  "top1_day_contribution": 0.29575792693089725,
+  "top1_symbol_contribution": 0.22418003679958312,
+  "top3_day_contribution": 0.6590241196270488,
+  "top3_symbol_contribution": 0.4606396631950629,
+  "top3_winners_removed_expectancy": 0.0019281597687072116,
+  "win_rate": 0.6744186046511628
+}
