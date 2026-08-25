@@ -1,0 +1,38 @@
+{
+  "task": "72 Part 8 -- pre-registered validation protocol",
+  "declared_before_any_validation_outcome_is_known": true,
+  "strategy": "IDIOSYNCRATIC_RESIDUAL_MOMENTUM_LONG_V1",
+  "required_fingerprint": "f3764b6794f2e00cc5262f73d241b5274ebf544dd65cc96e7a7ab175d7c6025a",
+  "note": "Validation must recompute the fingerprint from the loaded contract and verify it matches this exact value before trusting any other output.",
+  "primary_cost_bps": 10,
+  "diagnostic_cost_levels_bps": [0, 5, 10, 15, 20],
+  "day_dependence_emphasis": "The candidate's main unresolved Task71 weakness is DAY dependence (day-clustered CI crosses zero at every Task71 cell). This protocol therefore explicitly weighs distinct-day breadth and day-cluster bootstrap evidence, not just trade count.",
+  "VALIDATION_PASS_requires_all_of": [
+    "1. net_expectancy_primary_cost (10bps) > 0",
+    "2. profit_factor at 10bps > 1",
+    "3. net_expectancy_15bps >= 0 OR clearly economically non-trivial positive performance at 10bps with a documented reason why 15bps is slightly below zero",
+    "4. session_coverage (distinct trading days) >= 20",
+    "5. symbol_coverage >= 15",
+    "6. top1_symbol_contribution <= 0.40",
+    "7. top1_day_contribution <= 0.40",
+    "8. removing the top 3 winning trades does not flip the strategy into a materially large negative expectancy",
+    "9. performance is not carried exclusively by one small time subsegment (early/mid/late thirds -- at least two of three segments must show the same sign as the overall result, or the exception must be explained by data-quality/day-count asymmetry, not cherry-picked)",
+    "10. day-cluster bootstrap is not strongly contradictory to the positive point estimate -- the day-cluster CI does NOT have to exclude zero by itself, but if the point estimate is weak AND the day-cluster distribution is clearly negative (ci_high < 0), that combination is FAIL/INCONCLUSIVE as appropriate",
+    "11. symbol-cluster result must not materially contradict the edge (symbol-cluster CI should not be clearly negative, i.e. ci_high < 0)",
+    "12. stop behavior is operationally reasonable: no obvious execution/coding pathology (e.g. stop_rate not implausibly 0% or 100%, no fingerprint/causality violation in the stop logic)",
+    "13. no causal/data-quality/fingerprint violation (fingerprint match, zero interpolated/forward-filled/synthetic prices, all timestamps causal)",
+    "14. long-only mechanism remains directionally consistent with Task71 (gross_expectancy_pct > 0, matching Task71's LONG-side finding)",
+    "15. costs do not erase essentially all economic edge (net_expectancy_10bps_pct remains a non-trivial positive fraction of gross_expectancy_pct, not reduced to near-zero)"
+  ],
+  "classifications": {
+    "VALIDATION_PASS": "All 15 criteria above are collectively satisfied.",
+    "VALIDATION_FAIL": "Material contradiction of the frozen hypothesis -- e.g. net_expectancy_primary_cost is negative AND gross direction is also inconsistent with the LONG residual-momentum hypothesis (not merely thin/inconclusive), OR a clear causal/data-integrity/fingerprint violation is found.",
+    "VALIDATION_INCONCLUSIVE": "Sample/data uncertainty prevents a trustworthy decision either way -- e.g. session_coverage or symbol_coverage fall short of criteria 4/5, or the day-cluster/symbol-cluster evidence is too wide/ambiguous to support either PASS or FAIL confidently. This is NOT the same as FAIL."
+  },
+  "explicit_prohibitions": [
+    "Do not loosen, reweight, or drop any of the 15 criteria after seeing the actual validation numbers.",
+    "Do not rerun Task71's 72-cell discovery grid.",
+    "Do not tune threshold/horizon/stop using validation-holdout outcomes.",
+    "Replication is FORBIDDEN unless classification is exactly VALIDATION_PASS -- FAIL or INCONCLUSIVE must not be followed by a replication attempt on a different window."
+  ]
+}

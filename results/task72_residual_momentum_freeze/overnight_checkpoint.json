@@ -1,0 +1,24 @@
+{
+  "task": "72/73 overnight",
+  "stage": "STRATEGY_FROZEN",
+  "timestamp_utc": "2026-08-26T00:20:00Z",
+  "branch": "research/talonx-alpha-phenomenon-discovery",
+  "head_sha": "727daaa00dbfe475362542f196100a4ffe2de42f",
+
+  "freeze_complete": true,
+  "freeze_commit": "PENDING_THIS_COMMIT",
+
+  "holdout_audit_complete": false,
+  "holdout_lock_complete": false,
+  "holdout_lock_commit": null,
+
+  "validation_data_complete": false,
+  "validation_complete": false,
+  "validation_classification": null,
+
+  "replication_data_complete": false,
+  "replication_complete": false,
+  "replication_classification": null,
+
+  "next_action": "Strategy frozen: IDIOSYNCRATIC_RESIDUAL_MOMENTUM_LONG_V1 (threshold=0.75%, horizon=180m, stop=2.5%), fingerprint f3764b6794f2e00cc5262f73d241b5274ebf544dd65cc96e7a7ab175d7c6025a computed and recorded. 12 focused tests pass. Validation protocol (15 criteria) pre-registered. Proceeding to Part 9/10: holdout exposure re-audit and lock, to be committed and pushed BEFORE any holdout outcome is computed."
+}
