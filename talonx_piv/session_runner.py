@@ -38,10 +38,15 @@ from .decision_engine import DecisionEngine
 from .events import EventBus, PivEvent
 from .lifecycle import PaperLifecycle
 from .lifecycle_probe import close_piv_lifecycle_probe, run_piv_lifecycle_probe
+from .premarket_radar import PremarketRadarEngine, classify, is_premarket
 from .readiness import READY_AT, ReadinessStateError, SessionReadinessValidator, load_readiness_state, save_readiness_state
 
 ET = ZoneInfo("America/New_York")
 OPEN = time(9, 30)
+# Task 69Q Part 7C: if no NATURAL actionable signal has fired for this long
+# during the regular session, send one compact "engine active" heartbeat --
+# never more often than this, regardless of how many ticks run in between.
+HEARTBEAT_INTERVAL_SECONDS = 1800.0
 
 
 def _parse_hhmm(value: str) -> time:
@@ -74,6 +79,11 @@ class SessionRunner:
     decision_engine: DecisionEngine | None = None
     poll_interval_seconds: float = 60.0
     probe_enabled: bool = False
+    # Task 69Q Part 8: a single mutable dict, owned by the caller (cli.py),
+    # shared with the /ping listener -- see telegram_inbound.build_piv_info.
+    # None is a fully supported no-op (e.g. tests that don't need /ping).
+    piv_info: dict | None = None
+    premarket_radar_enabled: bool = True
 
     _last_bar_ts: dict[str, datetime] = field(default_factory=dict, init=False)
     _last_seen_wall: dict[str, datetime] = field(default_factory=dict, init=False)
@@ -83,6 +93,10 @@ class SessionRunner:
     _session: date | None = field(default=None, init=False)
     _probe_attempted: bool = field(default=False, init=False)
     _probe_position_open: bool = field(default=False, init=False)
+    _premarket_radar: PremarketRadarEngine = field(default_factory=PremarketRadarEngine, init=False)
+    _last_heartbeat_wall: datetime | None = field(default=None, init=False)
+    _last_natural_signal_wall: datetime | None = field(default=None, init=False)
+    _last_natural_signal_count_seen: int = field(default=0, init=False)
 
     @property
     def flatten_time(self) -> time:
@@ -159,6 +173,10 @@ class SessionRunner:
                     status=f"missing_minutes={len(telemetry.missing_minutes)}",
                 ))
         self._persist_readiness(session)
+        if self.piv_info is not None:
+            self.piv_info["session_ready_count"] = len(self._ready_symbols)
+            if self.decision_engine is not None:
+                self.piv_info["warmup_ready_count"] = len(self.decision_engine.warmup_ready_symbols)
 
     def _check_stale(self, now: datetime) -> None:
         for symbol in self.config.universe:
@@ -173,6 +191,12 @@ class SessionRunner:
                 self.events.emit(PivEvent.build("STALE_DATA", symbol=symbol, reason=f"no new bar for >{self.config.stale_seconds}s"))
             elif gap <= self.config.stale_seconds:
                 self._stale_flagged.discard(symbol)
+        if self.piv_info is not None:
+            self.piv_info["stale_count"] = len(self._stale_flagged)
+            self.piv_info["feed_health"] = (
+                f"DEGRADED ({len(self._stale_flagged)} stale)" if self._stale_flagged
+                else "HEALTHY (PIV live feed active)"
+            )
 
     async def process_tick(self, now: datetime) -> None:
         session = now.astimezone(ET).date()
@@ -226,6 +250,53 @@ class SessionRunner:
             self._close_probe()
 
         self._check_stale(now)
+        self._update_piv_info_after_tick(now)
+        self._maybe_emit_heartbeat(now)
+
+    def _update_piv_info_after_tick(self, now: datetime) -> None:
+        """Task 69Q Part 8: keeps the shared /ping dict current every tick --
+        cheap (small in-memory dicts/counters only, no I/O)."""
+        if self.piv_info is None:
+            return
+        if self.decision_engine is not None:
+            funnel = self.decision_engine.funnel_summary()
+            self.piv_info["quant_evaluation_cycles"] = funnel["evaluation_cycles"]
+            self.piv_info["quant_candidates"] = funnel["candidates"]
+            self.piv_info["quant_published"] = funnel["published"]
+            self.piv_info["quant_rejected"] = funnel["rejected"]
+            self.piv_info["quant_unaccounted"] = funnel["unaccounted_candidates"]
+            if funnel["published"] > self._last_natural_signal_count_seen:
+                self._last_natural_signal_count_seen = funnel["published"]
+                self._last_natural_signal_wall = now
+        self.piv_info["radar_watch_count"] = self._premarket_radar.watch_count
+        orders = self.lifecycle.state.orders.values()
+        self.piv_info["natural_orders"] = sum(1 for o in orders if o.get("source") == "STRATEGY")
+        self.piv_info["natural_fills"] = sum(1 for o in orders if o.get("source") == "STRATEGY" and o.get("status") == "filled")
+        self.piv_info["probe_orders"] = sum(1 for o in orders if o.get("source") == "PIV_LIFECYCLE_PROBE")
+        self.piv_info["probe_fills"] = sum(1 for o in orders if o.get("source") == "PIV_LIFECYCLE_PROBE" and o.get("status") == "filled")
+
+    def _maybe_emit_heartbeat(self, now: datetime) -> None:
+        """Task 69Q Part 7C: a compact, rate-limited 'engine active' status
+        when no NATURAL actionable signal has published in a while --
+        informational only, never sent more than once per
+        HEARTBEAT_INTERVAL_SECONDS regardless of tick frequency."""
+        if self.decision_engine is None:
+            return
+        if self._last_heartbeat_wall is None:
+            self._last_heartbeat_wall = now  # baseline -- no heartbeat at the very first eligible tick
+            return
+        if (now - self._last_heartbeat_wall).total_seconds() < HEARTBEAT_INTERVAL_SECONDS:
+            return
+        if self._last_natural_signal_wall is not None and (now - self._last_natural_signal_wall).total_seconds() < HEARTBEAT_INTERVAL_SECONDS:
+            self._last_heartbeat_wall = now
+            return
+        self._last_heartbeat_wall = now
+        funnel = self.decision_engine.funnel_summary()
+        top_reason = max(funnel["rejected_breakdown"], key=funnel["rejected_breakdown"].get) if funnel["rejected_breakdown"] else "NONE"
+        self.events.emit(PivEvent.build(
+            "STATUS_HEARTBEAT", status="NO_ACTIONABLE_TRADES_ENGINE_ACTIVE",
+            reason=f"top_rejection={top_reason}",
+        ))
 
     def _run_probe(self, now: datetime) -> None:
         self._probe_attempted = True
@@ -241,6 +312,64 @@ class SessionRunner:
         path = self.config.state_dir / "warmup_verification.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps([c.to_dict() for c in warmup_checks], indent=2, sort_keys=True), encoding="utf-8")
+
+    def _write_funnel_report(self) -> None:
+        """Task 69Q Part 3: DecisionEngine only lives for the duration of the
+        `start` command's live loop -- the separate `eod` CLI invocation
+        cannot see its in-memory counters, so they're persisted here for
+        `eod` to read and fold into the session report."""
+        if self.decision_engine is None:
+            return
+        import json
+        path = self.config.state_dir / "quant_funnel_report.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self.decision_engine.funnel_summary(), indent=2, sort_keys=True), encoding="utf-8")
+
+    def fetch_snapshots(self) -> dict[str, dict]:
+        """Alpaca /v2/stocks/snapshots -- gives prevDailyBar.c (previous
+        session close) and latestTrade/dailyBar for the pre-market radar's
+        gap calculation. Reuses the exact transport/feed-param pattern
+        fetch_bars_latest already uses; not called during the regular
+        session (radar is pre-market-only, see process_premarket_tick)."""
+        feed = FEED_MODE_PARAM[self.config.feed_mode]
+        headers = {"APCA-API-KEY-ID": self.config.key_id, "APCA-API-SECRET-KEY": self.config.secret_key}
+        response = self.transport.get(
+            f"{self.config.data_endpoint}/v2/stocks/snapshots",
+            headers=headers, params={"symbols": ",".join(self.config.universe), "feed": feed}, timeout=15,
+        )
+        if response.status_code != 200:
+            return {}
+        return (response.json() or {}).get("snapshots") or (response.json() or {})
+
+    async def process_premarket_tick(self, now: datetime) -> None:
+        """Observational only -- see premarket_radar.py's module docstring
+        for why this can never place an order (no lifecycle/broker import
+        anywhere in that module). Emits only on a bias TRANSITION, never
+        every tick (Part 7C: avoid spam)."""
+        if not self.premarket_radar_enabled:
+            return
+        try:
+            snapshots = self.fetch_snapshots()
+        except Exception as exc:  # noqa: BLE001 -- radar is best-effort, must never crash the session
+            self.events.emit(PivEvent.build("BROKER_ERROR", reason=f"PREMARKET_RADAR_FETCH_FAILED_{type(exc).__name__}: {exc}", status="RADAR_TICK_SKIPPED"))
+            return
+        observations = []
+        for symbol in self.config.universe:
+            snap = snapshots.get(symbol) or {}
+            prev_close = ((snap.get("prevDailyBar") or {}).get("c"))
+            latest_price = ((snap.get("latestTrade") or {}).get("p")) or ((snap.get("dailyBar") or {}).get("c"))
+            latest_volume = (snap.get("dailyBar") or {}).get("v")
+            observations.append(classify(symbol, prev_close, latest_price, latest_volume))
+        for transition in self._premarket_radar.evaluate(observations):
+            reason_bits = list(transition.get("reason_codes", ()))
+            if transition.get("gap_pct") is not None:
+                reason_bits.append(f"gap_pct={transition['gap_pct']}")
+            self.events.emit(PivEvent.build(
+                transition["event"], symbol=transition["symbol"], source="PREMARKET_RADAR", alpha_evidence=False,
+                status=transition.get("bias"), reason=",".join(reason_bits) or None,
+            ))
+        if self.piv_info is not None:
+            self.piv_info["radar_watch_count"] = self._premarket_radar.watch_count
 
     def _close_probe(self) -> None:
         closed = close_piv_lifecycle_probe(self.events, self.lifecycle)
@@ -286,11 +415,23 @@ class SessionRunner:
                             "BROKER_ERROR", reason=f"TICK_FAILED_{type(exc).__name__}: {exc}",
                             status="TICK_SKIPPED_LOOP_CONTINUES",
                         ))
+                elif is_premarket(now):
+                    # Task 69Q Part 7A: observational-only radar, wholly
+                    # separate from the regular-session decision path above --
+                    # never touches lifecycle/broker (see premarket_radar.py).
+                    try:
+                        await self.process_premarket_tick(now)
+                    except Exception as exc:  # noqa: BLE001 -- same posture as the regular-session tick above
+                        self.events.emit(PivEvent.build(
+                            "BROKER_ERROR", reason=f"PREMARKET_TICK_FAILED_{type(exc).__name__}: {exc}",
+                            status="RADAR_TICK_SKIPPED_LOOP_CONTINUES",
+                        ))
                 await sleep(self.poll_interval_seconds)
             if self._probe_position_open:
                 self._close_probe()
             if self.decision_engine is not None:
                 self.decision_engine.flatten_all(self._last_bar)
+                self._write_funnel_report()
         finally:
             if self.decision_engine is not None:
                 await self.decision_engine.stop()

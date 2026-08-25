@@ -22,9 +22,10 @@ from .events import EventBus, PivEvent
 from .lifecycle import PaperLifecycle, paper_cleanup
 from .preflight import Preflight
 from .reporting import build_session_report
+from .session_identity import build_session_identity
 from .session_runner import SessionRunner
 from .telegram import sender
-from .telegram_inbound import build_piv_telegram_listener
+from .telegram_inbound import build_piv_info, build_piv_telegram_listener
 
 
 async def run_session(runner: SessionRunner, listener) -> None:
@@ -45,10 +46,10 @@ async def run_session(runner: SessionRunner, listener) -> None:
             await listener_task
 
 
-def runtime(config: PivConfig):
+def runtime(config: PivConfig, session_id: str | None = None):
     bus = EventBus(
         config.state_dir / "piv_events.jsonl", sender(config.telegram_token, config.telegram_chat_id),
-        feed_mode=config.feed_mode,
+        feed_mode=config.feed_mode, session_id=session_id,
     )
     broker = AlpacaPaperClient(config)
     lifecycle = PaperLifecycle(config.state_dir / "lifecycle_state.json", broker, bus)
@@ -76,7 +77,8 @@ def main(argv: list[str] | None = None) -> int:
     base = PivConfig()
     approved = getattr(args, "approved_sha", None) or base.approved_sha
     config = PivConfig(approved_sha=approved)
-    bus, broker, lifecycle = runtime(config)
+    identity = build_session_identity(config)
+    bus, broker, lifecycle = runtime(config, session_id=identity.session_id)
     try:
         if args.command == "preflight":
             status, checks = Preflight(config, broker, bus).run()
@@ -88,6 +90,10 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(result, sort_keys=True))
             return 0 if result["clean"] else 2
         if args.command == "start":
+            (config.state_dir).mkdir(parents=True, exist_ok=True)
+            (config.state_dir / "session_identity.json").write_text(
+                json.dumps(identity.to_dict(), indent=2, sort_keys=True), encoding="utf-8",
+            )
             bus.emit(PivEvent.build("STARTUP", status="PAPER MODE / NO REAL CAPITAL"))
             status, checks = Preflight(config, broker, bus).run()
             Preflight.write_report(config.state_dir / "latest_preflight.json", status, checks, config.feed_mode)
@@ -101,13 +107,17 @@ def main(argv: list[str] | None = None) -> int:
                 import redis.asyncio as redis_asyncio
                 redis_client = redis_asyncio.from_url(os.environ.get("TALONX_REDIS_URL", "redis://localhost:6379"))
                 decision_engine = DecisionEngine(redis_client, bus, lifecycle)
+            piv_info = build_piv_info(
+                config.feed_mode, config.universe, session_id=identity.session_id,
+                runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
+            )
             runner = SessionRunner(
                 config, bus, lifecycle, broker.transport, decision_engine=decision_engine,
-                probe_enabled=args.confirm_piv_lifecycle_probe,
+                probe_enabled=args.confirm_piv_lifecycle_probe, piv_info=piv_info,
             )
             listener = None if args.no_telegram_inbound else build_piv_telegram_listener(
                 config.state_dir, redis_client=redis_client, started_at=datetime.now(timezone.utc),
-                feed_mode=config.feed_mode, universe=config.universe,
+                feed_mode=config.feed_mode, universe=config.universe, piv_info=piv_info,
             )
             asyncio.run(run_session(runner, listener))
             return 0
@@ -120,7 +130,22 @@ def main(argv: list[str] | None = None) -> int:
             result = lifecycle.eod_flatten()
             result["feed_mode"] = config.feed_mode
             (config.state_dir / "latest_reconciliation.json").write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
-            report = build_session_report(bus.path, result, config.feed_mode)
+            # Task 69Q Part 2/3: read back the live session's OWN identity/
+            # funnel counters (this `eod` invocation is a separate process
+            # from `start`'s in-memory state) so the report is scoped to
+            # that exact session/date rather than the whole append-only log.
+            session_id, trading_date_et = None, identity.trading_date_et
+            identity_path = config.state_dir / "session_identity.json"
+            if identity_path.exists():
+                saved = json.loads(identity_path.read_text(encoding="utf-8"))
+                session_id = saved.get("session_id")
+                trading_date_et = saved.get("trading_date_et") or trading_date_et
+            funnel_path = config.state_dir / "quant_funnel_report.json"
+            quant_funnel = json.loads(funnel_path.read_text(encoding="utf-8")) if funnel_path.exists() else None
+            report = build_session_report(
+                bus.path, result, config.feed_mode,
+                trading_date_et=trading_date_et, session_id=session_id, quant_funnel=quant_funnel,
+            )
             (config.state_dir / "latest_session_report.json").write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
             print(json.dumps(result, sort_keys=True))
             return 0 if result["matched"] and not result["broker_open_orders"] and not result["broker_positions"] else 2
