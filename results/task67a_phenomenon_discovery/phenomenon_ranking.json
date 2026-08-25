@@ -1,0 +1,65 @@
+{
+  "method": "composite = 3*verdict_tier + 2*econ_tier + 2*breadth_score + 2*stability_score(1 if stable else 0) + 1*concentration_score(1-top1_share). Documented, fixed BEFORE inspecting whether it changes the ordering; not tuned to produce a preferred result.",
+  "ranking": [
+    {
+      "family": "F6 Opening->Later",
+      "verdict_score": 3,
+      "econ_score": 2,
+      "breadth_score": 1.0,
+      "stability_score": 1.0,
+      "events_per_week": 59.3,
+      "concentration_score": 0.907,
+      "composite": 17.907
+    },
+    {
+      "family": "F3 Range Expansion",
+      "verdict_score": 2,
+      "econ_score": 3,
+      "breadth_score": 0.597,
+      "stability_score": 0.0,
+      "events_per_week": 6.1,
+      "concentration_score": 0.833,
+      "composite": 14.027
+    },
+    {
+      "family": "F2 Structural Pullback",
+      "verdict_score": 2,
+      "econ_score": 2,
+      "breadth_score": 1.0,
+      "stability_score": 0.0,
+      "events_per_week": 603.3,
+      "concentration_score": 0.944,
+      "composite": 12.944
+    },
+    {
+      "family": "F4 Relative Strength",
+      "verdict_score": 2,
+      "econ_score": 1,
+      "breadth_score": 0.754,
+      "stability_score": 1.0,
+      "events_per_week": 175.2,
+      "concentration_score": 0.938,
+      "composite": 12.446
+    },
+    {
+      "family": "F1 Multi-Hour Trend",
+      "verdict_score": 2,
+      "econ_score": 1,
+      "breadth_score": 1.0,
+      "stability_score": 0.0,
+      "events_per_week": 447.1,
+      "concentration_score": 0.954,
+      "composite": 10.954
+    },
+    {
+      "family": "F5 Compression->Expansion",
+      "verdict_score": 1,
+      "econ_score": 1,
+      "breadth_score": 1.0,
+      "stability_score": 0.0,
+      "events_per_week": 468.6,
+      "concentration_score": 0.947,
+      "composite": 7.947
+    }
+  ]
+}

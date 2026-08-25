@@ -71,5 +71,56 @@
       }
     }
   },
-  "stage1_families_1_2_3_final_status": "COMPLETE -- all 3 families (9 definitions total) screened, tested, documented, committed, and pushed. See each family's summary.md for full per-definition detail; see family_03's headline above for the phase's single most promising lead."
+  "stage1_families_1_2_3_final_status": "COMPLETE -- all 3 families (9 definitions total) screened, tested, documented, committed, and pushed. See each family's summary.md for full per-definition detail; see family_03's headline above for the phase's single most promising lead.",
+  "stage1_families_4_5_6_and_synthesis": {
+    "task": "67B Step 3 - families 4-6 + cross-family synthesis + final Stage 1 decision",
+    "started_utc": "2026-08-25T07:14:00Z",
+    "status": "COMPLETE",
+    "families": {
+      "family_04_relative_strength": {
+        "status": "COMPLETE", "committed": true,
+        "script": "research/scripts/task67a_family04_relative_strength.py",
+        "tests": "tests/test_task67a_family04_relative_strength.py (9 tests)",
+        "definitions": ["rs_trailing_30m", "rs_trailing_60m", "rs_trailing_90m"],
+        "verdicts_beta_adjusted": {"rs_trailing_30m": "WEAK_SIGNAL", "rs_trailing_60m": "WEAK_SIGNAL", "rs_trailing_90m": "WEAK_SIGNAL"},
+        "headline": "Causal fail-closed beta estimation: 31-day calibration / 32-day application calendar split, all 35/35 symbols cleared the >=2000-paired-observation threshold (0 failed closed). SPY-beta-adjusted excess CI excludes zero at most horizons but magnitude (3-7bps) never clears the 10bps round-trip friction bar -- ECONOMICALLY_TOO_SMALL throughout. Raw RS and beta-adjusted stayed in the same thin regime (no case of raw-looks-strong-but-adjustment-flattens-it)."
+      },
+      "family_05_compression_expansion": {
+        "status": "COMPLETE", "committed": true,
+        "script": "research/scripts/task67a_family05_compression_expansion.py",
+        "tests": "tests/test_task67a_family05_compression_expansion.py (13 tests)",
+        "definitions": ["persistent_compression_atr30_persist30", "relative_narrow_range_15v90", "declining_compression_atr30_lag30"],
+        "verdicts": {"persistent_compression_atr30_persist30": "PHENOMENON_NOT_OBSERVED", "relative_narrow_range_15v90": "PHENOMENON_NOT_OBSERVED", "declining_compression_atr30_lag30": "PHENOMENON_NOT_OBSERVED"},
+        "headline": "Clean negative across all 3 definitions, each testing CURRENT compression as a precondition (no requirement a breakout has begun -- distinct from Family 3's breakout-triggered definitions). VOLATILITY_EFFECT_NOT_OBSERVED and DIRECTIONAL_EDGE_NOT_OBSERVED throughout; declining_compression_atr30_lag30 found a genuine non-hypothesis-aligned result (matched controls showed significantly MORE absolute movement, CI excludes zero on the negative side)."
+      },
+      "family_06_opening_later": {
+        "status": "COMPLETE", "committed": true,
+        "script": "research/scripts/task67a_family06_opening_later.py",
+        "tests": "tests/test_task67a_family06_opening_later.py (13 tests)",
+        "definitions": ["opening_return_magnitude", "opening_relative_strength_vs_spy", "opening_relative_volume"],
+        "verdicts": {"opening_return_magnitude": "PHENOMENON_PRESENT", "opening_relative_strength_vs_spy": "PHENOMENON_PRESENT", "opening_relative_volume": "PHENOMENON_PRESENT"},
+        "headline": "THE STANDOUT RESULT OF STAGE 1: all 3 independently-defined signals reach PHENOMENON_PRESENT under the shared taxonomy -- coherent direction across 15/30/60/120m, matched-control CI excludes zero at 15m/60m/120m, POTENTIALLY_TRADEABLE economics, full breadth (35/35 symbols, 63/63 days), low concentration, stable effect surface. CRITICAL: the direction is MEAN-REVERSION (fade), the OPPOSITE of the family's original 'continuation' hypothesis -- see task67b_summary.json for the reframing. Decision point fixed at 14:00 UTC (30m post-open); never trades the opening breakout itself, orpb_v1.py never opened."
+      }
+    },
+    "cross_family_synthesis": {
+      "status": "COMPLETE",
+      "script": "research/scripts/task67b_cross_family_synthesis.py",
+      "outputs": ["event_overlap_matrix.csv", "family_comparison.csv", "effect_surface_summary.csv", "phenomenon_ranking.json", "cross_family_summary.json", "cross_family_summary.md"],
+      "bug_found_and_fixed": "research_stats.cross_family_overlap had the SAME class of tz-aware object-dtype bug already fixed in screening_framework.py during Step 1 -- never caught before because no family script called this function until cross-family synthesis was the first real caller. Fixed with the same _naive_utc_ns-style approach (kept as a private local helper in research_stats.py rather than importing screening_framework.py, to avoid a reverse dependency); regression test added (test_cross_family_overlap_does_not_raise_on_tz_aware_timestamps).",
+      "ranking_result": "F6 Opening->Later leads by a wide margin (composite 17.9 vs next-best F3 Range Expansion 14.0). Same-symbol-DAY overlap between families is largely saturated (uninformative given event density over only 63 days) -- same-symbol-TIME overlap (5-min tolerance, max ~0.5) is the meaningful redundancy signal and shows F6 is the LEAST redundant family, not the most."
+    },
+    "final_decision": {
+      "status": "COMPLETE",
+      "outputs": ["task67b_summary.json", "task67b_summary.md", "claude_handoff_next.md"],
+      "decision": "PHENOMENON_READY_FOR_STAGE_2",
+      "candidate": "family_06_opening_later, reframed as a fade/reversal hypothesis (not the originally-hypothesized continuation)",
+      "explicitly_not_nominated": "family_03_range_expansion's compression90_expansion10_2.5x -- single definition, n=76 (LIMITED), EFFECT_SURFACE_INSTABILITY=True; flagged as a watch item only."
+    },
+    "testing": {
+      "task67_focused_suite": "124/124 passing (tests/test_task67a_*.py)",
+      "broader_regression": "FULL_REGRESSION_DEFERRED_TO_DAYTIME -- attempted `pytest tests/ -q`; 470 failures + 17 collection errors, ALL traced to a single root cause: this fresh git worktree has no project virtualenv (worktrees don't carry untracked venvs), so `pandas_ta` and `psutil` are not installed for the system-wide Python interpreter this shell uses (`C:\\Users\\rites\\AppData\\Local\\Microsoft\\WindowsApps\\python`, no pandas_ta/psutil), and most of the runtime test suite transitively imports talonx_quant/indicators.py's df.ta pandas_ta accessor. Confirmed pre-existing/environment-only, NOT a Task 67 regression: (1) none of Task 67's changes touch any file outside research/task67a_lib/, research/scripts/task67a_*, tests/test_task67a_*.py, and results/task67a_phenomenon_discovery/; (2) the failure reproduces on a single isolated test with zero Task-67-authored code in its call stack (AttributeError: 'DataFrame' object has no attribute 'ta'); (3) no venv/.venv/env directory exists anywhere in this worktree to have been broken. Setting up a full project venv was judged out of scope for a research task and a system-wide pip install into the shared interpreter was avoided since it affects a shared system a research task should not unilaterally modify. Deferred to the daytime session, which presumably runs from the repo's proper (non-worktree) virtualenv.",
+      "known_pre_existing_failure_deselected": "tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset"
+    },
+    "protected_files_final_check": "All 8 individually-hashed protected files (talonx_quant/{strategy,indicators,consumer,config,fprc_v1,fprc_v1_shadow,orpb_v1,orpb_v1_shadow}.py) re-verified byte-identical to protected_files_fingerprint_manifest.json at the end of Task 67B. Canonical worktree c:\\workspace\\TalonX confirmed unchanged (branch research/talonx-strategy-validation, HEAD d9749f3813d2c5495109b470df616faceb127ffc, clean tree) at multiple checkpoints throughout."
+  }
 }

@@ -221,6 +221,38 @@ def test_cross_family_overlap_empty_input_does_not_error():
     assert result["a_covered_by_b_same_symbol_time"]["fraction"] == 0.0
 
 
+def test_cross_family_overlap_does_not_raise_on_tz_aware_timestamps():
+    """Regression pin (Task 67B): the same tz-aware object-dtype bug fixed
+    in screening_framework.py also existed here (cross_family_overlap was
+    never exercised on real, always-tz-aware market data until Task 67B's
+    cross-family synthesis was the first caller). Every event table this
+    function will ever actually be called with -- events.csv from any of
+    the 6 phenomenon families -- has a tz-aware `timestamp` column, so this
+    must run to completion (no UFuncBinaryResolutionError), not just the
+    tz-naive synthetic cases above."""
+    events_a = pd.DataFrame({
+        "symbol": ["AAA", "AAA", "BBB"],
+        "timestamp": pd.to_datetime(
+            ["2026-01-01 09:31:00", "2026-01-01 12:00:00", "2026-01-01 09:31:00"], utc=True,
+        ),
+        "day": ["2026-01-01", "2026-01-01", "2026-01-01"],
+    })
+    events_b = pd.DataFrame({
+        "symbol": ["AAA", "CCC"],
+        "timestamp": pd.to_datetime(["2026-01-01 09:32:00", "2026-01-01 09:31:00"], utc=True),
+        "day": ["2026-01-01", "2026-01-01"],
+    })
+    result = cross_family_overlap(
+        events_a, events_b, symbol_col="symbol", time_col="timestamp",
+        day_col="day", time_tolerance_minutes=2,
+    )
+    # Same expected result as the tz-naive correctness test above --
+    # tz-awareness must not change the outcome, only avoid the crash.
+    assert result["a_covered_by_b_same_symbol_time"]["count"] == 1
+    assert result["a_covered_by_b_same_symbol_time"]["fraction"] == pytest.approx(1 / 3)
+    assert result["b_covered_by_a_same_symbol_time"]["count"] == 1
+
+
 # ---------------------------------------------------------------------
 # compute_mfe_mae
 # ---------------------------------------------------------------------

@@ -1,0 +1,53 @@
+{
+  "task": "67B - Stage 1 phenomenon discovery final decision",
+  "declared_utc": "2026-08-25T08:50:00Z",
+  "all_six_families_genuinely_screened": true,
+  "family_verdicts": {
+    "family_01_multi_hour_trend": {"family_rollup": "0/3 PRESENT, 3/3 WEAK_SIGNAL, 0/3 NOT_OBSERVED, 0/3 INSUFFICIENT", "note": "Excess turns negative (mild mean-reversion, not continuation) at 60-120m for 2/3 defs; all ECONOMICALLY_TOO_SMALL."},
+    "family_02_structural_pullback": {"family_rollup": "0/3 PRESENT, 3/3 WEAK_SIGNAL, 0/3 NOT_OBSERVED, 0/3 INSUFFICIENT", "note": "2/3 defs POTENTIALLY_TRADEABLE by magnitude but excess sign is OPPOSITE the hypothesized continuation effect (matched controls outperform). All 3 flag EFFECT_SURFACE_INSTABILITY."},
+    "family_03_range_expansion": {"family_rollup": "0/3 PRESENT, 1/3 WEAK_SIGNAL, 2/3 NOT_OBSERVED, 0/3 INSUFFICIENT", "note": "compression90_expansion10_2.5x is the one promising definition: 60m excess +0.258% [CI 0.068,0.515] excludes zero, STRONG_EFFECT, but n=76 events (LIMITED sufficiency) and EFFECT_SURFACE_INSTABILITY=True. A fragile, isolated-looking result per the brief's own overfitting caution -- not nominated on the strength of one definition."},
+    "family_04_relative_strength": {"family_rollup": "0/3 PRESENT, 3/3 WEAK_SIGNAL, 0/3 NOT_OBSERVED, 0/3 INSUFFICIENT", "note": "Beta-adjusted (SPY) basis. CI excludes zero at every horizon for 60m/90m windows but excess magnitude (3-7bps) never clears the 10bps round-trip friction bar. Raw RS and beta-adjusted stayed in the same thin regime -- no 'flattered by beta exposure' story either way."},
+    "family_05_compression_expansion": {"family_rollup": "0/3 PRESENT, 0/3 WEAK_SIGNAL, 3/3 NOT_OBSERVED, 0/3 INSUFFICIENT", "note": "Clean negative result: compression alone (without a breakout already underway, distinct from Family 3) does not predict abnormal subsequent movement or direction on this data. VOLATILITY_EFFECT_NOT_OBSERVED and DIRECTIONAL_EDGE_NOT_OBSERVED for all 3 defs."},
+    "family_06_opening_later": {"family_rollup": "3/3 PRESENT, 0/3 WEAK_SIGNAL, 0/3 NOT_OBSERVED, 0/3 INSUFFICIENT", "note": "The only family where all 3 definitions independently reach PHENOMENON_PRESENT: coherent direction, matched-control support, POTENTIALLY_TRADEABLE economics, adequate breadth (35 symbols, 63 days), stable effect surface, CI excludes zero at 60m/120m (and 15m). CRITICAL: the finding is MEAN-REVERSION (fade), not the originally-hypothesized continuation -- strong opening-30m moves predict a NEGATIVE (opposite-sign) excess return into the later session, coherently across 15/30/60/120m horizons."}
+  },
+  "cross_family_synthesis_ref": "results/task67a_phenomenon_discovery/cross_family_summary.json (.md for narrative)",
+  "ranking_composite_scores": {
+    "F6_Opening_Later": 17.907,
+    "F3_Range_Expansion": 14.027,
+    "F2_Structural_Pullback": 12.944,
+    "F4_Relative_Strength": 12.446,
+    "F1_Multi_Hour_Trend": 10.954,
+    "F5_Compression_Expansion": 7.947
+  },
+  "ranking_method_note": "composite = 3*verdict_tier + 2*econ_tier + 2*breadth_score + 2*stability_score + 1*concentration_score; method fixed BEFORE inspecting whether it changed the ordering (see research/scripts/task67b_cross_family_synthesis.py). F6 leads by a wide margin (17.9 vs next-best 14.0) on every individual criterion except raw economic-classification tier (F3's single STRONG_EFFECT definition scores higher there, but loses heavily on stability and event count).",
+  "redundancy_check": "F6 has moderate same-symbol-TIME overlap with F4 (16%/49%) and F5 (6%/46%) -- meaning roughly half of F4's and F5's (much more numerous) events happen within 5 minutes of an F6 event, but only 6-16% of F6's own events are 'explained' by F4/F5 in the same way. F6 is not a near-duplicate of any other family's hypothesis; it is the most novel, not the most redundant, of the six.",
+  "stage1_decision": "PHENOMENON_READY_FOR_STAGE_2",
+  "candidates_nominated": [
+    {
+      "family": "family_06_opening_later",
+      "why": "Only family where all 3 independently-defined, non-fine-tuned definitions reach PHENOMENON_PRESENT under the exact same taxonomy used for all 6 families. Coherent sign across all 4 horizons, matched-control excess CI excludes zero at 15m/60m/120m, POTENTIALLY_TRADEABLE economic magnitude (net of the deliberately conservative 10bps round-trip friction assumption), stable effect surface (not an isolated-cell spike), 35/35 symbols and 63/63 days represented, low symbol concentration (top1 <= 9.3%), and the least redundant with the other 5 families per the overlap matrix.",
+      "critical_reframing_for_stage_2": "The ORIGINAL Family 6 hypothesis (see results/task65_piv/next_alpha_discovery_plan.md) was framed as 'opening information -> later-session CONTINUATION'. The actual empirical finding is the opposite: strong opening-30m moves (by absolute magnitude, SPY-relative strength, or relative volume) predict a coherent NEGATIVE (fading/mean-reverting) excess return into the later session. Stage 2 must freeze a FADE/reversal causal hypothesis, not a continuation one -- building a continuation entry rule from this evidence would be a direct misreading of the data.",
+      "what_stage_2_would_need_to_freeze": [
+        "A single specific decision-signal definition (or a documented, non-cherry-picked combination) among opening_return_magnitude / opening_relative_strength_vs_spy / opening_relative_volume -- Family 6's own report notes absolute magnitude was the marginally cleanest/strongest driver on this DEVELOPMENT sample, but this should be re-checked, not assumed, once VALIDATION data exists.",
+        "The exact decision timestamp (14:00 UTC / 30m post-RTH-open, as used throughout Stage 1) and the exact entry mechanics (market/limit, expected slippage) at that timestamp.",
+        "A specific holding horizon or exit rule -- Stage 1 only measured fixed 15/30/60/120m forward windows for phenomenon screening, not an actual exit policy; 60m and 120m showed the strongest, most CI-clean excess and are the natural starting point, but this needs its own design pass, not a copy of the screening horizon.",
+        "A realistic, less conservative-than-screening cost model specific to the intended execution venue/size, since the phenomenon's magnitude (excess ~0.16% at 60m, ~0.17% at 120m) is only 1.5-1.7x the 10bps round-trip friction reference used tonight -- Stage 2 must re-verify this survives real execution costs, not just the generic screening assumption.",
+        "A validation protocol against the ALREADY-RESERVED, still-unmaterialized VALIDATION window (2026-08-25 to 2026-09-22) -- per the data-split contract, this cannot be touched until it has actually traded (on/after 2026-09-23) and must not be iterated against; if Stage 2's frozen spec needs adjustment after a first look at VALIDATION, that adjustment itself invalidates that VALIDATION pass and requires REPLICATION as the next honest check, not a second look at the same VALIDATION data."
+      ]
+    }
+  ],
+  "candidates_explicitly_not_nominated": [
+    {
+      "family": "family_03_range_expansion",
+      "definition": "compression90_expansion10_2.5x",
+      "reason_not_nominated": "Single definition (not corroborated by the family's other 2 definitions, which were PHENOMENON_NOT_OBSERVED), small sample (n=76, LIMITED data sufficiency), and EFFECT_SURFACE_INSTABILITY=True (the brief's own definition of a suspicious 'isolated best-fit point' pattern). A real, worth-remembering lead, not yet strong enough for Stage 2 -- flagged in claude_handoff_next.md as a watch item, not carried forward as a candidate tonight."
+    }
+  ],
+  "why_not_no_phenomenon": "All six families were genuinely, fairly screened (none INSUFFICIENT_DATA) and Family 6 clears every PHENOMENON_PRESENT criterion in the shared taxonomy across all 3 of its definitions -- returning NO_PHENOMENON_READY_FOR_STAGE_2 would misrepresent a real, coherent, stable finding as an absence of evidence.",
+  "explicitly_not_done": [
+    "Stage 2 causal trade-rule engineering (no code written)",
+    "Any use of VALIDATION or REPLICATION data (both remain unmaterialized, per data_split_contract.json)",
+    "Any live/paper session, scheduler, or real-capital path",
+    "Any modification to talonx_quant/*, fprc_v1*, orpb_v1*, talonx_brain, talonx_core, talonx_dispatch, talonx_paper"
+  ]
+}

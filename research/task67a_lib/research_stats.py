@@ -549,16 +549,34 @@ def cross_family_overlap(
     rarely the same size and "80% of A overlaps B" is a different claim
     than "80% of B overlaps A".
     """
+    def _naive_utc_ns_local(series: pd.Series) -> np.ndarray:
+        # Same fix as research/task67a_lib/screening_framework.py's
+        # _naive_utc_ns: Series.to_numpy() on a tz-aware datetime column
+        # returns an `object` array of Timestamp instances (numpy has no
+        # tz-aware datetime64 dtype), which cannot be subtracted from a
+        # numpy.timedelta64/compared against a datetime64 scalar -- every
+        # place here that does vectorized time arithmetic must go through
+        # this first. Kept local/private rather than imported from
+        # screening_framework to avoid a reverse dependency (this module
+        # is the lower-level, market-structure-agnostic one).
+        dt = pd.to_datetime(series)
+        if getattr(dt.dt, "tz", None) is not None:
+            dt = dt.dt.tz_convert("UTC").dt.tz_localize(None)
+        return dt.to_numpy(dtype="datetime64[ns]")
+
     def _same_symbol_time(source: pd.DataFrame, other: pd.DataFrame) -> tuple[int, float]:
         if source.empty:
             return 0, 0.0
-        other_by_symbol = {sym: pd.to_datetime(g[time_col]).sort_values().to_numpy() for sym, g in other.groupby(symbol_col)}
+        other_by_symbol = {
+            sym: _naive_utc_ns_local(g.sort_values(time_col)[time_col])
+            for sym, g in other.groupby(symbol_col)
+        }
+        source_times = _naive_utc_ns_local(source[time_col])
+        source_symbols = source[symbol_col].to_numpy()
         hits = 0
-        for _, row in source.iterrows():
-            sym = row[symbol_col]
+        for sym, t in zip(source_symbols, source_times):
             if sym not in other_by_symbol:
                 continue
-            t = pd.Timestamp(row[time_col]).to_numpy()
             deltas_minutes = np.abs(other_by_symbol[sym] - t) / np.timedelta64(1, "m")
             if len(deltas_minutes) and deltas_minutes.min() <= time_tolerance_minutes:
                 hits += 1
