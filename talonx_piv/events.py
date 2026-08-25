@@ -7,6 +7,9 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Callable
+from zoneinfo import ZoneInfo
+
+ET = ZoneInfo("America/New_York")
 
 EVENT_TYPES = (
     "STARTUP", "PREFLIGHT_PASS", "PREFLIGHT_FAIL", "PAPER_SESSION_STARTED",
@@ -19,7 +22,66 @@ EVENT_TYPES = (
     "SESSION_READINESS_STATE_RESTORED", "SESSION_READINESS_STATE_MISSING",
     "SESSION_READINESS_STATE_INVALID", "SESSION_READINESS_STATE_STALE",
     "RUNTIME_PARITY_PASS", "RUNTIME_PARITY_FAIL",
+    # Task 69Q: informational, non-actionable notification classes -- see
+    # results/task69q_evidence_upgrade/notification_contract.json and
+    # premarket_radar_contract.json. None of these ever drives an order.
+    "PREMARKET_WATCH", "PREMARKET_WATCH_CLEARED", "STATUS_HEARTBEAT",
+    "EOD_SUMMARY",
 )
+
+# Task 69Q Part 7: every event is classified into exactly one operator-facing
+# notification category so natural strategy activity, PIV probe traffic, and
+# purely-observational radar output are never visually or statistically
+# conflated (Part 4/Part 7). Derived entirely from fields already carried by
+# every event (event type + source) -- no new required field on callers.
+NOTIFICATION_CLASSES = (
+    "SYSTEM", "PREMARKET_RADAR", "NATURAL_SIGNAL", "PAPER_EXECUTION", "PIV_TEST", "EOD",
+)
+
+_EXECUTION_EVENTS = {
+    "ORDER_INTENT", "PAPER_ORDER_SUBMITTED", "PAPER_ORDER_ACCEPTED", "PAPER_ORDER_REJECTED",
+    "PAPER_ORDER_CANCELLED", "PARTIAL_FILL", "FILLED", "POSITION_OPENED", "STOP_TRIGGERED",
+    "EXIT_TRIGGERED", "EXIT_REQUESTED", "EXIT_FILLED", "POSITION_CLOSED",
+}
+_SYSTEM_EVENTS = {
+    "STARTUP", "PREFLIGHT_PASS", "PREFLIGHT_FAIL", "PAPER_SESSION_STARTED",
+    "MARKET_DATA_READY", "DATA_NOT_READY", "STALE_DATA", "BROKER_ERROR", "KILL_SWITCH",
+    "SESSION_READINESS_STATE_RESTORED", "SESSION_READINESS_STATE_MISSING",
+    "SESSION_READINESS_STATE_INVALID", "SESSION_READINESS_STATE_STALE",
+    "RUNTIME_PARITY_PASS", "RUNTIME_PARITY_FAIL", "STATUS_HEARTBEAT",
+}
+
+
+def notification_class_for(event: str, source: str | None) -> str:
+    """Pure classification -- see NOTIFICATION_CLASSES. `source` is the
+    existing "STRATEGY" | "PIV_LIFECYCLE_PROBE" | "PREMARKET_RADAR" | None
+    field every emitter already sets (or leaves unset for pure system
+    events)."""
+    if event in ("EOD_FLATTEN", "SESSION_SUMMARY", "EOD_SUMMARY"):
+        return "EOD"
+    if event in ("PREMARKET_WATCH", "PREMARKET_WATCH_CLEARED"):
+        return "PREMARKET_RADAR"
+    if event in _SYSTEM_EVENTS:
+        return "SYSTEM"
+    if event == "SIGNAL" and source == "STRATEGY":
+        return "NATURAL_SIGNAL"
+    if event in _EXECUTION_EVENTS:
+        if source == "PIV_LIFECYCLE_PROBE":
+            return "PIV_TEST"
+        if source == "STRATEGY":
+            return "PAPER_EXECUTION"
+        return "PIV_TEST"
+    if source == "PIV_LIFECYCLE_PROBE":
+        return "PIV_TEST"
+    return "SYSTEM"
+
+
+def trading_date_for(timestamp_iso: str) -> str:
+    """Canonical trading-date bucket for an event: the America/New_York
+    calendar date of its (UTC) timestamp. Task 69Q Part 2 -- this is what
+    lets a single append-only piv_events.jsonl be safely filtered per
+    session/date without ever mixing e.g. 2026-08-24 and 2026-08-25."""
+    return datetime.fromisoformat(timestamp_iso).astimezone(ET).date().isoformat()
 
 
 @dataclass(frozen=True)
@@ -39,8 +101,33 @@ class PivEvent:
     paper: bool = True
     real_capital: bool = False
     feed_mode: str | None = None
-    source: str | None = None  # "STRATEGY" | "PIV_LIFECYCLE_PROBE" -- see talonx_piv/decision_engine.py, lifecycle_probe.py
+    source: str | None = None  # "STRATEGY" | "PIV_LIFECYCLE_PROBE" | "PREMARKET_RADAR" -- see decision_engine.py, lifecycle_probe.py, premarket_radar.py
     alpha_evidence: bool | None = None  # always False when set -- today's traffic is operational PIV test traffic only
+
+    # Task 69Q Part 2 -- session/date identity, stamped by EventBus.emit if
+    # not already set by the caller, so a single append-only piv_events.jsonl
+    # can always be filtered to exactly one trading date/session.
+    session_id: str | None = None
+    trading_date_et: str | None = None
+    # Task 69Q Part 7 -- see notification_class_for; auto-derived by
+    # EventBus.emit if not explicitly set.
+    notification_class: str | None = None
+
+    # Task 69Q Part 6 -- execution economics, populated only where the data
+    # legitimately exists (PaperLifecycle.apply_broker_update); never
+    # fabricated (e.g. gross_r/net_r stay None for any position with no
+    # defined stop_price -- see lifecycle.py).
+    reference_price: float | None = None
+    slippage_abs: float | None = None
+    slippage_bps: float | None = None
+    gross_pnl: float | None = None
+    net_pnl: float | None = None
+    estimated_transaction_cost: float | None = None
+    holding_seconds: float | None = None
+    gross_r: float | None = None
+    net_r: float | None = None
+    horizon: str | None = None
+    strategy_id: str | None = None
 
     @classmethod
     def build(cls, event: str, **fields: object) -> "PivEvent":
@@ -54,11 +141,12 @@ class EventBus:
 
     def __init__(
         self, path: Path, telegram_send: Callable[[str], bool] | None = None,
-        feed_mode: str = "RESEARCH_SIP",
+        feed_mode: str = "RESEARCH_SIP", session_id: str | None = None,
     ) -> None:
         self.path = path
         self.telegram_send = telegram_send
         self.feed_mode = feed_mode
+        self.session_id = session_id
         self._telegram_seen: set[str] = set()
         self.telegram_attempts = 0
         self.telegram_failures = 0
@@ -71,7 +159,8 @@ class EventBus:
 
     @staticmethod
     def format_telegram(event: PivEvent) -> str:
-        fields = ["PAPER / NO REAL CAPITAL", event.timestamp, event.event]
+        tag = f"[{event.notification_class}] " if event.notification_class else ""
+        fields = [f"{tag}PAPER / NO REAL CAPITAL", event.timestamp, event.event]
         if event.feed_mode is not None:
             fields.append(f"feed_mode={event.feed_mode}")
         if event.source is not None:
@@ -87,6 +176,12 @@ class EventBus:
     def emit(self, event: PivEvent) -> bool:
         if event.feed_mode is None:
             event = replace(event, feed_mode=self.feed_mode)
+        if event.session_id is None and self.session_id is not None:
+            event = replace(event, session_id=self.session_id)
+        if event.trading_date_et is None:
+            event = replace(event, trading_date_et=trading_date_for(event.timestamp))
+        if event.notification_class is None:
+            event = replace(event, notification_class=notification_class_for(event.event, event.source))
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(asdict(event), sort_keys=True) + "\n")
