@@ -124,7 +124,7 @@ def causal_price_at_offset(
         raise ValueError(f"bars is missing {day_col!r}; call add_trading_day(bars) first.")
     n = len(bars)
     out = np.full(n, np.nan, dtype=float)
-    times = pd.to_datetime(bars[time_col]).to_numpy()
+    times = _naive_utc_ns(bars[time_col])
     prices = bars[price_col].to_numpy(dtype=float)
     days = bars[day_col].to_numpy()
     target_times = times - np.timedelta64(int(round(offset_minutes * 60)), "s")
@@ -189,7 +189,7 @@ def causal_atr_proxy(
         raise ValueError(f"bars is missing {day_col!r}; call add_trading_day(bars) first.")
     n = len(bars)
     out = np.full(n, np.nan, dtype=float)
-    times = pd.to_datetime(bars[time_col]).to_numpy()
+    times = _naive_utc_ns(bars[time_col])
     bar_range = (bars[high_col] - bars[low_col]).to_numpy(dtype=float)
     days = bars[day_col].to_numpy()
 
@@ -204,6 +204,15 @@ def causal_atr_proxy(
         result = np.full(len(idx), np.nan, dtype=float)
         cum = np.concatenate([[0.0], np.cumsum(sym_range)])
         for i in range(len(idx)):
+            if lo[i] >= i:
+                # No same-day bar strictly BEFORE this one falls inside the
+                # trailing window (searchsorted landed on the bar itself,
+                # or later -- the latter cannot happen since window_start
+                # <= sym_times[i] always). A "window" of just the current
+                # bar is not a real trailing window -- same-day warmup,
+                # matching causal_price_at_offset's NaN-during-warmup
+                # convention (see test_causal_atr_proxy_same_day_only_and_warmup_nan).
+                continue
             if sym_days[lo[i]] != sym_days[i]:
                 continue  # window would reach into prior session -> invalid
             count = hi[i] - lo[i]
@@ -283,9 +292,18 @@ def add_bar_features(bars: pd.DataFrame) -> pd.DataFrame:
     valid = vol_pct.notna()
     out["vol_bucket"] = "UNKNOWN"
     if valid.sum() >= 30:
-        out.loc[valid, "vol_bucket"] = pd.qcut(
-            vol_pct[valid], q=3, labels=["LOW", "MID", "HIGH"], duplicates="drop"
-        ).astype(str)
+        try:
+            # duplicates="drop" can collapse fewer than 3 distinct bins if
+            # vol_pct has ties (e.g. near-constant volatility) -- a fixed
+            # 3-label list would then mismatch the actual edge count, so
+            # bins are labeled dynamically by however many bins actually
+            # resulted, LOW/MID/HIGH in ascending order.
+            bucketed = pd.qcut(vol_pct[valid], q=3, duplicates="drop")
+            n_bins = bucketed.cat.categories.size
+            label_names = ["LOW", "MID", "HIGH"][:max(n_bins, 1)]
+            out.loc[valid, "vol_bucket"] = bucketed.cat.codes.map(dict(enumerate(label_names))).astype(str)
+        except ValueError:
+            pass
     return out
 
 
@@ -472,18 +490,18 @@ def sample_control_candidates(
     pool = pd.concat(rows, ignore_index=False)
 
     if len(events):
-        ev_by_symbol = {sym: pd.to_datetime(g[time_col]).to_numpy() for sym, g in events.groupby(symbol_col)}
+        ev_by_symbol = {sym: _naive_utc_ns(g[time_col]) for sym, g in events.groupby(symbol_col)}
         buffer_ns = int(exclusion_buffer_minutes * 60 * 1e9)
         keep_mask = np.ones(len(pool), dtype=bool)
         pool_symbols = pool[symbol_col].to_numpy()
-        pool_times = pd.to_datetime(pool[time_col]).to_numpy()
+        pool_times = _naive_utc_ns(pool[time_col])
         for sym, ev_times in ev_by_symbol.items():
             sym_mask = pool_symbols == sym
             if not sym_mask.any():
                 continue
             idxs = np.where(sym_mask)[0]
-            t = pool_times[idxs].astype("datetime64[ns]").astype(np.int64)
-            e = ev_times.astype("datetime64[ns]").astype(np.int64)
+            t = pool_times[idxs].astype(np.int64)
+            e = ev_times.astype(np.int64)
             # For each candidate, distance to nearest event time.
             order = np.argsort(e)
             e_sorted = e[order]

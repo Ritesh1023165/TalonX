@@ -1,0 +1,60 @@
+{
+  "task": "67B Step 1 - screening_framework.py repair and validation",
+  "declared_utc": "2026-08-25T05:40:00Z",
+  "starting_point": {
+    "known_failure_at_commit": "2a540c1be7a071cf98e9850614c24b0425c15d1e",
+    "failing_tests_count": 10,
+    "total_tests": 23,
+    "reported_exception": "numpy._core._exceptions._UFuncBinaryResolutionError: ufunc 'subtract' cannot use operands with types dtype('O') and dtype('<m8[s]')",
+    "reported_location": "research/task67a_lib/screening_framework.py:201 (causal_atr_proxy)"
+  },
+  "root_cause": {
+    "summary": "screening_framework.py already defined a `_naive_utc_ns(series)` helper specifically to convert a tz-aware datetime Series to a genuine `datetime64[ns]` numpy array (its own docstring explains exactly why: `Series.to_numpy()` on a tz-aware datetime column returns an `object` array of `Timestamp` instances, since numpy has no tz-aware datetime64 dtype -- object arrays cannot be subtracted from a `numpy.timedelta64`). However, this helper was never actually called anywhere in the module -- every function instead used a bare `pd.to_datetime(bars[time_col]).to_numpy()`, which silently produced an object-dtype array on this dataset's tz-aware `timestamp` column (confirmed: `data/historical_1m/task67a_development/*.csv`'s timestamp column parses to tz-aware UTC). The bug therefore was not a design flaw, only a call-site omission of an already-written fix.",
+    "confirmed_by": "grep for `_naive_utc_ns` usage in screening_framework.py returned exactly one hit (the function's own definition) before this fix.",
+    "affected_functions_pre_fix": [
+      "causal_price_at_offset (line ~127: `times = pd.to_datetime(...).to_numpy()` then `times - np.timedelta64(...)`)",
+      "causal_atr_proxy (line ~192: same pattern, this is the exact line/traceback reported)",
+      "causal_trailing_return (calls causal_price_at_offset, inherited the bug)",
+      "sample_control_candidates (line ~479: `pool_times = pd.to_datetime(...).to_numpy()` then `.astype('datetime64[ns]').astype(np.int64)` -- this particular call chain happened not to raise the same UFuncTypeError since `.astype('datetime64[ns]')` on an object array of tz-aware Timestamps is accepted by numpy, but it silently drops the tz -- a correctness risk, not just a crash risk, so fixed for consistency even though it was not one of the 10 originally-failing tests -- its 2 failures were caused transitively via `add_bar_features` -> `causal_atr_proxy`)"
+    ]
+  },
+  "fix": {
+    "approach": "Smallest robust fix: replaced every `pd.to_datetime(<tz-aware series>).to_numpy()` call site that feeds vectorized numpy datetime64 arithmetic with `_naive_utc_ns(<series>)`, which explicitly tz-converts to UTC then tz-localizes to None before calling `.to_numpy(dtype='datetime64[ns]')` -- guaranteeing a true datetime64 array, not object. No function signature changed; no caller-visible behavior changed for already-passing tests.",
+    "files_changed": ["research/task67a_lib/screening_framework.py"],
+    "deliberately_not_changed": "add_trading_day's `trading_day` column was left tz-aware (NOT converted to naive) -- an earlier attempt to make it naive for consistency was reverted after discovering it would break sample_control_candidates's `session_start = day + day_open` / `eligible_start`/`eligible_end` scalar-Timestamp arithmetic against the (still tz-aware) bars['timestamp'] column, which would raise 'Cannot compare tz-naive and tz-aware timestamps'. `trading_day`'s only uses are equality comparisons (object-dtype Timestamp equality works fine) and scalar Timestamp arithmetic (also fine regardless of tz) -- neither hits the vectorized-subtraction bug, so leaving it tz-aware is correct and lower-risk than a broader tz-naive refactor.",
+    "additional_bugs_found_and_fixed_during_repair": [
+      {
+        "location": "causal_atr_proxy",
+        "bug": "Same-day warmup NOT correctly detected when a session's first bar has NO prior same-day bar within the window: searchsorted's `lo[i]` landed on the bar itself (index i), which trivially passed the `sym_days[lo[i]] == sym_days[i]` same-day check, producing a degenerate 1-bar 'window' (just the bar's own range) instead of the documented NaN-during-warmup behavior. Caught by test_causal_atr_proxy_same_day_only_and_warmup_nan (was masked by the dtype crash before this repair; started failing on its own once the dtype bug was fixed).",
+        "fix": "Added an explicit `if lo[i] >= i: continue` (equivalently `lo[i] == i`, since searchsorted guarantees lo[i] <= i) before the existing same-day check, requiring at least one genuine same-day bar strictly before position i within the window."
+      },
+      {
+        "location": "add_bar_features (vol_bucket assignment)",
+        "bug": "`pd.qcut(vol_pct[valid], q=3, labels=['LOW','MID','HIGH'], duplicates='drop')` raises ValueError('Bin labels must be one fewer than the number of bin edges') whenever vol_pct has enough ties that duplicates='drop' collapses to fewer than 3 actual bins (e.g. constant/near-constant volatility, which real DEVELOPMENT data won't have but small/synthetic fixtures can). Not a dtype bug; a fixed-length label list assumption. Surfaced test_sample_control_candidates_excludes_near_event_window and test_sample_control_candidates_respects_warmup_and_lead failing via add_bar_features.",
+        "fix": "Label count is now computed dynamically from the ACTUAL number of resulting bins (`bucketed.cat.categories.size`) rather than assumed to always be 3, sliced from ['LOW','MID','HIGH']; wrapped in try/except ValueError as a final fallback (leaves 'UNKNOWN' for that case, matching the module's existing insufficient-N philosophy)."
+      },
+      {
+        "location": "tests/test_task67a_screening_framework.py::test_compute_event_horizon_and_mfe_mae_respects_session_close_boundary",
+        "bug": "Test used `assert row_60['bounded_by_session_close'] is True` -- an identity comparison. pandas always stores a bool-dtype DataFrame column as numpy bool dtype internally, so `.iloc[0]`/`[...]` scalar access on it always returns `numpy.bool_`, never the literal Python `True` singleton, regardless of what was originally inserted -- `numpy.bool_(True) is True` is False. This is a test-authoring bug, not a screening_framework.py defect (the underlying value was already correctly a bool via `bool(bounded_by_close)` in research_stats.forward_return_horizons).",
+        "fix": "Changed both assertions to `bool(row_N['bounded_by_session_close']) is True/False`, which correctly asserts the VALUE rather than relying on Python singleton identity through a pandas bool column."
+      }
+    ],
+    "regression_tests_added": [
+      "test_naive_utc_ns_returns_datetime64_not_object_dtype_for_tz_aware_input -- pins _naive_utc_ns's dtype contract directly.",
+      "test_causal_price_at_offset_and_atr_proxy_do_not_raise_on_tz_aware_bars -- direct end-to-end pin of the exact original failure mode (both helpers on ordinary tz-aware bars, which is the only kind this dataset has)."
+    ]
+  },
+  "causality_verification": {
+    "no_future_bar_access": "Verified by existing tests test_causal_trailing_return_no_future_leakage and test_compute_event_horizon_and_mfe_mae_no_future_leakage: mutating a bar strictly AFTER an already-computed value's relevant window does not change that value. Both pass post-fix.",
+    "no_lookahead_in_trailing_return_atr_price_at_offset": "causal_price_at_offset/causal_trailing_return/causal_atr_proxy all use np.searchsorted against a symbol's OWN sorted-ascending timestamp array with an explicit backward-only offset/window (never a forward search), and are same-day-gated (test_causal_price_at_offset_never_reaches_into_prior_session, test_causal_atr_proxy_same_day_only_and_warmup_nan). No function in this module reads any bar at a time index > the row being computed.",
+    "session_close_boundary_respected": "compute_event_horizon_and_mfe_mae bounds every horizon and the MFE/MAE window at min(entry + horizon, RTH close for entry's own day) -- test_compute_event_horizon_and_mfe_mae_respects_session_close_boundary confirms a 60m horizon from 19:45 is correctly truncated to 15 bars (19:45-20:00), not 60."
+  },
+  "test_results": {
+    "screening_framework_tests": "25/25 passing (23 original + 2 new regression tests)",
+    "research_stats_tests": "19/19 passing (unchanged, no code in research_stats.py was touched)",
+    "data_guard_tests": "11/11 passing (unchanged, no code in data_guard.py was touched)",
+    "total": "55/55 passing"
+  },
+  "protected_files": "talonx_quant/*, fprc_v1*, orpb_v1*, talonx_brain, talonx_core, talonx_dispatch, talonx_paper -- none opened for writing during this repair.",
+  "canonical_worktree": "c:\\workspace\\TalonX -- not read or written during this repair."
+}

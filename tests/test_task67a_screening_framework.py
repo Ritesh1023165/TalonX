@@ -15,6 +15,7 @@ import pytest
 from research.task67a_lib.screening_framework import (
     RTH_CLOSE_UTC_HOUR,
     VerdictInputs,
+    _naive_utc_ns,
     add_bar_features,
     add_trading_day,
     causal_atr_proxy,
@@ -29,6 +30,39 @@ from research.task67a_lib.screening_framework import (
     session_close_timestamp_utc,
     time_of_day_bucket,
 )
+
+
+# ---------------------------------------------------------------------
+# Regression test for the tz-aware object-dtype bug (Task 67B fix):
+# pd.Series(tz-aware).to_numpy() yields an `object` array of Timestamps,
+# which numpy cannot subtract a timedelta64 from
+# (numpy._core._exceptions._UFuncBinaryResolutionError). Every
+# causal_*/sample_control_candidates helper that does vectorized time
+# arithmetic must route tz-aware timestamp columns through
+# `_naive_utc_ns` first, never through a bare `pd.to_datetime(...).to_numpy()`.
+# ---------------------------------------------------------------------
+
+def test_naive_utc_ns_returns_datetime64_not_object_dtype_for_tz_aware_input():
+    s = pd.Series(pd.date_range("2026-06-01 13:00:00", periods=5, freq="1min", tz="UTC"))
+    arr = _naive_utc_ns(s)
+    assert arr.dtype.kind == "M", f"expected a datetime64 dtype, got {arr.dtype!r} (object-dtype regression)"
+    # Subtracting a timedelta64 must not raise (this is exactly what failed
+    # before the fix, inside causal_price_at_offset/causal_atr_proxy).
+    shifted = arr - np.timedelta64(60, "s")
+    assert shifted[1] == arr[0]
+
+
+def test_causal_price_at_offset_and_atr_proxy_do_not_raise_on_tz_aware_bars():
+    """Direct regression pin for the exact failure mode: both helpers must
+    run to completion (no UFuncBinaryResolutionError) on ordinary tz-aware
+    bars, which is the only kind of bars this dataset ever has."""
+    bars = _minute_bars("AAA", "2026-06-01", 13, 120)
+    assert bars["timestamp"].dt.tz is not None  # precondition: genuinely tz-aware
+    bars = add_trading_day(bars)
+    ref = causal_price_at_offset(bars, 30)  # would raise UFuncBinaryResolutionError pre-fix
+    atr = causal_atr_proxy(bars, window_minutes=30)  # ditto
+    assert np.isfinite(ref[100])
+    assert np.isfinite(atr[100])
 
 
 def _minute_bars(symbol, day, start_hour, n_minutes, base_price=100.0, step=0.1):
@@ -190,11 +224,14 @@ def test_compute_event_horizon_and_mfe_mae_respects_session_close_boundary():
     })
     hm, mm = compute_event_horizon_and_mfe_mae(bars, events, horizons_minutes=[15, 60])
     row_60 = hm[hm["horizon_label"] == "60m"].iloc[0]
-    assert row_60["bounded_by_session_close"] is True
+    # pandas stores a bool column as numpy bool dtype, so a value read back
+    # via .iloc/[] is numpy.bool_, not the literal Python `True`/`False`
+    # object -- compare by value (bool(...) is/== ), not by identity.
+    assert bool(row_60["bounded_by_session_close"]) is True
     # From 19:45 to 20:00 close is only 15 minutes of bars.
     assert row_60["bars_observed"] == 15
     row_15 = hm[hm["horizon_label"] == "15m"].iloc[0]
-    assert row_15["bounded_by_session_close"] is False
+    assert bool(row_15["bounded_by_session_close"]) is False
 
 
 def test_compute_event_horizon_and_mfe_mae_direction_adjusts_short():
