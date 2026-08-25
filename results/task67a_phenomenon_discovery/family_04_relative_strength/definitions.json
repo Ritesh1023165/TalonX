@@ -1,0 +1,47 @@
+[
+  {
+    "name": "rs_trailing_30m",
+    "window_minutes": 30,
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 15.0,
+    "seed": 670467,
+    "tail_info": {
+      "rs_tail_quantile": 0.1,
+      "q_lo": -0.00578246034674904,
+      "q_hi": 0.005676496993816119,
+      "n_pool": 678633
+    }
+  },
+  {
+    "name": "rs_trailing_60m",
+    "window_minutes": 60,
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 30.0,
+    "seed": 670468,
+    "tail_info": {
+      "rs_tail_quantile": 0.1,
+      "q_lo": -0.008534478798994612,
+      "q_hi": 0.008321857326403446,
+      "n_pool": 666645
+    }
+  },
+  {
+    "name": "rs_trailing_90m",
+    "window_minutes": 90,
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 45.0,
+    "seed": 670469,
+    "tail_info": {
+      "rs_tail_quantile": 0.1,
+      "q_lo": -0.010881938590922772,
+      "q_hi": 0.010631297925694424,
+      "n_pool": 655074
+    }
+  }
+]

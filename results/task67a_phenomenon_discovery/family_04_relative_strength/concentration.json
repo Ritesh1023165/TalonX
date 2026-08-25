@@ -1,0 +1,56 @@
+{
+  "rs_trailing_30m": {
+    "n_rows": 4093,
+    "n_positive_rows": 2038,
+    "total_positive_value": 1293.7373324309106,
+    "insufficient_n": false,
+    "n_symbols": 35,
+    "top1_symbol": "MU",
+    "top1_symbol_share": 0.06167863613745331,
+    "top3_symbol_share": 0.16557234342828153,
+    "top3_symbols": [
+      "MU",
+      "KLAC",
+      "AMAT"
+    ],
+    "n_days": 32,
+    "best_day": "2026-07-29 00:00:00+00:00",
+    "best_day_share": 0.06088992210147839
+  },
+  "rs_trailing_60m": {
+    "n_rows": 2208,
+    "n_positive_rows": 1125,
+    "total_positive_value": 788.80148033919,
+    "insufficient_n": false,
+    "n_symbols": 35,
+    "top1_symbol": "STX",
+    "top1_symbol_share": 0.06195548347874333,
+    "top3_symbol_share": 0.18085913785035926,
+    "top3_symbols": [
+      "STX",
+      "KLAC",
+      "MU"
+    ],
+    "n_days": 32,
+    "best_day": "2026-07-02 00:00:00+00:00",
+    "best_day_share": 0.08298715028323825
+  },
+  "rs_trailing_90m": {
+    "n_rows": 1652,
+    "n_positive_rows": 853,
+    "total_positive_value": 639.2044440651667,
+    "insufficient_n": false,
+    "n_symbols": 35,
+    "top1_symbol": "MU",
+    "top1_symbol_share": 0.06736555843565258,
+    "top3_symbol_share": 0.19287038816354593,
+    "top3_symbols": [
+      "MU",
+      "STX",
+      "AMAT"
+    ],
+    "n_days": 32,
+    "best_day": "2026-07-02 00:00:00+00:00",
+    "best_day_share": 0.0982807764055536
+  }
+}
