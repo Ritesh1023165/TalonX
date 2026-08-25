@@ -1,0 +1,29 @@
+[
+  {
+    "name": "compression60_expansion15_2x",
+    "description": "Established = 60m trailing ATR proxy, evaluated 15m before now (bottom global tertile as a fraction of price). Recent = 15m trailing ATR proxy (ending now) >= 2.0x the lagged established value. Direction = sign of the 15m trailing return (breakout direction). Excludes first 30m of RTH.",
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 30,
+    "seed": 670367
+  },
+  {
+    "name": "compression90_expansion10_2.5x",
+    "description": "Established = 90m trailing ATR proxy, evaluated 10m before now (bottom global tertile). Recent = 10m trailing ATR proxy >= 2.5x the lagged established value. Direction = sign of the 10m trailing return. Excludes first 30m of RTH.",
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 20,
+    "seed": 670368
+  },
+  {
+    "name": "compression45_expansion20_1.75x",
+    "description": "Established = 45m trailing ATR proxy, evaluated 20m before now (bottom global tertile). Recent = 20m trailing ATR proxy >= 1.75x the lagged established value. Direction = sign of the 20m trailing return. Excludes first 30m of RTH.",
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 30,
+    "seed": 670369
+  }
+]

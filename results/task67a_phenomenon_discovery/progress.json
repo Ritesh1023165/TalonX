@@ -59,7 +59,17 @@
         "runtime_wall_clock": "~6 minutes for all 3 definitions on the full 35-symbol/62-day DEVELOPMENT set (stdout was block-buffered so no incremental progress was visible until completion -- noted for Family 4-6 agent: don't assume a silent long-running family script has hung)",
         "committed": true
       },
-      "family_03_range_expansion": {"status": "PENDING"}
+      "family_03_range_expansion": {
+        "status": "COMPLETE",
+        "script": "research/scripts/task67a_family03_range_expansion.py",
+        "tests": "tests/test_task67a_family03_range_expansion.py (9 tests, including a dedicated correctness/no-leakage test for the new local `_value_at_offset` helper)",
+        "definitions": ["compression60_expansion15_2x", "compression90_expansion10_2.5x", "compression45_expansion20_1.75x"],
+        "verdicts": {"compression60_expansion15_2x": "PHENOMENON_NOT_OBSERVED", "compression90_expansion10_2.5x": "WEAK_SIGNAL", "compression45_expansion20_1.75x": "PHENOMENON_NOT_OBSERVED"},
+        "headline": "MOST INTERESTING LEAD ACROSS ALL 3 FAMILIES: `compression90_expansion10_2.5x` (90m-established, 10m-recent, >=2.5x ATR expansion) shows a POSITIVE, hypothesis-ALIGNED excess-vs-matched-control at 60m of +0.258% with a clustered-bootstrap 95% CI of [0.068%, 0.515%] that excludes zero -- STRONG_EFFECT economic classification (excess and MFE both clear 2x the 10bps round-trip friction bar), and concentration is NOT a concern (top1_symbol_share=16.7%, best_day_share=30.3%, both under the 40% flag threshold). Held to WEAK_SIGNAL rather than PHENOMENON_PRESENT for two reasons: (1) only 76 deduplicated events / 24 symbols / 32 days -> data_sufficiency=LIMITED not ADEQUATE (n_events under the 100-event ADEQUATE bar); (2) EFFECT_SURFACE_INSTABILITY flagged (same_sign_frac=0.67, max/median cell-mean ratio=5.66 -- effect not evenly shared across vol/time-of-day cells, some concentration in a subset of regimes). The other two definitions (2.0x/60m-established and 1.75x/45m-established) are PHENOMENON_NOT_OBSERVED -- weaker expansion multiples / longer overlap between established and recent windows do not show the same effect, suggesting the 2.5x-or-higher / short-recent-window shape may matter, not just 'any range expansion'. RECOMMENDATION FOR FAMILY 4-6 / SYNTHESIS PHASE: this specific definition (or a close variant with a slightly larger event count, e.g. relaxing the expansion multiple by a small amount or extending the DEVELOPMENT window) is the single most promising Stage-1 lead found in families 1-3 and is worth a closer, non-cherry-picked look before Stage 1 concludes.",
+        "runtime_wall_clock": "a few minutes for all 3 definitions on the full 35-symbol/62-day DEVELOPMENT set (event counts here are far smaller than Families 1-2 -- range-expansion-with-compression is a much rarer condition than trend/pullback, as expected)",
+        "committed": true
+      }
     }
-  }
+  },
+  "stage1_families_1_2_3_final_status": "COMPLETE -- all 3 families (9 definitions total) screened, tested, documented, committed, and pushed. See each family's summary.md for full per-definition detail; see family_03's headline above for the phase's single most promising lead."
 }

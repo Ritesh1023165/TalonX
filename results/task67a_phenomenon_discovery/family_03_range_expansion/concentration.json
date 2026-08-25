@@ -1,0 +1,56 @@
+{
+  "compression60_expansion15_2x": {
+    "n_rows": 141,
+    "n_positive_rows": 72,
+    "total_positive_value": 38.14795483629412,
+    "insufficient_n": false,
+    "n_symbols": 23,
+    "top1_symbol": "INTU",
+    "top1_symbol_share": 0.1333392857606017,
+    "top3_symbol_share": 0.3429063158300118,
+    "top3_symbols": [
+      "INTU",
+      "REGN",
+      "ADBE"
+    ],
+    "n_days": 38,
+    "best_day": "2026-08-13 00:00:00+00:00",
+    "best_day_share": 0.2606777482350674
+  },
+  "compression90_expansion10_2.5x": {
+    "n_rows": 76,
+    "n_positive_rows": 44,
+    "total_positive_value": 31.09898448352171,
+    "insufficient_n": false,
+    "n_symbols": 19,
+    "top1_symbol": "INTU",
+    "top1_symbol_share": 0.16652653132338452,
+    "top3_symbol_share": 0.41166525977240825,
+    "top3_symbols": [
+      "INTU",
+      "ADBE",
+      "META"
+    ],
+    "n_days": 25,
+    "best_day": "2026-08-13 00:00:00+00:00",
+    "best_day_share": 0.3026515676746269
+  },
+  "compression45_expansion20_1.75x": {
+    "n_rows": 262,
+    "n_positive_rows": 138,
+    "total_positive_value": 60.123549256208605,
+    "insufficient_n": false,
+    "n_symbols": 24,
+    "top1_symbol": "REGN",
+    "top1_symbol_share": 0.10940581179626256,
+    "top3_symbol_share": 0.2673967464346434,
+    "top3_symbols": [
+      "REGN",
+      "INTU",
+      "VRTX"
+    ],
+    "n_days": 53,
+    "best_day": "2026-08-13 00:00:00+00:00",
+    "best_day_share": 0.1821649450441298
+  }
+}
