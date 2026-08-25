@@ -6,6 +6,16 @@ Data: DEVELOPMENT role, 35 symbols, 62 trading days (2026-05-15..2026-08-14). Fr
 
 **Family rollup:** 0/3 PHENOMENON_PRESENT, 3/3 WEAK_SIGNAL, 0/3 PHENOMENON_NOT_OBSERVED, 0/3 INSUFFICIENT_DATA -- definitions are NOT averaged into one number; each is reported independently, per the brief.
 
+**Important interpretation caveat (read before the per-definition tables):** all
+three definitions' excess-vs-matched-control mean turns NEGATIVE at the 60m/120m
+horizons (i.e. the opposite of "trend continuation"), and for `trend90_
+subwindow_agreement` / `multiwindow_agreement_30_60_90` the clustered-bootstrap CI
+at 60m/120m excludes zero -- a small, statistically-detectable MEAN-REVERSION
+signature after a strong same-direction 60-90m move, not continuation. All three
+are still classified ECONOMICALLY_TOO_SMALL (the |excess| stays under the 10bps
+round-trip friction bar even where it is statistically real), so this is reported
+as a genuine but uneconomical finding, not reframed as a positive result.
+
 ## Definition: `trend60_slope_consistent`
 
 |60m trailing return (causal_trailing_return-equivalent via causal_price_at_offset)| >= 0.4% AND all three constituent 20m sub-windows (0-20m, 20-40m, 40-60m ago) agree in sign with the 60m trend. Direction = sign of the 60m return.

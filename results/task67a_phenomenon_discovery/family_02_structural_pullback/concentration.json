@@ -1,0 +1,56 @@
+{
+  "strong_move90_shallow_retrace20": {
+    "n_rows": 5084,
+    "n_positive_rows": 2543,
+    "total_positive_value": 1582.772048240026,
+    "insufficient_n": false,
+    "n_symbols": 35,
+    "top1_symbol": "LRCX",
+    "top1_symbol_share": 0.054891933162966124,
+    "top3_symbol_share": 0.14761573830320482,
+    "top3_symbols": [
+      "LRCX",
+      "MU",
+      "STX"
+    ],
+    "n_days": 63,
+    "best_day": "2026-07-30 00:00:00+00:00",
+    "best_day_share": 0.035384097615607873
+  },
+  "pullback_toward_vwap_holds": {
+    "n_rows": 7481,
+    "n_positive_rows": 3783,
+    "total_positive_value": 2318.182577139247,
+    "insufficient_n": false,
+    "n_symbols": 35,
+    "top1_symbol": "STX",
+    "top1_symbol_share": 0.0557656420164042,
+    "top3_symbol_share": 0.16587037722790474,
+    "top3_symbols": [
+      "STX",
+      "LRCX",
+      "MU"
+    ],
+    "n_days": 63,
+    "best_day": "2026-07-27 00:00:00+00:00",
+    "best_day_share": 0.0299129637662826
+  },
+  "strong_move45_shallow_retrace10": {
+    "n_rows": 10215,
+    "n_positive_rows": 5127,
+    "total_positive_value": 3056.909900929823,
+    "insufficient_n": false,
+    "n_symbols": 35,
+    "top1_symbol": "STX",
+    "top1_symbol_share": 0.06297276821351022,
+    "top3_symbol_share": 0.1587303359148173,
+    "top3_symbols": [
+      "STX",
+      "LRCX",
+      "INTC"
+    ],
+    "n_days": 63,
+    "best_day": "2026-07-30 00:00:00+00:00",
+    "best_day_share": 0.03503113624358769
+  }
+}

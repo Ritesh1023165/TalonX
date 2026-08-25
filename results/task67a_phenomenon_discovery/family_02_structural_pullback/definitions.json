@@ -1,0 +1,29 @@
+[
+  {
+    "name": "strong_move90_shallow_retrace20",
+    "description": "Prior move over t-90m..t-20m has |return| >= 0.6%; retracement over t-20m..t (now) is OPPOSITE in sign (genuine pullback, not a continued extension) and its magnitude is <= 50% of the prior move's magnitude (shallow giveback, structure preserved). Direction = sign of the prior move (tests continuation after the pullback).",
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 60,
+    "seed": 670267
+  },
+  {
+    "name": "pullback_toward_vwap_holds",
+    "description": "Prior move over t-60m..t-15m has |return| >= 0.5%, moving away from the causal session VWAP; price has since pulled back from the t-15m extreme toward VWAP but has NOT crossed back through it (VWAP held as a structural reference level). Direction = sign of the prior move.",
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 45,
+    "seed": 670268
+  },
+  {
+    "name": "strong_move45_shallow_retrace10",
+    "description": "Coarser/faster-timeframe variant of definition A: prior move over t-45m..t-10m has |return| >= 0.4%; retracement over t-10m..t is opposite in sign and its magnitude is <= 60% of the prior move's magnitude. Direction = sign of the prior move.",
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 30,
+    "seed": 670269
+  }
+]

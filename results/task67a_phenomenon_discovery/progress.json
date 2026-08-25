@@ -49,7 +49,16 @@
         "runtime_wall_clock": "~3m20s for all 3 definitions on the full 35-symbol/62-day DEVELOPMENT set",
         "committed": true
       },
-      "family_02_structural_pullback": {"status": "PENDING"},
+      "family_02_structural_pullback": {
+        "status": "COMPLETE",
+        "script": "research/scripts/task67a_family02_structural_pullback.py",
+        "tests": "tests/test_task67a_family02_structural_pullback.py (11 tests)",
+        "definitions": ["strong_move90_shallow_retrace20", "pullback_toward_vwap_holds", "strong_move45_shallow_retrace10"],
+        "verdicts": {"strong_move90_shallow_retrace20": "WEAK_SIGNAL", "pullback_toward_vwap_holds": "WEAK_SIGNAL", "strong_move45_shallow_retrace10": "WEAK_SIGNAL"},
+        "headline": "IMPORTANT SIGN NUANCE: 2/3 definitions classify POTENTIALLY_TRADEABLE by |excess| magnitude, but the excess SIGN is the OPPOSITE of the hypothesized continuation effect at 60m/120m (CI excludes zero) -- matched controls (same symbol/time-of-day/vol regime, same borrowed direction, but NOT conditioned on the shallow-pullback pattern) outperform the actual pullback events. A mean-reversion-relative-to-control signature, not a continuation edge -- see summary.md's prominent interpretation caveat. All 3 also flagged EFFECT_SURFACE_INSTABILITY (same_sign_frac=0.44, effect not broadly shared across vol/time-of-day cells).",
+        "runtime_wall_clock": "~6 minutes for all 3 definitions on the full 35-symbol/62-day DEVELOPMENT set (stdout was block-buffered so no incremental progress was visible until completion -- noted for Family 4-6 agent: don't assume a silent long-running family script has hung)",
+        "committed": true
+      },
       "family_03_range_expansion": {"status": "PENDING"}
     }
   }
