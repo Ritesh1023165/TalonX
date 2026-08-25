@@ -148,6 +148,14 @@ async def test_decision_engine_only_called_for_ready_symbols(tmp_path):
 
     fake_engine = AsyncMock()
     fake_engine.warmup_ready_symbols = {"AAPL", "MSFT"}  # both warmup-ready -- this test isolates the readiness-validator gate
+    # funnel_summary is a plain (sync) method on the real DecisionEngine --
+    # give the fake a real dict return so SessionRunner's Task69Q piv_info/
+    # heartbeat bookkeeping (which reads this every tick) doesn't trip over
+    # AsyncMock's default "everything is awaitable" behavior.
+    fake_engine.funnel_summary = lambda: {
+        "evaluation_cycles": 0, "symbols_evaluated_total": 0, "candidates": 0, "published": 0,
+        "rejected": 0, "pending": 0, "errored": 0, "unaccounted_candidates": 0, "rejected_breakdown": {},
+    }
     run, transport, bus = runner(tmp_path, batches, decision_engine=fake_engine)
     ticks = [datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i) for i in range(30)]
     ticks.append(live_tick)

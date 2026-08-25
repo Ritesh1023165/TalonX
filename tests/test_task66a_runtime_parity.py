@@ -21,7 +21,13 @@ def test_telegram_inbound_capable_constructs_without_network_call(tmp_path):
 def test_build_piv_telegram_listener_uses_piv_scoped_audit_db(tmp_path):
     listener = build_piv_telegram_listener(tmp_path)
     assert listener.config.audit_db_path == str(tmp_path / "piv_telegram_audit.db")
-    assert listener.dispatch_agent is None  # documented degrade path, no full app coupling
+    # Task 69P made dispatch_agent a _PivPingContext shim (not None) so /ping's
+    # PIV section renders; Task 69Q extends that shim's piv_info dict with the
+    # unified-view fields SessionRunner updates live (see telegram_inbound.
+    # build_piv_info) -- this replaces the older "no full app coupling, stays
+    # None" expectation this test previously encoded.
+    assert listener.dispatch_agent is not None
+    assert listener.dispatch_agent.piv_info["mode"] == "PAPER / NO REAL CAPITAL"
 
 
 def test_runtime_parity_reports_pass_with_current_manifest():
