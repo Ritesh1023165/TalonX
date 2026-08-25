@@ -6199,3 +6199,71 @@ NO. Real capital: NO. Synthetic data: NO. Runtime worktree (`research/talonx-str
 touched: NO. Next action: new DEVELOPMENT-phase phenomenon/candidate discovery (Task67-style family
 screening), diagnostically informed by F6's cross-period directional instability but not
 re-litigating F6 itself; see `results/task70_f6_validation/claude_handoff_next.md`.
+
+## Task 71 — Forensic Alpha Reset + Structural Phenomenon Discovery (2026-08-26)
+
+> **PURPOSE**: Before searching for another candidate, forensically determine which prior failures
+> (legacy Quant, FPRC_V1, ORPB_V1, F1-F6) were genuine alpha failures vs. engineering/data/
+> methodology artifacts, then run ONE disciplined, predeclared discovery pass -- at most one primary
+> candidate, holdout data protected throughout.
+>
+> **FORENSIC AUDIT** (`results/task71_structural_discovery/failure_forensics.{csv,md}`): legacy Quant
+> (Tasks 8/26/36/37) never reached a clean profitable-or-unprofitable verdict -- officially UNPROVEN
+> at every checkpoint, each iteration fixing a real bug (short-inclusion, then stop-geometry) that
+> changed the trade population. FPRC_V1: HYPOTHESIS_FAILURE + ECONOMIC_EDGE_TOO_SMALL, gross
+> expectancy ~0, clean rejection, no contaminating defect. ORPB_V1: HYPOTHESIS_FAILURE + SAMPLE_SIZE
+> + CONCENTRATION, gross already negative pre-cost; a genuine SIP data gap was investigated and
+> correctly ruled out as contamination (not a feed-default bug). F1/F2 wrong-signed vs. their own
+> hypotheses (reversal where continuation was hypothesized); F5 a clean negative
+> ("compression alone predicts nothing"); F3's apparent win was one isolated n=76 definition its own
+> researchers flagged as cherry-pick risk; F4 a real but sub-10bps-friction effect. F6_FADE_V1: 1 of
+> 18 Stage-1 definitions screened, passed narrow VALIDATION, failed broad REPLICATION with reversed
+> sign. **Biggest failure mode identified: promotion decisions made on statistical criteria alone,
+> without adjusting for how many definitions/families had already been tried (~18-100+ program-wide
+> comparisons to date)** -- directly addressed by this task's own predeclared, bounded 72-cell grid.
+>
+> **DESIGN LOCK** (`research_design_lock.json`, committed BEFORE any new outcome): 4 families (AVWAP
+> flow-state, overnight-gap continuation, idiosyncratic residual momentum, failed structural break),
+> long/short never pooled, 5 cost levels (0/5/10/15/20bps), at most one primary candidate + one
+> research lead, explicit holdout-protection guard.
+>
+> **DEVELOPMENT BROADENING**: 4 non-adjacent regime slices (2025 Q1/Q3/Q4 + the existing 2026 summer
+> F6-era slice) drawn ONLY from already-contaminated 2025-01-24..2026-08-14 history --
+> 2,979,608 bars, 35/35 symbols clean in every slice, zero clean-2024 territory touched. Documented
+> `CURRENT_UNIVERSE_BACKCAST_BIAS` and per-family SIP/IEX provider-portability classification without
+> normalizing research parameters to any assumed IEX scale.
+>
+> **DISCOVERY RESULTS** (72 predeclared cells, 72 actually computed -- exact match): Family A
+> (AVWAP): near-zero gross expectancy in all 24 cells, net negative everywhere -- no edge. Family B
+> (deliberately NOT called PEAD -- no verified historical earnings-timestamp data exists in this
+> repo, see `event_data_audit.json`; named OVERNIGHT_GAP_CONTINUATION instead): 18/20 cells
+> net-negative, the 2 positive cells each sit beside a strongly negative cell at a neighboring
+> horizon -- isolated-winner pattern, downranked per the multiple-testing discipline. Family C
+> (idiosyncratic residual momentum, causal 20-trading-day trailing beta vs SPY): **LONG side positive
+> in all 8 of its own predeclared cells**, sign-stable across 3 independent time segments AND 3
+> independent regime slices, friction absorption ratio 1.1-2.8x, concentration well under 40%
+> everywhere; SHORT side of the identical mechanism fails cleanly (rejected on its own merits, LONG
+> stands alone). Family D (failed structural break): never clears 10bps cost in any single time
+> segment or regime slice on either side -- clean rejection, not even a research lead. A real bug in
+> the cluster-CI "weaker interpretation" selector (inverted comparison) was found and fixed, with a
+> dedicated regression test, before any result was reported.
+>
+> **NOMINATION**: `primary_candidate_draft.json` checks all 15 of the task's own pre-declared
+> criteria individually against Family C LONG -- 13 clear passes, 2 explicit undisguised caveats (the
+> day-clustered/weaker bootstrap CI crosses zero at every cell even though the symbol-clustered one
+> mostly doesn't; no stop/risk rule is frozen, `STOP_UNRESOLVED`, explicitly left for Task72). No
+> second family qualifies even as a research lead. **PRIMARY_CANDIDATE_READY_TO_FREEZE.**
+>
+> **HOLDOUT BUDGET**: zero 2024 outcomes computed this task; Task70's two consumed 2024 blocks were
+> not re-touched; remaining clean 2024 territory is only inventoried, never accessed.
+>
+> **TESTS**: 21 new focused tests (causal feature construction, no-lookahead, direction-sign
+> correctness, holdout-guard, cluster-CI weaker-interpretation logic including the bug found above)
+> -- all pass, run once before final interpretation.
+
+**Scope/deployment**: no strategy is frozen, integrated, or deployed by this task -- Task72 freezes
+IDIOSYNCRATIC_RESIDUAL_MOMENTUM_LONG (parameter/horizon selection, stop design, pre-registered
+validation protocol, fresh holdout lock) before any validation outcome exists. F6_FADE_V1 remains
+rejected and is not revisited. Real capital: NO. Runtime worktree
+(`research/talonx-strategy-validation`) touched: NO. See
+`results/task71_structural_discovery/claude_handoff_next.md` for the detailed handoff.

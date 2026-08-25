@@ -1,0 +1,54 @@
+{
+  "task": "71",
+  "purpose": "Forensic alpha reset + structural phenomenon discovery",
+  "research_branch": "research/talonx-alpha-phenomenon-discovery",
+  "starting_sha": "6743527bcb06077aa9240e1b77756e46d3822d49",
+  "runtime_branch": "research/talonx-strategy-validation",
+  "runtime_modified_by_this_task": false,
+  "f6_changed": false, "f6_rescued": false, "real_capital_introduced": false,
+  "forensic_summary": {
+    "legacy_quant": "officially UNPROVEN at every checkpoint (Task8/26/36/37) -- never a clean rejection OR vindication; each iteration fixed a real bug (short-inclusion, then stop-geometry) that changed the trade population, none reached adequate sample at a surviving profit factor",
+    "fprc_v1": "HYPOTHESIS_FAILURE + ECONOMIC_EDGE_TOO_SMALL -- gross expectancy ~0, clean statistical rejection, no contaminating defect found",
+    "orpb_v1": "HYPOTHESIS_FAILURE + SAMPLE_SIZE + CONCENTRATION -- gross expectancy already negative pre-cost, underpowered (46<90 trades), symbol-concentration cap breached; a genuine SIP-data-gap was investigated and correctly ruled out as contamination",
+    "f1_f5": "F1/F2 wrong-signed vs. hypothesis (reversal where continuation was hypothesized), F5 clean negative ('compression alone predicts nothing'), F3's apparent win was an isolated n=76 definition the researchers themselves flagged as cherry-pick risk, F4 showed a real but sub-10bps-friction effect",
+    "f6_fade_v1": "passed Stage-1 screening legitimately (1 of 18 definitions), passed narrow VALIDATION, failed broad REPLICATION with reversed sign -- textbook 'one lucky definition out of many' outcome",
+    "biggest_failure_mode": "promotion decisions made on statistical criteria alone (CI excludes zero, adequate breadth) without an explicit multiple-testing adjustment across ~18-100+ program-wide comparisons -- addressed directly by this task's predeclared 72-cell grid and explicit hypothesis-count disclosure"
+  },
+  "development_data": {
+    "slices": 4, "total_bars": 2979608, "symbols": 35,
+    "regimes": ["2025 Q1 (ORPB era)", "2025 Q3 (FPRC era)", "2025 Q4 (Task46-56 era)", "2026 summer (F6 era)"],
+    "all_slices_clean": true,
+    "no_2024_territory_touched": true
+  },
+  "families_screened": 4,
+  "predeclared_grid_cells": 72,
+  "actual_cells_computed": 72,
+  "multiple_testing_method": "predeclared bounded grid + cluster-aware bootstrap + explicit isolated-cell downgrade rule (no dedicated permutation framework built -- none pre-existed, out of scope per the task's own fallback instruction)",
+  "candidate_nominated": true,
+  "primary_candidate": {
+    "name": "IDIOSYNCRATIC_RESIDUAL_MOMENTUM_LONG",
+    "state": "PRIMARY_CANDIDATE_READY_TO_FREEZE",
+    "direction": "LONG_ONLY",
+    "primary_cell": {"threshold_band_pct": 0.75, "horizon": "EOD", "n_trades": 217, "n_symbols": 35, "n_days": 26,
+      "gross_expectancy_pct": 0.2265, "net_expectancy_10bps_pct": 0.1265, "profit_factor_10bps": 1.314},
+    "all_8_cells_positive": true,
+    "sign_stable_across_3_time_segments": true,
+    "sign_stable_across_3_regime_slices": true,
+    "day_clustered_ci_excludes_zero": false,
+    "stop_rule": "STOP_UNRESOLVED (diagnostics only, Task72's job)"
+  },
+  "research_lead_recorded": false,
+  "research_lead_reason": "None of Family A/B/D or Family C's SHORT side showed a corroborated (neighbor-consistent, regime-consistent) signal worth carrying forward -- recording an isolated cell as a lead would repeat F6's own failure mode.",
+  "holdout_budget": {
+    "task70_consumed_blocks": ["2024-02-01..2024-03-15", "2024-09-03..2024-10-18"],
+    "clean_2024_outcomes_inspected_this_task": false,
+    "next_holdout_consumed_this_task": false,
+    "remaining_clean_2024_inventory": ["2024-01-01..2024-01-31", "2024-03-16..2024-09-02 (minus Task70's Sept slice)", "2024-10-19..2024-12-31"],
+    "inventory_only_no_outcome_computed": true
+  },
+  "tests_run": [
+    "tests/test_task71_features.py", "tests/test_task71_family_a_avwap.py", "tests/test_task71_family_b_event_gap.py",
+    "tests/test_task71_family_c_residual_momentum.py", "tests/test_task71_family_d_failed_break.py", "tests/test_task71_diagnostics.py"
+  ],
+  "tests_result": "21 passed, 0 failed (run once before final interpretation, per instruction)"
+}
