@@ -1,0 +1,47 @@
+{
+  "lock": "TASK70_HOLDOUT_SELECTION_LOCK",
+  "selection_timestamp": "2026-08-25T00:00:00Z",
+  "strategy_fingerprint": "6beb8eebe50053aae27cab90226534b5d4392c46bd6e9c094873f7ad37466084",
+  "outcomes_inspected": false,
+  "validation_start": "2024-02-01",
+  "validation_end": "2024-03-15",
+  "replication_start": "2024-09-03",
+  "replication_end": "2024-10-18",
+  "universe": [
+    "AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX",
+    "ADBE", "ADI", "AMAT", "AVGO", "BKNG", "CMCSA", "COST", "CSCO", "GILD", "HON",
+    "INTC", "INTU", "ISRG", "KLAC", "LRCX", "MDLZ", "MU", "NFLX", "PANW", "PEP",
+    "QCOM", "REGN", "SBUX", "TXN", "VRTX"
+  ],
+  "provider_plan": {
+    "provider": "alpaca",
+    "feed": "sip",
+    "downloader": "scripts/download_historical_1m.py --provider alpaca",
+    "output_dirs": {
+      "validation": "data/historical_1m/task70_validation",
+      "replication": "data/historical_1m/task70_replication"
+    },
+    "note": "Same provider/feed convention as results/task67a_phenomenon_discovery/data_split_contract.json (RESEARCH_SIP). feed=sip explicitly (not omitted) for reproducibility of this lock."
+  },
+  "exposure_classification": "EXPOSED_DATA_ONLY (conservative) -- see historical_exposure_audit.json/md. No F6-relevant or any strategy OUTCOME was ever inspected for calendar year 2024 anywhere in this repo's tracked history; the only possible touches found are (a) pure trading-calendar session-date arithmetic in two unrelated frozen-candidate protocol scripts (zero price data), and (b) generic talonx_backtest documentation/config examples referencing 2024 date ranges, for which the only figures ever shown are a DATA QUALITY report (row/gap counts), never a strategy P&L/trade outcome, and for a structurally unrelated (momentum, not fade) strategy family in any case.",
+  "evidence_checked": [
+    "results/task67a_phenomenon_discovery/exposure_boundary_audit.json (systematic ledger-wide audit, Task 67A Stage 0, predates any F6 outcome)",
+    "results/task67a_phenomenon_discovery/data_split_contract.json",
+    "results/task68_f6_freeze/f6_fade_v1_spec.json (development_period, development_dataset_identity_or_hash)",
+    "results/task67a_phenomenon_discovery/family_06_opening_later/summary.md (735 development events, confirms F6 dataset scope)",
+    "research/scripts/task61r_freeze_temporal_protocol.py (direct read, lines 60/64 -- calendar-arithmetic-only 2024 reference)",
+    "research/scripts/task62_freeze_candidate.py (direct read, lines 71-72 -- calendar-arithmetic-only 2024 reference)",
+    "docs/backtesting.md (direct read -- 2024 data-quality-report example, no strategy outcome shown)",
+    "scripts/run_historical_regimes.py (direct read -- 2024-named regime CONFIGURATION only, no evidence of real execution against full 2024 data)",
+    "docs/research/TALONX_RESEARCH_LEDGER.md grep for 'talonx_backtest'/'run_historical_regimes'/'backtesting.md' (confirms no task result directory or ledger entry documents a real 2024 execution)",
+    "data/historical_1m/ directory listing in this worktree (contains only task67a_development, task67a_benchmarks -- no 2024 data ever downloaded here)",
+    "Live read-only Alpaca API check (feed=sip): AAPL 2024-02-01..02-09 (5316 bars) and 2024-09-03..09-11 (5195 bars) both HTTP 200 -- confirms historical-data AVAILABILITY (not outcome) for the account/provider this task will use",
+    "Live read-only Alpaca API check (feed=sip): all 35 universe symbols, one representative day per candidate window (2024-02-01, 2024-09-03) -- 33/35 symbols returned >300 one-minute bars; BKNG and REGN returned 141-290 bars on these specific days (high-share-price, lower per-minute trade-print liquidity -- not a FAILED/EMPTY status, just sparser prints; F6's own OPENING_WINDOW_MIN_BARS=20 gate will fail-closed per-day/per-symbol as designed if ever insufficient, never fabricate)"
+  ],
+  "selection_reason": "Both blocks lie entirely within calendar year 2024, the only period found EXPOSED_DATA_ONLY-or-cleaner across this repo's full tracked history (see historical_exposure_audit.json). Selection factors used, all pre-outcome per the task's own allowed list: (1) cleanliness (2024 is the least-exposed non-trivial-size window available with real market data); (2) historical-data availability (independently confirmed live via read-only Alpaca API checks, both a 2-week micro-sample and a full-universe single-day spot-check per window); (3) symbol coverage (all 35 universe symbols checked, none FAILED/EMPTY); (4) adequate session count (target 30-40 trading days per block, per approximate US equity trading-calendar arithmetic: VALIDATION ~32 sessions [Feb 2024 21 sessions (Presidents Day 2024-02-19 excluded) + Mar 1-15 2024 11 sessions], REPLICATION ~34 sessions [Sep 2024 20 sessions (Labor Day 2024-09-02 excluded, range starts 09-03) + Oct 1-18 2024 14 sessions] -- both approximate calendar estimates, to be confirmed against actual downloaded data in Part 4, per this repo's own documented lack of a trading-calendar source of truth for backtesting purposes, same caveat data_split_contract.json used); (5) temporal separation (validation and replication are ~5.5 months apart, zero adjacency); (6) broad calendar diversity (different quarters/seasons of the same year -- Q1 vs Q3/Q4). NOT selected based on any F6 performance -- no F6 outcome has been computed against any 2024 data at the time of this lock (outcomes_inspected=false, confirmed: no evaluator.evaluate() call has been made against real price data anywhere in this task before this file was written).",
+  "no_overlap_check": {
+    "validation_vs_replication": "2024-03-15 < 2024-09-03: no overlap, ~5.5 months gap",
+    "vs_f6_development": "2024 entirely precedes F6's own development window (2026-05-15..2026-08-14): no overlap",
+    "vs_orpb_fprc": "2024 entirely precedes ORPB_V1 (2025-01-24..2025-05-05) and FPRC_V1 (2025-05-06..2025-08-14): no overlap"
+  }
+}
