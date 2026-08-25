@@ -1,0 +1,29 @@
+[
+  {
+    "name": "persistent_compression_atr30_persist30",
+    "description": "Trailing 30m ATR proxy (bottom global tertile as a fraction of price) held CONTINUOUSLY for the entire trailing 30 minutes (every bar in the window individually below the tertile cutoff, not just the window average). No requirement that expansion has begun. Direction (secondary/weak signal) = sign of the 15m trailing return as of the compressed bar. Excludes first 30m of RTH.",
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 30,
+    "seed": 670567
+  },
+  {
+    "name": "relative_narrow_range_15v90",
+    "description": "Current 15m rolling high-low range pace (range/15) divided by the SAME symbol's own trailing 90m high-low range pace (range/90) -- a per-symbol-normalized ratio -- in the bottom global tertile. Tests whether the recent window is narrow relative to what THIS symbol itself has typically been doing, not an absolute range threshold. Direction (secondary/weak signal) = sign of the 15m trailing return. Excludes first 30m of RTH.",
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 30,
+    "seed": 670568
+  },
+  {
+    "name": "declining_compression_atr30_lag30",
+    "description": "Current causal 30m ATR proxy < the same measure evaluated ~30 minutes earlier (same-day causal lookback), AND both values below the global median as a fraction of price -- compression is DEEPENING, not merely present. Direction (secondary/weak signal) = sign of the 15m trailing return. Excludes first 30m of RTH.",
+    "dedup_group_keys": [
+      "symbol"
+    ],
+    "dedup_min_gap_minutes": 30,
+    "seed": 670569
+  }
+]

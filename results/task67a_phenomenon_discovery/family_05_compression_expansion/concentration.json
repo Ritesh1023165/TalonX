@@ -1,0 +1,56 @@
+{
+  "persistent_compression_atr30_persist30": {
+    "n_rows": 1230,
+    "n_positive_rows": 610,
+    "total_positive_value": 175.6451265306651,
+    "insufficient_n": false,
+    "n_symbols": 28,
+    "top1_symbol": "HON",
+    "top1_symbol_share": 0.08246246861135258,
+    "top3_symbol_share": 0.23474165400099214,
+    "top3_symbols": [
+      "HON",
+      "REGN",
+      "MDLZ"
+    ],
+    "n_days": 63,
+    "best_day": "2026-06-17 00:00:00+00:00",
+    "best_day_share": 0.05018772195042711
+  },
+  "relative_narrow_range_15v90": {
+    "n_rows": 5811,
+    "n_positive_rows": 2950,
+    "total_positive_value": 1662.9822218780305,
+    "insufficient_n": false,
+    "n_symbols": 35,
+    "top1_symbol": "MU",
+    "top1_symbol_share": 0.052586234539731116,
+    "top3_symbol_share": 0.14443566286477627,
+    "top3_symbols": [
+      "MU",
+      "KLAC",
+      "STX"
+    ],
+    "n_days": 63,
+    "best_day": "2026-06-09 00:00:00+00:00",
+    "best_day_share": 0.03194528505191834
+  },
+  "declining_compression_atr30_lag30": {
+    "n_rows": 2788,
+    "n_positive_rows": 1371,
+    "total_positive_value": 443.3115219385952,
+    "insufficient_n": false,
+    "n_symbols": 33,
+    "top1_symbol": "VRTX",
+    "top1_symbol_share": 0.0556463230025828,
+    "top3_symbol_share": 0.16177972565818596,
+    "top3_symbols": [
+      "VRTX",
+      "META",
+      "SBUX"
+    ],
+    "n_days": 63,
+    "best_day": "2026-05-29 00:00:00+00:00",
+    "best_day_share": 0.03032593580555002
+  }
+}

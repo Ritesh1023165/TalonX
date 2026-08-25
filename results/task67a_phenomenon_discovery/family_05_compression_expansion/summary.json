@@ -1,0 +1,715 @@
+{
+  "family": "family_05_compression_expansion",
+  "question": "Does sitting in a compressed volatility state predict LATER unusually large movement and/or directional persistence, evaluated at horizons AFTER the compressed bar -- with NO requirement that expansion has already begun? (later-session/general-session only; first 30m of RTH explicitly excluded, ORPB territory).",
+  "data": {
+    "role": "DEVELOPMENT",
+    "n_symbols_universe": 35,
+    "n_trading_days": 62,
+    "date_range": [
+      "2026-05-15",
+      "2026-08-14"
+    ]
+  },
+  "friction_assumption_bps": {
+    "one_way": 5.0,
+    "round_trip": 10.0
+  },
+  "primary_horizon_minutes": 60,
+  "direction_convention": "PRIMARY (volatility-effect, unsigned): approach (ii) -- own absolute-forward-range statistic (max(high)-min(low) over each horizon window as % of entry_price) computed directly from bars for both events and matched controls; VOLATILITY_EFFECT_PRESENT iff the matched-control excess at the 60m primary horizon is positive, its magnitude >= round-trip friction bps, and its clustered (by-symbol) bootstrap 95% CI excludes zero on the positive side. SECONDARY (directional edge, signed): weak directional signal = sign of the 15m trailing return ending at the compressed bar, run through the standard run_family_definition pipeline; DIRECTIONAL_EDGE_PRESENT uses the same positive/magnitude/CI rule applied to the signed excess. Both flags are additional to, not a replacement for, the standard PHENOMENON_PRESENT/WEAK_SIGNAL/PHENOMENON_NOT_OBSERVED/INSUFFICIENT_DATA verdict (computed on the secondary/signed analysis). VOLATILITY_EFFECT_PRESENT with DIRECTIONAL_EDGE_NOT_OBSERVED is an explicitly expected, valid possible outcome, not a failure.",
+  "definitions": {
+    "persistent_compression_atr30_persist30": {
+      "description": "Trailing 30m ATR proxy (bottom global tertile as a fraction of price) held CONTINUOUSLY for the entire trailing 30 minutes (every bar in the window individually below the tertile cutoff, not just the window average). No requirement that expansion has begun. Direction (secondary/weak signal) = sign of the 15m trailing return as of the compressed bar. Excludes first 30m of RTH.",
+      "dedup_group_keys": [
+        "symbol"
+      ],
+      "dedup_min_gap_minutes": 30,
+      "seed": 670567,
+      "n_raw_events": 102621,
+      "n_dedup_events": 1230,
+      "n_symbols": 28,
+      "n_days": 63,
+      "per_horizon": {
+        "15m": {
+          "horizon_minutes": 15,
+          "n_events": 1230,
+          "n_matched_pairs": 1047,
+          "raw_mean_pct": -0.0025610208403152794,
+          "raw_median_pct": -0.006211611629737138,
+          "positive_return_freq": 0.4796747967479675,
+          "matched_control_mean_pct": 0.0060943657604523565,
+          "excess_mean_pct": -0.009684538719944758,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.009684538719944758,
+            "ci_low": -0.026425999523010495,
+            "ci_high": 0.005916166650981216,
+            "n": 28,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670582,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "30m": {
+          "horizon_minutes": 30,
+          "n_events": 1230,
+          "n_matched_pairs": 1047,
+          "raw_mean_pct": 0.002987559629079362,
+          "raw_median_pct": 0.0008891533559944413,
+          "positive_return_freq": 0.5016260162601626,
+          "matched_control_mean_pct": -0.0017705854384869536,
+          "excess_mean_pct": 0.0022541299115350242,
+          "excess_bootstrap_clustered": {
+            "point_estimate": 0.0022541299115350242,
+            "ci_low": -0.017624904814641188,
+            "ci_high": 0.025646991981024735,
+            "n": 28,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670597,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "60m": {
+          "horizon_minutes": 60,
+          "n_events": 1230,
+          "n_matched_pairs": 1047,
+          "raw_mean_pct": 0.0023918279200695596,
+          "raw_median_pct": -0.0007476523715526426,
+          "positive_return_freq": 0.4959349593495935,
+          "matched_control_mean_pct": 0.0035044427322749668,
+          "excess_mean_pct": 0.0033572300464006326,
+          "excess_bootstrap_clustered": {
+            "point_estimate": 0.0033572300464006326,
+            "ci_low": -0.023560903213477955,
+            "ci_high": 0.03544148442043983,
+            "n": 28,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670627,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "120m": {
+          "horizon_minutes": 120,
+          "n_events": 1230,
+          "n_matched_pairs": 1047,
+          "raw_mean_pct": -0.014058958444042667,
+          "raw_median_pct": -0.017310266672188247,
+          "positive_return_freq": 0.48048780487804876,
+          "matched_control_mean_pct": 0.013336970617305337,
+          "excess_mean_pct": -0.011952772368376175,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.011952772368376175,
+            "ci_low": -0.04616618180243284,
+            "ci_high": 0.023378461028737668,
+            "n": 28,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670687,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        }
+      },
+      "mfe_pct_median": 0.3015463063670163,
+      "mae_pct_median": 0.299245625628187,
+      "concentration": {
+        "n_rows": 1230,
+        "n_positive_rows": 610,
+        "total_positive_value": 175.6451265306651,
+        "insufficient_n": false,
+        "n_symbols": 28,
+        "top1_symbol": "HON",
+        "top1_symbol_share": 0.08246246861135258,
+        "top3_symbol_share": 0.23474165400099214,
+        "top3_symbols": [
+          "HON",
+          "REGN",
+          "MDLZ"
+        ],
+        "n_days": 63,
+        "best_day": "2026-06-17 00:00:00+00:00",
+        "best_day_share": 0.05018772195042711
+      },
+      "effect_surface_instability": false,
+      "effect_surface_instability_reason": "9 populated cells (n>=5): same_sign_frac=0.56 (overall sign=+), max|mean|/median|mean|=2.94.",
+      "economic_classification": "ECONOMICALLY_TOO_SMALL",
+      "data_sufficiency": "ADEQUATE",
+      "verdict": "PHENOMENON_NOT_OBSERVED",
+      "verdict_reasoning": "4/6 early-kill checks failed (near-zero/incoherent excess effect, unstable effect surface, non-asymmetric MFE/MAE, high concentration, or a clustered-bootstrap CI for excess that straddles zero) -- most of the early-kill checklist holds, so this definition is treated as PHENOMENON_NOT_OBSERVED rather than cherry-picked into a weaker positive verdict.",
+      "verdict_inputs": {
+        "coherent_direction": false,
+        "matched_control_support": true,
+        "nontrivial_economic_scale": false,
+        "adequate_event_count": true,
+        "temporal_breadth": true,
+        "symbol_breadth": true,
+        "stable_effect_surface": true,
+        "asymmetric_mfe_mae": false,
+        "concentration_low": true,
+        "excess_ci_excludes_zero": false,
+        "data_sufficiency": "ADEQUATE"
+      },
+      "main_weakness": "Checks failing: coherent_direction, nontrivial_economic_scale, asymmetric_mfe_mae, excess_ci_excludes_zero",
+      "directional_edge_flag": "DIRECTIONAL_EDGE_NOT_OBSERVED",
+      "volatility_effect": {
+        "per_horizon": {
+          "15m": {
+            "horizon_minutes": 15,
+            "n_events": 1230,
+            "n_matched_pairs": 1047,
+            "raw_mean_abs_range_pct": 0.27133918162525367,
+            "matched_control_mean_abs_range_pct": 0.27827854799212837,
+            "excess_mean_abs_range_pct": -0.006808261288127915,
+            "excess_bootstrap_clustered": {
+              "point_estimate": -0.006808261288127915,
+              "ci_low": -0.030517158954456315,
+              "ci_high": 0.011964953265744259,
+              "n": 28,
+              "n_resamples": 10000,
+              "ci_level": 0.95,
+              "seed": 680582,
+              "method": "clustered_percentile_bootstrap",
+              "insufficient_n": false,
+              "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+            }
+          },
+          "30m": {
+            "horizon_minutes": 30,
+            "n_events": 1230,
+            "n_matched_pairs": 1047,
+            "raw_mean_abs_range_pct": 0.38385906214725873,
+            "matched_control_mean_abs_range_pct": 0.4162725710197327,
+            "excess_mean_abs_range_pct": -0.035652953234984706,
+            "excess_bootstrap_clustered": {
+              "point_estimate": -0.035652953234984706,
+              "ci_low": -0.06875229921168108,
+              "ci_high": -0.009363392674995169,
+              "n": 28,
+              "n_resamples": 10000,
+              "ci_level": 0.95,
+              "seed": 680597,
+              "method": "clustered_percentile_bootstrap",
+              "insufficient_n": false,
+              "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+            }
+          },
+          "60m": {
+            "horizon_minutes": 60,
+            "n_events": 1230,
+            "n_matched_pairs": 1047,
+            "raw_mean_abs_range_pct": 0.5577465448916517,
+            "matched_control_mean_abs_range_pct": 0.5660737900352147,
+            "excess_mean_abs_range_pct": -0.008331401678423863,
+            "excess_bootstrap_clustered": {
+              "point_estimate": -0.008331401678423863,
+              "ci_low": -0.057152448812515404,
+              "ci_high": 0.027498012313688258,
+              "n": 28,
+              "n_resamples": 10000,
+              "ci_level": 0.95,
+              "seed": 680627,
+              "method": "clustered_percentile_bootstrap",
+              "insufficient_n": false,
+              "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+            }
+          },
+          "120m": {
+            "horizon_minutes": 120,
+            "n_events": 1230,
+            "n_matched_pairs": 1047,
+            "raw_mean_abs_range_pct": 0.770146053027456,
+            "matched_control_mean_abs_range_pct": 0.745244462438903,
+            "excess_mean_abs_range_pct": 0.01150171131119072,
+            "excess_bootstrap_clustered": {
+              "point_estimate": 0.01150171131119072,
+              "ci_low": -0.04224501047961091,
+              "ci_high": 0.055239395072540255,
+              "n": 28,
+              "n_resamples": 10000,
+              "ci_level": 0.95,
+              "seed": 680687,
+              "method": "clustered_percentile_bootstrap",
+              "insufficient_n": false,
+              "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+            }
+          }
+        },
+        "economic_classification": "ECONOMICALLY_TOO_SMALL",
+        "abs_range_pct_median_max_horizon": 0.6933235907177382,
+        "flag": "VOLATILITY_EFFECT_NOT_OBSERVED"
+      }
+    },
+    "relative_narrow_range_15v90": {
+      "description": "Current 15m rolling high-low range pace (range/15) divided by the SAME symbol's own trailing 90m high-low range pace (range/90) -- a per-symbol-normalized ratio -- in the bottom global tertile. Tests whether the recent window is narrow relative to what THIS symbol itself has typically been doing, not an absolute range threshold. Direction (secondary/weak signal) = sign of the 15m trailing return. Excludes first 30m of RTH.",
+      "dedup_group_keys": [
+        "symbol"
+      ],
+      "dedup_min_gap_minutes": 30,
+      "seed": 670568,
+      "n_raw_events": 264620,
+      "n_dedup_events": 5811,
+      "n_symbols": 35,
+      "n_days": 63,
+      "per_horizon": {
+        "15m": {
+          "horizon_minutes": 15,
+          "n_events": 5811,
+          "n_matched_pairs": 4545,
+          "raw_mean_pct": 0.006788181352463965,
+          "raw_median_pct": 0.008229098090853454,
+          "positive_return_freq": 0.5105833763551885,
+          "matched_control_mean_pct": -0.002056403409078271,
+          "excess_mean_pct": 0.004438150683658835,
+          "excess_bootstrap_clustered": {
+            "point_estimate": 0.004438150683658835,
+            "ci_low": -0.016708878785644875,
+            "ci_high": 0.023158497646734243,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670583,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "30m": {
+          "horizon_minutes": 30,
+          "n_events": 5811,
+          "n_matched_pairs": 4545,
+          "raw_mean_pct": 0.018595381031220045,
+          "raw_median_pct": 0.01637018443741195,
+          "positive_return_freq": 0.5152297367062467,
+          "matched_control_mean_pct": 0.006795795841230917,
+          "excess_mean_pct": 0.0036551290463884725,
+          "excess_bootstrap_clustered": {
+            "point_estimate": 0.0036551290463884725,
+            "ci_low": -0.01965295588277018,
+            "ci_high": 0.02610152547851472,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670598,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "60m": {
+          "horizon_minutes": 60,
+          "n_events": 5811,
+          "n_matched_pairs": 4545,
+          "raw_mean_pct": -0.0010542418183992475,
+          "raw_median_pct": 0.014651094646069986,
+          "positive_return_freq": 0.5076578902082258,
+          "matched_control_mean_pct": 0.031341355485560156,
+          "excess_mean_pct": -0.03933045831630603,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.03933045831630603,
+            "ci_low": -0.0743499909722573,
+            "ci_high": -0.00711891582742936,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670628,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "120m": {
+          "horizon_minutes": 120,
+          "n_events": 5811,
+          "n_matched_pairs": 4545,
+          "raw_mean_pct": 0.003865252114443467,
+          "raw_median_pct": 0.00673740946607332,
+          "positive_return_freq": 0.5038719669592153,
+          "matched_control_mean_pct": 0.03533393362700894,
+          "excess_mean_pct": -0.032240509748623344,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.032240509748623344,
+            "ci_low": -0.06812486898740144,
+            "ci_high": 0.004056586691202933,
+            "n": 35,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670688,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        }
+      },
+      "mfe_pct_median": 0.5125072331983215,
+      "mae_pct_median": 0.493448631039343,
+      "concentration": {
+        "n_rows": 5811,
+        "n_positive_rows": 2950,
+        "total_positive_value": 1662.9822218780305,
+        "insufficient_n": false,
+        "n_symbols": 35,
+        "top1_symbol": "MU",
+        "top1_symbol_share": 0.052586234539731116,
+        "top3_symbol_share": 0.14443566286477627,
+        "top3_symbols": [
+          "MU",
+          "KLAC",
+          "STX"
+        ],
+        "n_days": 63,
+        "best_day": "2026-06-09 00:00:00+00:00",
+        "best_day_share": 0.03194528505191834
+      },
+      "effect_surface_instability": true,
+      "effect_surface_instability_reason": "9 populated cells (n>=5): same_sign_frac=0.56 (overall sign=-), max|mean|/median|mean|=7.28.",
+      "economic_classification": "ECONOMICALLY_TOO_SMALL",
+      "data_sufficiency": "ADEQUATE",
+      "verdict": "PHENOMENON_NOT_OBSERVED",
+      "verdict_reasoning": "4/6 early-kill checks failed (near-zero/incoherent excess effect, unstable effect surface, non-asymmetric MFE/MAE, high concentration, or a clustered-bootstrap CI for excess that straddles zero) -- most of the early-kill checklist holds, so this definition is treated as PHENOMENON_NOT_OBSERVED rather than cherry-picked into a weaker positive verdict.",
+      "verdict_inputs": {
+        "coherent_direction": false,
+        "matched_control_support": true,
+        "nontrivial_economic_scale": false,
+        "adequate_event_count": true,
+        "temporal_breadth": true,
+        "symbol_breadth": true,
+        "stable_effect_surface": false,
+        "asymmetric_mfe_mae": false,
+        "concentration_low": true,
+        "excess_ci_excludes_zero": true,
+        "data_sufficiency": "ADEQUATE"
+      },
+      "main_weakness": "Checks failing: coherent_direction, nontrivial_economic_scale, stable_effect_surface, asymmetric_mfe_mae",
+      "directional_edge_flag": "DIRECTIONAL_EDGE_NOT_OBSERVED",
+      "volatility_effect": {
+        "per_horizon": {
+          "15m": {
+            "horizon_minutes": 15,
+            "n_events": 5811,
+            "n_matched_pairs": 4545,
+            "raw_mean_abs_range_pct": 0.6122512527640105,
+            "matched_control_mean_abs_range_pct": 0.5500690679363324,
+            "excess_mean_abs_range_pct": -0.0031769760634687946,
+            "excess_bootstrap_clustered": {
+              "point_estimate": -0.0031769760634687946,
+              "ci_low": -0.014377275906069135,
+              "ci_high": 0.00865200190341658,
+              "n": 35,
+              "n_resamples": 10000,
+              "ci_level": 0.95,
+              "seed": 680583,
+              "method": "clustered_percentile_bootstrap",
+              "insufficient_n": false,
+              "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+            }
+          },
+          "30m": {
+            "horizon_minutes": 30,
+            "n_events": 5811,
+            "n_matched_pairs": 4545,
+            "raw_mean_abs_range_pct": 0.8543596651512655,
+            "matched_control_mean_abs_range_pct": 0.7606585186714562,
+            "excess_mean_abs_range_pct": 0.007194159739326753,
+            "excess_bootstrap_clustered": {
+              "point_estimate": 0.007194159739326753,
+              "ci_low": -0.005947172740681645,
+              "ci_high": 0.021941114249431064,
+              "n": 35,
+              "n_resamples": 10000,
+              "ci_level": 0.95,
+              "seed": 680598,
+              "method": "clustered_percentile_bootstrap",
+              "insufficient_n": false,
+              "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+            }
+          },
+          "60m": {
+            "horizon_minutes": 60,
+            "n_events": 5811,
+            "n_matched_pairs": 4545,
+            "raw_mean_abs_range_pct": 1.1499173876898592,
+            "matched_control_mean_abs_range_pct": 1.0403090218092323,
+            "excess_mean_abs_range_pct": 0.0059845907861949535,
+            "excess_bootstrap_clustered": {
+              "point_estimate": 0.0059845907861949535,
+              "ci_low": -0.016325735096678465,
+              "ci_high": 0.027762445289453673,
+              "n": 35,
+              "n_resamples": 10000,
+              "ci_level": 0.95,
+              "seed": 680628,
+              "method": "clustered_percentile_bootstrap",
+              "insufficient_n": false,
+              "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+            }
+          },
+          "120m": {
+            "horizon_minutes": 120,
+            "n_events": 5811,
+            "n_matched_pairs": 4545,
+            "raw_mean_abs_range_pct": 1.4895059974065137,
+            "matched_control_mean_abs_range_pct": 1.3416170191751549,
+            "excess_mean_abs_range_pct": 0.03435247953246642,
+            "excess_bootstrap_clustered": {
+              "point_estimate": 0.03435247953246642,
+              "ci_low": 0.007686024923634413,
+              "ci_high": 0.06390846283864157,
+              "n": 35,
+              "n_resamples": 10000,
+              "ci_level": 0.95,
+              "seed": 680688,
+              "method": "clustered_percentile_bootstrap",
+              "insufficient_n": false,
+              "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+            }
+          }
+        },
+        "economic_classification": "ECONOMICALLY_TOO_SMALL",
+        "abs_range_pct_median_max_horizon": 1.1866442469373042,
+        "flag": "VOLATILITY_EFFECT_NOT_OBSERVED"
+      }
+    },
+    "declining_compression_atr30_lag30": {
+      "description": "Current causal 30m ATR proxy < the same measure evaluated ~30 minutes earlier (same-day causal lookback), AND both values below the global median as a fraction of price -- compression is DEEPENING, not merely present. Direction (secondary/weak signal) = sign of the 15m trailing return. Excludes first 30m of RTH.",
+      "dedup_group_keys": [
+        "symbol"
+      ],
+      "dedup_min_gap_minutes": 30,
+      "seed": 670569,
+      "n_raw_events": 148284,
+      "n_dedup_events": 2788,
+      "n_symbols": 33,
+      "n_days": 63,
+      "per_horizon": {
+        "15m": {
+          "horizon_minutes": 15,
+          "n_events": 2788,
+          "n_matched_pairs": 2582,
+          "raw_mean_pct": 0.005156501509353585,
+          "raw_median_pct": 0.0,
+          "positive_return_freq": 0.4971305595408895,
+          "matched_control_mean_pct": -0.004730416997577317,
+          "excess_mean_pct": 0.009857971300263163,
+          "excess_bootstrap_clustered": {
+            "point_estimate": 0.009857971300263163,
+            "ci_low": -0.0007238755294308865,
+            "ci_high": 0.021317334489280866,
+            "n": 33,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670584,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "30m": {
+          "horizon_minutes": 30,
+          "n_events": 2788,
+          "n_matched_pairs": 2582,
+          "raw_mean_pct": 0.004091623950827663,
+          "raw_median_pct": -0.0035601680404849286,
+          "positive_return_freq": 0.48959827833572456,
+          "matched_control_mean_pct": -0.004127616406873311,
+          "excess_mean_pct": 0.009852047853430615,
+          "excess_bootstrap_clustered": {
+            "point_estimate": 0.009852047853430615,
+            "ci_low": -0.00589219281530816,
+            "ci_high": 0.02658570497255096,
+            "n": 33,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670599,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "60m": {
+          "horizon_minutes": 60,
+          "n_events": 2788,
+          "n_matched_pairs": 2582,
+          "raw_mean_pct": 0.0004908566097448072,
+          "raw_median_pct": -0.006728645235938863,
+          "positive_return_freq": 0.4917503586800574,
+          "matched_control_mean_pct": 0.013021121867840801,
+          "excess_mean_pct": -0.013568842969084526,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.013568842969084526,
+            "ci_low": -0.03552307813948596,
+            "ci_high": 0.008283224481691213,
+            "n": 33,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670629,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        },
+        "120m": {
+          "horizon_minutes": 120,
+          "n_events": 2788,
+          "n_matched_pairs": 2582,
+          "raw_mean_pct": -0.004521120579354856,
+          "raw_median_pct": -0.013855865800421835,
+          "positive_return_freq": 0.4867288378766141,
+          "matched_control_mean_pct": 0.03510273415519868,
+          "excess_mean_pct": -0.042146571725954464,
+          "excess_bootstrap_clustered": {
+            "point_estimate": -0.042146571725954464,
+            "ci_low": -0.06935370378988705,
+            "ci_high": -0.011301137421964019,
+            "n": 33,
+            "n_resamples": 10000,
+            "ci_level": 0.95,
+            "seed": 670689,
+            "method": "clustered_percentile_bootstrap",
+            "insufficient_n": false,
+            "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+          }
+        }
+      },
+      "mfe_pct_median": 0.32891643469106335,
+      "mae_pct_median": 0.3448659231969246,
+      "concentration": {
+        "n_rows": 2788,
+        "n_positive_rows": 1371,
+        "total_positive_value": 443.3115219385952,
+        "insufficient_n": false,
+        "n_symbols": 33,
+        "top1_symbol": "VRTX",
+        "top1_symbol_share": 0.0556463230025828,
+        "top3_symbol_share": 0.16177972565818596,
+        "top3_symbols": [
+          "VRTX",
+          "META",
+          "SBUX"
+        ],
+        "n_days": 63,
+        "best_day": "2026-05-29 00:00:00+00:00",
+        "best_day_share": 0.03032593580555002
+      },
+      "effect_surface_instability": false,
+      "effect_surface_instability_reason": "9 populated cells (n>=5): same_sign_frac=0.56 (overall sign=+), max|mean|/median|mean|=2.70.",
+      "economic_classification": "ECONOMICALLY_TOO_SMALL",
+      "data_sufficiency": "ADEQUATE",
+      "verdict": "PHENOMENON_NOT_OBSERVED",
+      "verdict_reasoning": "4/6 early-kill checks failed (near-zero/incoherent excess effect, unstable effect surface, non-asymmetric MFE/MAE, high concentration, or a clustered-bootstrap CI for excess that straddles zero) -- most of the early-kill checklist holds, so this definition is treated as PHENOMENON_NOT_OBSERVED rather than cherry-picked into a weaker positive verdict.",
+      "verdict_inputs": {
+        "coherent_direction": false,
+        "matched_control_support": true,
+        "nontrivial_economic_scale": false,
+        "adequate_event_count": true,
+        "temporal_breadth": true,
+        "symbol_breadth": true,
+        "stable_effect_surface": true,
+        "asymmetric_mfe_mae": false,
+        "concentration_low": true,
+        "excess_ci_excludes_zero": false,
+        "data_sufficiency": "ADEQUATE"
+      },
+      "main_weakness": "Checks failing: coherent_direction, nontrivial_economic_scale, asymmetric_mfe_mae, excess_ci_excludes_zero",
+      "directional_edge_flag": "DIRECTIONAL_EDGE_NOT_OBSERVED",
+      "volatility_effect": {
+        "per_horizon": {
+          "15m": {
+            "horizon_minutes": 15,
+            "n_events": 2788,
+            "n_matched_pairs": 2582,
+            "raw_mean_abs_range_pct": 0.31742945273470224,
+            "matched_control_mean_abs_range_pct": 0.4202844529364995,
+            "excess_mean_abs_range_pct": -0.10123840018512781,
+            "excess_bootstrap_clustered": {
+              "point_estimate": -0.10123840018512781,
+              "ci_low": -0.11346868553521894,
+              "ci_high": -0.08900667410837498,
+              "n": 33,
+              "n_resamples": 10000,
+              "ci_level": 0.95,
+              "seed": 680584,
+              "method": "clustered_percentile_bootstrap",
+              "insufficient_n": false,
+              "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+            }
+          },
+          "30m": {
+            "horizon_minutes": 30,
+            "n_events": 2788,
+            "n_matched_pairs": 2582,
+            "raw_mean_abs_range_pct": 0.45433447223250745,
+            "matched_control_mean_abs_range_pct": 0.5939480970858344,
+            "excess_mean_abs_range_pct": -0.1357809270723874,
+            "excess_bootstrap_clustered": {
+              "point_estimate": -0.1357809270723874,
+              "ci_low": -0.15402940061622708,
+              "ci_high": -0.11726456894437819,
+              "n": 33,
+              "n_resamples": 10000,
+              "ci_level": 0.95,
+              "seed": 680599,
+              "method": "clustered_percentile_bootstrap",
+              "insufficient_n": false,
+              "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+            }
+          },
+          "60m": {
+            "horizon_minutes": 60,
+            "n_events": 2788,
+            "n_matched_pairs": 2582,
+            "raw_mean_abs_range_pct": 0.645444709709796,
+            "matched_control_mean_abs_range_pct": 0.7769770196479228,
+            "excess_mean_abs_range_pct": -0.1264056994924939,
+            "excess_bootstrap_clustered": {
+              "point_estimate": -0.1264056994924939,
+              "ci_low": -0.15449704796098812,
+              "ci_high": -0.09697545595047276,
+              "n": 33,
+              "n_resamples": 10000,
+              "ci_level": 0.95,
+              "seed": 680629,
+              "method": "clustered_percentile_bootstrap",
+              "insufficient_n": false,
+              "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+            }
+          },
+          "120m": {
+            "horizon_minutes": 120,
+            "n_events": 2788,
+            "n_matched_pairs": 2582,
+            "raw_mean_abs_range_pct": 0.8710991844798868,
+            "matched_control_mean_abs_range_pct": 0.9849527217363885,
+            "excess_mean_abs_range_pct": -0.107676315838616,
+            "excess_bootstrap_clustered": {
+              "point_estimate": -0.107676315838616,
+              "ci_low": -0.13703902629831477,
+              "ci_high": -0.07632827495964452,
+              "n": 33,
+              "n_resamples": 10000,
+              "ci_level": 0.95,
+              "seed": 680689,
+              "method": "clustered_percentile_bootstrap",
+              "insufficient_n": false,
+              "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+            }
+          }
+        },
+        "economic_classification": "POTENTIALLY_TRADEABLE",
+        "abs_range_pct_median_max_horizon": 0.7708017692494601,
+        "flag": "VOLATILITY_EFFECT_NOT_OBSERVED"
+      }
+    }
+  },
+  "family_rollup": "0/3 PHENOMENON_PRESENT, 0/3 WEAK_SIGNAL, 3/3 PHENOMENON_NOT_OBSERVED, 0/3 INSUFFICIENT_DATA -- definitions are NOT averaged into one number; each is reported independently, per the brief. Standard verdicts are computed on the SECONDARY (signed/directional) analysis; the volatility-effect (primary/unsigned) and directional-edge flags are reported separately per definition below.",
+  "flag_rollup": "Volatility-effect: 0/3 PRESENT, 3/3 NOT_OBSERVED. Directional-edge: 0/3 PRESENT, 3/3 NOT_OBSERVED.",
+  "total_raw_events": 515525,
+  "total_dedup_events": 9829
+}
