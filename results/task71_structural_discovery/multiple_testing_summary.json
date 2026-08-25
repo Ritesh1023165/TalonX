@@ -1,0 +1,12 @@
+{
+  "predeclared_grid_cells": 72,
+  "actual_cells_computed": 72,
+  "cells_by_family": {
+    "FAMILY_A_AVWAP": 24,
+    "FAMILY_B_GAP": 20,
+    "FAMILY_C_RESIDUAL": 16,
+    "FAMILY_D_BREAK": 12
+  },
+  "method": "No dedicated max-statistic/permutation framework was built (none pre-existed and building one was out of scope for the time budget) -- per the task's own fallback instruction ('do not create a massive statistical framework if one is unavailable'), the control applied is: (1) a PREDECLARED, bounded grid (72 cells total, fixed before any outcome), (2) cluster-aware bootstrap CIs on every promising cell (not a naive i.i.d. CI), (3) an explicit total-hypothesis-count disclosure here, and (4) a qualitative downgrade of any isolated single-cell result not corroborated by neighboring parameter values or by more than one regime slice -- applied directly in candidate_ranking.md.",
+  "isolated_marginal_findings_downgrade_rule": "Any cell reaching nominal significance (CI excluding zero) that is NOT corroborated by its neighboring threshold band AND by a majority of regime slices sharing the same sign is treated as likely noise, not evidence, regardless of its raw p-value/CI -- this rule is applied in candidate_ranking.md, not silently."
+}

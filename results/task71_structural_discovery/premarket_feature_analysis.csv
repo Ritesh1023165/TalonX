@@ -1,0 +1,10 @@
+regime_slice,total_symbol_days_with_regular_session,symbol_days_with_any_premarket_bar,coverage_pct,avg_premarket_bars_per_symbol_day,min_premarket_bars,median_premarket_bars
+2026_q3_f6_era,2205,2188,99.2,139.6,1,102
+2025_q1_orpb_era,1015,963,94.9,92.1,1,35
+2025_q3_fprc_era,980,894,91.2,83.8,1,27
+2025_q4_task46_56_era,1015,993,97.8,105.1,1,41
+regime_slice,n_symbol_days,corr_premarket_return_vs_regular_session_return
+2026_q3_f6_era,2188,-0.1131
+2025_q1_orpb_era,963,-0.0504
+2025_q3_fprc_era,894,0.0581
+2025_q4_task46_56_era,993,-0.0139

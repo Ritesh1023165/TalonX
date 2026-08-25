@@ -1,0 +1,50 @@
+{
+  "candidate": "PRIMARY_CANDIDATE_DRAFT",
+  "state": "PRIMARY_CANDIDATE_READY_TO_FREEZE",
+  "name_working": "IDIOSYNCRATIC_RESIDUAL_MOMENTUM_LONG (Family C, LONG side only)",
+  "direction": "LONG_ONLY",
+  "not_frozen_yet": "This is a DRAFT nomination from Task71 discovery. Freezing (fingerprint, exact frozen parameters, pre-registered validation protocol, holdout lock) is Task72's job -- nothing here is a frozen spec.",
+  "mechanism": "At a fixed intraday decision point (11:00 ET), compute the stock's causal market-model residual: (stock's 09:30->11:00 return) - beta * (SPY's 09:30->11:00 return), where beta is a trailing-20-trading-day OLS beta estimated using ONLY days strictly before the decision day. When this residual is positive and exceeds a threshold (>=0.75% in the primary cell, >=1.5% in the stronger/lower-breadth cell), go long at the next bar's open and hold to a fixed horizon (best cells: EOD or 180m).",
+  "evidence_summary": {
+    "primary_cell": {"threshold_band": 0.75, "horizon": "EOD", "n_trades": 217, "n_symbols": 35, "n_days": 26,
+      "gross_expectancy_pct": 0.2265, "net_expectancy_10bps_pct": 0.1265, "profit_factor_10bps": 1.314,
+      "friction_absorption_ratio": 2.265, "bootstrap_ci_by_symbol": [0.074, 0.374], "bootstrap_ci_by_day": [-0.120, 0.529]},
+    "all_8_cells_positive": "Every one of the 8 predeclared cells (2 threshold bands x 4 horizons: 60m/120m/180m/EOD) shows POSITIVE gross AND net expectancy at 10bps, with PF ranging 1.10-1.49 -- a broad, same-sign plateau, not an isolated point.",
+    "time_stability": "Sign-stable and IMPROVING across all 3 mechanically-defined time segments: EARLY +0.059% net, MIDDLE +0.078% net, LATE +0.198% net.",
+    "regime_stability": "Sign-stable across all 3 real calendar regime slices: 2025 Q1 (+0.059% net), 2025 Q3 (+0.027% net), 2025 Q4 (+0.222% net) -- three genuinely distinct market periods, not one lucky quarter.",
+    "concentration": "top1_symbol_share=9.2%, top3_symbol_share=24.8%, top1_day_share=18.9% -- all comfortably below the 40% flag threshold used throughout this research program. Not a single-symbol or single-day story."
+  },
+  "known_weaknesses": [
+    "Day-clustered bootstrap CI does NOT exclude zero at any individual cell (crosses zero, e.g. [-0.120%, +0.529%] at the primary cell) -- per Part 14's own instruction, this is the WEAKER, more appropriately skeptical interpretation and is reported honestly, not hidden behind the stronger symbol-clustered CI (which does exclude zero at most cells). This means: with only ~22-26 distinct trading days in the broadened development pool, cross-sectional/market-wide dependence on any single day cannot be ruled out as a partial driver of the result.",
+    "Development sample is modest in absolute trade count (93-217 trades depending on threshold band) -- adequate per the task's own breadth bar (>=30 trades, >=10 symbols, >=10 days -- comfortably cleared) but not large in an absolute sense.",
+    "SHORT side of the same mechanism does not work -- this is a LONG_ONLY candidate, not a symmetric one (explicitly permitted by the task, but worth remembering: half the mechanism's a priori symmetric hypothesis space failed).",
+    "Sector-level beta control (vs. a sector ETF) was NOT built due to time/scope -- only market (SPY) beta is controlled for. Given the universe's heavy tech/semiconductor concentration (survivorship_bias_assessment.json), part of what looks like 'idiosyncratic' residual could still be sector-common movement not captured by a market-only beta. This is a genuine, undemonstrated risk, not resolved here.",
+    "No stop/risk rule is frozen -- see risk_stop_diagnostics.csv. STOP_UNRESOLVED as of this task (Part 18/19 diagnostics only; Task72's job to freeze one).",
+    "Corporate-actions/split-adjustment gap (survivorship_bias_assessment.json) applies here as it does to every other family in this program."
+  ],
+  "why_nominated_despite_weaknesses": "Every OTHER family (A, B, D) and the SHORT side of this same family failed cleanly or showed only isolated, non-corroborated cells. This is the only signal in the entire 72-cell predeclared grid that is: (a) positive in literally every one of its own 8 cells, (b) sign-stable across independent time segments AND independent calendar regimes, (c) not concentrated in a handful of symbols or days, and (d) economically meaningful relative to cost (friction absorption ratio 1.1-2.8x, not a razor's-edge +1bp-after-10bp-cost story). The day-clustered CI weakness is real and disclosed, not a reason to discard the only broadly-corroborated result in the program -- it is a reason for Task72 to treat this as 'ready to freeze and formally validate,' not 'proven.'",
+  "criteria_check": {
+    "1_coherent_mechanism": "PASS -- market-model residual momentum is a standard, economically motivated hypothesis (idiosyncratic information not yet fully reflected in price, net of market-wide movement).",
+    "2_causal_implementation": "PASS -- beta strictly trailing, decision/entry/exit strictly sequenced with no same-bar lookahead (tested in tests/test_task71_family_c_residual_momentum.py).",
+    "3_positive_expectancy_at_realistic_friction": "PASS -- net +0.127% to +0.180% at 10bps across all 8 cells.",
+    "4_meaningful_margin_above_friction": "PASS -- friction_absorption_ratio 1.10-2.80x, not barely-positive.",
+    "5_adequate_event_count": "PASS -- 217 trades / 35 symbols / 26 days at the primary cell (>=30/>=10/>=10 bar cleared).",
+    "6_broad_symbol_day_participation": "PASS -- all 35 universe symbols represented, 26 of the ~26-30 days with a qualifying signal.",
+    "7_acceptable_concentration": "PASS -- top1_symbol 9.2%, top1_day 18.9% (both well under 40%).",
+    "8_stable_sign_across_development_slices": "PASS -- positive in all 3 time segments and all 3 regime slices.",
+    "9_long_short_independently_justified": "PASS (as LONG_ONLY) -- SHORT side explicitly rejected on its own merits, LONG stands alone.",
+    "10_neighboring_parameter_stability": "PASS -- both threshold bands (0.75, 1.50) positive; all 4 horizons (60/120/180m/EOD) positive -- a plateau, not a single point.",
+    "11_no_critical_provider_portability_blind_spot": "CAVEAT -- classified PROVIDER_PORTABLE_WITH_CAVEAT in provider_semantics_assessment.json (price-only core signal, but an optional volume-confirmation extension would be provider-sensitive; not used in this draft's core mechanism).",
+    "12_no_dependence_on_one_market_event": "PASS on the specific-event axis (top1_day=18.9%) -- but see the day-clustered-CI weakness above for the broader cross-sectional-dependence caveat.",
+    "13_explicit_horizon": "PASS -- INTRADAY_SHORT, decision 11:00 ET, entry next-bar-open, exit EOD or 180m (both among the 8 positive cells; EOD chosen as the illustrative primary cell here, final choice is Task72's).",
+    "14_stop_risk_semantics": "STOP_UNRESOLVED -- see risk_stop_diagnostics.csv (median MAE 0.61%, median MFE 0.99%, 90th-pctile MAE 2.19%). No stop is frozen here; explicitly flagged for Task72, not silently skipped.",
+    "15_no_critical_data_integrity_issue": "PASS -- all 4 development slices 35/35 FULL, zero duplicate/out-of-order/NaN/Inf/invalid-OHLC/negative-volume rows (development_data_manifest.json)."
+  },
+  "dynamic_entry_cutoff": {
+    "exit_or_flatten_time": "15:50 ET (runtime's regular flatten)",
+    "required_minimum_holding_runway_for_EOD_horizon": "not fixed (EOD exit adapts to whatever time remains)",
+    "required_minimum_holding_runway_for_180m_horizon": "180 minutes",
+    "derived_latest_entry_time_for_180m_horizon": "15:50 ET - 180m = 12:50 ET",
+    "note": "This candidate's OWN decision time (11:00 ET) is far earlier than any of these derived cutoffs -- the dynamic-cutoff principle (Part 9) is satisfied trivially here, but is recorded per-horizon for Task72's use if the horizon choice changes."
+  }
+}

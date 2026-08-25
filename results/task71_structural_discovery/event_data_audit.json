@@ -1,0 +1,12 @@
+{
+  "audit": "TASK71_PART17_EVENT_DATA_AUDIT",
+  "question": "Do we possess trustworthy historical event metadata (earnings ticker/type/timestamp/timezone/before-open-after-close/actual/consensus/surprise/public-availability-timestamp) sufficient to justify calling Family B a PEAD (post-earnings-announcement-drift) study?",
+  "findings": {
+    "talonx_ingest_earnings_capability": "talonx_ingest/earnings.py exists (fetch_earnings_calendar, a yfinance calendar wrapper, per docs/architecture-overview.md) -- but this is a FORWARD-LOOKING upcoming-earnings-date fetch for the live 'Earnings Radar' fast-track feature, not a verified historical archive of PAST earnings timestamps with before-open/after-close attribution and confirmed actual-vs-consensus surprise values.",
+    "talonx_ingest_edgar_capability": "talonx_ingest/edgar/* ingests SEC filing metadata (10-K/10-Q financial facts) -- this is fundamentals data (fiscal-year revenue/net-income etc.), not an earnings-RELEASE-event timestamp/surprise dataset. It cannot support 'this specific gap was caused by an earnings surprise reported before/after this specific session.'",
+    "no_verified_historical_earnings_timestamp_archive_exists": true,
+    "conclusion": "PEAD_DATA_NOT_READY. This repository does not have a trustworthy, causally-timestamped historical earnings-surprise dataset for the 2025-2026 development period. Attempting to retroactively label specific gap days as earnings-driven using yfinance's forward-looking calendar function would require reconstructing historical release timestamps with hindsight -- explicitly disallowed by the task's own instruction ('do not scrape/use future-known event labels improperly')."
+  },
+  "decision": "Family B is named OVERNIGHT_GAP_CONTINUATION, not PEAD or any event-attributed name. It studies price-only overnight gap persistence, agnostic to catalyst. This is the honest naming the task's own Part 17 anticipated as the fallback.",
+  "future_work_note": "If a future task builds/verifies a trustworthy historical earnings-timestamp dataset (ideally sourced from a vendor with confirmed before-open/after-close attribution, not a scraped calendar), Family B's gap events could be RE-EXAMINED (not re-run on the same holdout) split by earnings-day vs non-earnings-day to see if the (still null, per Task71's own findings) gap-continuation result differs by catalyst type. Not attempted here."
+}

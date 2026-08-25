@@ -1,0 +1,32 @@
+{
+  "assessment": "TASK71_PART23_PRODUCT_PORTABILITY_CHECK",
+  "candidate": "IDIOSYNCRATIC_RESIDUAL_MOMENTUM_LONG (draft, not frozen)",
+  "runtime_not_altered_by_this_task": true,
+  "can_it_eventually_output_the_target_ticker_decision_contract": {
+    "ticker": "YES -- per-symbol by construction",
+    "decision_BULLISH_BEARISH_NO_TRADE": "YES -- LONG-only means BULLISH or NO_TRADE (never BEARISH, since the SHORT mirror was rejected)",
+    "WATCH_ACTIONABLE": "SUPPORTS BOTH -- the residual-crossing-threshold moment could be surfaced as WATCH before entry confirmation and ACTIONABLE at the entry bar, matching the existing talonx_piv notification taxonomy (Task69Q)",
+    "horizon": "YES -- INTRADAY_SHORT, explicit (EOD or 180m, TBD by Task72)",
+    "entry": "YES -- next-bar-open after the 11:00 ET decision, well-defined",
+    "stop": "NOT YET -- STOP_UNRESOLVED, Task72's job (see risk_stop_diagnostics.csv for the diagnostic groundwork)",
+    "target_exit": "PARTIAL -- fixed-time exit (EOD or 180m) is well-defined; no profit-target/structural-exit alternative was explored in Task71 (out of scope, Part 19 says compare exit families on DEVELOPMENT only when a stop is being designed -- deferred to Task72)",
+    "timestamp": "YES -- decision/entry/exit timestamps all explicit in the ledger schema",
+    "reason": "YES -- 'residual_momentum_long, residual=X.XX%, beta=Y.YY' is a natural reason-code string",
+    "data_status": "YES -- DATA_NOT_READY / RESIDUAL_BELOW_THRESHOLD / NO_NEXT_BAR_FOR_ENTRY / NO_VALID_EXIT already modeled as explicit rejection reasons in the Family C ledger schema",
+    "strategy_id_version": "Would be assigned at freeze time (Task72) -- not yet frozen, so no id/version exists yet."
+  },
+  "data_requirements": {
+    "SIP_required": "Research was conducted entirely on SIP (see provider_semantics_assessment.json). The core signal (price-only market-model residual) is classified PROVIDER_PORTABLE_WITH_CAVEAT -- it does NOT strictly require consolidated-tape SIP semantics the way an AVWAP or gap-liquidity feature would, since it's built from close-to-close/open-to-decision PRICE returns only, not volume.",
+    "IEX_live_feasibility": "Plausible in principle (no volume dependency in the core mechanism), but NOT independently verified against real IEX data in this task -- per provider_semantics_assessment.json's future-runtime-portability-requirement, this must be separately validated before live use, not assumed.",
+    "earnings_data": "NOT required -- this family never claimed PEAD/event attribution (see event_data_audit.json).",
+    "sector_ETF_data": "NOT required for the core mechanism as evaluated (market-only beta); would be an OPTIONAL future enhancement (sector-level control), not a current dependency.",
+    "extended_hours_data": "NOT required -- decision/entry/exit all occur within the regular session (09:30-16:00 ET); no premarket dependency for this specific candidate (unlike Family B).",
+    "daily_bars": "Effectively required for the causal beta estimation (20 trailing daily closes for both the stock and SPY) -- this is a DIFFERENT data cadence than the live intraday 1-minute feed talonx_piv already consumes, and would need its own (likely lightweight, once-daily) warmup/refresh mechanism if ever integrated.",
+    "multi_day_state": "NOT required -- the mechanism itself is single-session (decide, enter, exit same day); only the ROLLING BETA ESTIMATE needs multi-day history (a warmup concern, not a multi-day HOLDING concern)."
+  },
+  "could_it_realistically_run_in_PAPER_with_current_architecture": {
+    "assessment": "PLAUSIBLE IN PRINCIPLE, NOT ATTEMPTED HERE.",
+    "reasoning": "talonx_piv's existing warmup mechanism already causally hydrates historical bars before a live session (talonx_piv/warmup.py); a rolling-beta feature would need an ANALOGOUS but distinct daily-bar warmup path (20 trailing DAILY closes for the stock and for SPY), which does not exist today and is not built by Task71. talonx_piv would also need to add SPY to its universe/feed subscriptions if it doesn't already track it for this purpose. None of this is built, tested, or wired in this task -- this section is a feasibility opinion for Task72+, not an implementation.",
+    "explicit_non_action": "Per this task's own rules, the runtime worktree (research/talonx-strategy-validation) was not touched, examined for modification, or altered in any way by Task71."
+  }
+}
