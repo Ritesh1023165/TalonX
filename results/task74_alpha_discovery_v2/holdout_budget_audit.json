@@ -1,0 +1,29 @@
+{
+  "task": "74 Part 1 -- holdout budget audit (re-audited, not trusting prior inventory blindly)",
+  "audited_utc": "2026-08-26T02:00:00Z",
+  "method": "Re-verified against results/task70_f6_validation/historical_exposure_audit.json, results/task72_residual_momentum_freeze/{holdout_exposure_audit.json,holdout_lock.json,validation_metrics.json}, and a fresh repo-wide grep for '2024' across every JSON result, the ledger, and research/scripts+scripts *.py files.",
+  "period_classifications": [
+    {"period": "2024-01-01 to 2024-01-31", "classification": "EXPOSED_DATA_ONLY", "note": "No strategy outcome ever computed here. Same conservative classification Task70/Task72 applied to all of 2024 outside their own consumed blocks."},
+    {"period": "2024-02-01 to 2024-03-15", "classification": "OUTCOME_CONTAMINATED", "note": "Task70 F6_FADE_V1 VALIDATION -- real outcome computed. Do not reuse."},
+    {"period": "2024-03-16 to 2024-03-31", "classification": "EXPOSED_DATA_ONLY", "note": "No outcome computed here."},
+    {"period": "2024-04-01 to 2024-05-31", "classification": "OUTCOME_CONTAMINATED", "note": "Task72/73 IDIOSYNCRATIC_RESIDUAL_MOMENTUM_LONG_V1 VALIDATION -- real outcome computed (VALIDATION_FAIL). Do not reuse."},
+    {"period": "2024-06-01 to 2024-09-02", "classification": "EXPOSED_DATA_ONLY", "note": "No outcome computed here for any strategy. Largest remaining contiguous clean-ish block (~3 months, ~63 trading days)."},
+    {"period": "2024-09-03 to 2024-10-18", "classification": "OUTCOME_CONTAMINATED", "note": "Task70 F6_FADE_V1 REPLICATION -- real outcome computed. Do not reuse."},
+    {"period": "2024-10-19 to 2024-10-20", "classification": "EXPOSED_DATA_ONLY", "note": "Tiny 2-day gap between Task70's replication block and Task72/73's reserved block; too small to be independently useful."},
+    {"period": "2024-10-21 to 2024-12-20", "classification": "RESERVED_UNTOUCHED", "note": "Locked by Task72/73's holdout_lock.json as the REPLICATION range, but VALIDATION classified VALIDATION_FAIL, so per the pre-registered protocol replication was correctly NEVER RUN. outcomes_inspected=false was recorded and remains true -- zero price data or outcome for this block has ever been read into a strategy evaluation. Treated as RESERVED, not automatically reusable, until this task explicitly re-designates it (see below)."},
+    {"period": "2024-12-21 to 2024-12-31", "classification": "EXPOSED_DATA_ONLY", "note": "No outcome computed here. Short (~7 trading day) tail block."},
+    {"period": "2025-01-24 to 2026-08-14", "classification": "OUTCOME_CONTAMINATED (for prior strategies) / OWN-DEVELOPMENT (for this task)", "note": "ORPB_V1/FPRC_V1/legacy-Quant/F6_FADE_V1/Task71's 4-family screen/IDIOSYNCRATIC_RESIDUAL_MOMENTUM_LONG_V1 development all drew from this span. This is the ALREADY-CONTAMINATED/EXPOSED pool Task74 is explicitly instructed to reuse for DEVELOPMENT -- not a holdout concern for a NEW discovery pass, since 'nothing here is held out' per the original data-discipline rule (results/task67a_phenomenon_discovery/data_split_contract.json)."}
+  ],
+  "reserved_data_declaration": {
+    "reserved_validation": {"start": "2024-06-01", "end": "2024-09-02", "classification": "EXPOSED_DATA_ONLY", "rationale": "Largest remaining untouched-by-outcome block (~3 months); reserved for a FUTURE validation task, not consumed here."},
+    "reserved_replication": {"start": "2024-10-21", "end": "2024-12-20", "classification": "RESERVED_UNTOUCHED", "rationale": "Carried forward from Task72/73's lock -- genuinely never had an outcome computed against it. Re-designated as this lineage's reserved replication block rather than immediately reused, per this task's own instruction to treat it as RESERVED pending explicit review (which this audit constitutes)."},
+    "spare_unused_inventory": ["2024-01-01..2024-01-31", "2024-03-16..2024-03-31", "2024-12-21..2024-12-31"],
+    "not_reused_blocks": ["2024-02-01..2024-03-15 (Task70 F6 validation)", "2024-04-01..2024-05-31 (Task72 residual-momentum validation)", "2024-09-03..2024-10-18 (Task70 F6 replication)"]
+  },
+  "development_data_declaration": {
+    "role": "DEVELOPMENT ONLY -- already-contaminated/exposed 2025-2026 pool",
+    "source": "The same broad development pool used by Task71: data/historical_1m/task67a_development (2026-05-15..2026-08-14) + task71_development_2025q1/2025q3/2025q4. No new download required; no fresh 2024 data touched for discovery."
+  },
+  "outcomes_inspected_this_task": false,
+  "reserved_outcomes_touched_this_task": false
+}
