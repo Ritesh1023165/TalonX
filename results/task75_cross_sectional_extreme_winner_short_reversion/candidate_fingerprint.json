@@ -1,0 +1,28 @@
+{
+  "task": "75A Part 9 -- deterministic candidate fingerprint",
+  "computed_utc": "2026-08-26T08:50:00Z",
+  "full_fingerprint_sha256": "08930fb2bbbd1f8acbf2071be2e7bf6b2ead784a94e38837d05f4e8937eebff3",
+  "contract_only_fingerprint_sha256": "677adccd7e653e30c96122f0149356523f3a2fb3cb82a3d4967c3a1a06aa6f06",
+  "fingerprint_source": "research/task75_v1/fingerprint.py -- compute_fingerprint() hashes the strategy contract (research/task75_v1/contracts.py) PLUS the canonical JSON content of risk_policy.json, portfolio_construction.json, execution_cost_contract.json, validation_protocol.json, holdout_lock.json, and calendar_session_contract.json. compute_contract_only_fingerprint() hashes ONLY the strategy contract, for tests that should not depend on results/ file contents.",
+  "files_covered_by_full_fingerprint": [
+    "research/task75_v1/contracts.py (via contract_dict())",
+    "results/task75_cross_sectional_extreme_winner_short_reversion/risk_policy.json",
+    "results/task75_cross_sectional_extreme_winner_short_reversion/portfolio_construction.json",
+    "results/task75_cross_sectional_extreme_winner_short_reversion/execution_cost_contract.json",
+    "results/task75_cross_sectional_extreme_winner_short_reversion/validation_protocol.json",
+    "results/task75_cross_sectional_extreme_winner_short_reversion/holdout_lock.json",
+    "results/task75_cross_sectional_extreme_winner_short_reversion/calendar_session_contract.json"
+  ],
+  "code_identity": {
+    "strategy_module": "research/task75_v1/strategy.py",
+    "calendar_module": "research/task75_v1/calendar.py",
+    "reused_unmodified_dependencies": ["research/task71_lib/features.py::add_session_columns", "research/task71_lib/features.py::daily_bars_from_intraday"]
+  },
+  "protected_files_confirmed_not_modified": [
+    "talonx_quant/strategy.py", "talonx_quant/indicators.py", "talonx_quant/consumer.py", "talonx_quant/config.py",
+    "research/task72_residual_momentum/* (Residual Momentum V1, historical evidence)",
+    "research/task68_f6/* (F6, historical evidence)",
+    "research/task74_alpha_discovery_v2/* (Task74B discovery code, historical evidence, preserved unmodified)"
+  ],
+  "verification_instruction": "Task75B MUST recompute BOTH hashes from the exact same files at the start of its run and verify EXACT equality with the values recorded here before trusting any subsequent output. Any semantic change to any covered file after this point requires a new version (V2), not a silent re-freeze."
+}

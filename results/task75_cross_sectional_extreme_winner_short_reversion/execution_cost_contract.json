@@ -1,0 +1,33 @@
+{
+  "task": "75A Part 6 -- short-specific execution cost contract, frozen before any holdout outcome",
+  "primary_all_in_validation_hurdle_bps": 25.0,
+  "primary_hurdle_composition_estimate": {
+    "base_commission_and_spread": "10 bps -- the same baseline used by every prior TalonX candidate (F6, Residual Momentum V1), unchanged.",
+    "short_specific_addon": "15 bps -- a conservative, non-optimized addition covering (a) typically wider effective spread/slippage on an opening-auction SHORT entry versus a passive limit order, and (b) a borrow-fee-and-friction buffer for a 3-trading-day hold. NOT reverse-engineered from any observed P&L -- chosen as a round, conservative number before any holdout outcome exists.",
+    "explicit_caveat": "This is a PROXY, not a reconstructed historical borrow-fee schedule (none exists in this repo or is readily available for backtesting purposes -- see below). Do NOT treat 25bps as a precise historical cost measurement; treat it as a deliberately conservative hurdle a real candidate should clear with margin."
+  },
+  "diagnostic_cost_levels_bps": [0, 5, 10, 15, 20],
+  "diagnostic_purpose": "Retained for comparability with every prior task's cost-sensitivity tables -- NOT used as the primary pass/fail hurdle for THIS short-only candidate (25bps is), since 20bps alone was already shown insufficient reasoning for a short-specific strategy per this task's own instruction ('Do not assume 10 bps covers every short-specific economic cost unless demonstrated').",
+  "open_fill_semantics": {
+    "reference_price": "First regular-session (09:30 ET) bar's OPEN, per contracts.py -- NOT the exact opening-auction print (which this 1-minute-bar dataset cannot resolve to auction-level precision).",
+    "opening_auction_vs_first_valid_bar": "Entries are modeled at the first 1-minute bar's OPEN because that is the finest granularity available in this dataset -- this is an approximation of the true opening-auction execution price, acknowledged as a source of unmodeled slippage already partially covered by the short-specific cost add-on above, not a claim of auction-level precision."
+  },
+  "borrow_availability": {
+    "historical_reconstruction_possible": false,
+    "reason": "No historical stock-borrow-rate or hard-to-borrow-flag data source is integrated anywhere in this repo (same class of gap as the corporate-action provenance finding) -- confirmed by the same repo-wide search that found no corporate-action handling.",
+    "fail_closed_proxy": "For V1, EVERY symbol in the frozen 35-symbol mega-cap universe is ASSUMED borrowable at a low, easily-available cost (a standard assumption for large, liquid, widely-held mega-cap names, which rarely go hard-to-borrow) -- this assumption is NOT verified against any historical borrow data and is disclosed as an open limitation, not proven. A future task integrating real capital MUST verify actual borrow availability/cost per position before any live short is placed -- this freeze does not authorize skipping that check at execution time.",
+    "hard_to_borrow_rejection_behavior": "Not modeled in Task75B's validation (no historical HTB data exists to model it against) -- if a validated candidate is ever integrated toward PAPER/live, HTB rejection must be handled by the broker-integration layer, not assumed away by this research freeze."
+  },
+  "borrow_fee_accrual": {
+    "modeled_in_validation": false,
+    "proxy_applied": "Folded into the flat 15bps short-specific add-on above as a rough, non-precise buffer -- not modeled as a per-day accruing rate.",
+    "limitation": "A true borrow-fee model would accrue daily and vary by symbol/period based on actual borrow demand, which cannot be reconstructed from this repo's data. Disclosed, not silently ignored."
+  },
+  "dividend_liability": {
+    "modeled_in_validation": false,
+    "reason": "A SHORT position open across an ex-dividend date owes the dividend to the share lender. No dividend/ex-date data source is integrated in this repo (see corporate_action_policy.json). This liability is UNMODELED in Task75B -- a real, disclosed limitation, not assumed to be zero. It is a downside-only omission (it would make real short economics WORSE, not better, than what validation will show), so it does not inflate the apparent edge.",
+    "fail_closed_note": "Because ex-dividend dates cannot currently be verified, this cost cannot be added precisely -- it is left as an explicit, named gap rather than guessed at."
+  },
+  "gap_through_risk": "Governed by risk_policy.json's stop fill semantics (gap-through fills at the triggering bar's open, never a better price) -- applies symmetrically to both the scheduled fixed-horizon exit (no special handling needed, exits are always at a scheduled close, not stop-triggered) and the catastrophic stop.",
+  "rejected_unfillable_trade_accounting": "Any (symbol, decision_day) row that fails a data-readiness or session-availability check (see contracts.py REJECTION_REASONS) is excluded from the trade population entirely and counted in the rejection breakdown -- never assumed filled at a fallback price, never silently dropped without a labeled reason."
+}

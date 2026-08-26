@@ -1,0 +1,15 @@
+{
+  "task": "75A Part 8 -- holdout lock, no price outcome read",
+  "declared_utc": "2026-08-26T08:40:00Z",
+  "validation": {"start": "2024-06-01", "end": "2024-09-02", "status": "RESERVED, carried forward from Task74B's holdout_budget_audit.json, still untouched", "materialized": false},
+  "replication": {"start": "2024-10-21", "end": "2024-12-20", "status": "RESERVED, carried forward from Task72/73's never-executed replication lock and re-confirmed by Task74B, still untouched", "materialized": false},
+  "replication_gate": "Replication must remain untouched unless validation passes -- enforced procedurally (Task75B must not download or read replication-period data at all unless VALIDATION_PASS).",
+  "outcomes_inspected_this_task": false,
+  "dataset_requirements_for_task75b": {
+    "provider": "Alpaca -- adjustment parameter MUST be split-adjusted or fully adjusted (e.g. adjustment=split or adjustment=all), NOT raw. See corporate_action_policy.json.",
+    "universe": "the frozen 35-symbol universe (research/task75_v1/contracts.py::UNIVERSE) + SPY",
+    "guard_module": "A new LockedRangeGuard-style guard (following research/task72_residual_momentum/holdout_guard.py's pattern) must be constructed for these exact two date ranges before Task75B touches any 2024 data -- not built in Task75A since Task75A must not read or prepare to read any 2024 outcome."
+  },
+  "strategy_fingerprint_required": "See candidate_fingerprint.json -- must match exactly before Task75B trusts any output.",
+  "next_step": "Task75B: (1) resolve the corporate-action-safe-dataset precondition, (2) materialize (download) the VALIDATION range only, with a proper holdout guard, (3) run research/task75_v1/strategy.py::evaluate() exactly once, (4) apply validation_protocol.json's 17 criteria mechanically, (5) classify, (6) only if VALIDATION_PASS, proceed to REPLICATION."
+}

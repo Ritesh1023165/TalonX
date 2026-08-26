@@ -1,0 +1,17 @@
+{
+  "task": "75A Part 5 -- risk policy, frozen from DEVELOPMENT diagnostics only, no P&L-maximizing stop grid run",
+  "decision": "OPTION_B_STRUCTURAL_CATASTROPHIC_STOP",
+  "reasoning": "This is a SHORT position (theoretically unbounded loss potential if the price keeps rising, e.g. a short squeeze), held for a fixed 3-trading-day multi-day horizon that necessarily spans 2 overnight gaps. Task74B's own risk_diagnostics.csv for the anchor cell (FAMILY_B_MULTIDAY/REVERSAL/SHORT/loose/3D, n=1000) shows a WIDE adverse-excursion tail (in units of 1% of entry price): median MAE 2.35, 90th pct 7.88, 95th pct 10.07, 99th pct 16.28, max 26.34. Option A (no individual stop, exposure limits only) was considered but rejected: with a fixed 3-day hold and no monitoring in between, a single-name short-squeeze event inside the window would be uncapped at the position level until the scheduled exit -- an unacceptable tail risk for a SHORT-only strategy specifically. A structural stop is therefore frozen.",
+  "stop_rule": {
+    "status": "CATASTROPHIC_STOP_FROZEN",
+    "stop_distance_pct": 15.0,
+    "direction": "Stop triggers if price rises 15% or more above the entry (SHORT) price at any point during the hold.",
+    "selection_method": "A conservative ROUND buffer placed just above the 95th-percentile MAE (10.07, in the same 1%-of-entry-price units) observed in Task74B's OWN already-computed DEVELOPMENT diagnostic for this exact anchor cell -- NOT selected by running a stop-distance grid against P&L, and NOT re-derived from any new outcome computation. 15% sits between the 95th (10.07) and 99th (16.28) percentiles: wide enough to avoid triggering on ordinary within-distribution adverse excursions (which the median/90th-percentile figures show are usually much smaller), tight enough to cap the small minority of truly catastrophic single-name moves.",
+    "fill_semantics": "Checked on each subsequent regular-session bar's HIGH (SHORT stop = adverse move is UP) starting from the bar strictly after entry. If the triggering bar's OPEN already gapped through the stop level, fill at that bar's OPEN (never assume a better fill than the bar itself permits) -- same conservative gap-aware convention as Task72's frozen stop. If the stop is triggered on a day where the position's exit would otherwise fall on a LATER canonical day, the stop exit REPLACES the scheduled fixed-horizon exit for that position (whichever occurs first)."
+  },
+  "overnight_gap_treatment": "The stop is evaluated only on REGULAR-SESSION bars (09:30-16:00 ET); an overnight gap that lands beyond the stop level at the NEXT session's open is treated exactly like any other gap-through-stop event -- filled at that day's open (worse than the nominal stop price), never assumed to fill at the stop level itself. This is a conservative (pessimistic), not optimistic, assumption.",
+  "maximum_loss_assumption_per_position": "Structurally capped at approximately stop_distance_pct (15%) plus the worst-case single-bar gap-through amount beyond that level -- NOT a hard guarantee (a sufficiently extreme gap could still exceed 15% realized loss), but bounds normal-case tail risk far below the theoretically unlimited loss of an unstoppped short.",
+  "no_take_profit": true,
+  "no_trailing_stop": true,
+  "not_optimized_against_any_outcome": "Confirmed: this stop distance was derived from a single already-computed percentile statistic, not from a search over candidate stop distances scored against DEVELOPMENT P&L. No such grid was run in Task74B or Task75A."
+}

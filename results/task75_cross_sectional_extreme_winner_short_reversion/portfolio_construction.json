@@ -1,0 +1,22 @@
+{
+  "task": "75A Part 5 -- portfolio construction policy, frozen before any holdout outcome",
+  "position_sizing": {
+    "method": "EQUAL_NOTIONAL_PER_POSITION_RESEARCH_ONLY",
+    "reasoning": "Research/validation reporting uses per-trade percent returns (consistent with every prior TalonX candidate's evaluation convention -- F6, Residual Momentum V1). No real capital, no live sizing decision is made by this freeze."
+  },
+  "per_position_allocation_pct_of_reference_capital": 5.0,
+  "maximum_concurrent_positions": 20,
+  "maximum_gross_short_exposure_pct_of_reference_capital": 100.0,
+  "maximum_per_symbol_exposure": "1 open position per symbol at a time -- a symbol already short cannot be re-shorted on a subsequent Day0 signal until its existing position exits (matches contracts.py's ONE_SIGNAL_PER_SYMBOL_PER_DECISION_DAY combined with a no-pyramiding rule).",
+  "overlapping_cohorts": "Multiple concurrent positions ACROSS DIFFERENT symbols, and positions entered on DIFFERENT decision days that are still within their 3-day hold, are both expected and structurally normal for this strategy (a rolling daily decision cadence with a 3-day hold naturally overlaps) -- governed by the capacity rule below, not left unbounded.",
+  "capacity_constrained_selection_rule": {
+    "trigger": "On any Day1 entry session, if the number of qualifying (rank>=0.80, all data-quality/session checks passed) NEW signals plus already-open positions would exceed maximum_concurrent_positions",
+    "rule": "Rank ALL qualifying new signals for that entry day by their Day0 cross_sectional_rank_pct DESCENDING (the MOST extreme dislocations first -- the same ranking already used to determine threshold eligibility, not a new or separate scoring function) and admit new positions in that order until capacity is reached. Symbols that would exceed capacity are REJECTED for that entry day with reason CAPACITY_EXCEEDED -- never partially sized down, never queued to a later day.",
+    "determinism": "This rule is deterministic given the input data (same rank values, same ordering, same admission decisions every run) -- no randomness, no 'first available slot' race condition."
+  },
+  "portfolio_kill_switch_semantics": {
+    "not_yet_defined_for_v1": true,
+    "reasoning": "A portfolio-level kill-switch (e.g. 'flatten everything if aggregate drawdown exceeds X%') is a RUNTIME/PAPER-integration concern, not a DEVELOPMENT-freeze concern -- Task75A explicitly may not modify or design runtime/PAPER behavior. This is recorded as an EXPLICIT GAP for whichever future task performs PAPER integration (only after validation AND replication both pass), not silently assumed away.",
+    "development_and_validation_workaround": "For Task75B's validation-only purposes, portfolio-level statistics (daily equity curve, drawdown, gross exposure) are computed and reported per validation_protocol.json's Part 7 requirements WITHOUT any kill-switch intervention -- i.e. validation measures what the strategy would have done with no portfolio-level circuit breaker, which is the conservative (not favorable) assumption for a candidate that has not yet earned exposure-limiting infrastructure."
+  }
+}

@@ -6347,3 +6347,52 @@ rejected and is not revisited. Real capital: NO. Runtime worktree
 > `results/task74_alpha_discovery_v2/claude_handoff_next.md` for the full next-task handoff
 > (freeze parameters, design a DEVELOPMENT-only stop, pre-register validation, lock the reserved
 > holdout -- do not re-run the discovery grid or chase the rejected directions).
+
+## Task 75A -- Freeze + Prereigster CROSS_SECTIONAL_EXTREME_WINNER_SHORT_REVERSION_V1 (2026-08-26)
+
+> **RESULT: candidate frozen and pre-registered; Task75B explicitly BLOCKED pending a
+> corporate-action-safe dataset.** Three pre-freeze audits performed, all DEVELOPMENT-only /
+> public-knowledge-only, zero 2024 price data read:
+>
+> **EFFECTIVE SEARCH-COUNT AUDIT**: Task74B's design lock accounted MOMENTUM/REVERSAL as the
+> 2-slot "directions" budget, not LONG/SHORT -- the winning candidate (REVERSAL/SHORT) was chosen
+> only after observing BOTH legs' outcomes, an additional degree of freedom the locked design was
+> silent on (not prohibited, but not explicitly authorized). Not classified BLOCKED; the honest
+> effective search count (40 direction-level rows, not 20 hypothesis-cells) is carried forward as
+> an explicit multiple-testing caveat into the validation protocol rather than hidden. The large
+> margin (net@10bps 3.4x the bar), a genuine 6-cell parameter plateau, and both cluster CIs
+> excluding zero at the anchor cell are why this doesn't invalidate the nomination.
+>
+> **CANONICAL CALENDAR CORRECTION**: Task74B's evaluator indexed each symbol's own available daily
+> rows positionally, which could silently misalign Day1/exit if a symbol had a gap the rest of the
+> market didn't. Built a canonical-SPY-calendar-anchored replacement
+> (`research/task75_v1/calendar.py`) with fail-closed rejection (`SYMBOL_MISSING_REQUIRED_SESSION`)
+> instead of silent shifting. Impact audit on already-materialized DEVELOPMENT data: ZERO
+> symbol/day mismatches vs SPY's calendar across all 35 symbols in all 4 slices; re-running the
+> corrected evaluator reproduced Task74B's anchor cell EXACTLY (1000 trades/35 symbols/125 days,
+> gross 0.6070373392207478%) -- development population NOT materially changed.
+>
+> **CORPORATE-ACTION POLICY**: confirmed by direct source inspection that `scripts/download_historical_1m.py`
+> requests Alpaca `adjustment=raw` for every historical bar -- zero split/dividend handling exists
+> anywhere in this repo. Two well-known public 10:1 stock splits (NVDA ~2024-06-10, AVGO
+> ~2024-07-15) fall inside the reserved VALIDATION window (2024-06-01..09-02) for this exact
+> universe -- a raw series would show a catastrophic artificial discontinuity at each split date.
+> **Classified TASK75B_BLOCKED_PENDING_CORPORATE_ACTION_SAFE_DATASET.**
+>
+> **FROZEN**: `CROSS_SECTIONAL_EXTREME_WINNER_SHORT_REVERSION_V1` -- SHORT_ONLY, MULTI_DAY, top-20%
+> market-adjusted 3-day cross-sectional rank vs SPY, Day1 canonical-open entry, exit at the 3rd
+> canonical day's close, 15% catastrophic stop (conservative buffer over the anchor cell's
+> 95th-pctile MAE, not P&L-optimized), 25bps primary all-in cost (short-specific, stricter than the
+> generic 10bps used by prior candidates). Fingerprint
+> `08930fb2bbbd1f8acbf2071be2e7bf6b2ead784a94e38837d05f4e8937eebff3`. 17-criterion validation
+> protocol pre-registered (preserves Task74B's net@10bps>=+0.15% bar as a floor, adds an
+> entry-day-cluster bootstrap and a calendar moving-block bootstrap for overlapping-position
+> dependence). Reserved holdout unchanged (validation 2024-06-01..09-02, replication
+> 2024-10-21..12-20), zero outcomes inspected.
+>
+> **TESTS**: 19 new focused (canonical-calendar causality, missing-session rejection,
+> tie/percentile semantics, fingerprint determinism) + 217-test broader regression
+> (Task67A/68/71/72/74/74B/75 lineage), all pass. Real capital: NO. Runtime worktree touched: NO.
+> Completed well before the 12:30 BST live-session-safety cutoff. See
+> `results/task75_cross_sectional_extreme_winner_short_reversion/claude_handoff_next.md` for the
+> full next-task handoff (resolve the corporate-action blocker before any Task75B outcome).

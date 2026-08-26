@@ -19,6 +19,11 @@
     "development_population_materially_changed": false,
     "reasoning": "Because no symbol ever had a gap relative to SPY's calendar in any Task74B DEVELOPMENT slice, the OLD per-symbol-positional-index method and the NEW canonical-SPY-calendar method are mathematically IDENTICAL on this exact dataset -- there is nothing for the correction to change here. The Task74B nomination (CROSS_SECTIONAL_EXTREME_WINNER_SHORT_REVERSION, FAMILY_B/REVERSAL/SHORT) stands unchanged; this is a genuine confirmation, not an assumption."
   },
+  "code_level_verification": {
+    "method": "Ran the ACTUAL frozen research/task75_v1/strategy.py::evaluate() (canonical-SPY-calendar-anchored, SHORT_ONLY, loose/3D-only implementation) against all 4 DEVELOPMENT slices and compared directly to Task74B's cell_results.csv row for FAMILY_B_MULTIDAY/REVERSAL/SHORT/loose/3D.",
+    "result": "EXACT MATCH: n_trades=1000, n_symbols=35, n_days=125, gross_expectancy_pct=0.6070373392207478 (Task74B reported 0.607037). The corrected canonical-calendar implementation reproduces the nominated anchor population bit-for-bit on DEVELOPMENT data.",
+    "development_population_materially_changed": false
+  },
   "why_the_correction_is_still_mandatory_for_v1": "This audit only confirms DEVELOPMENT data (2025-2026, already known to be extremely clean, liquid mega-caps) had no gaps. It says nothing about the 2024 validation/replication data, which has NOT been inspected (per this task's absolute prohibition) and could plausibly contain a genuine single-symbol gap (a halt, a late corporate-action-driven trading suspension, a data-vendor gap). The canonical-calendar-safe implementation is therefore built and frozen as the ONLY implementation used going forward -- the old per-symbol-positional method is retired, not merely 'not needed.'",
   "additional_calendar_semantics_frozen": {
     "timezone": "America/New_York for all session/day-boundary definitions",

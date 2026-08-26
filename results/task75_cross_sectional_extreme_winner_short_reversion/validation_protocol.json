@@ -1,0 +1,54 @@
+{
+  "task": "75A Part 7/8 -- pre-registered one-shot validation protocol for CROSS_SECTIONAL_EXTREME_WINNER_SHORT_REVERSION_V1",
+  "declared_before_any_validation_outcome_is_known": true,
+  "required_fingerprint_source": "results/task75_cross_sectional_extreme_winner_short_reversion/candidate_fingerprint.json -- Task75B MUST recompute research.task75_v1.fingerprint.compute_fingerprint() and verify it matches EXACTLY before trusting any other output.",
+  "precondition_gate": {
+    "corporate_action_safe_dataset_required": true,
+    "current_status": "TASK75B_BLOCKED_PENDING_CORPORATE_ACTION_SAFE_DATASET (see corporate_action_policy.json) -- Task75B MUST NOT run against a raw/unadjusted Alpaca download. This gate is checked FIRST, before any other criterion, and failing it is an automatic BLOCKED (not FAIL, not INCONCLUSIVE) outcome requiring a new data-acquisition task before validation can even begin.",
+    "canonical_calendar_guard_required": true,
+    "note": "Task75B must use research/task75_v1/strategy.py::evaluate() unmodified -- NOT Task74B's family_b_multiday.py (retired, historical evidence only)."
+  },
+  "effective_search_count_disclosure": "Per effective_search_accounting.json: the honest denominator for this candidate's provenance is 40 direction-level comparisons (not 20 hypothesis-cells). This validation protocol does NOT loosen any criterion to compensate for the strength of the DEVELOPMENT point estimate -- if anything, the criteria below are held at or above Task74B's own bar.",
+  "overlapping_dependence_statistics_required": [
+    "trade-level (simple, unclustered) descriptive economics -- reported for completeness, NOT the basis for pass/fail on its own",
+    "symbol-cluster bootstrap (resample whole symbols, research.task67a_lib.research_stats.bootstrap_ci_clustered, reused unmodified)",
+    "entry-day cluster bootstrap (resample whole entry days, same function, group_ids=entry_day)",
+    "calendar moving-block / stationary bootstrap over the validation period's daily sequence, block length >= 3 trading days (the holding horizon), CHOSEN HERE before any outcome -- block_length=5 trading days (a small, defensible margin above the 3-day minimum, not tuned against any result)",
+    "portfolio-level daily equity curve (ADVISORY -- see portfolio_construction.json's kill-switch gap)",
+    "overlapping cohort exposure count per day", "maximum concurrent positions observed", "gross exposure observed",
+    "portfolio-level max drawdown (ADVISORY)", "day and regime/subperiod concentration",
+    "top 1/3/5 winning-trade removal", "top 1/3 winning-day removal"
+  ],
+  "pass_criteria": [
+    {"id": 1, "criterion": "session_coverage (distinct decision days) >= 20", "mandatory": true},
+    {"id": 2, "criterion": "symbol_coverage >= 15", "mandatory": true},
+    {"id": 3, "criterion": "number_of_trades >= 100", "mandatory": true},
+    {"id": 4, "criterion": "net_expectancy_at_PRIMARY_ALL_IN_cost (25bps, execution_cost_contract.json) > 0", "mandatory": true, "note": "PRIMARY pass/fail gate for this short-only candidate."},
+    {"id": 5, "criterion": "net_expectancy_10bps_pct >= +0.15% (Task74B's own bar, explicitly preserved, not loosened)", "mandatory": true},
+    {"id": 6, "criterion": "net_expectancy_15bps_pct > 0 AND net_expectancy_20bps_pct > 0 (meaningful survival, not merely non-negative-by-a-hair)", "mandatory": true},
+    {"id": 7, "criterion": "profit_factor at 25bps > 1", "mandatory": true},
+    {"id": 8, "criterion": "top1_symbol_contribution <= 0.30 AND top1_day_contribution <= 0.30", "mandatory": true},
+    {"id": 9, "criterion": "removing the best 5 trades does not flip net_expectancy_at_25bps negative", "mandatory": true},
+    {"id": 10, "criterion": "removing the best 3 days does not flip net_expectancy_at_25bps negative", "mandatory": true},
+    {"id": 11, "criterion": "symbol-cluster bootstrap CI for net_expectancy_at_25bps is not clearly negative (ci_high >= 0)", "mandatory": true},
+    {"id": 12, "criterion": "entry-day-cluster bootstrap CI for net_expectancy_at_25bps is not clearly negative (ci_high >= 0)", "mandatory": true},
+    {"id": 13, "criterion": "moving-block bootstrap (block_length=5 trading days) CI for net_expectancy_at_25bps is not clearly negative (ci_high >= 0)", "mandatory": true, "note": "This is the criterion most directly targeting overlapping-position dependence -- a genuinely new check beyond anything Task71/72/74B required."},
+    {"id": 14, "criterion": "at least 2 of 3 chronological validation subperiods (split the ~3-month window into thirds) show the same sign as the overall result", "mandatory": true},
+    {"id": 15, "criterion": "portfolio-level daily equity curve computed and max drawdown reported", "mandatory": false, "advisory": true, "reason": "No kill-switch/portfolio-circuit-breaker infra is frozen yet (portfolio_construction.json) -- reported for future reference, not gating."},
+    {"id": 16, "criterion": "fingerprint match, dataset hash recorded, zero interpolated/forward-filled/synthetic bars, causal timestamps re-verified (spot-check)", "mandatory": true},
+    {"id": 17, "criterion": "long-only-mechanism-reversed-check: N/A -- this is SHORT_ONLY by design; gross_expectancy sign must be consistent with the SHORT-on-extreme-winner hypothesis (i.e. gross positive)", "mandatory": true}
+  ],
+  "classifications": {
+    "BLOCKED": "The corporate-action-safe-dataset precondition gate (or the canonical-calendar-guard precondition) is not satisfied -- validation cannot responsibly run at all. This is checked FIRST.",
+    "VALIDATION_PASS": "All 17 mandatory criteria above are collectively satisfied (criterion 15 is advisory and never blocks PASS on its own).",
+    "VALIDATION_FAIL": "Material contradiction of the frozen hypothesis -- e.g. net_expectancy_at_25bps is negative AND gross_expectancy is also inconsistent with the SHORT-on-extreme-winner hypothesis, OR any mandatory criterion fails by a wide margin, OR a clear causal/data-integrity/fingerprint violation is found.",
+    "VALIDATION_INCONCLUSIVE": "Sample/data uncertainty prevents a trustworthy decision -- e.g. criteria 1-3 fall short, or the bootstrap/moving-block evidence is too wide to support either PASS or FAIL confidently. Distinct from FAIL."
+  },
+  "explicit_prohibitions": [
+    "Do not loosen, reweight, or drop any mandatory criterion after seeing the actual validation numbers.",
+    "Do not rerun Task74B's discovery grid or Task75A's freeze.",
+    "Do not tune the 15% stop, the 25bps primary cost, the 80th-percentile threshold, the 3-day lookback, or the 3-day horizon using validation-holdout outcomes.",
+    "Replication is FORBIDDEN unless classification is exactly VALIDATION_PASS -- FAIL or INCONCLUSIVE must not be followed by a replication attempt on a different window in search of a better result.",
+    "Validation runs EXACTLY ONCE. No parameter repair after a failure. No second attempt."
+  ]
+}

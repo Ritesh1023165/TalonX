@@ -1,0 +1,36 @@
+{
+  "task": "75A",
+  "purpose": "Freeze and pre-register CROSS_SECTIONAL_EXTREME_WINNER_SHORT_REVERSION_V1 before touching any 2024 holdout data",
+  "research_branch": "research/talonx-alpha-phenomenon-discovery",
+  "starting_sha": "7a64a98fe7f34348b62856e9b7b7a443d1326159",
+  "runtime_branch": "research/talonx-strategy-validation",
+  "runtime_modified_by_this_task": false,
+  "real_capital_introduced": false,
+  "prefreeze_audit_findings": {
+    "effective_search_count": "40 direction-level rows (not 20 hypothesis-cells) -- NOT prohibited by the locked Task74B design, but an under-specified gap; carried forward as an explicit multiple-testing caveat, not swept aside.",
+    "canonical_calendar_correction": "Built and frozen (research/task75_v1/calendar.py). Impact audit on DEVELOPMENT data: ZERO symbol/day mismatches vs SPY's calendar in any of the 4 slices; re-running the corrected evaluator reproduces Task74B's anchor cell EXACTLY (1000 trades, 35 symbols, 125 days, gross 0.6070373392207478%). Development population NOT materially changed.",
+    "corporate_action_provenance": "CONFIRMED raw/unadjusted (Alpaca adjustment=raw, zero split/dividend handling anywhere in the repo). At least 2 well-known public 10:1 splits (NVDA ~2024-06-10, AVGO ~2024-07-15) fall inside the reserved VALIDATION window. Classification: TASK75B_BLOCKED_PENDING_CORPORATE_ACTION_SAFE_DATASET."
+  },
+  "frozen_candidate": {
+    "name": "CROSS_SECTIONAL_EXTREME_WINNER_SHORT_REVERSION", "version": "V1", "direction": "SHORT_ONLY",
+    "horizon_product_mapping": "MULTI_DAY", "universe_size": 35, "benchmark": "SPY",
+    "feature": "causal 3-trading-day market-adjusted cumulative return, cross-sectional rank",
+    "threshold": "top 20% (rank >= 0.80)", "decision": "Day0 close", "entry": "Day1 canonical open, SHORT",
+    "exit": "close of 3rd canonical trading day (entry day inclusive)",
+    "stop": "15% catastrophic stop (Option B), fill semantics conservative/gap-aware",
+    "position_sizing": "equal-notional, 5% per position", "max_concurrent_positions": 20,
+    "max_gross_short_exposure_pct": 100.0
+  },
+  "execution_economics": {"primary_all_in_cost_bps": 25.0, "diagnostic_levels_bps": [0, 5, 10, 15, 20],
+    "borrow_handling": "assumed easily-borrowable, unverified", "dividend_handling": "unmodeled, disclosed limitation",
+    "gap_handling": "pessimistic fill only"},
+  "fingerprint": {"full": "08930fb2bbbd1f8acbf2071be2e7bf6b2ead784a94e38837d05f4e8937eebff3",
+    "contract_only": "677adccd7e653e30c96122f0149356523f3a2fb3cb82a3d4967c3a1a06aa6f06"},
+  "holdout": {"validation": ["2024-06-01", "2024-09-02"], "replication": ["2024-10-21", "2024-12-20"],
+    "outcomes_inspected_this_task": false},
+  "tests_run": ["tests/test_task75_v1_strategy.py", "tests/test_task75_v1_fingerprint.py", "tests/test_task74_holdout_guard.py"],
+  "focused_tests_result": "19 passed, 0 failed",
+  "broader_regression": "217 passed, 0 failed (Task67A/68/71/72/74/74B/75 lineage)",
+  "task75b_status": "BLOCKED_PENDING_CORPORATE_ACTION_SAFE_DATASET",
+  "live_session_safety": {"piv_runtime_disturbed": false, "large_replay_started": false, "completed_before_1230_bst_cutoff": true}
+}
