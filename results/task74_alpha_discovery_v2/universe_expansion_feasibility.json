@@ -1,0 +1,22 @@
+{
+  "task": "74B Family C -- higher-volatility universe expansion feasibility (feasibility only, no outcome research executed)",
+  "assessed_utc": "2026-08-26T03:15:00Z",
+  "question": "Can a historically defensible tradeable universe beyond the current 35-symbol mega-cap PIV set be constructed in this repo/environment without introducing un-auditable survivorship bias?",
+  "findings": [
+    {
+      "finding": "No point-in-time index/constituent membership data source is integrated anywhere in this repo (no historical Russell/S&P mid-cap membership snapshots, no historical shares-outstanding or market-cap history, no delisting/merger event table).",
+      "implication": "Any broader universe selection would necessarily use TODAY's liquid/tradeable symbol list applied retroactively -- the same CURRENT_UNIVERSE_BACKCAST_BIAS already disclosed and accepted for the existing 35-symbol PIV universe (Task71's survivorship_bias_assessment.json), but MATERIALLY WORSE for a higher-volatility/mid-cap expansion: mega-caps are overwhelmingly the same 35 names across the full historical window (long-established, low turnover), whereas a mid-cap/higher-beta universe has much higher historical turnover (delistings, mergers, promotions/demotions between cap tiers), so backcasting today's list introduces a much larger, unquantifiable survivorship bias than the existing mega-cap set carries."
+    },
+    {
+      "finding": "No historical minimum-price / minimum-dollar-volume screening capability exists to mechanically filter a candidate list at a PAST point in time (e.g. 'symbols with median dollar volume >= $X as of 2025-06-01') -- only current/live screening would be possible, which is exactly the backcast problem above.",
+      "implication": "The suggested mechanical filters (price >= $10/$20, minimum median dollar volume, minimum trading history, exclude penny/illiquid names) can only be applied using CURRENT data, not reconstructed historically, without new data engineering (a historical point-in-time universe/liquidity database) that is out of scope for a DEVELOPMENT-only task under this time budget."
+    },
+    {
+      "finding": "Building such a historical point-in-time universe/liquidity database is a data-engineering project in its own right (a new external data source or a materially larger internal reconstruction effort), not a same-task feasibility add-on.",
+      "implication": "Forcing an outcome study on a universe defined via retroactive current-day screening would silently repeat -- at a larger scale -- the exact backcast-bias problem this task's own instructions warn against ('do not force Family C outcome research' if the dataset does not support it robustly)."
+    }
+  ],
+  "classification": "UNIVERSE_EXPANSION_DEFERRED",
+  "outcome_research_executed": false,
+  "recommendation_for_a_future_task": "Before attempting a higher-volatility/mid-cap universe expansion, first acquire or construct a point-in-time constituent/liquidity dataset (e.g. a licensed historical index-membership feed, or a documented, mechanically-defensible point-in-time liquidity reconstruction using only data that existed at each historical date) as its OWN dedicated data-engineering task -- do not skip straight to a strategy backtest on a retroactively-screened universe."
+}

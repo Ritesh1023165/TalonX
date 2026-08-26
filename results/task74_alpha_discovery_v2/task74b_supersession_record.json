@@ -1,0 +1,26 @@
+{
+  "task": "74B -- supersession record",
+  "recorded_utc": "2026-08-26T03:00:00Z",
+  "previous_design_commit": "406910e7bab4724fe80fa75f0c2cd7db86fb7515",
+  "previous_design_name": "TASK74_RESEARCH_DESIGN_LOCK (2 families: EXTREME_CROSS_SECTIONAL_DISLOCATION_REVERSAL, VOLATILITY_EXPANSION_BREAKOUT_CONTINUATION)",
+  "outcomes_computed_under_old_design": false,
+  "audit_trail": "See the read-only audit reported before this task began: the only execution attempt of research/scripts/task74_run_discovery.py failed at import time (ModuleNotFoundError) before any data loading, family evaluation, or diagnostic computation occurred. Zero cell results, zero strategy return/expectancy/PF/win-rate values were ever computed, printed, or inspected under the old design. results/task74_alpha_discovery_v2/ contained only the pre-outcome design/audit files (holdout_budget_audit.*, research_design_lock.*) at the time of supersession.",
+  "superseding_design_commit": "PENDING_THIS_COMMIT",
+  "reason_for_supersession": "External methodological review motivated a structural pivot toward (1) catalyst/extreme-activity setups, (2) multi-day holding horizons, and (3) feasibility-only investigation of a higher-volatility/liquid expanded universe -- on the premise that ordinary mega-cap intraday effects (most recently RESIDUAL_MOMENTUM_V1: gross +0.1005%, net@10bps +0.0005%, net@15bps -0.0495%, PF@10bps 1.0018, negative after top-3-winner removal) have repeatedly shown gross expectancy too close to realistic transaction friction to be promotable.",
+  "holdout_unchanged": true,
+  "holdout_budget_carried_forward": {
+    "reserved_validation": {"start": "2024-06-01", "end": "2024-09-02", "classification": "EXPOSED_DATA_ONLY", "status": "unchanged, not consumed"},
+    "reserved_replication": {"start": "2024-10-21", "end": "2024-12-20", "classification": "RESERVED_UNTOUCHED", "status": "unchanged, not consumed -- Task72/73 validation FAILED before replication was ever run, so this block remains genuinely never-outcome-tested"},
+    "not_reused_blocks": ["2024-02-01..2024-03-15 (Task70 F6 validation)", "2024-04-01..2024-05-31 (Task72 residual-momentum validation)", "2024-09-03..2024-10-18 (Task70 F6 replication)"],
+    "verification": "No file under results/task74_alpha_discovery_v2/ or elsewhere in this session touched any 2024 date; holdout_budget_audit.json is unmodified since its original TASK74_HOLDOUT_BUDGET_LOCK commit (151f2db)."
+  },
+  "old_task74_source_code_disposition": {
+    "research/task74_alpha_discovery_v2/holdout_guard.py": "REUSE_UNCHANGED -- blocks all of 2024 identically under the new design; no semantic dependency on the superseded families.",
+    "research/task74_alpha_discovery_v2/features.py": "DISCARD -- implemented cross-sectional percentile rank (old Family A, 14:00 decision) and range-expansion-vs-trailing-average (old Family B, 11:30 decision), neither of which is used by the new catalyst/multi-day design. Deleted.",
+    "research/task74_alpha_discovery_v2/family_a.py": "DISCARD -- old EXTREME_CROSS_SECTIONAL_DISLOCATION_REVERSAL mechanism, superseded by the new catalyst/extreme-activity family. Deleted.",
+    "research/task74_alpha_discovery_v2/family_b.py": "DISCARD -- old VOLATILITY_EXPANSION_BREAKOUT_CONTINUATION mechanism (single-session), superseded by the new multi-day cross-sectional family. Deleted.",
+    "research/scripts/task74_run_discovery.py": "DISCARD -- orchestrated the two superseded families; never executed successfully. Deleted.",
+    "tests/test_task74_features.py, test_task74_family_a.py, test_task74_family_b.py, test_task74_search_budget.py": "DISCARD -- tested the superseded mechanisms/grid exclusively (synthetic fixtures only, never run against real DEVELOPMENT data -- synthetic-test execution does not constitute outcome exposure). Deleted.",
+    "tests/test_task74_holdout_guard.py": "REUSE_UNCHANGED -- tests the still-current holdout_guard.py."
+  }
+}

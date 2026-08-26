@@ -1,0 +1,86 @@
+{
+  "task": "74B -- superseding research design lock, declared BEFORE any new outcome is computed",
+  "declared_utc": "2026-08-26T03:10:00Z",
+  "development_data": {
+    "role": "DEVELOPMENT ONLY -- reuses the existing Task71 broadened pool (35-symbol universe + SPY, all 4 slices already include SPY), no new download",
+    "slices": [
+      {"label": "2026_q3_f6_era", "data_dir": "data/historical_1m/task67a_development", "start": "2026-05-15", "end": "2026-08-14"},
+      {"label": "2025_q1_orpb_era", "data_dir": "data/historical_1m/task71_development_2025q1", "start": "2025-02-03", "end": "2025-03-14"},
+      {"label": "2025_q3_fprc_era", "data_dir": "data/historical_1m/task71_development_2025q3", "start": "2025-06-02", "end": "2025-07-11"},
+      {"label": "2025_q4_task46_56_era", "data_dir": "data/historical_1m/task71_development_2025q4", "start": "2025-10-27", "end": "2025-12-05"}
+    ],
+    "universe": "canonical 35-symbol PIV universe + SPY",
+    "provider": "Alpaca SIP historical",
+    "pre_roll_policy": "NONE downloaded. Family B's trailing lookback is deliberately kept small (K=3 trading days) so warmup depletion at each slice's start is minimal -- same accepted precedent as Task71's causal-beta warmup, not a new pre-roll download. Documented explicitly rather than silently expanding scope."
+  },
+  "families": [
+    {
+      "family_id": "FAMILY_A",
+      "name": "CATALYST_EXTREME_ACTIVITY_CONTINUATION_OR_REVERSAL",
+      "mechanism": "At 10:00 ET (30 minutes post-open -- enough regular-session information exists to measure the activity condition causally, while remaining clearly an activity/catalyst trigger, not a late-day setup), compute (a) overnight gap magnitude: gap_pct = (today_open - prior_close)/prior_close*100, and (b) relative activity: RVOL = cumulative 09:30-10:00 volume today / causal trailing-10-day average of the SAME 09:30-10:00 volume window (prior days only, today excluded). An extreme session requires BOTH abs(gap_pct) and RVOL to clear a combined band. Two hypotheses tested SEPARATELY (not pooled): CONTINUATION (bet direction = sign(gap)) and REVERSAL (bet direction = -sign(gap)).",
+      "hypotheses_as_directions": ["CONTINUATION", "REVERSAL"],
+      "features": ["gap_pct", "rvol_09_30_to_10_00"],
+      "decision_time_et": "10:00",
+      "threshold_bands": [
+        {"label": "loose", "gap_pct_min": 2.0, "rvol_min": 2.0},
+        {"label": "tight", "gap_pct_min": 3.0, "rvol_min": 3.0}
+      ],
+      "horizons_minutes": [120, null],
+      "horizon_labels": ["120m", "EOD"],
+      "provider_note": "RVOL is volume-based -> PROVIDER_SENSITIVE (SIP research vs IEX live volume mismatch risk). gap_pct alone is price-only and portable, but was NOT separately gridded in Task74B (budget discipline) -- recorded as a deferred idea for Task75+, not silently added here.",
+      "predeclared_cells": "2 hypotheses x 2 bands x 2 horizons = 8"
+    },
+    {
+      "family_id": "FAMILY_B",
+      "name": "MULTIDAY_CROSS_SECTIONAL_MOMENTUM_OR_REVERSAL",
+      "mechanism": "On a completed session (Day0 close), compute each symbol's market-adjusted 3-trading-day cumulative displacement: (stock's 3-day cum return) - (SPY's 3-day cum return), using only information complete as of Day0 close (causal). Rank cross-sectionally among the universe symbols with valid data that day. Two hypotheses tested SEPARATELY: MOMENTUM (bet WITH the extreme -- LONG top rank, SHORT bottom rank) and REVERSAL (bet AGAINST the extreme -- SHORT top rank, LONG bottom rank). Materially different from the rejected IDIOSYNCRATIC_RESIDUAL_MOMENTUM_LONG_V1: multi-session (not single-session) displacement, cross-sectional rank (not a beta-residual), multi-day holding (not intraday), and both directions/both hypotheses genuinely tested rather than assuming LONG-only.",
+      "hypotheses_as_directions": ["MOMENTUM", "REVERSAL"],
+      "features": ["market_adjusted_3day_return_pct", "cross_sectional_rank_pct"],
+      "decision_point": "Day0 close (after the session is complete)",
+      "entry_rule": "Day1 (next trading day) OPEN",
+      "threshold_bands": [
+        {"label": "tight", "upper_percentile": 0.90, "lower_percentile": 0.10},
+        {"label": "loose", "upper_percentile": 0.80, "lower_percentile": 0.20}
+      ],
+      "horizons_trading_days": [2, 3, 5],
+      "horizon_labels": ["2D", "3D", "5D"],
+      "risk_semantics": "NO optimized stop in Task74B -- fixed-horizon-only discovery first, per instruction. MFE/MAE and overnight-gap risk recorded for any near-promotion cell. No synthetic daily bars; horizon exits bounded by each slice's actual last trading day (NO_VALID_EXIT rejection if the required forward session does not exist within the slice).",
+      "predeclared_cells": "2 hypotheses x 2 bands x 3 horizons = 12"
+    },
+    {
+      "family_id": "FAMILY_C",
+      "name": "HIGHER_VOLATILITY_UNIVERSE_EXPANSION_FEASIBILITY",
+      "mechanism": "FEASIBILITY STUDY ONLY, no outcome cells. Question: can a historically defensible tradeable universe beyond the current 35-symbol mega-cap PIV set be constructed in this repo/environment without un-auditable survivorship bias (point-in-time constituent membership, not today's list applied retroactively)? See universe_expansion_feasibility.json for the finding and classification.",
+      "predeclared_cells": "0 (feasibility only, pending the finding)"
+    }
+  ],
+  "search_budget": {
+    "max_families": 3, "families_used": 3,
+    "max_directions_per_family": 2, "directions_used": 2,
+    "max_threshold_bands": 2, "threshold_bands_used": 2,
+    "max_horizons_per_family": 3, "horizons_used_a": 2, "horizons_used_b": 3,
+    "predeclared_cells": {"FAMILY_A": 8, "FAMILY_B": 12, "FAMILY_C": 0, "total": 20},
+    "budget_cap": 36,
+    "note": "20 <= 36; materially fewer than the cap, and fewer than the superseded design's own 24."
+  },
+  "costs": {"levels_bps": [0, 5, 10, 15, 20], "primary_bps": 10},
+  "promotion_rule_stricter_economic_edge_bar": {
+    "primary_development_target": "net_expectancy_10bps_pct >= +0.15% per trade (mega-cap/liquid families)",
+    "preferred": "net_expectancy_15bps_pct >= +0.10%",
+    "additional": "positive at 20bps, or close enough that the edge remains clearly meaningful",
+    "friction_absorption_ratio_min_at_primary_cell": 2.5,
+    "explicit_prohibition": "Do not lower this bar after seeing results. These are conservative promotion hurdles based on TalonX's repeated failure of low-margin effects, not magical economic truths."
+  },
+  "robustness_requirements_for_nomination": [
+    "trade count, symbols, distinct days reported", "gross/net expectancy at all cost levels", "PF, win rate, average win/loss",
+    "max drawdown", "symbol-cluster bootstrap", "day-cluster bootstrap", "top symbol contribution", "top day contribution",
+    "remove best 1/3/5 trades", "remove best 1/3 days", "regime segmentation", "time segmentation", "parameter-neighbor consistency",
+    "no isolated winning cell"
+  ],
+  "family_classification_taxonomy": [
+    "REJECTED_NO_EDGE", "REJECTED_COST", "REJECTED_INSTABILITY", "REJECTED_CONCENTRATION", "REJECTED_SAMPLE",
+    "PROVIDER_LIMITED", "UNIVERSE_EXPANSION_DEFERRED", "RESEARCH_LEAD", "PRIMARY_CANDIDATE_READY_TO_FREEZE"
+  ],
+  "candidate_cap": {"max_primary_candidates": 1, "max_research_leads": 1},
+  "outcomes_computed_at_lock_time": false
+}
