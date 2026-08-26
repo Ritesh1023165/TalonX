@@ -44,6 +44,7 @@ from talonx_quant.consumer import QuantScanner
 from talonx_quant.schemas import QuantSignal, RejectedCandidateEvent, SignalDirection
 
 from .broker import PaperGuardError
+from .config import PivConfig
 from .events import EventBus, PivEvent
 from .lifecycle import PaperLifecycle
 from .warmup import WarmupCheck, preseed_and_verify
@@ -73,6 +74,11 @@ class DecisionEngine:
     events: EventBus
     lifecycle: PaperLifecycle
     config: QuantConfig = field(default_factory=QuantConfig)
+    # Task 70S: the OUTER PivConfig (Alpaca credentials/data_endpoint/feed_mode),
+    # separate from `config` above (QuantScanner's own, unrelated QuantConfig).
+    # None (the default -- every pre-Task-70S caller/test) means warmup.py's
+    # Alpaca leg is skipped entirely; see preseed_and_verify's own docstring.
+    piv_config: PivConfig | None = None
 
     def __post_init__(self) -> None:
         self.scanner = QuantScanner(self.config)
@@ -102,15 +108,19 @@ class DecisionEngine:
         self.evaluation_cycles = 0
         self.symbols_evaluated_total = 0
 
-    async def start(self, universe: list[str] | None = None) -> list[WarmupCheck]:
+    async def start(self, universe: list[str] | None = None, now: datetime | None = None) -> list[WarmupCheck]:
         """Causal pre-market hydration, then subscribe to the scanner's own
         signal channel. universe=None skips warmup entirely (e.g. a test
         that doesn't need it) -- callers driving a real session must always
         pass the configured PIV universe. See warmup.py's module docstring
         for the causality argument and why this must run before any live
-        bar is fed to the scanner."""
+        bar is fed to the scanner. `now` is test-only (fixes the causal
+        cutoff); real sessions always use the default (current UTC time)."""
         if universe is not None:
-            self.warmup_checks = await preseed_and_verify(self.scanner, universe, self.config.htf_sma_period)
+            self.warmup_checks = await preseed_and_verify(
+                self.scanner, universe, self.config.htf_sma_period,
+                piv_config=self.piv_config, now=now,
+            )
             self.warmup_ready_symbols = {c.symbol for c in self.warmup_checks if c.ready}
         await self._pubsub.subscribe(self.config.signals_channel)
         await self._pubsub.subscribe(self.config.rejected_candidates_channel)

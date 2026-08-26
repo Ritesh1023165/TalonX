@@ -106,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
             if config.decision_path_enabled and not args.no_decision_path:
                 import redis.asyncio as redis_asyncio
                 redis_client = redis_asyncio.from_url(os.environ.get("TALONX_REDIS_URL", "redis://localhost:6379"))
-                decision_engine = DecisionEngine(redis_client, bus, lifecycle)
+                decision_engine = DecisionEngine(redis_client, bus, lifecycle, piv_config=config)
             piv_info = build_piv_info(
                 config.feed_mode, config.universe, session_id=identity.session_id,
                 runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
