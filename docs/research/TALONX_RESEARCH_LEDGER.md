@@ -6267,3 +6267,38 @@ validation protocol, fresh holdout lock) before any validation outcome exists. F
 rejected and is not revisited. Real capital: NO. Runtime worktree
 (`research/talonx-strategy-validation`) touched: NO. See
 `results/task71_structural_discovery/claude_handoff_next.md` for the detailed handoff.
+
+## Task 72/73 -- Overnight Freeze + Untouched Validation (2026-08-26)
+
+> **RESULT: RESIDUAL_MOMENTUM_V1_REJECTED.** Froze
+> `IDIOSYNCRATIC_RESIDUAL_MOMENTUM_LONG_V1` from already-computed Task71 DEVELOPMENT evidence only
+> (no grid rerun, no new development outcome): threshold=0.75% (broader/less-selection-pressure band),
+> horizon=180m (structural tie-break vs EOD, same positive plateau), stop=2.5% (conservative buffer
+> over Task71's 90th-pctile MAE ~2.19%, risk containment not P&L-optimized). Fingerprint
+> `f3764b6794f2e00cc5262f73d241b5274ebf544dd65cc96e7a7ab175d7c6025a`, 12 causality/stop/exit tests pass.
+>
+> **HOLDOUT RE-AUDIT (Part 9, independent of Task71's own inventory)**: repo-wide re-grep confirmed
+> calendar year 2024 is EXPOSED_DATA_ONLY at worst except Task70's own two consumed blocks
+> (2024-02-01..03-15, 2024-09-03..10-18, not reused). Locked, committed, and pushed BEFORE any outcome:
+> VALIDATION=2024-04-01..2024-05-31, REPLICATION=2024-10-21..2024-12-20 -- exactly the predeclared
+> ranges, no substitution needed. `outcomes_inspected=false` recorded at lock time.
+>
+> **VALIDATION** (170 trades, 35 symbols, 24 distinct days, dataset hash `766359eb6698`, 36/36 symbols
+> FULL/clean): gross expectancy 0.1005%/trade, but net expectancy at the frozen 10bps cost collapsed to
+> ~0.0005%/trade (essentially erased) and went negative (-0.0495%) at 15bps; PF@10bps 1.0018
+> (breakeven); both symbol- and day-cluster bootstrap CIs cross zero; removing only the 3 largest
+> winning trades flips the entire holdout sample negative. Classification (pre-registered 15-criterion
+> protocol, none loosened after seeing numbers): **VALIDATION_FAIL** (criteria 3/8/15 fail on economic
+> substance). A `classify.py` coding bug mislabeling a benign 0% stop-fire rate as a pathology was found
+> and fixed transparently -- reclassifying from the SAME already-computed metrics with zero holdout
+> re-touch changed nothing (FAIL both before and after).
+>
+> Per the pre-registered protocol, replication is forbidden after a FAIL and was **not run**.
+> **FINAL ALPHA STATUS: RESIDUAL_MOMENTUM_V1_REJECTED.** The DEVELOPMENT-stage edge that looked stable
+> across 3 regimes and 3 time segments did not survive an untouched holdout at realistic cost -- Task71's
+> own disclosed day-dependence caveat turned out to be the operative weakness, not a merely theoretical
+> one. 182 broader regression tests (Task67A/68/71/72 lineage) pass. Real capital: NO. Runtime worktree
+> (`research/talonx-strategy-validation`) touched: NO. See
+> `results/task72_residual_momentum_freeze/morning_handoff.md` for the full write-up and next-task
+> recommendation (a fresh pre-registered discovery pass on unconsumed clean-2024 territory, not a tuned
+> re-test of this candidate).

@@ -1,7 +1,7 @@
 {
   "task": "72/73 overnight",
-  "stage": "VALIDATION_COMPLETE_FAIL_FINAL_SYNTHESIS_PENDING",
-  "timestamp_utc": "2026-08-26T01:15:00Z",
+  "stage": "COMPLETE",
+  "timestamp_utc": "2026-08-26T01:30:00Z",
   "branch": "research/talonx-alpha-phenomenon-discovery",
   "head_sha": "727daaa00dbfe475362542f196100a4ffe2de42f",
 
@@ -22,5 +22,5 @@
   "replication_complete": false,
   "replication_classification": "NOT_EXECUTED -- validation FAIL, replication is forbidden per the pre-registered protocol",
 
-  "next_action": "VALIDATION run exactly once (170 trades/35 symbols/24 days). Result: gross=0.1005%, net_10bps=0.0005% (essentially erased), net_15bps=-0.0495% (negative), PF_10bps=1.0018 (breakeven), symbol/day-cluster CIs both cross zero, top3-winner removal flips expectancy negative. Classification VALIDATION_FAIL (criteria 3, 8, 15 failed on substance -- a classify.py bug in criterion 12's stop-rate check was found and fixed, re-derived from the SAME already-computed metrics with no holdout re-touch; classification unchanged before/after). Per protocol: REPLICATION NOT RUN (forbidden after FAIL). FINAL ALPHA STATUS = RESIDUAL_MOMENTUM_V1_REJECTED. NEXT: write morning_handoff.md, commit TASK73_VALIDATION_RESULT, then TASK72_73_FINAL_SYNTHESIS (ledger update, one broader regression test pass), push, deliver final report. If context resets: do NOT rerun validation or attempt replication -- the result is final and this is purely a reporting/write-up step from here."
+  "next_action": "TASK OVERNIGHT COMPLETE. FINAL ALPHA STATUS = RESIDUAL_MOMENTUM_V1_REJECTED (VALIDATION_FAIL, replication correctly not run). morning_handoff.md, profitability_evidence_matrix.csv, provider_portability_note.json all written. Ledger updated with Task72/73 entry. 182 broader regression tests (task67a/68/71/72 lineage) pass, 0 failures. Runtime worktree (research/talonx-strategy-validation) reconfirmed untouched. All 4 checkpoints (TASK72_STRATEGY_FREEZE 916d1e9, TASK72_HOLDOUT_LOCK 4bb028c, TASK73_VALIDATION_RESULT ce46f8a, TASK72_73_FINAL_SYNTHESIS pending-this-commit) committed and pushed. Next task for a human/future session: a FRESH pre-registered discovery pass on currently-unconsumed clean-2024 territory (2024-01-01..01-31, 2024-03-16..04-30, 2024-06-01..09-02, 2024-12-21..12-31) -- do NOT tune/re-test this rejected candidate."
 }
