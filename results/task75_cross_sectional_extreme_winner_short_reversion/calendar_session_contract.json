@@ -1,0 +1,31 @@
+{
+  "task": "75A Part 3 -- canonical market-calendar correction + impact audit",
+  "audited_utc": "2026-08-26T08:10:00Z",
+  "problem_identified": "research/task74_alpha_discovery_v2/family_b_multiday.py evaluate() indexes each SYMBOL's own available daily-bar sequence positionally (per_symbol_series[symbol].iloc[i+1] for Day1, etc.). If a symbol were missing a bar on a day the rest of the market traded (a data gap, halt, late listing, or delisting), the NEXT AVAILABLE row for that symbol would silently be treated as 'Day1' even if it were really Day2 or later on the true calendar -- entry/exit dates could silently diverge from other symbols' Day1/exit, and the stock/SPY return windows underlying the ranking feature could reference different calendar spans for different symbols on the same nominal 'Day0'.",
+  "canonical_calendar_policy_for_v1": {
+    "source": "SPY's own regular-session trading_day set within the materialized dataset, per slice/period -- SPY is assumed continuously liquid and gap-free (verified per period, not assumed).",
+    "rule": "Day0, Day1, and every exit day are defined as POSITIONS IN THE CANONICAL SPY CALENDAR, not in a symbol's own available-row sequence. A symbol is REQUIRED to have a valid regular-session bar on every canonical session between Day0 and the exit day inclusive (Day0 itself, the entry day, and every day up to and including the exit day) -- if any required canonical session is missing for that symbol, the row is REJECTED, never shifted to the next available row and never filled/synthesized.",
+    "rejection_reasons_added": ["SYMBOL_MISSING_REQUIRED_SESSION (any canonical session in [Day0-lookback, exit_day] is absent for this symbol)", "SPY_CALENDAR_NOT_ESTABLISHED (SPY itself lacks a session, e.g. at a slice boundary)"]
+  },
+  "impact_audit": {
+    "method": "For each of the 4 Task74B DEVELOPMENT slices, built each symbol's regular-session trading_day set and compared it directly against SPY's trading_day set for the SAME slice (exact set equality check) -- using only already-materialized DEVELOPMENT data, no new download, no 2024 data read.",
+    "result": {
+      "2026_q3_f6_era": {"spy_days": 63, "symbols_with_any_mismatch_vs_spy": 0},
+      "2025_q1_orpb_era": {"spy_days": 29, "symbols_with_any_mismatch_vs_spy": 0},
+      "2025_q3_fprc_era": {"spy_days": 28, "symbols_with_any_mismatch_vs_spy": 0},
+      "2025_q4_task46_56_era": {"spy_days": 29, "symbols_with_any_mismatch_vs_spy": 0}
+    },
+    "conclusion": "ZERO symbol/day mismatches found across all 35 universe symbols in all 4 development slices. Every symbol's regular-session trading_day set is IDENTICAL to SPY's canonical trading_day set in every slice used by Task74B.",
+    "development_population_materially_changed": false,
+    "reasoning": "Because no symbol ever had a gap relative to SPY's calendar in any Task74B DEVELOPMENT slice, the OLD per-symbol-positional-index method and the NEW canonical-SPY-calendar method are mathematically IDENTICAL on this exact dataset -- there is nothing for the correction to change here. The Task74B nomination (CROSS_SECTIONAL_EXTREME_WINNER_SHORT_REVERSION, FAMILY_B/REVERSAL/SHORT) stands unchanged; this is a genuine confirmation, not an assumption."
+  },
+  "why_the_correction_is_still_mandatory_for_v1": "This audit only confirms DEVELOPMENT data (2025-2026, already known to be extremely clean, liquid mega-caps) had no gaps. It says nothing about the 2024 validation/replication data, which has NOT been inspected (per this task's absolute prohibition) and could plausibly contain a genuine single-symbol gap (a halt, a late corporate-action-driven trading suspension, a data-vendor gap). The canonical-calendar-safe implementation is therefore built and frozen as the ONLY implementation used going forward -- the old per-symbol-positional method is retired, not merely 'not needed.'",
+  "additional_calendar_semantics_frozen": {
+    "timezone": "America/New_York for all session/day-boundary definitions",
+    "one_signal_per_symbol_per_decision_day": true,
+    "overlapping_positions": "Multiple concurrent positions in DIFFERENT symbols, and multiple concurrent positions in the SAME symbol from DIFFERENT decision days, are both structurally possible under a 3-trading-day hold with a daily decision cadence -- governed by portfolio_construction.json's capacity rules, not silently allowed to compound without limit.",
+    "holidays_and_half_days": "Governed entirely by SPY's own observed session list -- no separate holiday calendar is maintained or assumed; if SPY did not trade a session, no Day0/Day1/exit indexing ever references that date for any symbol.",
+    "duplicate_and_out_of_order_bars": "Rejected upstream by talonx_backtest.data.check_data_quality (reused unmodified) before any session indexing occurs -- a slice failing this check blocks the whole slice, not just the affected symbol/day.",
+    "minimum_valid_cross_sectional_breadth": "At least 10 symbols with a valid market-adjusted-return value on a given Day0 are required for that day's rank to be computed at all (below this, the day is skipped entirely, not computed with a degenerate/tiny cross-section)."
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "task": "75A Part 1 -- effective search-count audit for CROSS_SECTIONAL_EXTREME_WINNER_SHORT_REVERSION",
+  "audited_utc": "2026-08-26T08:00:00Z",
+  "predeclared_design": {
+    "source": "results/task74_alpha_discovery_v2/research_design_lock_v2.json",
+    "family_b_predeclared_cells": 12,
+    "family_b_search_budget_accounting": "hypotheses_as_directions: [MOMENTUM, REVERSAL] -- the design lock's OWN search_budget.max_directions_per_family=2 / directions_used=2 maps to the HYPOTHESIS axis (MOMENTUM vs REVERSAL), NOT to a LONG/SHORT bet-direction axis. The mechanism text describes each hypothesis as inherently two-sided ('MOMENTUM: LONG top rank, SHORT bottom rank'; 'REVERSAL: SHORT top rank, LONG bottom rank') -- i.e. LONG and SHORT are a DETERMINISTIC, jointly-computed PAIR that falls out of evaluating ONE hypothesis at ONE threshold/horizon, not two independently choosable search parameters."
+  },
+  "what_task74b_actually_did": {
+    "cell_results_rows": 40,
+    "reason_for_40_not_20": "cell_results.csv reports each of the 20 predeclared hypothesis-cells split into its LONG and SHORT sub-population for transparency (the carried-over 'no long/short pooling to hide a failing side' rule) -- this reporting choice was itself correct and necessary.",
+    "additional_selection_step_performed": "AFTER observing that REVERSAL's SHORT sub-population (extreme winners) was strong/robust and its LONG sub-population (extreme losers) was weak/unstable (sign-flipping, no cluster CI ever excluding zero), Task74B nominated ONLY the SHORT sub-population as the PRIMARY_CANDIDATE, discarding the LONG sub-population as REJECTED_INSTABILITY. This decision -- which HALF of one hypothesis to keep -- was made only after both halves' outcomes were known.",
+    "is_this_the_same_as_hiding_a_failing_side": "NO -- both halves were reported and both classifications are visible in candidate_ranking.json. But choosing to promote only the winning half, rather than requiring the whole hypothesis (both LONG and SHORT) to jointly pass or jointly fail, IS an additional degree of freedom not explicitly pre-registered as an independent promotion axis."
+  },
+  "was_direction_level_promotion_explicitly_authorized_by_the_locked_design": false,
+  "was_direction_level_promotion_explicitly_prohibited_by_the_locked_design": false,
+  "finding": "AMBIGUOUS/UNDER-SPECIFIED, not a clean prohibition. The locked design required LONG/SHORT to be reported separately (transparency) but is SILENT on whether a single leg may be independently promoted while its mirror is rejected. Per Part 1's own decision rule ('If this audit finds that SHORT-only promotion was PROHIBITED by the locked design, stop and classify BLOCKED'), the honest finding here is NOT a prohibition -- it is a genuine specification gap. This task does not classify BLOCKED on this basis alone, but treats the true effective search space conservatively rather than pretending only 20 cells were ever compared.",
+  "effective_selection_opportunity_used_for_nomination": {
+    "family_a_cells": 8, "family_a_direction_rows": 16,
+    "family_b_cells": 12, "family_b_direction_rows": 24,
+    "total_predeclared_hypothesis_cells": 20,
+    "total_direction_level_rows_actually_compared_before_choosing_a_winner": 40,
+    "conservative_effective_search_count_carried_forward": 40,
+    "rationale": "Since the actual selection process compared all 40 direction-level rows (not just 20 hypothesis-level rows) before settling on ONE winning row (FAMILY_B/REVERSAL/SHORT/loose/3D), the honest multiple-testing denominator for this specific candidate's provenance is 40, not 20. This is carried into validation_protocol.json's multiple-testing disclosure and used to argue for a materially MORE conservative validation bar than a naive '1-in-20' framing would suggest."
+  },
+  "why_this_does_not_invalidate_the_nomination": [
+    "The winning cell's economic margin (net@10bps +0.507%, friction absorption 6.07x) clears the promotion bar by a wide multiple (3.4x the +0.15% requirement), not a marginal squeak-through -- large margins are inherently more robust to a doubled effective-search denominator than a borderline result would be.",
+    "The winning finding shows a genuine parameter PLATEAU (all 6 band x horizon cells of REVERSAL/SHORT share the same sign), which a single lucky direction-flip from noise would not be expected to produce consistently across 6 independent parameter combinations.",
+    "Both cluster bootstrap CIs (symbol AND day) exclude zero at the anchor cell -- a materially stronger evidentiary bar than merely 'the best of several comparisons looked good.'",
+    "Outlier-removal robustness (best-5-trades-removed, best-3-days-removed) both remain positive -- the edge is not an artifact of a handful of extreme observations that a lucky direction-selection could produce."
+  ],
+  "program_wide_multiple_testing_caveat": "This is Task75A's SECOND independently-nominated candidate lineage in this research program (after F1-F6, FPRC_V1, ORPB_V1, and IDIOSYNCRATIC_RESIDUAL_MOMENTUM_LONG_V1 -- see docs/research/TALONX_RESEARCH_LEDGER.md), and within Task74B alone at least 40 direction-level comparisons (across 2 families) were inspected before this candidate emerged. No formal program-wide multiple-testing correction (e.g. Bonferroni/FDR across the full multi-task history) has been applied anywhere in this research lineage -- consistent with the program's own documented fallback ('do not build a massive statistical framework if one is unavailable'), but this remains an open, disclosed limitation of every candidate this program has ever produced, this one included.",
+  "conclusion": "NOT BLOCKED. Effective search count of 40 (not 20) is carried forward into the Task75B validation protocol as an explicit, disclosed multiple-testing caveat, and the validation bar is not loosened to compensate for the strength of the point estimate -- if anything, the pre-registered criteria in validation_protocol.json are held to the full Task74B bar or stricter, given this finding."
+}

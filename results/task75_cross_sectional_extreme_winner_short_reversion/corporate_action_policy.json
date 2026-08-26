@@ -1,0 +1,32 @@
+{
+  "task": "75A Part 4 -- corporate-action policy audit (repo metadata and public-knowledge only, ZERO 2024 price data read)",
+  "audited_utc": "2026-08-26T08:20:00Z",
+  "adjustment_provenance": {
+    "downloader": "scripts/download_historical_1m.py::fetch_alpaca()",
+    "finding": "The Alpaca request explicitly sets `\"adjustment\": \"raw\"` (line ~208) for every historical bar download in this repository -- confirmed by direct source inspection, not inference.",
+    "conclusion": "ALL historical 1-minute bars in data/historical_1m/ across this entire repository (development slices, Task70/72 validation/replication blocks, everything) are RAW/UNADJUSTED prices. No split adjustment, no dividend adjustment, no other corporate-action adjustment has ever been applied to any bar this project has downloaded."
+  },
+  "split_reverse_split_merger_detection": {
+    "repo_wide_search_performed": "grep for corporate_action, stock_split, split_ratio, split_adjust, dividend_adjust, ex_date across every .py file in the repository",
+    "result": "ZERO matches. No split-detection, no adjustment-reconciliation, no corporate-action event table, no delisting/merger handling exists anywhere in talonx_backtest, scripts/, or research/."
+  },
+  "dividend_ex_date_handling_for_a_short_only_strategy": {
+    "finding": "Not modeled anywhere. A SHORT position open across a dividend ex-date owes the dividend to the share lender -- this is a real, unmodeled cost/liability for this specific SHORT-only candidate that raw OHLCV bars do not surface at all (a dividend does not itself cause a large single-bar price discontinuity the way a split does, but the LIABILITY still exists and is currently completely unaccounted for in any cost model in this repo)."
+  },
+  "known_public_corporate_actions_inside_the_reserved_validation_window_2024_06_01_to_2024_09_02": [
+    {
+      "symbol": "NVDA", "event": "10-for-1 stock split", "public_effective_date": "~2024-06-10",
+      "source": "General public market knowledge (widely reported), NOT verified against any price data in this repo -- no 2024 price bar was read to produce this entry.",
+      "impact_if_uncorrected": "A raw/unadjusted price series would show an artificial ~90% single-bar price drop at the split date with no true economic return. Any 3-day cross-sectional return feature or any P&L calculation for a position spanning this date would be catastrophically wrong."
+    },
+    {
+      "symbol": "AVGO", "event": "10-for-1 stock split", "public_effective_date": "~2024-07-15",
+      "source": "General public market knowledge (widely reported), NOT verified against any price data in this repo.",
+      "impact_if_uncorrected": "Same class of catastrophic distortion as NVDA, for both the ranking feature and any spanning position's P&L."
+    }
+  ],
+  "disclaimer_on_the_known_events_list": "This list is NOT exhaustive and is NOT independently verified against this repo's price data (doing so would require reading 2024 prices, which is prohibited in this task). It is provided as sufficient evidence that the risk is REAL and CONCRETE for this exact universe and exact reserved validation window, not merely theoretical -- a full, systematic, repo-external corporate-action audit (e.g. a licensed corporate-actions feed, or Alpaca's own corporate-actions API cross-referenced against the 35-symbol universe for the full 2024 calendar year) is required before Task75B, not assumed complete from this list.",
+  "fail_closed_behavior_when_adjustment_provenance_is_unknown": "No fail-closed per-symbol mechanism exists today (there is no split-detection to trigger a fail-closed rejection) -- the ENTIRE dataset must be treated as unsafe for a multi-day return strategy until either (a) re-downloaded with a non-raw Alpaca adjustment parameter (e.g. `adjustment=split` or `adjustment=all`) for the validation/replication windows, or (b) a verified corporate-action event table is obtained and used to explicitly exclude or adjust affected symbol/date windows.",
+  "classification": "TASK75B_BLOCKED_PENDING_CORPORATE_ACTION_SAFE_DATASET",
+  "conclusion": "Per this task's own explicit instruction ('If adjustment provenance cannot be proven, Task75A may finish with Task75B explicitly BLOCKED... Do not validate using ambiguous price adjustment'): provenance IS proven here (confirmed RAW, which is worse than merely 'ambiguous' -- it is confirmed NOT corporate-action-safe), and at least two known, real, public corporate actions fall inside the reserved validation window for this exact universe. Task75B must NOT run against the current raw dataset. This does not block Task75A itself, which proceeds to freeze everything else and explicitly records this blocker."
+}
