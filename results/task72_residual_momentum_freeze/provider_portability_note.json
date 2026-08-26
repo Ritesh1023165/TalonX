@@ -1,0 +1,9 @@
+{
+  "task": "72 Part 17 -- provider portability note",
+  "research_provider": "Alpaca SIP (development AND validation, both consistent with Task71/Task70 precedent)",
+  "live_paper_provider": "Alpaca IEX",
+  "core_signal_nature": "price-only market-model residual (close-to-close/open-to-decision returns), no volume dependency -- classified PROVIDER_PORTABLE_WITH_CAVEAT in Task71's provider_semantics_assessment.json",
+  "sip_to_iex_parity_proven": false,
+  "applicability": "MOOT -- VALIDATION classified VALIDATION_FAIL (see validation_summary.md: realistic 10bps costs reduce the edge to ~0.0005%/trade, essentially erased, and the edge is not robust to removing its top 3 winning trades). Final alpha status is RESIDUAL_MOMENTUM_V1_REJECTED. No PAPER deployment is being considered, so a SIP/IEX parity/shadow comparison is not a live next step for this candidate version.",
+  "next_requirement_if_a_future_version_is_attempted": "Any future residual-momentum variant that reaches VALIDATION_PASS would still need an independent SIP-vs-IEX signal parity check near the 11:00 decision, the 0.75%-equivalent threshold boundary, and the entry/stop/exit reference prices before any PAPER integration -- this requirement is unchanged from Task71's finding, simply not actionable yet."
+}

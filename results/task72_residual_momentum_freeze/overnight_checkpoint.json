@@ -1,7 +1,7 @@
 {
   "task": "72/73 overnight",
-  "stage": "HOLDOUT_LOCKED",
-  "timestamp_utc": "2026-08-26T00:40:00Z",
+  "stage": "VALIDATION_COMPLETE_FAIL_FINAL_SYNTHESIS_PENDING",
+  "timestamp_utc": "2026-08-26T01:15:00Z",
   "branch": "research/talonx-alpha-phenomenon-discovery",
   "head_sha": "727daaa00dbfe475362542f196100a4ffe2de42f",
 
@@ -10,15 +10,17 @@
 
   "holdout_audit_complete": true,
   "holdout_lock_complete": true,
-  "holdout_lock_commit": "PENDING_THIS_COMMIT",
+  "holdout_lock_commit": "4bb028c56b00d16b230422e6a7060822e6a84db9",
 
-  "validation_data_complete": false,
-  "validation_complete": false,
-  "validation_classification": null,
+  "validation_data_complete": true,
+  "validation_complete": true,
+  "validation_classification": "VALIDATION_FAIL",
+  "validation_dataset_hash": "766359eb6698",
+  "validation_failed_criteria": ["3_net_15bps_ok", "8_top3_removed_not_materially_negative", "15_costs_do_not_erase_edge"],
 
   "replication_data_complete": false,
   "replication_complete": false,
-  "replication_classification": null,
+  "replication_classification": "NOT_EXECUTED -- validation FAIL, replication is forbidden per the pre-registered protocol",
 
-  "next_action": "Holdout re-audit complete (2024 confirmed EXPOSED_DATA_ONLY except Task70's two consumed blocks; Task71's own development range separately excluded). Locked VALIDATION=2024-04-01..2024-05-31, REPLICATION=2024-10-21..2024-12-20 -- exactly the predeclared preferred ranges, no substitution needed. Zero outcomes inspected before this lock. NEXT: materialize (download) both ranges via scripts/download_historical_1m.py --provider alpaca for the 35-symbol universe + SPY, then run the frozen strategy against VALIDATION exactly once. If context resets: this lock is final and committed -- do NOT re-audit or re-select holdout ranges, proceed directly to data materialization using the ranges recorded in holdout_lock.json."
+  "next_action": "VALIDATION run exactly once (170 trades/35 symbols/24 days). Result: gross=0.1005%, net_10bps=0.0005% (essentially erased), net_15bps=-0.0495% (negative), PF_10bps=1.0018 (breakeven), symbol/day-cluster CIs both cross zero, top3-winner removal flips expectancy negative. Classification VALIDATION_FAIL (criteria 3, 8, 15 failed on substance -- a classify.py bug in criterion 12's stop-rate check was found and fixed, re-derived from the SAME already-computed metrics with no holdout re-touch; classification unchanged before/after). Per protocol: REPLICATION NOT RUN (forbidden after FAIL). FINAL ALPHA STATUS = RESIDUAL_MOMENTUM_V1_REJECTED. NEXT: write morning_handoff.md, commit TASK73_VALIDATION_RESULT, then TASK72_73_FINAL_SYNTHESIS (ledger update, one broader regression test pass), push, deliver final report. If context resets: do NOT rerun validation or attempt replication -- the result is final and this is purely a reporting/write-up step from here."
 }

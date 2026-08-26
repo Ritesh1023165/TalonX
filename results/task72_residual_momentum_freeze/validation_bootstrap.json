@@ -1,0 +1,26 @@
+{
+  "by_symbol": {
+    "point_estimate": 0.10050175466040438,
+    "ci_low": -0.02069444975336093,
+    "ci_high": 0.21647236253021176,
+    "n": 35,
+    "n_resamples": 5000,
+    "ci_level": 0.95,
+    "seed": 670067,
+    "method": "clustered_percentile_bootstrap",
+    "insufficient_n": false,
+    "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+  },
+  "by_day": {
+    "point_estimate": 0.10050175466040438,
+    "ci_low": -0.050772820885801824,
+    "ci_high": 0.25169882763885293,
+    "n": 24,
+    "n_resamples": 5000,
+    "ci_level": 0.95,
+    "seed": 670067,
+    "method": "clustered_percentile_bootstrap",
+    "insufficient_n": false,
+    "caveat": "Resamples whole groups (e.g. symbol or event-cluster) to respect within-group dependence."
+  }
+}

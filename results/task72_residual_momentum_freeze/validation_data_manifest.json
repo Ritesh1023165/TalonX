@@ -1,0 +1,264 @@
+{
+  "all_clean": true,
+  "data_dir": "data\\historical_1m\\task72_validation",
+  "dataset_hash_sha256": "766359eb6698",
+  "per_symbol": {
+    "AAPL": {
+      "first_timestamp": "2024-04-01 08:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:59:00+00:00",
+      "rows": 32750
+    },
+    "ADBE": {
+      "first_timestamp": "2024-04-01 11:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:56:00+00:00",
+      "rows": 17970
+    },
+    "ADI": {
+      "first_timestamp": "2024-04-01 11:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:53:00+00:00",
+      "rows": 17719
+    },
+    "AMAT": {
+      "first_timestamp": "2024-04-01 09:28:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 22:47:00+00:00",
+      "rows": 19148
+    },
+    "AMD": {
+      "first_timestamp": "2024-04-01 08:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:59:00+00:00",
+      "rows": 33681
+    },
+    "AMZN": {
+      "first_timestamp": "2024-04-01 08:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:59:00+00:00",
+      "rows": 31789
+    },
+    "AVGO": {
+      "first_timestamp": "2024-04-01 08:27:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:55:00+00:00",
+      "rows": 17734
+    },
+    "BKNG": {
+      "first_timestamp": "2024-04-01 13:30:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 21:04:00+00:00",
+      "rows": 6746
+    },
+    "CMCSA": {
+      "first_timestamp": "2024-04-01 11:05:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:56:00+00:00",
+      "rows": 18773
+    },
+    "COST": {
+      "first_timestamp": "2024-04-01 11:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:56:00+00:00",
+      "rows": 17359
+    },
+    "CSCO": {
+      "first_timestamp": "2024-04-01 09:55:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:59:00+00:00",
+      "rows": 20843
+    },
+    "GILD": {
+      "first_timestamp": "2024-04-01 08:12:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:34:00+00:00",
+      "rows": 18386
+    },
+    "GOOGL": {
+      "first_timestamp": "2024-04-01 08:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:55:00+00:00",
+      "rows": 27477
+    },
+    "HON": {
+      "first_timestamp": "2024-04-01 12:30:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:16:00+00:00",
+      "rows": 17513
+    },
+    "INTC": {
+      "first_timestamp": "2024-04-01 08:02:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:59:00+00:00",
+      "rows": 32065
+    },
+    "INTU": {
+      "first_timestamp": "2024-04-01 13:30:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 22:47:00+00:00",
+      "rows": 15863
+    },
+    "ISRG": {
+      "first_timestamp": "2024-04-01 13:30:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 21:04:00+00:00",
+      "rows": 16154
+    },
+    "KLAC": {
+      "first_timestamp": "2024-04-01 11:25:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 20:06:00+00:00",
+      "rows": 12928
+    },
+    "LRCX": {
+      "first_timestamp": "2024-04-01 13:29:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 21:04:00+00:00",
+      "rows": 14132
+    },
+    "MDLZ": {
+      "first_timestamp": "2024-04-01 13:29:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 20:46:00+00:00",
+      "rows": 17727
+    },
+    "META": {
+      "first_timestamp": "2024-04-01 08:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:59:00+00:00",
+      "rows": 26773
+    },
+    "MSFT": {
+      "first_timestamp": "2024-04-01 08:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:52:00+00:00",
+      "rows": 26500
+    },
+    "MU": {
+      "first_timestamp": "2024-04-01 08:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:59:00+00:00",
+      "rows": 27882
+    },
+    "NFLX": {
+      "first_timestamp": "2024-04-01 11:05:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:33:00+00:00",
+      "rows": 19871
+    },
+    "NVDA": {
+      "first_timestamp": "2024-04-01 08:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:59:00+00:00",
+      "rows": 36493
+    },
+    "PANW": {
+      "first_timestamp": "2024-04-01 08:01:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:59:00+00:00",
+      "rows": 19850
+    },
+    "PEP": {
+      "first_timestamp": "2024-04-01 11:39:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:08:00+00:00",
+      "rows": 18121
+    },
+    "PYPL": {
+      "first_timestamp": "2024-04-01 08:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:59:00+00:00",
+      "rows": 23246
+    },
+    "QCOM": {
+      "first_timestamp": "2024-04-01 08:05:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:59:00+00:00",
+      "rows": 20908
+    },
+    "REGN": {
+      "first_timestamp": "2024-04-01 13:30:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 21:04:00+00:00",
+      "rows": 10273
+    },
+    "SBUX": {
+      "first_timestamp": "2024-04-01 08:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:58:00+00:00",
+      "rows": 21985
+    },
+    "SPY": {
+      "first_timestamp": "2024-04-01 08:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:59:00+00:00",
+      "rows": 34406
+    },
+    "STX": {
+      "first_timestamp": "2024-04-01 09:43:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 20:03:00+00:00",
+      "rows": 17407
+    },
+    "TSLA": {
+      "first_timestamp": "2024-04-01 08:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:59:00+00:00",
+      "rows": 39333
+    },
+    "TXN": {
+      "first_timestamp": "2024-04-01 09:51:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 23:13:00+00:00",
+      "rows": 18425
+    },
+    "VRTX": {
+      "first_timestamp": "2024-04-01 12:00:00+00:00",
+      "has_critical_corruption": false,
+      "is_clean": true,
+      "last_timestamp": "2024-05-31 21:04:00+00:00",
+      "rows": 15370
+    }
+  },
+  "requested_end": "2024-05-31",
+  "requested_start": "2024-04-01",
+  "role": "validation",
+  "strategy_fingerprint_match": true,
+  "total_bars": 783600
+}

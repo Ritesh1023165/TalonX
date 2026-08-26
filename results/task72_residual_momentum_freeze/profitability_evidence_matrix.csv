@@ -1,0 +1,4 @@
+period,trades,symbols,days,gross_expectancy_pct,net_expectancy_10bps_pct,net_expectancy_15bps_pct,pf_10bps,win_rate,max_drawdown_pct,symbol_cluster_ci_low,symbol_cluster_ci_high,day_cluster_ci_low,day_cluster_ci_high,top3_winners_removed_expectancy_10bps_pct,top1_symbol_contribution,top1_day_contribution,stop_rate,classification
+DEVELOPMENT (Task71, threshold=0.75%, horizon=180m),217,35,26,0.230022,0.130022,0.030022,1.389523,,,0.106874,0.351872,-0.141813,0.551553,,0.081448,0.223551,,PRIMARY_CANDIDATE_READY_TO_FREEZE
+VALIDATION (2024-04-01..2024-05-31),170,35,24,0.100502,0.000502,-0.049498,1.001778,0.458824,-14.753267,-0.020694,0.216472,-0.050773,0.251699,-0.048632,0.118486,0.158071,0.0,VALIDATION_FAIL
+REPLICATION (not run -- validation FAIL, forbidden per protocol),,,,,,,,,,,,,,,,,NOT_EXECUTED

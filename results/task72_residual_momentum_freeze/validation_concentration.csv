@@ -1,0 +1,2 @@
+n_rows,n_positive_rows,total_positive_value,insufficient_n,n_symbols,top1_symbol,top1_symbol_share,top3_symbol_share,top3_symbols,n_days,best_day,best_day_share
+170,88,56.36546587502667,False,33,TSLA,0.11848605730042201,0.28076321317907327,"['TSLA', 'NVDA', 'PANW']",22,2024-05-15,0.158070694550453
