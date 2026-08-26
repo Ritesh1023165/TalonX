@@ -1,0 +1,89 @@
+{
+  "task": "74 Part 3/4 -- research design lock, declared BEFORE any new outcome is computed",
+  "declared_utc": "2026-08-26T02:15:00Z",
+  "development_data": {
+    "role": "DEVELOPMENT ONLY -- reuses the existing Task71 broadened pool, no new download",
+    "slices": [
+      {"label": "2026_q3_f6_era", "data_dir": "data/historical_1m/task67a_development", "start": "2026-05-15", "end": "2026-08-14"},
+      {"label": "2025_q1_orpb_era", "data_dir": "data/historical_1m/task71_development_2025q1", "start": "2025-02-03", "end": "2025-03-14"},
+      {"label": "2025_q3_fprc_era", "data_dir": "data/historical_1m/task71_development_2025q3", "start": "2025-06-02", "end": "2025-07-11"},
+      {"label": "2025_q4_task46_56_era", "data_dir": "data/historical_1m/task71_development_2025q4", "start": "2025-10-27", "end": "2025-12-05"}
+    ],
+    "universe": "canonical 35-symbol PIV universe + SPY",
+    "provider": "Alpaca SIP historical (research default, unchanged from Task70/71/72)",
+    "current_universe_backcast_bias": "Disclosed and unresolved, same as Task71 -- today's liquid universe applied retroactively; no historical constituent reconstruction attempted."
+  },
+  "families": [
+    {
+      "family_id": "FAMILY_A",
+      "name": "EXTREME_CROSS_SECTIONAL_DISLOCATION_REVERSAL",
+      "mechanism": "At a LATE decision time (14:00 ET, deliberately later than F6's opening-range fade and Task71's 11:00 residual-momentum decision), rank each universe symbol's open(09:30)->decision(14:00) return against the OTHER 34 symbols' same-day same-window returns (cross-sectional percentile rank, causal -- uses only same-day public price data already available to every market participant by 14:00, not future information). An EXTREME dislocation (top or bottom percentile) that has already begun to STALL (exhaustion confirmation: the last 30 minutes' return is smaller in magnitude, or opposite in sign, than the return accumulated before that) is hypothesized to partially mean-revert into the close. Differs materially from Task71 Family C (single-stock market-beta residual, 11:00 decision, no cross-sectional ranking, no exhaustion confirmation) and from F6 (opening-range fade, not a late-day cross-sectional-extremity reversal).",
+      "directions": ["SHORT_EXTREME_WINNER_REVERT_DOWN", "LONG_EXTREME_LOSER_REVERT_UP"],
+      "features": ["session_open_to_decision_return_pct", "cross_sectional_percentile_rank", "pre_decision_30m_return_pct", "exhaustion_flag"],
+      "decision_time_et": "14:00",
+      "threshold_bands": [
+        {"label": "tight", "upper_percentile": 0.90, "lower_percentile": 0.10},
+        {"label": "loose", "upper_percentile": 0.85, "lower_percentile": 0.15}
+      ],
+      "horizons_minutes": [30, 60, null],
+      "horizon_labels": ["30m", "60m", "EOD"]
+    },
+    {
+      "family_id": "FAMILY_B",
+      "name": "VOLATILITY_EXPANSION_BREAKOUT_CONTINUATION",
+      "mechanism": "At a MID-MORNING decision time (11:30 ET, deliberately avoiding the crowded open and distinct from Task71's 11:00 residual-momentum decision), compute today's partial-session (09:30->11:30) high-low range relative to a CAUSAL trailing 10-trading-day average FULL-day range (prior days only, current day excluded). A sufficiently large range_expansion_ratio COMBINED WITH a genuine break of the causal trailing 10-day high (for LONG) or low (for SHORT) is hypothesized to continue (not fade/revert) through the rest of the session, since volatility expansion + structural break together indicate a real supply/demand shift, not mere noise. Differs materially from Task71 Family A (AVWAP-distance flow-state, no volatility-expansion or trailing-high/low structural confirmation, 30-120m horizons from an 11:00 decision) and from Task71 Family D (looks for FAILED breaks/reclaims, the opposite mechanism -- this family requires the break to hold, not fail).",
+      "directions": ["LONG_BREAKOUT_UP", "SHORT_BREAKDOWN_DOWN"],
+      "features": ["partial_session_range", "trailing_10d_avg_daily_range", "range_expansion_ratio", "trailing_10d_high", "trailing_10d_low"],
+      "decision_time_et": "11:30",
+      "threshold_bands": [
+        {"label": "tight", "range_expansion_ratio_min": 0.8},
+        {"label": "loose", "range_expansion_ratio_min": 0.6}
+      ],
+      "horizons_minutes": [60, 120, null],
+      "horizon_labels": ["60m", "120m", "EOD"]
+    }
+  ],
+  "search_budget": {
+    "max_families": 3, "families_used": 2,
+    "max_directions_per_family": 2, "directions_used": 2,
+    "max_threshold_bands": 2, "threshold_bands_used": 2,
+    "max_horizons_per_family": 3, "horizons_used": 3,
+    "predeclared_cells": {"FAMILY_A": 12, "FAMILY_B": 12, "total": 24},
+    "budget_cap": 36,
+    "note": "24 <= 36; deliberately fewer than the cap, per the task's own preference for a smaller search than Task71's 72-cell grid."
+  },
+  "costs": {"levels_bps": [0, 5, 10, 15, 20], "primary_bps": 10},
+  "promotion_rule_economic_edge_first": {
+    "primary_promotion_target": "net_expectancy_10bps_pct >= +0.10% per trade",
+    "preferred": "net_expectancy_15bps_pct > 0",
+    "friction_absorption_ratio_min_at_primary_cell": 2.0,
+    "friction_absorption_ratio_definition": "gross_expectancy_pct / (10bps expressed as 0.10 percentage points)",
+    "explicit_prohibition": "Do not lower this bar after seeing results. Statistical significance (CI excludes zero) or PF>1 alone is NOT sufficient for promotion."
+  },
+  "robustness_requirements_for_nomination": [
+    "1. positive net expectancy @10bps",
+    "2. preferably positive @15bps",
+    "3. at least 3 adjacent/related parameter cells share the same sign",
+    "4. no isolated winner surrounded by negative neighbors",
+    "5. positive in at least 3 of the 4 distinct development regime slices",
+    "6. no single symbol >30% of positive economics",
+    "7. no single day >30% of positive economics",
+    "8. top-3-winner removal remains >=0 or only mildly negative",
+    "9. >=100 trades preferred",
+    "10. >=20 symbols",
+    "11. >=20 distinct trading days",
+    "12. symbol-cluster bootstrap not contradictory (ci_high >= 0)",
+    "13. day-cluster evidence not strongly negative",
+    "14. mechanism interpretable",
+    "15. implementation causal (see tests)",
+    "16. no heavy reliance on volume unless explicitly classified PROVIDER_SENSITIVE",
+    "17. parameter plateau (not an isolated peak)",
+    "18. no long/short pooling to hide one failing side -- every cell reported by direction separately"
+  ],
+  "family_classification_taxonomy": [
+    "REJECTED_NO_EDGE", "REJECTED_COST", "REJECTED_INSTABILITY", "REJECTED_CONCENTRATION",
+    "REJECTED_SAMPLE", "RESEARCH_LEAD", "PRIMARY_CANDIDATE_READY_TO_FREEZE"
+  ],
+  "candidate_cap": {"max_primary_candidates": 1, "max_research_leads": 1, "research_lead_requires": "meaningfully close to the promotion bar, not merely 'interesting'"},
+  "outcomes_computed_at_lock_time": false
+}
