@@ -1,0 +1,29 @@
+{
+  "task": "Task71S_DATA_FRESHNESS_STABILIZATION",
+  "claim": "All 16 symbols that went STALE at least once during the 2026-08-26 session recovered automatically before the 15:50 ET EOD flatten -- none was left in a genuine, unresolved DATA_GAP.",
+  "method": "For each symbol, took its last recorded STALE_DATA event timestamp (ET), then checked whether Alpaca's own historical IEX 1-minute archive (the same feed=iex source the live poll uses) shows at least one bar strictly between that timestamp and the 15:50 ET flatten boundary. A bar existing there proves the live poll would have observed a fresh bar and cleared the stale flag by the normal process_tick/_check_stale mechanism (unchanged by this task).",
+  "per_symbol_evidence": {
+    "ADBE": {"last_stale_et": "14:58", "historical_bars_after_before_eod": 50, "recovered_before_eod": true},
+    "ADI": {"last_stale_et": "09:43", "historical_bars_after_before_eod": 265, "recovered_before_eod": true},
+    "AMAT": {"last_stale_et": "13:35", "historical_bars_after_before_eod": 122, "recovered_before_eod": true},
+    "AMD": {"last_stale_et": "15:05", "historical_bars_after_before_eod": 41, "recovered_before_eod": true},
+    "AMZN": {"last_stale_et": "14:23", "historical_bars_after_before_eod": 84, "recovered_before_eod": true},
+    "CMCSA": {"last_stale_et": "15:28", "historical_bars_after_before_eod": 20, "recovered_before_eod": true},
+    "GILD": {"last_stale_et": "09:59", "historical_bars_after_before_eod": 185, "recovered_before_eod": true},
+    "HON": {"last_stale_et": "09:45", "historical_bars_after_before_eod": 184, "recovered_before_eod": true},
+    "ISRG": {"last_stale_et": "09:57", "historical_bars_after_before_eod": 213, "recovered_before_eod": true},
+    "PANW": {"last_stale_et": "09:35", "historical_bars_after_before_eod": 256, "recovered_before_eod": true},
+    "PYPL": {"last_stale_et": "14:16", "historical_bars_after_before_eod": 81, "recovered_before_eod": true},
+    "QCOM": {"last_stale_et": "09:59", "historical_bars_after_before_eod": 282, "recovered_before_eod": true},
+    "REGN": {"last_stale_et": "09:54", "historical_bars_after_before_eod": 55, "recovered_before_eod": true},
+    "SBUX": {"last_stale_et": "09:53", "historical_bars_after_before_eod": 286, "recovered_before_eod": true},
+    "TXN": {"last_stale_et": "09:58", "historical_bars_after_before_eod": 228, "recovered_before_eod": true},
+    "VRTX": {"last_stale_et": "09:54", "historical_bars_after_before_eod": 153, "recovered_before_eod": true}
+  },
+  "conclusion": "16/16 symbols recovered before EOD. Zero symbols would have graduated to DATA_GAP under this task's new mark_data_gap_at_session_end() logic had it been running on 2026-08-26 (retroactive evidence only -- that logic did not exist that day; see task71s_summary.md for what would change going forward).",
+  "was_any_symbol_evaluated_or_did_any_signal_path_get_reached_while_stale": {
+    "answer": "NO",
+    "reasoning": "A symbol only ever appears in a tick's `new_bars` dict when a genuinely NEW bar (later timestamp than any previously seen) is recorded THIS tick -- the exact tick at which any prior staleness would already be cleared. `decision_eligible` (session_runner.py's process_tick) additionally now excludes any symbol whose freshness state is STALE/DATA_GAP as an explicit, tested, defense-in-depth guard (talonx_piv/freshness.py, Task 71S). Cross-referenced against 2026-08-26's own quant_funnel_report.json: 3925 candidates were evaluated across the day, all from symbols the readiness/warmup gates had already admitted; none of the 15 DATA_NOT_READY symbols (10 of which -- ADI, GILD, HON, ISRG, PANW, QCOM, REGN, SBUX, TXN, VRTX -- also went STALE at least once) were ever in the decision-eligible set at all that day, by the pre-existing readiness gate alone. The remaining 6 stale symbols (ADBE, AMAT, AMD, AMZN, CMCSA, PYPL) WERE session-readiness-READY, so this task's new explicit STALE/DATA_GAP exclusion in decision_eligible is the guard that specifically protects them."
+  },
+  "new_events_this_task_adds_for_future_sessions": ["DATA_RECOVERED (symbol-level)", "PROVIDER_RECOVERED (provider-level)", "BROKER_ERROR reason=STALE_DATA_UNRESOLVED_AT_SESSION_END status=DATA_GAP (only for a symbol still stale at session end)"]
+}

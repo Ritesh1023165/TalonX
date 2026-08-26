@@ -36,6 +36,7 @@ from zoneinfo import ZoneInfo
 from .config import FEED_MODE_PARAM, PivConfig
 from .decision_engine import DecisionEngine
 from .events import EventBus, PivEvent
+from .freshness import DATA_GAP, HEALTHY, STALE, FreshnessTracker
 from .lifecycle import PaperLifecycle
 from .lifecycle_probe import close_piv_lifecycle_probe, run_piv_lifecycle_probe
 from .premarket_radar import PremarketRadarEngine, classify, is_premarket
@@ -97,20 +98,45 @@ class SessionRunner:
     _last_heartbeat_wall: datetime | None = field(default=None, init=False)
     _last_natural_signal_wall: datetime | None = field(default=None, init=False)
     _last_natural_signal_count_seen: int = field(default=0, init=False)
+    # Task 71S: symbol-freshness / provider-health state machine -- a
+    # parallel, redundant-by-design classification layer alongside
+    # _last_seen_wall/_stale_flagged above (neither of which is removed or
+    # changed in behavior); see freshness.py's own module docstring for the
+    # evidence basis and talonx_piv.gap_forensics for the separate,
+    # read-only post-hoc historical classifier.
+    _freshness: FreshnessTracker = field(default_factory=FreshnessTracker, init=False)
+    _last_fetch_ok: bool = field(default=True, init=False)
 
     @property
     def flatten_time(self) -> time:
         return _parse_hhmm(self.config.eod_flatten_et)
 
     def fetch_bars_latest(self) -> dict[str, Bar]:
+        """Unchanged external contract: always returns a dict (possibly
+        empty), never raises. Task 71S addition: `self._last_fetch_ok` is
+        set as an explicit, directly-observed side-channel signal (True iff
+        this call's own HTTP round-trip completed with status 200) --
+        process_tick feeds this into self._freshness.record_provider_fetch_result
+        so provider-level health is driven by this fact, never inferred
+        from how many symbols individually look stale (see freshness.py's
+        module docstring for why that inference is unsound here)."""
         feed = FEED_MODE_PARAM[self.config.feed_mode]
         headers = {"APCA-API-KEY-ID": self.config.key_id, "APCA-API-SECRET-KEY": self.config.secret_key}
-        response = self.transport.get(
-            f"{self.config.data_endpoint}/v2/stocks/bars/latest",
-            headers=headers, params={"symbols": ",".join(self.config.universe), "feed": feed}, timeout=15,
-        )
-        if response.status_code != 200:
+        try:
+            response = self.transport.get(
+                f"{self.config.data_endpoint}/v2/stocks/bars/latest",
+                headers=headers, params={"symbols": ",".join(self.config.universe), "feed": feed}, timeout=15,
+            )
+        except Exception:  # noqa: BLE001 -- classified as a provider-fetch failure below; the outer run()
+            # loop's own per-tick try/except (see b935588) remains the last-resort safety net for anything
+            # this local catch doesn't anticipate -- this one only exists so THIS tick's _check_stale/
+            # heartbeat/etc. still run using whatever data already exists, instead of skipping the whole tick.
+            self._last_fetch_ok = False
             return {}
+        if response.status_code != 200:
+            self._last_fetch_ok = False
+            return {}
+        self._last_fetch_ok = True
         bars = (response.json() or {}).get("bars") or {}
         result: dict[str, Bar] = {}
         for symbol, row in bars.items():
@@ -186,9 +212,15 @@ class SessionRunner:
             if last_seen is None:
                 continue
             gap = (now - last_seen).total_seconds()
-            if gap > self.config.stale_seconds and symbol not in self._stale_flagged:
-                self._stale_flagged.add(symbol)
-                self.events.emit(PivEvent.build("STALE_DATA", symbol=symbol, reason=f"no new bar for >{self.config.stale_seconds}s"))
+            if gap > self.config.stale_seconds:
+                # Task 71S: keep the parallel freshness classification in
+                # sync on every check (idempotent while still stale) --
+                # the EXISTING _stale_flagged dedup below remains the sole
+                # authority for whether an event is actually emitted.
+                self._freshness.observe_stale(symbol)
+                if symbol not in self._stale_flagged:
+                    self._stale_flagged.add(symbol)
+                    self.events.emit(PivEvent.build("STALE_DATA", symbol=symbol, reason=f"no new bar for >{self.config.stale_seconds}s"))
             elif gap <= self.config.stale_seconds:
                 self._stale_flagged.discard(symbol)
         if self.piv_info is not None:
@@ -197,6 +229,7 @@ class SessionRunner:
                 f"DEGRADED ({len(self._stale_flagged)} stale)" if self._stale_flagged
                 else "HEALTHY (PIV live feed active)"
             )
+            self.piv_info["provider_health"] = self._freshness.provider_state
 
     async def process_tick(self, now: datetime) -> None:
         session = now.astimezone(ET).date()
@@ -204,6 +237,10 @@ class SessionRunner:
             self._session, self._ready_symbols = session, None
             self._last_bar_ts.clear(); self._last_seen_wall.clear(); self._stale_flagged.clear(); self._last_bar.clear()
             self._probe_attempted = self._probe_position_open = False
+            # Task 71S: exact session/date scoping for freshness/provider
+            # state too -- no STALE/DATA_GAP/PROVIDER_UNAVAILABLE state
+            # ever survives an ET trading-date boundary.
+            self._freshness.reset_for_session(session)
             # Restore before anything else this session: restored entries land in
             # the validator's own _final/_observed state, so the existing
             # finalize-trigger below (now >= READY_AT and _ready_symbols is None)
@@ -212,6 +249,15 @@ class SessionRunner:
             self._restore_readiness(session)
 
         fetched = self.fetch_bars_latest()
+        # Task 71S: a directly-observed fact about THIS fetch call (not an
+        # inference from how many symbols are individually stale) -- see
+        # freshness.py's module docstring for why that inference is unsound.
+        provider_state, provider_transitioned = self._freshness.record_provider_fetch_result(self._last_fetch_ok)
+        if provider_transitioned:
+            if provider_state == HEALTHY:
+                self.events.emit(PivEvent.build("PROVIDER_RECOVERED", status="MARKET_DATA_FETCH_HEALTHY"))
+            else:
+                self.events.emit(PivEvent.build("BROKER_ERROR", reason="MARKET_DATA_FETCH_FAILED", status=provider_state))
         new_bars: dict[str, Bar] = {}
         for symbol in self.config.universe:
             bar = fetched.get(symbol)
@@ -224,6 +270,9 @@ class SessionRunner:
             self._last_seen_wall[symbol] = now
             self._last_bar[symbol] = bar
             new_bars[symbol] = bar
+            _, recovered = self._freshness.observe_fresh(symbol)
+            if recovered:
+                self.events.emit(PivEvent.build("DATA_RECOVERED", symbol=symbol, reason="new bar observed after a stale/gap episode"))
             local_time = bar.timestamp.astimezone(ET).time()
             if OPEN <= local_time < READY_AT:
                 self.validator.observe(symbol, session, bar.timestamp)
@@ -238,8 +287,15 @@ class SessionRunner:
             # complete) AND warmup-ready (scanner has enough causal history
             # to compute indicators / HTF trend) before it ever reaches the
             # decision engine -- two independent fail-closed gates, neither
-            # weakens the other.
+            # weakens the other. Task 71S: a THIRD explicit gate -- a
+            # symbol currently STALE/DATA_GAP is excluded even if it
+            # somehow appeared in decision_eligible (belt-and-suspenders;
+            # in practice a stale symbol never has a fresh entry in
+            # new_bars in the first place, since observe_fresh above would
+            # already have cleared its stale state the moment a new bar
+            # arrived -- see freshness.py).
             decision_eligible = self._ready_symbols & self.decision_engine.warmup_ready_symbols
+            decision_eligible = {s for s in decision_eligible if self._freshness.state_of(s) not in (STALE, DATA_GAP)}
             ready_bars = {s: b for s, b in new_bars.items() if s in decision_eligible}
             if ready_bars:
                 await self.decision_engine.on_bars(ready_bars)
@@ -324,6 +380,22 @@ class SessionRunner:
         path = self.config.state_dir / "quant_funnel_report.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(self.decision_engine.funnel_summary(), indent=2, sort_keys=True), encoding="utf-8")
+
+    def _write_freshness_report(self) -> None:
+        """Task 71S: any symbol still STALE (never recovered) at session
+        end graduates to DATA_GAP -- an explicitly unresolved gap, distinct
+        from an episode that recovered mid-session. Persisted so `eod` (a
+        separate process) and any post-hoc gap_forensics.py run can see the
+        final per-symbol/provider state for the day."""
+        import json
+        gapped = self._freshness.mark_data_gap_at_session_end()
+        for symbol in gapped:
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", symbol=symbol, reason="STALE_DATA_UNRESOLVED_AT_SESSION_END", status="DATA_GAP",
+            ))
+        path = self.config.state_dir / "freshness_report.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self._freshness.snapshot(), indent=2, sort_keys=True), encoding="utf-8")
 
     def fetch_snapshots(self) -> dict[str, dict]:
         """Alpaca /v2/stocks/snapshots -- gives prevDailyBar.c (previous
@@ -432,6 +504,7 @@ class SessionRunner:
             if self.decision_engine is not None:
                 self.decision_engine.flatten_all(self._last_bar)
                 self._write_funnel_report()
+            self._write_freshness_report()
         finally:
             if self.decision_engine is not None:
                 await self.decision_engine.stop()

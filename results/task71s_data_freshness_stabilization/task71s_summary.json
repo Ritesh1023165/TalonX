@@ -1,0 +1,89 @@
+{
+  "task": "Task71S_DATA_FRESHNESS_STABILIZATION",
+  "mode": "PAPER_NO_REAL_CAPITAL",
+  "no_order_submitted": true,
+  "no_live_piv_session_started": true,
+  "phase_a_task70s_integration_audit": {
+    "verdict": "NOT_BLOCKED",
+    "diff_range": "636fa9c..54ae8ff",
+    "readiness_computation_block_unchanged": true,
+    "on_bars_unchanged": true,
+    "talonx_quant_files_in_diff": 0,
+    "35_of_35_causal_reverified": true
+  },
+  "phase_b_forensics": {
+    "stale_events_total": 72,
+    "stale_events_classified": 72,
+    "stale_events_confirmed_no_iex_trade": 72,
+    "stale_events_other_classification": 0,
+    "unique_stale_symbols": 16,
+    "missing_opening_minutes_total": 121,
+    "missing_opening_minutes_classified": 121,
+    "missing_opening_minutes_confirmed_no_iex_trade": 121,
+    "missing_opening_minutes_other_classification": 0,
+    "not_ready_symbols": 15,
+    "regn_conclusion": "CONFIRMED_NO_IEX_TRADE -- legitimate IEX print sparsity (70/390 regular-session minutes present all day historically), not an ingestion defect",
+    "isolated_broker_error": {
+      "reason": "PREMARKET_RADAR_FETCH_FAILED_ConnectTimeout",
+      "endpoint": "/v2/stocks/snapshots (premarket radar only, separate from the decision-path poll)",
+      "impact_on_decision_path": "none",
+      "count": 1
+    },
+    "provider_wide_interruption_found": false,
+    "architectural_correction": "live feed is a per-symbol-batched REST poll (fetch_bars_latest, 60s interval), not a WebSocket subscription -- 'missed WebSocket bar'/'broken subscription' as literal sockets do not apply to this codebase"
+  },
+  "phase_c_implementation": {
+    "files_added": ["talonx_piv/freshness.py", "talonx_piv/gap_forensics.py"],
+    "files_modified": ["talonx_piv/session_runner.py", "talonx_piv/events.py"],
+    "files_explicitly_not_touched": [
+      "talonx_quant/strategy.py", "talonx_quant/indicators.py",
+      "talonx_quant/consumer.py", "talonx_quant/config.py"
+    ],
+    "new_event_types": ["DATA_RECOVERED", "PROVIDER_RECOVERED"],
+    "existing_behavior_preserved": {
+      "stale_data_dedup": true,
+      "feed_health_string_contract": true,
+      "readiness_gate": true,
+      "threshold_value_120s": true
+    },
+    "new_symbol_states": ["FRESH", "STALE", "RECOVERED", "DATA_GAP", "UNKNOWN"],
+    "new_provider_states": ["HEALTHY", "DEGRADED", "PROVIDER_UNAVAILABLE"],
+    "threshold_changed": false,
+    "threshold_change_justification": "evidence does not support a different value for premarket/regular/postmarket -- see threshold_analysis.md"
+  },
+  "test_results": {
+    "new_suite": {"file": "tests/test_task71s_data_freshness_stabilization.py", "passed": 29, "failed": 0},
+    "directly_related_suites_reverified": {
+      "files": [
+        "tests/test_task65_session_runner.py", "tests/test_task65b_warmup.py",
+        "tests/test_task65_piv.py", "tests/test_task64_piv.py",
+        "tests/test_task69p_telegram_piv_parity.py", "tests/test_task69q_evidence_upgrade.py",
+        "tests/test_telegram_ping_safety.py", "tests/test_task69q_alpaca_historical_warmup.py",
+        "tests/test_task70s_alpaca_warmup_stabilization.py", "tests/test_task66b_prep_preflight.py"
+      ],
+      "passed": 180, "failed": 0
+    },
+    "full_repo_regression": {
+      "passed": 2119, "failed": 1, "skipped": 1, "xfailed": 15,
+      "vs_task70s_baseline_passed": 2090,
+      "delta_explained_by": "this task's own 29 new tests (2119 - 2090 = 29)",
+      "failure": "tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset -- identical to the Task 70S baseline failure; this task's diff never touches talonx_backtest/talonx_quant/the sample dataset",
+      "collection_errors_ignored": ["tests/test_task61_validation_protocol.py", "tests/test_task61r_temporal_freeze.py"],
+      "collection_errors_reason": "ModuleNotFoundError: exchange_calendars -- pre-existing missing environment dependency, unrelated to this task"
+    }
+  },
+  "acceptance_criteria_self_assessment": {
+    "task70s_integration_audited_first": true,
+    "all_72_stale_events_accounted_for": true,
+    "every_missing_minute_classified_or_unknown": true,
+    "symbol_inactivity_and_provider_failure_represented_separately": true,
+    "no_stale_incomplete_symbol_can_publish_signal": true,
+    "recovery_explicit_deterministic_tested": true,
+    "no_bar_fabricated_or_silently_filled": true,
+    "no_alpha_or_execution_behaviour_changes": true,
+    "no_broker_mutation_occurs": true,
+    "new_and_directly_related_tests_pass": true,
+    "full_suite_compared_honestly_with_baseline": true,
+    "remaining_uncertainty_fail_closed": true
+  }
+}
