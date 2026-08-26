@@ -1,0 +1,43 @@
+{
+  "task": "74B Part 11 -- primary candidate nomination (draft, NOT frozen, NOT validated)",
+  "name": "CROSS_SECTIONAL_EXTREME_WINNER_SHORT_REVERSION",
+  "state": "PRIMARY_CANDIDATE_READY_TO_FREEZE",
+  "family": "FAMILY_B_MULTIDAY_CROSS_SECTIONAL_MOMENTUM_OR_REVERSAL",
+  "hypothesis": "REVERSAL",
+  "direction": "SHORT_ONLY",
+  "mechanism": "On a completed session (Day0 close), compute each universe symbol's market-adjusted 3-trading-day cumulative displacement: (stock's 3-day cumulative return) minus (SPY's 3-day cumulative return over the same window), using only information complete as of Day0 close. Rank cross-sectionally among universe symbols with a valid value that day. When a symbol's rank is in the TOP 20% (loose band) or TOP 10% (tight band) -- an extreme past outperformer -- enter SHORT at the next trading day's (Day1) OPEN, hypothesizing multi-day mean reversion. Exit at the close of a fixed trading-day horizon (2, 3, or 5 trading days after entry, inclusive of the entry day).",
+  "recommended_anchor_cell": {"threshold_band": "loose", "horizon_label": "3D",
+    "reason": "The only cell where BOTH symbol-cluster and day-cluster bootstrap CIs exclude zero; a corroborating parameter plateau exists across all 6 (band x horizon) cells sharing the same sign."},
+  "decision_point": "Day0 close (after the session is complete) -- no intraday timing dependency",
+  "entry_semantics": "Day1 (next trading day) OPEN, SHORT",
+  "exit_semantics": "Fixed trading-day horizon close (2D/3D/5D tested; 3D recommended as the anchor). No intraday exit optimization.",
+  "stop_status": "STOP_UNRESOLVED -- fixed-horizon-only discovery per instruction. MAE/MFE recorded (results/task74_alpha_discovery_v2/risk_diagnostics.csv): median MAE ~2.3-3.4x a 1%-of-entry-price risk unit, median MFE ~2.7-3.7x, across the top cells -- a future task should freeze a stop from this DEVELOPMENT-only diagnostic, not from validation outcomes.",
+  "cost_assumptions": {"primary_bps": 10, "diagnostic_levels_bps": [0, 5, 10, 15, 20]},
+  "evidence_summary": {
+    "anchor_cell_loose_3D": {
+      "n_trades": 1000, "n_symbols": 35, "n_days": 125,
+      "gross_expectancy_pct": 0.607037, "net_expectancy_10bps_pct": 0.507037, "net_expectancy_15bps_pct": 0.457037,
+      "net_expectancy_20bps_pct": 0.407037, "profit_factor_10bps": 1.304572, "win_rate": 0.507,
+      "friction_absorption_ratio_10bps": 6.070373,
+      "symbol_cluster_ci": [0.068478, 1.270970], "day_cluster_ci": [0.034016, 1.201483],
+      "top1_symbol_share": 0.123332, "top3_symbol_share": 0.283326, "top1_day_share": 0.049399
+    },
+    "parameter_plateau": "All 6 cells (loose/tight x 2D/3D/5D) share the same positive sign.",
+    "regime_stability": "3 of 4 development regimes positive (2025_q1_orpb_era, 2025_q4_task46_56_era, 2026_q3_f6_era); 2025_q3_fprc_era negative -- disclosed.",
+    "time_segment_stability": "MIDDLE and LATE strongly positive; EARLY slightly negative (-0.04%).",
+    "outlier_robustness": "Remains positive after removing the best 5 trades (+0.129%) and the best 3 days (+0.223%) -- never flips negative, unlike the rejected residual-momentum candidate.",
+    "concentration": "No single symbol or day dominates (top1 symbol 12.3%, top1 day 4.9%, both well under the 30% cap)."
+  },
+  "known_weaknesses": [
+    "The mirror LONG side (extreme past LOSERS reverting up) is materially weaker and does NOT corroborate a symmetric long/short strategy -- this is a SHORT-ONLY finding, disclosed not hidden.",
+    "One of 4 development regimes (2025 Q3, FPRC era) shows a negative gross expectancy.",
+    "The EARLY time segment is slightly negative -- the edge strengthens in the MIDDLE/LATE segments.",
+    "No stop is frozen yet (STOP_UNRESOLVED); multi-day holding carries overnight-gap risk not yet quantified into an execution rule.",
+    "SIP-vs-IEX daily close/open parity near the rank-threshold boundaries has not been independently verified (see provider_portability.json).",
+    "3-day, cross-sectional, market-adjusted displacement rank is a NEW mechanism relative to any prior TalonX strategy -- no live-trading precedent exists for this specific signal family yet."
+  ],
+  "provider_portability": "PROVIDER_PORTABLE_WITH_CAVEAT -- price-only (daily open/close), no volume dependency, but SIP-vs-IEX parity at the rank-threshold boundary is unverified.",
+  "horizon_product_mapping": "MULTI_DAY -- this is NOT an intraday signal and must not be relabeled as one.",
+  "runtime_integration_status": "NOT integrated, NOT frozen, NOT validated by Task74B. Runtime worktree untouched.",
+  "next_task_requirement": "Freeze exact parameters (recommend loose/3D as the anchor, or a disciplined pre-committed choice among the 6 plateau cells), freeze a stop/risk rule from DEVELOPMENT diagnostics only, pre-register a validation protocol emphasizing day-cluster evidence (this candidate's main disclosed weakness pattern, same class of concern as the rejected residual-momentum candidate), then lock a genuinely untouched holdout and run validation exactly once before any replication."
+}

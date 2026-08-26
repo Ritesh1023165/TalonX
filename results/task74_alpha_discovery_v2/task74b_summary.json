@@ -1,0 +1,47 @@
+{
+  "task": "74B",
+  "purpose": "Superseding alpha discovery: catalyst/extreme-activity setups, multi-day holding horizons, higher-volatility-universe feasibility -- economic-edge-first, holdout-preserving",
+  "research_branch": "research/talonx-alpha-phenomenon-discovery",
+  "previous_task74_design_commit": "406910e7bab4724fe80fa75f0c2cd7db86fb7515",
+  "superseding_lock_commit": "72dcfaaa6494b18c63cee65432763c1f6b5e1884",
+  "outcomes_computed_under_old_design": false,
+  "runtime_branch": "research/talonx-strategy-validation",
+  "runtime_modified_by_this_task": false,
+  "real_capital_introduced": false,
+  "development_data": {
+    "slices": 4, "total_bars": 3109895, "symbols": 35, "all_clean": true,
+    "regimes": ["2025 Q1 (ORPB era)", "2025 Q3 (FPRC era)", "2025 Q4 (Task46-56 era)", "2026 summer (F6 era)"],
+    "spy_source_note": "The 2026-summer slice's SPY data was merged in from data/historical_1m/task67a_benchmarks/SPY.csv (already-existing, already-downloaded repo data for the exact same date range) rather than the slice's own directory, which never had SPY.csv -- documented, zero new download."
+  },
+  "search_budget": {"predeclared_cells": 20, "cells_reported_by_direction_breakdown": 40,
+    "note": "20 (hypothesis x threshold x horizon) combinations were predeclared; each is reported split by actual LONG/SHORT bet direction (40 rows in cell_results.csv) per the no-long/short-pooling robustness rule -- this is a transparency breakdown, not additional hypotheses tested."},
+  "family_results": {
+    "FAMILY_A_CATALYST_CONTINUATION": "REJECTED_COST -- larger loose-band sample net-negative after 10bps; tight-band's small positive too thin (n=25) to corroborate",
+    "FAMILY_A_CATALYST_REVERSAL": "REJECTED_SAMPLE -- attractive point estimates but n=25-48, both cluster CIs cross zero at every cell, 3-8 trades per regime",
+    "FAMILY_B_MULTIDAY_MOMENTUM": "REJECTED_NO_EDGE -- negative in all 12 cells",
+    "FAMILY_B_MULTIDAY_REVERSAL_LONG": "REJECTED_INSTABILITY -- sign flips at 2D, no cluster CI ever excludes zero",
+    "FAMILY_B_MULTIDAY_REVERSAL_SHORT": "PRIMARY_CANDIDATE_READY_TO_FREEZE",
+    "FAMILY_C_UNIVERSE_EXPANSION": "UNIVERSE_EXPANSION_DEFERRED -- no defensible point-in-time universe data source exists"
+  },
+  "primary_candidate": {
+    "name": "CROSS_SECTIONAL_EXTREME_WINNER_SHORT_REVERSION",
+    "state": "PRIMARY_CANDIDATE_READY_TO_FREEZE",
+    "direction": "SHORT_ONLY",
+    "horizon_product_mapping": "MULTI_DAY",
+    "anchor_cell": {"threshold_band": "loose", "horizon_label": "3D", "n_trades": 1000, "n_symbols": 35, "n_days": 125,
+      "gross_expectancy_pct": 0.607037, "net_expectancy_10bps_pct": 0.507037, "net_expectancy_15bps_pct": 0.457037,
+      "profit_factor_10bps": 1.304572, "friction_absorption_ratio_10bps": 6.070373,
+      "symbol_cluster_ci": [0.068478, 1.270970], "day_cluster_ci": [0.034016, 1.201483]},
+    "all_6_cells_same_sign": true,
+    "regime_stability": "3 of 4 positive", "time_segment_stability": "2 of 3 positive (EARLY weak)",
+    "outlier_robust": "positive after removing best5 trades (+0.129%) and best3 days (+0.223%) -- never flips negative"
+  },
+  "research_lead_recorded": false,
+  "holdout_budget": {
+    "reserved_validation": ["2024-06-01", "2024-09-02"], "reserved_replication": ["2024-10-21", "2024-12-20"],
+    "clean_2024_outcomes_inspected_this_task": false, "reserved_data_touched_this_task": false
+  },
+  "tests_run": ["tests/test_task74_holdout_guard.py", "tests/test_task74b_family_a.py", "tests/test_task74b_family_b.py", "tests/test_task74b_search_budget.py"],
+  "focused_tests_result": "20 passed, 0 failed",
+  "broader_regression": "202 passed, 0 failed (tests/test_task67a_*, test_task68_*, test_task71_*, test_task72_*, test_task74_*, test_task74b_*)"
+}

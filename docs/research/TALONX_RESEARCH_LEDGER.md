@@ -6302,3 +6302,48 @@ rejected and is not revisited. Real capital: NO. Runtime worktree
 > `results/task72_residual_momentum_freeze/morning_handoff.md` for the full write-up and next-task
 > recommendation (a fresh pre-registered discovery pass on unconsumed clean-2024 territory, not a tuned
 > re-test of this candidate).
+
+## Task 74/74B -- Superseding Alpha Discovery: Catalyst + Multi-Day (2026-08-26)
+
+> **RESULT: ONE new candidate nominated -- CROSS_SECTIONAL_EXTREME_WINNER_SHORT_REVERSION,
+> PRIMARY_CANDIDATE_READY_TO_FREEZE.** Task74's original design (2-family, cross-sectional-
+> dislocation-reversal + volatility-expansion-breakout, locked at `406910e`) was superseded
+> BEFORE any outcome was computed under it -- confirmed by a read-only audit (the only execution
+> attempt failed at import time before any data loading). Superseded transparently
+> (`72dcfaa`, TASK74B_SUPERSEDING_RESEARCH_DESIGN_LOCK) in response to external methodological
+> review motivated by RESIDUAL_MOMENTUM_V1's validation failure (net@10bps collapsed to
+> +0.0005%, essentially erased by cost).
+>
+> **HOLDOUT**: re-confirmed 2024-06-01..2024-09-02 (reserved validation) and 2024-10-21..2024-12-20
+> (reserved replication, carried forward from Task72/73's never-executed replication lock) remain
+> untouched; zero clean/reserved outcomes read this task.
+>
+> **NEW DESIGN (20 predeclared cells, reported as 40 direction-split rows)**: FAMILY_A
+> CATALYST_EXTREME_ACTIVITY (10:00 ET gap+RVOL trigger, CONTINUATION/REVERSAL hypotheses,
+> RVOL marked PROVIDER_SENSITIVE) and FAMILY_B MULTIDAY_CROSS_SECTIONAL (Day0-close
+> market-adjusted 3-day cross-sectional rank, Day1-open entry, 2/3/5-trading-day fixed exits,
+> MOMENTUM/REVERSAL hypotheses). FAMILY_C (higher-volatility universe expansion) was
+> feasibility-only and classified `UNIVERSE_EXPANSION_DEFERRED` -- no point-in-time
+> constituent/liquidity data source exists in this repo to avoid compounding survivorship bias.
+>
+> **RESULTS**: Family A REJECTED on both hypotheses (CONTINUATION: REJECTED_COST;
+> REVERSAL: REJECTED_SAMPLE -- attractive point estimates but n=25-48 with both cluster CIs
+> crossing zero at every cell). Family B's MOMENTUM hypothesis REJECTED_NO_EDGE (negative in
+> all 12 cells) and REVERSAL's LONG side REJECTED_INSTABILITY (sign flips at 2D, no cluster CI
+> ever excludes zero). Family B's **REVERSAL/SHORT side is the winner**: all 6 cells (2 bands x
+> 3 horizons) share the same positive sign; anchor cell (loose band, 3-day horizon) shows 1000
+> trades/35 symbols/125 days, gross +0.607%, net@10bps **+0.507%**, net@15bps +0.457%, PF 1.305,
+> friction absorption 6.07x -- the ONLY cell where BOTH symbol-cluster [0.068,1.271] and
+> day-cluster [0.034,1.201] bootstrap CIs exclude zero. Survives removing the 5 best trades
+> (+0.129%) and best 3 days (+0.223%) without flipping negative -- unlike the rejected
+> residual-momentum candidate, which DID flip negative under the identical test. 3 of 4
+> development regimes positive; disclosed weaknesses: SHORT-only (LONG mirror is weak/unstable),
+> one negative regime (2025 Q3 FPRC era), a weak EARLY time segment, `STOP_UNRESOLVED`, and
+> unverified SIP-vs-IEX daily-price parity at the rank-threshold boundary.
+>
+> **HORIZON MAPPING**: MULTI_DAY (not intraday). **TESTS**: 20 new focused + 202-test broader
+> regression (Task67A/68/71/72/74/74B lineage), all pass. Real capital: NO. Runtime worktree
+> (`research/talonx-strategy-validation`) touched: NO. See
+> `results/task74_alpha_discovery_v2/claude_handoff_next.md` for the full next-task handoff
+> (freeze parameters, design a DEVELOPMENT-only stop, pre-register validation, lock the reserved
+> holdout -- do not re-run the discovery grid or chase the rejected directions).

@@ -1,0 +1,68 @@
+{
+  "task": "74B Part 10/11/15 -- candidate ranking against the locked promotion bar and 18-item robustness checklist",
+  "promotion_bar": {"net_10bps_min_pct": 0.15, "net_15bps_preferred_min_pct": 0.10, "friction_absorption_min": 2.5},
+  "rankings": [
+    {
+      "family": "FAMILY_B_MULTIDAY", "hypothesis": "REVERSAL", "direction": "SHORT",
+      "classification": "PRIMARY_CANDIDATE_READY_TO_FREEZE",
+      "best_cells": [
+        {"threshold_band": "loose", "horizon_label": "3D", "n_trades": 1000, "n_symbols": 35, "n_days": 125,
+         "gross_expectancy_pct": 0.607037, "net_10bps_pct": 0.507037, "net_15bps_pct": 0.457037, "net_20bps_pct": 0.407037,
+         "pf_10bps": 1.304572, "friction_absorption_10bps": 6.070373,
+         "symbol_cluster_ci": [0.068478, 1.270970], "day_cluster_ci": [0.034016, 1.201483],
+         "note": "Recommended anchor cell -- the ONLY cell where BOTH cluster bootstraps exclude zero."},
+        {"threshold_band": "tight", "horizon_label": "3D", "n_trades": 500, "n_symbols": 35, "n_days": 125,
+         "gross_expectancy_pct": 0.679297, "net_10bps_pct": 0.579297, "pf_10bps": 1.338190,
+         "symbol_cluster_ci": [0.060122, 1.422448], "day_cluster_ci": [-0.026042, 1.421299],
+         "note": "Corroborating neighbor -- same sign, similar magnitude, day-cluster CI barely crosses zero."},
+        {"threshold_band": "loose", "horizon_label": "5D", "n_trades": 936, "n_symbols": 35, "n_days": 117,
+         "gross_expectancy_pct": 0.806029, "net_10bps_pct": 0.706029, "pf_10bps": 1.304603,
+         "symbol_cluster_ci": [0.043007, 1.850884], "day_cluster_ci": [-0.071935, 1.735066],
+         "note": "Largest raw edge of any cell -- but day-cluster CI crosses zero here, so 3D is preferred as the anchor."},
+        {"threshold_band": "tight", "horizon_label": "5D", "n_trades": 468, "n_symbols": 35, "n_days": 117,
+         "gross_expectancy_pct": 0.745137, "net_10bps_pct": 0.645137, "pf_10bps": 1.262178,
+         "symbol_cluster_ci": [-0.160555, 1.908469], "day_cluster_ci": [-0.313464, 1.908005],
+         "note": "Same sign, weaker cluster support (both CIs cross zero at this cell)."},
+        {"threshold_band": "tight", "horizon_label": "2D", "n_trades": 516, "n_symbols": 35, "n_days": 129,
+         "gross_expectancy_pct": 0.256182, "net_10bps_pct": 0.156182, "pf_10bps": 1.104703, "note": "Weakest of the 6, still positive."},
+        {"threshold_band": "loose", "horizon_label": "2D", "n_trades": 1032, "n_symbols": 35, "n_days": 129,
+         "gross_expectancy_pct": 0.181955, "net_10bps_pct": 0.081955, "pf_10bps": 1.055846,
+         "note": "Below the 0.15% net@10bps bar on its own, but same sign -- part of the plateau, not an outlier."}
+      ],
+      "parameter_plateau": "6/6 cells (2 bands x 3 horizons) share the SAME positive sign -- a genuine plateau, not an isolated peak.",
+      "regime_stability": "3 of 4 development regimes positive (2025_q1_orpb_era +0.553%, 2025_q4_task46_56_era +0.607%, 2026_q3_f6_era +0.911%); 2025_q3_fprc_era is NEGATIVE (-0.692%) -- disclosed, not hidden. Meets the >=3-of-4 bar exactly.",
+      "time_segment_stability": "EARLY segment slightly negative (-0.041%); MIDDLE (+0.791%) and LATE (+0.778%) strongly positive -- 2 of 3 segments positive.",
+      "concentration": "top1_symbol_share=0.123, top3_symbol_share=0.283 (both well under the 30% cap); top1_day_share=0.049 (well under 30%).",
+      "outlier_robustness": "Removing the 5 best trades still leaves net@10bps at +0.129% (positive). Removing the best 3 days still leaves +0.223% (positive). Never flips negative -- materially more robust than Task71/72's rejected residual-momentum candidate, which flipped negative under the same test.",
+      "asymmetry_disclosed": "The REVERSAL hypothesis's LONG mirror (extreme past LOSERS, bet to revert up) is materially weaker: sign flips at the 2D horizon, and NEITHER cluster bootstrap excludes zero at any of its 6 cells. This is a SHORT-ONLY finding, not a symmetric long/short strategy -- reported honestly, not pooled to hide the failing LONG side."
+    },
+    {
+      "family": "FAMILY_B_MULTIDAY", "hypothesis": "REVERSAL", "direction": "LONG",
+      "classification": "REJECTED_INSTABILITY",
+      "reason": "Sign flips at the 2D horizon (loose: -0.201%, tight: -0.125%) before turning positive at 3D/5D; neither symbol- nor day-cluster bootstrap excludes zero at ANY of its 6 cells despite 351-903 trades per cell -- statistically indistinguishable from noise despite decent sample size."
+    },
+    {
+      "family": "FAMILY_B_MULTIDAY", "hypothesis": "MOMENTUM", "direction": "BOTH",
+      "classification": "REJECTED_NO_EDGE",
+      "reason": "Uniformly negative across all 12 cells (both bands, all 3 horizons, both LONG and SHORT sub-legs) -- a clean, unambiguous rejection, the mechanical mirror-image of the REVERSAL finding."
+    },
+    {
+      "family": "FAMILY_A_CATALYST", "hypothesis": "CONTINUATION", "direction": "BOTH",
+      "classification": "REJECTED_COST",
+      "reason": "The larger, more reliable loose-band cells (63 trades/30 symbols/44 days) show gross expectancy near zero and NEGATIVE net expectancy after 10bps cost (-0.025% to -0.052%). The tight-band cells show a small positive net (+0.017% to +0.170%) but on only 25 trades/17 symbols/19-23 days -- too thin to independently corroborate, not treated as a separate finding."
+    },
+    {
+      "family": "FAMILY_A_CATALYST", "hypothesis": "REVERSAL", "direction": "BOTH",
+      "classification": "REJECTED_SAMPLE",
+      "reason": "Attractive point estimates (net@10bps +0.148% to +0.552%) but n=25-48 trades per cell, and BOTH symbol- and day-cluster bootstrap CIs cross zero at EVERY one of the 4 cells. Per-regime trade counts are 3-8 -- far too thin to assess regime stability meaningfully. This is exactly the small-sample pattern the program's own forensic history (Task71's failure_forensics.md) warns against rewarding."
+    },
+    {
+      "family": "FAMILY_C_UNIVERSE_EXPANSION", "hypothesis": "N/A", "direction": "N/A",
+      "classification": "UNIVERSE_EXPANSION_DEFERRED",
+      "reason": "Feasibility-only; no defensible point-in-time universe/liquidity data source exists in this repo (see universe_expansion_feasibility.json). Zero outcome cells."
+    }
+  ],
+  "primary_candidate_recorded": true,
+  "research_lead_recorded": false,
+  "research_lead_reason": "No remaining direction is meaningfully close to promotion once sample-size and cluster-CI evidence is weighed honestly -- recording Family A's REVERSAL point estimate as a lead would repeat the exact small-sample-overfitting failure mode this program's own forensic audit (Task71) diagnosed."
+}
