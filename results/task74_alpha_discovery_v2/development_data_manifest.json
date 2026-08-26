@@ -1,0 +1,40 @@
+{
+  "role": "DEVELOPMENT (reused unchanged from Task71)",
+  "slices": {
+    "2026_q3_f6_era": {
+      "data_dir": "data\\historical_1m\\task67a_development",
+      "start": "2026-05-15",
+      "end": "2026-08-14",
+      "dataset_hash_sha256": "b8787cb099be",
+      "total_bars": 1433278,
+      "all_clean": true
+    },
+    "2025_q1_orpb_era": {
+      "data_dir": "data\\historical_1m\\task71_development_2025q1",
+      "start": "2025-02-03",
+      "end": "2025-03-14",
+      "dataset_hash_sha256": "efeccf93e369",
+      "total_bars": 561876,
+      "all_clean": true
+    },
+    "2025_q3_fprc_era": {
+      "data_dir": "data\\historical_1m\\task71_development_2025q3",
+      "start": "2025-06-02",
+      "end": "2025-07-11",
+      "dataset_hash_sha256": "a51b01dc7844",
+      "total_bars": 516199,
+      "all_clean": true
+    },
+    "2025_q4_task46_56_era": {
+      "data_dir": "data\\historical_1m\\task71_development_2025q4",
+      "start": "2025-10-27",
+      "end": "2025-12-05",
+      "dataset_hash_sha256": "e2a34c50a60e",
+      "total_bars": 598542,
+      "all_clean": true
+    }
+  },
+  "total_bars_all_slices": 3109895,
+  "all_slices_clean": true,
+  "universe_symbols": 35
+}

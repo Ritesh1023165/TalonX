@@ -1,0 +1,21 @@
+{
+  "task": "74B -- provider portability classification (mechanism-based, independent of outcome)",
+  "research_provider": "Alpaca SIP historical",
+  "live_provider": "Alpaca IEX",
+  "families": {
+    "FAMILY_A_CATALYST": {
+      "classification": "PROVIDER_SENSITIVE",
+      "reason": "The RVOL feature (relative activity vs. a causal trailing-10-day average of the same time-of-day volume window) is volume-based. SIP (research) consolidates volume across all reporting venues; IEX (live) reflects only IEX's own venue volume -- these are NOT the same quantity, and no SIP-to-IEX volume normalization has been performed or validated anywhere in this research lineage. The gap_pct sub-feature alone is price-only and portable, but Task74B did NOT grid a price-only-only variant (budget discipline) -- recorded as a deferred idea for a future task, not silently substituted here.",
+      "live_portability_conclusion": "Do NOT claim live portability for the combined gap+RVOL trigger as gridded. A live IEX-only RVOL proxy would need independent construction and validation, not a threshold rescale."
+    },
+    "FAMILY_B_MULTIDAY_MULTIDAY": {
+      "classification": "PROVIDER_PORTABLE_WITH_CAVEAT",
+      "reason": "The core signal (multi-day market-adjusted cross-sectional displacement/rank) is built entirely from daily CLOSE and OPEN prices -- no volume dependency. Price series between SIP and IEX are much more likely to agree closely (both track the same underlying trades, just different consolidation), though exact tick-level agreement at rank-threshold boundaries near the 10-90th/20-80th percentile cutoffs has not been independently verified.",
+      "live_portability_conclusion": "Plausible in principle; SIP-vs-IEX daily close/open parity near threshold boundaries would need a dedicated verification step before any PAPER integration, matching the same caveat already recorded for Task71's rejected residual-momentum candidate."
+    },
+    "FAMILY_C_UNIVERSE_EXPANSION": {
+      "classification": "NOT_APPLICABLE",
+      "reason": "Feasibility-only, no strategy signal was gridded (UNIVERSE_EXPANSION_DEFERRED)."
+    }
+  }
+}
