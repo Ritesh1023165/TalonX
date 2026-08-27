@@ -7,10 +7,11 @@
   "stages": {
     "stage0_baseline_and_plan": "COMPLETE",
     "stage1_runtime_safety": "COMPLETE",
-    "stage2_alerts": "IN_PROGRESS",
-    "stage3_shadow": "IN_PROGRESS",
-    "stage4_observability": "NOT_STARTED"
+    "stage2_alerts": "COMPLETE",
+    "stage3_shadow": "COMPLETE",
+    "stage4_observability": "IN_PROGRESS"
   },
+  "note_on_commit_structure": "notification_outbox.py and shadow_ledger.py (the CODE for Stages 2/3) were implemented and wired into decision_engine.py together with Stage 1's decision-contract wiring in the same commit (3a7e404), because DecisionEngine's three-independent-branch design (see implementation_plan.md's flow diagram) is one cohesive change -- splitting it into three artificially-staged commits would have required temporarily wiring in throwaway no-op stand-ins and re-editing working, already-tested code purely for commit granularity. This is disclosed, not hidden. Stage 2 and Stage 3's own commits below carry each stage's DISTINCT evidence/documentation artifacts plus additional integration-level tests specific to that stage's requirements (alert delivery contract proof, shadow simulation policy proof) that were not yet written at Stage 1's commit time.",
   "stage1_summary": {
     "decision_contract_wired": true,
     "partial_fill_accounting_fixed": true,
