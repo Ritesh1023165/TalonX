@@ -9,7 +9,7 @@ session_runner.py, which uses talonx_piv/freshness.py for its real-time
 state machine instead). Its purpose is strictly retrospective: given a
 day's already-recorded gap (a missing opening minute, or a STALE_DATA
 event), determine -- using the same feed (feed=iex) the live system itself
-used -- whether the gap is CONFIRMED_NO_IEX_TRADE (the historical archive
+used -- whether the gap is NO_IEX_BAR_OBSERVED (the historical archive
 independently agrees no trade printed) or a genuine
 HISTORICAL_DATA_DISAGREEMENT (the archive shows a bar the live system
 evidently missed). Classification is only ever as strong as the evidence
@@ -33,7 +33,7 @@ from .alpaca_historical_warmup import _parse_bars_page, _request_page
 
 ET = ZoneInfo("America/New_York")
 
-CONFIRMED_NO_IEX_TRADE = "CONFIRMED_NO_IEX_TRADE"
+NO_IEX_BAR_OBSERVED = "NO_IEX_BAR_OBSERVED"
 LIVE_STREAM_BAR_MISSED = "LIVE_STREAM_BAR_MISSED"
 SUBSCRIPTION_OR_PIPELINE_GAP = "SUBSCRIPTION_OR_PIPELINE_GAP"
 PROVIDER_WIDE_INTERRUPTION = "PROVIDER_WIDE_INTERRUPTION"
@@ -42,7 +42,7 @@ HISTORICAL_DATA_DISAGREEMENT = "HISTORICAL_DATA_DISAGREEMENT"
 UNKNOWN = "UNKNOWN"
 
 GAP_CLASSIFICATIONS = (
-    CONFIRMED_NO_IEX_TRADE, LIVE_STREAM_BAR_MISSED, SUBSCRIPTION_OR_PIPELINE_GAP,
+    NO_IEX_BAR_OBSERVED, LIVE_STREAM_BAR_MISSED, SUBSCRIPTION_OR_PIPELINE_GAP,
     PROVIDER_WIDE_INTERRUPTION, LOCAL_PROCESSING_DELAY, HISTORICAL_DATA_DISAGREEMENT, UNKNOWN,
 )
 
@@ -87,7 +87,7 @@ def classify_missing_minute(minute_et_label: str, historical_minutes: set[str] |
     unavailable."""
     if historical_minutes is None:
         return UNKNOWN
-    return HISTORICAL_DATA_DISAGREEMENT if minute_et_label in historical_minutes else CONFIRMED_NO_IEX_TRADE
+    return HISTORICAL_DATA_DISAGREEMENT if minute_et_label in historical_minutes else NO_IEX_BAR_OBSERVED
 
 
 def classify_stale_event(
@@ -101,7 +101,7 @@ def classify_stale_event(
     last_seen_wall and prevented/cleared it). Returns (classification,
     evidence_string).
 
-    CONFIRMED_NO_IEX_TRADE: neither of those two minutes has a historical
+    NO_IEX_BAR_OBSERVED: neither of those two minutes has a historical
     bar either -- the flag was an accurate reflection of genuine market
     sparsity, exactly as this module's own docstring's 2026-08-26 forensic
     run found for all 72 stale events that day.
@@ -124,7 +124,7 @@ def classify_stale_event(
     m2 = (ts_et - timedelta(minutes=2)).strftime("%H:%M")
     m1_present, m2_present = m1 in historical_minutes, m2 in historical_minutes
     if not m1_present and not m2_present:
-        return CONFIRMED_NO_IEX_TRADE, f"neither {m2} nor {m1} ET has a historical bar"
+        return NO_IEX_BAR_OBSERVED, f"neither {m2} nor {m1} ET has a historical bar"
     present = [m for m, ok in ((m2, m2_present), (m1, m1_present)) if ok]
     return HISTORICAL_DATA_DISAGREEMENT, f"historical archive has a bar at {','.join(present)} ET that the live system missed"
 

@@ -205,9 +205,20 @@ class SessionRunner:
                 self.piv_info["warmup_ready_count"] = len(self.decision_engine.warmup_ready_symbols)
 
     def _check_stale(self, now: datetime) -> None:
+        # Task 71S-R1: deliberately checks EVERY universe symbol that has
+        # ever been observed this session -- NOT gated on _ready_symbols
+        # membership. Before this fix, a symbol excluded from the decision
+        # path at 10:00 ET finalization (e.g. REGN on 2026-08-26) silently
+        # stopped being monitored for the rest of the day too (this
+        # function used to `continue` past it): REGN alone had ~40
+        # regular-session gaps >120s that day per
+        # iex_coverage_by_symbol.csv, of which only 5 (the ones before
+        # 10:00 ET) were ever observed or reported. Decision-ELIGIBILITY
+        # remains gated exactly as before (see process_tick's
+        # decision_eligible, unchanged) -- only OBSERVATIONAL monitoring is
+        # widened here, per this task's "continue observational monitoring
+        # even when decision evaluation is unavailable" requirement.
         for symbol in self.config.universe:
-            if self._ready_symbols is not None and symbol not in self._ready_symbols:
-                continue
             last_seen = self._last_seen_wall.get(symbol)
             if last_seen is None:
                 continue
@@ -221,8 +232,27 @@ class SessionRunner:
                 if symbol not in self._stale_flagged:
                     self._stale_flagged.add(symbol)
                     self.events.emit(PivEvent.build("STALE_DATA", symbol=symbol, reason=f"no new bar for >{self.config.stale_seconds}s"))
+                    # Task 71S-R1: the DECISION-RELEVANT framing, in the
+                    # established readiness vocabulary -- distinct from the
+                    # raw feed-observability STALE_DATA event above. Symbol
+                    # embedded in `reason` so EventBus's dedup key (which
+                    # does not include `symbol`) cannot suppress a second
+                    # symbol's identical transition at the Telegram layer.
+                    self.events.emit(PivEvent.build(
+                        "DATA_NOT_READY", symbol=symbol,
+                        reason=f"INSUFFICIENT_RECENT_IEX_PRINTS:{symbol}",
+                        status="EXCLUDED_FROM_DECISION_PATH",
+                    ))
             elif gap <= self.config.stale_seconds:
                 self._stale_flagged.discard(symbol)
+                if gap > 0:
+                    # gap == 0 means a fresh bar arrived THIS tick --
+                    # already counted via observe_fresh; only a genuinely
+                    # quiet tick (ordinary IEX sparsity, not yet stale) is
+                    # counted here. Never emits anything (see
+                    # observe_quiet_tick's own docstring) -- purely a
+                    # rolling coverage counter.
+                    self._freshness.observe_quiet_tick(symbol)
         if self.piv_info is not None:
             self.piv_info["stale_count"] = len(self._stale_flagged)
             self.piv_info["feed_health"] = (
@@ -386,16 +416,33 @@ class SessionRunner:
         end graduates to DATA_GAP -- an explicitly unresolved gap, distinct
         from an episode that recovered mid-session. Persisted so `eod` (a
         separate process) and any post-hoc gap_forensics.py run can see the
-        final per-symbol/provider state for the day."""
+        final per-symbol/provider state for the day.
+
+        Task 71S-R1: the report is stamped with session_id/trading_date_et/
+        runtime_sha/config_hash, read back from session_identity.json --
+        the same file/pattern cli.py's own `eod` command already uses to
+        scope ITS report to the exact live session (this runner's own
+        in-memory identity isn't directly available to it; reading the
+        file it was already written to at `start` is the established,
+        reused mechanism, not a new one)."""
         import json
         gapped = self._freshness.mark_data_gap_at_session_end()
         for symbol in gapped:
             self.events.emit(PivEvent.build(
                 "BROKER_ERROR", symbol=symbol, reason="STALE_DATA_UNRESOLVED_AT_SESSION_END", status="DATA_GAP",
             ))
+        identity = {"session_id": None, "trading_date_et": None, "runtime_sha": None, "config_hash": None}
+        identity_path = self.config.state_dir / "session_identity.json"
+        if identity_path.exists():
+            try:
+                saved = json.loads(identity_path.read_text(encoding="utf-8"))
+                identity.update({k: saved.get(k) for k in identity})
+            except (OSError, json.JSONDecodeError):
+                pass  # best-effort stamping only -- never blocks writing the report itself
+        report = {**identity, **self._freshness.snapshot()}
         path = self.config.state_dir / "freshness_report.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self._freshness.snapshot(), indent=2, sort_keys=True), encoding="utf-8")
+        path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
 
     def fetch_snapshots(self) -> dict[str, dict]:
         """Alpaca /v2/stocks/snapshots -- gives prevDailyBar.c (previous

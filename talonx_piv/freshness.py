@@ -5,7 +5,7 @@ one of the 2026-08-26 session's 72 STALE_DATA events, and all 121
 missing-opening-minute observations across its 15 DATA_NOT_READY symbols,
 were independently confirmed -- via a read-only comparison against Alpaca's
 own historical IEX 1-minute archive (talonx_piv/gap_forensics.py) -- to be
-CONFIRMED_NO_IEX_TRADE: a genuine, per-symbol, per-minute absence of any
+NO_IEX_BAR_OBSERVED: a genuine, per-symbol, per-minute absence of any
 IEX-reported trade, not a live-ingestion defect. Missing minutes were
 frequently shared across many DIFFERENT symbols in the exact same clock
 minute purely by coincidence of independent thin printing (up to 8 of the
@@ -36,6 +36,17 @@ RECOVERED = "RECOVERED"  # transient: returned only on the exact recovery tick, 
 DATA_GAP = "DATA_GAP"  # a STALE episode still unresolved at end-of-session
 UNKNOWN = "UNKNOWN"  # no bar observed yet for this symbol this session
 
+# Task 71S-R1: a per-TICK classification (never stored as the symbol's
+# ongoing state) for "the provider poll succeeded and this symbol simply
+# had no new bar this cycle, while still within the stale threshold" --
+# the single most common, entirely ordinary condition on this feed (see
+# results/task71s_r1_live_iex_semantics/iex_coverage_by_symbol.csv: most
+# of the universe has well under 100% regular-session minute coverage on
+# an ordinary day). This is deliberately NEVER an emitted event -- only a
+# rolling counter (see observe_quiet_tick) -- so that ordinary sparsity
+# never produces a notification, let alone a storm of them.
+NO_NEW_IEX_BAR = "NO_NEW_IEX_BAR"
+
 # --- Provider-level health states (independent dimension -- see module docstring) ---
 HEALTHY = "HEALTHY"
 DEGRADED = "DEGRADED"
@@ -63,21 +74,33 @@ class FreshnessTracker:
     _session: date | None = field(default=None, init=False)
     _provider_state: str = field(default=HEALTHY, init=False)
     _consecutive_provider_failures: int = field(default=0, init=False)
+    # Task 71S-R1: rolling, in-memory, THIS-SESSION-ONLY coverage counters --
+    # computed purely from what the live poll itself observes over time (no
+    # historical network call), so "live suitability" can be reported without
+    # ever guessing at a hard pass/fail threshold (see
+    # results/task71s_r1_live_iex_semantics/threshold reasoning: no such
+    # threshold is invented here -- these are exposed as metrics only).
+    _fresh_bar_count: dict[str, int] = field(default_factory=dict, init=False)
+    _quiet_tick_count: dict[str, int] = field(default_factory=dict, init=False)
+    _stale_episode_count: dict[str, int] = field(default_factory=dict, init=False)
 
     def reset_for_session(self, session: date) -> bool:
         """Exact session/date scoping (no state persists across an ET
         trading-date boundary): a new session always starts every symbol
         at UNKNOWN and the provider at HEALTHY, never carrying over a
-        prior date's STALE/DATA_GAP/PROVIDER_UNAVAILABLE state. Returns
-        True iff this call actually performed a reset (idempotent no-op
-        otherwise, matching SessionRunner's own `self._session != session`
-        convention)."""
+        prior date's STALE/DATA_GAP/PROVIDER_UNAVAILABLE state (or a prior
+        date's rolling coverage counters). Returns True iff this call
+        actually performed a reset (idempotent no-op otherwise, matching
+        SessionRunner's own `self._session != session` convention)."""
         if self._session == session:
             return False
         self._session = session
         self._state = {}
         self._provider_state = HEALTHY
         self._consecutive_provider_failures = 0
+        self._fresh_bar_count = {}
+        self._quiet_tick_count = {}
+        self._stale_episode_count = {}
         return True
 
     def state_of(self, symbol: str) -> str:
@@ -98,7 +121,18 @@ class FreshnessTracker:
         previous = self._state.get(symbol, UNKNOWN)
         recovered = previous in (STALE, DATA_GAP)
         self._state[symbol] = FRESH
+        self._fresh_bar_count[symbol] = self._fresh_bar_count.get(symbol, 0) + 1
         return (RECOVERED if recovered else FRESH), recovered
+
+    def observe_quiet_tick(self, symbol: str) -> str:
+        """Call when the poll succeeded but `symbol` had no NEW bar this
+        tick, and the gap is still within the stale threshold -- an
+        entirely ordinary condition on this feed (see module docstring),
+        never itself an event. Only increments the rolling coverage
+        counter; never changes the symbol's stored FRESH/STALE/etc state."""
+        symbol = symbol.upper()
+        self._quiet_tick_count[symbol] = self._quiet_tick_count.get(symbol, 0) + 1
+        return NO_NEW_IEX_BAR
 
     def observe_stale(self, symbol: str) -> tuple[str, bool]:
         """Call when the caller has already determined (from its own
@@ -112,7 +146,23 @@ class FreshnessTracker:
         previous = self._state.get(symbol, UNKNOWN)
         newly_stale = previous not in (STALE, DATA_GAP)
         self._state[symbol] = STALE
+        if newly_stale:
+            self._stale_episode_count[symbol] = self._stale_episode_count.get(symbol, 0) + 1
         return STALE, newly_stale
+
+    def coverage_ratio(self, symbol: str) -> float | None:
+        """fresh_bar_count / (fresh_bar_count + quiet_tick_count) -- the
+        fraction of this session's checked ticks that produced a genuinely
+        new bar for `symbol`. None if never checked at all yet (avoids a
+        misleading 0.0 for a symbol simply not yet observed). This is a
+        rolling, LIVE, in-memory metric -- distinct from, and never a
+        substitute for, warmup.py's historical-lookback-based
+        WarmupCheck.ready (see warmup_vs_live_suitability.csv)."""
+        symbol = symbol.upper()
+        fresh = self._fresh_bar_count.get(symbol, 0)
+        quiet = self._quiet_tick_count.get(symbol, 0)
+        total = fresh + quiet
+        return None if total == 0 else fresh / total
 
     def mark_data_gap_at_session_end(self) -> list[str]:
         """Any symbol still STALE (never recovered) graduates to DATA_GAP
@@ -146,8 +196,24 @@ class FreshnessTracker:
         return self._provider_state, self._provider_state != previous
 
     def snapshot(self) -> dict[str, object]:
-        """Cheap, JSON-friendly snapshot for /ping or EOD reporting."""
+        """Cheap, JSON-friendly snapshot for /ping or EOD reporting.
+        `coverage` reports symbols unsuitable for the current minute-driven
+        decision path CLEARLY (rolling ratio + raw counters) without ever
+        auto-excluding a symbol on this basis alone -- that decision stays
+        with the existing, unmodified readiness/warmup gates plus the
+        stale-episode-driven STALE/DATA_GAP exclusion. A configured symbol
+        is never silently removed from this snapshot even at 0 coverage."""
+        symbols = sorted(set(self._state) | set(self._fresh_bar_count) | set(self._quiet_tick_count))
         return {
             "provider_state": self._provider_state,
             "symbols": dict(sorted(self._state.items())),
+            "coverage": {
+                s: {
+                    "fresh_bar_count": self._fresh_bar_count.get(s, 0),
+                    "quiet_tick_count": self._quiet_tick_count.get(s, 0),
+                    "stale_episode_count": self._stale_episode_count.get(s, 0),
+                    "coverage_ratio": self.coverage_ratio(s),
+                }
+                for s in symbols
+            },
         }

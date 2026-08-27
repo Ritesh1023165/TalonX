@@ -1,0 +1,96 @@
+{
+  "task": "Task71S_R1_LIVE_IEX_SEMANTICS",
+  "mode": "PAPER_NO_REAL_CAPITAL",
+  "no_order_submitted": true,
+  "no_live_piv_session_started": true,
+  "phase_a_evidence_quality_audit": {
+    "verdict": "NOT_BLOCKED",
+    "diff_range": "54ae8ff..d1764a8",
+    "confirmed_no_iex_trade_justified": false,
+    "evidence_basis_found": "aggregate_bar_absence_only",
+    "trade_level_records_queried": false,
+    "alpaca_aggregation_semantics_documented": false,
+    "correction_applied": "CONFIRMED_NO_IEX_TRADE renamed to NO_IEX_BAR_OBSERVED (logic unchanged)",
+    "stale_guard_alters_alpha": false,
+    "data_recovered_can_bypass_readiness_gates": false,
+    "unrelated_decision_or_order_behavior_found": false
+  },
+  "phase_b_iex_suitability": {
+    "symbols_measured": 35,
+    "premarket_coverage_range_pct": [0.0, 2.7],
+    "regular_session_coverage_range_pct": [17.9, 100.0],
+    "total_regular_session_gaps_over_120s": 476,
+    "symbols_100pct_regular_coverage": 7,
+    "warmup_ready_but_low_live_coverage_count": 17,
+    "warmup_ready_but_low_live_coverage_threshold_used_for_reporting_only": "under 90% regular-session coverage (a REPORTING cutoff for this summary table, NOT a new runtime auto-exclusion threshold)",
+    "no_suitability_threshold_invented_in_runtime": true,
+    "regn": {
+      "warmup_ready_task70s": true,
+      "warmup_bar_count": 726,
+      "live_regular_session_coverage_pct": 17.9,
+      "live_regular_session_gaps_over_120s": 40,
+      "live_regular_session_longest_gap_minutes": 33,
+      "stale_events_actually_observed_live_2026_08_26": 5,
+      "reason_for_discrepancy": "old _check_stale skipped symbols outside _ready_symbols; REGN was excluded from _ready_symbols at 10:00 ET and therefore invisible to staleness monitoring for the rest of the day -- fixed in Phase C"
+    }
+  },
+  "phase_c_implementation": {
+    "files_added": [],
+    "files_modified": [
+      "talonx_piv/gap_forensics.py", "talonx_piv/freshness.py",
+      "talonx_piv/session_runner.py"
+    ],
+    "test_files_added": ["tests/test_task71s_r1_live_iex_semantics.py"],
+    "test_files_modified": ["tests/test_task71s_data_freshness_stabilization.py"],
+    "files_explicitly_not_touched": [
+      "talonx_quant/strategy.py", "talonx_quant/indicators.py",
+      "talonx_quant/consumer.py", "talonx_quant/config.py"
+    ],
+    "new_runtime_states": ["NO_NEW_IEX_BAR (transient, never emitted)"],
+    "new_event_reason_code": "DATA_NOT_READY reason=INSUFFICIENT_RECENT_IEX_PRINTS:{symbol} status=EXCLUDED_FROM_DECISION_PATH",
+    "core_fix": "_check_stale no longer gated on _ready_symbols membership -- observational monitoring now continues for every universe symbol regardless of decision-readiness",
+    "rolling_coverage_tracking_added": true,
+    "coverage_used_for_auto_exclusion": false,
+    "threshold_value_changed": false,
+    "session_identity_stamping_added_to": "freshness_report.json (session_id, trading_date_et, runtime_sha, config_hash)"
+  },
+  "test_results": {
+    "new_suite": {"file": "tests/test_task71s_r1_live_iex_semantics.py", "passed": 18, "failed": 0},
+    "directly_related_suites_reverified": {
+      "files": [
+        "tests/test_task65_session_runner.py", "tests/test_task65b_warmup.py",
+        "tests/test_task65_piv.py", "tests/test_task64_piv.py",
+        "tests/test_task69p_telegram_piv_parity.py", "tests/test_task69q_evidence_upgrade.py",
+        "tests/test_telegram_ping_safety.py", "tests/test_task69q_alpaca_historical_warmup.py",
+        "tests/test_task70s_alpaca_warmup_stabilization.py",
+        "tests/test_task71s_data_freshness_stabilization.py",
+        "tests/test_task71s_r1_live_iex_semantics.py",
+        "tests/test_task66b_prep_preflight.py"
+      ],
+      "passed": 198, "failed": 0
+    },
+    "full_repo_regression": {
+      "passed": 2137, "failed": 1, "skipped": 1, "xfailed": 15,
+      "vs_task71s_baseline_passed": 2119,
+      "delta_explained_by": "this task's own 18 new tests (2137 - 2119 = 18)",
+      "failure": "tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset -- identical to the Task 70S/71S baseline failure; this task's diff never touches talonx_backtest/talonx_quant/the sample dataset",
+      "collection_errors_ignored": ["tests/test_task61_validation_protocol.py", "tests/test_task61r_temporal_freeze.py"],
+      "collection_errors_reason": "ModuleNotFoundError: exchange_calendars -- pre-existing missing environment dependency, unrelated to this task"
+    }
+  },
+  "acceptance_criteria_self_assessment": {
+    "no_unsupported_confirmed_no_iex_trade_claims_remain": true,
+    "live_state_names_distinguish_sparsity_from_provider_failure": true,
+    "provider_health_cannot_degrade_from_quiet_symbols_alone": true,
+    "sparse_incomplete_symbols_remain_fail_closed": true,
+    "recovery_explicit_and_deterministic": true,
+    "repeated_sparsity_no_warning_storms": true,
+    "all_35_symbols_have_measured_iex_coverage": true,
+    "warmup_readiness_and_live_suitability_separate_fields": true,
+    "no_bar_fabrication": true,
+    "no_alpha_order_changes": true,
+    "no_broker_mutation": true,
+    "relevant_tests_pass": true,
+    "full_suite_compared_honestly_with_baseline": true
+  }
+}

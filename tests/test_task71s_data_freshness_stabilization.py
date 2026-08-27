@@ -31,7 +31,7 @@ from talonx_piv.freshness import (
     FreshnessTracker,
 )
 from talonx_piv.gap_forensics import (
-    CONFIRMED_NO_IEX_TRADE,
+    NO_IEX_BAR_OBSERVED,
     HISTORICAL_DATA_DISAGREEMENT,
     PROVIDER_WIDE_INTERRUPTION,
     SUBSCRIPTION_OR_PIPELINE_GAP,
@@ -214,7 +214,7 @@ def test_confirmed_no_trade_distinct_from_historical_disagreement():
     # neither of the two most-recent minutes has a historical bar -> confirmed
     hist = {"09:30", "09:37"}
     classification, _ = classify_stale_event("2026-08-26T13:33:00+00:00", hist)  # 09:33 ET
-    assert classification == CONFIRMED_NO_IEX_TRADE
+    assert classification == NO_IEX_BAR_OBSERVED
 
     # 09:32 ET (one minute before) DOES have a bar -> the live flag disagreed with history
     hist2 = {"09:30", "09:32"}
@@ -224,7 +224,7 @@ def test_confirmed_no_trade_distinct_from_historical_disagreement():
 
 
 def test_missing_minute_classification_confirmed_vs_disagreement():
-    assert classify_missing_minute("09:30", {"09:31", "09:32"}) == CONFIRMED_NO_IEX_TRADE
+    assert classify_missing_minute("09:30", {"09:31", "09:32"}) == NO_IEX_BAR_OBSERVED
     assert classify_missing_minute("09:30", {"09:30", "09:31"}) == HISTORICAL_DATA_DISAGREEMENT
 
 
@@ -272,14 +272,14 @@ def test_single_symbol_disagreement_is_pipeline_gap_not_provider_wide():
 def test_real_2026_08_26_evidence_all_72_confirmed_no_trade():
     """Regression-locks this task's own forensic finding: replaying the
     exact classification methodology against the two most-recent minutes
-    of a genuinely sparse historical set reproduces CONFIRMED_NO_IEX_TRADE,
+    of a genuinely sparse historical set reproduces NO_IEX_BAR_OBSERVED,
     matching every one of the 72 real events analyzed for
     results/task71s_data_freshness_stabilization/stale_event_timeline.csv."""
     # REGN's own historical minute set around its first 2026-08-26 stale
     # event (09:32:10 ET) -- REGN's actual first print that day was 09:37.
     hist = {"09:37", "09:38"}
     classification, _ = classify_stale_event("2026-08-26T13:32:10.971281+00:00", hist)
-    assert classification == CONFIRMED_NO_IEX_TRADE
+    assert classification == NO_IEX_BAR_OBSERVED
 
 
 # =======================================================================
