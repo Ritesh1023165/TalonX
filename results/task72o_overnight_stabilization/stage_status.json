@@ -1,0 +1,10 @@
+{
+  "stage": "STAGE_0",
+  "status": "PASS",
+  "starting_sha": "3fa0c51",
+  "ending_sha": "3fa0c51",
+  "tests": {"targeted_passed": 95, "targeted_failed": 0, "full_suite": "not re-run this stage, baseline recorded from Task71S-R1: 2137 passed / 1 failed / 1 skipped / 15 xfailed"},
+  "artifacts": ["stage0_task71s_r1_audit.md"],
+  "blockers": [],
+  "next_stage": "STAGE_1"
+}

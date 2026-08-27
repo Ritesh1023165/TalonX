@@ -127,28 +127,46 @@ def main(argv: list[str] | None = None) -> int:
             print("KILL_SWITCH")
             return 0
         if args.command == "eod":
-            result = lifecycle.eod_flatten()
-            result["feed_mode"] = config.feed_mode
-            (config.state_dir / "latest_reconciliation.json").write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
-            # Task 69Q Part 2/3: read back the live session's OWN identity/
-            # funnel counters (this `eod` invocation is a separate process
-            # from `start`'s in-memory state) so the report is scoped to
-            # that exact session/date rather than the whole append-only log.
-            session_id, trading_date_et = None, identity.trading_date_et
+            # Task 72O Stage 1: manual `eod` recovery MUST identify the
+            # live session it is reconciling -- it must never mint a
+            # second, unrelated session_id for EOD events (the exact
+            # 2026-08-26 bug this stage fixes). Refuses, with zero broker
+            # calls, if no live session identity is known.
             identity_path = config.state_dir / "session_identity.json"
-            if identity_path.exists():
-                saved = json.loads(identity_path.read_text(encoding="utf-8"))
-                session_id = saved.get("session_id")
-                trading_date_et = saved.get("trading_date_et") or trading_date_et
+            if not identity_path.exists():
+                bus.emit(PivEvent.build("BROKER_ERROR", reason="EOD_REQUIRES_KNOWN_LIVE_SESSION_IDENTITY", status="PIV_BLOCKED"))
+                print("PIV_BLOCKED: no session_identity.json -- cannot identify the live session to reconcile", file=sys.stderr)
+                return 2
+            saved = json.loads(identity_path.read_text(encoding="utf-8"))
+            live_session_id = saved.get("session_id")
+            trading_date_et = saved.get("trading_date_et") or identity.trading_date_et
+            runtime_sha = saved.get("runtime_sha") or identity.runtime_sha
+            config_hash = saved.get("config_hash") or identity.config_hash
+            if not live_session_id:
+                bus.emit(PivEvent.build("BROKER_ERROR", reason="EOD_REQUIRES_KNOWN_LIVE_SESSION_IDENTITY", status="PIV_BLOCKED"))
+                print("PIV_BLOCKED: session_identity.json is missing session_id", file=sys.stderr)
+                return 2
+
+            from .eod_lifecycle import run_eod_lifecycle
+            outcome = run_eod_lifecycle(
+                config, bus, lifecycle, live_session_id=live_session_id, trading_date_et=trading_date_et,
+                runtime_sha=runtime_sha, config_hash=config_hash, trigger_reason="MANUAL_CLI_INVOCATION",
+            )
+            result = dict(outcome.get("reconciliation") or {})
+            result["feed_mode"] = config.feed_mode
+            result["eod_status"] = outcome["status"]
+            result["live_session_id"] = outcome["session_id"]
+            result["reconciliation_run_id"] = outcome["reconciliation_run_id"]
+            (config.state_dir / "latest_reconciliation.json").write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
             funnel_path = config.state_dir / "quant_funnel_report.json"
             quant_funnel = json.loads(funnel_path.read_text(encoding="utf-8")) if funnel_path.exists() else None
             report = build_session_report(
                 bus.path, result, config.feed_mode,
-                trading_date_et=trading_date_et, session_id=session_id, quant_funnel=quant_funnel,
+                trading_date_et=trading_date_et, session_id=live_session_id, quant_funnel=quant_funnel,
             )
             (config.state_dir / "latest_session_report.json").write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
             print(json.dumps(result, sort_keys=True))
-            return 0 if result["matched"] and not result["broker_open_orders"] and not result["broker_positions"] else 2
+            return outcome["exit_code"]
     except (PaperGuardError, OSError, RuntimeError) as exc:
         bus.emit(PivEvent.build("BROKER_ERROR", reason=str(exc), status="PIV_BLOCKED"))
         print("PIV_BLOCKED", file=sys.stderr)

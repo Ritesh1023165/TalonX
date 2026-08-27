@@ -31,6 +31,12 @@ EVENT_TYPES = (
     # premarket_radar_contract.json. None of these ever drives an order.
     "PREMARKET_WATCH", "PREMARKET_WATCH_CLEARED", "STATUS_HEARTBEAT",
     "EOD_SUMMARY",
+    # Task 72O Stage 1 -- ordered, idempotent EOD reconciliation lifecycle
+    # (see talonx_piv/eod_lifecycle.py). SESSION_COMPLETED is emitted only
+    # after EOD_RECONCILIATION_PASSED; never on FAILED/INCONCLUSIVE.
+    "EOD_STARTED", "EOD_CANCEL_REQUESTED", "EOD_FLATTEN_REQUESTED",
+    "EOD_RECONCILIATION_STARTED", "EOD_RECONCILIATION_PASSED",
+    "EOD_RECONCILIATION_FAILED", "SESSION_COMPLETED",
 )
 
 # Task 69Q Part 7: every event is classified into exactly one operator-facing
@@ -62,7 +68,11 @@ def notification_class_for(event: str, source: str | None) -> str:
     existing "STRATEGY" | "PIV_LIFECYCLE_PROBE" | "PREMARKET_RADAR" | None
     field every emitter already sets (or leaves unset for pure system
     events)."""
-    if event in ("EOD_FLATTEN", "SESSION_SUMMARY", "EOD_SUMMARY"):
+    if event in (
+        "EOD_FLATTEN", "SESSION_SUMMARY", "EOD_SUMMARY", "EOD_STARTED",
+        "EOD_CANCEL_REQUESTED", "EOD_FLATTEN_REQUESTED", "EOD_RECONCILIATION_STARTED",
+        "EOD_RECONCILIATION_PASSED", "EOD_RECONCILIATION_FAILED", "SESSION_COMPLETED",
+    ):
         return "EOD"
     if event in ("PREMARKET_WATCH", "PREMARKET_WATCH_CLEARED"):
         return "PREMARKET_RADAR"

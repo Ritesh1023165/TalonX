@@ -1,0 +1,26 @@
+{
+  "ordered_sequence": [
+    "EOD_STARTED", "EOD_CANCEL_REQUESTED", "EOD_FLATTEN_REQUESTED",
+    "EOD_RECONCILIATION_STARTED",
+    "EOD_RECONCILIATION_PASSED_or_EOD_RECONCILIATION_FAILED",
+    "SESSION_COMPLETED (only if PASSED)"
+  ],
+  "idempotent_retry_sequence": [
+    "EOD_STARTED",
+    "EOD_CANCEL_REQUESTED (status=ALREADY_REQUESTED_SKIPPED_IDEMPOTENT_RETRY, no broker call)",
+    "EOD_RECONCILIATION_STARTED",
+    "EOD_RECONCILIATION_PASSED_or_FAILED",
+    "SESSION_COMPLETED (only if PASSED)"
+  ],
+  "cancel_or_close_failure_sequence": [
+    "EOD_STARTED", "EOD_CANCEL_REQUESTED",
+    "EOD_RECONCILIATION_FAILED (status=INCONCLUSIVE, reason=<exception>)"
+  ],
+  "every_eod_event_fields": {
+    "session_id": "the ORIGINAL live_session_id, always explicitly stamped -- never the EventBus's own default identity",
+    "trading_date_et": "explicit, from the caller",
+    "correlation_id": "the reconciliation_run_id for this specific invocation"
+  },
+  "terminal_states": ["PASSED", "FAILED", "INCONCLUSIVE"],
+  "session_completed_gate": "emitted if and only if status == PASSED"
+}

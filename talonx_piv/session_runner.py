@@ -495,6 +495,44 @@ class SessionRunner:
         if closed is not None:
             self._probe_position_open = False
 
+    def _run_eod_lifecycle(self, trigger_reason: str) -> dict:
+        """Task 72O Stage 1: the guaranteed end-of-run EOD trigger, called
+        from every code path that can end this runner's loop (scheduled
+        completion, controlled shutdown, or a safely-caught unhandled
+        exception -- see run()). Always uses the ORIGINAL live session's
+        own identity (read from session_identity.json, written by cli.py
+        BEFORE this runner is ever constructed -- guaranteed to exist by
+        the time the loop starts) rather than inventing a new one, and a
+        fresh reconciliation_run_id -- never a second trading session.
+        Never raises (run_eod_lifecycle itself never raises)."""
+        import json as _json
+        identity_path = self.config.state_dir / "session_identity.json"
+        session_id, runtime_sha, config_hash = None, "unknown", "unknown"
+        if identity_path.exists():
+            try:
+                saved = _json.loads(identity_path.read_text(encoding="utf-8"))
+                session_id = saved.get("session_id")
+                runtime_sha = saved.get("runtime_sha") or runtime_sha
+                config_hash = saved.get("config_hash") or config_hash
+            except (OSError, _json.JSONDecodeError):
+                pass
+        trading_date_et = (self._session or datetime.now(timezone.utc).astimezone(ET).date()).isoformat()
+        if session_id is None:
+            # No known live session identity -- cannot safely attribute
+            # EOD events to "the" live session (would repeat the exact
+            # 2026-08-26 bug this stage fixes). Recorded, not guessed.
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", reason="EOD_REQUIRES_KNOWN_LIVE_SESSION_IDENTITY",
+                status="EOD_LIFECYCLE_SKIPPED", trading_date_et=trading_date_et,
+            ))
+            return {"status": "INCONCLUSIVE", "exit_code": 2, "session_id": None}
+        from .eod_lifecycle import run_eod_lifecycle
+        return run_eod_lifecycle(
+            self.config, self.events, self.lifecycle, live_session_id=session_id,
+            trading_date_et=trading_date_et, runtime_sha=runtime_sha, config_hash=config_hash,
+            trigger_reason=trigger_reason,
+        )
+
     async def run(
         self, *, stop_at: datetime | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
@@ -510,16 +548,22 @@ class SessionRunner:
                 ))
                 await self.decision_engine.stop()
                 return
+        trigger_reason = "LOOP_EXITED_UNKNOWN_REASON"
         try:
             self.events.emit(PivEvent.build("PAPER_SESSION_STARTED", status="LIVE_RUNNER_LOOP_STARTED"))
             while True:
                 self.lifecycle.reload()
                 if self.lifecycle.state.kill_switch:
                     self.events.emit(PivEvent.build("KILL_SWITCH", reason="RUNNER_LOOP_OBSERVED_KILL_SWITCH", status="RUNNER_LOOP_STOPPED"))
+                    trigger_reason = "CONTROLLED_SHUTDOWN"
                     break
                 now = clock()
                 local = now.astimezone(ET)
-                if (stop_at is not None and now >= stop_at) or local.time() >= self.flatten_time:
+                if stop_at is not None and now >= stop_at:
+                    trigger_reason = "RECOVERABLE_LOOP_TERMINATION"
+                    break
+                if local.time() >= self.flatten_time:
+                    trigger_reason = "SCHEDULED_COMPLETION"
                     break
                 if local.time() >= OPEN:
                     try:
@@ -552,6 +596,14 @@ class SessionRunner:
                 self.decision_engine.flatten_all(self._last_bar)
                 self._write_funnel_report()
             self._write_freshness_report()
+            self._run_eod_lifecycle(trigger_reason)
+        except Exception as exc:  # noqa: BLE001 -- Task 72O Stage 1: a genuinely unhandled exception
+            # (escaping every per-tick guard above) must still trigger EOD cleanup where safe -- broker
+            # reconciliation itself never raises (see eod_lifecycle.run_eod_lifecycle's own try/except),
+            # so this can only ever ADD a best-effort cleanup attempt, never mask the real failure: the
+            # original exception is always re-raised after.
+            self._run_eod_lifecycle(f"UNHANDLED_EXCEPTION_{type(exc).__name__}")
+            raise
         finally:
             if self.decision_engine is not None:
                 await self.decision_engine.stop()
