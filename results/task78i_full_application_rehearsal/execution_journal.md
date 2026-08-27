@@ -27,6 +27,15 @@ All four gaps closed:
   collected, 0 errors.
 - See `integration_gap_closure.md` for the full write-up.
 
+## Stage 2 — COMPLETE
+New `talonx_piv/supervisor.py`: `ComponentHealthRegistry`, ordered `run_startup_sequence` (5
+required steps, fail-stop), `run_with_bounded_restart` (crash-safe since `SessionRunner.run()`
+already guarantees EOD before returning/raising), persisted recovery state and component health.
+New `talonx_piv/cli.py supervise` subcommand (additive — `start` unchanged). Also added
+`no_duplicate_full_app_or_piv_process` to `talonx_piv/preflight.py` itself (reusing the exact
+check from `talonx_ops/preflight.py`) so PIV's own preflight independently guards against running
+alongside `run_talonx.py`. 20 new tests. Full collection now 2385 collected, 0 errors.
+
 ## Commands used (representative, not exhaustive — see test files for full detail)
 ```
 .venv/Scripts/python.exe -m pytest tests/test_task78i_*.py -q

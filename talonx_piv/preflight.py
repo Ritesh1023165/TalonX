@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 from typing import Any, Callable
@@ -57,6 +58,31 @@ class Preflight:
 
         check("approved_sha", lambda: ((head := self._git("rev-parse", "HEAD")) == self.config.approved_sha, head))
         check("tracked_tree_clean", lambda: (not (status := self._git("status", "--short", "--untracked-files=no")), status or "clean"))
+        # Task 78I Stage 2: reuses the EXACT same check `talonx_ops.preflight.
+        # FullAppPreflight` already runs for the general app (see that
+        # module's own no_duplicate_process) -- run here too so PIV's own
+        # preflight independently refuses to proceed if run_talonx.py's
+        # general pipeline is already running (both would otherwise
+        # construct a separate QuantScanner subscribed to the SAME default
+        # Redis channels -- see architecture_and_ownership.md). Belt-and-
+        # suspenders with the general app's own check, not a replacement.
+        def no_duplicate_full_app_process() -> tuple[bool, str]:
+            try:
+                out = subprocess.check_output(
+                    [
+                        "powershell", "-NoProfile", "-Command",
+                        "Get-CimInstance Win32_Process | "
+                        "Where-Object { $_.CommandLine -match 'run_talonx\\.py|talonx_piv\\.cli' -and "
+                        "$_.CommandLine -notmatch 'Get-CimInstance' } | "
+                        "Select-Object -ExpandProperty ProcessId",
+                    ],
+                    text=True, timeout=20,
+                )
+            except Exception as exc:  # noqa: BLE001 -- inability to check is a caveat, not a found duplicate
+                return True, f"process-duplicate check could not run ({type(exc).__name__}: {exc}) -- not treated as a block"
+            pids = [line.strip() for line in out.splitlines() if line.strip() and line.strip() != str(os.getpid())]
+            return not pids, f"{len(pids)} matching process(es) other than this one: {pids or 'none'}"
+        check("no_duplicate_full_app_or_piv_process", no_duplicate_full_app_process)
         check("config_hash", lambda: (True, config_hash(self.config)))
         identity: dict[str, Any] = {}
         def paper() -> tuple[bool, str]:

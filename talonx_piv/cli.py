@@ -30,6 +30,11 @@ from .reporting import build_session_report
 from .session_identity import build_session_identity
 from .session_runner import SessionRunner
 from .shadow_ledger import ShadowLedger
+from .supervisor import (
+    ComponentHealthRegistry, ComponentStatus, StartupReport, StartupStepResult, TerminalSupervisorFailure,
+    invocation_id as new_invocation_id, persist_component_health, persist_recovery_state,
+    run_startup_sequence, run_with_bounded_restart,
+)
 from .telegram import sender
 from .telegram_inbound import build_piv_info, build_piv_telegram_listener
 
@@ -112,6 +117,14 @@ def parser() -> argparse.ArgumentParser:
     start.add_argument("--no-telegram-inbound", action="store_true", help="Do not start the inbound Telegram /ping listener (use if a separate run_talonx.py process is already polling the SAME bot token -- only one poller per token is allowed).")
     kill = sub.add_parser("kill-switch"); kill.add_argument("--cancel-paper-orders", action="store_true")
     sub.add_parser("eod")
+    supervise = sub.add_parser("supervise", help="Task 78I Stage 2: run the unified supervisor (ordered startup-safety sequence, component health tracking, bounded restart/backoff) around the same live session start already does.")
+    supervise.add_argument("--approved-sha", required=True)
+    supervise.add_argument("--confirm-paper-session-start", action="store_true")
+    supervise.add_argument("--no-decision-path", action="store_true")
+    supervise.add_argument("--confirm-piv-lifecycle-probe", action="store_true")
+    supervise.add_argument("--no-telegram-inbound", action="store_true")
+    supervise.add_argument("--max-restarts", type=int, default=3)
+    supervise.add_argument("--backoff-seconds", type=float, default=30.0)
     return root
 
 
@@ -188,6 +201,94 @@ def main(argv: list[str] | None = None) -> int:
                 feed_mode=config.feed_mode, universe=config.universe, piv_info=piv_info,
             )
             asyncio.run(run_session(runner, listener))
+            return 0
+        if args.command == "supervise":
+            (config.state_dir).mkdir(parents=True, exist_ok=True)
+            (config.state_dir / "session_identity.json").write_text(
+                json.dumps(identity.to_dict(), indent=2, sort_keys=True), encoding="utf-8",
+            )
+            bus.emit(PivEvent.build("STARTUP", status="PAPER MODE / NO REAL CAPITAL / SUPERVISED"))
+            registry = ComponentHealthRegistry()
+            registry.register("preflight", required=True)
+            registry.register("execution_ownership", required=True)
+            registry.register("session_runner", required=True)
+            registry.register("decision_engine", required=config.decision_path_enabled and not args.no_decision_path)
+            registry.register("telegram_inbound", required=False)
+            this_invocation_id = new_invocation_id()
+
+            status, checks = Preflight(config, broker, bus).run()
+            Preflight.write_report(config.state_dir / "latest_preflight.json", status, checks, config.feed_mode)
+            registry.heartbeat("preflight", ComponentStatus.HEALTHY if status == "PIV_READY" else ComponentStatus.FAILED, status)
+            persist_component_health(config.state_dir, registry)
+            if status != "PIV_READY":
+                failed_preflight_report = StartupReport(steps=[StartupStepResult("preflight", False, status)])
+                persist_recovery_state(config.state_dir, invocation_id=this_invocation_id, session_id=identity.session_id, startup=failed_preflight_report)
+                print("PIV_BLOCKED", file=sys.stderr)
+                return 2
+
+            # Task 78I Stage 2: the ordered startup-safety sequence -- belt-
+            # and-suspenders with Preflight above (which already covers git
+            # SHA/tree/feed/telegram/universe/runtime-parity), filling in
+            # what Preflight does NOT cover: ownership, broker-state
+            # reconciliation BEFORE accepting entries, and an explicit
+            # approval/PAPER-setting report.
+            startup = run_startup_sequence(config, broker, lifecycle, bus, skip_duplicate_process_check=True)
+            persist_recovery_state(config.state_dir, invocation_id=this_invocation_id, session_id=identity.session_id, startup=startup)
+            if not startup.passed:
+                registry.heartbeat("execution_ownership", ComponentStatus.FAILED, startup.first_failure.detail)
+                persist_component_health(config.state_dir, registry)
+                bus.emit(PivEvent.build("BROKER_ERROR", reason=f"SUPERVISOR_STARTUP_FAILED:{startup.first_failure.step}", status="PIV_BLOCKED"))
+                print("PIV_BLOCKED", file=sys.stderr)
+                return 2
+            registry.heartbeat("execution_ownership", ComponentStatus.HEALTHY, "acquired and reconciled")
+            persist_component_health(config.state_dir, registry)
+
+            lifecycle.start_session(True, args.confirm_paper_session_start)
+            print("PAPER_SESSION_STARTED (SUPERVISED)")
+
+            decision_engine = None
+            redis_client = None
+            if config.decision_path_enabled and not args.no_decision_path:
+                import redis.asyncio as redis_asyncio
+                redis_client = redis_asyncio.from_url(os.environ.get("TALONX_REDIS_URL", "redis://localhost:6379"))
+                decision_ledger = DecisionLedger(config.state_dir / "decision_ledger.json")
+                notification_outbox = NotificationOutbox(
+                    config.state_dir / "notification_outbox.json", sender(config.telegram_token, config.telegram_chat_id),
+                )
+                shadow_ledger = ShadowLedger(config.state_dir / "shadow_ledger.json")
+                decision_engine = DecisionEngine(
+                    redis_client, bus, lifecycle, piv_config=config,
+                    decision_ledger=decision_ledger, notification_outbox=notification_outbox, shadow_ledger=shadow_ledger,
+                    runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
+                )
+            piv_info = build_piv_info(
+                config.feed_mode, config.universe, session_id=identity.session_id,
+                runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
+            )
+            runner = SessionRunner(
+                config, bus, lifecycle, broker.transport, decision_engine=decision_engine,
+                probe_enabled=args.confirm_piv_lifecycle_probe, piv_info=piv_info,
+            )
+            listener = None if args.no_telegram_inbound else build_piv_telegram_listener(
+                config.state_dir, redis_client=redis_client, started_at=datetime.now(timezone.utc),
+                feed_mode=config.feed_mode, universe=config.universe, piv_info=piv_info,
+            )
+            registry.heartbeat("decision_engine", ComponentStatus.HEALTHY if decision_engine is not None else ComponentStatus.NOT_STARTED, "constructed" if decision_engine is not None else "decision path disabled")
+            registry.heartbeat("telegram_inbound", ComponentStatus.HEALTHY if listener is not None else ComponentStatus.DEGRADED, "started" if listener is not None else "disabled (--no-telegram-inbound)")
+            persist_component_health(config.state_dir, registry)
+
+            def _on_heartbeat() -> None:
+                persist_component_health(config.state_dir, registry)
+
+            try:
+                asyncio.run(run_with_bounded_restart(
+                    lambda: run_session(runner, listener), registry,
+                    max_restarts=args.max_restarts, backoff_seconds=args.backoff_seconds, on_heartbeat=_on_heartbeat,
+                ))
+            except TerminalSupervisorFailure as exc:
+                bus.emit(PivEvent.build("BROKER_ERROR", reason=f"SUPERVISOR_TERMINAL_FAILURE:{exc}", status="PIV_BLOCKED"))
+                print("PIV_BLOCKED: supervisor exhausted bounded restarts", file=sys.stderr)
+                return 2
             return 0
         broker.verify_paper_identity()
         acquire_execution_ownership(config, broker, bus)
