@@ -1,0 +1,16 @@
+stage,unit,count,pct_of_bars,notes
+bars_processed,bars,1903044,100.00%,all 10 symbols merged chronological pass
+rejected_LOW_VOLATILITY,bars,1781848,93.63%,bar-level gate before any candidate/trigger evaluation; dominant rejection reason by a wide margin
+raw_candidates_generated,candidate signals,5021,0.26%,signals_generated in summary.json; bullish 2488 / bearish 2533
+rejected_LOW_CONFLUENCE,candidate signals,3640,0.19%,candidate-level; dominant candidate-stage rejection reason (72.5% of all candidates)
+rejected_OPENING_BLACKOUT,candidate signals,930,0.05%,pre-market/opening-window candidates
+rejected_US_MARKET_SESSION_CLOSED,candidate signals,368,0.02%,outside regular trading hours
+rejected_CLOSING_BLACKOUT,candidate signals,55,0.00%,closing-window candidates
+rejected_LOW_RISK_REWARD,candidate signals,7,0.00%,structural R:R below the frozen minimum
+rejected_NO_ACTIVE_POSITION,candidate signals,3,0.00%,published BEARISH signals while FLAT -- long-only lifecycle correctly takes no action
+rejected_PREMARKET_LIQUIDITY,candidate signals,2,0.00%,
+rejected_COOLDOWN,candidate signals,2,0.00%,
+rejected_TREND_GATE,candidate signals,1,0.00%,bullish candidate with htf_sma_200 available but close below it
+bullish_candidates_reaching_confluence_ge2,candidate signals,12,0.00%,minimum confluence threshold (2) satisfied; of these only 4 were in the regular session (rest pre_market/closed, structurally ineligible to execute)
+signals_published,signals,3,0.00%,all 3 are bearish (rejected downstream as NO_ACTIVE_POSITION); zero bullish signals ever reached publication
+trades_executed,trades,0,0.00%,zero across all 10 symbols and the full ~1-year window
