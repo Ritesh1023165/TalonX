@@ -83,6 +83,16 @@ def test_notification_and_shadow_status_join_by_decision_id(tmp_path):
     assert status["shadow_status"] == "OPEN"
 
 
+def test_gemini_status_defaults_not_requested_and_joins_directly_by_decision_id(tmp_path):
+    _write(tmp_path / "decision_ledger.json", {
+        "d1": {"recommendation": "BUY", "decision_execution_status": "ENTRY_ELIGIBLE"},
+        "d2": {"recommendation": "BUY", "decision_execution_status": "ENTRY_ELIGIBLE"},
+    })
+    _write(tmp_path / "gemini_enrichment.json", {"d1": {"status": "COMPLETED", "verdict": "supportive"}})
+    assert build_decision_status(tmp_path, "d1")["gemini_status"] == "COMPLETED"
+    assert build_decision_status(tmp_path, "d2")["gemini_status"] == "NOT_REQUESTED"
+
+
 def test_late_event_updates_status_without_regression(tmp_path):
     """Simulates a late-arriving fill: the projection built BEFORE the fill
     shows PENDING; rebuilt AFTER the fill is persisted, it correctly shows

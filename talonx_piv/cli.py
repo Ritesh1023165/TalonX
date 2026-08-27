@@ -22,6 +22,7 @@ from .decision_ledger import DecisionLedger
 from .events import EventBus, PivEvent
 from .execution_ownership import ExecutionOwnership, account_lock_key
 from .execution_settings import load_paper_entry_settings
+from .gemini_enrichment import GeminiEnrichmentOutbox
 from .lifecycle import PaperLifecycle, paper_cleanup
 from .notification_outbox import NotificationOutbox
 from .observability import build_integrated_projection
@@ -86,6 +87,26 @@ def acquire_execution_ownership(config: PivConfig, broker: AlpacaPaperClient, bu
         )
     broker.execution_ownership = lock
     return lock
+
+
+def build_gemini_chain_if_enabled(bus: EventBus):
+    """Task 78I Stage 3: optional, off by default. Only attempted when
+    TALONX_PIV_GEMINI_ENABLED is explicitly truthy -- a NEW capability must
+    never silently start making real API calls just because talonx_brain
+    happens to be importable/configured for the general app. Construction
+    failure (missing API key, import error, etc.) degrades to None
+    (enrichment simply resolves UNAVAILABLE for every request) -- it never
+    blocks PAPER_SESSION_STARTED or any decision/broker path."""
+    if os.environ.get("TALONX_PIV_GEMINI_ENABLED", "").strip().lower() not in {"1", "true", "yes", "on"}:
+        return None
+    try:
+        from talonx_brain.llm import build_research_chain
+        return build_research_chain()
+    except Exception as exc:  # noqa: BLE001 -- optional component; never blocks startup.
+        bus.emit(PivEvent.build(
+            "BROKER_ERROR", reason=f"GEMINI_CHAIN_CONSTRUCTION_FAILED_{type(exc).__name__}", status="ENRICHMENT_DISABLED_DEGRADED",
+        ))
+        return None
 
 
 def runtime(config: PivConfig, session_id: str | None = None):
@@ -183,18 +204,21 @@ def main(argv: list[str] | None = None) -> int:
                     config.state_dir / "notification_outbox.json", sender(config.telegram_token, config.telegram_chat_id),
                 )
                 shadow_ledger = ShadowLedger(config.state_dir / "shadow_ledger.json")
+                gemini_enrichment = GeminiEnrichmentOutbox(config.state_dir / "gemini_enrichment.json")
                 decision_engine = DecisionEngine(
                     redis_client, bus, lifecycle, piv_config=config,
                     decision_ledger=decision_ledger, notification_outbox=notification_outbox, shadow_ledger=shadow_ledger,
+                    gemini_enrichment=gemini_enrichment,
                     runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
                 )
             piv_info = build_piv_info(
                 config.feed_mode, config.universe, session_id=identity.session_id,
                 runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
             )
+            gemini_chain = build_gemini_chain_if_enabled(bus) if decision_engine is not None else None
             runner = SessionRunner(
                 config, bus, lifecycle, broker.transport, decision_engine=decision_engine,
-                probe_enabled=args.confirm_piv_lifecycle_probe, piv_info=piv_info,
+                probe_enabled=args.confirm_piv_lifecycle_probe, piv_info=piv_info, gemini_chain=gemini_chain,
             )
             listener = None if args.no_telegram_inbound else build_piv_telegram_listener(
                 config.state_dir, redis_client=redis_client, started_at=datetime.now(timezone.utc),
@@ -256,18 +280,23 @@ def main(argv: list[str] | None = None) -> int:
                     config.state_dir / "notification_outbox.json", sender(config.telegram_token, config.telegram_chat_id),
                 )
                 shadow_ledger = ShadowLedger(config.state_dir / "shadow_ledger.json")
+                gemini_enrichment = GeminiEnrichmentOutbox(config.state_dir / "gemini_enrichment.json")
                 decision_engine = DecisionEngine(
                     redis_client, bus, lifecycle, piv_config=config,
                     decision_ledger=decision_ledger, notification_outbox=notification_outbox, shadow_ledger=shadow_ledger,
+                    gemini_enrichment=gemini_enrichment,
                     runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
                 )
             piv_info = build_piv_info(
                 config.feed_mode, config.universe, session_id=identity.session_id,
                 runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
             )
+            gemini_chain = build_gemini_chain_if_enabled(bus) if decision_engine is not None else None
+            registry.register("gemini_enrichment", required=False)
+            registry.heartbeat("gemini_enrichment", ComponentStatus.HEALTHY if gemini_chain is not None else ComponentStatus.DEGRADED, "configured" if gemini_chain is not None else "TALONX_PIV_GEMINI_ENABLED not set, or construction failed -- degraded, never blocking")
             runner = SessionRunner(
                 config, bus, lifecycle, broker.transport, decision_engine=decision_engine,
-                probe_enabled=args.confirm_piv_lifecycle_probe, piv_info=piv_info,
+                probe_enabled=args.confirm_piv_lifecycle_probe, piv_info=piv_info, gemini_chain=gemini_chain,
             )
             listener = None if args.no_telegram_inbound else build_piv_telegram_listener(
                 config.state_dir, redis_client=redis_client, started_at=datetime.now(timezone.utc),

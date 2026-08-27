@@ -36,6 +36,18 @@ New `talonx_piv/cli.py supervise` subcommand (additive — `start` unchanged). A
 check from `talonx_ops/preflight.py`) so PIV's own preflight independently guards against running
 alongside `run_talonx.py`. 20 new tests. Full collection now 2385 collected, 0 errors.
 
+## Stage 3 — COMPLETE
+New `talonx_piv/gemini_enrichment.py`: decision_id-keyed, restart-safe outbox wrapping
+`talonx_brain.llm`'s existing `_BaseResearchChain`/`build_research_chain` (reused, not
+reimplemented). Additive-only extraction (5 named fields only); proved an injected action/price/
+approval field in a fake response has zero effect, at both the outbox level and the real
+DecisionEngine+SessionRunner application-wiring level. Wired into `decision_engine.py`
+(`request()`, decoupled from the alert), `session_runner.py` (independent async
+`dispatch_pending` tick step), `cli.py` (opt-in via `TALONX_PIV_GEMINI_ENABLED`, degrades to None
+on any construction failure), `observability.py` (`gemini_status` in the decision projection,
+`gemini_enrichment` counts in the integrated projection). 24 new tests. Full collection now 2399
+collected, 0 errors.
+
 ## Commands used (representative, not exhaustive — see test files for full detail)
 ```
 .venv/Scripts/python.exe -m pytest tests/test_task78i_*.py -q

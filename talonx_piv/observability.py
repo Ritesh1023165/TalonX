@@ -78,6 +78,10 @@ def build_decision_status(state_dir: Path, decision_id: str) -> dict[str, Any]:
             shadow_status = record.get("status", "UNKNOWN")
             break
 
+    gemini = _read_json(state_dir / "gemini_enrichment.json", {})
+    gemini_record = gemini.get(decision_id)
+    gemini_status = gemini_record.get("status", "NOT_REQUESTED") if gemini_record is not None else "NOT_REQUESTED"
+
     decision_execution_status = decision.get("decision_execution_status", "NOT_APPLICABLE")
     if decision_execution_status not in ("ENTRY_ELIGIBLE", "EXIT_ELIGIBLE"):
         execution_status = "NOT_ATTEMPTED_BY_DESIGN"
@@ -117,6 +121,7 @@ def build_decision_status(state_dir: Path, decision_id: str) -> dict[str, Any]:
         "decision_execution_status": decision_execution_status,
         "notification_status": notification_status,
         "shadow_status": shadow_status,
+        "gemini_status": gemini_status,
         "execution_status": execution_status,
     }
 
@@ -143,6 +148,9 @@ def build_integrated_projection(
 
     shadow = _read_json(state_dir / "shadow_ledger.json", {})
     shadow = {k: v for k, v in shadow.items() if v.get("decision_id") in session_decision_ids}
+
+    gemini = _read_json(state_dir / "gemini_enrichment.json", {})
+    gemini = {k: v for k, v in gemini.items() if k in session_decision_ids}
 
     lifecycle_state = _read_json(state_dir / "lifecycle_state.json", {})
     orders = lifecycle_state.get("orders", {})
@@ -198,6 +206,12 @@ def build_integrated_projection(
         else:  # UNCONFIRMED_TIMEOUT or anything else genuinely unresolved
             paper_order_status_counts["unknown"] += 1
 
+    gemini_status_counts = {"not_requested": 0, "pending": 0, "completed": 0, "timeout": 0, "malformed": 0, "unavailable": 0}
+    for record in gemini.values():
+        status = record.get("status", "PENDING").lower()
+        key = status if status in gemini_status_counts else "not_requested"
+        gemini_status_counts[key] += 1
+
     execution_failure_count = session_report.get("rejections", 0)  # PAPER_ORDER_REJECTED count -- broker-boundary rejections, distinct from entry_blocked_paper_disabled_count above (a decision-layer, pre-broker classification)
 
     freshness_report = _read_json(state_dir / "freshness_report.json", {})
@@ -228,6 +242,11 @@ def build_integrated_projection(
             "scope": "lifecycle_state.json orders (ALL orders in the current state file -- lifecycle_state.json is not itself session-scoped, matching its own existing schema)",
             "total": len(orders),
             **paper_order_status_counts,
+        },
+        "gemini_enrichment": {
+            "scope": "gemini_enrichment.json records keyed directly by decision_id (no dedup indirection, unlike notifications) whose decision_id belongs to a decision in-scope above",
+            "total": len(gemini),
+            **gemini_status_counts,
         },
         "natural_vs_test": {
             "scope": "piv_events.jsonl, scoped to trading_date_et if supplied -- reused from reporting.build_session_report, never re-parsed independently",

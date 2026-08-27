@@ -6,7 +6,7 @@
     "stage0_baseline_and_architecture": "COMPLETE",
     "stage1_close_integration_gaps": "COMPLETE",
     "stage2_unified_supervisor": "COMPLETE",
-    "stage3_gemini_enrichment": "NOT_STARTED",
+    "stage3_gemini_enrichment": "COMPLETE",
     "stage4_dashboard_integration": "NOT_STARTED",
     "stage5_offline_rehearsal": "NOT_STARTED"
   },
@@ -36,7 +36,15 @@
     "modified_files": ["talonx_piv/cli.py", "talonx_piv/preflight.py"],
     "collection_after_stage2": "2385 collected, 0 errors"
   },
+  "stage3_summary": {
+    "new_module": "talonx_piv/gemini_enrichment.py",
+    "reused_interface": "talonx_brain.llm._BaseResearchChain.generate(signal, citations) + talonx_brain.llm.build_research_chain factory",
+    "new_test_files": ["tests/test_task78i_gemini_enrichment.py", "tests/test_task78i_gemini_integration.py"],
+    "modified_files": ["talonx_piv/decision_engine.py", "talonx_piv/session_runner.py", "talonx_piv/cli.py", "talonx_piv/observability.py"],
+    "collection_after_stage3": "2399 collected, 0 errors"
+  },
   "checkpoint_commits": {
-    "stage1": "54fdc9d"
+    "stage1": "54fdc9d",
+    "stage2": "daa59ff"
   }
 }

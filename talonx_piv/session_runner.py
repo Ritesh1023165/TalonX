@@ -85,6 +85,13 @@ class SessionRunner:
     # None is a fully supported no-op (e.g. tests that don't need /ping).
     piv_info: dict | None = None
     premarket_radar_enabled: bool = True
+    # Task 78I Stage 3: optional -- None (the default) means no Gemini
+    # enrichment adapter is configured; dispatch_pending's own None-chain
+    # handling then honestly resolves every pending request to
+    # UNAVAILABLE, never fabricated as COMPLETED. Production (cli.py) sets
+    # this to the REAL talonx_brain chain; every test/rehearsal injects a
+    # fake one.
+    gemini_chain: Any | None = None
 
     _last_bar_ts: dict[str, datetime] = field(default_factory=dict, init=False)
     _last_seen_wall: dict[str, datetime] = field(default_factory=dict, init=False)
@@ -339,6 +346,21 @@ class SessionRunner:
         self._update_piv_info_after_tick(now)
         self._maybe_emit_heartbeat(now)
         self._dispatch_pending_notifications()
+        await self._dispatch_pending_gemini_enrichment()
+
+    async def _dispatch_pending_gemini_enrichment(self) -> None:
+        """Task 78I Stage 3: an INDEPENDENT, optional dispatch step -- a
+        Gemini outage/timeout here can only ever delay/withhold
+        enrichment, never suppress the decision/alert/shadow/execution
+        branches that already happened before this runs."""
+        if self.decision_engine is None:
+            return
+        try:
+            await self.decision_engine.gemini_enrichment.dispatch_pending(self.gemini_chain)
+        except Exception as exc:  # noqa: BLE001 -- must never crash the live tick loop.
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", reason=f"GEMINI_ENRICHMENT_DISPATCH_FAILED_{type(exc).__name__}", status="DISPATCH_SKIPPED_LOOP_CONTINUES",
+            ))
 
     def _dispatch_pending_notifications(self) -> None:
         """Task 77I Stage 2: an INDEPENDENT dispatch step, decoupled from

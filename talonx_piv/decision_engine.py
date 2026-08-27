@@ -48,8 +48,9 @@ from .config import PivConfig
 from .decision_contract import DataReadiness, ExecutionStatus, MarketView, Recommendation, StrategyApprovalStatus, decide
 from .decision_ledger import DecisionLedger
 from .events import EventBus, PivEvent, trading_date_for
+from .gemini_enrichment import GeminiEnrichmentOutbox
 from .lifecycle import PaperLifecycle, stable_id
-from .notification_outbox import NotificationOutbox
+from .notification_outbox import NotificationOutbox, classify as classify_notification
 from .shadow_ledger import ShadowLedger
 from .warmup import WarmupCheck, preseed_and_verify
 
@@ -92,6 +93,10 @@ class DecisionEngine:
     decision_ledger: DecisionLedger | None = None
     notification_outbox: NotificationOutbox | None = None
     shadow_ledger: ShadowLedger | None = None
+    # Task 78I Stage 3: optional -- None means enrichment is not
+    # configured at all (in-memory-only outbox constructed below), matching
+    # every other optional-component pattern in this class.
+    gemini_enrichment: GeminiEnrichmentOutbox | None = None
     runtime_sha: str | None = None
     config_hash: str | None = None
     # TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE. The ONLY way any decision this
@@ -106,6 +111,7 @@ class DecisionEngine:
         self.decision_ledger = self.decision_ledger or DecisionLedger(None)
         self.notification_outbox = self.notification_outbox or NotificationOutbox(None, None)
         self.shadow_ledger = self.shadow_ledger or ShadowLedger(None)
+        self.gemini_enrichment = self.gemini_enrichment or GeminiEnrichmentOutbox(None)
         self.scanner = QuantScanner(self.config)
         self.scanner._client = self.redis_client
         self._pubsub = self.redis_client.pubsub()
@@ -282,6 +288,21 @@ class DecisionEngine:
             target_price=signal.target_price, horizon=NATURAL_STRATEGY_HORIZON,
         )
         self._record_decision(decision)
+        if classify_notification(decision) is not None:
+            # Task 78I Stage 3: enrichment is REQUESTED for the same set of
+            # decisions worth alerting on (actionable or WATCH) -- durable
+            # bookkeeping only, never a chain.generate() call here (that
+            # happens independently in dispatch_pending, see module
+            # docstring's "initial deterministic alert does not wait for
+            # Gemini"). A failure here must never suppress the alert/shadow/
+            # execution branches that already happened above.
+            try:
+                self.gemini_enrichment.request(decision.decision_id, decision.ticker, signal)
+            except Exception as exc:  # noqa: BLE001 -- optional component; never blocks the decision path.
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", symbol=symbol, reason=f"GEMINI_ENRICHMENT_REQUEST_FAILED_{type(exc).__name__}",
+                    source="STRATEGY",
+                ))
         if decision.recommendation != Recommendation.BUY:
             return
         if decision.execution_status != ExecutionStatus.ENTRY_ELIGIBLE:
