@@ -48,6 +48,13 @@ on any construction failure), `observability.py` (`gemini_status` in the decisio
 `gemini_enrichment` counts in the integrated projection). 24 new tests. Full collection now 2399
 collected, 0 errors.
 
+## Stage 4 — COMPLETE
+One new, additive GET `/piv/status` route on the EXISTING `dashboard_web.py` aiohttp server
+(default `localhost:8787`, loopback only) — returns `observability.build_integrated_projection`
+as JSON, computed fresh on every request, HTTP 500 with an explicit error body on a read failure.
+Zero change to `/`, `/static/*`, `/ws`. 5 new tests via `aiohttp.test_utils.TestClient/TestServer`
+(isolated, loopback, in-process). Full collection now 2404 collected, 0 errors.
+
 ## Commands used (representative, not exhaustive — see test files for full detail)
 ```
 .venv/Scripts/python.exe -m pytest tests/test_task78i_*.py -q

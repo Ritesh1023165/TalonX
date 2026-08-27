@@ -7,7 +7,7 @@
     "stage1_close_integration_gaps": "COMPLETE",
     "stage2_unified_supervisor": "COMPLETE",
     "stage3_gemini_enrichment": "COMPLETE",
-    "stage4_dashboard_integration": "NOT_STARTED",
+    "stage4_dashboard_integration": "COMPLETE",
     "stage5_offline_rehearsal": "NOT_STARTED"
   },
   "stage1_summary": {
@@ -43,8 +43,14 @@
     "modified_files": ["talonx_piv/decision_engine.py", "talonx_piv/session_runner.py", "talonx_piv/cli.py", "talonx_piv/observability.py"],
     "collection_after_stage3": "2399 collected, 0 errors"
   },
+  "stage4_summary": {
+    "modified_file": "dashboard_web.py (one new GET /piv/status route, additive only)",
+    "new_test_file": "tests/test_task78i_dashboard_integration.py",
+    "collection_after_stage4": "2404 collected, 0 errors"
+  },
   "checkpoint_commits": {
     "stage1": "54fdc9d",
-    "stage2": "daa59ff"
+    "stage2": "daa59ff",
+    "stage3": "5f23831"
   }
 }
