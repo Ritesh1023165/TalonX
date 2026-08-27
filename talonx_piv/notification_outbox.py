@@ -42,9 +42,20 @@ from typing import Any, Callable
 from .decision_contract import Decision, Recommendation
 from .lifecycle import stable_id
 
-PENDING_STATUSES = ("PENDING", "RETRY")
+# Task 78I Stage 5: UNCERTAIN is included here (not a Task 77I original
+# decision) -- discovered during the offline recovery rehearsal that a
+# record left UNCERTAIN (the adapter raised, true delivery status unknown)
+# was never retried by a later dispatch_pending() call, silently stuck in
+# limbo forever (neither retried nor terminal). Since UNCERTAIN genuinely
+# means "we do not know whether this was delivered," retrying it on the
+# next dispatch_pending() call (bounded by the same max_attempts as PENDING/
+# RETRY) is the safer choice than leaving it permanently unresolved --
+# the outbox's own dedup key already means re-attempting a genuinely-
+# already-delivered message is at worst a harmless duplicate send, never a
+# lost one.
+PENDING_STATUSES = ("PENDING", "RETRY", "UNCERTAIN")
 TERMINAL_STATUSES = ("SENT", "FAILED")
-ALL_STATUSES = PENDING_STATUSES + TERMINAL_STATUSES + ("UNCERTAIN",)
+ALL_STATUSES = PENDING_STATUSES + TERMINAL_STATUSES
 
 CLASSIFICATION_ACTIONABLE_BUY = "ACTIONABLE_BUY"
 CLASSIFICATION_ACTIONABLE_SELL = "ACTIONABLE_SELL"

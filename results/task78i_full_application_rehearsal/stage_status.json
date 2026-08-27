@@ -8,7 +8,7 @@
     "stage2_unified_supervisor": "COMPLETE",
     "stage3_gemini_enrichment": "COMPLETE",
     "stage4_dashboard_integration": "COMPLETE",
-    "stage5_offline_rehearsal": "NOT_STARTED"
+    "stage5_offline_rehearsal": "COMPLETE"
   },
   "stage1_summary": {
     "gap_a_shadow_independence": "AUDITED_NO_CORRECTION_NEEDED",
@@ -48,9 +48,18 @@
     "new_test_file": "tests/test_task78i_dashboard_integration.py",
     "collection_after_stage4": "2404 collected, 0 errors"
   },
+  "stage5_summary": {
+    "new_test_file": "tests/test_task78i_stage5_rehearsal.py",
+    "scenarios_passed": "20/20",
+    "genuine_defect_fixed": "NotificationOutbox UNCERTAIN retry gap (talonx_piv/notification_outbox.py)",
+    "full_collection": "2423 collected, 0 errors",
+    "full_suite": "2412 passed, 1 skipped, 10 xfailed, 0 failures",
+    "reconciliation": "2412 - 2316 = 96, matching 96 new tests across 11 new files -- zero unexplained regression"
+  },
   "checkpoint_commits": {
     "stage1": "54fdc9d",
     "stage2": "daa59ff",
-    "stage3": "5f23831"
+    "stage3": "5f23831",
+    "stage4": "f3a7e17"
   }
 }

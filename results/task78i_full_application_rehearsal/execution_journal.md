@@ -55,6 +55,17 @@ as JSON, computed fresh on every request, HTTP 500 with an explicit error body o
 Zero change to `/`, `/static/*`, `/ws`. 5 new tests via `aiohttp.test_utils.TestClient/TestServer`
 (isolated, loopback, in-process). Full collection now 2404 collected, 0 errors.
 
+## Stage 5 — COMPLETE
+New `tests/test_task78i_stage5_rehearsal.py` -- all 20 required scenarios PASSED, driving the real
+supervisor/decision/lifecycle/shadow/notification/enrichment stack with isolated state, fake
+adapters, a fake clock, and blocked external network access throughout. Results recorded to
+`rehearsal_scenarios.csv`. One genuine defect discovered and fixed during this stage:
+`NotificationOutbox.dispatch_pending`'s retry-eligible status set did not include `UNCERTAIN`,
+leaving a record permanently stuck after an adapter exception -- fixed in
+`talonx_piv/notification_outbox.py`. Full repository suite re-run: 2412 passed, 1 skipped,
+10 xfailed, 0 failures (was 2316 passed at this task's Stage 0 start) -- `2412-2316=96`, exactly
+matching the 96 new tests added across all 5 stages. Full collection: 2423 collected, 0 errors.
+
 ## Commands used (representative, not exhaustive — see test files for full detail)
 ```
 .venv/Scripts/python.exe -m pytest tests/test_task78i_*.py -q
