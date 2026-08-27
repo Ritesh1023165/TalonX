@@ -14,14 +14,20 @@ ANOMALY_CLASSES = (
 def build_session_report(
     event_path: Path, reconciliation: dict, feed_mode: str | None = None,
     *, trading_date_et: str | None = None, session_id: str | None = None,
-    quant_funnel: dict | None = None,
+    quant_funnel: dict | None = None, integrated_projection: dict | None = None,
 ) -> dict:
     """trading_date_et (Task 69Q Part 2): when given, scopes every count
     below to just that America/New_York calendar date -- piv_events.jsonl
     is append-only and can span multiple trading dates (confirmed in
     Task69P's raw evidence), so a report built without this filter risks
     silently mixing e.g. 2026-08-24 and 2026-08-25 activity. Omit it only
-    for legacy/whole-file callers that intentionally want the full history."""
+    for legacy/whole-file callers that intentionally want the full history.
+
+    integrated_projection (Task 77I Stage 4): the optional, read-only
+    talonx_piv.observability.build_integrated_projection(...) output, passed
+    through unchanged under result["integrated_projection"] when supplied --
+    this function never computes it itself (no new parsing logic duplicated
+    here)."""
     rows = []
     if event_path.exists():
         rows = [json.loads(line) for line in event_path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -86,4 +92,6 @@ def build_session_report(
         result["quant_funnel"] = quant_funnel
         if quant_funnel.get("unaccounted_candidates", 0):
             result["quant_funnel_flag"] = "UNACCOUNTED_CANDIDATES_DETECTED"
+    if integrated_projection is not None:
+        result["integrated_projection"] = integrated_projection
     return result

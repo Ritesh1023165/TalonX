@@ -156,6 +156,11 @@ async def test_decision_engine_only_called_for_ready_symbols(tmp_path):
         "evaluation_cycles": 0, "symbols_evaluated_total": 0, "candidates": 0, "published": 0,
         "rejected": 0, "pending": 0, "errored": 0, "unaccounted_candidates": 0, "rejected_breakdown": {},
     }
+    # Task 77I: dispatch_pending is a plain SYNC method on the real
+    # NotificationOutbox -- stubbed as a plain callable (not AsyncMock's
+    # default auto-async attribute) so SessionRunner's per-tick dispatch
+    # call doesn't leave an unawaited coroutine warning.
+    fake_engine.notification_outbox.dispatch_pending = lambda: {}
     run, transport, bus = runner(tmp_path, batches, decision_engine=fake_engine)
     ticks = [datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i) for i in range(30)]
     ticks.append(live_tick)

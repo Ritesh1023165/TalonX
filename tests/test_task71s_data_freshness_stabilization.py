@@ -412,6 +412,10 @@ async def test_integration_no_signal_from_stale_symbol(tmp_path):
         "evaluation_cycles": 0, "symbols_evaluated_total": 0, "candidates": 0, "published": 0,
         "rejected": 0, "pending": 0, "errored": 0, "unaccounted_candidates": 0, "rejected_breakdown": {},
     }
+    # Task 77I: dispatch_pending is a plain SYNC method on the real
+    # NotificationOutbox -- stubbed as a plain callable to avoid an
+    # unawaited-coroutine warning from AsyncMock's default auto-async attrs.
+    fake_engine.notification_outbox.dispatch_pending = lambda: {}
     run, transport, bus = make_runner(tmp_path, [], decision_engine=fake_engine)
     run._session = SESSION
     run._ready_symbols = {"AAPL"}
@@ -432,6 +436,10 @@ async def test_integration_recovery_permits_evaluation_once_restored(tmp_path):
         "evaluation_cycles": 0, "symbols_evaluated_total": 0, "candidates": 0, "published": 0,
         "rejected": 0, "pending": 0, "errored": 0, "unaccounted_candidates": 0, "rejected_breakdown": {},
     }
+    # Task 77I: dispatch_pending is a plain SYNC method on the real
+    # NotificationOutbox -- stubbed as a plain callable to avoid an
+    # unawaited-coroutine warning from AsyncMock's default auto-async attrs.
+    fake_engine.notification_outbox.dispatch_pending = lambda: {}
     tick = datetime(2026, 8, 24, 10, 1, tzinfo=ET).astimezone(ZoneInfo("UTC"))
     run, transport, bus = make_runner(
         tmp_path, [{"AAPL": bar_row(to_utc_iso(tick.astimezone(ET)))}], decision_engine=fake_engine,

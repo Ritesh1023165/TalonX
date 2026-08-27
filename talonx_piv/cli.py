@@ -23,6 +23,7 @@ from .events import EventBus, PivEvent
 from .execution_settings import load_paper_entry_settings
 from .lifecycle import PaperLifecycle, paper_cleanup
 from .notification_outbox import NotificationOutbox
+from .observability import build_integrated_projection
 from .preflight import Preflight
 from .reporting import build_session_report
 from .session_identity import build_session_identity
@@ -186,9 +187,13 @@ def main(argv: list[str] | None = None) -> int:
             (config.state_dir / "latest_reconciliation.json").write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
             funnel_path = config.state_dir / "quant_funnel_report.json"
             quant_funnel = json.loads(funnel_path.read_text(encoding="utf-8")) if funnel_path.exists() else None
+            integrated_projection = build_integrated_projection(
+                config.state_dir, session_id=live_session_id, trading_date_et=trading_date_et,
+            )
             report = build_session_report(
                 bus.path, result, config.feed_mode,
                 trading_date_et=trading_date_et, session_id=live_session_id, quant_funnel=quant_funnel,
+                integrated_projection=integrated_projection,
             )
             (config.state_dir / "latest_session_report.json").write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
             print(json.dumps(result, sort_keys=True))

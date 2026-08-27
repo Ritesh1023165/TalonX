@@ -28,3 +28,34 @@
 ## Stage log
 See `stage_status.json` for the authoritative machine-readable checkpoint ledger. Prose
 narrative per stage is appended below as each stage completes.
+
+## Stage 1 — COMPLETE (commit 3a7e404)
+Decision contract wired into decision_engine.py's real _handle_entry/_check_exit. Partial-fill
+accounting bug fixed in lifecycle.py::apply_broker_update. Timed-out submissions now marked
+UNCONFIRMED_TIMEOUT and resolved via reconcile(). Three new durable ledgers introduced
+(decision_ledger.py, notification_outbox.py, shadow_ledger.py), wired as independent branches.
+6 pre-existing tests updated (Task 76S's fail-closed-approval-style disclosed changes) across
+test_task65b_decision_engine.py, test_task76s_broker_boundary.py,
+test_task76s_protective_exit_eod.py. One flaky test discovered and fixed (a decision_id
+collision from two datetime.now() calls landing on the identical value under Windows clock
+resolution in a fast test loop -- a test-fixture-only artifact, not a production risk, since
+real market bars are always >=1 minute apart; fixed by using explicit, deterministically-offset
+timestamps in the affected tests rather than changing decision_id's production scheme).
+
+## Stage 2 — COMPLETE (commit bac0845)
+decision_event_schema.json, alert_delivery_contract.md.
+
+## Stage 3 — COMPLETE (commit b82f3c9)
+shadow_simulation_policy.md, shadow_test_results.csv.
+
+## Stage 4 — COMPLETE
+observability.py (new minimal read-only projection module), reporting.py (additive
+integrated_projection passthrough), cli.py wiring, 12 accelerated end-to-end scenarios driving
+the real SessionRunner+DecisionEngine stack. Found and fixed a benign RuntimeWarning (unawaited
+coroutine) in 4 pre-existing AsyncMock-based SessionRunner tests, caused by
+notification_outbox.dispatch_pending() being auto-mocked as async by AsyncMock's default
+attribute behavior -- fixed by stubbing it as a plain sync callable in those 4 fixtures
+(test_task65_session_runner.py, test_task71s_data_freshness_stabilization.py x2,
+test_task71s_r1_live_iex_semantics.py). Final full suite: 2316 passed, 1 skipped, 10 xfailed,
+zero failures, zero unexplained regression (see task77i_summary.json for the exact
+reconciliation math).

@@ -1,0 +1,13 @@
+scenario,result,note
+01_approved_paper_disabled,PASSED,"decision+alert+shadow created, zero broker orders"
+02_approved_paper_enabled_linked,PASSED,"real PAPER position + linked shadow, both present, distinct records"
+03_unvalidated_no_entry,PASSED,"zero broker orders, zero shadow positions"
+04_bearish_flat_no_short,PASSED,zero broker orders
+05_long_authorised_exit,PASSED,sell reaches broker on stop hit
+06_partial_fill_concurrent_exit,PASSED,competing oversized exit correctly rejected; remaining_quantity correct
+07_notification_outage,PASSED,broker entry + shadow unaffected; outbox records UNCERTAIN honestly
+08_broker_outage_uncertain,PASSED,uncertain order fails closed then resolves via reconcile()
+09_sparse_missing_data,PASSED,missing symbol never synthesized
+10_restart_pending_work,PASSED,"all three ledgers correctly resumed post-restart, no duplication"
+11_eod_session_identity,PASSED,"status=PASSED, session_id preserved"
+12_dashboard_counters_match,PASSED,projection counts reconcile exactly to underlying ledger sizes
