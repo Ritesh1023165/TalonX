@@ -44,28 +44,38 @@ _SMOKE_CSV = _REPO_ROOT / "examples" / "data" / "sample_AAPL_1m.csv"
 _TRADE_CSV = _REPO_ROOT / "examples" / "data" / "sample_AAPL_trade_1m.csv"
 _MULTI_CSV = _REPO_ROOT / "examples" / "data" / "sample_multi_trade_1m.csv"
 
-# Task 25A finding (2026-08-20): both sample_AAPL_trade_1m.csv's one
-# demo trade and ALL THREE of sample_multi_trade_1m.csv's TSTW/TSTL/
-# TSTE demo trades turn out to be built entirely around a BEARISH
+# Task 25A finding (2026-08-20): sample_AAPL_trade_1m.csv's one demo
+# trade and ALL THREE of sample_multi_trade_1m.csv's TSTW/TSTL/TSTE
+# demo trades turned out to be built entirely around a BEARISH
 # macd_bearish_cross signal opening a short position while flat --
 # i.e. these "documented, deterministic" example datasets were
 # unknowingly relying on the exact long/short bug Task 24/25A fixes
 # (see results/task24_requirements_parity_audit/long_short_flow.md).
 # Under the corrected LONG_ONLY lifecycle these signals are, correctly,
-# NO_ACTIVE_POSITION no-ops -- zero trades. Regenerating these CSVs as
-# genuine BULLISH long demonstrations under the FROZEN production
-# QuantConfig (these fixtures' own stated constraint) requires real
-# 200-bar/15-min HTF trend-gate warmup (trend_gate_applicable is
-# BULLISH-only -- see talonx_quant/consumer.py -- which is itself
-# further evidence for the LONG_ONLY reading), not a small data tweak,
-# and is out of scope for a correctness-only task. Tracked as a
-# BLOCKING FOLLOW-UP in results/task25a_long_only_parity_fix/
-# task25a_summary.md rather than rushed here. xfail(strict=True) so an
-# eventual CSV regeneration is forced to remove this marker, not
-# silently leave it stale.
+# NO_ACTIVE_POSITION no-ops -- zero trades.
+#
+# sample_AAPL_trade_1m.csv was regenerated in Task 73S
+# (results/task73s_regression_and_zero_trade_diagnosis/stage1_fixture_diff_explanation.md):
+# ~9 trading days of quiet, LOW_VOLATILITY-rejected pre-roll data were
+# prepended (purely to satisfy the ALREADY-EXISTING, unmodified 200-bar/
+# 15-min HTF trend-gate warmup requirement -- trend_gate_applicable is
+# BULLISH-only, see talonx_quant/consumer.py), and a genuine BULLISH
+# macd_bullish_cross recovery (RSI+volume confluence legs, clearing the
+# HTF trend gate and structural R:R) was appended, producing one real
+# long trade -- entry, TARGET exit, trades.csv/equity_curve.csv, and
+# HTML report metrics are now genuinely exercised. The xfail marker
+# below no longer applies to this fixture and has been removed from
+# its tests (this comment documents why, per the marker's own original
+# instruction: "an eventual CSV regeneration is forced to remove this
+# marker, not silently leave it stale").
+#
+# sample_multi_trade_1m.csv (TSTW/TSTL/TSTE) was NOT touched by Task 73S
+# (out of scope for that task's specific regression target) and remains
+# the pending BLOCKING FOLLOW-UP tracked in
+# results/task25a_long_only_parity_fix/task25a_summary.md.
 _XFAIL_PENDING_SAMPLE_DATA_REGENERATION = pytest.mark.xfail(
-    reason="Task 25A: sample_AAPL_trade_1m.csv / sample_multi_trade_1m.csv's demo trades were built on the "
-           "long/short bug (BEARISH-while-flat) that Task 24/25A fixed; now correctly produce zero trades. "
+    reason="Task 25A: sample_multi_trade_1m.csv's demo trades were built on the long/short bug "
+           "(BEARISH-while-flat) that Task 24/25A fixed; now correctly produce zero trades. "
            "Needs a dedicated CSV-regeneration follow-up, not fixed here.",
     strict=True,
 )
@@ -170,7 +180,6 @@ def test_trade_dataset_never_flags_critical_corruption():
     assert not report.has_critical_corruption
 
 
-@_XFAIL_PENDING_SAMPLE_DATA_REGENERATION
 def test_trade_dataset_runs_the_documented_command_and_produces_at_least_one_trade(tmp_path, capsys):
     exit_code = _run(_TRADE_CSV, tmp_path)
 
@@ -184,7 +193,6 @@ def test_trade_dataset_runs_the_documented_command_and_produces_at_least_one_tra
     assert summary["metrics"]["net"]["total_trades"] >= 1
 
 
-@_XFAIL_PENDING_SAMPLE_DATA_REGENERATION
 def test_trade_dataset_populates_trades_and_equity_curve_csv(tmp_path):
     _run(_TRADE_CSV, tmp_path)
 
@@ -202,7 +210,6 @@ def test_trade_dataset_populates_trades_and_equity_curve_csv(tmp_path):
     assert trades_json[0]["direction"] in ("bullish", "bearish")
 
 
-@_XFAIL_PENDING_SAMPLE_DATA_REGENERATION
 def test_trade_dataset_exercises_a_concrete_exit_path(tmp_path):
     """"Ideally exercise at least one exit path" -- this fixture is
     calibrated to hit TARGET specifically, not just fall through to
@@ -212,7 +219,6 @@ def test_trade_dataset_exercises_a_concrete_exit_path(tmp_path):
     assert any(t["exit_reason"] == "TARGET" for t in trades_json)
 
 
-@_XFAIL_PENDING_SAMPLE_DATA_REGENERATION
 def test_trade_dataset_html_report_contains_real_trade_metrics(tmp_path):
     _run(_TRADE_CSV, tmp_path)
     html = (tmp_path / "backtest_results.html").read_text(encoding="utf-8")
@@ -227,7 +233,6 @@ def test_trade_dataset_html_report_contains_real_trade_metrics(tmp_path):
     assert len(payload["equity_curve"]) >= 1
 
 
-@_XFAIL_PENDING_SAMPLE_DATA_REGENERATION
 def test_trade_dataset_signal_satisfies_the_frozen_strategy_naturally(tmp_path):
     """Confirms the qualifying candidate cleared confluence AND R:R at
     their PRODUCTION default values -- nothing about this dataset

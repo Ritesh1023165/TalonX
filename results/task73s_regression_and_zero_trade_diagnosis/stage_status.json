@@ -1,0 +1,23 @@
+{
+  "stage": "STAGE_1",
+  "status": "PASS",
+  "starting_sha": "df6da2b",
+  "ending_sha": "PENDING_COMMIT",
+  "tests": {
+    "target_test_repeated_3x": "1 passed each run",
+    "surrounding_suite": "32 passed",
+    "sample_data_suite": "15 passed, 6 xfailed (untouched sample_multi_trade_1m.csv), 0 failed",
+    "full_repo_suite": "2165 passed, 0 failed, 1 skipped, 10 xfailed"
+  },
+  "artifacts": [
+    "stage0_baseline_audit.md", "stage0_repro_before.txt",
+    "stage1_failure_before.txt", "stage1_root_cause.md",
+    "stage1_fixture_diff_explanation.md", "stage1_test_results.txt",
+    "stage1_full_suite_results.txt",
+    "stage1_original_fixture_backup.csv"
+  ],
+  "blockers": [],
+  "next_stage": "STAGE_2",
+  "committed": false,
+  "pushed": false
+}
