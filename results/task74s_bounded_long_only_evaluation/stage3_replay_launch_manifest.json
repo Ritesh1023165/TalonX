@@ -1,0 +1,13 @@
+{
+  "launched_at_utc": "2026-08-27T07:13:10Z",
+  "background_task_id": "b33yth92n",
+  "command": "python -m talonx_backtest --data data/historical_1m/task7b_alpaca_long_history --symbols AAPL,MSFT,NVDA,AMZN,META,AMD,TSLA,GOOGL,PYPL,STX --entry-slippage-bps 5 --exit-slippage-bps 5 --spread-bps 10 --research-telemetry --progress-interval 60 --out results/task74s_bounded_long_only_evaluation/stage3_replay --prefix task74s_10symbol_full",
+  "starting_sha_at_launch": "4a3fc3e",
+  "preregistration_committed_before_launch": true,
+  "control_tests_run_before_launch": "tests/test_task73s_control_fixture.py -- 3 passed",
+  "data_quality_checked_before_launch": true,
+  "estimated_runtime_minutes": 234,
+  "estimated_runtime_basis": "Task 36 ledger record for an identical-size 1,903,044-bar/10-symbol dataset with research_telemetry=True",
+  "relaunch_count": 0,
+  "scope_changed_after_launch": false
+}
