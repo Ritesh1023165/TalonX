@@ -14,6 +14,7 @@ from talonx_piv.broker import AlpacaPaperClient, PaperGuardError
 from talonx_piv.config import PAPER_ENDPOINT, PivConfig
 from talonx_piv.decision_engine import DecisionEngine
 from talonx_piv.events import EventBus, PivEvent, notification_class_for, trading_date_for
+from talonx_piv.execution_settings import PaperEntrySettings
 from talonx_piv.lifecycle import PaperLifecycle
 from talonx_piv.premarket_radar import PremarketRadarEngine, classify, is_premarket
 from talonx_piv.reporting import build_session_report
@@ -145,7 +146,10 @@ def _lifecycle(tmp_path):
     broker = AlpacaPaperClient(cfg, transport)
     broker.verify_paper_identity()
     bus = EventBus(tmp_path / "events.jsonl", feed_mode=cfg.feed_mode)
-    life = PaperLifecycle(tmp_path / "state.json", broker, bus)
+    # Task 76S: TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE. AAPL explicitly
+    # enabled to preserve this file's pre-existing execution-economics test
+    # intent under the new fail-closed default.
+    life = PaperLifecycle(tmp_path / "state.json", broker, bus, PaperEntrySettings.for_test("AAPL"))
     life.start_session(True, True)
     return life, bus
 

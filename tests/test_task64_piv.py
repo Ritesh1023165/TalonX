@@ -10,6 +10,7 @@ import pytest
 from talonx_piv.broker import AlpacaPaperClient, PaperGuardError
 from talonx_piv.config import PAPER_ENDPOINT, PivConfig
 from talonx_piv.events import EventBus, PivEvent
+from talonx_piv.execution_settings import PaperEntrySettings
 from talonx_piv.lifecycle import PaperLifecycle, paper_cleanup, stable_id
 from talonx_piv.preflight import Preflight
 from talonx_piv.readiness import SessionReadinessValidator
@@ -59,9 +60,16 @@ def ready_validator(missing=()):
 
 
 def lifecycle(tmp_path, transport=None, telegram=None):
+    # Task 76S: TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE. This file's tests
+    # exercise the AAPL order lifecycle pre-dating the Stage 2 fail-closed
+    # paper_entry_enabled default; explicitly enabling AAPL here preserves
+    # their original intent (duplicate/partial-fill/reject/restart/kill-
+    # switch mechanics) rather than having every one of them newly blocked
+    # by PAPER_ENTRY_DISABLED_FOR_TICKER.
     transport = transport or Transport(); broker = AlpacaPaperClient(config(tmp_path), transport); broker.verify_paper_identity()
     events = EventBus(tmp_path / "events.jsonl", telegram)
-    life = PaperLifecycle(tmp_path / "state.json", broker, events); life.start_session(True, True)
+    life = PaperLifecycle(tmp_path / "state.json", broker, events, PaperEntrySettings.for_test("AAPL"))
+    life.start_session(True, True)
     return life, broker, transport, events
 
 

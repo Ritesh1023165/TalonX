@@ -19,6 +19,7 @@ from .broker import AlpacaPaperClient, PaperGuardError
 from .config import PivConfig
 from .decision_engine import DecisionEngine
 from .events import EventBus, PivEvent
+from .execution_settings import load_paper_entry_settings
 from .lifecycle import PaperLifecycle, paper_cleanup
 from .preflight import Preflight
 from .reporting import build_session_report
@@ -52,7 +53,14 @@ def runtime(config: PivConfig, session_id: str | None = None):
         feed_mode=config.feed_mode, session_id=session_id,
     )
     broker = AlpacaPaperClient(config)
-    lifecycle = PaperLifecycle(config.state_dir / "lifecycle_state.json", broker, bus)
+    # Task 76S Stage 2/3: fail-closed by construction -- if
+    # paper_entry_settings.json does not exist yet (e.g. immediately after
+    # this task ships), load_paper_entry_settings returns an all-disabled
+    # PaperEntrySettings, so NO ticker may open a new PAPER entry until an
+    # operator explicitly populates that file. See execution_settings.py
+    # and results/task76s_long_only_execution_contract/paper_setting_migration.md.
+    paper_entry_settings = load_paper_entry_settings(config.state_dir / "paper_entry_settings.json")
+    lifecycle = PaperLifecycle(config.state_dir / "lifecycle_state.json", broker, bus, paper_entry_settings)
     return bus, broker, lifecycle
 
 

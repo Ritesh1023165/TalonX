@@ -16,6 +16,7 @@ from talonx_piv.broker import AlpacaPaperClient, PaperGuardError
 from talonx_piv.config import PAPER_ENDPOINT, PivConfig
 from talonx_piv.decision_engine import DecisionEngine
 from talonx_piv.events import EventBus
+from talonx_piv.execution_settings import PaperEntrySettings
 from talonx_piv.lifecycle import PaperLifecycle
 from talonx_piv.session_runner import Bar
 from talonx_quant.schemas import QuantSignal, SignalDirection, SignalType
@@ -109,7 +110,10 @@ def build_engine(tmp_path, messages=None, **cfg_overrides):
     broker = AlpacaPaperClient(cfg, transport)
     broker.verify_paper_identity()
     bus = EventBus(tmp_path / "events.jsonl", feed_mode=cfg.feed_mode)
-    life = PaperLifecycle(tmp_path / "state.json", broker, bus)
+    # Task 76S: TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE. AAPL explicitly
+    # enabled to preserve this file's pre-existing natural-signal/duplicate/
+    # broker-verification test intent under the new fail-closed default.
+    life = PaperLifecycle(tmp_path / "state.json", broker, bus, PaperEntrySettings.for_test("AAPL"))
     life.start_session(True, True)
     engine = DecisionEngine(FakeRedisClient(FakePubSub(messages)), bus, life)
     engine.scanner._handle_market_tick = AsyncMock()
@@ -184,7 +188,10 @@ async def test_requires_paper_verification_fails_closed_on_broker_error(tmp_path
     transport = Transport()
     broker = AlpacaPaperClient(cfg, transport)  # deliberately never verified
     bus = EventBus(tmp_path / "events.jsonl", feed_mode=cfg.feed_mode)
-    life = PaperLifecycle(tmp_path / "state.json", broker, bus)
+    # Task 76S: TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE. AAPL explicitly
+    # enabled to preserve this file's pre-existing natural-signal/duplicate/
+    # broker-verification test intent under the new fail-closed default.
+    life = PaperLifecycle(tmp_path / "state.json", broker, bus, PaperEntrySettings.for_test("AAPL"))
     life.state.session_enabled = True
     engine = DecisionEngine(FakeRedisClient(FakePubSub([signal.model_dump_json().encode()])), bus, life)
     engine.scanner._handle_market_tick = AsyncMock()
@@ -208,7 +215,10 @@ def test_duplicate_protection_unchanged_with_source_tagging(tmp_path):
     broker = AlpacaPaperClient(cfg, transport)
     broker.verify_paper_identity()
     bus = EventBus(tmp_path / "events.jsonl", feed_mode=cfg.feed_mode)
-    life = PaperLifecycle(tmp_path / "state.json", broker, bus)
+    # Task 76S: TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE. AAPL explicitly
+    # enabled to preserve this file's pre-existing natural-signal/duplicate/
+    # broker-verification test intent under the new fail-closed default.
+    life = PaperLifecycle(tmp_path / "state.json", broker, bus, PaperEntrySettings.for_test("AAPL"))
     life.start_session(True, True)
     life.order_intent("sig", "AAPL", "buy", 1, source="STRATEGY", alpha_evidence=False)
     with pytest.raises(PaperGuardError):

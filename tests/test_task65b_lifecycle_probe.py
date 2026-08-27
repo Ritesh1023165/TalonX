@@ -10,6 +10,7 @@ import pytest
 from talonx_piv.broker import AlpacaPaperClient
 from talonx_piv.config import PAPER_ENDPOINT, PivConfig
 from talonx_piv.events import EventBus
+from talonx_piv.execution_settings import PaperEntrySettings
 from talonx_piv.lifecycle import PaperLifecycle
 from talonx_piv.lifecycle_probe import (
     PROBE_CUTOFF_ET, PROBE_SYMBOL, close_piv_lifecycle_probe, natural_strategy_lifecycle_observed,
@@ -68,7 +69,10 @@ def lifecycle(tmp_path, transport=None):
     broker = AlpacaPaperClient(cfg, transport)
     broker.verify_paper_identity()
     bus = EventBus(tmp_path / "events.jsonl", feed_mode=cfg.feed_mode)
-    life = PaperLifecycle(tmp_path / "state.json", broker, bus)
+    # Task 76S: TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE. AAPL (PROBE_SYMBOL)
+    # and MSFT explicitly enabled to preserve this file's pre-existing probe/
+    # natural-lifecycle test intent under the new fail-closed default.
+    life = PaperLifecycle(tmp_path / "state.json", broker, bus, PaperEntrySettings.for_test("AAPL", "MSFT"))
     life.start_session(True, True)
     return cfg, bus, life, transport
 
