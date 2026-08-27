@@ -224,7 +224,12 @@ class PaperLifecycle:
             position = self._open_position_for(symbol)
             if position is None:
                 self._reject("SELL_WHILE_FLAT", symbol, source, alpha_evidence)
-            held = float(position.get("quantity") or 0.0)
+            # Task 77I: `remaining_quantity` (set once any closing fill has
+            # been applied -- see apply_broker_update) reflects what is
+            # ACTUALLY still held after a genuine partial close; a position
+            # with no closing fills yet has no such key, so this falls back
+            # to the full entry `quantity`, unchanged from before this task.
+            held = float(position.get("remaining_quantity", position.get("quantity")) or 0.0)
             pending_sell = self._pending_quantity(symbol, "sell")
             available = held - pending_sell
             if quantity > available + 1e-9:
@@ -269,6 +274,14 @@ class PaperLifecycle:
 
     def apply_broker_update(self, broker_order_id: str, status: str, filled_qty: float = 0.0, fill_price: float | None = None) -> None:
         order = self.state.orders[broker_order_id]
+        # Task 77I: captured BEFORE this call's own update overwrites it --
+        # Alpaca reports `filled_qty` CUMULATIVELY per order, so the amount
+        # that actually happened THIS update is the delta since the
+        # previously-stored value, not the raw field itself. See
+        # partial_fill_before_after.md for the bug this fixes (a second
+        # partially_filled/filled transition on the same closing order used
+        # to fabricate an orphan phantom OPEN position).
+        previous_filled_qty = float(order.get("filled_qty") or 0.0)
         order.update(status=status, filled_qty=filled_qty, fill_price=fill_price)
         intent_id, symbol = order["intent_id"], order["symbol"]
         source, alpha_evidence = order.get("source"), order.get("alpha_evidence")
@@ -302,17 +315,38 @@ class PaperLifecycle:
             if side == "sell" and existing_position_id is not None and existing_position_id in self.state.positions:
                 position = self.state.positions[existing_position_id]
                 entry_price = position.get("price")
-                entry_quantity = position.get("quantity") or filled_qty
+                entry_quantity = float(position.get("quantity") or 0.0) or filled_qty
                 entry_time = position.get("entry_time")
+                # Task 77I: incremental exit quantity for THIS update only --
+                # never the order's full (possibly still-growing) cumulative
+                # filled_qty, and never the position's full original entry
+                # size. Accumulated across every closing fill this position
+                # has ever seen (possibly from more than one closing order,
+                # e.g. a scaled-out partial sell followed by a later sell of
+                # the remainder).
+                incremental_qty = max(0.0, filled_qty - previous_filled_qty)
+                prior_exit_qty = float(position.get("exit_quantity") or 0.0)
+                cumulative_exit_qty = prior_exit_qty + incremental_qty
+                remaining_qty = max(0.0, entry_quantity - cumulative_exit_qty)
                 exit_slippage_abs = (fill_price - reference_price) if (fill_price is not None and reference_price is not None) else None
                 exit_slippage_bps = (exit_slippage_abs / reference_price * 10000) if (exit_slippage_abs is not None and reference_price) else None
-                gross_pnl = ((fill_price - entry_price) * entry_quantity) if (fill_price is not None and entry_price is not None) else None
+                fill_gross_pnl = ((fill_price - entry_price) * incremental_qty) if (fill_price is not None and entry_price is not None) else None
                 # PAPER broker models zero commissions/fees; net_pnl equals
                 # gross_pnl today. estimated_transaction_cost is carried
                 # explicitly (rather than omitted) so a future real cost model
                 # only has to change this one value, not the schema.
-                estimated_transaction_cost = 0.0 if gross_pnl is not None else None
-                net_pnl = (gross_pnl - estimated_transaction_cost) if gross_pnl is not None else None
+                fill_transaction_cost = 0.0 if fill_gross_pnl is not None else None
+                fill_net_pnl = (fill_gross_pnl - fill_transaction_cost) if fill_gross_pnl is not None else None
+                prior_gross_pnl = position.get("gross_pnl")
+                prior_net_pnl = position.get("net_pnl")
+                cumulative_gross_pnl = (
+                    (prior_gross_pnl or 0.0) + fill_gross_pnl if fill_gross_pnl is not None
+                    else prior_gross_pnl
+                )
+                cumulative_net_pnl = (
+                    (prior_net_pnl or 0.0) + fill_net_pnl if fill_net_pnl is not None
+                    else prior_net_pnl
+                )
                 holding_seconds = None
                 if entry_time is not None:
                     try:
@@ -321,26 +355,50 @@ class PaperLifecycle:
                         holding_seconds = None
                 position_stop = position.get("stop_price")
                 gross_r = net_r = None
-                if position_stop is not None and entry_price is not None and entry_price != position_stop and gross_pnl is not None:
+                if position_stop is not None and entry_price is not None and entry_price != position_stop and cumulative_gross_pnl is not None:
                     denom = (entry_price - position_stop) * entry_quantity
                     if denom:
-                        gross_r, net_r = gross_pnl / denom, net_pnl / denom
+                        gross_r, net_r = cumulative_gross_pnl / denom, cumulative_net_pnl / denom
                 position.update(
-                    status="CLOSED", exit_price=fill_price, exit_quantity=filled_qty,
-                    exit_reference_price=reference_price, gross_pnl=gross_pnl, net_pnl=net_pnl,
+                    exit_price=fill_price, exit_quantity=cumulative_exit_qty,
+                    remaining_quantity=remaining_qty,
+                    exit_reference_price=reference_price, gross_pnl=cumulative_gross_pnl, net_pnl=cumulative_net_pnl,
                     holding_seconds=holding_seconds,
                 )
-                del self.state.open_position_by_symbol[symbol]
-                self.events.emit(PivEvent.build(
-                    "POSITION_CLOSED", symbol=symbol, correlation_id=intent_id, broker_order_id=broker_order_id,
-                    position_id=existing_position_id, quantity=filled_qty, price=fill_price,
-                    source=source, alpha_evidence=alpha_evidence, reference_price=reference_price,
-                    slippage_abs=exit_slippage_abs, slippage_bps=exit_slippage_bps,
-                    gross_pnl=gross_pnl, net_pnl=net_pnl, estimated_transaction_cost=estimated_transaction_cost,
-                    holding_seconds=holding_seconds, gross_r=gross_r, net_r=net_r,
-                    horizon=horizon or position.get("horizon"), strategy_id=strategy_id or position.get("strategy_id"),
-                ))
-            else:
+                fully_closed = remaining_qty <= 1e-9
+                if fully_closed:
+                    # Only NOW -- once the position's entire remaining size
+                    # has actually been sold, possibly across more than one
+                    # fill/order -- is it safe to mark CLOSED and free the
+                    # symbol for a new entry. A partial fill leaves the
+                    # position OPEN with a reduced remaining_quantity, and
+                    # (critically) leaves open_position_by_symbol[symbol]
+                    # intact, so a second fill-status transition on the SAME
+                    # order re-attaches to this SAME position instead of
+                    # falling into the open/BUY branch below and fabricating
+                    # a phantom second position (the exact bug this fixes).
+                    position["status"] = "CLOSED"
+                    del self.state.open_position_by_symbol[symbol]
+                    self.events.emit(PivEvent.build(
+                        "POSITION_CLOSED", symbol=symbol, correlation_id=intent_id, broker_order_id=broker_order_id,
+                        position_id=existing_position_id, quantity=cumulative_exit_qty, price=fill_price,
+                        source=source, alpha_evidence=alpha_evidence, reference_price=reference_price,
+                        slippage_abs=exit_slippage_abs, slippage_bps=exit_slippage_bps,
+                        gross_pnl=cumulative_gross_pnl, net_pnl=cumulative_net_pnl, estimated_transaction_cost=fill_transaction_cost,
+                        holding_seconds=holding_seconds, gross_r=gross_r, net_r=net_r,
+                        horizon=horizon or position.get("horizon"), strategy_id=strategy_id or position.get("strategy_id"),
+                    ))
+            elif side == "buy":
+                # Task 77I: explicitly gated on side=="buy" -- previously this
+                # branch was reached for ANY fill lacking a currently-tracked
+                # open position, including a sell fill whose position had
+                # already been (prematurely) closed by the very bug fixed
+                # above. With that bug fixed, a sell fill should never reach
+                # here in normal operation; this guard makes it structurally
+                # impossible to fabricate a phantom OPEN position from a SELL
+                # fill even in an anomalous/out-of-band broker-update case
+                # (e.g. a duplicate status callback), rather than relying on
+                # that no longer happening in practice.
                 position_id = stable_id("position", intent_id, symbol)
                 first = position_id not in self.state.positions
                 entry_slippage_abs = (fill_price - reference_price) if (fill_price is not None and reference_price is not None) else None
@@ -349,10 +407,10 @@ class PaperLifecycle:
                     "symbol": symbol, "quantity": filled_qty, "price": fill_price, "status": "OPEN",
                     "source": source, "alpha_evidence": alpha_evidence, "entry_time": now_iso,
                     "reference_price": reference_price, "stop_price": stop_price,
-                    "strategy_id": strategy_id, "horizon": horizon,
+                    "strategy_id": strategy_id, "horizon": horizon, "exit_quantity": 0.0,
+                    "remaining_quantity": filled_qty,
                 }
-                if side == "buy":
-                    self.state.open_position_by_symbol[symbol] = position_id
+                self.state.open_position_by_symbol[symbol] = position_id
                 if first:
                     self.events.emit(PivEvent.build(
                         "POSITION_OPENED", symbol=symbol, correlation_id=intent_id, broker_order_id=broker_order_id,
@@ -389,7 +447,54 @@ class PaperLifecycle:
                 break
             sleep(poll_interval_seconds)
             elapsed += poll_interval_seconds
+        else:
+            # Task 77I: the loop ran out of time without ever observing a
+            # terminal status -- the true broker outcome is UNKNOWN, not
+            # inert. Marked with a sentinel status deliberately outside
+            # _TERMINAL_ORDER_STATUSES so oversell/pyramiding/pending-entry
+            # guards keep treating this order as outstanding (fail closed)
+            # until reconcile() resolves it against a fresh broker read --
+            # never silently dropped, never blindly resubmitted (the
+            # existing duplicate-intent-id guard also still applies to the
+            # ORIGINAL signal_id regardless).
+            if broker_order_id in self.state.orders:
+                self.state.orders[broker_order_id]["status"] = "UNCONFIRMED_TIMEOUT"
+                self._save()
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", broker_order_id=broker_order_id,
+                reason="ORDER_SUBMISSION_TIMEOUT_UNCONFIRMED", status="RECONCILE_REQUIRED",
+            ))
         return last
+
+    def _resolve_unconfirmed_orders(self) -> None:
+        """Task 77I: called at the top of reconcile() -- any order left
+        UNCONFIRMED_TIMEOUT by poll_order_until_terminal is re-queried
+        against the broker (a fresh, authoritative read, never trusted from
+        stale local state) and its real status applied via
+        apply_broker_update, restart-safe since this scans persisted state
+        every time reconcile() runs (EOD, probe pre-check, or a manual CLI
+        invocation) rather than relying on any in-memory-only bookkeeping."""
+        pending_ids = [
+            broker_order_id for broker_order_id, order in self.state.orders.items()
+            if order.get("status") == "UNCONFIRMED_TIMEOUT"
+        ]
+        for broker_order_id in pending_ids:
+            try:
+                current = self.broker.get_order(broker_order_id)
+            except Exception as exc:  # noqa: BLE001 -- a broker-read failure here must not crash
+                # reconcile(); the order stays UNCONFIRMED_TIMEOUT (still fail-closed/outstanding)
+                # and will be retried on the next reconcile() call.
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", broker_order_id=broker_order_id,
+                    reason=f"UNCONFIRMED_ORDER_RECONCILE_READ_FAILED_{type(exc).__name__}", status="STILL_UNRESOLVED",
+                ))
+                continue
+            status = str(current.get("status") or "")
+            if not status:
+                continue
+            filled_qty = float(current.get("filled_qty") or 0.0)
+            fill_price = float(current["filled_avg_price"]) if current.get("filled_avg_price") else None
+            self.apply_broker_update(broker_order_id, status, filled_qty, fill_price)
 
     def activate_kill_switch(self, cancel_orders: bool = False) -> None:
         self.state.kill_switch = True
@@ -400,6 +505,7 @@ class PaperLifecycle:
         self.events.emit(PivEvent.build("KILL_SWITCH", reason="OPERATOR_ACTIVATED", status="NEW_PAPER_ORDERS_BLOCKED"))
 
     def reconcile(self) -> dict[str, Any]:
+        self._resolve_unconfirmed_orders()
         broker_orders = self.broker.open_orders()
         broker_positions = self.broker.positions()
         internal_open = {v["symbol"] for v in self.state.positions.values() if v.get("status") == "OPEN"}

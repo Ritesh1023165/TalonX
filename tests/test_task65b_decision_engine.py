@@ -14,6 +14,7 @@ import pytest
 
 from talonx_piv.broker import AlpacaPaperClient, PaperGuardError
 from talonx_piv.config import PAPER_ENDPOINT, PivConfig
+from talonx_piv.decision_contract import StrategyApprovalStatus
 from talonx_piv.decision_engine import DecisionEngine
 from talonx_piv.events import EventBus
 from talonx_piv.execution_settings import PaperEntrySettings
@@ -115,7 +116,20 @@ def build_engine(tmp_path, messages=None, **cfg_overrides):
     # broker-verification test intent under the new fail-closed default.
     life = PaperLifecycle(tmp_path / "state.json", broker, bus, PaperEntrySettings.for_test("AAPL"))
     life.start_session(True, True)
-    engine = DecisionEngine(FakeRedisClient(FakePubSub(messages)), bus, life)
+    # Task 77I: TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE. This file tests
+    # DecisionEngine's own signal->order_intent->broker glue, not strategy
+    # approval -- decide() now hard-gates a real BUY on
+    # strategy_approval_status==APPROVED (see decision_engine.py), which no
+    # production caller ever sets (cli.py never supplies this override). To
+    # preserve this file's pre-existing "does a published signal correctly
+    # become an order" test intent, this fixture explicitly opts into
+    # APPROVED via the test-only override; production behavior (default
+    # UNVALIDATED, entries blocked) is proven separately in
+    # test_task77i_decision_engine_wiring.py.
+    engine = DecisionEngine(
+        FakeRedisClient(FakePubSub(messages)), bus, life,
+        strategy_approval_status_override=StrategyApprovalStatus.APPROVED,
+    )
     engine.scanner._handle_market_tick = AsyncMock()
     engine.scanner._flush_throttle_window = AsyncMock()
     return engine, transport, bus, life
@@ -193,7 +207,13 @@ async def test_requires_paper_verification_fails_closed_on_broker_error(tmp_path
     # broker-verification test intent under the new fail-closed default.
     life = PaperLifecycle(tmp_path / "state.json", broker, bus, PaperEntrySettings.for_test("AAPL"))
     life.state.session_enabled = True
-    engine = DecisionEngine(FakeRedisClient(FakePubSub([signal.model_dump_json().encode()])), bus, life)
+    # Task 77I: TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE -- see build_engine's
+    # own comment above for why this override is needed to reach order_intent
+    # at all under the new strategy-approval gate.
+    engine = DecisionEngine(
+        FakeRedisClient(FakePubSub([signal.model_dump_json().encode()])), bus, life,
+        strategy_approval_status_override=StrategyApprovalStatus.APPROVED,
+    )
     engine.scanner._handle_market_tick = AsyncMock()
     engine.scanner._flush_throttle_window = AsyncMock()
     await engine.on_bars({"AAPL": bar()})

@@ -217,21 +217,59 @@ def test_duplicate_sell_request_with_different_signal_id_rejected(tmp_path):
     assert transport.submits == 2  # entry + first sell only
 
 
-def test_partial_fill_of_a_closing_sell_still_blocks_a_second_sell(tmp_path):
-    """A partial fill on a SELL_TO_CLOSE marks the position CLOSED in this
-    codebase's existing apply_broker_update (a pre-existing accounting
-    characteristic this task does not redesign -- see
-    remaining_integration_work.md) -- meaning a second sell attempt is
-    correctly rejected, just as SELL_WHILE_FLAT rather than an oversell.
-    Either way, no second sell reaches the broker."""
+def test_partial_fill_of_a_closing_sell_correctly_reduces_remaining_and_blocks_oversell(tmp_path):
+    """Task 77I fix (Task 76S's disclosed item 4): a partial fill on a
+    SELL_TO_CLOSE no longer prematurely marks the position CLOSED -- it
+    reduces remaining_quantity and leaves the position OPEN, still
+    correctly tracked. A second sell attempt for MORE than the true
+    remainder (1 share, not the full original 3) is rejected as an
+    oversell (not the previous, less precise SELL_WHILE_FLAT), and never
+    reaches the broker."""
     life, transport, _ = _life(tmp_path)
     entry = life.order_intent("s1", "AAPL", "buy", 3)
     _fill(life, entry["id"], 3, 100.0)
     exit1 = life.order_intent("exit-1", "AAPL", "sell", 2)
     life.apply_broker_update(exit1["id"], "partially_filled", 1, 101.0)
-    with pytest.raises(PaperGuardError, match="SELL_WHILE_FLAT"):
-        life.order_intent("exit-2", "AAPL", "sell", 3)
+    position = life._open_position_for("AAPL")
+    assert position is not None  # still OPEN, not prematurely closed
+    assert position["remaining_quantity"] == 2  # 3 held - 1 actually sold so far
+    with pytest.raises(PaperGuardError, match="OVERSIZED_OR_DUPLICATE_SELL"):
+        life.order_intent("exit-2", "AAPL", "sell", 3)  # more than the true remainder
     assert transport.submits == 2  # entry + first sell only -- never a third submission
+
+
+def test_partial_fill_then_second_sell_for_true_remainder_fully_closes_position(tmp_path):
+    """Positive case for the same fix: a scale-out sell (qty=2) fills in two
+    steps (1 then, cumulatively, 2 -- both against the SAME order, matching
+    how Alpaca reports cumulative filled_qty), leaving 1 of 3 shares
+    remaining and the position still correctly OPEN. Only once a SECOND,
+    correctly-sized order for the true remainder (1 share) is submitted and
+    filled does the position finally close -- with cumulative P&L computed
+    from each fill's own incremental quantity and price, never the entry
+    quantity misapplied to a single fill price."""
+    life, transport, _ = _life(tmp_path)
+    entry = life.order_intent("s1", "AAPL", "buy", 3)
+    _fill(life, entry["id"], 3, 100.0)
+    exit1 = life.order_intent("exit-1", "AAPL", "sell", 2)
+    life.apply_broker_update(exit1["id"], "partially_filled", 1, 101.0)  # 1 of 2 filled so far
+    position = life._open_position_for("AAPL")
+    assert position["remaining_quantity"] == 2
+    life.apply_broker_update(exit1["id"], "filled", 2, 101.0)  # exit1 now fully filled (cumulative 2)
+    position = life._open_position_for("AAPL")
+    assert position is not None  # still open -- only 2 of 3 shares ever sold so far
+    assert position["remaining_quantity"] == 1
+    assert position["exit_quantity"] == 2
+    exit2 = life.order_intent("exit-2", "AAPL", "sell", 1)  # the true remainder -- exit1 is now terminal
+    life.apply_broker_update(exit2["id"], "filled", 1, 102.0)
+    assert life._open_position_for("AAPL") is None  # now fully closed
+    position_id = next(iter(life.state.positions))
+    position = life.state.positions[position_id]
+    assert position["status"] == "CLOSED"
+    assert position["remaining_quantity"] == 0
+    assert position["exit_quantity"] == 3  # 1 + 1 (both from exit1's two fill updates) + 1 (exit2)
+    # gross_pnl = 1*(101-100) [exit1 first increment] + 1*(101-100) [exit1 second increment]
+    #           + 1*(102-100) [exit2] = 1 + 1 + 2 = 4 -- never entry_quantity(3) * a single fill price
+    assert position["gross_pnl"] == pytest.approx(4.0)
 
 
 def test_reversing_a_long_into_a_short_via_oversell_is_blocked(tmp_path):

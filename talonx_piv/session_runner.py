@@ -338,6 +338,23 @@ class SessionRunner:
         self._check_stale(now)
         self._update_piv_info_after_tick(now)
         self._maybe_emit_heartbeat(now)
+        self._dispatch_pending_notifications()
+
+    def _dispatch_pending_notifications(self) -> None:
+        """Task 77I Stage 2: an INDEPENDENT dispatch step, decoupled from
+        the decision path itself (enqueue() already happened, synchronously
+        and durably, inside DecisionEngine._record_decision) -- a Telegram
+        outage here can only ever delay delivery, never suppress a decision
+        record or a shadow position that was already created before this
+        runs."""
+        if self.decision_engine is None:
+            return
+        try:
+            self.decision_engine.notification_outbox.dispatch_pending()
+        except Exception as exc:  # noqa: BLE001 -- must never crash the live tick loop.
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", reason=f"NOTIFICATION_DISPATCH_FAILED_{type(exc).__name__}", status="DISPATCH_SKIPPED_LOOP_CONTINUES",
+            ))
 
     def _update_piv_info_after_tick(self, now: datetime) -> None:
         """Task 69Q Part 8: keeps the shared /ping dict current every tick --

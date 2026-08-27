@@ -13,6 +13,7 @@ import pytest
 
 from talonx_piv.broker import AlpacaPaperClient
 from talonx_piv.config import PAPER_ENDPOINT, PivConfig
+from talonx_piv.decision_contract import StrategyApprovalStatus
 from talonx_piv.decision_engine import DecisionEngine, OpenDecisionPosition
 from talonx_piv.eod_lifecycle import STATUS_FAILED, STATUS_INCONCLUSIVE, STATUS_PASSED, run_eod_lifecycle
 from talonx_piv.events import EventBus
@@ -114,7 +115,13 @@ def build_engine(tmp_path, *, paper_entry_enabled_for=()):
     bus = EventBus(tmp_path / "events.jsonl", feed_mode=cfg.feed_mode)
     life = PaperLifecycle(tmp_path / "state.json", broker, bus, PaperEntrySettings.for_test(*paper_entry_enabled_for))
     life.start_session(True, True)
-    engine = DecisionEngine(FakeRedisClient(), bus, life)
+    # Task 77I: TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE. This file tests
+    # protective-exit/EOD behavior, not strategy approval -- decide() now
+    # hard-gates a real BUY on strategy_approval_status==APPROVED (see
+    # decision_engine.py), which no production caller ever sets. This
+    # override preserves this file's pre-existing "does a natural signal
+    # open a real position to then protect" test intent.
+    engine = DecisionEngine(FakeRedisClient(), bus, life, strategy_approval_status_override=StrategyApprovalStatus.APPROVED)
     engine.scanner._handle_market_tick = AsyncMock()
     engine.scanner._flush_throttle_window = AsyncMock()
     return engine, transport, bus, life

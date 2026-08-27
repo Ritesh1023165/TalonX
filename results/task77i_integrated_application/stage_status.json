@@ -1,0 +1,23 @@
+{
+  "task": "Task77I_INTEGRATED_SAFETY_ALERTS_SHADOW_OBSERVABILITY",
+  "starting_sha": "2c597c0e38077c390f1c4280d84dc5816e6a4d97",
+  "environment_correction": "use .venv/Scripts/python.exe, not shell-default python",
+  "baseline_collection": "2257 collected, 0 errors",
+  "baseline_directly_affected_suites": "134 passed",
+  "stages": {
+    "stage0_baseline_and_plan": "COMPLETE",
+    "stage1_runtime_safety": "COMPLETE",
+    "stage2_alerts": "IN_PROGRESS",
+    "stage3_shadow": "IN_PROGRESS",
+    "stage4_observability": "NOT_STARTED"
+  },
+  "stage1_summary": {
+    "decision_contract_wired": true,
+    "partial_fill_accounting_fixed": true,
+    "timeout_uncertainty_handled": true,
+    "restart_safety_proven": true,
+    "new_tests": 45,
+    "regression": "zero -- all pre-existing directly-affected suites pass unchanged"
+  },
+  "checkpoint_commits": {}
+}

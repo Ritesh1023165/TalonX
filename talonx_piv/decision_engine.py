@@ -45,8 +45,12 @@ from talonx_quant.schemas import QuantSignal, RejectedCandidateEvent, SignalDire
 
 from .broker import PaperGuardError
 from .config import PivConfig
-from .events import EventBus, PivEvent
-from .lifecycle import PaperLifecycle
+from .decision_contract import DataReadiness, ExecutionStatus, MarketView, Recommendation, StrategyApprovalStatus, decide
+from .decision_ledger import DecisionLedger
+from .events import EventBus, PivEvent, trading_date_for
+from .lifecycle import PaperLifecycle, stable_id
+from .notification_outbox import NotificationOutbox
+from .shadow_ledger import ShadowLedger
 from .warmup import WarmupCheck, preseed_and_verify
 
 PIV_QUANTITY = 1.0
@@ -79,8 +83,29 @@ class DecisionEngine:
     # None (the default -- every pre-Task-70S caller/test) means warmup.py's
     # Alpaca leg is skipped entirely; see preseed_and_verify's own docstring.
     piv_config: PivConfig | None = None
+    # Task 77I: the three new durable ledgers -- all optional, defaulting to
+    # an in-memory-only instance (never touches disk) in __post_init__ so
+    # every pre-existing DecisionEngine test-construction site keeps working
+    # unchanged (same fail-safe-default pattern Task 76S used for
+    # PaperEntrySettings). Every REAL production caller (cli.py::runtime())
+    # always supplies real, state_dir-backed instances.
+    decision_ledger: DecisionLedger | None = None
+    notification_outbox: NotificationOutbox | None = None
+    shadow_ledger: ShadowLedger | None = None
+    runtime_sha: str | None = None
+    config_hash: str | None = None
+    # TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE. The ONLY way any decision this
+    # engine makes can ever resolve to StrategyApprovalStatus.APPROVED --
+    # `cli.py` never sets this (grep-provable), so no production code path
+    # can reach it. Every real decision hardcodes UNVALIDATED, regardless of
+    # any caller-supplied value elsewhere -- "do not trust a caller-supplied
+    # 'approved' flag as production authority."
+    strategy_approval_status_override: StrategyApprovalStatus | None = None
 
     def __post_init__(self) -> None:
+        self.decision_ledger = self.decision_ledger or DecisionLedger(None)
+        self.notification_outbox = self.notification_outbox or NotificationOutbox(None, None)
+        self.shadow_ledger = self.shadow_ledger or ShadowLedger(None)
         self.scanner = QuantScanner(self.config)
         self.scanner._client = self.redis_client
         self._pubsub = self.redis_client.pubsub()
@@ -193,6 +218,44 @@ class DecisionEngine:
                 continue
         return published
 
+    def _strategy_approval_status(self) -> StrategyApprovalStatus:
+        # See the field's own docstring above -- production callers never
+        # supply strategy_approval_status_override, so this is always
+        # UNVALIDATED outside a TEST_FIXTURE_ONLY construction site.
+        return self.strategy_approval_status_override or StrategyApprovalStatus.UNVALIDATED
+
+    def _record_decision(self, decision) -> None:
+        """Task 77I: durable-record-before-dispatch, then two INDEPENDENT,
+        individually-guarded branches -- a NotificationOutbox or
+        ShadowLedger failure can never suppress the other, and neither can
+        ever suppress or alter the real order_intent call that follows in
+        the caller (which does not depend on either succeeding). If the
+        durable record itself fails to write, that exception is NOT
+        swallowed here -- it propagates to the caller, which must not then
+        proceed to a BUY (see _handle_entry: the record() call happens
+        before the recommendation==BUY branch, so a recording failure
+        blocks the entry by construction, never silently continuing)."""
+        self.decision_ledger.record(
+            decision, event_id=decision.decision_id, evidence_category="natural",
+            runtime_sha=self.runtime_sha, config_hash=self.config_hash,
+        )
+        try:
+            self.notification_outbox.enqueue(decision)
+        except Exception as exc:  # noqa: BLE001 -- a notification-outbox failure must never suppress
+            # shadow tracking or the real order_intent call that follows -- see module docstring.
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", symbol=decision.ticker, reason=f"NOTIFICATION_ENQUEUE_FAILED_{type(exc).__name__}",
+                source="STRATEGY",
+            ))
+        try:
+            self.shadow_ledger.consider_entry(decision, source="STRATEGY")
+        except Exception as exc:  # noqa: BLE001 -- a shadow-ledger failure must never suppress a
+            # notification or the real order_intent call that follows -- see module docstring.
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", symbol=decision.ticker, reason=f"SHADOW_CONSIDER_ENTRY_FAILED_{type(exc).__name__}",
+                source="STRATEGY",
+            ))
+
     def _handle_entry(self, signal: QuantSignal) -> None:
         self.natural_signal_count += 1
         self.published_count += 1
@@ -201,10 +264,28 @@ class DecisionEngine:
             "SIGNAL", symbol=symbol, price=signal.price, status=signal.signal_type.value,
             source="STRATEGY", alpha_evidence=False,
         ))
-        if signal.direction != SignalDirection.BULLISH:
-            return  # LONG_ONLY lifecycle -- see module docstring; no order for a bearish signal
-        if symbol in self.positions:
-            return  # one PIV position per symbol at a time
+        market_view = MarketView.BULLISH if signal.direction == SignalDirection.BULLISH else MarketView.BEARISH
+        has_open_long = symbol in self.positions
+        decision_id = stable_id("decision", "entry", symbol, signal.bar_timestamp.isoformat())
+        decision = decide(
+            decision_id=decision_id, session_id=self.events.session_id or "",
+            trading_date_et=trading_date_for(signal.bar_timestamp.isoformat()), ticker=symbol,
+            market_view=market_view, has_open_long=has_open_long,
+            # A fresh incoming signal (bullish OR bearish) is never itself an
+            # authorised exit condition -- see module docstring's LONG_ONLY
+            # note and decision_contract's own hard invariant: SELL_TO_CLOSE
+            # must never be reachable from market_view alone.
+            approved_exit_condition=False,
+            strategy_approval_status=self._strategy_approval_status(), data_readiness=DataReadiness.READY,
+            paper_entry_enabled=self.lifecycle.paper_entry_settings.enabled_for(symbol),
+            strategy_id=signal.signal_type.value, entry_price=signal.price, stop_price=signal.stop_price,
+            target_price=signal.target_price, horizon=NATURAL_STRATEGY_HORIZON,
+        )
+        self._record_decision(decision)
+        if decision.recommendation != Recommendation.BUY:
+            return
+        if decision.execution_status != ExecutionStatus.ENTRY_ELIGIBLE:
+            return  # BUY preserved above (recorded); broker entry withheld (e.g. PAPER entry disabled)
         signal_id = f"strategy_entry_{symbol}_{signal.bar_timestamp.isoformat()}"
         try:
             result = self.lifecycle.order_intent(
@@ -231,6 +312,18 @@ class DecisionEngine:
                 reason = "STOP"
             elif position.target_price is not None and bar.high >= position.target_price:
                 reason = "TARGET"
+        decision_id = stable_id("decision", "exit", symbol, bar.timestamp.isoformat())
+        decision = decide(
+            decision_id=decision_id, session_id=self.events.session_id or "",
+            trading_date_et=trading_date_for(bar.timestamp.isoformat()), ticker=symbol,
+            market_view=MarketView.NEUTRAL, has_open_long=True,
+            approved_exit_condition=reason is not None,
+            strategy_approval_status=self._strategy_approval_status(), data_readiness=DataReadiness.READY,
+            paper_entry_enabled=self.lifecycle.paper_entry_settings.enabled_for(symbol),
+            strategy_id=None, stop_price=position.stop_price, target_price=position.target_price,
+            horizon=NATURAL_STRATEGY_HORIZON,
+        )
+        self._record_decision(decision)
         if reason is None:
             return
         del self.positions[symbol]
@@ -264,9 +357,30 @@ class DecisionEngine:
             self._handle_entry(signal)
         for symbol, bar in bars.items():
             self._check_exit(symbol, bar)
+        for symbol, bar in bars.items():
+            # Task 77I Stage 3: advances PENDING_FILL -> OPEN and checks
+            # OPEN -> CLOSED for any shadow position on this symbol, using
+            # the SAME bars the real decision path just saw -- completely
+            # independent of whether a real order_intent call happened
+            # above (a shadow entry only exists at all for an
+            # approved-strategy BUY -- see shadow_ledger.py).
+            try:
+                self.shadow_ledger.on_bar(symbol, bar)
+            except Exception as exc:  # noqa: BLE001 -- shadow tracking must never take down the real
+                # decision/execution loop.
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", symbol=symbol, reason=f"SHADOW_ON_BAR_FAILED_{type(exc).__name__}", source="STRATEGY",
+                ))
 
     def flatten_all(self, bars: dict[str, Any]) -> None:
         for symbol in list(self.positions):
             bar = bars.get(symbol)
             if bar is not None:
                 self._check_exit(symbol, bar, force_reason="END_OF_SESSION")
+        for symbol, bar in bars.items():
+            try:
+                self.shadow_ledger.force_close(symbol, bar.timestamp, bar.close, "END_OF_SESSION")
+            except Exception as exc:  # noqa: BLE001 -- same posture as on_bars above.
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", symbol=symbol, reason=f"SHADOW_FORCE_CLOSE_FAILED_{type(exc).__name__}", source="STRATEGY",
+                ))

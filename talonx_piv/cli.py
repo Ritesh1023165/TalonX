@@ -18,13 +18,16 @@ except ImportError:  # pragma: no cover
 from .broker import AlpacaPaperClient, PaperGuardError
 from .config import PivConfig
 from .decision_engine import DecisionEngine
+from .decision_ledger import DecisionLedger
 from .events import EventBus, PivEvent
 from .execution_settings import load_paper_entry_settings
 from .lifecycle import PaperLifecycle, paper_cleanup
+from .notification_outbox import NotificationOutbox
 from .preflight import Preflight
 from .reporting import build_session_report
 from .session_identity import build_session_identity
 from .session_runner import SessionRunner
+from .shadow_ledger import ShadowLedger
 from .telegram import sender
 from .telegram_inbound import build_piv_info, build_piv_telegram_listener
 
@@ -114,7 +117,22 @@ def main(argv: list[str] | None = None) -> int:
             if config.decision_path_enabled and not args.no_decision_path:
                 import redis.asyncio as redis_asyncio
                 redis_client = redis_asyncio.from_url(os.environ.get("TALONX_REDIS_URL", "redis://localhost:6379"))
-                decision_engine = DecisionEngine(redis_client, bus, lifecycle, piv_config=config)
+                # Task 77I: the three new durable ledgers -- real, state_dir-
+                # backed instances only here (production). No caller in this
+                # file ever sets strategy_approval_status_override (grep-
+                # provable -- see test_task77i_decision_engine_wiring.py's
+                # own confirmation of this), so every real decision resolves
+                # strategy approval to UNVALIDATED.
+                decision_ledger = DecisionLedger(config.state_dir / "decision_ledger.json")
+                notification_outbox = NotificationOutbox(
+                    config.state_dir / "notification_outbox.json", sender(config.telegram_token, config.telegram_chat_id),
+                )
+                shadow_ledger = ShadowLedger(config.state_dir / "shadow_ledger.json")
+                decision_engine = DecisionEngine(
+                    redis_client, bus, lifecycle, piv_config=config,
+                    decision_ledger=decision_ledger, notification_outbox=notification_outbox, shadow_ledger=shadow_ledger,
+                    runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
+                )
             piv_info = build_piv_info(
                 config.feed_mode, config.universe, session_id=identity.session_id,
                 runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
