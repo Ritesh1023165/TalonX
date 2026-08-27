@@ -1,0 +1,85 @@
+{
+  "task": "Task74S_BOUNDED_MULTI_SYMBOL_LONG_ONLY_EVALUATION",
+  "label": "DEVELOPMENT_ROBUSTNESS_EVALUATION",
+  "preregistered_before_any_replay": true,
+  "starting_branch": "research/talonx-strategy-validation",
+  "starting_sha": "848de0d6388f59972d8dce9b35cb45f35fe0173e",
+  "candidate": {
+    "name": "TALONX_PRODUCTION_QUANTSCANNER_INTRADAY_LONG_ONLY_V1",
+    "code_location": "talonx_quant/{strategy,consumer,indicators,config}.py (all protected, unmodified), executed via talonx_backtest.BacktestEngine",
+    "parameters_changed": false,
+    "confluence_score_min_verified": 2
+  },
+  "universe": {
+    "selected": "10_symbol_frozen_research_universe",
+    "symbols": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX"],
+    "rejected_alternative": "35_symbol_operational_universe (talonx_piv.config.PivConfig.DEFAULT_UNIVERSE)",
+    "resolution_method": "documented_evidence_only_no_performance_data_consulted",
+    "evidence_summary": "see stage0_verification_and_inventory.md section 5 and evaluation_protocol.md section 2",
+    "holdout_overlap": "none -- task56_holdout/task56_independent_family_holdout contain only the 25 additional (non-core) symbols, verified by directory listing"
+  },
+  "data_source": {
+    "directory": "data/historical_1m/task7b_alpaca_long_history",
+    "provider": "alpaca",
+    "feed": "SIP",
+    "dataset_hash": "5e5412a960bf",
+    "common_usable_period_utc": ["2025-08-15 13:03:00+00:00", "2026-08-14 23:58:00+00:00"],
+    "total_bars_summed": 1903044,
+    "total_bars_merge_sorted": 1901714
+  },
+  "reporting_buckets": {
+    "convention": "fixed_calendar_month_august_begins_15th",
+    "buckets": [
+      "2025-08 (15-31, partial)", "2025-09", "2025-10", "2025-11", "2025-12",
+      "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07",
+      "2026-08 (1-14, partial)"
+    ]
+  },
+  "primary_cost_config": {
+    "entry_slippage_bps": 5, "exit_slippage_bps": 5, "spread_bps": 10,
+    "total_round_trip_bps": 20,
+    "source": "unchanged from Task 73S, verified from talonx_backtest/execution.py"
+  },
+  "secondary_cost_sensitivity_grid": {
+    "method": "analytic_recomputation_from_primary_replay_trades_not_a_second_replay",
+    "justification": "see evaluation_protocol.md section 6 -- trade identification (entry/exit bar, exit_reason) is provably cost-independent in talonx_backtest/execution.py; only net_pnl/net_R are a closed-form function of (raw_price, direction, bps)",
+    "scenarios_bps_entry_exit_spread": [
+      {"label": "zero", "entry": 0, "exit": 0, "spread": 0, "round_trip_bps": 0},
+      {"label": "half", "entry": 2.5, "exit": 2.5, "spread": 5, "round_trip_bps": 10},
+      {"label": "baseline", "entry": 5, "exit": 5, "spread": 10, "round_trip_bps": 20},
+      {"label": "double", "entry": 10, "exit": 10, "spread": 20, "round_trip_bps": 40}
+    ]
+  },
+  "runtime_estimate": {
+    "basis": "Task 36 ledger record: identical 1,903,044-bar/10-symbol dataset, research_telemetry=True, completed in 233.8 minutes",
+    "expected_minutes_approx": 234,
+    "execution_mode": "single background process, not re-scoped based on interim output"
+  },
+  "sample_size_threshold": {
+    "documented_in_repo": false,
+    "invented_for_this_task": false,
+    "note": "no defensible trade-count threshold is documented anywhere in this repository for this universe/window; none is invented post-hoc"
+  },
+  "decision_gates": {
+    "zero_trades": {"economics": "N/A", "profitability_verdict": "INCONCLUSIVE"},
+    "nonzero_trades_positive": "at most justifies untouched validation -- never VALIDATED_AND_REPLICATED or 'validated alpha'",
+    "nonzero_trades_negative_or_mixed": "reported as-is, no re-scoping, no parameter change",
+    "portfolio_level_returns": "not reported unless concurrency/sizing/capital/overlap are actually modelled (they are not) -- trade-level statistics only",
+    "correlated_trades": "not treated as independent observations without qualification",
+    "correctness_defect_mid_run": "stop and report; do not silently repair and continue under the same experiment identity"
+  },
+  "anti_p_hacking_commitments": [
+    "universe/dates/cost grid/buckets fixed before Stage 2/3 execute",
+    "no alteration after seeing results",
+    "no repeated re-scoping or experiment extension",
+    "no forward-filling of missing data",
+    "no holdout access",
+    "no IEX/SIP substitution",
+    "runs exactly once"
+  ],
+  "commit_plan": {
+    "stage1_preregistration": "committed before any replay is launched",
+    "stage2_3_4_5_evidence": "separate subsequent commit(s)",
+    "runner_changes_if_any": "committed separately from research evidence"
+  }
+}
