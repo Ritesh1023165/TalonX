@@ -1,0 +1,8 @@
+directory,symbols_available,date_range,role,accessed_this_task
+data/historical_1m/task7b_alpaca_long_history,"AAPL,AMD,AMZN,GOOGL,META,MSFT,NVDA,PYPL,STX,TSLA",2025-08-15 to 2026-08-14,DEVELOPMENT (used, 3-symbol subset),true
+data/historical_1m/task56_holdout,unknown (not inspected),unknown,RESERVED_HOLDOUT,false
+data/historical_1m/task56_independent_family_holdout,unknown (not inspected),unknown,RESERVED_HOLDOUT,false
+data/historical_1m/task46_validation_windows,unknown (not inspected),unknown,VALIDATION (not run this task),false
+data/historical_1m/task54_extended_windows,unknown (not inspected),unknown,VALIDATION (not run this task),false
+data/historical_1m/task61r_fprc_v1_validation,unknown (not inspected),unknown,OTHER_RESEARCH_LINE_NOT_THIS_CANDIDATE,false
+data/historical_1m/task63_orpb_v1_validation,unknown (not inspected),unknown,RETIRED_STRATEGY_ORPB_V1_NOT_THIS_CANDIDATE,false

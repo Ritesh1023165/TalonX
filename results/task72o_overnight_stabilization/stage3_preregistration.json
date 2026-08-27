@@ -1,0 +1,46 @@
+{
+  "preregistered_before_any_run": true,
+  "candidate": {
+    "name": "TALONX_PRODUCTION_QUANTSCANNER_INTRADAY_LONG_ONLY_V1",
+    "code_location": "talonx_quant/strategy.py + talonx_quant/consumer.py + talonx_quant/indicators.py (all UNMODIFIED, protected, executed as-is via talonx_backtest.BacktestEngine)",
+    "frozen_before_task72o": true,
+    "freeze_evidence": "This is the existing, currently-deployed production strategy (RSI/MACD/MA-cross + volume-surge + confluence-score + structural-R:R gates, per talonx_quant/config.py's own documented 2026-08-14/2026-08-16/2026-08-21 analyst-review history) -- not a candidate invented for this task. Its own rules have not been touched by Task 72O (protected files untouched, confirmed via git diff).",
+    "long_only_compatible": true,
+    "long_only_evidence": "talonx_quant's LONG_ONLY lifecycle (Task 25A, referenced in talonx_piv/decision_engine.py's own module docstring): only BULLISH signals ever open a position anywhere in this system.",
+    "not_a_mirror_of_rejected_short": true,
+    "mirror_check": "Unrelated to CROSS_SECTIONAL_EXTREME_WINNER_SHORT_REVERSION_V1 or any research-worktree short candidate -- different codebase module, different research lineage, predates that research entirely.",
+    "not_tuned_on_validation_or_holdout": true,
+    "tuning_check": "No parameter was changed by this task. This run uses talonx_quant.config.QuantConfig's existing, already-deployed default values, unmodified.",
+    "executable_existing_code": true,
+    "runner": "scripts/run_historical_regimes.py -> talonx_backtest.BacktestEngine (both pre-existing, unmodified by this task)"
+  },
+  "universe": ["AAPL", "MSFT", "NVDA"],
+  "universe_selection_reason": "Subset of the 10 symbols already downloaded in data/historical_1m/task7b_alpaca_long_history (pre-existing repo data, not a fresh download) -- limited to 3 of the most liquid names for overnight token/time-budget tractability, disclosed as a scope limitation, not a cherry-pick of favorable results (selected BEFORE any run).",
+  "amendment_before_seeing_any_result": "A first 3-symbol attempt (218,781 bars) was projected, from progress-rate alone (no candidate output was ever inspected), to exceed the overnight time budget; stopped and re-run on AAPL only. This is a blind, non-result-driven scope reduction, recorded in stage3_run_log.txt -- see stage3_profitability_verdict.md for the actual (AAPL-only) universe used.",
+  "data_source": "data/historical_1m/task7b_alpaca_long_history (already on disk, Alpaca-sourced, covers 2025-08-15 through 2026-08-14)",
+  "development_period": {
+    "regime": "range_chop_2025",
+    "requested": "2025-01-01 to 2025-12-31",
+    "actual_available_overlap": "2025-08-15 to 2025-12-31 (data does not exist before 2025-08-15 -- reported honestly, not padded)"
+  },
+  "validation_period": "NOT RUN this task (time-budget constrained) -- see stage3_next_research_plan.md",
+  "untouched_holdouts": {
+    "not_accessed": ["data/historical_1m/task56_holdout", "data/historical_1m/task56_independent_family_holdout"],
+    "reason": "No decision gate for this specific run references a reserved holdout; per this task's own instruction, holdouts are only accessed if the candidate and decision gates were preregistered first for THAT SPECIFIC data -- not done here, so they remain untouched."
+  },
+  "primary_cost_assumption": "Repository's own built-in --cost-sensitivity sweep (talonx_backtest's existing, established bps grid) -- cost-sensitivity NOT disabled for this run (unlike Stage 2's reproduction, which used --no-cost-sensitivity for speed). The zero-cost/gross baseline is never treated as the pass/fail number.",
+  "metrics_reported": [
+    "trade_count", "expectancy_R", "profit_factor", "win_rate", "total_R", "max_drawdown_R",
+    "bootstrap_confidence_interval", "results_after_primary_cost", "outlier_sensitivity",
+    "top_winner_removal", "symbol_concentration", "window_regime_concentration", "longest_losing_sequence"
+  ],
+  "decision_gates": {
+    "VALIDATED_AND_REPLICATED_requires": [
+      "positive result after primary (non-zero) cost", "adequate sample size (existing repo small-sample convention, see docs/backtesting.md)",
+      "no dependence on a handful of outlier trades/symbols/windows", "untouched replication evidence", "no causal leakage", "no product incompatibility"
+    ],
+    "note": "Given this task runs ONLY a single development-period regime on a 3-symbol subset (no validation/replication run performed), VALIDATED_AND_REPLICATED is definitionally UNREACHABLE this task regardless of the numbers -- the ceiling classification here is at most VALIDATION_CANDIDATE, disclosed upfront before any run."
+  },
+  "config_hash": "unchanged from repository default (talonx_quant.config.QuantConfig(), no override)",
+  "runtime_sha_at_preregistration": "3be9eac"
+}

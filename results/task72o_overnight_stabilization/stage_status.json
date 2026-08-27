@@ -1,10 +1,19 @@
 {
-  "stage": "STAGE_0",
+  "stage": "STAGE_3",
   "status": "PASS",
-  "starting_sha": "3fa0c51",
-  "ending_sha": "3fa0c51",
-  "tests": {"targeted_passed": 95, "targeted_failed": 0, "full_suite": "not re-run this stage, baseline recorded from Task71S-R1: 2137 passed / 1 failed / 1 skipped / 15 xfailed"},
-  "artifacts": ["stage0_task71s_r1_audit.md"],
+  "starting_sha": "3be9eac",
+  "ending_sha": "3be9eac (no code change -- research artifacts only)",
+  "tests": {"note": "no code added; existing talonx_backtest/scripts.run_historical_regimes tools used unmodified"},
+  "artifacts": [
+    "stage3_preregistration.json", "stage3_candidate_inventory.csv", "stage3_data_inventory.csv",
+    "stage3_economics.csv", "stage3_cost_sensitivity.csv", "stage3_outlier_sensitivity.csv",
+    "stage3_symbol_concentration.csv", "stage3_window_regime_results.csv", "stage3_bootstrap_results.json",
+    "stage3_profitability_verdict.md", "stage3_next_research_plan.md", "stage3_run_log.txt",
+    "scratch_stage3/ (raw backtest report files)"
+  ],
   "blockers": [],
-  "next_stage": "STAGE_1"
+  "classification": "INCONCLUSIVE (zero trades executed for AAPL, 2025-08-15..2025-12-31, at established 5/5/10bps cost)",
+  "next_stage": "STAGE_4",
+  "committed": false,
+  "pushed": false
 }
