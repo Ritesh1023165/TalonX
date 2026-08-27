@@ -26,6 +26,9 @@
   cost-sensitivity sweep) were stopped blind on runtime alone. Result:
   6 signals generated, 0 published, 0 trades (66,648 LOW_VOLATILITY
   rejections dominate). Classified INCONCLUSIVE -- zero trade sample,
-  not a negative result. No candidate integrated. No commit needed for
-  code (none changed); results artifacts to be committed alongside
-  Stage 4's morning report.
+  not a negative result. No candidate integrated. Committed+pushed as
+  part of 7ed27c7 alongside Stage 2's evidence.
+- [Stage 4] COMPLETE. Morning report + recommendation written: GO
+  (operational/observational scope only -- not alpha validation). All
+  explicit GO gates satisfied. Final HEAD 7ed27c7, clean, pushed.
+  Overnight Task 72O finished.
