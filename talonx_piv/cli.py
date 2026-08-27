@@ -20,6 +20,7 @@ from .config import PivConfig
 from .decision_engine import DecisionEngine
 from .decision_ledger import DecisionLedger
 from .events import EventBus, PivEvent
+from .execution_ownership import ExecutionOwnership, account_lock_key
 from .execution_settings import load_paper_entry_settings
 from .lifecycle import PaperLifecycle, paper_cleanup
 from .notification_outbox import NotificationOutbox
@@ -49,6 +50,37 @@ async def run_session(runner: SessionRunner, listener) -> None:
         if listener_task is not None:
             listener.stop()
             await listener_task
+
+
+def _execution_lock_dir() -> Path:
+    """Task 78I Stage 1D: deliberately a FIXED, global location -- NEVER
+    under config.state_dir -- so two application instances configured with
+    DIFFERENT state_dir but the SAME underlying Alpaca paper account still
+    collide on the same lock. Overridable via TALONX_PIV_LOCK_DIR for
+    isolated tests/rehearsal only; production uses the default unchanged."""
+    return Path(os.environ.get("TALONX_PIV_LOCK_DIR", str(Path.home() / ".talonx_piv" / "locks")))
+
+
+def acquire_execution_ownership(config: PivConfig, broker: AlpacaPaperClient, bus: EventBus) -> ExecutionOwnership:
+    """Must be called AFTER broker.verify_paper_identity() has succeeded.
+    Raises PaperGuardError (never returns a not-acquired lock silently) if
+    another live process already owns this account -- callers must treat
+    this exactly like a preflight failure, never proceeding to any
+    mutating operation."""
+    if broker.identity is None:
+        raise PaperGuardError("cannot acquire execution ownership before paper identity is verified")
+    key = account_lock_key(config.broker_endpoint, broker.identity.account_id)
+    lock = ExecutionOwnership(_execution_lock_dir(), key, owner_label=f"pid={os.getpid()} endpoint={config.broker_endpoint}")
+    if not lock.acquire():
+        bus.emit(PivEvent.build(
+            "BROKER_ERROR", reason="EXECUTION_OWNERSHIP_ALREADY_HELD", status="PIV_BLOCKED",
+        ))
+        raise PaperGuardError(
+            f"execution ownership for this PAPER account is already held by another live process "
+            f"(lock={lock.lock_path}) -- refusing to start a second execution writer"
+        )
+    broker.execution_ownership = lock
+    return lock
 
 
 def runtime(config: PivConfig, session_id: str | None = None):
@@ -98,6 +130,8 @@ def main(argv: list[str] | None = None) -> int:
             print(status)
             return 0 if status == "PIV_READY" else 2
         if args.command == "cleanup":
+            broker.verify_paper_identity()
+            acquire_execution_ownership(config, broker, bus)
             result = paper_cleanup(broker, bus, args.confirm_paper_cleanup)
             print(json.dumps(result, sort_keys=True))
             return 0 if result["clean"] else 2
@@ -109,6 +143,13 @@ def main(argv: list[str] | None = None) -> int:
             bus.emit(PivEvent.build("STARTUP", status="PAPER MODE / NO REAL CAPITAL"))
             status, checks = Preflight(config, broker, bus).run()
             Preflight.write_report(config.state_dir / "latest_preflight.json", status, checks, config.feed_mode)
+            if status == "PIV_READY":
+                # Task 78I Stage 1D: ownership is acquired AFTER preflight
+                # (which itself calls verify_paper_identity()), BEFORE
+                # start_session flips session_enabled=True -- a session that
+                # cannot claim exclusive execution ownership must never be
+                # allowed to begin accepting entries.
+                acquire_execution_ownership(config, broker, bus)
             lifecycle.start_session(status == "PIV_READY", args.confirm_paper_session_start)
             print("PAPER_SESSION_STARTED")
             if args.no_live_loop:
@@ -149,6 +190,7 @@ def main(argv: list[str] | None = None) -> int:
             asyncio.run(run_session(runner, listener))
             return 0
         broker.verify_paper_identity()
+        acquire_execution_ownership(config, broker, bus)
         if args.command == "kill-switch":
             lifecycle.activate_kill_switch(args.cancel_paper_orders)
             print("KILL_SWITCH")

@@ -40,6 +40,87 @@ def _read_json(path: Path, default: Any) -> Any:
         return default
 
 
+def build_decision_status(state_dir: Path, decision_id: str) -> dict[str, Any]:
+    """Task 78I Stage 1C -- derives a decision's CURRENT notification/
+    shadow/execution status by joining against the authoritative, linked
+    durable records every time this is called -- never a separately stored,
+    independently-mutable status field that could regress or go stale.
+    Rebuilding this after a restart, or after a late/duplicate event has
+    been persisted, always reflects exactly the current ledger truth (pure
+    function of on-disk state) -- see status_projection_recovery.json.
+
+    Read-only; performs zero writes.
+    """
+    decisions = _read_json(state_dir / "decision_ledger.json", {})
+    decision = decisions.get(decision_id)
+    if decision is None:
+        return {"decision_id": decision_id, "found": False}
+
+    notifications = _read_json(state_dir / "notification_outbox.json", {})
+    notification_status = "NOT_APPLICABLE"
+    for record in notifications.values():
+        if record.get("decision_id") == decision_id:
+            notification_status = record.get("status", "UNKNOWN")
+            break
+    else:
+        # Known, disclosed limitation: NotificationOutbox deduplicates by
+        # (ticker, date, classification, recommendation, reason_codes), NOT
+        # by decision_id -- a decision whose identical situation was already
+        # queued under an EARLIER decision_id will show no direct record
+        # here even though an equivalent alert was sent. Reported as
+        # NOT_APPLICABLE (never fabricated as SENT) -- see remaining_issues.md.
+        pass
+
+    shadow = _read_json(state_dir / "shadow_ledger.json", {})
+    shadow_status = "NOT_APPLICABLE"
+    for record in shadow.values():
+        if record.get("decision_id") == decision_id:
+            shadow_status = record.get("status", "UNKNOWN")
+            break
+
+    decision_execution_status = decision.get("decision_execution_status", "NOT_APPLICABLE")
+    if decision_execution_status not in ("ENTRY_ELIGIBLE", "EXIT_ELIGIBLE"):
+        execution_status = "NOT_ATTEMPTED_BY_DESIGN"
+    else:
+        lifecycle_state = _read_json(state_dir / "lifecycle_state.json", {})
+        intents = lifecycle_state.get("intents", {})
+        orders = lifecycle_state.get("orders", {})
+        matching_intent_id = next((iid for iid, intent in intents.items() if intent.get("decision_id") == decision_id), None)
+        if matching_intent_id is None:
+            # The decision layer wanted to execute (ENTRY/EXIT_ELIGIBLE), but
+            # no persisted intent references this decision_id -- either the
+            # order_intent call was rejected by a STATEFUL guard (which
+            # rejects before persisting an intent -- e.g. a race against
+            # ALREADY_HOLDING_NO_PYRAMIDING) or the attempt has not yet
+            # happened. Honestly reported as unknown, never guessed.
+            execution_status = "ATTEMPTED_OUTCOME_UNKNOWN_NO_PERSISTED_INTENT"
+        else:
+            intent = intents[matching_intent_id]
+            if intent.get("status") == "REJECTED":
+                execution_status = "REJECTED"
+            else:
+                order = next((o for o in orders.values() if o.get("intent_id") == matching_intent_id), None)
+                if order is None:
+                    execution_status = "SUBMITTED_NO_BROKER_ACK_YET"
+                elif order.get("status") == "filled":
+                    execution_status = "FILLED"
+                elif order.get("status") in ("rejected", "canceled", "expired"):
+                    execution_status = "REJECTED"
+                elif order.get("status") == "UNCONFIRMED_TIMEOUT":
+                    execution_status = "UNCONFIRMED"
+                else:
+                    execution_status = "PENDING"
+
+    return {
+        "decision_id": decision_id, "found": True,
+        "recommendation": decision.get("recommendation"),
+        "decision_execution_status": decision_execution_status,
+        "notification_status": notification_status,
+        "shadow_status": shadow_status,
+        "execution_status": execution_status,
+    }
+
+
 def build_integrated_projection(
     state_dir: Path, *, session_id: str | None = None, trading_date_et: str | None = None,
 ) -> dict[str, Any]:

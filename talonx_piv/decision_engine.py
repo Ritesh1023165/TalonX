@@ -293,6 +293,7 @@ class DecisionEngine:
                 reference_price=signal.price, stop_price=signal.stop_price,
                 signal_timestamp=signal.bar_timestamp.isoformat(),
                 strategy_id=signal.signal_type.value, horizon=NATURAL_STRATEGY_HORIZON,
+                decision_id=decision.decision_id,
             )
         except PaperGuardError as exc:
             self.events.emit(PivEvent.build("BROKER_ERROR", symbol=symbol, reason=str(exc), source="STRATEGY"))
@@ -335,7 +336,7 @@ class DecisionEngine:
             result = self.lifecycle.order_intent(
                 signal_id, symbol, "sell", PIV_QUANTITY, source="STRATEGY", alpha_evidence=False,
                 reference_price=exit_reference_price, signal_timestamp=bar.timestamp.isoformat(),
-                horizon=NATURAL_STRATEGY_HORIZON,
+                horizon=NATURAL_STRATEGY_HORIZON, decision_id=decision.decision_id,
             )
         except PaperGuardError as exc:
             self.events.emit(PivEvent.build("BROKER_ERROR", symbol=symbol, reason=str(exc), source="STRATEGY"))

@@ -47,7 +47,7 @@ Causal fill rule (non-lookahead, spec-required):
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 from typing import Any
@@ -62,6 +62,22 @@ STATUS_OPEN = "OPEN"
 STATUS_CLOSED = "CLOSED"
 STATUS_UNRESOLVED = "UNRESOLVED"
 
+# Task 78I Stage 1B: horizon labels this codebase actually declares, mapped
+# to a concrete deadline duration -- deliberately EMPTY for production. The
+# only horizon value any real caller ever attaches to a Decision today is
+# `decision_engine.NATURAL_STRATEGY_HORIZON = "INTRADAY_SHORT"`, and no
+# existing minute/hour value for it is declared anywhere else in this
+# repository (confirmed by search -- see horizon_exit_evidence.json). Per
+# this task's own explicit instruction ("Missing horizon policy must not be
+# silently replaced with an arbitrary holding period"), this module does
+# NOT invent a duration for it. A Decision whose horizon is absent from
+# this mapping simply gets NO horizon-based shadow deadline -- it still
+# exits normally via stop/target/EOD, exactly as before this stage. Tests
+# supply an explicit TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE policy via
+# ShadowLedger's own `horizon_policy` constructor parameter to exercise the
+# mechanism deterministically; production code (cli.py) never supplies one.
+DEFAULT_HORIZON_POLICY: dict[str, timedelta] = {}
+
 
 @dataclass
 class ShadowPosition:
@@ -74,6 +90,7 @@ class ShadowPosition:
     target_price: float | None
     horizon: str | None
     status: str = STATUS_PENDING_FILL
+    horizon_deadline: str | None = None
     hypothetical_fill_time: str | None = None
     planned_entry_price: float | None = None
     simulated_entry_price_raw: float | None = None
@@ -101,9 +118,17 @@ class ShadowPosition:
 
 
 class ShadowLedger:
-    def __init__(self, state_path: Path | None, execution_config: ExecutionConfig | None = None) -> None:
+    def __init__(
+        self, state_path: Path | None, execution_config: ExecutionConfig | None = None,
+        horizon_policy: dict[str, timedelta] | None = None,
+    ) -> None:
         self.state_path = state_path
         self.config = execution_config or ExecutionConfig()
+        # TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE when non-empty: production
+        # (cli.py) never supplies this, so every real decision's horizon
+        # ("INTRADAY_SHORT") has no entry here -- see DEFAULT_HORIZON_POLICY's
+        # own docstring for why that is deliberate, not an oversight.
+        self.horizon_policy = dict(horizon_policy) if horizon_policy is not None else dict(DEFAULT_HORIZON_POLICY)
         self.positions: dict[str, dict[str, Any]] = self._load()
         self._by_decision: dict[str, str] = {p["decision_id"]: sid for sid, p in self.positions.items()}
         self._pending_by_symbol: dict[str, str] = {
@@ -166,10 +191,13 @@ class ShadowLedger:
             if bar.timestamp.isoformat() > position["recommendation_time"]:
                 fill_raw = bar.open
                 fill_net = apply_entry_cost(fill_raw, SignalDirection.BULLISH, self.config)
+                fill_time = bar.timestamp
+                horizon_delta = self.horizon_policy.get(position.get("horizon"))
+                horizon_deadline = (fill_time + horizon_delta).isoformat() if horizon_delta is not None else None
                 position.update(
-                    status=STATUS_OPEN, hypothetical_fill_time=bar.timestamp.isoformat(),
+                    status=STATUS_OPEN, hypothetical_fill_time=fill_time.isoformat(),
                     simulated_entry_price_raw=fill_raw, simulated_entry_price_net=fill_net,
-                    mfe_price=fill_raw, mae_price=fill_raw,
+                    mfe_price=fill_raw, mae_price=fill_raw, horizon_deadline=horizon_deadline,
                     initial_risk=(abs(fill_raw - position["stop_price"]) if position.get("stop_price") is not None else None),
                 )
                 del self._pending_by_symbol[symbol]
@@ -189,6 +217,18 @@ class ShadowLedger:
                     exit_price = position["stop_price"] if outcome == "stop" else position["target_price"]
                     self._close(open_id, bar.timestamp, exit_price, outcome.upper())
                     return
+            # Task 78I Stage 1B: horizon deadline checked only AFTER stop/
+            # target (price-risk management takes precedence on a same-bar
+            # tie) -- a real, OBSERVED price (this bar's close) is used,
+            # never a fabricated price interpolated at the exact deadline
+            # instant. `bar.timestamp >= deadline` is the first CAUSAL
+            # opportunity to act on horizon expiry -- never earlier, and
+            # correctly reflects a LATE exit (not backdated to the
+            # deadline) when this is the first bar observed after a gap.
+            deadline = position.get("horizon_deadline")
+            if deadline is not None and bar.timestamp.isoformat() >= deadline:
+                self._close(open_id, bar.timestamp, bar.close, "HORIZON")
+                return
             self._save()
 
     def force_close(self, symbol: str, timestamp: Any, price: float | None, reason: str) -> None:
@@ -196,9 +236,21 @@ class ShadowLedger:
         position closes at the given (real, observed) price, exactly like
         the real EOD flatten; a still-PENDING_FILL shadow position (never
         observed a later bar before this) resolves UNRESOLVED_NO_FILL --
-        never fabricated as if it had filled and immediately closed."""
+        never fabricated as if it had filled and immediately closed.
+
+        Task 78I Stage 1B: if this position's horizon_deadline had already
+        passed with NO intervening bar ever observed to causally execute
+        the horizon exit (a genuine data/observation gap through end of
+        session), the reason is reclassified to make that explicit --
+        distinct from an ordinary EOD close that happens before horizon
+        ever expired. Still uses the real, observed flatten price (never a
+        price fabricated at the deadline instant itself)."""
         open_id = self._open_by_symbol.get(symbol)
         if open_id is not None:
+            position = self.positions[open_id]
+            deadline = position.get("horizon_deadline")
+            if deadline is not None and timestamp.isoformat() >= deadline and reason != "HORIZON":
+                reason = "HORIZON_EXPIRED_NO_EXECUTABLE_OBSERVATION"
             if price is not None:
                 self._close(open_id, timestamp, price, reason)
             else:

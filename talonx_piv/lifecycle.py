@@ -182,6 +182,19 @@ class PaperLifecycle:
         reference_price: float | None = None, stop_price: float | None = None,
         signal_timestamp: str | None = None, strategy_id: str | None = None,
         horizon: str | None = None,
+        # Task 78I Stage 1C: optional cross-reference to the
+        # talonx_piv.decision_contract.Decision this order was raised from --
+        # never validated/consumed by this method itself (order_intent's own
+        # guards are unaffected), purely so a later status projection
+        # (observability.py) can join an intent/order back to its decision
+        # WITHOUT reconstructing signal_id from decision_id (which happen to
+        # share their derivation inputs today only by coincidence, not by any
+        # guaranteed contract) -- an explicit field is more robust than an
+        # implicit one. Absent on any pre-Task78I intent (old state files),
+        # which simply cannot be joined to a decision -- an acceptable,
+        # documented restart-compatibility edge case, exactly like
+        # open_position_by_symbol's own historical rollout.
+        decision_id: str | None = None,
     ) -> dict[str, Any]:
         symbol = symbol.upper()
 
@@ -244,6 +257,7 @@ class PaperLifecycle:
             "source": source, "alpha_evidence": alpha_evidence,
             "reference_price": reference_price, "stop_price": stop_price,
             "signal_timestamp": signal_timestamp, "strategy_id": strategy_id, "horizon": horizon,
+            "decision_id": decision_id,
         }
         self._save()
         self.events.emit(PivEvent.build(

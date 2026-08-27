@@ -7,6 +7,7 @@ from typing import Any
 import requests
 
 from .config import PAPER_ENDPOINT, PivConfig
+from .execution_ownership import ExecutionOwnership, ExecutionOwnershipError
 
 
 class PaperGuardError(RuntimeError):
@@ -27,6 +28,21 @@ class AlpacaPaperClient:
         self.config = config
         self.transport = transport
         self.identity: PaperIdentity | None = None
+        # Task 78I Stage 1D: None (the default -- every pre-Task78I caller)
+        # means NO ownership enforcement at all, preserving all existing
+        # single-process test/behavior exactly. A real live session
+        # (cli.py::runtime()) always sets this after verify_paper_identity()
+        # succeeds, before any mutation is attempted -- see
+        # execution_ownership.py's own module docstring for the full design.
+        self.execution_ownership: ExecutionOwnership | None = None
+
+    def _require_execution_ownership(self) -> None:
+        if self.execution_ownership is None:
+            return
+        try:
+            self.execution_ownership.require()
+        except ExecutionOwnershipError as exc:
+            raise PaperGuardError(f"EXECUTION_OWNERSHIP_NOT_HELD: {exc}") from exc
 
     @property
     def headers(self) -> dict[str, str]:
@@ -75,18 +91,21 @@ class AlpacaPaperClient:
 
     def submit_order(self, payload: dict[str, Any]) -> dict[str, Any]:
         self._require_verified()
+        self._require_execution_ownership()
         response = self.transport.post(f"{PAPER_ENDPOINT}/v2/orders", headers=self.headers, json=payload, timeout=15)
         response.raise_for_status()
         return dict(response.json())
 
     def cancel_all_orders(self) -> list[dict[str, Any]]:
         self._require_verified()
+        self._require_execution_ownership()
         response = self.transport.delete(f"{PAPER_ENDPOINT}/v2/orders", headers=self.headers, timeout=15)
         response.raise_for_status()
         return list(response.json() or [])
 
     def close_all_positions(self) -> list[dict[str, Any]]:
         self._require_verified()
+        self._require_execution_ownership()
         response = self.transport.delete(f"{PAPER_ENDPOINT}/v2/positions", headers=self.headers, params={"cancel_orders": "true"}, timeout=15)
         response.raise_for_status()
         return list(response.json() or [])
