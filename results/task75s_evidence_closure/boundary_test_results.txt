@@ -1,0 +1,33 @@
+TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+Direct invocation of the real, unmodified talonx_quant functions
+(talonx_quant.strategy._confluence_score, talonx_quant.consumer._fails_min_volatility)
+with constructed IndicatorSnapshot inputs. No code was changed. No pytest file was
+added (scratch interpreter session only, reproduced here for the record).
+
+confluence_score_min: 2   rsi_oversold: 30.0   min_atr_pct: 0.25
+
+[Confluence -- MACD no-self-credit]
+Same bar/inputs, MACD_BULLISH_CROSS (own trigger) confluence_score: 2 (expect 2: RSI+volume only, MACD leg excluded)   -> PASS
+Same bar/inputs, RSI_OVERSOLD_VOLUME_SURGE (independent) confluence_score: 3 (expect 3: MACD+RSI+volume, MACD leg IS independent here) -> PASS
+
+[Confluence -- RSI structural self-exclusion boundary]
+RSI exactly at oversold threshold (30.0), confluence_score: 1 (expect 1: volume leg only) -> PASS
+  (trigger condition requires rsi_prev<30 and rsi>=30; confluence RSI leg requires rsi<30 --
+   mutually exclusive by construction at the trigger bar, confirmed at the exact boundary value)
+
+[Volatility gate -- exact boundary, synthetic]
+atr_pct=0.2449 (below) fails_min_volatility: True  (expect True)  -> PASS
+atr_pct=0.25000 (exact) fails_min_volatility: False (expect False -- strict '<' comparison, '==' passes) -> PASS
+atr_pct=0.2501 (above) fails_min_volatility: False (expect False) -> PASS
+
+[Volatility gate -- exact boundary, REAL production telemetry]
+(from task74s_10symbol_full_research_volatility_telemetry.csv, 1,901,855 rows, unmodified)
+Nearest real rows below 0.25: atr_pct=0.245001 (GOOGL 2026-07-01, TSLA 2026-07-30, AMZN 2025-11-14,
+  AAPL 2026-02-05, AMD 2025-08-19) -- all passes_volatility=False. Consistent with '<' comparison.
+Nearest real rows above 0.25: atr_pct=0.254997-0.254999 (STX, NVDA, MSFT, x2 more) -- all
+  passes_volatility=True. Consistent with '<' comparison.
+No real row lands exactly at atr_pct==0.25 (continuous float data) -- exact boundary confirmed via
+the synthetic check above instead, using the real unmodified function.
+
+CONCLUSION: both gates behave exactly as documented in the code's own docstrings and comments, at
+and around their respective thresholds. No implementation/specification mismatch found in either gate.

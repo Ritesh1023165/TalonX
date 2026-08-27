@@ -1,0 +1,17 @@
+........................................................................ [ 79%]
+........................................................................ [ 82%]
+........................................................................ [ 85%]
+........................................................................ [ 88%]
+........................................................................ [ 92%]
+........................................................................ [ 95%]
+........................................................................ [ 98%]
+.........................                                                [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\pandas_ta\__init__.py:37
+  C:\workspace\TalonX\.venv\Lib\site-packages\pandas_ta\__init__.py:37: Pandas4Warning: The 'mode.copy_on_write' option is deprecated. Copy-on-Write can no longer be disabled (it is always enabled with pandas >= 3.0), and setting the option has no impact. This option will be removed in pandas 4.0.
+    from pandas_ta.core import AnalysisIndicators
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+2174 passed, 1 skipped, 10 xfailed, 1 warning in 821.84s (0:13:41)
+
+[exited with code 0]

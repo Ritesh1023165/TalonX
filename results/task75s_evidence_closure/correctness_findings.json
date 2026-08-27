@@ -1,0 +1,33 @@
+{
+  "gates_audited": ["LOW_VOLATILITY", "LOW_CONFLUENCE"],
+  "code_changed": false,
+  "thresholds_changed": false,
+  "volatility_gate": {
+    "formula": "atr_pct = (atr/price)*100; fails if atr_pct < min_atr_pct",
+    "threshold": 0.25,
+    "units_confirmed_consistent": true,
+    "boundary_comparison": "strict less-than; exact-boundary value passes (does not fail)",
+    "verified_with_real_telemetry": true,
+    "verified_with_direct_function_call": true,
+    "nan_handling": "missing ATR or falsy price -> does not fail this gate (deliberate, documented; downstream signal checks independently require ATR)",
+    "production_replay_agreement": "talon_backtest/engine.py imports _fails_min_volatility directly from talonx_quant.consumer -- same function object",
+    "implementation_specification_mismatch_found": false
+  },
+  "confluence_gate": {
+    "formula": "0-3 point score (MACD independent-cross, direction-aware RSI extreme, volume surge); eligible if score >= confluence_score_min",
+    "threshold": 2,
+    "boundary_comparison": "inclusive (>=); exact-threshold score passes",
+    "macd_no_self_credit_rule": "confirmed operative via real-data distribution (2332 macd_bullish_cross candidates, 0 ever reach score>=2) and direct function-level test (same inputs score 2 vs 3 depending only on signal_type)",
+    "rsi_structural_self_exclusion": "confirmed via direct function-level test at the exact boundary (rsi=30.0 exactly -> RSI leg contributes 0, score=1 from volume leg only)",
+    "verified_with_real_telemetry": true,
+    "verified_with_direct_function_call": true,
+    "nan_handling": "missing rsi/volume_surge_ratio -> leg contributes 0, not an exception; missing total score -> (score or 0) fails the >= threshold, fail-closed at eligibility",
+    "production_replay_agreement": "talonx_backtest/engine.py imports _confluence_eligible directly from talonx_quant.consumer and evaluate_signals (which calls _confluence_score) directly from talonx_quant.strategy -- same function objects",
+    "implementation_specification_mismatch_found": false
+  },
+  "overall_verdict": "GATES_IMPLEMENTED_CORRECTLY",
+  "high_rejection_rate_treated_as_evidence_of_defect": false,
+  "recommendation_to_lower_thresholds": false,
+  "minimal_reproduction_preserved": "boundary_test_results.txt (labeled TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE)",
+  "impact_on_task74s_conclusion": "none -- NO_ELIGIBLE_LONG_SETUPS stands; the zero-trade result reflects correctly-implemented, correctly-threshold gates interacting with this sample's actual data, not a code defect"
+}
