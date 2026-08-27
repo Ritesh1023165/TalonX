@@ -1,0 +1,4 @@
+stage,reason,count,pct_of_bars_processed,note
+volatility_gate,LOW_VOLATILITY,66648,99.47,"ATR%% below min_atr_pct=0.25 -- bar never reaches trigger evaluation"
+session_gate,US_MARKET_SESSION_CLOSED,4,0.006,"a trigger fired but the bar's own timestamp is outside 09:30-16:00 ET regular session -- fail-closed, correct"
+confluence_gate,LOW_CONFLUENCE,2,0.003,"a trigger fired inside regular session but confluence_score (1 and 0 respectively) < confluence_score_min=2"
