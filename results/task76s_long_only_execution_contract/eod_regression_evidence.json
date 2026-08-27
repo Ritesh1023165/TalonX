@@ -1,0 +1,33 @@
+{
+  "purpose": "Confirm eod_lifecycle.py's pre-existing (Task 72O) contract is completely unmodified and unaffected by Task 76S's lifecycle.py boundary hardening.",
+  "eod_lifecycle_py_modified": false,
+  "pre_existing_suite": "tests/test_task72o_eod_lifecycle.py",
+  "result": "22 passed, 0 failed",
+  "tests": [
+    "test_zero_orders_zero_positions_passes",
+    "test_existing_paper_orders_are_cancelled",
+    "test_existing_paper_positions_are_closed",
+    "test_cancellation_failure_is_inconclusive_not_passed",
+    "test_close_failure_is_inconclusive_not_passed",
+    "test_reconciliation_mismatch_is_failed_not_passed",
+    "test_delayed_broker_convergence_then_idempotent_retry_passes",
+    "test_reconciliation_broker_read_failure_is_inconclusive",
+    "test_idempotent_retry_does_not_duplicate_close_requests",
+    "test_completed_reconciliation_can_be_safely_reread",
+    "test_process_interruption_during_eod_then_resume",
+    "test_original_live_session_linkage_and_separate_reconciliation_run_id",
+    "test_two_reconciliation_runs_get_different_run_ids",
+    "test_cross_date_state_rejected",
+    "test_different_session_id_same_date_does_not_reuse_prior_cancel_close",
+    "test_session_completed_never_emitted_on_failed",
+    "test_session_completed_never_emitted_on_inconclusive",
+    "test_no_network_transport_ever_constructed",
+    "test_scheduled_completion_triggers_eod_lifecycle",
+    "test_controlled_shutdown_kill_switch_triggers_eod_lifecycle",
+    "test_unhandled_exception_still_triggers_eod_then_reraises",
+    "test_no_session_identity_file_skips_eod_without_guessing"
+  ],
+  "additional_new_eod_coverage": "tests/test_task76s_protective_exit_eod.py (7 tests: idempotent retry, session-identity retention, reconciliation-mismatch verdict, broker-outage verdict -- exercised specifically against a PaperLifecycle constructed the new way, to prove the constructor/boundary change introduces no EOD interaction regression)",
+  "reconciliation_flags_field_added": "LifecycleState.reconciliation_flags (Task 76S) -- absent on old state files, defaults to {} via dataclass default_factory, does not participate in eod_lifecycle.py's own reconcile()-consuming logic beyond the pre-existing 'matched'/'broker_open_orders'/'broker_positions' keys eod_lifecycle.py already reads",
+  "protected_files_diff_since_b0c11b7": 0
+}
