@@ -40,3 +40,19 @@ baseline/isolation blocker (R2.*, R3.*, R4.*) is closed and the full suite
 reconciles exactly with zero unexpected failures; otherwise `BLOCKED` with
 precise reasons. Retained xfail/skip (if any) each carry a specific
 justification + impact assessment in `xfail_skip_disposition.md`.
+
+---
+
+## Outcome (post-implementation)
+
+| Rows | Landed change | Regression tests | Pre-fix proof | Status |
+|---|---|---|---|---|
+| R2.1–R2.6 | `talonx_piv/lifecycle.py:apply_broker_update` late-fill re-open / contradiction / idempotency (commit `d2f6285`) | `test_task81_r1_late_fill_recovery.py` (10) | `5 failed / 5 passed` — `section2_prefix.txt` | PASS |
+| R3.1–R3.5 | `talonx_piv/lifecycle.py:reconcile` + `_classify_broker_open_order` + orphan-intent bucket (commit `1d43e0a`) | `test_task81_r1_reconciliation_completeness.py` (8) | `5 failed / 1 passed` — `section3_prefix.txt` | PASS |
+| R4.1–R4.6 | `talonx_piv/session_identity.py:assess_session_recovery` missing/unusable identity (commit `24a80dc`) | `test_task81_r1_missing_identity_recovery.py` (9) | `5 failed / 3 passed` — `section4_prefix.txt` | PASS |
+| R5 | analysis only — `xfail_skip_disposition.md` (commit `043769b`) | `--runxfail` on all 11 | baseline `2597p/1s/10xf` exact | RETAINED — single stale-CSV root cause, non-blocking |
+| R6 | `iex_evidence_correction.md` (commit `a11bef0`); Task 81 `iex_findings.md` preserved | n/a | n/a | DONE |
+| R7 | `test_task81_r1_guard_negative_controls.py` (4); deterministic clocks / tmp_path / no historical writes; focused suites ×2 (`252 passed` each) | — | — | PASS |
+
+Verdict: `BASELINE_VERIFIED_READY_FOR_ISOLATION`. Final full suite:
+`raw_test_output/final_full_suite.txt`.
