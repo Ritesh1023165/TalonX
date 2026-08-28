@@ -1,5 +1,19 @@
 # Task 79E-R2 — Complete Experimental Activation Stabilisation
 
+> **ERRATA (Task 79E-R2-2, continuation from this file's own final commit
+> `c9a4994`):** the PASS verdict below is preserved EXACTLY as originally
+> evidenced and remains accurate for everything it actually tested.
+> However, this report's own "Remaining, disclosed limitations" section
+> (items 1 and 2, below) recorded two gaps as non-blocking that a later
+> round's task brief identified as, in fact, mandatory to close, along
+> with two related correctness defects (count-based uncertain-submission
+> resolution, and fill-time causality based on an "already OPEN" boolean
+> rather than actual observed fill timing). All four are now closed —
+> see `findings_and_tests_report_ADDENDUM_R2_2.md` in this same
+> directory for the full reproduction-fix-test evidence, and
+> `task80_launch_handoff_refresh_r2_2.md` for the corrected operator
+> guidance. Nothing below this notice was edited.
+
 ## Scope and starting point
 
 Continuation from `013d5ae` (Task 79E-R1) on `research/talonx-strategy-validation`.

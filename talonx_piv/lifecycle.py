@@ -44,14 +44,20 @@ ALLOWED_ORDER_SOURCES: frozenset[str | None] = frozenset({None, "STRATEGY", "PIV
 # duplicate-entry detection below.
 _TERMINAL_ORDER_STATUSES = frozenset({"filled", "rejected", "canceled", "expired"})
 
-# Task 79E-R2: a SUBMIT_FAILED_UNCERTAIN intent is only ever declared
-# SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED after find_order_by_client_id has
-# returned "not found" this many SEPARATE times, across separate
-# reconcile() calls -- "a single 404 must not mean confirmed never
-# submitted." Every uncertain-exposure protection (pyramiding block,
-# experimental concurrent-exposure/budget reservation) is retained for the
-# full duration, never released early.
-UNCERTAIN_SUBMISSION_CONFIRMATION_THRESHOLD = 2
+# Task 79E-R2-2: NO count-based threshold exists any more -- absence is
+# never proof of non-submission, no matter how many times observed (see
+# _resolve_uncertain_submissions's own docstring for the full rationale;
+# an earlier R2 draft auto-declared SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED
+# after exactly 2 "not found" results, which meant a genuinely-submitted
+# order that only became visible later -- e.g. broker-side eventual
+# consistency -- would NEVER be discovered, since a terminal-looking
+# intent is no longer queried by any subsequent reconcile() pass at all).
+# What IS bounded is the POLLING RATE, via this backoff schedule (seconds
+# to wait before the NEXT check, indexed by how many consecutive
+# not-found observations have been made so far; the last entry repeats
+# for any further attempts) -- this bounds load on the broker, never the
+# truth of the outcome.
+UNCERTAIN_SUBMISSION_BACKOFF_SCHEDULE_SECONDS: tuple[float, ...] = (0.0, 30.0, 60.0, 300.0, 900.0, 3600.0)
 
 
 class ActionIntent(str, Enum):
@@ -149,6 +155,23 @@ class PaperLifecycle:
             return load_experimental_authorization(self.experimental_authorization_path)
         return self.experimental_authorization
 
+    def _authoritative_session_scope(self) -> str | None:
+        """Task 79E-R2-2 Requirement 3: derived INDEPENDENTLY from this
+        lifecycle's own EventBus -- never trusts a caller-supplied value.
+        Task 79E-R2's own design let decision_engine.py compute the
+        session_scope value and simply pass it through
+        order_intent(experimental_session_scope=...); that meant a caller
+        bug (or a genuinely stale/mismatched value from anywhere else) was
+        silently accepted at the true broker boundary, defeating the whole
+        point of a SEPARATE, independent check there. This is now the
+        ONLY value _enforce_experimental_paper_guards ever checks against
+        -- an `experimental_session_scope` argument to order_intent is
+        still accepted for logging/diagnostic purposes only. Returns None
+        (missing identity) when `self.events.session_id` is falsy -- never
+        matches a real (non-empty) authored session_scope, so a missing
+        identity fails closed rather than silently skipping the check."""
+        return self.events.session_id or None
+
     def _load(self) -> LifecycleState:
         if not self.state_path.exists():
             return LifecycleState()
@@ -236,16 +259,30 @@ class PaperLifecycle:
         return total
 
     def entry_still_pending_or_uncertain(self, symbol: str) -> bool:
-        """Task 79E-R2: True iff a BUY for `symbol` has been submitted (or
-        its true outcome is still genuinely uncertain -- SUBMIT_FAILED_
-        UNCERTAIN, not yet resolved either way) but has not yet resolved to
-        either a confirmed fill (an OPEN position) or a confirmed non-fill
+        """Task 79E-R2/R2-2: True iff a BUY for `symbol` has been submitted
+        (or its true outcome is still genuinely uncertain -- SUBMIT_FAILED_
+        UNCERTAIN, not yet resolved either way, OR the intent never even
+        reached SUBMITTED/SUBMIT_FAILED_UNCERTAIN at all -- a crash strictly
+        between persisting the intent and calling submit_order, which is
+        JUST as genuinely uncertain) but has not yet resolved to either a
+        confirmed fill (an OPEN position) or a confirmed non-fill
         (rejected / SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED). Used by
         decision_engine.py so exit-plan tracking is never deleted merely
         because `_open_position_for(symbol)` does not show an OPEN
         position YET -- an entry can be legitimately pending (accepted,
-        not yet filled) for one or more ticks before its fill lands."""
-        return bool(self._non_terminal_orders_for(symbol, "buy") or self._orphaned_uncertain_intents_for(symbol, "buy"))
+        not yet filled) for one or more ticks before its fill lands -- and
+        by order_intent's own PENDING_ENTRY_EXISTS guard, so a same-symbol
+        retry can never pyramid past a genuinely-unresolved prior attempt
+        regardless of exactly which uncertain state it is stuck in."""
+        if self._non_terminal_orders_for(symbol, "buy") or self._orphaned_uncertain_intents_for(symbol, "buy"):
+            return True
+        for intent in self.state.intents.values():
+            if intent.get("status") != "ORDER_INTENT":
+                continue
+            payload = intent.get("payload", {})
+            if payload.get("symbol") == symbol and payload.get("side") == "buy":
+                return True
+        return False
 
     def mark_exit_triggered(self, symbol: str, reason: str) -> None:
         """Task 79E-R2: persists the triggered-exit reason onto `symbol`'s
@@ -348,7 +385,16 @@ class PaperLifecycle:
         fully succeeds (guards passed AND budget reserved) or raises via
         `_reject` with NO state mutated, since `_reject` always raises
         before any `self.state.experimental_budgets` write below is
-        reached."""
+        reached.
+
+        Task 79E-R2-2 Requirement 3: the `session_scope` PARAMETER is no
+        longer what gets checked -- see _authoritative_session_scope's own
+        docstring for why trusting a caller-supplied value defeated the
+        point of an independent broker-boundary check. It is accepted
+        here purely so a caller (decision_engine.py) can still be
+        diagnosed/logged against what it BELIEVES the session is, but the
+        actual guard below always uses this lifecycle's own
+        self.events.session_id."""
         auth = self._current_experimental_authorization()
         if auth is None:
             self._reject("EXPERIMENTAL_AUTHORIZATION_NOT_CONFIGURED", symbol, source, alpha_evidence)
@@ -358,7 +404,7 @@ class PaperLifecycle:
             symbol=symbol, trading_date_et=trading_date_et or "", strategy_id=strategy_id or "",
             strategy_version=strategy_version or "", runtime_sha=self.runtime_sha or "",
             config_hash=self.config_hash or "", now=datetime.now(timezone.utc),
-            account_id=self.broker.identity.account_id, session_scope=session_scope,
+            account_id=self.broker.identity.account_id, session_scope=self._authoritative_session_scope(),
         )
         if not ok:
             self._reject(f"EXPERIMENTAL_{reason}", symbol, source, alpha_evidence)
@@ -512,7 +558,11 @@ class PaperLifecycle:
                 self._reject("UNEXPECTED_SHORT_BLOCKS_NEW_ENTRIES", symbol, source, alpha_evidence)
             if self._open_position_for(symbol) is not None:
                 self._reject("ALREADY_HOLDING_NO_PYRAMIDING", symbol, source, alpha_evidence)
-            if self._non_terminal_orders_for(symbol, "buy") or self._orphaned_uncertain_intents_for(symbol, "buy"):
+            # Task 79E-R2-2: entry_still_pending_or_uncertain also covers a
+            # genuinely-stuck ORDER_INTENT-status intent (a crash strictly
+            # between persisting the intent and calling submit_order),
+            # which the OLD inline check here did not.
+            if self.entry_still_pending_or_uncertain(symbol):
                 self._reject("PENDING_ENTRY_EXISTS", symbol, source, alpha_evidence)
             if not self.paper_entry_settings.enabled_for(symbol):
                 self._reject("PAPER_ENTRY_DISABLED_FOR_TICKER", symbol, source, alpha_evidence)
@@ -597,7 +647,22 @@ class PaperLifecycle:
         ))
         return result
 
-    def apply_broker_update(self, broker_order_id: str, status: str, filled_qty: float = 0.0, fill_price: float | None = None) -> None:
+    def apply_broker_update(
+        self, broker_order_id: str, status: str, filled_qty: float = 0.0, fill_price: float | None = None,
+        # Task 79E-R2-2 Requirement 2: the BROKER's own authoritative
+        # timestamp for this status transition (Alpaca's `filled_at`, or
+        # `updated_at` as a fallback for a non-final transition Alpaca
+        # does not stamp with `filled_at` at all, e.g. a partial fill) --
+        # a "controlled", externally-sourced timestamp, never this
+        # process's own `datetime.now()`. Every real caller (poll_order_
+        # until_terminal, _resolve_unconfirmed_orders,
+        # _resolve_uncertain_submissions, _refresh_non_terminal_orders)
+        # extracts this from the broker's own response; direct callers
+        # (tests) must supply it explicitly to get causality-protected
+        # behaviour -- see decision_engine.py's own docstring on why
+        # "unknown timing" deliberately does NOT default to permissive.
+        filled_at: str | None = None,
+    ) -> None:
         order = self.state.orders[broker_order_id]
         # Task 77I: captured BEFORE this call's own update overwrites it --
         # Alpaca reports `filled_qty` CUMULATIVELY per order, so the amount
@@ -731,6 +796,7 @@ class PaperLifecycle:
                 first = position_id not in self.state.positions
                 entry_slippage_abs = (fill_price - reference_price) if (fill_price is not None and reference_price is not None) else None
                 entry_slippage_bps = (entry_slippage_abs / reference_price * 10000) if (entry_slippage_abs is not None and reference_price) else None
+                existing_position = self.state.positions.get(position_id)
                 self.state.positions[position_id] = {
                     "symbol": symbol, "quantity": filled_qty, "price": fill_price, "status": "OPEN",
                     "source": source, "alpha_evidence": alpha_evidence, "entry_time": now_iso,
@@ -745,6 +811,16 @@ class PaperLifecycle:
                     # evaluated against a bar at or before the one that
                     # produced the entry signal.
                     "entry_signal_bar_timestamp": entry_signal_bar_timestamp,
+                    # Task 79E-R2-2 Requirement 2: the BROKER's own
+                    # authoritative timestamp for the FIRST fill this
+                    # position ever saw -- first-write-wins (never
+                    # overwritten by a later partial fill of the SAME
+                    # position; the causal floor is when the position FIRST
+                    # became genuinely at-risk, not when it was last
+                    # updated). decision_engine.py's fill-causality gate
+                    # compares a candidate exit bar's own timestamp against
+                    # THIS value, never a local datetime.now() sample.
+                    "first_fill_observed_at": (existing_position or {}).get("first_fill_observed_at") or filled_at,
                 }
                 self.state.open_position_by_symbol[symbol] = position_id
                 if first:
@@ -776,9 +852,10 @@ class PaperLifecycle:
             status = str(last.get("status") or "")
             filled_qty = float(last.get("filled_qty") or 0.0)
             fill_price = float(last["filled_avg_price"]) if last.get("filled_avg_price") else None
+            filled_at = last.get("filled_at") or last.get("updated_at")
             if status and status != seen_status:
                 seen_status = status
-                self.apply_broker_update(broker_order_id, status, filled_qty, fill_price)
+                self.apply_broker_update(broker_order_id, status, filled_qty, fill_price, filled_at)
             if status in terminal:
                 break
             sleep(poll_interval_seconds)
@@ -830,7 +907,8 @@ class PaperLifecycle:
                 continue
             filled_qty = float(current.get("filled_qty") or 0.0)
             fill_price = float(current["filled_avg_price"]) if current.get("filled_avg_price") else None
-            self.apply_broker_update(broker_order_id, status, filled_qty, fill_price)
+            filled_at = current.get("filled_at") or current.get("updated_at")
+            self.apply_broker_update(broker_order_id, status, filled_qty, fill_price, filled_at)
 
     def _order_response_matches_intent(self, found: dict[str, Any], payload: dict[str, Any], client_order_id: str) -> bool:
         """Task 79E-R2: "Reject unrelated/malformed responses" -- adopting a
@@ -854,8 +932,25 @@ class PaperLifecycle:
             return False
         return math.isfinite(found_qty) and abs(found_qty - expected_qty) <= 1e-6
 
-    def _resolve_uncertain_submissions(self) -> None:
-        """Task 79E-R1/R2: a SUBMIT_FAILED_UNCERTAIN intent (order_intent's
+    def _uncertain_submission_due_for_check(self, intent: dict[str, Any], now: datetime) -> bool:
+        """Task 79E-R2-2: bounds the POLLING RATE (never the truth of the
+        outcome -- see UNCERTAIN_SUBMISSION_BACKOFF_SCHEDULE_SECONDS's own
+        docstring). An intent with no prior check is always due
+        immediately."""
+        last_checked_raw = intent.get("last_uncertain_check_at")
+        if not last_checked_raw:
+            return True
+        try:
+            last_checked = datetime.fromisoformat(last_checked_raw)
+        except ValueError:
+            return True
+        attempts = int(intent.get("not_found_confirmations") or 0)
+        schedule = UNCERTAIN_SUBMISSION_BACKOFF_SCHEDULE_SECONDS
+        backoff_seconds = schedule[min(attempts, len(schedule) - 1)]
+        return (now - last_checked).total_seconds() >= backoff_seconds
+
+    def _resolve_uncertain_submissions(self, *, now: datetime | None = None) -> None:
+        """Task 79E-R1/R2/R2-2: a SUBMIT_FAILED_UNCERTAIN intent (order_intent's
         own submit_order call raised BEFORE any broker order id was
         received -- see order_intent's try/except) has NO broker order id
         to poll with get_order, unlike UNCONFIRMED_TIMEOUT above. The only
@@ -865,64 +960,73 @@ class PaperLifecycle:
         blindly resubmitting the same signal, which could double-enter if
         the original request in fact succeeded.
 
-        Task 79E-R2 hardening over R1:
-        - A response IS verified (client_order_id/symbol/side/qty) against
-          the ORIGINAL intent before being adopted as evidence of anything
-          -- an unrelated or malformed response is rejected outright and
-          leaves the intent exactly as unresolved as before this call.
-        - A single "not found" (404) is NOT treated as conclusive -- the
-          reservation (pyramiding block, experimental exposure/budget) is
-          retained until the SAME "not found" outcome has been observed
-          across UNCERTAIN_SUBMISSION_CONFIRMATION_THRESHOLD separate
-          reconcile() passes, each a fresh, independent broker read.
+        Task 79E-R2 hardening over R1: a response IS verified
+        (client_order_id/symbol/side/qty) against the ORIGINAL intent
+        before being adopted as evidence of anything -- an unrelated or
+        malformed response is rejected outright and leaves the intent
+        exactly as unresolved as before this call.
 
-        Found-and-verified -> the order DID reach the broker despite the
-        local exception; adopted into self.state.orders and its real
-        status applied via apply_broker_update, exactly as if
-        poll_order_until_terminal had originally observed it. Confirmed
-        not-found (after the threshold) -> the intent is marked terminal
-        so pyramiding/concurrent-exposure guards stop treating it as
-        outstanding (the experimental budget reservation, if any, is
-        deliberately NOT refunded even now -- conservative in case the
-        broker's own repeated "not found" reads are themselves unreliable/
-        eventually-consistent)."""
+        Task 79E-R2-2 hardening over R2: an intent NEVER auto-resolves to
+        "confirmed not submitted" based on absence alone, no matter how
+        many times it is observed -- a prior draft did so after exactly 2
+        "not found" results, which meant the intent stopped being queried
+        by any FUTURE reconcile() pass at all, so a genuinely-submitted
+        order that only became visible LATER (e.g. broker-side eventual
+        consistency, or a transient lookup failure on the broker's own
+        side) could never be discovered. This method therefore keeps
+        re-querying EVERY SUBMIT_FAILED_UNCERTAIN intent, indefinitely,
+        subject only to a bounded POLLING backoff (see
+        _uncertain_submission_due_for_check) -- exposure reservations
+        (pyramiding block, experimental concurrent-exposure/budget) are
+        retained for as long as the intent remains unresolved, which may
+        be forever, until either (a) a verified match is found here, or
+        (b) an operator explicitly resolves it out of band (see
+        operator_resolve_uncertain_submission) based on evidence this
+        system itself cannot obtain (e.g. checking the broker's own
+        dashboard directly). Found-and-verified -> adopted into
+        self.state.orders and its real status applied via
+        apply_broker_update, exactly as if poll_order_until_terminal had
+        originally observed it -- exactly once (the intent status
+        transitions away from SUBMIT_FAILED_UNCERTAIN the moment this
+        happens, so it is never adopted twice)."""
+        now = now or datetime.now(timezone.utc)
         uncertain_ids = [
             intent_id for intent_id, intent in self.state.intents.items()
             if intent.get("status") == "SUBMIT_FAILED_UNCERTAIN"
         ]
         for intent_id in uncertain_ids:
             intent = self.state.intents[intent_id]
+            if not self._uncertain_submission_due_for_check(intent, now):
+                continue
             payload = intent.get("payload", {})
             client_order_id = payload.get("client_order_id") or intent_id
             try:
                 found = self.broker.find_order_by_client_id(client_order_id)
             except Exception as exc:  # noqa: BLE001 -- a broker-read failure here must not crash
                 # reconcile(); the intent stays SUBMIT_FAILED_UNCERTAIN (still fail-closed/outstanding)
-                # and will be retried on the next reconcile() call. Never counted toward the
-                # not-found-confirmation threshold below -- an error is not evidence of "not found."
+                # and will be retried on the next reconcile() call (subject to backoff). Never counted
+                # toward not_found_confirmations -- an error is not evidence of "not found."
+                intent["last_uncertain_check_at"] = now.isoformat()
+                self._save()
                 self.events.emit(PivEvent.build(
                     "BROKER_ERROR", order_intent_id=intent_id, correlation_id=intent_id,
                     reason=f"UNCERTAIN_SUBMISSION_RECONCILE_READ_FAILED_{type(exc).__name__}", status="STILL_UNRESOLVED",
                 ))
                 continue
+            intent["last_uncertain_check_at"] = now.isoformat()
             if found is None:
                 attempts = int(intent.get("not_found_confirmations") or 0) + 1
                 intent["not_found_confirmations"] = attempts
                 self._save()
-                if attempts < UNCERTAIN_SUBMISSION_CONFIRMATION_THRESHOLD:
-                    self.events.emit(PivEvent.build(
-                        "BROKER_ERROR", symbol=payload.get("symbol"), order_intent_id=intent_id,
-                        correlation_id=intent_id, reason="UNCERTAIN_SUBMISSION_NOT_FOUND_AWAITING_CONFIRMATION",
-                        status=f"STILL_UNRESOLVED_ATTEMPT_{attempts}_OF_{UNCERTAIN_SUBMISSION_CONFIRMATION_THRESHOLD}",
-                    ))
-                    continue
-                intent["status"] = "SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED"
-                self._save()
                 self.events.emit(PivEvent.build(
                     "BROKER_ERROR", symbol=payload.get("symbol"), order_intent_id=intent_id,
-                    correlation_id=intent_id, reason="UNCERTAIN_SUBMISSION_CONFIRMED_NEVER_REACHED_BROKER",
-                    status="RESOLVED_NOT_SUBMITTED",
+                    correlation_id=intent_id, reason="UNCERTAIN_SUBMISSION_NOT_FOUND_STILL_UNRESOLVED",
+                    status=(
+                        f"ABSENCE_IS_NOT_PROOF_ATTEMPT_{attempts}_AWAITING_EVIDENCE_OR_OPERATOR_RESOLUTION"
+                    ),
                 ))
+                # Deliberately NO auto-resolution to a terminal status here,
+                # regardless of `attempts` -- see this method's own docstring.
                 continue
             if not self._order_response_matches_intent(found, payload, client_order_id):
                 # Task 79E-R2: an unrelated/malformed response -- never
@@ -931,6 +1035,7 @@ class PaperLifecycle:
                 # it is evidence the lookup itself returned something
                 # untrustworthy). The intent stays exactly as unresolved as
                 # it was before this call.
+                self._save()
                 self.events.emit(PivEvent.build(
                     "BROKER_ERROR", symbol=payload.get("symbol"), order_intent_id=intent_id,
                     correlation_id=intent_id, reason="UNCERTAIN_SUBMISSION_RESPONSE_MISMATCH_REJECTED",
@@ -939,9 +1044,11 @@ class PaperLifecycle:
                 continue
             broker_id = str(found.get("id") or "")
             if not broker_id:
+                self._save()
                 continue
             intent["status"] = "SUBMITTED"
             intent.pop("not_found_confirmations", None)
+            intent.pop("last_uncertain_check_at", None)
             symbol = payload.get("symbol")
             self.state.orders[broker_id] = {
                 "intent_id": intent_id, "symbol": symbol, "status": "SUBMITTED", "filled_qty": 0.0,
@@ -957,7 +1064,88 @@ class PaperLifecycle:
             if status:
                 filled_qty = float(found.get("filled_qty") or 0.0)
                 fill_price = float(found["filled_avg_price"]) if found.get("filled_avg_price") else None
-                self.apply_broker_update(broker_id, status, filled_qty, fill_price)
+                filled_at = found.get("filled_at") or found.get("updated_at")
+                self.apply_broker_update(broker_id, status, filled_qty, fill_price, filled_at)
+
+    def operator_resolve_uncertain_submission(
+        self, intent_id: str, *, operator_confirmation: bool, operator_note: str = "",
+    ) -> None:
+        """Task 79E-R2-2: the ONLY way a SUBMIT_FAILED_UNCERTAIN intent's
+        exposure reservation is EVER released without this system itself
+        finding definitive evidence (a verified matching order) -- absence
+        alone, no matter how many times observed, is never proof of
+        non-submission on its own (see _resolve_uncertain_submissions's
+        own docstring). Requires EXPLICIT operator confirmation (mirroring
+        paper_cleanup's own `explicitly_confirmed` pattern); the operator
+        is asserting they have independently verified -- e.g. by checking
+        the broker's own dashboard directly, out of band from anything
+        this codebase can query -- that this specific order never reached
+        the broker. Reuses the SAME terminal status
+        ("SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED") the system's own R1/R2
+        auto-resolution used to set, so every existing downstream reader
+        (observability.py's execution-status projection, pyramiding/
+        exposure guards) needs no changes; only the RESOLUTION SOURCE
+        differs (recorded explicitly for audit). If the operator has
+        instead independently found the REAL order, they must supply its
+        true broker id through the normal adoption path (a future
+        reconcile() call, once it becomes discoverable) rather than
+        through this method, which only ever resolves to "not submitted.\""""
+        if not operator_confirmation:
+            raise PaperGuardError("operator_resolve_uncertain_submission requires explicit confirmation")
+        intent = self.state.intents.get(intent_id)
+        if intent is None:
+            raise PaperGuardError(f"no such intent: {intent_id!r}")
+        if intent.get("status") != "SUBMIT_FAILED_UNCERTAIN":
+            raise PaperGuardError(
+                f"intent {intent_id!r} is not SUBMIT_FAILED_UNCERTAIN (currently {intent.get('status')!r}) -- "
+                "operator resolution only applies to a still-uncertain submission"
+            )
+        intent["status"] = "SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED"
+        intent["resolution_source"] = "OPERATOR"
+        intent["operator_resolution_note"] = operator_note
+        intent["operator_resolved_at"] = datetime.now(timezone.utc).isoformat()
+        self._save()
+        self.events.emit(PivEvent.build(
+            "BROKER_ERROR", symbol=intent.get("payload", {}).get("symbol"), order_intent_id=intent_id,
+            correlation_id=intent_id, reason="UNCERTAIN_SUBMISSION_OPERATOR_RESOLVED_NOT_SUBMITTED",
+            status=f"OPERATOR_NOTE:{operator_note}" if operator_note else "OPERATOR_RESOLVED_NO_NOTE",
+        ))
+
+    def _refresh_non_terminal_orders(self) -> None:
+        """Task 79E-R2-2 Requirement 4: 'adopted-but-pending orders...
+        without waiting for EOD.' An order ADOPTED via
+        _resolve_uncertain_submissions (or any other non-terminal order
+        not currently inside an in-flight poll_order_until_terminal call,
+        e.g. because the process that submitted it has since restarted)
+        would otherwise sit at whatever status it last had FOREVER --
+        _resolve_unconfirmed_orders only re-queries orders explicitly
+        marked UNCONFIRMED_TIMEOUT. This refreshes every CURRENTLY
+        non-terminal, non-UNCONFIRMED_TIMEOUT order on each reconcile()
+        pass instead -- bounded to genuinely outstanding orders only
+        (never unbounded), and idempotent (a repeat call against an
+        already-terminal order is a no-op, since the query is scoped to
+        non-terminal orders each time it runs)."""
+        outstanding_ids = [
+            broker_order_id for broker_order_id, order in self.state.orders.items()
+            if order.get("status") not in _TERMINAL_ORDER_STATUSES and order.get("status") != "UNCONFIRMED_TIMEOUT"
+        ]
+        for broker_order_id in outstanding_ids:
+            try:
+                current = self.broker.get_order(broker_order_id)
+            except Exception as exc:  # noqa: BLE001 -- a broker-read failure here must not crash
+                # reconcile(); the order stays at its last-known status and will be retried next pass.
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", broker_order_id=broker_order_id,
+                    reason=f"NON_TERMINAL_ORDER_REFRESH_READ_FAILED_{type(exc).__name__}", status="STILL_UNRESOLVED",
+                ))
+                continue
+            status = str(current.get("status") or "")
+            if not status:
+                continue
+            filled_qty = float(current.get("filled_qty") or 0.0)
+            fill_price = float(current["filled_avg_price"]) if current.get("filled_avg_price") else None
+            filled_at = current.get("filled_at") or current.get("updated_at")
+            self.apply_broker_update(broker_order_id, status, filled_qty, fill_price, filled_at)
 
     def activate_kill_switch(self, cancel_orders: bool = False) -> None:
         self.state.kill_switch = True
@@ -967,9 +1155,10 @@ class PaperLifecycle:
             self.broker.cancel_all_orders()
         self.events.emit(PivEvent.build("KILL_SWITCH", reason="OPERATOR_ACTIVATED", status="NEW_PAPER_ORDERS_BLOCKED"))
 
-    def reconcile(self) -> dict[str, Any]:
+    def reconcile(self, *, now: datetime | None = None) -> dict[str, Any]:
         self._resolve_unconfirmed_orders()
-        self._resolve_uncertain_submissions()
+        self._resolve_uncertain_submissions(now=now)
+        self._refresh_non_terminal_orders()
         broker_orders = self.broker.open_orders()
         broker_positions = self.broker.positions()
         internal_open = {v["symbol"] for v in self.state.positions.values() if v.get("status") == "OPEN"}

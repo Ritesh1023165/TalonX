@@ -28,7 +28,7 @@ from .notification_outbox import NotificationOutbox
 from .observability import build_integrated_projection
 from .preflight import Preflight
 from .reporting import build_session_report
-from .session_identity import build_session_identity
+from .session_identity import resolve_session_identity
 from .session_runner import SessionRunner
 from .shadow_ledger import ShadowLedger
 from .supervisor import (
@@ -174,7 +174,11 @@ def main(argv: list[str] | None = None) -> int:
     base = PivConfig()
     approved = getattr(args, "approved_sha", None) or base.approved_sha
     config = PivConfig(approved_sha=approved)
-    identity = build_session_identity(config)
+    # Task 79E-R2-2 Requirement 3: resumes the SAME session identity for a
+    # genuinely still-live session (see resolve_session_identity's own
+    # docstring for the exact, fail-closed criteria) -- a full process
+    # restart no longer always mints a brand-new session_id.
+    identity = resolve_session_identity(config)
     bus, broker, lifecycle, experimental_authorization_path = runtime(
         config, session_id=identity.session_id, runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
     )

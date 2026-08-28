@@ -77,7 +77,14 @@ def _life(tmp_path, *, auth=None, enabled=("AAPL",), transport=None):
     broker = AlpacaPaperClient(PivConfig(key_id="k", secret_key="s", paper_trading=True, real_capital=False,
                                           broker_endpoint=PAPER_ENDPOINT, approved_sha="abc", state_dir=tmp_path), transport)
     broker.verify_paper_identity()
-    bus = EventBus(tmp_path / "events.jsonl", feed_mode="RESEARCH_SIP")
+    # Task 79E-R2-2 Requirement 3: the broker-boundary experimental guard
+    # now derives session_scope from THIS lifecycle's own
+    # self.events.session_id (never a caller-supplied value) -- session_id
+    # set here to match _auth()'s own default session_scope="REGULAR" so
+    # these UNIT tests of order_intent's OWN guard mechanics (not of
+    # real session-identity semantics -- see test_task79e_r2_activation_safety.py
+    # for that) keep passing the session-scope check by default.
+    bus = EventBus(tmp_path / "events.jsonl", feed_mode="RESEARCH_SIP", session_id="REGULAR")
     life = PaperLifecycle(
         tmp_path / "state.json", broker, bus, PaperEntrySettings.for_test(*enabled),
         experimental_authorization=auth, runtime_sha="sha1", config_hash="cfg1",

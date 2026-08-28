@@ -214,7 +214,9 @@ def test_restart_rehydrates_exit_plan_and_stop_still_fires():
         with _no_sleep_poll(life1):
             engine1._handle_entry(make_signal(stop=98.0, target=104.0))
         assert "AAPL" in engine1.positions
-        life1.apply_broker_update(transport.orders[0]["id"], "filled", 1.0, 100.0)
+        life1.apply_broker_update(
+            transport.orders[0]["id"], "filled", 1.0, 100.0, filled_at=datetime.now(timezone.utc).isoformat(),
+        )
         assert life1.state.positions
         # Simulate a full process restart: brand-new PaperLifecycle/DecisionEngine
         # reading the SAME persisted state files, never touching engine1 again.
@@ -265,7 +267,7 @@ def test_partial_fill_is_retried_and_sized_to_actual_remaining_holdings(tmp_path
         engine._handle_entry(make_signal(stop=98.0, target=104.0))
     assert "AAPL" in engine.positions
     buy_order_id = transport.orders[0]["id"]
-    life.apply_broker_update(buy_order_id, "filled", 1.0, 100.0)
+    life.apply_broker_update(buy_order_id, "filled", 1.0, 100.0, filled_at=datetime.now(timezone.utc).isoformat())
 
     stop_bar = Bar(datetime.now(timezone.utc) + timedelta(minutes=1), 97.5, 98.5, 97.0, 97.5, 1000)
     with _no_sleep_poll(life):
@@ -296,7 +298,9 @@ def test_rejected_exit_keeps_position_tracked_for_retry(tmp_path):
     engine, life, transport, outbox, shadow, bus, _ = build_stack(tmp_path, paper_enabled=("AAPL", "MSFT"), auth=_auth())
     with _no_sleep_poll(life):
         engine._handle_entry(make_signal(stop=98.0, target=104.0))
-    life.apply_broker_update(transport.orders[0]["id"], "filled", 1.0, 100.0)
+    life.apply_broker_update(
+        transport.orders[0]["id"], "filled", 1.0, 100.0, filled_at=datetime.now(timezone.utc).isoformat(),
+    )
     # Disable PAPER entries for AAPL AFTER entry -- order_intent's own SELL
     # branch does not gate on paper_entry_settings (only BUY does), so
     # instead simulate a rejection via the kill switch, which DOES block
@@ -380,6 +384,13 @@ async def test_same_bar_as_entry_never_triggers_stop(tmp_path):
         transport.orders[-1]["status"] = "filled"
         transport.orders[-1]["filled_qty"] = "1"
         transport.orders[-1]["filled_avg_price"] = "100.0"
+        # Task 79E-R2-2: captured HERE (genuinely after `ts`, the entry
+        # bar's own timestamp, was captured below) -- the fill's real
+        # timestamp is later than the entry bar's own, which is exactly
+        # what makes the entry bar itself causally INeligible (proving the
+        # same-tick exclusion via genuine timestamp comparison, not a
+        # caller-computed flag).
+        transport.orders[-1]["filled_at"] = datetime.now(timezone.utc).isoformat()
         return response
 
     transport.post = _auto_fill_post
@@ -555,12 +566,19 @@ def test_two_symbols_competing_for_one_slot(tmp_path):
     assert "MSFT" not in engine.positions
 
 
-def test_uncertain_submission_confirmed_not_reached_broker_frees_pyramiding_guard(tmp_path):
+def test_uncertain_submission_never_auto_resolves_operator_resolution_frees_pyramiding_guard(tmp_path):
     """A submission that raises BEFORE any broker id is received leaves an
-    intent SUBMIT_FAILED_UNCERTAIN. reconcile() must resolve the ambiguity
-    via the order's stable client_order_id -- confirmed NOT reached ->
-    pyramiding/exposure guards stop treating it as outstanding, WITHOUT
-    ever blindly resubmitting the original request."""
+    intent SUBMIT_FAILED_UNCERTAIN. Task 79E-R2-2 superseded this test's own
+    ORIGINAL R2 design (a count-based threshold of 2 "not found" results
+    auto-confirmed non-submission) -- see
+    test_task79e_r2_activation_safety.py's own
+    test_repeated_404s_never_auto_confirm_not_submitted_then_order_appears_and_is_adopted_once
+    for the full reproduction of why that was wrong (a genuinely-submitted
+    order that only became discoverable LATER would never be found again,
+    since a "resolved" intent is no longer queried at all). This test now
+    proves the two ACTUAL ways an uncertain submission's exposure
+    reservation can be released: (1) never merely by repeated absence, and
+    (2) explicit, evidence-backed operator resolution."""
     transport = ControllableTransport()
     engine, life, transport, outbox, shadow, bus, _ = build_stack(tmp_path, transport=transport)
     from talonx_piv.lifecycle import stable_id
@@ -572,21 +590,33 @@ def test_uncertain_submission_confirmed_not_reached_broker_frees_pyramiding_guar
     with pytest.raises(PaperGuardError, match="PENDING_ENTRY_EXISTS"):
         life.order_intent("s2", "AAPL", "buy", 1.0, source="STRATEGY", reference_price=100.0)
 
-    # Task 79E-R2: a SINGLE 404 must never be conclusive -- the first
-    # reconcile() leaves the intent still uncertain (still fail-closed),
-    # and the pyramiding guard must still be blocking a same-symbol entry.
-    life.reconcile()
-    assert life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_UNCERTAIN"
-    with pytest.raises(PaperGuardError, match="PENDING_ENTRY_EXISTS"):
-        life.order_intent("s2b", "AAPL", "buy", 1.0, source="STRATEGY", reference_price=100.0)
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    for attempt in range(1, 4):
+        life.reconcile(now=base + timedelta(hours=attempt))
+        assert life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_UNCERTAIN", f"wrongly auto-resolved at attempt {attempt}"
+        with pytest.raises(PaperGuardError, match="PENDING_ENTRY_EXISTS"):
+            life.order_intent(f"s2-{attempt}", "AAPL", "buy", 1.0, source="STRATEGY", reference_price=100.0)
 
-    # A SECOND independent 404, on a SEPARATE reconcile() pass, is what
-    # finally confirms it.
-    life.reconcile()
+    # The ONLY way this ever resolves to "not submitted" now: an operator,
+    # asserting they have independently verified this out of band.
+    with pytest.raises(PaperGuardError, match="requires explicit confirmation"):
+        life.operator_resolve_uncertain_submission(intent_id, operator_confirmation=False)
+    assert life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_UNCERTAIN"  # unaffected by the rejected attempt
+
+    life.operator_resolve_uncertain_submission(
+        intent_id, operator_confirmation=True, operator_note="verified never submitted via Alpaca dashboard",
+    )
     assert life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED"
+    assert life.state.intents[intent_id]["resolution_source"] == "OPERATOR"
+
     # A genuinely NEW signal_id may now proceed -- never a blind retry of s1.
     result = life.order_intent("s3", "AAPL", "buy", 1.0, source="STRATEGY", reference_price=100.0)
     assert result["id"]
+
+    # Resolving an already-resolved (no longer SUBMIT_FAILED_UNCERTAIN)
+    # intent again is rejected -- operator resolution applies exactly once.
+    with pytest.raises(PaperGuardError, match="not SUBMIT_FAILED_UNCERTAIN"):
+        life.operator_resolve_uncertain_submission(intent_id, operator_confirmation=True)
 
 
 def test_uncertain_submission_confirmed_reached_broker_is_adopted_not_reentered(tmp_path):

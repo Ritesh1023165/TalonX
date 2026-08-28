@@ -36,10 +36,10 @@ from talonx_piv.events import EventBus
 from talonx_piv.execution_settings import PaperEntrySettings
 from talonx_piv.experimental_authorization import ExperimentalAuthorization, ExperimentalPaperPermission
 from talonx_piv.gemini_enrichment import GeminiEnrichmentOutbox
-from talonx_piv.lifecycle import PaperLifecycle, UNCERTAIN_SUBMISSION_CONFIRMATION_THRESHOLD, stable_id
+from talonx_piv.lifecycle import PaperLifecycle, UNCERTAIN_SUBMISSION_BACKOFF_SCHEDULE_SECONDS, stable_id
 from talonx_piv.notification_outbox import NotificationOutbox
-from talonx_piv.session_identity import build_session_identity
-from talonx_piv.session_runner import Bar
+from talonx_piv.session_identity import build_session_identity, resolve_session_identity
+from talonx_piv.session_runner import ET, Bar, SessionRunner
 from talonx_piv.shadow_ledger import ShadowLedger
 from talonx_quant.schemas import QuantSignal, SignalDirection, SignalType
 
@@ -88,10 +88,27 @@ class AlpacaContractTransport:
         # rejects a response that merely has a truthy `id`.
         self.unrelated_response_for: dict[str, dict] = {}
         self.malformed_response_for: set[str] = set()
+        # Task 79E-R2-2: simulates "the order genuinely reached the broker
+        # (it exists in self.orders) but a lookup by client_order_id
+        # doesn't show it YET" -- eventual-consistency delay, distinct
+        # from dropped_client_order_ids (which means the order was NEVER
+        # created at all). Removing an id from this set is what makes the
+        # SAME real order become discoverable later, without ever
+        # duplicating it.
+        self.hidden_from_lookup_client_order_ids: set[str] = set()
+        # Task 79E-R2-2 Requirement 4: enables driving a REAL
+        # SessionRunner.process_tick loop (fetch_bars_latest calls
+        # GET .../bars/latest) through this SAME transport, so the
+        # combined restart/recovery scenario test exercises actual runtime
+        # wiring rather than manually invoking recovery helpers.
+        self.bar_batches: list[dict] = []
 
     def get(self, url, **kwargs):
         if url.endswith("/v2/account"):
             return Response({"id": self.account_id, "account_number": "PA555555", "status": "ACTIVE"})
+        if "bars/latest" in url:
+            body = self.bar_batches.pop(0) if self.bar_batches else {}
+            return Response({"bars": body})
         if url.endswith("/v2/orders:by_client_order_id"):
             params = kwargs.get("params") or {}
             client_order_id = params.get("client_order_id")
@@ -99,6 +116,8 @@ class AlpacaContractTransport:
                 return Response({"not_an_order": True}, 200)  # 200 but no usable `id`
             if client_order_id in self.unrelated_response_for:
                 return Response(self.unrelated_response_for[client_order_id], 200)
+            if client_order_id in self.hidden_from_lookup_client_order_ids:
+                return Response({"message": "order not found"}, 404)
             if client_order_id in self.dropped_client_order_ids:
                 return Response({"message": "order not found"}, 404)
             match = next((o for o in self.orders if o.get("client_order_id") == client_order_id), None)
@@ -339,25 +358,69 @@ def test_uncertain_submission_matching_response_is_adopted(tmp_path):
     assert len(transport.orders) == 1
 
 
-def test_single_404_never_confirms_not_submitted(tmp_path):
-    """Requirement 1: 'a single 404 must not mean confirmed never
-    submitted or release uncertain-exposure protection.' Reservations
-    (pyramiding block) must survive across the FIRST reconcile()'s 404."""
+def test_repeated_404s_never_auto_confirm_not_submitted_then_order_appears_and_is_adopted_once(tmp_path):
+    """Task 79E-R2-2 Requirement 1 (supersedes R2's own now-corrected
+    threshold design -- see the report's addendum): NO count of "not
+    found" results, however large, may ever auto-declare an intent
+    confirmed-not-submitted -- absence is never proof of non-submission.
+    Exposure (pyramiding block) is retained across every one of several
+    404s; once the ORIGINAL order finally becomes discoverable (e.g. a
+    broker-side eventual-consistency delay resolves), it is adopted --
+    exactly once, with no duplicate entry ever submitted."""
     transport = AlpacaContractTransport()
     engine, life, transport, outbox, shadow, bus, identity = build_stack(tmp_path, transport=transport)
     intent_id = stable_id("intent", "s1", "AAPL", "buy", 1.0)
-    transport.dropped_client_order_ids.add(intent_id)
+    # The order DOES genuinely reach the broker (a real record is created),
+    # but the local response is lost -- AND a lookup by client_order_id
+    # does not show it yet either (eventual-consistency delay), so several
+    # reconcile() passes must observe "not found" before it clears up.
+    real_post = transport.post
+
+    def _post_but_hide_from_lookup(url, **kwargs):
+        response = real_post(url, **kwargs)
+        transport.hidden_from_lookup_client_order_ids.add(intent_id)
+        raise RuntimeError("simulated response lost after broker accepted it")
+
+    transport.post = _post_but_hide_from_lookup
     with pytest.raises(RuntimeError):
         life.order_intent("s1", "AAPL", "buy", 1.0, source="STRATEGY", reference_price=100.0)
+    assert len(transport.orders) == 1  # it DID reach the broker
 
-    assert UNCERTAIN_SUBMISSION_CONFIRMATION_THRESHOLD >= 2  # the policy this test proves
-    for attempt in range(1, UNCERTAIN_SUBMISSION_CONFIRMATION_THRESHOLD):
-        life.reconcile()
-        assert life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_UNCERTAIN", f"resolved too early at attempt {attempt}"
+    # Deterministic, explicit "controlled" timestamps -- never datetime.now()
+    # ordering assumptions -- spaced far enough apart to clear even the
+    # LONGEST backoff interval, so every one of these calls genuinely
+    # re-queries the broker (proving the "never auto-resolve" behaviour is
+    # not merely masked by backoff skipping the check).
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    max_backoff = max(UNCERTAIN_SUBMISSION_BACKOFF_SCHEDULE_SECONDS)
+    for attempt in range(1, 6):  # far more than R2's old threshold of 2
+        moment = base + timedelta(seconds=attempt * (max_backoff + 1))
+        life.reconcile(now=moment)
+        assert life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_UNCERTAIN", f"wrongly auto-resolved at attempt {attempt}"
+        assert life.state.intents[intent_id]["not_found_confirmations"] == attempt
         with pytest.raises(PaperGuardError, match="PENDING_ENTRY_EXISTS"):
             life.order_intent(f"retry-{attempt}", "AAPL", "buy", 1.0, source="STRATEGY", reference_price=100.0)
-    life.reconcile()  # the THRESHOLD-th independent 404
-    assert life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED"
+
+    # The original order finally becomes discoverable (broker-side eventual
+    # consistency resolved, or a transient lookup issue cleared up).
+    transport.hidden_from_lookup_client_order_ids.discard(intent_id)
+    real_order = next(o for o in transport.orders if o.get("client_order_id") == intent_id)
+    life.reconcile(now=base + timedelta(seconds=6 * (max_backoff + 1)))
+    assert life.state.intents[intent_id]["status"] == "SUBMITTED"
+    assert real_order["id"] in life.state.orders
+
+    # Adopted exactly once -- a further reconcile() pass is a no-op (the
+    # intent is no longer SUBMIT_FAILED_UNCERTAIN, so it is not re-queried
+    # at all), and no duplicate order was ever created.
+    orders_before = len(transport.orders)
+    life.reconcile(now=base + timedelta(seconds=7 * (max_backoff + 1)))
+    assert len(transport.orders) == orders_before
+    assert len([o for o in life.state.orders.values() if o.get("intent_id") == intent_id]) == 1
+    # Still correctly blocks a same-symbol retry -- the ADOPTED order is
+    # itself now a real, non-terminal outstanding order (status "new"),
+    # never a duplicate entry.
+    with pytest.raises(PaperGuardError, match="PENDING_ENTRY_EXISTS"):
+        life.order_intent("s2-new", "AAPL", "buy", 1.0, source="STRATEGY", reference_price=100.0)
 
 
 def test_repeated_reconciliation_is_idempotent_and_never_double_adopts(tmp_path):
@@ -409,7 +472,9 @@ def test_accepted_unfilled_entry_keeps_exit_tracking(tmp_path):
     assert not any(o.get("side") == "sell" for o in transport.orders)
 
     # The fill finally lands.
-    life.apply_broker_update(transport.orders[0]["id"], "filled", 1.0, 100.0)
+    life.apply_broker_update(
+        transport.orders[0]["id"], "filled", 1.0, 100.0, filled_at=datetime.now(timezone.utc).isoformat(),
+    )
     assert life._open_position_for("AAPL") is not None
     with _no_sleep_poll(life):
         engine._check_exit("AAPL", Bar(stop_bar.timestamp + timedelta(minutes=1), 97.0, 97.5, 96.5, 97.0, 1000))
@@ -507,7 +572,9 @@ def test_triggered_exit_reason_persists_and_survives_price_recovery_after_restar
     engine, life, transport, outbox, shadow, bus, identity = build_stack(tmp_path, auth=_auth())
     with _no_sleep_poll(life):
         engine._handle_entry(make_signal(stop=98.0, target=104.0))
-    life.apply_broker_update(transport.orders[0]["id"], "filled", 1.0, 100.0)
+    life.apply_broker_update(
+        transport.orders[0]["id"], "filled", 1.0, 100.0, filled_at=datetime.now(timezone.utc).isoformat(),
+    )
 
     stop_bar = Bar(datetime.now(timezone.utc) + timedelta(minutes=1), 97.5, 98.5, 97.0, 97.5, 1000)
     with _no_sleep_poll(life):
@@ -612,6 +679,41 @@ def test_rehydration_healthy_case_still_reports_no_action_required(tmp_path):
 # 4. Actual fill causality (delayed/partial fills, replay, restart)
 # ---------------------------------------------------------------------------
 
+def test_forced_eod_exit_unaffected_by_unknown_fill_timing(tmp_path):
+    """Requirement 2: 'Preserve legitimate post-fill and forced EOD
+    exits.' A forced EOD flatten is time-based, never price-based -- it
+    must still flatten a position even with COMPLETELY UNKNOWN fill
+    timing (no first_fill_observed_at at all), which is exactly the case
+    the natural price-based gate now correctly refuses to act on. Proves
+    `force_reason` genuinely bypasses the fill-time causality gate."""
+    engine, life, transport, outbox, shadow, bus, identity = build_stack(tmp_path, auth=_auth())
+    with _no_sleep_poll(life):
+        engine._handle_entry(make_signal(stop=98.0, target=104.0))
+    assert "AAPL" in engine.positions
+    # Filled, but with NO filled_at at all -- unknown timing.
+    life.apply_broker_update(transport.orders[0]["id"], "filled", 1.0, 100.0)
+    assert life._open_position_for("AAPL") is not None
+
+    # A NATURAL price-based check must NOT trigger -- unknown timing.
+    stop_bar = bar(97.5)
+    with _no_sleep_poll(life):
+        engine._check_exit("AAPL", stop_bar)
+    assert "AAPL" in engine.positions
+    assert not any(o.get("side") == "sell" for o in transport.orders)
+
+    # A FORCED (EOD) exit, via flatten_all, DOES still act despite the
+    # exact same unknown timing.
+    with _no_sleep_poll(life):
+        engine.flatten_all({"AAPL": bar(97.5)})
+    sell_orders = [o for o in transport.orders if o.get("side") == "sell"]
+    assert len(sell_orders) == 1
+    assert engine.positions["AAPL"].exit_reason == "END_OF_SESSION"
+    life.apply_broker_update(sell_orders[0]["id"], "filled", 1.0, 97.5)
+    with _no_sleep_poll(life):
+        engine._check_exit("AAPL", bar(97.5))  # observes confirmed-flat, stops tracking
+    assert "AAPL" not in engine.positions
+
+
 @pytest.mark.asyncio
 async def test_delayed_fill_across_multiple_ticks_is_still_causally_protected(tmp_path):
     """Requirement 4: 'replace same-tick-only protection with rules
@@ -652,7 +754,12 @@ async def test_delayed_fill_across_multiple_ticks_is_still_causally_protected(tm
     # The fill finally lands, confirmed BETWEEN tick 2 and tick 3 (e.g. a
     # reconcile() call, or the broker simply took a while) -- observed
     # fresh at the START of tick 3, BEFORE tick 3's own bar is evaluated.
-    life.apply_broker_update(transport.orders[0]["id"], "filled", 1.0, 97.0)
+    # `filled_at` is a CONTROLLED timestamp (never datetime.now()),
+    # explicitly placed between tick 2 and tick 3's own bar timestamps.
+    life.apply_broker_update(
+        transport.orders[0]["id"], "filled", 1.0, 97.0,
+        filled_at=(ts + timedelta(minutes=1, seconds=30)).isoformat(),
+    )
 
     # Tick 3: this bar's own low is ALSO below stop -- but this bar is
     # legitimately AFTER the confirmed fill, so it IS eligible and DOES
@@ -666,31 +773,50 @@ async def test_delayed_fill_across_multiple_ticks_is_still_causally_protected(tm
 
 
 @pytest.mark.asyncio
-async def test_restart_mid_delayed_fill_still_applies_causality_correctly(tmp_path):
-    """A restart occurring WHILE an entry is still merely pending (not yet
-    filled) must not fabricate eligibility -- the freshly-rehydrated
-    (well, in this case NOT rehydrated, since it's not OPEN yet) engine's
-    first tick after the fill finally lands must still be treated as
-    "already open before this tick", never using stale pre-restart price
-    history to retroactively trigger."""
+async def test_restart_mid_pending_entry_restores_plan_and_applies_causality_correctly(tmp_path):
+    """Task 79E-R2-2 Requirement 4: 'full-process restart also fails to
+    restore pending-entry plans' -- CLOSED this task (see
+    DecisionEngine._rehydrate_pending_entries). A restart occurring WHILE
+    an entry is still merely pending (not yet filled) now DOES restore a
+    plan for it (stop/target from the durable intent record), and once the
+    fill finally lands and is confirmed, causality is still correctly
+    applied -- a bar BEFORE the fill was ever confirmed by the NEW process
+    must not retroactively trigger, exactly like the pre-restart case."""
     transport = AlpacaContractTransport()
-    engine, life, transport, outbox, shadow, bus, identity = build_stack(tmp_path, auth=_auth(), transport=transport)
+    engine, life, transport, outbox, shadow, bus, identity = build_stack(tmp_path, auth=_auth())
     with _no_sleep_poll(life):
         engine._handle_entry(make_signal(stop=98.0, target=104.0))
     assert transport.orders[0]["status"] == "new"  # not filled at "crash" time
 
     cfg = life.broker.config
     engine2, life2 = _rebuild_engine(tmp_path, life, bus, cfg, auth=life.experimental_authorization)
-    # Not rehydrated as an OPEN position (it never was one) -- but also not
-    # silently forgotten: DecisionEngine2 has no bookkeeping for it at all
-    # yet, matching a genuinely fresh process's own natural behavior (the
-    # NEXT real signal/tick would re-decide it independently; this is not
-    # a regression Task 79E-R2 claims to fix, since a genuinely NEW process
-    # has no natural way to know about an in-flight, not-yet-filled order
-    # it did not itself submit without a broader order-adoption mechanism
-    # out of this task's scope -- see remaining_issues in the report).
-    life2.apply_broker_update(transport.orders[0]["id"], "filled", 1.0, 100.0)
+    # Now RESTORED -- the pending entry's own plan, from the durable intent
+    # record (never invented).
+    assert "AAPL" in engine2.positions
+    assert engine2.positions["AAPL"].stop_price == 98.0
+    assert engine2.positions["AAPL"].target_price == 104.0
+
+    # A bar arrives on the new process BEFORE the fill is ever confirmed --
+    # must not trigger (nothing confirmed-held yet).
+    pre_fill_bar = Bar(datetime.now(timezone.utc), 97.0, 97.5, 96.0, 97.0, 1000)
+    with _no_sleep_poll(life2):
+        engine2._check_exit("AAPL", pre_fill_bar)
+    assert "AAPL" in engine2.positions
+    assert not any(o.get("side") == "sell" for o in transport.orders)
+
+    # The fill lands, confirmed with a controlled timestamp strictly AFTER
+    # pre_fill_bar's own.
+    life2.apply_broker_update(
+        transport.orders[0]["id"], "filled", 1.0, 100.0,
+        filled_at=(pre_fill_bar.timestamp + timedelta(seconds=30)).isoformat(),
+    )
     assert life2._open_position_for("AAPL") is not None
+
+    # A bar STRICTLY after the confirmed fill now correctly triggers.
+    post_fill_bar = Bar(pre_fill_bar.timestamp + timedelta(minutes=1), 97.0, 97.5, 96.0, 97.0, 1000)
+    with _no_sleep_poll(life2):
+        engine2._check_exit("AAPL", post_fill_bar)
+    assert any(o.get("side") == "sell" for o in transport.orders)
 
 
 # ---------------------------------------------------------------------------
@@ -730,6 +856,37 @@ def test_unrelated_session_id_rejected(tmp_path):
         engine._handle_entry(make_signal())
     assert transport.orders == []
     assert "AAPL" not in engine.positions
+
+
+def test_broker_boundary_ignores_a_contradictory_caller_supplied_session_scope(tmp_path):
+    """Requirement 3's own exact reproduction: 'lifecycle.events.session_id
+    is session-B, authorization permits session-A, and the caller supplies
+    session-A; the broker-entry guard accepts it.' This is the R2 (round
+    1) defect: order_intent's own `experimental_session_scope` parameter
+    was what got checked, so a caller (bug or otherwise) claiming a
+    DIFFERENT session than the lifecycle's own REAL one was silently
+    trusted. Called directly at the true broker boundary (order_intent)
+    to isolate this from decision_engine.py's own separate, independent
+    pre-check -- proving THIS layer alone no longer trusts the caller."""
+    auth = _auth(session_scope="session-B")
+    engine, life, transport, outbox, shadow, bus, identity = build_stack(
+        tmp_path, auth=dataclasses.replace(auth, session_scope="session-B"), bind_auth_to_live_session=False,
+    )
+    # The lifecycle's OWN real session_id is `identity.session_id` (call it
+    # "session-A" in the reproduction's own naming) -- NOT "session-B".
+    assert bus.session_id != "session-B"
+    with pytest.raises(PaperGuardError, match="EXPERIMENTAL_WRONG_SESSION_SCOPE"):
+        life.order_intent(
+            "s1", "AAPL", "buy", 1.0, source="EXPERIMENTAL", reference_price=100.0,
+            experimental_id="exp-r2", experimental_trading_date_et=_auth().trading_date_et,
+            strategy_id="macd_bullish_cross", experimental_strategy_version=get_strategy_version(),
+            # The caller CLAIMS "session-B" (matching the authorization) --
+            # this must be IGNORED; only lifecycle's own real session_id
+            # (bus.session_id, which is neither "session-A" nor
+            # "session-B" here) is ever actually checked.
+            experimental_session_scope="session-B",
+        )
+    assert transport.orders == []
 
 
 def test_same_session_recovery_permitted_across_reconstruction(tmp_path):
@@ -794,7 +951,9 @@ def test_revocation_blocks_new_entries_but_not_existing_exits(tmp_path):
     with _no_sleep_poll(life):
         engine._handle_entry(make_signal(stop=98.0, target=104.0))
     assert "AAPL" in engine.positions
-    life.apply_broker_update(transport.orders[0]["id"], "filled", 1.0, 100.0)
+    life.apply_broker_update(
+        transport.orders[0]["id"], "filled", 1.0, 100.0, filled_at=datetime.now(timezone.utc).isoformat(),
+    )
 
     auth_path.unlink()  # revoked
 
@@ -842,3 +1001,191 @@ def test_combined_two_symbols_competing_one_pending_one_uncertain(tmp_path):
     assert "AAPL" in engine.positions
     life.apply_broker_update(transport.orders[0]["id"], "filled", 1.0, 100.0)
     assert life._open_position_for("AAPL") is not None
+
+
+# ---------------------------------------------------------------------------
+# 7. Combined recovery scenario -- REAL SessionRunner/supervisor wiring,
+#    across simulated full-process restarts, fake external services only.
+# ---------------------------------------------------------------------------
+
+def bar_row(ts_iso: str, price: float = 100.0) -> dict:
+    return {"t": ts_iso, "o": price, "h": price + 1, "l": price - 1, "c": price, "v": 1000}
+
+
+def to_utc_iso(local: datetime) -> str:
+    return local.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def build_runner_stack(tmp_path, transport, *, redis_messages=None):
+    """Task 79E-R2-2 Requirement 4: builds a REAL SessionRunner (not a bare
+    DecisionEngine/PaperLifecycle pair) against the SAME shared transport
+    and tmp_path -- called once per simulated "process" in the combined
+    scenario below, exactly like test_task78i_stage5_rehearsal.py's own
+    established pattern. Uses resolve_session_identity (not
+    build_session_identity) so a "restart" (a second/third call against
+    the SAME tmp_path, with the prior session still session_enabled=True)
+    genuinely proves Requirement 3's full-process session recovery, not
+    merely an in-memory EventBus reconstruction."""
+    cfg = PivConfig(
+        key_id="key", secret_key="secret", paper_trading=True, real_capital=False,
+        broker_endpoint=PAPER_ENDPOINT, approved_sha="abc", state_dir=tmp_path,
+        universe=("AAPL",), stale_seconds=90,
+    )
+    broker = AlpacaPaperClient(cfg, transport)
+    broker.verify_paper_identity()
+    identity = resolve_session_identity(cfg)
+    (tmp_path / "session_identity.json").write_text(json.dumps(identity.to_dict(), sort_keys=True), encoding="utf-8")
+    bus = EventBus(tmp_path / "piv_events.jsonl", feed_mode=cfg.feed_mode, session_id=identity.session_id)
+    life = PaperLifecycle(tmp_path / "lifecycle_state.json", broker, bus, PaperEntrySettings.for_test("AAPL"))
+    life.start_session(True, True)
+    from talonx_piv.decision_contract import StrategyApprovalStatus
+    engine = DecisionEngine(
+        _FakeRedisClient(_FakePubSub(redis_messages)), bus, life, piv_config=cfg,
+        decision_ledger=DecisionLedger(tmp_path / "decision_ledger.json"),
+        notification_outbox=NotificationOutbox(tmp_path / "notification_outbox.json", lambda m: True),
+        shadow_ledger=ShadowLedger(tmp_path / "shadow_ledger.json"),
+        gemini_enrichment=GeminiEnrichmentOutbox(tmp_path / "gemini_enrichment.json"),
+        runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
+        # TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE. This combined scenario is
+        # about the RUNTIME RECOVERY machinery (Requirement 4), not the
+        # experimental-authorization path already covered elsewhere in
+        # this file -- an approved-strategy fixture keeps the scenario
+        # focused, matching test_task78i_stage5_rehearsal.py's own
+        # established pattern.
+        strategy_approval_status_override=StrategyApprovalStatus.APPROVED,
+    )
+    engine.scanner._handle_market_tick = AsyncMock()
+    engine.scanner._flush_throttle_window = AsyncMock()
+    engine.warmup_ready_symbols = {"AAPL"}
+    runner = SessionRunner(cfg, bus, life, transport, decision_engine=engine, poll_interval_seconds=60.0)
+    return cfg, broker, identity, bus, life, engine, runner
+
+
+def _prime_ready(runner: SessionRunner, tick: datetime) -> None:
+    """Bypasses the opening-range warmup dance (not this test's own
+    concern -- see test_task78i_stage5_rehearsal.py for dedicated
+    readiness-path coverage) by hand-setting the SAME session/ready-
+    symbols state a natural 09:30-10:00 ET warmup would have finalized to.
+    Must set `_session` FIRST -- process_tick's own session-boundary
+    check resets `_ready_symbols` to None whenever `_session` does not
+    already match the tick's own ET date."""
+    runner._session = tick.astimezone(ET).date()
+    runner._ready_symbols = {"AAPL"}
+
+
+class _FakePubSub:
+    def __init__(self, messages=None):
+        self._messages = list(messages or [])
+
+    async def subscribe(self, channel): pass
+    async def unsubscribe(self, channel): pass
+    async def close(self): pass
+
+    async def get_message(self, ignore_subscribe_messages=True, timeout=0.2):
+        if self._messages:
+            return {"data": self._messages.pop(0)}
+        return None
+
+
+class _FakeRedisClient:
+    def __init__(self, pubsub):
+        self._pubsub = pubsub
+
+    def pubsub(self):
+        return self._pubsub
+
+
+@pytest.mark.asyncio
+async def test_combined_restart_recovery_scenario_through_real_session_runner(tmp_path):
+    """Task 79E-R2-2 Requirement 4's own required combined scenario, driven
+    through REAL SessionRunner.process_tick calls (never a manually-
+    invoked recovery helper standing in for runtime wiring):
+
+    accepted entry -> process restart -> delayed fill -> restored
+    monitoring -> triggered partial exit -> restart with recovered price
+    -> completed exit.
+
+    Three simulated full-process "restarts" share the SAME lifecycle
+    state file and the SAME broker transport (its own order history is
+    exactly what a real Alpaca paper account would retain across a real
+    restart) -- only the SessionRunner/DecisionEngine/PaperLifecycle
+    Python objects are torn down and rebuilt each time, exactly mirroring
+    what actually happens when this codebase's own process restarts."""
+    with patch("time.sleep", lambda *_: None):
+        transport = AlpacaContractTransport()
+        base = datetime(2026, 8, 27, 9, 30, tzinfo=timezone.utc)
+
+        # -- "Process 1": accepted entry --------------------------------------
+        signal = make_signal(stop=98.0, target=104.0, ts=base)
+        cfg1, broker1, identity1, bus1, life1, engine1, runner1 = build_runner_stack(
+            tmp_path, transport, redis_messages=[signal.model_dump_json().encode()],
+        )
+        tick1 = base
+        _prime_ready(runner1, tick1)
+        transport.bar_batches.append({"AAPL": bar_row(to_utc_iso(tick1), 100.0)})
+        await runner1.process_tick(tick1)
+        assert "AAPL" in engine1.positions
+        buy_order = transport.orders[0]
+        assert buy_order["status"] == "new"  # accepted, NOT yet filled -- a genuinely pending entry
+
+        # -- "Process 2": restart while still pending, THEN the delayed fill --
+        cfg2, broker2, identity2, bus2, life2, engine2, runner2 = build_runner_stack(tmp_path, transport)
+        _prime_ready(runner2, tick1)
+        assert identity2.session_id == identity1.session_id  # Requirement 3: same-session recovery, full process
+        assert "AAPL" in engine2.positions  # Requirement 4: pending-entry plan RESTORED, not lost
+        assert engine2.positions["AAPL"].stop_price == 98.0
+        assert life2._open_position_for("AAPL") is None  # still genuinely not filled
+
+        delayed_fill_at = tick1 + timedelta(minutes=1, seconds=30)
+        life2.apply_broker_update(buy_order["id"], "filled", 1.0, 100.0, filled_at=delayed_fill_at.isoformat())
+        assert life2._open_position_for("AAPL") is not None
+
+        # A tick whose bar is BEFORE the confirmed fill must never trigger --
+        # proves restored monitoring respects fill-time causality, not merely
+        # "is it open now."
+        tick2 = tick1 + timedelta(minutes=1)
+        transport.bar_batches.append({"AAPL": bar_row(to_utc_iso(tick2), 97.0)})  # low pierces stop, but PRE-fill
+        await runner2.process_tick(tick2)
+        assert not any(o.get("side") == "sell" for o in transport.orders)
+        assert "AAPL" in engine2.positions
+
+        # A tick strictly AFTER the confirmed fill DOES trigger -- a partial exit.
+        tick3 = tick1 + timedelta(minutes=2)
+        transport.bar_batches.append({"AAPL": bar_row(to_utc_iso(tick3), 96.5)})  # low pierces stop, post-fill
+        await runner2.process_tick(tick3)
+        sell_orders = [o for o in transport.orders if o.get("side") == "sell"]
+        assert len(sell_orders) == 1
+        triggered_sell = sell_orders[0]
+        # Partially filled, then the rest cancelled -- 0.6 genuinely still owed.
+        life2.apply_broker_update(triggered_sell["id"], "partially_filled", 0.4, 97.0)
+        life2.apply_broker_update(triggered_sell["id"], "canceled", 0.4, 97.0)
+        assert life2.remaining_holdings("AAPL") == pytest.approx(0.6)
+        assert engine2.positions["AAPL"].exit_reason == "STOP"
+
+        # -- "Process 3": restart with a triggered-but-unconfirmed partial exit,
+        #    and price has since RECOVERED well above the stop -------------
+        cfg3, broker3, identity3, bus3, life3, engine3, runner3 = build_runner_stack(tmp_path, transport)
+        _prime_ready(runner3, tick1)
+        assert identity3.session_id == identity1.session_id  # STILL the same recovered session
+        assert "AAPL" in engine3.positions
+        assert engine3.positions["AAPL"].exit_reason == "STOP"  # the trigger survived TWO restarts
+
+        tick4 = tick1 + timedelta(minutes=3)
+        # Price fully recovered above the stop -- a naive re-derivation from
+        # price alone would NOT re-trigger. The persisted reason must still
+        # force the remaining 0.6 to be sold.
+        transport.bar_batches.append({"AAPL": bar_row(to_utc_iso(tick4), 102.0)})
+        await runner3.process_tick(tick4)
+        sell_orders = [o for o in transport.orders if o.get("side") == "sell"]
+        assert len(sell_orders) == 2
+        completing_sell = sell_orders[1]
+        assert completing_sell["qty"] == "0.6"  # sized to ACTUAL remaining holdings, never a fixed constant
+
+        life3.apply_broker_update(completing_sell["id"], "filled", 0.6, 102.0, filled_at=tick4.isoformat())
+        assert life3._open_position_for("AAPL") is None  # fully closed
+
+        # One more tick observes the now-confirmed-flat state and stops tracking.
+        tick5 = tick1 + timedelta(minutes=4)
+        transport.bar_batches.append({"AAPL": bar_row(to_utc_iso(tick5), 102.0)})
+        await runner3.process_tick(tick5)
+        assert "AAPL" not in engine3.positions

@@ -217,7 +217,12 @@ async def test_exit_remains_available_after_experimental_entry(tmp_path):
 
     # A bar whose low pierces the stop must trigger the exit, even though
     # nothing about the ORIGINAL authorization is re-checked for the exit.
-    exit_bar = Bar(datetime.now(timezone.utc), 97.5, 98.5, 97.0, 97.5, 1000)
+    # Task 79E-R2-2: offset well clear of the fill's own `filled_at`
+    # (RehearsalTransport stamps it at real submission wall-clock time,
+    # inside _handle_entry above) -- a deterministic separation, not a
+    # same-instant datetime.now() call that could tie or even reorder
+    # against it depending on clock resolution.
+    exit_bar = Bar(datetime.now(timezone.utc) + timedelta(minutes=1), 97.5, 98.5, 97.0, 97.5, 1000)
     engine._check_exit("AAPL", exit_bar)
 
     assert "AAPL" not in engine.positions

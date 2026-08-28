@@ -123,7 +123,8 @@ class RehearsalTransport:
             self.fail_next_submit = False
             raise RuntimeError("simulated broker submission failure")
         order = {"id": f"order-{len(self.orders) + 1}", "status": "filled", "filled_qty": "1",
-                 "filled_avg_price": "100.0", **kwargs.get("json", {})}
+                 "filled_avg_price": "100.0", "filled_at": datetime.now(timezone.utc).isoformat(),
+                 **kwargs.get("json", {})}
         self.orders.append(order)
         return Response(order)
 

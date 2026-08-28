@@ -76,6 +76,15 @@ class FullTransport:
         self.bar_batches = list(bar_batches or [])
         self.orders: list[dict] = []
         self.fail_next_bars_fetch = False
+        # Task 79E-R2-2: the fill-time causality gate needs a `filled_at`
+        # consistent with whatever timeline THIS test is using for its own
+        # bars -- real wall-clock `datetime.now()` is the sane default
+        # (matches most tests' own bar() helper), but a test driving a
+        # FIXED/historical bar timeline (e.g. entry_ts = datetime(2026, 8,
+        # 27, ...)) must set this explicitly before triggering an entry,
+        # or its own later, still-historical bars would appear to be
+        # BEFORE a real-wall-clock fill and never become causally eligible.
+        self.next_fill_at: str | None = None
 
     def get(self, url, **kwargs):
         if url.endswith("/v2/account"):
@@ -98,7 +107,8 @@ class FullTransport:
 
     def post(self, url, **kwargs):
         order = {"id": f"order-{len(self.orders) + 1}", "status": "filled", "filled_qty": "1",
-                 "filled_avg_price": "100.0", **kwargs.get("json", {})}
+                 "filled_avg_price": "100.0", "filled_at": self.next_fill_at or datetime.now(timezone.utc).isoformat(),
+                 **kwargs.get("json", {})}
         self.orders.append(order)
         return Response(order)
 
@@ -278,6 +288,11 @@ async def test_05_existing_long_plus_authorised_exit(tmp_path):
     from talonx_piv.session_runner import Bar
     stack = build_stack(tmp_path, paper_enabled=("AAPL",), approval_override=StrategyApprovalStatus.APPROVED)
     entry_ts = datetime(2026, 8, 27, 10, 5, tzinfo=ET)
+    # Task 79E-R2-2: this test drives a FIXED, historical bar timeline --
+    # the fill must be timestamped consistently with it (a controlled
+    # timestamp, not real wall-clock "now") for the fill-time causality
+    # gate to ever treat the later, still-historical exit bar as eligible.
+    stack["transport"].next_fill_at = entry_ts.astimezone(timezone.utc).isoformat()
     stack["engine"]._pubsub._messages.append(make_signal(ts=entry_ts, stop=98.0, target=104.0).model_dump_json().encode())
     stack["engine"].warmup_ready_symbols = {"AAPL"}
     await stack["engine"].on_bars({"AAPL": Bar(entry_ts.astimezone(timezone.utc), 100.0, 100.5, 99.5, 100.0, 1000)})

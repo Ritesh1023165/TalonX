@@ -7,7 +7,7 @@ handling, all still function exactly as before. No real broker/network
 call is made anywhere in this file (FakeTransport/FakeBroker only)."""
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -55,7 +55,10 @@ class FakeTransport:
         self.n += 1
         payload = kwargs.get("json", {})
         price = 100.0 if payload.get("side") == "buy" else 98.0
-        order = {"id": f"order-{self.n}", "status": "filled", "filled_qty": "1", "filled_avg_price": str(price)}
+        order = {
+            "id": f"order-{self.n}", "status": "filled", "filled_qty": "1", "filled_avg_price": str(price),
+            "filled_at": datetime.now(timezone.utc).isoformat(),
+        }
         self.orders[order["id"]] = order
         return Response(order)
 
@@ -145,7 +148,9 @@ async def test_disable_entries_after_opening_protective_exit_still_works(tmp_pat
     # exit still fires normally.
     life.paper_entry_settings = PaperEntrySettings.for_test()  # AAPL now disabled
     engine._pubsub = FakePubSub([])  # no further signals this tick
-    stop_bar = Bar(datetime.now(timezone.utc), 99.0, 99.5, 97.0, 98.0, 1000)  # breaches stop=98
+    # Task 79E-R2-2: offset well clear of the fill's own `filled_at`,
+    # deterministic separation rather than a same-instant datetime.now().
+    stop_bar = Bar(datetime.now(timezone.utc) + timedelta(minutes=1), 99.0, 99.5, 97.0, 98.0, 1000)  # breaches stop=98
     await engine.on_bars({"AAPL": stop_bar})
     assert "AAPL" not in engine.positions
     assert len(transport.orders) == 2  # entry + exit
@@ -163,9 +168,18 @@ async def test_entry_readiness_failure_does_not_disable_position_management(tmp_
     # prior session) directly in lifecycle state, bypassing order_intent --
     # this models "the position already exists," not a new entry.
     entry_signal_id = "prior_open"
+    # Task 79E-R2-2: "unknown timing must not authorize a pre-fill price
+    # exit" -- this position's fill timing IS known (a real prior fill,
+    # simply from another path), so it is supplied explicitly here as a
+    # controlled timestamp well before stop_bar's own, exactly as a real
+    # apply_broker_update call from that other path would have persisted
+    # it. This is what proves "position management still works" -- via
+    # genuine known-fill-time eligibility, not via unknown-timing
+    # permissiveness (which this task deliberately closes).
+    known_fill_at = datetime.now(timezone.utc) - timedelta(minutes=5)
     life.state.positions["pos_1"] = {
         "symbol": "AAPL", "quantity": 1, "price": 100.0, "status": "OPEN",
-        "stop_price": 98.0, "target_price": 104.0,
+        "stop_price": 98.0, "target_price": 104.0, "first_fill_observed_at": known_fill_at.isoformat(),
     }
     life.state.open_position_by_symbol["AAPL"] = "pos_1"
     life._save()
@@ -187,7 +201,11 @@ async def test_target_hit_triggers_controlled_exit_unaffected_by_contract(tmp_pa
     engine._pubsub = FakePubSub([signal.model_dump_json().encode()])
     await engine.on_bars({"AAPL": bar(100.0)})
     assert "AAPL" in engine.positions
-    target_bar = Bar(datetime.now(timezone.utc), 103.0, 105.0, 102.5, 104.5, 1000)  # high breaches target=104
+    # Task 79E-R2-2: offset well clear of the fill's own `filled_at`
+    # (stamped by Transport.post at real submission wall-clock time,
+    # inside on_bars above) -- a deterministic separation, never a
+    # same-instant datetime.now() call.
+    target_bar = Bar(datetime.now(timezone.utc) + timedelta(minutes=1), 103.0, 105.0, 102.5, 104.5, 1000)  # high breaches target=104
     engine._pubsub = FakePubSub([])
     await engine.on_bars({"AAPL": target_bar})
     assert "AAPL" not in engine.positions

@@ -63,6 +63,24 @@ PIV_QUANTITY = 1.0
 NATURAL_STRATEGY_HORIZON = "INTRADAY_SHORT"
 
 
+def _parse_iso_datetime(value: Any) -> datetime | None:
+    """Task 79E-R2-2: strict parsing of a persisted, BROKER-sourced ISO
+    timestamp (e.g. lifecycle position's `first_fill_observed_at`) --
+    never a local wall-clock sample. Returns None for anything not a
+    genuinely parseable, timezone-aware ISO-8601 string (a timezone-naive
+    value is rejected outright, matching experimental_authorization.py's
+    own `_parse_aware_datetime` posture -- never silently assumed UTC)."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed
+
+
 def _is_finite_positive_number(value: Any) -> bool:
     """Task 79E-R2: strict validity check for a persisted quantity field --
     bool excluded explicitly (bool is an int subclass in Python), matching
@@ -199,6 +217,40 @@ class DecisionEngine:
         self.evaluation_cycles = 0
         self.symbols_evaluated_total = 0
         self._rehydrate_positions()
+        self._rehydrate_pending_entries()
+
+    def _rehydrate_pending_entries(self) -> None:
+        """Task 79E-R2-2 Requirement 4: "full-process restart also fails to
+        restore pending-entry plans." _rehydrate_positions alone only
+        restores from CONFIRMED OPEN lifecycle positions -- an entry that
+        was accepted/uncertain (or even stuck at bare ORDER_INTENT status,
+        see lifecycle.entry_still_pending_or_uncertain) but never reached
+        OPEN before the process died has ZERO decision-engine-level
+        bookkeeping otherwise restored at all, silently losing its stop/
+        target plan on restart (the lifecycle-layer pyramiding/exposure
+        reservation already survives independently -- this closes the
+        DECISION-ENGINE-layer half of the same gap). Restores from the
+        durable intent record itself (stop_price/target_price/
+        experimental_id -- all persisted at order_intent time, before
+        submission is even attempted), never invented."""
+        seen_symbols = set(self.positions.keys())
+        for intent in self.lifecycle.state.intents.values():
+            payload = intent.get("payload", {})
+            symbol = payload.get("symbol")
+            if not symbol or symbol in seen_symbols or payload.get("side") != "buy":
+                continue
+            if not self.lifecycle.entry_still_pending_or_uncertain(symbol):
+                continue
+            experimental_id = intent.get("experimental_id")
+            self.positions[symbol] = OpenDecisionPosition(
+                symbol, f"rehydrated_pending_{symbol}", intent.get("stop_price"), intent.get("target_price"),
+                experimental=experimental_id is not None, experimental_id=experimental_id,
+            )
+            seen_symbols.add(symbol)
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", symbol=symbol, reason="PENDING_ENTRY_PLAN_REHYDRATED_FROM_PERSISTED_INTENT",
+                status="RESTART_RECOVERY_AWAITING_FILL_CONFIRMATION",
+            ))
 
     def _rehydrate_positions(self) -> None:
         """Task 79E-R1/R2: rebuild self.positions from lifecycle.state.
@@ -211,11 +263,12 @@ class DecisionEngine:
         persistence to restore a plan that had ALREADY fired before the
         restart -- Task 79E-R2 Requirement 3: "a triggered exit must
         remain actionable after restart even if price recovers." A
-        rehydrated position is never causality-gated by skip_price_check
-        (see on_bars/_check_exit) -- it was never opened by THIS process
-        on THIS tick, so it carries no same-bar-as-entry risk in the first
-        place; it IS still subject to the pending/uncertain-entry
-        preservation _check_exit itself applies to every symbol.
+        rehydrated position's own `first_fill_observed_at` (persisted on
+        the lifecycle position record, read back by _check_exit for its
+        fill-time causality gate) survives the restart unchanged, exactly
+        like a never-restarted position's would; it IS still subject to
+        the pending/uncertain-entry preservation _check_exit itself
+        applies to every symbol.
 
         Task 79E-R2 Requirement 3: "missing required plan fields must
         produce explicit degraded/blocked recovery -- not
@@ -612,7 +665,7 @@ class DecisionEngine:
         if broker_id:
             self.lifecycle.poll_order_until_terminal(str(broker_id))
 
-    def _check_exit(self, symbol: str, bar: Any, *, force_reason: str | None = None, skip_price_check: bool = False) -> None:
+    def _check_exit(self, symbol: str, bar: Any, *, force_reason: str | None = None) -> None:
         position = self.positions.get(symbol)
         if position is None:
             return
@@ -633,40 +686,37 @@ class DecisionEngine:
         # NOR any pending/uncertain entry outstanding -- i.e. the entry is
         # genuinely, conclusively gone (rejected, confirmed-not-submitted,
         # or the position was already fully sold and closed).
-        if self.lifecycle._open_position_for(symbol) is None:
+        lifecycle_position = self.lifecycle._open_position_for(symbol)
+        if lifecycle_position is None:
             if self.lifecycle.entry_still_pending_or_uncertain(symbol):
                 return  # keep the plan; nothing confirmed-held yet to protect or sell
             del self.positions[symbol]
             return
-        # Task 79E-R1/R2 entry/exit causality: `skip_price_check` is set
-        # ONLY by on_bars() itself, computed as "was this symbol's
-        # lifecycle position ALREADY confirmed OPEN before this tick's own
-        # entries were processed" (see on_bars's own comment) -- true fill-
-        # state, not merely "was this the same tick _handle_entry ran on."
-        # This correctly protects BOTH a same-tick fill (the original R1
-        # case: the entry bar's own low/high must never retroactively
-        # trigger its own stop) AND a genuinely DELAYED fill (an order left
-        # pending/accepted for one or more ticks before it actually fills
-        # -- R1's narrower rule left that case's own first-eligible bar
-        # unprotected). Deliberately NOT derived from wall-clock
-        # timestamps (an earlier draft compared `bar.timestamp` against a
-        # persisted entry timestamp with `>`, but two back-to-back
-        # `datetime.now()` calls were observed to produce BIT-IDENTICAL
-        # values on at least one real test-execution environment -- see
-        # test_task65b_decision_engine.py's
-        # test_stop_hit_triggers_controlled_exit, which caught this in the
-        # full suite; clock-resolution-based ordering is not a safe
-        # primitive here). A DIRECT _check_exit call (every test/caller
-        # that does not go through on_bars) defaults to fully eligible --
-        # only on_bars's own same-tick-vs-delayed-fill orchestration can
-        # ever have the ambiguity this gate exists to resolve. A forced
-        # exit (EOD flatten) is time-based, never price-based, and always
-        # bypasses this gate too. Once a reason has already been latched
-        # (position.exit_reason), it is never re-derived from price again
-        # -- only confirmed-flat (above) clears it, so a delayed/partial
-        # exit keeps being retried regardless of where price moves
-        # afterward.
-        causally_eligible = force_reason is not None or not skip_price_check
+        # Task 79E-R2-2 Requirement 2 entry/exit causality: compares this
+        # bar's own MARKET-DATA timestamp against the BROKER's own
+        # authoritative fill timestamp (lifecycle_position's persisted
+        # `first_fill_observed_at`, set once from the broker's `filled_at`/
+        # `updated_at` -- see lifecycle.apply_broker_update) -- never a
+        # local `datetime.now()` sample. This replaces Task 79E-R2's own
+        # `skip_price_check` design (a boolean computed by on_bars from
+        # "is the lifecycle position ALREADY OPEN before this tick"), which
+        # was itself found insufficient: a position already OPEN before
+        # on_bars starts says nothing about whether THIS SPECIFIC arriving
+        # bar's own price window is before, spans, or is after the actual
+        # fill moment -- only a genuine timestamp comparison can answer
+        # that, and "already open" alone is not one.
+        #
+        # UNKNOWN timing (no first_fill_observed_at persisted at all, e.g.
+        # a foreign/legacy position from before this field existed, or a
+        # test/caller that never supplied filled_at to apply_broker_update)
+        # deliberately does NOT default to permissive -- "unknown timing
+        # must not authorize a pre-fill price exit." Only `force_reason`
+        # (a forced EOD flatten, which is time-based, never price-based)
+        # bypasses this gate.
+        first_fill_observed_at = _parse_iso_datetime(lifecycle_position.get("first_fill_observed_at"))
+        causally_eligible = force_reason is not None or (
+            first_fill_observed_at is not None and bar.timestamp > first_fill_observed_at
+        )
         reason = force_reason or position.exit_reason
         if reason is None and causally_eligible:
             if position.stop_price is not None and bar.low <= position.stop_price:
@@ -749,31 +799,17 @@ class DecisionEngine:
         self.evaluation_cycles += 1
         self.symbols_evaluated_total += len(bars)
         self._flag_orphaned_positions(bars.keys())
-        # Task 79E-R2 Requirement 4: captured BEFORE this tick's entries are
-        # processed -- a symbol is only causality-ELIGIBLE for a NATURAL
-        # price-based stop/target check if its lifecycle position was
-        # ALREADY confirmed OPEN (i.e. genuinely filled) prior to this
-        # tick, so price-based evaluation can never use price action from
-        # at-or-before the fill -- regardless of whether the fill happened
-        # synchronously during THIS tick's own _handle_entry (the original
-        # same-tick-entry case) or was only confirmed later, on some
-        # earlier tick, after a genuinely DELAYED fill (an order that stays
-        # pending/accepted for one or more ticks before it fills) --
-        # replacing Task 79E-R1's narrower "did _handle_entry just create
-        # this position on THIS tick" rule, which only protected the
-        # same-tick case and left a delayed fill's own first-eligible bar
-        # unprotected. A rehydrated (restart-recovered) position is,
-        # symmetrically, ALREADY open before the very first post-restart
-        # tick, so it is correctly fully eligible from that first tick.
-        already_filled_before_tick = {
-            symbol for symbol in bars if self.lifecycle._open_position_for(symbol) is not None
-        }
         for symbol, bar in bars.items():
             await self.feed_bar(symbol, bar)
         for signal in await self.flush_and_collect():
             self._handle_entry(signal)
+        # Task 79E-R2-2 Requirement 2: _check_exit now determines its own
+        # price-eligibility internally, by comparing each bar's own
+        # timestamp against the broker-sourced fill timestamp persisted on
+        # the lifecycle position (see _check_exit's own docstring) -- no
+        # caller-computed flag is needed or passed any more.
         for symbol, bar in bars.items():
-            self._check_exit(symbol, bar, skip_price_check=symbol not in already_filled_before_tick)
+            self._check_exit(symbol, bar)
         for symbol, bar in bars.items():
             # Task 77I Stage 3: advances PENDING_FILL -> OPEN and checks
             # OPEN -> CLOSED for any shadow position on this symbol, using

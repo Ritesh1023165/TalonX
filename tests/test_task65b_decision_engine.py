@@ -7,7 +7,7 @@ correctly, and does a published QuantSignal correctly become (or correctly
 NOT become, for a bearish signal) a paper order intent."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock
 
 import pytest
@@ -51,6 +51,11 @@ class Transport:
     def post(self, url, **kwargs):
         order = {
             "id": f"order-{len(self.orders) + 1}", "status": "filled", "filled_qty": "1", "filled_avg_price": "100.0",
+            # Task 79E-R2-2: the broker's own fill timestamp, extracted by
+            # apply_broker_update as `first_fill_observed_at` -- required
+            # for the fill-time causality gate to ever treat this position
+            # as eligible for a natural price-based exit.
+            "filled_at": datetime.now(timezone.utc).isoformat(),
             **kwargs.get("json", {}),
         }
         self.orders.append(order)
@@ -184,7 +189,11 @@ async def test_stop_hit_triggers_controlled_exit(tmp_path):
     engine, transport, bus, life = build_engine(tmp_path, messages=[signal.model_dump_json().encode()])
     await engine.on_bars({"AAPL": bar(100.0)})  # entry fills at 100
     assert "AAPL" in engine.positions
-    stop_bar = Bar(datetime.now(timezone.utc), 99.0, 99.5, 97.0, 98.0, 1000)  # low breaches stop=98
+    # Task 79E-R2-2: offset well clear of the fill's own `filled_at`
+    # (Transport.post stamps it at real submission wall-clock time,
+    # inside on_bars above) -- a deterministic separation, never a
+    # same-instant datetime.now() call.
+    stop_bar = Bar(datetime.now(timezone.utc) + timedelta(minutes=1), 99.0, 99.5, 97.0, 98.0, 1000)  # low breaches stop=98
     await engine.on_bars({"AAPL": stop_bar})
     assert "AAPL" not in engine.positions
     assert len(transport.orders) == 2 and transport.orders[1]["side"] == "sell"

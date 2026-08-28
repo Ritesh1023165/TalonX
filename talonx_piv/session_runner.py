@@ -92,6 +92,15 @@ class SessionRunner:
     # this to the REAL talonx_brain chain; every test/rehearsal injects a
     # fake one.
     gemini_chain: Any | None = None
+    # Task 79E-R2-2 Requirement 4: "ordinary ticks currently do not
+    # reconcile; self-healing depends on an external call." Bounds how
+    # often the live tick loop itself runs lifecycle.reconcile() (which
+    # resolves UNCONFIRMED_TIMEOUT orders, SUBMIT_FAILED_UNCERTAIN
+    # intents, refreshes every other outstanding order, and re-detects
+    # unexpected shorts) -- see _maybe_reconcile. 300s balances "recover
+    # without waiting for EOD" against not hammering the broker's own
+    # read endpoints every single poll tick.
+    reconcile_interval_seconds: float = 300.0
 
     _last_bar_ts: dict[str, datetime] = field(default_factory=dict, init=False)
     _last_seen_wall: dict[str, datetime] = field(default_factory=dict, init=False)
@@ -113,6 +122,7 @@ class SessionRunner:
     # read-only post-hoc historical classifier.
     _freshness: FreshnessTracker = field(default_factory=FreshnessTracker, init=False)
     _last_fetch_ok: bool = field(default=True, init=False)
+    _last_reconcile_wall: datetime | None = field(default=None, init=False)
 
     @property
     def flatten_time(self) -> time:
@@ -268,6 +278,40 @@ class SessionRunner:
             )
             self.piv_info["provider_health"] = self._freshness.provider_state
 
+    def _maybe_reconcile(self, now: datetime) -> None:
+        """Task 79E-R2-2 Requirement 4: "ordinary ticks currently do not
+        reconcile; self-healing depends on an external call." Runs
+        lifecycle.reconcile() (which resolves UNCONFIRMED_TIMEOUT orders,
+        SUBMIT_FAILED_UNCERTAIN intents via their stable client_order_id,
+        refreshes every other outstanding order so an adopted-but-pending
+        one is never left stale forever, and re-detects unexpected shorts)
+        on a BOUNDED cadence during the live tick loop itself -- never
+        waiting for EOD. Runs on the VERY FIRST tick of a session
+        unconditionally (_last_reconcile_wall starts None), matching
+        cli.py's own pre-DecisionEngine-construction reconcile() call for
+        the plain `start` command -- this is genuinely redundant with that
+        one in the common case, which is fine; it is the ONLY reconcile
+        that happens at all for a long-running session after that first
+        tick. A reconcile() failure is caught and logged, never crashes
+        the tick -- reconciliation_flags simply persist at their LAST
+        KNOWN state (fail-closed by construction: see order_intent's own
+        UNEXPECTED_SHORT_BLOCKS_NEW_ENTRIES guard), so a failed or
+        mismatched reconciliation degrades to "still blocked by the last
+        known state," never silently ignored. Uses real wall-clock time
+        purely as a RATE LIMIT (never a causality comparison), so the
+        wall-clock-collision concern that ruled out timestamp-based
+        causality elsewhere in this codebase does not apply here."""
+        if self._last_reconcile_wall is not None and (now - self._last_reconcile_wall).total_seconds() < self.reconcile_interval_seconds:
+            return
+        self._last_reconcile_wall = now
+        try:
+            self.lifecycle.reconcile(now=now)
+        except Exception as exc:  # noqa: BLE001 -- must never crash the live tick loop.
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", reason=f"PERIODIC_RECONCILE_FAILED_{type(exc).__name__}: {exc}",
+                status="RECONCILIATION_SKIPPED_LAST_KNOWN_STATE_RETAINED",
+            ))
+
     async def process_tick(self, now: datetime) -> None:
         session = now.astimezone(ET).date()
         if self._session != session:
@@ -285,6 +329,7 @@ class SessionRunner:
             # separate seeding needed, and no risk of double-finalizing.
             self._restore_readiness(session)
 
+        self._maybe_reconcile(now)
         fetched = self.fetch_bars_latest()
         # Task 71S: a directly-observed fact about THIS fetch call (not an
         # inference from how many symbols are individually stale) -- see
