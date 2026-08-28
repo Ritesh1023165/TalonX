@@ -6,13 +6,14 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
-import os
 from pathlib import Path
 import subprocess
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 import requests
+
+from talonx_core import process_guard
 
 from .broker import AlpacaPaperClient
 from .config import CANONICAL_ALPHA_FEED_MODES, FEED_MODE_PARAM, FEED_MODES, PivConfig
@@ -66,23 +67,7 @@ class Preflight:
         # construct a separate QuantScanner subscribed to the SAME default
         # Redis channels -- see architecture_and_ownership.md). Belt-and-
         # suspenders with the general app's own check, not a replacement.
-        def no_duplicate_full_app_process() -> tuple[bool, str]:
-            try:
-                out = subprocess.check_output(
-                    [
-                        "powershell", "-NoProfile", "-Command",
-                        "Get-CimInstance Win32_Process | "
-                        "Where-Object { $_.CommandLine -match 'run_talonx\\.py|talonx_piv\\.cli' -and "
-                        "$_.CommandLine -notmatch 'Get-CimInstance' } | "
-                        "Select-Object -ExpandProperty ProcessId",
-                    ],
-                    text=True, timeout=20,
-                )
-            except Exception as exc:  # noqa: BLE001 -- inability to check is a caveat, not a found duplicate
-                return True, f"process-duplicate check could not run ({type(exc).__name__}: {exc}) -- not treated as a block"
-            pids = [line.strip() for line in out.splitlines() if line.strip() and line.strip() != str(os.getpid())]
-            return not pids, f"{len(pids)} matching process(es) other than this one: {pids or 'none'}"
-        check("no_duplicate_full_app_or_piv_process", no_duplicate_full_app_process)
+        check("no_duplicate_full_app_or_piv_process", process_guard.no_competing_talonx_process)
         check("config_hash", lambda: (True, config_hash(self.config)))
         identity: dict[str, Any] = {}
         def paper() -> tuple[bool, str]:

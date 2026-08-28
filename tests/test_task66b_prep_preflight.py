@@ -20,8 +20,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from talonx_ops.preflight import FULL_APP_E2E_BLOCKED, FULL_APP_E2E_READY, Check, FullAppPreflight
 from talonx_ops.provider_status import LOCAL_SIMULATED_PAPER_LEDGER, paper_execution_path_label
+from talonx_core import process_guard
+
+
+@pytest.fixture(autouse=True)
+def _successful_process_enumeration(monkeypatch):
+    monkeypatch.setattr(process_guard, "no_competing_talonx_process", lambda: (True, "test fixture: none"))
 
 
 class FakeTransport:

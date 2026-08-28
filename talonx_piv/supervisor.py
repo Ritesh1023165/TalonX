@@ -43,9 +43,10 @@ from datetime import datetime, timezone
 from enum import Enum
 import json
 from pathlib import Path
-import subprocess
 from typing import Any, Awaitable, Callable
 import uuid
+
+from talonx_core import process_guard
 
 from .broker import AlpacaPaperClient
 from .config import PAPER_ENDPOINT, PivConfig
@@ -132,28 +133,8 @@ class StartupReport:
 
 
 def no_duplicate_full_app_or_piv_process(*, exclude_pid: int | None = None) -> tuple[bool, str]:
-    """Reuses the EXACT same check `talonx_ops.preflight.FullAppPreflight`
-    and `talonx_piv.preflight.Preflight` already run -- a THIRD call site
-    (the supervisor's own startup) belt-and-suspenders re-confirms this
-    immediately before constructing any component, not just at the earlier
-    `preflight`/`start` boundary."""
-    import os
-    exclude_pid = exclude_pid if exclude_pid is not None else os.getpid()
-    try:
-        out = subprocess.check_output(
-            [
-                "powershell", "-NoProfile", "-Command",
-                "Get-CimInstance Win32_Process | "
-                "Where-Object { $_.CommandLine -match 'run_talonx\\.py|talonx_piv\\.cli' -and "
-                "$_.CommandLine -notmatch 'Get-CimInstance' } | "
-                "Select-Object -ExpandProperty ProcessId",
-            ],
-            text=True, timeout=20,
-        )
-    except Exception as exc:  # noqa: BLE001 -- inability to check is a caveat, not a found duplicate
-        return True, f"process-duplicate check could not run ({type(exc).__name__}: {exc}) -- not treated as a block"
-    pids = [line.strip() for line in out.splitlines() if line.strip() and line.strip() != str(exclude_pid)]
-    return not pids, f"{len(pids)} matching process(es) other than this one: {pids or 'none'}"
+    """Compatibility wrapper around the shared fail-closed safety gate."""
+    return process_guard.no_competing_talonx_process(exclude_pid=exclude_pid)
 
 
 def run_startup_sequence(

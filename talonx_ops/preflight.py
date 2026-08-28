@@ -32,6 +32,7 @@ from typing import Any, Callable
 import requests
 
 from talonx_core.config import CoreConfig
+from talonx_core import process_guard
 from talonx_core.store import TickerStateStore
 from talonx_dispatch.config import DispatchConfig
 from talonx_dispatch.store import AuditStore
@@ -91,27 +92,10 @@ class FullAppPreflight:
             return not status, status or "clean"
         check("tracked_tree_clean", tree_clean)
 
-        # 3: no duplicate full-app/PIV process. Windows-only mechanism
-        # (this project runs on Windows -- see the repo's own environment) --
-        # if the check itself can't run (e.g. a non-Windows CI box), that's
-        # reported as a caveat, not treated as evidence of a duplicate.
-        def no_duplicate_process() -> tuple[bool, str]:
-            try:
-                out = subprocess.check_output(
-                    [
-                        "powershell", "-NoProfile", "-Command",
-                        "Get-CimInstance Win32_Process | "
-                        "Where-Object { $_.CommandLine -match 'run_talonx\\.py|talonx_piv\\.cli' -and "
-                        "$_.CommandLine -notmatch 'Get-CimInstance' } | "
-                        "Select-Object -ExpandProperty ProcessId",
-                    ],
-                    text=True, timeout=20,
-                )
-            except Exception as exc:  # noqa: BLE001 -- inability to check is a caveat, not a found duplicate
-                return True, f"process-duplicate check could not run ({type(exc).__name__}: {exc}) -- not treated as a block"
-            pids = [line.strip() for line in out.splitlines() if line.strip()]
-            return not pids, f"{len(pids)} matching process(es): {pids or 'none'}"
-        check("no_duplicate_full_app_or_piv_process", no_duplicate_process)
+        # 3: no duplicate full-app/PIV process. Inability to enumerate is a
+        # launch block because uncertainty is not proof that no competitor
+        # exists. The current preflight process itself is excluded.
+        check("no_duplicate_full_app_or_piv_process", process_guard.no_competing_talonx_process)
 
         # 4: Redis reachable
         def redis_reachable() -> tuple[bool, str]:

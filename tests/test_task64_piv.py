@@ -14,6 +14,7 @@ from talonx_piv.execution_settings import PaperEntrySettings
 from talonx_piv.lifecycle import PaperLifecycle, paper_cleanup, stable_id
 from talonx_piv.preflight import Preflight
 from talonx_piv.readiness import SessionReadinessValidator
+from talonx_core import process_guard
 
 ET = ZoneInfo("America/New_York")
 SESSION = date(2026, 8, 24)
@@ -183,6 +184,7 @@ def test_correlation_ids_stable_and_present(tmp_path):
 
 
 def test_preflight_pass(tmp_path, monkeypatch):
+    monkeypatch.setattr(process_guard, "no_competing_talonx_process", lambda: (True, "test fixture: none"))
     transport = Transport(); cfg = config(tmp_path); broker = AlpacaPaperClient(cfg, transport); bus = EventBus(tmp_path / "events.jsonl")
     flight = Preflight(cfg, broker, bus, tmp_path, transport); monkeypatch.setattr(flight, "_git", lambda *args: "abc" if args[0] == "rev-parse" else "")
     status, checks = flight.run()
@@ -190,6 +192,7 @@ def test_preflight_pass(tmp_path, monkeypatch):
 
 
 def test_preflight_blocked(tmp_path, monkeypatch):
+    monkeypatch.setattr(process_guard, "no_competing_talonx_process", lambda: (True, "test fixture: none"))
     transport = Transport(); cfg = config(tmp_path, broker_endpoint="https://api.alpaca.markets"); broker = AlpacaPaperClient(cfg, transport)
     flight = Preflight(cfg, broker, EventBus(tmp_path / "events.jsonl"), tmp_path, transport); monkeypatch.setattr(flight, "_git", lambda *args: "abc" if args[0] == "rev-parse" else "")
     status, _ = flight.run()
