@@ -133,8 +133,10 @@ def run_eod_lifecycle(
             _save_state(path, {**identity, "status": STATUS_INCONCLUSIVE, "cancel_close_requested": False, "reconciliation_error": cancel_close_error})
             return {**identity, "status": STATUS_INCONCLUSIVE, "reconciliation": None, "exit_code": 2}
 
-        for position in lifecycle.state.positions.values():
-            position["status"] = "CLOSED"
+        # Task 81 §4 (C7): do NOT mark internal positions CLOSED here merely
+        # because close_all_positions was ACCEPTED -- an accepted close
+        # request is not proof the broker is flat. They are marked CLOSED
+        # only once reconcile() below confirms zero broker positions/orders.
         lifecycle.state.session_enabled = False
         lifecycle._save()
         # Persisted BEFORE reconciliation so a crash mid-reconciliation,
@@ -163,10 +165,24 @@ def run_eod_lifecycle(
         status = STATUS_INCONCLUSIVE
         if reconciliation_error is None and reconciliation.get("read_failures"):
             reconciliation_error = "INCOMPLETE_RECONCILIATION: " + ", ".join(reconciliation["read_failures"])
-    elif reconciliation["matched"] and reconciliation["broker_open_orders"] == 0 and reconciliation["broker_positions"] == 0:
+    elif (
+        reconciliation["broker_open_orders"] == 0
+        and reconciliation["broker_positions"] == 0
+        and not reconciliation.get("unexpected_short_symbols")
+    ):
+        # Task 81 §4 (C7): EOD success == the BROKER is genuinely flat (zero
+        # orders, zero positions, no unexpected short) on a COMPLETE read.
+        # Only now are any still-OPEN internal positions confirmed closed --
+        # never merely because close_all_positions returned without error.
         status = STATUS_PASSED
     else:
         status = STATUS_FAILED
+
+    if status == STATUS_PASSED:
+        for position in lifecycle.state.positions.values():
+            if position.get("status") == "OPEN":
+                position["status"] = "CLOSED"
+        lifecycle._save()
 
     result_event = "EOD_RECONCILIATION_PASSED" if status == STATUS_PASSED else "EOD_RECONCILIATION_FAILED"
     events.emit(PivEvent.build(

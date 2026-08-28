@@ -618,11 +618,29 @@ class SessionRunner:
             ))
             return {"status": "INCONCLUSIVE", "exit_code": 2, "session_id": None}
         from .eod_lifecycle import run_eod_lifecycle
-        return run_eod_lifecycle(
+        outcome = run_eod_lifecycle(
             self.config, self.events, self.lifecycle, live_session_id=session_id,
             trading_date_et=trading_date_et, runtime_sha=runtime_sha, config_hash=config_hash,
             trigger_reason=trigger_reason,
         )
+        # Task 81 §4 (C4): the automatic shutdown path must ALSO emit the
+        # correctly-scoped session report -- for PASSED / FAILED /
+        # INCONCLUSIVE alike -- not only the manual `cli eod` path. Pure
+        # read; never re-triggers broker cancel/close. A report-generation
+        # failure is recorded but never masks the EOD outcome.
+        try:
+            from .reporting import finalize_session_report
+            finalize_session_report(
+                self.config.state_dir, self.events.path, config_feed_mode=self.config.feed_mode,
+                live_session_id=outcome.get("session_id"), trading_date_et=trading_date_et,
+                eod_outcome=outcome,
+            )
+        except Exception as exc:  # noqa: BLE001 -- report generation must never break shutdown
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", reason=f"SESSION_REPORT_GENERATION_FAILED_{type(exc).__name__}: {exc}",
+                status="EOD_COMPLETED_REPORT_DEGRADED",
+            ))
+        return outcome
 
     async def run(
         self, *, stop_at: datetime | None = None,

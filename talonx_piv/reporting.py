@@ -28,16 +28,38 @@ def build_session_report(
     through unchanged under result["integrated_projection"] when supplied --
     this function never computes it itself (no new parsing logic duplicated
     here)."""
-    rows = []
-    if event_path.exists():
-        rows = [json.loads(line) for line in event_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    # Task 81 §4 (C1): an absent / empty / unreadable events source must
+    # produce an EXPLICIT diagnostic -- never a plausible-looking
+    # zero-activity PARITY_OK report.
+    events_source_health = "OK"
+    all_rows: list[dict] = []
+    if not event_path.exists():
+        events_source_health = "EVENTS_SOURCE_ABSENT"
+    else:
+        raw_lines = [line for line in event_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        for line in raw_lines:
+            try:
+                all_rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                events_source_health = "EVENTS_SOURCE_UNREADABLE"
+        if events_source_health == "OK" and not raw_lines:
+            events_source_health = "EVENTS_SOURCE_EMPTY"
+    rows = all_rows
     if trading_date_et is not None:
-        rows = [row for row in rows if row.get("trading_date_et") == trading_date_et]
+        scoped = [row for row in rows if row.get("trading_date_et") == trading_date_et]
+        if events_source_health == "OK" and not scoped and rows:
+            # The file has activity, but none for the session/date being
+            # reported -- a wrong-session / stale-scope condition, not
+            # "verified zero activity".
+            events_source_health = "EVENTS_SCOPE_EMPTY_FILE_HAS_OTHER_DATES"
+        rows = scoped
     counts = Counter(row["event"] for row in rows)
     data_issues = counts["DATA_NOT_READY"] + counts["STALE_DATA"]
     execution_drift = len(reconciliation.get("unexpected_broker_symbols", [])) + len(reconciliation.get("missing_broker_symbols", []))
     classification = "PARITY_OK"
-    if execution_drift: classification = "EXECUTION_DRIFT"
+    if events_source_health != "OK":
+        classification = "REVIEW_REQUIRED"
+    elif execution_drift: classification = "EXECUTION_DRIFT"
     elif data_issues: classification = "DATA_ISSUE"
     elif counts["BROKER_ERROR"]: classification = "REVIEW_REQUIRED"
     resolved_feed_mode = feed_mode or (rows[0].get("feed_mode") if rows else None)
@@ -60,6 +82,7 @@ def build_session_report(
         "session_id": session_id,
         "trading_date_et": trading_date_et,
         "classification": classification,
+        "events_source_health": events_source_health,
         "feed_mode": resolved_feed_mode,
         "canonical_alpha_evidence": resolved_feed_mode == "RESEARCH_SIP",
         "data_feed_health": {"data_not_ready": counts["DATA_NOT_READY"], "stale_data": counts["STALE_DATA"]},
@@ -95,3 +118,78 @@ def build_session_report(
     if integrated_projection is not None:
         result["integrated_projection"] = integrated_projection
     return result
+
+
+def finalize_session_report(
+    state_dir: Path, events_path: Path, *, config_feed_mode: str | None,
+    live_session_id: str | None, trading_date_et: str | None, eod_outcome: dict,
+) -> dict:
+    """Task 81 §4 (C4/C5/C6): build and durably write
+    ``latest_session_report.json`` for a completed session, scoped to the
+    ORIGINAL live session identity, for EVERY EOD outcome (PASSED / FAILED /
+    INCONCLUSIVE). Pure read of the durable ledgers / events / reconciliation
+    -- it never cancels or closes anything at the broker, so a retry can be
+    issued freely. Report-generation status is recorded SEPARATELY from the
+    broker/EOD status so a degraded report is never mistaken for a failed
+    session (or vice versa)."""
+    from .observability import build_integrated_projection
+
+    diagnostics: list[str] = []
+    report_generation_status = "OK"
+
+    reconciliation = dict(eod_outcome.get("reconciliation") or {})
+    reconciliation["feed_mode"] = config_feed_mode
+    reconciliation["eod_status"] = eod_outcome.get("status")
+    reconciliation["live_session_id"] = eod_outcome.get("session_id")
+    reconciliation["reconciliation_run_id"] = eod_outcome.get("reconciliation_run_id")
+    try:
+        (state_dir / "latest_reconciliation.json").write_text(
+            json.dumps(reconciliation, indent=2, sort_keys=True), encoding="utf-8",
+        )
+    except OSError as exc:
+        report_generation_status = "DEGRADED"
+        diagnostics.append(f"latest_reconciliation_write_failed:{exc}")
+
+    quant_funnel = None
+    funnel_path = state_dir / "quant_funnel_report.json"
+    if funnel_path.exists():
+        try:
+            quant_funnel = json.loads(funnel_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            report_generation_status = "DEGRADED"
+            diagnostics.append(f"quant_funnel_unreadable:{exc}")
+
+    integrated_projection = None
+    if live_session_id is not None:
+        try:
+            integrated_projection = build_integrated_projection(
+                state_dir, session_id=live_session_id, trading_date_et=trading_date_et,
+            )
+        except Exception as exc:  # noqa: BLE001 -- report generation must never crash shutdown
+            report_generation_status = "DEGRADED"
+            diagnostics.append(f"integrated_projection_failed:{type(exc).__name__}:{exc}")
+    else:
+        report_generation_status = "DEGRADED"
+        diagnostics.append("no_live_session_identity_scope_unavailable")
+
+    report = build_session_report(
+        events_path, reconciliation, config_feed_mode,
+        trading_date_et=trading_date_et, session_id=live_session_id,
+        quant_funnel=quant_funnel, integrated_projection=integrated_projection,
+    )
+    report["eod_status"] = eod_outcome.get("status")
+    report["report_generation_status"] = report_generation_status
+    report["report_generation_diagnostics"] = diagnostics
+    report["scoped_to"] = {"session_id": live_session_id, "trading_date_et": trading_date_et}
+    if integrated_projection is not None:
+        report["source_health_ok"] = integrated_projection.get("source_health_ok")
+        report["source_health_diagnostics"] = integrated_projection.get("source_health_diagnostics", [])
+
+    try:
+        (state_dir / "latest_session_report.json").write_text(
+            json.dumps(report, indent=2, sort_keys=True), encoding="utf-8",
+        )
+    except OSError as exc:
+        report["report_generation_status"] = "FAILED"
+        report["report_generation_diagnostics"] = diagnostics + [f"latest_session_report_write_failed:{exc}"]
+    return report

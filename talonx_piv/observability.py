@@ -40,6 +40,36 @@ def _read_json(path: Path, default: Any) -> Any:
         return default
 
 
+# Task 81 §4 (C1/C2): a missing OPTIONAL ledger, a genuine verified-zero,
+# and an UNREADABLE required source are three distinct conditions -- the
+# projection must name which one it is, never collapse all of them into a
+# plausible-looking zero.
+_HEALTHY_SOURCE_STATUSES = frozenset({"PRESENT_WITH_RECORDS", "VERIFIED_ZERO", "ABSENT_OPTIONAL"})
+
+
+def _classify_json_source(
+    path: Path, *, required: bool, total_records: int, in_scope_records: int, session_run_corroborated: bool,
+) -> dict[str, Any]:
+    if not path.exists():
+        return {
+            "status": "ABSENT_REQUIRED" if required else "ABSENT_OPTIONAL",
+            "detail": "file does not exist",
+        }
+    try:
+        text = path.read_text(encoding="utf-8")
+        if text.strip():
+            json.loads(text)
+    except (OSError, json.JSONDecodeError) as exc:
+        return {"status": "UNREADABLE", "detail": f"{type(exc).__name__}: {exc}"}
+    if total_records == 0:
+        if session_run_corroborated:
+            return {"status": "VERIFIED_ZERO", "detail": "present, parses, no records; a session run is corroborated by the events log"}
+        return {"status": "ZERO_UNCORROBORATED", "detail": "present, parses, no records, and no session run is corroborated -- cannot distinguish 'nothing happened' from 'never populated'"}
+    if in_scope_records == 0:
+        return {"status": "WRONG_SESSION", "detail": f"{total_records} record(s) present but none belong to the scoped session/date"}
+    return {"status": "PRESENT_WITH_RECORDS", "detail": f"{in_scope_records} of {total_records} record(s) in scope"}
+
+
 def build_decision_status(state_dir: Path, decision_id: str) -> dict[str, Any]:
     """Task 78I Stage 1C -- derives a decision's CURRENT notification/
     shadow/execution status by joining against the authoritative, linked
@@ -156,19 +186,20 @@ def build_integrated_projection(
     session_id = session_id or identity.get("session_id")
     trading_date_et = trading_date_et or identity.get("trading_date_et")
 
-    decisions = _read_json(state_dir / "decision_ledger.json", {})
+    decisions_raw = _read_json(state_dir / "decision_ledger.json", {})
+    decisions = dict(decisions_raw)
     if session_id is not None:
         decisions = {k: v for k, v in decisions.items() if v.get("session_id") == session_id}
     session_decision_ids = set(decisions.keys())
 
-    notifications = _read_json(state_dir / "notification_outbox.json", {})
-    notifications = {k: v for k, v in notifications.items() if v.get("decision_id") in session_decision_ids}
+    notifications_raw = _read_json(state_dir / "notification_outbox.json", {})
+    notifications = {k: v for k, v in notifications_raw.items() if v.get("decision_id") in session_decision_ids}
 
-    shadow = _read_json(state_dir / "shadow_ledger.json", {})
-    shadow = {k: v for k, v in shadow.items() if v.get("decision_id") in session_decision_ids}
+    shadow_raw = _read_json(state_dir / "shadow_ledger.json", {})
+    shadow = {k: v for k, v in shadow_raw.items() if v.get("decision_id") in session_decision_ids}
 
-    gemini = _read_json(state_dir / "gemini_enrichment.json", {})
-    gemini = {k: v for k, v in gemini.items() if k in session_decision_ids}
+    gemini_raw = _read_json(state_dir / "gemini_enrichment.json", {})
+    gemini = {k: v for k, v in gemini_raw.items() if k in session_decision_ids}
 
     lifecycle_state = _read_json(state_dir / "lifecycle_state.json", {})
     orders = lifecycle_state.get("orders", {})
@@ -246,7 +277,94 @@ def build_integrated_projection(
 
     freshness_report = _read_json(state_dir / "freshness_report.json", {})
 
+    # -- Task 81 §4 (C1/C2/C3): explicit source-health diagnostics --
+    events_path = state_dir / "piv_events.jsonl"
+    events_total = events_scoped = 0
+    events_status = "ABSENT_REQUIRED"
+    events_detail = "file does not exist"
+    if events_path.exists():
+        try:
+            lines = [ln for ln in events_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+            parsed = []
+            unreadable = 0
+            for ln in lines:
+                try:
+                    parsed.append(json.loads(ln))
+                except json.JSONDecodeError:
+                    unreadable += 1
+            events_total = len(parsed)
+            events_scoped = sum(
+                1 for r in parsed
+                if (trading_date_et is None or r.get("trading_date_et") == trading_date_et)
+            )
+            if unreadable:
+                events_status, events_detail = "UNREADABLE", f"{unreadable} unparseable line(s)"
+            elif not lines:
+                events_status, events_detail = "EMPTY_REQUIRED", "present but empty"
+            elif events_scoped == 0 and events_total:
+                events_status, events_detail = "STALE_SCOPE", f"{events_total} event(s) present, none for the scoped date {trading_date_et}"
+            else:
+                events_status, events_detail = "PRESENT_WITH_RECORDS", f"{events_scoped} of {events_total} event(s) in scope"
+        except OSError as exc:
+            events_status, events_detail = "UNREADABLE", f"{type(exc).__name__}: {exc}"
+    session_run_corroborated = events_status == "PRESENT_WITH_RECORDS"
+
+    identity_status = (
+        "PRESENT_WITH_RECORDS" if identity.get("session_id")
+        else ("UNREADABLE" if (state_dir / "session_identity.json").exists() else "ABSENT_REQUIRED")
+    )
+    if identity.get("session_id") and session_id and identity.get("session_id") != session_id:
+        identity_status = "WRONG_SESSION"
+
+    source_health = {
+        "session_identity": {"status": identity_status, "detail": identity.get("session_id") or "no session_id resolved"},
+        "piv_events": {"status": events_status, "detail": events_detail},
+        "decision_ledger": _classify_json_source(
+            state_dir / "decision_ledger.json", required=False,
+            total_records=len(decisions_raw), in_scope_records=len(decisions),
+            session_run_corroborated=session_run_corroborated,
+        ),
+        "shadow_ledger": _classify_json_source(
+            state_dir / "shadow_ledger.json", required=False,
+            total_records=len(shadow_raw), in_scope_records=len(shadow),
+            session_run_corroborated=session_run_corroborated,
+        ),
+        "notification_outbox": _classify_json_source(
+            state_dir / "notification_outbox.json", required=False,
+            total_records=len(notifications_raw), in_scope_records=len(notifications),
+            session_run_corroborated=session_run_corroborated,
+        ),
+        "gemini_enrichment": _classify_json_source(
+            state_dir / "gemini_enrichment.json", required=False,
+            total_records=len(gemini_raw), in_scope_records=len(gemini),
+            session_run_corroborated=session_run_corroborated,
+        ),
+        "lifecycle_state": _classify_json_source(
+            state_dir / "lifecycle_state.json", required=True,
+            total_records=len(lifecycle_state.get("orders", {})) + len(lifecycle_state.get("positions", {})) + len(lifecycle_state.get("intents", {})),
+            in_scope_records=len(lifecycle_state.get("orders", {})) + len(lifecycle_state.get("positions", {})) + len(lifecycle_state.get("intents", {})),
+            session_run_corroborated=session_run_corroborated,
+        ),
+        "latest_reconciliation": {
+            "status": ("PRESENT_WITH_RECORDS" if reconciliation else ("UNREADABLE" if (state_dir / "latest_reconciliation.json").exists() and not isinstance(reconciliation, dict) else "ABSENT_OPTIONAL")),
+            "detail": "broker/internal reconciliation snapshot",
+        },
+        "freshness_report": {
+            "status": ("PRESENT_WITH_RECORDS" if freshness_report else "ABSENT_OPTIONAL"),
+            "detail": f"provider_state={freshness_report.get('provider_state')}" if freshness_report else "no session-end provider/symbol state recorded",
+        },
+    }
+    source_health_diagnostics = [
+        f"{name}: {entry['status']} ({entry['detail']})"
+        for name, entry in source_health.items()
+        if entry["status"] not in _HEALTHY_SOURCE_STATUSES
+    ]
+    source_health_ok = not source_health_diagnostics
+
     return {
+        "source_health": source_health,
+        "source_health_ok": source_health_ok,
+        "source_health_diagnostics": source_health_diagnostics,
         "scope": {
             "session_id": session_id, "trading_date_et": trading_date_et,
             "runtime_sha": identity.get("runtime_sha"), "config_hash": identity.get("config_hash"),

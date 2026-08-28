@@ -413,27 +413,23 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
 
             from .eod_lifecycle import run_eod_lifecycle
+            from .reporting import finalize_session_report
             outcome = run_eod_lifecycle(
                 config, bus, lifecycle, live_session_id=live_session_id, trading_date_et=trading_date_et,
                 runtime_sha=runtime_sha, config_hash=config_hash, trigger_reason="MANUAL_CLI_INVOCATION",
             )
+            # Task 81 §4 (C4/C5/C6): one shared, read-only report finaliser --
+            # scoped to the ORIGINAL live session, emitted for PASSED /
+            # FAILED / INCONCLUSIVE alike, never re-triggering broker
+            # cancel/close, report-generation status kept separate.
+            report = finalize_session_report(
+                config.state_dir, bus.path, config_feed_mode=config.feed_mode,
+                live_session_id=live_session_id, trading_date_et=trading_date_et, eod_outcome=outcome,
+            )
             result = dict(outcome.get("reconciliation") or {})
             result["feed_mode"] = config.feed_mode
             result["eod_status"] = outcome["status"]
-            result["live_session_id"] = outcome["session_id"]
-            result["reconciliation_run_id"] = outcome["reconciliation_run_id"]
-            (config.state_dir / "latest_reconciliation.json").write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
-            funnel_path = config.state_dir / "quant_funnel_report.json"
-            quant_funnel = json.loads(funnel_path.read_text(encoding="utf-8")) if funnel_path.exists() else None
-            integrated_projection = build_integrated_projection(
-                config.state_dir, session_id=live_session_id, trading_date_et=trading_date_et,
-            )
-            report = build_session_report(
-                bus.path, result, config.feed_mode,
-                trading_date_et=trading_date_et, session_id=live_session_id, quant_funnel=quant_funnel,
-                integrated_projection=integrated_projection,
-            )
-            (config.state_dir / "latest_session_report.json").write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+            result["report_generation_status"] = report.get("report_generation_status")
             print(json.dumps(result, sort_keys=True))
             return outcome["exit_code"]
     except (PaperGuardError, OSError, RuntimeError) as exc:
