@@ -66,6 +66,4 @@ authorisation.
 ## Build identity
 
 - Task 79G's own HEAD at handoff time: `bc8a14a`.
-- This task's final commit SHA: **see `final_report.md`** (recorded there
-  after the full regression suite passed and the commit was made, so this
-  file's own text does not go stale the moment a later task adds a commit).
+- This task's final commit SHA: `3f034a3` (parent: `bc8a14a`).
