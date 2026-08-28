@@ -105,6 +105,7 @@ class PaperLifecycle:
         paper_entry_settings: PaperEntrySettings | None = None,
         experimental_authorization: ExperimentalAuthorization | None = None,
         runtime_sha: str | None = None, config_hash: str | None = None,
+        experimental_authorization_path: Path | None = None,
     ) -> None:
         self.state_path = state_path
         self.broker = broker
@@ -120,9 +121,24 @@ class PaperLifecycle:
         # guard). Never inferred/constructed here; always the caller's
         # explicit choice.
         self.experimental_authorization = experimental_authorization
+        # Task 79E-R1: when set, THIS takes priority over the static object
+        # above -- every guard call reloads fresh from disk (see
+        # _current_experimental_authorization), so an operator deleting,
+        # disabling, or editing the file mid-session is observed on the very
+        # next order_intent call, not only after a process restart. cli.py's
+        # real runtime() always sets this; `experimental_authorization=`
+        # (the object) remains supported unchanged for every pre-existing
+        # test/caller that constructs a fixed authorization directly.
+        self.experimental_authorization_path = experimental_authorization_path
         self.runtime_sha = runtime_sha
         self.config_hash = config_hash
         self.state = self._load()
+
+    def _current_experimental_authorization(self) -> ExperimentalAuthorization | None:
+        if self.experimental_authorization_path is not None:
+            from .experimental_authorization import load_experimental_authorization
+            return load_experimental_authorization(self.experimental_authorization_path)
+        return self.experimental_authorization
 
     def _load(self) -> LifecycleState:
         if not self.state_path.exists():
@@ -183,6 +199,16 @@ class PaperLifecycle:
                 out.append(intent)
         return out
 
+    def _orphaned_uncertain_intents_for_any_symbol(self, side: str) -> list[dict[str, Any]]:
+        """Same as `_orphaned_uncertain_intents_for` but across ALL symbols --
+        used by the experimental concurrent-exposure guard (Task 79E-R1),
+        which must see uncertain exposure regardless of which symbol it
+        landed on."""
+        return [
+            intent for intent in self.state.intents.values()
+            if intent.get("status") == "SUBMIT_FAILED_UNCERTAIN" and intent.get("payload", {}).get("side") == side
+        ]
+
     def _pending_quantity(self, symbol: str, side: str) -> float:
         """Sum of (originally-requested - filled_qty) across every
         non-terminal order of `side` for `symbol` -- what is already
@@ -200,6 +226,69 @@ class PaperLifecycle:
             total += float(intent.get("payload", {}).get("qty", 0.0) or 0.0)
         return total
 
+    def remaining_holdings(self, symbol: str) -> float:
+        """Task 79E-R1: actual current holdings for `symbol` minus whatever
+        is already spoken for by a non-terminal or uncertain sell -- i.e.
+        what a NEW sell attempt could still legitimately request right now.
+        0.0 if no OPEN position exists. Used by decision_engine.py so an
+        exit is sized to REAL remaining holdings (after any prior partial
+        fill) rather than a fixed constant, and so a second exit attempt on
+        the same still-partially-filled position never oversells/duplicates
+        (mirrors order_intent's own SELL_TO_CLOSE `available` computation
+        exactly -- this is the read-only counterpart callers can consult
+        BEFORE deciding whether there is anything left to sell)."""
+        position = self._open_position_for(symbol)
+        if position is None:
+            return 0.0
+        held = float(position.get("remaining_quantity", position.get("quantity")) or 0.0)
+        pending_sell = self._pending_quantity(symbol, "sell")
+        return max(0.0, held - pending_sell)
+
+    def _experimental_prior_activity_exists(self, experiment_id: str) -> bool:
+        """Task 79E-R1: used to distinguish "this experiment has genuinely
+        never spent anything yet" (a fresh, all-zero budget record is
+        correct) from "budget bookkeeping for this experiment_id is MISSING
+        despite real prior activity" (state damage/loss -- must fail closed,
+        never silently treated as zero exposure)."""
+        for position in self.state.positions.values():
+            if position.get("experimental_id") == experiment_id:
+                return True
+        for intent in self.state.intents.values():
+            if intent.get("experimental_id") == experiment_id:
+                return True
+        return False
+
+    def _validated_budget_record(self, experiment_id: str) -> dict[str, Any] | None:
+        """Task 79E-R1: strict, fail-closed parsing of the durable budget
+        record -- mirrors experimental_authorization.py's own strict-parsing
+        posture (bool checked before int/float since bool is an int
+        subclass; every numeric value must be finite; never negative).
+        Returns None (caller must reject/fail closed) for: a missing record
+        that nonetheless has prior recorded activity for this experiment_id
+        (state loss, not a fresh start), a non-dict record, a boolean/
+        negative/non-finite entries_used or notional_used, or any other
+        malformed shape. The damaged raw value is deliberately NOT
+        overwritten/reset by this method -- only order_intent's own
+        `_reject` path is ever reached from here, which raises before any
+        write, preserving the damaged state as evidence for an operator to
+        inspect (see remaining_issues.md)."""
+        raw = self.state.experimental_budgets.get(experiment_id)
+        if raw is None:
+            if self._experimental_prior_activity_exists(experiment_id):
+                return None
+            return {"entries_used": 0, "notional_used": 0.0}
+        if not isinstance(raw, dict):
+            return None
+        entries_used = raw.get("entries_used")
+        notional_used = raw.get("notional_used")
+        if isinstance(entries_used, bool) or not isinstance(entries_used, int) or entries_used < 0:
+            return None
+        if isinstance(notional_used, bool) or not isinstance(notional_used, (int, float)):
+            return None
+        if not math.isfinite(notional_used) or notional_used < 0:
+            return None
+        return {"entries_used": entries_used, "notional_used": float(notional_used)}
+
     def _reject(self, reason: str, symbol: str, source: str | None, alpha_evidence: bool | None) -> None:
         self.events.emit(PivEvent.build(
             "PAPER_ORDER_REJECTED", symbol=symbol, reason=reason, source=source, alpha_evidence=alpha_evidence,
@@ -209,16 +298,19 @@ class PaperLifecycle:
     def _enforce_experimental_paper_guards(
         self, *, symbol: str, source: str | None, alpha_evidence: bool | None, quantity: float,
         reference_price: float | None, experimental_id: str | None, trading_date_et: str | None,
-        strategy_id: str | None, strategy_version: str | None,
+        strategy_id: str | None, strategy_version: str | None, session_scope: str | None,
     ) -> None:
         """Task 79E -- re-validated fresh on EVERY EXPERIMENTAL entry
-        attempt, never cached from an earlier decision-layer check. Reserves
-        (increments) the durable budget atomically with the guard pass --
-        this method either fully succeeds (guards passed AND budget
-        reserved) or raises via `_reject` with NO state mutated, since
-        `_reject` always raises before any `self.state.experimental_budgets`
-        write below is reached."""
-        auth = self.experimental_authorization
+        attempt, never cached from an earlier decision-layer check (Task
+        79E-R1: this now includes re-LOADING the authorization object
+        itself, not just checking `now` fresh against a cached one -- see
+        `_current_experimental_authorization`). Reserves (increments) the
+        durable budget atomically with the guard pass -- this method either
+        fully succeeds (guards passed AND budget reserved) or raises via
+        `_reject` with NO state mutated, since `_reject` always raises
+        before any `self.state.experimental_budgets` write below is
+        reached."""
+        auth = self._current_experimental_authorization()
         if auth is None:
             self._reject("EXPERIMENTAL_AUTHORIZATION_NOT_CONFIGURED", symbol, source, alpha_evidence)
         if self.broker.identity is None:
@@ -227,7 +319,7 @@ class PaperLifecycle:
             symbol=symbol, trading_date_et=trading_date_et or "", strategy_id=strategy_id or "",
             strategy_version=strategy_version or "", runtime_sha=self.runtime_sha or "",
             config_hash=self.config_hash or "", now=datetime.now(timezone.utc),
-            account_id=self.broker.identity.account_id,
+            account_id=self.broker.identity.account_id, session_scope=session_scope,
         )
         if not ok:
             self._reject(f"EXPERIMENTAL_{reason}", symbol, source, alpha_evidence)
@@ -236,23 +328,56 @@ class PaperLifecycle:
         if quantity > auth.paper.max_quantity_per_entry + 1e-9:
             self._reject("EXPERIMENTAL_QUANTITY_EXCEEDS_LIMIT", symbol, source, alpha_evidence)
 
-        concurrent_open = sum(
-            1 for p in self.state.positions.values()
-            if p.get("status") == "OPEN" and p.get("experimental_id") == auth.experiment_id
-        )
-        if concurrent_open >= auth.paper.max_concurrent_exposure:
+        # Task 79E-R1: PENDING (submitted, not yet filled) and genuinely
+        # UNCERTAIN (SUBMIT_FAILED_UNCERTAIN) experimental buy exposure
+        # counts toward concurrent exposure too -- not only CONFIRMED OPEN
+        # positions. Without this, two different symbols could each pass a
+        # max_concurrent_exposure=1 check back-to-back before either one's
+        # order actually fills (the original bug this closes: symbol A's
+        # entry is SUBMITTED-but-not-yet-FILLED when symbol B's own guard
+        # check runs and sees zero OPEN positions). A per-SYMBOL set (not a
+        # raw count) avoids double-counting a single symbol whose order is
+        # simultaneously "OPEN position" (a partial fill already landed) AND
+        # "non-terminal order" (more of that same fill is still outstanding).
+        exposed_symbols: set[str] = set()
+        for position in self.state.positions.values():
+            if position.get("status") == "OPEN" and position.get("experimental_id") == auth.experiment_id:
+                exposed_symbols.add(str(position.get("symbol")))
+        for order in self.state.orders.values():
+            if order.get("status") in _TERMINAL_ORDER_STATUSES:
+                continue
+            intent = self.state.intents.get(order.get("intent_id"), {})
+            if intent.get("payload", {}).get("side") != "buy" or intent.get("experimental_id") != auth.experiment_id:
+                continue
+            exposed_symbols.add(str(order.get("symbol")))
+        for intent in self._orphaned_uncertain_intents_for_any_symbol("buy"):
+            if intent.get("experimental_id") == auth.experiment_id:
+                exposed_symbols.add(str(intent.get("payload", {}).get("symbol")))
+        if len(exposed_symbols) >= auth.paper.max_concurrent_exposure:
             self._reject("EXPERIMENTAL_CONCURRENT_EXPOSURE_LIMIT", symbol, source, alpha_evidence)
 
-        budget = self.state.experimental_budgets.get(auth.experiment_id, {"entries_used": 0, "notional_used": 0.0})
+        budget = self._validated_budget_record(auth.experiment_id)
+        if budget is None:
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", symbol=symbol, reason="EXPERIMENTAL_BUDGET_STATE_DAMAGED", source=source,
+                status=json.dumps(self.state.experimental_budgets.get(auth.experiment_id), sort_keys=True, default=str),
+            ))
+            self._reject("EXPERIMENTAL_BUDGET_STATE_DAMAGED_FAIL_CLOSED", symbol, source, alpha_evidence)
         if budget["entries_used"] >= auth.paper.max_entry_count:
             self._reject("EXPERIMENTAL_ENTRY_COUNT_EXHAUSTED", symbol, source, alpha_evidence)
         # Reference-price budget check ONLY -- never a hard cap on realised
         # fill value (existing orders are market orders; the eventual fill
         # price can differ from reference_price). If reference_price is
-        # unavailable, the requested notional cannot be estimated at all --
-        # fail closed rather than treat it as zero-cost.
-        if reference_price is None:
-            self._reject("EXPERIMENTAL_REFERENCE_PRICE_REQUIRED_FOR_BUDGET_CHECK", symbol, source, alpha_evidence)
+        # unavailable OR not a genuine finite positive price, the requested
+        # notional cannot be estimated at all -- fail closed rather than
+        # treat it as zero-cost or silently misuse a bad value.
+        if (
+            reference_price is None or isinstance(reference_price, bool)
+            or not isinstance(reference_price, (int, float)) or not math.isfinite(reference_price)
+            or reference_price <= 0
+        ):
+            reason = "EXPERIMENTAL_REFERENCE_PRICE_REQUIRED_FOR_BUDGET_CHECK" if reference_price is None else "EXPERIMENTAL_REFERENCE_PRICE_INVALID"
+            self._reject(reason, symbol, source, alpha_evidence)
         requested_notional = float(reference_price) * float(quantity)
         if budget["notional_used"] + requested_notional > auth.paper.max_reference_notional_budget + 1e-9:
             self._reject("EXPERIMENTAL_NOTIONAL_BUDGET_EXHAUSTED", symbol, source, alpha_evidence)
@@ -277,6 +402,12 @@ class PaperLifecycle:
         # or target price that triggered it), stop_price is not meaningful and
         # should be omitted.
         reference_price: float | None = None, stop_price: float | None = None,
+        # Task 79E-R1: persisted alongside stop_price so a position's full
+        # exit plan survives a process restart -- see decision_engine.py's
+        # _rehydrate_positions, which reads this back from the position
+        # record apply_broker_update writes on fill (below), rather than
+        # inventing/guessing a target for a restored position.
+        target_price: float | None = None,
         signal_timestamp: str | None = None, strategy_id: str | None = None,
         horizon: str | None = None,
         # Task 78I Stage 1C: optional cross-reference to the
@@ -301,6 +432,13 @@ class PaperLifecycle:
         # reconstructed or assumed.
         experimental_id: str | None = None, experimental_trading_date_et: str | None = None,
         experimental_strategy_version: str | None = None,
+        # Task 79E-R1: see experimental_authorization.py's own docstring --
+        # both the decision layer AND this broker-boundary re-check must
+        # independently supply the SAME fixed scope identifying "the live
+        # natural-strategy decision path" (never the isolated
+        # PIV_LIFECYCLE_PROBE lifecycle, which never calls order_intent with
+        # source="EXPERIMENTAL" at all).
+        experimental_session_scope: str | None = None,
     ) -> dict[str, Any]:
         symbol = symbol.upper()
 
@@ -344,7 +482,7 @@ class PaperLifecycle:
                     symbol=symbol, source=source, alpha_evidence=alpha_evidence, quantity=quantity,
                     reference_price=reference_price, experimental_id=experimental_id,
                     trading_date_et=experimental_trading_date_et, strategy_id=strategy_id,
-                    strategy_version=experimental_strategy_version,
+                    strategy_version=experimental_strategy_version, session_scope=experimental_session_scope,
                 )
         else:  # SELL_TO_CLOSE
             position = self._open_position_for(symbol)
@@ -368,7 +506,7 @@ class PaperLifecycle:
         self.state.intents[intent_id] = {
             "signal_id": signal_id, "payload": payload, "status": "ORDER_INTENT",
             "source": source, "alpha_evidence": alpha_evidence,
-            "reference_price": reference_price, "stop_price": stop_price,
+            "reference_price": reference_price, "stop_price": stop_price, "target_price": target_price,
             "signal_timestamp": signal_timestamp, "strategy_id": strategy_id, "horizon": horizon,
             "decision_id": decision_id, "experimental_id": experimental_id,
         }
@@ -455,9 +593,11 @@ class PaperLifecycle:
             side = intent.get("payload", {}).get("side")
             reference_price = intent.get("reference_price")
             stop_price = intent.get("stop_price")
+            target_price = intent.get("target_price")
             strategy_id = intent.get("strategy_id")
             horizon = intent.get("horizon")
             experimental_id = intent.get("experimental_id")
+            entry_signal_bar_timestamp = intent.get("signal_timestamp")
             now_iso = datetime.now(timezone.utc).isoformat()
             existing_position_id = self.state.open_position_by_symbol.get(symbol)
 
@@ -555,9 +695,17 @@ class PaperLifecycle:
                 self.state.positions[position_id] = {
                     "symbol": symbol, "quantity": filled_qty, "price": fill_price, "status": "OPEN",
                     "source": source, "alpha_evidence": alpha_evidence, "entry_time": now_iso,
-                    "reference_price": reference_price, "stop_price": stop_price,
+                    "reference_price": reference_price, "stop_price": stop_price, "target_price": target_price,
                     "strategy_id": strategy_id, "horizon": horizon, "exit_quantity": 0.0,
                     "remaining_quantity": filled_qty, "experimental_id": experimental_id,
+                    # Task 79E-R1: the ORIGINAL signal's bar_timestamp (never
+                    # the fill's own wall-clock time) -- decision_engine.py's
+                    # entry/exit causality guard and _rehydrate_positions both
+                    # key off this so a restored position, exactly like a
+                    # never-restarted one, can never have its stop/target
+                    # evaluated against a bar at or before the one that
+                    # produced the entry signal.
+                    "entry_signal_bar_timestamp": entry_signal_bar_timestamp,
                 }
                 self.state.open_position_by_symbol[symbol] = position_id
                 if first:
@@ -645,6 +793,71 @@ class PaperLifecycle:
             fill_price = float(current["filled_avg_price"]) if current.get("filled_avg_price") else None
             self.apply_broker_update(broker_order_id, status, filled_qty, fill_price)
 
+    def _resolve_uncertain_submissions(self) -> None:
+        """Task 79E-R1: a SUBMIT_FAILED_UNCERTAIN intent (order_intent's own
+        submit_order call raised BEFORE any broker order id was received --
+        see order_intent's try/except) has NO broker order id to poll with
+        get_order, unlike UNCONFIRMED_TIMEOUT above. The only way to resolve
+        the genuine ambiguity ("did this actually reach the broker or not?")
+        is to look it up by its STABLE, locally-derived client_order_id (see
+        broker.find_order_by_client_id) -- never by blindly resubmitting the
+        same signal, which could double-enter if the original request in
+        fact succeeded. Found -> the order DID reach the broker despite the
+        local exception; adopted into self.state.orders and its real status
+        applied via apply_broker_update, exactly as if poll_order_until_
+        terminal had originally observed it. Not found -> the broker has no
+        record of it at all; the intent is marked terminal so pyramiding/
+        concurrent-exposure guards stop treating it as outstanding (the
+        experimental budget reservation, if any, is deliberately NOT
+        refunded even now -- conservative in the rare case the broker's own
+        "not found" read is itself unreliable/eventually-consistent)."""
+        uncertain_ids = [
+            intent_id for intent_id, intent in self.state.intents.items()
+            if intent.get("status") == "SUBMIT_FAILED_UNCERTAIN"
+        ]
+        for intent_id in uncertain_ids:
+            intent = self.state.intents[intent_id]
+            client_order_id = intent.get("payload", {}).get("client_order_id") or intent_id
+            try:
+                found = self.broker.find_order_by_client_id(client_order_id)
+            except Exception as exc:  # noqa: BLE001 -- a broker-read failure here must not crash
+                # reconcile(); the intent stays SUBMIT_FAILED_UNCERTAIN (still fail-closed/outstanding)
+                # and will be retried on the next reconcile() call.
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", order_intent_id=intent_id, correlation_id=intent_id,
+                    reason=f"UNCERTAIN_SUBMISSION_RECONCILE_READ_FAILED_{type(exc).__name__}", status="STILL_UNRESOLVED",
+                ))
+                continue
+            if found is None:
+                intent["status"] = "SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED"
+                self._save()
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", symbol=intent.get("payload", {}).get("symbol"), order_intent_id=intent_id,
+                    correlation_id=intent_id, reason="UNCERTAIN_SUBMISSION_CONFIRMED_NEVER_REACHED_BROKER",
+                    status="RESOLVED_NOT_SUBMITTED",
+                ))
+                continue
+            broker_id = str(found.get("id") or "")
+            if not broker_id:
+                continue
+            intent["status"] = "SUBMITTED"
+            symbol = intent.get("payload", {}).get("symbol")
+            self.state.orders[broker_id] = {
+                "intent_id": intent_id, "symbol": symbol, "status": "SUBMITTED", "filled_qty": 0.0,
+                "source": intent.get("source"), "alpha_evidence": intent.get("alpha_evidence"),
+            }
+            self._save()
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", symbol=symbol, order_intent_id=intent_id, broker_order_id=broker_id,
+                correlation_id=intent_id, reason="UNCERTAIN_SUBMISSION_CONFIRMED_REACHED_BROKER",
+                status="RESOLVED_ADOPTED",
+            ))
+            status = str(found.get("status") or "")
+            if status:
+                filled_qty = float(found.get("filled_qty") or 0.0)
+                fill_price = float(found["filled_avg_price"]) if found.get("filled_avg_price") else None
+                self.apply_broker_update(broker_id, status, filled_qty, fill_price)
+
     def activate_kill_switch(self, cancel_orders: bool = False) -> None:
         self.state.kill_switch = True
         self.state.session_enabled = False
@@ -655,6 +868,7 @@ class PaperLifecycle:
 
     def reconcile(self) -> dict[str, Any]:
         self._resolve_unconfirmed_orders()
+        self._resolve_uncertain_submissions()
         broker_orders = self.broker.open_orders()
         broker_positions = self.broker.positions()
         internal_open = {v["symbol"] for v in self.state.positions.values() if v.get("status") == "OPEN"}

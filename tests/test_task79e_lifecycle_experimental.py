@@ -90,7 +90,7 @@ def _order(life, **overrides):
     kwargs = dict(
         signal_id="s1", symbol="AAPL", side="buy", quantity=1.0, source="EXPERIMENTAL",
         reference_price=100.0, experimental_id="exp-1", experimental_trading_date_et="2026-08-28",
-        strategy_id="STRAT", experimental_strategy_version="v1",
+        strategy_id="STRAT", experimental_strategy_version="v1", experimental_session_scope="REGULAR",
     )
     kwargs.update(overrides)
     return life.order_intent(**kwargs)
@@ -253,6 +253,16 @@ def test_budget_not_reset_by_reloading_a_fresh_authorization_object(tmp_path):
 
     with pytest.raises(PaperGuardError, match="EXPERIMENTAL_ENTRY_COUNT_EXHAUSTED"):
         _order(life, signal_id="s3")  # 3rd entry -- exceeds max_entry_count=2, proving the counter carried over
+
+
+def test_wrong_session_scope_rejected(tmp_path):
+    """Task 79E-R1: session_scope was parsed but never enforced -- an
+    authorization scoped to a different session type must never be honored
+    at the broker boundary."""
+    life, transport, _ = _life(tmp_path, auth=_auth(session_scope="PIV_LIFECYCLE_PROBE"))
+    with pytest.raises(PaperGuardError, match="EXPERIMENTAL_WRONG_SESSION_SCOPE"):
+        _order(life)
+    assert transport.orders == []
 
 
 def test_normal_strategy_source_unaffected_by_experimental_guards(tmp_path):

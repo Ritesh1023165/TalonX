@@ -86,11 +86,21 @@ class ExperimentalAuthorization:
 
     def permits_entry(
         self, *, symbol: str, trading_date_et: str, strategy_id: str, strategy_version: str,
-        runtime_sha: str, config_hash: str, now: datetime,
+        runtime_sha: str, config_hash: str, now: datetime, session_scope: str | None = None,
     ) -> tuple[bool, str]:
         """Re-checked EVERY time a caller wants to know if a NEW experimental
         entry may be considered right now -- never cached as a single
-        boolean checked once at startup. `now` must be timezone-aware."""
+        boolean checked once at startup. `now` must be timezone-aware.
+
+        Task 79E-R1: `session_scope` is REQUIRED in practice (both real
+        callers -- decision_engine.py and lifecycle.py -- always pass the
+        fixed "REGULAR" scope identifying the live natural-strategy decision
+        path, never the isolated PIV_LIFECYCLE_PROBE lifecycle or a
+        rehearsal/test session). Kept optional here (default None) only so
+        this stays a pure, narrowly-scoped addition -- None never matches a
+        real (non-empty-string) `self.session_scope`, so an old caller that
+        forgets to pass it fails closed rather than silently skipping the
+        check."""
         if now.tzinfo is None:
             return False, "NOW_NOT_TIMEZONE_AWARE"
         if not self.operator_acknowledged_unvalidated:
@@ -99,6 +109,8 @@ class ExperimentalAuthorization:
             return False, "SYMBOL_NOT_IN_ALLOWED_SET"
         if trading_date_et != self.trading_date_et:
             return False, "WRONG_TRADING_DATE"
+        if session_scope != self.session_scope:
+            return False, "WRONG_SESSION_SCOPE"
         if strategy_id != self.strategy_id:
             return False, "WRONG_STRATEGY_ID"
         if strategy_version != self.strategy_version:
@@ -115,7 +127,7 @@ class ExperimentalAuthorization:
 
     def permits_paper_execution(
         self, *, symbol: str, trading_date_et: str, strategy_id: str, strategy_version: str,
-        runtime_sha: str, config_hash: str, now: datetime, account_id: str,
+        runtime_sha: str, config_hash: str, now: datetime, account_id: str, session_scope: str | None = None,
     ) -> tuple[bool, str]:
         """A SEPARATE, additionally-required check -- entry permission alone
         never authorises a broker order. Re-checks entry permission first
@@ -124,6 +136,7 @@ class ExperimentalAuthorization:
         entry_ok, entry_reason = self.permits_entry(
             symbol=symbol, trading_date_et=trading_date_et, strategy_id=strategy_id,
             strategy_version=strategy_version, runtime_sha=runtime_sha, config_hash=config_hash, now=now,
+            session_scope=session_scope,
         )
         if not entry_ok:
             return False, entry_reason

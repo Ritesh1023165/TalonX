@@ -83,6 +83,26 @@ class AlpacaPaperClient:
         response.raise_for_status()
         return dict(response.json())
 
+    def find_order_by_client_id(self, client_order_id: str) -> dict[str, Any] | None:
+        """Task 79E-R1: the ONLY way to resolve a SUBMIT_FAILED_UNCERTAIN
+        intent -- one whose submit_order call raised BEFORE any broker order
+        id was ever received, so lifecycle.py has no id to poll with
+        get_order. Alpaca's own order-status-vocabulary is keyed by broker
+        id, but every order this codebase submits also carries a stable,
+        locally-derived client_order_id (see lifecycle.stable_id) -- looking
+        the order up by THAT identity (status=all, so a since-terminalised
+        order is still found) answers "did this actually reach the broker?"
+        without ever blindly resubmitting. Returns None if the broker has no
+        record of it at all (the original request never arrived)."""
+        self._require_verified()
+        response = self.transport.get(
+            f"{PAPER_ENDPOINT}/v2/orders", headers=self.headers,
+            params={"status": "all", "limit": 1, "client_order_id": client_order_id}, timeout=15,
+        )
+        response.raise_for_status()
+        orders = list(response.json() or [])
+        return orders[0] if orders else None
+
     def positions(self) -> list[dict[str, Any]]:
         self._require_verified()
         response = self.transport.get(f"{PAPER_ENDPOINT}/v2/positions", headers=self.headers, timeout=15)

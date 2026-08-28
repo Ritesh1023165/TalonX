@@ -40,6 +40,7 @@ def _binding(**overrides):
     kwargs = dict(
         symbol="AAPL", trading_date_et="2026-08-28", strategy_id="MACD_BULLISH_CROSS",
         strategy_version="v1", runtime_sha="abc123", config_hash="cfg123", now=NOW,
+        session_scope="REGULAR",
     )
     kwargs.update(overrides)
     return kwargs
@@ -246,3 +247,35 @@ def test_wrong_account_also_blocks_via_entry_binding_reason_when_entry_itself_in
     auth = load_experimental_authorization(_write(tmp_path, _base(paper=_paper_base())))
     ok, reason = auth.permits_paper_execution(**_binding(symbol="MSFT"), account_id="acct-1")
     assert not ok and reason == "SYMBOL_NOT_IN_ALLOWED_SET"  # entry-level check runs first
+
+
+# ---------------------------------------------------------------------------
+# Task 79E-R1: session_scope enforcement (Stage 3 -- previously parsed and
+# stored but never actually checked by permits_entry/permits_paper_execution)
+# ---------------------------------------------------------------------------
+
+def test_wrong_session_scope_rejected(tmp_path):
+    auth = load_experimental_authorization(_write(tmp_path, _base(session_scope="REGULAR")))
+    ok, reason = auth.permits_entry(**_binding(session_scope="PIV_LIFECYCLE_PROBE"))
+    assert not ok and reason == "WRONG_SESSION_SCOPE"
+
+
+def test_missing_session_scope_rejected(tmp_path):
+    """A caller that forgets to pass session_scope at all must fail closed,
+    not silently skip the check -- None never matches a real (non-empty)
+    authored session_scope."""
+    auth = load_experimental_authorization(_write(tmp_path, _base(session_scope="REGULAR")))
+    ok, reason = auth.permits_entry(**{k: v for k, v in _binding().items() if k != "session_scope"})
+    assert not ok and reason == "WRONG_SESSION_SCOPE"
+
+
+def test_matching_session_scope_permits(tmp_path):
+    auth = load_experimental_authorization(_write(tmp_path, _base(session_scope="REGULAR")))
+    ok, reason = auth.permits_entry(**_binding(session_scope="REGULAR"))
+    assert ok, reason
+
+
+def test_wrong_session_scope_blocks_paper_execution_too(tmp_path):
+    auth = load_experimental_authorization(_write(tmp_path, _base(session_scope="REGULAR", paper=_paper_base())))
+    ok, reason = auth.permits_paper_execution(**_binding(session_scope="OTHER"), account_id="acct-1")
+    assert not ok and reason == "WRONG_SESSION_SCOPE"

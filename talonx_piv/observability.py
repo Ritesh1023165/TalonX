@@ -106,6 +106,20 @@ def build_decision_status(state_dir: Path, decision_id: str) -> dict[str, Any]:
             intent = intents[matching_intent_id]
             if intent.get("status") == "REJECTED":
                 execution_status = "REJECTED"
+            elif intent.get("status") == "SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED":
+                # Task 79E-R1: reconcile() resolved a genuinely uncertain
+                # submission (no broker order id received) via its stable
+                # client_order_id and confirmed it never reached the broker
+                # at all -- distinct from REJECTED (which means the broker
+                # DID receive and decline it) and from the generic
+                # ATTEMPTED_OUTCOME_UNKNOWN fallback (this one IS resolved,
+                # just to a negative outcome).
+                execution_status = "CONFIRMED_NOT_SUBMITTED"
+            elif intent.get("status") == "SUBMIT_FAILED_UNCERTAIN":
+                # Not yet reconciled -- genuinely unknown, reported as such
+                # rather than defaulting to the more optimistic-sounding
+                # SUBMITTED_NO_BROKER_ACK_YET below.
+                execution_status = "SUBMISSION_UNCERTAIN_PENDING_RECONCILE"
             else:
                 order = next((o for o in orders.values() if o.get("intent_id") == matching_intent_id), None)
                 if order is None:

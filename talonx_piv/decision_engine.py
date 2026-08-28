@@ -60,6 +60,14 @@ PIV_QUANTITY = 1.0
 # researched/frozen/validated (Task69Q PERMANENT PRODUCT TARGET #6). Do not
 # widen this without a separately validated longer-horizon strategy family.
 NATURAL_STRATEGY_HORIZON = "INTRADAY_SHORT"
+# Task 79E-R1: the ONE fixed scope value every REAL call site of this module
+# passes -- identifies "the live natural-strategy decision path" so an
+# experimental authorization can never silently leak into a differently-
+# scoped session (the isolated PIV_LIFECYCLE_PROBE lifecycle never routes
+# through DecisionEngine/order_intent(source="EXPERIMENTAL") at all, so it
+# is structurally excluded regardless). See experimental_authorization.py's
+# own docstring for the full rationale.
+EXPERIMENTAL_SESSION_SCOPE_REGULAR = "REGULAR"
 
 
 def _natural_strategy_version() -> str:
@@ -92,6 +100,15 @@ class OpenDecisionPosition:
     # exit-independence).
     experimental: bool = False
     experimental_id: str | None = None
+    # Task 79E-R1: set once a STOP/TARGET/forced exit condition is first
+    # observed for this position, and STAYS set (even across bars where the
+    # triggering condition is no longer literally true, e.g. price recovers
+    # mid-exit) until the position is CONFIRMED fully flat at the broker --
+    # see _check_exit. This is what lets a partially-filled or
+    # rejected/failed exit keep being retried on every subsequent bar for
+    # whatever quantity is still actually held, instead of the plan being
+    # silently dropped the instant the first sell attempt was made.
+    exit_reason: str | None = None
 
 
 @dataclass
@@ -131,6 +148,15 @@ class DecisionEngine:
     # never active unless an operator has populated the underlying,
     # inactive-by-default authorization file (see experimental_authorization.py).
     experimental_authorization: ExperimentalAuthorization | None = None
+    # Task 79E-R1: when set, takes priority over the static object above --
+    # every permission check reloads fresh from disk (see
+    # _current_experimental_authorization), so an operator deleting,
+    # disabling, or editing the authorization file mid-session is observed
+    # on the very next signal, not only after a process restart. cli.py's
+    # real runtime() always sets this; `experimental_authorization=` (the
+    # object) remains supported unchanged for every pre-existing test/
+    # caller that constructs a fixed authorization directly.
+    experimental_authorization_path: Any = None
     # TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE. The ONLY way any decision this
     # engine makes can ever resolve to StrategyApprovalStatus.APPROVED --
     # `cli.py` never sets this (grep-provable), so no production code path
@@ -170,6 +196,51 @@ class DecisionEngine:
         self.rejected_breakdown: dict[str, int] = {}
         self.evaluation_cycles = 0
         self.symbols_evaluated_total = 0
+        self._rehydrate_positions()
+
+    def _rehydrate_positions(self) -> None:
+        """Task 79E-R1: rebuild self.positions from lifecycle.state.positions
+        (persisted, restart-surviving truth) so a process restart does not
+        silently lose an open position's exit plan (Task 79E's own disclosed
+        gap -- see remaining_issues.md item 1). Relies on order_intent's
+        target_price persistence (added this task, alongside the
+        pre-existing stop_price) to restore the full plan. A rehydrated
+        position is never causality-gated at all (see _check_exit's own
+        docstring on `skip_price_check`, which only on_bars() ever sets --
+        a rehydrated position was never opened by THIS process on THIS
+        tick, so it carries no same-bar-as-entry risk in the first place)."""
+        for position in self.lifecycle.state.positions.values():
+            if position.get("status") != "OPEN":
+                continue
+            symbol = position.get("symbol")
+            if not symbol or symbol in self.positions:
+                continue
+            experimental_id = position.get("experimental_id")
+            self.positions[symbol] = OpenDecisionPosition(
+                symbol, f"rehydrated_{symbol}", position.get("stop_price"), position.get("target_price"),
+                experimental=experimental_id is not None, experimental_id=experimental_id,
+            )
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", symbol=symbol, reason="EXIT_PLAN_REHYDRATED_FROM_PERSISTED_STATE",
+                status="RESTART_RECOVERY_NO_ACTION_REQUIRED",
+            ))
+
+    def _flag_orphaned_positions(self, symbols: Any) -> None:
+        """Task 79E-R1: "missing plans must fail visibly, not be invented" --
+        an OPEN lifecycle position with no corresponding self.positions
+        entry (e.g. rehydration missed it, or state was mutated out of
+        band) must never be silently ignored OR have a plan fabricated for
+        it. Checked only for symbols this tick actually observed a bar for
+        (cheap; every genuinely open position eventually appears here)."""
+        for symbol in symbols:
+            if symbol in self.positions:
+                continue
+            lifecycle_position = self.lifecycle._open_position_for(symbol)
+            if lifecycle_position is not None:
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", symbol=symbol, reason="MISSING_EXIT_PLAN_FOR_OPEN_POSITION",
+                    status="ORPHANED_POSITION_NOT_MONITORED_FOR_STOP_TARGET",
+                ))
 
     async def start(self, universe: list[str] | None = None, now: datetime | None = None) -> list[WarmupCheck]:
         """Causal pre-market hydration, then subscribe to the scanner's own
@@ -308,13 +379,24 @@ class DecisionEngine:
         age = (now - bar_ts).total_seconds()
         return 0 <= age <= stale_seconds
 
+    def _current_experimental_authorization(self) -> ExperimentalAuthorization | None:
+        """Task 79E-R1: reload FRESH from disk on every call when a path is
+        configured -- never a cached object -- so deletion, disablement, or
+        an edited binding is observed on the very next signal. Falls back to
+        the static `experimental_authorization` object for every
+        pre-existing test/caller that constructs one directly."""
+        if self.experimental_authorization_path is not None:
+            from .experimental_authorization import load_experimental_authorization
+            return load_experimental_authorization(self.experimental_authorization_path)
+        return self.experimental_authorization
+
     def _experimental_permissions(self, *, symbol: str, signal: QuantSignal, trading_date_et: str) -> tuple[bool, bool, str | None]:
         """Returns (experimental_buy_permitted, experimental_paper_permitted,
         experimental_id) -- both booleans default False/False if no
         authorization is configured at all, or if the signal itself is not
         fresh (see _signal_is_fresh), matching "signals admitted to the
         experimental path must correspond to eligible, fresh inputs"."""
-        auth = self.experimental_authorization
+        auth = self._current_experimental_authorization()
         if auth is None:
             return False, False, None
         now = datetime.now(timezone.utc)
@@ -323,10 +405,26 @@ class DecisionEngine:
                 "BROKER_ERROR", symbol=symbol, reason="EXPERIMENTAL_SIGNAL_NOT_FRESH", source="EXPERIMENTAL",
             ))
             return False, False, None
+        # Task 79E-R1: a fresh bar_timestamp alone only proves the MESSAGE is
+        # recent -- not that the symbol itself is currently session-eligible
+        # (has passed the SAME causal warmup gate the normal decision path
+        # requires before it will ever act on a signal for that symbol; see
+        # session_runner.py's own decision_eligible computation). Skipped
+        # (never blocks) when warmup_ready_symbols is empty -- i.e. warmup
+        # was never run for this engine instance at all (every isolated
+        # unit/integration test that drives _handle_entry directly without
+        # calling start() first) -- so this is purely an ADDITIONAL,
+        # belt-and-suspenders check for a real, warmed-up live session, not
+        # a new requirement on every construction site.
+        if self.warmup_ready_symbols and symbol not in self.warmup_ready_symbols:
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", symbol=symbol, reason="EXPERIMENTAL_SYMBOL_NOT_SESSION_ELIGIBLE", source="EXPERIMENTAL",
+            ))
+            return False, False, None
         buy_ok, buy_reason = auth.permits_entry(
             symbol=symbol, trading_date_et=trading_date_et, strategy_id=signal.signal_type.value,
             strategy_version=_natural_strategy_version(), runtime_sha=self.runtime_sha or "",
-            config_hash=self.config_hash or "", now=now,
+            config_hash=self.config_hash or "", now=now, session_scope=EXPERIMENTAL_SESSION_SCOPE_REGULAR,
         )
         if not buy_ok:
             return False, False, None
@@ -335,6 +433,7 @@ class DecisionEngine:
             symbol=symbol, trading_date_et=trading_date_et, strategy_id=signal.signal_type.value,
             strategy_version=_natural_strategy_version(), runtime_sha=self.runtime_sha or "",
             config_hash=self.config_hash or "", now=now, account_id=account_id,
+            session_scope=EXPERIMENTAL_SESSION_SCOPE_REGULAR,
         )
         return True, paper_ok, auth.experiment_id
 
@@ -399,10 +498,11 @@ class DecisionEngine:
                 extra_kwargs = dict(
                     experimental_id=decision.experimental_id, experimental_trading_date_et=trading_date_et,
                     experimental_strategy_version=_natural_strategy_version(),
+                    experimental_session_scope=EXPERIMENTAL_SESSION_SCOPE_REGULAR,
                 )
             result = self.lifecycle.order_intent(
                 signal_id, symbol, "buy", PIV_QUANTITY, source=order_source, alpha_evidence=False,
-                reference_price=signal.price, stop_price=signal.stop_price,
+                reference_price=signal.price, stop_price=signal.stop_price, target_price=signal.target_price,
                 signal_timestamp=signal.bar_timestamp.isoformat(),
                 strategy_id=signal.signal_type.value, horizon=NATURAL_STRATEGY_HORIZON,
                 decision_id=decision.decision_id, **extra_kwargs,
@@ -418,16 +518,52 @@ class DecisionEngine:
         if broker_id:
             self.lifecycle.poll_order_until_terminal(str(broker_id))
 
-    def _check_exit(self, symbol: str, bar: Any, *, force_reason: str | None = None) -> None:
+    def _check_exit(self, symbol: str, bar: Any, *, force_reason: str | None = None, skip_price_check: bool = False) -> None:
         position = self.positions.get(symbol)
         if position is None:
             return
-        reason = force_reason
-        if reason is None:
+        # Task 79E-R1: the lifecycle-side truth is authoritative for whether
+        # this position is still actually open -- a PRIOR call's sell may
+        # have since been confirmed fully filled (via poll_order_until_
+        # terminal or a later reconcile()) without this engine ever having
+        # re-observed it until now. Confirmed flat -> stop tracking; never
+        # invent/guess a plan for a symbol lifecycle no longer shows OPEN.
+        if self.lifecycle._open_position_for(symbol) is None:
+            del self.positions[symbol]
+            return
+        # Task 79E-R1 entry/exit causality: `skip_price_check` is set ONLY
+        # by on_bars() itself, ONLY for a symbol that _handle_entry just
+        # opened a position for on THIS SAME tick -- on_bars hands that
+        # SAME bar to both _handle_entry (as the signal source) and
+        # _check_exit (as the price to test) in one call, and that bar's
+        # own low/high may reflect price action that occurred before the
+        # actual fill, which must never be allowed to retroactively trigger
+        # a protective exit. Deliberately NOT derived from wall-clock
+        # timestamps (an earlier draft compared `bar.timestamp` against a
+        # persisted entry timestamp with `>`, but two back-to-back
+        # `datetime.now()` calls were observed to produce BIT-IDENTICAL
+        # values on at least one real test-execution environment -- see
+        # test_task65b_decision_engine.py's
+        # test_stop_hit_triggers_controlled_exit, which caught this in the
+        # full suite; clock-resolution-based ordering is not a safe
+        # primitive here). A DIRECT _check_exit call (every test/caller
+        # that does not go through on_bars) is therefore never
+        # causality-gated at all -- exactly its pre-Task79E-R1 behaviour.
+        # A forced exit (EOD flatten) is time-based, never price-based, and
+        # always bypasses this gate too. Once a reason has already been
+        # latched (position.exit_reason), it is never re-derived from
+        # price again -- only confirmed-flat (above) clears it, so a
+        # delayed/partial exit keeps being retried regardless of where
+        # price moves afterward.
+        causally_eligible = force_reason is not None or not skip_price_check
+        reason = force_reason or position.exit_reason
+        if reason is None and causally_eligible:
             if position.stop_price is not None and bar.low <= position.stop_price:
                 reason = "STOP"
             elif position.target_price is not None and bar.high >= position.target_price:
                 reason = "TARGET"
+        if reason is not None and position.exit_reason is None:
+            position.exit_reason = reason
         decision_id = stable_id("decision", "exit", symbol, bar.timestamp.isoformat())
         decision = decide(
             decision_id=decision_id, session_id=self.events.session_id or "",
@@ -449,7 +585,16 @@ class DecisionEngine:
         self._record_decision(decision)
         if reason is None:
             return
-        del self.positions[symbol]
+        # Task 79E-R1: sized to ACTUAL remaining holdings minus whatever a
+        # prior attempt already has outstanding (pending/uncertain) -- never
+        # the fixed PIV_QUANTITY constant, which is only ever correct for a
+        # position's FIRST exit attempt with zero partial fills so far.
+        # Zero/near-zero means an earlier attempt already covers everything
+        # currently sellable -- do NOT submit a duplicate; keep monitoring
+        # (position stays tracked) until lifecycle confirms fully flat.
+        available = self.lifecycle.remaining_holdings(symbol)
+        if available <= 1e-9:
+            return
         exit_event = "STOP_TRIGGERED" if reason == "STOP" else "EXIT_REQUESTED"
         order_source = "EXPERIMENTAL" if position.experimental else "STRATEGY"
         self.events.emit(PivEvent.build(exit_event, symbol=symbol, reason=reason, price=bar.close, source=order_source, alpha_evidence=False))
@@ -457,17 +602,26 @@ class DecisionEngine:
         exit_reference_price = {"STOP": position.stop_price, "TARGET": position.target_price}.get(reason)
         try:
             result = self.lifecycle.order_intent(
-                signal_id, symbol, "sell", PIV_QUANTITY, source=order_source, alpha_evidence=False,
+                signal_id, symbol, "sell", available, source=order_source, alpha_evidence=False,
                 reference_price=exit_reference_price, signal_timestamp=bar.timestamp.isoformat(),
                 horizon=NATURAL_STRATEGY_HORIZON, decision_id=decision.decision_id,
                 experimental_id=position.experimental_id if position.experimental else None,
+                experimental_session_scope=EXPERIMENTAL_SESSION_SCOPE_REGULAR if position.experimental else None,
             )
         except PaperGuardError as exc:
+            # Task 79E-R1: the position stays tracked (never deleted here) --
+            # a rejected/failed exit attempt must keep being monitored and
+            # retried on subsequent bars, not silently abandoned.
             self.events.emit(PivEvent.build("BROKER_ERROR", symbol=symbol, reason=str(exc), source=order_source))
             return
         broker_id = result.get("id")
         if broker_id:
             self.lifecycle.poll_order_until_terminal(str(broker_id))
+        # Only now -- after this attempt (and any resulting fill observed by
+        # the poll above) -- re-check whether the position is confirmed
+        # fully flat; only then stop tracking it.
+        if self.lifecycle._open_position_for(symbol) is None:
+            del self.positions[symbol]
 
     async def on_bars(self, bars: dict[str, Any]) -> None:
         """bars: {symbol: Bar} for this tick's newly-fetched, already-READY
@@ -476,12 +630,23 @@ class DecisionEngine:
         passed here at all."""
         self.evaluation_cycles += 1
         self.symbols_evaluated_total += len(bars)
+        self._flag_orphaned_positions(bars.keys())
         for symbol, bar in bars.items():
             await self.feed_bar(symbol, bar)
+        # Task 79E-R1: track which symbols get a BRAND NEW position from a
+        # signal drained THIS tick -- see _check_exit's own docstring for
+        # why this (never a wall-clock comparison) is what protects a fresh
+        # entry from being immediately stopped out by the SAME bar's own
+        # low/high, fed to _check_exit for every symbol right below.
+        entered_this_tick: set[str] = set()
         for signal in await self.flush_and_collect():
+            entry_symbol = signal.ticker.upper()
+            had_position = entry_symbol in self.positions
             self._handle_entry(signal)
+            if not had_position and entry_symbol in self.positions:
+                entered_this_tick.add(entry_symbol)
         for symbol, bar in bars.items():
-            self._check_exit(symbol, bar)
+            self._check_exit(symbol, bar, skip_price_check=symbol in entered_this_tick)
         for symbol, bar in bars.items():
             # Task 77I Stage 3: advances PENDING_FILL -> OPEN and checks
             # OPEN -> CLOSED for any shadow position on this symbol, using
