@@ -184,7 +184,14 @@ fabricated bars.
 | §4 pre-fix | `pytest tests/test_task81_r1_missing_identity_recovery.py` (pre-fix) | `5 failed, 3 passed` — `section4_prefix.txt` |
 | Focused recovery/reconciliation ×2 | `pytest -p no:cacheprovider <19 recovery/reconciliation/eod/cli suites>` | run 1: `252 passed`; run 2: `252 passed` — `focused_recovery_run{1,2}.txt` |
 | xfail exposure | `pytest --runxfail <10 xfails + 1 skip>` | all 10 fail with `trades_executed=0`-family errors; the skip conditionally skips — `xfail_runxfail_*.txt` |
-| Final full suite | `pytest -p no:cacheprovider tests/ -q -rxXs` | **<filled on completion>** — `final_full_suite.txt` |
+| Final full suite | `pytest -p no:cacheprovider tests/ -q -rxXs` | **`2625 passed, 1 skipped, 10 xfailed`, exit 0 (848s)** — `final_full_suite.txt` |
+
+**Count reconciliation:** baseline `2597 passed / 1 skipped / 10 xfailed`
+→ final `2625 / 1 / 10`. Delta `+28 passed` = exactly the 28 new items
+collected across the 4 new `test_task81_r1_*` files (verified via
+`pytest --collect-only`). `skipped` and `xfailed` unchanged; `0` failed,
+`0` xpassed, `0` errors. No dependency added/upgraded; no skip/xfail
+marker changed.
 
 ## Remaining blockers vs deferred work
 

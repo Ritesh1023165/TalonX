@@ -55,4 +55,6 @@ justification + impact assessment in `xfail_skip_disposition.md`.
 | R7 | `test_task81_r1_guard_negative_controls.py` (4); deterministic clocks / tmp_path / no historical writes; focused suites ×2 (`252 passed` each) | — | — | PASS |
 
 Verdict: `BASELINE_VERIFIED_READY_FOR_ISOLATION`. Final full suite:
-`raw_test_output/final_full_suite.txt`.
+`2625 passed, 1 skipped, 10 xfailed`, exit 0 — baseline `2597/1/10` + 28
+new R1 cases, exact reconciliation, zero unexpected failures
+(`raw_test_output/final_full_suite.txt`).
