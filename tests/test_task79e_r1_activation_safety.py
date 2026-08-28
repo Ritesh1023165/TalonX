@@ -609,6 +609,14 @@ def test_uncertain_submission_never_auto_resolves_operator_resolution_frees_pyra
     assert life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED"
     assert life.state.intents[intent_id]["resolution_source"] == "OPERATOR"
 
+    # Task 81 §2: while the submission was still SUBMIT_FAILED_UNCERTAIN,
+    # every reconcile() above durably blocked new entries (an unresolved
+    # submission is an incomplete reconciliation). Now that the operator
+    # has resolved it, a clean reconcile pass (no unresolved submission,
+    # empty broker) clears that block -- the natural operator workflow.
+    life.reconcile(now=base + timedelta(hours=5))
+    assert life.state.reconciliation_flags["entry_admission_blocked"] is False
+
     # A genuinely NEW signal_id may now proceed -- never a blind retry of s1.
     result = life.order_intent("s3", "AAPL", "buy", 1.0, source="STRATEGY", reference_price=100.0)
     assert result["id"]

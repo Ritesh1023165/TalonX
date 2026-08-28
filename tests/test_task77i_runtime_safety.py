@@ -137,7 +137,13 @@ def test_reconcile_resolves_an_unconfirmed_order_against_a_fresh_broker_read(tmp
 def test_reconcile_leaves_order_unresolved_if_broker_read_still_fails(tmp_path):
     """A broker-read failure during resolution must not crash reconcile()
     or fabricate a resolved status -- the order stays UNCONFIRMED_TIMEOUT
-    (still fail-closed/outstanding) for the next reconcile() attempt."""
+    (still fail-closed/outstanding) for the next reconcile() attempt.
+
+    Task 81 §2: an unresolved UNCONFIRMED_TIMEOUT order means the pass is
+    NOT complete, so reconcile() must report matched=False and durably
+    block new BUY admission -- an incomplete read is never treated as a
+    clean, matched pass merely because the position symbol sets agree.
+    """
     class FlakyGetOrderTransport(StuckTransport):
         def get(self, url, **kwargs):
             if "/v2/orders/" in url:
@@ -154,7 +160,10 @@ def test_reconcile_leaves_order_unresolved_if_broker_read_still_fails(tmp_path):
     life._save()
     result = life.reconcile()  # must not raise
     assert life.state.orders[entry["id"]]["status"] == "UNCONFIRMED_TIMEOUT"
-    assert result["matched"] is True  # zero broker positions, zero internal OPEN positions -- still consistent
+    assert result["matched"] is False  # incomplete: an unresolved order outcome
+    assert result["complete"] is False
+    assert entry["id"] in result["unconfirmed_timeout_orders"]
+    assert life.state.reconciliation_flags["entry_admission_blocked"] is True
 
 
 # ---------------------------------------------------------------------------

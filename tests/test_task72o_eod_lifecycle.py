@@ -111,7 +111,7 @@ def test_existing_paper_orders_are_cancelled(tmp_path):
 
 
 def test_existing_paper_positions_are_closed(tmp_path):
-    broker = FakeBroker(positions=[{"symbol": "AAPL"}])
+    broker = FakeBroker(positions=[{"symbol": "AAPL", "qty": "1", "side": "long"}])
     cfg, bus, life = make_lifecycle(tmp_path, broker, internal_positions_open=["AAPL"])
     result = run_eod_lifecycle(cfg, bus, life, trigger_reason="SCHEDULED_COMPLETION", **COMMON)
     assert result["status"] == STATUS_PASSED
@@ -138,7 +138,7 @@ def test_close_failure_is_inconclusive_not_passed(tmp_path):
 def test_reconciliation_mismatch_is_failed_not_passed(tmp_path):
     # Broker still reports an open position even after close_all_positions
     # "succeeded" (delayed broker-side convergence / genuine mismatch).
-    broker = FakeBroker(positions=[{"symbol": "AAPL"}])
+    broker = FakeBroker(positions=[{"symbol": "AAPL", "qty": "1", "side": "long"}])
     broker.close_all_positions = lambda: []  # "succeeds" but broker state doesn't actually clear yet
     cfg, bus, life = make_lifecycle(tmp_path, broker, internal_positions_open=["AAPL"])
     result = run_eod_lifecycle(cfg, bus, life, trigger_reason="SCHEDULED_COMPLETION", **COMMON)
@@ -152,7 +152,7 @@ def test_delayed_broker_convergence_then_idempotent_retry_passes(tmp_path):
     """First call: broker hasn't converged yet -> FAILED. A later retry
     (broker now converged) re-reads reconciliation and passes -- without
     re-issuing cancel/close (idempotent)."""
-    broker = FakeBroker(positions=[{"symbol": "AAPL"}])
+    broker = FakeBroker(positions=[{"symbol": "AAPL", "qty": "1", "side": "long"}])
     cfg, bus, life = make_lifecycle(tmp_path, broker, internal_positions_open=["AAPL"])
     def fake_close():
         broker.close_calls += 1

@@ -59,6 +59,12 @@ _TERMINAL_ORDER_STATUSES = frozenset({"filled", "rejected", "canceled", "expired
 # truth of the outcome.
 UNCERTAIN_SUBMISSION_BACKOFF_SCHEDULE_SECONDS: tuple[float, ...] = (0.0, 30.0, 60.0, 300.0, 900.0, 3600.0)
 
+# Task 81 §2: absolute tolerance for reconciliation quantity comparisons.
+# Share quantities are integers in this product; this only absorbs float
+# round-trips through JSON / str(). Any difference above this is a genuine
+# position-size mismatch and blocks new entries.
+RECONCILE_QUANTITY_TOLERANCE = 1e-6
+
 
 class ActionIntent(str, Enum):
     """Explicit, typed action intent -- Task 76S Stage 3 requires enforcing
@@ -598,8 +604,6 @@ class PaperLifecycle:
         if intent is ActionIntent.BUY_TO_OPEN:
             if self.state.reconciliation_flags.get("unexpected_short_detected"):
                 self._reject("UNEXPECTED_SHORT_BLOCKS_NEW_ENTRIES", symbol, source, alpha_evidence)
-            if self.state.reconciliation_flags.get("entry_admission_blocked"):
-                self._reject("RECONCILIATION_BLOCKS_NEW_ENTRIES", symbol, source, alpha_evidence)
             if self._open_position_for(symbol) is not None:
                 self._reject("ALREADY_HOLDING_NO_PYRAMIDING", symbol, source, alpha_evidence)
             # Task 79E-R2-2: entry_still_pending_or_uncertain also covers a
@@ -608,6 +612,18 @@ class PaperLifecycle:
             # which the OLD inline check here did not.
             if self.entry_still_pending_or_uncertain(symbol):
                 self._reject("PENDING_ENTRY_EXISTS", symbol, source, alpha_evidence)
+            # Task 81 §2: the generic reconciliation admission block is
+            # checked AFTER the more specific same-symbol guards above, so a
+            # same-symbol pending/uncertain entry (or an already-open
+            # position) still rejects with its own precise reason -- the
+            # generic RECONCILIATION_BLOCKS_NEW_ENTRIES reason is reserved
+            # for the case where nothing symbol-specific applies (e.g. a
+            # different symbol, or a durable block from a failed/incomplete
+            # broker read). An unresolved/uncertain submission also sets
+            # this flag via reconcile(), so a NEW symbol's entry is still
+            # correctly blocked while broker truth is unknown.
+            if self.state.reconciliation_flags.get("entry_admission_blocked"):
+                self._reject("RECONCILIATION_BLOCKS_NEW_ENTRIES", symbol, source, alpha_evidence)
             if not self.paper_entry_settings.enabled_for(symbol):
                 self._reject("PAPER_ENTRY_DISABLED_FOR_TICKER", symbol, source, alpha_evidence)
             if source == "EXPERIMENTAL":
@@ -1177,7 +1193,7 @@ class PaperLifecycle:
             status=f"OPERATOR_NOTE:{operator_note}" if operator_note else "OPERATOR_RESOLVED_NO_NOTE",
         ))
 
-    def _refresh_non_terminal_orders(self) -> None:
+    def _refresh_non_terminal_orders(self) -> list[str]:
         """Task 79E-R2-2 Requirement 4: 'adopted-but-pending orders...
         without waiting for EOD.' An order ADOPTED via
         _resolve_uncertain_submissions (or any other non-terminal order
@@ -1190,7 +1206,16 @@ class PaperLifecycle:
         pass instead -- bounded to genuinely outstanding orders only
         (never unbounded), and idempotent (a repeat call against an
         already-terminal order is a no-op, since the query is scoped to
-        non-terminal orders each time it runs)."""
+        non-terminal orders each time it runs).
+
+        Task 81 §2: returns a list of failure reasons for any outstanding
+        order whose individual broker refresh could NOT be completed this
+        pass (transport error, malformed body, or an unparseable numeric
+        field). A non-empty return means reconcile() must NOT treat broker
+        order state as fully known -- it fails closed (keeps/sets an
+        entry-admission block) instead of clearing it merely because the
+        position *symbol sets* happen to agree."""
+        failures: list[str] = []
         outstanding_ids = [
             broker_order_id for broker_order_id, order in self.state.orders.items()
             if order.get("status") not in _TERMINAL_ORDER_STATUSES and order.get("status") != "UNCONFIRMED_TIMEOUT"
@@ -1204,14 +1229,24 @@ class PaperLifecycle:
                     "BROKER_ERROR", broker_order_id=broker_order_id,
                     reason=f"NON_TERMINAL_ORDER_REFRESH_READ_FAILED_{type(exc).__name__}", status="STILL_UNRESOLVED",
                 ))
+                failures.append(f"ORDER_REFRESH_FAILED:{broker_order_id}:{type(exc).__name__}")
+                continue
+            if not isinstance(current, dict):
+                failures.append(f"ORDER_REFRESH_MALFORMED:{broker_order_id}")
                 continue
             status = str(current.get("status") or "")
             if not status:
+                failures.append(f"ORDER_REFRESH_NO_STATUS:{broker_order_id}")
                 continue
-            filled_qty = float(current.get("filled_qty") or 0.0)
-            fill_price = float(current["filled_avg_price"]) if current.get("filled_avg_price") else None
+            try:
+                filled_qty = float(current.get("filled_qty") or 0.0)
+                fill_price = float(current["filled_avg_price"]) if current.get("filled_avg_price") else None
+            except (TypeError, ValueError):
+                failures.append(f"ORDER_REFRESH_UNPARSEABLE_NUMERIC:{broker_order_id}")
+                continue
             filled_at = current.get("filled_at") or current.get("updated_at")
             self.apply_broker_update(broker_order_id, status, filled_qty, fill_price, filled_at)
+        return failures
 
     def activate_kill_switch(self, cancel_orders: bool = False) -> None:
         self.state.kill_switch = True
@@ -1221,14 +1256,109 @@ class PaperLifecycle:
             self.broker.cancel_all_orders()
         self.events.emit(PivEvent.build("KILL_SWITCH", reason="OPERATOR_ACTIVATED", status="NEW_PAPER_ORDERS_BLOCKED"))
 
+    def _coerce_broker_qty(self, value: Any) -> tuple[float, bool]:
+        """(_qty, ok). Task 81 §2: an unparseable / non-finite / boolean
+        quantity from a broker position or order row is a data-quality
+        failure, never silently coerced to 0.0."""
+        if isinstance(value, bool):
+            return 0.0, False
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return 0.0, False
+        if not math.isfinite(parsed):
+            return 0.0, False
+        return parsed, True
+
+    def _known_broker_order_identities(self) -> tuple[set[str], set[str]]:
+        """Every broker order id and client_order_id this system has ever
+        recorded -- used to decide whether a broker-reported open order is
+        attributable to something we submitted (Task 81 §2 defect 2)."""
+        known_ids = {str(oid) for oid in self.state.orders}
+        known_client_ids: set[str] = set()
+        for oid, order in self.state.orders.items():
+            intent = self.state.intents.get(order.get("intent_id"), {})
+            cid = intent.get("payload", {}).get("client_order_id") or order.get("intent_id")
+            if cid:
+                known_client_ids.add(str(cid))
+        for intent_id, intent in self.state.intents.items():
+            cid = intent.get("payload", {}).get("client_order_id") or intent_id
+            if cid:
+                known_client_ids.add(str(cid))
+        return known_ids, known_client_ids
+
     def reconcile(self, *, now: datetime | None = None) -> dict[str, Any]:
+        """Task 81 §2: a reconcile pass compares position quantities AND
+        sides AND outstanding-order identities AND unresolved submissions --
+        not just the set of symbols held. A failed, malformed, incomplete
+        or contradictory broker read durably blocks new BUY admission
+        (persisted in reconciliation_flags, which survives a restart) and
+        the block clears ONLY after a pass that is both COMPLETE (every
+        broker read succeeded and returned a well-formed body, and there
+        are no unresolved/uncertain submissions) and CONSISTENT (position
+        symbols, quantities and sides agree, no untracked broker orders,
+        no unexpected short). Protective exits, alerts, shadow tracking,
+        monitoring and the EOD cleanup path are never gated by this block
+        (BUY_TO_OPEN only)."""
+        read_failures: list[str] = []
         self._resolve_unconfirmed_orders()
         self._resolve_uncertain_submissions(now=now)
-        self._refresh_non_terminal_orders()
-        broker_orders = self.broker.open_orders()
-        broker_positions = self.broker.positions()
-        internal_open = {v["symbol"] for v in self.state.positions.values() if v.get("status") == "OPEN"}
-        broker_open = {str(v.get("symbol")) for v in broker_positions}
+        read_failures.extend(self._refresh_non_terminal_orders())
+
+        try:
+            broker_orders_raw: Any = self.broker.open_orders()
+        except Exception as exc:  # noqa: BLE001 -- a broker-read failure must not crash reconcile()
+            broker_orders_raw = None
+            read_failures.append(f"OPEN_ORDERS_READ_FAILED:{type(exc).__name__}")
+        try:
+            broker_positions_raw: Any = self.broker.positions()
+        except Exception as exc:  # noqa: BLE001
+            broker_positions_raw = None
+            read_failures.append(f"POSITIONS_READ_FAILED:{type(exc).__name__}")
+
+        orders_ok = isinstance(broker_orders_raw, list) and all(isinstance(o, dict) for o in broker_orders_raw)
+        positions_ok = isinstance(broker_positions_raw, list) and all(isinstance(p, dict) for p in broker_positions_raw)
+        if not orders_ok:
+            read_failures.append("OPEN_ORDERS_RESPONSE_MALFORMED")
+        if not positions_ok:
+            read_failures.append("POSITIONS_RESPONSE_MALFORMED")
+        broker_orders: list[dict[str, Any]] = broker_orders_raw if orders_ok else []
+        broker_positions: list[dict[str, Any]] = broker_positions_raw if positions_ok else []
+
+        # -- Position comparison: symbols, quantities, sides --
+        internal_pos: dict[str, float] = {}
+        for pos in self.state.positions.values():
+            if pos.get("status") != "OPEN":
+                continue
+            symbol = str(pos.get("symbol"))
+            qty = _safe_float(pos.get("remaining_quantity", pos.get("quantity")))
+            internal_pos[symbol] = internal_pos.get(symbol, 0.0) + qty
+
+        broker_pos: dict[str, float] = {}
+        side_mismatches: set[str] = set()
+        for row in broker_positions:
+            symbol = str(row.get("symbol") or "")
+            if not symbol:
+                read_failures.append("POSITION_ROW_MISSING_SYMBOL")
+                continue
+            qty, ok = self._coerce_broker_qty(row.get("qty"))
+            if not ok:
+                read_failures.append(f"POSITION_QTY_UNPARSEABLE:{symbol}")
+                continue
+            side = str(row.get("side") or "").lower()
+            if side and side != "long":
+                # A non-long broker position (short handled separately below,
+                # but ANY non-long side is still a comparison failure here).
+                side_mismatches.add(symbol)
+            broker_pos[symbol] = broker_pos.get(symbol, 0.0) + qty
+
+        internal_open = set(internal_pos)
+        broker_open = set(broker_pos)
+        symbol_sets_match = internal_open == broker_open
+        quantity_mismatches = sorted(
+            symbol for symbol in (internal_open | broker_open)
+            if abs(internal_pos.get(symbol, 0.0) - broker_pos.get(symbol, 0.0)) > RECONCILE_QUANTITY_TOLERANCE
+        )
 
         # Task 76S Stage 3: a broker-reported SHORT this system never opened
         # (side=="short" or a negative qty) is an unexpected-state safety
@@ -1239,13 +1369,74 @@ class PaperLifecycle:
             str(p.get("symbol")) for p in broker_positions
             if str(p.get("side", "")).lower() == "short" or _safe_float(p.get("qty")) < 0
         )
-        matched = internal_open == broker_open
+
+        # -- Outstanding broker order identities (Task 81 §2 defect 2) --
+        known_order_ids, known_client_ids = self._known_broker_order_identities()
+        untracked_broker_orders: list[str] = []
+        for row in broker_orders:
+            broker_id = str(row.get("id") or "")
+            client_id = str(row.get("client_order_id") or "")
+            if broker_id and broker_id in known_order_ids:
+                continue
+            if client_id and client_id in known_client_ids:
+                continue
+            untracked_broker_orders.append(broker_id or client_id or "<unidentified>")
+        untracked_broker_orders = sorted(set(untracked_broker_orders))
+
+        # -- Unresolved / genuinely-uncertain submissions --
+        unresolved_submissions = sorted(
+            intent_id for intent_id, intent in self.state.intents.items()
+            if intent.get("status") == "SUBMIT_FAILED_UNCERTAIN"
+        )
+        unconfirmed_timeout_orders = sorted(
+            oid for oid, order in self.state.orders.items()
+            if order.get("status") == "UNCONFIRMED_TIMEOUT"
+        )
+
+        complete = not read_failures and not unresolved_submissions and not unconfirmed_timeout_orders
+        consistent = (
+            symbol_sets_match and not quantity_mismatches and not side_mismatches
+            and not untracked_broker_orders and not unexpected_shorts
+        )
+        matched = bool(complete and consistent)
+
+        reasons: list[str] = []
+        if read_failures:
+            reasons.append("INCOMPLETE_BROKER_READ:" + ",".join(sorted(set(read_failures))[:8]))
+        if unresolved_submissions:
+            reasons.append(f"UNRESOLVED_SUBMISSIONS:{len(unresolved_submissions)}")
+        if unconfirmed_timeout_orders:
+            reasons.append(f"UNCONFIRMED_TIMEOUT_ORDERS:{len(unconfirmed_timeout_orders)}")
+        if not symbol_sets_match:
+            reasons.append("POSITION_SYMBOL_SET_MISMATCH")
+        if quantity_mismatches:
+            reasons.append("POSITION_QUANTITY_MISMATCH:" + ",".join(quantity_mismatches))
+        if side_mismatches:
+            reasons.append("POSITION_SIDE_MISMATCH:" + ",".join(sorted(side_mismatches)))
+        if untracked_broker_orders:
+            reasons.append("UNTRACKED_BROKER_ORDERS:" + ",".join(untracked_broker_orders))
+        if unexpected_shorts:
+            reasons.append("UNEXPECTED_SHORT:" + ",".join(unexpected_shorts))
+
+        if matched:
+            status = "MATCHED"
+        elif read_failures or unresolved_submissions or unconfirmed_timeout_orders:
+            status = "INCOMPLETE_RECONCILIATION"
+        else:
+            status = "MISMATCHED"
+
         self.state.reconciliation_flags = {
             "unexpected_short_detected": bool(unexpected_shorts),
             "unexpected_short_symbols": unexpected_shorts,
-            "entry_admission_blocked": not matched or bool(unexpected_shorts),
+            # matched already requires complete AND consistent, so this only
+            # ever goes False on a fully clean pass -- a prior durable block
+            # is never dropped on a dirty one.
+            "entry_admission_blocked": (not matched) or bool(unexpected_shorts),
             "matched": matched,
-            "status": "MATCHED" if matched and not unexpected_shorts else "MISMATCHED",
+            "status": status,
+            "reason": "; ".join(reasons),
+            "last_reconcile_complete": complete,
+            "last_reconcile_consistent": consistent,
         }
         self._save()
 
@@ -1255,6 +1446,15 @@ class PaperLifecycle:
             "unexpected_broker_symbols": sorted(broker_open - internal_open),
             "missing_broker_symbols": sorted(internal_open - broker_open),
             "unexpected_short_symbols": unexpected_shorts,
+            "untracked_broker_orders": untracked_broker_orders,
+            "position_quantity_mismatches": quantity_mismatches,
+            "position_side_mismatches": sorted(side_mismatches),
+            "unresolved_submissions": unresolved_submissions,
+            "unconfirmed_timeout_orders": unconfirmed_timeout_orders,
+            "incomplete_read": bool(read_failures),
+            "read_failures": sorted(set(read_failures)),
+            "complete": complete,
+            "consistent": consistent,
         }
 
     def eod_flatten(self) -> dict[str, Any]:

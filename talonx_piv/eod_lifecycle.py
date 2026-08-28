@@ -155,6 +155,14 @@ def run_eod_lifecycle(
 
     if reconciliation is None:
         status = STATUS_INCONCLUSIVE
+    elif reconciliation.get("incomplete_read") or reconciliation.get("complete") is False:
+        # Task 81 §2/§4: a reconcile pass that could not fully read broker
+        # state (a failed/malformed response, or an unresolved/uncertain
+        # submission) is INCONCLUSIVE -- distinct from FAILED, which means
+        # the broker WAS read and definitively did not match. Never PASSED.
+        status = STATUS_INCONCLUSIVE
+        if reconciliation_error is None and reconciliation.get("read_failures"):
+            reconciliation_error = "INCOMPLETE_RECONCILIATION: " + ", ".join(reconciliation["read_failures"])
     elif reconciliation["matched"] and reconciliation["broker_open_orders"] == 0 and reconciliation["broker_positions"] == 0:
         status = STATUS_PASSED
     else:

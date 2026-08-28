@@ -125,7 +125,7 @@ def test_probe_skipped_if_natural_strategy_lifecycle_already_observed(tmp_path):
 
 def test_probe_blocked_on_unreconciled_state(tmp_path):
     # Broker reports a position the internal state doesn't know about -> matched=False.
-    transport = Transport(positions=[{"symbol": "NFLX"}])
+    transport = Transport(positions=[{"symbol": "NFLX", "qty": "1", "side": "long"}])
     cfg, bus, life, _ = lifecycle(tmp_path, transport)
     result = run_piv_lifecycle_probe(cfg, bus, life, explicit_confirmation=True, now_et_time=AFTER_CUTOFF)
     assert not result.ran and result.reason == "PROBE_BLOCKED_UNRECONCILED_STATE"
@@ -138,7 +138,9 @@ def test_probe_blocked_if_existing_position_in_probe_symbol(tmp_path):
     # natural-lifecycle-observed check (covered by its own test above).
     # Transport is pre-seeded with the matching broker-side position so
     # reconciliation passes and the existing-position guard is what fires.
-    transport = Transport(positions=[{"symbol": PROBE_SYMBOL}])
+    # (Documented Alpaca position rows always carry qty/side -- Task 81 §2
+    # reconcile now compares quantities and sides, not just the symbol set.)
+    transport = Transport(positions=[{"symbol": PROBE_SYMBOL, "qty": "1", "side": "long"}])
     cfg, bus, life, transport = lifecycle(tmp_path, transport)
     entry = life.order_intent("prior-sig", PROBE_SYMBOL, "buy", 1)
     life.apply_broker_update(entry["id"], "filled", 1, 100.0)

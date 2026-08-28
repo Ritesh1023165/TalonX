@@ -309,7 +309,7 @@ def test_reconciliation_mismatch_prevents_successful_terminal_verdict(tmp_path):
             self.close_calls += 1
             return list(self._positions)
 
-    broker = StuckPositionBroker(open_orders=[], positions=[{"symbol": "AAPL"}])
+    broker = StuckPositionBroker(open_orders=[], positions=[{"symbol": "AAPL", "qty": "1", "side": "long"}])
     cfg, bus, life = make_eod_lifecycle(tmp_path, broker)
     result = run_eod_lifecycle(
         cfg, bus, life, live_session_id="sess-2", trading_date_et="2026-08-28",
