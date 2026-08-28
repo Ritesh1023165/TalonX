@@ -90,4 +90,4 @@ regression numbers.
 ## Build identity
 
 - Task 79E's own final commit: `3f034a3` (docs fill-in: `84d8c73`).
-- This task's final commit SHA: **[FILLED IN AFTER COMMIT — see below]**.
+- This task's final commit SHA: `64cdd16` (parent: `84d8c73`).
