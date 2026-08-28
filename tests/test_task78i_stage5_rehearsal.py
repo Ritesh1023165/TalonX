@@ -62,7 +62,13 @@ def _record(scenario_no: int, name: str, trigger: str, expected: str, observed: 
 @pytest.fixture(scope="module", autouse=True)
 def _write_csv_after_module():
     yield
-    path = Path("results/task78i_full_application_rehearsal/rehearsal_scenarios.csv")
+    # Task 81 §6 (E3): do not clobber the historical evidence directory on a
+    # routine run -- write run-specific output to a temp location unless an
+    # operator explicitly opts in via TALONX_TEST_EVIDENCE_DIR.
+    import os
+    import tempfile
+    base = Path(os.environ.get("TALONX_TEST_EVIDENCE_DIR", tempfile.gettempdir()))
+    path = base / "task78i_full_application_rehearsal" / "rehearsal_scenarios.csv"
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=["scenario", "trigger", "expected", "observed", "evidence", "verdict", "limitation", "label"])

@@ -48,11 +48,17 @@ def test_eligible_buy_remains_recorded_even_when_paper_entry_disabled(tmp_path):
 
 
 def test_persists_and_reloads_across_a_new_instance(tmp_path):
+    # Task 81 §6 (E1): assert the reloaded content matches what was written,
+    # not merely that *something* came back.
     path = tmp_path / "decisions.json"
     ledger1 = DecisionLedger(path)
-    ledger1.record(_decision(), event_id="e1", evidence_category="natural")
+    written = ledger1.record(_decision(), event_id="e1", evidence_category="natural")
     ledger2 = DecisionLedger(path)  # simulates a restart
-    assert ledger2.get("d1") is not None
+    reloaded = ledger2.get("d1")
+    assert reloaded == written
+    assert reloaded["event_id"] == "e1"
+    assert reloaded["evidence_category"] == "natural"
+    assert reloaded["recommendation"] == written["recommendation"]
 
 
 def test_none_path_is_in_memory_only_never_touches_disk(tmp_path):

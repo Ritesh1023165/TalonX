@@ -269,8 +269,19 @@ def test_different_session_id_same_date_does_not_reuse_prior_cancel_close(tmp_pa
 # SESSION_COMPLETED gating
 # ---------------------------------------------------------------------
 
-def test_session_completed_never_emitted_on_failed():
-    pass  # covered by test_reconciliation_mismatch_is_failed_not_passed and cancellation/close failure tests above
+def test_session_completed_never_emitted_on_failed(tmp_path):
+    # Task 81 §6 (E1): assert the actual state/outcome, not a `pass` stub.
+    broker = FakeBroker(positions=[{"symbol": "AAPL", "qty": "1", "side": "long"}])
+    broker.close_all_positions = lambda: []  # "accepted" but broker stays non-flat
+    cfg, bus, life = make_lifecycle(tmp_path, broker, internal_positions_open=["AAPL"])
+    result = run_eod_lifecycle(cfg, bus, life, trigger_reason="SCHEDULED_COMPLETION", **COMMON)
+    assert result["status"] == STATUS_FAILED
+    seq = event_sequence(bus)
+    assert "EOD_RECONCILIATION_FAILED" in seq
+    assert "SESSION_COMPLETED" not in seq
+    assert "EOD_RECONCILIATION_PASSED" not in seq
+    # C7: an accepted-but-unconfirmed close does not mark the position closed.
+    assert life.state.positions["pos_AAPL"]["status"] == "OPEN"
 
 
 def test_session_completed_never_emitted_on_inconclusive(tmp_path):

@@ -197,7 +197,13 @@ def _record(scenario: str, result: str, note: str = "") -> None:
 
 
 def _write_scenarios_csv():
-    path = Path("results/task77i_integrated_application/end_to_end_scenarios.csv")
+    # Task 81 §6 (E3): never overwrite the historical evidence directory
+    # during a routine test run. Default to a run-specific temp location;
+    # an operator can opt in to a real evidence dir via TALONX_TEST_EVIDENCE_DIR.
+    import os
+    import tempfile
+    base = Path(os.environ.get("TALONX_TEST_EVIDENCE_DIR", tempfile.gettempdir()))
+    path = base / "task77i_integrated_application" / "end_to_end_scenarios.csv"
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=["scenario", "result", "note"])
