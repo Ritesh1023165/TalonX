@@ -284,6 +284,48 @@ class PaperLifecycle:
                 return True
         return False
 
+    def pending_buy_intent_ids(self) -> list[str]:
+        """Return the exact durable BUY intents that still represent
+        unresolved entry exposure.
+
+        A symbol-level predicate is sufficient for pyramiding protection,
+        but restart rehydration must bind a plan to the specific outstanding
+        broker order (or orphan uncertain intent).  Returning intent ids here
+        prevents callers from accidentally selecting an older terminal
+        same-symbol intent merely because a newer order is pending.
+        """
+        pending: set[str] = set()
+        for order in self.state.orders.values():
+            if order.get("status") in _TERMINAL_ORDER_STATUSES:
+                continue
+            intent_id = order.get("intent_id")
+            intent = self.state.intents.get(intent_id, {})
+            if intent.get("payload", {}).get("side") == "buy":
+                pending.add(str(intent_id))
+        for intent_id, intent in self.state.intents.items():
+            if intent.get("status") not in {"ORDER_INTENT", "SUBMIT_FAILED_UNCERTAIN"}:
+                continue
+            if intent.get("payload", {}).get("side") == "buy":
+                pending.add(intent_id)
+        return sorted(pending)
+
+    def record_reconciliation_failure(self, reason: str) -> None:
+        """Persist a fail-closed entry-admission state after reconcile fails.
+
+        This deliberately does not disable the session: protective exits and
+        all non-broker decision branches must remain available while new BUY
+        exposure is blocked pending a later successful, matched reconcile.
+        """
+        flags = dict(self.state.reconciliation_flags)
+        flags.update({
+            "entry_admission_blocked": True,
+            "matched": False,
+            "status": "RECONCILIATION_ERROR",
+            "reason": reason,
+        })
+        self.state.reconciliation_flags = flags
+        self._save()
+
     def mark_exit_triggered(self, symbol: str, reason: str) -> None:
         """Task 79E-R2: persists the triggered-exit reason onto `symbol`'s
         OPEN position record so a restart AFTER a stop/target has fired --
@@ -556,6 +598,8 @@ class PaperLifecycle:
         if intent is ActionIntent.BUY_TO_OPEN:
             if self.state.reconciliation_flags.get("unexpected_short_detected"):
                 self._reject("UNEXPECTED_SHORT_BLOCKS_NEW_ENTRIES", symbol, source, alpha_evidence)
+            if self.state.reconciliation_flags.get("entry_admission_blocked"):
+                self._reject("RECONCILIATION_BLOCKS_NEW_ENTRIES", symbol, source, alpha_evidence)
             if self._open_position_for(symbol) is not None:
                 self._reject("ALREADY_HOLDING_NO_PYRAMIDING", symbol, source, alpha_evidence)
             # Task 79E-R2-2: entry_still_pending_or_uncertain also covers a
@@ -797,12 +841,14 @@ class PaperLifecycle:
                 entry_slippage_abs = (fill_price - reference_price) if (fill_price is not None and reference_price is not None) else None
                 entry_slippage_bps = (entry_slippage_abs / reference_price * 10000) if (entry_slippage_abs is not None and reference_price) else None
                 existing_position = self.state.positions.get(position_id)
-                self.state.positions[position_id] = {
-                    "symbol": symbol, "quantity": filled_qty, "price": fill_price, "status": "OPEN",
-                    "source": source, "alpha_evidence": alpha_evidence, "entry_time": now_iso,
-                    "reference_price": reference_price, "stop_price": stop_price, "target_price": target_price,
-                    "strategy_id": strategy_id, "horizon": horizon, "exit_quantity": 0.0,
-                    "remaining_quantity": filled_qty, "experimental_id": experimental_id,
+                incremental_qty = max(0.0, filled_qty - previous_filled_qty)
+                if existing_position is None:
+                    position = {
+                        "symbol": symbol, "quantity": filled_qty, "price": fill_price, "status": "OPEN",
+                        "source": source, "alpha_evidence": alpha_evidence, "entry_time": now_iso,
+                        "reference_price": reference_price, "stop_price": stop_price, "target_price": target_price,
+                        "strategy_id": strategy_id, "horizon": horizon, "exit_quantity": 0.0,
+                        "remaining_quantity": filled_qty, "experimental_id": experimental_id,
                     # Task 79E-R1: the ORIGINAL signal's bar_timestamp (never
                     # the fill's own wall-clock time) -- decision_engine.py's
                     # entry/exit causality guard and _rehydrate_positions both
@@ -810,7 +856,7 @@ class PaperLifecycle:
                     # never-restarted one, can never have its stop/target
                     # evaluated against a bar at or before the one that
                     # produced the entry signal.
-                    "entry_signal_bar_timestamp": entry_signal_bar_timestamp,
+                        "entry_signal_bar_timestamp": entry_signal_bar_timestamp,
                     # Task 79E-R2-2 Requirement 2: the BROKER's own
                     # authoritative timestamp for the FIRST fill this
                     # position ever saw -- first-write-wins (never
@@ -820,9 +866,29 @@ class PaperLifecycle:
                     # updated). decision_engine.py's fill-causality gate
                     # compares a candidate exit bar's own timestamp against
                     # THIS value, never a local datetime.now() sample.
-                    "first_fill_observed_at": (existing_position or {}).get("first_fill_observed_at") or filled_at,
-                }
-                self.state.open_position_by_symbol[symbol] = position_id
+                        "first_fill_observed_at": filled_at,
+                    }
+                else:
+                    # Alpaca's filled_qty is cumulative for the BUY order.
+                    # Merge only the newly-filled delta into actual holdings;
+                    # replacing this record would resurrect prior exits and
+                    # erase the durable triggered-exit latch.
+                    position = existing_position
+                    prior_entry_qty = float(position.get("quantity") or 0.0)
+                    prior_remaining = float(position.get("remaining_quantity", prior_entry_qty) or 0.0)
+                    position.update({
+                        "symbol": symbol,
+                        "quantity": max(prior_entry_qty, filled_qty),
+                        "remaining_quantity": prior_remaining + incremental_qty,
+                        "status": "OPEN" if incremental_qty > 0 else position.get("status", "OPEN"),
+                    })
+                    if fill_price is not None:
+                        position["price"] = fill_price
+                    if position.get("first_fill_observed_at") is None and filled_at is not None:
+                        position["first_fill_observed_at"] = filled_at
+                self.state.positions[position_id] = position
+                if position.get("status") == "OPEN":
+                    self.state.open_position_by_symbol[symbol] = position_id
                 if first:
                     self.events.emit(PivEvent.build(
                         "POSITION_OPENED", symbol=symbol, correlation_id=intent_id, broker_order_id=broker_order_id,
@@ -1173,15 +1239,19 @@ class PaperLifecycle:
             str(p.get("symbol")) for p in broker_positions
             if str(p.get("side", "")).lower() == "short" or _safe_float(p.get("qty")) < 0
         )
+        matched = internal_open == broker_open
         self.state.reconciliation_flags = {
             "unexpected_short_detected": bool(unexpected_shorts),
             "unexpected_short_symbols": unexpected_shorts,
+            "entry_admission_blocked": not matched or bool(unexpected_shorts),
+            "matched": matched,
+            "status": "MATCHED" if matched and not unexpected_shorts else "MISMATCHED",
         }
         self._save()
 
         return {
             "broker_open_orders": len(broker_orders), "broker_positions": len(broker_positions),
-            "internal_positions": len(internal_open), "matched": internal_open == broker_open,
+            "internal_positions": len(internal_open), "matched": matched,
             "unexpected_broker_symbols": sorted(broker_open - internal_open),
             "missing_broker_symbols": sorted(internal_open - broker_open),
             "unexpected_short_symbols": unexpected_shorts,

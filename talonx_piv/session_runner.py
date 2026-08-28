@@ -293,11 +293,10 @@ class SessionRunner:
         one in the common case, which is fine; it is the ONLY reconcile
         that happens at all for a long-running session after that first
         tick. A reconcile() failure is caught and logged, never crashes
-        the tick -- reconciliation_flags simply persist at their LAST
-        KNOWN state (fail-closed by construction: see order_intent's own
-        UNEXPECTED_SHORT_BLOCKS_NEW_ENTRIES guard), so a failed or
-        mismatched reconciliation degrades to "still blocked by the last
-        known state," never silently ignored. Uses real wall-clock time
+        the tick -- a failed reconcile durably records an entry-admission
+        block, while a returned mismatch is durably blocked by reconcile()
+        itself. Protective exits remain available because the block is
+        enforced only on BUY_TO_OPEN. Uses real wall-clock time
         purely as a RATE LIMIT (never a causality comparison), so the
         wall-clock-collision concern that ruled out timestamp-based
         causality elsewhere in this codebase does not apply here."""
@@ -305,11 +304,19 @@ class SessionRunner:
             return
         self._last_reconcile_wall = now
         try:
-            self.lifecycle.reconcile(now=now)
+            result = self.lifecycle.reconcile(now=now)
+            if not result.get("matched", False):
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", reason="PERIODIC_RECONCILE_POSITION_MISMATCH",
+                    status="NEW_ENTRIES_BLOCKED_LAST_RECONCILIATION_MISMATCHED",
+                ))
         except Exception as exc:  # noqa: BLE001 -- must never crash the live tick loop.
+            self.lifecycle.record_reconciliation_failure(
+                f"PERIODIC_RECONCILE_FAILED_{type(exc).__name__}"
+            )
             self.events.emit(PivEvent.build(
                 "BROKER_ERROR", reason=f"PERIODIC_RECONCILE_FAILED_{type(exc).__name__}: {exc}",
-                status="RECONCILIATION_SKIPPED_LAST_KNOWN_STATE_RETAINED",
+                status="RECONCILIATION_FAILED_NEW_ENTRIES_BLOCKED",
             ))
 
     async def process_tick(self, now: datetime) -> None:

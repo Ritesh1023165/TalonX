@@ -103,12 +103,17 @@ def resolve_session_identity(config: PivConfig, *, now: datetime | None = None) 
       this session still genuinely live" signal; a session that has
       already been EOD-flattened or kill-switched must NEVER be silently
       resumed, only ever a still-open one.
+    - the saved config hash, feed mode, and runtime SHA match the current
+      invocation. A same-day restart under changed operating bindings is a
+      new session, so any session-scoped permission must be re-authorized.
 
     Mints a genuinely FRESH identity (build_session_identity) in every
     other case, including any missing file or read/parse failure --
     fails closed toward minting a new, unambiguous identity rather than
     resuming something uncertain."""
     now = now or datetime.now(timezone.utc)
+    current_config_hash = compute_config_hash(config)
+    current_runtime_sha = runtime_sha()
     identity_path = config.state_dir / "session_identity.json"
     lifecycle_path = config.state_dir / "lifecycle_state.json"
     if identity_path.exists() and lifecycle_path.exists():
@@ -123,6 +128,9 @@ def resolve_session_identity(config: PivConfig, *, now: datetime | None = None) 
                 saved.get("trading_date_et") == today_et
                 and lifecycle_state.get("session_enabled") is True
                 and lifecycle_state.get("kill_switch") is not True
+                and saved.get("config_hash") == current_config_hash
+                and saved.get("feed_mode") == config.feed_mode
+                and saved.get("runtime_sha") == current_runtime_sha
             ):
                 return SessionIdentity(
                     session_id=saved["session_id"], trading_date_et=saved["trading_date_et"],

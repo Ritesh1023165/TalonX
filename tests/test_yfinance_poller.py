@@ -55,6 +55,7 @@ def poller(monkeypatch) -> YFinancePoller:
 
 @pytest.mark.asyncio
 async def test_healthy_cycle_does_not_reset_session(poller, monkeypatch):
+    monkeypatch.setattr(poll_module, "is_premarket_window", lambda: False)
     symbols = ["AAPL", "MSFT", "NVDA"]
     monkeypatch.setattr(poller, "_fetch_snapshots", lambda syms: [_event(s) for s in syms])
     reset_mock = MagicMock()
@@ -74,6 +75,7 @@ async def test_healthy_cycle_does_not_reset_session(poller, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_degraded_cycle_is_not_silently_treated_as_healthy(poller, monkeypatch):
+    monkeypatch.setattr(poll_module, "is_premarket_window", lambda: False)
     # 3 symbols requested, only 1 comes back -- 67% failure, above the 50% threshold.
     symbols = ["AAPL", "MSFT", "NVDA"]
     monkeypatch.setattr(poller, "_fetch_snapshots", lambda syms: [_event("AAPL")])
@@ -93,6 +95,21 @@ async def test_degraded_cycle_is_not_silently_treated_as_healthy(poller, monkeyp
     # normal poll-interval sleep (_sleep_or_stop was never reached because
     # the degraded-cycle branch `continue`s past it).
     poller._sleep_or_stop.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_premarket_cycle_fetches_but_suppresses_non_authoritative_callbacks(poller, monkeypatch):
+    symbols = ["AAPL", "MSFT", "NVDA"]
+    fetched = MagicMock(return_value=[_event(s) for s in symbols])
+    monkeypatch.setattr(poller, "_fetch_snapshots", fetched)
+    monkeypatch.setattr(poll_module, "is_premarket_window", lambda: True)
+    monkeypatch.setattr(poller, "_sleep_or_stop", AsyncMock(side_effect=lambda _: poller.stop()))
+    on_event = AsyncMock()
+
+    await poller.stream(symbols, on_event)
+
+    fetched.assert_called_once_with(symbols)
+    on_event.assert_not_awaited()
 
 
 @pytest.mark.asyncio

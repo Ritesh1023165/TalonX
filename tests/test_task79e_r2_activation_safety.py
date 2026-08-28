@@ -81,6 +81,7 @@ class AlpacaContractTransport:
     def __init__(self, account_id="acct-r2"):
         self.account_id = account_id
         self.orders: list[dict] = []
+        self.positions: list[dict] = []
         self.raise_on_post = False
         self.dropped_client_order_ids: set[str] = set()
         # Task 79E-R2: simulates "the broker returned an UNRELATED order"
@@ -129,7 +130,7 @@ class AlpacaContractTransport:
             match = next((o for o in self.orders if o["id"] == order_id), None)
             return Response(match or {}, 200 if match else 404)
         if url.endswith("/v2/positions"):
-            return Response([])
+            return Response(self.positions)
         return Response({}, 404)
 
     def post(self, url, **kwargs):
@@ -971,6 +972,170 @@ def test_revocation_blocks_new_entries_but_not_existing_exits(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Task 79E-R2-3: recovery-state integrity regressions
+# ---------------------------------------------------------------------------
+
+def test_reconcile_mismatch_blocks_entries_until_a_later_matched_pass(tmp_path):
+    engine, life, transport, outbox, shadow, bus, identity = build_stack(tmp_path)
+    transport.positions = [{"symbol": "NFLX", "qty": "1", "side": "long"}]
+
+    result = life.reconcile()
+    assert result["matched"] is False
+    assert life.state.reconciliation_flags["entry_admission_blocked"] is True
+    with pytest.raises(PaperGuardError, match="RECONCILIATION_BLOCKS_NEW_ENTRIES"):
+        life.order_intent("blocked", "AAPL", "buy", 1.0, source="STRATEGY")
+
+    transport.positions = []
+    result = life.reconcile()
+    assert result["matched"] is True
+    assert life.state.reconciliation_flags["entry_admission_blocked"] is False
+    assert life.order_intent("recovered", "AAPL", "buy", 1.0, source="STRATEGY")["id"]
+
+
+def test_periodic_reconcile_exception_blocks_new_entries_but_preserves_exits(tmp_path):
+    engine, life, transport, outbox, shadow, bus, identity = build_stack(tmp_path)
+    entry = life.order_intent("open", "AAPL", "buy", 1.0, source="STRATEGY")
+    life.apply_broker_update(entry["id"], "filled", 1.0, 100.0, filled_at=datetime.now(timezone.utc).isoformat())
+    runner = SessionRunner(life.broker.config, bus, life, transport)
+
+    def fail_reconcile(*, now=None):
+        raise ConnectionError("broker read unavailable")
+
+    life.reconcile = fail_reconcile
+    runner._maybe_reconcile(datetime.now(timezone.utc))
+    assert life.state.reconciliation_flags["entry_admission_blocked"] is True
+    with pytest.raises(PaperGuardError, match="RECONCILIATION_BLOCKS_NEW_ENTRIES"):
+        life.order_intent("blocked", "MSFT", "buy", 1.0, source="STRATEGY")
+
+    # Entry admission is blocked, but reducing known long exposure remains
+    # available and correctly sized.
+    exit_order = life.order_intent("protective", "AAPL", "sell", 1.0, source="STRATEGY")
+    assert exit_order["side"] == "sell"
+
+    reloaded = PaperLifecycle(
+        tmp_path / "lifecycle_state.json", life.broker, bus,
+        PaperEntrySettings.for_test("AAPL", "MSFT"),
+    )
+    assert reloaded.state.reconciliation_flags["entry_admission_blocked"] is True
+
+
+def test_restart_rehydrates_actual_pending_order_not_older_same_symbol_intent(tmp_path):
+    engine, life, transport, outbox, shadow, bus, identity = build_stack(tmp_path)
+    old = life.order_intent(
+        "old", "AAPL", "buy", 1.0, source="STRATEGY",
+        stop_price=90.0, target_price=130.0,
+    )
+    life.apply_broker_update(old["id"], "rejected", 0.0, None)
+    new = life.order_intent(
+        "new", "AAPL", "buy", 1.0, source="STRATEGY",
+        stop_price=98.0, target_price=104.0,
+    )
+    assert new["status"] == "new"
+
+    engine2, life2 = _rebuild_engine(tmp_path, life, bus, life.broker.config)
+    assert engine2.positions["AAPL"].stop_price == 98.0
+    assert engine2.positions["AAPL"].target_price == 104.0
+    assert engine2.positions["AAPL"].entry_signal_id == (
+        f"rehydrated_pending_{stable_id('intent', 'new', 'AAPL', 'buy', 1.0)}"
+    )
+
+
+def test_later_buy_fill_preserves_prior_exits_remaining_holdings_and_exit_latch(tmp_path):
+    engine, life, transport, outbox, shadow, bus, identity = build_stack(tmp_path)
+    buy = life.order_intent(
+        "entry", "AAPL", "buy", 2.0, source="STRATEGY",
+        reference_price=100.0, stop_price=98.0, target_price=104.0,
+    )
+    life.apply_broker_update(
+        buy["id"], "partially_filled", 1.0, 100.0,
+        filled_at="2026-08-28T14:00:00+00:00",
+    )
+    life.mark_exit_triggered("AAPL", "STOP_HIT")
+    sell = life.order_intent(
+        "partial-exit", "AAPL", "sell", 0.4, source="STRATEGY", reference_price=99.0,
+    )
+    life.apply_broker_update(sell["id"], "filled", 0.4, 99.0)
+
+    before = dict(life._open_position_for("AAPL"))
+    assert before["exit_quantity"] == pytest.approx(0.4)
+    assert before["remaining_quantity"] == pytest.approx(0.6)
+    assert before["triggered_exit_reason"] == "STOP_HIT"
+
+    # The original BUY order later completes. Only its newly-filled 1 share
+    # is added to current holdings; the 0.4 already sold is not resurrected.
+    life.apply_broker_update(
+        buy["id"], "filled", 2.0, 100.5,
+        filled_at="2026-08-28T14:05:00+00:00",
+    )
+    after = life._open_position_for("AAPL")
+    assert after["quantity"] == pytest.approx(2.0)
+    assert after["exit_quantity"] == pytest.approx(0.4)
+    assert after["remaining_quantity"] == pytest.approx(1.6)
+    assert after["triggered_exit_reason"] == "STOP_HIT"
+    assert after["exit_price"] == pytest.approx(99.0)
+    assert after["first_fill_observed_at"] == "2026-08-28T14:00:00+00:00"
+
+
+def test_session_identity_reuse_requires_current_config_and_runtime_bindings(tmp_path):
+    now = datetime(2026, 8, 28, 14, 0, tzinfo=timezone.utc)
+    cfg = PivConfig(state_dir=tmp_path, universe=("AAPL",), feed_mode="IEX_PAPER_PIV")
+    pending_intent_id = stable_id("intent", "pending-before-rebind", "AAPL", "buy", 1.0)
+    with patch("talonx_piv.session_identity.runtime_sha", return_value="sha-old"):
+        saved = build_session_identity(cfg, now=now)
+    (tmp_path / "session_identity.json").write_text(json.dumps(saved.to_dict()), encoding="utf-8")
+    (tmp_path / "lifecycle_state.json").write_text(
+        json.dumps({
+            "session_enabled": True,
+            "kill_switch": False,
+            "intents": {
+                pending_intent_id: {
+                    "status": "ORDER_INTENT",
+                    "payload": {"symbol": "AAPL", "side": "buy", "qty": "1.0"},
+                    "experimental_id": "exp-r2-3",
+                },
+            },
+            "experimental_budgets": {
+                "exp-r2-3": {"entries_used": 1, "notional_used": 100.0},
+            },
+        }),
+        encoding="utf-8",
+    )
+
+    with patch("talonx_piv.session_identity.runtime_sha", return_value="sha-old"):
+        same = resolve_session_identity(cfg, now=now + timedelta(minutes=1))
+    assert same.session_id == saved.session_id
+
+    changed_cfg = dataclasses.replace(cfg, universe=("AAPL", "MSFT"))
+    with patch("talonx_piv.session_identity.runtime_sha", return_value="sha-old"):
+        rebound = resolve_session_identity(changed_cfg, now=now + timedelta(minutes=2))
+    assert rebound.session_id != saved.session_id
+    assert rebound.config_hash != saved.config_hash
+
+    with patch("talonx_piv.session_identity.runtime_sha", return_value="sha-new"):
+        redeployed = resolve_session_identity(cfg, now=now + timedelta(minutes=3))
+    assert redeployed.session_id != saved.session_id
+    assert redeployed.runtime_sha == "sha-new"
+
+    # Minting a fresh identity must never rewrite durable lifecycle truth.
+    # Budget use and unresolved exposure survive the rebind and still block a
+    # same-symbol retry at the broker boundary.
+    transport = AlpacaContractTransport()
+    broker = AlpacaPaperClient(changed_cfg, transport)
+    broker.verify_paper_identity()
+    bus = EventBus(tmp_path / "rebound_events.jsonl", session_id=rebound.session_id)
+    life = PaperLifecycle(
+        tmp_path / "lifecycle_state.json", broker, bus,
+        PaperEntrySettings.for_test("AAPL", "MSFT"),
+    )
+    assert life.state.experimental_budgets["exp-r2-3"] == {
+        "entries_used": 1, "notional_used": 100.0,
+    }
+    assert life.entry_still_pending_or_uncertain("AAPL") is True
+    with pytest.raises(PaperGuardError, match="PENDING_ENTRY_EXISTS"):
+        life.order_intent("retry-after-rebind", "AAPL", "buy", 1.0, source="STRATEGY")
+
+
+# ---------------------------------------------------------------------------
 # 6. Combined failure/recovery scenario
 # ---------------------------------------------------------------------------
 
@@ -1170,16 +1335,27 @@ async def test_combined_restart_recovery_scenario_through_real_session_runner(tm
         assert "AAPL" in engine3.positions
         assert engine3.positions["AAPL"].exit_reason == "STOP"  # the trigger survived TWO restarts
 
+        # This restarted process's first ordinary tick also suffers a broker
+        # reconciliation read failure. The tick must continue, durably block
+        # only NEW BUY exposure, and preserve the already-latched protective
+        # exit obligation for the verified remaining 0.6 shares.
+        def fail_reconcile(*, now=None):
+            raise ConnectionError("simulated reconciliation read failure")
+
+        life3.reconcile = fail_reconcile
         tick4 = tick1 + timedelta(minutes=3)
         # Price fully recovered above the stop -- a naive re-derivation from
         # price alone would NOT re-trigger. The persisted reason must still
         # force the remaining 0.6 to be sold.
         transport.bar_batches.append({"AAPL": bar_row(to_utc_iso(tick4), 102.0)})
         await runner3.process_tick(tick4)
+        assert life3.state.reconciliation_flags["entry_admission_blocked"] is True
         sell_orders = [o for o in transport.orders if o.get("side") == "sell"]
         assert len(sell_orders) == 2
         completing_sell = sell_orders[1]
         assert completing_sell["qty"] == "0.6"  # sized to ACTUAL remaining holdings, never a fixed constant
+        with pytest.raises(PaperGuardError, match="RECONCILIATION_BLOCKS_NEW_ENTRIES"):
+            life3.order_intent("blocked-after-reconcile", "MSFT", "buy", 1.0, source="STRATEGY")
 
         life3.apply_broker_update(completing_sell["id"], "filled", 0.6, 102.0, filled_at=tick4.isoformat())
         assert life3._open_position_for("AAPL") is None  # fully closed

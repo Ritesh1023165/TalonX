@@ -227,23 +227,36 @@ class DecisionEngine:
         see lifecycle.entry_still_pending_or_uncertain) but never reached
         OPEN before the process died has ZERO decision-engine-level
         bookkeeping otherwise restored at all, silently losing its stop/
-        target plan on restart (the lifecycle-layer pyramiding/exposure
+        target plan on restart. Recovery is keyed by the exact outstanding
+        order's intent_id (never merely by symbol), so an older terminal
+        same-symbol intent cannot donate the wrong plan. The lifecycle-layer pyramiding/exposure
         reservation already survives independently -- this closes the
         DECISION-ENGINE-layer half of the same gap). Restores from the
         durable intent record itself (stop_price/target_price/
         experimental_id -- all persisted at order_intent time, before
         submission is even attempted), never invented."""
         seen_symbols = set(self.positions.keys())
-        for intent in self.lifecycle.state.intents.values():
+        pending_by_symbol: dict[str, list[tuple[str, dict]]] = {}
+        for intent_id in self.lifecycle.pending_buy_intent_ids():
+            intent = self.lifecycle.state.intents.get(intent_id, {})
             payload = intent.get("payload", {})
             symbol = payload.get("symbol")
-            if not symbol or symbol in seen_symbols or payload.get("side") != "buy":
+            if not symbol or symbol in seen_symbols:
                 continue
-            if not self.lifecycle.entry_still_pending_or_uncertain(symbol):
+            pending_by_symbol.setdefault(symbol, []).append((intent_id, intent))
+
+        for symbol, candidates in pending_by_symbol.items():
+            if len(candidates) != 1:
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", symbol=symbol,
+                    reason="PENDING_ENTRY_PLAN_REHYDRATION_BLOCKED_AMBIGUOUS_INTENTS",
+                    status="RESTART_RECOVERY_REQUIRES_RECONCILIATION",
+                ))
                 continue
+            intent_id, intent = candidates[0]
             experimental_id = intent.get("experimental_id")
             self.positions[symbol] = OpenDecisionPosition(
-                symbol, f"rehydrated_pending_{symbol}", intent.get("stop_price"), intent.get("target_price"),
+                symbol, f"rehydrated_pending_{intent_id}", intent.get("stop_price"), intent.get("target_price"),
                 experimental=experimental_id is not None, experimental_id=experimental_id,
             )
             seen_symbols.add(symbol)
