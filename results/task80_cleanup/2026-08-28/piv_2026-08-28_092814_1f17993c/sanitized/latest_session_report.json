@@ -1,0 +1,162 @@
+{
+  "actual_strategy_signals": 0,
+  "broker_accepts": 0,
+  "broker_internal_reconciliation": {
+    "broker_open_orders": 0,
+    "broker_positions": 0,
+    "eod_status": "PASSED",
+    "feed_mode": "IEX_PAPER_PIV",
+    "internal_positions": 0,
+    "live_session_id": "piv_2026-08-28_092814_1f17993c",
+    "matched": true,
+    "missing_broker_symbols": [],
+    "reconciliation_run_id": "eodrun_02cd7d3df8610b68928d",
+    "unexpected_broker_symbols": [],
+    "unexpected_short_symbols": []
+  },
+  "broker_rejects": 0,
+  "canonical_alpha_evidence": false,
+  "classification": "DATA_ISSUE",
+  "cost_R": null,
+  "data_feed_health": {
+    "data_not_ready": 532,
+    "stale_data": 515
+  },
+  "duplicate_prevention_events": 0,
+  "exit_reasons": {},
+  "expected_strategy_signals": 0,
+  "feed_mode": "IEX_PAPER_PIV",
+  "full_fills": 0,
+  "gross_R": null,
+  "integrated_projection": {
+    "decisions": {
+      "actionable_approved_count": 0,
+      "by_recommendation": {},
+      "observational_watch_count": 0,
+      "scope": "decision_ledger.json records with session_id == the scope session_id above",
+      "total": 0
+    },
+    "entry_disabled_vs_execution_failure": {
+      "broker_boundary_rejections": 0,
+      "entry_disabled_paper_setting": 0,
+      "scope": "entry_disabled: decision_ledger records with decision_execution_status==ENTRY_BLOCKED_PAPER_DISABLED (pre-broker). execution_failure: piv_events.jsonl PAPER_ORDER_REJECTED count for the same date/session (broker-boundary), via reporting.build_session_report's own 'rejections' field."
+    },
+    "experimental": {
+      "decision_count": 0,
+      "notification_count": 0,
+      "paper_order_count": 0,
+      "scope": "Task 79E -- EXPERIMENTAL_BUY decisions / EXPERIMENTAL-classified notifications / experimental-flagged shadow records / EXPERIMENTAL-sourced paper orders, all already scoped in-session above. Reported separately -- NEVER folded into decisions.actionable_approved_count, notifications totals-by-classification, or any validated-strategy statistic, since an experimental record is explicitly UNVALIDATED evidence, not proof the strategy is profitable.",
+      "shadow_count": 0
+    },
+    "gemini_enrichment": {
+      "completed": 0,
+      "malformed": 0,
+      "not_requested": 0,
+      "pending": 0,
+      "scope": "gemini_enrichment.json records keyed directly by decision_id (no dedup indirection, unlike notifications) whose decision_id belongs to a decision in-scope above",
+      "timeout": 0,
+      "total": 0,
+      "unavailable": 0
+    },
+    "natural_vs_test": {
+      "natural_strategy": {
+        "candidates_published": 0,
+        "fills": 0,
+        "gross_pnl": null,
+        "net_pnl": null,
+        "orders": 0,
+        "positions_closed": 0,
+        "positions_opened": 0
+      },
+      "piv_test_traffic": {
+        "alpha_evidence": false,
+        "fills": 0,
+        "orders": 0,
+        "positions_closed": 0,
+        "positions_opened": 0
+      },
+      "scope": "piv_events.jsonl, scoped to trading_date_et if supplied -- reused from reporting.build_session_report, never re-parsed independently"
+    },
+    "notifications": {
+      "failed": 0,
+      "pending": 0,
+      "scope": "notification_outbox.json records whose decision_id belongs to a decision in-scope above",
+      "sent": 0,
+      "total": 0,
+      "unknown": 0
+    },
+    "paper_orders": {
+      "filled": 0,
+      "rejected": 0,
+      "scope": "lifecycle_state.json orders (ALL orders in the current state file -- lifecycle_state.json is not itself session-scoped, matching its own existing schema)",
+      "submitted": 0,
+      "total": 0,
+      "unknown": 0
+    },
+    "provider_and_data_health": {
+      "data_feed_health": {
+        "data_not_ready": 532,
+        "stale_data": 515
+      },
+      "provider_state": "HEALTHY",
+      "scope": "freshness_report.json (session-end provider/symbol state) and reporting.build_session_report's data_feed_health (DATA_NOT_READY/STALE_DATA event counts)"
+    },
+    "scope": {
+      "config_hash": "1f17993cf4a3",
+      "runtime_sha": "8d2a8dd164b712bd7faa087dec27030dc9bfccce",
+      "session_id": "piv_2026-08-28_092814_1f17993c",
+      "trading_date_et": "2026-08-28"
+    },
+    "shadow": {
+      "closed": 0,
+      "open": 0,
+      "pending": 0,
+      "scope": "shadow_ledger.json records whose decision_id belongs to a decision in-scope above",
+      "total": 0,
+      "unresolved": 0
+    }
+  },
+  "missed_orders": [],
+  "natural_strategy": {
+    "candidates_published": 0,
+    "fills": 0,
+    "gross_pnl": null,
+    "net_pnl": null,
+    "orders": 0,
+    "positions_closed": 0,
+    "positions_opened": 0
+  },
+  "paper_order_intents": 0,
+  "paper_pnl": null,
+  "partial_fills": 0,
+  "piv_test_traffic": {
+    "alpha_evidence": false,
+    "fills": 0,
+    "orders": 0,
+    "positions_closed": 0,
+    "positions_opened": 0
+  },
+  "positions_closed": 0,
+  "positions_opened": 0,
+  "quant_funnel": {
+    "candidates": 5721,
+    "errored": 0,
+    "evaluation_cycles": 330,
+    "pending": 0,
+    "published": 0,
+    "rejected": 5721,
+    "rejected_breakdown": {
+      "LOW_CONFLUENCE": 6,
+      "LOW_RISK_REWARD": 2,
+      "LOW_VOLATILITY": 5713
+    },
+    "symbols_evaluated_total": 5823,
+    "unaccounted_candidates": 0
+  },
+  "rejections": 0,
+  "session_id": "piv_2026-08-28_092814_1f17993c",
+  "submitted_orders": 0,
+  "telegram_delivery_status": "see runtime counters/logs",
+  "trading_date_et": "2026-08-28",
+  "unexpected_orders": []
+}
