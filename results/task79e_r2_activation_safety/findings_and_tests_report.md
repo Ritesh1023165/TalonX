@@ -10,6 +10,12 @@ paths, found that several of them were incomplete or, in one case, built
 against a fabricated (never-documented) endpoint, fixed every one, and
 closed the remaining gaps R1 had left implicit.
 
+## Build identity
+
+- Starting SHA (Task 79E-R1's own final commit): `013d5ae`.
+- Tested-against SHA (this task's feature commit, what `regression_results.txt` was run against): `3d788ca`.
+- Final SHA (this docs-only follow-up commit filling in the SHA above into the handoff refresh): recorded in `task80_launch_handoff_refresh.md`.
+
 ## How to reproduce this report
 
 ```

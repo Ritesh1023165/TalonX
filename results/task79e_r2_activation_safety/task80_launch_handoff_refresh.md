@@ -98,4 +98,4 @@ regression numbers.
 
 - Task 79E's own final commit: `3f034a3` (docs fill-in: `84d8c73`).
 - Task 79E-R1's own final commit: `64cdd16` (docs fill-in: `013d5ae`).
-- This task's final commit SHA: **[FILLED IN AFTER COMMIT]**.
+- This task's final commit SHA: `3d788ca` (parent: `013d5ae`).
