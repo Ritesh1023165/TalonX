@@ -13,6 +13,12 @@ Continuation from `c9a4994` (this repo's own prior "Task 79E-R2" final
 commit — see `git log --oneline` for confirmation) on
 `research/talonx-strategy-validation`.
 
+## Build identity
+
+- Starting SHA: `c9a4994`.
+- This round's own feature commit (code + tests + this report): `8aa1f81`.
+- Final SHA (this docs-only follow-up commit filling in the SHA above): see `git log -1`.
+
 ## Why the prior PASS was correct for what it tested, but incomplete
 
 `findings_and_tests_report.md`'s own "Remaining, disclosed limitations"

@@ -103,4 +103,5 @@ evidence, and regression numbers.
 - Task 79E-R1's own final commit: `64cdd16` (docs fill-in: `013d5ae`).
 - Task 79E-R2's own final commit: `3d788ca` (docs fill-in: `c9a4994`).
 - This round's (Task 79E-R2-2's) starting commit: `c9a4994`.
-- This round's final commit SHA: recorded in a follow-up docs-only commit, see repository `git log`.
+- This round's own feature commit: `8aa1f81`.
+- This round's final commit (this docs-only fill-in): recorded by this commit itself, see repository `git log`.
