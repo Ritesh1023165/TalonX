@@ -913,33 +913,62 @@ class PaperLifecycle:
                     # replacing this record would resurrect prior exits and
                     # erase the durable triggered-exit latch.
                     position = existing_position
-                    if position.get("status") == "CLOSED":
-                        # Task 81 §3 (B5): a delayed / duplicated BUY fill
-                        # update must never re-open an already-closed
-                        # position or resurrect sold quantity. The order
-                        # record above is left at its (truthful) status;
-                        # the position stays closed and the discrepancy is
-                        # surfaced -- reconcile() then blocks new entries on
-                        # the resulting broker-vs-internal position mismatch.
+                    requested_qty = _safe_float(intent.get("payload", {}).get("qty"))
+                    if requested_qty > 0 and filled_qty > requested_qty + 1e-9:
+                        # Task 81-R1 §2: the broker reports MORE cumulative
+                        # fill than this intent ever requested -- a genuine
+                        # contradiction. Never applied; the position's
+                        # verified exit accounting is left intact and the
+                        # discrepancy is surfaced (reconcile() then blocks
+                        # new entries on the broker-vs-internal mismatch).
                         self.events.emit(PivEvent.build(
                             "BROKER_ERROR", symbol=symbol, broker_order_id=broker_order_id, correlation_id=intent_id,
-                            reason="LATE_BUY_FILL_ON_CLOSED_POSITION_IGNORED",
+                            reason="BUY_FILL_EXCEEDS_REQUESTED_QUANTITY",
+                            status=f"requested={requested_qty} cumulative_filled={filled_qty} position_id={position_id}",
+                        ))
+                        self._save()
+                        return
+                    if position.get("status") == "CLOSED" and incremental_qty <= 1e-9:
+                        # Task 81-R1 §2: a duplicate / stale update on an
+                        # already-closed position carries no genuine new
+                        # quantity -- idempotent no-op, never resurrecting
+                        # sold quantity or the position.
+                        self.events.emit(PivEvent.build(
+                            "BROKER_ERROR", symbol=symbol, broker_order_id=broker_order_id, correlation_id=intent_id,
+                            reason="LATE_BUY_FILL_ON_CLOSED_POSITION_NO_NEW_QTY_IGNORED",
                             status=f"position_id={position_id} cumulative_filled={filled_qty}",
                         ))
                         self._save()
                         return
+                    reopened_from_closed = position.get("status") == "CLOSED" and incremental_qty > 1e-9
                     prior_entry_qty = float(position.get("quantity") or 0.0)
                     prior_remaining = float(position.get("remaining_quantity", prior_entry_qty) or 0.0)
+                    # Task 81-R1 §2: a GENUINE positive cumulative-fill delta
+                    # for the still-outstanding BUY -- even after the earlier
+                    # partial share was already sold and the position CLOSED
+                    # -- accounts for the newly acquired share and restores
+                    # protective monitoring, WITHOUT resurrecting the sold
+                    # quantity: exit_quantity, realised exit P&L, the
+                    # triggered-exit latch, the exit plan and intent linkage
+                    # (position_id) are all preserved by this in-place merge.
                     position.update({
                         "symbol": symbol,
                         "quantity": max(prior_entry_qty, filled_qty),
                         "remaining_quantity": prior_remaining + incremental_qty,
-                        "status": "OPEN" if incremental_qty > 0 else position.get("status", "OPEN"),
+                        "status": "OPEN" if incremental_qty > 1e-9 else position.get("status", "OPEN"),
                     })
-                    if fill_price is not None:
+                    if fill_price is not None and incremental_qty > 1e-9:
                         position["price"] = fill_price
                     if position.get("first_fill_observed_at") is None and filled_at is not None:
                         position["first_fill_observed_at"] = filled_at
+                    if reopened_from_closed:
+                        self.events.emit(PivEvent.build(
+                            "POSITION_OPENED", symbol=symbol, correlation_id=intent_id,
+                            broker_order_id=broker_order_id, position_id=position_id,
+                            quantity=incremental_qty, price=fill_price, source=source, alpha_evidence=alpha_evidence,
+                            reference_price=reference_price, strategy_id=strategy_id, horizon=horizon,
+                            status="REOPENED_BY_LATE_FILL_COMPLETION",
+                        ))
                 self.state.positions[position_id] = position
                 if position.get("status") == "OPEN":
                     self.state.open_position_by_symbol[symbol] = position_id

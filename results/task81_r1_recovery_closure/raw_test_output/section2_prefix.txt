@@ -1,0 +1,25 @@
+    def test_out_of_order_updates(tmp_path):
+        """The completion (cumulative 2) arrives BEFORE a straggling re-report
+        of the earlier partial (cumulative 1). The straggler must not rewind."""
+        cfg = _cfg(tmp_path)
+        life = _life(cfg, Transport())
+        buy, _ = _run_sequence(life)
+        pos_id = next(iter(life.state.positions))
+        life.apply_broker_update(buy["id"], "filled", 2, 100.5, filled_at="2026-08-28T13:50:00Z")
+        life.apply_broker_update(buy["id"], "partially_filled", 1, 100.0, filled_at=FA)  # straggler
+        pos = life.state.positions[pos_id]
+>       assert pos["remaining_quantity"] == pytest.approx(1)
+E       assert 0.0 == 1 ± 1.0e-06
+E         
+E         comparison failed
+E         Obtained: 0.0
+E         Expected: 1 ± 1.0e-06
+
+tests\test_task81_r1_late_fill_recovery.py:311: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_task81_r1_late_fill_recovery.py::test_reproduce_late_fill_leaves_order_2_position_closed_zero
+FAILED tests/test_task81_r1_late_fill_recovery.py::test_late_fill_completion_reopens_monitoring_without_resurrecting_sold_qty
+FAILED tests/test_task81_r1_late_fill_recovery.py::test_contradictory_overfill_fails_visibly
+FAILED tests/test_task81_r1_late_fill_recovery.py::test_restart_before_and_after_late_fill
+FAILED tests/test_task81_r1_late_fill_recovery.py::test_out_of_order_updates
+5 failed, 5 passed in 1.25s
