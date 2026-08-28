@@ -15,6 +15,10 @@ Task 80-P1 implementation is complete.
 - Candidate processes are restricted to Python executables, preventing a
   PowerShell invocation wrapper whose command text contains the child command
   from being misclassified as a second application pipeline.
+- The current process's snapshotted ancestor chain is also excluded. This
+  prevents Python-based terminal/tool orchestration parents that embed the
+  child command from being misclassified, while peer TalonX Python processes
+  remain launch blockers.
 - The independent per-account OS execution lock remains unchanged.
 - No protected `talonx_quant` strategy file was changed.
 
@@ -30,6 +34,15 @@ Authoritative full suite:
 
 ```text
 2546 passed, 1 skipped, 10 xfailed, 48 warnings in 925.84s (0:15:25)
+0 failures
+```
+
+The final ancestor-aware guard then passed `16` focused tests plus a real
+elevated enumeration reporting zero competitors. Its authoritative suite was
+also rerun:
+
+```text
+2546 passed, 1 skipped, 10 xfailed, 48 warnings in 1070.93s (0:17:50)
 0 failures
 ```
 

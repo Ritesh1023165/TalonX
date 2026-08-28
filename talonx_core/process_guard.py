@@ -13,14 +13,24 @@ import subprocess
 from typing import Callable
 
 
-_PROCESS_QUERY = (
-    "$ErrorActionPreference = 'Stop'; "
-    "Get-CimInstance Win32_Process -ErrorAction Stop | "
-    "Where-Object { $_.Name -match '^python(?:w)?(?:\\.exe)?$' -and "
-    "$_.CommandLine -match 'run_talonx\\.py|talonx_piv\\.cli' -and "
-    "$_.CommandLine -notmatch 'Get-CimInstance' } | "
-    "Select-Object -ExpandProperty ProcessId"
-)
+def _process_query(current_pid: int) -> str:
+    # Snapshot once, then walk the current process's ancestry inside that
+    # same snapshot. Tooling/terminal launchers can be Python processes whose
+    # command line embeds the child command; ancestors are invocation
+    # machinery, not peer TalonX pipelines.
+    return (
+        "$ErrorActionPreference = 'Stop'; "
+        "$all = @(Get-CimInstance Win32_Process -ErrorAction Stop); "
+        f"$cursor = {current_pid}; $excluded = @(); "
+        "while ($cursor -gt 0) { "
+        "if ($excluded -contains $cursor) { break }; "
+        "$excluded += $cursor; "
+        "$node = $all | Where-Object { $_.ProcessId -eq $cursor } | Select-Object -First 1; "
+        "if ($null -eq $node) { break }; $cursor = [int]$node.ParentProcessId }; "
+        "$all | Where-Object { $_.Name -match '^python(?:w)?(?:\\.exe)?$' -and "
+        "$_.CommandLine -match 'run_talonx\\.py|talonx_piv\\.cli' -and "
+        "$_.ProcessId -notin $excluded } | Select-Object -ExpandProperty ProcessId"
+    )
 
 
 def no_competing_talonx_process(
@@ -30,10 +40,10 @@ def no_competing_talonx_process(
 ) -> tuple[bool, str]:
     """Return success only after complete enumeration proves no competitor.
 
-    Only Python application processes are candidates. Invocation shells can
-    contain the child's command text (for example ``powershell -Command
-    python -m talonx_piv.cli ...``) but are not themselves a second TalonX
-    pipeline. Windows process enumeration can report access failures as non-terminating
+    Only Python application processes are candidates. The current process and
+    its verified ancestor chain are excluded because terminal/tool launchers
+    can embed the child's command text without being a second TalonX pipeline.
+    Windows process enumeration can report access failures as non-terminating
     PowerShell errors.  ``-ErrorAction Stop`` plus ``$ErrorActionPreference``
     makes those failures observable to the caller.  Every exception and every
     malformed result blocks startup; uncertainty is never treated as proof
@@ -43,7 +53,7 @@ def no_competing_talonx_process(
     current_pid = os.getpid() if exclude_pid is None else exclude_pid
     try:
         output = check_output(
-            ["powershell", "-NoProfile", "-Command", _PROCESS_QUERY],
+            ["powershell", "-NoProfile", "-Command", _process_query(current_pid)],
             text=True,
             timeout=20,
             stderr=subprocess.STDOUT,
