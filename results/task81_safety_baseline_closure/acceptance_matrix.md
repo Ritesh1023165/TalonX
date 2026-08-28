@@ -69,3 +69,21 @@ safety/reporting/test rows (A*, B*, C*, E*) pass; otherwise `BASELINE_BLOCKED`
 with exact remaining items. §5 (D*) unresolved data-coverage questions stated
 explicitly and assessed for whether they block isolation engineering or only a
 future pilot.
+
+---
+
+## Outcome (post-implementation)
+
+| Rows | Landed change | Regression tests | Status |
+|---|---|---|---|
+| A1–A11 | `talonx_piv/lifecycle.py` `reconcile` / `_refresh_non_terminal_orders` / `order_intent` BUY-guard order; `eod_lifecycle` INCONCLUSIVE mapping (commit `3dbac5d`) | `test_task81_reconciliation_admission.py` (14) — proven `11 failed / 3 passed` pre-fix | PASS |
+| B1–B6 | `session_identity.py` `assess_session_recovery` + `SessionRecoveryRequired`; `cli.py` start/supervise refusal; `lifecycle.apply_broker_update` monotonic clamp + closed-position guard (commit `18dc8e3`) | `test_task81_recovery_binding.py` (15) | PASS |
+| C1–C7 | `observability.build_integrated_projection` `source_health`; `reporting.build_session_report` `events_source_health`; `reporting.finalize_session_report`; `session_runner._run_eod_lifecycle` wiring; `eod_lifecycle` C7 (commit `fee25a0`) | `test_task81_source_health_and_reporting.py` (15) | PASS |
+| D1–D2 | analysis only — `iex_findings.md` (commit `a2b14c8`) | `test_task81_iex_readiness_bookkeeping.py` (4) | RESOLVED (no defect) + 1 evidence-limited question, non-blocking for isolation |
+| E1–E5 | weak-test strengthening; evidence-dir isolation; negative controls (commit `4085f58`) | `test_task81_guard_negative_controls.py` (3); strengthened `test_task72o_…::test_session_completed_never_emitted_on_failed`, `test_task77i_decision_ledger.py::test_persists_and_reloads…` | PASS |
+
+Full-suite runs recorded in `raw_test_output/`. Post-§2 full suite:
+`2560 passed, 1 skipped, 10 xfailed`, exit 0. Final full suite after all
+edits: `2597 passed, 1 skipped, 10 xfailed`, exit 0
+(`raw_test_output/full_suite_final.txt`). Verdict:
+`BASELINE_VERIFIED_READY_FOR_ISOLATION`.
