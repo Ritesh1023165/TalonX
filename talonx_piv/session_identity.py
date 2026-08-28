@@ -176,7 +176,12 @@ def assess_session_recovery(config: PivConfig, *, now: datetime | None = None) -
     eod_state = _safe_load_json(eod_path) if eod_path.exists() else None
 
     identity_wellformed = isinstance(saved, dict) and all(k in saved for k in _SESSION_IDENTITY_REQUIRED_FIELDS)
+    identity_missing = not identity_path.exists()
     identity_corrupt = identity_path.exists() and not identity_wellformed
+    # Task 81-R1 §4: a missing OR corrupt OR incomplete identity is
+    # equally UNUSABLE -- neither can safely anchor a recovery decision
+    # around unresolved state, and neither may be silently replaced.
+    identity_unusable = not identity_wellformed
     lifecycle_corrupt = lifecycle_path.exists() and not isinstance(lifecycle_state, dict)
     eod_corrupt = eod_path.exists() and not isinstance(eod_state, dict)
 
@@ -210,6 +215,8 @@ def assess_session_recovery(config: PivConfig, *, now: datetime | None = None) -
         )
 
     reasons: list[str] = []
+    if identity_missing:
+        reasons.append("SESSION_IDENTITY_MISSING")
     if identity_corrupt:
         reasons.append("SESSION_IDENTITY_CORRUPT")
     if binding_changes:
@@ -224,9 +231,15 @@ def assess_session_recovery(config: PivConfig, *, now: datetime | None = None) -
 
     unresolved = bool(exposure_reasons) or bool(eod_reason) or eod_corrupt
 
-    # 2. Something changed AND there is unresolved exposure/EOD state ->
-    #    never silently replace. Preserve context, block, report.
-    if unresolved and (binding_changes or identity_corrupt or eod_reason or eod_corrupt or (identity_wellformed and not session_live)):
+    # 2. The identity is unusable (missing / corrupt / incomplete), OR a
+    #    binding / EOD / liveness condition changed -- AND there is
+    #    unresolved exposure or EOD state. Never silently mint or overwrite
+    #    an authorization-bound identity around that: preserve context,
+    #    block, report the operator recovery transition.
+    if unresolved and (
+        binding_changes or identity_unusable or eod_reason or eod_corrupt
+        or (identity_wellformed and not session_live)
+    ):
         action = (
             "Recover the preserved session before starting a new one: resolve every outstanding "
             "order / uncertain submission / open position, run `python -m talonx_piv.cli eod` to "
