@@ -16,7 +16,8 @@ from typing import Callable
 _PROCESS_QUERY = (
     "$ErrorActionPreference = 'Stop'; "
     "Get-CimInstance Win32_Process -ErrorAction Stop | "
-    "Where-Object { $_.CommandLine -match 'run_talonx\\.py|talonx_piv\\.cli' -and "
+    "Where-Object { $_.Name -match '^python(?:w)?(?:\\.exe)?$' -and "
+    "$_.CommandLine -match 'run_talonx\\.py|talonx_piv\\.cli' -and "
     "$_.CommandLine -notmatch 'Get-CimInstance' } | "
     "Select-Object -ExpandProperty ProcessId"
 )
@@ -29,7 +30,10 @@ def no_competing_talonx_process(
 ) -> tuple[bool, str]:
     """Return success only after complete enumeration proves no competitor.
 
-    Windows process enumeration can report access failures as non-terminating
+    Only Python application processes are candidates. Invocation shells can
+    contain the child's command text (for example ``powershell -Command
+    python -m talonx_piv.cli ...``) but are not themselves a second TalonX
+    pipeline. Windows process enumeration can report access failures as non-terminating
     PowerShell errors.  ``-ErrorAction Stop`` plus ``$ErrorActionPreference``
     makes those failures observable to the caller.  Every exception and every
     malformed result blocks startup; uncertainty is never treated as proof

@@ -12,6 +12,9 @@ Task 80-P1 implementation is complete.
 - Process enumeration now blocks on access denial, timeout, missing PowerShell, subprocess failure, or malformed PID output.
 - The PowerShell query forces normally non-terminating CIM errors to terminate, so an empty stdout stream cannot disguise `Access denied` as a successful empty process list.
 - The current PID is excluded; any other `run_talonx.py` or `talonx_piv.cli` PID blocks startup.
+- Candidate processes are restricted to Python executables, preventing a
+  PowerShell invocation wrapper whose command text contains the child command
+  from being misclassified as a second application pipeline.
 - The independent per-account OS execution lock remains unchanged.
 - No protected `talonx_quant` strategy file was changed.
 
@@ -27,6 +30,16 @@ Authoritative full suite:
 
 ```text
 2546 passed, 1 skipped, 10 xfailed, 48 warnings in 925.84s (0:15:25)
+0 failures
+```
+
+Launch-preflight follow-up found that a `powershell -Command ... talonx_piv.cli`
+invocation wrapper was initially classified as a competing process. After
+restricting candidates to Python executables, the focused correction suite
+reported `19 passed in 16.98s` and the authoritative suite was rerun:
+
+```text
+2546 passed, 1 skipped, 10 xfailed, 48 warnings in 943.42s (0:15:43)
 0 failures
 ```
 

@@ -94,6 +94,7 @@ def test_powershell_query_forces_nonterminating_errors_to_stop():
     query = captured["command"][-1]
     assert "$ErrorActionPreference = 'Stop'" in query
     assert "-ErrorAction Stop" in query
+    assert "$_.Name -match '^python(?:w)?(?:\\.exe)?$'" in query
     assert captured["kwargs"]["stderr"] == subprocess.STDOUT
 
 
