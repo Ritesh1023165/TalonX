@@ -83,7 +83,11 @@ def build_decision_status(state_dir: Path, decision_id: str) -> dict[str, Any]:
     gemini_status = gemini_record.get("status", "NOT_REQUESTED") if gemini_record is not None else "NOT_REQUESTED"
 
     decision_execution_status = decision.get("decision_execution_status", "NOT_APPLICABLE")
-    if decision_execution_status not in ("ENTRY_ELIGIBLE", "EXIT_ELIGIBLE"):
+    # Task 79E: ENTRY_ELIGIBLE_EXPERIMENTAL_PAPER is the experimental
+    # analogue of ENTRY_ELIGIBLE -- a real order_intent call was attempted
+    # for it too, so it must join against lifecycle intents/orders below the
+    # same way, never fall through to NOT_ATTEMPTED_BY_DESIGN.
+    if decision_execution_status not in ("ENTRY_ELIGIBLE", "EXIT_ELIGIBLE", "ENTRY_ELIGIBLE_EXPERIMENTAL_PAPER"):
         execution_status = "NOT_ATTEMPTED_BY_DESIGN"
     else:
         lifecycle_state = _read_json(state_dir / "lifecycle_state.json", {})
@@ -214,6 +218,18 @@ def build_integrated_projection(
 
     execution_failure_count = session_report.get("rejections", 0)  # PAPER_ORDER_REJECTED count -- broker-boundary rejections, distinct from entry_blocked_paper_disabled_count above (a decision-layer, pre-broker classification)
 
+    # Task 79E: explicit, additive-only visibility into experimental
+    # activity -- deliberately counted SEPARATELY from
+    # actionable_approved_count above (EXPERIMENTAL_BUY/
+    # EXPERIMENTAL_SELL_TO_CLOSE are distinct recommendation/classification
+    # strings from BUY/SELL_TO_CLOSE, so they were already naturally
+    # excluded from that count; this section makes the exclusion visible
+    # and auditable rather than merely implicit).
+    experimental_decision_count = sum(1 for record in decisions.values() if record.get("recommendation") == "EXPERIMENTAL_BUY")
+    experimental_notification_count = sum(1 for record in notifications.values() if str(record.get("classification", "")).startswith("EXPERIMENTAL"))
+    experimental_shadow_count = sum(1 for record in shadow.values() if record.get("experimental") is True)
+    experimental_paper_order_count = sum(1 for order in orders.values() if order.get("source") == "EXPERIMENTAL")
+
     freshness_report = _read_json(state_dir / "freshness_report.json", {})
 
     return {
@@ -262,5 +278,12 @@ def build_integrated_projection(
             "scope": "freshness_report.json (session-end provider/symbol state) and reporting.build_session_report's data_feed_health (DATA_NOT_READY/STALE_DATA event counts)",
             "provider_state": freshness_report.get("provider_state"),
             "data_feed_health": session_report.get("data_feed_health"),
+        },
+        "experimental": {
+            "scope": "Task 79E -- EXPERIMENTAL_BUY decisions / EXPERIMENTAL-classified notifications / experimental-flagged shadow records / EXPERIMENTAL-sourced paper orders, all already scoped in-session above. Reported separately -- NEVER folded into decisions.actionable_approved_count, notifications totals-by-classification, or any validated-strategy statistic, since an experimental record is explicitly UNVALIDATED evidence, not proof the strategy is profitable.",
+            "decision_count": experimental_decision_count,
+            "notification_count": experimental_notification_count,
+            "shadow_count": experimental_shadow_count,
+            "paper_order_count": experimental_paper_order_count,
         },
     }

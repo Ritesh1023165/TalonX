@@ -112,6 +112,13 @@ class ShadowPosition:
     coverage_flag: str = "NORMAL"
     outcome_quality: str | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    # Task 79E -- kept separate from `source` (which stays "STRATEGY" for
+    # both a normal and an experimental natural signal): `experimental`/
+    # `experimental_id` are the ONLY fields distinguishing an experimental
+    # research shadow record from a normal one, so reporting/dashboard joins
+    # never need to infer experiment membership indirectly.
+    experimental: bool = False
+    experimental_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -157,12 +164,18 @@ class ShadowLedger:
         return self.positions.get(shadow_id) if shadow_id else None
 
     def consider_entry(self, decision: Decision, *, source: str) -> dict[str, Any] | None:
-        """Only for decision.recommendation == BUY. Idempotent per
-        decision_id -- a duplicate/restarted call for the same decision
-        returns the existing record unchanged. At most one PENDING_FILL/OPEN
-        shadow position per symbol at a time (mirrors the real one-position-
-        per-symbol invariant), never overlapping."""
-        if decision.recommendation != Recommendation.BUY:
+        """For decision.recommendation == BUY (validated-strategy) OR
+        EXPERIMENTAL_BUY (Task 79E -- an explicitly, narrowly authorised
+        research permission for an otherwise-UNVALIDATED strategy; see
+        experimental_authorization.py). Both remain gated on the SAME
+        actionability bar (a real recommendation the product would act on),
+        never on the PAPER-entry setting or broker availability -- see
+        shadow_independence_matrix.csv. Idempotent per decision_id -- a
+        duplicate/restarted call for the same decision returns the existing
+        record unchanged. At most one PENDING_FILL/OPEN shadow position per
+        symbol at a time (mirrors the real one-position-per-symbol
+        invariant), never overlapping."""
+        if decision.recommendation not in (Recommendation.BUY, Recommendation.EXPERIMENTAL_BUY):
             return None
         existing = self.get_by_decision(decision.decision_id)
         if existing is not None:
@@ -174,6 +187,7 @@ class ShadowLedger:
             shadow_id=shadow_id, decision_id=decision.decision_id, symbol=decision.ticker, source=source,
             recommendation_time=decision.timestamp, stop_price=decision.stop_price,
             target_price=decision.target_price, horizon=decision.horizon, planned_entry_price=decision.entry_price,
+            experimental=decision.experimental, experimental_id=decision.experimental_id,
         )
         self.positions[shadow_id] = position.to_dict()
         self._by_decision[decision.decision_id] = shadow_id

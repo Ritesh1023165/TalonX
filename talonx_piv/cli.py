@@ -22,6 +22,7 @@ from .decision_ledger import DecisionLedger
 from .events import EventBus, PivEvent
 from .execution_ownership import ExecutionOwnership, account_lock_key
 from .execution_settings import load_paper_entry_settings
+from .experimental_authorization import load_experimental_authorization
 from .gemini_enrichment import GeminiEnrichmentOutbox
 from .lifecycle import PaperLifecycle, paper_cleanup
 from .notification_outbox import NotificationOutbox
@@ -109,7 +110,7 @@ def build_gemini_chain_if_enabled(bus: EventBus):
         return None
 
 
-def runtime(config: PivConfig, session_id: str | None = None):
+def runtime(config: PivConfig, session_id: str | None = None, runtime_sha: str | None = None, config_hash: str | None = None):
     bus = EventBus(
         config.state_dir / "piv_events.jsonl", sender(config.telegram_token, config.telegram_chat_id),
         feed_mode=config.feed_mode, session_id=session_id,
@@ -122,8 +123,19 @@ def runtime(config: PivConfig, session_id: str | None = None):
     # operator explicitly populates that file. See execution_settings.py
     # and results/task76s_long_only_execution_contract/paper_setting_migration.md.
     paper_entry_settings = load_paper_entry_settings(config.state_dir / "paper_entry_settings.json")
-    lifecycle = PaperLifecycle(config.state_dir / "lifecycle_state.json", broker, bus, paper_entry_settings)
-    return bus, broker, lifecycle
+    # Task 79E: fail-closed/inactive-by-default the same way -- absent or
+    # malformed experimental_authorization.json (the normal, expected state
+    # for every session until an operator explicitly authors one) means
+    # experimental_authorization stays None, so the experimental path is
+    # completely unreachable (see decision_engine.py's
+    # _experimental_permissions: None -> (False, False, None) for every
+    # signal, identical to pre-Task79E behavior).
+    experimental_authorization = load_experimental_authorization(config.state_dir / "experimental_authorization.json")
+    lifecycle = PaperLifecycle(
+        config.state_dir / "lifecycle_state.json", broker, bus, paper_entry_settings,
+        experimental_authorization=experimental_authorization, runtime_sha=runtime_sha, config_hash=config_hash,
+    )
+    return bus, broker, lifecycle, experimental_authorization
 
 
 def parser() -> argparse.ArgumentParser:
@@ -156,7 +168,9 @@ def main(argv: list[str] | None = None) -> int:
     approved = getattr(args, "approved_sha", None) or base.approved_sha
     config = PivConfig(approved_sha=approved)
     identity = build_session_identity(config)
-    bus, broker, lifecycle = runtime(config, session_id=identity.session_id)
+    bus, broker, lifecycle, experimental_authorization = runtime(
+        config, session_id=identity.session_id, runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
+    )
     try:
         if args.command == "preflight":
             status, checks = Preflight(config, broker, bus).run()
@@ -210,6 +224,7 @@ def main(argv: list[str] | None = None) -> int:
                     decision_ledger=decision_ledger, notification_outbox=notification_outbox, shadow_ledger=shadow_ledger,
                     gemini_enrichment=gemini_enrichment,
                     runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
+                    experimental_authorization=experimental_authorization,
                 )
             piv_info = build_piv_info(
                 config.feed_mode, config.universe, session_id=identity.session_id,
@@ -286,6 +301,7 @@ def main(argv: list[str] | None = None) -> int:
                     decision_ledger=decision_ledger, notification_outbox=notification_outbox, shadow_ledger=shadow_ledger,
                     gemini_enrichment=gemini_enrichment,
                     runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
+                    experimental_authorization=experimental_authorization,
                 )
             piv_info = build_piv_info(
                 config.feed_mode, config.universe, session_id=identity.session_id,

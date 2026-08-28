@@ -49,6 +49,17 @@ class Recommendation(str, Enum):
     HOLD = "HOLD"
     SELL_TO_CLOSE = "SELL_TO_CLOSE"
     NO_TRADE = "NO_TRADE"
+    # Task 79E -- a SEPARATE recommendation, never a variant of BUY. Reachable
+    # ONLY when a caller-supplied, pre-validated `experimental_buy_permitted`
+    # is True (see experimental_authorization.py -- the actual validation:
+    # identity/date/session/version/expiry binding -- happens there, never in
+    # this pure function). `strategy_approval_status` is NEVER upgraded to
+    # APPROVED to reach this branch -- it stays exactly what the caller
+    # passed (UNVALIDATED for every real strategy). This is deliberately a
+    # distinct enum value, not a flag on BUY, so no existing `recommendation
+    # == Recommendation.BUY` check anywhere in this codebase can ever be
+    # accidentally satisfied by an experimental decision.
+    EXPERIMENTAL_BUY = "EXPERIMENTAL_BUY"
 
 
 class StrategyApprovalStatus(str, Enum):
@@ -83,6 +94,11 @@ class ExecutionStatus(str, Enum):
     ENTRY_BLOCKED_PAPER_DISABLED = "ENTRY_BLOCKED_PAPER_DISABLED"
     ENTRY_BLOCKED_UNVALIDATED_STRATEGY = "ENTRY_BLOCKED_UNVALIDATED_STRATEGY"
     EXIT_ELIGIBLE = "EXIT_ELIGIBLE"
+    # Task 79E -- distinct from ENTRY_ELIGIBLE/ENTRY_BLOCKED_PAPER_DISABLED so
+    # a report can never conflate a validated-strategy PAPER entry with an
+    # experimental one just because both happen to be "eligible" today.
+    ENTRY_ELIGIBLE_EXPERIMENTAL_PAPER = "ENTRY_ELIGIBLE_EXPERIMENTAL_PAPER"
+    ENTRY_BLOCKED_EXPERIMENTAL_PAPER_NOT_PERMITTED = "ENTRY_BLOCKED_EXPERIMENTAL_PAPER_NOT_PERMITTED"
 
 
 @dataclass(frozen=True)
@@ -105,6 +121,15 @@ class Decision:
     stop_price: float | None = None
     target_price: float | None = None
     horizon: str | None = None
+    # Task 79E -- kept SEPARATE from strategy_approval_status (never
+    # overwrites it): `experimental` is True iff this decision (a fresh
+    # EXPERIMENTAL_BUY, or a HOLD/SELL_TO_CLOSE against a position that
+    # itself originated experimentally) belongs to the experimental research
+    # path. `experimental_id` cross-references the specific
+    # ExperimentalAuthorization.experiment_id that permitted it (None for
+    # every ordinary decision).
+    experimental: bool = False
+    experimental_id: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -120,6 +145,7 @@ class Decision:
             "timestamp": self.timestamp,
             "entry_price": self.entry_price, "stop_price": self.stop_price,
             "target_price": self.target_price, "horizon": self.horizon,
+            "experimental": self.experimental, "experimental_id": self.experimental_id,
         }
 
 
@@ -142,12 +168,25 @@ def decide(
     target_price: float | None = None,
     horizon: str | None = None,
     now: datetime | None = None,
+    # Task 79E -- both default False/None, so every pre-existing call site
+    # (which never passes these) is byte-identical to before this change.
+    # `experimental_buy_permitted`/`experimental_paper_permitted` must
+    # already be the RESULT of a full ExperimentalAuthorization validation
+    # (identity/date/session/version/expiry/account binding) performed by
+    # the caller -- this function does no such validation itself and trusts
+    # neither a bare string nor a caller's own "approved=true"-style claim;
+    # it only ever sees two already-strictly-typed booleans.
+    experimental_buy_permitted: bool = False,
+    experimental_paper_permitted: bool = False,
+    experimental_id: str | None = None,
+    is_experimental_position: bool = False,
 ) -> Decision:
     """Pure function -- no I/O, no broker/event-bus access. Implements the
     Task 76S required behaviour table exactly; see the module docstring for
     why `approved_exit_condition` (not `market_view == BEARISH`) is the only
     thing that can ever produce SELL_TO_CLOSE while holding."""
     reason_codes: list[str] = []
+    experimental = False
 
     if has_open_long:
         if approved_exit_condition:
@@ -156,6 +195,12 @@ def decide(
         else:
             recommendation = Recommendation.HOLD
             reason_codes.append("EXISTING_LONG_NO_APPROVED_EXIT_CONDITION")
+        # An experimental position's protective exit/HOLD remains labelled
+        # experimental regardless of the CURRENT entry permission's state
+        # (expired, revoked, or never re-checked here at all) -- exits are
+        # never gated on entry permission, exactly like paper_entry_enabled
+        # never gates SELL_TO_CLOSE.
+        experimental = is_experimental_position
     else:
         if market_view != MarketView.BULLISH:
             recommendation = Recommendation.NO_TRADE
@@ -164,8 +209,13 @@ def decide(
             recommendation = Recommendation.NO_TRADE
             reason_codes.append(f"DATA_INSUFFICIENT_FOR_ENTRY:{data_readiness.value}")
         elif strategy_approval_status != StrategyApprovalStatus.APPROVED:
-            recommendation = Recommendation.NO_TRADE
-            reason_codes.append("STRATEGY_UNVALIDATED_NO_ACTIONABLE_BUY_PROMOTION")
+            if experimental_buy_permitted:
+                recommendation = Recommendation.EXPERIMENTAL_BUY
+                reason_codes.append("EXPERIMENTAL_RESEARCH_PERMISSION_GRANTED_STRATEGY_STILL_UNVALIDATED")
+                experimental = True
+            else:
+                recommendation = Recommendation.NO_TRADE
+                reason_codes.append("STRATEGY_UNVALIDATED_NO_ACTIONABLE_BUY_PROMOTION")
         else:
             recommendation = Recommendation.BUY
             reason_codes.append("ELIGIBLE_APPROVED_BULLISH_SETUP_NO_HOLDING")
@@ -179,6 +229,16 @@ def decide(
             # block broker entry").
         else:
             execution_status = ExecutionStatus.ENTRY_ELIGIBLE
+    elif recommendation == Recommendation.EXPERIMENTAL_BUY:
+        if not experimental_paper_permitted:
+            execution_status = ExecutionStatus.ENTRY_BLOCKED_EXPERIMENTAL_PAPER_NOT_PERMITTED
+            reason_codes.append("EXPERIMENTAL_PAPER_EXECUTION_NOT_PERMITTED")
+            # Recommendation preserved as EXPERIMENTAL_BUY -- only the
+            # broker entry is blocked, mirroring the BUY/PAPER-disabled rule
+            # above exactly (Stage 1 requirement 5: a PAPER-only failure
+            # must not suppress the alert/shadow record).
+        else:
+            execution_status = ExecutionStatus.ENTRY_ELIGIBLE_EXPERIMENTAL_PAPER
     elif recommendation == Recommendation.SELL_TO_CLOSE:
         execution_status = ExecutionStatus.EXIT_ELIGIBLE
     else:
@@ -192,4 +252,5 @@ def decide(
         strategy_approval_status=strategy_approval_status, data_readiness=data_readiness,
         paper_entry_enabled=paper_entry_enabled, execution_status=execution_status, timestamp=timestamp,
         entry_price=entry_price, stop_price=stop_price, target_price=target_price, horizon=horizon,
+        experimental=experimental, experimental_id=experimental_id if experimental else None,
     )

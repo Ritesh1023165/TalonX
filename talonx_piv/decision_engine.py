@@ -36,7 +36,7 @@ whether a signal fires or what it does.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from talonx_quant.config import QuantConfig
@@ -48,6 +48,7 @@ from .config import PivConfig
 from .decision_contract import DataReadiness, ExecutionStatus, MarketView, Recommendation, StrategyApprovalStatus, decide
 from .decision_ledger import DecisionLedger
 from .events import EventBus, PivEvent, trading_date_for
+from .experimental_authorization import ExperimentalAuthorization
 from .gemini_enrichment import GeminiEnrichmentOutbox
 from .lifecycle import PaperLifecycle, stable_id
 from .notification_outbox import NotificationOutbox, classify as classify_notification
@@ -61,12 +62,36 @@ PIV_QUANTITY = 1.0
 NATURAL_STRATEGY_HORIZON = "INTRADAY_SHORT"
 
 
+def _natural_strategy_version() -> str:
+    """Task 79E: QuantConfig has no strategy-version concept of its own --
+    reuses talonx_backtest.reproducibility.get_strategy_version(), the
+    SAME sha256[:12] fingerprint of the frozen strategy files
+    (talonx_quant/{strategy,indicators,config,session}.py) the backtest
+    reproducibility pipeline already computes and tests, rather than
+    inventing a second, parallel, hand-maintained version tag. Computed
+    fresh on every call (matches runtime_sha/config_hash's own
+    "never cached, never assumed" identity philosophy) -- it changes the
+    moment protected strategy source changes, forcing any
+    ExperimentalAuthorization bound to the old fingerprint to fail closed.
+    """
+    from talonx_backtest.reproducibility import get_strategy_version
+    return get_strategy_version()
+
+
 @dataclass
 class OpenDecisionPosition:
     symbol: str
     entry_signal_id: str
     stop_price: float | None
     target_price: float | None
+    # Task 79E: True iff THIS position originated from an EXPERIMENTAL_BUY
+    # decision -- carried so its protective exit/HOLD decisions stay
+    # correctly labelled `experimental=True` regardless of whether the
+    # entry permission that created it is still active (exits are never
+    # gated on entry permission, matching paper_entry_enabled's own
+    # exit-independence).
+    experimental: bool = False
+    experimental_id: str | None = None
 
 
 @dataclass
@@ -99,6 +124,13 @@ class DecisionEngine:
     gemini_enrichment: GeminiEnrichmentOutbox | None = None
     runtime_sha: str | None = None
     config_hash: str | None = None
+    # Task 79E: None (the default -- every pre-Task79E caller/test) means NO
+    # experimental permission exists at all -- every eligible-but-UNVALIDATED
+    # signal resolves exactly as before this task (NO_TRADE). Never
+    # constructed here; always the caller's (cli.py's) explicit choice, and
+    # never active unless an operator has populated the underlying,
+    # inactive-by-default authorization file (see experimental_authorization.py).
+    experimental_authorization: ExperimentalAuthorization | None = None
     # TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE. The ONLY way any decision this
     # engine makes can ever resolve to StrategyApprovalStatus.APPROVED --
     # `cli.py` never sets this (grep-provable), so no production code path
@@ -262,6 +294,50 @@ class DecisionEngine:
                 source="STRATEGY",
             ))
 
+    def _signal_is_fresh(self, signal: QuantSignal, now: datetime) -> bool:
+        """Task 79E Stage 0: "do not assume every drained pub/sub message is
+        current merely because some bars passed the runner's readiness
+        gate" -- a message could, in principle, be delayed/foreign/replayed
+        on the channel. Reuses the SAME stale-data threshold
+        (config.stale_seconds) session_runner.py already applies to raw bar
+        freshness, rather than inventing a second one."""
+        bar_ts = signal.bar_timestamp
+        if bar_ts.tzinfo is None:
+            return False
+        stale_seconds = getattr(self.piv_config, "stale_seconds", 120) if self.piv_config is not None else 120
+        age = (now - bar_ts).total_seconds()
+        return 0 <= age <= stale_seconds
+
+    def _experimental_permissions(self, *, symbol: str, signal: QuantSignal, trading_date_et: str) -> tuple[bool, bool, str | None]:
+        """Returns (experimental_buy_permitted, experimental_paper_permitted,
+        experimental_id) -- both booleans default False/False if no
+        authorization is configured at all, or if the signal itself is not
+        fresh (see _signal_is_fresh), matching "signals admitted to the
+        experimental path must correspond to eligible, fresh inputs"."""
+        auth = self.experimental_authorization
+        if auth is None:
+            return False, False, None
+        now = datetime.now(timezone.utc)
+        if not self._signal_is_fresh(signal, now):
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", symbol=symbol, reason="EXPERIMENTAL_SIGNAL_NOT_FRESH", source="EXPERIMENTAL",
+            ))
+            return False, False, None
+        buy_ok, buy_reason = auth.permits_entry(
+            symbol=symbol, trading_date_et=trading_date_et, strategy_id=signal.signal_type.value,
+            strategy_version=_natural_strategy_version(), runtime_sha=self.runtime_sha or "",
+            config_hash=self.config_hash or "", now=now,
+        )
+        if not buy_ok:
+            return False, False, None
+        account_id = self.lifecycle.broker.identity.account_id if self.lifecycle.broker.identity is not None else ""
+        paper_ok, _paper_reason = auth.permits_paper_execution(
+            symbol=symbol, trading_date_et=trading_date_et, strategy_id=signal.signal_type.value,
+            strategy_version=_natural_strategy_version(), runtime_sha=self.runtime_sha or "",
+            config_hash=self.config_hash or "", now=now, account_id=account_id,
+        )
+        return True, paper_ok, auth.experiment_id
+
     def _handle_entry(self, signal: QuantSignal) -> None:
         self.natural_signal_count += 1
         self.published_count += 1
@@ -272,10 +348,14 @@ class DecisionEngine:
         ))
         market_view = MarketView.BULLISH if signal.direction == SignalDirection.BULLISH else MarketView.BEARISH
         has_open_long = symbol in self.positions
+        trading_date_et = trading_date_for(signal.bar_timestamp.isoformat())
+        experimental_buy_permitted, experimental_paper_permitted, experimental_id = self._experimental_permissions(
+            symbol=symbol, signal=signal, trading_date_et=trading_date_et,
+        )
         decision_id = stable_id("decision", "entry", symbol, signal.bar_timestamp.isoformat())
         decision = decide(
             decision_id=decision_id, session_id=self.events.session_id or "",
-            trading_date_et=trading_date_for(signal.bar_timestamp.isoformat()), ticker=symbol,
+            trading_date_et=trading_date_et, ticker=symbol,
             market_view=market_view, has_open_long=has_open_long,
             # A fresh incoming signal (bullish OR bearish) is never itself an
             # authorised exit condition -- see module docstring's LONG_ONLY
@@ -286,6 +366,8 @@ class DecisionEngine:
             paper_entry_enabled=self.lifecycle.paper_entry_settings.enabled_for(symbol),
             strategy_id=signal.signal_type.value, entry_price=signal.price, stop_price=signal.stop_price,
             target_price=signal.target_price, horizon=NATURAL_STRATEGY_HORIZON,
+            experimental_buy_permitted=experimental_buy_permitted,
+            experimental_paper_permitted=experimental_paper_permitted, experimental_id=experimental_id,
         )
         self._record_decision(decision)
         if classify_notification(decision) is not None:
@@ -303,23 +385,35 @@ class DecisionEngine:
                     "BROKER_ERROR", symbol=symbol, reason=f"GEMINI_ENRICHMENT_REQUEST_FAILED_{type(exc).__name__}",
                     source="STRATEGY",
                 ))
-        if decision.recommendation != Recommendation.BUY:
+        if decision.recommendation not in (Recommendation.BUY, Recommendation.EXPERIMENTAL_BUY):
             return
-        if decision.execution_status != ExecutionStatus.ENTRY_ELIGIBLE:
-            return  # BUY preserved above (recorded); broker entry withheld (e.g. PAPER entry disabled)
+        is_experimental = decision.recommendation == Recommendation.EXPERIMENTAL_BUY
+        required_status = ExecutionStatus.ENTRY_ELIGIBLE_EXPERIMENTAL_PAPER if is_experimental else ExecutionStatus.ENTRY_ELIGIBLE
+        if decision.execution_status != required_status:
+            return  # recommendation preserved above (recorded); broker entry withheld (e.g. PAPER/experimental-PAPER not permitted)
         signal_id = f"strategy_entry_{symbol}_{signal.bar_timestamp.isoformat()}"
+        order_source = "EXPERIMENTAL" if is_experimental else "STRATEGY"
         try:
+            extra_kwargs: dict[str, Any] = {}
+            if is_experimental:
+                extra_kwargs = dict(
+                    experimental_id=decision.experimental_id, experimental_trading_date_et=trading_date_et,
+                    experimental_strategy_version=_natural_strategy_version(),
+                )
             result = self.lifecycle.order_intent(
-                signal_id, symbol, "buy", PIV_QUANTITY, source="STRATEGY", alpha_evidence=False,
+                signal_id, symbol, "buy", PIV_QUANTITY, source=order_source, alpha_evidence=False,
                 reference_price=signal.price, stop_price=signal.stop_price,
                 signal_timestamp=signal.bar_timestamp.isoformat(),
                 strategy_id=signal.signal_type.value, horizon=NATURAL_STRATEGY_HORIZON,
-                decision_id=decision.decision_id,
+                decision_id=decision.decision_id, **extra_kwargs,
             )
         except PaperGuardError as exc:
-            self.events.emit(PivEvent.build("BROKER_ERROR", symbol=symbol, reason=str(exc), source="STRATEGY"))
+            self.events.emit(PivEvent.build("BROKER_ERROR", symbol=symbol, reason=str(exc), source=order_source))
             return
-        self.positions[symbol] = OpenDecisionPosition(symbol, signal_id, signal.stop_price, signal.target_price)
+        self.positions[symbol] = OpenDecisionPosition(
+            symbol, signal_id, signal.stop_price, signal.target_price,
+            experimental=is_experimental, experimental_id=decision.experimental_id,
+        )
         broker_id = result.get("id")
         if broker_id:
             self.lifecycle.poll_order_until_terminal(str(broker_id))
@@ -344,23 +438,32 @@ class DecisionEngine:
             paper_entry_enabled=self.lifecycle.paper_entry_settings.enabled_for(symbol),
             strategy_id=None, stop_price=position.stop_price, target_price=position.target_price,
             horizon=NATURAL_STRATEGY_HORIZON,
+            # Task 79E: exits are NEVER gated on entry permission -- an
+            # experimental position's protective exit stays correctly
+            # labelled `experimental=True` regardless of whether the
+            # authorization that created it has since expired or been
+            # disabled (mirrors paper_entry_enabled's own pre-existing
+            # exit-independence).
+            is_experimental_position=position.experimental,
         )
         self._record_decision(decision)
         if reason is None:
             return
         del self.positions[symbol]
         exit_event = "STOP_TRIGGERED" if reason == "STOP" else "EXIT_REQUESTED"
-        self.events.emit(PivEvent.build(exit_event, symbol=symbol, reason=reason, price=bar.close, source="STRATEGY", alpha_evidence=False))
+        order_source = "EXPERIMENTAL" if position.experimental else "STRATEGY"
+        self.events.emit(PivEvent.build(exit_event, symbol=symbol, reason=reason, price=bar.close, source=order_source, alpha_evidence=False))
         signal_id = f"strategy_exit_{symbol}_{bar.timestamp.isoformat()}"
         exit_reference_price = {"STOP": position.stop_price, "TARGET": position.target_price}.get(reason)
         try:
             result = self.lifecycle.order_intent(
-                signal_id, symbol, "sell", PIV_QUANTITY, source="STRATEGY", alpha_evidence=False,
+                signal_id, symbol, "sell", PIV_QUANTITY, source=order_source, alpha_evidence=False,
                 reference_price=exit_reference_price, signal_timestamp=bar.timestamp.isoformat(),
                 horizon=NATURAL_STRATEGY_HORIZON, decision_id=decision.decision_id,
+                experimental_id=position.experimental_id if position.experimental else None,
             )
         except PaperGuardError as exc:
-            self.events.emit(PivEvent.build("BROKER_ERROR", symbol=symbol, reason=str(exc), source="STRATEGY"))
+            self.events.emit(PivEvent.build("BROKER_ERROR", symbol=symbol, reason=str(exc), source=order_source))
             return
         broker_id = result.get("id")
         if broker_id:

@@ -60,15 +60,25 @@ ALL_STATUSES = PENDING_STATUSES + TERMINAL_STATUSES
 CLASSIFICATION_ACTIONABLE_BUY = "ACTIONABLE_BUY"
 CLASSIFICATION_ACTIONABLE_SELL = "ACTIONABLE_SELL"
 CLASSIFICATION_WATCH = "WATCH_OBSERVATION_ONLY"
+# Task 79E -- kept structurally distinct from CLASSIFICATION_ACTIONABLE_*:
+# an experimental decision can NEVER collide with, or be deduplicated
+# against, a validated-strategy actionable one (see _dedup_key below, which
+# also folds in experimental_id).
+CLASSIFICATION_EXPERIMENTAL_BUY = "EXPERIMENTAL_BUY"
+CLASSIFICATION_EXPERIMENTAL_SELL = "EXPERIMENTAL_SELL_TO_CLOSE"
 
 _UNVALIDATED_REASON = "STRATEGY_UNVALIDATED_NO_ACTIONABLE_BUY_PROMOTION"
 
+EXPERIMENTAL_BANNER = "EXPERIMENTAL / UNVALIDATED / PAPER OR SHADOW ONLY / NO REAL CAPITAL"
+
 
 def classify(decision: Decision) -> str | None:
+    if decision.recommendation == Recommendation.EXPERIMENTAL_BUY:
+        return CLASSIFICATION_EXPERIMENTAL_BUY
     if decision.recommendation == Recommendation.BUY:
         return CLASSIFICATION_ACTIONABLE_BUY
     if decision.recommendation == Recommendation.SELL_TO_CLOSE:
-        return CLASSIFICATION_ACTIONABLE_SELL
+        return CLASSIFICATION_EXPERIMENTAL_SELL if decision.experimental else CLASSIFICATION_ACTIONABLE_SELL
     if _UNVALIDATED_REASON in decision.reason_codes:
         return CLASSIFICATION_WATCH
     return None
@@ -77,11 +87,33 @@ def classify(decision: Decision) -> str | None:
 def _format_message(decision: Decision, classification: str) -> str:
     tag = f"[{classification}]"
     execution = decision.execution_status.value
-    bits = [
-        tag, "PAPER / NO REAL CAPITAL", decision.ticker, decision.recommendation.value,
+    bits = [tag]
+    if decision.experimental:
+        # Task 79E -- REQUIRED prominent banner on every experimental
+        # notification, verbatim.
+        bits.append(EXPERIMENTAL_BANNER)
+    else:
+        bits.append("PAPER / NO REAL CAPITAL")
+    bits += [
+        decision.ticker, decision.recommendation.value,
         f"strategy_approval={decision.strategy_approval_status.value}", f"execution_status={execution}",
         f"reasons={','.join(decision.reason_codes)}",
+        f"entry={decision.entry_price}", f"stop={decision.stop_price}", f"target={decision.target_price}",
+        f"horizon={decision.horizon}",
     ]
+    if decision.experimental:
+        bits.append(f"experiment_id={decision.experimental_id}")
+        bits.append(f"strategy_id={decision.strategy_id}")
+        bits.append(f"strategy_version={decision.strategy_version}")
+        # Honest, non-fabricated broker-execution status at the moment this
+        # message was composed -- never claims "filled"/"sent" here (that
+        # is recorded separately, keyed by decision_id, by lifecycle.py's
+        # own apply_broker_update once/if it actually happens).
+        broker_state = {
+            "ENTRY_ELIGIBLE_EXPERIMENTAL_PAPER": "broker_execution=ENABLED_PENDING_SUBMISSION",
+            "ENTRY_BLOCKED_EXPERIMENTAL_PAPER_NOT_PERMITTED": "broker_execution=SKIPPED_NOT_PERMITTED",
+        }.get(execution, "broker_execution=NOT_APPLICABLE")
+        bits.append(broker_state)
     return " | ".join(bits)
 
 
@@ -89,6 +121,12 @@ def _dedup_key(decision: Decision, classification: str) -> str:
     return stable_id(
         "notif", decision.ticker, decision.trading_date_et, classification,
         decision.recommendation.value, "|".join(sorted(decision.reason_codes)),
+        # Task 79E: folded in so two DIFFERENT experiments (or the same
+        # experiment across two different sessions/dates already covered by
+        # trading_date_et) are never merged into one deduplicated alert --
+        # None for every ordinary, non-experimental decision, preserving the
+        # exact pre-existing dedup key for normal-mode notifications.
+        decision.experimental_id or "",
     )
 
 
