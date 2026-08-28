@@ -55,7 +55,7 @@ def _auth(*, identity, allowed_symbols=("AAPL",), paper=None, activated_delta=ti
         strategy_id="macd_bullish_cross", strategy_version=get_strategy_version(),
         runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
         allowed_symbols=frozenset(s.upper() for s in allowed_symbols),
-        trading_date_et=identity.trading_date_et, session_scope="REGULAR",
+        trading_date_et=identity.trading_date_et, session_scope=identity.session_id,
         activated_at=now + activated_delta, expires_at=now + expires_delta,
         paper=paper,
     )

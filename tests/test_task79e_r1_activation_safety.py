@@ -63,14 +63,14 @@ class ControllableTransport:
     def get(self, url, **kwargs):
         if url.endswith("/v2/account"):
             return Response({"id": self.account_id, "account_number": "PA999999", "status": "ACTIVE"})
-        if url.endswith("/v2/orders"):
+        if url.endswith("/v2/orders:by_client_order_id"):
             params = kwargs.get("params") or {}
             client_order_id = params.get("client_order_id")
-            if client_order_id is not None:
-                if client_order_id in self.dropped_client_order_ids:
-                    return Response([])
-                match = next((o for o in self.orders if o.get("client_order_id") == client_order_id), None)
-                return Response([match] if match else [])
+            if client_order_id in self.dropped_client_order_ids:
+                return Response({"message": "order not found"}, 404)
+            match = next((o for o in self.orders if o.get("client_order_id") == client_order_id), None)
+            return Response(match, 200) if match else Response({"message": "order not found"}, 404)
+        if url.endswith("/v2/orders"):
             return Response([o for o in self.orders if o.get("status") not in ("filled", "rejected", "canceled")])
         if "/v2/orders/" in url:
             order_id = url.rsplit("/", 1)[-1]
@@ -151,7 +151,8 @@ class _NullRedisClient:
 
 
 def build_stack(tmp_path, *, universe=("AAPL", "MSFT"), paper_enabled=("AAPL", "MSFT"),
-                 auth=None, auth_path=None, transport=None, trading_date_et=None, redis_client=None):
+                 auth=None, auth_path=None, transport=None, trading_date_et=None, redis_client=None,
+                 bind_auth_to_live_session=True):
     cfg = PivConfig(
         key_id="key", secret_key="secret", paper_trading=True, real_capital=False,
         broker_endpoint=PAPER_ENDPOINT, approved_sha="abc", state_dir=tmp_path,
@@ -162,6 +163,21 @@ def build_stack(tmp_path, *, universe=("AAPL", "MSFT"), paper_enabled=("AAPL", "
     broker.verify_paper_identity()
     identity = build_session_identity(cfg)
     bus = EventBus(tmp_path / "piv_events.jsonl", feed_mode=cfg.feed_mode, session_id=identity.session_id)
+    if bind_auth_to_live_session:
+        # Task 79E-R2: session_scope is now bound to the REAL, per-process
+        # session_id (see decision_engine.py's _live_session_scope), which
+        # cannot be known before `identity` is computed above -- rebind the
+        # fixture's auth (object or on-disk file) here so every existing
+        # `auth=_auth()`/`auth_path=...` call site keeps working unchanged.
+        # Pass bind_auth_to_live_session=False for a test that deliberately
+        # wants an UNRELATED session_scope.
+        if auth is not None:
+            import dataclasses
+            auth = dataclasses.replace(auth, session_scope=identity.session_id)
+        if auth_path is not None and auth_path.exists():
+            payload = json.loads(auth_path.read_text(encoding="utf-8"))
+            payload["session_scope"] = identity.session_id
+            auth_path.write_text(json.dumps(payload), encoding="utf-8")
     life = PaperLifecycle(
         tmp_path / "lifecycle_state.json", broker, bus, PaperEntrySettings.for_test(*paper_enabled),
         experimental_authorization=auth, experimental_authorization_path=auth_path,
@@ -304,11 +320,16 @@ def test_rejected_exit_keeps_position_tracked_for_retry(tmp_path):
     assert life.remaining_holdings("AAPL") == 0.0
 
 
-def test_missing_exit_plan_fails_visibly(tmp_path):
-    """An OPEN lifecycle position with NO corresponding self.positions entry
-    (state mutated out of band, or rehydration somehow missed it) must
-    produce a visible error event -- never be silently ignored, and never
-    have a stop/target plan invented for it."""
+def test_missing_exit_plan_self_heals_when_recoverable(tmp_path):
+    """Task 79E-R2: an OPEN lifecycle position with NO corresponding
+    self.positions entry, but with enough persisted information to safely
+    rebuild a plan from (quantity + stop/target), now SELF-HEALS via the
+    same rehydration logic a restart would use -- rather than staying a
+    permanently-orphaned, merely-visible gap for the rest of the session.
+    The genuinely UNRECOVERABLE case (no usable quantity at all) is
+    covered separately by
+    test_task79e_r2_activation_safety.py::test_rehydration_blocked_when_quantity_information_missing,
+    which still fails visibly and is never silently ignored or invented."""
     engine, life, transport, outbox, shadow, bus, tmp_path2 = build_stack(tmp_path)
     life.state.positions["orphan_pos"] = {
         "symbol": "MSFT", "quantity": 1.0, "price": 100.0, "status": "OPEN",
@@ -321,13 +342,15 @@ def test_missing_exit_plan_fails_visibly(tmp_path):
     import asyncio
     asyncio.run(engine.on_bars({"MSFT": bar(100.0)}))
 
-    events = json.loads(bus.path.read_text(encoding="utf-8")) if False else [
-        json.loads(line) for line in bus.path.read_text(encoding="utf-8").splitlines() if line.strip()
-    ]
+    assert "MSFT" in engine.positions
+    assert engine.positions["MSFT"].stop_price == 98.0
+    assert engine.positions["MSFT"].target_price == 104.0
+    events = [json.loads(line) for line in bus.path.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert any(
-        e.get("event") == "BROKER_ERROR" and e.get("reason") == "MISSING_EXIT_PLAN_FOR_OPEN_POSITION" and e.get("symbol") == "MSFT"
+        e.get("event") == "BROKER_ERROR" and e.get("reason") == "EXIT_PLAN_REHYDRATED_FROM_PERSISTED_STATE" and e.get("symbol") == "MSFT"
         for e in events
     )
+    assert not any(e.get("reason") == "MISSING_EXIT_PLAN_FOR_OPEN_POSITION" for e in events)
 
 
 # ---------------------------------------------------------------------------
@@ -402,7 +425,9 @@ async def test_same_bar_as_entry_never_triggers_stop(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_wrong_session_scope_blocks_experimental_entry_at_decision_layer(tmp_path):
-    engine, life, transport, outbox, shadow, bus, _ = build_stack(tmp_path, auth=_auth(session_scope="PIV_LIFECYCLE_PROBE"))
+    engine, life, transport, outbox, shadow, bus, _ = build_stack(
+        tmp_path, auth=_auth(session_scope="PIV_LIFECYCLE_PROBE"), bind_auth_to_live_session=False,
+    )
     with _no_sleep_poll(life):
         engine._handle_entry(make_signal())
     assert transport.orders == []
@@ -461,6 +486,11 @@ def test_edited_binding_mid_session_blocks_next_entry(tmp_path):
     payload["allowed_symbols"] = ["AAPL", "MSFT"]
     auth_path.write_text(json.dumps(payload), encoding="utf-8")
     engine, life, transport, outbox, shadow, bus, _ = build_stack(tmp_path, auth_path=auth_path)
+    # build_stack rebinds session_scope to the live session_id on the FILE
+    # (see bind_auth_to_live_session) -- keep this test's own in-memory
+    # `payload` dict in sync so its own later re-write below does not
+    # clobber that rebind back to the stale "REGULAR" placeholder.
+    payload["session_scope"] = bus.session_id
 
     with _no_sleep_poll(life):
         engine._handle_entry(make_signal(ticker="AAPL"))
@@ -542,6 +572,16 @@ def test_uncertain_submission_confirmed_not_reached_broker_frees_pyramiding_guar
     with pytest.raises(PaperGuardError, match="PENDING_ENTRY_EXISTS"):
         life.order_intent("s2", "AAPL", "buy", 1.0, source="STRATEGY", reference_price=100.0)
 
+    # Task 79E-R2: a SINGLE 404 must never be conclusive -- the first
+    # reconcile() leaves the intent still uncertain (still fail-closed),
+    # and the pyramiding guard must still be blocking a same-symbol entry.
+    life.reconcile()
+    assert life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_UNCERTAIN"
+    with pytest.raises(PaperGuardError, match="PENDING_ENTRY_EXISTS"):
+        life.order_intent("s2b", "AAPL", "buy", 1.0, source="STRATEGY", reference_price=100.0)
+
+    # A SECOND independent 404, on a SEPARATE reconcile() pass, is what
+    # finally confirms it.
     life.reconcile()
     assert life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED"
     # A genuinely NEW signal_id may now proceed -- never a blind retry of s1.
@@ -589,7 +629,7 @@ def test_damaged_budget_record_fails_closed(tmp_path):
             "s1", "AAPL", "buy", 1.0, source="EXPERIMENTAL", reference_price=100.0,
             experimental_id="exp-r1", experimental_trading_date_et=_auth().trading_date_et,
             strategy_id="macd_bullish_cross", experimental_strategy_version=get_strategy_version(),
-            experimental_session_scope="REGULAR",
+            experimental_session_scope=life.experimental_authorization.session_scope,
         )
     assert life.state.experimental_budgets["exp-r1"] == "not-a-dict"  # evidence preserved, not overwritten
 
@@ -610,7 +650,7 @@ def test_various_damaged_budget_shapes_fail_closed(tmp_path, bad_value):
             "s1", "AAPL", "buy", 1.0, source="EXPERIMENTAL", reference_price=100.0,
             experimental_id="exp-r1", experimental_trading_date_et=_auth().trading_date_et,
             strategy_id="macd_bullish_cross", experimental_strategy_version=get_strategy_version(),
-            experimental_session_scope="REGULAR",
+            experimental_session_scope=life.experimental_authorization.session_scope,
         )
 
 
@@ -630,7 +670,7 @@ def test_missing_budget_with_prior_activity_fails_closed(tmp_path):
             "s1", "AAPL", "buy", 1.0, source="EXPERIMENTAL", reference_price=100.0,
             experimental_id="exp-r1", experimental_trading_date_et=_auth().trading_date_et,
             strategy_id="macd_bullish_cross", experimental_strategy_version=get_strategy_version(),
-            experimental_session_scope="REGULAR",
+            experimental_session_scope=life.experimental_authorization.session_scope,
         )
 
 
@@ -642,7 +682,7 @@ def test_invalid_reference_price_rejected(tmp_path):
                 f"s-{bad_price}", "AAPL", "buy", 1.0, source="EXPERIMENTAL", reference_price=bad_price,
                 experimental_id="exp-r1", experimental_trading_date_et=_auth().trading_date_et,
                 strategy_id="macd_bullish_cross", experimental_strategy_version=get_strategy_version(),
-                experimental_session_scope="REGULAR",
+                experimental_session_scope=life.experimental_authorization.session_scope,
             )
     assert transport.orders == []
 

@@ -84,24 +84,50 @@ class AlpacaPaperClient:
         return dict(response.json())
 
     def find_order_by_client_id(self, client_order_id: str) -> dict[str, Any] | None:
-        """Task 79E-R1: the ONLY way to resolve a SUBMIT_FAILED_UNCERTAIN
+        """Task 79E-R1/R2: the ONLY way to resolve a SUBMIT_FAILED_UNCERTAIN
         intent -- one whose submit_order call raised BEFORE any broker order
         id was ever received, so lifecycle.py has no id to poll with
         get_order. Alpaca's own order-status-vocabulary is keyed by broker
         id, but every order this codebase submits also carries a stable,
         locally-derived client_order_id (see lifecycle.stable_id) -- looking
-        the order up by THAT identity (status=all, so a since-terminalised
-        order is still found) answers "did this actually reach the broker?"
-        without ever blindly resubmitting. Returns None if the broker has no
-        record of it at all (the original request never arrived)."""
+        the order up by THAT identity answers "did this actually reach the
+        broker?" without ever blindly resubmitting.
+
+        Task 79E-R2: uses Alpaca's ACTUAL documented endpoint --
+        `GET /v2/orders:by_client_order_id?client_order_id=...` (see
+        https://docs.alpaca.markets/us/reference/getorderbyclientorderid),
+        NOT `/v2/orders?status=all&client_order_id=...` (an R1 mistake --
+        that query param is not part of the documented list-orders filter
+        set at all; it happened to "work" only because the offline fakes
+        modeled the WRONG contract). Returns the single Order object on a
+        clean 200, or None on a clean 404 (an explicit "no such order"
+        response, per Alpaca's get-by-id semantics). Any OTHER response
+        (malformed body, non-404 error status) raises -- lifecycle.py's own
+        caller already treats a raised exception as "still unresolved,
+        retry later," never as evidence of anything; only a genuine 404 (or
+        a genuine match) is evidence. A single 404 is deliberately NOT
+        treated as fully conclusive by the caller either -- see
+        lifecycle.py's own _resolve_uncertain_submissions, which requires
+        this to be observed on more than one separate reconcile() pass
+        before treating "not found" as durable evidence the order never
+        reached the broker."""
         self._require_verified()
         response = self.transport.get(
-            f"{PAPER_ENDPOINT}/v2/orders", headers=self.headers,
-            params={"status": "all", "limit": 1, "client_order_id": client_order_id}, timeout=15,
+            f"{PAPER_ENDPOINT}/v2/orders:by_client_order_id", headers=self.headers,
+            params={"client_order_id": client_order_id}, timeout=15,
         )
+        if response.status_code == 404:
+            return None
         response.raise_for_status()
-        orders = list(response.json() or [])
-        return orders[0] if orders else None
+        body = response.json()
+        if not isinstance(body, dict) or not body.get("id"):
+            # Task 79E-R2: a 200 with a malformed/empty body is NOT the same
+            # as a documented 404 -- it is ambiguous, not evidence of
+            # anything. Raising (rather than returning None) keeps the
+            # caller's fail-closed "still unresolved" path, never silently
+            # treated as "confirmed not submitted."
+            raise PaperGuardError(f"malformed order-by-client-id response for {client_order_id!r}")
+        return body
 
     def positions(self) -> list[dict[str, Any]]:
         self._require_verified()

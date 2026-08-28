@@ -37,6 +37,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+import math
 from typing import Any
 
 from talonx_quant.config import QuantConfig
@@ -60,14 +61,15 @@ PIV_QUANTITY = 1.0
 # researched/frozen/validated (Task69Q PERMANENT PRODUCT TARGET #6). Do not
 # widen this without a separately validated longer-horizon strategy family.
 NATURAL_STRATEGY_HORIZON = "INTRADAY_SHORT"
-# Task 79E-R1: the ONE fixed scope value every REAL call site of this module
-# passes -- identifies "the live natural-strategy decision path" so an
-# experimental authorization can never silently leak into a differently-
-# scoped session (the isolated PIV_LIFECYCLE_PROBE lifecycle never routes
-# through DecisionEngine/order_intent(source="EXPERIMENTAL") at all, so it
-# is structurally excluded regardless). See experimental_authorization.py's
-# own docstring for the full rationale.
-EXPERIMENTAL_SESSION_SCOPE_REGULAR = "REGULAR"
+
+
+def _is_finite_positive_number(value: Any) -> bool:
+    """Task 79E-R2: strict validity check for a persisted quantity field --
+    bool excluded explicitly (bool is an int subclass in Python), matching
+    experimental_authorization.py's own strict-parsing posture."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return math.isfinite(value) and value > 0
 
 
 def _natural_strategy_version() -> str:
@@ -199,48 +201,120 @@ class DecisionEngine:
         self._rehydrate_positions()
 
     def _rehydrate_positions(self) -> None:
-        """Task 79E-R1: rebuild self.positions from lifecycle.state.positions
-        (persisted, restart-surviving truth) so a process restart does not
-        silently lose an open position's exit plan (Task 79E's own disclosed
-        gap -- see remaining_issues.md item 1). Relies on order_intent's
-        target_price persistence (added this task, alongside the
-        pre-existing stop_price) to restore the full plan. A rehydrated
-        position is never causality-gated at all (see _check_exit's own
-        docstring on `skip_price_check`, which only on_bars() ever sets --
-        a rehydrated position was never opened by THIS process on THIS
-        tick, so it carries no same-bar-as-entry risk in the first place)."""
+        """Task 79E-R1/R2: rebuild self.positions from lifecycle.state.
+        positions (persisted, restart-surviving truth) so a process
+        restart does not silently lose an open position's exit plan (Task
+        79E's own disclosed gap -- see remaining_issues.md item 1). Relies
+        on order_intent's target_price persistence (alongside the
+        pre-existing stop_price) to restore the full plan, and on
+        lifecycle.mark_exit_triggered's own `triggered_exit_reason`
+        persistence to restore a plan that had ALREADY fired before the
+        restart -- Task 79E-R2 Requirement 3: "a triggered exit must
+        remain actionable after restart even if price recovers." A
+        rehydrated position is never causality-gated by skip_price_check
+        (see on_bars/_check_exit) -- it was never opened by THIS process
+        on THIS tick, so it carries no same-bar-as-entry risk in the first
+        place; it IS still subject to the pending/uncertain-entry
+        preservation _check_exit itself applies to every symbol.
+
+        Task 79E-R2 Requirement 3: "missing required plan fields must
+        produce explicit degraded/blocked recovery -- not
+        'NO_ACTION_REQUIRED'":
+        - No usable quantity information at all (neither `quantity` nor
+          `remaining_quantity` is a genuine finite positive number) means
+          exits could never be sized safely -- this method does NOT
+          rehydrate a plan it cannot trust; the position is deliberately
+          left untracked here so _flag_orphaned_positions's own visible
+          MISSING_EXIT_PLAN_FOR_OPEN_POSITION catches it on the very next
+          tick, rather than silently inventing a size or dropping it with
+          no signal at all.
+        - Both stop_price AND target_price missing means the position CAN
+          be tracked (sized exits and forced EOD flatten still work) but
+          has no NATURAL trigger at all -- flagged as degraded rather than
+          claiming "no action required."
+        """
         for position in self.lifecycle.state.positions.values():
             if position.get("status") != "OPEN":
                 continue
             symbol = position.get("symbol")
             if not symbol or symbol in self.positions:
                 continue
-            experimental_id = position.get("experimental_id")
-            self.positions[symbol] = OpenDecisionPosition(
-                symbol, f"rehydrated_{symbol}", position.get("stop_price"), position.get("target_price"),
-                experimental=experimental_id is not None, experimental_id=experimental_id,
-            )
+            self._try_rehydrate_one(symbol, position)
+
+    def _try_rehydrate_one(self, symbol: str, position: dict) -> bool:
+        """Shared by _rehydrate_positions (at construction) AND
+        _flag_orphaned_positions (mid-session, e.g. for a position that
+        only became OPEN AFTER a SUBMIT_FAILED_UNCERTAIN entry was later
+        confirmed-adopted-and-filled by reconcile() -- _handle_entry's own
+        self.positions[symbol] assignment is never reached for that case,
+        since the raw exception propagates past it per the Task 78I
+        contract; this is what closes that gap generally, rather than
+        leaving it a permanently-orphaned, merely-visible-but-never-healed
+        position for the rest of the session). Returns True iff a plan was
+        (possibly degraded) rehydrated; False iff recovery was BLOCKED
+        (see this method's own event reasons for which)."""
+        quantity = position.get("quantity")
+        remaining_quantity = position.get("remaining_quantity")
+        if not _is_finite_positive_number(remaining_quantity) and not _is_finite_positive_number(quantity):
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", symbol=symbol, reason="EXIT_PLAN_RECOVERY_BLOCKED_MISSING_QUANTITY",
+                status="DEGRADED_RECOVERY_ORPHAN_EXPECTED_NEXT_TICK",
+            ))
+            return False
+        stop_price = position.get("stop_price")
+        target_price = position.get("target_price")
+        experimental_id = position.get("experimental_id")
+        triggered_exit_reason = position.get("triggered_exit_reason")
+        self.positions[symbol] = OpenDecisionPosition(
+            symbol, f"rehydrated_{symbol}", stop_price, target_price,
+            experimental=experimental_id is not None, experimental_id=experimental_id,
+            exit_reason=triggered_exit_reason,
+        )
+        if triggered_exit_reason is not None:
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", symbol=symbol, reason="EXIT_PLAN_REHYDRATED_WITH_TRIGGERED_EXIT_PENDING",
+                status=f"RESTART_RECOVERY_MUST_STILL_SELL_REASON_{triggered_exit_reason}",
+            ))
+        elif stop_price is None and target_price is None:
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", symbol=symbol, reason="EXIT_PLAN_RECOVERED_WITHOUT_PROTECTIVE_LEVELS",
+                status="DEGRADED_RECOVERY_NO_NATURAL_STOP_OR_TARGET",
+            ))
+        else:
             self.events.emit(PivEvent.build(
                 "BROKER_ERROR", symbol=symbol, reason="EXIT_PLAN_REHYDRATED_FROM_PERSISTED_STATE",
                 status="RESTART_RECOVERY_NO_ACTION_REQUIRED",
             ))
+        return True
 
     def _flag_orphaned_positions(self, symbols: Any) -> None:
-        """Task 79E-R1: "missing plans must fail visibly, not be invented" --
-        an OPEN lifecycle position with no corresponding self.positions
-        entry (e.g. rehydration missed it, or state was mutated out of
-        band) must never be silently ignored OR have a plan fabricated for
-        it. Checked only for symbols this tick actually observed a bar for
-        (cheap; every genuinely open position eventually appears here)."""
+        """Task 79E-R1/R2: "missing plans must fail visibly, not be
+        invented" -- an OPEN lifecycle position with no corresponding
+        self.positions entry (e.g. rehydration missed it, state was
+        mutated out of band, or a SUBMIT_FAILED_UNCERTAIN entry was only
+        confirmed-adopted-and-filled by a LATER reconcile() call, after
+        _handle_entry's own exception already propagated past its
+        self.positions[symbol] assignment) is first given a chance to
+        self-heal via the SAME rehydration logic a restart would use
+        (_try_rehydrate_one) -- if that succeeds, this is no longer a gap
+        at all. Only a GENUINE recovery failure (unsizeable quantity) is
+        ever left as a visible MISSING_EXIT_PLAN_FOR_OPEN_POSITION
+        (_try_rehydrate_one's own event already covers that case, so
+        nothing further is invented here). Checked only for symbols this
+        tick actually observed a bar for (cheap; every genuinely open
+        position eventually appears here)."""
         for symbol in symbols:
             if symbol in self.positions:
                 continue
             lifecycle_position = self.lifecycle._open_position_for(symbol)
-            if lifecycle_position is not None:
-                self.events.emit(PivEvent.build(
-                    "BROKER_ERROR", symbol=symbol, reason="MISSING_EXIT_PLAN_FOR_OPEN_POSITION",
-                    status="ORPHANED_POSITION_NOT_MONITORED_FOR_STOP_TARGET",
-                ))
+            if lifecycle_position is None:
+                continue
+            if self._try_rehydrate_one(symbol, lifecycle_position):
+                continue
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", symbol=symbol, reason="MISSING_EXIT_PLAN_FOR_OPEN_POSITION",
+                status="ORPHANED_POSITION_NOT_MONITORED_FOR_STOP_TARGET",
+            ))
 
     async def start(self, universe: list[str] | None = None, now: datetime | None = None) -> list[WarmupCheck]:
         """Causal pre-market hydration, then subscribe to the scanner's own
@@ -390,6 +464,26 @@ class DecisionEngine:
             return load_experimental_authorization(self.experimental_authorization_path)
         return self.experimental_authorization
 
+    def _live_session_scope(self) -> str:
+        """Task 79E-R2 Requirement 5: "'REGULAR' is a category, not a
+        session identity" -- Task 79E-R1 bound every experimental
+        permission check to a fixed literal "REGULAR" string, which never
+        actually distinguished one live session from another. This binds
+        to the AUTHORITATIVE durable live-session identity instead:
+        `self.events.session_id`, minted once per process by
+        session_identity.build_session_identity and persisted to
+        session_identity.json at `start`/`supervise` time. Binding to the
+        real session id means a genuinely different process invocation
+        (which always mints a fresh session_id -- see session_identity.py's
+        own docstring) is correctly rejected as an unrelated session, while
+        an in-process supervised restart
+        (talonx_piv.supervisor.run_with_bounded_restart, which reconstructs
+        SessionRunner/DecisionEngine but reuses the SAME EventBus/
+        session_id across bounded restarts) is correctly recognised as THE
+        SAME session recovering, never a new one -- permits same-session
+        recovery while rejecting unrelated invocations."""
+        return self.events.session_id or ""
+
     def _experimental_permissions(self, *, symbol: str, signal: QuantSignal, trading_date_et: str) -> tuple[bool, bool, str | None]:
         """Returns (experimental_buy_permitted, experimental_paper_permitted,
         experimental_id) -- both booleans default False/False if no
@@ -424,7 +518,7 @@ class DecisionEngine:
         buy_ok, buy_reason = auth.permits_entry(
             symbol=symbol, trading_date_et=trading_date_et, strategy_id=signal.signal_type.value,
             strategy_version=_natural_strategy_version(), runtime_sha=self.runtime_sha or "",
-            config_hash=self.config_hash or "", now=now, session_scope=EXPERIMENTAL_SESSION_SCOPE_REGULAR,
+            config_hash=self.config_hash or "", now=now, session_scope=self._live_session_scope(),
         )
         if not buy_ok:
             return False, False, None
@@ -433,7 +527,7 @@ class DecisionEngine:
             symbol=symbol, trading_date_et=trading_date_et, strategy_id=signal.signal_type.value,
             strategy_version=_natural_strategy_version(), runtime_sha=self.runtime_sha or "",
             config_hash=self.config_hash or "", now=now, account_id=account_id,
-            session_scope=EXPERIMENTAL_SESSION_SCOPE_REGULAR,
+            session_scope=self._live_session_scope(),
         )
         return True, paper_ok, auth.experiment_id
 
@@ -498,7 +592,7 @@ class DecisionEngine:
                 extra_kwargs = dict(
                     experimental_id=decision.experimental_id, experimental_trading_date_et=trading_date_et,
                     experimental_strategy_version=_natural_strategy_version(),
-                    experimental_session_scope=EXPERIMENTAL_SESSION_SCOPE_REGULAR,
+                    experimental_session_scope=self._live_session_scope(),
                 )
             result = self.lifecycle.order_intent(
                 signal_id, symbol, "buy", PIV_QUANTITY, source=order_source, alpha_evidence=False,
@@ -528,17 +622,33 @@ class DecisionEngine:
         # terminal or a later reconcile()) without this engine ever having
         # re-observed it until now. Confirmed flat -> stop tracking; never
         # invent/guess a plan for a symbol lifecycle no longer shows OPEN.
+        #
+        # Task 79E-R2 Requirement 2: "do not delete exit tracking merely
+        # because no OPEN position exists yet" -- a BUY can be legitimately
+        # ACCEPTED-BUT-NOT-YET-FILLED (or its true outcome genuinely
+        # uncertain) for one or more ticks after order_intent succeeded and
+        # self.positions[symbol] was created in _handle_entry, BEFORE
+        # lifecycle ever shows an OPEN position for it. Tracking is only
+        # ever dropped here when lifecycle shows NEITHER an OPEN position
+        # NOR any pending/uncertain entry outstanding -- i.e. the entry is
+        # genuinely, conclusively gone (rejected, confirmed-not-submitted,
+        # or the position was already fully sold and closed).
         if self.lifecycle._open_position_for(symbol) is None:
+            if self.lifecycle.entry_still_pending_or_uncertain(symbol):
+                return  # keep the plan; nothing confirmed-held yet to protect or sell
             del self.positions[symbol]
             return
-        # Task 79E-R1 entry/exit causality: `skip_price_check` is set ONLY
-        # by on_bars() itself, ONLY for a symbol that _handle_entry just
-        # opened a position for on THIS SAME tick -- on_bars hands that
-        # SAME bar to both _handle_entry (as the signal source) and
-        # _check_exit (as the price to test) in one call, and that bar's
-        # own low/high may reflect price action that occurred before the
-        # actual fill, which must never be allowed to retroactively trigger
-        # a protective exit. Deliberately NOT derived from wall-clock
+        # Task 79E-R1/R2 entry/exit causality: `skip_price_check` is set
+        # ONLY by on_bars() itself, computed as "was this symbol's
+        # lifecycle position ALREADY confirmed OPEN before this tick's own
+        # entries were processed" (see on_bars's own comment) -- true fill-
+        # state, not merely "was this the same tick _handle_entry ran on."
+        # This correctly protects BOTH a same-tick fill (the original R1
+        # case: the entry bar's own low/high must never retroactively
+        # trigger its own stop) AND a genuinely DELAYED fill (an order left
+        # pending/accepted for one or more ticks before it actually fills
+        # -- R1's narrower rule left that case's own first-eligible bar
+        # unprotected). Deliberately NOT derived from wall-clock
         # timestamps (an earlier draft compared `bar.timestamp` against a
         # persisted entry timestamp with `>`, but two back-to-back
         # `datetime.now()` calls were observed to produce BIT-IDENTICAL
@@ -547,14 +657,15 @@ class DecisionEngine:
         # test_stop_hit_triggers_controlled_exit, which caught this in the
         # full suite; clock-resolution-based ordering is not a safe
         # primitive here). A DIRECT _check_exit call (every test/caller
-        # that does not go through on_bars) is therefore never
-        # causality-gated at all -- exactly its pre-Task79E-R1 behaviour.
-        # A forced exit (EOD flatten) is time-based, never price-based, and
-        # always bypasses this gate too. Once a reason has already been
-        # latched (position.exit_reason), it is never re-derived from
-        # price again -- only confirmed-flat (above) clears it, so a
-        # delayed/partial exit keeps being retried regardless of where
-        # price moves afterward.
+        # that does not go through on_bars) defaults to fully eligible --
+        # only on_bars's own same-tick-vs-delayed-fill orchestration can
+        # ever have the ambiguity this gate exists to resolve. A forced
+        # exit (EOD flatten) is time-based, never price-based, and always
+        # bypasses this gate too. Once a reason has already been latched
+        # (position.exit_reason), it is never re-derived from price again
+        # -- only confirmed-flat (above) clears it, so a delayed/partial
+        # exit keeps being retried regardless of where price moves
+        # afterward.
         causally_eligible = force_reason is not None or not skip_price_check
         reason = force_reason or position.exit_reason
         if reason is None and causally_eligible:
@@ -564,6 +675,13 @@ class DecisionEngine:
                 reason = "TARGET"
         if reason is not None and position.exit_reason is None:
             position.exit_reason = reason
+            # Task 79E-R2 Requirement 3: persisted immediately, not only
+            # held in memory -- "a triggered exit must remain actionable
+            # after restart even if price recovers." A no-op (never
+            # overwrites an already-recorded reason) if lifecycle already
+            # has one for this symbol, e.g. from a prior process's own
+            # trigger this rehydrated position already carried in.
+            self.lifecycle.mark_exit_triggered(symbol, reason)
         decision_id = stable_id("decision", "exit", symbol, bar.timestamp.isoformat())
         decision = decide(
             decision_id=decision_id, session_id=self.events.session_id or "",
@@ -606,7 +724,7 @@ class DecisionEngine:
                 reference_price=exit_reference_price, signal_timestamp=bar.timestamp.isoformat(),
                 horizon=NATURAL_STRATEGY_HORIZON, decision_id=decision.decision_id,
                 experimental_id=position.experimental_id if position.experimental else None,
-                experimental_session_scope=EXPERIMENTAL_SESSION_SCOPE_REGULAR if position.experimental else None,
+                experimental_session_scope=self._live_session_scope() if position.experimental else None,
             )
         except PaperGuardError as exc:
             # Task 79E-R1: the position stays tracked (never deleted here) --
@@ -631,22 +749,31 @@ class DecisionEngine:
         self.evaluation_cycles += 1
         self.symbols_evaluated_total += len(bars)
         self._flag_orphaned_positions(bars.keys())
+        # Task 79E-R2 Requirement 4: captured BEFORE this tick's entries are
+        # processed -- a symbol is only causality-ELIGIBLE for a NATURAL
+        # price-based stop/target check if its lifecycle position was
+        # ALREADY confirmed OPEN (i.e. genuinely filled) prior to this
+        # tick, so price-based evaluation can never use price action from
+        # at-or-before the fill -- regardless of whether the fill happened
+        # synchronously during THIS tick's own _handle_entry (the original
+        # same-tick-entry case) or was only confirmed later, on some
+        # earlier tick, after a genuinely DELAYED fill (an order that stays
+        # pending/accepted for one or more ticks before it fills) --
+        # replacing Task 79E-R1's narrower "did _handle_entry just create
+        # this position on THIS tick" rule, which only protected the
+        # same-tick case and left a delayed fill's own first-eligible bar
+        # unprotected. A rehydrated (restart-recovered) position is,
+        # symmetrically, ALREADY open before the very first post-restart
+        # tick, so it is correctly fully eligible from that first tick.
+        already_filled_before_tick = {
+            symbol for symbol in bars if self.lifecycle._open_position_for(symbol) is not None
+        }
         for symbol, bar in bars.items():
             await self.feed_bar(symbol, bar)
-        # Task 79E-R1: track which symbols get a BRAND NEW position from a
-        # signal drained THIS tick -- see _check_exit's own docstring for
-        # why this (never a wall-clock comparison) is what protects a fresh
-        # entry from being immediately stopped out by the SAME bar's own
-        # low/high, fed to _check_exit for every symbol right below.
-        entered_this_tick: set[str] = set()
         for signal in await self.flush_and_collect():
-            entry_symbol = signal.ticker.upper()
-            had_position = entry_symbol in self.positions
             self._handle_entry(signal)
-            if not had_position and entry_symbol in self.positions:
-                entered_this_tick.add(entry_symbol)
         for symbol, bar in bars.items():
-            self._check_exit(symbol, bar, skip_price_check=symbol in entered_this_tick)
+            self._check_exit(symbol, bar, skip_price_check=symbol not in already_filled_before_tick)
         for symbol, bar in bars.items():
             # Task 77I Stage 3: advances PENDING_FILL -> OPEN and checks
             # OPEN -> CLOSED for any shadow position on this symbol, using

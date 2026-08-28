@@ -226,6 +226,18 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 shadow_ledger = ShadowLedger(config.state_dir / "shadow_ledger.json")
                 gemini_enrichment = GeminiEnrichmentOutbox(config.state_dir / "gemini_enrichment.json")
+                # Task 79E-R2 Requirement 3: "restore only against reconciled
+                # exposure" -- the `supervise` command's own startup sequence
+                # already reconciles broker state (open orders, positions,
+                # unexpected shorts, and now also any UNCONFIRMED_TIMEOUT/
+                # SUBMIT_FAILED_UNCERTAIN order) BEFORE ever constructing a
+                # DecisionEngine (see supervisor.run_startup_sequence's
+                # step3_reconcile). This plain `start` command previously had
+                # no equivalent call, so DecisionEngine.__post_init__'s own
+                # _rehydrate_positions could run against un-reconciled,
+                # possibly-stale local state. Matches supervise's posture
+                # exactly, ahead of DecisionEngine's own rehydration below.
+                lifecycle.reconcile()
                 decision_engine = DecisionEngine(
                     redis_client, bus, lifecycle, piv_config=config,
                     decision_ledger=decision_ledger, notification_outbox=notification_outbox, shadow_ledger=shadow_ledger,

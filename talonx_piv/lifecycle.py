@@ -44,6 +44,15 @@ ALLOWED_ORDER_SOURCES: frozenset[str | None] = frozenset({None, "STRATEGY", "PIV
 # duplicate-entry detection below.
 _TERMINAL_ORDER_STATUSES = frozenset({"filled", "rejected", "canceled", "expired"})
 
+# Task 79E-R2: a SUBMIT_FAILED_UNCERTAIN intent is only ever declared
+# SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED after find_order_by_client_id has
+# returned "not found" this many SEPARATE times, across separate
+# reconcile() calls -- "a single 404 must not mean confirmed never
+# submitted." Every uncertain-exposure protection (pyramiding block,
+# experimental concurrent-exposure/budget reservation) is retained for the
+# full duration, never released early.
+UNCERTAIN_SUBMISSION_CONFIRMATION_THRESHOLD = 2
+
 
 class ActionIntent(str, Enum):
     """Explicit, typed action intent -- Task 76S Stage 3 requires enforcing
@@ -225,6 +234,36 @@ class PaperLifecycle:
         for intent in self._orphaned_uncertain_intents_for(symbol, side):
             total += float(intent.get("payload", {}).get("qty", 0.0) or 0.0)
         return total
+
+    def entry_still_pending_or_uncertain(self, symbol: str) -> bool:
+        """Task 79E-R2: True iff a BUY for `symbol` has been submitted (or
+        its true outcome is still genuinely uncertain -- SUBMIT_FAILED_
+        UNCERTAIN, not yet resolved either way) but has not yet resolved to
+        either a confirmed fill (an OPEN position) or a confirmed non-fill
+        (rejected / SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED). Used by
+        decision_engine.py so exit-plan tracking is never deleted merely
+        because `_open_position_for(symbol)` does not show an OPEN
+        position YET -- an entry can be legitimately pending (accepted,
+        not yet filled) for one or more ticks before its fill lands."""
+        return bool(self._non_terminal_orders_for(symbol, "buy") or self._orphaned_uncertain_intents_for(symbol, "buy"))
+
+    def mark_exit_triggered(self, symbol: str, reason: str) -> None:
+        """Task 79E-R2: persists the triggered-exit reason onto `symbol`'s
+        OPEN position record so a restart AFTER a stop/target has fired --
+        but before the resulting sell is confirmed -- does not lose the
+        fact that this position MUST still be sold, even if price recovers
+        before the process comes back up (see decision_engine.py's
+        _rehydrate_positions, which reads this back into
+        OpenDecisionPosition.exit_reason). A no-op if there is no OPEN
+        position for the symbol, or if a reason is already recorded
+        (first-write-wins, matching the in-memory latch's own semantics --
+        the ORIGINAL trigger reason is what must survive, never overwritten
+        by a later, possibly-different one)."""
+        position = self._open_position_for(symbol)
+        if position is None or position.get("triggered_exit_reason"):
+            return
+        position["triggered_exit_reason"] = reason
+        self._save()
 
     def remaining_holdings(self, symbol: str) -> float:
         """Task 79E-R1: actual current holdings for `symbol` minus whatever
@@ -793,55 +832,117 @@ class PaperLifecycle:
             fill_price = float(current["filled_avg_price"]) if current.get("filled_avg_price") else None
             self.apply_broker_update(broker_order_id, status, filled_qty, fill_price)
 
+    def _order_response_matches_intent(self, found: dict[str, Any], payload: dict[str, Any], client_order_id: str) -> bool:
+        """Task 79E-R2: "Reject unrelated/malformed responses" -- adopting a
+        found order is a state-mutating trust decision (it creates a
+        self.state.orders entry that oversell/pyramiding/exposure guards
+        will treat as real), so it must never happen on a response that
+        merely LOOKS like a match (has a truthy `id`) without actually
+        matching the specific request this intent made. Every field the
+        broker's own contract documents for an Order (client_order_id,
+        symbol, side, qty) is cross-checked."""
+        if str(found.get("client_order_id") or "") != client_order_id:
+            return False
+        if str(found.get("symbol") or "").upper() != str(payload.get("symbol") or "").upper():
+            return False
+        if str(found.get("side") or "").lower() != str(payload.get("side") or "").lower():
+            return False
+        try:
+            found_qty = float(found.get("qty"))
+            expected_qty = float(payload.get("qty"))
+        except (TypeError, ValueError):
+            return False
+        return math.isfinite(found_qty) and abs(found_qty - expected_qty) <= 1e-6
+
     def _resolve_uncertain_submissions(self) -> None:
-        """Task 79E-R1: a SUBMIT_FAILED_UNCERTAIN intent (order_intent's own
-        submit_order call raised BEFORE any broker order id was received --
-        see order_intent's try/except) has NO broker order id to poll with
-        get_order, unlike UNCONFIRMED_TIMEOUT above. The only way to resolve
-        the genuine ambiguity ("did this actually reach the broker or not?")
-        is to look it up by its STABLE, locally-derived client_order_id (see
-        broker.find_order_by_client_id) -- never by blindly resubmitting the
-        same signal, which could double-enter if the original request in
-        fact succeeded. Found -> the order DID reach the broker despite the
-        local exception; adopted into self.state.orders and its real status
-        applied via apply_broker_update, exactly as if poll_order_until_
-        terminal had originally observed it. Not found -> the broker has no
-        record of it at all; the intent is marked terminal so pyramiding/
-        concurrent-exposure guards stop treating it as outstanding (the
-        experimental budget reservation, if any, is deliberately NOT
-        refunded even now -- conservative in the rare case the broker's own
-        "not found" read is itself unreliable/eventually-consistent)."""
+        """Task 79E-R1/R2: a SUBMIT_FAILED_UNCERTAIN intent (order_intent's
+        own submit_order call raised BEFORE any broker order id was
+        received -- see order_intent's try/except) has NO broker order id
+        to poll with get_order, unlike UNCONFIRMED_TIMEOUT above. The only
+        way to resolve the genuine ambiguity ("did this actually reach the
+        broker or not?") is to look it up by its STABLE, locally-derived
+        client_order_id (see broker.find_order_by_client_id) -- never by
+        blindly resubmitting the same signal, which could double-enter if
+        the original request in fact succeeded.
+
+        Task 79E-R2 hardening over R1:
+        - A response IS verified (client_order_id/symbol/side/qty) against
+          the ORIGINAL intent before being adopted as evidence of anything
+          -- an unrelated or malformed response is rejected outright and
+          leaves the intent exactly as unresolved as before this call.
+        - A single "not found" (404) is NOT treated as conclusive -- the
+          reservation (pyramiding block, experimental exposure/budget) is
+          retained until the SAME "not found" outcome has been observed
+          across UNCERTAIN_SUBMISSION_CONFIRMATION_THRESHOLD separate
+          reconcile() passes, each a fresh, independent broker read.
+
+        Found-and-verified -> the order DID reach the broker despite the
+        local exception; adopted into self.state.orders and its real
+        status applied via apply_broker_update, exactly as if
+        poll_order_until_terminal had originally observed it. Confirmed
+        not-found (after the threshold) -> the intent is marked terminal
+        so pyramiding/concurrent-exposure guards stop treating it as
+        outstanding (the experimental budget reservation, if any, is
+        deliberately NOT refunded even now -- conservative in case the
+        broker's own repeated "not found" reads are themselves unreliable/
+        eventually-consistent)."""
         uncertain_ids = [
             intent_id for intent_id, intent in self.state.intents.items()
             if intent.get("status") == "SUBMIT_FAILED_UNCERTAIN"
         ]
         for intent_id in uncertain_ids:
             intent = self.state.intents[intent_id]
-            client_order_id = intent.get("payload", {}).get("client_order_id") or intent_id
+            payload = intent.get("payload", {})
+            client_order_id = payload.get("client_order_id") or intent_id
             try:
                 found = self.broker.find_order_by_client_id(client_order_id)
             except Exception as exc:  # noqa: BLE001 -- a broker-read failure here must not crash
                 # reconcile(); the intent stays SUBMIT_FAILED_UNCERTAIN (still fail-closed/outstanding)
-                # and will be retried on the next reconcile() call.
+                # and will be retried on the next reconcile() call. Never counted toward the
+                # not-found-confirmation threshold below -- an error is not evidence of "not found."
                 self.events.emit(PivEvent.build(
                     "BROKER_ERROR", order_intent_id=intent_id, correlation_id=intent_id,
                     reason=f"UNCERTAIN_SUBMISSION_RECONCILE_READ_FAILED_{type(exc).__name__}", status="STILL_UNRESOLVED",
                 ))
                 continue
             if found is None:
+                attempts = int(intent.get("not_found_confirmations") or 0) + 1
+                intent["not_found_confirmations"] = attempts
+                self._save()
+                if attempts < UNCERTAIN_SUBMISSION_CONFIRMATION_THRESHOLD:
+                    self.events.emit(PivEvent.build(
+                        "BROKER_ERROR", symbol=payload.get("symbol"), order_intent_id=intent_id,
+                        correlation_id=intent_id, reason="UNCERTAIN_SUBMISSION_NOT_FOUND_AWAITING_CONFIRMATION",
+                        status=f"STILL_UNRESOLVED_ATTEMPT_{attempts}_OF_{UNCERTAIN_SUBMISSION_CONFIRMATION_THRESHOLD}",
+                    ))
+                    continue
                 intent["status"] = "SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED"
                 self._save()
                 self.events.emit(PivEvent.build(
-                    "BROKER_ERROR", symbol=intent.get("payload", {}).get("symbol"), order_intent_id=intent_id,
+                    "BROKER_ERROR", symbol=payload.get("symbol"), order_intent_id=intent_id,
                     correlation_id=intent_id, reason="UNCERTAIN_SUBMISSION_CONFIRMED_NEVER_REACHED_BROKER",
                     status="RESOLVED_NOT_SUBMITTED",
+                ))
+                continue
+            if not self._order_response_matches_intent(found, payload, client_order_id):
+                # Task 79E-R2: an unrelated/malformed response -- never
+                # adopted, and never counted as a "not found" confirmation
+                # either (it is not evidence the order was never submitted;
+                # it is evidence the lookup itself returned something
+                # untrustworthy). The intent stays exactly as unresolved as
+                # it was before this call.
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", symbol=payload.get("symbol"), order_intent_id=intent_id,
+                    correlation_id=intent_id, reason="UNCERTAIN_SUBMISSION_RESPONSE_MISMATCH_REJECTED",
+                    status="STILL_UNRESOLVED",
                 ))
                 continue
             broker_id = str(found.get("id") or "")
             if not broker_id:
                 continue
             intent["status"] = "SUBMITTED"
-            symbol = intent.get("payload", {}).get("symbol")
+            intent.pop("not_found_confirmations", None)
+            symbol = payload.get("symbol")
             self.state.orders[broker_id] = {
                 "intent_id": intent_id, "symbol": symbol, "status": "SUBMITTED", "filled_qty": 0.0,
                 "source": intent.get("source"), "alpha_evidence": intent.get("alpha_evidence"),
