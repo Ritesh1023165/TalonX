@@ -27,3 +27,10 @@ authorize a launch or experimental activation.
 - Experimental permission is separate, absent, and disabled by default.
 - Task 80 still requires separate operator authorization and fresh read-only
   preflight/broker/session checks. Do not infer launch approval from this task.
+
+## Build identity
+
+- Starting SHA: `96fa40ab5e1601b06f639cf757191caa8c4329f6`.
+- Task feature commit: `fbc78f4`.
+- Final docs follow-up: the commit containing this build-identity fill-in; see
+  `git log --oneline`.

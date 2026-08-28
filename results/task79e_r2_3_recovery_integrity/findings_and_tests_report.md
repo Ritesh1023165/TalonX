@@ -4,7 +4,7 @@
 
 - Starting branch: `research/talonx-strategy-validation`
 - Starting SHA: `96fa40ab5e1601b06f639cf757191caa8c4329f6`
-- Task feature commit: recorded in the final build-identity follow-up below.
+- Task feature commit: `fbc78f4`.
 
 ## Confirmed defects and fixes
 
@@ -97,7 +97,6 @@ not strategy validation, profitability evidence, or Task 80 launch authority.
 
 ## Build identity
 
-- Feature commit: pending at report-update time; filled by the docs-only
-  follow-up commit after the feature checkpoint is created.
+- Feature commit: `fbc78f4`.
 - Final docs follow-up: the commit containing the filled feature SHA; see
   `git log --oneline`.
