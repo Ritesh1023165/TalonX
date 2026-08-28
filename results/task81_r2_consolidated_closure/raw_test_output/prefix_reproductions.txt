@@ -1,0 +1,21 @@
+>       assert life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_UNCERTAIN"   # promoted by production code
+E       AssertionError: assert 'ORDER_INTENT' == 'SUBMIT_FAILED_UNCERTAIN'
+E         - SUBMIT_FAILED_UNCERTAIN
+>           assert life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_UNCERTAIN", f"auto-resolved at {i}"
+E           assert 'ORDER_INTENT' == 'SUBMIT_FAILED_UNCERTAIN'
+E             - SUBMIT_FAILED_UNCERTAIN
+>       assert life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_UNCERTAIN"   # still unresolved
+E       AssertionError: assert 'ORDER_INTENT' == 'SUBMIT_FAILED_UNCERTAIN'
+E         - SUBMIT_FAILED_UNCERTAIN
+        life.reconcile(now=BASE)                     # promotes to SUBMIT_FAILED_UNCERTAIN
+>       assert life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_UNCERTAIN"
+E       AssertionError: assert 'ORDER_INTENT' == 'SUBMIT_FAILED_UNCERTAIN'
+E         - SUBMIT_FAILED_UNCERTAIN
+        with pytest.raises(PaperGuardError, match="not SUBMIT_FAILED_UNCERTAIN"):
+        """Task 79E-R2-2: the ONLY way a SUBMIT_FAILED_UNCERTAIN intent's
+        ("SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED") the system's own R1/R2
+        if intent.get("status") != "SUBMIT_FAILED_UNCERTAIN":
+                f"intent {intent_id!r} is not SUBMIT_FAILED_UNCERTAIN (currently {intent.get('status')!r}) -- "
+E           talonx_piv.broker.PaperGuardError: intent 'intent_d626e42de508967cc418' is not SUBMIT_FAILED_UNCERTAIN (currently 'ORDER_INTENT') -- operator resolution only applies to a still-uncertain submission
+>       assert [i for i in life.state.intents.values() if i["status"] == "SUBMIT_FAILED_UNCERTAIN"] != []
+32 failed, 12 passed in 1.15s

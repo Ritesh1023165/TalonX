@@ -44,6 +44,23 @@ ALLOWED_ORDER_SOURCES: frozenset[str | None] = frozenset({None, "STRATEGY", "PIV
 # duplicate-entry detection below.
 _TERMINAL_ORDER_STATUSES = frozenset({"filled", "rejected", "canceled", "expired"})
 
+# Task 81-R2 §4: the full documented Alpaca order-status vocabulary
+# (https://docs.alpaca.markets/reference/getallorders -> Order.status,
+# plus the "nested" statuses). apply_broker_update refuses any status
+# outside this set BEFORE it mutates trusted accounting -- an unrecognised
+# status is a malformed/contradictory response, never applied. This
+# module's own pre-broker-ack "SUBMITTED" and poll-timeout
+# "UNCONFIRMED_TIMEOUT" sentinels are internal-only and never arrive here
+# as an incoming broker status.
+_ALPACA_ORDER_STATUSES = frozenset({
+    "new", "partially_filled", "filled", "done_for_day", "canceled", "expired",
+    "replaced", "pending_cancel", "pending_replace", "accepted", "pending_new",
+    "accepted_for_bidding", "stopped", "rejected", "suspended", "calculated", "held",
+})
+# Statuses that are DONE-NOT-FILLED -- an order this system holds in one of
+# these that the broker still reports open is a contradiction.
+_DONE_NOT_FILLED_STATUSES = frozenset({"canceled", "rejected", "expired"})
+
 # Task 79E-R2-2: NO count-based threshold exists any more -- absence is
 # never proof of non-submission, no matter how many times observed (see
 # _resolve_uncertain_submissions's own docstring for the full rationale;
@@ -707,6 +724,40 @@ class PaperLifecycle:
         ))
         return result
 
+    def _validate_broker_update(
+        self, order: dict[str, Any], status: str, filled_qty: Any, fill_price: Any,
+    ) -> str | None:
+        """Task 81-R2 §4: reject a malformed / contradictory broker update
+        BEFORE it mutates trusted accounting. Returns a reason string to
+        refuse, or None to proceed. Checks: recognised Alpaca status;
+        finite, non-boolean, non-negative filled_qty; finite positive
+        fill_price when present; cumulative filled_qty not exceeding the
+        intent's requested quantity (an impossible fill)."""
+        if status not in _ALPACA_ORDER_STATUSES:
+            return f"UNRECOGNISED_STATUS_{status!r}"
+        if isinstance(filled_qty, bool):
+            return "FILLED_QTY_IS_BOOLEAN"
+        try:
+            fq = float(filled_qty)
+        except (TypeError, ValueError):
+            return "FILLED_QTY_NOT_NUMERIC"
+        if not math.isfinite(fq) or fq < 0:
+            return "FILLED_QTY_NOT_FINITE_NONNEGATIVE"
+        if fill_price is not None:
+            if isinstance(fill_price, bool):
+                return "FILL_PRICE_IS_BOOLEAN"
+            try:
+                fp = float(fill_price)
+            except (TypeError, ValueError):
+                return "FILL_PRICE_NOT_NUMERIC"
+            if not math.isfinite(fp) or fp <= 0:
+                return "FILL_PRICE_NOT_FINITE_POSITIVE"
+        intent = self.state.intents.get(order.get("intent_id"), {})
+        requested = _safe_float(intent.get("payload", {}).get("qty"))
+        if requested > 0 and fq > requested + RECONCILE_QUANTITY_TOLERANCE:
+            return f"FILLED_QTY_EXCEEDS_REQUESTED_{fq}_GT_{requested}"
+        return None
+
     def apply_broker_update(
         self, broker_order_id: str, status: str, filled_qty: float = 0.0, fill_price: float | None = None,
         # Task 79E-R2-2 Requirement 2: the BROKER's own authoritative
@@ -724,6 +775,20 @@ class PaperLifecycle:
         filled_at: str | None = None,
     ) -> None:
         order = self.state.orders[broker_order_id]
+        # -- Task 81-R2 §4: validate the incoming update BEFORE any trusted
+        #    accounting (order status, fill high-water mark, position) is
+        #    touched. A malformed / contradictory response is refused
+        #    outright -- it must not poison an order's terminal status or
+        #    its filled-qty high-water mark. --
+        reject_reason = self._validate_broker_update(order, status, filled_qty, fill_price)
+        if reject_reason is not None:
+            self.events.emit(PivEvent.build(
+                "BROKER_ERROR", symbol=order.get("symbol"), broker_order_id=broker_order_id,
+                correlation_id=order.get("intent_id"),
+                reason=f"BROKER_UPDATE_REJECTED_{reject_reason}",
+                status="NOT_APPLIED_ACCOUNTING_UNCHANGED",
+            ))
+            return
         # Task 77I: captured BEFORE this call's own update overwrites it --
         # Alpaca reports `filled_qty` CUMULATIVELY per order, so the amount
         # that actually happened THIS update is the delta since the
@@ -1051,13 +1116,47 @@ class PaperLifecycle:
                     reason=f"UNCONFIRMED_ORDER_RECONCILE_READ_FAILED_{type(exc).__name__}", status="STILL_UNRESOLVED",
                 ))
                 continue
-            status = str(current.get("status") or "")
-            if not status:
+            # Task 81-R2 §4: the SAME parse/validate contract as every other
+            # reconcile entry path -- a malformed/contradictory response
+            # leaves the order UNCONFIRMED_TIMEOUT (fail-closed), never
+            # applied to accounting.
+            status, filled_qty, fill_price, filled_at, err = self._extract_order_update_fields(current)
+            if err is not None:
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", broker_order_id=broker_order_id,
+                    reason=f"UNCONFIRMED_ORDER_RECONCILE_RESPONSE_{err}", status="STILL_UNRESOLVED",
+                ))
                 continue
-            filled_qty = float(current.get("filled_qty") or 0.0)
-            fill_price = float(current["filled_avg_price"]) if current.get("filled_avg_price") else None
-            filled_at = current.get("filled_at") or current.get("updated_at")
             self.apply_broker_update(broker_order_id, status, filled_qty, fill_price, filled_at)
+
+    def _promote_orphan_order_intents(self) -> list[str]:
+        """Task 81-R2 §3: an ORDER_INTENT-status intent with NO recorded
+        broker order -- a crash strictly between persisting the intent and
+        calling submit_order -- is genuinely UNCERTAIN (did the request
+        reach the broker or not?). Promote it to SUBMIT_FAILED_UNCERTAIN so
+        the audited production machinery handles it: discovery by the
+        stable client_order_id (_resolve_uncertain_submissions ->
+        broker.find_order_by_client_id), adoption only on an exact match
+        (_order_response_matches_intent), and the operator-resolution path
+        (operator_resolve_uncertain_submission) for independently-verified
+        non-submission. Never a blind resubmission; never a count-based
+        declaration that an absent order never existed."""
+        intent_ids_with_orders = {o.get("intent_id") for o in self.state.orders.values()}
+        promoted: list[str] = []
+        for intent_id, intent in self.state.intents.items():
+            if intent.get("status") == "ORDER_INTENT" and intent_id not in intent_ids_with_orders:
+                intent["status"] = "SUBMIT_FAILED_UNCERTAIN"
+                intent["promoted_from_orphan_order_intent_at"] = datetime.now(timezone.utc).isoformat()
+                promoted.append(intent_id)
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", symbol=intent.get("payload", {}).get("symbol"),
+                    order_intent_id=intent_id, correlation_id=intent_id,
+                    reason="ORPHAN_ORDER_INTENT_PROMOTED_TO_UNCERTAIN",
+                    status="AWAITING_DISCOVERY_OR_OPERATOR_RESOLUTION",
+                ))
+        if promoted:
+            self._save()
+        return promoted
 
     def _order_response_matches_intent(self, found: dict[str, Any], payload: dict[str, Any], client_order_id: str) -> bool:
         """Task 79E-R2: "Reject unrelated/malformed responses" -- adopting a
@@ -1209,12 +1308,14 @@ class PaperLifecycle:
                 correlation_id=intent_id, reason="UNCERTAIN_SUBMISSION_CONFIRMED_REACHED_BROKER",
                 status="RESOLVED_ADOPTED",
             ))
-            status = str(found.get("status") or "")
-            if status:
-                filled_qty = float(found.get("filled_qty") or 0.0)
-                fill_price = float(found["filled_avg_price"]) if found.get("filled_avg_price") else None
-                filled_at = found.get("filled_at") or found.get("updated_at")
+            status, filled_qty, fill_price, filled_at, err = self._extract_order_update_fields(found)
+            if err is None and status:
                 self.apply_broker_update(broker_id, status, filled_qty, fill_price, filled_at)
+            elif err is not None:
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", symbol=symbol, order_intent_id=intent_id, broker_order_id=broker_id,
+                    correlation_id=intent_id, reason=f"ADOPTED_ORDER_RESPONSE_{err}", status="ADOPTED_STATUS_NOT_APPLIED",
+                ))
 
     def operator_resolve_uncertain_submission(
         self, intent_id: str, *, operator_confirmation: bool, operator_note: str = "",
@@ -1260,7 +1361,38 @@ class PaperLifecycle:
             status=f"OPERATOR_NOTE:{operator_note}" if operator_note else "OPERATOR_RESOLVED_NO_NOTE",
         ))
 
-    def _refresh_non_terminal_orders(self) -> list[str]:
+    def _extract_order_update_fields(
+        self, row: Any,
+    ) -> tuple[str, float, float | None, str | None, str | None]:
+        """Task 81-R2 §2/§4: ONE parser for turning a broker Order response
+        into an apply_broker_update call, shared by every reconcile entry
+        path (_resolve_unconfirmed_orders, _resolve_uncertain_submissions,
+        _refresh_non_terminal_orders). Returns
+        (status, filled_qty, fill_price, filled_at, error); a non-None
+        `error` means the response is malformed/contradictory and must NOT
+        be applied to accounting."""
+        if not isinstance(row, dict):
+            return "", 0.0, None, None, "ROW_NOT_AN_OBJECT"
+        status = str(row.get("status") or "")
+        if not status:
+            return "", 0.0, None, None, "NO_STATUS"
+        if status not in _ALPACA_ORDER_STATUSES:
+            return "", 0.0, None, None, f"UNRECOGNISED_STATUS_{status}"
+        raw_fq = row.get("filled_qty")
+        fq, fok = self._coerce_broker_qty(raw_fq if raw_fq is not None else 0.0)
+        if not fok or fq < 0:
+            return "", 0.0, None, None, "MALFORMED_FILLED_QTY"
+        fill_price: float | None = None
+        raw_fp = row.get("filled_avg_price")
+        if raw_fp not in (None, "", "None"):
+            fp, pok = self._coerce_broker_qty(raw_fp)
+            if not pok or fp <= 0:
+                return "", 0.0, None, None, "MALFORMED_FILL_PRICE"
+            fill_price = fp
+        filled_at = row.get("filled_at") or row.get("updated_at")
+        return status, fq, fill_price, filled_at, None
+
+    def _refresh_non_terminal_orders(self) -> tuple[list[str], set[str]]:
         """Task 79E-R2-2 Requirement 4: 'adopted-but-pending orders...
         without waiting for EOD.' An order ADOPTED via
         _resolve_uncertain_submissions (or any other non-terminal order
@@ -1275,14 +1407,16 @@ class PaperLifecycle:
         already-terminal order is a no-op, since the query is scoped to
         non-terminal orders each time it runs).
 
-        Task 81 §2: returns a list of failure reasons for any outstanding
-        order whose individual broker refresh could NOT be completed this
-        pass (transport error, malformed body, or an unparseable numeric
-        field). A non-empty return means reconcile() must NOT treat broker
-        order state as fully known -- it fails closed (keeps/sets an
-        entry-admission block) instead of clearing it merely because the
-        position *symbol sets* happen to agree."""
+        Task 81 §2 / R2 §2: returns (failures, unresolved_ids) -- failure
+        reason strings for any outstanding order whose individual broker
+        refresh could NOT be completed this pass (transport error,
+        malformed body, unparseable/contradictory field), and the set of
+        those order ids so reconcile()'s reverse-direction check does not
+        additionally flag them as missing from the broker open list. A
+        non-empty return means reconcile() must NOT treat broker order
+        state as fully known."""
         failures: list[str] = []
+        unresolved_ids: set[str] = set()
         outstanding_ids = [
             broker_order_id for broker_order_id, order in self.state.orders.items()
             if order.get("status") not in _TERMINAL_ORDER_STATUSES and order.get("status") != "UNCONFIRMED_TIMEOUT"
@@ -1297,23 +1431,15 @@ class PaperLifecycle:
                     reason=f"NON_TERMINAL_ORDER_REFRESH_READ_FAILED_{type(exc).__name__}", status="STILL_UNRESOLVED",
                 ))
                 failures.append(f"ORDER_REFRESH_FAILED:{broker_order_id}:{type(exc).__name__}")
+                unresolved_ids.add(broker_order_id)
                 continue
-            if not isinstance(current, dict):
-                failures.append(f"ORDER_REFRESH_MALFORMED:{broker_order_id}")
+            status, filled_qty, fill_price, filled_at, err = self._extract_order_update_fields(current)
+            if err is not None:
+                failures.append(f"ORDER_REFRESH_{err}:{broker_order_id}")
+                unresolved_ids.add(broker_order_id)
                 continue
-            status = str(current.get("status") or "")
-            if not status:
-                failures.append(f"ORDER_REFRESH_NO_STATUS:{broker_order_id}")
-                continue
-            try:
-                filled_qty = float(current.get("filled_qty") or 0.0)
-                fill_price = float(current["filled_avg_price"]) if current.get("filled_avg_price") else None
-            except (TypeError, ValueError):
-                failures.append(f"ORDER_REFRESH_UNPARSEABLE_NUMERIC:{broker_order_id}")
-                continue
-            filled_at = current.get("filled_at") or current.get("updated_at")
             self.apply_broker_update(broker_order_id, status, filled_qty, fill_price, filled_at)
-        return failures
+        return failures, unresolved_ids
 
     def activate_kill_switch(self, cancel_orders: bool = False) -> None:
         self.state.kill_switch = True
@@ -1354,70 +1480,113 @@ class PaperLifecycle:
                 known_client_ids.add(str(cid))
         return known_ids, known_client_ids
 
-    def _fields_agree(self, row: dict[str, Any], payload: dict[str, Any]) -> bool:
-        """Task 81-R1 §3: a broker order row matches a durable intent's
-        payload only if symbol, side and quantity all agree (id membership
-        alone is insufficient)."""
-        if str(row.get("symbol") or "").upper() != str(payload.get("symbol") or "").upper():
-            return False
-        if str(row.get("side") or "").lower() != str(payload.get("side") or "").lower():
-            return False
-        row_qty, ok = self._coerce_broker_qty(row.get("qty"))
-        if not ok:
-            return False
-        return abs(row_qty - _safe_float(payload.get("qty"))) <= RECONCILE_QUANTITY_TOLERANCE
+    def _parse_broker_order_response(self, row: Any) -> tuple[dict[str, Any] | None, str | None]:
+        """Task 81-R2 §2/§4: normalise and validate the REQUIRED fields of a
+        broker Order object before it is used for any match or accounting
+        decision. Returns (parsed, error): `parsed` carries normalised
+        id / client_order_id / symbol / side / qty / filled_qty / status;
+        `error` is a reason string when a required field is missing or
+        malformed (`parsed` is then None). A malformed row is never an
+        accepted match and never mutates accounting."""
+        if not isinstance(row, dict):
+            return None, "ROW_NOT_AN_OBJECT"
+        oid = str(row.get("id") or "")
+        cid = str(row.get("client_order_id") or "")
+        symbol = str(row.get("symbol") or "").upper()
+        side = str(row.get("side") or "").lower()
+        status = str(row.get("status") or "")
+        if not oid:
+            return None, "MISSING_ID"
+        if not cid:
+            return None, "MISSING_CLIENT_ORDER_ID"
+        if not symbol:
+            return None, "MISSING_SYMBOL"
+        if side not in {"buy", "sell"}:
+            return None, "MISSING_OR_INVALID_SIDE"
+        if status and status not in _ALPACA_ORDER_STATUSES:
+            return None, f"UNRECOGNISED_STATUS:{status}"
+        qty, qok = self._coerce_broker_qty(row.get("qty"))
+        if not qok or qty < 0:
+            return None, "MALFORMED_QTY"
+        raw_fq = row.get("filled_qty")
+        fq, fok = self._coerce_broker_qty(raw_fq if raw_fq is not None else 0.0)
+        if not fok or fq < 0:
+            return None, "MALFORMED_FILLED_QTY"
+        return {
+            "id": oid, "client_order_id": cid, "symbol": symbol, "side": side,
+            "qty": qty, "filled_qty": fq, "status": status,
+        }, None
 
-    def _classify_broker_open_order(self, row: dict[str, Any]) -> tuple[str, str]:
-        """Task 81-R1 §3: classify one broker-reported OPEN order against
-        this system's exact durable intents/orders. Returns
-        (classification, detail) where classification is one of
-        "OK" | "UNTRACKED" | "CONTRADICTION".
+    def _verify_broker_order_row(self, row: Any) -> tuple[str, str]:
+        """Task 81-R2 §2: the ONE coherent contract for deciding whether a
+        broker-reported OPEN order is a verified match for exactly one
+        durable intent. Returns (verdict, detail), verdict in
+        "OK" | "UNTRACKED" | "CONTRADICTION" | "MALFORMED".
 
-        A historically-known id is NOT enough: an order this system holds
-        in a TERMINAL state (e.g. locally cancelled) that the broker still
-        reports open is a contradiction, not an accepted match; and a
-        matched id/client-id whose symbol/side/qty disagree with the
-        durable intent is a contradiction too."""
-        broker_id = str(row.get("id") or "")
-        client_id = str(row.get("client_order_id") or "")
+        - Broker id AND client_order_id are each resolved to a durable
+          intent independently; if they resolve to DIFFERENT intents the
+          IDs conflict -> CONTRADICTION.
+        - A matched-by-id row whose client_order_id does not equal the
+          intent's own client_order_id -> CONTRADICTION.
+        - Any terminal-vs-open contradiction -- INCLUDING a locally
+          `filled` order the broker still lists open -- is CONTRADICTION.
+          No eventual-consistency exemption.
+        - symbol / side / requested qty / cumulative filled qty are all
+          cross-checked; an impossible cumulative fill (> requested) or a
+          regressed filled_qty (< what we already recorded) -> CONTRADICTION.
+        - No resolvable intent at all -> UNTRACKED."""
+        parsed, err = self._parse_broker_order_response(row)
+        if err is not None:
+            return "MALFORMED", err
+        oid, cid = parsed["id"], parsed["client_order_id"]
 
-        # An order this system considers DONE-NOT-FILLED (cancelled /
-        # rejected / expired) that the broker still reports open is a
-        # contradiction. A locally-`filled` order still lingering in the
-        # broker's open list is handled by the position-quantity
-        # comparison instead (weaker signal, and commonly just broker
-        # eventual-consistency) -- see the reconcile() docstring.
-        _DONE_NOT_FILLED = {"canceled", "rejected", "expired"}
-        internal_order = self.state.orders.get(broker_id) if broker_id else None
-        if internal_order is not None:
-            if internal_order.get("status") in _DONE_NOT_FILLED:
-                return "CONTRADICTION", f"{broker_id}:internal_status={internal_order.get('status')}_but_broker_open"
-            intent = self.state.intents.get(internal_order.get("intent_id"), {})
-            payload = intent.get("payload", {})
-            if payload and not self._fields_agree(row, payload):
-                return "CONTRADICTION", f"{broker_id}:symbol/side/qty_disagree_with_intent"
-            return "OK", broker_id
-
-        # No matching broker-id record -- try the client_order_id against
-        # every durable intent (this is how an adopted-but-not-yet-recorded
-        # or a genuinely-orphan submission would present).
+        by_id_order = self.state.orders.get(oid)
+        by_id_intent_id = by_id_order.get("intent_id") if by_id_order else None
+        by_cid_intent_id: str | None = None
         for intent_id, intent in self.state.intents.items():
-            payload = intent.get("payload", {})
-            cid = str(payload.get("client_order_id") or intent_id)
-            if client_id and cid == client_id:
-                recorded = next(
-                    (o for o in self.state.orders.values() if o.get("intent_id") == intent_id), None,
-                )
-                if recorded is not None and recorded.get("status") in _DONE_NOT_FILLED:
-                    return "CONTRADICTION", f"{client_id}:recorded_order_{recorded.get('status')}_but_broker_open"
-                if intent.get("status") in {
-                    "REJECTED", "SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED",
-                }:
-                    return "CONTRADICTION", f"{client_id}:intent_status={intent.get('status')}_but_broker_open"
-                if payload and not self._fields_agree(row, payload):
-                    return "CONTRADICTION", f"{client_id}:symbol/side/qty_disagree_with_intent"
-                return "OK", client_id
-        return "UNTRACKED", broker_id or client_id or "<unidentified>"
+            if str(intent.get("payload", {}).get("client_order_id") or intent_id) == cid:
+                by_cid_intent_id = intent_id
+                break
+
+        if by_id_intent_id and by_cid_intent_id and by_id_intent_id != by_cid_intent_id:
+            return "CONTRADICTION", f"{oid}:conflicting_ids id->{by_id_intent_id} cid->{by_cid_intent_id}"
+
+        intent_id = by_id_intent_id or by_cid_intent_id
+        if intent_id is None:
+            return "UNTRACKED", oid or cid or "<unidentified>"
+
+        intent = self.state.intents.get(intent_id, {})
+        payload = intent.get("payload", {})
+        if not payload:
+            return "CONTRADICTION", f"{oid}:no_durable_payload_for_intent"
+        recorded_order = by_id_order or next(
+            (o for o in self.state.orders.values() if o.get("intent_id") == intent_id), None,
+        )
+
+        expected_cid = str(payload.get("client_order_id") or intent_id)
+        if cid != expected_cid:
+            return "CONTRADICTION", f"{oid}:client_order_id_mismatch expected={expected_cid} got={cid}"
+
+        if recorded_order is not None and recorded_order.get("status") in _TERMINAL_ORDER_STATUSES:
+            return "CONTRADICTION", f"{oid}:internal_order_terminal={recorded_order.get('status')}_but_broker_open"
+        if intent.get("status") in {"REJECTED", "SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED"}:
+            return "CONTRADICTION", f"{oid}:intent_terminal={intent.get('status')}_but_broker_open"
+
+        if parsed["symbol"] != str(payload.get("symbol") or "").upper():
+            return "CONTRADICTION", f"{oid}:symbol {parsed['symbol']}!={payload.get('symbol')}"
+        if parsed["side"] != str(payload.get("side") or "").lower():
+            return "CONTRADICTION", f"{oid}:side {parsed['side']}!={payload.get('side')}"
+        requested = _safe_float(payload.get("qty"))
+        if abs(parsed["qty"] - requested) > RECONCILE_QUANTITY_TOLERANCE:
+            return "CONTRADICTION", f"{oid}:requested_qty {parsed['qty']}!={requested}"
+        if parsed["filled_qty"] > requested + RECONCILE_QUANTITY_TOLERANCE:
+            return "CONTRADICTION", f"{oid}:impossible_cumulative_fill {parsed['filled_qty']}>{requested}"
+        if recorded_order is not None:
+            recorded_fq = _safe_float(recorded_order.get("filled_qty"))
+            if parsed["filled_qty"] < recorded_fq - RECONCILE_QUANTITY_TOLERANCE:
+                return "CONTRADICTION", f"{oid}:filled_qty_regressed {parsed['filled_qty']}<{recorded_fq}"
+
+        return "OK", oid
 
     def reconcile(self, *, now: datetime | None = None) -> dict[str, Any]:
         """Task 81 §2: a reconcile pass compares position quantities AND
@@ -1434,8 +1603,13 @@ class PaperLifecycle:
         (BUY_TO_OPEN only)."""
         read_failures: list[str] = []
         self._resolve_unconfirmed_orders()
+        # Task 81-R2 §3: fold orphan ORDER_INTENTs into the uncertain-
+        # submission machinery BEFORE it runs, so discovery/adoption/
+        # operator-resolution all go through audited production code.
+        self._promote_orphan_order_intents()
         self._resolve_uncertain_submissions(now=now)
-        read_failures.extend(self._refresh_non_terminal_orders())
+        refresh_failures, refresh_unresolved_ids = self._refresh_non_terminal_orders()
+        read_failures.extend(refresh_failures)
 
         try:
             broker_orders_raw: Any = self.broker.open_orders()
@@ -1509,14 +1683,35 @@ class PaperLifecycle:
         #    a valid match. --
         untracked_broker_orders: list[str] = []
         contradictory_broker_orders: list[str] = []
+        malformed_broker_order_rows: list[str] = []
         for row in broker_orders:
-            classification, detail = self._classify_broker_open_order(row)
-            if classification == "UNTRACKED":
+            verdict, detail = self._verify_broker_order_row(row)
+            if verdict == "UNTRACKED":
                 untracked_broker_orders.append(detail)
-            elif classification == "CONTRADICTION":
+            elif verdict == "CONTRADICTION":
                 contradictory_broker_orders.append(detail)
+            elif verdict == "MALFORMED":
+                malformed_broker_order_rows.append(detail)
         untracked_broker_orders = sorted(set(untracked_broker_orders))
         contradictory_broker_orders = sorted(set(contradictory_broker_orders))
+        if malformed_broker_order_rows:
+            read_failures.append("OPEN_ORDER_ROW_MALFORMED:" + ",".join(sorted(set(malformed_broker_order_rows))[:6]))
+
+        # -- Task 81-R2 §2: REVERSE direction -- every internally-outstanding
+        #    order needs a verified CURRENT disposition: present in the
+        #    broker open list by id, refreshed-to-terminal this pass, or a
+        #    recorded read failure this pass. Anything else is a
+        #    contradiction between the two broker reads (open_orders list vs
+        #    get_order) -- a transient inconsistent snapshot that blocks and
+        #    is retried, never a clean pass. --
+        broker_open_ids = {str(r.get("id") or "") for r in broker_orders}
+        orders_missing_from_broker_list = sorted(
+            oid for oid, order in self.state.orders.items()
+            if order.get("status") not in _TERMINAL_ORDER_STATUSES
+            and order.get("status") != "UNCONFIRMED_TIMEOUT"
+            and oid not in broker_open_ids
+            and oid not in refresh_unresolved_ids
+        ) if orders_ok else []
 
         # -- Unresolved / genuinely-uncertain submissions --
         unresolved_submissions = sorted(
@@ -1527,16 +1722,17 @@ class PaperLifecycle:
             oid for oid, order in self.state.orders.items()
             if order.get("status") == "UNCONFIRMED_TIMEOUT"
         )
-        # Task 81-R1 §3: an ORDER_INTENT-status intent with NO recorded
-        # broker order (a crash strictly between persisting the intent and
-        # calling submit_order) is an ORPHAN -- unresolved until a
-        # verified matching order is discovered or an operator explicitly
-        # dispositions it. Absence of a broker order is NOT proof of
-        # non-submission.
+        # Task 81-R1/R2 §3: orphan ORDER_INTENTs are promoted to
+        # SUBMIT_FAILED_UNCERTAIN at the top of this method, so they are
+        # already counted in unresolved_submissions above. This list is
+        # kept for visibility -- an intent still stuck at ORDER_INTENT
+        # (belt-and-suspenders) or one carrying the orphan-promotion marker.
         _intent_ids_with_orders = {o.get("intent_id") for o in self.state.orders.values()}
         orphan_intents = sorted(
             intent_id for intent_id, intent in self.state.intents.items()
-            if intent.get("status") == "ORDER_INTENT" and intent_id not in _intent_ids_with_orders
+            if (intent.get("status") == "ORDER_INTENT" and intent_id not in _intent_ids_with_orders)
+            or (intent.get("promoted_from_orphan_order_intent_at")
+                and intent.get("status") in {"SUBMIT_FAILED_UNCERTAIN", "ORDER_INTENT"})
         )
 
         complete = (
@@ -1546,6 +1742,7 @@ class PaperLifecycle:
         consistent = (
             symbol_sets_match and not quantity_mismatches and not side_mismatches
             and not untracked_broker_orders and not contradictory_broker_orders
+            and not orders_missing_from_broker_list
             and not unexpected_shorts
         )
         matched = bool(complete and consistent)
@@ -1561,6 +1758,8 @@ class PaperLifecycle:
             reasons.append(f"ORPHAN_ORDER_INTENTS:{len(orphan_intents)}")
         if contradictory_broker_orders:
             reasons.append("CONTRADICTORY_BROKER_ORDERS:" + ",".join(contradictory_broker_orders))
+        if orders_missing_from_broker_list:
+            reasons.append("ORDERS_MISSING_FROM_BROKER_LIST:" + ",".join(orders_missing_from_broker_list))
         if not symbol_sets_match:
             reasons.append("POSITION_SYMBOL_SET_MISMATCH")
         if quantity_mismatches:
@@ -1602,6 +1801,7 @@ class PaperLifecycle:
             "unexpected_short_symbols": unexpected_shorts,
             "untracked_broker_orders": untracked_broker_orders,
             "contradictory_broker_orders": contradictory_broker_orders,
+            "orders_missing_from_broker_list": orders_missing_from_broker_list,
             "position_quantity_mismatches": quantity_mismatches,
             "position_side_mismatches": sorted(side_mismatches),
             "unresolved_submissions": unresolved_submissions,

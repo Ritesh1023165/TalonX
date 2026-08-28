@@ -151,18 +151,19 @@ def test_broker_order_matched_only_with_consistent_symbol_side_qty(tmp_path):
     life = _life(cfg, transport)
     buy = life.order_intent("b1", "AAPL", "buy", 2, source="STRATEGY", reference_price=100.0)
     bid = buy["id"]
+    cid = buy["client_order_id"]   # the REAL client_order_id we sent (== intent id)
     # Broker reports our id back, but with a WRONG quantity -- not a valid match.
     transport.open_orders_body = [{
-        "id": bid, "client_order_id": bid, "symbol": "AAPL", "side": "buy",
+        "id": bid, "client_order_id": cid, "symbol": "AAPL", "side": "buy",
         "qty": "9", "filled_qty": "0", "status": "new", "filled_avg_price": None,
     }]
     result = life.reconcile(now=NOW)
     assert result["matched"] is False
     assert result.get("contradictory_broker_orders")
 
-    # Consistent id + symbol + side + qty + non-terminal internal state -> OK.
+    # Consistent id + client id + symbol + side + qty + non-terminal internal state -> OK.
     transport.open_orders_body = [{
-        "id": bid, "client_order_id": bid, "symbol": "AAPL", "side": "buy",
+        "id": bid, "client_order_id": cid, "symbol": "AAPL", "side": "buy",
         "qty": "2", "filled_qty": "0", "status": "new", "filled_avg_price": None,
     }]
     result2 = life.reconcile(now=NOW)
@@ -216,26 +217,20 @@ def test_orphan_intent_clears_only_after_documented_operator_resolution(tmp_path
     transport = Transport()
     life = _life(cfg, transport)
     intent_id = _make_orphan_intent(life)
-    life.reconcile(now=NOW)
+    life.reconcile(now=NOW)   # Task 81-R2 §3: promotes the orphan to SUBMIT_FAILED_UNCERTAIN
+    assert life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_UNCERTAIN"
     assert life.state.reconciliation_flags["entry_admission_blocked"] is True
 
-    # Operator-verified: the order never reached the broker.
+    # Resolved ONLY through the production operator method (independently
+    # verified non-submission) -- no direct status editing.
     life.operator_resolve_uncertain_submission(
-        intent_id, operator_confirmation=True, operator_note="verified never submitted",
-    ) if life.state.intents[intent_id]["status"] == "SUBMIT_FAILED_UNCERTAIN" else _resolve_orphan(life, intent_id)
+        intent_id, operator_confirmation=True, operator_note="verified never submitted via Alpaca dashboard",
+    )
 
     result = life.reconcile(now=NOW)
     assert intent_id not in result.get("orphan_intents", [])
     assert result["matched"] is True
     assert life.state.reconciliation_flags["entry_admission_blocked"] is False
-
-
-def _resolve_orphan(life, intent_id):
-    """A bare ORDER_INTENT orphan is resolved by an explicit operator
-    terminal disposition (mirrors operator_resolve_uncertain_submission)."""
-    life.state.intents[intent_id]["status"] = "REJECTED"
-    life.state.intents[intent_id]["resolution_source"] = "OPERATOR"
-    life._save()
 
 
 # ---------------------------------------------------------------------------
@@ -259,6 +254,8 @@ def test_block_persists_and_clears_only_on_clean_pass(tmp_path):
     intent_id = _make_orphan_intent(life)
     life.reconcile(now=NOW)
     assert life.state.reconciliation_flags["entry_admission_blocked"] is True
-    _resolve_orphan(life, intent_id)
+    life.operator_resolve_uncertain_submission(
+        intent_id, operator_confirmation=True, operator_note="verified never submitted",
+    )
     life.reconcile(now=NOW)
     assert life.state.reconciliation_flags["entry_admission_blocked"] is False

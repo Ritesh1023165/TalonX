@@ -157,6 +157,11 @@ def _reload(tmp_path, transport, *, enabled=("AAPL",), state_name="state.json"):
 
 def _open_internal_position(life, symbol, qty, price=100.0):
     entry = life.order_intent("sig-" + symbol, symbol, "buy", qty, source="STRATEGY")
+    # Keep the fake broker consistent: a real Alpaca GET /v2/orders?status=open
+    # never returns a filled order (Task 81-R2 §7 -- realistic broker fakes).
+    for o in getattr(life.broker.transport, "orders", []):
+        if o.get("id") == entry["id"]:
+            o.update(status="filled", filled_qty=str(qty), filled_avg_price=str(price))
     life.apply_broker_update(entry["id"], "filled", qty, price, filled_at="2026-08-28T13:30:00Z")
     return entry
 
