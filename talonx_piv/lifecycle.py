@@ -1354,6 +1354,71 @@ class PaperLifecycle:
                 known_client_ids.add(str(cid))
         return known_ids, known_client_ids
 
+    def _fields_agree(self, row: dict[str, Any], payload: dict[str, Any]) -> bool:
+        """Task 81-R1 §3: a broker order row matches a durable intent's
+        payload only if symbol, side and quantity all agree (id membership
+        alone is insufficient)."""
+        if str(row.get("symbol") or "").upper() != str(payload.get("symbol") or "").upper():
+            return False
+        if str(row.get("side") or "").lower() != str(payload.get("side") or "").lower():
+            return False
+        row_qty, ok = self._coerce_broker_qty(row.get("qty"))
+        if not ok:
+            return False
+        return abs(row_qty - _safe_float(payload.get("qty"))) <= RECONCILE_QUANTITY_TOLERANCE
+
+    def _classify_broker_open_order(self, row: dict[str, Any]) -> tuple[str, str]:
+        """Task 81-R1 §3: classify one broker-reported OPEN order against
+        this system's exact durable intents/orders. Returns
+        (classification, detail) where classification is one of
+        "OK" | "UNTRACKED" | "CONTRADICTION".
+
+        A historically-known id is NOT enough: an order this system holds
+        in a TERMINAL state (e.g. locally cancelled) that the broker still
+        reports open is a contradiction, not an accepted match; and a
+        matched id/client-id whose symbol/side/qty disagree with the
+        durable intent is a contradiction too."""
+        broker_id = str(row.get("id") or "")
+        client_id = str(row.get("client_order_id") or "")
+
+        # An order this system considers DONE-NOT-FILLED (cancelled /
+        # rejected / expired) that the broker still reports open is a
+        # contradiction. A locally-`filled` order still lingering in the
+        # broker's open list is handled by the position-quantity
+        # comparison instead (weaker signal, and commonly just broker
+        # eventual-consistency) -- see the reconcile() docstring.
+        _DONE_NOT_FILLED = {"canceled", "rejected", "expired"}
+        internal_order = self.state.orders.get(broker_id) if broker_id else None
+        if internal_order is not None:
+            if internal_order.get("status") in _DONE_NOT_FILLED:
+                return "CONTRADICTION", f"{broker_id}:internal_status={internal_order.get('status')}_but_broker_open"
+            intent = self.state.intents.get(internal_order.get("intent_id"), {})
+            payload = intent.get("payload", {})
+            if payload and not self._fields_agree(row, payload):
+                return "CONTRADICTION", f"{broker_id}:symbol/side/qty_disagree_with_intent"
+            return "OK", broker_id
+
+        # No matching broker-id record -- try the client_order_id against
+        # every durable intent (this is how an adopted-but-not-yet-recorded
+        # or a genuinely-orphan submission would present).
+        for intent_id, intent in self.state.intents.items():
+            payload = intent.get("payload", {})
+            cid = str(payload.get("client_order_id") or intent_id)
+            if client_id and cid == client_id:
+                recorded = next(
+                    (o for o in self.state.orders.values() if o.get("intent_id") == intent_id), None,
+                )
+                if recorded is not None and recorded.get("status") in _DONE_NOT_FILLED:
+                    return "CONTRADICTION", f"{client_id}:recorded_order_{recorded.get('status')}_but_broker_open"
+                if intent.get("status") in {
+                    "REJECTED", "SUBMIT_FAILED_CONFIRMED_NOT_SUBMITTED",
+                }:
+                    return "CONTRADICTION", f"{client_id}:intent_status={intent.get('status')}_but_broker_open"
+                if payload and not self._fields_agree(row, payload):
+                    return "CONTRADICTION", f"{client_id}:symbol/side/qty_disagree_with_intent"
+                return "OK", client_id
+        return "UNTRACKED", broker_id or client_id or "<unidentified>"
+
     def reconcile(self, *, now: datetime | None = None) -> dict[str, Any]:
         """Task 81 §2: a reconcile pass compares position quantities AND
         sides AND outstanding-order identities AND unresolved submissions --
@@ -1437,18 +1502,21 @@ class PaperLifecycle:
             if str(p.get("side", "")).lower() == "short" or _safe_float(p.get("qty")) < 0
         )
 
-        # -- Outstanding broker order identities (Task 81 §2 defect 2) --
-        known_order_ids, known_client_ids = self._known_broker_order_identities()
+        # -- Outstanding broker order identities (Task 81 §2 defect 2,
+        #    Task 81-R1 §3): each broker-reported OPEN order is matched
+        #    against its EXACT durable intent -- id membership alone (esp.
+        #    a historically-known id for a locally-terminal order) is not
+        #    a valid match. --
         untracked_broker_orders: list[str] = []
+        contradictory_broker_orders: list[str] = []
         for row in broker_orders:
-            broker_id = str(row.get("id") or "")
-            client_id = str(row.get("client_order_id") or "")
-            if broker_id and broker_id in known_order_ids:
-                continue
-            if client_id and client_id in known_client_ids:
-                continue
-            untracked_broker_orders.append(broker_id or client_id or "<unidentified>")
+            classification, detail = self._classify_broker_open_order(row)
+            if classification == "UNTRACKED":
+                untracked_broker_orders.append(detail)
+            elif classification == "CONTRADICTION":
+                contradictory_broker_orders.append(detail)
         untracked_broker_orders = sorted(set(untracked_broker_orders))
+        contradictory_broker_orders = sorted(set(contradictory_broker_orders))
 
         # -- Unresolved / genuinely-uncertain submissions --
         unresolved_submissions = sorted(
@@ -1459,11 +1527,26 @@ class PaperLifecycle:
             oid for oid, order in self.state.orders.items()
             if order.get("status") == "UNCONFIRMED_TIMEOUT"
         )
+        # Task 81-R1 §3: an ORDER_INTENT-status intent with NO recorded
+        # broker order (a crash strictly between persisting the intent and
+        # calling submit_order) is an ORPHAN -- unresolved until a
+        # verified matching order is discovered or an operator explicitly
+        # dispositions it. Absence of a broker order is NOT proof of
+        # non-submission.
+        _intent_ids_with_orders = {o.get("intent_id") for o in self.state.orders.values()}
+        orphan_intents = sorted(
+            intent_id for intent_id, intent in self.state.intents.items()
+            if intent.get("status") == "ORDER_INTENT" and intent_id not in _intent_ids_with_orders
+        )
 
-        complete = not read_failures and not unresolved_submissions and not unconfirmed_timeout_orders
+        complete = (
+            not read_failures and not unresolved_submissions
+            and not unconfirmed_timeout_orders and not orphan_intents
+        )
         consistent = (
             symbol_sets_match and not quantity_mismatches and not side_mismatches
-            and not untracked_broker_orders and not unexpected_shorts
+            and not untracked_broker_orders and not contradictory_broker_orders
+            and not unexpected_shorts
         )
         matched = bool(complete and consistent)
 
@@ -1474,6 +1557,10 @@ class PaperLifecycle:
             reasons.append(f"UNRESOLVED_SUBMISSIONS:{len(unresolved_submissions)}")
         if unconfirmed_timeout_orders:
             reasons.append(f"UNCONFIRMED_TIMEOUT_ORDERS:{len(unconfirmed_timeout_orders)}")
+        if orphan_intents:
+            reasons.append(f"ORPHAN_ORDER_INTENTS:{len(orphan_intents)}")
+        if contradictory_broker_orders:
+            reasons.append("CONTRADICTORY_BROKER_ORDERS:" + ",".join(contradictory_broker_orders))
         if not symbol_sets_match:
             reasons.append("POSITION_SYMBOL_SET_MISMATCH")
         if quantity_mismatches:
@@ -1487,7 +1574,7 @@ class PaperLifecycle:
 
         if matched:
             status = "MATCHED"
-        elif read_failures or unresolved_submissions or unconfirmed_timeout_orders:
+        elif read_failures or unresolved_submissions or unconfirmed_timeout_orders or orphan_intents:
             status = "INCOMPLETE_RECONCILIATION"
         else:
             status = "MISMATCHED"
@@ -1514,10 +1601,12 @@ class PaperLifecycle:
             "missing_broker_symbols": sorted(internal_open - broker_open),
             "unexpected_short_symbols": unexpected_shorts,
             "untracked_broker_orders": untracked_broker_orders,
+            "contradictory_broker_orders": contradictory_broker_orders,
             "position_quantity_mismatches": quantity_mismatches,
             "position_side_mismatches": sorted(side_mismatches),
             "unresolved_submissions": unresolved_submissions,
             "unconfirmed_timeout_orders": unconfirmed_timeout_orders,
+            "orphan_intents": orphan_intents,
             "incomplete_read": bool(read_failures),
             "read_failures": sorted(set(read_failures)),
             "complete": complete,
