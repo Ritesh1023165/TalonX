@@ -28,7 +28,10 @@ from .notification_outbox import NotificationOutbox
 from .observability import build_integrated_projection
 from .preflight import Preflight
 from .reporting import build_session_report
-from .session_identity import resolve_session_identity
+from .session_identity import (
+    _SESSION_IDENTITY_REQUIRED_FIELDS, SessionIdentity, SessionRecoveryRequired,
+    build_session_identity, resolve_session_identity, write_session_recovery_marker,
+)
 from .session_runner import SessionRunner
 from .shadow_ledger import ShadowLedger
 from .supervisor import (
@@ -178,7 +181,31 @@ def main(argv: list[str] | None = None) -> int:
     # genuinely still-live session (see resolve_session_identity's own
     # docstring for the exact, fail-closed criteria) -- a full process
     # restart no longer always mints a brand-new session_id.
-    identity = resolve_session_identity(config)
+    try:
+        identity = resolve_session_identity(config)
+    except SessionRecoveryRequired as exc:
+        # Task 81 §3: bindings changed / identity corrupt / EOD incomplete
+        # while exposure or submissions remain unresolved. Never mint a
+        # replacement session or overwrite session_identity.json here.
+        write_session_recovery_marker(config.state_dir, exc, command=args.command)
+        print("PIV_BLOCKED_RECOVERY_REQUIRED", file=sys.stderr)
+        print(f"  required action: {exc.required_action}", file=sys.stderr)
+        for _reason in exc.reasons:
+            print(f"  reason: {_reason}", file=sys.stderr)
+        if args.command in ("start", "supervise"):
+            return 2
+        # Read-only / recovery commands (preflight, eod, kill-switch,
+        # cleanup, report) may still run against the PRESERVED identity so
+        # the operator can carry out the recovery transition.
+        if isinstance(exc.preserved_identity, dict) and all(
+            k in exc.preserved_identity for k in _SESSION_IDENTITY_REQUIRED_FIELDS
+        ):
+            identity = SessionIdentity(**{k: exc.preserved_identity[k] for k in _SESSION_IDENTITY_REQUIRED_FIELDS})
+        elif args.command in ("preflight",):
+            identity = build_session_identity(config)
+        else:
+            print("  no usable preserved session identity -- cannot proceed", file=sys.stderr)
+            return 2
     bus, broker, lifecycle, experimental_authorization_path = runtime(
         config, session_id=identity.session_id, runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
     )

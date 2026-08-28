@@ -38,7 +38,10 @@ from talonx_piv.experimental_authorization import ExperimentalAuthorization, Exp
 from talonx_piv.gemini_enrichment import GeminiEnrichmentOutbox
 from talonx_piv.lifecycle import PaperLifecycle, UNCERTAIN_SUBMISSION_BACKOFF_SCHEDULE_SECONDS, stable_id
 from talonx_piv.notification_outbox import NotificationOutbox
-from talonx_piv.session_identity import build_session_identity, resolve_session_identity
+from talonx_piv.session_identity import (
+    RECOVERY_REQUIRED, SessionRecoveryRequired, assess_session_recovery,
+    build_session_identity, resolve_session_identity,
+)
 from talonx_piv.session_runner import ET, Bar, SessionRunner
 from talonx_piv.shadow_ledger import ShadowLedger
 from talonx_quant.schemas import QuantSignal, SignalDirection, SignalType
@@ -1105,24 +1108,32 @@ def test_session_identity_reuse_requires_current_config_and_runtime_bindings(tmp
         same = resolve_session_identity(cfg, now=now + timedelta(minutes=1))
     assert same.session_id == saved.session_id
 
+    # Task 81 §3 (supersedes R2-3's "silently mint a fresh identity" here):
+    # a CHANGED binding while an unresolved ORDER_INTENT (pending entry
+    # exposure) still exists must NOT silently create a replacement
+    # session. It raises SessionRecoveryRequired, preserving recovery
+    # context and naming the operator action.
     changed_cfg = dataclasses.replace(cfg, universe=("AAPL", "MSFT"))
     with patch("talonx_piv.session_identity.runtime_sha", return_value="sha-old"):
-        rebound = resolve_session_identity(changed_cfg, now=now + timedelta(minutes=2))
-    assert rebound.session_id != saved.session_id
-    assert rebound.config_hash != saved.config_hash
+        with pytest.raises(SessionRecoveryRequired) as ei_config:
+            resolve_session_identity(changed_cfg, now=now + timedelta(minutes=2))
+    assert any("BINDINGS_CHANGED" in r for r in ei_config.value.reasons)
+    assert any("UNRESOLVED_SUBMISSION" in r for r in ei_config.value.reasons)
+    assert "eod" in ei_config.value.required_action
+    assert ei_config.value.preserved_identity["session_id"] == saved.session_id
 
     with patch("talonx_piv.session_identity.runtime_sha", return_value="sha-new"):
-        redeployed = resolve_session_identity(cfg, now=now + timedelta(minutes=3))
-    assert redeployed.session_id != saved.session_id
-    assert redeployed.runtime_sha == "sha-new"
+        with pytest.raises(SessionRecoveryRequired) as ei_sha:
+            resolve_session_identity(cfg, now=now + timedelta(minutes=3))
+    assert any("runtime_sha" in r for r in ei_sha.value.reasons)
 
-    # Minting a fresh identity must never rewrite durable lifecycle truth.
-    # Budget use and unresolved exposure survive the rebind and still block a
-    # same-symbol retry at the broker boundary.
+    # The recovery-required condition must not have rewritten durable
+    # lifecycle truth. Budget use and unresolved exposure are intact and
+    # still block a same-symbol retry at the broker boundary.
     transport = AlpacaContractTransport()
     broker = AlpacaPaperClient(changed_cfg, transport)
     broker.verify_paper_identity()
-    bus = EventBus(tmp_path / "rebound_events.jsonl", session_id=rebound.session_id)
+    bus = EventBus(tmp_path / "rebound_events.jsonl", session_id=saved.session_id)
     life = PaperLifecycle(
         tmp_path / "lifecycle_state.json", broker, bus,
         PaperEntrySettings.for_test("AAPL", "MSFT"),
@@ -1133,6 +1144,18 @@ def test_session_identity_reuse_requires_current_config_and_runtime_bindings(tmp
     assert life.entry_still_pending_or_uncertain("AAPL") is True
     with pytest.raises(PaperGuardError, match="PENDING_ENTRY_EXISTS"):
         life.order_intent("retry-after-rebind", "AAPL", "buy", 1.0, source="STRATEGY")
+
+    # The defined, verified transition: once the pending exposure is
+    # resolved (here: the intent reaches a terminal state) a changed
+    # binding cleanly mints a fresh session -- no recovery block.
+    state = json.loads((tmp_path / "lifecycle_state.json").read_text())
+    state["intents"][pending_intent_id]["status"] = "REJECTED"
+    state["session_enabled"] = False
+    (tmp_path / "lifecycle_state.json").write_text(json.dumps(state), encoding="utf-8")
+    with patch("talonx_piv.session_identity.runtime_sha", return_value="sha-old"):
+        clean = assess_session_recovery(changed_cfg, now=now + timedelta(minutes=4))
+    assert clean.mode != RECOVERY_REQUIRED
+    assert clean.identity.session_id != saved.session_id
 
 
 # ---------------------------------------------------------------------------

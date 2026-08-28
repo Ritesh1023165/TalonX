@@ -732,6 +732,29 @@ class PaperLifecycle:
         # partially_filled/filled transition on the same closing order used
         # to fabricate an orphan phantom OPEN position).
         previous_filled_qty = float(order.get("filled_qty") or 0.0)
+        previous_status = str(order.get("status") or "")
+        # Task 81 §3 (B5): broker `filled_qty` is cumulative per order and
+        # must never regress. A delayed / duplicated / out-of-order broker
+        # update carrying a SMALLER cumulative quantity, or re-reporting an
+        # already-terminal order, must not rewind accounting, resurrect
+        # sold quantity, erase the terminal state, or double-count a later
+        # legitimate fill (a regressed stored filled_qty would inflate the
+        # next update's computed increment). Once an order is terminal it is
+        # final: apply_broker_update becomes a no-op, emitting a diagnostic
+        # only if the new report actually contradicts the terminal record.
+        if previous_status in _TERMINAL_ORDER_STATUSES:
+            if status != previous_status or filled_qty < previous_filled_qty - 1e-9:
+                self.events.emit(PivEvent.build(
+                    "BROKER_ERROR", symbol=order.get("symbol"), broker_order_id=broker_order_id,
+                    correlation_id=order.get("intent_id"),
+                    reason="STALE_OR_CONTRADICTORY_BROKER_UPDATE_IGNORED",
+                    status=f"kept={previous_status}/{previous_filled_qty} ignored={status}/{filled_qty}",
+                ))
+            return
+        # Non-terminal so far: clamp the cumulative fill quantity to its
+        # high-water mark so an older/smaller cumulative report cannot
+        # rewind it.
+        filled_qty = max(previous_filled_qty, float(filled_qty or 0.0))
         order.update(status=status, filled_qty=filled_qty, fill_price=fill_price)
         intent_id, symbol = order["intent_id"], order["symbol"]
         source, alpha_evidence = order.get("source"), order.get("alpha_evidence")
@@ -890,6 +913,21 @@ class PaperLifecycle:
                     # replacing this record would resurrect prior exits and
                     # erase the durable triggered-exit latch.
                     position = existing_position
+                    if position.get("status") == "CLOSED":
+                        # Task 81 §3 (B5): a delayed / duplicated BUY fill
+                        # update must never re-open an already-closed
+                        # position or resurrect sold quantity. The order
+                        # record above is left at its (truthful) status;
+                        # the position stays closed and the discrepancy is
+                        # surfaced -- reconcile() then blocks new entries on
+                        # the resulting broker-vs-internal position mismatch.
+                        self.events.emit(PivEvent.build(
+                            "BROKER_ERROR", symbol=symbol, broker_order_id=broker_order_id, correlation_id=intent_id,
+                            reason="LATE_BUY_FILL_ON_CLOSED_POSITION_IGNORED",
+                            status=f"position_id={position_id} cumulative_filled={filled_qty}",
+                        ))
+                        self._save()
+                        return
                     prior_entry_qty = float(position.get("quantity") or 0.0)
                     prior_remaining = float(position.get("remaining_quantity", prior_entry_qty) or 0.0)
                     position.update({
