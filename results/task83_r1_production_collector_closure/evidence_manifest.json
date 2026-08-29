@@ -1,0 +1,89 @@
+{
+  "task": "Task 83-R1 Production Collector Correctness and Evidence-Integrity Closure",
+  "generated_at": "2026-08-29T16:11:39.953938+00:00",
+  "algorithm": "sha256 over git-normalized (LF) bytes",
+  "content_commit": "bb7af515cbcc8512883fc2b4a8f034c32dddc140",
+  "excluded": [
+    "_make_manifest.py",
+    "evidence_manifest.json"
+  ],
+  "note": "Hashes are over LF-normalized bytes so this manifest verifies from a fresh clone regardless of the checkout's line-ending policy. content_commit is the code/evidence commit these hashes describe -- this manifest and its generator are excluded to avoid a self-referential SHA.",
+  "file_count": 15,
+  "artifacts": [
+    {
+      "file": "__pycache__/_make_manifest.cpython-312.pyc",
+      "bytes": 4134,
+      "sha256": "6f7cfa486f512a518df61e977be56108171e58c04dab07a38434c1db1ba2d796"
+    },
+    {
+      "file": "acceptance_matrix.md",
+      "bytes": 12738,
+      "sha256": "5aec876dbb09bcbf99e9d61b954ef9aa6f58818584cb9f656188505946b0a2cb"
+    },
+    {
+      "file": "contracts.md",
+      "bytes": 10754,
+      "sha256": "318f162c5c2cdcc4075c946fffb50b5b2ce7eec1caee23d4493b622c2b509924"
+    },
+    {
+      "file": "expanded_rehearsal_matrix.csv",
+      "bytes": 2098,
+      "sha256": "c1cda40f2c9fb48ff17a7ec8fa305f708e61621d31cac0ef089d10b2867d187a"
+    },
+    {
+      "file": "expanded_rehearsal_matrix.md",
+      "bytes": 3955,
+      "sha256": "5929ea448f3bac55f35d8b9e5cbb20eb4fec825f6b2a2ca4e9f11fb20d2a0ca1"
+    },
+    {
+      "file": "fresh_clone_manifest_verification.md",
+      "bytes": 3293,
+      "sha256": "272bdf173c3d554060f5ecbd8cbb1e620e5c3937343fb205ccf1cab9295f543d"
+    },
+    {
+      "file": "raw_test_output/adjacent_suites.txt",
+      "bytes": 840,
+      "sha256": "c9697060f1042b36ec335c26fcbbc54ae603bbaf382e9df2ae01364545786261"
+    },
+    {
+      "file": "raw_test_output/baseline_full_suite.txt",
+      "bytes": 8304,
+      "sha256": "e1be5ec047d62e76eb2952004dd848eb13446d1a5337fe42bad0bf70874a67a9"
+    },
+    {
+      "file": "raw_test_output/final_full_suite.txt",
+      "bytes": 8384,
+      "sha256": "f5c58f8bd4f3e1f51d530d3aac029a2d1363612e2ecc0c0697e1dd8602d869ba"
+    },
+    {
+      "file": "raw_test_output/focused_run1.txt",
+      "bytes": 35,
+      "sha256": "dcabd6b60015ddb9db644669f10f59828e256f97456897d0a2e60a98290e4230"
+    },
+    {
+      "file": "raw_test_output/focused_run2.txt",
+      "bytes": 35,
+      "sha256": "273a77d772c7bac88611bf178395c60fee31a91c233a16a4f5ddcf71bd44cc7c"
+    },
+    {
+      "file": "README.md",
+      "bytes": 3386,
+      "sha256": "3df3b076da95670fca73da5bfe969b5fd899abac89aa2d34313554754c4844c1"
+    },
+    {
+      "file": "remaining_blockers.md",
+      "bytes": 3061,
+      "sha256": "bc08abed7c4bc0ab0a9f0d7f2c2fa9e8b30d9e05a117416e913495d6760b570b"
+    },
+    {
+      "file": "retained_20_scenarios_matrix.csv",
+      "bytes": 3415,
+      "sha256": "82d3c5727c61dbe35f45eb76b295a569f7f0d0ba3eeaeb0a33cba93fd6c71d26"
+    },
+    {
+      "file": "verification_report.md",
+      "bytes": 8548,
+      "sha256": "d53209b14a9320993f68831527f8308f5b8a7b7096aaf02494e0f0cc5a1062f2"
+    }
+  ]
+}
