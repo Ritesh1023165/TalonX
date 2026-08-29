@@ -1,0 +1,68 @@
+{
+  "task": "Task 83 Dashboard Separation, Daily Comparison Evidence and Offline Dual-Run Qualification",
+  "generated_at": "2026-08-29T14:07:17.958734+00:00",
+  "algorithm": "sha256",
+  "file_count": 12,
+  "artifacts": [
+    {
+      "file": "acceptance_matrix.md",
+      "bytes": 11623,
+      "sha256": "5cef7a5dc27755ff6e69c8260a95a6ac17881ebc41f9b95cb8fb38f876ba86bd"
+    },
+    {
+      "file": "architecture_and_ownership.md",
+      "bytes": 5849,
+      "sha256": "e80e6b8b83a4f7373f3148a238f29725789e5a0d36ff1beb8f47a2fce3a90c5c"
+    },
+    {
+      "file": "comparison_schema_and_health_contract.md",
+      "bytes": 5307,
+      "sha256": "abdf95c5bddf6979c7d1d5a0bc68672e1f9d399d8f86fe024af75399e660a9f6"
+    },
+    {
+      "file": "offline_rehearsal_matrix.csv",
+      "bytes": 3439,
+      "sha256": "7f719b759ed3cbdb2321763006a6f6c99e809892013aeaa013f94003046e0526"
+    },
+    {
+      "file": "operator_handoff.md",
+      "bytes": 3624,
+      "sha256": "2d1fcc6dcf6ea778f141fd9db82d80c5752bfc2f7f34777120d0371560bc45eb"
+    },
+    {
+      "file": "raw_test_output/baseline_full_suite.txt",
+      "bytes": 10837,
+      "sha256": "fc3dccd9aeea5505e80a115c432b77f0e709d935a3f4c7cb3f6312177d946e05"
+    },
+    {
+      "file": "raw_test_output/final_full_suite.txt",
+      "bytes": 8426,
+      "sha256": "340510b700b34052de6e00470e2edea50afcf9f7c0bab4a775f49a1ef476789a"
+    },
+    {
+      "file": "raw_test_output/focused_run1.txt",
+      "bytes": 447,
+      "sha256": "56ddec4742c55890f1ada49b583aa9fde073b891696d4e52699b509fad5e49e5"
+    },
+    {
+      "file": "raw_test_output/focused_run2.txt",
+      "bytes": 34,
+      "sha256": "b9d9c85de67034c004ba70b739d8b244959b00d636550ab18a34c17153e1e9fe"
+    },
+    {
+      "file": "remaining_blockers.md",
+      "bytes": 2894,
+      "sha256": "56ed10b79ee3698baf69223a055e4b4112ca9c197f287486330895596e1894fc"
+    },
+    {
+      "file": "route_inventory.md",
+      "bytes": 3842,
+      "sha256": "c5dbfc372d2db0abb33262d3a62904ab4169f826ada35508a825b4530775e678"
+    },
+    {
+      "file": "verification_report.md",
+      "bytes": 5606,
+      "sha256": "e7bd8c1e765729bb5e9568bb970bb99f54de28e168b0d1f99b6521c4f39cb841"
+    }
+  ]
+}

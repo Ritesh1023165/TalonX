@@ -2,8 +2,8 @@ scenario,name,expected,observed,verdict,label
 1,Original alone,PIV honestly NOT_RUN; collector read-only,"piv_identity=MISSING, original_writes=[]",PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
 2,PIV alone (shadow),PIV SHADOW recorded; Original absent handled,execution_mode=SHADOW,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
 3,Original + isolated PIV,isolation validates; both sides recorded,isolation_passed=True; orig=1; piv=3,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
-4,Duplicate Original rejected,guard blocks a second ORIGINAL,"ok=False; runtime-role process policy blocked peer PID(s): [15036, 22872]",PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
-5,Duplicate PIV rejected,guard blocks a second PIV even when isolation-verified,"ok=False; runtime-role process policy blocked peer PID(s): [20552, 22180]",PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+4,Duplicate Original rejected,guard blocks a second ORIGINAL,"ok=False; runtime-role process policy blocked peer PID(s): [13832, 16288]",PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+5,Duplicate PIV rejected,guard blocks a second PIV even when isolation-verified,"ok=False; runtime-role process policy blocked peer PID(s): [14992, 23544]",PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
 6,Overlapping/uncertain bindings rejected,same-DB isolation fails AND unmarked PIV peer blocks Original,same_db_isolation=False; unmarked_peer_ok=False,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
 7,DB separate + channel overlap rejected,different DB does not save an overlapping channel name,passed=False; every PIV Redis channel must use the configured non-empty PIV namespace; one or more PIV Pub/Sub channels overlap Original channels,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
 8,Correct DB + prefixed channels accepted,isolation passes,passed=True; all_prefixed=True,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE

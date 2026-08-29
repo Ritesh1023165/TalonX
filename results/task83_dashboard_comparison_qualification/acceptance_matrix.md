@@ -112,9 +112,9 @@ All Task 83 focused suites pass twice (`focused_run1.txt`, `focused_run2.txt`,
 | # | Requirement | Artifact | Status |
 |---|---|---|---|
 | 7.1 | focused collector/isolation/dashboard suites run twice | `raw_test_output/focused_run1.txt`, `focused_run2.txt` | ✅ |
-| 7.2 | full repository suite | `raw_test_output/final_full_suite.txt` | ⏳ |
-| 7.3 | collected/pass/fail/skip/xfail counts reconciled exactly | `verification_report.md` §Count reconciliation | ⏳ |
-| 7.4 | impacted checks + final full suite rerun after any later edit | `verification_report.md` | ⏳ |
+| 7.2 | full repository suite | `raw_test_output/final_full_suite.txt` | ✅ |
+| 7.3 | collected/pass/fail/skip/xfail counts reconciled exactly | `verification_report.md` §Count reconciliation | ✅ |
+| 7.4 | impacted checks + final full suite rerun after any later edit | `verification_report.md` | ✅ |
 | 7.5 | final source-level audit vs every acceptance row | this matrix, Status column | ✅ |
 
 ## §8 Boundaries

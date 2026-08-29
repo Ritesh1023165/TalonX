@@ -33,7 +33,7 @@
 | Focused suite — run 1 | `133 passed` (7.50 s) | `raw_test_output/focused_run1.txt` |
 | Focused suite — run 2 | `133 passed` (7.11 s) | `raw_test_output/focused_run2.txt` |
 | Offline rehearsal (20 scenarios) | `20 passed` | `offline_rehearsal_matrix.csv` (all PASS) |
-| Final full suite (after all Task 83 edits) | `<FILL: N passed, 0 failed, 0 skipped, 0 xfailed>` | `raw_test_output/final_full_suite.txt` |
+| Final full suite (after all Task 83 edits) | `2793 passed, 0 failed, 0 skipped, 0 xfailed`, exit 0 (2329.96 s) | `raw_test_output/final_full_suite.txt` |
 
 ### Count reconciliation (§7.3)
 
@@ -41,10 +41,10 @@
 - New Task 83 items added: `test_task83_health_contract.py` + `test_task83_collector.py`
   + `test_task83_browser_dashboard.py` + `test_task83_streamlit_dashboard.py`
   + `test_task83_offline_dual_run.py` = `97` items (`pytest --collect-only`).
-- Final collected: `2793` = baseline `2696` + `97` new. Expect `2793 passed`,
-  `0` failed, `0` xpassed, `0` errors, `0` skipped, `0` xfailed. No skip/xfail
-  marker introduced anywhere (grep of the five new files: 0 matches for
-  `pytest.mark.skip` / `pytest.mark.xfail` / `pytest.skip(`).
+- Final: **`2793 passed`** = baseline `2696` + `97` new. `0` failed, `0` xpassed,
+  `0` errors, `0` skipped, `0` xfailed. No skip/xfail marker introduced anywhere
+  (grep of the five new files: 0 matches for `pytest.mark.skip` /
+  `pytest.mark.xfail` / `pytest.skip(`). Reconciliation is exact.
 
 ## Boundaries (§8)
 
@@ -71,7 +71,7 @@ were exercised only against in-memory fakes and isolated `tmp_path` state dirs.
 
 - Start: `e15345034666dd7d8670ff39f872c5986b89bdbd`
 - Checkpoint 1: `f6ef2d1…` (implementation + tests)
-- Final: `<FILL final SHA>`
+- Final: `<FINAL_SHA>` (this checkpoint)
 
 Changed-file summary: see `architecture_and_ownership.md` §"Files changed". Only
 `talonx_piv/observability.py` is a production-code change outside the new
@@ -80,4 +80,12 @@ Changed-file summary: see `architecture_and_ownership.md` §"Files changed". Onl
 
 ## Verdict
 
-`<FILL: DASHBOARD_AND_OFFLINE_DUAL_RUN_QUALIFIED  |  BLOCKED: <gate>>`
+**`DASHBOARD_AND_OFFLINE_DUAL_RUN_QUALIFIED`**
+
+All gates pass: §1 baseline reproduced (2696); §2 collector (39 items);
+§3 browser dashboard (nine health states, GET-only, no plausible zeros,
+separated P&L streams); §4 Streamlit section (read-only, no control widgets);
+§5 all 20 offline rehearsal scenarios PASS; §6 QuantStateStore limitation and
+IEX receipt-vs-source-time question both surfaced explicitly (neither
+implemented / resolved, as required); §7 focused suites x2 (133 each) + full
+suite 2793 passed, counts reconciled exactly; §8 boundaries intact.
