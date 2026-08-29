@@ -36,6 +36,8 @@
 | Retained 20 offline scenarios | `20 passed` | `retained_20_scenarios_matrix.csv` |
 | Expanded rehearsal (13 new, 21–33) | `13 passed` | `expanded_rehearsal_matrix.csv` |
 | Final full suite (after all R1 edits) | `2869 passed, 0 failed, 0 skipped, 0 xfailed`, exit 0 (3316.43 s) | `raw_test_output/final_full_suite.txt` |
+| Compliance re-run (after `_make_manifest.py` pycache-exclusion, a results/ helper imported only by scenario 33) | `2869 passed, 0 failed, 0 skipped, 0 xfailed`, exit 0 (3256.42 s) | `raw_test_output/final_full_suite_rerun.txt` |
+| Fresh-clone manifest verification (committed blobs) | `0 mismatches` of 14 artifacts; `test_s33_fresh_clone_manifest_verification` PASS against committed `evidence_manifest.json` | `fresh_clone_manifest_verification.md` |
 
 ### Count reconciliation (§8.4)
 
@@ -101,7 +103,8 @@ monitoring resume, holdout access, alpha tuning, or protected Quant change.
 - Start: `fd9b66ac1ee9ba64ead44c5cc764c285a4d2c36b`
 - Checkpoint 1: `239a42c` (implementation + tests)
 - Checkpoint 2: `c1ec63f` (contracts + .gitattributes + focused runs)
-- Final: recorded in the next commit (this report) + the evidence-manifest commit
+- Content commit: `5b3764981de474691a0ba9898845c7b9bf6e984a`
+- Final: recorded in this report's commit
 
 ## Verdict
 
