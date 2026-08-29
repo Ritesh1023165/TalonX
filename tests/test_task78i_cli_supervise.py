@@ -71,7 +71,9 @@ def test_supervise_blocked_when_preflight_fails(tmp_path, monkeypatch):
     Telegram not configured, etc.) -- supervise must report PIV_BLOCKED and
     persist a startup-failure recovery record, never silently proceed."""
     _base_env(monkeypatch, tmp_path)
-    code = cli.main(["supervise", "--approved-sha", "abc", "--confirm-paper-session-start"])
+    code = cli.main([
+        "supervise", "--approved-sha", "abc", "--confirm-paper-session-start", "--isolated-parallel",
+    ])
     assert code == 2
     health_path = tmp_path / "state" / "component_health.json"
     assert health_path.exists()
@@ -93,7 +95,9 @@ def test_supervise_second_instance_blocked_by_ownership(tmp_path, monkeypatch):
     holder = ExecutionOwnership(lock_dir, key)
     assert holder.acquire() is True
     try:
-        code = cli.main(["supervise", "--approved-sha", "abc", "--confirm-paper-session-start"])
+        code = cli.main([
+            "supervise", "--approved-sha", "abc", "--confirm-paper-session-start", "--isolated-parallel",
+        ])
         assert code == 2  # PIV_BLOCKED, regardless of whether preflight itself would have passed
     finally:
         holder.release()

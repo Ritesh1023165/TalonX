@@ -9,8 +9,12 @@ being started accidentally before either reaches that boundary.
 from __future__ import annotations
 
 import os
+import json
 import subprocess
 from typing import Callable
+
+ORIGINAL_ROLE = "ORIGINAL"
+PIV_ROLE = "PIV"
 
 
 def _process_query(current_pid: int) -> str:
@@ -29,7 +33,10 @@ def _process_query(current_pid: int) -> str:
         "if ($null -eq $node) { break }; $cursor = [int]$node.ParentProcessId }; "
         "$all | Where-Object { $_.Name -match '^python(?:w)?(?:\\.exe)?$' -and "
         "$_.CommandLine -match 'run_talonx\\.py|talonx_piv\\.cli' -and "
-        "$_.ProcessId -notin $excluded } | Select-Object -ExpandProperty ProcessId"
+        "$_.ProcessId -notin $excluded } | ForEach-Object { "
+        "$role = if ($_.CommandLine -match 'talonx_piv\\.cli') { 'PIV' } else { 'ORIGINAL' }; "
+        "$isolated = $role -eq 'PIV' -and $_.CommandLine -match '(?:^|\\s)--isolated-parallel(?:\\s|$)'; "
+        "[pscustomobject]@{pid=[int]$_.ProcessId;role=$role;isolated=[bool]$isolated} | ConvertTo-Json -Compress }"
     )
 
 
@@ -37,6 +44,8 @@ def no_competing_talonx_process(
     *,
     exclude_pid: int | None = None,
     check_output: Callable[..., str] = subprocess.check_output,
+    current_role: str | None = None,
+    piv_isolation_verified: bool = False,
 ) -> tuple[bool, str]:
     """Return success only after complete enumeration proves no competitor.
 
@@ -61,16 +70,60 @@ def no_competing_talonx_process(
     except Exception as exc:  # noqa: BLE001 -- every enumeration failure is a safety block
         return False, f"process enumeration failed closed ({type(exc).__name__})"
 
-    parsed: list[int] = []
+    parsed: list[dict[str, object]] = []
     for raw in output.splitlines():
         value = raw.strip()
         if not value:
             continue
-        if not value.isascii() or not value.isdecimal() or int(value) <= 0:
-            return False, "process enumeration returned malformed PID output -- failed closed"
-        parsed.append(int(value))
+        # Numeric-only output remains accepted for the legacy strict mode so
+        # existing diagnostic callers and their captured fixtures remain
+        # compatible. Role-aware startup requires structured proof.
+        if value.isascii() and value.isdecimal() and int(value) > 0:
+            if current_role is not None:
+                return False, "process enumeration omitted runtime role -- failed closed"
+            parsed.append({"pid": int(value), "role": "UNKNOWN", "isolated": False})
+            continue
+        try:
+            row = json.loads(value)
+        except json.JSONDecodeError:
+            return False, "process enumeration returned malformed PID/process output -- failed closed"
+        if (
+            not isinstance(row, dict)
+            or isinstance(row.get("pid"), bool)
+            or not isinstance(row.get("pid"), int)
+            or row["pid"] <= 0
+            or row.get("role") not in {ORIGINAL_ROLE, PIV_ROLE}
+            or not isinstance(row.get("isolated"), bool)
+        ):
+            return False, "process enumeration returned malformed PID/process output -- failed closed"
+        parsed.append(row)
 
-    competitors = sorted({pid for pid in parsed if pid != current_pid})
-    if competitors:
-        return False, f"{len(competitors)} competing TalonX process(es): {competitors}"
-    return True, "0 competing TalonX processes; enumeration completed successfully"
+    peers = {int(row["pid"]): row for row in parsed if int(row["pid"]) != current_pid}
+    if current_role is None:
+        if peers:
+            return False, f"{len(peers)} competing TalonX process(es): {sorted(peers)}"
+        return True, "0 competing TalonX processes; enumeration completed successfully"
+
+    if current_role not in {ORIGINAL_ROLE, PIV_ROLE}:
+        return False, "unknown current runtime role -- failed closed"
+    blocked: list[int] = []
+    allowed_peer = 0
+    for pid, row in peers.items():
+        peer_role = str(row["role"])
+        if peer_role == current_role:
+            blocked.append(pid)
+        elif current_role == PIV_ROLE:
+            if piv_isolation_verified:
+                allowed_peer += 1
+            else:
+                blocked.append(pid)
+        elif bool(row["isolated"]):
+            allowed_peer += 1
+        else:
+            blocked.append(pid)
+    if blocked:
+        return False, f"runtime-role process policy blocked peer PID(s): {sorted(blocked)}"
+    return True, (
+        f"runtime-role process policy passed for {current_role}; "
+        f"{allowed_peer} isolated opposite-role peer(s) allowed"
+    )

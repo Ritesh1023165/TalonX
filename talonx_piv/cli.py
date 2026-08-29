@@ -23,6 +23,7 @@ from .events import EventBus, PivEvent
 from .execution_ownership import ExecutionOwnership, account_lock_key
 from .execution_settings import load_paper_entry_settings
 from .gemini_enrichment import GeminiEnrichmentOutbox
+from .isolation import build_piv_quant_config
 from .lifecycle import PaperLifecycle, paper_cleanup
 from .notification_outbox import NotificationOutbox
 from .observability import build_integrated_projection
@@ -114,7 +115,8 @@ def build_gemini_chain_if_enabled(bus: EventBus):
 
 def runtime(config: PivConfig, session_id: str | None = None, runtime_sha: str | None = None, config_hash: str | None = None):
     bus = EventBus(
-        config.state_dir / "piv_events.jsonl", sender(config.telegram_token, config.telegram_chat_id),
+        config.state_dir / "piv_events.jsonl",
+        sender(config.telegram_token, config.telegram_chat_id) if config.telegram_enabled else None,
         feed_mode=config.feed_mode, session_id=session_id,
     )
     broker = AlpacaPaperClient(config)
@@ -158,6 +160,7 @@ def parser() -> argparse.ArgumentParser:
     start.add_argument("--no-decision-path", action="store_true", help="Run the live feed/readiness loop without the strategy decision path wired in (Task65 plumbing-only behavior).")
     start.add_argument("--confirm-piv-lifecycle-probe", action="store_true", help="Enable the operator-confirmed PIV_LIFECYCLE_PROBE fallback (only fires if no natural STRATEGY order lifecycle occurred by the predeclared cutoff).")
     start.add_argument("--no-telegram-inbound", action="store_true", help="Do not start the inbound Telegram /ping listener (use if a separate run_talonx.py process is already polling the SAME bot token -- only one poller per token is allowed).")
+    start.add_argument("--isolated-parallel", action="store_true", help="Required Task 82 marker: PIV bindings were validated for parallel operation beside Original.")
     kill = sub.add_parser("kill-switch"); kill.add_argument("--cancel-paper-orders", action="store_true")
     sub.add_parser("eod")
     supervise = sub.add_parser("supervise", help="Task 78I Stage 2: run the unified supervisor (ordered startup-safety sequence, component health tracking, bounded restart/backoff) around the same live session start already does.")
@@ -166,6 +169,7 @@ def parser() -> argparse.ArgumentParser:
     supervise.add_argument("--no-decision-path", action="store_true")
     supervise.add_argument("--confirm-piv-lifecycle-probe", action="store_true")
     supervise.add_argument("--no-telegram-inbound", action="store_true")
+    supervise.add_argument("--isolated-parallel", action="store_true")
     supervise.add_argument("--max-restarts", type=int, default=3)
     supervise.add_argument("--backoff-seconds", type=float, default=30.0)
     return root
@@ -206,6 +210,9 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print("  no usable preserved session identity -- cannot proceed", file=sys.stderr)
             return 2
+    if args.command in ("start", "supervise") and not args.isolated_parallel:
+        print("PIV_BLOCKED: --isolated-parallel is required for runtime startup", file=sys.stderr)
+        return 2
     bus, broker, lifecycle, experimental_authorization_path = runtime(
         config, session_id=identity.session_id, runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
     )
@@ -244,7 +251,7 @@ def main(argv: list[str] | None = None) -> int:
             redis_client = None
             if config.decision_path_enabled and not args.no_decision_path:
                 import redis.asyncio as redis_asyncio
-                redis_client = redis_asyncio.from_url(os.environ.get("TALONX_REDIS_URL", "redis://localhost:6379"))
+                redis_client = redis_asyncio.from_url(config.redis_url)
                 # Task 77I: the three new durable ledgers -- real, state_dir-
                 # backed instances only here (production). No caller in this
                 # file ever sets strategy_approval_status_override (grep-
@@ -253,7 +260,8 @@ def main(argv: list[str] | None = None) -> int:
                 # strategy approval to UNVALIDATED.
                 decision_ledger = DecisionLedger(config.state_dir / "decision_ledger.json")
                 notification_outbox = NotificationOutbox(
-                    config.state_dir / "notification_outbox.json", sender(config.telegram_token, config.telegram_chat_id),
+                    config.state_dir / "notification_outbox.json",
+                    sender(config.telegram_token, config.telegram_chat_id) if config.telegram_enabled else None,
                 )
                 shadow_ledger = ShadowLedger(config.state_dir / "shadow_ledger.json")
                 gemini_enrichment = GeminiEnrichmentOutbox(config.state_dir / "gemini_enrichment.json")
@@ -270,7 +278,7 @@ def main(argv: list[str] | None = None) -> int:
                 # exactly, ahead of DecisionEngine's own rehydration below.
                 lifecycle.reconcile()
                 decision_engine = DecisionEngine(
-                    redis_client, bus, lifecycle, piv_config=config,
+                    redis_client, bus, lifecycle, config=build_piv_quant_config(config), piv_config=config,
                     decision_ledger=decision_ledger, notification_outbox=notification_outbox, shadow_ledger=shadow_ledger,
                     gemini_enrichment=gemini_enrichment,
                     runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
@@ -285,7 +293,7 @@ def main(argv: list[str] | None = None) -> int:
                 config, bus, lifecycle, broker.transport, decision_engine=decision_engine,
                 probe_enabled=args.confirm_piv_lifecycle_probe, piv_info=piv_info, gemini_chain=gemini_chain,
             )
-            listener = None if args.no_telegram_inbound else build_piv_telegram_listener(
+            listener = None if args.no_telegram_inbound or not config.telegram_enabled else build_piv_telegram_listener(
                 config.state_dir, redis_client=redis_client, started_at=datetime.now(timezone.utc),
                 feed_mode=config.feed_mode, universe=config.universe, piv_info=piv_info,
             )
@@ -339,15 +347,16 @@ def main(argv: list[str] | None = None) -> int:
             redis_client = None
             if config.decision_path_enabled and not args.no_decision_path:
                 import redis.asyncio as redis_asyncio
-                redis_client = redis_asyncio.from_url(os.environ.get("TALONX_REDIS_URL", "redis://localhost:6379"))
+                redis_client = redis_asyncio.from_url(config.redis_url)
                 decision_ledger = DecisionLedger(config.state_dir / "decision_ledger.json")
                 notification_outbox = NotificationOutbox(
-                    config.state_dir / "notification_outbox.json", sender(config.telegram_token, config.telegram_chat_id),
+                    config.state_dir / "notification_outbox.json",
+                    sender(config.telegram_token, config.telegram_chat_id) if config.telegram_enabled else None,
                 )
                 shadow_ledger = ShadowLedger(config.state_dir / "shadow_ledger.json")
                 gemini_enrichment = GeminiEnrichmentOutbox(config.state_dir / "gemini_enrichment.json")
                 decision_engine = DecisionEngine(
-                    redis_client, bus, lifecycle, piv_config=config,
+                    redis_client, bus, lifecycle, config=build_piv_quant_config(config), piv_config=config,
                     decision_ledger=decision_ledger, notification_outbox=notification_outbox, shadow_ledger=shadow_ledger,
                     gemini_enrichment=gemini_enrichment,
                     runtime_sha=identity.runtime_sha, config_hash=identity.config_hash,
@@ -364,12 +373,15 @@ def main(argv: list[str] | None = None) -> int:
                 config, bus, lifecycle, broker.transport, decision_engine=decision_engine,
                 probe_enabled=args.confirm_piv_lifecycle_probe, piv_info=piv_info, gemini_chain=gemini_chain,
             )
-            listener = None if args.no_telegram_inbound else build_piv_telegram_listener(
+            listener = None if args.no_telegram_inbound or not config.telegram_enabled else build_piv_telegram_listener(
                 config.state_dir, redis_client=redis_client, started_at=datetime.now(timezone.utc),
                 feed_mode=config.feed_mode, universe=config.universe, piv_info=piv_info,
             )
             registry.heartbeat("decision_engine", ComponentStatus.HEALTHY if decision_engine is not None else ComponentStatus.NOT_STARTED, "constructed" if decision_engine is not None else "decision path disabled")
-            registry.heartbeat("telegram_inbound", ComponentStatus.HEALTHY if listener is not None else ComponentStatus.DEGRADED, "started" if listener is not None else "disabled (--no-telegram-inbound)")
+            registry.heartbeat(
+                "telegram_inbound", ComponentStatus.HEALTHY,
+                "started" if listener is not None else "disabled by Task 82 isolation policy",
+            )
             persist_component_health(config.state_dir, registry)
 
             def _on_heartbeat() -> None:

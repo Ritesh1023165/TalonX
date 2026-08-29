@@ -128,7 +128,7 @@ def test_piv_preflight_status_blocks_when_enumeration_is_uncertain(tmp_path, mon
     monkeypatch.setattr(
         piv_preflight_module.process_guard,
         "no_competing_talonx_process",
-        lambda: (False, "process enumeration failed closed (PermissionError)"),
+        lambda **kwargs: (False, "process enumeration failed closed (PermissionError)"),
     )
     cfg = PivConfig(approved_sha="abc", state_dir=tmp_path, decision_path_enabled=False)
     flight = piv_preflight_module.Preflight(
@@ -136,7 +136,7 @@ def test_piv_preflight_status_blocks_when_enumeration_is_uncertain(tmp_path, mon
     )
     monkeypatch.setattr(flight, "_git", lambda *args: "abc" if args[0] == "rev-parse" else "")
     status, checks = flight.run()
-    check = next(item for item in checks if item.name == "no_duplicate_full_app_or_piv_process")
+    check = next(item for item in checks if item.name == "runtime_role_process_policy")
     assert status == "PIV_BLOCKED"
     assert check.passed is False
 
@@ -144,7 +144,7 @@ def test_piv_preflight_status_blocks_when_enumeration_is_uncertain(tmp_path, mon
 def test_full_app_status_blocks_when_enumeration_is_uncertain(monkeypatch):
     monkeypatch.setattr(
         "talonx_ops.preflight.process_guard.no_competing_talonx_process",
-        lambda: (False, "process enumeration failed closed (PermissionError)"),
+        lambda **kwargs: (False, "process enumeration failed closed (PermissionError)"),
     )
     status, checks = FullAppPreflight(
         expected_sha="definitely-not-current", transport=_Transport(),

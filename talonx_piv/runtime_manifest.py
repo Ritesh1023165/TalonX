@@ -85,12 +85,11 @@ COMPONENT_COVERAGE: tuple[ComponentCoverage, ...] = (
     ),
     ComponentCoverage(
         "telegram_outbound", True, "telegram_reachable",
-        "Existing EventBus -> telegram.sender fan-out (Task 64).",
+        "Outbox capability remains present, but Task 82 isolation requires external PIV Telegram delivery disabled; Original owns notifications.",
     ),
     ComponentCoverage(
         "telegram_inbound_command_listener", True, "telegram_inbound_capability",
-        "Reuses talonx_dispatch.telegram_listener.TelegramReplyListener (dispatch_agent=None) -- "
-        "restored in Task 66A; omitted in Task 65B. See telegram_inbound.py for the single-poller-per-token caveat.",
+        "Listener capability remains available for tests/legacy inspection, but Task 82 isolation disables it so Original is the sole bot poller.",
     ),
     ComponentCoverage(
         "health_metrics_status", True, "telegram_inbound_capability",

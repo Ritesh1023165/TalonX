@@ -95,7 +95,9 @@ class FullAppPreflight:
         # 3: no duplicate full-app/PIV process. Inability to enumerate is a
         # launch block because uncertainty is not proof that no competitor
         # exists. The current preflight process itself is excluded.
-        check("no_duplicate_full_app_or_piv_process", process_guard.no_competing_talonx_process)
+        check("no_duplicate_full_app_or_piv_process", lambda: process_guard.no_competing_talonx_process(
+            current_role=process_guard.ORIGINAL_ROLE,
+        ))
 
         # 4: Redis reachable
         def redis_reachable() -> tuple[bool, str]:

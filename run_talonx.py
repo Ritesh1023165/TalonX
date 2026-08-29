@@ -1054,6 +1054,17 @@ async def periodic_earnings_calendar_sync_loop(
 async def main() -> None:
     args = _parse_args()
 
+    # Task 82: one Original runtime is allowed to coexist with one PIV
+    # process only when the latter advertises the isolation profile that
+    # its own preflight has already validated. Duplicate Original runtimes
+    # and unmarked/uncertain PIV peers fail before any store is opened.
+    from talonx_core import process_guard
+    process_ok, process_detail = process_guard.no_competing_talonx_process(
+        current_role=process_guard.ORIGINAL_ROLE,
+    )
+    if not process_ok:
+        raise RuntimeError(f"Original startup blocked by runtime process policy: {process_detail}")
+
     watchlist_config = WatchlistConfig()
     watchlist_store = TickerWatchlistStore(watchlist_config.db_path)
     if args.tickers:

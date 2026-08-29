@@ -18,6 +18,7 @@ from talonx_core import process_guard
 from .broker import AlpacaPaperClient
 from .config import CANONICAL_ALPHA_FEED_MODES, FEED_MODE_PARAM, FEED_MODES, PivConfig
 from .events import EventBus, PivEvent
+from .isolation import isolation_binding_payload, validate_piv_isolation
 from .readiness import SessionReadinessValidator
 from .runtime_manifest import runtime_parity_status
 from .telegram_inbound import telegram_inbound_capable
@@ -36,7 +37,9 @@ def config_hash(config: PivConfig) -> str:
         "broker_endpoint": config.broker_endpoint, "data_endpoint": config.data_endpoint,
         "stale_seconds": config.stale_seconds, "entry_cutoff_et": config.entry_cutoff_et,
         "eod_flatten_et": config.eod_flatten_et, "universe": config.universe, "feed_mode": config.feed_mode,
-        "decision_path_enabled": config.decision_path_enabled, "version": "TASK64_V1",
+        "decision_path_enabled": config.decision_path_enabled,
+        "isolation_bindings": isolation_binding_payload(config),
+        "version": "TASK82_V1",
     }
     return hashlib.sha256(json.dumps(safe, sort_keys=True).encode()).hexdigest()
 
@@ -59,15 +62,18 @@ class Preflight:
 
         check("approved_sha", lambda: ((head := self._git("rev-parse", "HEAD")) == self.config.approved_sha, head))
         check("tracked_tree_clean", lambda: (not (status := self._git("status", "--short", "--untracked-files=no")), status or "clean"))
-        # Task 78I Stage 2: reuses the EXACT same check `talonx_ops.preflight.
-        # FullAppPreflight` already runs for the general app (see that
-        # module's own no_duplicate_process) -- run here too so PIV's own
-        # preflight independently refuses to proceed if run_talonx.py's
-        # general pipeline is already running (both would otherwise
-        # construct a separate QuantScanner subscribed to the SAME default
-        # Redis channels -- see architecture_and_ownership.md). Belt-and-
-        # suspenders with the general app's own check, not a replacement.
-        check("no_duplicate_full_app_or_piv_process", process_guard.no_competing_talonx_process)
+        # Task 82: prove resource isolation first, then permit at most one
+        # opposite-role Original peer. A duplicate PIV remains blocked.
+        isolation: dict[str, bool] = {"passed": False}
+        def isolated_bindings() -> tuple[bool, str]:
+            passed, detail = validate_piv_isolation(self.config)
+            isolation["passed"] = passed
+            return passed, detail
+        check("original_piv_runtime_isolation", isolated_bindings)
+        check("runtime_role_process_policy", lambda: process_guard.no_competing_talonx_process(
+            current_role=process_guard.PIV_ROLE,
+            piv_isolation_verified=isolation["passed"],
+        ))
         check("config_hash", lambda: (True, config_hash(self.config)))
         identity: dict[str, Any] = {}
         def paper() -> tuple[bool, str]:
@@ -137,6 +143,8 @@ class Preflight:
             return True, "yfinance importable -- full 35-symbol preseed+verify runs at session start, not preflight"
         check("warmup_mechanism_capability", warmup_capability)
         def telegram_inbound() -> tuple[bool, str]:
+            if not self.config.telegram_enabled:
+                return True, "disabled by default; Original application retains sole bot ownership"
             return telegram_inbound_capable(self.config.state_dir)
         check("telegram_inbound_capability", telegram_inbound)
         def runtime_parity() -> tuple[bool, str]:
@@ -155,6 +163,8 @@ class Preflight:
         check("logging_writable", writable)
         check("telemetry_enabled", lambda: (True, str(self.events.path)))
         def telegram() -> tuple[bool, str]:
+            if not self.config.telegram_enabled:
+                return True, "disabled by default; no PIV outbound Telegram calls"
             if not self.config.telegram_token or not self.config.telegram_chat_id:
                 return False, "Telegram token/chat id missing"
             response = self.transport.get(f"https://api.telegram.org/bot{self.config.telegram_token}/getMe", timeout=15)

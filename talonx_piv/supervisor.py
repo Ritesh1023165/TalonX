@@ -51,6 +51,7 @@ from talonx_core import process_guard
 from .broker import AlpacaPaperClient
 from .config import PAPER_ENDPOINT, PivConfig
 from .events import EventBus
+from .isolation import validate_piv_isolation
 from .lifecycle import PaperLifecycle
 
 
@@ -132,9 +133,19 @@ class StartupReport:
         return {"passed": self.passed, "steps": [s.to_dict() for s in self.steps]}
 
 
-def no_duplicate_full_app_or_piv_process(*, exclude_pid: int | None = None) -> tuple[bool, str]:
-    """Compatibility wrapper around the shared fail-closed safety gate."""
-    return process_guard.no_competing_talonx_process(exclude_pid=exclude_pid)
+def no_duplicate_full_app_or_piv_process(
+    *, exclude_pid: int | None = None, config: PivConfig | None = None,
+) -> tuple[bool, str]:
+    """Role-aware gate; no config retains the legacy strict diagnostic."""
+    if config is None:
+        return process_guard.no_competing_talonx_process(exclude_pid=exclude_pid)
+    isolated, detail = validate_piv_isolation(config)
+    if not isolated:
+        return False, f"PIV isolation validation failed: {detail}"
+    return process_guard.no_competing_talonx_process(
+        exclude_pid=exclude_pid, current_role=process_guard.PIV_ROLE,
+        piv_isolation_verified=True,
+    )
 
 
 def run_startup_sequence(
@@ -158,7 +169,7 @@ def run_startup_sequence(
         return bool(passed)
 
     def step0_duplicate_process() -> tuple[bool, str]:
-        return no_duplicate_full_app_or_piv_process()
+        return no_duplicate_full_app_or_piv_process(config=config)
     if skip_duplicate_process_check:
         report.steps.append(StartupStepResult("no_duplicate_process", True, "SKIPPED (read-only/rehearsal mode)"))
     elif not run_step("no_duplicate_process", step0_duplicate_process):
