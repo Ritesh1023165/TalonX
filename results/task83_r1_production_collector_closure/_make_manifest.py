@@ -39,6 +39,9 @@ def build(content_commit: str | None) -> dict:
     for p in sorted(HERE.rglob("*")):
         if not p.is_file() or p.name in EXCLUDED:
             continue
+        # transient / non-committed files are never part of the manifest
+        if "__pycache__" in p.parts or p.suffix in {".pyc", ".pyo"} or p.name.endswith(".tmp"):
+            continue
         artifacts.append({
             "file": p.relative_to(HERE).as_posix(),
             "bytes": _byte_len_lf(p),
