@@ -262,6 +262,7 @@ class ComparisonCollector:
         the_date = trading_date or piv_trading_date
         original_records: list[ComparisonRecord] = []
         redis_ping_ok = None
+        metrics: dict[str, dict[str, int]] = {}
         if the_date is not None:
             date_candidates = [the_date, now.astimezone(timezone.utc).date().isoformat()]
             metrics, redis_ping_ok, mdiags = self._read_original_metrics(date_candidates)
@@ -362,7 +363,7 @@ class ComparisonCollector:
         writer.write_comparison(
             self._comparison_payload(the_date, pairs, source_health, capability_limitations))
         writer.write_divergences([d.to_dict() for d in divs])
-        writer.write_telegram(self._telegram_payload(the_date, all_original, events_text, identity))
+        writer.write_telegram(self._telegram_payload(the_date, metrics, events_text, identity))
         merged_diags = self._merge_diagnostics(writer.read_diagnostics(), diagnostics)
         writer.write_diagnostics(merged_diags)
         writer.write_file_hashes()
@@ -492,16 +493,13 @@ class ComparisonCollector:
             "not_alpha_evidence": AGREEMENT_IS_NOT_ALPHA,
         }
 
-    def _telegram_payload(self, the_date, all_original, events_text, identity) -> dict[str, Any]:
-        original_telegram = {
-            r.decision_outcome: None for r in all_original if r.stage == "telegram"
-        }
-        # pull the integer values back out of the fingerprint payloads we stored
-        totals: dict[str, int] = {}
-        for r in all_original:
-            if r.stage != "telegram":
-                continue
-        # PIV zero-attempt assertion -- scan the events file for any Telegram attempt marker
+    def _telegram_payload(self, the_date, metrics: dict, events_text: str, identity: dict) -> dict[str, Any]:
+        # Original Telegram totals: every metrics:{date}:dispatch:*telegram* counter.
+        dispatch = metrics.get("dispatch", {})
+        telegram_totals = {k: int(v) for k, v in sorted(dispatch.items()) if "telegram" in k}
+
+        # Mandatory PIV zero-attempt assertion: scan the PIV events file for
+        # ANY outbound Telegram marker. PIV must never attempt one.
         piv_attempts = 0
         for ln in events_text.splitlines():
             if not ln.strip():
@@ -510,15 +508,14 @@ class ComparisonCollector:
                 row = json.loads(ln)
             except json.JSONDecodeError:
                 continue
-            if row.get("telegram_attempt") or row.get("event") == "TELEGRAM_SENT":
+            if (row.get("telegram_attempt") or row.get("telegram_sent")
+                    or row.get("event") in ("TELEGRAM_SENT", "TELEGRAM_ATTEMPT")):
                 piv_attempts += 1
         return {
             "trading_date": the_date,
-            "original_telegram_counters": sorted(original_telegram.keys()),
-            "original_telegram_note": (
-                "counter names observed on redis metrics:dispatch:*telegram*; exact values are "
-                "in original_events.jsonl fingerprint payloads"
-            ),
+            "original_telegram_totals": telegram_totals,
+            "original_telegram_counters": sorted(telegram_totals.keys()),
+            "original_telegram_owner": "ORIGINAL",
             "piv_outbound_telegram_attempts": piv_attempts,
             "piv_zero_attempt_assertion": piv_attempts == 0,
             "piv_session_id": identity.get("session_id"),
