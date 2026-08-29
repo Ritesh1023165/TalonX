@@ -109,6 +109,29 @@ def test_session_rollover_does_not_inherit_counters_or_ownership(tmp_path):
     assert all(value is False for value in b["ownership"].values())
 
 
+def test_identity_free_disabled_bus_does_not_fabricate_telemetry(tmp_path):
+    bus = EventBus(
+        tmp_path / "events.jsonl", None, session_id=None,
+        telemetry_path=tmp_path, trading_date_et=DATE,
+    )
+    assert bus.emit(PivEvent.build("STARTUP")) is True
+    assert bus.telegram_attempts == 0
+    assert not (tmp_path / TELEMETRY_NAME).exists()
+    assert assess_piv_notification(tmp_path, SESSION_A, DATE)["verdict"] == "UNVERIFIED"
+
+
+def test_identity_free_enabled_sender_fails_before_unrecorded_send(tmp_path):
+    calls = []
+
+    with pytest.raises(ValueError, match="session_id and trading_date_et are required"):
+        EventBus(
+            tmp_path / "events.jsonl", lambda message: calls.append(message) or True,
+            session_id=None, telemetry_path=tmp_path, trading_date_et=DATE,
+        )
+    assert calls == []
+    assert not (tmp_path / TELEMETRY_NAME).exists()
+
+
 def test_previous_session_remains_readable_and_restart_preserves_counters(tmp_path):
     _disabled(tmp_path, SESSION_A)
     merge_telemetry(

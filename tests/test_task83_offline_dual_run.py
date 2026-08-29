@@ -7,8 +7,8 @@ flow are labelled below. Where process ownership is under test (scenarios
 lines are matched by the real ``talonx_core.process_guard`` Windows
 enumeration; the guard then runs for real against the live process table.
 
-Each scenario appends its verdict to
-``results/task83_dashboard_comparison_qualification/offline_rehearsal_matrix.csv``.
+Ordinary pytest execution records verdicts in memory only. An explicit output
+option is required to publish a retained evidence candidate.
 """
 
 from __future__ import annotations
@@ -39,9 +39,6 @@ DATE = "2026-08-28"
 SESSION = "piv_2026-08-28_100000_abcd1234"
 NOW = datetime(2026, 8, 28, 15, 0, 0, tzinfo=timezone.utc)
 
-# Task 83-R1: the original Task 83 evidence file is immutable; the retained
-# 20-scenario run is re-emitted under the R1 evidence directory instead.
-_MATRIX = Path("results/task83_r1_production_collector_closure/retained_20_scenarios_matrix.csv")
 _RESULTS: list[dict] = []
 
 
@@ -53,10 +50,20 @@ def _record(n: int, name: str, expected: str, observed: str, verdict: str) -> No
 
 
 @pytest.fixture(scope="module", autouse=True)
-def _write_matrix():
+def _write_matrix(request):
     yield
-    _MATRIX.parent.mkdir(parents=True, exist_ok=True)
-    with _MATRIX.open("w", newline="", encoding="utf-8") as fh:
+    output = request.config.getoption("--task83-r2-retained-matrix-output")
+    if not output:
+        return
+    expected = set(range(1, 21))
+    observed = [int(row["scenario"]) for row in _RESULTS]
+    assert set(observed) == expected and len(observed) == len(expected), (
+        f"explicit retained rehearsal requires exactly scenarios 1-20; got {observed}"
+    )
+    assert all(row["verdict"] == "PASS" for row in _RESULTS), _RESULTS
+    matrix = Path(output)
+    matrix.parent.mkdir(parents=True, exist_ok=True)
+    with matrix.open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=["scenario", "name", "expected", "observed", "verdict", "label"])
         w.writeheader()
         for row in sorted(_RESULTS, key=lambda r: r["scenario"]):

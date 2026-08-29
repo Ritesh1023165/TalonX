@@ -24,6 +24,10 @@ def pytest_addoption(parser):
         "--task83-r2-matrix-output", action="store", default=None,
         help="temporary CSV destination for a complete scenarios 21-33 run",
     )
+    parser.addoption(
+        "--task83-r2-retained-matrix-output", action="store", default=None,
+        help="temporary CSV destination for a complete retained scenarios 1-20 run",
+    )
 
 
 @pytest.fixture

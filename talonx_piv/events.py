@@ -170,7 +170,15 @@ class EventBus:
         # Task 83-R1 §5: durable, session-scoped notification telemetry.
         # ``telemetry_path`` is the PIV state dir; None disables persistence
         # (in-memory counters only, unchanged behaviour for isolated tests).
-        self._telemetry_dir = telemetry_path
+        identity_complete = bool(session_id and trading_date_et)
+        if telemetry_path is not None and not identity_complete and telegram_send is not None:
+            raise ValueError(
+                "session_id and trading_date_et are required when durable Telegram telemetry is enabled"
+            )
+        # Identity-free helper/read-only construction keeps the historical
+        # in-memory-only behavior. It must not invent a telemetry partition:
+        # absence remains UNVERIFIED and can never become VERIFIED_ZERO.
+        self._telemetry_dir = telemetry_path if identity_complete else None
         self._trading_date_et = trading_date_et
         if self._telemetry_dir is not None:
             from .notification_telemetry import merge_telemetry

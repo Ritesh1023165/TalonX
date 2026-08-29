@@ -162,7 +162,10 @@ class TelegramReplyListener:
         # session-bound recorder and therefore cannot create a second
         # listener merely for measurement.
         self.poll_telemetry = poll_telemetry
-        self._bot_factory = bot_factory or Bot
+        # Preserve an explicitly injected factory.  Otherwise resolve the
+        # module-level Bot at poll time so established patch/fake seams do not
+        # accidentally fall through to a real Telegram client.
+        self._bot_factory = bot_factory
         self._process = psutil.Process()
         self._stop_event = asyncio.Event()
         self._replies_sent = 0
@@ -199,7 +202,8 @@ class TelegramReplyListener:
                 await asyncio.sleep(wait)
 
     async def _poll_forever(self) -> None:
-        async with self._bot_factory(token=self.config.telegram_bot_token) as bot:
+        bot_factory = self._bot_factory or Bot
+        async with bot_factory(token=self.config.telegram_bot_token) as bot:
             offset = await self._drain_backlog(bot)
             logger.info("Telegram reply listener polling (poll timeout %.0fs)", self.config.telegram_poll_timeout_seconds)
 
