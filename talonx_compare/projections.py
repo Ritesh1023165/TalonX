@@ -341,24 +341,34 @@ _ORIGINAL_STAGE_FOR_MODULE = {
 
 
 def project_original_metrics(
-    metrics: dict[str, dict[str, int]], *, trading_date: str, session_id: str | None,
+    metrics: dict[str, dict[str, int]], *, trading_date: str, run_scope: str | None,
     as_of: str | None,
 ) -> tuple[list[ComparisonRecord], list[dict[str, Any]]]:
     """metrics == {module: {counter: value}} as read from
-    ``metrics:{date}:{module}:{counter}`` keys on Redis DB 0."""
+    ``metrics:{date}:{module}:{counter}`` keys on Redis DB 0. Each counter
+    becomes an explicit AGGREGATE record (§3.5) -- compared as a value,
+    never collapsed with individual events."""
+    from .identity import KIND_AGGREGATE
+
     records: list[ComparisonRecord] = []
     for module, counters in sorted(metrics.items()):
         stage = _ORIGINAL_STAGE_FOR_MODULE.get(module, module)
         for counter, value in sorted(counters.items()):
             is_telegram = module == "dispatch" and "telegram" in counter
+            agg_name = f"{module}:{counter}"
             records.append(make_record(
                 pipeline=PIPELINE_ORIGINAL,
                 stage="telegram" if is_telegram else stage,
                 symbol="",
-                event_time=as_of, trading_date=trading_date, session_id=session_id,
+                event_time=as_of, trading_date=trading_date, session_id=None,
+                run_scope=run_scope,
+                record_kind=KIND_AGGREGATE, aggregate_name=agg_name, aggregate_value=float(value),
                 decision_outcome=counter,
                 source=f"redis:metrics:{module}",
-                fingerprint_payload={"module": module, "counter": counter, "value": int(value)},
+                # value IS in the fingerprint so a changed counter appends a
+                # new versioned line; alignment_key (agg:<name>) is stable,
+                # so alignment keeps only the LATEST value per counter.
+                fingerprint_payload={"aggregate_name": agg_name, "aggregate_value": float(value)},
             ))
     return records, []
 
@@ -374,16 +384,27 @@ _CHANNEL_STAGE = {
 }
 
 
+_PIV_CHANNEL_STAGE = {
+    "talonx:piv:market:stream": ("market", EXEC_NONE),
+    "talonx:piv:signals:quant": ("quant", EXEC_NONE),
+    "talonx:piv:quant:rejected": ("quant", EXEC_NONE),
+    "talonx:piv:news:events": ("core", EXEC_NONE),
+    "talonx:piv:paper:trades": ("lifecycle", EXEC_NONE),
+}
+
+
 def project_original_messages(
-    messages: list[dict[str, Any]], *, trading_date: str | None, session_id: str | None,
+    messages: list[dict[str, Any]], *, trading_date: str | None, run_scope: str | None,
+    pipeline: str = PIPELINE_ORIGINAL,
 ) -> tuple[list[ComparisonRecord], list[dict[str, Any]]]:
     """messages == [{"channel": str, "data": str-json}] captured live off
-    the Original channels. Read-only projection; the collector never
-    re-publishes these."""
+    the Original (or, with pipeline=PIV, the PIV) channels. Read-only
+    projection; the collector never re-publishes these."""
     records, diags = [], []
+    channel_map = _PIV_CHANNEL_STAGE if pipeline == PIPELINE_PIV else _CHANNEL_STAGE
     for msg in messages:
         channel = msg.get("channel")
-        stage_exec = _CHANNEL_STAGE.get(channel)
+        stage_exec = channel_map.get(channel) or _CHANNEL_STAGE.get(channel)
         if stage_exec is None:
             continue
         stage, exec_class = stage_exec
@@ -408,8 +429,10 @@ def project_original_messages(
             diags.append(_diag("MALFORMED", f"redis:{channel}", "no timestamp/trading_date"))
             continue
         records.append(make_record(
-            pipeline=PIPELINE_ORIGINAL, stage=stage, symbol=symbol,
-            event_time=ts, trading_date=td, session_id=session_id,
+            pipeline=pipeline, stage=stage, symbol=symbol,
+            event_time=ts, trading_date=td,
+            session_id=(run_scope if pipeline == PIPELINE_PIV else None),
+            run_scope=run_scope,
             source_bar_time=payload.get("bar_time") or payload.get("source_bar_time"),
             decision_id=payload.get("alert_id") or payload.get("signal_id"),
             decision_outcome=payload.get("action") or payload.get("signal_type")

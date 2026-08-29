@@ -45,6 +45,15 @@ class CompareConfig:
         default_factory=lambda: os.getenv("TALONX_REDIS_URL", "redis://localhost:6379/0")
     )
 
+    # Verified Original runtime metadata (Task 83-R1 §3): the ONLY source
+    # from which a collector-derived Original run scope may be built. It is
+    # NOT an Original-emitted session id.
+    original_runtime_metadata_path: Path = field(
+        default_factory=lambda: Path(os.getenv(
+            "TALONX_RUNTIME_METADATA_PATH", str(Path.home() / ".talonx" / "runtime_metadata.json")
+        ))
+    )
+
     # --- PIV bindings the collector only OBSERVES ---
     piv_redis_url: str = field(
         default_factory=lambda: os.getenv("TALONX_PIV_REDIS_URL", "redis://localhost:6379/1")

@@ -39,7 +39,9 @@ DATE = "2026-08-28"
 SESSION = "piv_2026-08-28_100000_abcd1234"
 NOW = datetime(2026, 8, 28, 15, 0, 0, tzinfo=timezone.utc)
 
-_MATRIX = Path("results/task83_dashboard_comparison_qualification/offline_rehearsal_matrix.csv")
+# Task 83-R1: the original Task 83 evidence file is immutable; the retained
+# 20-scenario run is re-emitted under the R1 evidence directory instead.
+_MATRIX = Path("results/task83_r1_production_collector_closure/retained_20_scenarios_matrix.csv")
 _RESULTS: list[dict] = []
 
 

@@ -62,8 +62,9 @@ def test_collector_subscribe_only_no_publish(cfg):
     svc._buffer_original.append({"channel": "talonx:signals:quant",
                                  "data": json.dumps({"ticker": "AAPL", "timestamp": f"{DATE}T14:00:00+00:00",
                                                      "signal_type": "LONG"})})
+    drained = svc._buffer_original.swap()
     ComparisonCollector(cfg, clock=lambda: NOW).collect_once(
-        captured_original_messages=svc._buffer_original)
+        captured_original_messages=drained)
     assert original.write_calls == [] and piv.write_calls == []
     server_log = original._server.publish_log
     assert server_log == []  # collector never published anything
@@ -278,30 +279,51 @@ def test_piv_records_written(cfg, piv_dir):
 # --- 2.13 Telegram totals + PIV zero-attempt ----------------
 
 def test_telegram_totals_and_piv_zero_assertion(cfg, piv_dir):
+    """Task 83-R1 §5: without durable notification telemetry the archive
+    may NOT assert zero -- it is UNVERIFIED, not zero."""
     original, piv = make_pair()
     original.seed_metric(DATE, "dispatch", "pushed_telegram", 7)
     original.seed_metric(DATE, "dispatch", "muted_cooldown", 3)
     r = _collector(cfg, original_redis=original, piv_redis=piv).collect_once()
     tg = json.loads((cfg.evidence_root / DATE / "telegram.json").read_text())
-    assert tg["piv_zero_attempt_assertion"] is True
-    assert tg["piv_outbound_telegram_attempts"] == 0
+    assert tg["piv_notification_telemetry"]["verdict"] == "MISSING"
+    assert tg["piv_zero_attempt_assertion"] is False
     assert "pushed_telegram" in tg["original_telegram_counters"]
+    assert tg["original_telegram_totals"]["pushed_telegram"] == 7
+
+
+def test_piv_zero_assertion_only_with_verified_telemetry(cfg, piv_dir):
+    """A durable telemetry file for the session, outbound+inbound disabled,
+    all counters zero -> and only then -> the archive asserts zero."""
+    from talonx_piv.notification_telemetry import merge_telemetry
+
+    merge_telemetry(piv_dir, session_id=SESSION, trading_date_et=DATE,
+                    ownership={"outbound_enabled": False, "sender_constructed": False,
+                              "inbound_poller_constructed": False, "inbound_poller_started": False})
+    r = _collector(cfg).collect_once()
+    tg = json.loads((cfg.evidence_root / DATE / "telegram.json").read_text())
+    assert tg["piv_notification_telemetry"]["verdict"] == "VERIFIED_ZERO"
+    assert tg["piv_zero_attempt_assertion"] is True
 
 
 def test_piv_zero_assertion_fails_loudly_if_piv_attempted_telegram(cfg, piv_dir):
-    write_piv_state(piv_dir, events=[
-        {"event": "SIGNAL", "timestamp": f"{DATE}T14:00:00+00:00", "symbol": "AAPL",
-         "session_id": SESSION, "trading_date_et": DATE, "telegram_attempt": True},
-    ])
+    from talonx_piv.notification_telemetry import merge_telemetry
+
+    merge_telemetry(piv_dir, session_id=SESSION, trading_date_et=DATE,
+                    ownership={"outbound_enabled": True, "sender_constructed": True},
+                    outbound_delta={"attempts": 1, "failures": 1})
     r = _collector(cfg).collect_once()
     tg = json.loads((cfg.evidence_root / DATE / "telegram.json").read_text())
-    assert tg["piv_outbound_telegram_attempts"] == 1
+    assert tg["piv_notification_telemetry"]["verdict"] == "ATTEMPTS_RECORDED"
     assert tg["piv_zero_attempt_assertion"] is False
 
 
 # --- 2.14 per-symbol/stage comparison ----------------------
 
 def test_per_symbol_stage_comparison(cfg, piv_dir):
+    """Task 83-R1 §3.6: an Original quant signal and a PIV quant SIGNAL
+    with no shared decision id are DISTINCT events -- each gets its own
+    (stage, symbol, event_identity) row, never collapsed into one."""
     original, piv = make_pair()
     r = _collector(cfg, original_redis=original, piv_redis=piv).collect_once(
         captured_original_messages=[{
@@ -311,10 +333,11 @@ def test_per_symbol_stage_comparison(cfg, piv_dir):
         }])
     comp = json.loads((cfg.evidence_root / DATE / "comparison.json").read_text())
     assert "per_stage_totals" in comp and "per_symbol_stage" in comp
-    rows = {(x["stage"], x["symbol"]): x for x in comp["per_symbol_stage"]}
-    assert ("quant", "AAPL") in rows
-    assert rows[("quant", "AAPL")]["original_present"] is True
-    assert rows[("quant", "AAPL")]["piv_present"] is True
+    quant_aapl = [x for x in comp["per_symbol_stage"] if x["stage"] == "quant" and x["symbol"] == "AAPL"]
+    assert any(x["original_present"] and not x["piv_present"] for x in quant_aapl)
+    assert any(x["piv_present"] and not x["original_present"] for x in quant_aapl)
+    # every row carries its event identity + record kind
+    assert all("event_identity" in x and x["record_kind"] == "EVENT" for x in quant_aapl)
 
 
 # --- 2.15 hashes + diagnostics --------------------------
@@ -324,12 +347,14 @@ def test_evidence_file_hashes(cfg):
     hp = cfg.evidence_root / DATE / "file_hashes.json"
     assert hp.exists()
     stored = json.loads(hp.read_text())
-    assert stored["algorithm"] == "sha256"
+    assert stored["algorithm"] == "sha256-lf-normalized"
     assert "manifest.json" in stored["hashes"]
+    assert "runtime_status.json" in stored["hashes"]
     from talonx_compare.evidence import EvidenceWriter
 
-    ok, problems = EvidenceWriter(cfg.evidence_root, DATE).verify_file_hashes()
-    assert ok, problems
+    integ = EvidenceWriter(cfg.evidence_root, DATE).verify_archive()
+    assert integ.ok, integ.problems
+    assert integ.state == "HEALTHY"
 
 
 def test_source_diagnostics_recorded(cfg, piv_dir):

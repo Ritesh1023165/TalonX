@@ -1,35 +1,49 @@
-"""Task 83 §2 -- the comparison identity.
+"""Task 83 §2 / Task 83-R1 §3 -- the comparison identity.
 
 Every comparable unit of work, from either pipeline, is projected onto ONE
-record shape with exactly these fields:
+record shape:
 
     pipeline          "ORIGINAL" | "PIV"
-    session_id        the emitting pipeline's own session id (never shared)
+    session_id        the emitting pipeline's OWN session id, verbatim
+                      (PIV stamps one; Original does not -> None). Never
+                      shared or invented.
+    run_scope         the scope alignment partitions on. For PIV this IS
+                      session_id. For Original it is a COLLECTOR-DERIVED
+                      run scope (from verified runtime metadata/bindings,
+                      prefixed "orig:") or the sentinel "UNSCOPED" when no
+                      usable run identity is available -- in which case
+                      event-level agreement is NOT asserted.
+    record_kind       "EVENT" | "AGGREGATE". Aggregates (rolled-up
+                      counters) are compared as aggregate values under an
+                      explicit aggregate key and are never collapsed with
+                      individual events.
     trading_date      America/New_York calendar date (YYYY-MM-DD)
-    stage             warmup | quant | brain | core | dispatch | telegram
-                      | readiness | freshness | decision | shadow
-                      | lifecycle | reconciliation | eod
+    stage             warmup|quant|brain|core|dispatch|telegram|readiness
+                      |freshness|decision|shadow|lifecycle|reconciliation|eod
     symbol            uppercased ticker, or "" for stage-level aggregates
     event_time        ISO-8601 UTC -- when the pipeline recorded it
-    source_bar_time   ISO-8601 -- the market bar the work was derived from
-                      (None where the source does not carry it; see the
+    source_bar_time   ISO-8601 -- the market bar the work derived from
+                      (None where the source does not carry it -- see the
                       unresolved IEX receipt-vs-source-time question)
     decision_id       the PIV decision id / Original alert id, or None
-    decision_outcome  the decision / outcome label (BUY, HOLD, REJECTED...)
+    event_identity    the STABLE per-event identity alignment keys on:
+                      decision_id when present, else a documented causal
+                      identity "causal:<fingerprint>" (stage + symbol +
+                      source_bar_time + outcome + payload all fold into
+                      the fingerprint), or "agg:<name>" for aggregates.
+    decision_outcome  the decision / outcome label
     reason_codes      tuple of reason-code strings, order-normalised
-    execution_class   NONE | SIMULATED_PAPER | PIV_SHADOW | PIV_PAPER
-                      | EXPERIMENTAL -- keeps simulated / shadow / paper /
-                      experimental outcomes from ever being merged
-    payload_fingerprint  stable hash of the identity-bearing payload fields
+    execution_class   NONE|SIMULATED_PAPER|PIV_SHADOW|PIV_PAPER|EXPERIMENTAL
+    payload_fingerprint  stable hash of the identity-bearing payload
 
-Alignment (alignment.py) keys strictly on
-(trading_date, stage, symbol) and NEVER crosses trading dates, sessions,
-or symbols.
+Alignment keys on (trading_date, stage, symbol, event_identity) WITHIN one
+run_scope pairing; it never crosses trading dates, PIV sessions, symbols,
+or (for events) distinct event identities.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -40,6 +54,14 @@ ET = ZoneInfo("America/New_York")
 
 PIPELINE_ORIGINAL = "ORIGINAL"
 PIPELINE_PIV = "PIV"
+
+# run-scope sentinels
+UNSCOPED = "UNSCOPED"
+ORIGINAL_SCOPE_PREFIX = "orig:"
+
+# record kinds
+KIND_EVENT = "EVENT"
+KIND_AGGREGATE = "AGGREGATE"
 
 # execution classes -- deliberately disjoint; never summed together
 EXEC_NONE = "NONE"
@@ -62,7 +84,7 @@ STAGES = (
 # identically (this is what makes restart dedup exact).
 _FINGERPRINT_EXCLUDE = frozenset({
     "timestamp", "event_time", "received_at", "detected_at_utc", "_id",
-    "runtime_start_utc", "age_seconds", "last_update",
+    "runtime_start_utc", "age_seconds", "last_update", "generated_at",
 })
 
 
@@ -99,34 +121,45 @@ class ComparisonRecord:
     reason_codes: tuple[str, ...]
     execution_class: str
     payload_fingerprint: str
+    event_identity: str = ""
+    run_scope: str | None = None
+    record_kind: str = KIND_EVENT
+    aggregate_name: str | None = None
+    aggregate_value: float | None = None
     # provenance -- which source file / channel this projection came from
     source: str = ""
 
     def dedup_key(self) -> str:
-        """Stable identity for restart-safe dedup: pipeline + scope +
-        fingerprint. A late re-delivery of the same logical record maps to
-        the same key and is recorded once."""
+        """Stable identity for restart-safe dedup. A late re-delivery of
+        the SAME logical record maps to the same key and is recorded once;
+        a genuinely different event (different decision_id / causal
+        identity / run scope) gets its own key and stays distinct."""
         return "|".join((
-            self.pipeline, self.session_id or "-", self.trading_date, self.stage,
-            self.symbol or "-", self.decision_id or "-", self.payload_fingerprint,
+            self.pipeline, self.record_kind, self.run_scope or "-", self.trading_date,
+            self.stage, self.symbol or "-", self.event_identity or "-", self.payload_fingerprint,
         ))
 
-    def alignment_key(self) -> tuple[str, str, str]:
-        return (self.trading_date, self.stage, self.symbol)
+    def alignment_key(self) -> tuple[str, str, str, str]:
+        return (self.trading_date, self.stage, self.symbol, self.event_identity)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "pipeline": self.pipeline,
             "session_id": self.session_id,
+            "run_scope": self.run_scope,
+            "record_kind": self.record_kind,
             "trading_date": self.trading_date,
             "stage": self.stage,
             "symbol": self.symbol,
             "event_time": self.event_time,
             "source_bar_time": self.source_bar_time,
             "decision_id": self.decision_id,
+            "event_identity": self.event_identity,
             "decision_outcome": self.decision_outcome,
             "reason_codes": list(self.reason_codes),
             "execution_class": self.execution_class,
+            "aggregate_name": self.aggregate_name,
+            "aggregate_value": self.aggregate_value,
             "payload_fingerprint": self.payload_fingerprint,
             "source": self.source,
             "_id": self.dedup_key(),
@@ -137,15 +170,20 @@ class ComparisonRecord:
         return cls(
             pipeline=d["pipeline"],
             session_id=d.get("session_id"),
+            run_scope=d.get("run_scope"),
+            record_kind=d.get("record_kind", KIND_EVENT),
             trading_date=d["trading_date"],
             stage=d["stage"],
             symbol=d.get("symbol") or "",
             event_time=d.get("event_time"),
             source_bar_time=d.get("source_bar_time"),
             decision_id=d.get("decision_id"),
+            event_identity=d.get("event_identity") or "",
             decision_outcome=d.get("decision_outcome"),
             reason_codes=tuple(d.get("reason_codes") or ()),
             execution_class=d.get("execution_class", EXEC_NONE),
+            aggregate_name=d.get("aggregate_name"),
+            aggregate_value=d.get("aggregate_value"),
             payload_fingerprint=d["payload_fingerprint"],
             source=d.get("source", ""),
         )
@@ -159,16 +197,23 @@ def make_record(
     event_time: str | None,
     session_id: str | None,
     trading_date: str | None = None,
+    run_scope: str | None = None,
     source_bar_time: str | None = None,
     decision_id: str | None = None,
     decision_outcome: str | None = None,
     reason_codes: Any = (),
     execution_class: str = EXEC_NONE,
     source: str = "",
+    record_kind: str = KIND_EVENT,
+    aggregate_name: str | None = None,
+    aggregate_value: float | None = None,
+    event_identity: str | None = None,
     fingerprint_payload: dict[str, Any] | None = None,
 ) -> ComparisonRecord:
     """Build a ComparisonRecord, deriving trading_date from event_time when
-    not supplied and normalising reason-code order."""
+    not supplied, normalising reason-code order, and computing a stable
+    ``event_identity`` (decision_id > explicit > causal fingerprint >
+    aggregate name)."""
     if trading_date is None:
         if not event_time:
             raise ValueError("make_record needs trading_date or event_time")
@@ -187,18 +232,39 @@ def make_record(
     fp_src.setdefault("execution_class", execution_class)
     if source_bar_time is not None:
         fp_src.setdefault("source_bar_time", source_bar_time)
+    fp = payload_fingerprint(fp_src)
+
+    if record_kind == KIND_AGGREGATE:
+        eid = f"agg:{aggregate_name}"
+    elif decision_id:
+        eid = str(decision_id)
+    elif event_identity:
+        eid = event_identity
+    else:
+        # documented causal identity: the payload fingerprint already folds
+        # in stage + symbol + source_bar_time + outcome + reason codes.
+        eid = f"causal:{fp}"
+
+    # PIV run_scope IS its session id; a caller may override (Original).
+    resolved_scope = run_scope if run_scope is not None else session_id
+
     return ComparisonRecord(
         pipeline=pipeline,
         session_id=session_id,
+        run_scope=resolved_scope,
+        record_kind=record_kind,
         trading_date=trading_date,
         stage=stage,
         symbol=(symbol or "").upper(),
         event_time=event_time,
         source_bar_time=source_bar_time,
         decision_id=decision_id,
+        event_identity=eid,
         decision_outcome=decision_outcome,
         reason_codes=codes,
         execution_class=execution_class if execution_class in EXECUTION_CLASSES else EXEC_NONE,
-        payload_fingerprint=payload_fingerprint(fp_src),
+        aggregate_name=aggregate_name,
+        aggregate_value=aggregate_value,
+        payload_fingerprint=fp,
         source=source,
     )

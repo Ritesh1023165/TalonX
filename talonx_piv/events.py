@@ -157,6 +157,7 @@ class EventBus:
     def __init__(
         self, path: Path, telegram_send: Callable[[str], bool] | None = None,
         feed_mode: str = "RESEARCH_SIP", session_id: str | None = None,
+        telemetry_path: Path | None = None, trading_date_et: str | None = None,
     ) -> None:
         self.path = path
         self.telegram_send = telegram_send
@@ -165,6 +166,23 @@ class EventBus:
         self._telegram_seen: set[str] = set()
         self.telegram_attempts = 0
         self.telegram_failures = 0
+        self.telegram_successes = 0
+        # Task 83-R1 §5: durable, session-scoped notification telemetry.
+        # ``telemetry_path`` is the PIV state dir; None disables persistence
+        # (in-memory counters only, unchanged behaviour for isolated tests).
+        self._telemetry_dir = telemetry_path
+        self._trading_date_et = trading_date_et
+        if self._telemetry_dir is not None:
+            from .notification_telemetry import merge_telemetry
+
+            merge_telemetry(
+                self._telemetry_dir,
+                session_id=session_id, trading_date_et=trading_date_et,
+                ownership={
+                    "outbound_enabled": telegram_send is not None,
+                    "sender_constructed": telegram_send is not None,
+                },
+            )
 
     @staticmethod
     def _key(event: PivEvent) -> str:
@@ -207,11 +225,27 @@ class EventBus:
             return True
         self._telegram_seen.add(key)
         self.telegram_attempts += 1
+        outcome = "successes"
         try:
             if not self.telegram_send(self.format_telegram(event)):
                 self.telegram_failures += 1
+                outcome = "failures"
                 return False
         except Exception:
             self.telegram_failures += 1
+            outcome = "failures"
             return False
+        finally:
+            # persist at the ACTUAL send boundary -- an attempt that raises
+            # or returns falsey is still recorded (§5.6).
+            if self._telemetry_dir is not None:
+                from .notification_telemetry import merge_telemetry
+
+                merge_telemetry(
+                    self._telemetry_dir,
+                    session_id=self.session_id, trading_date_et=self._trading_date_et,
+                    outbound_delta={"attempts": 1, outcome: 1},
+                    outbound={"last_attempt_at": event.timestamp},
+                )
+        self.telegram_successes += 1
         return True

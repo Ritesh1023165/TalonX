@@ -350,7 +350,11 @@ def compare_view(
 ) -> dict[str, Any]:
     archive = CompareArchive(config or CompareConfig())
     day = archive.day(trading_date) if trading_date else archive.latest()
-    comparison = day.get("comparison") or {}
+    trustworthy = day.get("trustworthy", False)
+    # Task 83-R1 §6.8: derived totals from a corrupt archive are NOT
+    # presented as trustworthy -- they move to a clearly-labelled
+    # untrusted block and per_stage_totals reads empty.
+    comparison = (day.get("comparison") if trustworthy else None) or {}
     per_stage = comparison.get("per_stage_totals", {})
     per_symbol_stage = comparison.get("per_symbol_stage", [])
     divergences = day.get("divergences", [])
@@ -367,9 +371,14 @@ def compare_view(
         "trading_date": day.get("trading_date"),
         "available_dates": day.get("available_dates", archive.available_dates()),
         "health": day.get("health"),
+        "trustworthy": trustworthy,
         "archive_integrity": day.get("archive_integrity"),
+        "runtime_status": day.get("runtime_status"),
+        "original_run_scope": comparison.get("original_run_scope"),
+        "event_level_agreement_assertable": comparison.get("event_level_agreement_assertable"),
         "per_stage_totals": per_stage,
         "per_symbol_stage": per_symbol_stage,
+        "untrusted_comparison": day.get("comparison_untrusted") if not trustworthy else None,
         "divergence_by_class": div_by_class,
         "divergences": divergences,
         "missing_or_late_stages": missing_late,
@@ -414,8 +423,10 @@ def streamlit_piv_comparison_payload(
 
     live_piv = piv_view(state_dir=piv_state_dir, now=now)
     day = archive.day(selected) if selected else {"trading_date": None,
-                                                  "health": SourceHealth(NOT_RUN, "no archive").to_dict()}
-    comparison = day.get("comparison") or {}
+                                                  "health": SourceHealth(NOT_RUN, "no archive").to_dict(),
+                                                  "trustworthy": False}
+    trustworthy = day.get("trustworthy", False)
+    comparison = (day.get("comparison") if trustworthy else None) or {}
     per_stage = comparison.get("per_stage_totals", {})
 
     # archived Original vs PIV funnels, side by side
@@ -437,7 +448,9 @@ def streamlit_piv_comparison_payload(
         "available_dates": dates,
         "selected_date": selected,
         "archive_health": day.get("health"),
+        "archive_trustworthy": trustworthy,
         "archive_integrity": day.get("archive_integrity"),
+        "runtime_status": day.get("runtime_status"),
         "manifest": day.get("manifest"),
         "live_piv_identity": live_piv["identity"],
         "strategy_approval_status": "UNVALIDATED",

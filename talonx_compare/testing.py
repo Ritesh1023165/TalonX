@@ -23,6 +23,7 @@ class _FakeServer:
     def __init__(self) -> None:
         self.kv: dict[int, dict[str, bytes]] = defaultdict(dict)
         self.channels: dict[str, list["FakePubSub"]] = defaultdict(list)
+        self.async_channels: dict[str, list[Any]] = defaultdict(list)
         self.publish_log: list[tuple[str, str]] = []
 
 
@@ -236,3 +237,97 @@ class RecordingTelegram:
         self.attempts += 1
         self.messages.append(text)
         return True
+
+
+# --------------------------------------------------------------------------
+# Async fake Redis for driving the REAL CollectorService (Task 83-R1 §7)
+# --------------------------------------------------------------------------
+
+class AsyncFakePubSub:
+    def __init__(self, server: "_FakeServer", *, fail_after: int | None = None) -> None:
+        self._server = server
+        self._subscribed: set[str] = set()
+        self._queue: list[dict[str, Any]] = []
+        self._fail_after = fail_after
+        self._gets = 0
+
+    async def subscribe(self, *channels: str) -> None:
+        for ch in channels:
+            self._subscribed.add(ch)
+            self._server.async_channels[ch].append(self)
+
+    async def unsubscribe(self, *channels: str) -> None:
+        for ch in channels or list(self._subscribed):
+            self._subscribed.discard(ch)
+            subs = self._server.async_channels.get(ch, [])
+            if self in subs:
+                subs.remove(self)
+
+    async def get_message(self, ignore_subscribe_messages: bool = True, timeout: float = 0.0):
+        import asyncio
+
+        self._gets += 1
+        if self._fail_after is not None and self._gets > self._fail_after:
+            raise ConnectionError("simulated PubSub drop")
+        if self._queue:
+            return self._queue.pop(0)
+        # honour the poll timeout (bounded) so the subscribe loop yields
+        # to the event loop instead of hot-spinning -- matches real redis.
+        await asyncio.sleep(min(timeout, 0.01) if timeout else 0.005)
+        return None
+
+    def _deliver(self, channel: str, data: str) -> None:
+        self._queue.append({"type": "message", "channel": channel, "data": data})
+
+    async def aclose(self) -> None:
+        await self.unsubscribe()
+
+    close = aclose
+
+
+class AsyncFakeRedis:
+    """Minimal async client matching what CollectorService._subscribe uses:
+    ``ping`` / ``pubsub`` / ``aclose``. ``unreachable`` makes ``ping``
+    raise (subscription -> DISCONNECTED, never NOT_RUN)."""
+
+    def __init__(self, server: "_FakeServer", *, unreachable: bool = False,
+                 fail_ping_times: int = 0, pubsub_fail_after: int | None = None) -> None:
+        self._server = server
+        self.unreachable = unreachable
+        self._fail_ping_times = fail_ping_times
+        self._pings = 0
+        self._pubsub_fail_after = pubsub_fail_after
+
+    async def ping(self) -> bool:
+        self._pings += 1
+        if self.unreachable or self._pings <= self._fail_ping_times:
+            raise ConnectionError("simulated redis unreachable")
+        return True
+
+    def pubsub(self) -> AsyncFakePubSub:
+        return AsyncFakePubSub(self._server, fail_after=self._pubsub_fail_after)
+
+    async def aclose(self) -> None:
+        pass
+
+    # sync publish helper for tests to inject "live" traffic
+    def publish_sync(self, channel: str, data: str) -> None:
+        self._server.publish_log.append((channel, data))
+        for sub in list(self._server.async_channels.get(channel, [])):
+            sub._deliver(channel, data)
+
+
+def install_async_fakes(monkeypatch, *, original: "AsyncFakeRedis", piv: "AsyncFakeRedis") -> None:
+    """Patch ``redis.asyncio.from_url`` so the Original URL yields
+    ``original`` and the PIV URL yields ``piv``. Server-wide Pub/Sub is
+    modelled: both share one bus."""
+    import redis.asyncio as _ra
+
+    def _from_url(url, *a, **k):
+        return piv if url.rstrip("/").endswith("/1") else original
+
+    monkeypatch.setattr(_ra, "from_url", _from_url)
+
+
+def new_async_server():
+    return _FakeServer()

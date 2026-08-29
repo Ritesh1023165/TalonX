@@ -19,7 +19,7 @@ from .broker import AlpacaPaperClient, PaperGuardError
 from .config import PivConfig
 from .decision_engine import DecisionEngine
 from .decision_ledger import DecisionLedger
-from .events import EventBus, PivEvent
+from .events import ET as _ET, EventBus, PivEvent
 from .execution_ownership import ExecutionOwnership, account_lock_key
 from .execution_settings import load_paper_entry_settings
 from .gemini_enrichment import GeminiEnrichmentOutbox
@@ -44,7 +44,19 @@ from .telegram import sender
 from .telegram_inbound import build_piv_info, build_piv_telegram_listener
 
 
-async def run_session(runner: SessionRunner, listener) -> None:
+def _merge_notification_telemetry(state_dir: Path, **kw) -> None:
+    """Task 83-R1 §5 -- best-effort durable notification-ownership record.
+    Never raises: telemetry must not be able to break a session."""
+    try:
+        from .notification_telemetry import merge_telemetry
+
+        merge_telemetry(state_dir, **kw)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+async def run_session(runner: SessionRunner, listener, *, telemetry_dir: Path | None = None,
+                      session_id: str | None = None) -> None:
     """Runs SessionRunner.run() as the main task; the inbound Telegram
     listener (if any) runs concurrently as a background task, started
     first so /ping is answerable from the moment the session begins, and
@@ -53,6 +65,14 @@ async def run_session(runner: SessionRunner, listener) -> None:
     except/backoff) means nothing it does can crash the session, but the
     reverse must also hold: a session crash/kill-switch stop must not
     leave the listener polling forever in the background."""
+    if telemetry_dir is not None:
+        from .notification_telemetry import merge_telemetry
+
+        merge_telemetry(
+            telemetry_dir, session_id=session_id,
+            ownership={"inbound_poller_started": listener is not None},
+            inbound_delta={"poll_starts": 1} if listener is not None else None,
+        )
     listener_task = asyncio.create_task(listener.run()) if listener is not None else None
     try:
         await runner.run()
@@ -114,10 +134,12 @@ def build_gemini_chain_if_enabled(bus: EventBus):
 
 
 def runtime(config: PivConfig, session_id: str | None = None, runtime_sha: str | None = None, config_hash: str | None = None):
+    _trading_date_et = datetime.now(timezone.utc).astimezone(_ET).date().isoformat()
     bus = EventBus(
         config.state_dir / "piv_events.jsonl",
         sender(config.telegram_token, config.telegram_chat_id) if config.telegram_enabled else None,
         feed_mode=config.feed_mode, session_id=session_id,
+        telemetry_path=config.state_dir, trading_date_et=_trading_date_et,
     )
     broker = AlpacaPaperClient(config)
     # Task 76S Stage 2/3: fail-closed by construction -- if
@@ -297,7 +319,12 @@ def main(argv: list[str] | None = None) -> int:
                 config.state_dir, redis_client=redis_client, started_at=datetime.now(timezone.utc),
                 feed_mode=config.feed_mode, universe=config.universe, piv_info=piv_info,
             )
-            asyncio.run(run_session(runner, listener))
+            _merge_notification_telemetry(
+                config.state_dir, session_id=identity.session_id,
+                ownership={"inbound_poller_constructed": listener is not None},
+            )
+            asyncio.run(run_session(runner, listener, telemetry_dir=config.state_dir,
+                                    session_id=identity.session_id))
             return 0
         if args.command == "supervise":
             (config.state_dir).mkdir(parents=True, exist_ok=True)
@@ -377,6 +404,10 @@ def main(argv: list[str] | None = None) -> int:
                 config.state_dir, redis_client=redis_client, started_at=datetime.now(timezone.utc),
                 feed_mode=config.feed_mode, universe=config.universe, piv_info=piv_info,
             )
+            _merge_notification_telemetry(
+                config.state_dir, session_id=identity.session_id,
+                ownership={"inbound_poller_constructed": listener is not None},
+            )
             registry.heartbeat("decision_engine", ComponentStatus.HEALTHY if decision_engine is not None else ComponentStatus.NOT_STARTED, "constructed" if decision_engine is not None else "decision path disabled")
             registry.heartbeat(
                 "telegram_inbound", ComponentStatus.HEALTHY,
@@ -389,7 +420,8 @@ def main(argv: list[str] | None = None) -> int:
 
             try:
                 asyncio.run(run_with_bounded_restart(
-                    lambda: run_session(runner, listener), registry,
+                    lambda: run_session(runner, listener, telemetry_dir=config.state_dir,
+                                        session_id=identity.session_id), registry,
                     max_restarts=args.max_restarts, backoff_seconds=args.backoff_seconds, on_heartbeat=_on_heartbeat,
                 ))
             except TerminalSupervisorFailure as exc:

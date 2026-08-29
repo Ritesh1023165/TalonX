@@ -1,21 +1,20 @@
-"""Task 83 §3/§4 -- read-only accessor over the date-partitioned evidence
-store, for the browser and Streamlit dashboards.
+"""Task 83 §3/§4 / Task 83-R1 §6 -- read-only accessor over the
+date-partitioned evidence store, for the browser and Streamlit dashboards.
 
-Everything here is a pure read. A missing / unreadable / stale directory
-is reported as its explicit health state, never as an empty-but-plausible
-success.
+Every read is pure. A missing / unreadable / stale / corrupt directory is
+reported as its explicit state; derived totals from a corrupt archive are
+NEVER presented as trustworthy.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Any
 
 from .config import CompareConfig
 from .evidence import EvidenceWriter
-from .health import MISSING, NOT_RUN, UNREADABLE, HEALTHY, DEGRADED, SourceHealth
+from .health import DEGRADED, HEALTHY, MISSING, NOT_RUN, UNREADABLE, SourceHealth
 
 
 def _read_json(path: Path) -> tuple[Any, str | None]:
@@ -41,41 +40,43 @@ class CompareArchive:
         )
 
     def day(self, trading_date: str) -> dict[str, Any]:
-        """Everything the dashboards need for one date, plus an explicit
-        archive-integrity verdict."""
         writer = EvidenceWriter(self.config.evidence_root, trading_date)
         d = writer.dir
-        if not d.exists():
+        if not d.exists() or not (d / "manifest.json").exists():
             return {
                 "trading_date": trading_date,
-                "health": SourceHealth(NOT_RUN, f"no evidence directory for {trading_date}").to_dict(),
+                "health": SourceHealth(NOT_RUN, f"no evidence archive for {trading_date}").to_dict(),
+                "trustworthy": False,
             }
-        manifest, m_err = _read_json(d / "manifest.json")
+
+        integ = writer.verify_archive()
+        manifest, _ = _read_json(d / "manifest.json")
+        runtime_status, _ = _read_json(d / "runtime_status.json")
         comparison, c_err = _read_json(d / "comparison.json")
-        divergences, dv_err = _read_json(d / "divergences.json")
-        telegram, t_err = _read_json(d / "telegram.json")
-        diagnostics, dg_err = _read_json(d / "diagnostics.json")
-        hashes_ok, hash_problems = writer.verify_file_hashes()
+        divergences, _ = _read_json(d / "divergences.json")
+        telegram, _ = _read_json(d / "telegram.json")
+        diagnostics, _ = _read_json(d / "diagnostics.json")
 
-        errs = [e for e in (m_err, c_err, dv_err, t_err, dg_err) if e and e != "missing"]
-        if m_err == "missing":
-            health = SourceHealth(MISSING, "manifest.json missing").to_dict()
-        elif errs:
-            health = SourceHealth(UNREADABLE, "; ".join(errs)).to_dict()
-        elif not hashes_ok:
-            health = SourceHealth(DEGRADED, "file hash mismatch: " + "; ".join(hash_problems)).to_dict()
+        if integ.state == "MISSING":
+            health = SourceHealth(MISSING, "; ".join(integ.problems)).to_dict()
+        elif integ.state == "UNREADABLE":
+            health = SourceHealth(UNREADABLE, "; ".join(integ.problems)).to_dict()
+        elif integ.state == "DEGRADED":
+            health = SourceHealth(DEGRADED, "archive integrity DEGRADED: " + "; ".join(integ.problems)).to_dict()
         else:
-            health = SourceHealth(HEALTHY, "archive present and hash-verified").to_dict()
+            health = SourceHealth(HEALTHY, "archive present and integrity-verified").to_dict()
 
+        trustworthy = integ.ok
         return {
             "trading_date": trading_date,
             "health": health,
-            "archive_integrity": {
-                "file_hashes_ok": hashes_ok,
-                "problems": hash_problems,
-            },
+            "trustworthy": trustworthy,
+            "archive_integrity": integ.to_dict(),
             "manifest": manifest,
-            "comparison": comparison,
+            "runtime_status": runtime_status,
+            # derived views are only surfaced as trustworthy when integrity holds
+            "comparison": comparison if trustworthy else None,
+            "comparison_untrusted": None if trustworthy else comparison,
             "divergences": (divergences or {}).get("divergences", []) if divergences else [],
             "telegram": telegram,
             "diagnostics": (diagnostics or {}).get("diagnostics", []) if diagnostics else [],
@@ -87,6 +88,7 @@ class CompareArchive:
             return {
                 "trading_date": None,
                 "health": SourceHealth(NOT_RUN, "no comparison evidence has been collected yet").to_dict(),
+                "trustworthy": False,
                 "available_dates": [],
             }
         payload = self.day(dates[-1])

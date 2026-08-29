@@ -103,13 +103,17 @@ def test_outcomes_separated_by_execution_class(tmp_path):
 
 def test_archive_integrity_diagnostics(tmp_path):
     payload, cfg = _payload(tmp_path)
-    assert payload["archive_integrity"]["file_hashes_ok"] is True
-    # tamper with an evidence file -> integrity check must flag it
+    assert payload["archive_integrity"]["ok"] is True
+    assert payload["archive_trustworthy"] is True
+    # tamper with an evidence file -> integrity check must flag it and the
+    # section must stop treating derived totals as trustworthy (§6.8)
     (cfg.evidence_root / DATE / "comparison.json").write_text("{}", encoding="utf-8")
     tampered = streamlit_piv_comparison_payload(config=cfg, piv_state_dir=cfg.piv_state_dir,
                                                 trading_date=DATE)
-    assert tampered["archive_integrity"]["file_hashes_ok"] is False
+    assert tampered["archive_integrity"]["ok"] is False
     assert tampered["archive_integrity"]["problems"]
+    assert tampered["archive_trustworthy"] is False
+    assert tampered["per_stage_totals"] == {}  # corrupt -> not surfaced as trustworthy
 
 
 def test_not_run_state_is_honest_when_no_evidence(tmp_path):
