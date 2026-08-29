@@ -1,0 +1,2 @@
+scenario,name,expected,observed,verdict,label
+33,fresh-clone manifest verification,LF-normalized hashing round-trips; committed blobs match when present,"committed_checked=11 mismatches=['expanded_rehearsal_matrix.csv: not in git', 'raw_test_output/baseline_full_suite.txt: not in git', 'retained_20_scenarios_matrix.csv: not in git']",FAIL,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
