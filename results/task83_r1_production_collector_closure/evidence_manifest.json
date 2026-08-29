@@ -1,14 +1,14 @@
 {
   "task": "Task 83-R1 Production Collector Correctness and Evidence-Integrity Closure",
-  "generated_at": "2026-08-29T16:12:27.850425+00:00",
+  "generated_at": "2026-08-29T17:08:12.133860+00:00",
   "algorithm": "sha256 over git-normalized (LF) bytes",
-  "content_commit": "5b3764981de474691a0ba9898845c7b9bf6e984a",
+  "content_commit": "2ce779879b9872a06fc2e127c71908b53ad6c3f0",
   "excluded": [
     "_make_manifest.py",
     "evidence_manifest.json"
   ],
   "note": "Hashes are over LF-normalized bytes so this manifest verifies from a fresh clone regardless of the checkout's line-ending policy. content_commit is the code/evidence commit these hashes describe -- this manifest and its generator are excluded to avoid a self-referential SHA.",
-  "file_count": 14,
+  "file_count": 15,
   "artifacts": [
     {
       "file": "acceptance_matrix.md",
@@ -51,6 +51,11 @@
       "sha256": "f5c58f8bd4f3e1f51d530d3aac029a2d1363612e2ecc0c0697e1dd8602d869ba"
     },
     {
+      "file": "raw_test_output/final_full_suite_rerun.txt",
+      "bytes": 8384,
+      "sha256": "6889014add6062c99a86ff7b7061c6535254e1f0757e94176e01e2435b7938a2"
+    },
+    {
       "file": "raw_test_output/focused_run1.txt",
       "bytes": 35,
       "sha256": "dcabd6b60015ddb9db644669f10f59828e256f97456897d0a2e60a98290e4230"
@@ -77,8 +82,8 @@
     },
     {
       "file": "verification_report.md",
-      "bytes": 8548,
-      "sha256": "d53209b14a9320993f68831527f8308f5b8a7b7096aaf02494e0f0cc5a1062f2"
+      "bytes": 9024,
+      "sha256": "1a8a457dce92282ba095f7a7ae066213fdc0badf38eff6910c509b180477a3fb"
     }
   ]
 }
