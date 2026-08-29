@@ -49,6 +49,8 @@ from pathlib import Path
 from aiohttp import WSMsgType, web
 
 from dashboard import CHANNELS, REDIS_URL, ChannelStats, handle_message
+from talonx_compare.config import CompareConfig
+from talonx_compare.dashboard_views import compare_view, original_view, piv_view
 from talonx_piv.config import PivConfig
 from talonx_piv.observability import build_integrated_projection
 from talonx_quant.config import QuantConfig
@@ -286,6 +288,60 @@ async def piv_status_handler(request: web.Request) -> web.Response:
     return web.json_response(projection)
 
 
+async def original_view_handler(request: web.Request) -> web.Response:
+    """Task 83 §3 -- read-only Original view. Redis health, the
+    Warmup/Quant/Brain/Core/Dispatch/Telegram stage funnel, and local
+    simulated-paper activity. A missing/unreachable source is reported as
+    its explicit health state, never as a plausible zero. GET only; no
+    launch/order/authorization/safety-control endpoint of any kind."""
+    import redis as _redis
+
+    client = None
+    try:
+        client = _redis.from_url(REDIS_URL, socket_connect_timeout=1.0, socket_timeout=1.0)
+        payload = await asyncio.to_thread(original_view, redis_client=client)
+    except Exception as exc:  # noqa: BLE001 -- a read failure is surfaced, never a silent 200
+        return web.json_response(
+            {"error": f"ORIGINAL_VIEW_READ_FAILED: {type(exc).__name__}: {exc}"}, status=500)
+    finally:
+        if client is not None:
+            try:
+                client.close()
+            except Exception:  # noqa: BLE001
+                pass
+    return web.json_response(payload)
+
+
+async def piv_view_handler(request: web.Request) -> web.Response:
+    """Task 83 §3 -- read-only PIV view: provider/readiness/freshness,
+    quant funnel, decisions, shadow, PAPER lifecycle, reconciliation, EOD,
+    plus UNVALIDATED status, feed/exec mode, real-capital prohibition and
+    the QuantStateStore capability limitation. GET only."""
+    state_dir: Path = request.app["piv_state_dir"]
+    try:
+        payload = await asyncio.to_thread(piv_view, state_dir=state_dir)
+    except Exception as exc:  # noqa: BLE001
+        return web.json_response(
+            {"error": f"PIV_VIEW_READ_FAILED: {type(exc).__name__}: {exc}",
+             "state_dir": str(state_dir)}, status=500)
+    return web.json_response(payload)
+
+
+async def compare_view_handler(request: web.Request) -> web.Response:
+    """Task 83 §3 -- read-only Compare view: per-stage totals, per-symbol
+    agreement/divergence, missing/late stages + reason codes, and the
+    separate Original-simulated vs PIV-shadow/PAPER outcome streams. GET
+    only; reads only the collector's date-partitioned evidence store."""
+    trading_date = request.query.get("date")
+    try:
+        payload = await asyncio.to_thread(
+            compare_view, config=request.app["compare_config"], trading_date=trading_date)
+    except Exception as exc:  # noqa: BLE001
+        return web.json_response(
+            {"error": f"COMPARE_VIEW_READ_FAILED: {type(exc).__name__}: {exc}"}, status=500)
+    return web.json_response(payload)
+
+
 async def on_startup(app: web.Application) -> None:
     app["redis_task"] = asyncio.create_task(_redis_consumer(app))
     app["broadcast_task"] = asyncio.create_task(_broadcaster(app))
@@ -310,6 +366,7 @@ def build_app(piv_state_dir: Path | None = None) -> web.Application:
     # results/task64_paper_piv_readiness/runtime default) -- never a new,
     # separate default. Tests/rehearsal pass an isolated tmp_path directly.
     app["piv_state_dir"] = piv_state_dir if piv_state_dir is not None else PivConfig().state_dir
+    app["compare_config"] = CompareConfig()
     app["stats"] = {watch.key: ChannelStats() for watch in CHANNELS}
     app["websockets"] = set()
     app["started_at"] = time.monotonic()
@@ -330,6 +387,10 @@ def build_app(piv_state_dir: Path | None = None) -> web.Application:
     app.router.add_get("/ws", websocket_handler)
     app.router.add_get("/", index_handler)
     app.router.add_get("/piv/status", piv_status_handler)
+    # Task 83 §3 -- three additive, GET-only, read-only views.
+    app.router.add_get("/views/original", original_view_handler)
+    app.router.add_get("/views/piv", piv_view_handler)
+    app.router.add_get("/views/compare", compare_view_handler)
     app.router.add_static("/static/", STATIC_DIR, show_index=False)
 
     app.on_startup.append(on_startup)

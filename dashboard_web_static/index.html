@@ -143,6 +143,16 @@
   <div class="stat">total messages <b id="grand-total">0</b></div>
   <div class="stat">distinct tickers <b id="distinct-tickers">0</b></div>
 </header>
+<nav id="view-tabs" style="display:flex;gap:6px;padding:8px 16px;border-bottom:1px solid var(--panel-border)">
+  <button class="view-tab" data-view="live" style="background:var(--panel);color:var(--fg);border:1px solid var(--panel-border);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px">Live pipeline</button>
+  <button class="view-tab" data-view="original" style="background:var(--panel);color:var(--fg);border:1px solid var(--panel-border);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px">Original</button>
+  <button class="view-tab" data-view="piv" style="background:var(--panel);color:var(--fg);border:1px solid var(--panel-border);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px">PIV</button>
+  <button class="view-tab" data-view="compare" style="background:var(--panel);color:var(--fg);border:1px solid var(--panel-border);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px">Compare</button>
+</nav>
+<section id="isolation-view" style="display:none;padding:12px 16px">
+  <div id="isolation-meta" style="color:var(--muted);font-size:11px;margin-bottom:8px"></div>
+  <div id="isolation-body"></div>
+</section>
 <main id="cards">
   <div class="card card-wide" style="--accent:#2dd4bf">
     <div class="card-head">
@@ -394,6 +404,109 @@ function connect() {
 }
 
 connect();
+
+/* --- Task 83: read-only Original / PIV / Compare views ------------------- */
+const HEALTH_COLOR = {
+  RUNNING: "#22c55e", HEALTHY: "#22c55e", DEGRADED: "#f59e0b", STALE: "#f59e0b",
+  MISSING: "#ef4444", DISCONNECTED: "#ef4444", NOT_RUN: "#64748b",
+  UNREADABLE: "#ef4444", WRONG_SESSION: "#ef4444",
+};
+function healthBadge(h) {
+  if (!h || !h.state) return "";
+  const c = HEALTH_COLOR[h.state] || "#64748b";
+  const age = (h.age_seconds != null) ? ` · age ${Math.round(h.age_seconds)}s` : "";
+  const upd = h.last_update ? ` · updated ${h.last_update}` : "";
+  return `<span style="color:${c};font-weight:600">${h.state}</span>` +
+         `<span style="color:var(--muted)"> — ${h.detail || ""}${upd}${age}</span>`;
+}
+function kv(label, value) {
+  return `<div style="margin:2px 0"><span style="color:var(--muted)">${label}:</span> <b>${value}</b></div>`;
+}
+function jsonBlock(obj) {
+  return `<pre style="white-space:pre-wrap;font-size:11px;background:var(--panel);border:1px solid var(--panel-border);border-radius:6px;padding:8px;overflow:auto">${
+    JSON.stringify(obj, null, 2).replace(/</g, "&lt;")}</pre>`;
+}
+
+let activeView = "live";
+async function loadView(view) {
+  activeView = view;
+  const cards = document.getElementById("cards");
+  const iso = document.getElementById("isolation-view");
+  document.querySelectorAll(".view-tab").forEach(b => {
+    b.style.outline = (b.dataset.view === view) ? "2px solid var(--fg)" : "none";
+  });
+  if (view === "live") { cards.style.display = ""; iso.style.display = "none"; return; }
+  cards.style.display = "none";
+  iso.style.display = "";
+  const meta = document.getElementById("isolation-meta");
+  const body = document.getElementById("isolation-body");
+  meta.textContent = "loading " + view + " ...";
+  try {
+    const resp = await fetch("/views/" + view, { method: "GET" });
+    const data = await resp.json();
+    if (!resp.ok) { body.innerHTML = jsonBlock(data); meta.textContent = "read failed"; return; }
+    meta.textContent = "GET /views/" + view + " · read-only · " + (data.as_of || data.trading_date || "");
+    body.innerHTML = renderView(view, data);
+  } catch (e) {
+    body.innerHTML = `<div style="color:#ef4444">fetch error: ${e}</div>`;
+  }
+}
+function renderView(view, d) {
+  if (view === "original") {
+    let h = `<h2>Original</h2>`;
+    h += kv("run", healthBadge(d.run_health));
+    h += kv("redis", healthBadge(d.redis_health));
+    h += kv("metrics", healthBadge(d.metrics_health));
+    h += `<h3>Warmup / Quant / Brain / Core / Dispatch / Telegram</h3>`;
+    h += `<table class="bw-table"><thead><tr><th>Stage</th><th>Total</th><th>Health</th></tr></thead><tbody>`;
+    (d.lifecycle_stages || []).forEach(s => {
+      h += `<tr><td>${s.stage}</td><td>${s.total}</td><td>${healthBadge(s.health)}</td></tr>`;
+    });
+    h += `</tbody></table>`;
+    h += `<h3>Telegram (owner: ${d.telegram.owner})</h3>` + jsonBlock(d.telegram);
+    h += `<h3>Local simulated-paper (${d.simulated_paper.execution_class})</h3>`;
+    h += `<div style="color:var(--muted);font-size:11px">${d.simulated_paper.note}</div>`;
+    h += jsonBlock(d.simulated_paper);
+    return h;
+  }
+  if (view === "piv") {
+    let h = `<h2>PIV</h2>`;
+    h += kv("session", (d.identity.session_id || "—") + "  " + healthBadge(d.identity.health));
+    h += kv("strategy", d.strategy_approval_status + " / profitability " + d.profitability);
+    h += kv("feed mode", d.feed_mode);
+    h += kv("execution mode", d.execution_mode);
+    h += kv("real capital", d.real_capital_prohibited ? "PROHIBITED" : "?");
+    h += kv("experimental authorization", d.experimental_authorization);
+    h += `<h3>Provider / readiness / freshness</h3>`;
+    h += kv("provider state", healthBadge(d.provider_state.health) + " — " + JSON.stringify(d.provider_state.value));
+    h += jsonBlock({ per_symbol_readiness: d.per_symbol_readiness, per_symbol_freshness: d.per_symbol_freshness });
+    h += `<h3>Quant funnel / decisions</h3>` + jsonBlock({ quant_funnel: d.quant_funnel, decisions: d.decisions });
+    h += `<h3>Shadow (${d.shadow.execution_class}) · PAPER lifecycle (${d.paper_lifecycle.execution_class})</h3>`;
+    h += `<div style="color:var(--muted);font-size:11px">${d.shadow.note}</div>`;
+    h += jsonBlock({ shadow: d.shadow, paper_lifecycle: d.paper_lifecycle });
+    h += `<h3>Reconciliation / EOD</h3>` + jsonBlock({ reconciliation: d.reconciliation, eod: d.eod });
+    h += `<h3>Known capability limitation</h3>` + jsonBlock(d.capability_limitations);
+    h += `<h3>Unresolved</h3>` + jsonBlock(d.unresolved_questions);
+    return h;
+  }
+  // compare
+  let h = `<h2>Compare</h2>`;
+  h += kv("trading date", d.trading_date || "—") + kv("archive", healthBadge(d.health));
+  h += kv("archive integrity", JSON.stringify(d.archive_integrity));
+  h += `<h3>Per-stage totals</h3>` + jsonBlock(d.per_stage_totals);
+  h += `<h3>Per-symbol / stage agreement</h3>` + jsonBlock(d.per_symbol_stage);
+  h += `<h3>Divergence by class</h3>` + jsonBlock(d.divergence_by_class);
+  h += `<h3>Missing / late stages + reason codes</h3>` + jsonBlock(d.missing_or_late_stages);
+  h += `<h3>Outcome streams (never combined)</h3>` + jsonBlock(d.outcome_streams);
+  h += `<h3>Diagnostics</h3>` + jsonBlock(d.diagnostics);
+  h += `<div style="color:var(--muted);font-size:11px;margin-top:8px">${d.not_alpha_evidence}</div>`;
+  return h;
+}
+document.querySelectorAll(".view-tab").forEach(b => {
+  b.addEventListener("click", () => loadView(b.dataset.view));
+});
+loadView("live");
+setInterval(() => { if (activeView !== "live") loadView(activeView); }, 5000);
 </script>
 </body>
 </html>

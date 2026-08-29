@@ -361,10 +361,33 @@ def build_integrated_projection(
     ]
     source_health_ok = not source_health_diagnostics
 
+    # Task 83 §6: PIV has NO durable QuantStateStore. The reused in-process
+    # QuantScanner keeps rolling bar buffers and funnel counters in memory
+    # only; they do not survive a PIV restart. Task 82 reserved an isolated
+    # path (<state_dir>/piv_quant.db) so a future enablement cannot select
+    # Original's database -- but a reserved, isolated path is NOT evidence
+    # that persistence exists. Surfaced here as an explicit capability
+    # limitation so no dashboard can imply otherwise.
+    quant_db_path = state_dir / "piv_quant.db"
+    capability_limitations = {
+        "durable_quant_state_store": {
+            "status": "NOT_IMPLEMENTED",
+            "persistence_exists": False,
+            "isolated_path_reserved": str(quant_db_path),
+            "isolated_path_present_on_disk": quant_db_path.exists(),
+            "detail": (
+                "PIV Quant counters/buffers are session-lifetime, in-memory only. "
+                "The isolated path is reserved (Task 82) but unused; its presence or "
+                "absence on disk does not indicate that PIV Quant state is persisted."
+            ),
+        },
+    }
+
     return {
         "source_health": source_health,
         "source_health_ok": source_health_ok,
         "source_health_diagnostics": source_health_diagnostics,
+        "capability_limitations": capability_limitations,
         "scope": {
             "session_id": session_id, "trading_date_et": trading_date_et,
             "runtime_sha": identity.get("runtime_sha"), "config_hash": identity.get("config_hash"),
