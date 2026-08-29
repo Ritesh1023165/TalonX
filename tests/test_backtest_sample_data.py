@@ -73,12 +73,16 @@ _MULTI_CSV = _REPO_ROOT / "examples" / "data" / "sample_multi_trade_1m.csv"
 # (out of scope for that task's specific regression target) and remains
 # the pending BLOCKING FOLLOW-UP tracked in
 # results/task25a_long_only_parity_fix/task25a_summary.md.
-_XFAIL_PENDING_SAMPLE_DATA_REGENERATION = pytest.mark.xfail(
-    reason="Task 25A: sample_multi_trade_1m.csv's demo trades were built on the long/short bug "
-           "(BEARISH-while-flat) that Task 24/25A fixed; now correctly produce zero trades. "
-           "Needs a dedicated CSV-regeneration follow-up, not fixed here.",
-    strict=True,
-)
+# Task 81-R2 (2026-08-29): sample_multi_trade_1m.csv has now been
+# regenerated deterministically via the UNCHANGED strategy
+# (scripts/gen_sample_multi_trade_1m.py; spec in
+# results/task81_r2_consolidated_closure/fixture_spec.md). It reuses the
+# exact known-good bar sequence of sample_AAPL_trade_1m.csv through its
+# entry bar, then appends a different post-entry path per symbol so
+# TSTW -> TARGET, TSTL -> STOP (clean -1R), TSTE -> END_OF_SESSION (small
+# positive R). The xfail marker that stood here is removed -- every
+# test below now exercises three genuine long trades. All synthetic
+# outcomes: TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE.
 
 
 def _run(csv_path: Path, out_dir: Path):
@@ -271,7 +275,6 @@ def test_multi_trade_dataset_never_flags_critical_corruption():
         assert not report.has_critical_corruption
 
 
-@_XFAIL_PENDING_SAMPLE_DATA_REGENERATION
 def test_multi_trade_dataset_runs_the_documented_command_and_produces_three_trades(tmp_path, capsys):
     exit_code = _run_multi(_MULTI_CSV, tmp_path)
 
@@ -283,7 +286,6 @@ def test_multi_trade_dataset_runs_the_documented_command_and_produces_three_trad
     assert summary["trades_executed"] == 3
 
 
-@_XFAIL_PENDING_SAMPLE_DATA_REGENERATION
 def test_multi_trade_dataset_exercises_target_stop_and_eod_exit_reasons(tmp_path):
     _run_multi(_MULTI_CSV, tmp_path)
     trades_json = json.loads((tmp_path / "backtest_trades.json").read_text(encoding="utf-8"))
@@ -292,7 +294,6 @@ def test_multi_trade_dataset_exercises_target_stop_and_eod_exit_reasons(tmp_path
     assert exit_reasons == {"TSTW": "TARGET", "TSTL": "STOP", "TSTE": "END_OF_SESSION"}
 
 
-@_XFAIL_PENDING_SAMPLE_DATA_REGENERATION
 def test_multi_trade_dataset_has_at_least_one_winner_and_one_loser(tmp_path):
     _run_multi(_MULTI_CSV, tmp_path)
     trades_json = json.loads((tmp_path / "backtest_trades.json").read_text(encoding="utf-8"))
@@ -305,7 +306,6 @@ def test_multi_trade_dataset_has_at_least_one_winner_and_one_loser(tmp_path):
     assert stop_trade["gross_R"] == pytest.approx(-1.0)  # a clean 1R stop-out
 
 
-@_XFAIL_PENDING_SAMPLE_DATA_REGENERATION
 def test_multi_trade_dataset_populates_aggregate_statistics(tmp_path):
     """Profit factor / average loss / drawdown / cumulative R / win-loss
     stats all need >=1 win AND >=1 loss to be non-degenerate -- this
@@ -325,7 +325,6 @@ def test_multi_trade_dataset_populates_aggregate_statistics(tmp_path):
     assert net["win_rate"] == pytest.approx(2 / 3)
 
 
-@_XFAIL_PENDING_SAMPLE_DATA_REGENERATION
 def test_multi_trade_dataset_equity_curve_reflects_the_win_loss_sequence(tmp_path):
     _run_multi(_MULTI_CSV, tmp_path)
     equity_text = (tmp_path / "backtest_equity_curve.csv").read_text(encoding="utf-8")
@@ -339,7 +338,6 @@ def test_multi_trade_dataset_equity_curve_reflects_the_win_loss_sequence(tmp_pat
     assert cumulative[-1] == max(cumulative)  # no drawdown after the recovery
 
 
-@_XFAIL_PENDING_SAMPLE_DATA_REGENERATION
 def test_multi_trade_dataset_html_report_contains_populated_metrics(tmp_path):
     _run_multi(_MULTI_CSV, tmp_path)
     html = (tmp_path / "backtest_results.html").read_text(encoding="utf-8")
