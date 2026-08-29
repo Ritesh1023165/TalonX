@@ -29,7 +29,7 @@
 
 | Run | Result | Artifact |
 |---|---|---|
-| Baseline full suite (at start SHA `e153450`) | `<FILL: N passed, 0 failed, 0 skipped, 0 xfailed>` | `raw_test_output/baseline_full_suite.txt` |
+| Baseline full suite (at start SHA `e153450`) | `2696 passed, 0 failed, 0 skipped, 0 xfailed`, exit 0 (2655.83 s) | `raw_test_output/baseline_full_suite.txt` |
 | Focused suite — run 1 | `133 passed` (7.50 s) | `raw_test_output/focused_run1.txt` |
 | Focused suite — run 2 | `133 passed` (7.11 s) | `raw_test_output/focused_run2.txt` |
 | Offline rehearsal (20 scenarios) | `20 passed` | `offline_rehearsal_matrix.csv` (all PASS) |
@@ -37,12 +37,14 @@
 
 ### Count reconciliation (§7.3)
 
-- Baseline collected: `<FILL>` (`<P> passed / 0 skipped / 0 xfailed`).
+- Baseline collected: `2696` (`2696 passed / 0 skipped / 0 xfailed`).
 - New Task 83 items added: `test_task83_health_contract.py` + `test_task83_collector.py`
   + `test_task83_browser_dashboard.py` + `test_task83_streamlit_dashboard.py`
-  + `test_task83_offline_dual_run.py` = `<FILL: exact --collect-only count>` items.
-- Final collected: `<FILL>` = baseline `<FILL>` + `<FILL>` new. `0` failed, `0` xpassed,
-  `0` errors, `0` skipped, `0` xfailed. No skip/xfail marker introduced anywhere.
+  + `test_task83_offline_dual_run.py` = `97` items (`pytest --collect-only`).
+- Final collected: `2793` = baseline `2696` + `97` new. Expect `2793 passed`,
+  `0` failed, `0` xpassed, `0` errors, `0` skipped, `0` xfailed. No skip/xfail
+  marker introduced anywhere (grep of the five new files: 0 matches for
+  `pytest.mark.skip` / `pytest.mark.xfail` / `pytest.skip(`).
 
 ## Boundaries (§8)
 
