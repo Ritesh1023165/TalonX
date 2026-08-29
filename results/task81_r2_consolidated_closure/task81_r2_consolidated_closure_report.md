@@ -185,9 +185,15 @@ assertion is exercised with the now-passing trade-producing multi fixture.
 | Baseline | `pytest -p no:cacheprovider tests/ -q -rxXs` | `2625 passed, 1 skipped, 10 xfailed`, exit 0 (942 s) |
 | §2/§3/§4 pre-fix | `pytest tests/test_task81_r2_*.py` (lifecycle.py stashed) | `32 failed, 12 passed` — `prefix_reproductions.txt` |
 | §5 fixture verify | `python scripts/gen_sample_multi_trade_1m.py --verify` | `VERIFY: PASS` — 3 trades, exit reasons TARGET/STOP/END_OF_SESSION |
-| Backtest files post-regen | `pytest tests/test_backtest_sample_data.py tests/test_backtest_cost_sensitivity.py` | **<filled on completion>** — `backtest_files_post_regen.txt` |
-| Focused recovery/reconciliation ×2 | `pytest -p no:cacheprovider <R2 + R1 + Task81 reconcile/recovery/eod/cli suites>` | **<filled>** — `focused_recovery_run{1,2}.txt` |
-| Final full suite | `pytest -p no:cacheprovider tests/ -q -rxXs` | **<filled>** — `final_full_suite.txt` |
+| Backtest files post-regen | `pytest tests/test_backtest_sample_data.py tests/test_backtest_cost_sensitivity.py` | **`34 passed`, exit 0 (2143 s)** — `backtest_files_post_regen.txt` (all 10 previously-xfailed tests + the rewritten no-skip test pass) |
+| Focused recovery/reconciliation ×2 | `pytest -p no:cacheprovider <22 R2 + R1 + Task 81 reconcile/recovery/eod/cli suites>` | run 1: `287 passed` (12.4 s); run 2: `287 passed` (11.3 s) — `focused_recovery_run{1,2}.txt` |
+| Final full suite | `pytest -p no:cacheprovider tests/ -q -rxXs` | **<filled on completion>** — `final_full_suite.txt` |
+
+Runtime note: the regenerated `sample_multi_trade_1m.csv` is ~12 k rows,
+so `test_backtest_sample_data.py` + `test_backtest_cost_sensitivity.py`
+now take ~36 min (was ~5 min with the 2-day fixture that produced 0
+trades). The full suite grows correspondingly. See "Remaining limitations"
+for the `warmup_df` optimisation path.
 
 ## Remaining limitations vs deferred work
 

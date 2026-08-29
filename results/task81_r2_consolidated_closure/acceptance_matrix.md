@@ -81,3 +81,20 @@ count reconciliation, rerun on any subsequent change.
 Verdict: `BASELINE_VERIFIED_READY_FOR_ISOLATION` only when every row above
 passes and the full suite reconciles exactly; otherwise `BLOCKED` with the
 unmet requirement + required authority/decision.
+
+---
+
+## Outcome (post-implementation)
+
+| Rows | Landed change | Regression tests (node ids) | Pre-fix proof | Status |
+|---|---|---|---|---|
+| R2a.1–R2a.9 | `lifecycle.py` `_verify_broker_order_row` + `_extract_order_update_fields` + reverse `orders_missing_from_broker_list` (commit `04fe20f`) | `test_task81_r2_reconcile_identity.py` (17) | `32 failed / 12 passed` vs `d8e530e` — `prefix_reproductions.txt` | PASS |
+| R3.1–R3.6 | `lifecycle.py` `_promote_orphan_order_intents` in `reconcile` (commit `04fe20f`); R1 status-edit helper removed | `test_task81_r2_orphan_recovery.py` (11); `test_task81_r1_reconciliation_completeness.py` updated | included above | PASS |
+| R4.1–R4.6 | `lifecycle.py` `_validate_broker_update` at top of `apply_broker_update` (commit `04fe20f`) | `test_task81_r2_apply_update_validation.py` (15) | included above | PASS |
+| R5.1–R5.3 | `scripts/gen_sample_multi_trade_1m.py` + regenerated `sample_multi_trade_1m.csv`; 10 xfail markers removed; skip rewritten (commit `a736231`) | `test_backtest_sample_data.py::test_multi_trade_*` (6), `test_backtest_cost_sensitivity.py::test_multi_trade_*` (4), `::test_zero_trade_fixture_reports_no_expectancy_in_any_scenario` | `--runxfail`: 9 passed / 12 deselected (all previously-xfailed now pass); fixture `--verify`: PASS | PASS |
+| R6.1–R6.3 | `report_corrections.md` (commit `a686004`) | n/a | n/a | DONE |
+| R7 | `test_task81_r2_guard_negative_controls.py` (5); `call_path_audit.md`; `state_transition_matrix.md` (commit `a686004`) | — | — | PASS |
+
+Full-suite runs in `raw_test_output/`. Verdict:
+`BASELINE_VERIFIED_READY_FOR_ISOLATION` (one disclosed evidence-limited
+IEX follow-up per §6 C4, not an isolation blocker).
