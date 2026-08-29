@@ -187,7 +187,15 @@ assertion is exercised with the now-passing trade-producing multi fixture.
 | §5 fixture verify | `python scripts/gen_sample_multi_trade_1m.py --verify` | `VERIFY: PASS` — 3 trades, exit reasons TARGET/STOP/END_OF_SESSION |
 | Backtest files post-regen | `pytest tests/test_backtest_sample_data.py tests/test_backtest_cost_sensitivity.py` | **`34 passed`, exit 0 (2143 s)** — `backtest_files_post_regen.txt` (all 10 previously-xfailed tests + the rewritten no-skip test pass) |
 | Focused recovery/reconciliation ×2 | `pytest -p no:cacheprovider <22 R2 + R1 + Task 81 reconcile/recovery/eod/cli suites>` | run 1: `287 passed` (12.4 s); run 2: `287 passed` (11.3 s) — `focused_recovery_run{1,2}.txt` |
-| Final full suite | `pytest -p no:cacheprovider tests/ -q -rxXs` | **<filled on completion>** — `final_full_suite.txt` |
+| Final full suite | `pytest -p no:cacheprovider tests/ -q -rxXs` | **`2685 passed, 0 skipped, 0 xfailed`, exit 0 (2544 s)** — `final_full_suite.txt` |
+
+**Count reconciliation (exact):** baseline `2625 passed / 1 skipped / 10
+xfailed` = 2636 collected → final `2685 passed / 0 skipped / 0 xfailed` =
+2685 collected. Delta collected `+49` = exactly the 49 new
+`test_task81_r2_*` items (`pytest --collect-only`). The 1 former skip and
+the 10 former xfails all moved to **passed** (genuinely closed, markers
+removed). `2625 + 49 + 1 + 10 = 2685`. `0` failed, `0` xpassed, `0`
+errors. No skip/xfail marker remains anywhere.
 
 Runtime note: the regenerated `sample_multi_trade_1m.csv` is ~12 k rows,
 so `test_backtest_sample_data.py` + `test_backtest_cost_sensitivity.py`

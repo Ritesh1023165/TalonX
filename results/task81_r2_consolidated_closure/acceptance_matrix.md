@@ -98,3 +98,11 @@ unmet requirement + required authority/decision.
 Full-suite runs in `raw_test_output/`. Verdict:
 `BASELINE_VERIFIED_READY_FOR_ISOLATION` (one disclosed evidence-limited
 IEX follow-up per §6 C4, not an isolation blocker).
+
+## Final full suite
+
+`2685 passed, 0 skipped, 0 xfailed`, exit 0 (2544s). Reconciles exactly
+against the `2625/1/10` baseline: `+49` new `test_task81_r2_*` items; the 1
+skip and 10 xfails all now pass (markers removed). `0` failed / xpassed /
+errors. Verdict: `BASELINE_VERIFIED_READY_FOR_ISOLATION` (one disclosed
+evidence-limited IEX follow-up, not an isolation blocker).
