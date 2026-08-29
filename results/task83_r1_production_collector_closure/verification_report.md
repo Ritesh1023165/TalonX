@@ -29,7 +29,7 @@
 
 | Run | Result | Artifact |
 |---|---|---|
-| Baseline full suite (at `fd9b66a`) | `<FILL: N passed, 0 failed, 0 skipped, 0 xfailed>` | `raw_test_output/baseline_full_suite.txt` |
+| Baseline full suite (at `fd9b66a`) | `2793 passed, 0 failed, 0 skipped, 0 xfailed`, exit 0 (3125.03 s) | `raw_test_output/baseline_full_suite.txt` |
 | Focused Task 83 + 83-R1 — run 1 | `173 passed` (15.06 s) | `raw_test_output/focused_run1.txt` |
 | Focused Task 83 + 83-R1 — run 2 | `173 passed` (16.90 s) | `raw_test_output/focused_run2.txt` |
 | Adjacent suites | `279 passed` (33.84 s) | `raw_test_output/adjacent_suites.txt` |
@@ -39,7 +39,7 @@
 
 ### Count reconciliation (§8.4)
 
-- Baseline: `<FILL>` (`<P> passed / 0 skipped / 0 xfailed`).
+- Baseline: `2793` (`2793 passed / 0 skipped / 0 xfailed`).
 - New R1 test items:
   - `tests/test_task83_r1_manifest.py` + `_alignment.py` + `_transport_health.py`
     + `_notification_telemetry.py` + `_archive_integrity.py` + `_production_loop.py`
@@ -47,7 +47,7 @@
   - `tests/test_task83_collector.py`: **+1** item
     (`test_piv_zero_assertion_only_with_verified_telemetry`; one existing test
     was renamed in place, not added).
-- Final: `<FILL>` = baseline `<FILL>` + `76` new. `0` failed, `0` skipped,
+- Final: `<FILL>` = baseline `2793` + `76` new. `0` failed, `0` skipped,
   `0` xfailed, `0` xpassed, `0` collection errors. No skip/xfail marker
   introduced (grep of the six new files: 0 matches for `pytest.mark.skip` /
   `pytest.mark.xfail` / `pytest.skip(`).
