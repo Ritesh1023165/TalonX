@@ -1,8 +1,8 @@
 {
   "task": "Task 83-R1 Production Collector Correctness and Evidence-Integrity Closure",
-  "generated_at": "2026-08-29T22:30:54.947211+00:00",
+  "generated_at": "2026-08-29T23:00:53.081631+00:00",
   "algorithm": "sha256 over git-normalized (LF) bytes",
-  "content_commit": "4aff6f6dc238461512e6c4f582b5d3ec61b3b252",
+  "content_commit": "478723ad0a000c61804f19ab08d6f0a0b09d1c43",
   "excluded": [
     "_make_manifest.py",
     "evidence_manifest.json"
@@ -23,7 +23,7 @@
     {
       "file": "expanded_rehearsal_matrix.csv",
       "bytes": 2157,
-      "sha256": "47a55e58bf0499f960ef959fd42cec8911ff4e8018bf4cfaf2cb5e2b2c4ac6ea"
+      "sha256": "09c495602851ed84e14bac906b069bbea948efa7f91764743af10ed70354ddf5"
     },
     {
       "file": "expanded_rehearsal_matrix.md",
