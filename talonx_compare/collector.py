@@ -316,8 +316,8 @@ class ComparisonCollector:
             "piv_reconciliation": classify_json_file(
                 sd / "latest_reconciliation.json", required=False, now=now).to_dict(),
             "original_redis": classify_redis(redis_ping_ok).to_dict(),
-            "quant_state_store_limitation": QUANT_STATE_STORE_LIMITATION,
         }
+        capability_limitations = {"durable_quant_state_store": QUANT_STATE_STORE_LIMITATION}
         original_health_ok = source_health["original_redis"]["state"] in ("RUNNING", "NOT_RUN")
         piv_health_ok = all(
             source_health[k]["state"] in ("HEALTHY", "RUNNING", "NOT_RUN")
@@ -359,7 +359,8 @@ class ComparisonCollector:
         self._detect_missing_stages(pairs, diagnostics)
 
         # --- 8. write derived views ---
-        writer.write_comparison(self._comparison_payload(the_date, pairs, source_health))
+        writer.write_comparison(
+            self._comparison_payload(the_date, pairs, source_health, capability_limitations))
         writer.write_divergences([d.to_dict() for d in divs])
         writer.write_telegram(self._telegram_payload(the_date, all_original, events_text, identity))
         merged_diags = self._merge_diagnostics(writer.read_diagnostics(), diagnostics)
@@ -452,7 +453,7 @@ class ComparisonCollector:
             "not_alpha_evidence": AGREEMENT_IS_NOT_ALPHA,
         }
 
-    def _comparison_payload(self, the_date, pairs, source_health) -> dict[str, Any]:
+    def _comparison_payload(self, the_date, pairs, source_health, capability_limitations=None) -> dict[str, Any]:
         by_stage: dict[str, dict[str, int]] = {}
         by_symbol_stage: list[dict[str, Any]] = []
         for pair in pairs:
@@ -482,6 +483,7 @@ class ComparisonCollector:
             "per_stage_totals": by_stage,
             "per_symbol_stage": by_symbol_stage,
             "source_health": source_health,
+            "capability_limitations": capability_limitations or {},
             "operational_agreement_only": True,
             "pnl_streams_note": (
                 "Original SIMULATED_PAPER, PIV_SHADOW, PIV_PAPER and EXPERIMENTAL outcomes are "
