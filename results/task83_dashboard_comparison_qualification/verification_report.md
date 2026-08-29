@@ -70,8 +70,8 @@ were exercised only against in-memory fakes and isolated `tmp_path` state dirs.
 ## Start / final SHAs
 
 - Start: `e15345034666dd7d8670ff39f872c5986b89bdbd`
-- Checkpoint 1: `f6ef2d1…` (implementation + tests)
-- Final: `<FINAL_SHA>` (this checkpoint)
+- Checkpoints: `f6ef2d1` (impl+tests) · `ca1323f` (evidence+cleanup) · `8c58f33` (telegram totals) · `e5c56b4` (baseline+focused) · `501f191` (final)
+- Final: `501f1912d04b5ad63546a62cddea96a4b4895a31`
 
 Changed-file summary: see `architecture_and_ownership.md` §"Files changed". Only
 `talonx_piv/observability.py` is a production-code change outside the new

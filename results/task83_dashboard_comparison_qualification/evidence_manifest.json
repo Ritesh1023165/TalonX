@@ -1,6 +1,6 @@
 {
   "task": "Task 83 Dashboard Separation, Daily Comparison Evidence and Offline Dual-Run Qualification",
-  "generated_at": "2026-08-29T14:07:17.958734+00:00",
+  "generated_at": "2026-08-29T14:07:46.049391+00:00",
   "algorithm": "sha256",
   "file_count": 12,
   "artifacts": [
@@ -61,8 +61,8 @@
     },
     {
       "file": "verification_report.md",
-      "bytes": 5606,
-      "sha256": "e7bd8c1e765729bb5e9568bb970bb99f54de28e168b0d1f99b6521c4f39cb841"
+      "bytes": 5717,
+      "sha256": "e081349f00a1d2874177c94aa43dcc2cb35a54db9a2100863ad7903b489dc529"
     }
   ]
 }
