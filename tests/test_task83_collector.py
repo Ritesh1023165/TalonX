@@ -286,7 +286,7 @@ def test_telegram_totals_and_piv_zero_assertion(cfg, piv_dir):
     original.seed_metric(DATE, "dispatch", "muted_cooldown", 3)
     r = _collector(cfg, original_redis=original, piv_redis=piv).collect_once()
     tg = json.loads((cfg.evidence_root / DATE / "telegram.json").read_text())
-    assert tg["piv_notification_telemetry"]["verdict"] == "MISSING"
+    assert tg["piv_notification_telemetry"]["verdict"] == "UNVERIFIED"
     assert tg["piv_zero_attempt_assertion"] is False
     assert "pushed_telegram" in tg["original_telegram_counters"]
     assert tg["original_telegram_totals"]["pushed_telegram"] == 7

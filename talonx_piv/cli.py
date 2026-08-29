@@ -44,19 +44,7 @@ from .telegram import sender
 from .telegram_inbound import build_piv_info, build_piv_telegram_listener
 
 
-def _merge_notification_telemetry(state_dir: Path, **kw) -> None:
-    """Task 83-R1 §5 -- best-effort durable notification-ownership record.
-    Never raises: telemetry must not be able to break a session."""
-    try:
-        from .notification_telemetry import merge_telemetry
-
-        merge_telemetry(state_dir, **kw)
-    except Exception:  # noqa: BLE001
-        pass
-
-
-async def run_session(runner: SessionRunner, listener, *, telemetry_dir: Path | None = None,
-                      session_id: str | None = None) -> None:
+async def run_session(runner: SessionRunner, listener) -> None:
     """Runs SessionRunner.run() as the main task; the inbound Telegram
     listener (if any) runs concurrently as a background task, started
     first so /ping is answerable from the moment the session begins, and
@@ -65,14 +53,6 @@ async def run_session(runner: SessionRunner, listener, *, telemetry_dir: Path | 
     except/backoff) means nothing it does can crash the session, but the
     reverse must also hold: a session crash/kill-switch stop must not
     leave the listener polling forever in the background."""
-    if telemetry_dir is not None:
-        from .notification_telemetry import merge_telemetry
-
-        merge_telemetry(
-            telemetry_dir, session_id=session_id,
-            ownership={"inbound_poller_started": listener is not None},
-            inbound_delta={"poll_starts": 1} if listener is not None else None,
-        )
     listener_task = asyncio.create_task(listener.run()) if listener is not None else None
     try:
         await runner.run()
@@ -318,13 +298,10 @@ def main(argv: list[str] | None = None) -> int:
             listener = None if args.no_telegram_inbound or not config.telegram_enabled else build_piv_telegram_listener(
                 config.state_dir, redis_client=redis_client, started_at=datetime.now(timezone.utc),
                 feed_mode=config.feed_mode, universe=config.universe, piv_info=piv_info,
+                session_id=identity.session_id, trading_date_et=identity.trading_date_et,
+                telegram_token=config.telegram_token, telegram_chat_id=config.telegram_chat_id,
             )
-            _merge_notification_telemetry(
-                config.state_dir, session_id=identity.session_id,
-                ownership={"inbound_poller_constructed": listener is not None},
-            )
-            asyncio.run(run_session(runner, listener, telemetry_dir=config.state_dir,
-                                    session_id=identity.session_id))
+            asyncio.run(run_session(runner, listener))
             return 0
         if args.command == "supervise":
             (config.state_dir).mkdir(parents=True, exist_ok=True)
@@ -403,10 +380,8 @@ def main(argv: list[str] | None = None) -> int:
             listener = None if args.no_telegram_inbound or not config.telegram_enabled else build_piv_telegram_listener(
                 config.state_dir, redis_client=redis_client, started_at=datetime.now(timezone.utc),
                 feed_mode=config.feed_mode, universe=config.universe, piv_info=piv_info,
-            )
-            _merge_notification_telemetry(
-                config.state_dir, session_id=identity.session_id,
-                ownership={"inbound_poller_constructed": listener is not None},
+                session_id=identity.session_id, trading_date_et=identity.trading_date_et,
+                telegram_token=config.telegram_token, telegram_chat_id=config.telegram_chat_id,
             )
             registry.heartbeat("decision_engine", ComponentStatus.HEALTHY if decision_engine is not None else ComponentStatus.NOT_STARTED, "constructed" if decision_engine is not None else "decision path disabled")
             registry.heartbeat(
@@ -420,8 +395,7 @@ def main(argv: list[str] | None = None) -> int:
 
             try:
                 asyncio.run(run_with_bounded_restart(
-                    lambda: run_session(runner, listener, telemetry_dir=config.state_dir,
-                                        session_id=identity.session_id), registry,
+                    lambda: run_session(runner, listener), registry,
                     max_restarts=args.max_restarts, backoff_seconds=args.backoff_seconds, on_heartbeat=_on_heartbeat,
                 ))
             except TerminalSupervisorFailure as exc:

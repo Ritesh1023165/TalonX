@@ -23,6 +23,43 @@ class CollectorLockError(RuntimeError):
 def _pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
+    if os.name == "nt":
+        # Never use os.kill(pid, 0) as a Windows liveness probe. CPython's
+        # Windows implementation routes ordinary signals through
+        # TerminateProcess, so a nominal signal-zero probe can destroy the
+        # process whose collector lock we are merely inspecting.
+        try:
+            import ctypes
+
+            process_query_limited_information = 0x1000
+            still_active = 259
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            kernel32.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+            kernel32.OpenProcess.restype = ctypes.c_void_p
+            kernel32.GetExitCodeProcess.argtypes = [
+                ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong),
+            ]
+            kernel32.GetExitCodeProcess.restype = ctypes.c_int
+            kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+            kernel32.CloseHandle.restype = ctypes.c_int
+            handle = kernel32.OpenProcess(
+                process_query_limited_information, False, pid,
+            )
+            if not handle:
+                # Access denied means the PID exists but cannot be queried;
+                # fail closed and treat it as alive. Other failures (most
+                # notably ERROR_INVALID_PARAMETER for a missing PID) mean no
+                # live process could be opened.
+                return ctypes.get_last_error() == 5
+            try:
+                exit_code = ctypes.c_ulong()
+                if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                    return True
+                return exit_code.value == still_active
+            finally:
+                kernel32.CloseHandle(handle)
+        except Exception:  # noqa: BLE001 -- uncertain liveness fails closed
+            return True
     try:
         os.kill(pid, 0)
         return True
@@ -31,18 +68,7 @@ def _pid_alive(pid: int) -> bool:
     except PermissionError:
         return True
     except OSError:
-        # Windows: os.kill with signal 0 raises OSError for a live PID it
-        # cannot signal; fall back to OpenProcess.
-        try:
-            import ctypes
-
-            handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)  # type: ignore[attr-defined]
-            if handle:
-                ctypes.windll.kernel32.CloseHandle(handle)  # type: ignore[attr-defined]
-                return True
-            return False
-        except Exception:  # noqa: BLE001
-            return False
+        return False
 
 
 class CollectorLock:

@@ -147,6 +147,8 @@ class TelegramReplyListener:
         config: DispatchConfig | None = None,
         telegram_client: TelegramClient | None = None,
         dispatch_agent=None,
+        poll_telemetry=None,
+        bot_factory=None,
     ):
         self.store = store
         self.config = config or DispatchConfig()
@@ -155,6 +157,12 @@ class TelegramReplyListener:
         # DispatchAgent.started_at (uptime) and its live Redis client (WS
         # heartbeat lookup) without a hard constructor dependency.
         self.dispatch_agent = dispatch_agent
+        # Optional boundary hook.  The general/Original application does
+        # not pass one, so its listener path remains a no-op.  PIV passes a
+        # session-bound recorder and therefore cannot create a second
+        # listener merely for measurement.
+        self.poll_telemetry = poll_telemetry
+        self._bot_factory = bot_factory or Bot
         self._process = psutil.Process()
         self._stop_event = asyncio.Event()
         self._replies_sent = 0
@@ -169,6 +177,9 @@ class TelegramReplyListener:
     async def run(self) -> None:
         if not self.telegram_client.is_configured:
             return  # nothing to poll against -- same "additive, not required" posture as sending
+
+        if self.poll_telemetry is not None:
+            self.poll_telemetry.poller_started()
 
         attempt = 0
         while not self._stop_event.is_set():
@@ -188,13 +199,14 @@ class TelegramReplyListener:
                 await asyncio.sleep(wait)
 
     async def _poll_forever(self) -> None:
-        async with Bot(token=self.config.telegram_bot_token) as bot:
+        async with self._bot_factory(token=self.config.telegram_bot_token) as bot:
             offset = await self._drain_backlog(bot)
             logger.info("Telegram reply listener polling (poll timeout %.0fs)", self.config.telegram_poll_timeout_seconds)
 
             while not self._stop_event.is_set():
                 try:
-                    updates = await bot.get_updates(
+                    updates = await self._instrumented_get_updates(
+                        bot,
                         offset=offset,
                         timeout=int(self.config.telegram_poll_timeout_seconds),
                         read_timeout=self.config.telegram_poll_timeout_seconds + 10.0,
@@ -210,12 +222,33 @@ class TelegramReplyListener:
                     await self._handle_update(update)
 
     async def _drain_backlog(self, bot: Bot) -> int | None:
-        updates = await bot.get_updates(timeout=0, allowed_updates=["message"])
+        updates = await self._instrumented_get_updates(
+            bot, timeout=0, allowed_updates=["message"],
+        )
         if not updates:
             return None
         drained = updates[-1].update_id + 1
         logger.info("Drained %d pending Telegram update(s) on startup without replying", len(updates))
         return drained
+
+    async def _instrumented_get_updates(self, bot: Bot, **kwargs):
+        """Record the real request boundary, never a helper-only proxy.
+
+        The attempt is durably recorded before network I/O.  If that write
+        fails, the request is not made, preventing a stale verified-zero
+        record from coexisting with an unrecorded Telegram attempt.
+        """
+        if self.poll_telemetry is not None:
+            self.poll_telemetry.before_get_updates()
+        try:
+            updates = await bot.get_updates(**kwargs)
+        except Exception:
+            if self.poll_telemetry is not None:
+                self.poll_telemetry.get_updates_failed()
+            raise
+        if self.poll_telemetry is not None:
+            self.poll_telemetry.get_updates_succeeded()
+        return updates
 
     async def _handle_update(self, update: Update) -> None:
         message = update.message

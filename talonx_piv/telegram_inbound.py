@@ -87,6 +87,11 @@ def build_piv_telegram_listener(
     feed_mode: str | None = None,
     universe: tuple[str, ...] = (),
     piv_info: dict | None = None,
+    session_id: str | None = None,
+    trading_date_et: str | None = None,
+    telegram_token: str | None = None,
+    telegram_chat_id: str | None = None,
+    bot_factory=None,
 ) -> TelegramReplyListener:
     """PIV-scoped audit DB (under the PIV runtime state dir, not
     ~/.talonx/dispatch_audit.db) so this never shares or corrupts a
@@ -104,13 +109,33 @@ def build_piv_telegram_listener(
     safe defaults so a caller that doesn't pass them still gets a valid
     (mostly "unknown") listener, matching the pre-existing degrade
     posture."""
-    config = DispatchConfig(audit_db_path=str(state_dir / "piv_telegram_audit.db"))
+    config = DispatchConfig(
+        audit_db_path=str(state_dir / "piv_telegram_audit.db"),
+        # Never inherit Original's TELEGRAM_* environment bindings. PIV
+        # uses only its explicitly supplied PIV credentials.
+        telegram_bot_token=telegram_token,
+        telegram_chat_id=telegram_chat_id,
+    )
     store = AuditStore(config.audit_db_path)
     piv_info = piv_info if piv_info is not None else build_piv_info(feed_mode, universe)
     agent = _PivPingContext(
         _client=redis_client, started_at=started_at, piv_info=piv_info,
     )
-    return TelegramReplyListener(store, config, dispatch_agent=agent)
+    poll_telemetry = None
+    if session_id is not None or trading_date_et is not None:
+        if not session_id or not trading_date_et:
+            raise ValueError("session_id and trading_date_et must be supplied together")
+        from .notification_telemetry import PivInboundPollTelemetry, merge_telemetry
+
+        merge_telemetry(
+            state_dir, session_id=session_id, trading_date_et=trading_date_et,
+            ownership={"inbound_poller_constructed": True},
+        )
+        poll_telemetry = PivInboundPollTelemetry(state_dir, session_id, trading_date_et)
+    return TelegramReplyListener(
+        store, config, dispatch_agent=agent, poll_telemetry=poll_telemetry,
+        bot_factory=bot_factory,
+    )
 
 
 def _feed_provider_label(feed_mode: str | None) -> str:

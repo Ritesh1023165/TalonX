@@ -431,7 +431,7 @@ class ComparisonCollector:
             self._detect_missing_stages(pairs, diagnostics)
 
             # 5e. telegram / notification telemetry verdict
-            notif = assess_piv_notification(sd, session_id)
+            notif = assess_piv_notification(sd, session_id, the_date)
 
             # 5f. derived views + runtime status + hashes (all atomic)
             writer.write_comparison(

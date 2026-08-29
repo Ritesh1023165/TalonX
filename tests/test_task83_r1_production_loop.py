@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -198,8 +199,9 @@ async def test_s27_reconnect_preserves_buffered_messages(cfg, monkeypatch):
 def test_s28_missing_piv_notification_telemetry(cfg):
     ComparisonCollector(cfg, clock=lambda: T0).collect_once()
     tg = json.loads((cfg.evidence_root / DATE / "telegram.json").read_text())
-    ok = tg["piv_notification_telemetry"]["verdict"] == "MISSING" and tg["piv_zero_attempt_assertion"] is False
-    _rec(28, "missing PIV notification telemetry", "verdict MISSING, not zero",
+    ok = (tg["piv_notification_telemetry"]["verdict"] == "UNVERIFIED"
+          and tg["piv_zero_attempt_assertion"] is False)
+    _rec(28, "missing PIV notification telemetry", "verdict UNVERIFIED, not zero",
          f"verdict={tg['piv_notification_telemetry']['verdict']}", "PASS" if ok else "FAIL")
     assert ok
 
@@ -259,6 +261,18 @@ def test_s31_archive_corruption_before_next_pass(cfg):
 
 
 # ── 32. concurrent collect-once / service writer contention ──
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows process-probe regression")
+def test_windows_collector_pid_probe_is_read_only(monkeypatch):
+    """A liveness check must never route through Windows TerminateProcess."""
+    from talonx_compare import lock as lock_module
+
+    def forbidden_kill(*_args, **_kwargs):
+        pytest.fail("Windows collector liveness probe called destructive os.kill")
+
+    monkeypatch.setattr(lock_module.os, "kill", forbidden_kill)
+    assert lock_module._pid_alive(os.getpid()) is True
+
 
 def test_s32_concurrent_writer_contention(cfg):
     ComparisonCollector(cfg, clock=lambda: T0).collect_once()

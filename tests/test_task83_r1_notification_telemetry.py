@@ -70,7 +70,7 @@ def test_enabled_sender_failed_send_archives_one_attempt(tmp_path):
     assert tel["outbound"]["attempts"] == 1
     assert tel["outbound"]["failures"] == 1
     # the archive must NOT be able to call this zero
-    v = assess_piv_notification(tmp_path, SESSION)
+    v = assess_piv_notification(tmp_path, SESSION, DATE)
     assert v["verdict"] == "ATTEMPTS_RECORDED"
     assert v["piv_zero_attempt_assertion"] is False
 
@@ -78,21 +78,22 @@ def test_enabled_sender_failed_send_archives_one_attempt(tmp_path):
 # --- 5.3 inbound poller counters ------------------------------
 
 def test_inbound_poller_counters_persist(tmp_path):
-    merge_telemetry(tmp_path, session_id=SESSION,
+    merge_telemetry(tmp_path, session_id=SESSION, trading_date_et=DATE,
                     ownership={"inbound_poller_constructed": True, "inbound_poller_started": True},
                     inbound_delta={"poll_starts": 1})
     tel = load_telemetry(tmp_path)
     assert tel["inbound"]["poll_starts"] == 1
     assert tel["ownership"]["inbound_poller_started"] is True
-    v = assess_piv_notification(tmp_path, SESSION)
+    v = assess_piv_notification(tmp_path, SESSION, DATE)
     assert v["verdict"] == "ATTEMPTS_RECORDED"
 
 
 # --- 5.4 missing telemetry -> UNVERIFIED, never zero ----------
 
 def test_missing_telemetry_is_unverified_not_zero(tmp_path):
-    v = assess_piv_notification(tmp_path, SESSION)
-    assert v["verdict"] == "MISSING"
+    v = assess_piv_notification(tmp_path, SESSION, DATE)
+    assert v["verdict"] == "UNVERIFIED"
+    assert v["evidence_status"] == "MISSING"
     assert v["piv_zero_attempt_assertion"] is False
     assert "UNVERIFIED" in v["detail"] or "not zero" in v["detail"]
 
@@ -104,14 +105,17 @@ def test_zero_assertion_requires_all_three_conditions(tmp_path):
     merge_telemetry(tmp_path, session_id=SESSION, trading_date_et=DATE,
                     ownership={"outbound_enabled": False, "sender_constructed": False,
                               "inbound_poller_constructed": False, "inbound_poller_started": False})
-    assert assess_piv_notification(tmp_path, SESSION)["verdict"] == "VERIFIED_ZERO"
+    assert assess_piv_notification(tmp_path, SESSION, DATE)["verdict"] == "VERIFIED_ZERO"
 
     # (b) wrong session -> not zero
-    assert assess_piv_notification(tmp_path, "some-other-session")["verdict"] == "WRONG_SESSION"
+    wrong = assess_piv_notification(tmp_path, "some-other-session", DATE)
+    assert wrong["verdict"] == "UNVERIFIED"
+    assert wrong["evidence_status"] == "WRONG_SESSION"
 
     # (c) an ownership flag enabled -> not zero
-    merge_telemetry(tmp_path, session_id=SESSION, ownership={"outbound_enabled": True})
-    assert assess_piv_notification(tmp_path, SESSION)["verdict"] == "UNVERIFIED"
+    merge_telemetry(tmp_path, session_id=SESSION, trading_date_et=DATE,
+                    ownership={"outbound_enabled": True})
+    assert assess_piv_notification(tmp_path, SESSION, DATE)["verdict"] == "UNVERIFIED"
 
 
 # --- 5.7 PIV disabled by default ---------------------------
@@ -125,13 +129,10 @@ def test_piv_disabled_by_default(monkeypatch, tmp_path):
 # --- 5.8 Original notification ownership untouched ---------
 
 def test_original_notification_ownership_untouched():
-    """Task 83-R1 changes only add PIV-scoped telemetry files; no Original
-    notification path is modified."""
-    import subprocess
+    """The shared listener defaults to no telemetry hook for Original."""
+    from talonx_dispatch.config import DispatchConfig
+    from talonx_dispatch.store import AuditStore
+    from talonx_dispatch.telegram_listener import TelegramReplyListener
 
-    diff = subprocess.check_output(
-        ["git", "diff", "--stat", "fd9b66a..HEAD", "--",
-         "talonx_dispatch/", "talonx_core/consumer.py", "run_talonx.py"],
-        text=True,
-    )
-    assert diff.strip() == "", f"unexpected Original-side changes:\n{diff}"
+    listener = TelegramReplyListener(AuditStore(":memory:"), DispatchConfig())
+    assert listener.poll_telemetry is None

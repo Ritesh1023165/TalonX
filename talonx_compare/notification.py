@@ -17,7 +17,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from talonx_piv.notification_telemetry import TELEMETRY_NAME, load_telemetry
+from talonx_piv.notification_telemetry import TELEMETRY_NAME, select_telemetry
 
 VERIFIED_ZERO = "VERIFIED_ZERO"
 UNVERIFIED = "UNVERIFIED"
@@ -26,37 +26,84 @@ WRONG_SESSION = "WRONG_SESSION"
 ATTEMPTS_RECORDED = "ATTEMPTS_RECORDED"
 
 
-def assess_piv_notification(state_dir: Path, expected_session_id: str | None) -> dict[str, Any]:
-    tel = load_telemetry(Path(state_dir))
-    if tel is None:
+def assess_piv_notification(
+    state_dir: Path, expected_session_id: str | None,
+    expected_trading_date_et: str | None,
+) -> dict[str, Any]:
+    if not expected_session_id or not expected_trading_date_et:
         return {
-            "verdict": MISSING,
-            "detail": f"{TELEMETRY_NAME} absent -- PIV notification behaviour is UNVERIFIED, not zero",
+            "verdict": UNVERIFIED,
+            "evidence_status": "MISSING_IDENTITY",
+            "detail": "exact session_id and trading_date_et are required; notification behaviour is UNVERIFIED",
             "piv_zero_attempt_assertion": False,
             "telemetry": None,
         }
-
-    tel_session = tel.get("session_id")
-    if expected_session_id is not None and tel_session not in (None, expected_session_id):
+    evidence_status, tel = select_telemetry(
+        Path(state_dir), session_id=expected_session_id,
+        trading_date_et=expected_trading_date_et,
+    )
+    if evidence_status != "OK" or tel is None:
         return {
-            "verdict": WRONG_SESSION,
-            "detail": f"telemetry is for session {tel_session!r}, archiving {expected_session_id!r}",
+            "verdict": UNVERIFIED,
+            "evidence_status": evidence_status,
+            "detail": (
+                f"{TELEMETRY_NAME} exact selection failed ({evidence_status}); "
+                "PIV notification behaviour is UNVERIFIED, never zero"
+            ),
             "piv_zero_attempt_assertion": False,
-            "telemetry": tel,
+            "telemetry": None,
         }
 
     own = tel.get("ownership", {})
     outbound = tel.get("outbound", {})
     inbound = tel.get("inbound", {})
-    outbound_attempts = int(outbound.get("attempts", 0) or 0)
-    inbound_starts = int(inbound.get("poll_starts", 0) or 0)
+    required_ownership = {
+        "outbound_enabled", "sender_constructed", "inbound_poller_constructed",
+        "inbound_poller_started",
+    }
+    required_outbound = {"attempts", "successes", "failures"}
+    required_inbound = {
+        "poll_starts", "poll_attempts", "poll_successes", "poll_failures",
+    }
+    if not (
+        required_ownership <= set(own)
+        and required_outbound <= set(outbound)
+        and required_inbound <= set(inbound)
+    ):
+        return {
+            "verdict": UNVERIFIED, "evidence_status": "INCOMPLETE",
+            "detail": "telemetry record lacks required ownership or counter fields",
+            "piv_zero_attempt_assertion": False, "telemetry": tel,
+        }
+    try:
+        outbound_attempts = int(outbound["attempts"])
+        inbound_starts = int(inbound["poll_starts"])
+        inbound_attempts = int(inbound["poll_attempts"])
+        all_counts = [
+            outbound_attempts, int(outbound["successes"]), int(outbound["failures"]),
+            inbound_starts, inbound_attempts, int(inbound["poll_successes"]),
+            int(inbound["poll_failures"]),
+        ]
+    except (TypeError, ValueError):
+        return {
+            "verdict": UNVERIFIED, "evidence_status": "CORRUPT_COUNTERS",
+            "detail": "telemetry counters are not valid integers",
+            "piv_zero_attempt_assertion": False, "telemetry": tel,
+        }
+    if any(value < 0 for value in all_counts):
+        return {
+            "verdict": UNVERIFIED, "evidence_status": "CORRUPT_COUNTERS",
+            "detail": "telemetry counters cannot be negative",
+            "piv_zero_attempt_assertion": False, "telemetry": tel,
+        }
 
-    if outbound_attempts > 0 or inbound_starts > 0:
+    if outbound_attempts > 0 or inbound_starts > 0 or inbound_attempts > 0:
         return {
             "verdict": ATTEMPTS_RECORDED,
+            "evidence_status": "OK",
             "detail": (f"outbound attempts={outbound_attempts} "
                        f"(failures={outbound.get('failures', 0)}, successes={outbound.get('successes', 0)}), "
-                       f"inbound poll_starts={inbound_starts}"),
+                       f"inbound poll_starts={inbound_starts}, poll_attempts={inbound_attempts}"),
             "piv_zero_attempt_assertion": False,
             "telemetry": tel,
         }
@@ -67,24 +114,23 @@ def assess_piv_notification(state_dir: Path, expected_session_id: str | None) ->
         and own.get("inbound_poller_constructed") is False
         and own.get("inbound_poller_started") is False
     )
-    counters_zero = (
-        outbound_attempts == 0
-        and int(outbound.get("failures", 0) or 0) == 0
-        and int(outbound.get("successes", 0) or 0) == 0
-        and inbound_starts == 0
-        and int(inbound.get("poll_attempts", 0) or 0) == 0
+    counters_zero = all(value == 0 for value in all_counts)
+    session_match = (
+        tel.get("session_id") == expected_session_id
+        and tel.get("trading_date_et") == expected_trading_date_et
     )
-    session_match = (expected_session_id is None) or (tel_session == expected_session_id)
 
     if disabled and counters_zero and session_match:
         return {
             "verdict": VERIFIED_ZERO,
+            "evidence_status": "OK",
             "detail": "telemetry present for this session; outbound + inbound disabled; all counters zero",
             "piv_zero_attempt_assertion": True,
             "telemetry": tel,
         }
     return {
         "verdict": UNVERIFIED,
+        "evidence_status": "OK",
         "detail": (f"cannot assert zero -- disabled={disabled}, counters_zero={counters_zero}, "
                    f"session_match={session_match}"),
         "piv_zero_attempt_assertion": False,
