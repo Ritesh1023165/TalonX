@@ -35,7 +35,7 @@
 | Adjacent suites | `279 passed` (33.84 s) | `raw_test_output/adjacent_suites.txt` |
 | Retained 20 offline scenarios | `20 passed` | `retained_20_scenarios_matrix.csv` |
 | Expanded rehearsal (13 new, 21–33) | `13 passed` | `expanded_rehearsal_matrix.csv` |
-| Final full suite (after all R1 edits) | `<FILL: N passed, 0 failed, 0 skipped, 0 xfailed>` | `raw_test_output/final_full_suite.txt` |
+| Final full suite (after all R1 edits) | `2869 passed, 0 failed, 0 skipped, 0 xfailed`, exit 0 (3316.43 s) | `raw_test_output/final_full_suite.txt` |
 
 ### Count reconciliation (§8.4)
 
@@ -47,8 +47,8 @@
   - `tests/test_task83_collector.py`: **+1** item
     (`test_piv_zero_assertion_only_with_verified_telemetry`; one existing test
     was renamed in place, not added).
-- Final: `<FILL>` = baseline `2793` + `76` new. `0` failed, `0` skipped,
-  `0` xfailed, `0` xpassed, `0` collection errors. No skip/xfail marker
+- Final: **`2869 passed`** = baseline `2793` + `76` new. `0` failed, `0` skipped,
+  `0` xfailed, `0` xpassed, `0` collection errors. Reconciliation is exact. No skip/xfail marker
   introduced (grep of the six new files: 0 matches for `pytest.mark.skip` /
   `pytest.mark.xfail` / `pytest.skip(`).
 
@@ -101,8 +101,21 @@ monitoring resume, holdout access, alpha tuning, or protected Quant change.
 - Start: `fd9b66ac1ee9ba64ead44c5cc764c285a4d2c36b`
 - Checkpoint 1: `239a42c` (implementation + tests)
 - Checkpoint 2: `c1ec63f` (contracts + .gitattributes + focused runs)
-- Final: `<FINAL_SHA>`
+- Final: recorded in the next commit (this report) + the evidence-manifest commit
 
 ## Verdict
 
-`<FILL: DASHBOARD_AND_OFFLINE_DUAL_RUN_QUALIFIED | BLOCKED: <gate>>`
+**`DASHBOARD_AND_OFFLINE_DUAL_RUN_QUALIFIED`**
+
+All gates pass: §1 baseline reproduced (`2793`); §2 immutable manifest / mutable
+runtime_status split (false `generated_at` conflict closed, binding changes fail
+visibly); §3 session- and event-safe alignment (per-session partition, event
+identity, collector-derived Original run scope / UNSCOPED, aggregate records);
+§4 `TransportHealth` state machine (failed subscription = DISCONNECTED not
+NOT_RUN, one-sided isolation, PIV pubsub vs state-file health, reconnect
+evidence, race-safe buffer); §5 durable PIV notification telemetry (archive
+asserts zero only for VERIFIED_ZERO); §6 fail-closed archive integrity (8
+corruption classes, abort-before-corrupt-write, atomic writes, lock-guarded,
+LF-normalized manifest hashing); §7 20 retained + 13 new production-loop
+scenarios all PASS; §8 focused ×2 (`173`), adjacent (`279`), full suite
+`2869 passed`, counts reconciled exactly, boundaries intact.

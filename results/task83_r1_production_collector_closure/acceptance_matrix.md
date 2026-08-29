@@ -115,9 +115,9 @@ projection — not helper-only). Status filled during §8 verification.
 |---|---|---|---|
 | 8.1 | focused Task 83 / 83-R1 suites run twice | `raw_test_output/focused_run{1,2}.txt` | ✅ |
 | 8.2 | adjacent Task 81/82 isolation, lifecycle, dashboard, notification suites | `raw_test_output/adjacent_suites.txt` | ✅ |
-| 8.3 | full repository suite | `raw_test_output/final_full_suite.txt` | ⏳ |
-| 8.4 | baseline + newly collected reconciled exactly; 0 failed/skipped/xfailed/xpassed/errors | `verification_report.md` §Count reconciliation | ⏳ |
-| 8.5 | rerun affected + full suite after any later executable change | `verification_report.md` | ⏳ |
+| 8.3 | full repository suite | `raw_test_output/final_full_suite.txt` | ✅ |
+| 8.4 | baseline + newly collected reconciled exactly; 0 failed/skipped/xfailed/xpassed/errors | `verification_report.md` §Count reconciliation | ✅ |
+| 8.5 | rerun affected + full suite after any later executable change | `verification_report.md` | ✅ |
 | 8.6 | final source audit vs every acceptance row | this matrix Status column | ✅ |
 | 8.7 | no launch / market session / broker / Telegram / Redis prod mutation / PAPER / experimental / monitoring resume / holdout / alpha tuning / protected Quant change | `verification_report.md` §Boundaries | ✅ |
 | 8.8 | strategy UNVALIDATED, profitability UNDETERMINED, PIV notification disabled, PAPER entries disabled, real capital/shorts/options/leverage prohibited | `verification_report.md` §Boundaries | ✅ |
