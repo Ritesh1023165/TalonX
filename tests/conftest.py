@@ -14,6 +14,18 @@ from talonx_ingest.edgar.models import CompanyRef, FilingMetadata
 from talonx_ingest.news.models import NewsArticle
 
 
+def pytest_addoption(parser):
+    """Explicit opt-in destination for Task 83-R2 rehearsal evidence.
+
+    The default is ``None``, so ordinary and partial test runs cannot write
+    the committed matrix.
+    """
+    parser.addoption(
+        "--task83-r2-matrix-output", action="store", default=None,
+        help="temporary CSV destination for a complete scenarios 21-33 run",
+    )
+
+
 @pytest.fixture
 def company() -> CompanyRef:
     return CompanyRef(ticker="AAPL", cik="0000320193", name="Apple Inc.")

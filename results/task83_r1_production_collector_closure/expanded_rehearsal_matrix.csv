@@ -1,2 +1,14 @@
 scenario,name,expected,observed,verdict,label
-33,fresh-clone manifest verification,LF-normalized hashing round-trips; committed blobs match when present,"committed_checked=11 mismatches=['expanded_rehearsal_matrix.csv: not in git', 'raw_test_output/baseline_full_suite.txt: not in git', 'retained_20_scenarios_matrix.csv: not in git']",FAIL,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+21,two passes stable bindings,no manifest_conflict from elapsed time,r1.written=True r2.conflict=False,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+22,same-day multiple decisions one symbol,3 distinct decision rows,"event_identities=['d1', 'd2', 'd3']",PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+23,same-day two run scopes separated,"both sessions kept, manifest conflict raised","conflict=True scopes=['piv_2026-08-28_100000_aaaa1111', 'piv_2026-08-28_143000_bbbb2222']",PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+24,Original scope unavailable,UNSCOPED; no event-level agreement asserted,scope=UNSCOPED,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+25,"Original Redis down, PIV healthy",Original DISCONNECTED; PIV evidence intact,orig=DISCONNECTED piv=HEALTHY,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+26,"PIV Pub/Sub down, Original healthy",PIV pubsub DISCONNECTED separate from PIV state-file HEALTHY,pubsub=DISCONNECTED files=HEALTHY,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+27,reconnect preserves buffered messages,"reconnect recorded, no loss",reconnect_count=1,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+28,missing PIV notification telemetry,"verdict UNVERIFIED, not zero",verdict=UNVERIFIED,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+29,disabled notification verified zero,verdict VERIFIED_ZERO,verdict=VERIFIED_ZERO,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+30,enabled sender persisted failed attempt,1 attempt archived even though send raised,attempts=1 failures=1,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+31,archive corruption before next pass,"write aborted, hashes not regenerated, dashboard flags corruption",aborted=True trustworthy=False,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+32,concurrent writer contention,"collect_once waits for the lock, archive stays HEALTHY",integrity_ok=True,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+33,fresh-clone manifest verification,LF-normalized hashing round-trips; all content-commit blobs match,content_commit=2ce779879b9872a06fc2e127c71908b53ad6c3f0 committed_checked=15 mismatches=[],PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE

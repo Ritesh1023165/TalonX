@@ -41,7 +41,6 @@ SESSION_A = "piv_2026-08-28_100000_aaaa1111"
 SESSION_B = "piv_2026-08-28_143000_bbbb2222"
 T0 = datetime(2026, 8, 28, 15, 0, 0, tzinfo=timezone.utc)
 
-_MATRIX = Path("results/task83_r1_production_collector_closure/expanded_rehearsal_matrix.csv")
 _RESULTS: list[dict] = []
 
 
@@ -51,10 +50,25 @@ def _rec(n, name, expected, observed, verdict):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def _write_matrix():
+def _write_matrix(request):
     yield
-    _MATRIX.parent.mkdir(parents=True, exist_ok=True)
-    with _MATRIX.open("w", newline="", encoding="utf-8") as fh:
+    # Ordinary pytest execution must never rewrite committed historical
+    # evidence. The explicit generator supplies a temporary destination and
+    # qualification is refused unless the whole 21-33 set actually ran.
+    output = request.config.getoption("--task83-r2-matrix-output")
+    if output is None:
+        output = os.environ.get("TASK83_R2_MATRIX_OUTPUT")
+    if not output:
+        return
+    expected = set(range(21, 34))
+    observed = [int(row["scenario"]) for row in _RESULTS]
+    assert set(observed) == expected and len(observed) == len(expected), (
+        f"explicit rehearsal requires exactly scenarios 21-33; got {observed}"
+    )
+    assert all(row["verdict"] == "PASS" for row in _RESULTS), _RESULTS
+    matrix = Path(output)
+    matrix.parent.mkdir(parents=True, exist_ok=True)
+    with matrix.open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=["scenario", "name", "expected", "observed", "verdict", "label"])
         w.writeheader()
         for row in sorted(_RESULTS, key=lambda r: r["scenario"]):
@@ -327,29 +341,41 @@ def test_s33_fresh_clone_manifest_verification(tmp_path):
     assert mod._sha256_lf(sample) == hashlib.sha256(lf).hexdigest()
     assert mod._byte_len_lf(sample) == len(lf)
 
-    # (b) committed-blob check when available (never skips -- just a no-op
-    #     assertion when the evidence has not been committed yet)
+    # (b) committed-blob check is mandatory. Missing manifest, missing
+    # content commit, or missing artifact is a hard failure -- never a no-op.
     manifest_rel = "results/task83_r1_production_collector_closure/evidence_manifest.json"
     proc = subprocess.run(["git", "cat-file", "-p", f"HEAD:{manifest_rel}"],
                           capture_output=True)
+    assert proc.returncode == 0, f"required committed manifest missing: {manifest_rel}"
+    manifest = json.loads(proc.stdout)
+    content_commit = manifest.get("content_commit")
+    assert content_commit and content_commit != "UNSET", "manifest content_commit missing"
+    commit_check = subprocess.run(
+        ["git", "cat-file", "-e", f"{content_commit}^{{commit}}"], capture_output=True,
+    )
+    assert commit_check.returncode == 0, f"content commit unavailable: {content_commit}"
     committed_checked = 0
     mismatches: list[str] = []
-    if proc.returncode == 0:
-        manifest = json.loads(proc.stdout)
-        for art in manifest.get("artifacts", []):
-            rel = "results/task83_r1_production_collector_closure/" + art["file"]
-            b = subprocess.run(["git", "cat-file", "-p", f"HEAD:{rel}"], capture_output=True)
-            if b.returncode != 0:
-                mismatches.append(f"{art['file']}: not in git")
-                continue
-            norm = b.stdout.replace(b"\r\n", b"\n")
-            committed_checked += 1
-            if hashlib.sha256(norm).hexdigest() != art["sha256"]:
-                mismatches.append(f"{art['file']}: hash mismatch")
-            if len(norm) != art["bytes"]:
-                mismatches.append(f"{art['file']}: byte mismatch")
+    for art in manifest.get("artifacts", []):
+        rel = "results/task83_r1_production_collector_closure/" + art["file"]
+        blob = subprocess.run(
+            ["git", "cat-file", "-p", f"{content_commit}:{rel}"], capture_output=True,
+        )
+        if blob.returncode != 0:
+            mismatches.append(f"{art['file']}: not in content commit")
+            continue
+        norm = blob.stdout.replace(b"\r\n", b"\n")
+        committed_checked += 1
+        if hashlib.sha256(norm).hexdigest() != art["sha256"]:
+            mismatches.append(f"{art['file']}: hash mismatch")
+        if len(norm) != art["bytes"]:
+            mismatches.append(f"{art['file']}: byte mismatch")
+    if committed_checked != manifest.get("file_count"):
+        mismatches.append(
+            f"checked {committed_checked}, manifest declares {manifest.get('file_count')}"
+        )
     _rec(33, "fresh-clone manifest verification",
-         "LF-normalized hashing round-trips; committed blobs match when present",
-         f"committed_checked={committed_checked} mismatches={mismatches}",
+         "LF-normalized hashing round-trips; all content-commit blobs match",
+         f"content_commit={content_commit} committed_checked={committed_checked} mismatches={mismatches}",
          "PASS" if not mismatches else "FAIL")
     assert not mismatches, mismatches

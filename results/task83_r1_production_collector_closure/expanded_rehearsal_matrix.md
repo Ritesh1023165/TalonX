@@ -26,7 +26,7 @@ scenarios (see the Task 83 `offline_rehearsal_matrix.csv`), unchanged.
 | 25 | Original Redis disconnected, PIV healthy | `CollectorService.run_for` (async fake, Original `unreachable`) | PASS — `original_redis=DISCONNECTED`, PIV state-file `HEALTHY`, PIV records archived |
 | 26 | PIV Pub/Sub disconnected, Original healthy | `CollectorService.run_for` (PIV `unreachable`) | PASS — `piv_pubsub=DISCONNECTED` separate from `piv_session_identity=HEALTHY` |
 | 27 | Disconnect → reconnect, buffered messages preserved | `CollectorService.run_for` (`fail_ping_times=1`) | PASS — `reconnect_count>=1`, state recovers to RUNNING/STALE, no loss |
-| 28 | Missing PIV notification telemetry | collector → `telegram.json` | PASS — verdict `MISSING`, `piv_zero_attempt_assertion=False` |
+| 28 | Missing PIV notification telemetry | collector → `telegram.json` | PASS — verdict `UNVERIFIED`, `piv_zero_attempt_assertion=False` |
 | 29 | Disabled PIV notification, verified zero counters | `merge_telemetry` + collector | PASS — verdict `VERIFIED_ZERO`, assertion `True` |
 | 30 | Enabled fake sender with a persisted failed attempt | real `EventBus` (sender raises) + collector | PASS — verdict `ATTEMPTS_RECORDED`, `attempts=1 failures=1` archived |
 | 31 | Archive corruption before the next collection pass | collector ×2 + `compare_view` | PASS — `write_aborted=True`, hashes not regenerated, dashboard `trustworthy=False`, `per_stage_totals={}` |
@@ -50,3 +50,9 @@ scenarios (see the Task 83 `offline_rehearsal_matrix.csv`), unchanged.
 | archive corruption before the next collection pass | 31 |
 | concurrent collect-once / service writer contention | 32 |
 | fresh-clone evidence-manifest verification | 33 |
+
+Task 83-R2 generation is explicit: `scripts/generate_task83_r2_rehearsal_evidence.py`
+runs the complete production-loop module into a temporary candidate, refuses
+publication unless scenarios 21–33 are present exactly once and all PASS, then
+atomically replaces the committed CSV. Ordinary or partial pytest runs do not
+write this evidence file.
