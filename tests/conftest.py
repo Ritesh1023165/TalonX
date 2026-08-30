@@ -11,6 +11,14 @@ from datetime import date, datetime, timezone
 
 import pytest
 
+# The test suite is offline by contract (Task 83-R3B fail-closed networking).
+# Force the HuggingFace / sentence-transformers stack to stay on its local
+# cache so no code path under test can reach huggingface.co for an embedding
+# model -- a single such attempt trips the session network guard. Set at
+# import time, before any test module pulls in the model libraries.
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
 from _network_guard import GuardInitializationError, NetworkGuard
 from talonx_ingest.edgar.models import CompanyRef, FilingMetadata
 from talonx_ingest.news.models import NewsArticle

@@ -22,6 +22,7 @@ from pathlib import Path
 
 import pytest
 
+from talonx_dispatch.config import DispatchConfig
 from talonx_ops.preflight import FULL_APP_E2E_BLOCKED, FULL_APP_E2E_READY, Check, FullAppPreflight
 from talonx_ops.provider_status import LOCAL_SIMULATED_PAPER_LEDGER, paper_execution_path_label
 from talonx_core import process_guard
@@ -30,6 +31,24 @@ from talonx_core import process_guard
 @pytest.fixture(autouse=True)
 def _successful_process_enumeration(monkeypatch):
     monkeypatch.setattr(process_guard, "no_competing_talonx_process", lambda: (True, "test fixture: none"))
+
+
+@pytest.fixture(autouse=True)
+def _offline_brain(monkeypatch):
+    """brain_operational_hard_requirement constructs a real ResearchAgent,
+    whose ContextRetriever eagerly builds an embedding-backed VectorStore
+    that reaches huggingface.co for the model on a cold cache. This suite
+    only asserts deterministic checks, never Brain readiness, so keep it
+    fully offline -- same explicit fake tests/test_task80_p1_process_guard.py
+    already uses for this exact reason."""
+
+    class _OfflineResearchAgent:
+        def __init__(self, *args, **kwargs):
+            self.llm_chain = type(
+                "_OfflineLlmChain", (), {"describe": lambda self: "offline-test-fake"}
+            )()
+
+    monkeypatch.setattr("talonx_brain.consumer.ResearchAgent", _OfflineResearchAgent)
 
 
 class FakeTransport:
@@ -102,8 +121,15 @@ def test_no_secrets_printed_check_never_echoes_a_token():
     _, checks = flight.run()
     by_name = {c.name: c for c in checks}
     assert by_name["no_secrets_printed"].passed is True
+    # Only raw credential VALUES must never be echoed. Env-var NAMES may
+    # legitimately appear in a diagnostic detail (e.g. "<NAME> missing" when
+    # the environment has no token configured, as in a sanitized clean-room
+    # run) -- so assert against the actual configured values, not the name.
+    cfg = DispatchConfig()
+    secret_values = [v for v in (cfg.telegram_bot_token, cfg.telegram_chat_id) if v]
     for check in checks:
-        assert "TELEGRAM_BOT_TOKEN" not in check.detail  # env var NAMES are fine, raw values are not
+        for secret in secret_values:
+            assert secret not in check.detail
 
 
 def test_all_expected_check_names_present():

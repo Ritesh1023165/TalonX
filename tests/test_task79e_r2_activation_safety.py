@@ -1081,7 +1081,15 @@ def test_later_buy_fill_preserves_prior_exits_remaining_holdings_and_exit_latch(
 
 def test_session_identity_reuse_requires_current_config_and_runtime_bindings(tmp_path):
     now = datetime(2026, 8, 28, 14, 0, tzinfo=timezone.utc)
-    cfg = PivConfig(state_dir=tmp_path, universe=("AAPL",), feed_mode="IEX_PAPER_PIV")
+    # Explicit paper bindings like every other verify_paper_identity() call
+    # in this file -- otherwise the config falls back to ambient TALONX_PIV_*
+    # env vars, which a sanitized clean-room run strips (paper_trading=False
+    # -> PaperGuardError at the broker boundary below).
+    cfg = PivConfig(
+        key_id="key", secret_key="secret", paper_trading=True, real_capital=False,
+        broker_endpoint=PAPER_ENDPOINT, state_dir=tmp_path,
+        universe=("AAPL",), feed_mode="IEX_PAPER_PIV",
+    )
     pending_intent_id = stable_id("intent", "pending-before-rebind", "AAPL", "buy", 1.0)
     with patch("talonx_piv.session_identity.runtime_sha", return_value="sha-old"):
         saved = build_session_identity(cfg, now=now)

@@ -31,7 +31,13 @@ def _fingerprint(files: tuple[str, ...]) -> str:
     for relative in files:
         digest.update(relative.encode("utf-8"))
         digest.update(b"\0")
-        digest.update((ROOT / relative).read_bytes())
+        # Hash the canonical LF form so the frozen fingerprints stay stable
+        # across working trees that materialise these files with CRLF (e.g.
+        # a detached clean-room checkout under core.autocrlf). The committed
+        # blobs are LF, so this is a no-op there and the frozen constants
+        # below are unchanged -- same LF-normalised evidence hashing Task
+        # 83-R1 already adopted elsewhere.
+        digest.update((ROOT / relative).read_bytes().replace(b"\r\n", b"\n"))
         digest.update(b"\0")
     return digest.hexdigest()
 
