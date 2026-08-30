@@ -13,7 +13,9 @@ import ipaddress
 import json
 import os
 import socket
+import tempfile
 import threading
+import time
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
@@ -40,6 +42,36 @@ _TARGETS = {
     "asyncio.BaseEventLoop.create_connection": (asyncio.BaseEventLoop, "create_connection"),
     "asyncio.BaseEventLoop.sock_connect": (asyncio.BaseEventLoop, "sock_connect"),
 }
+
+# Reporting is intentionally single-process.  Every NetworkGuard instance in
+# this process that resolves to the same report path shares one writer lock;
+# no cross-process serialization claim is made.
+_REPORT_PATH_LOCKS_GUARD = threading.Lock()
+_REPORT_PATH_LOCKS: dict[str, threading.RLock] = {}
+_REPLACE_ATTEMPTS = 50
+
+
+def _report_path_lock(path: Path) -> threading.RLock:
+    key = os.path.normcase(str(path.resolve()))
+    with _REPORT_PATH_LOCKS_GUARD:
+        return _REPORT_PATH_LOCKS.setdefault(key, threading.RLock())
+
+
+def _atomic_replace(source: Path, destination: Path) -> None:
+    """Replace atomically, tolerating only transient Windows sharing denial.
+
+    Readers on Windows can briefly prevent replacement of an existing file.
+    The same writer-owned temporary file is retried for a bounded interval;
+    persistent denial and every non-permission failure remain visible.
+    """
+    for attempt in range(_REPLACE_ATTEMPTS):
+        try:
+            os.replace(source, destination)
+            return
+        except PermissionError:
+            if attempt == _REPLACE_ATTEMPTS - 1:
+                raise
+            time.sleep(min(0.001 * (2 ** min(attempt, 4)), 0.02))
 
 
 def _destination(address: Any) -> tuple[Any, Any]:
@@ -342,13 +374,48 @@ class NetworkGuard:
         if report["counters"]["guard_initialization_failures"] != 0:
             raise AssertionError("the active network guard recorded an initialization failure")
 
+    def read_report(self) -> dict[str, Any]:
+        """Read one complete report within the documented process boundary."""
+        if self.report_path is None:
+            raise NetworkGuardError("network guard report path is not configured")
+        with _report_path_lock(self.report_path):
+            return json.loads(self.report_path.read_text(encoding="utf-8"))
+
     def write_report(self) -> None:
         if self.report_path is None:
             return
-        report = self.snapshot()
-        self.report_path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.report_path.with_name(f".{self.report_path.name}.tmp")
-        temporary.write_text(
-            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
-        os.replace(temporary, self.report_path)
+        report_path = self.report_path
+        with _report_path_lock(report_path):
+            # Snapshot only after acquiring the path writer lock. This ensures
+            # an older in-memory view can never replace a newer completed one.
+            report = self.snapshot()
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            descriptor = -1
+            temporary: Path | None = None
+            try:
+                descriptor, name = tempfile.mkstemp(
+                    prefix=f".{report_path.name}.",
+                    suffix=".tmp",
+                    dir=report_path.parent,
+                )
+                temporary = Path(name)
+                with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+                    descriptor = -1  # ownership transferred to the context manager
+                    json.dump(report, handle, indent=2, sort_keys=True)
+                    handle.write("\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                _atomic_replace(temporary, report_path)
+                temporary = None  # atomically moved; nothing remains to clean
+            except BaseException as exc:
+                if descriptor >= 0:
+                    os.close(descriptor)
+                if temporary is not None:
+                    try:
+                        temporary.unlink(missing_ok=True)
+                    except OSError as cleanup_error:
+                        exc.add_note(
+                            f"failed to remove this writer's temporary report "
+                            f"{temporary}: {cleanup_error}"
+                        )
+                raise
