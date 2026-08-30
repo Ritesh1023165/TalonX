@@ -1,0 +1,3 @@
+# Task 84 — Monday Morning Precheck
+
+On Monday morning, verify the approved branch/SHA and clean tracked tree; confirm protected Quant files and required stashes are intact; confirm no competing Python, pytest, TalonX, Redis, dashboard, Original, or PIV process exists; verify required credentials and PAPER authorization by presence/status only without printing values; confirm market-session timing, broker PAPER identity, isolated Original/PIV state and Redis bindings, Telegram single-poller ownership, dashboard local bindings, and fail-closed safety controls. Record a go/no-go result and stop. Do not launch a runtime, submit an order, access holdouts, or approve a strategy as part of the precheck.
