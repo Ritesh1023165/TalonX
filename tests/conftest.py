@@ -6,12 +6,36 @@ setup boilerplate.
 """
 from __future__ import annotations
 
+import os
 from datetime import date, datetime, timezone
 
 import pytest
 
+from _network_guard import GuardInitializationError, NetworkGuard
 from talonx_ingest.edgar.models import CompanyRef, FilingMetadata
 from talonx_ingest.news.models import NewsArticle
+
+
+def pytest_configure(config):
+    """Install the opt-in fail-closed guard before test execution."""
+    if os.environ.get("TALONX_TEST_NETWORK_GUARD") != "1":
+        return
+    guard = NetworkGuard(os.environ.get("TALONX_TEST_NETWORK_GUARD_REPORT"))
+    try:
+        guard.install()
+    except GuardInitializationError as exc:
+        raise pytest.UsageError(f"TalonX test network guard initialization failed: {exc}") from exc
+    config._talonx_network_guard = guard
+
+
+def pytest_unconfigure(config):
+    guard = getattr(config, "_talonx_network_guard", None)
+    if guard is not None:
+        try:
+            guard.assert_reconciled()
+            guard.write_report()
+        finally:
+            guard.uninstall()
 
 
 def pytest_addoption(parser):
@@ -28,6 +52,17 @@ def pytest_addoption(parser):
         "--task83-r2-retained-matrix-output", action="store", default=None,
         help="temporary CSV destination for a complete retained scenarios 1-20 run",
     )
+
+
+@pytest.fixture(scope="session")
+def talonx_network_guard(request) -> NetworkGuard:
+    guard = getattr(request.config, "_talonx_network_guard", None)
+    if guard is None:
+        pytest.fail(
+            "TALONX_TEST_NETWORK_GUARD=1 is required for network-isolation tests",
+            pytrace=False,
+        )
+    return guard
 
 
 @pytest.fixture

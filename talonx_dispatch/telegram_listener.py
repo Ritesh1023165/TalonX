@@ -53,6 +53,7 @@ import json
 import logging
 import re
 from datetime import datetime, time, timedelta, timezone
+from typing import Any, AsyncContextManager, Callable
 from zoneinfo import ZoneInfo
 
 import psutil
@@ -139,6 +140,19 @@ logger = logging.getLogger("talonx_dispatch.telegram_listener")
 # alert. Group 1 captures the optional "LT" marker, group 2 the digits.
 _ID_PATTERN = re.compile(r"^/?(?:details|id)?\s*#?(LT)?(\d+)$", re.IGNORECASE)
 
+BotFactory = Callable[..., AsyncContextManager[Bot]]
+
+
+def _default_bot_factory(*, token: str) -> Bot:
+    """The single production construction boundary for inbound Telegram bots.
+
+    Keeping this as a callable (rather than storing ``Bot`` on listener
+    construction) lets tests inject their factory explicitly without any
+    dependency on module-global patch timing.  Calling it is intentionally
+    deferred until a configured listener actually starts polling.
+    """
+    return Bot(token=token)
+
 
 class TelegramReplyListener:
     def __init__(
@@ -148,7 +162,7 @@ class TelegramReplyListener:
         telegram_client: TelegramClient | None = None,
         dispatch_agent=None,
         poll_telemetry=None,
-        bot_factory=None,
+        bot_factory: BotFactory | None = None,
     ):
         self.store = store
         self.config = config or DispatchConfig()
@@ -162,10 +176,12 @@ class TelegramReplyListener:
         # session-bound recorder and therefore cannot create a second
         # listener merely for measurement.
         self.poll_telemetry = poll_telemetry
-        # Preserve an explicitly injected factory.  Otherwise resolve the
-        # module-level Bot at poll time so established patch/fake seams do not
-        # accidentally fall through to a real Telegram client.
-        self._bot_factory = bot_factory
+        # This is the only inbound Bot construction boundary. Tests inject an
+        # explicit factory; production receives the deferred default wrapper.
+        # Neither path constructs or captures a Bot instance here.
+        self._bot_factory: BotFactory | Any = (
+            bot_factory if bot_factory is not None else _default_bot_factory
+        )
         self._process = psutil.Process()
         self._stop_event = asyncio.Event()
         self._replies_sent = 0
@@ -202,8 +218,8 @@ class TelegramReplyListener:
                 await asyncio.sleep(wait)
 
     async def _poll_forever(self) -> None:
-        bot_factory = self._bot_factory or Bot
-        async with bot_factory(token=self.config.telegram_bot_token) as bot:
+        bot_context = self._make_bot_context()
+        async with bot_context as bot:
             offset = await self._drain_backlog(bot)
             logger.info("Telegram reply listener polling (poll timeout %.0fs)", self.config.telegram_poll_timeout_seconds)
 
@@ -224,6 +240,18 @@ class TelegramReplyListener:
                 for update in updates:
                     offset = update.update_id + 1
                     await self._handle_update(update)
+
+    def _make_bot_context(self) -> AsyncContextManager[Bot]:
+        """Validate and invoke the configured Bot factory immediately before polling."""
+        factory = self._bot_factory
+        if not callable(factory):
+            raise TypeError("Telegram bot_factory must be callable")
+        context = factory(token=self.config.telegram_bot_token)
+        if not callable(getattr(context, "__aenter__", None)) or not callable(
+            getattr(context, "__aexit__", None)
+        ):
+            raise TypeError("Telegram bot_factory must return an async context manager")
+        return context
 
     async def _drain_backlog(self, bot: Bot) -> int | None:
         updates = await self._instrumented_get_updates(

@@ -2,18 +2,17 @@
 tests/test_telegram_listener.py
 ------------------------------------
 Tests talonx_dispatch.telegram_listener.TelegramReplyListener -- the
-two-way half of the Telegram integration. Bot.get_updates is mocked by
-patching the Bot class used inside telegram_listener.py (same "mock the
-external service, exercise the orchestration logic" boundary every other
-consumer's tests in this project use); replies go through an injected
-mock TelegramClient rather than a second Bot mock, matching how the
-constructor is actually meant to be used.
+two-way half of the Telegram integration. Polling tests inject the Bot
+factory explicitly at listener construction; they never rely on patching a
+module global after construction. Replies go through an injected mock
+TelegramClient, matching how the constructor is intended to be isolated.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -70,9 +69,30 @@ def telegram_client():
     return client
 
 
+class _NeverBotFactory:
+    """Fail immediately if a handler-only test accidentally starts polling."""
+
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, **kwargs):
+        self.calls.append(kwargs)
+        raise AssertionError("handler-only test attempted to construct a Telegram Bot")
+
+
 @pytest.fixture
-def listener(store, telegram_client) -> TelegramReplyListener:
-    return TelegramReplyListener(store=store, config=_config(), telegram_client=telegram_client)
+def never_bot_factory():
+    return _NeverBotFactory()
+
+
+@pytest.fixture
+def listener(store, telegram_client, never_bot_factory) -> TelegramReplyListener:
+    return TelegramReplyListener(
+        store=store,
+        config=_config(),
+        telegram_client=telegram_client,
+        bot_factory=never_bot_factory,
+    )
 
 
 # --- _parse_alert_id --------------------------------------------------------
@@ -321,15 +341,18 @@ async def test_ping_ignored_from_unrecognized_chat(listener, store, telegram_cli
 
 
 @pytest.mark.asyncio
-async def test_run_is_a_noop_when_telegram_not_configured(store):
+async def test_run_is_a_noop_when_telegram_not_configured(store, never_bot_factory):
     client = AsyncMock()
     client.is_configured = False
-    listener = TelegramReplyListener(store=store, config=_config(), telegram_client=client)
+    listener = TelegramReplyListener(
+        store=store,
+        config=_config(),
+        telegram_client=client,
+        bot_factory=never_bot_factory,
+    )
 
-    with patch("talonx_dispatch.telegram_listener.Bot") as bot_cls:
-        await listener.run()  # must return immediately, not hang
-
-    bot_cls.assert_not_called()
+    await asyncio.wait_for(listener.run(), timeout=1)  # must return immediately, not hang
+    assert never_bot_factory.calls == []
 
 
 # --- 2026-08-17 pipeline-observability fix: MARKET/QUANT/BRAIN/CORE/
@@ -665,7 +688,7 @@ async def test_ping_still_shows_original_uptime_cpu_and_signal_lines(listener, s
 
 
 @pytest.mark.asyncio
-async def test_poll_forever_drains_backlog_then_handles_new_updates(listener, store, telegram_client):
+async def test_poll_forever_drains_backlog_then_handles_new_updates(store, telegram_client):
     store.get_by_id.return_value = _row(alert_id=47)
 
     mock_bot = AsyncMock()
@@ -677,7 +700,7 @@ async def test_poll_forever_drains_backlog_then_handles_new_updates(listener, st
             return (_update(100, "stale, ignored"),)  # backlog drain (timeout=0 call)
         if call_count["n"] == 2:
             return (_update(101, "47"),)  # first real poll
-        listener.stop()
+        polling_listener.stop()
         return ()
 
     mock_bot.get_updates = AsyncMock(side_effect=get_updates_side_effect)
@@ -685,11 +708,19 @@ async def test_poll_forever_drains_backlog_then_handles_new_updates(listener, st
     bot_ctx = MagicMock()
     bot_ctx.__aenter__ = AsyncMock(return_value=mock_bot)
     bot_ctx.__aexit__ = AsyncMock(return_value=False)
+    bot_factory = MagicMock(return_value=bot_ctx)
+    polling_listener = TelegramReplyListener(
+        store=store,
+        config=_config(),
+        telegram_client=telegram_client,
+        bot_factory=bot_factory,
+    )
 
-    with patch("talonx_dispatch.telegram_listener.Bot", return_value=bot_ctx) as bot_cls:
-        await listener.run()
+    await asyncio.wait_for(polling_listener.run(), timeout=1)
 
-    bot_cls.assert_called_once_with(token="TEST_TOKEN")
+    bot_factory.assert_called_once_with(token="TEST_TOKEN")
+    bot_ctx.__aenter__.assert_awaited_once()
+    bot_ctx.__aexit__.assert_awaited_once()
     assert call_count["n"] >= 3
     telegram_client.send.assert_awaited_once()
     # The backlog update ("stale, ignored") must never have triggered a reply --

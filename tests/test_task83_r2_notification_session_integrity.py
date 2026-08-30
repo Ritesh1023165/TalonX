@@ -382,6 +382,7 @@ async def test_telemetry_write_failure_is_visible_and_prevents_request(tmp_path,
     bot = _FakeBot([[]])
     listener = TelegramReplyListener(
         AuditStore(":memory:"), DispatchConfig(), poll_telemetry=telemetry,
+        bot_factory=lambda *, token: bot,
     )
 
     def fail_write(*_args, **_kwargs):
