@@ -142,13 +142,33 @@ def test_piv_preflight_status_blocks_when_enumeration_is_uncertain(tmp_path, mon
 
 
 def test_full_app_status_blocks_when_enumeration_is_uncertain(monkeypatch):
+    constructed = []
+
+    class OfflineResearchAgent:
+        """Minimal explicit fake for this process-gate-only test.
+
+        FullAppPreflight checks every capability even after one gate fails.
+        A real ResearchAgent eagerly constructs its embedding-backed retriever,
+        which is unrelated to process enumeration and may attempt a model
+        download.  Keeping the fake local makes this test's offline boundary
+        visible and load-bearing.
+        """
+
+        def __init__(self, *args, **kwargs):
+            constructed.append((args, kwargs))
+            self.llm_chain = type(
+                "OfflineLlmChain", (), {"describe": lambda self: "offline-test-fake"}
+            )()
+
     monkeypatch.setattr(
         "talonx_ops.preflight.process_guard.no_competing_talonx_process",
         lambda **kwargs: (False, "process enumeration failed closed (PermissionError)"),
     )
+    monkeypatch.setattr("talonx_brain.consumer.ResearchAgent", OfflineResearchAgent)
     status, checks = FullAppPreflight(
         expected_sha="definitely-not-current", transport=_Transport(),
     ).run()
     check = next(item for item in checks if item.name == "no_duplicate_full_app_or_piv_process")
     assert status == FULL_APP_E2E_BLOCKED
     assert check.passed is False
+    assert len(constructed) == 1
