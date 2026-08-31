@@ -178,10 +178,16 @@ from talonx_watchlist.store import TickerWatchlistStore
 from talonx_ops.provider_status import configured_market_data_provider, paper_execution_path_label
 from talonx_ops.runtime_metadata import write_runtime_metadata
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
+from talonx_ops.logging_setup import configure_logging
+
+# Task 87B FC_07: bounded, lower-noise logging -- size-rotated file
+# handler, chatty third-party loggers at WARNING, regime_shadow per-symbol
+# INFO spam collapsed to a periodic summary (TALONX_LOG_VERBOSE=1 to keep
+# it all). Falls back to plain basicConfig if setup fails for any reason.
+try:
+    configure_logging(level=logging.INFO)
+except Exception:  # noqa: BLE001 -- logging setup must never block startup
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("run_talonx")
 
 
