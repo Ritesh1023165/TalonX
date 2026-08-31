@@ -80,10 +80,52 @@ class RedisEventPublisher:
         self._publish_failures = 0
         self._reconnect_attempts = 0
         self._reconnect_successes = 0
+        # Task 87B FC_02: the Redis-backed market_redis_publish_failures
+        # counter under-counts because its own increment runs over the
+        # same failing transport (Task 87A). These in-process tallies are
+        # the source of truth; _flush_publish_failure_delta reconciles the
+        # delta to Redis over a HEALTHY client (on reconnect, and
+        # opportunistically from incr_metric) without double counting.
+        self._publish_failures_flushed = 0
+        self._dropped_while_disconnected = 0
 
     @property
     def publish_failures(self) -> int:
         return self._publish_failures
+
+    @property
+    def dropped_while_disconnected(self) -> int:
+        return self._dropped_while_disconnected
+
+    def local_counters(self) -> dict[str, int]:
+        """Transport-independent snapshot -- always readable even with
+        Redis down. Used by /ping (via the liveness beat) so the operator
+        total never under-reports an in-progress incident."""
+        return {
+            "publish_failures": self._publish_failures,
+            "publish_failures_flushed_to_redis": self._publish_failures_flushed,
+            "dropped_while_disconnected": self._dropped_while_disconnected,
+            "reconnect_attempts": self._reconnect_attempts,
+            "reconnect_successes": self._reconnect_successes,
+        }
+
+    async def _flush_publish_failure_delta(self) -> None:
+        """Push (local publish_failures - already-flushed) to Redis as a
+        single delta over the current (healthy) client. No-op when there
+        is nothing new or no client."""
+        delta = self._publish_failures - self._publish_failures_flushed
+        if delta <= 0 or self._client is None:
+            return
+        before = self._publish_failures_flushed
+        self._publish_failures_flushed = self._publish_failures  # optimistic; rolled back on failure
+        try:
+            key = f"metrics:{datetime.now(timezone.utc):%Y-%m-%d}:ingest:market_redis_publish_failures"
+            new_value = await self._client.incrby(key, delta)
+            if new_value == delta:
+                await self._client.expire(key, 2764800)
+        except Exception as exc:  # noqa: BLE001 -- telemetry must never break ingestion
+            self._publish_failures_flushed = before  # not actually flushed -- retry next time
+            logger.debug("Deferred publish-failure delta flush failed: %s", exc)
 
     @property
     def reconnect_attempts(self) -> int:
@@ -165,6 +207,9 @@ class RedisEventPublisher:
                 # "reconnect".
                 await self.incr_metric("ingest", "market_redis_reconnect_attempts", attempt)
                 await self.incr_metric("ingest", "market_redis_reconnect_successes", 1)
+                # Task 87B FC_02: reconcile any publish failures that piled
+                # up (uncounted in Redis) while we were disconnected.
+                await self._flush_publish_failure_delta()
                 logger.info("Redis event publisher reconnected at %s (after %d attempt(s))", self.config.url, attempt)
                 return
         # loop exits without reconnecting only if close() was called mid-retry -- not logged as a failure
@@ -269,6 +314,11 @@ class RedisEventPublisher:
         raises -- a metrics-write failure must not affect ingestion."""
         if self._client is None or amount <= 0:
             return
+        # Task 87B FC_02: opportunistically drain any publish-failure
+        # backlog over this (healthy) client -- cheap no-op when there is
+        # none. Skip for the failure counter itself to avoid re-entrancy.
+        if counter != "market_redis_publish_failures":
+            await self._flush_publish_failure_delta()
         key = f"metrics:{datetime.now(timezone.utc):%Y-%m-%d}:{stage}:{counter}"
         try:
             new_value = await self._client.incrby(key, amount)
@@ -280,21 +330,24 @@ class RedisEventPublisher:
 
     async def _publish(self, channel: str, payload: str) -> None:
         if self._client is None:
-            return  # publishing disabled (not connected) -- silent no-op by design
+            # Task 87B FC_02: previously a silent, UNCOUNTED no-op -- so a
+            # publish issued during a reconnect window vanished with no
+            # trace. Now it is counted in the transport-independent
+            # tallies; the delta reconciles to Redis on reconnect.
+            self._publish_failures += 1
+            self._dropped_while_disconnected += 1
+            return
         try:
             await self._client.publish(channel, payload)
         except Exception as exc:  # noqa: BLE001 -- never let a publish failure propagate
             logger.warning("Failed to publish to Redis channel %s: %s", channel, exc)
             self._publish_failures += 1
-            # Best-effort: uses the SAME (possibly now-broken) client this
-            # publish just failed against, since _maybe_handle_disconnect
-            # below hasn't torn it down yet -- if the failure was
-            # connection-level, this write will typically also fail
-            # (already silently caught inside incr_metric itself), losing
-            # this one data point rather than crashing; acceptable, same
-            # best-effort posture every metric write in this codebase
-            # already has.
-            await self.incr_metric("ingest", "market_redis_publish_failures", 1)
+            # Task 87B FC_02: do NOT try to write the failure counter over
+            # the transport that just failed. The in-process tally above
+            # is authoritative; _flush_publish_failure_delta reconciles it
+            # to Redis on the next healthy opportunity (reconnect / a
+            # later incr_metric), so the operator total can no longer
+            # under-count the incident that is happening right now.
             self._maybe_handle_disconnect(exc)
 
     def _maybe_handle_disconnect(self, exc: Exception) -> None:

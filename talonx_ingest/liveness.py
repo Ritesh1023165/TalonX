@@ -101,6 +101,15 @@ class LivenessBeacon:
         if self._startup_readiness is not None:
             payload["startup_phase"] = self._startup_readiness.current_phase
             payload["startup_market_ready"] = self._startup_readiness.is_market_ready()
+        # Task 87B FC_02: transport-independent failure tallies -- so /ping
+        # can report max(redis counter, this) and never under-count an
+        # in-progress Redis incident.
+        local_counters = getattr(self._publisher, "local_counters", None)
+        if callable(local_counters):
+            try:
+                payload["transport_counters"] = local_counters()
+            except Exception:  # noqa: BLE001 -- observability extra, never fatal
+                pass
         ok = await self._publisher.write_liveness(payload, self._ttl)
         if ok:
             self._beats_written += 1

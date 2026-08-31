@@ -507,6 +507,25 @@ class TelegramReplyListener:
         provider_rate_limited = await _get_metric(client, "ingest", "provider_rate_limited")
         redis_publish_failed = await _get_metric(client, "ingest", "market_redis_publish_failures")
         redis_reconnects = await _get_metric(client, "ingest", "market_redis_reconnect_successes")
+        # Task 87B FC_02: the Redis counter can under-count an in-progress
+        # incident (its own increment rides the failing transport). The
+        # liveness beat carries the transport-INDEPENDENT tally; report
+        # whichever is larger so the operator total is never optimistic.
+        publish_failed_display = _fmt_metric(redis_publish_failed)
+        live, _sent = await self._read_json_key(client, self.config.liveness_key)
+        if isinstance(live, dict):
+            tc = live.get("transport_counters") or {}
+            local_pf = tc.get("publish_failures")
+            try:
+                redis_pf_int = int(redis_publish_failed) if redis_publish_failed is not None else 0
+            except (TypeError, ValueError):
+                redis_pf_int = 0
+            if isinstance(local_pf, int) and local_pf > redis_pf_int:
+                dropped = tc.get("dropped_while_disconnected") or 0
+                publish_failed_display = (
+                    f"{local_pf} (in-process; {redis_pf_int} flushed to Redis"
+                    + (f", {dropped} while disconnected" if dropped else "") + ")"
+                )
         return [
             "\U0001F4E1 MARKET",
             f"  Source: {await self._ws_status()}",
@@ -517,7 +536,7 @@ class TelegramReplyListener:
             f"  Provider failures today: {_fmt_metric(provider_failed)}",
             f"  Provider retries today: {_fmt_metric(provider_retries)}",
             f"  Provider rate limits today: {_fmt_metric(provider_rate_limited)}",
-            f"  Redis publish failures today: {_fmt_metric(redis_publish_failed)}",
+            f"  Redis publish failures today: {publish_failed_display}",
             f"  Redis reconnects today: {_fmt_metric(redis_reconnects)}",
         ]
 
