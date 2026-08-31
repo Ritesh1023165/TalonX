@@ -180,14 +180,14 @@ from talonx_ops.runtime_metadata import write_runtime_metadata
 
 from talonx_ops.logging_setup import configure_logging
 
-# Task 87B FC_07: bounded, lower-noise logging -- size-rotated file
-# handler, chatty third-party loggers at WARNING, regime_shadow per-symbol
-# INFO spam collapsed to a periodic summary (TALONX_LOG_VERBOSE=1 to keep
-# it all). Falls back to plain basicConfig if setup fails for any reason.
-try:
-    configure_logging(level=logging.INFO)
-except Exception:  # noqa: BLE001 -- logging setup must never block startup
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+# Minimal at import time (kept identical to the pre-FC_07 behaviour so
+# merely importing run_talonx has no global side effect for tests). The
+# full FC_07 setup -- rotating file handler, third-party WARNING levels,
+# regime_shadow noise filter -- is applied inside main() where it belongs.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 logger = logging.getLogger("run_talonx")
 
 
@@ -1094,6 +1094,15 @@ async def periodic_earnings_calendar_sync_loop(
 
 async def main() -> None:
     args = _parse_args()
+
+    # Task 87B FC_07: apply the full bounded/low-noise logging setup here
+    # (not at import) -- size-rotated file handler, httpx/yfinance/... at
+    # WARNING, and the regime_shadow per-symbol INFO spam collapsed to a
+    # periodic summary (TALONX_LOG_VERBOSE=1 keeps it all).
+    try:
+        configure_logging(level=logging.INFO)
+    except Exception as exc:  # noqa: BLE001 -- logging setup must never block startup
+        logger.warning("FC_07 logging setup failed, keeping basic logging: %s", exc)
 
     # Task 82: one Original runtime is allowed to coexist with one PIV
     # process only when the latter advertises the isolation profile that
