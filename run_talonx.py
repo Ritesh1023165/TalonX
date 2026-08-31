@@ -136,6 +136,7 @@ from talonx_ingest.config import MarketDataConfig, settings
 from talonx_ingest.earnings import fetch_earnings_calendar
 from talonx_ingest.edgar.client import EdgarClient
 from talonx_ingest.events.publisher import RedisEventPublisher
+from talonx_ingest.liveness import LivenessBeacon
 from talonx_ingest.market_data.manager import MarketDataManager
 from talonx_ingest.market_data.run import make_on_event
 from talonx_ingest.market_data.yfinance_poll import YFinancePoller, fetch_extended_hours_quote
@@ -1257,6 +1258,16 @@ async def main() -> None:
             refresh_warn_seconds=settings.market_data.premarket_refresh_warn_seconds,
         )
 
+    # Task 87B FC_03: market-INDEPENDENT ingest liveness beacon -- a timer
+    # beat that keeps /ping able to tell "ingest process/Redis down" from
+    # "market legitimately quiet" (post-close, thin pre-market, weekend).
+    liveness_beacon: LivenessBeacon | None = None
+    if not args.skip_market_data:
+        liveness_beacon = LivenessBeacon(
+            market_publisher,
+            active_poller_fn=lambda: ("premarket_vectorized" if is_premarket_window() else "streaming_yfinance"),
+        )
+
     market_data_runner: WatchlistDrivenMarketData | None = None
     long_term_price_runner: LongTermPriceRunner | None = None
     if not args.skip_market_data:
@@ -1309,6 +1320,8 @@ async def main() -> None:
             earnings_fast_track_poller.stop()
         if premarket_poller is not None:
             premarket_poller.stop()
+        if liveness_beacon is not None:
+            liveness_beacon.stop()
         if quant_scanner is not None:
             quant_scanner.stop()
         if fundamental_scanner is not None:
@@ -1384,6 +1397,8 @@ async def main() -> None:
         tasks.append(asyncio.create_task(earnings_fast_track_poller.run(), name="earnings_fast_track"))
     if premarket_poller is not None:
         tasks.append(asyncio.create_task(premarket_poller.run(), name="premarket_poller"))
+    if liveness_beacon is not None:
+        tasks.append(asyncio.create_task(liveness_beacon.run(), name="liveness_beacon"))
     if quant_scanner is not None:
         tasks.append(asyncio.create_task(quant_scanner.run(), name="quant_scanner"))
     if fundamental_scanner is not None:
@@ -1465,6 +1480,8 @@ async def main() -> None:
             earnings_fast_track_poller.stop()
         if premarket_poller is not None:
             premarket_poller.stop()
+        if liveness_beacon is not None:
+            liveness_beacon.stop()
         if quant_scanner is not None:
             quant_scanner.stop()
         if fundamental_scanner is not None:

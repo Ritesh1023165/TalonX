@@ -477,6 +477,12 @@ class TelegramReplyListener:
             return piv_info.get("feed_health", "UNKNOWN (PIV feed status pending)")
         if client is None:
             return "UNKNOWN (no Redis connection)"
+        # Task 87B FC_03: an "idle" label means the ingest process is
+        # provably alive (fresh liveness beat) but the current US session
+        # phase legitimately has no ticks to expect -- a post-market /
+        # pre-market-thin / weekend quiet, NOT a feed failure.
+        if "idle" in market_health:
+            return "IDLE (market quiet -- ingest alive, no ticks expected now)"
         if "disconnected" in market_health:
             return "DEGRADED (market feed disconnected)"
         if "stale" in market_health:
@@ -533,44 +539,109 @@ class TelegramReplyListener:
             return "unknown (watchlist query failed)"
 
     async def _market_feed_freshness(self, client) -> tuple[str, str]:
-        """Returns (last_event_description, health_label), derived from
-        the WS heartbeat's `updated_at` field (talonx_ingest.events.
-        publisher.RedisEventPublisher.write_ws_heartbeat already writes
-        this timestamp on every market event -- _ws_status above never
-        read it; this is the same key, read a second time, purely
-        additive). Distinguishes a genuinely fresh feed from one that's
-        technically still within the heartbeat's TTL but hasn't actually
-        updated in a while -- a plain "key exists" check alone can't
-        tell the two apart."""
-        if client is None:
-            return "unknown (no Redis connection)", "unknown"
+        """(last_event_description, health_label). Task 87B FC_03: when the
+        market-INDEPENDENT ingest liveness beat (``talonx:ingest:liveness``,
+        written on a timer by talonx_ingest.liveness.LivenessBeacon) is
+        present, use a session-aware model so a legitimately quiet market
+        (post-close, thin pre-market, weekend) reads as IDLE rather than
+        DISCONNECTED, while a dead process/Redis link still reads as
+        DISCONNECTED and stale ticks DURING the regular session still read
+        as STALE. When the beat is absent (older runtime, or a fixture
+        without it), fall back to the pre-FC_03 ws_heartbeat-only
+        healthy/stale/disconnected behaviour -- unchanged."""
+        state, desc, _reason = await self._market_feed_state(client)
+        label = {
+            "HEALTHY": "\U0001F7E2 healthy",
+            "IDLE": "\U0001F7E2 idle",
+            "STALE": "\U0001F7E1 stale",
+            "DISCONNECTED": "\U0001F534 disconnected",
+            "UNKNOWN": "\U0001F7E1 unknown",
+        }.get(state, "\U0001F7E1 unknown")
+        return desc, label
+
+    async def _read_json_key(self, client, key: str) -> tuple[dict | None, str | None]:
+        """(parsed_dict, sentinel). sentinel is 'missing' / 'error' /
+        'malformed' when parsed_dict is None, else None."""
         try:
-            raw = await client.get(self.config.ws_heartbeat_key)
-        except Exception as exc:  # noqa: BLE001 -- a status-check failure must not break /ping
-            logger.warning("WS heartbeat lookup failed: %s", exc)
-            return "unknown", "unknown"
+            raw = await client.get(key)
+        except Exception as exc:  # noqa: BLE001 -- a status-check read must never break /ping
+            logger.warning("Health key lookup failed for %s: %s", key, exc)
+            return None, "error"
         if raw is None:
-            return "unknown (no heartbeat)", "\U0001F534 disconnected"
-
+            return None, "missing"
         try:
-            updated_at_raw = json.loads(raw).get("updated_at")
+            data = json.loads(raw)
         except (TypeError, ValueError):
-            return "unknown (malformed heartbeat)", "\U0001F7E1 unknown"
-        if not updated_at_raw:
-            return "unknown (no timestamp in heartbeat)", "\U0001F7E1 unknown"
-        try:
-            updated_at = datetime.fromisoformat(updated_at_raw)
-        except ValueError:
-            return "unknown (unparseable timestamp)", "\U0001F7E1 unknown"
+            return None, "malformed"
+        return (data if isinstance(data, dict) else None), (None if isinstance(data, dict) else "malformed")
 
-        age_seconds = (datetime.now(timezone.utc) - updated_at).total_seconds()
-        last_event_desc = f"{age_seconds:.0f}s ago ({updated_at.strftime('%H:%M:%S')} UTC)"
-        # 90s: comfortably above the 5s default yfinance poll interval and
-        # a real WebSocket's tick cadence, comfortably below the 120s
-        # heartbeat TTL a stale-but-not-yet-expired key could otherwise
-        # hide behind.
-        health = "\U0001F7E2 healthy" if age_seconds < 90 else "\U0001F7E1 stale"
-        return last_event_desc, health
+    async def _market_feed_state(self, client) -> tuple[str, str, str]:
+        """Machine-readable feed state -> (STATE, last_event_desc, reason).
+
+        STATE is one of HEALTHY / IDLE / STALE / DISCONNECTED / UNKNOWN.
+        Historical Redis reconnect/failure counters are deliberately NOT an
+        input here (they are informational only, printed elsewhere)."""
+        if client is None:
+            return "UNKNOWN", "unknown (no Redis connection)", "no Redis connection"
+
+        now = datetime.now(timezone.utc)
+        hb, hb_sentinel = await self._read_json_key(client, self.config.ws_heartbeat_key)
+        hb_age: float | None = None
+        hb_updated: datetime | None = None
+        if hb is not None:
+            try:
+                hb_updated = datetime.fromisoformat(hb.get("updated_at"))
+                hb_age = (now - hb_updated).total_seconds()
+            except (TypeError, ValueError):
+                hb_age = None
+        last_event_desc = (
+            f"{hb_age:.0f}s ago ({hb_updated.strftime('%H:%M:%S')} UTC)"
+            if hb_age is not None and hb_updated is not None
+            else {"missing": "unknown (no heartbeat)", "error": "unknown",
+                  "malformed": "unknown (malformed heartbeat)"}.get(hb_sentinel or "", "unknown")
+        )
+
+        live, live_sentinel = await self._read_json_key(client, self.config.liveness_key)
+
+        # ---- legacy fallback: no liveness beacon in play (unchanged) ----
+        if live is None:
+            if hb is None:
+                return "DISCONNECTED", "unknown (no heartbeat)", f"ws_heartbeat {hb_sentinel}"
+            if hb_age is None:
+                return "UNKNOWN", last_event_desc, "ws_heartbeat has no usable timestamp"
+            if hb_age < self.config.market_feed_fresh_seconds:
+                return "HEALTHY", last_event_desc, "recent market event"
+            return "STALE", last_event_desc, f"no market event for {hb_age:.0f}s (no liveness beacon)"
+
+        # ---- FC_03 session-aware model (liveness beat present) ----
+        try:
+            live_updated = datetime.fromisoformat(live.get("updated_at"))
+            live_age = (now - live_updated).total_seconds()
+        except (TypeError, ValueError):
+            live_age = None
+        redis_reachable = bool(live.get("redis_reachable", True))
+        phase = live.get("session_phase") or "unknown"
+
+        if live_age is None or live_age > self.config.liveness_stale_seconds or not redis_reachable:
+            why = (
+                "liveness beat has no timestamp" if live_age is None
+                else f"liveness beat {live_age:.0f}s old (> {self.config.liveness_stale_seconds:.0f}s)"
+                if live_age > self.config.liveness_stale_seconds
+                else "liveness beat reports redis unreachable"
+            )
+            return "DISCONNECTED", last_event_desc, why
+
+        # process + redis provably alive from here on.
+        beat_age = live.get("last_market_event_age_seconds")
+        event_age = hb_age if hb_age is not None else (float(beat_age) if beat_age is not None else None)
+        if event_age is not None and event_age < self.config.market_feed_fresh_seconds:
+            return "HEALTHY", last_event_desc, f"market event {event_age:.0f}s ago"
+        if phase == "regular":
+            return "STALE", last_event_desc, (
+                f"no market event for {event_age:.0f}s during the regular session"
+                if event_age is not None else "no market event during the regular session"
+            )
+        return "IDLE", last_event_desc, f"ingest alive; market phase '{phase}' -- no ticks expected"
 
     # Fixed display order for the candidate-stage breakdown, matching the
     # gate pipeline's actual sequence in talonx_quant/consumer.py -- shown

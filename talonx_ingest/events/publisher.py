@@ -228,6 +228,36 @@ class RedisEventPublisher:
         except Exception as exc:  # noqa: BLE001 -- a heartbeat write must never break ingestion
             logger.warning("Failed to write WS heartbeat to Redis: %s", exc)
 
+    async def read_ws_heartbeat(self) -> str | None:
+        """Task 87B FC_03: read-back of the WS heartbeat this same class
+        writes, so LivenessBeacon can fold "last market event age" into the
+        market-independent liveness beat without a second Redis reader."""
+        if self._client is None:
+            return None
+        try:
+            raw = await self._client.get(self.config.ws_heartbeat_key)
+        except Exception as exc:  # noqa: BLE001 -- a status read must never break ingestion
+            logger.debug("WS heartbeat read-back failed: %s", exc)
+            return None
+        if raw is None:
+            return None
+        return raw.decode() if isinstance(raw, bytes) else raw
+
+    async def write_liveness(self, payload: dict, ttl_seconds: int) -> bool:
+        """Task 87B FC_03: write the market-INDEPENDENT ingest liveness
+        beat (see talonx_ingest.liveness). Best-effort, never raises."""
+        if self._client is None:
+            return False
+        try:
+            await self._client.set(
+                self.config.liveness_key, json.dumps(payload), ex=ttl_seconds
+            )
+            return True
+        except Exception as exc:  # noqa: BLE001 -- a liveness write must never break ingestion
+            logger.warning("Failed to write ingest liveness beat to Redis: %s", exc)
+            self._maybe_handle_disconnect(exc)
+            return False
+
     async def incr_metric(self, stage: str, counter: str, amount: int = 1) -> None:
         """Stage-Gate Metric Funnel (Phase 2 requirement doc): atomic,
         per-UTC-day Redis counters at `metrics:{YYYY-MM-DD}:{stage}:{counter}`,
