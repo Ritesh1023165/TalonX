@@ -54,6 +54,48 @@ def _looks_like_rate_limited(exc: Exception) -> bool:
     return "429" in haystack or "rate limit" in haystack or "too many requests" in haystack
 
 
+# ---- Task 87B FC_05: provider-error taxonomy -----------------------------
+# Operator-facing categories. yfinance's own logger emits a speculative
+# "possibly delisted; no price data" ERROR for ANY empty response --
+# transient pre-market gaps included -- which misleads an operator into
+# assuming a real delisting. TalonX classifies the condition itself and
+# logs ONE attributed line; a TEMPORARY_NO_DATA never invalidates a
+# symbol (the next cycle re-requests the full list unchanged).
+PROVIDER_ERR_TEMPORARY_NO_DATA = "TEMPORARY_NO_DATA"
+PROVIDER_ERR_UNSUPPORTED_SESSION = "UNSUPPORTED_SESSION"
+PROVIDER_ERR_RATE_LIMIT = "RATE_LIMIT"
+PROVIDER_ERR_TIMEOUT = "PROVIDER_TIMEOUT"
+PROVIDER_ERR_SYMBOL_INVALID = "SYMBOL_INVALID"
+PROVIDER_ERR_SCHEMA = "PROVIDER_SCHEMA_ERROR"
+PROVIDER_ERR_UNKNOWN = "UNKNOWN_PROVIDER_ERROR"
+
+
+def classify_provider_error(exc: Exception) -> str:
+    """Best-effort mapping of a caught per-symbol yfinance failure to an
+    operator-facing category. Deliberately conservative: a bare "no price
+    data" / "possibly delisted" is TEMPORARY_NO_DATA, never SYMBOL_INVALID
+    -- Task 87A: do not infer a delisting from a single cycle."""
+    name = type(exc).__name__.lower()
+    msg = f"{name} {exc}".lower()
+    if _looks_like_rate_limited(exc):
+        return PROVIDER_ERR_RATE_LIMIT
+    if "timeout" in msg or "timed out" in name or "readtimeout" in name or "connecttimeout" in name:
+        return PROVIDER_ERR_TIMEOUT
+    # yfinance raises an explicit invalid-symbol / invalid-period type for a
+    # genuinely bad ticker; only THAT counts as SYMBOL_INVALID.
+    if "notfound" in name or "invalidticker" in name or "symbolnotfound" in name:
+        return PROVIDER_ERR_SYMBOL_INVALID
+    if "prepost" in msg or "pre/post" in msg or "extended hours" in msg or "unsupported" in msg:
+        return PROVIDER_ERR_UNSUPPORTED_SESSION
+    # A bare KeyError deep in yfinance's scraper parsing (e.g.
+    # 'currentTradingPeriod') == a malformed/incomplete provider response.
+    if name == "keyerror" or "jsondecodeerror" in name or "schema" in msg:
+        return PROVIDER_ERR_SCHEMA
+    if "no price data" in msg or "possibly delisted" in msg or "no data found" in msg:
+        return PROVIDER_ERR_TEMPORARY_NO_DATA
+    return PROVIDER_ERR_UNKNOWN
+
+
 class YFinancePoller:
     def __init__(self, config: MarketDataConfig | None = None, metrics_publisher=None):
         self.config = config or settings.market_data
@@ -77,6 +119,48 @@ class YFinancePoller:
         self._requests_failed = 0
         self._retries = 0
         self._rate_limited = 0
+        # Task 87B FC_05: per-category provider-error tally + the set of
+        # symbols currently returning no data, so a recovery can be logged
+        # (INFO) rather than a symbol silently staying dark.
+        self._error_categories: dict[str, int] = {}
+        self._no_data_symbols: set[str] = set()
+
+    @property
+    def error_categories(self) -> dict[str, int]:
+        return dict(self._error_categories)
+
+    @property
+    def no_data_symbols(self) -> set[str]:
+        return set(self._no_data_symbols)
+
+    def _note_recovery(self, symbol: str) -> None:
+        if symbol in self._no_data_symbols:
+            self._no_data_symbols.discard(symbol)
+            logger.info("[provider RECOVERED] %s is returning data again", symbol)
+
+    def _note_no_data(self, symbol: str) -> None:
+        if symbol not in self._no_data_symbols:
+            self._no_data_symbols.add(symbol)
+            logger.debug("[provider TEMPORARY_NO_DATA] %s: no last_price this cycle (not a failure)", symbol)
+
+    def _drain_category_deltas(self) -> dict[str, int]:
+        flushed = getattr(self, "_error_categories_flushed", {})
+        deltas: dict[str, int] = {}
+        for cat, total in self._error_categories.items():
+            d = total - flushed.get(cat, 0)
+            if d > 0:
+                deltas[cat] = d
+        self._error_categories_flushed = dict(self._error_categories)
+        return deltas
+
+    def _classify_and_record(self, symbol: str, exc: Exception) -> str:
+        category = classify_provider_error(exc)
+        self._error_categories[category] = self._error_categories.get(category, 0) + 1
+        level = logging.WARNING if category in (
+            PROVIDER_ERR_SCHEMA, PROVIDER_ERR_TIMEOUT, PROVIDER_ERR_RATE_LIMIT, PROVIDER_ERR_SYMBOL_INVALID,
+        ) else logging.INFO
+        logger.log(level, "[provider %s] %s: %s", category, symbol, exc)
+        return category
 
     @property
     def requests_failed(self) -> int:
@@ -214,6 +298,12 @@ class YFinancePoller:
 
             await self._flush_provider_metric("provider_requests_failed", self._requests_failed - failed_before)
             await self._flush_provider_metric("provider_rate_limited", self._rate_limited - rate_limited_before)
+            # Task 87B FC_05: category-tagged provider-failure metrics so
+            # the counted set matches the surfaced set (Task 87A found they
+            # diverged -- the loud "possibly delisted" lines were uncounted
+            # while the counted ones were quiet warnings).
+            for _cat, _delta in self._drain_category_deltas().items():
+                await self._flush_provider_metric(f"provider_err_{_cat.lower()}", _delta)
 
             # 2026-08-18 correctness fix (code-review findings #2/#4):
             # fast_info (this poller's price source) does NOT reflect
@@ -300,14 +390,16 @@ class YFinancePoller:
             try:
                 ticker = tickers.tickers.get(symbol.upper())
                 if ticker is None:
-                    logger.warning("yfinance returned no ticker object for %s", symbol)
+                    self._note_no_data(symbol.upper())  # routine "no data yet", NOT a failure
                     continue
 
                 info = ticker.fast_info
                 last_price = getattr(info, "last_price", None)
                 if last_price is None:
+                    self._note_no_data(symbol.upper())
                     continue
 
+                self._note_recovery(symbol.upper())  # was dark, is back
                 cumulative_volume = getattr(info, "last_volume", None)
                 events.append(
                     MarketEvent(
@@ -329,10 +421,12 @@ class YFinancePoller:
                     )
                 )
             except Exception as exc:  # noqa: BLE001 -- isolate per-symbol failures
-                logger.warning("yfinance fetch failed for %s: %s", symbol, exc)
+                category = self._classify_and_record(symbol.upper(), exc)
                 self._requests_failed += 1
-                if _looks_like_rate_limited(exc):
+                if category == PROVIDER_ERR_RATE_LIMIT:
                     self._rate_limited += 1
+                # A transient failure never removes a symbol -- the next
+                # cycle re-requests the whole list unchanged.
                 continue
 
         return events
