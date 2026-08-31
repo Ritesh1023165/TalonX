@@ -53,6 +53,7 @@ class LivenessBeacon:
         interval_seconds: float | None = None,
         ttl_seconds: int | None = None,
         active_poller_fn: Callable[[], str] | None = None,
+        startup_readiness=None,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._publisher = publisher
@@ -60,6 +61,7 @@ class LivenessBeacon:
         self._interval = interval_seconds if interval_seconds is not None else cfg.liveness_interval_seconds
         self._ttl = ttl_seconds if ttl_seconds is not None else cfg.liveness_ttl_seconds
         self._active_poller_fn = active_poller_fn
+        self._startup_readiness = startup_readiness
         self._now = clock or (lambda: datetime.now(timezone.utc))
         self._stop_event = asyncio.Event()
         self._beats_written = 0
@@ -96,6 +98,9 @@ class LivenessBeacon:
             "last_market_event_age_seconds": None if age is None else round(age, 1),
             "active_poller": (self._active_poller_fn() if self._active_poller_fn is not None else "unknown"),
         }
+        if self._startup_readiness is not None:
+            payload["startup_phase"] = self._startup_readiness.current_phase
+            payload["startup_market_ready"] = self._startup_readiness.is_market_ready()
         ok = await self._publisher.write_liveness(payload, self._ttl)
         if ok:
             self._beats_written += 1

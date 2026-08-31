@@ -137,6 +137,16 @@ from talonx_ingest.earnings import fetch_earnings_calendar
 from talonx_ingest.edgar.client import EdgarClient
 from talonx_ingest.events.publisher import RedisEventPublisher
 from talonx_ingest.liveness import LivenessBeacon
+from talonx_ingest.startup_readiness import (
+    PHASE_BOOTSTRAP_SCHEDULED,
+    PHASE_CONSUMERS_STARTED,
+    PHASE_FULL_READY,
+    PHASE_MARKET_POLLERS_STARTED,
+    PHASE_PRESEED_COMPLETE,
+    PHASE_REDIS_CONNECTED,
+    StartupReadiness,
+    delayed_start,
+)
 from talonx_ingest.market_data.manager import MarketDataManager
 from talonx_ingest.market_data.run import make_on_event
 from talonx_ingest.market_data.yfinance_poll import YFinancePoller, fetch_extended_hours_quote
@@ -1120,6 +1130,14 @@ async def main() -> None:
     # closes. Zero-ready is reported, never fatal here -- QuantScanner's
     # existing live-accumulation fallback still applies unchanged; this is
     # ordering only, not a new requirement on strategy readiness.
+    # Task 87B FC_06: bounded startup sequencing. The critical path (Redis
+    # connect, market pollers, core consumers) comes up first; the
+    # expensive background bootstrap loops are staggered so their heavy
+    # first cycles do not all collide at t=0 (the 2026-08-31 Redis
+    # incident's root cause).
+    startup_readiness = StartupReadiness()
+    bootstrap_stagger_seconds = _env_float("TALONX_STARTUP_BOOTSTRAP_STAGGER_SECONDS", 3.0)
+
     initial_preseed_report = None
     if quant_scanner is not None:
         initial_watchlist_symbols = sorted(watchlist_store.list_active_symbols())
@@ -1136,8 +1154,10 @@ async def main() -> None:
             )
         else:
             logger.info("Watchlist is empty at startup -- skipping initial Quant preseed (nothing to seed).")
+    startup_readiness.mark(PHASE_PRESEED_COMPLETE)
 
     market_publisher = RedisEventPublisher()
+    startup_readiness._publisher = market_publisher
 
     research_agent: ResearchAgent | None = None
     brain_store: BrainStatsStore | None = None
@@ -1266,6 +1286,7 @@ async def main() -> None:
         liveness_beacon = LivenessBeacon(
             market_publisher,
             active_poller_fn=lambda: ("premarket_vectorized" if is_premarket_window() else "streaming_yfinance"),
+            startup_readiness=startup_readiness,
         )
 
     market_data_runner: WatchlistDrivenMarketData | None = None
@@ -1349,6 +1370,8 @@ async def main() -> None:
 
     if market_data_runner is not None:
         await market_publisher.connect()  # logs a warning and continues if Redis unavailable
+        startup_readiness.mark(PHASE_REDIS_CONNECTED)
+        await startup_readiness.publish()
 
     logger.info(
         "Starting TalonX (interval=%.1fh, ingestion=%s, market_data=%s, "
@@ -1413,41 +1436,59 @@ async def main() -> None:
         tasks.append(asyncio.create_task(paper_trading_engine.run(), name="paper_trading_engine"))
     if long_term_paper_engine is not None:
         tasks.append(asyncio.create_task(long_term_paper_engine.run(), name="long_term_paper_engine"))
+    # Task 87B FC_06: the critical path (pollers + core consumers, added
+    # above) starts at t=0; the expensive background bootstrap loops below
+    # -- whose FIRST cycle does heavy EDGAR + sentence-transformer
+    # embedding + XBRL work -- are staggered by a small bounded delay so
+    # they do not collide with the Redis connect / poller spin-up. Their
+    # steady-state cadence (args.interval_hours) is unchanged.
+    _stg = bootstrap_stagger_seconds
+    startup_readiness.mark(PHASE_MARKET_POLLERS_STARTED)
+    startup_readiness.mark(PHASE_CONSUMERS_STARTED)
     if not args.skip_ingestion:
-        tasks.append(
-            asyncio.create_task(
-                periodic_ingestion_loop(watchlist_store, args.interval_hours, stop_event),
-                name="periodic_ingestion",
-            )
-        )
-        tasks.append(
-            asyncio.create_task(
-                periodic_long_term_financials_loop(watchlist_store, args.interval_hours, stop_event),
-                name="periodic_long_term_financials",
-            )
-        )
+        tasks.append(asyncio.create_task(
+            delayed_start(
+                lambda: periodic_ingestion_loop(watchlist_store, args.interval_hours, stop_event),
+                _stg * 1, name="periodic_ingestion",
+            ), name="periodic_ingestion",
+        ))
+        tasks.append(asyncio.create_task(
+            delayed_start(
+                lambda: periodic_long_term_financials_loop(watchlist_store, args.interval_hours, stop_event),
+                _stg * 2, name="periodic_long_term_financials",
+            ), name="periodic_long_term_financials",
+        ))
     if not args.skip_earnings_sync:
-        tasks.append(
-            asyncio.create_task(
-                periodic_earnings_calendar_sync_loop(
+        tasks.append(asyncio.create_task(
+            delayed_start(
+                lambda: periodic_earnings_calendar_sync_loop(
                     watchlist_store, _env_float("TALONX_INGEST_EARNINGS_SYNC_INTERVAL_HOURS", 168.0), stop_event,
                 ),
-                name="periodic_earnings_calendar_sync",
-            )
-        )
+                _stg * 3, name="periodic_earnings_calendar_sync",
+            ), name="periodic_earnings_calendar_sync",
+        ))
     if reactive_ingestion is not None:
         tasks.append(asyncio.create_task(reactive_ingestion.run(), name="reactive_ingestion"))
     if quant_preseed is not None:
         tasks.append(asyncio.create_task(quant_preseed.run(), name="quant_preseed"))
     if run_long_term_factors_reconciliation:
-        tasks.append(
-            asyncio.create_task(
-                reconcile_missing_long_term_factors(
+        tasks.append(asyncio.create_task(
+            delayed_start(
+                lambda: reconcile_missing_long_term_factors(
                     watchlist_store, quant_store, stop_event, fundamental_scanner,
                 ),
-                name="reconcile_long_term_factors",
-            )
-        )
+                _stg * 4, name="reconcile_long_term_factors",
+            ), name="reconcile_long_term_factors",
+        ))
+    startup_readiness.mark(PHASE_BOOTSTRAP_SCHEDULED)
+
+    async def _mark_full_ready() -> None:
+        await asyncio.sleep(_stg * 5)
+        startup_readiness.mark(PHASE_FULL_READY)
+        await startup_readiness.publish()
+        logger.info("Startup fully ready: %s", startup_readiness.snapshot())
+
+    tasks.append(asyncio.create_task(_mark_full_ready(), name="startup_full_ready_marker"))
 
     if not tasks:
         logger.error("Everything was skipped -- nothing to run. Drop at least one --skip-* flag.")
