@@ -88,6 +88,20 @@ class RedisEventPublisher:
         # opportunistically from incr_metric) without double counting.
         self._publish_failures_flushed = 0
         self._dropped_while_disconnected = 0
+        # Task 87B FC_08: per-symbol {SYMBOL: {"at": iso, "source": ...}}
+        # last-market-event stamp. Updated in-process on every event (no
+        # Redis write here); LivenessBeacon flushes the map to
+        # talonx:ingest:symbol_coverage once per beat.
+        self._symbol_last_event: dict[str, dict[str, str]] = {}
+
+    def note_symbol_event(self, symbol: str, source: str = "") -> None:
+        self._symbol_last_event[symbol.upper()] = {
+            "at": datetime.now(timezone.utc).isoformat(),
+            "source": source,
+        }
+
+    def symbol_coverage(self) -> dict[str, dict[str, str]]:
+        return dict(self._symbol_last_event)
 
     @property
     def publish_failures(self) -> int:
@@ -287,6 +301,20 @@ class RedisEventPublisher:
         if raw is None:
             return None
         return raw.decode() if isinstance(raw, bytes) else raw
+
+    async def write_symbol_coverage(self, coverage: dict, ttl_seconds: int) -> bool:
+        """Task 87B FC_08: write the per-symbol last-event map as one JSON
+        key (talonx:ingest:symbol_coverage). Best-effort, never raises."""
+        if self._client is None:
+            return False
+        try:
+            await self._client.set(
+                "talonx:ingest:symbol_coverage", json.dumps(coverage), ex=ttl_seconds
+            )
+            return True
+        except Exception as exc:  # noqa: BLE001 -- coverage telemetry must never break ingestion
+            logger.debug("Failed to write symbol coverage to Redis: %s", exc)
+            return False
 
     async def write_liveness(self, payload: dict, ttl_seconds: int) -> bool:
         """Task 87B FC_03: write the market-INDEPENDENT ingest liveness

@@ -113,6 +113,16 @@ class LivenessBeacon:
         ok = await self._publisher.write_liveness(payload, self._ttl)
         if ok:
             self._beats_written += 1
+        # Task 87B FC_08: flush the per-symbol coverage map (one Redis
+        # write per beat, not per event) so 87C can prove every configured
+        # symbol is accounted for and identify one that has gone dark.
+        coverage = getattr(self._publisher, "symbol_coverage", None)
+        write_cov = getattr(self._publisher, "write_symbol_coverage", None)
+        if callable(coverage) and callable(write_cov):
+            try:
+                await write_cov(coverage(), self._ttl * 4)
+            except Exception:  # noqa: BLE001 -- coverage telemetry is never fatal
+                pass
 
     async def run(self) -> None:
         logger.info(

@@ -42,6 +42,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 import json
+import os
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 import uuid
@@ -275,11 +276,28 @@ class TerminalSupervisorFailure(RuntimeError):
     terminal failure, distinct from a single recoverable exception."""
 
 
+async def _periodic_supervisor_heartbeat(
+    registry: ComponentHealthRegistry, component_name: str, interval_seconds: float,
+    on_heartbeat: Callable[[], None] | None, sleep: Callable[[float], Awaitable[None]],
+) -> None:
+    """Task 87B (PIV component-health lag): keep component_health.json's
+    last_heartbeat current WHILE run_once() is executing. Previously
+    on_heartbeat fired only at loop entry / clean exit / exception, so a
+    healthy long-running session left the file frozen at startup time
+    (Task 86: ~4.5h stale) -- indistinguishable from a hung process."""
+    while True:
+        await sleep(interval_seconds)
+        registry.heartbeat(component_name, ComponentStatus.HEALTHY, "supervised, running")
+        if on_heartbeat is not None:
+            on_heartbeat()
+
+
 async def run_with_bounded_restart(
     run_once: Callable[[], Awaitable[None]], registry: ComponentHealthRegistry, *,
     component_name: str = "session_runner", max_restarts: int = 3, backoff_seconds: float = 30.0,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     on_heartbeat: Callable[[], None] | None = None,
+    heartbeat_interval_seconds: float | None = None,
 ) -> int:
     """Wraps `run_once` (e.g. `lambda: run_session(runner, listener)`) in a
     bounded restart/backoff loop. `run_once` is expected to already
@@ -289,12 +307,28 @@ async def run_with_bounded_restart(
     (e.g. scheduled EOD completion, or a controlled shutdown) ends the loop
     immediately with 0 attempts consumed -- restarts are for a genuinely
     UNEXPECTED exception only. Returns the number of restart attempts that
-    were actually needed (0 on a clean first run)."""
+    were actually needed (0 on a clean first run).
+
+    Task 87B: a background heartbeat refreshes component_health.json every
+    ``heartbeat_interval_seconds`` (default 30, or
+    TALONX_PIV_SUPERVISOR_HEARTBEAT_SECONDS) for the duration of each
+    run_once(), so the file proves current liveness rather than freezing
+    at startup."""
+    if heartbeat_interval_seconds is None:
+        try:
+            heartbeat_interval_seconds = float(os.environ.get("TALONX_PIV_SUPERVISOR_HEARTBEAT_SECONDS", "30"))
+        except (TypeError, ValueError):
+            heartbeat_interval_seconds = 30.0
     attempt = 0
     while True:
         registry.heartbeat(component_name, ComponentStatus.HEALTHY, f"attempt={attempt}")
         if on_heartbeat is not None:
             on_heartbeat()
+        hb_task = None
+        if heartbeat_interval_seconds and heartbeat_interval_seconds > 0:
+            hb_task = asyncio.ensure_future(_periodic_supervisor_heartbeat(
+                registry, component_name, heartbeat_interval_seconds, on_heartbeat, sleep,
+            ))
         try:
             await run_once()
             registry.heartbeat(component_name, ComponentStatus.HEALTHY, f"clean exit after {attempt} restart(s)")
@@ -316,3 +350,10 @@ async def run_with_bounded_restart(
                     f"{component_name} failed {attempt} time(s), exceeding max_restarts={max_restarts}: {exc}"
                 ) from exc
             await sleep(backoff_seconds)
+        finally:
+            if hb_task is not None:
+                hb_task.cancel()
+                try:
+                    await hb_task
+                except (asyncio.CancelledError, Exception):  # noqa: BLE001 -- cleanup must never raise
+                    pass
