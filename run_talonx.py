@@ -582,6 +582,9 @@ class PreMarketPoller:
         self._active_earnings_symbols_fn = active_earnings_symbols_fn
         self._refresh_warn_seconds = refresh_warn_seconds
         self._stop_event = asyncio.Event()
+        # Task 87B FC_04: last computed (selected, excluded) -- also exposed
+        # for status inspection / tests without needing a poll cycle.
+        self.last_selection: tuple[list[str], dict[str, str]] = ([], {})
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -589,11 +592,22 @@ class PreMarketPoller:
     def _in_window(self) -> bool:
         return is_premarket_window()
 
-    def _symbols(self) -> set[str]:
-        symbols = set(self._store.list_active_symbols())
+    def _select(self) -> tuple[set[str], dict[str, str]]:
+        """Task 87B FC_04: return (selected, excluded{symbol: reason}) so
+        the dynamic 43->42 narrowing is self-explanatory in the logs. The
+        EXCLUSION ITSELF IS UNCHANGED -- a symbol currently owned by
+        EarningsFastTrackPoller is still deliberately left out here to
+        avoid two pollers double-publishing ticks for it."""
+        configured = set(self._store.list_active_symbols())
+        excluded: dict[str, str] = {}
         if self._active_earnings_symbols_fn is not None:
-            symbols -= self._active_earnings_symbols_fn()
-        return symbols
+            for sym in sorted(self._active_earnings_symbols_fn()):
+                if sym in configured:
+                    excluded[sym] = "EARNINGS_FAST_TRACK"  # alternate owner: EarningsFastTrackPoller
+        return configured - set(excluded), excluded
+
+    def _symbols(self) -> set[str]:
+        return self._select()[0]
 
     async def run(self) -> None:
         while not self._stop_event.is_set():
@@ -605,10 +619,20 @@ class PreMarketPoller:
                 pass  # normal case: interval elapsed -- poll again if still in window, or check again if not
 
     async def _poll_once(self) -> None:
-        symbols = sorted(self._symbols())
+        selected_set, excluded = self._select()
+        symbols = sorted(selected_set)
+        configured_n = len(selected_set) + len(excluded)
         if not symbols:
             return
-        logger.info("Pre-market vectorized poll for %d tracked symbol(s)", len(symbols))
+        self.last_selection = (symbols, excluded)
+        excl_desc = (
+            "{" + ", ".join(f"{s}:{r}" for s, r in sorted(excluded.items())) + "}"
+        ) if excluded else "{}"
+        logger.info(
+            "PreMarketPoller configured=%d selected=%d excluded=%s "
+            "(excluded symbols are covered by EarningsFastTrackPoller, not dropped)",
+            configured_n, len(symbols), excl_desc,
+        )
         try:
             quotes = await asyncio.to_thread(fetch_watchlist_quotes, symbols, self._refresh_warn_seconds)
         except Exception as exc:  # noqa: BLE001 -- a bad cycle shouldn't kill the poller
