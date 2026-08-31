@@ -91,6 +91,19 @@ class CoreConfig:
     reconnect_backoff_base_seconds: float = _env_float("TALONX_CORE_RECONNECT_BASE", 1.0)
     reconnect_backoff_max_seconds: float = _env_float("TALONX_CORE_RECONNECT_MAX", 30.0)
 
+    # --- Task 87B FC_01: durable decision-bearing alert outbox ---
+    # JSON state file for talonx_core.alert_outbox.AlertOutbox. A publish
+    # failure leaves a PENDING record here that survives a process restart
+    # and is re-published (bounded jittered backoff) once Redis recovers.
+    # Default is "" == in-memory only (no file, restart-durability off) so
+    # a bare CoreConfig() in a unit test never touches a real path;
+    # run_talonx.py passes an explicit on-disk path (see
+    # DEFAULT_ALERT_OUTBOX_PATH) for the real runtime, and
+    # TALONX_CORE_ALERT_OUTBOX_PATH overrides both.
+    alert_outbox_path: str = os.environ.get("TALONX_CORE_ALERT_OUTBOX_PATH", "")
+    alert_outbox_backoff_base_seconds: float = _env_float("TALONX_CORE_ALERT_OUTBOX_BASE", 1.0)
+    alert_outbox_backoff_max_seconds: float = _env_float("TALONX_CORE_ALERT_OUTBOX_MAX", 60.0)
+
     # --- Decision matrix ---
     # A CONFIRMED/CONTRADICTED verdict only reaches talonx:alerts:dispatch
     # if the research confidence backing it meets this bar -- below it,
@@ -171,3 +184,10 @@ class CoreConfig:
     price_delta_retrigger_pct_long_term: float = _env_float(
         "TALONX_CORE_LT_PRICE_DELTA_RETRIGGER_PCT", 0.05
     )
+
+
+# Task 87B FC_01: the real-runtime on-disk location run_talonx.py wires
+# into CoreConfig.alert_outbox_path (kept next to the other ~/.talonx/*.db
+# / *.json state). A bare CoreConfig() in a unit test gets "" (in-memory,
+# no file) instead.
+DEFAULT_ALERT_OUTBOX_PATH: str = str(Path.home() / ".talonx" / "core_alert_outbox.json")

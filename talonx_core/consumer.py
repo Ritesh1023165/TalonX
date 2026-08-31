@@ -46,6 +46,7 @@ from pydantic import ValidationError
 
 from talonx_ingest.common.structured_logging import log_structured
 
+from talonx_core.alert_outbox import KIND_INTRADAY, KIND_LONG_TERM, AlertOutbox, make_outbox_id
 from talonx_core.config import CoreConfig
 from talonx_core.decision import evaluate_long_term_verbose, evaluate_verbose
 from talonx_core.schemas import (
@@ -100,12 +101,27 @@ class DecisionEngine:
         correlator: TickerCorrelator | None = None,
         long_term_correlator: LongTermTickerCorrelator | None = None,
         store: TickerStateStore | None = None,
+        alert_outbox: AlertOutbox | None = None,
     ):
         self.config = config or CoreConfig()
         self.correlator = correlator or TickerCorrelator()
         self.long_term_correlator = long_term_correlator or LongTermTickerCorrelator()
         self.store = store
         self._client = None
+        # Task 87B FC_01: durable decision-bearing alert outbox. An explicit
+        # instance wins; otherwise build one from config unless the path is
+        # blank ("" -> best-effort publish only, the pre-FC_01 behaviour).
+        if alert_outbox is not None:
+            self.alert_outbox = alert_outbox
+        elif self.config.alert_outbox_path:
+            self.alert_outbox = AlertOutbox(
+                self.config.alert_outbox_path,
+                self._raw_publish,
+                backoff_base_seconds=self.config.alert_outbox_backoff_base_seconds,
+                backoff_max_seconds=self.config.alert_outbox_backoff_max_seconds,
+            )
+        else:
+            self.alert_outbox = AlertOutbox(None, self._raw_publish)
         self._stop_event = asyncio.Event()
         self._signals_processed = 0
         self._reports_processed = 0
@@ -185,11 +201,19 @@ class DecisionEngine:
         await pubsub.subscribe(*channels)
         logger.info("Subscribed to %s", ", ".join(channels))
 
+        # Task 87B FC_01: a reconnect means Redis is back -- immediately
+        # drain any alert the previous connection (or a previous process)
+        # failed to publish, before resuming normal message handling.
+        await self._flush_alert_outbox()
+
         try:
             while not self._stop_event.is_set():
                 message = await pubsub.get_message(
                     ignore_subscribe_messages=True, timeout=1.0
                 )
+                # Cheap no-op when nothing is pending / nothing is due;
+                # retries a stuck alert on the next 1s poll tick otherwise.
+                await self._flush_alert_outbox()
                 if message is None:
                     continue  # normal: no message within this poll window
                 await self._handle_message(message)
@@ -326,26 +350,75 @@ class DecisionEngine:
         elif self.store is not None:
             self.store.record_suppressed(ticker, reason, datetime.now(timezone.utc), horizon="long_term")
 
-    async def _publish_alert(self, alert: ActionableAlert) -> None:
+    async def _raw_publish(self, channel: str, payload: str) -> bool:
+        """The actual Redis fan-out, wrapped so a lost connection or a
+        publish exception is a clean ``False`` (retry later) rather than a
+        raise -- the AlertOutbox owns retry/backoff/idempotency on top."""
+        if self._client is None:
+            return False
         try:
-            await self._client.publish(self.config.alerts_channel, alert.to_redis_payload())
+            await self._client.publish(channel, payload)
+            return True
+        except Exception as exc:  # noqa: BLE001 -- a publish failure shouldn't crash the engine
+            logger.warning("Failed to publish to Redis channel %s: %s", channel, exc)
+            return False
+
+    async def _flush_alert_outbox(self) -> None:
+        try:
+            await self.alert_outbox.flush()
+        except Exception as exc:  # noqa: BLE001 -- the outbox flusher must never break the message loop
+            logger.warning("Alert outbox flush failed (will retry): %s", exc)
+
+    async def _deliver_alert(
+        self, *, kind: str, channel: str, alert, ticker: str, action: str, correlated_at,
+    ) -> bool:
+        """Task 87B FC_01: persist the fan-out obligation BEFORE attempting
+        delivery, so a publish failure leaves a recoverable PENDING record
+        (survives restart, retried with backoff by ``flush``) instead of a
+        silently lost alert. Returns True iff Redis accepted it right now."""
+        trading_date = correlated_at.astimezone(timezone.utc).date().isoformat()
+        outbox_id = make_outbox_id(
+            ticker=ticker, trading_date=trading_date, kind=kind, action=action,
+            correlated_at=correlated_at.isoformat(),
+        )
+        alert.outbox_id = outbox_id
+        payload = alert.to_redis_payload()
+        self.alert_outbox.enqueue(
+            outbox_id=outbox_id, channel=channel, payload=payload, kind=kind, ticker=ticker, action=action,
+        )
+        ok = await self._raw_publish(channel, payload)
+        if ok:
+            self.alert_outbox.mark_published(outbox_id)
+        else:
+            logger.warning(
+                "Alert fan-out for %s %s deferred to durable outbox (pending_depth=%d) -- "
+                "will retry after Redis recovery",
+                ticker, action, self.alert_outbox.pending_depth(),
+            )
+        return ok
+
+    async def _publish_alert(self, alert: ActionableAlert) -> None:
+        ok = await self._deliver_alert(
+            kind=KIND_INTRADAY, channel=self.config.alerts_channel, alert=alert,
+            ticker=alert.ticker, action=alert.action.value, correlated_at=alert.correlated_at,
+        )
+        if ok:
             self._alerts_published += 1
             logger.info(
                 "Alert: %s %s (%s, confidence %.2f) -- %s",
                 alert.ticker, alert.action.value, alert.severity.value,
                 alert.research_confidence, alert.rationale[:120],
             )
-        except Exception as exc:  # noqa: BLE001 -- a publish failure shouldn't crash the engine
-            logger.warning("Failed to publish alert to Redis: %s", exc)
 
     async def _publish_long_term_alert(self, alert: LongTermActionableAlert) -> None:
-        try:
-            await self._client.publish(self.config.alerts_channel_long_term, alert.to_redis_payload())
+        ok = await self._deliver_alert(
+            kind=KIND_LONG_TERM, channel=self.config.alerts_channel_long_term, alert=alert,
+            ticker=alert.ticker, action=alert.action.value, correlated_at=alert.correlated_at,
+        )
+        if ok:
             self._long_term_alerts_published += 1
             logger.info(
                 "Long-term alert: %s %s (%s, quality %d/10, MoS %.1f%%) -- %s",
                 alert.ticker, alert.action.value, alert.severity.value,
                 alert.quality_score, alert.margin_of_safety_pct * 100, alert.rationale[:120],
             )
-        except Exception as exc:  # noqa: BLE001 -- a publish failure shouldn't crash the engine
-            logger.warning("Failed to publish long-term alert to Redis: %s", exc)

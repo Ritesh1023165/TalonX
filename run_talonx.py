@@ -154,7 +154,7 @@ from talonx_quant.store import QuantStateStore
 from talonx_brain.config import BrainConfig
 from talonx_brain.consumer import ResearchAgent
 from talonx_brain.store import BrainStatsStore
-from talonx_core.config import CoreConfig
+from talonx_core.config import DEFAULT_ALERT_OUTBOX_PATH, CoreConfig
 from talonx_core.consumer import DecisionEngine
 from talonx_core.store import TickerStateStore
 from talonx_dispatch.consumer import DispatchAgent
@@ -1166,7 +1166,14 @@ async def main() -> None:
     decision_engine: DecisionEngine | None = None
     core_store: TickerStateStore | None = None
     if not args.skip_core:
-        core_config = CoreConfig()
+        # Task 87B FC_01: wire the durable decision-bearing alert outbox to a
+        # real on-disk path for the live runtime (a bare CoreConfig() in a
+        # unit test stays in-memory). An explicit env var still wins.
+        core_config = CoreConfig(
+            alert_outbox_path=os.environ.get(
+                "TALONX_CORE_ALERT_OUTBOX_PATH", DEFAULT_ALERT_OUTBOX_PATH
+            )
+        )
         if core_config.enable_persistence:
             try:
                 core_store = TickerStateStore(core_config.state_db_path)
