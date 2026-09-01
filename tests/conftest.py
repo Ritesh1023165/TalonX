@@ -66,9 +66,17 @@ def pytest_addoption(parser):
 def talonx_network_guard(request) -> NetworkGuard:
     guard = getattr(request.config, "_talonx_network_guard", None)
     if guard is None:
-        pytest.fail(
-            "TALONX_TEST_NETWORK_GUARD=1 is required for network-isolation tests",
-            pytrace=False,
+        # The fail-closed socket guard is opt-in (it must not be installed
+        # during ordinary runs -- it would interfere with the real-localhost
+        # Redis integration tests). When it is not enabled, the tests that
+        # depend on it have no prerequisite, so SKIP with an explicit reason
+        # rather than ERROR -- a missing opt-in dependency is a skip, not a
+        # failure (Task 91 test-hygiene: keep the full-suite result
+        # interpretable without tribal knowledge).
+        pytest.skip(
+            "network-isolation tests require TALONX_TEST_NETWORK_GUARD=1 "
+            "(opt-in fail-closed socket guard); set it to run them",
+            allow_module_level=False,
         )
     return guard
 

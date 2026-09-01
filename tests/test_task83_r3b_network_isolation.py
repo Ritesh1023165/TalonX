@@ -316,6 +316,13 @@ def test_zz_guard_report_reconciles_expected_and_unexpected_attempts(
         "block_hostname",
     }.issubset(report["expected_negative_controls"])
     assert report["counters"]["permitted_loopback_connections"] >= 3
-    assert talonx_network_guard.report_path is not None
+    # The on-disk report round-trip needs TALONX_TEST_NETWORK_GUARD_REPORT
+    # to point at a destination -- a second opt-in beyond enabling the
+    # guard itself. When only the guard is enabled (no report path), the
+    # in-memory reconciliation above is the whole assertion; skip the
+    # file check rather than fail on an unstated prerequisite (Task 91
+    # test-hygiene).
+    if talonx_network_guard.report_path is None:
+        pytest.skip("TALONX_TEST_NETWORK_GUARD_REPORT is not set -- on-disk report round-trip not exercised")
     on_disk = json.loads(Path(talonx_network_guard.report_path).read_text(encoding="utf-8"))
     assert on_disk == report

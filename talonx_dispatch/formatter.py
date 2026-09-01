@@ -512,16 +512,25 @@ def format_telegram_earnings_heads_up(
     fair_value = report.dcf_fair_value_per_share
     margin_of_safety_pct = (fair_value - signal.price) / fair_value if fair_value else 0.0
     discount_label = _discount_or_premium_label(signal.price, margin_of_safety_pct)
+    # signal.price is the market price captured at the ticker's LAST
+    # fundamental-factor re-score (talonx_quant FundamentalScanner --
+    # _latest_prices live-bar close, or a yfinance last-close fallback),
+    # frozen until the next EDGAR filing event. This T-48h heads-up fires
+    # BEFORE the earnings-triggered republish, so it can be days old. Label
+    # it a Reference Price with its capture date -- never "Current Price" --
+    # so the reader does not mistake it, or the margin of safety derived
+    # from it, for a live quote (Task 91 DELL price-provenance fix).
+    ref_date = signal.computed_at.strftime("%b %d")
 
     lines = [
         f"\U0001F4C5 UPCOMING EARNINGS RADAR | `{ticker}`{company_suffix} • #RADAR",
         _SEPARATOR_LINE,
         f"\U0001F552 Reporting: {reporting_line} ({session_label})",
-        f"\U0001F4B0 Current Price: ${signal.price:,.2f}  |  Fair Value: ${fair_value:,.2f}",
+        f"\U0001F4CA Reference Price ({ref_date}): ${signal.price:,.2f}  |  Fair Value: ${fair_value:,.2f}",
         f"⭐ Quality: {report.quality_score}/10  |  Moat: {report.moat_rating.value.upper()}",
         f"\U0001F6E1️ Margin of Safety: {discount_label}",
         "",
-        "\U0001F4A1 Status: Active Holding — Pipeline prepared for post-earnings re-evaluation.",
+        "\U0001F4A1 Status: Not a portfolio position — research watchlist; re-eval post-earnings.",
     ]
     return _fit_within_budget(lines, _SHORT_PUSH_MAX_CHARS, summary_line_index=7)
 

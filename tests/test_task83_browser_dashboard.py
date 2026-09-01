@@ -148,7 +148,17 @@ async def test_not_run_is_not_zero_activity(tmp_path, monkeypatch):
     unreachable = FakeRedis(unreachable=True)
     import redis as _redis
     monkeypatch.setattr(_redis, "from_url", lambda *a, **k: unreachable)
-    monkeypatch.setenv("TALONX_RUNTIME_METADATA_PATH", str(tmp_path / "nonexistent.json"))
+    # talonx_ops.runtime_metadata.RUNTIME_METADATA_PATH is bound once at
+    # import time from TALONX_RUNTIME_METADATA_PATH, so a bare setenv here
+    # is a no-op whenever an earlier test in the session already imported
+    # that module (which is why this test passed alone but failed in the
+    # full suite -- Task 91 test-hygiene). Patch the resolved constant
+    # directly so the "Original never started" scenario is deterministic
+    # regardless of collection order.
+    import talonx_ops.runtime_metadata as _rtmeta
+    missing_metadata = tmp_path / "nonexistent.json"
+    monkeypatch.setenv("TALONX_RUNTIME_METADATA_PATH", str(missing_metadata))
+    monkeypatch.setattr(_rtmeta, "RUNTIME_METADATA_PATH", missing_metadata)
 
     client = await _client(dashboard_web.build_app(piv_state_dir=tmp_path))
     try:
