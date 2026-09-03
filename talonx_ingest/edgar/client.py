@@ -266,6 +266,39 @@ class EdgarClient:
         return await self._get(url, as_json=True)
 
     # ------------------------------------------------------------------
+    # Raw passthroughs for the event-intelligence layer
+    # (talonx_ingest.intelligence.edgar_normalize). These return the
+    # UNPARSED SEC JSON; normalization/classification lives entirely in
+    # that package. Kept here only so every SEC call shares this client's
+    # one auth/rate-limit/retry/backoff path -- no new transport.
+    # ------------------------------------------------------------------
+
+    async def get_submissions(self, company: CompanyRef | str) -> dict[str, Any]:
+        """Raw `data.sec.gov/submissions/CIK##########.json` document.
+
+        Unlike `get_recent_filings` (which filters to target forms and
+        drops `acceptanceDateTime`/`items`), this returns the whole feed
+        so the event layer can read every field it needs, including the
+        causal `acceptanceDateTime` and 8-K `items` arrays. Accepts a
+        `CompanyRef` or a bare CIK string/int."""
+        cik = (
+            company.cik
+            if isinstance(company, CompanyRef)
+            else str(company).lstrip("CIK").zfill(10)
+        )
+        url = f"{self.config.submissions_base}/CIK{cik}.json"
+        return await self._get(url, as_json=True)
+
+    async def fetch_filing_index(self, cik: str | int, accession: str) -> dict[str, Any]:
+        """Raw accession `index.json` -- the `directory.item` list of every
+        document in a filing (primary doc + exhibits). Used to populate a
+        filing's exhibit references."""
+        cik_int = int(str(cik).lstrip("CIK"))
+        acc_nodash = accession.replace("-", "")
+        url = f"{self.config.archives_base}/{cik_int}/{acc_nodash}/index.json"
+        return await self._get(url, as_json=True)
+
+    # ------------------------------------------------------------------
     # Document fetch
     # ------------------------------------------------------------------
 
