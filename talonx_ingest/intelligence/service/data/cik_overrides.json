@@ -1,0 +1,3 @@
+{
+  "_README": "Explicit symbol -> CIK overrides for the intelligence ingestion service. Add an entry ONLY when the SEC company_tickers.json file is missing a ticker or maps it wrongly (e.g. a recent ticker change). Each entry: {\"cik\": \"0000000000\", \"company_name\": \"...\", \"note\": \"why this override exists + date\"}. This map wins over the SEC file. Never add a fuzzy/ambiguous mapping here. Symbols that simply do not file 8-K/10-Q/10-K belong in ServiceConfig.KNOWN_NON_FILERS, not here."
+}
