@@ -298,6 +298,29 @@ class EdgarClient:
         url = f"{self.config.archives_base}/{cik_int}/{acc_nodash}/index.json"
         return await self._get(url, as_json=True)
 
+    async def get_company_concept(
+        self, cik: str | int, taxonomy: str, concept: str
+    ) -> dict[str, Any]:
+        """Raw `data.sec.gov/api/xbrl/companyconcept/CIK##########/<taxonomy>/<concept>.json`
+        -- every reported value for one XBRL concept, across every filing,
+        each row carrying its own `filed` date and `accn`. The
+        filing-comparison engine's `xbrl` module selects the FIRST-filed
+        value per period (never a later restatement). Unparsed passthrough,
+        same auth/rate-limit/retry path as every other SEC call here."""
+        cik_int = int(str(cik).lstrip("CIK"))
+        url = (
+            f"https://data.sec.gov/api/xbrl/companyconcept/"
+            f"CIK{cik_int:010d}/{taxonomy}/{concept}.json"
+        )
+        return await self._get(url, as_json=True)
+
+    async def fetch_document(self, url: str) -> str:
+        """Fetch one filing document body (HTML/text) by absolute EDGAR
+        Archives URL, via the shared rate-limited transport. Thin wrapper
+        over `_get(..., as_json=False)` so callers outside this module do
+        not touch `_get` directly."""
+        return await self._get(url, as_json=False)
+
     # ------------------------------------------------------------------
     # Document fetch
     # ------------------------------------------------------------------
