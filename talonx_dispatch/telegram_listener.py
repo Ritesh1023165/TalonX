@@ -163,9 +163,16 @@ class TelegramReplyListener:
         dispatch_agent=None,
         poll_telemetry=None,
         bot_factory: BotFactory | None = None,
+        extra_resolvers=None,
     ):
         self.store = store
         self.config = config or DispatchConfig()
+        # Task 99A additive hook: ordered list of callables `str -> str | None`.
+        # Each is tried (before the numeric alert-ID path) against an inbound
+        # message's text; the first to return a non-None string has that string
+        # replied and handling stops. The Original application passes none, so
+        # this list is empty and the existing behaviour is byte-identical.
+        self.extra_resolvers = list(extra_resolvers or [])
         self.telegram_client = telegram_client or TelegramClient(self.config)
         # Optional -- see module docstring. Gives /ping access to
         # DispatchAgent.started_at (uptime) and its live Redis client (WS
@@ -294,6 +301,16 @@ class TelegramReplyListener:
         if message.text.strip().lower() in ("/ping", "ping"):
             await self._handle_ping()
             return
+
+        for resolver in self.extra_resolvers:
+            try:
+                reply = resolver(message.text)
+            except Exception:  # noqa: BLE001 -- a broken resolver must never kill the poller
+                logger.exception("extra reply resolver raised; ignoring")
+                continue
+            if reply is not None:
+                await self._reply(reply)
+                return
 
         parsed = _parse_alert_id(message.text)
         if parsed is None:
