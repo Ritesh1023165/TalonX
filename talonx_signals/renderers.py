@@ -223,12 +223,85 @@ def render_event_update(row: dict) -> str:
         f"Event: {_esc(row.get('event_type', 'filing'))}",
         f"Filed: {_esc(row.get('accepted_at', 'n/a'))} (SEC acceptance timestamp)",
     ]
-    for line in (row.get("material_changes") or []):
+    if row.get("current_price") is not None:
+        lines.append(f"Latest price: {_price(row['current_price'])} (reference only)")
+    for line in (row.get("material_changes") or [])[:6]:
         lines.append(f"  - {_esc(line)}")
     if row.get("insider_context"):
         lines.append(f"Insider (open-market P/S): {_esc(row['insider_context'])}")
     if row.get("significance_band"):
-        lines.append(f"Information significance: {_esc(row['significance_band'])} (attention priority, not a forecast)")
-    lines.append("Source: SEC EDGAR + deterministic 96C/96D engines. No fair-value / moat estimate.")
+        lines.append(f"Information significance: {_raw(row['significance_band'])} (attention priority, not a forecast)")
+    lines.append("Source: SEC EDGAR + deterministic 96C/96D/96E engines. No fair-value / moat / direction estimate.")
     lines.append("#EVENT")
     return _finish(lines, row["event_id"])
+
+
+def render_event_update_details(row: dict) -> str:
+    """Fuller reply-for-details view for an `E…` id."""
+    lines = [
+        f"\U0001F3DB️ POST-EARNINGS / FUNDAMENTAL UPDATE -- FULL DETAIL",
+        f"`{_esc(row['symbol'])}`{_company_suffix(row.get('company'))}",
+        "─" * 22,
+        f"Event / item: {_esc(row.get('event_type'))}",
+        f"Accession: {_raw(row.get('accession', 'n/a'))}",
+        f"SEC acceptance: {_esc(row.get('accepted_at', 'n/a'))}"
+        + (f"  ({_raw(row.get('session_bucket'))})" if row.get("session_bucket") else ""),
+    ]
+    mc = row.get("material_changes") or []
+    if mc:
+        lines.append("")
+        lines.append("What changed (deterministic 96C):")
+        for line in mc:
+            lines.append(f"  - {_esc(line)}")
+    if row.get("insider_context"):
+        lines.append("")
+        lines.append(f"Insider context (96D): {_esc(row['insider_context'])}")
+    reasons = row.get("significance_reasons") or []
+    if row.get("significance_band") or reasons:
+        lines.append("")
+        lines.append(f"Information significance (96E): {_raw(row.get('significance_band', 'n/a'))} "
+                     "-- attention priority, NOT a forecast / direction / return")
+        for r in reasons:
+            lines.append(f"  - {_esc(r)}")
+    lines += [
+        "",
+        "Provenance:",
+        f"  source: SEC EDGAR via talonx_ingest.intelligence (96A/96B); read via IntelligenceReadAPI",
+        f"  filing: {_raw(row.get('evidence_url', 'n/a'))}",
+        f"  96A event_id: {_raw(row.get('source_event_id', 'n/a'))}",
+        f"  dashboard evidence: http://127.0.0.1:8760/evidence/event/{_raw(row.get('source_event_id', ''))}",
+        f"  card id: {_raw(row['event_id'])}",
+        "",
+        "No fair value / moat / margin-of-safety (no valid free point-in-time source). Descriptive only.",
+    ]
+    text = "\n".join(lines)
+    assert_no_predictive_language(text)
+    return text
+
+
+def render_radar_details(row: dict) -> str:
+    """Fuller reply-for-details view for an `R…` id."""
+    lines = [
+        f"\U0001F4C5 UPCOMING EARNINGS RADAR -- FULL DETAIL",
+        f"`{_esc(row['symbol'])}`{_company_suffix(row.get('company'))}",
+        "─" * 22,
+        f"Expected report: {_esc(row.get('reporting_when', 'date TBC'))}",
+        f"Context: {_esc(row.get('context', ''))}",
+    ]
+    if row.get("current_price") is not None:
+        lines.append(f"Current price: {_price(row['current_price'])} (reference only)")
+    if row.get("holding_status"):
+        lines.append(f"Watch / holding status: {_esc(row['holding_status'])}")
+    lines += [
+        "",
+        "Provenance:",
+        "  source: talonx_watchlist.upcoming_earnings (yfinance `.calendar`, free / £0)",
+        "  synced by: run_talonx periodic earnings-calendar sync loop",
+        "  note: date is an ESTIMATE; session (BMO/AMC) usually UNSPECIFIED from Yahoo",
+        f"  card id: {_raw(row['radar_id'])}",
+        "",
+        "No fair value / moat / margin-of-safety shown (no valid free source).",
+    ]
+    text = "\n".join(lines)
+    assert_no_predictive_language(text)
+    return text

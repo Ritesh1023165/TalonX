@@ -23,9 +23,9 @@ from typing import Callable
 from talonx_signals.alert_store import ExperimentalAlertStore
 from talonx_signals.renderers import (
     render_directional_details,
-    render_event_update,
+    render_event_update_details,
     render_experimental_trade,
-    render_radar,
+    render_radar_details,
 )
 
 _PATTERN = re.compile(r"^\s*/?(?:details\s+)?#?([DXRE])([0-9a-fA-F]{6,32})\s*$", re.IGNORECASE)
@@ -48,10 +48,10 @@ def make_reply_resolver(store: ExperimentalAlertStore) -> Callable[[str], str | 
             return render_experimental_trade(row) if row else _missing("experimental trade", public_id)
         if prefix == "R":
             row = store.get_radar(public_id)
-            return render_radar(row) if row else _missing("earnings radar item", public_id)
+            return render_radar_details(row) if row else _missing("earnings radar item", public_id)
         if prefix == "E":
             row = store.get_event_update(public_id)
-            return render_event_update(row) if row else _missing("event update", public_id)
+            return render_event_update_details(row) if row else _missing("event update", public_id)
         return None  # unreachable
 
     return resolve

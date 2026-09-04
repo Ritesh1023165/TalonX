@@ -72,13 +72,19 @@ CREATE TABLE IF NOT EXISTS radar_alerts (
 );
 CREATE TABLE IF NOT EXISTS event_updates (
     event_id TEXT PRIMARY KEY,
+    source_event_id TEXT,
     symbol TEXT NOT NULL,
     company TEXT,
     event_type TEXT,
     accepted_at TEXT,
+    session_bucket TEXT,
+    current_price REAL,
     material_changes TEXT,
     insider_context TEXT,
     significance_band TEXT,
+    significance_reasons TEXT,
+    accession TEXT,
+    evidence_url TEXT,
     sent INTEGER NOT NULL DEFAULT 0,
     send_error TEXT,
     created_at TEXT NOT NULL
@@ -173,10 +179,12 @@ class ExperimentalAlertStore:
 
     def record_event_update(self, row: dict) -> bool:
         r = {k: row.get(k) for k in (
-            "event_id", "symbol", "company", "event_type", "accepted_at",
-            "insider_context", "significance_band",
+            "event_id", "source_event_id", "symbol", "company", "event_type", "accepted_at",
+            "session_bucket", "current_price", "insider_context", "significance_band",
+            "accession", "evidence_url",
         )}
         r["material_changes"] = json.dumps(row.get("material_changes") or [])
+        r["significance_reasons"] = json.dumps(row.get("significance_reasons") or [])
         r["created_at"] = _now()
         return self._insert_or_ignore("event_updates", r)
 
@@ -236,11 +244,14 @@ class ExperimentalAlertStore:
 
     def get_event_update(self, event_id: str) -> dict | None:
         row = self._one("event_updates", event_id)
-        if row and isinstance(row.get("material_changes"), str):
-            try:
-                row["material_changes"] = json.loads(row["material_changes"])
-            except ValueError:
-                row["material_changes"] = []
+        if not row:
+            return row
+        for k in ("material_changes", "significance_reasons"):
+            if isinstance(row.get(k), str):
+                try:
+                    row[k] = json.loads(row[k])
+                except ValueError:
+                    row[k] = []
         return row
 
     def _one(self, table: str, pk: str) -> dict | None:

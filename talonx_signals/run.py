@@ -35,6 +35,7 @@ import json
 import logging
 import signal
 import sys
+from datetime import datetime, timedelta, timezone
 
 from talonx_signals.config import ExperimentalConfig, validate_experimental_isolation
 from talonx_signals.alert_store import ExperimentalAlertStore
@@ -42,6 +43,14 @@ from talonx_signals.dashboard import ExperimentalDashboard
 from talonx_signals.directional import DirectionalAlertEngine
 from talonx_signals.dispatcher import ExperimentalDispatcher, NullSender, TelegramSenderAdapter
 from talonx_signals.experimental_paper import ExperimentalPaperEngine
+from talonx_signals.intelligence_bridge import (
+    BridgeMetrics,
+    EarningsRadarBridge,
+    PostEarningsBridge,
+    bridge_health,
+    overnight_event_labels,
+)
+from talonx_signals.premarket import PremarketSymbolInput, PremarketWatchEngine
 from talonx_signals.relaxed_profile import assert_control_profile_unchanged, build_experimental_quant_config
 from talonx_signals.schemas import PROFILE_CONTROL, PROFILE_EXPERIMENTAL, TradeGateStatus
 from talonx_signals.telemetry import ForwardOutcomeRecorder, ForwardOutcomeStore
@@ -67,6 +76,16 @@ class ExperimentalLane:
         )
         self.dir_control = DirectionalAlertEngine()
         self.dir_experimental = DirectionalAlertEngine(config=build_experimental_quant_config(cfg))
+        # Task 99B -- live intelligence bridge
+        self.radar_bridge = EarningsRadarBridge()
+        self.post_earnings_bridge = PostEarningsBridge()
+        self.bridge_metrics = BridgeMetrics()
+        self.premarket_engine = PremarketWatchEngine()
+        self._intel_api = None            # lazily opened IntelligenceReadAPI
+        self._watchlist = None
+        self._last_price: dict[str, float] = {}
+        self._premarket_bundle = None
+        self._effective_symbols: list[str] = []
         self._stop = asyncio.Event()
 
     # ------------------------------------------------------------------
@@ -122,6 +141,7 @@ class ExperimentalLane:
         pubsub = client.pubsub()
         channels = [_CONTROL_SIGNALS, _CONTROL_REJECTED,
                     self.cfg.signals_channel, self.cfg.rejected_candidates_channel]
+        channels = channels + ["talonx:market:stream"]   # price cache only (read-only)
         await pubsub.subscribe(*channels)
         logger.info("subscribed: %s", channels)
         try:
@@ -133,6 +153,12 @@ class ExperimentalLane:
                     payload = json.loads(msg["data"])
                 except (ValueError, TypeError):
                     continue
+                if msg["channel"] == "talonx:market:stream":
+                    px = payload.get("price") or payload.get("close")
+                    sym = str(payload.get("symbol") or payload.get("ticker") or "").upper()
+                    if sym and px is not None:
+                        self._last_price[sym] = float(px)
+                    continue
                 try:
                     await self.handle_message(msg["channel"], payload)
                 except Exception:  # noqa: BLE001 - one bad message never stops the lane
@@ -141,9 +167,101 @@ class ExperimentalLane:
             await pubsub.unsubscribe()
             await client.aclose()
 
+    # ------------------------------------------------------------------
+    # Task 99B -- live intelligence bridge
+    # ------------------------------------------------------------------
+    def _open_intel(self):
+        if self._intel_api is None:
+            from talonx_ingest.intelligence.dashboard.readapi import IntelligenceReadAPI
+
+            self._intel_api = IntelligenceReadAPI()
+        if self._watchlist is None:
+            from talonx_watchlist.config import WatchlistConfig
+            from talonx_watchlist.store import TickerWatchlistStore
+
+            self._watchlist = TickerWatchlistStore(WatchlistConfig().db_path)
+        return self._intel_api, self._watchlist
+
+    def _price(self, symbol: str) -> float | None:
+        return self._last_price.get(symbol.upper())
+
+    async def bridge_cycle(self, *, now: datetime | None = None) -> dict:
+        now = now or datetime.now(timezone.utc)
+        api, wl = self._open_intel()
+        result = {"radar": 0, "events": 0, "errors": 0}
+        try:
+            upcoming = wl.list_upcoming_earnings()
+            self._effective_symbols = sorted({str(r["ticker"]).upper() for r in upcoming}) or None
+            radar_rows = self.radar_bridge.build_rows(upcoming, now=now, price_lookup=self._price)
+            self.bridge_metrics.radar_rows_built += len(radar_rows)
+            for row in radar_rows:
+                r = await self.dispatcher.dispatch_radar(row)
+                if r not in ("DUPLICATE",):
+                    self.bridge_metrics.radar_dispatched += 1
+                    result["radar"] += 1
+            self.bridge_metrics.last_radar_refresh_utc = now.isoformat()
+        except Exception:  # noqa: BLE001
+            logger.exception("earnings radar bridge cycle failed")
+            self.bridge_metrics.bridge_failures += 1
+            result["errors"] += 1
+        try:
+            since = now - timedelta(days=3)
+            ev_rows = self.post_earnings_bridge.scan(api, since=since, price_lookup=self._price)
+            self.bridge_metrics.event_rows_built += len(ev_rows)
+            for row in ev_rows:
+                r = await self.dispatcher.dispatch_event_update(row)
+                if r not in ("DUPLICATE",):
+                    self.bridge_metrics.event_dispatched += 1
+                    result["events"] += 1
+            self.bridge_metrics.last_event_bridge_utc = now.isoformat()
+        except Exception:  # noqa: BLE001
+            logger.exception("post-earnings bridge cycle failed")
+            self.bridge_metrics.bridge_failures += 1
+            result["errors"] += 1
+        return result
+
+    async def refresh_premarket(self, *, now: datetime | None = None):
+        now = now or datetime.now(timezone.utc)
+        try:
+            api, wl = self._open_intel()
+            upcoming = {str(r["ticker"]).upper(): r for r in wl.list_upcoming_earnings()}
+            overnight = overnight_event_labels(
+                api, self._effective_symbols, since=now - timedelta(hours=18),
+            )
+            syms = sorted(set(self._last_price) | set(upcoming) | set(overnight))
+            inputs = []
+            for s in syms:
+                ue = upcoming.get(s)
+                inputs.append(PremarketSymbolInput(
+                    symbol=s,
+                    latest_price=self._last_price.get(s),
+                    earnings_when=(str(ue["earnings_date"]) if ue else None),
+                    overnight_events=tuple(overnight.get(s, ())),
+                ))
+            self._premarket_bundle = self.premarket_engine.assess(
+                inputs, now=now, watchlist_configured=len(syms), watchlist_active=len(syms),
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("premarket refresh failed")
+        return self._premarket_bundle
+
+    async def _bridge_loop(self, interval_seconds: float) -> None:
+        # first pass immediately, then every `interval_seconds`
+        while not self._stop.is_set():
+            await self.bridge_cycle()
+            await self.refresh_premarket()
+            try:
+                await asyncio.wait_for(self._stop.wait(), timeout=interval_seconds)
+            except asyncio.TimeoutError:
+                pass
+
+    def premarket_provider(self):
+        return self._premarket_bundle
+
     def health(self) -> dict:
-        return {
-            "market_feed": {"status": "up" if not self._stop.is_set() else "down"},
+        base = {
+            "market_feed": {"status": "up" if not self._stop.is_set() else "down",
+                            "detail": f"{len(self._last_price)} symbols priced"},
             "control_strategy": {"status": "healthy", "detail": "run_talonx.py (separate process)"},
             "experimental_strategy": {"status": "healthy", "detail": PROFILE_EXPERIMENTAL},
             "dispatcher": {"status": "healthy",
@@ -151,6 +269,15 @@ class ExperimentalLane:
             "paper_engine": {"status": "healthy", "detail": str(self.cfg.paper_db_path)},
             "telegram": {"status": "healthy" if self.dispatcher.enable_external_send else "degraded"},
         }
+        try:
+            api, wl = self._open_intel()
+            bh = bridge_health(api, wl.list_upcoming_earnings(), self.bridge_metrics)
+            base["intelligence_service"] = bh["intelligence_source"]
+            base["earnings_source"] = bh["earnings_source"]
+            base["intelligence_bridge"] = bh["dispatch_bridge"]
+        except Exception:  # noqa: BLE001
+            base["intelligence_service"] = {"status": "idle", "detail": "not opened"}
+        return base
 
     def stop(self) -> None:
         self._stop.set()
@@ -159,12 +286,19 @@ class ExperimentalLane:
         self.alert_store.close()
         self.outcome_store.close()
         self.paper.close()
+        for h in (self._intel_api, self._watchlist):
+            try:
+                h and h.close()
+            except Exception:  # noqa: BLE001
+                pass
 
 
 async def _serve_dashboard(lane: ExperimentalLane, host: str, port: int) -> None:
     from aiohttp import web
 
-    board = ExperimentalDashboard(lane.alert_store, lane.outcome_store, health_provider=lane.health)
+    board = ExperimentalDashboard(lane.alert_store, lane.outcome_store,
+                                  health_provider=lane.health,
+                                  premarket_provider=lane.premarket_provider)
 
     async def _index(_req):
         return web.Response(text=board.render(), content_type="text/html")
@@ -234,6 +368,7 @@ async def _amain(args: argparse.Namespace) -> int:
         asyncio.create_task(scanner.run(), name="exp-quant-scanner"),
         asyncio.create_task(lane.consume(), name="exp-directional-consumer"),
         asyncio.create_task(_serve_dashboard(lane, args.host, args.port), name="exp-dashboard"),
+        asyncio.create_task(lane._bridge_loop(args.bridge_interval), name="exp-intel-bridge"),
     ]
     try:
         await lane._stop.wait()
@@ -259,6 +394,8 @@ def main() -> None:
                     help="explicitly enable external Telegram delivery (default: dry-run)")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8770)
+    ap.add_argument("--bridge-interval", type=float, default=300.0,
+                    help="seconds between live-intelligence bridge cycles")
     args = ap.parse_args()
     try:
         sys.exit(asyncio.run(_amain(args)))

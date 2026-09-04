@@ -94,6 +94,7 @@ class ExperimentalDashboard:
         parts = [
             self._system_health(),
             self._premarket(),
+            f'<div class="grid2">{self._earnings_radar()}{self._intelligence_events()}</div>',
             f'<div class="grid2">{self._latest_directional("BULLISH")}{self._latest_directional("BEARISH")}</div>',
             self._experimental_trades(),
             self._control_vs_experimental(),
@@ -147,6 +148,37 @@ class ExperimentalDashboard:
                           + _table(["symbol", "kind", "gap%", "detail"], _rows(d.get(key))))
         cov = f'<div class="muted">watchlist {d.get("watchlist_covered")}/{d.get("watchlist_active")} covered</div>'
         return f"<section><h2>Pre-market</h2>{cov}{''.join(blocks)}</section>"
+
+    def _earnings_radar(self) -> str:
+        with self.alert_store._lock:  # noqa: SLF001
+            rows = [dict(r) for r in self.alert_store._conn.execute(
+                "SELECT * FROM radar_alerts ORDER BY reporting_when LIMIT 60"
+            ).fetchall()]
+        tbl = _table(
+            ["symbol", "expected report", "price", "status", "context"],
+            [[r["symbol"], r.get("reporting_when"), _num(r.get("current_price")),
+              r.get("holding_status") or "-", r.get("context")] for r in rows],
+        )
+        return (f"<section><h2>Earnings Radar "
+                f'<span class="muted">(watchlist calendar, yfinance / free)</span></h2>{tbl}</section>')
+
+    def _intelligence_events(self) -> str:
+        with self.alert_store._lock:  # noqa: SLF001
+            rows = [dict(r) for r in self.alert_store._conn.execute(
+                "SELECT * FROM event_updates ORDER BY accepted_at DESC LIMIT 60"
+            ).fetchall()]
+        def _band(b):
+            cls = {"CRITICAL": "bad", "HIGH": "warn", "MEDIUM": "muted", "LOW": "muted"}.get(str(b), "muted")
+            return _span(f"pill {cls}", b or "-")
+        tbl = _table(
+            ["accepted", "symbol", "event", "significance", "evidence"],
+            [[r.get("accepted_at"), r["symbol"], r.get("event_type"), _band(r.get("significance_band")),
+              _Raw(f'<a href="http://127.0.0.1:8760/evidence/event/{_e(r.get("source_event_id") or "")}">96G</a>')
+              if r.get("source_event_id") else "-"] for r in rows],
+        )
+        return (f"<section><h2>Live Intelligence Events "
+                f'<span class="muted">(SEC 8-K 2.02 / 10-Q / 10-K -- descriptive, not a forecast)</span>'
+                f"</h2>{tbl}</section>")
 
     def _latest_directional(self, direction: str) -> str:
         rows = [

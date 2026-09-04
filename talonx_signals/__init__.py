@@ -59,6 +59,13 @@ from talonx_signals.telemetry import (
 )
 from talonx_signals.dashboard import ExperimentalDashboard, make_app as make_dashboard_app
 from talonx_signals.experimental_paper import ExperimentalPaperEngine
+from talonx_signals.intelligence_bridge import (
+    BridgeMetrics,
+    EarningsRadarBridge,
+    PostEarningsBridge,
+    bridge_health,
+    overnight_event_labels,
+)
 
 __all__ += [
     "ExperimentalAlertStore",
@@ -73,4 +80,9 @@ __all__ += [
     "ExperimentalDashboard",
     "make_dashboard_app",
     "ExperimentalPaperEngine",
+    "EarningsRadarBridge",
+    "PostEarningsBridge",
+    "BridgeMetrics",
+    "bridge_health",
+    "overnight_event_labels",
 ]
