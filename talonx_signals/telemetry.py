@@ -17,12 +17,17 @@ Never touches CONTROL / PIV / dispatch / paper databases.
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+from talonx_signals import market_sessions
+
+logger = logging.getLogger("talonx_signals.telemetry")
 
 HORIZONS = ("30m", "60m", "eod", "1d")
 _STATUS_ORDER = ("PENDING_30M", "PENDING_60M", "PENDING_EOD", "PENDING_1D", "COMPLETE")
@@ -162,6 +167,41 @@ class ForwardOutcomeStore:
                 "SELECT * FROM forward_observations WHERE status != 'COMPLETE'"
             ).fetchall()]
 
+    def pending_for_symbol(self, symbol: str) -> list[dict]:
+        """Task 99G -- the live-wiring lookup: every open (non-COMPLETE)
+        observation for one symbol, so a single incoming market bar can be
+        applied to all of them in one pass. A symbol with no open
+        observations is a fast, empty-list no-op (indexed on `symbol`)."""
+        with self._lock:
+            return [dict(r) for r in self._conn.execute(
+                "SELECT * FROM forward_observations WHERE symbol=? AND status != 'COMPLETE'",
+                (symbol.upper(),),
+            ).fetchall()]
+
+    def summary(self) -> dict[str, Any]:
+        """Task 99G -- narrow health snapshot for the live dashboard/health
+        endpoint. One pass, no N+1."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT status, r_30m, r_60m, r_eod, r_1d FROM forward_observations"
+            ).fetchall()
+        out = {
+            "total": len(rows), "pending": 0,
+            "resolved_30m": 0, "resolved_60m": 0, "resolved_eod": 0, "resolved_1d": 0,
+        }
+        for r in rows:
+            if r["status"] != "COMPLETE":
+                out["pending"] += 1
+            if r["r_30m"] is not None:
+                out["resolved_30m"] += 1
+            if r["r_60m"] is not None:
+                out["resolved_60m"] += 1
+            if r["r_eod"] is not None:
+                out["resolved_eod"] += 1
+            if r["r_1d"] is not None:
+                out["resolved_1d"] += 1
+        return out
+
 
 class ForwardOutcomeRecorder:
     """Idempotent. ``open_*`` creates the row; ``on_price`` advances MFE/MAE and
@@ -218,6 +258,17 @@ class ForwardOutcomeRecorder:
 
     # ---- fill ----
     def on_price(self, obs_id: str, ts: datetime, price: float) -> None:
+        """Apply ONE causal price observation to ONE observation. Never uses
+        a price before `alert_ts`. Idempotent: a horizon already resolved
+        (its `r_*` field non-None) is never touched again -- calling this
+        repeatedly, with duplicate or out-of-order ticks, is always safe.
+
+        Task 99G: also resolves `+eod`/`+1d` from this SAME causal tick
+        stream (real NYSE session-close instants via `market_sessions`,
+        never a wall-clock snapshot) -- no separate scheduler, no second
+        polling loop. A tick strictly before the relevant close instant
+        never resolves it; the first tick at-or-after does."""
+        ts = _as_utc(ts)
         row = self.store._get(obs_id)
         if row is None or row["status"] == "COMPLETE":
             return
@@ -227,7 +278,7 @@ class ForwardOutcomeRecorder:
             return
         ret = (price - ref) / ref * 100.0
         updates: dict[str, Any] = {}
-        # running extremes (in % terms)
+        # running extremes (in % terms) -- only ts > t0 bars ever reach here
         mfe = max(row.get("mfe") or 0.0, ret)
         mae = min(row.get("mae") or 0.0, ret)
         updates["mfe"], updates["mae"] = mfe, mae
@@ -236,8 +287,49 @@ class ForwardOutcomeRecorder:
             updates.update(self._resolve_field(row, "30m", ret))
         if elapsed >= self.windows.m60 and row["r_60m"] is None:
             updates.update(self._resolve_field(row, "60m", ret))
+
+        alert_date = t0.astimezone(market_sessions.ET).date()
+        if row["r_eod"] is None:
+            try:
+                eod_close = market_sessions.session_close_utc(alert_date)
+            except Exception:  # noqa: BLE001 - a calendar failure must never break price updates
+                logger.exception("session_close_utc failed for obs %s; EOD left pending", obs_id)
+                eod_close = None
+            if eod_close is not None and ts >= eod_close:
+                updates.update(self._resolve_field(row, "eod", ret))
+
+        eod_now_resolved = updates.get("r_eod", row.get("r_eod")) is not None
+        if eod_now_resolved and row["r_1d"] is None:
+            try:
+                next_close = market_sessions.next_session_close_utc(alert_date)
+            except Exception:  # noqa: BLE001
+                logger.exception("next_session_close_utc failed for obs %s; +1D left pending", obs_id)
+                next_close = None
+            if next_close is not None and ts >= next_close:
+                updates.update(self._resolve_field(row, "1d", ret))
+
         updates["status"] = self._advance_status(row, updates)
         self.store._update(obs_id, **updates)
+
+    def on_market_bar(self, symbol: str, ts: datetime, price: float) -> int:
+        """Task 99G -- the live-wiring entry point. Apply one incoming market
+        bar (already flowing through the existing talonx:market:stream
+        subscription -- no new polling loop) to every OPEN observation for
+        `symbol`. A malformed/failing row is logged and skipped; it never
+        stops the rest of the batch or the caller's own message loop.
+        Returns the number of observations found for this symbol (0 is the
+        normal, fast case for a symbol with nothing pending)."""
+        try:
+            rows = self.store.pending_for_symbol(symbol)
+        except Exception:  # noqa: BLE001
+            logger.exception("pending_for_symbol lookup failed for %s", symbol)
+            return 0
+        for row in rows:
+            try:
+                self.on_price(row["obs_id"], ts, price)
+            except Exception:  # noqa: BLE001 - one bad row must never break the batch
+                logger.exception("on_price failed for obs %s (%s)", row["obs_id"], symbol)
+        return len(rows)
 
     def resolve_eod(self, obs_id: str, eod_price: float) -> None:
         self._resolve_boundary(obs_id, "eod", eod_price)

@@ -62,6 +62,21 @@ _CONTROL_SIGNALS = "talonx:signals:quant"
 _CONTROL_REJECTED = "talonx:quant:rejected"
 
 
+def _parse_event_ts(raw: str | None) -> datetime | None:
+    """Task 99G -- the bar's OWN market timestamp (never wall-clock "now"),
+    for causal forward-outcome advancement. Returns None (never fabricates a
+    time) if the payload carries no usable timestamp -- that bar is simply
+    not used to advance telemetry, same fail-closed posture as everywhere
+    else in this module."""
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
 class ExperimentalLane:
     def __init__(self, cfg: ExperimentalConfig, *, enable_external_send: bool = False):
         self.cfg = cfg
@@ -158,6 +173,17 @@ class ExperimentalLane:
                     sym = str(payload.get("symbol") or payload.get("ticker") or "").upper()
                     if sym and px is not None:
                         self._last_price[sym] = float(px)
+                        # Task 99G -- advance forward-outcome telemetry from this
+                        # SAME live tick (no separate polling loop). A malformed
+                        # timestamp or a lookup failure is fully isolated inside
+                        # on_market_bar and must never break this message loop.
+                        raw_ts = payload.get("timestamp") or payload.get("published_at")
+                        bar_ts = _parse_event_ts(raw_ts)
+                        if bar_ts is not None:
+                            try:
+                                self.recorder.on_market_bar(sym, bar_ts, float(px))
+                            except Exception:  # noqa: BLE001
+                                logger.exception("forward-outcome bar update failed for %s", sym)
                     continue
                 try:
                     await self.handle_message(msg["channel"], payload)
@@ -269,6 +295,20 @@ class ExperimentalLane:
             "paper_engine": {"status": "healthy", "detail": str(self.cfg.paper_db_path)},
             "telegram": {"status": "healthy" if self.dispatcher.enable_external_send else "degraded"},
         }
+        try:
+            fo = self.outcome_store.summary()
+            base["forward_outcomes"] = {
+                "status": "healthy",
+                "detail": (f"{fo['pending']} pending / {fo['total']} total -- "
+                          f"resolved 30m={fo['resolved_30m']} 60m={fo['resolved_60m']} "
+                          f"eod={fo['resolved_eod']} 1d={fo['resolved_1d']}"),
+                "pending": fo["pending"], "total": fo["total"],
+                "resolved_30m": fo["resolved_30m"], "resolved_60m": fo["resolved_60m"],
+                "resolved_eod": fo["resolved_eod"], "resolved_1d": fo["resolved_1d"],
+                "last_update": datetime.now(timezone.utc).isoformat(),
+            }
+        except Exception:  # noqa: BLE001
+            base["forward_outcomes"] = {"status": "degraded", "detail": "summary unavailable"}
         try:
             api, wl = self._open_intel()
             bh = bridge_health(api, wl.list_upcoming_earnings(), self.bridge_metrics)
