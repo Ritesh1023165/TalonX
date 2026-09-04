@@ -55,11 +55,18 @@ def _span(cls: str, text: Any) -> _Raw:
     return _Raw(f'<span class="{cls}">{_e(text)}</span>')
 
 
+_EM_DASH = "—"  # em dash -- the literal Unicode char, NOT the HTML entity.
+# `_table` escapes every non-_Raw cell value, so an "&mdash;" placeholder in a
+# DATA cell is escaped to "&amp;mdash;" and shows literally as "&mdash;" in the
+# browser. Emitting the real "—" renders correctly and keeps escaping
+# untouched (html.escape does not alter it).
+
+
 def _num(v: Any, digits: int = 2) -> str:
     try:
         return f"{float(v):.{digits}f}"
     except (TypeError, ValueError):
-        return "&mdash;"
+        return _EM_DASH
 
 
 def _table(headers: list[str], rows: list[list[Any]]) -> str:
@@ -104,10 +111,10 @@ class ExperimentalDashboard:
         return (
             "<!doctype html><meta charset=utf-8><title>TalonX Experimental Signals</title>"
             f"<style>{_STYLE}</style>"
-            "<header><h1>TalonX &mdash; Experimental Signal Telemetry "
-            '<span class="muted">(EXPERIMENTAL_RELAXED_V1 &middot; paper-only &middot; observational)</span></h1></header>'
+            "<header><h1>TalonX — Experimental Signal Telemetry "
+            '<span class="muted">(EXPERIMENTAL_RELAXED_V1 · paper-only · observational)</span></h1></header>'
             f"<main>{''.join(parts)}</main>"
-            f'<footer>rendered {now} &middot; read-only &middot; no execution controls on this page</footer>'
+            f'<footer>rendered {now} · read-only · no execution controls on this page</footer>'
         )
 
     # ------------------------------------------------------------------
@@ -127,7 +134,7 @@ class ExperimentalDashboard:
             extra.append(f'last event: {_e(h["last_event_at"])}')
         if h.get("coverage"):
             extra.append(f'coverage: {_e(h["coverage"])}')
-        note = f'<div class="muted">{" &middot; ".join(extra)}</div>' if extra else ""
+        note = f'<div class="muted">{" · ".join(extra)}</div>' if extra else ""
         return f"<section><h2>System Health</h2>{_table(['component','status','detail'], rows)}{note}</section>"
 
     def _premarket(self) -> str:
@@ -253,7 +260,7 @@ class ExperimentalDashboard:
             ["directional alerts", c_n, e_n],
             ["  bullish", c_b, e_b],
             ["  bearish", c_r, e_r],
-            ["experimental BUYs", "&mdash;", e_trades],
+            ["experimental BUYs", _EM_DASH, e_trades],
         ]
         rej_rows = sorted(set(c_rej) | set(e_rej))
         for reason in rej_rows:
@@ -275,7 +282,7 @@ class ExperimentalDashboard:
             ] for r in sorted(rows, key=lambda r: r.get("alert_ts") or "", reverse=True)[:60]],
         )
         return (f"<section><h2>Forward Outcomes "
-                f'<span class="muted">({pending} pending / {len(rows)} total &middot; +1D fills next session)</span>'
+                f'<span class="muted">({pending} pending / {len(rows)} total · +1D fills next session)</span>'
                 f"</h2>{tbl}</section>")
 
 

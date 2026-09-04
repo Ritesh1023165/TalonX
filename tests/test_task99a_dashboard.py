@@ -102,6 +102,33 @@ def test_html_escaping_of_untrusted_text(stores):
     assert "&lt;script&gt;" in out
 
 
+def test_missing_numeric_cells_render_real_em_dash_not_html_entity(stores):
+    """Task 99E -- a missing numeric value (e.g. an Earnings RADAR row has no
+    gap) must show the literal Unicode "—", never the HTML entity "&mdash;"
+    (which _table would escape to "&amp;mdash;" and display literally)."""
+    a, o = stores
+    a.record_radar(dict(radar_id="Rtask99e00000001", symbol="AAPL", company="Apple Inc.",
+                        reporting_when="2026-10-29", current_price=None, holding_status=None,
+                        context="reports in 55 day(s)"))
+    out = ExperimentalDashboard(a, o).render()
+    assert "&mdash;" not in out          # not the literal escaped entity
+    assert "&amp;mdash;" not in out      # not double-escaped either
+    assert "—" in out                    # the real em dash is present
+    # and it appears in the Earnings Radar row for AAPL (gap/price columns)
+    radar_seg = out.split("Earnings Radar")[1].split("</section>")[0]
+    assert "AAPL" in radar_seg and "—" in radar_seg
+
+
+def test_html_escaping_still_safe_after_em_dash_fix(stores):
+    """Fixing the placeholder must not weaken cell escaping."""
+    a, o = stores
+    a.record_radar(dict(radar_id="Rtask99e00000002", symbol="AAPL",
+                        context="<script>alert(1)</script>", reporting_when="2026-10-29"))
+    out = ExperimentalDashboard(a, o).render()
+    assert "<script>alert(1)</script>" not in out
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in out
+
+
 def test_no_short_or_order_controls_anywhere(stores):
     a, o = stores
     a.record_directional(_alert())
