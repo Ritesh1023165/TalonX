@@ -111,6 +111,23 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# Columns added to a table AFTER its first shipped version. `CREATE TABLE IF
+# NOT EXISTS` never alters an existing table, so a DB created by an earlier
+# build keeps the old shape -- apply these idempotently on open (same
+# PRAGMA table_info + ALTER TABLE pattern talonx_watchlist/store.py and
+# talonx_core/store.py use). Additive only; never drops or retypes a column.
+_ADDED_COLUMNS: dict[str, list[tuple[str, str]]] = {
+    "event_updates": [
+        ("source_event_id", "TEXT"),
+        ("session_bucket", "TEXT"),
+        ("current_price", "REAL"),
+        ("significance_reasons", "TEXT"),
+        ("accession", "TEXT"),
+        ("evidence_url", "TEXT"),
+    ],
+}
+
+
 class ExperimentalAlertStore:
     def __init__(self, db_path: str | Path):
         self.db_path = str(db_path)
@@ -121,7 +138,15 @@ class ExperimentalAlertStore:
         with self._lock:
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.executescript(_DDL)
+            self._migrate()
             self._conn.commit()
+
+    def _migrate(self) -> None:
+        for table, cols in _ADDED_COLUMNS.items():
+            existing = {r[1] for r in self._conn.execute(f"PRAGMA table_info({table})")}
+            for name, decl in cols:
+                if name not in existing:
+                    self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
 
     def close(self) -> None:
         with self._lock:

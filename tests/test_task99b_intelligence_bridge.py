@@ -299,6 +299,50 @@ def test_radar_and_event_idempotent_through_dispatch(tmp_path):
 # real 96A replay (guarded)
 # ---------------------------------------------------------------------------
 
+def test_alert_store_migrates_stale_event_updates_schema(tmp_path):
+    """A DB created before 99B added the extra event_updates columns must be
+    upgraded in place on open (idempotent ALTER TABLE), not left crashing
+    record_event_update. Reproduces the Task 99C live-startup defect."""
+    import sqlite3
+
+    p = tmp_path / "stale.db"
+    old = sqlite3.connect(p)
+    old.executescript(
+        "CREATE TABLE event_updates (event_id TEXT PRIMARY KEY, symbol TEXT NOT NULL, "
+        "company TEXT, event_type TEXT, accepted_at TEXT, material_changes TEXT, "
+        "insider_context TEXT, significance_band TEXT, sent INTEGER NOT NULL DEFAULT 0, "
+        "send_error TEXT, created_at TEXT NOT NULL);"
+    )
+    old.execute(
+        "INSERT INTO event_updates (event_id, symbol, created_at) VALUES (?,?,?)",
+        ("Eold0000000000aa", "AAPL", "2026-08-01T00:00:00+00:00"),
+    )
+    old.commit()
+    old.close()
+
+    store = ExperimentalAlertStore(p)
+    cols = {r[1] for r in store._conn.execute("PRAGMA table_info(event_updates)")}
+    assert {"source_event_id", "session_bucket", "current_price",
+            "significance_reasons", "accession", "evidence_url"} <= cols
+    # pre-existing row preserved
+    assert store._conn.execute("SELECT COUNT(*) FROM event_updates").fetchone()[0] == 1
+    # and a full 99B row now inserts cleanly
+    ok = store.record_event_update({
+        "event_id": "Enew0000000000bb", "source_event_id": "SEC:x:EARNINGS_RESULTS",
+        "symbol": "MSFT", "event_type": "8-K Item 2.02", "accepted_at": "2026-08-20T20:00:00+00:00",
+        "session_bucket": "AMC", "current_price": 400.0, "material_changes": ["x"],
+        "significance_reasons": ["y"], "accession": "0001-26-1", "evidence_url": "http://x",
+        "significance_band": "HIGH",
+    })
+    assert ok
+    row = store.get_event_update("Enew0000000000bb")
+    assert row["source_event_id"] == "SEC:x:EARNINGS_RESULTS" and row["material_changes"] == ["x"]
+    store.close()
+
+    # re-open is a no-op (idempotent)
+    ExperimentalAlertStore(p).close()
+
+
 _REPLAY = Path("results/task99b_live_intelligence_bridge/_replay_ledger.db")
 
 
