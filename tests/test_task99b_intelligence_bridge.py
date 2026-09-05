@@ -224,7 +224,12 @@ def test_post_earnings_detail_has_provenance_and_evidence_link():
     api = FakeIntelAPI()
     row = PostEarningsBridge().scan(api)[0]
     d = render_event_update_details(row)
-    assert "Accession:" in d and "96A event_id:" in d
+    # Task 99H: static provenance labels containing a literal "_" are now
+    # Markdown-escaped in the source template (`event\_id`) so Telegram's
+    # legacy Markdown parser never treats them as an italic delimiter;
+    # Telegram strips the backslash on render, so the reader still sees
+    # "96A event_id:" unchanged.
+    assert "Accession:" in d and r"96A event\_id:" in d
     assert "127.0.0.1:8760/evidence/event/" in d
 
 

@@ -87,7 +87,12 @@ def test_experimental_buy_and_sell_render():
     buy = render_experimental_trade(_trade("BUY"))
     sell = render_experimental_trade(_trade("SELL"))
     assert "EXPERIMENTAL BUY (paper)" in buy
-    assert "Admitted by: relaxed_confluence" in buy
+    # Task 99H: `admitted_by` is an internal identifier routed through
+    # `_raw()`, which now Markdown-escapes underscores (`_` -> `\_`) so
+    # Telegram's legacy Markdown parser never treats it as an italic
+    # delimiter -- Telegram strips the backslash on render, so the human
+    # reads "relaxed_confluence" unchanged; only the raw string differs.
+    assert r"Admitted by: relaxed\_confluence" in buy
     assert "EXPERIMENTAL SELL / EXIT (paper)" in sell
     assert "Closes an existing experimental LONG only -- never a short." in sell
     assert "R multiple: 1.44" in sell

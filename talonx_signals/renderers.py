@@ -42,12 +42,30 @@ def assert_no_predictive_language(text: str) -> None:
 
 
 def _raw(value: Any) -> str:
-    """Controlled values (our own enum members / identifiers / hashtags) --
-    per docs/modules/dispatch.md these are from our schemas and never need
-    Markdown escaping. Also unwraps ``Enum`` -> its ``.value``."""
+    """Values we control the origin of (our own enum members / identifiers /
+    hashtags) -- i.e. never externally injectable. Also unwraps ``Enum`` ->
+    its ``.value``.
+
+    Task 99H correction: "controlled" (not externally injectable) is NOT the
+    same property as "Markdown-safe". Telegram's legacy Markdown parser does
+    not know or care where a character came from -- a literal `_`/`*`/`` ` ``/
+    `[` toggles an entity regardless of provenance. Every enum in
+    `talonx_signals.schemas` is snake_case or SCREAMING_SNAKE_CASE BY
+    CONVENTION (``TradeGateStatus.WOULD_REJECT``, reject reasons like
+    ``LOW_RISK_REWARD``, ``PROFILE_EXPERIMENTAL = "EXPERIMENTAL_RELAXED_V1"``,
+    ``MarketSession.PRE_MARKET = "pre_market"``, every ``setup_type`` value)
+    -- i.e. guaranteed to contain the literal underscore Telegram treats as an
+    italic delimiter. Confirmed live 2026-09-04 (Task 99F/99H): 10/61 sends
+    failed with "Can't parse entities" once the AGGREGATE unescaped-underscore
+    count across a rendered message's several `_raw()` fields happened to be
+    odd (see results/task99h_telegram_escape/root_cause.md) -- not any single
+    field's own parity. `_raw()` therefore escapes exactly like `_esc()` now;
+    the two names are kept separate only to document intent at each call site
+    (`_raw` = "an internal identifier", `_esc` = "external/free text"), not
+    because they behave differently."""
     if hasattr(value, "value"):
         value = value.value
-    return str(value)
+    return _MD_ESCAPE.sub(r"\\\1", str(value))
 
 
 def _esc(value: Any) -> str:
@@ -138,7 +156,7 @@ def render_directional_details(row: dict) -> str:
         f"  RSI {ev.get('rsi')}   MACD {ev.get('macd')} / signal {ev.get('macd_signal_line')}"
         + (f"   ({ev.get('macd_cross')} cross)" if ev.get("macd_cross") else ""),
         f"  Volume surge x {ev.get('volume_surge_ratio')}   ATR {ev.get('atr')} ({_pct(ev.get('atr_pct'))} of price)",
-        f"  15m-200SMA {ev.get('htf_sma_200')}   trend_aligned={ev.get('trend_aligned')}"
+        f"  15m-200SMA {ev.get('htf_sma_200')}   trend\\_aligned={ev.get('trend_aligned')}"
         + (f"   price vs SMA {_pct(ev.get('price_vs_htf_sma_200_pct'))}" if ev.get('price_vs_htf_sma_200_pct') is not None else ""),
         f"  Pivots  R1 {ev.get('pivot_resistance')}  S1 {ev.get('pivot_support')}",
     ]
@@ -153,9 +171,9 @@ def render_directional_details(row: dict) -> str:
         + (f" ({_raw(row.get('trade_gate_reject_reason'))})" if row.get("trade_gate_reject_reason") else ""),
         "",
         "Provenance:",
-        f"  bar_timestamp {_raw(row.get('bar_timestamp'))}   generated_at {_raw(row.get('generated_at'))}",
-        f"  source: talonx_signals.DirectionalAlertEngine <- talonx_quant.strategy.evaluate_signals",
-        f"  alert_id {_raw(row['alert_id'])}",
+        f"  bar\\_timestamp {_raw(row.get('bar_timestamp'))}   generated\\_at {_raw(row.get('generated_at'))}",
+        "  source: talonx\\_signals.DirectionalAlertEngine <- talonx\\_quant.strategy.evaluate\\_signals",
+        f"  alert\\_id {_raw(row['alert_id'])}",
     ]
     text = "\n".join(lines)
     assert_no_predictive_language(text)
@@ -266,9 +284,9 @@ def render_event_update_details(row: dict) -> str:
     lines += [
         "",
         "Provenance:",
-        f"  source: SEC EDGAR via talonx_ingest.intelligence (96A/96B); read via IntelligenceReadAPI",
+        "  source: SEC EDGAR via talonx\\_ingest.intelligence (96A/96B); read via IntelligenceReadAPI",
         f"  filing: {_raw(row.get('evidence_url', 'n/a'))}",
-        f"  96A event_id: {_raw(row.get('source_event_id', 'n/a'))}",
+        f"  96A event\\_id: {_raw(row.get('source_event_id', 'n/a'))}",
         f"  dashboard evidence: http://127.0.0.1:8760/evidence/event/{_raw(row.get('source_event_id', ''))}",
         f"  card id: {_raw(row['event_id'])}",
         "",
@@ -295,8 +313,8 @@ def render_radar_details(row: dict) -> str:
     lines += [
         "",
         "Provenance:",
-        "  source: talonx_watchlist.upcoming_earnings (yfinance `.calendar`, free / £0)",
-        "  synced by: run_talonx periodic earnings-calendar sync loop",
+        "  source: talonx\\_watchlist.upcoming\\_earnings (yfinance `.calendar`, free / £0)",
+        "  synced by: run\\_talonx periodic earnings-calendar sync loop",
         "  note: date is an ESTIMATE; session (BMO/AMC) usually UNSPECIFIED from Yahoo",
         f"  card id: {_raw(row['radar_id'])}",
         "",
