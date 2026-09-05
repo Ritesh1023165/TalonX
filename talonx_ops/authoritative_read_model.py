@@ -30,14 +30,12 @@ import json
 import os
 import sqlite3
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 _HOME = Path.home() / ".talonx"
-_EXP = _HOME / "experimental"
-_INTEL_STATE = _HOME / "intelligence"
 
 # staleness thresholds (seconds)
 _ORIGINAL_METADATA_MAX_AGE = 6 * 3600          # runtime_metadata.json older than this + no live pid => not live
