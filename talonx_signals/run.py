@@ -78,6 +78,13 @@ def _parse_event_ts(raw: str | None) -> datetime | None:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
+def _to_float_or_none(v) -> float | None:
+    try:
+        return None if v is None else float(v)
+    except (TypeError, ValueError):
+        return None
+
+
 class ExperimentalLane:
     def __init__(self, cfg: ExperimentalConfig, *, enable_external_send: bool = False):
         self.cfg = cfg
@@ -101,6 +108,17 @@ class ExperimentalLane:
         # file, WAL, idempotent on the deterministic watch_id). Passive -- read
         # by nothing in the decision path; a write failure is swallowed below.
         self.premarket_store = PremarketStateStore(cfg.state_dir / "premarket" / "premarket_state.db")
+        # Task 104: ABNORMAL_VOLUME reuses Original's EXISTING validated RVOL --
+        # `volume_surge_ratio` (talonx_quant.indicators) already rides the quant
+        # signal/rejected channels this lane subscribes to. We only OBSERVE it
+        # (read-only) and its validated pre-market threshold. No new feed.
+        try:
+            from talonx_quant.config import QuantConfig
+
+            self._pm_vol_threshold = float(QuantConfig().premarket_volume_surge_ratio_threshold)
+        except Exception:  # noqa: BLE001
+            self._pm_vol_threshold = 3.0
+        self._premarket_vol: dict[str, tuple[float, float | None, str]] = {}  # sym -> (rvol, vol, bar_ts)
         self._intel_api = None            # lazily opened IntelligenceReadAPI
         self._watchlist = None
         self._last_price: dict[str, float] = {}
@@ -109,7 +127,30 @@ class ExperimentalLane:
         self._stop = asyncio.Event()
 
     # ------------------------------------------------------------------
+    def _observe_premarket_volume(self, payload: dict) -> None:
+        """Task 104 -- OBSERVE (never compute) Original's own `volume_surge_ratio`
+        off a pre-market quant signal/rejected payload, so the pre-market
+        projection can carry an ABNORMAL_VOLUME row. Read-only; no effect on any
+        decision."""
+        try:
+            if str(payload.get("session") or "").lower() != "pre_market":
+                return
+            vsr = payload.get("volume_surge_ratio")
+            if vsr is None:
+                return
+            sym = str(payload.get("ticker") or payload.get("symbol") or "").upper()
+            if not sym:
+                return
+            bar_ts = str(payload.get("bar_timestamp") or payload.get("rejected_at")
+                         or payload.get("generated_at") or "")
+            self._premarket_vol[sym] = (float(vsr), _to_float_or_none(payload.get("volume")), bar_ts)
+        except (TypeError, ValueError):
+            pass
+
     async def handle_message(self, channel: str, payload: dict) -> None:
+        if channel in (_CONTROL_SIGNALS, self.cfg.signals_channel,
+                       _CONTROL_REJECTED, self.cfg.rejected_candidates_channel):
+            self._observe_premarket_volume(payload)
         if channel in (_CONTROL_SIGNALS, self.cfg.signals_channel):
             profile = PROFILE_CONTROL if channel == _CONTROL_SIGNALS else PROFILE_EXPERIMENTAL
             eng = self.dir_control if profile == PROFILE_CONTROL else self.dir_experimental
@@ -272,6 +313,7 @@ class ExperimentalLane:
             self._premarket_bundle = self.premarket_engine.assess(
                 inputs, now=now, watchlist_configured=len(syms), watchlist_active=len(syms),
             )
+            self._attach_abnormal_volume(self._premarket_bundle, now=now)
         except Exception:  # noqa: BLE001
             logger.exception("premarket refresh failed")
         # Task 102: persist the (already-computed) surface as a passive, durable
@@ -283,6 +325,31 @@ class ExperimentalLane:
             except Exception:  # noqa: BLE001
                 logger.exception("premarket persistence failed (non-fatal)")
         return self._premarket_bundle
+
+    def _attach_abnormal_volume(self, bundle, *, now: datetime) -> None:
+        """Task 104 -- add ABNORMAL_VOLUME rows to the (already-assessed) bundle
+        from Original's OWN `volume_surge_ratio` observed off the quant channels
+        during the pre-market window. Only rows clearing Original's validated
+        `premarket_volume_surge_ratio_threshold` are added. Deterministic
+        watch_id; informational only (external_eligible stays 0)."""
+        if bundle is None or not self._premarket_vol:
+            return
+        from talonx_signals.schemas import PremarketWatch, WatchKind, make_watch_id
+
+        have = {w.symbol for w in bundle.abnormal_volume}
+        for sym, (rvol, vol, bar_ts) in sorted(self._premarket_vol.items()):
+            if sym in have or rvol < self._pm_vol_threshold:
+                continue
+            baseline = (vol / rvol) if (vol is not None and rvol) else None
+            detail = f"{rvol:.1f}x avg pre-market volume (>= {self._pm_vol_threshold:.1f}x)"
+            if vol is not None and baseline is not None:
+                detail += f"  [vol {vol:.0f} / baseline {baseline:.0f}]"
+            bundle.abnormal_volume.append(PremarketWatch(
+                watch_id=make_watch_id(symbol=sym, kind=WatchKind.ABNORMAL_VOLUME.value, day=now),
+                symbol=sym, kind=WatchKind.ABNORMAL_VOLUME,
+                relative_volume=rvol, detail=detail,
+                reason_codes=("quant_volume_surge_ratio", f"threshold_{self._pm_vol_threshold:g}"),
+            ))
 
     async def _bridge_loop(self, interval_seconds: float) -> None:
         # first pass immediately, then every `interval_seconds`

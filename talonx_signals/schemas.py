@@ -115,6 +115,9 @@ class PremarketWatch(BaseModel):
     reference_price: float | None = None
     prev_close: float | None = None
     gap_pct: float | None = None
+    # Task 104: relative volume (== talonx_quant.indicators.volume_surge_ratio)
+    # for ABNORMAL_VOLUME rows. Informational; None for every other kind.
+    relative_volume: float | None = None
     detail: str = ""
     reason_codes: tuple[str, ...] = ()
     observed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

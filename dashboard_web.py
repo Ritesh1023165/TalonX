@@ -415,6 +415,30 @@ async def admin_config_get(request: web.Request) -> web.Response:
     })
 
 
+async def admin_index(request: web.Request) -> web.Response:
+    """Task 104 -- GET /admin/ : the dedicated local admin page (loopback only).
+    Static HTML that drives the existing /admin/config API. Not linked from the
+    read-only cockpit."""
+    if not request.app.get("admin_enabled", False):
+        return web.Response(status=403, text="admin config is only available on a loopback bind")
+    return web.FileResponse(STATIC_DIR / "admin.html")
+
+
+async def admin_config_state(request: web.Request) -> web.Response:
+    """Task 104 -- GET /admin/config/state : read-only current values for the 9
+    editable fields, so the admin page can show current-vs-proposed."""
+    if not request.app.get("admin_enabled", False):
+        return web.json_response({"error": "loopback only"}, status=403)
+    from talonx_ops.admin_config import AdminConfigService
+
+    svc = AdminConfigService()
+    try:
+        state = await asyncio.to_thread(svc.current_state)
+    finally:
+        svc.close()
+    return web.json_response(state)
+
+
 async def admin_config_apply(request: web.Request) -> web.Response:
     """Task 102 -- POST /admin/config/apply. Body: {action, params, confirm}.
     Loopback-only; every attempt (accepted, rejected, refused) is audited."""
@@ -521,9 +545,11 @@ def build_app(piv_state_dir: Path | None = None, *, admin_enabled: bool = True) 
     # Task 100C -- six additive, GET-only, read-only unified-cockpit sections.
     app.router.add_get("/api/sections", sections_all_handler)
     app.router.add_get("/api/section/{name}", section_handler)
-    # Task 102 -- local-only operational config (loopback-gated, audited, no
+    # Task 102/104 -- local-only operational config (loopback-gated, audited, no
     # strategy/execution keys). GET is read-only; POST requires confirm=true.
+    app.router.add_get("/admin/", admin_index)
     app.router.add_get("/admin/config", admin_config_get)
+    app.router.add_get("/admin/config/state", admin_config_state)
     app.router.add_post("/admin/config/apply", admin_config_apply)
     app.router.add_static("/static/", STATIC_DIR, show_index=False)
 

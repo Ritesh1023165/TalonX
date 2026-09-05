@@ -164,11 +164,10 @@ class PremarketStateStore:
                 wid = w.get("watch_id")
                 if not wid:
                     continue
+                # Task 104: PremarketWatch.relative_volume carries the RVOL
+                # (== quant volume_surge_ratio) for ABNORMAL_VOLUME rows; NULL
+                # for every other kind. Never fabricated -- absent stays NULL.
                 rel_vol = w.get("relative_volume")
-                if rel_vol is None:
-                    rc = w.get("reason_codes") or ()
-                    # PremarketWatch carries the ratio in `detail` for ABNORMAL_VOLUME;
-                    # we keep relative_volume NULL unless a numeric field is present.
                 self._conn.execute(
                     """
                     INSERT INTO premarket_events

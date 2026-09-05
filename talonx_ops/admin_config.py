@@ -309,6 +309,45 @@ class AdminConfigService:
     def audit_tail(self, limit: int = 50) -> list[dict]:
         return self._audit.tail(limit)
 
+    def current_state(self) -> dict[str, Any]:
+        """Read-only snapshot of exactly the fields the 9 allowed actions can
+        change -- so the admin page can show 'current' next to 'proposed'.
+        Never touches strategy/execution config."""
+        out: dict[str, Any] = {"watchlist": [], "paper": {}}
+        try:
+            wl = self._watchlist()
+            try:
+                for t in wl.list_tickers():
+                    out["watchlist"].append({
+                        "symbol": t.get("symbol"), "name": t.get("name"),
+                        "status": t.get("status"),
+                        "strategy_horizon": t.get("strategy_horizon"),
+                        "paper_trading_enabled": bool(t.get("paper_trading_enabled")),
+                        "paper_trading_enabled_long_term": bool(t.get("paper_trading_enabled_long_term")),
+                    })
+            finally:
+                try:
+                    wl.close()
+                except Exception:  # noqa: BLE001
+                    pass
+        except Exception as exc:  # noqa: BLE001
+            out["watchlist_error"] = repr(exc)
+        try:
+            ps = self._paper()
+            try:
+                out["paper"] = {
+                    "trade_allocation_usd": ps.get_portfolio_summary().get("trade_allocation_usd"),
+                    "dca_contribution_usd": ps.get_long_term_portfolio_summary().get("dca_contribution_usd"),
+                }
+            finally:
+                try:
+                    ps.close()
+                except Exception:  # noqa: BLE001
+                    pass
+        except Exception as exc:  # noqa: BLE001
+            out["paper_error"] = repr(exc)
+        return out
+
     def close(self) -> None:
         self._audit.close()
 
