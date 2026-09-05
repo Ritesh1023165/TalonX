@@ -220,6 +220,7 @@ class DispatchAgent:
         store: AuditStore | None = None,
         telegram_client: TelegramClient | None = None,
         watchlist_store: TickerWatchlistStore | None = None,
+        extra_resolvers=None,
     ):
         self.config = config or DispatchConfig()
         self.store = store or AuditStore(self.config.audit_db_path)
@@ -228,8 +229,14 @@ class DispatchAgent:
         # /ping health check's uptime source -- process start, not just
         # this consumer loop's connect time (matches "Server Status: Active").
         self.started_at = datetime.now(timezone.utc)
+        # Task 100B: `extra_resolvers` are ordered `str -> str | None` callables
+        # tried BEFORE the numeric/LT alert-id path (see TelegramReplyListener's
+        # own docstring). run_talonx.py passes the Experimental D/X/R/E reply
+        # resolver here so there is still exactly ONE get_updates poller. The
+        # Original app passing None keeps behaviour byte-identical.
         self.reply_listener = TelegramReplyListener(
-            self.store, self.config, self.telegram_client, dispatch_agent=self
+            self.store, self.config, self.telegram_client, dispatch_agent=self,
+            extra_resolvers=extra_resolvers,
         )
         self._client = None
         self._stop_event = asyncio.Event()

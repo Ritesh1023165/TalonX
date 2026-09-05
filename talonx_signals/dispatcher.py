@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from talonx_signals.alert_store import ExperimentalAlertStore
+from talonx_signals.external_boundary import assert_experimental_send_allowed
 from talonx_signals.renderers import (
     assert_no_predictive_language,
     render_directional_setup,
@@ -43,8 +44,15 @@ class SenderProtocol(Protocol):
     async def send(self, text: str) -> SendResult: ...
 
 
+#: Task 100B Phase 6 -- a sender advertises whether it can put bytes on the
+#: network. Only a sender with ``is_external_transport=True`` is subject to the
+#: structural :func:`assert_experimental_send_allowed` gate; test/dry-run
+#: senders never leave the process. An unknown sender defaults to ``True``
+#: (fail-closed).
 class RecordingSender:
     """Test / dry-run sender. Records every text; never touches the network."""
+
+    is_external_transport = False
 
     def __init__(self, fail_times: int = 0, retry_after: float | None = None, permanent: bool = False):
         self.sent: list[str] = []
@@ -66,6 +74,8 @@ class RecordingSender:
 
 
 class NullSender:
+    is_external_transport = False
+
     @property
     def configured(self) -> bool:
         return False
@@ -77,6 +87,8 @@ class NullSender:
 class TelegramSenderAdapter:
     """Wraps the existing, qualified ``talonx_dispatch.telegram_client
     .TelegramClient`` -- the ONLY transport touch point for external sends."""
+
+    is_external_transport = True
 
     def __init__(self, client: Any = None):
         if client is None:
@@ -180,6 +192,12 @@ class ExperimentalDispatcher:
             self.metrics.dry_run_held += 1
             self.store.log(public_id, kind, "DRY_RUN_HELD")
             return "HELD"
+        # Task 100B Phase 6: structural boundary -- if the sender is a real
+        # external transport, a send STILL requires the explicit env override,
+        # or this raises and nothing leaves the process. Test/dry-run senders
+        # (is_external_transport=False) never reach the network and are exempt.
+        if getattr(self.sender, "is_external_transport", True):
+            assert_experimental_send_allowed(f"ExperimentalDispatcher._deliver/{kind}")
         ok = await self._send_with_retry(text)
         if ok:
             self.store.mark_sent(table, public_id)
@@ -221,6 +239,8 @@ class ExperimentalDispatcher:
         out = {"directional": 0, "trade": 0}
         if not (self.enable_external_send and self.sender.configured):
             return out
+        if getattr(self.sender, "is_external_transport", True):
+            assert_experimental_send_allowed("ExperimentalDispatcher.drain_pending")
         for row in self.store.pending("directional_alerts"):
             text = render_directional_setup(row, company=self._company(row["symbol"]))
             if await self._send_with_retry(text):

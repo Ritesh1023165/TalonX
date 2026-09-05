@@ -1245,13 +1245,26 @@ async def main() -> None:
         decision_engine = DecisionEngine(config=core_config, store=core_store)
 
     dispatch_agent: DispatchAgent | None = None
+    # Task 100B Phase 5 (Task 99L Option A): register the Experimental D/X/R/E
+    # reply resolver on Original's SINGLE TelegramReplyListener via extra_resolvers
+    # -- run_talonx.py reads exp_alerts.db through a read-only (mode=ro), WAL-safe
+    # handle; no second poller, no Experimental sender, no write path. Imported
+    # lazily so unrelated `import run_talonx` paths don't pull in talonx_signals.
+    from talonx_signals.reply import build_experimental_dxre_resolver
+
+    exp_reply_store, _dxre_resolver = build_experimental_dxre_resolver(
+        on_error=lambda exc: logger.warning("Experimental D/X/R/E reply resolver: %s", exc)
+    )
+    exp_resolvers = [_dxre_resolver] if _dxre_resolver is not None else None
     if not args.skip_dispatch:
         try:
             # Shares the SAME watchlist_store instance already created
             # above (not a second TickerWatchlistStore against the same
             # file) -- same one-connection-per-process convention
             # paper_trading_engine's construction already follows.
-            dispatch_agent = DispatchAgent(watchlist_store=watchlist_store)
+            dispatch_agent = DispatchAgent(
+                watchlist_store=watchlist_store, extra_resolvers=exp_resolvers
+            )
         except Exception as exc:  # noqa: BLE001 -- audit DB init failure shouldn't crash the whole run
             logger.warning(
                 "Module 5 (talonx_dispatch) disabled for this run: %s. Modules 1-4 "
@@ -1590,6 +1603,8 @@ async def main() -> None:
             core_store.close()
         if dispatch_agent is not None:
             dispatch_agent.store.close()
+        if exp_reply_store is not None:  # Task 100B: D/X/R/E read-only bridge handle
+            exp_reply_store.close()
         if paper_store is not None:
             paper_store.close()
         watchlist_store.close()

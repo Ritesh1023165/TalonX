@@ -94,6 +94,24 @@ class SingletonLock:
         self._held = True
         return True
 
+    def is_stale(self) -> bool:
+        """True when a lock file exists but the pid that wrote it is not a live
+        process on this host.
+
+        ``acquire()`` already reclaims such a lock automatically; a supervisor
+        (Task 100B) calls this only to *report* that the previous instance
+        crashed (so a restart can be logged as a recovery, not a normal start),
+        without ever needing ``force=True``. A lock written on a different host
+        is treated as *not* stale here — this process cannot know whether that
+        pid is alive, so it must not claim staleness.
+        """
+        info = self.read()
+        if info is None:
+            return False
+        if info.host != socket.gethostname():
+            return False
+        return not _pid_alive(info.pid)
+
     def release(self) -> None:
         if not self._held:
             return

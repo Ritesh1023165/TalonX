@@ -209,7 +209,10 @@ class AuthoritativeReadModel:
             live, reason, hb_ts = False, "no service.heartbeat.json", None
             try:
                 payload = json.loads(hb.read_text(encoding="utf-8"))
-                hb_ts = payload.get("at") or payload.get("timestamp") or payload.get("written_at")
+                # `write_heartbeat` (service/singleton.py) writes `heartbeat_at_utc`;
+                # the others are tolerated for forward/backward compatibility.
+                hb_ts = (payload.get("heartbeat_at_utc") or payload.get("at")
+                         or payload.get("timestamp") or payload.get("written_at"))
                 if hb_ts is None:
                     hb_ts = datetime.fromtimestamp(hb.stat().st_mtime, timezone.utc).isoformat()
                 age = _age_seconds(hb_ts, self.now)
@@ -233,35 +236,42 @@ class AuthoritativeReadModel:
         return self.now.astimezone(timezone.utc).strftime("%Y-%m-%d")
 
     def market(self) -> DomainAuthority:
-        con = _ro(self.home / "paper_trading.db")
-        if con is None:
-            return DomainAuthority("market", AuthorityStatus.UNKNOWN,
-                                   "talonx_ingest.market_data.manager (state)",
-                                   note="paper_trading.db (latest_prices tap) unavailable")
+        """Task 100B Phase 12: consume the ONE unified accessor
+        ``talonx_ops.market_health.MarketHealth`` for producer truth rather than
+        re-deriving it here."""
         try:
-            n = _q1(con, "SELECT COUNT(*) FROM latest_prices") or 0
-            newest = _q1(con, "SELECT MAX(updated_at) FROM latest_prices")
-        finally:
-            con.close()
-        orig = self.original_producer()
-        age = _age_seconds(newest, self.now)
-        vals = {"symbols_priced": n, "newest_tick": newest,
-                "newest_tick_age_seconds": round(age) if age is not None else None}
-        if not orig["live"]:
-            return DomainAuthority(
-                "market", AuthorityStatus.NO_ACTIVE_PRODUCER,
-                "talonx_ingest.market_data.manager (via run_talonx.py)", vals, newest,
-                legacy_sources=("talonx:market:stream", "dashboard_web.py ChannelStats"),
-                note=f"run_talonx.py not running ({orig['reason']}); last tick data is a stale projection")
-        if age is None or age > _MARKET_TICK_MAX_AGE:
-            return DomainAuthority("market", AuthorityStatus.STALE,
-                                   "talonx_ingest.market_data.manager (via run_talonx.py)", vals, newest,
-                                   legacy_sources=("talonx:market:stream",),
-                                   note=f"producer live but newest tick is {age:.0f}s old" if age is not None
-                                   else "producer live but no tick timestamp")
-        return DomainAuthority("market", AuthorityStatus.ACTIVE,
-                               "talonx_ingest.market_data.manager (via run_talonx.py)", vals, newest,
-                               legacy_sources=("talonx:market:stream",))
+            from talonx_ops.market_health import MarketHealth
+
+            mv = MarketHealth(
+                home=self.home,
+                runtime_metadata_path=self.runtime_metadata_path,
+                now=self.now,
+                check_processes=self.check_processes,
+                producer_probe=self.original_producer,
+            ).view()
+        except Exception as exc:  # noqa: BLE001
+            return DomainAuthority("market", AuthorityStatus.UNKNOWN,
+                                   "talonx_ops.market_health.MarketHealth",
+                                   note=f"market health accessor error: {exc!r}")
+        vals = mv.to_dict()
+        newest = mv.newest_tick
+        status = {
+            "HEALTHY": AuthorityStatus.ACTIVE,
+            "IDLE": AuthorityStatus.ACTIVE,
+            "STALE": AuthorityStatus.STALE,
+            "DISCONNECTED": AuthorityStatus.NO_ACTIVE_PRODUCER,
+            "UNKNOWN": AuthorityStatus.UNKNOWN,
+        }.get(mv.state, AuthorityStatus.UNKNOWN)
+        note = f"feed state {mv.state}"
+        if not mv.producer_live:
+            note = f"run_talonx.py not running ({mv.producer_reason}); data below is a stale projection"
+        return DomainAuthority(
+            "market", status, "talonx_ops.market_health.MarketHealth (unified accessor)",
+            vals, newest,
+            legacy_sources=("talonx:market:stream", "dashboard_web.py ChannelStats",
+                            ":8770 /__health", "run_talonx.py internal"),
+            note=note,
+        )
 
     def symbol_coverage(self) -> DomainAuthority:
         con = _ro(self.home / "watchlist.db")
@@ -621,11 +631,103 @@ class AuthoritativeReadModel:
                                vals, note="one logical alert is counted once, against its own family's store")
 
     def eod_reconciliation(self) -> DomainAuthority:
+        """Task 100B Phase 13: read the durable EOD reconciliation store
+        (``~/.talonx/eod_reconciliation.db``, owned by
+        ``talonx_ops.eod_reconciliation``)."""
+        try:
+            from talonx_ops.eod_reconciliation import EodReconciliationStore
+
+            store = EodReconciliationStore(self.home / "eod_reconciliation.db", read_only=True)
+            latest = store.latest()
+            today = store.get(self._today())
+            store.close()
+        except Exception as exc:  # noqa: BLE001
+            return DomainAuthority("eod_reconciliation", AuthorityStatus.UNKNOWN,
+                                   "talonx_ops.eod_reconciliation.EodReconciliationStore",
+                                   note=f"store read error: {exc!r}")
+        if latest is None:
+            return DomainAuthority(
+                "eod_reconciliation", AuthorityStatus.ZERO_ACTIVITY,
+                "talonx_ops.eod_reconciliation.EodReconciliationStore (~/.talonx/eod_reconciliation.db)",
+                {"sessions_recorded": 0},
+                note="store exists but no session has been reconciled yet")
+        rec = (today or latest).to_dict()
+        vals = {
+            "latest_session": latest.session_date,
+            "today_reconciled": today is not None,
+            "status": rec["status"],
+            "original_paper": rec["original_paper"],
+            "experimental_paper": rec["experimental_paper"],
+            "piv_paper": rec["piv_paper"],
+            "alert_counts": rec["alert_counts"],
+            "component_status": rec["component_status"],
+            "mismatches": rec["mismatches"],
+        }
+        status = AuthorityStatus.ACTIVE if rec["status"] in ("RECONCILED", "RECONCILED_WITH_MISMATCH") \
+            else AuthorityStatus.STALE if rec["status"] == "PARTIAL" else AuthorityStatus.UNKNOWN
         return DomainAuthority(
-            "eod_reconciliation", AuthorityStatus.NO_ACTIVE_PRODUCER,
-            "(none -- no persistent EOD store exists)", {},
-            note="EOD reconciliation is ad-hoc per forensic script (Task 92/99F/99I). Task 99K flagged a "
-                 "persistent EOD summary store as an OPTIONAL Task 100 improvement -- not built in Task 100A.")
+            "eod_reconciliation", status,
+            "talonx_ops.eod_reconciliation.EodReconciliationStore", vals, rec["generated_at_utc"],
+            note=f"read-only broker checks; PIV recorded NOT_CHECKED unless an explicit reader is injected "
+                 f"(status={rec['status']})")
+
+    def supervision(self) -> DomainAuthority:
+        """Task 100B Phase 16: surface the runtime supervision picture -- process
+        liveness for the three lanes, the single-Telegram-owner invariant, the
+        structural Experimental external boundary, and the forward-recorder
+        (Experimental lane) state. Read-only: this reports what is observable
+        cross-process, it does not orchestrate anything."""
+        try:
+            from talonx_ops.supervisor import count_telegram_get_updates_owners
+        except Exception:  # noqa: BLE001
+            count_telegram_get_updates_owners = lambda: None  # type: ignore
+        orig = self.original_producer()
+        exp = self.experimental_producer()
+        intel = self.intelligence_producer()
+        owners = None
+        if self.check_processes:
+            try:
+                owners = count_telegram_get_updates_owners()
+            except Exception:  # noqa: BLE001
+                owners = None
+        vals = {
+            "components": {
+                "original": {"live": orig["live"], "reason": orig["reason"],
+                             "classification": "MANDATORY"},
+                "experimental": {"live": exp["live"], "reason": exp["reason"],
+                                 "classification": "OPTIONAL"},
+                "intelligence": {"live": intel["live"], "reason": intel["reason"],
+                                 "classification": "OPTIONAL",
+                                 "heartbeat_at": intel["heartbeat_at"]},
+            },
+            "telegram_get_updates_owners": owners,
+            "telegram_owner_invariant_ok": (owners is None) or (owners <= 1),
+            "experimental_external_eligible": False,
+            "experimental_boundary": "INTERNAL-ONLY -- structurally enforced "
+                                     "(talonx_signals.dispatcher external routing gated; "
+                                     "Task 100B Phase 6)",
+            "forward_recorder": {
+                "lane": "experimental",
+                "state": "READY" if exp["live"] else "DOWN",
+                "note": "ForwardOutcomeRecorder runs in-process in talonx_signals.run",
+            },
+            "supervisor_model": "talonx_ops.supervisor.Supervisor (state model: "
+                                "NOT_STARTED/STARTING/READY/DEGRADED/FAILED/STOPPING/STOPPED/RESTARTING)",
+        }
+        # status: ACTIVE if the mandatory lane is live and the invariant holds
+        if not orig["live"]:
+            status = AuthorityStatus.NO_ACTIVE_PRODUCER
+            note = f"Original (MANDATORY) not running ({orig['reason']})"
+        elif owners is not None and owners > 1:
+            status = AuthorityStatus.STALE
+            note = f"INVARIANT VIOLATION: {owners} Telegram get_updates owners (expected exactly 1)"
+        else:
+            status = AuthorityStatus.ACTIVE
+            note = ("Original live; single Telegram receive owner; Experimental external boundary "
+                    "structurally closed")
+        return DomainAuthority(
+            "supervision", status, "talonx_ops.supervisor.Supervisor", vals, None,
+            note=note)
 
     # ---- aggregate ------------------------------------------------------
     def snapshot(self) -> dict[str, Any]:
@@ -634,6 +736,7 @@ class AuthoritativeReadModel:
             self.brain_reports, self.official_alerts, self.experimental_alerts,
             self.original_paper, self.experimental_paper, self.piv, self.intelligence,
             self.filings_legacy_channel, self.telegram_delivery, self.eod_reconciliation,
+            self.supervision,
         ]
         domains = []
         for m in methods:

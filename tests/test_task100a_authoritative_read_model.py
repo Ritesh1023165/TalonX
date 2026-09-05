@@ -283,7 +283,8 @@ def test_16_17_18_paper_engines_isolated(home, model_factory):
 def test_19_missing_optional_store_does_not_crash(home, model_factory):
     m = model_factory(check_processes=False)  # empty home, no dbs at all
     snap = m.snapshot()
-    assert len(snap["domains"]) == 14
+    # 14 Task 100A domains + `supervision` added in Task 100B Phase 16
+    assert len(snap["domains"]) == 15
     for d in snap["domains"]:
         assert d["status"] in {s.value for s in AuthorityStatus}
 

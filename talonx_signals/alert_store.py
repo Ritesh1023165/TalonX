@@ -318,3 +318,72 @@ class ExperimentalAlertStore:
             self._conn.execute("DELETE FROM dispatch_log WHERE at < ?", (iso,))
             self._conn.commit()
         return n
+
+
+# ---------------------------------------------------------------------------
+# Task 100B: read-only sibling for the D/X/R/E reply bridge.
+# ---------------------------------------------------------------------------
+class ReadOnlyExperimentalAlertStore:
+    """A ``get_*``-only view of ``exp_alerts.db`` for a *second* process
+    (run_talonx.py's Telegram reply listener) to resolve D/X/R/E replies
+    without ever writing.
+
+    Unlike ``ExperimentalAlertStore``, construction runs **no** DDL / schema
+    migration / PRAGMA -- the file is opened ``file:...?mode=ro`` so a write
+    is physically impossible, and a concurrent WAL writer (the real
+    Experimental lane) is unaffected. If the file does not exist yet, every
+    read returns ``None`` (the resolver then emits its normal
+    "not found / aged out" message). Duck-types the four ``get_*`` methods
+    ``talonx_signals.reply.make_reply_resolver`` calls.
+    """
+
+    def __init__(self, db_path: str | Path):
+        self.db_path = str(db_path)
+        self._conn: sqlite3.Connection | None = None
+        try:
+            if Path(self.db_path).exists():
+                self._conn = sqlite3.connect(
+                    f"file:{self.db_path}?mode=ro", uri=True, check_same_thread=False, timeout=1.0
+                )
+                self._conn.row_factory = sqlite3.Row
+        except sqlite3.Error:
+            self._conn = None
+
+    def _one(self, table: str, pk: str) -> dict | None:
+        if self._conn is None:
+            return None
+        try:
+            cur = self._conn.execute(f"SELECT * FROM {table} WHERE {_PK[table]}=?", (pk,))
+            r = cur.fetchone()
+        except sqlite3.Error:
+            return None
+        return dict(r) if r is not None else None
+
+    def get_directional(self, alert_id: str) -> dict | None:
+        return self._one("directional_alerts", alert_id)
+
+    def get_trade(self, trade_id: str) -> dict | None:
+        return self._one("experimental_trades", trade_id)
+
+    def get_radar(self, radar_id: str) -> dict | None:
+        return self._one("radar_alerts", radar_id)
+
+    def get_event_update(self, event_id: str) -> dict | None:
+        row = self._one("event_updates", event_id)
+        if not row:
+            return row
+        for k in ("material_changes", "significance_reasons"):
+            if isinstance(row.get(k), str):
+                try:
+                    row[k] = json.loads(row[k])
+                except ValueError:
+                    row[k] = []
+        return row
+
+    def close(self) -> None:
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            except sqlite3.Error:
+                pass
+            self._conn = None
