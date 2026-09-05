@@ -1,0 +1,121 @@
+{
+  "checks": [
+    {
+      "detail": "9b3ae0c4f990b48fe311f2f7ef4a25d702aaac83",
+      "name": "expected_sha",
+      "passed": true
+    },
+    {
+      "detail": "clean",
+      "name": "tracked_tree_clean",
+      "passed": true
+    },
+    {
+      "detail": "0 matching process(es): none",
+      "name": "no_duplicate_full_app_or_piv_process",
+      "passed": true
+    },
+    {
+      "detail": "reachable at redis://localhost:6379/0",
+      "name": "redis_reachable",
+      "passed": true
+    },
+    {
+      "detail": "35 active symbol(s): ['AAPL', 'ABCL', 'ABT', 'ACHR', 'ADC', 'ADP', 'AFL', 'AGNC', 'AMAT', 'AMD', 'AVGO', 'BABA', 'BLK', 'BLSH', 'C', 'CSCO', 'CVX', 'DELL', 'GOOGL', 'IBM', 'INTC', 'MSFT', 'MSTR', 'NUE', 'NVDA', 'ORCL', 'PYPL', 'SHOP', 'SKHY', 'SPCX', 'STX', 'TSLA', 'UNH', 'V', 'VRT']",
+      "name": "active_watchlist_non_empty",
+      "passed": true
+    },
+    {
+      "detail": "39 paper-enabled symbol(s): ['AAPL', 'ABCL', 'ABT', 'ACHR', 'ADC', 'ADP', 'AFL', 'AGNC', 'AMAT', 'AMD', 'AVGO', 'BABA', 'BLK', 'BLSH', 'C', 'CSCO', 'CVX', 'DELL', 'GOOGL', 'IBM', 'INTC', 'MSFT', 'MSTR', 'NUE', 'NVDA', 'ORCL', 'PATH', 'PLTR', 'PYPL', 'RIG', 'SHOP', 'SKHY', 'SMCI', 'SPCX', 'STX', 'TSLA', 'UNH', 'V', 'VRT']",
+      "name": "paper_enabled_symbols_recorded",
+      "passed": true
+    },
+    {
+      "detail": "C:\\Users\\rites\\.talonx\\quant.db",
+      "name": "quant_store_accessible",
+      "passed": true
+    },
+    {
+      "detail": "provider=Gemini (gemini-flash-lite-latest)",
+      "name": "brain_operational_hard_requirement",
+      "passed": true
+    },
+    {
+      "detail": "C:\\Users\\rites\\.talonx\\chroma",
+      "name": "chroma_vector_store_accessible",
+      "passed": true
+    },
+    {
+      "detail": "C:\\Users\\rites\\.talonx\\core_state.db",
+      "name": "core_store_accessible",
+      "passed": true
+    },
+    {
+      "detail": "C:\\Users\\rites\\.talonx\\dispatch_audit.db",
+      "name": "dispatch_audit_store_accessible",
+      "passed": true
+    },
+    {
+      "detail": "C:\\Users\\rites\\.talonx\\paper_trading.db",
+      "name": "paper_store_accessible",
+      "passed": true
+    },
+    {
+      "detail": "HTTP 200",
+      "name": "telegram_outbound_reachable",
+      "passed": true
+    },
+    {
+      "detail": "DispatchAgent.run() starts TelegramReplyListener(dispatch_agent=self) when Telegram is configured",
+      "name": "telegram_inbound_ping_capability",
+      "passed": true
+    },
+    {
+      "detail": "YFINANCE_POLLING",
+      "name": "market_data_provider_identified",
+      "passed": true
+    },
+    {
+      "detail": "yfinance importable (network call happens at session start, not preflight)",
+      "name": "market_data_provider_connectivity_capability",
+      "passed": true
+    },
+    {
+      "detail": "is_premarket_window()=False",
+      "name": "premarket_mechanism_available",
+      "passed": true
+    },
+    {
+      "detail": "talonx_quant.preseed_ordering.run_initial_preseed importable; yfinance importable",
+      "name": "quant_initial_preseed_capability",
+      "passed": true
+    },
+    {
+      "detail": "generate_eod_report.py importable",
+      "name": "eod_report_capability",
+      "passed": true
+    },
+    {
+      "detail": "talonx_paper.engine references: none",
+      "name": "no_real_capital_execution_capability",
+      "passed": true
+    },
+    {
+      "detail": "LOCAL_SIMULATED_LEDGER (talonx_paper, SQLite -- not a broker)",
+      "name": "execution_path_is_local_simulated",
+      "passed": true
+    },
+    {
+      "detail": "checks report booleans/labels/HTTP status only, never raw credential values",
+      "name": "no_secrets_printed",
+      "passed": true
+    },
+    {
+      "detail": "2026-08-24T21:33:59.279216+00:00",
+      "name": "current_time_reported",
+      "passed": true
+    }
+  ],
+  "generated_at": "2026-08-24T21:33:59.279216+00:00",
+  "status": "FULL_APP_E2E_READY"
+}

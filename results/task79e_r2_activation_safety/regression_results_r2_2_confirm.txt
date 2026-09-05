@@ -1,0 +1,201 @@
+.............................................s.xxxx..................... [  2%]
+........................................................................ [  5%]
+........................................................................ [  8%]
+........................................................................ [ 11%]
+.....xxxxxx............................................................. [ 14%]
+........................................................................ [ 17%]
+........................................................................ [ 19%]
+........................................................................ [ 22%]
+........................................................................ [ 25%]
+........................................................................ [ 28%]
+........................................................................ [ 31%]
+........................................................................ [ 34%]
+........................................................................ [ 36%]
+........................................................................ [ 39%]
+........................................................................ [ 42%]
+........................................................................ [ 45%]
+........................................................................ [ 48%]
+........................................................................ [ 51%]
+........................................................................ [ 53%]
+........................................................................ [ 56%]
+........................................................................ [ 59%]
+........................................................................ [ 62%]
+........................................................................ [ 65%]
+........................................................................ [ 68%]
+........................................................................ [ 71%]
+........................................................................ [ 73%]
+........................................................................ [ 76%]
+........................................................................ [ 79%]
+........................................................................ [ 82%]
+........................................................................ [ 85%]
+........................................................................ [ 88%]
+........................................................................ [ 90%]
+........................................................................ [ 93%]
+........................................................................ [ 96%]
+................................................FF...................... [ 99%]
+...............                                                          [100%]
+================================== FAILURES ===================================
+__________________ test_healthy_cycle_does_not_reset_session __________________
+
+poller = <talonx_ingest.market_data.yfinance_poll.YFinancePoller object at 0x00000181B7B28200>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000181B7B29730>
+
+    @pytest.mark.asyncio
+    async def test_healthy_cycle_does_not_reset_session(poller, monkeypatch):
+        symbols = ["AAPL", "MSFT", "NVDA"]
+        monkeypatch.setattr(poller, "_fetch_snapshots", lambda syms: [_event(s) for s in syms])
+        reset_mock = MagicMock()
+        monkeypatch.setattr(poll_module, "_reset_yfinance_session", reset_mock)
+        on_event = AsyncMock()
+    
+        async def stop_after_one_cycle(seconds):
+            poller.stop()
+    
+        monkeypatch.setattr(poller, "_sleep_or_stop", stop_after_one_cycle)
+    
+        await poller.stream(symbols, on_event)
+    
+>       assert on_event.await_count == 3
+E       AssertionError: assert 0 == 3
+E        +  where 0 = <AsyncMock id='1656617511792'>.await_count
+
+tests\test_yfinance_poller.py:71: AssertionError
+___________ test_degraded_cycle_is_not_silently_treated_as_healthy ____________
+
+poller = <talonx_ingest.market_data.yfinance_poll.YFinancePoller object at 0x00000181B7B29C70>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000181B7B2B110>
+
+    @pytest.mark.asyncio
+    async def test_degraded_cycle_is_not_silently_treated_as_healthy(poller, monkeypatch):
+        # 3 symbols requested, only 1 comes back -- 67% failure, above the 50% threshold.
+        symbols = ["AAPL", "MSFT", "NVDA"]
+        monkeypatch.setattr(poller, "_fetch_snapshots", lambda syms: [_event("AAPL")])
+        monkeypatch.setattr(poller, "_sleep_or_stop", AsyncMock())
+    
+        async def fake_sleep(seconds):
+            poller.stop()  # stop right after the first degraded-cycle backoff sleep
+    
+        monkeypatch.setattr("asyncio.sleep", fake_sleep)
+        on_event = AsyncMock()
+    
+        await poller.stream(symbols, on_event)
+    
+        # Still emits whatever partial data it got, exactly once (one cycle ran)...
+>       on_event.assert_awaited_once()
+
+tests\test_yfinance_poller.py:91: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <AsyncMock id='1656617996688'>
+
+    def assert_awaited_once(self):
+        """
+        Assert that the mock was awaited exactly once.
+        """
+        if not self.await_count == 1:
+            msg = (f"Expected {self._mock_name or 'mock'} to have been awaited once."
+                   f" Awaited {self.await_count} times.")
+>           raise AssertionError(msg)
+E           AssertionError: Expected mock to have been awaited once. Awaited 0 times.
+
+C:\Users\rites\AppData\Local\Python\pythoncore-3.12-64\Lib\unittest\mock.py:2334: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  talonx_ingest.market_data.yfinance_poll:yfinance_poll.py:253 yfinance poll cycle degraded: only 1/3 symbols returned data (67% failure, 1 consecutive); backing off 0.0s
+============================== warnings summary ===============================
+.venv\Lib\site-packages\pandas_ta\__init__.py:37
+  C:\workspace\TalonX\.venv\Lib\site-packages\pandas_ta\__init__.py:37: Pandas4Warning: The 'mode.copy_on_write' option is deprecated. Copy-on-Write can no longer be disabled (it is always enabled with pandas >= 3.0), and setting the option has no impact. This option will be removed in pandas 4.0.
+    from pandas_ta.core import AnalysisIndicators
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:312: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["piv_state_dir"] = piv_state_dir if piv_state_dir is not None else PivConfig().state_dir
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:313: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["stats"] = {watch.key: ChannelStats() for watch in CHANNELS}
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:314: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["websockets"] = set()
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:315: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["started_at"] = time.monotonic()
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:316: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["stop_event"] = asyncio.Event()
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:317: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["quant_config"] = QuantConfig()
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:326: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["buffer_stats"] = {
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+  C:\workspace\TalonX\dashboard_web.py:290: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["redis_task"] = asyncio.create_task(_redis_consumer(app))
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+  C:\workspace\TalonX\dashboard_web.py:291: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["broadcast_task"] = asyncio.create_task(_broadcaster(app))
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+  C:\workspace\TalonX\dashboard_web.py:292: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["buffer_poll_task"] = asyncio.create_task(_buffer_stats_poll(app))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_yfinance_poller.py::test_healthy_cycle_does_not_reset_session
+FAILED tests/test_yfinance_poller.py::test_degraded_cycle_is_not_silently_treated_as_healthy
+2 failed, 2522 passed, 1 skipped, 10 xfailed, 48 warnings in 856.43s (0:14:16)
+EXIT:1

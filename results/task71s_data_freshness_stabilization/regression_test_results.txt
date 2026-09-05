@@ -1,0 +1,65 @@
+TASK 71S -- REGRESSION TEST RESULTS
+=====================================
+
+1) TARGETED SUITE (new, this task)
+------------------------------------
+$ .venv/Scripts/python.exe -m pytest tests/test_task71s_data_freshness_stabilization.py -q
+.............................
+29 passed in 1.23s
+
+2) DIRECTLY-RELATED PRE-EXISTING SUITES (warmup / readiness / staleness / PIV)
+----------------------------------------------------------------------------------
+$ .venv/Scripts/python.exe -m pytest tests/test_task65_session_runner.py tests/test_task65b_warmup.py \
+    tests/test_task65_piv.py tests/test_task64_piv.py tests/test_task69p_telegram_piv_parity.py \
+    tests/test_task69q_evidence_upgrade.py tests/test_telegram_ping_safety.py \
+    tests/test_task69q_alpaca_historical_warmup.py tests/test_task70s_alpaca_warmup_stabilization.py \
+    tests/test_task66b_prep_preflight.py -q
+........................................................................ [ 40%]
+........................................................................ [ 80%]
+....................................                                     [100%]
+180 passed in 37.99s
+
+Includes Task 70S's own full test file (26 tests) -- confirmed still
+passing unchanged, and test_stale_data_flagged_once_when_no_new_bar_arrives
+(the pre-existing STALE_DATA dedup regression test) -- confirmed still
+passing byte-for-byte unchanged.
+
+3) FULL REPOSITORY REGRESSION SUITE
+--------------------------------------
+$ .venv/Scripts/python.exe -m pytest tests/ -q --ignore=tests/test_task61_validation_protocol.py --ignore=tests/test_task61r_temporal_freeze.py
+
+1 failed, 2119 passed, 1 skipped, 15 xfailed, 1 warning in 520.62s (0:08:40)
+
+FAILED tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset
+
+--ignore flags: same two pre-existing collection errors as Task 70S
+(ModuleNotFoundError: exchange_calendars) -- unrelated environment gap,
+not touched by this task either.
+
+4) HONEST COMPARISON AGAINST THE TASK 70S BASELINE
+------------------------------------------------------
+Task 70S's own full-suite result (regression_test_results.txt in
+results/task70s_piv_stabilization_phase1/): "1 failed, 2090 passed, 1
+skipped, 15 xfailed" with the SAME single failing test
+(test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset).
+
+Task 71S's result: "1 failed, 2119 passed, 1 skipped, 15 xfailed" -- the
+difference of exactly +29 passed (2119 - 2090 = 29) is fully accounted for
+by this task's own new test file
+(tests/test_task71s_data_freshness_stabilization.py, 29 tests). The
+skipped count (1) and xfailed count (15) are IDENTICAL. The single
+failure is the IDENTICAL test, with the same root cause (a data-dependent
+historical-regime backtest realizing SUCCESS_ZERO_TRADES against the
+current sample dataset snapshot) already independently verified in Task
+70S to be pre-existing and unrelated to any PIV/warmup/freshness code (a
+fresh git-stash A/B re-run was not repeated this task since Task 70S
+already established, on the immediately-prior commit, that this failure
+is identical on the untouched baseline -- and this task's own diff never
+touches talonx_backtest, talonx_quant, or the sample historical dataset,
+so there is no plausible mechanism by which this task's changes could
+have affected that test's outcome).
+
+CONCLUSION: behaviourally identical to the Task 70S baseline in every
+respect except the intentional addition of this task's own 29 new tests.
+No regression introduced; the one known failure remains exactly as
+characterized before.

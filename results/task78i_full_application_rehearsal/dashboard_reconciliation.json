@@ -1,0 +1,22 @@
+{
+  "purpose": "Task 78I Stage 4 -- proves the ONE new dashboard route (GET /piv/status on the EXISTING dashboard_web.py aiohttp server) is genuinely additive, read-only, and reconciles to durable records.",
+  "route": "GET /piv/status",
+  "server": "dashboard_web.py (existing, unmodified aiohttp app -- default localhost:8787, loopback only)",
+  "handler": "dashboard_web.py::piv_status_handler -- calls talonx_piv.observability.build_integrated_projection(state_dir) fresh on every request, returns it as JSON",
+  "existing_routes_touched": "none -- `/`, `/static/*`, `/ws` are byte-identical, confirmed by test_existing_routes_unaffected",
+  "no_piv_awareness_before_this_task": "confirmed by grep in Task 77I's own research (re-verified by the Stage 0 subagent this task) -- zero references to talonx_piv/piv_events/PIV anywhere in dashboard.py/dashboard_web.py/dashboard_web_static/ before this change",
+  "no_order_placement_or_safety_override_controls": "the route is GET-only, returns JSON, performs zero writes -- build_integrated_projection itself is read-only (see Task 77I's own dashboard_counter_reconciliation.json, unchanged)",
+  "separation_from_general_pipeline_counters": "the existing dashboard's own Redis-channel counters (ChannelStats, /ws broadcast) are completely untouched and remain fully separate from /piv/status's payload -- no merging of PIV counters with general-pipeline counters anywhere",
+  "historical_probe_exclusion": "unchanged from Task 77I -- build_integrated_projection scopes every count to session_id, excluding historical/other-session records by construction",
+  "stale_read_handling": "computed fresh on every GET (never cached/polled like the existing buffer-warmup panel) -- a read failure (corrupt state file, unexpected exception) returns HTTP 500 with an explicit error body, never a silently-empty-looking 200. Proven by test_piv_status_route_reports_read_failure_explicitly.",
+  "reconciliation_proof": "test_piv_status_route_returns_the_integrated_projection writes a decision_ledger.json record directly, then confirms the route's JSON response reports decisions.total==1, matching Task 77I's own dashboard_counter_reconciliation.json guarantee (every count reconciles to its ledger) -- now proven reachable over HTTP too, not just via the Python function directly.",
+  "verified_with": "aiohttp.test_utils.TestClient/TestServer -- an isolated, loopback, in-process test server (never a real bound socket reachable from outside the test process)",
+  "tests": [
+    "test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection",
+    "test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error",
+    "test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly",
+    "test_task78i_dashboard_integration.py::test_existing_routes_unaffected",
+    "test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default"
+  ],
+  "all_passed": true
+}

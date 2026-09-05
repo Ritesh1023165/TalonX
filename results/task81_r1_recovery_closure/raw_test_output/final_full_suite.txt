@@ -1,0 +1,144 @@
+.............................................s.xxxx..................... [  2%]
+........................................................................ [  5%]
+........................................................................ [  8%]
+........................................................................ [ 10%]
+.....xxxxxx............................................................. [ 13%]
+........................................................................ [ 16%]
+........................................................................ [ 19%]
+........................................................................ [ 21%]
+........................................................................ [ 24%]
+........................................................................ [ 27%]
+........................................................................ [ 30%]
+........................................................................ [ 32%]
+........................................................................ [ 35%]
+........................................................................ [ 38%]
+........................................................................ [ 40%]
+........................................................................ [ 43%]
+........................................................................ [ 46%]
+........................................................................ [ 49%]
+........................................................................ [ 51%]
+........................................................................ [ 54%]
+........................................................................ [ 57%]
+........................................................................ [ 60%]
+........................................................................ [ 62%]
+........................................................................ [ 65%]
+........................................................................ [ 68%]
+........................................................................ [ 71%]
+........................................................................ [ 73%]
+........................................................................ [ 76%]
+........................................................................ [ 79%]
+........................................................................ [ 81%]
+........................................................................ [ 84%]
+........................................................................ [ 87%]
+........................................................................ [ 90%]
+........................................................................ [ 92%]
+........................................................................ [ 95%]
+........................................................................ [ 98%]
+............................................                             [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\pandas_ta\__init__.py:37
+  C:\workspace\TalonX\.venv\Lib\site-packages\pandas_ta\__init__.py:37: Pandas4Warning: The 'mode.copy_on_write' option is deprecated. Copy-on-Write can no longer be disabled (it is always enabled with pandas >= 3.0), and setting the option has no impact. This option will be removed in pandas 4.0.
+    from pandas_ta.core import AnalysisIndicators
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:312: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["piv_state_dir"] = piv_state_dir if piv_state_dir is not None else PivConfig().state_dir
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:313: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["stats"] = {watch.key: ChannelStats() for watch in CHANNELS}
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:314: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["websockets"] = set()
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:315: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["started_at"] = time.monotonic()
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:316: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["stop_event"] = asyncio.Event()
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:317: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["quant_config"] = QuantConfig()
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:326: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["buffer_stats"] = {
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+  C:\workspace\TalonX\dashboard_web.py:290: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["redis_task"] = asyncio.create_task(_redis_consumer(app))
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+  C:\workspace\TalonX\dashboard_web.py:291: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["broadcast_task"] = asyncio.create_task(_broadcaster(app))
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+  C:\workspace\TalonX\dashboard_web.py:292: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["buffer_poll_task"] = asyncio.create_task(_buffer_stats_poll(app))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+XFAIL tests/test_backtest_cost_sensitivity.py::test_multi_trade_fixture_produces_three_trades_in_every_scenario - Task 25A: sample_multi_trade_1m.csv's demo trades were built on the long/short bug (BEARISH-while-flat) that Task 24/25A fixed; now correctly produce zero trades. Needs a dedicated CSV-regeneration follow-up, not fixed here.
+XFAIL tests/test_backtest_cost_sensitivity.py::test_multi_trade_net_r_actually_changes_with_cost - Task 25A: sample_multi_trade_1m.csv's demo trades were built on the long/short bug (BEARISH-while-flat) that Task 24/25A fixed; now correctly produce zero trades. Needs a dedicated CSV-regeneration follow-up, not fixed here.
+XFAIL tests/test_backtest_cost_sensitivity.py::test_multi_trade_higher_cost_never_improves_expectancy_without_skipping - Task 25A: sample_multi_trade_1m.csv's demo trades were built on the long/short bug (BEARISH-while-flat) that Task 24/25A fixed; now correctly produce zero trades. Needs a dedicated CSV-regeneration follow-up, not fixed here.
+XFAIL tests/test_backtest_cost_sensitivity.py::test_multi_trade_trade_count_and_win_loss_mix_are_cost_invariant - Task 25A: sample_multi_trade_1m.csv's demo trades were built on the long/short bug (BEARISH-while-flat) that Task 24/25A fixed; now correctly produce zero trades. Needs a dedicated CSV-regeneration follow-up, not fixed here.
+XFAIL tests/test_backtest_sample_data.py::test_multi_trade_dataset_runs_the_documented_command_and_produces_three_trades - Task 25A: sample_multi_trade_1m.csv's demo trades were built on the long/short bug (BEARISH-while-flat) that Task 24/25A fixed; now correctly produce zero trades. Needs a dedicated CSV-regeneration follow-up, not fixed here.
+XFAIL tests/test_backtest_sample_data.py::test_multi_trade_dataset_exercises_target_stop_and_eod_exit_reasons - Task 25A: sample_multi_trade_1m.csv's demo trades were built on the long/short bug (BEARISH-while-flat) that Task 24/25A fixed; now correctly produce zero trades. Needs a dedicated CSV-regeneration follow-up, not fixed here.
+XFAIL tests/test_backtest_sample_data.py::test_multi_trade_dataset_has_at_least_one_winner_and_one_loser - Task 25A: sample_multi_trade_1m.csv's demo trades were built on the long/short bug (BEARISH-while-flat) that Task 24/25A fixed; now correctly produce zero trades. Needs a dedicated CSV-regeneration follow-up, not fixed here.
+XFAIL tests/test_backtest_sample_data.py::test_multi_trade_dataset_populates_aggregate_statistics - Task 25A: sample_multi_trade_1m.csv's demo trades were built on the long/short bug (BEARISH-while-flat) that Task 24/25A fixed; now correctly produce zero trades. Needs a dedicated CSV-regeneration follow-up, not fixed here.
+XFAIL tests/test_backtest_sample_data.py::test_multi_trade_dataset_equity_curve_reflects_the_win_loss_sequence - Task 25A: sample_multi_trade_1m.csv's demo trades were built on the long/short bug (BEARISH-while-flat) that Task 24/25A fixed; now correctly produce zero trades. Needs a dedicated CSV-regeneration follow-up, not fixed here.
+XFAIL tests/test_backtest_sample_data.py::test_multi_trade_dataset_html_report_contains_populated_metrics - Task 25A: sample_multi_trade_1m.csv's demo trades were built on the long/short bug (BEARISH-while-flat) that Task 24/25A fixed; now correctly produce zero trades. Needs a dedicated CSV-regeneration follow-up, not fixed here.
+SKIPPED [1] tests\test_backtest_cost_sensitivity.py:90: fixture produced too few trades to compare expectancy across scenarios
+2625 passed, 1 skipped, 10 xfailed, 48 warnings in 848.28s (0:14:08)
+EXIT=0

@@ -33,6 +33,7 @@ from zoneinfo import ZoneInfo
 from talonx_ingest.common.backoff import jittered_backoff_seconds
 from talonx_ingest.config import MarketDataConfig, settings
 from talonx_ingest.market_data.models import DataSource, MarketEvent, MarketEventType
+from talonx_ingest.session import is_premarket_window
 
 logger = logging.getLogger("talonx_ingest.market_data.yfinance_poll")
 
@@ -41,8 +42,62 @@ EventCallback = Callable[[MarketEvent], Awaitable[None]]
 _ET = ZoneInfo("America/New_York")
 
 
+def _looks_like_rate_limited(exc: Exception) -> bool:
+    """Narrow, best-effort heuristic -- yfinance/Yahoo's undocumented
+    endpoints don't raise a single stable exception type for rate-limiting
+    (observed as a bare KeyError deep in scraper parsing just as often as an
+    HTTP error -- see _reset_yfinance_session's own docstring), so this
+    checks both the exception's type name and its message for the tell-tale
+    "429"/"rate limit" signature rather than trying to catch a specific
+    class that may not be the one actually raised."""
+    haystack = f"{type(exc).__name__} {exc}".lower()
+    return "429" in haystack or "rate limit" in haystack or "too many requests" in haystack
+
+
+# ---- Task 87B FC_05: provider-error taxonomy -----------------------------
+# Operator-facing categories. yfinance's own logger emits a speculative
+# "possibly delisted; no price data" ERROR for ANY empty response --
+# transient pre-market gaps included -- which misleads an operator into
+# assuming a real delisting. TalonX classifies the condition itself and
+# logs ONE attributed line; a TEMPORARY_NO_DATA never invalidates a
+# symbol (the next cycle re-requests the full list unchanged).
+PROVIDER_ERR_TEMPORARY_NO_DATA = "TEMPORARY_NO_DATA"
+PROVIDER_ERR_UNSUPPORTED_SESSION = "UNSUPPORTED_SESSION"
+PROVIDER_ERR_RATE_LIMIT = "RATE_LIMIT"
+PROVIDER_ERR_TIMEOUT = "PROVIDER_TIMEOUT"
+PROVIDER_ERR_SYMBOL_INVALID = "SYMBOL_INVALID"
+PROVIDER_ERR_SCHEMA = "PROVIDER_SCHEMA_ERROR"
+PROVIDER_ERR_UNKNOWN = "UNKNOWN_PROVIDER_ERROR"
+
+
+def classify_provider_error(exc: Exception) -> str:
+    """Best-effort mapping of a caught per-symbol yfinance failure to an
+    operator-facing category. Deliberately conservative: a bare "no price
+    data" / "possibly delisted" is TEMPORARY_NO_DATA, never SYMBOL_INVALID
+    -- Task 87A: do not infer a delisting from a single cycle."""
+    name = type(exc).__name__.lower()
+    msg = f"{name} {exc}".lower()
+    if _looks_like_rate_limited(exc):
+        return PROVIDER_ERR_RATE_LIMIT
+    if "timeout" in msg or "timed out" in name or "readtimeout" in name or "connecttimeout" in name:
+        return PROVIDER_ERR_TIMEOUT
+    # yfinance raises an explicit invalid-symbol / invalid-period type for a
+    # genuinely bad ticker; only THAT counts as SYMBOL_INVALID.
+    if "notfound" in name or "invalidticker" in name or "symbolnotfound" in name:
+        return PROVIDER_ERR_SYMBOL_INVALID
+    if "prepost" in msg or "pre/post" in msg or "extended hours" in msg or "unsupported" in msg:
+        return PROVIDER_ERR_UNSUPPORTED_SESSION
+    # A bare KeyError deep in yfinance's scraper parsing (e.g.
+    # 'currentTradingPeriod') == a malformed/incomplete provider response.
+    if name == "keyerror" or "jsondecodeerror" in name or "schema" in msg:
+        return PROVIDER_ERR_SCHEMA
+    if "no price data" in msg or "possibly delisted" in msg or "no data found" in msg:
+        return PROVIDER_ERR_TEMPORARY_NO_DATA
+    return PROVIDER_ERR_UNKNOWN
+
+
 class YFinancePoller:
-    def __init__(self, config: MarketDataConfig | None = None):
+    def __init__(self, config: MarketDataConfig | None = None, metrics_publisher=None):
         self.config = config or settings.market_data
         self._stop_event = asyncio.Event()
         # Cumulative-to-incremental volume conversion state (see
@@ -53,9 +108,82 @@ class YFinancePoller:
         # genuine "first observation" rather than inheriting stale state
         # from a previous run.
         self._volume_state: dict[str, tuple[date, float]] = {}
+        # 2026-08-18 /ping observability fix: optional -- duck-typed to
+        # RedisEventPublisher.incr_metric's signature (async
+        # incr_metric(stage, counter, amount=1)), same "None means additive,
+        # not required" posture every other optional Redis dependency in
+        # this codebase already has. In-process counters below are always
+        # tracked regardless, so tests never need a real/mocked Redis
+        # client to verify this module's own failure-detection logic.
+        self._metrics_publisher = metrics_publisher
+        self._requests_failed = 0
+        self._retries = 0
+        self._rate_limited = 0
+        # Task 87B FC_05: per-category provider-error tally + the set of
+        # symbols currently returning no data, so a recovery can be logged
+        # (INFO) rather than a symbol silently staying dark.
+        self._error_categories: dict[str, int] = {}
+        self._no_data_symbols: set[str] = set()
+
+    @property
+    def error_categories(self) -> dict[str, int]:
+        return dict(self._error_categories)
+
+    @property
+    def no_data_symbols(self) -> set[str]:
+        return set(self._no_data_symbols)
+
+    def _note_recovery(self, symbol: str) -> None:
+        if symbol in self._no_data_symbols:
+            self._no_data_symbols.discard(symbol)
+            logger.info("[provider RECOVERED] %s is returning data again", symbol)
+
+    def _note_no_data(self, symbol: str) -> None:
+        if symbol not in self._no_data_symbols:
+            self._no_data_symbols.add(symbol)
+            logger.debug("[provider TEMPORARY_NO_DATA] %s: no last_price this cycle (not a failure)", symbol)
+
+    def _drain_category_deltas(self) -> dict[str, int]:
+        flushed = getattr(self, "_error_categories_flushed", {})
+        deltas: dict[str, int] = {}
+        for cat, total in self._error_categories.items():
+            d = total - flushed.get(cat, 0)
+            if d > 0:
+                deltas[cat] = d
+        self._error_categories_flushed = dict(self._error_categories)
+        return deltas
+
+    def _classify_and_record(self, symbol: str, exc: Exception) -> str:
+        category = classify_provider_error(exc)
+        self._error_categories[category] = self._error_categories.get(category, 0) + 1
+        level = logging.WARNING if category in (
+            PROVIDER_ERR_SCHEMA, PROVIDER_ERR_TIMEOUT, PROVIDER_ERR_RATE_LIMIT, PROVIDER_ERR_SYMBOL_INVALID,
+        ) else logging.INFO
+        logger.log(level, "[provider %s] %s: %s", category, symbol, exc)
+        return category
+
+    @property
+    def requests_failed(self) -> int:
+        return self._requests_failed
+
+    @property
+    def retries(self) -> int:
+        return self._retries
+
+    @property
+    def rate_limited(self) -> int:
+        return self._rate_limited
 
     def stop(self) -> None:
         self._stop_event.set()
+
+    async def _flush_provider_metric(self, counter: str, amount: int) -> None:
+        if self._metrics_publisher is None or amount <= 0:
+            return
+        try:
+            await self._metrics_publisher.incr_metric("ingest", counter, amount)
+        except Exception as exc:  # noqa: BLE001 -- a metrics-write failure must not break polling
+            logger.debug("Provider metric flush failed for %s: %s", counter, exc)
 
     def _incremental_volume(self, symbol: str, cumulative: float | None, now: datetime) -> float | None:
         """`fast_info.last_volume` is Yahoo's CUMULATIVE (day-to-date)
@@ -138,10 +266,23 @@ class YFinancePoller:
         consecutive_failures = 0
 
         while not self._stop_event.is_set():
+            # Snapshotted before the call and diffed after -- _fetch_snapshots
+            # runs synchronously off-thread (asyncio.to_thread) and increments
+            # self._requests_failed/self._rate_limited directly as PLAIN
+            # instance-attribute writes (never awaits, never touches Redis;
+            # to_thread runs one call at a time so there's no concurrent-
+            # write hazard). This delta is what gets flushed to Redis here,
+            # back on the event loop, without changing _fetch_snapshots's
+            # return type (still a plain list[MarketEvent], so every
+            # existing test that monkeypatches or calls it directly is
+            # unaffected).
+            failed_before, rate_limited_before = self._requests_failed, self._rate_limited
             try:
                 snapshots = await asyncio.to_thread(self._fetch_snapshots, symbols)
             except Exception as exc:  # noqa: BLE001 -- keep polling alive regardless
                 consecutive_failures += 1
+                self._retries += 1
+                await self._flush_provider_metric("provider_retries", 1)
                 self._maybe_reset_session(consecutive_failures)
                 wait = jittered_backoff_seconds(
                     consecutive_failures,
@@ -155,12 +296,44 @@ class YFinancePoller:
                 await asyncio.sleep(wait)
                 continue
 
-            for event in snapshots:
-                await on_event(event)
+            await self._flush_provider_metric("provider_requests_failed", self._requests_failed - failed_before)
+            await self._flush_provider_metric("provider_rate_limited", self._rate_limited - rate_limited_before)
+            # Task 87B FC_05: category-tagged provider-failure metrics so
+            # the counted set matches the surfaced set (Task 87A found they
+            # diverged -- the loud "possibly delisted" lines were uncounted
+            # while the counted ones were quiet warnings).
+            for _cat, _delta in self._drain_category_deltas().items():
+                await self._flush_provider_metric(f"provider_err_{_cat.lower()}", _delta)
+
+            # 2026-08-18 correctness fix (code-review findings #2/#4):
+            # fast_info (this poller's price source) does NOT reflect
+            # pre/post-market trading -- see fetch_extended_hours_quote's
+            # own docstring, and run_talonx.PreMarketPoller's, which exists
+            # specifically because of this gap. Left unsuppressed, this
+            # continuous poller would keep republishing the STALE prior
+            # regular-session price as a fresh-timestamped BAR event every
+            # cycle throughout pre-market, racing PreMarketPoller's genuine
+            # premarket bars (fetch_quotes_vectorized, which DOES capture
+            # real pre/post-market prices) on the SAME talonx:market:stream
+            # channel for the SAME symbols -- two uncoordinated, disagreeing
+            # price sources feeding the same quant buffer. _fetch_snapshots
+            # itself is still called every cycle above (not skipped) so
+            # _incremental_volume's per-symbol cumulative-volume tracking
+            # stays continuous -- only the STALE/non-representative event
+            # publication is suppressed here, not the underlying fetch.
+            # PreMarketPoller is the sole authoritative price source for
+            # the pre-market window; this poller resumes publishing the
+            # instant the window ends (regular-session behavior is
+            # completely unchanged).
+            if not is_premarket_window():
+                for event in snapshots:
+                    await on_event(event)
 
             failure_rate = 1.0 - (len(snapshots) / len(symbols) if symbols else 1.0)
             if len(symbols) >= 3 and failure_rate >= self.config.yfinance_degraded_cycle_failure_rate:
                 consecutive_failures += 1
+                self._retries += 1
+                await self._flush_provider_metric("provider_retries", 1)
                 self._maybe_reset_session(consecutive_failures)
                 wait = jittered_backoff_seconds(
                     consecutive_failures,
@@ -193,6 +366,19 @@ class YFinancePoller:
         Blocking call, run off the event loop via asyncio.to_thread.
         Uses `fast_info` per ticker for lightweight last-price/volume data
         rather than full `.history()`, which is much slower per call.
+
+        Return type deliberately unchanged (still a plain list[MarketEvent],
+        not a tuple) -- self._requests_failed/self._rate_limited below are
+        incremented as plain instance-attribute writes instead, so every
+        existing caller/test that monkeypatches or calls this directly
+        keeps working unmodified; stream() diffs those two counters
+        before/after this call to compute what to flush to Redis (see its
+        own docstring). Only a genuine per-symbol EXCEPTION counts as a
+        failure -- a ticker object simply missing, or fast_info legitimately
+        having no last_price this poll (e.g. between updates), is ordinary
+        "no new data yet", not a provider failure (same distinction
+        stream()'s existing failure_rate calculation already makes at the
+        whole-cycle level).
         """
         import yfinance as yf  # imported lazily so this stays optional
 
@@ -204,14 +390,16 @@ class YFinancePoller:
             try:
                 ticker = tickers.tickers.get(symbol.upper())
                 if ticker is None:
-                    logger.warning("yfinance returned no ticker object for %s", symbol)
+                    self._note_no_data(symbol.upper())  # routine "no data yet", NOT a failure
                     continue
 
                 info = ticker.fast_info
                 last_price = getattr(info, "last_price", None)
                 if last_price is None:
+                    self._note_no_data(symbol.upper())
                     continue
 
+                self._note_recovery(symbol.upper())  # was dark, is back
                 cumulative_volume = getattr(info, "last_volume", None)
                 events.append(
                     MarketEvent(
@@ -233,7 +421,12 @@ class YFinancePoller:
                     )
                 )
             except Exception as exc:  # noqa: BLE001 -- isolate per-symbol failures
-                logger.warning("yfinance fetch failed for %s: %s", symbol, exc)
+                category = self._classify_and_record(symbol.upper(), exc)
+                self._requests_failed += 1
+                if category == PROVIDER_ERR_RATE_LIMIT:
+                    self._rate_limited += 1
+                # A transient failure never removes a symbol -- the next
+                # cycle re-requests the whole list unchanged.
                 continue
 
         return events

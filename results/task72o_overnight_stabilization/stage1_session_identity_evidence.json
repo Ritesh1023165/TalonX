@@ -1,0 +1,13 @@
+{
+  "claim": "EOD events (from both the guaranteed SessionRunner path and the manual cli.py eod recovery path) are always stamped with the ORIGINAL live session_id, never a freshly-minted one.",
+  "mechanism": "run_eod_lifecycle requires live_session_id as an explicit keyword argument; both callers read it from session_identity.json (written once, at `start`, before any runner/reconciliation code runs) rather than constructing a new SessionIdentity.",
+  "manual_cli_eod_now_refuses_without_identity": "cli.py's eod branch: if session_identity.json is missing or lacks session_id, emits BROKER_ERROR reason=EOD_REQUIRES_KNOWN_LIVE_SESSION_IDENTITY and returns exit code 2 -- zero broker calls made.",
+  "session_runner_guaranteed_path_same_rule": "SessionRunner._run_eod_lifecycle reads the same session_identity.json; if absent, emits BROKER_ERROR reason=EOD_REQUIRES_KNOWN_LIVE_SESSION_IDENTITY and status EOD_LIFECYCLE_SKIPPED, returns INCONCLUSIVE without any broker call.",
+  "test_evidence": [
+    "test_original_live_session_linkage_and_separate_reconciliation_run_id",
+    "test_two_reconciliation_runs_get_different_run_ids",
+    "test_scheduled_completion_triggers_eod_lifecycle (asserts every EOD_*/SESSION_COMPLETED event carries the session_identity.json-sourced session_id, not a fresh one)",
+    "test_no_session_identity_file_skips_eod_without_guessing"
+  ],
+  "reconciliation_run_id_always_distinct_from_session_id": true
+}

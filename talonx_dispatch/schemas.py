@@ -136,6 +136,12 @@ class ActionableAlert(BaseModel):
     correlated_at: datetime
     published_at: datetime
 
+    # Task 87B FC_01: talonx_core.alert_outbox's stable delivery id. Used
+    # here ONLY to de-duplicate an at-least-once retry/replay so a Redis
+    # outage never produces a duplicate user-facing alert. Optional --
+    # None for a legacy/pre-FC_01 payload (treated as "not previously seen").
+    outbox_id: str | None = None
+
 
 class OrderType(str, Enum):
     BUY = "BUY"
@@ -225,6 +231,9 @@ class LongTermActionableAlert(BaseModel):
 
     correlated_at: datetime
     published_at: datetime
+
+    # Task 87B FC_01 -- see ActionableAlert.outbox_id above.
+    outbox_id: str | None = None
 
 
 class LongTermOrderType(str, Enum):

@@ -1,0 +1,36 @@
+{
+  "base_commit": "af3bc97d47b3216f053a09fce533f51509b0c695",
+  "current_candidate_strategy_fingerprint": "2ae6216bca70",
+  "current_candidate_strategy_git_blob": "37a06f69a43b112ddc103afa045586b20f31997d",
+  "current_candidate_zero_drift": true,
+  "deployment": "MONDAY_DECISION_SHADOW_ONLY",
+  "fprc_v1_isolation": true,
+  "frozen_files": {
+    "results/task59_candidate_architecture_triage/next_candidate_spec.md": "3c670dee568c1bcdc2f478f3f3c736a0b1ea06d38799b9571e08f7aa62ae329f",
+    "talonx_quant/fprc_v1.py": "de4ef7f4f2194dcd5798564c54120f57f1fcb771280dbd1ec61c474e9328cc85",
+    "talonx_quant/fprc_v1_shadow.py": "921cf1b6f9663f2f72e690a4076e3fe9dd278941e4b0e95441b045f3990b6a88"
+  },
+  "implementation": "PASS",
+  "implementation_fingerprint_sha256": "be91c38047cf9aa9dbb6c8a948eaf52dd64ed4b16c7d8a70359388b58e5c2a64",
+  "no_capital": true,
+  "production_behavior_changed": false,
+  "supporting_file_hashes": {
+    "research/scripts/task60_freeze_fprc_v1.py": "73fbee76c302ecde25df3046acfeb357c5453ed036bd990f9b4148e009a667a3",
+    "tests/test_fprc_v1.py": "d15981cd8ef1913995cbf8f698d8e676e900c0803494351d9580c6d36cda2db7"
+  },
+  "tests": {
+    "focused": {
+      "passed": 12,
+      "failed": 0
+    },
+    "full_suite": {
+      "collected": 1874,
+      "passed": 1857,
+      "failed": 1,
+      "skipped": 1,
+      "xfailed": 15,
+      "baseline_exception": "tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset expected one trade; untouched current candidate rejected its generated signal as LOW_CONFLUENCE"
+    }
+  },
+  "validation_started": false
+}

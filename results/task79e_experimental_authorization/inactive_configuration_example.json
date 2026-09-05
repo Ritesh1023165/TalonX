@@ -1,0 +1,25 @@
+{
+  "_comment_1": "TEMPLATE ONLY -- NOT ACTIVE. enabled:false means load_experimental_authorization() returns None and the experimental path is completely unreachable, exactly as if this file did not exist. This is the ONLY configuration this task ships; no operator has authored a live one.",
+  "_comment_2": "Copy this file to <state_dir>/experimental_authorization.json and change every field deliberately -- runtime_sha/config_hash/strategy_version must match the EXACT session identity that will read this file (see session_identity.py / talonx_backtest.reproducibility.get_strategy_version()) or every guard fails closed with a WRONG_* reason.",
+  "enabled": false,
+  "experiment_id": "REPLACE_WITH_UNIQUE_EXPERIMENT_ID",
+  "operator_acknowledged_unvalidated": true,
+  "strategy_id": "macd_bullish_cross",
+  "strategy_version": "REPLACE_WITH_get_strategy_version_OUTPUT",
+  "runtime_sha": "REPLACE_WITH_SESSION_IDENTITY_RUNTIME_SHA",
+  "config_hash": "REPLACE_WITH_SESSION_IDENTITY_CONFIG_HASH",
+  "allowed_symbols": ["REPLACE_WITH_ONE_OR_MORE_TICKERS"],
+  "trading_date_et": "REPLACE_WITH_YYYY-MM-DD",
+  "session_scope": "REGULAR",
+  "activated_at": "REPLACE_WITH_ISO8601_TIMEZONE_AWARE_TIMESTAMP",
+  "expires_at": "REPLACE_WITH_ISO8601_TIMEZONE_AWARE_TIMESTAMP_AFTER_activated_at",
+  "paper": {
+    "_comment": "Omit this whole 'paper' key, or set enabled:false, to permit the alert+shadow record ONLY with no broker order ever submitted.",
+    "enabled": false,
+    "account_id_binding": "REPLACE_WITH_EXACT_PAPER_ACCOUNT_ID",
+    "max_quantity_per_entry": 1.0,
+    "max_reference_notional_budget": 100.0,
+    "max_entry_count": 1,
+    "max_concurrent_exposure": 1
+  }
+}

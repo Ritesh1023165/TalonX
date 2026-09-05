@@ -1,0 +1,186 @@
+{
+  "checked_utc": "2026-08-25T13:40:53.400581+00:00",
+  "http_status": 200,
+  "per_symbol": {
+    "AAPL": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "MSFT": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "NVDA": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "AMZN": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "META": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "AMD": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "TSLA": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "GOOGL": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "PYPL": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "STX": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "ADBE": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "ADI": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "AMAT": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "AVGO": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "BKNG": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "CMCSA": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "COST": {
+      "last_bar_ts": "2026-08-25T13:35:00+00:00",
+      "age_seconds": 353.4,
+      "status": "STALE"
+    },
+    "CSCO": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "GILD": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "HON": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "INTC": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "INTU": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "ISRG": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "KLAC": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "LRCX": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "MDLZ": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "MU": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "NFLX": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "PANW": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "PEP": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "QCOM": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "REGN": {
+      "last_bar_ts": "2026-08-25T13:39:00+00:00",
+      "age_seconds": 113.4,
+      "status": "FRESH"
+    },
+    "SBUX": {
+      "last_bar_ts": "2026-08-25T13:38:00+00:00",
+      "age_seconds": 173.4,
+      "status": "STALE"
+    },
+    "TXN": {
+      "last_bar_ts": "2026-08-25T13:37:00+00:00",
+      "age_seconds": 233.4,
+      "status": "STALE"
+    },
+    "VRTX": {
+      "last_bar_ts": "2026-08-25T13:31:00+00:00",
+      "age_seconds": 593.4,
+      "status": "STALE"
+    }
+  },
+  "summary": {
+    "fresh": 31,
+    "stale": 4,
+    "no_data": 0
+  }
+}

@@ -236,8 +236,11 @@ from pydantic import ValidationError
 from talonx_quant import preseed
 from talonx_quant.aggregation import HtfBarAggregator
 from talonx_quant.buffer import RollingBarBuffer
-from talonx_quant.config import QuantConfig
-from talonx_quant.indicators import compute_daily_pivots, compute_htf_trend, compute_indicators
+from talonx_quant.config import ConfluenceContract, QuantConfig, VolatilityGateMode
+from talonx_quant.indicators import (
+    VolatilityRegimeSnapshot, classify_regime_shadow_disagreement, compute_daily_pivots, compute_htf_trend,
+    compute_indicators, compute_volatility_regime, evaluate_regime,
+)
 from talonx_quant.schemas import (
     MarketTickEvent,
     NewsArticleIngestedEvent,
@@ -295,6 +298,46 @@ def _fails_min_volatility(snapshot, config: QuantConfig) -> bool:
     return atr_pct < config.min_atr_pct
 
 
+def _evaluate_active_volatility_gate(
+    fails_volatility_1m: bool, regime_result, config: QuantConfig,
+) -> tuple[bool, str, str | None]:
+    """Task 45: the ONE authoritative dispatch between the two mutually
+    exclusive volatility ELIGIBILITY implementations -- called identically
+    by talonx_backtest.engine and talonx_quant.consumer, with both already-
+    computed inputs (fails_volatility_1m from _fails_min_volatility above,
+    regime_result from talonx_quant.indicators.evaluate_regime) passed in
+    rather than recomputed, so this function contains zero threshold logic
+    of its own.
+
+    Returns (gate_fails, canonical_strategy_rejection_reason,
+    detail_reason_or_None).
+
+    CURRENT_1M (the default): returns fails_volatility_1m UNCHANGED and the
+    pre-Task-45 "LOW_VOLATILITY" rejection string -- byte-for-byte the
+    same decision and reason as before this function existed (proven in
+    results/task45_experimental_regime_gate/current_mode_regression.json).
+
+    MULTITIMEFRAME_EXPERIMENTAL: returns `not regime_result.eligible` and
+    the new "LOW_VOLATILITY_REGIME" canonical reason, with
+    regime_result.reason (one of evaluate_regime's 5 stable values --
+    REGIME_ELIGIBLE/REGIME_STATE_NOT_READY/REGIME_15M_BELOW_THRESHOLD/
+    REGIME_60M_BELOW_THRESHOLD/REGIME_BOTH_BELOW_THRESHOLD) preserved
+    separately as the detail reason, never collapsed into the canonical
+    one. No 15m-only or 1m fallback exists if the regime state isn't
+    ready -- evaluate_regime's own eligible=False already covers that.
+
+    Fails CLOSED (raises) on any other value -- this should be
+    structurally unreachable, since VolatilityGateMode's own constructor
+    already rejects an invalid config value at QuantConfig-construction
+    time, but this function does not silently assume that guard always
+    ran first."""
+    if config.volatility_gate_mode == VolatilityGateMode.CURRENT_1M:
+        return fails_volatility_1m, "LOW_VOLATILITY", None
+    if config.volatility_gate_mode == VolatilityGateMode.MULTITIMEFRAME_EXPERIMENTAL:
+        return (not regime_result.eligible), "LOW_VOLATILITY_REGIME", regime_result.reason
+    raise ValueError(f"Unknown volatility_gate_mode: {config.volatility_gate_mode!r}")
+
+
 def _trend_gate_applicable(signal: QuantSignal, config: QuantConfig) -> bool:
     """True when the 15m-200-SMA trend gate is actually meant to evaluate
     this candidate -- config.trend_gate_enabled, BULLISH direction,
@@ -308,6 +351,26 @@ def _trend_gate_applicable(signal: QuantSignal, config: QuantConfig) -> bool:
         and signal.direction == SignalDirection.BULLISH
         and signal.session == "regular"
     )
+
+
+def _confluence_eligible(signal: QuantSignal, config: QuantConfig) -> bool:
+    """Task 51: the ONE authoritative LOW_CONFLUENCE eligibility check,
+    shared by talonx_quant.consumer (live) and talonx_backtest.engine
+    (research) -- same "reuse, don't duplicate" architecture as
+    _trend_gate_applicable/_opportunity_score above.
+
+    LEGACY: confluence_score/confluence_score_min, byte-for-byte the
+    pre-Task-51 threshold check -- unchanged, zero-drift.
+
+    INDEPENDENT_CONFIRMATION_EXPERIMENTAL: the owner's contract read
+    literally (TRIGGER + AT LEAST ONE independent confirmation) --
+    confirmation_count >= 1, NOT compared against confluence_score_min
+    (that threshold is a LEGACY-only concept; strategy.py's _build_signal
+    already sets confluence_score = confirmation_count under this
+    contract, so this reduces to `>= 1` directly, no threshold sweep)."""
+    if config.confluence_contract == ConfluenceContract.INDEPENDENT_CONFIRMATION_EXPERIMENTAL:
+        return (signal.confluence_score or 0) >= 1
+    return (signal.confluence_score or 0) >= config.confluence_score_min
 
 
 def _opportunity_score(signal: QuantSignal, config: QuantConfig) -> float:
@@ -400,12 +463,41 @@ _GATE_NAMES = {
     "GLOBAL_RISK_DEGRADED": "risk_degraded_gate",
     "FINAL_REVALIDATION_DATA_UNAVAILABLE": "throttle_revalidation_gate",
     "UK_SESSION_CLOSED": "uk_session_gate",
+    "US_MARKET_SESSION_CLOSED": "us_session_gate",
+    "PREMARKET_PROVIDER_UNSUPPORTED": "premarket_provider_gate",
 }
 
 
 class QuantScanner:
     def __init__(self, config: QuantConfig | None = None, store: QuantStateStore | None = None):
         self.config = config or QuantConfig()
+        # Task 45 live-safety guard: QuantScanner is the live/paper-shadow
+        # execution path (Monday's known-safe build) -- MULTITIMEFRAME_
+        # EXPERIMENTAL is research/backtest-only (talonx_backtest.
+        # BacktestEngine has no such restriction). Fails fast HERE, at
+        # construction, before any market tick is ever processed, rather
+        # than relying solely on the default value or on
+        # _evaluate_active_volatility_gate's own defense-in-depth check --
+        # a mis-set env var must never let live trading silently run under
+        # an experimental, unvalidated gate.
+        if self.config.volatility_gate_mode != VolatilityGateMode.CURRENT_1M:
+            raise ValueError(
+                f"QuantScanner (live/paper-shadow execution) only supports "
+                f"volatility_gate_mode=CURRENT_1M -- got "
+                f"{self.config.volatility_gate_mode!r}. MULTITIMEFRAME_EXPERIMENTAL "
+                f"is research/backtest-only (talonx_backtest.BacktestEngine)."
+            )
+        # Task 51: same fail-closed posture, same reason -- a mis-set env var
+        # must never let live/paper-shadow trading silently run under an
+        # experimental, unvalidated confirmation contract. INDEPENDENT_
+        # CONFIRMATION_EXPERIMENTAL is research/backtest-only.
+        if self.config.confluence_contract != ConfluenceContract.LEGACY:
+            raise ValueError(
+                f"QuantScanner (live/paper-shadow execution) only supports "
+                f"confluence_contract=LEGACY -- got "
+                f"{self.config.confluence_contract!r}. INDEPENDENT_CONFIRMATION_EXPERIMENTAL "
+                f"is research/backtest-only (talonx_backtest.BacktestEngine)."
+            )
         self.store = store
         self.buffer = RollingBarBuffer(self.config.max_bars_per_symbol)
         # 15-min 200 SMA higher-timeframe trend gate: a second, coarser
@@ -420,6 +512,27 @@ class QuantScanner:
         self._htf_aggregator = HtfBarAggregator(
             self.config.htf_bar_interval_minutes, rth_only=self.config.rth_only_htf_sma,
         )
+        # Task 40: multi-timeframe volatility REGIME state (observability
+        # only -- see compute_volatility_regime's docstring). The 15m leg
+        # reuses buffer_htf/_htf_aggregator above unchanged; this is ONLY
+        # the new 60-minute leg, built from the exact same, already-proven
+        # classes -- deliberately continuous (rth_only=False), per Task
+        # 39's session-policy design, not a runtime-tunable knob.
+        self.buffer_60m = RollingBarBuffer(self.config.regime_60m_max_bars)
+        self._aggregator_60m = HtfBarAggregator(self.config.regime_60m_bar_interval_minutes, rth_only=False)
+        # Latest snapshot per symbol -- observability only, never consulted
+        # by any gate/eligibility decision.
+        self._latest_regime_snapshot: dict[str, VolatilityRegimeSnapshot] = {}
+        # Task 44: 60m historical bootstrap bookkeeping. _bootstrapped_60m
+        # guards against re-fetching for a symbol already handled this
+        # process lifetime (mirrors _preseeded_1m's own convention).
+        # _bootstrap_60m_cutoff records the last (minute-floored)
+        # timestamp bootstrap fed into the 60m aggregator, per symbol --
+        # any live tick at or before this cutoff is skipped by
+        # _update_regime_buffer_60m (causality/dedup guard, see that
+        # method), never fed a second time.
+        self._bootstrapped_60m: set[str] = set()
+        self._bootstrap_60m_cutoff: dict[str, datetime] = {}
         # True Calendar-Aligned 1-Minute Candle Aggregation (Requirement 1):
         # raw poll-cycle BAR events (12s cadence by default) accumulate here,
         # floor-bucketed to the minute, and the running OHLCV is written
@@ -485,6 +598,8 @@ class QuantScanner:
         self._risk_degraded: bool = False
         self._signals_suppressed_risk_degraded = 0
         self._signals_suppressed_uk_session_closed = 0
+        self._signals_suppressed_us_session_closed = 0
+        self._signals_suppressed_premarket_provider_unsupported = 0
         self._client = None
         self._stop_event = asyncio.Event()
         self._signals_published = 0
@@ -547,6 +662,14 @@ class QuantScanner:
     @property
     def signals_suppressed_uk_session_closed(self) -> int:
         return self._signals_suppressed_uk_session_closed
+
+    @property
+    def signals_suppressed_us_session_closed(self) -> int:
+        return self._signals_suppressed_us_session_closed
+
+    @property
+    def signals_suppressed_premarket_provider_unsupported(self) -> int:
+        return self._signals_suppressed_premarket_provider_unsupported
 
     @property
     def risk_degraded(self) -> bool:
@@ -714,6 +837,12 @@ class QuantScanner:
             bars = self.buffer_htf.get_bars(symbol)
             if bars:
                 self.store.checkpoint_buffer(symbol, "15m", bars)
+        # Task 40: 60-minute regime leg -- same generic, buffer_type-keyed
+        # checkpoint mechanism above, no store schema change needed.
+        for symbol in self.buffer_60m.known_symbols():
+            bars = self.buffer_60m.get_bars(symbol)
+            if bars:
+                self.store.checkpoint_buffer(symbol, "60m", bars)
 
     async def _load_buffers_from_store(self) -> None:
         """Reloads both RollingBarBuffers from their last checkpoint --
@@ -777,6 +906,32 @@ class QuantScanner:
                 )
             await self._preseed_htf_if_needed(symbol, force=force_backfill)
 
+        # Task 40: 60-minute regime leg -- minimal reload only (no gap
+        # limit, mirroring the 15m block's own "no gap limit" reload
+        # above). Deliberately does NOT add a yfinance historical-backfill
+        # path analogous to _preseed_htf_if_needed -- that is a materially
+        # larger, separate feature, explicitly out of scope for Task 40's
+        # "smallest implementation possible" instruction. See
+        # results/task40_volatility_state/warmup_state_requirements.md
+        # for the exact remaining-gap classification. Until that future
+        # task exists, a fresh process simply re-warms this leg from live
+        # ticks over the following ~2 continuous days (>14 60-min bars),
+        # same as any other cold-started buffer before its own checkpoint
+        # mechanism existed.
+        for symbol in self.store.buffered_symbols("60m"):
+            bars = self.store.load_buffer(symbol, "60m")
+            for bar in bars:
+                self.buffer_60m.add_bar(
+                    symbol=symbol, timestamp=datetime.fromisoformat(bar["timestamp"]),
+                    open_=bar["open"], high=bar["high"], low=bar["low"],
+                    close=bar["close"], volume=bar["volume"], session=bar.get("session"),
+                )
+            if bars:
+                logger.info(
+                    "Reloaded %d 60-min regime bar(s) for %s from checkpoint (no gap limit, no backfill)",
+                    len(bars), symbol,
+                )
+
     async def preseed_symbols(self, symbols: list[str]) -> None:
         """Public entrypoint for run_talonx.py's watchlist-driven pre-seed
         reconciler (Requirement 2's "new ticker added to the watchlist"
@@ -790,6 +945,7 @@ class QuantScanner:
             symbol = symbol.upper()
             await self._preseed_1m_if_needed(symbol)
             await self._preseed_htf_if_needed(symbol)
+            await self._bootstrap_60m_if_needed(symbol)
 
     async def _preseed_1m_if_needed(self, symbol: str) -> None:
         if not self.config.historical_preseed_enabled:
@@ -988,6 +1144,134 @@ class QuantScanner:
                 volume=finalized["volume"],
             )
 
+    def _feed_60m_bar(
+        self, symbol: str, timestamp: datetime, open_: float | None, high: float | None,
+        low: float | None, close: float | None, volume: float | None,
+    ) -> None:
+        """Task 40/44: the ONE authoritative 60-minute aggregation step --
+        identical HtfBarAggregator.update() -> (if finalized)
+        RollingBarBuffer.add_bar() pair, called by BOTH the live tick path
+        (_update_regime_buffer_60m below) and the historical bootstrap
+        path (_bootstrap_60m_if_needed) with the exact same one-bar-at-
+        a-time semantics. No second aggregation/ATR formula exists for
+        either caller."""
+        symbol = symbol.upper()
+        finalized = self._aggregator_60m.update(
+            symbol=symbol, timestamp=timestamp, open_=open_, high=high, low=low, close=close, volume=volume,
+        )
+        if finalized is not None:
+            self.buffer_60m.add_bar(
+                symbol=symbol, timestamp=finalized["timestamp"], open_=finalized["open"],
+                high=finalized["high"], low=finalized["low"], close=finalized["close"],
+                volume=finalized["volume"],
+            )
+
+    def _update_regime_buffer_60m(self, event: MarketTickEvent) -> None:
+        """Task 40: the 60-minute regime leg's bucketing -- identical
+        pattern to _update_htf_buffer above (same HtfBarAggregator/
+        RollingBarBuffer classes, a different interval/rth_only), just
+        for the new buffer_60m. Deliberately continuous (rth_only=False,
+        set at construction) rather than RTH-only like the 15m trend
+        buffer -- Task 39's session-policy design.
+
+        Task 44 causality/dedup guard: if a historical bootstrap already
+        fed this symbol's 60m aggregator up through some cutoff minute,
+        any live tick whose OWN minute is at or before that cutoff is
+        skipped here -- bootstrap bars must never be re-processed as live
+        bars (see _bootstrap_60m_if_needed's own docstring). This is the
+        ONLY new behavior on the live path; the aggregation call itself
+        (_feed_60m_bar) is byte-for-byte the same as before Task 44."""
+        symbol = event.symbol.upper()
+        cutoff = self._bootstrap_60m_cutoff.get(symbol)
+        if cutoff is not None and event.timestamp.replace(second=0, microsecond=0) <= cutoff:
+            return
+        self._feed_60m_bar(
+            symbol, event.timestamp, event.open, event.high, event.low, event.close, event.volume,
+        )
+
+    async def _bootstrap_60m_if_needed(self, symbol: str) -> None:
+        """Task 44: removes the 60m cold-start observability caveat by
+        feeding CAUSAL historical 1-minute bars through the exact same
+        aggregation path live bars use (_feed_60m_bar -- no separate ATR/
+        aggregation formula). Source: preseed.fetch_1m_history, the SAME
+        function _run_1m_preseed already uses for the 1-minute buffer --
+        no second data-loading system.
+
+        Restart-priority rule (do not double-seed): if buffer_60m already
+        has more than atr_period bars for this symbol (from a prior
+        checkpoint reload -- see _load_buffers_from_store's 60m block,
+        scheduled as an earlier asyncio task and, as its very first
+        awaited step, practically likely (not strictly guaranteed by
+        asyncio's own scheduling) to complete before preseed_symbols
+        runs -- or an earlier bootstrap this process lifetime), this
+        returns immediately without any network call. Otherwise it
+        (re)fetches the full configured historical window and feeds it
+        through _feed_60m_bar bar-by-bar. Correctness does not depend on
+        that ordering being guaranteed: RollingBarBuffer.add_bar's own
+        upsert-by-timestamp semantics (buffer.py) make re-feeding
+        idempotent even in the rare case both paths race -- the same
+        historical timestamp is simply replaced with an identical value,
+        never duplicated; the only cost of the race is a possibly-
+        redundant fetch, never an incorrect final state.
+
+        Causality: `bars` are, by construction, all strictly at-or-before
+        the fetch's own wall-clock moment, which happens during startup
+        preseed, necessarily before this process's live tick loop begins
+        -- no live/future bar can ever be included. After feeding, the
+        LAST bar's own (already minute-aligned) timestamp is recorded as
+        this symbol's dedup cutoff, consulted by
+        _update_regime_buffer_60m so no live tick can ever re-process a
+        bootstrapped minute."""
+        if not self.config.historical_preseed_enabled:
+            return
+        symbol = symbol.upper()
+        if symbol in self._bootstrapped_60m:
+            return
+        self._bootstrapped_60m.add(symbol)
+        if self.buffer_60m.bar_count(symbol) > self.config.atr_period:
+            return  # already enough bars (checkpoint or an earlier bootstrap) -- no network call needed
+
+        try:
+            bars = await asyncio.to_thread(
+                preseed.fetch_1m_history, symbol, self.config.regime_60m_bootstrap_period,
+            )
+        except Exception as exc:  # noqa: BLE001 -- bootstrap is best-effort, never fatal (same posture as preseed.py)
+            logger.warning("60-minute regime bootstrap fetch failed for %s: %s", symbol, exc)
+            return
+        if not bars:
+            logger.info(
+                "60-minute regime bootstrap returned no data for %s -- falling back to live accumulation "
+                "(regime state will honestly report NOT_READY until enough live bars accumulate)", symbol,
+            )
+            return
+
+        bars = sorted(bars, key=lambda b: b["timestamp"])
+        # Discard any in-flight accumulator this symbol may already have
+        # (e.g. a live tick that arrived before this bootstrap ran, or a
+        # thin partial checkpoint fed through _feed_60m_bar rather than
+        # buffer_60m.add_bar directly) -- otherwise re-feeding this known-
+        # clean historical range could double-accumulate into whatever
+        # bucket was already forming. Already-finalized bars sitting in
+        # buffer_60m are untouched by this reset (RollingBarBuffer.
+        # add_bar's own upsert-by-timestamp keeps those correct
+        # regardless); only the aggregator's not-yet-finalized in-flight
+        # state is cleared.
+        self._aggregator_60m.reset(symbol)
+        for bar in bars:
+            self._feed_60m_bar(
+                symbol, bar["timestamp"], bar["open"], bar["high"], bar["low"], bar["close"], bar["volume"],
+            )
+        cutoff = bars[-1]["timestamp"].replace(second=0, microsecond=0)
+        self._bootstrap_60m_cutoff[symbol] = cutoff
+        logger.info(
+            "60-minute regime bootstrap: fed %d historical 1-min bar(s) for %s (%s -> %s), "
+            "buffer_60m now %d bar(s), dedup cutoff=%s",
+            len(bars), symbol, bars[0]["timestamp"], bars[-1]["timestamp"],
+            self.buffer_60m.bar_count(symbol), cutoff,
+        )
+        if self.store is not None:
+            self.store.checkpoint_buffer(symbol, "60m", self.buffer_60m.get_bars(symbol))
+
     def _update_1m_buffer(self, event: MarketTickEvent) -> None:
         """True Calendar-Aligned 1-Minute Candle Aggregation (Requirement
         1): floor-buckets incoming BAR events to the minute and builds a
@@ -1131,6 +1415,7 @@ class QuantScanner:
 
         self._update_1m_buffer(event)
         self._update_htf_buffer(event)
+        self._update_regime_buffer_60m(event)
         self._bars_processed += 1
 
         if not bar_just_closed:
@@ -1144,11 +1429,53 @@ class QuantScanner:
         if snapshot is None:
             return  # not enough history yet for this symbol
 
-        if _fails_min_volatility(snapshot, self.config):
+        # Task 40: regime snapshot computed for EVERY closed bar,
+        # unconditionally -- deliberately BEFORE the volatility gate below
+        # so it is available regardless of that gate's outcome
+        # (observability state, not an eligibility input; see
+        # compute_volatility_regime's docstring). Reuses buffer_htf's
+        # dataframe exactly as compute_htf_trend/compute_daily_pivots
+        # already do below -- no new 15m read path.
+        self._latest_regime_snapshot[event.symbol.upper()] = compute_volatility_regime(
+            self.buffer_htf.get_dataframe(event.symbol), self.buffer_60m.get_dataframe(event.symbol),
+            self.config.atr_period, snapshot.bar_timestamp,
+        )
+
+        fails_volatility = _fails_min_volatility(snapshot, self.config)
+
+        # Task 42: shadow comparison, EXISTING decision (fails_volatility,
+        # unchanged) vs. the new Contract B evaluator -- observability
+        # only. Never consulted below; `fails_volatility` alone still
+        # drives the reject-or-continue branch that follows. Recorded via
+        # this project's existing per-stage Redis metric counters
+        # (_incr_metric, already feeding talonx_dispatch's Daily Funnel
+        # dashboard) plus a structured log line -- no Telegram/user-facing
+        # surface touched, matching Task 42's observability-only scope.
+        regime_result = evaluate_regime(self._latest_regime_snapshot[event.symbol.upper()])
+        old_passes = not fails_volatility
+        disagreement = classify_regime_shadow_disagreement(old_passes, regime_result)
+        await _incr_metric(self._client, "quant", f"regime_shadow_{disagreement}", 1)
+        logger.info(
+            "regime_shadow symbol=%s current_pass=%s new_ready=%s new_eligible=%s reason=%s "
+            "atr_pct_15m=%s atr_pct_60m=%s disagreement=%s",
+            event.symbol, old_passes, regime_result.ready, regime_result.eligible, regime_result.reason,
+            regime_result.atr_pct_15m, regime_result.atr_pct_60m, disagreement,
+        )
+
+        # Task 45: mode-aware ACTIVE gate decision -- QuantScanner's own
+        # __init__ guard (see below) already refuses to construct with any
+        # mode other than CURRENT_1M, so this is CURRENT_1M-only in
+        # practice on the live path; still routed through the same shared
+        # dispatch talonx_backtest.engine uses (defense in depth, and one
+        # authoritative decision point instead of two).
+        gate_fails, rejection_reason, _detail_reason = _evaluate_active_volatility_gate(
+            fails_volatility, regime_result, self.config,
+        )
+        if gate_fails:
             self._signals_suppressed_low_volatility += 1
             await _incr_metric(self._client, "quant", "failed_min_volatility", 1)
-            await self._record_rejection(event.symbol, "LOW_VOLATILITY", 1, datetime.now(timezone.utc))
-            return  # ATR% below config.min_atr_pct -- low-beta name, skip momentum evaluation entirely
+            await self._record_rejection(event.symbol, rejection_reason, 1, datetime.now(timezone.utc))
+            return  # ATR% below config.min_atr_pct (CURRENT_1M) -- low-beta name, skip momentum evaluation entirely
 
         df_htf = self.buffer_htf.get_dataframe(event.symbol)
         htf_sma_200 = compute_htf_trend(df_htf, self.config.htf_sma_period)
@@ -1206,6 +1533,33 @@ class QuantScanner:
             logger.info(
                 "Suppressed %d candidate(s) for %s -- outside TalonX's UK operating "
                 "window (Mon-Fri 08:00-22:00 Europe/London)",
+                len(signals), event.symbol,
+            )
+            return
+
+        # US Market Closed Session Rejection (2026-08-18 correctness fix,
+        # code-review finding #5): session=="closed" (outside 04:00-16:00
+        # ET -- talonx_quant.session.get_session) previously had NO
+        # dedicated gate below -- every check from here on is either
+        # unconditional or specifically keyed on "pre_market", so a
+        # closed-session candidate (e.g. from a still-polling yfinance
+        # source overnight) could reach evaluation/scoring/publication on
+        # the same footing as a genuine regular-session one. This is a
+        # SEPARATE, orthogonal concept from the UK operating window check
+        # above (is_operating_window_open): that gates WHEN TalonX itself
+        # is allowed to publish (an operator schedule); this gates
+        # WHETHER the US equities market is even open right now,
+        # regardless of TalonX's own schedule. All signals from one
+        # evaluate_signals() call share the same triggering bar and
+        # therefore the same .session (see strategy.py/schemas.py).
+        if signals and signals[0].session == "closed":
+            self._signals_suppressed_us_session_closed += len(signals)
+            await _incr_metric(self._client, "quant", "dropped_us_session_closed", len(signals))
+            await self._record_rejection(
+                event.symbol, "US_MARKET_SESSION_CLOSED", len(signals), datetime.now(timezone.utc), signals,
+            )
+            logger.info(
+                "Suppressed %d candidate(s) for %s -- US equities market session is closed",
                 len(signals), event.symbol,
             )
             return
@@ -1277,7 +1631,7 @@ class QuantScanner:
         # below is started -- a low-conviction candidate that never
         # becomes a real signal must not still burn the ticker's cooldown
         # slot and block a later, better one.
-        qualifying = [s for s in signals if (s.confluence_score or 0) >= self.config.confluence_score_min]
+        qualifying = [s for s in signals if _confluence_eligible(s, self.config)]
         if not qualifying:
             self._signals_suppressed_low_confluence += len(signals)
             await _incr_metric(self._client, "quant", "failed_confluence", len(signals))
@@ -1357,6 +1711,37 @@ class QuantScanner:
         # Pre-market liquidity gate: dollar volume + bid-ask spread, both
         # fail-closed (missing/stale data = gate not cleared, not assumed
         # to pass). Regular-session/closed candidates are untouched.
+        #
+        # 2026-08-18 correctness fix (code-review finding #2): a provider
+        # that has NEVER delivered a genuine bid/ask QUOTE event for this
+        # ticker (yfinance -- see talonx_ingest/market_data/yfinance_poll.py,
+        # which only ever emits BAR events; only polygon_ws.py constructs
+        # QUOTE events with bid/ask) is distinguished here from one that
+        # HAS delivered a quote but it fails the freshness/spread/dollar-
+        # volume check. Both outcomes still REJECT the candidate -- this
+        # gate remains exactly as fail-closed as before, no pass/fail
+        # behavior changes -- but the audit trail now says WHY:
+        # PREMARKET_PROVIDER_UNSUPPORTED (no quote capability at all,
+        # e.g. running on yfinance) vs PREMARKET_LIQUIDITY (a quote WAS
+        # available and was genuinely too thin/stale/wide, or dollar
+        # volume was too low).
+        survivors, dropped_for_provider = _partition(
+            survivors, lambda s: s.session != "pre_market" or self._latest_quotes.get(s.ticker.upper()) is not None
+        )
+        if dropped_for_provider:
+            await self._record_rejection(
+                event.symbol, "PREMARKET_PROVIDER_UNSUPPORTED", len(dropped_for_provider),
+                datetime.now(timezone.utc), dropped_for_provider,
+            )
+        self._signals_suppressed_premarket_provider_unsupported += len(dropped_for_provider)
+        await _incr_metric(self._client, "quant", "failed_premarket_provider_unsupported", len(dropped_for_provider))
+        if not survivors:
+            logger.info(
+                "Suppressed %d candidate(s) for %s -- pre-market quote capability unavailable from current provider",
+                len(dropped_for_provider), event.symbol,
+            )
+            return
+
         survivors, dropped_for_liquidity = _partition(
             survivors, lambda s: s.session != "pre_market" or self._clears_premarket_liquidity(s)
         )
@@ -1749,6 +2134,16 @@ class QuantScanner:
             "target_price": geometry.target_price,
             "risk_reward_ratio": geometry.risk_reward_ratio,
             "signal_age_ms": signal_age_ms,
+            # Task 35: the geometry re-derived above may have picked a
+            # DIFFERENT path than the one recorded at signal generation
+            # (e.g. price drifted through the structural level between
+            # generation and this final pre-publish revalidation) -- these
+            # must move together with stop_price/target_price/ratio, same
+            # reasoning as the rest of this update dict.
+            "geometry_path": geometry.geometry_path,
+            "fallback_reason": geometry.fallback_reason,
+            "structural_level": geometry.structural_level,
+            "structural_level_type": geometry.structural_level_type,
         })
 
     async def _flush_throttle_window(self) -> None:

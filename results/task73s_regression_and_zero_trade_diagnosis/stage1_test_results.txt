@@ -1,0 +1,34 @@
+STAGE 1 -- TEST RESULTS (fixture repair applied)
+
+1) Target test, 3 repeated independent runs
+------------------------------------------------
+tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset
+Run 1: 1 passed in 57.24s
+Run 2: 1 passed in 63.65s
+Run 3: 1 passed in 63.07s
+(Deterministic pass; full log: stage1_target_repeated.txt)
+
+2) Surrounding suite
+------------------------
+tests/test_run_historical_regimes.py -- 32 passed in 61.84s (0:01:01)
+
+3) Sample-data fixture suite (tests/test_backtest_sample_data.py)
+-----------------------------------------------------------------
+Before removing the resolved xfail markers: 10 passed, 4 FAILED
+(unexpected XPASS under strict=True -- confirms the fixture repair
+worked), 7 xfailed (6 of the failures/passes belonged to
+sample_AAPL_trade_1m.csv's 5 tests + 1 genuinely-still-xfailed TARGET-
+exit test; 6 of the 7 xfailed were the untouched sample_multi_trade_1m.csv
+tests).
+
+After removing the now-inapplicable xfail marker from the 5
+sample_AAPL_trade_1m.csv-specific tests (and extending the fixture by 3
+bars so the trade genuinely reaches TARGET, resolving the 6th):
+**15 passed, 6 xfailed, 0 failed** in 421.80s (0:07:01). The 6 remaining
+xfailed tests are exactly (and only) the untouched
+sample_multi_trade_1m.csv (TSTW/TSTL/TSTE) tests -- out of scope for
+this task, correctly left blocked.
+
+4) Full repository suite
+----------------------------
+See stage1_full_suite_results.txt.

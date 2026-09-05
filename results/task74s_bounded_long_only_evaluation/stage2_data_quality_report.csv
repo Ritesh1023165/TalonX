@@ -1,0 +1,11 @@
+symbol,rows,duplicate_timestamps,out_of_order_timestamps,unexpected_intra_session_gap_bars,has_critical_corruption
+AAPL,189563,0,0,4088,False
+MSFT,199156,0,0,4099,False
+NVDA,237875,0,0,3912,False
+AMZN,194988,0,0,4033,False
+META,184201,0,0,4041,False
+AMD,204714,0,0,4060,False
+TSLA,234652,0,0,3906,False
+GOOGL,191394,0,0,4082,False
+PYPL,142095,0,0,4149,False
+STX,124406,0,0,4775,False

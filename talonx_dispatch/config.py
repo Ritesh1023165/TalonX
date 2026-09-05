@@ -124,6 +124,14 @@ class DispatchConfig:
     ws_heartbeat_key: str = os.environ.get(
         "TALONX_REDIS_WS_HEARTBEAT_KEY", "talonx:ingest:ws_heartbeat"
     )
+    # Task 87B FC_03: market-independent ingest liveness beat (written by
+    # talonx_ingest.liveness.LivenessBeacon). When present, /ping uses a
+    # session-aware HEALTHY/IDLE/STALE/DISCONNECTED model; when absent
+    # (older runtime / a fixture without it), /ping falls back to the
+    # legacy ws_heartbeat-only healthy/stale/disconnected behaviour.
+    liveness_key: str = os.environ.get("TALONX_REDIS_LIVENESS_KEY", "talonx:ingest:liveness")
+    liveness_stale_seconds: float = _env_float("TALONX_DISPATCH_LIVENESS_STALE_SECONDS", 90.0)
+    market_feed_fresh_seconds: float = _env_float("TALONX_DISPATCH_MARKET_FRESH_SECONDS", 90.0)
 
     # --- Telegram ---
     # Optional, same "additive, degrade gracefully" philosophy as

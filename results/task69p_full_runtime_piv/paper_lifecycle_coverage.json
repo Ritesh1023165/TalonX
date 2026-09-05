@@ -1,0 +1,50 @@
+{
+  "task": "69P Part 8/9 - PAPER broker lifecycle + duplicate/idempotency coverage",
+  "natural_lifecycle_observed": false,
+  "natural_signal_count_today": 0,
+  "natural_lifecycle_note": "Verified by scanning every event today (2026-08-25) for a non-PIV_LIFECYCLE_PROBE source: all 18 sourced events today are source=PIV_LIFECYCLE_PROBE. Zero natural strategy signals fired -- classified STRATEGY_BEHAVIOR_EXPECTED (a no-signal day is a valid, expected strategy outcome, not a defect), consistent with decision_eligible being only ~14 symbols and no factor lining up during the session.",
+  "probe_used": true,
+  "probe_preconditions_verified_before_session_start": {
+    "no_natural_lifecycle_by_predeclared_cutoff": "true (confirmed above -- zero natural signals all session)",
+    "paper_only_verified": "true -- paper_trading=True, real_capital=False confirmed via PivConfig at multiple checkpoints today",
+    "explicit_operator_confirmation": "true -- --confirm-piv-lifecycle-probe passed explicitly at session start (11:54 UTC), before any probe could fire, per the same mechanism used and approved in Task 65B",
+    "no_current_orders_positions_before_probe": "true -- broker showed 0/0 at every checkpoint prior to 19:00 UTC (process audit, preflight, 15:00 UK readiness checkpoint)",
+    "reconciliation_clean": "true -- see reconciliation section below",
+    "clearly_tagged": "true -- every probe event carries source=PIV_LIFECYCLE_PROBE, alpha_evidence=false",
+    "excluded_from_strategy_statistics": "true -- by construction (alpha_evidence=false on every probe event); no alpha/profitability conclusion is drawn from this trade"
+  },
+  "probe_execution_trace": {
+    "entry_signal_utc": "2026-08-25T19:00:22.233457Z",
+    "entry_order_intent_utc": "2026-08-25T19:00:22.678295Z",
+    "entry_order_submitted_utc": "2026-08-25T19:00:23.764038Z",
+    "entry_filled_utc": "2026-08-25T19:00:24.832012Z",
+    "entry_fill_price": 308.41,
+    "entry_position_id": "position_66f1d04da1ff6190c483",
+    "exit_order_intent_utc": "2026-08-25T19:01:27.617759Z",
+    "exit_order_submitted_utc": "2026-08-25T19:01:28.876968Z",
+    "exit_filled_utc": "2026-08-25T19:01:30.308483Z",
+    "exit_fill_price": 308.35,
+    "exit_position_id": "position_bb4b82fc3104cc113f5c",
+    "hold_duration_seconds": 65.5,
+    "symbol": "AAPL",
+    "quantity": 1.0,
+    "gross_pnl_this_probe": -0.06,
+    "gross_pnl_note": "Trivial, expected-to-be-irrelevant -- explicitly excluded from any alpha/profitability conclusion per design (alpha_evidence=false). Timing (~65s hold) closely matches the identical probe's execution on 2026-08-24 (~64s hold), same predeclared design."
+  },
+  "reconciliation_after_probe": {
+    "broker_open_orders": 0,
+    "broker_positions": 0,
+    "internal_lifecycle_state_positions": "2 new entries added today (position_66f1d04d..., position_bb4b82fc...), both currently status=OPEN in lifecycle_state.json -- NOT a discrepancy: the broker is genuinely flat (bought 1 then sold 1, net zero exposure), but this system tracks entry/exit as two separate position records and only flips their status to CLOSED during EOD reconciliation (confirmed: yesterday's 2026-08-24 equivalent two entries show status=CLOSED, and that flip happened during yesterday's 19:52 UTC EOD run, not immediately on fill). Expected to self-resolve at today's EOD.",
+    "kill_switch": false
+  },
+  "duplicate_idempotency_check": {
+    "logical_signals_today": 2,
+    "logical_order_intents_today": 2,
+    "broker_orders_today": 2,
+    "duplicate_intents_blocked": 0,
+    "duplicate_broker_submissions": 0,
+    "unexpected_orders": 0,
+    "conclusion": "One logical signal -> exactly one order intent -> exactly one broker order, for both entry and exit legs. No duplication observed."
+  },
+  "full_lifecycle_validated": "YES, via the approved isolated probe (natural lifecycle did not occur) -- signal -> intent -> duplicate/idempotency protection -> paper submit -> broker acknowledgment -> fill -> internal position -> controlled exit -> reconciliation, all exercised through the real PAPER broker, exactly as Part 8 requires for a probe-based validation."
+}

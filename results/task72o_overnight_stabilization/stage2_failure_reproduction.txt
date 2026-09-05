@@ -1,0 +1,15 @@
+Command: .venv/Scripts/python.exe -m pytest tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset -q
+Result: 1 failed in 6.32s
+Assertion location: tests/test_run_historical_regimes.py:475
+  assert comparison[0]["total_trades"] == 1  # sample_AAPL_trade_1m.csv's one calibrated TARGET trade
+Actual: total_trades == 0 (Signals generated: 1, Signals published: 0, Trades executed: 0)
+
+Manual reproduction (scripts.run_historical_regimes, same CLI args the
+test uses) confirms identically: backtest_rejected_signals.csv shows
+~256 AAPL,LOW_VOLATILITY rejections (the min_atr_pct gate, expected/
+benign -- most bars in this synthetic fixture are flat) followed by
+exactly ONE candidate that clears every other gate and reaches the
+confluence check:
+  AAPL,LOW_CONFLUENCE,1,2026-01-06 15:21:00+00:00
+That single candidate -- the fixture's intended "one calibrated TARGET
+trade" -- is rejected by confluence_score_min=2.

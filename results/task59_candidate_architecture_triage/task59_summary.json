@@ -1,0 +1,135 @@
+{
+  "task": "Task 59 - Current Candidate Final Triage + Next Architecture Specification",
+  "input_git_checkpoint": "f52ca87266bf04daaa54490fc1e8f83624e3b691",
+  "decision": "REDESIGN_SIGNAL_ARCHITECTURE",
+  "deployment": "MONDAY_DECISION_SHADOW_ONLY",
+  "capital_authorized": false,
+  "production_change_authorized": false,
+  "task59_replay_performed": false,
+  "task59_market_data_downloaded": false,
+  "task59_parameter_search_performed": false,
+  "current_candidate_verdict": "Technically coherent and reproducible, but economically unsupported as a deployable architecture because gross edge is weak, 5bps economics are negative, MACD is gross-negative, MA is inactive, and RSI payoff is independently weak and winner-tail concentrated.",
+  "task_evidence": {
+    "Task53": {
+      "classification": "CANDIDATE_FREQUENCY_RECOVERED_ECONOMICS_UNCLEAR",
+      "trades": 34,
+      "gross_expectancy_R": 0.012,
+      "expectancy_R_5bps": -0.333,
+      "finding": "Causal pre-roll and readiness fixed frequency without establishing economics."
+    },
+    "Task54": {
+      "classification": "EDGE_WEAK_AND_COST_SENSITIVE",
+      "trades": 89,
+      "gross_expectancy_R": 0.237,
+      "expectancy_R_5bps": -0.292,
+      "finding": "Extended evidence remained cost-negative and statistically uncertain."
+    },
+    "Task55": {
+      "classification": "FAMILY_EFFECT_TENTATIVE",
+      "finding": "Prior RSI outperformed MACD but was winner-tail sensitive and non-causal."
+    },
+    "Task56": {
+      "classification": "FAMILY_EFFECT_WEAKENED",
+      "trades": 105,
+      "RSI_gross_expectancy_R": 0.016423523292318075,
+      "RSI_expectancy_R_5bps": -0.23964169970484192,
+      "MACD_gross_expectancy_R": -0.020619638999771275,
+      "MACD_expectancy_R_5bps": -0.42718538200252404,
+      "finding": "Interpretability passed but common-support and winner-removal robustness failed."
+    },
+    "Task57": {
+      "classification": "BOTH_GROSS_AND_COST_WEAK",
+      "trades": 228,
+      "gross_expectancy_R": 0.09199904114197151,
+      "gross_profit_factor": 1.1501682406951137,
+      "expectancy_R_5bps": -0.3241287144701208,
+      "profit_factor_5bps": 0.6594581785514859,
+      "mean_cost_R_5bps": 0.4161277556120923,
+      "finding": "Costs are material but neither reasonable geometry nor outlier removal reveals robust edge."
+    },
+    "Task58": {
+      "classification": "PRIOR_WINNERS_CONCENTRATED",
+      "prior_RSI_expectancy_R": 0.6210448622666375,
+      "Task56_RSI_expectancy_R": 0.016423523292318064,
+      "prior_expectancy_after_top3_removal_R": 0.05791569869964643,
+      "prior_winner_median_MFE_R": 4.23965074682896,
+      "Task56_winner_median_MFE_R": 2.199525168500723,
+      "finding": "Independent weakness was loss of payoff tail, not lower win rate or worse capture efficiency."
+    }
+  },
+  "technically_proven_components": [
+    "causal 10-trading-day pre-roll and readiness gates",
+    "closed-bar state and next-bar-open execution",
+    "long-only position lifecycle and fail-closed risk-state handling",
+    "single-source geometry with fill-time validity repair",
+    "conservative stop-first ambiguity handling and 15:50 ET flatten",
+    "deterministic family mapping, cost accounting, MFE/MAE, and provenance telemetry"
+  ],
+  "economically_unsupported_components": [
+    "mixed RSI/MACD/MA entry-family architecture",
+    "MACD crossover as a positive-expectancy entry trigger",
+    "RSI curl as an independently robust entry edge",
+    "same-bar at-least-one indicator/volume confirmation as sufficient continuation evidence",
+    "15m/60m ATR thresholds as a profitable-regime discriminator",
+    "15m SMA200 alignment as a discriminating edge rather than direction context",
+    "prior-session pivot R:R screen as assurance of realized payoff",
+    "composite opportunity score as an economically validated ranking",
+    "generic opposite-family exits as hypothesis-specific failure semantics"
+  ],
+  "keep": [
+    "causal warmup/readiness and data-quality gates",
+    "closed-bar evaluation and next-bar fills",
+    "long-only state and operational risk controls",
+    "15m SMA200 as direction context only",
+    "cost/MFE/MAE/provenance telemetry",
+    "session blackouts and mandatory EOD flatten"
+  ],
+  "change": [
+    "one economic hypothesis and one entry state machine",
+    "sequential price-persistence confirmation",
+    "setup-local structural invalidation",
+    "hypothesis-failure exit",
+    "cost-in-R feasibility before publication and at fill",
+    "cost-first deterministic capacity ordering"
+  ],
+  "drop_from_next_candidate": [
+    "RSI MACD and MA as entry triggers",
+    "same-bar indicator confirmation",
+    "hard 15m/60m ATR eligibility thresholds",
+    "prior-session pivot target and R:R gate",
+    "opposite-family SIGNAL_EXIT"
+  ],
+  "next_candidate": {
+    "name": "FAILED_PULLBACK_RECLAIM_CONTINUATION_V1",
+    "hypothesis": "In an established uptrend, a brief break below regular-session VWAP followed by an immediate reclaim and next-bar persistence identifies absorbed supply and continuation large enough to clear setup-local risk and 5bps friction.",
+    "entry": "Two closes below VWAP, first reclaim close above VWAP and prior-bar high, immediate next bar closes above VWAP and reclaim high, then enter next bar open.",
+    "stop": "One minimum tick below the setup-local pullback low.",
+    "profit_target": null,
+    "signal_exit": "First completed 5m close below regular-session VWAP, executed next 1m open.",
+    "cost_R_5bps_ceiling": 0.20,
+    "minimum_net_edge_margin_R": 0.15
+  },
+  "preregistered_validation": {
+    "windows": "First 60 complete XNYS trading days strictly after 2026-07-09, split into three consecutive 20-day windows with 10-day causal pre-roll each.",
+    "universe_size": 35,
+    "provider": "Alpaca only",
+    "minimum_total_trades": 60,
+    "minimum_trades_per_window": 15,
+    "minimum_symbols": 10,
+    "minimum_expectancy_R_5bps": 0.15,
+    "minimum_profit_factor_5bps": 1.25,
+    "bootstrap_95pct_lower_bound_must_exceed_zero": true,
+    "top3_winner_removal_expectancy_5bps_must_exceed_zero": true,
+    "replication_required_before_any_production_decision": true
+  },
+  "hard_rejection_rule": "After outcomes are unblinded, failure of any support, economic, robustness, cost-feasibility, or correctness criterion retires FPRC_V1 with no parameter tweak, sample extension, gate change, or variant replay on those windows.",
+  "artifacts": [
+    "task59_summary.md",
+    "task59_summary.json",
+    "task59_conclusion.md",
+    "evidence_matrix.csv",
+    "architecture_keep_change_drop.csv",
+    "next_candidate_spec.md",
+    "next_validation_protocol.md"
+  ]
+}

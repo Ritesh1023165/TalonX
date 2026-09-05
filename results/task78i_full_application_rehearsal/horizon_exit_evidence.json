@@ -1,0 +1,28 @@
+{
+  "module": "talonx_piv/shadow_ledger.py",
+  "mechanism": "ShadowLedger(..., horizon_policy: dict[str, timedelta] | None = None) -- maps a Decision.horizon label to a deadline duration, computed from the position's ACTUAL hypothetical_fill_time (never the decision/recommendation time).",
+  "declared_production_policy": "DEFAULT_HORIZON_POLICY = {} (deliberately empty)",
+  "why_empty": "The only horizon value any real caller ever attaches to a Decision today is decision_engine.NATURAL_STRATEGY_HORIZON = 'INTRADAY_SHORT'. Searched the full repository (talonx_core/consumer.py, talonx_paper/*, talonx_dispatch/*, talonx_watchlist/*, research/scripts/*) for any existing minute/hour value tied to that label -- none exists. Per this task's explicit instruction ('Missing horizon policy must not be silently replaced with an arbitrary holding period'), no duration is invented. A production Decision's shadow position therefore has horizon_deadline=None and exits only via stop/target/EOD, exactly as it did before this stage.",
+  "deadline_calculation": "fill_time (the bar whose OPEN the shadow position actually filled at, not the decision/recommendation timestamp) + horizon_policy[horizon]",
+  "which_observations_can_execute_the_exit": "Only a bar with bar.timestamp >= horizon_deadline, observed via ShadowLedger.on_bar -- the FIRST such bar causally reachable. Checked AFTER stop/target on the same bar (price-risk management takes precedence on a same-bar tie).",
+  "exit_price_used": "The triggering bar's real, observed close price -- never a price interpolated or fabricated at the exact deadline instant.",
+  "no_executable_observation_at_expiry": "If force_close (EOD or any other forced flatten) is reached while horizon_deadline has already passed with no intervening bar ever observed, exit_reason is reclassified to the explicit 'HORIZON_EXPIRED_NO_EXECUTABLE_OBSERVATION' (distinct from ordinary 'END_OF_SESSION') -- still uses the real, observed flatten price supplied by the caller, never fabricated.",
+  "late_arriving_data": "A bar observed well after the deadline (following a data gap) still causally executes the horizon exit at THAT bar's real close/timestamp -- never backdated to the nominal deadline. holding_seconds correctly reflects the true, longer-than-nominal holding period.",
+  "missing_data_before_any_fill": "A PENDING_FILL position (decision made, but no later bar ever observed to establish a causal fill) whose horizon would already have expired if it had filled is left PENDING_FILL -- never treated as if it had filled and immediately exited. force_close resolves it UNRESOLVED / UNRESOLVED_NO_FILL_BEFORE_HORIZON_END (unchanged from Task 77I's existing behavior).",
+  "restart_safety": "horizon_deadline is a persisted, primitive ISO-string field on ShadowPosition (full-file JSON, same pattern as every other ledger in this codebase) -- a freshly-constructed ShadowLedger pointed at the same state_path and the same horizon_policy sees the identical deadline and resumes horizon-exit checking correctly.",
+  "broker_isolation": "ShadowLedger has zero import of or reference to lifecycle.py/broker.py/order_intent anywhere in the module (grep-confirmed, also proven by test_shadow_deadline_never_touches_broker_or_lifecycle via source inspection) -- a horizon deadline structurally cannot send a broker order.",
+  "tests": [
+    "test_task78i_horizon_exit.py::test_default_policy_has_no_entries_missing_horizon_never_gets_an_arbitrary_deadline",
+    "test_task78i_horizon_exit.py::test_no_policy_configured_means_no_horizon_deadline",
+    "test_task78i_horizon_exit.py::test_horizon_deadline_computed_from_fill_time_not_decision_time",
+    "test_task78i_horizon_exit.py::test_exact_deadline_boundary_exits_at_first_bar_reaching_it",
+    "test_task78i_horizon_exit.py::test_horizon_checked_after_stop_target_same_bar",
+    "test_task78i_horizon_exit.py::test_late_arriving_bar_after_gap_still_exits_causally_not_backdated",
+    "test_task78i_horizon_exit.py::test_horizon_expiry_with_no_executable_observation_before_session_end",
+    "test_task78i_horizon_exit.py::test_ordinary_eod_close_before_horizon_expiry_keeps_end_of_session_reason",
+    "test_task78i_horizon_exit.py::test_missing_data_at_expiry_yields_pending_state_not_fabricated_fill",
+    "test_task78i_horizon_exit.py::test_restart_preserves_horizon_deadline_and_resumes_correctly",
+    "test_task78i_horizon_exit.py::test_shadow_deadline_never_touches_broker_or_lifecycle"
+  ],
+  "all_passed": true
+}

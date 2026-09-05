@@ -1,0 +1,21 @@
+{
+  "task": "69P Part 12 - EOD reconciliation",
+  "eod_command_run_utc": "2026-08-25T19:51:57Z",
+  "result": {
+    "broker_open_orders": 0,
+    "broker_positions": 0,
+    "internal_positions": 0,
+    "matched": true,
+    "missing_broker_symbols": [],
+    "unexpected_broker_symbols": []
+  },
+  "internal_position_ledger_final_state": {
+    "position_c616f6e525ec57690bd0": "CLOSED (2026-08-24 PIV_LIFECYCLE_PROBE entry)",
+    "position_fb1dd2a8474dd69431d2": "CLOSED (2026-08-24 PIV_LIFECYCLE_PROBE exit)",
+    "position_66f1d04da1ff6190c483": "CLOSED (2026-08-25 PIV_LIFECYCLE_PROBE entry)",
+    "position_bb4b82fc3104cc113f5c": "CLOSED (2026-08-25 PIV_LIFECYCLE_PROBE exit)"
+  },
+  "no_residual_exposure": true,
+  "overnight_exposure": false,
+  "built_in_session_report_caveat": "results/task64_paper_piv_readiness/runtime/latest_session_report.json is generated from the SAME piv_events.jsonl file used across both 2026-08-24 and 2026-08-25 (never rotated per-session-date) -- its counters (submitted_orders=4, full_fills=4, positions_opened=4) are CUMULATIVE across both days (2 legs each day), not today-scoped, and its auto-classification ('DATA_ISSUE', derived from a blunt data_not_ready/stale_data count heuristic) does not reflect the deeper, date-scoped investigation performed in stale_data_summary.json. This task's own classification (ENGINE_DEFECT=OBSERVABILITY_STATE_NOT_SHARED, already fixed; STALE_DATA pattern itself is PARITY_OK/expected) supersedes the built-in report's generic label for the purposes of this task's final classification."
+}

@@ -1,0 +1,39 @@
+{
+  "candidate": "FPRC_V1",
+  "identical_trades_for_0bps_and_5bps": true,
+  "single_replay": true,
+  "task": "61R",
+  "total_trades": 205,
+  "windows": {
+    "V1": {
+      "evaluation_bars": 262082,
+      "pending_entries_after_finalize": 0,
+      "pending_exits_after_finalize": 0,
+      "positions_after_finalize": 0,
+      "published": 73,
+      "rejections": 446,
+      "trades": 68,
+      "warmup_bars": 131281
+    },
+    "V2": {
+      "evaluation_bars": 256178,
+      "pending_entries_after_finalize": 0,
+      "pending_exits_after_finalize": 0,
+      "positions_after_finalize": 0,
+      "published": 72,
+      "rejections": 387,
+      "trades": 72,
+      "warmup_bars": 131373
+    },
+    "V3": {
+      "evaluation_bars": 261469,
+      "pending_entries_after_finalize": 0,
+      "pending_exits_after_finalize": 0,
+      "positions_after_finalize": 0,
+      "published": 65,
+      "rejections": 287,
+      "trades": 65,
+      "warmup_bars": 125590
+    }
+  }
+}

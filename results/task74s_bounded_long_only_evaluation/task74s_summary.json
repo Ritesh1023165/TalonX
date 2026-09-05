@@ -1,0 +1,75 @@
+{
+  "task": "Task74S_BOUNDED_MULTI_SYMBOL_LONG_ONLY_EVALUATION",
+  "label": "DEVELOPMENT_ROBUSTNESS_EVALUATION",
+  "starting_branch": "research/talonx-strategy-validation",
+  "starting_sha": "848de0d6388f59972d8dce9b35cb45f35fe0173e",
+  "stages": {
+    "stage0_verify_inventory": {"status": "PASS"},
+    "stage1_preregistration": {"status": "PASS", "commit": "4a3fc3e", "pushed": true, "committed_before_replay": true},
+    "stage2_integrity_preroll": {"status": "PASS", "commit": "f7ff865", "pushed": true},
+    "stage3_one_frozen_replay": {"status": "PASS", "commit": "pending_final_commit"},
+    "stage4_economics_robustness": {"status": "COMPLETE_NA_ZERO_TRADES"},
+    "stage5_conclusion": {"status": "COMPLETE"}
+  },
+  "universe_resolution": {
+    "selected": "10_symbol_frozen_research_universe",
+    "symbols": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX"],
+    "rejected_alternative": "35_symbol_operational_universe",
+    "method": "documented_provenance_only_no_performance_data"
+  },
+  "window": {
+    "common_usable_period_utc": ["2025-08-15 13:03:00+00:00", "2026-08-14 23:58:00+00:00"],
+    "calendar_month_buckets": 13
+  },
+  "replay_result": {
+    "bars_processed": 1903044,
+    "signals_generated": 5021,
+    "bullish_candidates": 2488,
+    "bearish_candidates": 2533,
+    "bullish_candidates_confluence_ge2": 12,
+    "bullish_candidates_regular_session_confluence_ge2": 4,
+    "signals_published": 3,
+    "signals_published_direction": "all_bearish_rejected_as_no_active_position",
+    "trades_executed": 0,
+    "dominant_bar_level_rejection": {"reason": "LOW_VOLATILITY", "count": 1781848, "pct_of_bars": 93.63},
+    "dominant_candidate_level_rejection": {"reason": "LOW_CONFLUENCE", "count": 3640, "pct_of_candidates": 72.5},
+    "per_symbol_zero_trades": true,
+    "per_bucket_zero_trades": true,
+    "zero_short_invariant_holds": true
+  },
+  "economics": {
+    "primary_result": "N/A",
+    "secondary_cost_sensitivity_grid": "N/A",
+    "reason": "zero trades"
+  },
+  "final_verdicts": {
+    "data_replay_correctness": "PASS",
+    "signal_frequency": "LIKELY_TOO_SPARSE",
+    "net_economics": "N/A",
+    "evidence_strength": "NONE",
+    "overall_outcome": "NO_ELIGIBLE_LONG_SETUPS",
+    "profitability_verdict": "INCONCLUSIVE"
+  },
+  "protected_files_unchanged": true,
+  "eod_code_unchanged": true,
+  "holdouts_accessed": [],
+  "external_notifications_sent": 0,
+  "broker_mutations": 0,
+  "runner_code_changed": false,
+  "universe_dates_params_altered_after_seeing_results": false,
+  "test_results": {
+    "control_fixture_before_replay": "3 passed",
+    "final_full_suite": "2168 passed, 1 skipped, 10 xfailed",
+    "regression_vs_task73s_baseline": "none -- identical counts"
+  },
+  "known_environment_gap_disclosed": {
+    "affected_modules": ["tests/test_task61_validation_protocol.py", "tests/test_task61r_temporal_freeze.py"],
+    "cause": "missing optional dependency exchange-calendars, not caused by this task"
+  },
+  "large_raw_files_excluded_from_git": [
+    {"file": "stage3_replay/task74s_10symbol_full_research_volatility_telemetry.csv", "size_mb": 163, "sha256": "a60c75d7e7bd51aefbcf4c0ff96ae7de1caa974ee7ba9610ce397a6f764e1f8f"},
+    {"file": "stage3_replay/task74s_10symbol_full_rejected_signals.csv", "size_mb": 84, "sha256": "0887b1712e65346fb8318d2ac8405e8d069904509da9bf81df61ccecf5f1da53"}
+  ],
+  "files_changed": [],
+  "commits": ["4a3fc3e", "f7ff865", "pending_final_commit"]
+}

@@ -1,0 +1,68 @@
+{
+  "audit_boundary_note": "The candidate block ends one XNYS session before the Task7B canonical dataset begins; therefore it also precedes every Task37-58 evaluation/context interval.",
+  "candidate_evaluation_end": "2025-08-14",
+  "candidate_evaluation_start": "2025-05-20",
+  "rows": [
+    {
+      "conservative_end": "2026-07-31",
+      "conservative_start": "2025-08-29",
+      "evaluation_overlap": false,
+      "exposure_description": "Task37 A/B/C reused for volatility development",
+      "tasks": "37-38,41"
+    },
+    {
+      "conservative_end": "2026-08-23",
+      "conservative_start": "2025-08-29",
+      "evaluation_overlap": false,
+      "exposure_description": "design/implementation; any empirical inputs reuse Task37 or recent 2026 startup data",
+      "tasks": "39-45"
+    },
+    {
+      "conservative_end": "2026-06-09",
+      "conservative_start": "2025-10-13",
+      "evaluation_overlap": false,
+      "exposure_description": "X/Y/Z evaluation plus Task53 causal warmups; reused by Tasks47-52",
+      "tasks": "46-53"
+    },
+    {
+      "conservative_end": "2026-05-18",
+      "conservative_start": "2025-09-15",
+      "evaluation_overlap": false,
+      "exposure_description": "W1/W2/W3 warmup and evaluation packages",
+      "tasks": "54"
+    },
+    {
+      "conservative_end": "2026-05-18",
+      "conservative_start": "2025-09-29",
+      "evaluation_overlap": false,
+      "exposure_description": "Task53/54 trade evidence only",
+      "tasks": "55"
+    },
+    {
+      "conservative_end": "2026-07-09",
+      "conservative_start": "2025-12-11",
+      "evaluation_overlap": false,
+      "exposure_description": "H1/H2/H3 warmup and independent evaluation packages",
+      "tasks": "56"
+    },
+    {
+      "conservative_end": "2026-07-09",
+      "conservative_start": "2025-09-29",
+      "evaluation_overlap": false,
+      "exposure_description": "Task53/54/56 trade evidence only",
+      "tasks": "57"
+    },
+    {
+      "conservative_end": "2026-07-09",
+      "conservative_start": "2025-09-29",
+      "evaluation_overlap": false,
+      "exposure_description": "Task53/54/56 trades and corresponding entry/exit bar context",
+      "tasks": "58"
+    }
+  ],
+  "status": "PASS",
+  "strictly_before_earliest_documented_exposure": true,
+  "task": "61R",
+  "task37_58_overlap": false,
+  "task53_58_design_evidence_overlap": false
+}

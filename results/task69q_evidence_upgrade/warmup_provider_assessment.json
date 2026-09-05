@@ -1,0 +1,26 @@
+{
+  "assessment": "WARMUP_PROVIDER_REMEDIATION_PATH",
+  "current_state": {
+    "warmup_provider": "YFINANCE (talonx_quant/preseed.py, via talonx_piv/warmup.py's preseed_and_verify -> scanner.preseed_symbols(), unmodified)",
+    "live_provider": "ALPACA_IEX",
+    "task69p_result": "35 configured, 17 warmup-ready, 18 INSUFFICIENT_1M_HISTORY -- entirely a yfinance data-availability limitation, not a session-readiness or strategy-gate limitation"
+  },
+  "live_entitlement_check_performed_this_task": {
+    "method": "Read-only GET requests to https://data.alpaca.markets/v2/stocks/{symbol}/bars using the SAME APCA_API_KEY_ID/APCA_API_SECRET_KEY already configured for this repo's live PIV feed (.env) -- no orders, no account mutation, no new credential.",
+    "result_1_iex_feed_entitlement": "feed=iex historical bars: HTTP 200, real bars returned for AAPL (2026-08-20..08-24 range) -- confirms this account's EXISTING IEX entitlement (already used for the live feed) also covers HISTORICAL bars, not just latest/streaming.",
+    "result_2_sip_feed_entitlement": "feed=sip historical bars: ALSO HTTP 200 for the same range -- this account appears to have some SIP historical access too (Alpaca's free tier commonly allows delayed/historical SIP access even without a live SIP subscription). NOT relied upon for this assessment's recommendation -- the recommended fix uses feed=iex only, so it does not depend on this less-certain SIP finding, and no production behavior was changed based on it.",
+    "result_3_previously_failing_symbols": "Fetched feed=iex 1-minute bars for STX, QCOM, LRCX (three of the 18 symbols yfinance's warmup marked INSUFFICIENT_1M_HISTORY in Task69P) over 2026-08-21..08-24: 678, 651, and 680 bars respectively -- far more than warmup.py's REQUIRED_1M_BARS=120 threshold. This strongly suggests the 18 yfinance failures are a yfinance-side data gap (rate limiting, delisting-adjacent symbol quirks, or yfinance's own historical coverage gaps), not a real data-availability problem for this universe.",
+    "caveat": "Only 3 of the 18 failing symbols were spot-checked (bounded scope for this task); a full 35-symbol comparison was not run. The finding is directional and strong but not exhaustively proven across the whole universe."
+  },
+  "recommended_path": {
+    "preferred_provider": "ALPACA_HISTORICAL (feed=iex) -- same account, same entitlement already used for the live feed, no SIP dependency, verified via the checks above",
+    "prototype_built_this_task": "talonx_piv/alpaca_historical_warmup.py -- fetch_1m_bars() reuses the exact transport/header pattern already used by session_runner.fetch_bars_latest/broker.py. Tested (tests/test_task69q_alpaca_historical_warmup.py) against a fake transport for schema parsing, feed-param correctness (iex, not sip), fail-closed behavior on non-200, and malformed-row skipping.",
+    "explicitly_NOT_done_this_task": "Wiring fetch_1m_bars() into talonx_quant.consumer.QuantScanner's RollingBarBuffer/buffer_htf (the actual warmup integration point talonx_piv/warmup.py's preseed_and_verify calls into via scanner.preseed_symbols()). This requires: (1) converting Alpaca's 1m bars into whatever RollingBarBuffer.add_bar (or equivalent) expects, (2) deriving the 15m HTF buffer via aggregation (yfinance's preseed.py fetches 15m bars directly from a separate call -- an Alpaca-based replacement would need to either fetch a native 15Min timeframe from the same endpoint, or aggregate 1m bars, and either choice needs correctness review against talonx_quant.indicators.compute_htf_trend's expectations), and (3) deciding whether this becomes the default provider or an env-flagged alternative with yfinance as fallback. None of this touches consumer.py/indicators.py/strategy.py/config.py directly, but it does touch how their inputs are populated, and deserves its own focused task rather than a same-day addition alongside everything else in Task69Q.",
+    "deferred_to": "production_readiness_gaps.json PRG-07"
+  },
+  "safety_notes": {
+    "no_production_behavior_changed": "talonx_piv/warmup.py, talonx_quant/preseed.py, and talonx_quant/consumer.py are completely unmodified by this task -- the live warmup path still uses yfinance exactly as before.",
+    "no_sip_entitlement_assumed_or_relied_upon": "The recommended remediation path uses feed=iex only. The SIP finding is reported for completeness but is NOT the basis for any recommendation or code change.",
+    "yfinance_remains_fallback_dev_only_candidate": "Per the task's own guidance ('yfinance may remain fallback/dev-only if required, but should not be the desired critical production warmup dependency') -- this assessment supports demoting it once the Alpaca-based path is built and validated, not before."
+  }
+}

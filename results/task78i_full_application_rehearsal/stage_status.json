@@ -1,0 +1,65 @@
+{
+  "task": "Task78I_INTEGRATION_COMPLETION_ORCHESTRATION_RECOVERY_REHEARSAL",
+  "starting_sha": "6f6193ff76fb4d459c1b1b95e7f284e23a38058e",
+  "baseline_collection": "2327 collected, 0 errors",
+  "stages": {
+    "stage0_baseline_and_architecture": "COMPLETE",
+    "stage1_close_integration_gaps": "COMPLETE",
+    "stage2_unified_supervisor": "COMPLETE",
+    "stage3_gemini_enrichment": "COMPLETE",
+    "stage4_dashboard_integration": "COMPLETE",
+    "stage5_offline_rehearsal": "COMPLETE"
+  },
+  "stage1_summary": {
+    "gap_a_shadow_independence": "AUDITED_NO_CORRECTION_NEEDED",
+    "gap_b_horizon_exits": "IMPLEMENTED",
+    "gap_c_status_projections": "IMPLEMENTED",
+    "gap_d_execution_ownership": "IMPLEMENTED",
+    "new_test_files": [
+      "tests/test_task78i_shadow_independence.py",
+      "tests/test_task78i_horizon_exit.py",
+      "tests/test_task78i_status_projection.py",
+      "tests/test_task78i_execution_ownership.py",
+      "tests/test_task78i_cli_ownership.py"
+    ],
+    "modified_modules": [
+      "talonx_piv/shadow_ledger.py", "talonx_piv/observability.py", "talonx_piv/lifecycle.py",
+      "talonx_piv/decision_engine.py", "talonx_piv/broker.py", "talonx_piv/cli.py"
+    ],
+    "new_modules": ["talonx_piv/execution_ownership.py"],
+    "collection_after_stage1": "2369 collected, 0 errors"
+  },
+  "stage2_summary": {
+    "new_module": "talonx_piv/supervisor.py",
+    "new_cli_command": "talonx_piv/cli.py supervise",
+    "new_test_files": ["tests/test_task78i_supervisor.py", "tests/test_task78i_cli_supervise.py"],
+    "modified_files": ["talonx_piv/cli.py", "talonx_piv/preflight.py"],
+    "collection_after_stage2": "2385 collected, 0 errors"
+  },
+  "stage3_summary": {
+    "new_module": "talonx_piv/gemini_enrichment.py",
+    "reused_interface": "talonx_brain.llm._BaseResearchChain.generate(signal, citations) + talonx_brain.llm.build_research_chain factory",
+    "new_test_files": ["tests/test_task78i_gemini_enrichment.py", "tests/test_task78i_gemini_integration.py"],
+    "modified_files": ["talonx_piv/decision_engine.py", "talonx_piv/session_runner.py", "talonx_piv/cli.py", "talonx_piv/observability.py"],
+    "collection_after_stage3": "2399 collected, 0 errors"
+  },
+  "stage4_summary": {
+    "modified_file": "dashboard_web.py (one new GET /piv/status route, additive only)",
+    "new_test_file": "tests/test_task78i_dashboard_integration.py",
+    "collection_after_stage4": "2404 collected, 0 errors"
+  },
+  "stage5_summary": {
+    "new_test_file": "tests/test_task78i_stage5_rehearsal.py",
+    "scenarios_passed": "20/20",
+    "genuine_defect_fixed": "NotificationOutbox UNCERTAIN retry gap (talonx_piv/notification_outbox.py)",
+    "full_collection": "2423 collected, 0 errors",
+    "full_suite": "2412 passed, 1 skipped, 10 xfailed, 0 failures",
+    "reconciliation": "2412 - 2316 = 96, matching 96 new tests across 11 new files -- zero unexplained regression"
+  },
+  "checkpoint_commits": {
+    "stage1": "54fdc9d",
+    "stage2": "daa59ff",
+    "stage3": "5f23831",
+    "stage4": "f3a7e17"
+  }
+}

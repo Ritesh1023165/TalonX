@@ -1,0 +1,219 @@
+{
+  "schema_version": 1,
+  "session_id": "piv_2026-08-28_092814_1f17993c",
+  "trading_date_et": "2026-08-28",
+  "runtime_sha": "8d2a8dd164b712bd7faa087dec27030dc9bfccce",
+  "hash_algorithm": "SHA256",
+  "files": [
+    {
+      "path": "local_raw/logs/dashboard_web_20260828_143400.err.log",
+      "bytes": 8381,
+      "sha256": "64ebd54f68503ffa12472121ab79c7c9c3b3b4857a9f07f614f0f033f8b3c7c6",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/logs/dashboard_web_20260828_143400.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/process/dashboard_web.pid.json",
+      "bytes": 76,
+      "sha256": "29b0e60cc089b5cd7cd37b671d542fa028a47b5c884e785ad0f1655cbecadf46",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/process/monitor-talonx-paper-session.automation.toml",
+      "bytes": 2176,
+      "sha256": "104dfc39975ff7d5d7875c68918dfdca61f7340aec1f3d13b7fc7cc4575edd71",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/component_health.json",
+      "bytes": 1432,
+      "sha256": "8ddf407f0ff0c04b8d523df39249a66ac6aaf67f85cecc637db436249b6d3e4e",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/eod_state.json",
+      "bytes": 584,
+      "sha256": "2b9f1731b6bd13c152830eee986c4e61c3257e79b48b1e2496f091bc81392aa5",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/freshness_report.json",
+      "bytes": 6570,
+      "sha256": "402a3f63138efb2757075db38d1b84040e41a108d3329488aa77562a079074ab",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/gemini_enrichment.json",
+      "bytes": 2,
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/latest_preflight.json",
+      "bytes": 3487,
+      "sha256": "69fe6f13a48c4018cdb70105e4dac799b01fb22db61c29091d7357d4a7edbdb5",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/latest_session_report.json",
+      "bytes": 5607,
+      "sha256": "26db77e6a5d79355d165ce06abd96666513c2d1976004a3fa3b2a01b2d4dcaa9",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/lifecycle_state.json",
+      "bytes": 376,
+      "sha256": "e51a72857dddcc9ff41750fd02a42bc7e6a148b6dc58895735a36bf3d094aa47",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/notification_outbox.json",
+      "bytes": 2,
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/paper_entry_settings.json",
+      "bytes": 592,
+      "sha256": "a6e82d0aa7380ce48432d1ff3c4946b5d821957c7b4ea4dc8619c5a331babdb6",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/piv_events.jsonl",
+      "bytes": 1250242,
+      "sha256": "4b1f9ac47df4d5d9fa65511576d6258cac50829e0115de078d0a734170141aec",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/piv_telegram_audit.db",
+      "bytes": 81920,
+      "sha256": "631ecd3d293e48f6469fe7553d11abbac94ac1f6c82fb887b4003ce34676b6d6",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/quant_funnel_report.json",
+      "bytes": 311,
+      "sha256": "8fbef4e399adaac31ce37c92b2089e7b3cd8863d87d5884de81b248e356cbbe2",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/session_identity.json",
+      "bytes": 279,
+      "sha256": "b7d632f99202eaa34d015bdf7102a942e4ef039c241388c91e719f56fd3c6a56",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/session_readiness_state.json",
+      "bytes": 19722,
+      "sha256": "57b5e8aa36207bdd4f7ab6dab8be8babcc78722fc223c582c05d7bc4ae02701e",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/supervisor_recovery_state.json",
+      "bytes": 2100,
+      "sha256": "8354f8fc7fc7ed07ade30ee38ccf5e4fa4f3175a76e90b2c859b2672db188be3",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_after_cleanup/warmup_verification.json",
+      "bytes": 20960,
+      "sha256": "6afa3b8be88530b65de4194e73e1b8b51bcac1df36ce3f9d7044d21ac90f3742",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_before_cleanup/component_health.json",
+      "bytes": 1432,
+      "sha256": "8ddf407f0ff0c04b8d523df39249a66ac6aaf67f85cecc637db436249b6d3e4e",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_before_cleanup/eod_state.json",
+      "bytes": 584,
+      "sha256": "2b9f1731b6bd13c152830eee986c4e61c3257e79b48b1e2496f091bc81392aa5",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_before_cleanup/freshness_report.json",
+      "bytes": 6570,
+      "sha256": "402a3f63138efb2757075db38d1b84040e41a108d3329488aa77562a079074ab",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_before_cleanup/gemini_enrichment.json",
+      "bytes": 2,
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_before_cleanup/latest_preflight.json",
+      "bytes": 3487,
+      "sha256": "69fe6f13a48c4018cdb70105e4dac799b01fb22db61c29091d7357d4a7edbdb5",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_before_cleanup/lifecycle_state.json",
+      "bytes": 376,
+      "sha256": "e51a72857dddcc9ff41750fd02a42bc7e6a148b6dc58895735a36bf3d094aa47",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_before_cleanup/notification_outbox.json",
+      "bytes": 2,
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_before_cleanup/paper_entry_settings.json",
+      "bytes": 557,
+      "sha256": "9b50a5707f321d4a1f834c24f823218a45a02b4b7d6b6b5cc596f0a48d2d8201",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_before_cleanup/piv_events.jsonl",
+      "bytes": 1250242,
+      "sha256": "4b1f9ac47df4d5d9fa65511576d6258cac50829e0115de078d0a734170141aec",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_before_cleanup/piv_telegram_audit.db",
+      "bytes": 81920,
+      "sha256": "631ecd3d293e48f6469fe7553d11abbac94ac1f6c82fb887b4003ce34676b6d6",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_before_cleanup/quant_funnel_report.json",
+      "bytes": 311,
+      "sha256": "8fbef4e399adaac31ce37c92b2089e7b3cd8863d87d5884de81b248e356cbbe2",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_before_cleanup/session_identity.json",
+      "bytes": 279,
+      "sha256": "b7d632f99202eaa34d015bdf7102a942e4ef039c241388c91e719f56fd3c6a56",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_before_cleanup/session_readiness_state.json",
+      "bytes": 19722,
+      "sha256": "57b5e8aa36207bdd4f7ab6dab8be8babcc78722fc223c582c05d7bc4ae02701e",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_before_cleanup/supervisor_recovery_state.json",
+      "bytes": 2100,
+      "sha256": "8354f8fc7fc7ed07ade30ee38ccf5e4fa4f3175a76e90b2c859b2672db188be3",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    },
+    {
+      "path": "local_raw/runtime_before_cleanup/warmup_verification.json",
+      "bytes": 20960,
+      "sha256": "6afa3b8be88530b65de4194e73e1b8b51bcac1df36ce3f9d7044d21ac90f3742",
+      "classification": "LOCAL_RAW_NOT_COMMITTED"
+    }
+  ]
+}

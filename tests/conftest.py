@@ -6,12 +6,79 @@ setup boilerplate.
 """
 from __future__ import annotations
 
+import os
 from datetime import date, datetime, timezone
 
 import pytest
 
+# The test suite is offline by contract (Task 83-R3B fail-closed networking).
+# Force the HuggingFace / sentence-transformers stack to stay on its local
+# cache so no code path under test can reach huggingface.co for an embedding
+# model -- a single such attempt trips the session network guard. Set at
+# import time, before any test module pulls in the model libraries.
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
+from _network_guard import GuardInitializationError, NetworkGuard
 from talonx_ingest.edgar.models import CompanyRef, FilingMetadata
 from talonx_ingest.news.models import NewsArticle
+
+
+def pytest_configure(config):
+    """Install the opt-in fail-closed guard before test execution."""
+    if os.environ.get("TALONX_TEST_NETWORK_GUARD") != "1":
+        return
+    guard = NetworkGuard(os.environ.get("TALONX_TEST_NETWORK_GUARD_REPORT"))
+    try:
+        guard.install()
+    except GuardInitializationError as exc:
+        raise pytest.UsageError(f"TalonX test network guard initialization failed: {exc}") from exc
+    config._talonx_network_guard = guard
+
+
+def pytest_unconfigure(config):
+    guard = getattr(config, "_talonx_network_guard", None)
+    if guard is not None:
+        try:
+            guard.assert_reconciled()
+            guard.write_report()
+        finally:
+            guard.uninstall()
+
+
+def pytest_addoption(parser):
+    """Explicit opt-in destination for Task 83-R2 rehearsal evidence.
+
+    The default is ``None``, so ordinary and partial test runs cannot write
+    the committed matrix.
+    """
+    parser.addoption(
+        "--task83-r2-matrix-output", action="store", default=None,
+        help="temporary CSV destination for a complete scenarios 21-33 run",
+    )
+    parser.addoption(
+        "--task83-r2-retained-matrix-output", action="store", default=None,
+        help="temporary CSV destination for a complete retained scenarios 1-20 run",
+    )
+
+
+@pytest.fixture(scope="session")
+def talonx_network_guard(request) -> NetworkGuard:
+    guard = getattr(request.config, "_talonx_network_guard", None)
+    if guard is None:
+        # The fail-closed socket guard is opt-in (it must not be installed
+        # during ordinary runs -- it would interfere with the real-localhost
+        # Redis integration tests). When it is not enabled, the tests that
+        # depend on it have no prerequisite, so SKIP with an explicit reason
+        # rather than ERROR -- a missing opt-in dependency is a skip, not a
+        # failure (Task 91 test-hygiene: keep the full-suite result
+        # interpretable without tribal knowledge).
+        pytest.skip(
+            "network-isolation tests require TALONX_TEST_NETWORK_GUARD=1 "
+            "(opt-in fail-closed socket guard); set it to run them",
+            allow_module_level=False,
+        )
+    return guard
 
 
 @pytest.fixture

@@ -1,0 +1,6 @@
+{
+  "causal_cutoff_utc": "2026-08-26T08:19:00+00:00",
+  "universe_size": 35,
+  "ready_count": 35,
+  "note": "Live read-only Alpaca IEX historical bars endpoint call, feed=iex, historical-data-only, no order endpoint touched, reproducing the EXACT causal cutoff (2026-08-26T08:19:00Z) recorded in Task69R attempt_1_record.json where the old yfinance-only warmup path produced 0/35 READY."
+}

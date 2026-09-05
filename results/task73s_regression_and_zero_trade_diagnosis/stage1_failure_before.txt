@@ -1,0 +1,137 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+__________ test_real_end_to_end_run_against_the_sample_trade_dataset __________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-549/test_real_end_to_end_run_again0')
+
+    def test_real_end_to_end_run_against_the_sample_trade_dataset(tmp_path):
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        shutil.copy(_REPO_ROOT / "examples" / "data" / "sample_AAPL_trade_1m.csv", data_dir / "AAPL.csv")
+    
+        out_root = tmp_path / "reports"
+        exit_code = main([
+            "--data-dir", str(data_dir), "--symbols", "AAPL", "--regimes", "full_period_2024_2026",
+            "--out-dir", str(out_root), "--tz", "America/New_York", "--no-cost-sensitivity",
+        ])
+    
+        assert exit_code == 0
+        comparison = json.loads((out_root / "regime_comparison.json").read_text(encoding="utf-8"))
+        assert len(comparison) == 1
+        assert comparison[0]["ran"] is True
+>       assert comparison[0]["total_trades"] == 1  # sample_AAPL_trade_1m.csv's one calibrated TARGET trade
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert 0 == 1
+
+tests\test_run_historical_regimes.py:475: AssertionError
+---------------------------- Captured stdout call -----------------------------
+
+======================================================================
+Regime: full_period_2024_2026 (2024-01-01 -> 2026-08-01)
+  Full available window, 2024-2026 -- whatever data is on disk.
+======================================================================
+======================================================================
+DATA QUALITY
+======================================================================
+Data-quality report: AAPL
+  Rows:                    462
+  Range:                   2026-01-05 14:30:00+00:00 -> 2026-01-06 15:41:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    1050 (1 gap(s))
+    Expected (session closed):    1050
+    Unexpected (inside session):  0
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+======================================================================
+BACKTEST RESULT
+======================================================================
+  progress:  54.8%  (253/462 bars)
+  progress:  86.6%  (400/462 bars)
+  progress: 100.0%  (462/462 bars)
+Backtest Summary
+----------------
+
+Period:               2026-01-05 14:30:00+00:00 -> 2026-01-06 15:41:00+00:00
+Symbols:              AAPL
+Bars processed:       462
+Signals generated:    1
+Signals published:    0
+Trades executed:      0
+Throttle fidelity:    LIMITED (flushed once per 1-minute bar-close, not continuously every throttle_window_seconds)
+
+Execution assumptions
+----------------------
+Entry slippage:       0.0 bps
+Exit slippage:        0.0 bps
+Spread:               0.0 bps
+Same-bar resolution:  STOP_FIRST
+EOD flatten:          ENABLED
+
+*** COST-FREE BASELINE ***
+Slippage: 0 bps   Spread: 0 bps
+These results do NOT represent realistic execution costs -- do not call this
+"realistic performance" or "live expected return". Use --cost-sensitivity for
+a range of non-zero cost assumptions.
+
+Timezone
+--------
+Input timezone:       America/New_York
+Internal timezone:    UTC
+Session timezone:     America/New_York
+
+Reproducibility
+----------------
+git_commit:           df6da2ba0d9a369a943b37d54dd71fd07319fbba
+backtester_version:   0.1.0
+strategy_version:     2ae6216bca70
+config_hash:          32a7c5b4732e
+dataset_hash:         4ac1f63a80ae
+run_timestamp:        2026-08-27T05:17:51.028349+00:00
+
+Portfolio disclaimer
+---------------------
+This backtest evaluates TRADE-LEVEL strategy performance (R-multiples per signal). It does NOT model starting capital, position sizing, maximum portfolio exposure, concurrent-position limits, or buying power. Aggregate R/expectancy figures here describe the strategy's per-trade edge, not a realistic portfolio-level return.
+
+No trades were executed -- see `rejections` for the gate funnel (no fabricated metrics below).
+Report files written:
+  trades_csv           C:\Users\rites\AppData\Local\Temp\pytest-of-rites\pytest-549\test_real_end_to_end_run_again0\reports\regime_full_period_2024_2026\backtest_trades.csv
+  trades_json          C:\Users\rites\AppData\Local\Temp\pytest-of-rites\pytest-549\test_real_end_to_end_run_again0\reports\regime_full_period_2024_2026\backtest_trades.json
+  summary_json         C:\Users\rites\AppData\Local\Temp\pytest-of-rites\pytest-549\test_real_end_to_end_run_again0\reports\regime_full_period_2024_2026\backtest_summary.json
+  summary_txt          C:\Users\rites\AppData\Local\Temp\pytest-of-rites\pytest-549\test_real_end_to_end_run_again0\reports\regime_full_period_2024_2026\backtest_summary.txt
+  equity_curve_csv     C:\Users\rites\AppData\Local\Temp\pytest-of-rites\pytest-549\test_real_end_to_end_run_again0\reports\regime_full_period_2024_2026\backtest_equity_curve.csv
+  rejected_signals_csv C:\Users\rites\AppData\Local\Temp\pytest-of-rites\pytest-549\test_real_end_to_end_run_again0\reports\regime_full_period_2024_2026\backtest_rejected_signals.csv
+  data_quality_json    C:\Users\rites\AppData\Local\Temp\pytest-of-rites\pytest-549\test_real_end_to_end_run_again0\reports\regime_full_period_2024_2026\backtest_data_quality.json
+  results_html         C:\Users\rites\AppData\Local\Temp\pytest-of-rites\pytest-549\test_real_end_to_end_run_again0\reports\regime_full_period_2024_2026\backtest_results.html
+
+Open C:\Users\rites\AppData\Local\Temp\pytest-of-rites\pytest-549\test_real_end_to_end_run_again0\reports\regime_full_period_2024_2026\backtest_results.html in a browser to view the full report.
+
+# TalonX multi-regime backtest comparison
+
+**Empirical measurement only -- not a parameter search.** The SAME frozen strategy (unmodified QuantConfig) was run against different historical date ranges. No regime's result should be read as "the strategy is tuned for this period" -- none of these runs changed anything about the strategy.
+
+| Regime | Period | Status | Trades | Win Rate | Profit Factor | Expectancy (R) | Total R | Max DD (R) | Small Sample |
+|---|---|---|---|---|---|---|---|---|---|
+| full_period_2024_2026 | 2024-01-01 -> 2026-08-01 | SUCCESS_ZERO_TRADES | 0 | n/a | n/a | n/a | n/a | n/a | no |
+
+Every number above is read directly from each regime's own `backtest_summary.json` (net-of-cost metrics) -- none is estimated or interpolated. A regime with 0 (or very few) trades produces `n/a`/0 values here honestly, not a fabricated placeholder; treat any `SUCCESS_SMALL_SAMPLE` row as low-confidence (see docs/backtesting.md's statistical-confidence guidance). Sharpe/Sortino per trade are omitted from this compact table but remain in `regime_comparison.json` for every regime.
+
+## Cost Sensitivity
+
+### full_period_2024_2026
+
+Cost sensitivity was not requested for this run (`--no-cost-sensitivity`).
+
+
+Written: C:\Users\rites\AppData\Local\Temp\pytest-of-rites\pytest-549\test_real_end_to_end_run_again0\reports\regime_comparison.md
+Written: C:\Users\rites\AppData\Local\Temp\pytest-of-rites\pytest-549\test_real_end_to_end_run_again0\reports\regime_comparison.json
+=========================== short test summary info ===========================
+FAILED tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset
+1 failed in 6.98s

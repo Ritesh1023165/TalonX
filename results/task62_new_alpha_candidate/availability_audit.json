@@ -1,0 +1,575 @@
+{
+  "all_35_boundaries_available": true,
+  "bars_persisted": false,
+  "candidate_imported_for_universe_only": true,
+  "candidate_instantiated": false,
+  "provider": "alpaca",
+  "purpose": "availability-only boundary audit; no signals, replay, or returns",
+  "requested_package_end": "2025-05-05",
+  "requested_package_start": "2025-01-24",
+  "symbols": {
+    "AAPL": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:59:00+00:00",
+        "actual_start": "2025-01-24 00:01:00+00:00",
+        "available": true,
+        "bars": 827,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:59:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 840,
+        "status": "FULL"
+      }
+    },
+    "ADBE": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:59:00+00:00",
+        "actual_start": "2025-01-24 12:52:00+00:00",
+        "available": true,
+        "bars": 403,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:51:00+00:00",
+        "actual_start": "2025-05-05 11:18:00+00:00",
+        "available": true,
+        "bars": 402,
+        "status": "FULL"
+      }
+    },
+    "ADI": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 21:50:00+00:00",
+        "actual_start": "2025-01-24 00:02:00+00:00",
+        "available": true,
+        "bars": 414,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 22:09:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 390,
+        "status": "FULL"
+      }
+    },
+    "AMAT": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:56:00+00:00",
+        "actual_start": "2025-01-24 00:34:00+00:00",
+        "available": true,
+        "bars": 422,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:19:00+00:00",
+        "actual_start": "2025-05-05 11:08:00+00:00",
+        "available": true,
+        "bars": 412,
+        "status": "FULL"
+      }
+    },
+    "AMD": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:59:00+00:00",
+        "actual_start": "2025-01-24 00:01:00+00:00",
+        "available": true,
+        "bars": 800,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:59:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 794,
+        "status": "FULL"
+      }
+    },
+    "AMZN": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:59:00+00:00",
+        "actual_start": "2025-01-24 00:03:00+00:00",
+        "available": true,
+        "bars": 674,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:59:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 822,
+        "status": "FULL"
+      }
+    },
+    "AVGO": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:55:00+00:00",
+        "actual_start": "2025-01-24 00:01:00+00:00",
+        "available": true,
+        "bars": 616,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:59:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 577,
+        "status": "FULL"
+      }
+    },
+    "BKNG": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 21:34:00+00:00",
+        "actual_start": "2025-01-24 14:30:00+00:00",
+        "available": true,
+        "bars": 173,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 20:14:00+00:00",
+        "actual_start": "2025-05-05 12:13:00+00:00",
+        "available": true,
+        "bars": 114,
+        "status": "FULL"
+      }
+    },
+    "CMCSA": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:47:00+00:00",
+        "actual_start": "2025-01-24 09:21:00+00:00",
+        "available": true,
+        "bars": 421,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:35:00+00:00",
+        "actual_start": "2025-05-05 08:45:00+00:00",
+        "available": true,
+        "bars": 446,
+        "status": "FULL"
+      }
+    },
+    "COST": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:15:00+00:00",
+        "actual_start": "2025-01-24 12:27:00+00:00",
+        "available": true,
+        "bars": 363,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:48:00+00:00",
+        "actual_start": "2025-05-05 12:00:00+00:00",
+        "available": true,
+        "bars": 379,
+        "status": "FULL"
+      }
+    },
+    "CSCO": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:50:00+00:00",
+        "actual_start": "2025-01-24 00:44:00+00:00",
+        "available": true,
+        "bars": 437,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:35:00+00:00",
+        "actual_start": "2025-05-05 08:29:00+00:00",
+        "available": true,
+        "bars": 442,
+        "status": "FULL"
+      }
+    },
+    "GILD": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:56:00+00:00",
+        "actual_start": "2025-01-24 00:37:00+00:00",
+        "available": true,
+        "bars": 406,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:35:00+00:00",
+        "actual_start": "2025-05-05 08:48:00+00:00",
+        "available": true,
+        "bars": 402,
+        "status": "FULL"
+      }
+    },
+    "GOOGL": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:56:00+00:00",
+        "actual_start": "2025-01-24 00:01:00+00:00",
+        "available": true,
+        "bars": 652,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:59:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 631,
+        "status": "FULL"
+      }
+    },
+    "HON": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 22:34:00+00:00",
+        "actual_start": "2025-01-24 14:27:00+00:00",
+        "available": true,
+        "bars": 400,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 21:58:00+00:00",
+        "actual_start": "2025-05-05 11:38:00+00:00",
+        "available": true,
+        "bars": 395,
+        "status": "FULL"
+      }
+    },
+    "INTC": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:59:00+00:00",
+        "actual_start": "2025-01-24 00:00:00+00:00",
+        "available": true,
+        "bars": 807,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:59:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 774,
+        "status": "FULL"
+      }
+    },
+    "INTU": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 22:21:00+00:00",
+        "actual_start": "2025-01-24 13:36:00+00:00",
+        "available": true,
+        "bars": 372,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 22:03:00+00:00",
+        "actual_start": "2025-05-05 13:30:00+00:00",
+        "available": true,
+        "bars": 347,
+        "status": "FULL"
+      }
+    },
+    "ISRG": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:34:00+00:00",
+        "actual_start": "2025-01-24 00:00:00+00:00",
+        "available": true,
+        "bars": 454,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 22:53:00+00:00",
+        "actual_start": "2025-05-05 12:00:00+00:00",
+        "available": true,
+        "bars": 385,
+        "status": "FULL"
+      }
+    },
+    "KLAC": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:44:00+00:00",
+        "actual_start": "2025-01-24 13:18:00+00:00",
+        "available": true,
+        "bars": 313,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 20:29:00+00:00",
+        "actual_start": "2025-05-05 12:17:00+00:00",
+        "available": true,
+        "bars": 289,
+        "status": "FULL"
+      }
+    },
+    "LRCX": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:56:00+00:00",
+        "actual_start": "2025-01-24 00:03:00+00:00",
+        "available": true,
+        "bars": 483,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:51:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 443,
+        "status": "FULL"
+      }
+    },
+    "MDLZ": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 22:44:00+00:00",
+        "actual_start": "2025-01-24 13:00:00+00:00",
+        "available": true,
+        "bars": 399,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:35:00+00:00",
+        "actual_start": "2025-05-05 11:04:00+00:00",
+        "available": true,
+        "bars": 400,
+        "status": "FULL"
+      }
+    },
+    "META": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:59:00+00:00",
+        "actual_start": "2025-01-24 00:02:00+00:00",
+        "available": true,
+        "bars": 618,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:58:00+00:00",
+        "actual_start": "2025-05-05 08:14:00+00:00",
+        "available": true,
+        "bars": 632,
+        "status": "FULL"
+      }
+    },
+    "MSFT": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:47:00+00:00",
+        "actual_start": "2025-01-24 00:03:00+00:00",
+        "available": true,
+        "bars": 569,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:59:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 633,
+        "status": "FULL"
+      }
+    },
+    "MU": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:51:00+00:00",
+        "actual_start": "2025-01-24 00:01:00+00:00",
+        "available": true,
+        "bars": 687,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:52:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 577,
+        "status": "FULL"
+      }
+    },
+    "NFLX": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:42:00+00:00",
+        "actual_start": "2025-01-24 00:02:00+00:00",
+        "available": true,
+        "bars": 514,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:58:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 642,
+        "status": "FULL"
+      }
+    },
+    "NVDA": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:59:00+00:00",
+        "actual_start": "2025-01-24 00:01:00+00:00",
+        "available": true,
+        "bars": 954,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:59:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 957,
+        "status": "FULL"
+      }
+    },
+    "PANW": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 22:34:00+00:00",
+        "actual_start": "2025-01-24 00:58:00+00:00",
+        "available": true,
+        "bars": 419,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:54:00+00:00",
+        "actual_start": "2025-05-05 10:44:00+00:00",
+        "available": true,
+        "bars": 435,
+        "status": "FULL"
+      }
+    },
+    "PEP": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:56:00+00:00",
+        "actual_start": "2025-01-24 00:31:00+00:00",
+        "available": true,
+        "bars": 409,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:57:00+00:00",
+        "actual_start": "2025-05-05 08:03:00+00:00",
+        "available": true,
+        "bars": 444,
+        "status": "FULL"
+      }
+    },
+    "PYPL": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:54:00+00:00",
+        "actual_start": "2025-01-24 00:56:00+00:00",
+        "available": true,
+        "bars": 462,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:58:00+00:00",
+        "actual_start": "2025-05-05 08:03:00+00:00",
+        "available": true,
+        "bars": 475,
+        "status": "FULL"
+      }
+    },
+    "QCOM": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:48:00+00:00",
+        "actual_start": "2025-01-24 00:12:00+00:00",
+        "available": true,
+        "bars": 490,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:49:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 464,
+        "status": "FULL"
+      }
+    },
+    "REGN": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 22:24:00+00:00",
+        "actual_start": "2025-01-24 09:11:00+00:00",
+        "available": true,
+        "bars": 335,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 20:32:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 338,
+        "status": "FULL"
+      }
+    },
+    "SBUX": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:44:00+00:00",
+        "actual_start": "2025-01-24 00:05:00+00:00",
+        "available": true,
+        "bars": 420,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:58:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 479,
+        "status": "FULL"
+      }
+    },
+    "STX": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 21:38:00+00:00",
+        "actual_start": "2025-01-24 12:17:00+00:00",
+        "available": true,
+        "bars": 393,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 20:50:00+00:00",
+        "actual_start": "2025-05-05 11:17:00+00:00",
+        "available": true,
+        "bars": 391,
+        "status": "FULL"
+      }
+    },
+    "TSLA": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:59:00+00:00",
+        "actual_start": "2025-01-24 00:00:00+00:00",
+        "available": true,
+        "bars": 926,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:59:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 940,
+        "status": "FULL"
+      }
+    },
+    "TXN": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 23:49:00+00:00",
+        "actual_start": "2025-01-24 00:01:00+00:00",
+        "available": true,
+        "bars": 596,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:35:00+00:00",
+        "actual_start": "2025-05-05 08:00:00+00:00",
+        "available": true,
+        "bars": 431,
+        "status": "FULL"
+      }
+    },
+    "VRTX": {
+      "2025-01-24": {
+        "actual_end": "2025-01-24 21:00:00+00:00",
+        "actual_start": "2025-01-24 14:30:00+00:00",
+        "available": true,
+        "bars": 366,
+        "status": "FULL"
+      },
+      "2025-05-05": {
+        "actual_end": "2025-05-05 23:13:00+00:00",
+        "actual_start": "2025-05-05 08:10:00+00:00",
+        "available": true,
+        "bars": 388,
+        "status": "FULL"
+      }
+    }
+  },
+  "symbols_passing_both_boundaries": 35,
+  "task": 62,
+  "validation_started": false
+}

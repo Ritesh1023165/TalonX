@@ -1,0 +1,49 @@
+{
+  "task": "Task 56 - Independent Family Holdout Validation",
+  "protocol_commit": "8de8d4990c932830f09271bf45fa2326afc4e676",
+  "attempt_timestamp_utc": "2026-08-23T10:09:47.1937074Z",
+  "stage": "PRE_REPLAY_DATA_ACQUISITION",
+  "classification": "VALIDATION_BLOCKED",
+  "deployment_state": "MONDAY_DECISION_SHADOW_ONLY",
+  "provider": "alpaca",
+  "attempted_window": "H1_early",
+  "attempted_range": {
+    "start": "2025-12-11",
+    "end": "2026-01-26"
+  },
+  "attempted_symbols": [
+    "ADBE", "ADI", "AMAT", "AVGO", "BKNG", "CMCSA", "COST", "CSCO", "GILD", "HON",
+    "INTC", "INTU", "ISRG", "KLAC", "LRCX", "MDLZ", "MU", "NFLX", "PANW", "PEP",
+    "QCOM", "REGN", "SBUX", "TXN", "VRTX"
+  ],
+  "result": {
+    "downloaded_symbol_files": 0,
+    "download_summary_written": false,
+    "error_class": "NETWORK_ACCESS_UNAVAILABLE",
+    "error": "The sandbox forced Alpaca HTTPS requests through an unreachable local proxy (127.0.0.1:9). The required network-elevated rerun was rejected by the active execution policy.",
+    "credentials_exposed": false
+  },
+  "pre_replay_gates": {
+    "all_35_symbol_dataset_coverage": "FAIL",
+    "downloaded_data_quality": "NOT_RUN",
+    "all_35_symbol_warmup_readiness_on_complete_packages": "NOT_RUN",
+    "expensive_replay": "NOT_STARTED"
+  },
+  "local_evidence": {
+    "original_10_full_year_coverage": true,
+    "existing_local_warmup_feasibility": "35/35 ready in all three windows",
+    "additional_25_complete_evaluation_packages": false,
+    "note": "Prior warmup feasibility does not substitute for the frozen requirement that all 35 symbols have complete independent evaluation coverage."
+  },
+  "prohibited_fallbacks_not_used": [
+    "No reduced universe",
+    "No substituted provider",
+    "No replacement dates",
+    "No tuning",
+    "No family enable/disable action",
+    "No strategy/config change"
+  ],
+  "economics_and_diagnostics": "NOT_RUN_VALIDATION_BLOCKED",
+  "capital_used": false
+}
+

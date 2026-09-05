@@ -1,0 +1,33 @@
+{
+  "task": "Task70S_PIV_STABILIZATION_PHASE1",
+  "claim": "The Alpaca IEX historical 1-minute warmup path never consumes a bar at or after the declared causal cutoff (the same instant used to open the live decision-eligible loop), and never reuses any cross-date cached state.",
+  "mechanism": {
+    "requested_end_param": "Set to exactly `causal_cutoff` (see run_alpaca_1m_warmup's `end` request parameter), formatted as an RFC3339 UTC 'Z' string via _iso_z().",
+    "defense_in_depth_filter": "_sanitize() re-checks every returned bar's own timestamp and drops (future_bars_dropped) any bar with timestamp >= causal_cutoff, independent of whatever the provider's own `end` parameter enforcement does -- so even a provider bug or edge-inclusive response cannot introduce a look-ahead bar.",
+    "no_persisted_cache": "No warmup result is ever written to or read from disk by this path. Every call to run_alpaca_1m_warmup / preseed_and_verify recomputes requested_start/requested_end fresh from the caller-supplied (or current-time) causal_cutoff -- there is no on-disk Alpaca-warmup cache file anywhere in this repository, so there is no mechanism by which a stale cross-ET-trading-date result could be reused. (Contrast with talonx_piv/readiness.py's SEPARATE session_readiness_state.json, which DOES persist/restore across restarts and already has its own staleness guard -- that file is unrelated to and unmodified by this task.)"
+  },
+  "unit_test_evidence": {
+    "file": "tests/test_task70s_alpaca_warmup_stabilization.py",
+    "tests": [
+      "test_bar_exactly_at_causal_cutoff_is_excluded -- a bar timestamped EXACTLY at causal_cutoff is dropped (future_bars_dropped == 1), proving the boundary is exclusive on both ends (>=, not >).",
+      "test_bar_after_causal_cutoff_is_excluded -- a bar 5 minutes after causal_cutoff is dropped.",
+      "test_no_cross_date_reuse_each_call_recomputes_from_current_cutoff -- two preseed_and_verify calls one session-date apart (2026-08-24 vs 2026-08-26) against fresh FakeScanner instances produce DIFFERENT requested start/end params each time, proving no reuse of a prior call's range or result."
+    ]
+  },
+  "live_read_evidence": {
+    "description": "Read-only Alpaca IEX historical bars endpoint calls (feed=iex, GET only, no order/broker endpoint touched) against the real PAPER-account credentials already configured in this repo's .env, reproducing the EXACT causal cutoff Task69R's attempt 1 recorded (2026-08-26T08:19:00Z, from logs/task69r_live_paper_2026_08_26/attempt_1_preserved/attempt_1_record.json).",
+    "requested_end_utc": "2026-08-26T08:19:00Z",
+    "sample_symbol_AAPL": {
+      "requested_start": "2026-08-16T08:19:00Z",
+      "requested_end": "2026-08-26T08:19:00Z",
+      "bar_count": 1000,
+      "future_bars_dropped": 0,
+      "note": "requested_end matches the declared causal cutoff exactly; zero bars were dropped as future-leakage because the provider itself respected the `end` param, and the independent _sanitize() defense-in-depth check found nothing to drop."
+    },
+    "full_35_symbol_result": "See readiness_by_symbol.csv and _live_smoke_summary.json in this directory -- 35/35 READY, zero future_bars_dropped across all 35 symbols."
+  },
+  "credential_safety": {
+    "claim": "Zero credential values appear in any evidence artifact, log, or test assertion in this task.",
+    "proof": "tests/test_task70s_alpaca_warmup_stabilization.py::test_no_credential_leakage_in_result_or_check_json and test_no_credential_leakage_through_full_warmup_check assert the literal key_id/secret_key values are absent from json.dumps() of every produced record. The live smoke-test script that produced this file's own live_read_evidence asserted the same before printing anything."
+  }
+}

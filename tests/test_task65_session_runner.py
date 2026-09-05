@@ -1,0 +1,289 @@
+"""Task 65B -- SessionRunner: readiness gating, no synthesized data, no feed
+fallback, stale-data detection, kill-switch, and decision-path wiring
+(enabled -> decision_engine.on_bars called only for READY symbols; disabled
+-> zero orders deterministically, matching the original Task65 plumbing-only
+behavior -- see Part E test #1, "old decision path disabled state is
+detected")."""
+from __future__ import annotations
+
+from datetime import date, datetime, timedelta
+from unittest.mock import AsyncMock
+from zoneinfo import ZoneInfo
+
+import pytest
+
+from talonx_piv.broker import AlpacaPaperClient
+from talonx_piv.config import PAPER_ENDPOINT, PivConfig
+from talonx_piv.events import EventBus
+from talonx_piv.lifecycle import PaperLifecycle
+from talonx_piv.session_runner import SessionRunner
+
+ET = ZoneInfo("America/New_York")
+SESSION = date(2026, 8, 24)
+UNIVERSE = ("AAPL", "MSFT")
+
+
+class Response:
+    def __init__(self, body, status=200): self.body, self.status_code = body, status
+    def json(self): return self.body
+    def raise_for_status(self):
+        if self.status_code >= 400: raise RuntimeError(f"HTTP {self.status_code}")
+
+
+class BarsTransport:
+    def __init__(self, batches: list[dict[str, dict]]):
+        self.batches = list(batches)
+        self.feed_params_used: list[str] = []
+        self.orders: list = []
+
+    def get(self, url, **kwargs):
+        if url.endswith("/v2/account"):
+            return Response({"id": "id", "account_number": "PA1", "status": "ACTIVE"}, 200)
+        if url.endswith("/v2/orders"):
+            return Response(self.orders)
+        if "bars/latest" in url:
+            self.feed_params_used.append(kwargs["params"]["feed"])
+            body = self.batches.pop(0) if self.batches else {}
+            return Response({"bars": body})
+        return Response({}, 404)
+
+    def post(self, url, **kwargs):
+        order = {"id": f"order-{len(self.orders) + 1}", **kwargs.get("json", {})}
+        self.orders.append(order)
+        return Response(order)
+
+    def delete(self, url, **kwargs):
+        return Response([])
+
+
+def bar_row(ts: str, price: float = 100.0) -> dict:
+    return {"t": ts, "o": price, "h": price + 1, "l": price - 1, "c": price, "v": 1000}
+
+
+def config(tmp_path, **overrides):
+    values = dict(key_id="key", secret_key="secret", paper_trading=True, real_capital=False,
+                  broker_endpoint=PAPER_ENDPOINT, approved_sha="abc", state_dir=tmp_path,
+                  universe=UNIVERSE, stale_seconds=90)
+    values.update(overrides)
+    return PivConfig(**values)
+
+
+def runner(tmp_path, batches, decision_engine=None, **overrides):
+    cfg = config(tmp_path, **overrides)
+    transport = BarsTransport(batches)
+    broker = AlpacaPaperClient(cfg, transport)
+    broker.verify_paper_identity()
+    bus = EventBus(tmp_path / "events.jsonl", feed_mode=cfg.feed_mode)
+    life = PaperLifecycle(tmp_path / "state.json", broker, bus)
+    life.start_session(True, True)
+    return SessionRunner(cfg, bus, life, transport, decision_engine=decision_engine), transport, bus
+
+
+def to_utc_iso(local: datetime) -> str:
+    return local.astimezone(ZoneInfo("UTC")).isoformat().replace("+00:00", "Z")
+
+
+@pytest.mark.asyncio
+async def test_missing_opening_minute_marks_symbol_data_not_ready(tmp_path):
+    batches = []
+    skip_time = datetime(2026, 8, 24, 9, 35, tzinfo=ET).time()
+    for i in range(30):
+        minute = datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i)
+        ts = to_utc_iso(minute)
+        row = {"AAPL": bar_row(ts)}
+        if minute.time() != skip_time:
+            row["MSFT"] = bar_row(ts)
+        batches.append(row)
+    ready_tick = datetime(2026, 8, 24, 10, 0, tzinfo=ET)
+    batches.append({"AAPL": bar_row(to_utc_iso(ready_tick)), "MSFT": bar_row(to_utc_iso(ready_tick))})
+
+    run, transport, bus = runner(tmp_path, batches)
+    ticks = [datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i) for i in range(30)]
+    ticks.append(ready_tick)
+    for tick in ticks:
+        await run.process_tick(tick.astimezone(ZoneInfo("UTC")))
+
+    assert run._ready_symbols == {"AAPL"}
+    events = bus.path.read_text(encoding="utf-8")
+    assert '"event": "MARKET_DATA_READY"' in events and '"symbol": "AAPL"' in events
+    assert '"event": "DATA_NOT_READY"' in events and '"symbol": "MSFT"' in events
+
+
+@pytest.mark.asyncio
+async def test_decision_path_disabled_zero_orders_matching_old_behavior(tmp_path):
+    """Old decision-path-disabled state (decision_engine=None) is fully
+    reachable and deterministic -- zero orders regardless of how many ticks
+    run, not 'no signal happened to fire this run'."""
+    batches = []
+    for i in range(45):
+        minute = datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i)
+        ts = to_utc_iso(minute)
+        batches.append({"AAPL": bar_row(ts, 100 + i), "MSFT": bar_row(ts, 200 + i)})
+
+    run, transport, bus = runner(tmp_path, batches, decision_engine=None)
+    for i in range(45):
+        tick = datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i)
+        await run.process_tick(tick.astimezone(ZoneInfo("UTC")))
+
+    assert run._ready_symbols == {"AAPL", "MSFT"}
+    assert transport.orders == []
+    events = bus.path.read_text(encoding="utf-8")
+    assert '"event": "SIGNAL"' not in events
+    assert '"event": "ORDER_INTENT"' not in events
+
+
+@pytest.mark.asyncio
+async def test_decision_engine_only_called_for_ready_symbols(tmp_path):
+    skip_time = datetime(2026, 8, 24, 9, 35, tzinfo=ET).time()
+    batches = []
+    for i in range(30):
+        minute = datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i)
+        ts = to_utc_iso(minute)
+        row = {"AAPL": bar_row(ts)}
+        if minute.time() != skip_time:
+            row["MSFT"] = bar_row(ts)
+        batches.append(row)
+    live_tick = datetime(2026, 8, 24, 10, 1, tzinfo=ET)
+    batches.append({"AAPL": bar_row(to_utc_iso(live_tick)), "MSFT": bar_row(to_utc_iso(live_tick))})
+
+    fake_engine = AsyncMock()
+    fake_engine.warmup_ready_symbols = {"AAPL", "MSFT"}  # both warmup-ready -- this test isolates the readiness-validator gate
+    # funnel_summary is a plain (sync) method on the real DecisionEngine --
+    # give the fake a real dict return so SessionRunner's Task69Q piv_info/
+    # heartbeat bookkeeping (which reads this every tick) doesn't trip over
+    # AsyncMock's default "everything is awaitable" behavior.
+    fake_engine.funnel_summary = lambda: {
+        "evaluation_cycles": 0, "symbols_evaluated_total": 0, "candidates": 0, "published": 0,
+        "rejected": 0, "pending": 0, "errored": 0, "unaccounted_candidates": 0, "rejected_breakdown": {},
+    }
+    # Task 77I: dispatch_pending is a plain SYNC method on the real
+    # NotificationOutbox -- stubbed as a plain callable (not AsyncMock's
+    # default auto-async attribute) so SessionRunner's per-tick dispatch
+    # call doesn't leave an unawaited coroutine warning.
+    fake_engine.notification_outbox.dispatch_pending = lambda: {}
+    run, transport, bus = runner(tmp_path, batches, decision_engine=fake_engine)
+    ticks = [datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i) for i in range(30)]
+    ticks.append(live_tick)
+    for tick in ticks:
+        await run.process_tick(tick.astimezone(ZoneInfo("UTC")))
+
+    assert run._ready_symbols == {"AAPL"}  # MSFT missing a minute -> not ready
+    fake_engine.on_bars.assert_awaited()
+    called_bars = fake_engine.on_bars.await_args.args[0]
+    assert "MSFT" not in called_bars and "AAPL" in called_bars
+
+
+@pytest.mark.asyncio
+async def test_stale_data_flagged_once_when_no_new_bar_arrives(tmp_path):
+    base = datetime(2026, 8, 24, 10, 1, tzinfo=ET).astimezone(ZoneInfo("UTC"))
+    run, transport, bus = runner(tmp_path, [])
+    run._session = SESSION
+    run._ready_symbols = {"AAPL"}
+    run._last_seen_wall["AAPL"] = base
+    run._check_stale(base + timedelta(seconds=200))
+    run._check_stale(base + timedelta(seconds=210))  # still stale -- must not re-emit
+    events = bus.path.read_text(encoding="utf-8").splitlines()
+    stale_events = [row for row in events if '"event": "STALE_DATA"' in row]
+    assert len(stale_events) == 1
+
+
+@pytest.mark.asyncio
+async def test_feed_param_pinned_no_fallback(tmp_path):
+    ts = to_utc_iso(datetime(2026, 8, 24, 9, 30, tzinfo=ET))
+    run, transport, bus = runner(tmp_path, [{"AAPL": bar_row(ts)}], feed_mode="IEX_PAPER_PIV")
+    await run.process_tick(datetime(2026, 8, 24, 9, 30, tzinfo=ET).astimezone(ZoneInfo("UTC")))
+    assert run._last_bar_ts and transport.feed_params_used == ["iex"]
+
+
+@pytest.mark.asyncio
+async def test_missing_symbol_in_response_is_not_synthesized(tmp_path):
+    ts = to_utc_iso(datetime(2026, 8, 24, 9, 30, tzinfo=ET))
+    run, transport, bus = runner(tmp_path, [{"AAPL": bar_row(ts)}])  # MSFT absent
+    await run.process_tick(datetime(2026, 8, 24, 9, 30, tzinfo=ET).astimezone(ZoneInfo("UTC")))
+    assert "MSFT" not in run._last_bar_ts
+    assert "AAPL" in run._last_bar_ts
+
+
+@pytest.mark.asyncio
+async def test_duplicate_bar_not_reprocessed(tmp_path):
+    ts = to_utc_iso(datetime(2026, 8, 24, 9, 30, tzinfo=ET))
+    run, transport, bus = runner(tmp_path, [{"AAPL": bar_row(ts)}, {"AAPL": bar_row(ts)}])
+    tick = datetime(2026, 8, 24, 9, 30, tzinfo=ET).astimezone(ZoneInfo("UTC"))
+    await run.process_tick(tick)
+    first_seen = run._last_seen_wall["AAPL"]
+    await run.process_tick(tick + timedelta(seconds=30))
+    assert run._last_seen_wall["AAPL"] == first_seen
+
+
+@pytest.mark.asyncio
+async def test_isolated_tick_failure_does_not_kill_the_session_loop(tmp_path):
+    """Confirmed live 2026-08-24: an unhandled requests.exceptions.ReadTimeout
+    from fetch_bars_latest() crashed the whole multi-hour session after
+    ~34 minutes. A transient per-tick failure must be recorded and skipped,
+    not propagate out of run()'s loop."""
+    run, transport, bus = runner(tmp_path, [])
+    calls = []
+    first = True
+
+    async def flaky_tick(now):
+        nonlocal first
+        calls.append(now)
+        if first:
+            first = False
+            raise TimeoutError("simulated transient network timeout")
+
+    run.process_tick = flaky_tick  # type: ignore[method-assign]
+    ticks = iter([
+        datetime(2026, 8, 24, 9, 31, tzinfo=ET).astimezone(ZoneInfo("UTC")),
+        datetime(2026, 8, 24, 9, 32, tzinfo=ET).astimezone(ZoneInfo("UTC")),
+        datetime(2026, 8, 24, 16, 0, tzinfo=ET).astimezone(ZoneInfo("UTC")),  # past flatten_time -- ends the loop
+    ])
+
+    async def fake_sleep(seconds):
+        pass
+
+    await run.run(clock=lambda: next(ticks), sleep=fake_sleep)
+    assert len(calls) == 2  # both the failing tick AND the next one ran -- loop survived
+    events = bus.path.read_text(encoding="utf-8")
+    assert '"event": "BROKER_ERROR"' in events and "TICK_FAILED_TimeoutError" in events
+
+
+@pytest.mark.asyncio
+async def test_readiness_survives_simulated_process_restart(tmp_path):
+    """End-to-end wiring proof: a fresh SessionRunner (simulating a new
+    process after a crash/restart) sharing the same state_dir restores
+    the prior run's READY decision instead of re-deriving DATA_NOT_READY
+    from a cold, empty validator -- the exact defect fixed in Task 66A."""
+    ts = to_utc_iso(datetime(2026, 8, 24, 9, 30, tzinfo=ET))
+    run1, _, bus1 = runner(tmp_path, [{"AAPL": bar_row(ts)}])
+    await run1.process_tick(datetime(2026, 8, 24, 9, 30, tzinfo=ET).astimezone(ZoneInfo("UTC")))
+    for i in range(1, 30):
+        minute = datetime(2026, 8, 24, 9, 30, tzinfo=ET) + timedelta(minutes=i)
+        run1.validator.observe("AAPL", SESSION, minute)
+    run1._finalize_readiness(SESSION, datetime(2026, 8, 24, 10, 0, tzinfo=ET))
+    assert run1._ready_symbols == {"AAPL"}
+    assert (run1.config.state_dir / "session_readiness_state.json").exists()
+
+    # Fresh SessionRunner, fresh validator instance, SAME state_dir -- simulates a real restart.
+    run2, _, bus2 = runner(tmp_path, [])
+    late = datetime(2026, 8, 24, 14, 41, tzinfo=ET).astimezone(ZoneInfo("UTC"))  # long after 10:00, like today's incident
+    await run2.process_tick(late)
+    assert run2._ready_symbols == {"AAPL"}
+    events2 = bus2.path.read_text(encoding="utf-8")
+    assert '"event": "SESSION_READINESS_STATE_RESTORED"' in events2
+
+
+@pytest.mark.asyncio
+async def test_kill_switch_stops_loop_without_processing_further_ticks(tmp_path):
+    run, transport, bus = runner(tmp_path, [])
+    run.lifecycle.activate_kill_switch()
+    calls = []
+
+    async def fake_tick(now):
+        calls.append(now)
+    run.process_tick = fake_tick  # type: ignore[method-assign]
+    ticks = iter([datetime(2026, 8, 24, 9, 31, tzinfo=ET).astimezone(ZoneInfo("UTC"))])
+    await run.run(clock=lambda: next(ticks), sleep=AsyncMock())
+    assert calls == []
+    events = bus.path.read_text(encoding="utf-8")
+    assert '"event": "KILL_SWITCH"' in events

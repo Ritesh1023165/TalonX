@@ -1,0 +1,15 @@
+field,value
+provider,alpaca
+feed,SIP (per docs/research/TALONX_RESEARCH_LEDGER.md Task 7B section title "Long-History Dataset (Alpaca SIP)"; no IEX substitution)
+dataset_directory,data/historical_1m/task7b_alpaca_long_history
+dataset_hash,5e5412a960bf
+requested_start,2025-08-15
+requested_end,2026-08-14
+common_usable_period_start_utc,2025-08-15 13:03:00+00:00
+common_usable_period_end_utc,2026-08-14 23:58:00+00:00
+common_usable_period_source,STX (latest actual_start, earliest actual_end of all 10 symbols)
+total_bars_all_symbols_summed,1903044
+total_bars_merge_sorted_common_period,1901714
+symbol_count,10
+holdout_overlap_check,ZERO -- task56_holdout and task56_independent_family_holdout contain only the 25 additional (non-core-10) symbols; none of the 10 core symbols appear in any holdout directory at any date
+provenance,identical dataset used unmodified by Task72O and Task73S (this research line) and Task4/7B/8/13/13B/22/24/25A/26/36/53-56/58/61R/63/63R (broader ledger history)

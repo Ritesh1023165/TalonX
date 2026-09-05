@@ -1,0 +1,663 @@
+======================================================================
+DATA QUALITY
+======================================================================
+Data-quality report: AAPL
+  Rows:                    189,563
+  Range:                   2025-08-15 08:00:00+00:00 -> 2026-08-14 23:59:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    335557 (22572 gap(s))
+    Expected (session closed):    331469
+    Unexpected (inside session):  4088
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: AMD
+  Rows:                    204,714
+  Range:                   2025-08-15 08:00:00+00:00 -> 2026-08-14 23:59:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    320406 (18964 gap(s))
+    Expected (session closed):    316346
+    Unexpected (inside session):  4060
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: AMZN
+  Rows:                    194,988
+  Range:                   2025-08-15 08:00:00+00:00 -> 2026-08-14 23:59:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    330132 (22309 gap(s))
+    Expected (session closed):    326099
+    Unexpected (inside session):  4033
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: GOOGL
+  Rows:                    191,394
+  Range:                   2025-08-15 08:00:00+00:00 -> 2026-08-14 23:59:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    333726 (21774 gap(s))
+    Expected (session closed):    329644
+    Unexpected (inside session):  4082
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: META
+  Rows:                    184,201
+  Range:                   2025-08-15 08:19:00+00:00 -> 2026-08-14 23:59:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    340900 (21526 gap(s))
+    Expected (session closed):    336859
+    Unexpected (inside session):  4041
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: MSFT
+  Rows:                    199,156
+  Range:                   2025-08-15 08:00:00+00:00 -> 2026-08-14 23:59:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    325964 (16922 gap(s))
+    Expected (session closed):    321865
+    Unexpected (inside session):  4099
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: NVDA
+  Rows:                    237,875
+  Range:                   2025-08-15 08:00:00+00:00 -> 2026-08-14 23:59:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    287245 (2684 gap(s))
+    Expected (session closed):    283333
+    Unexpected (inside session):  3912
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: PYPL
+  Rows:                    142,095
+  Range:                   2025-08-15 08:00:00+00:00 -> 2026-08-14 23:59:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    383025 (22077 gap(s))
+    Expected (session closed):    378876
+    Unexpected (inside session):  4149
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: STX
+  Rows:                    124,406
+  Range:                   2025-08-15 13:03:00+00:00 -> 2026-08-14 23:58:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    400410 (15121 gap(s))
+    Expected (session closed):    395635
+    Unexpected (inside session):  4775
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+Data-quality report: TSLA
+  Rows:                    234,652
+  Range:                   2025-08-15 08:00:00+00:00 -> 2026-08-14 23:59:00+00:00
+  Timezone:                UTC
+  Inferred bar interval:   60.0s
+  Duplicate timestamps:    0
+  Out-of-order timestamps: 0
+  Missing bars (total):    290468 (4993 gap(s))
+    Expected (session closed):    286562
+    Unexpected (inside session):  3906
+  Invalid prices (<=0):    0
+  Invalid OHLC relations:  0
+  Negative volume:         0
+  NaN values:              0
+  Infinite values:         0
+  CRITICAL CORRUPTION:     no
+
+======================================================================
+BACKTEST RESULT
+======================================================================
+  progress:   0.4%  (6,733/1,903,044 bars)
+  progress:   0.6%  (11,495/1,903,044 bars)
+  progress:   0.9%  (16,186/1,903,044 bars)
+  progress:   1.1%  (20,821/1,903,044 bars)
+  progress:   1.3%  (25,178/1,903,044 bars)
+  progress:   1.6%  (29,768/1,903,044 bars)
+  progress:   1.8%  (34,389/1,903,044 bars)
+  progress:   2.0%  (38,961/1,903,044 bars)
+  progress:   2.3%  (43,547/1,903,044 bars)
+  progress:   2.5%  (48,092/1,903,044 bars)
+  progress:   2.8%  (52,515/1,903,044 bars)
+  progress:   3.0%  (56,997/1,903,044 bars)
+  progress:   3.2%  (61,444/1,903,044 bars)
+  progress:   3.5%  (65,950/1,903,044 bars)
+  progress:   3.7%  (70,448/1,903,044 bars)
+  progress:   3.9%  (74,947/1,903,044 bars)
+  progress:   4.2%  (79,375/1,903,044 bars)
+  progress:   4.4%  (83,840/1,903,044 bars)
+  progress:   4.6%  (88,329/1,903,044 bars)
+  progress:   4.9%  (92,817/1,903,044 bars)
+  progress:   5.1%  (97,192/1,903,044 bars)
+  progress:   5.3%  (101,723/1,903,044 bars)
+  progress:   5.6%  (106,127/1,903,044 bars)
+  progress:   5.8%  (110,681/1,903,044 bars)
+  progress:   6.1%  (115,220/1,903,044 bars)
+  progress:   6.3%  (119,712/1,903,044 bars)
+  progress:   6.5%  (124,204/1,903,044 bars)
+  progress:   6.8%  (128,737/1,903,044 bars)
+  progress:   7.0%  (133,180/1,903,044 bars)
+  progress:   7.2%  (137,471/1,903,044 bars)
+  progress:   7.5%  (141,924/1,903,044 bars)
+  progress:   7.7%  (146,438/1,903,044 bars)
+  progress:   7.9%  (150,896/1,903,044 bars)
+  progress:   8.2%  (155,268/1,903,044 bars)
+  progress:   8.4%  (159,671/1,903,044 bars)
+  progress:   8.6%  (164,176/1,903,044 bars)
+  progress:   8.9%  (168,719/1,903,044 bars)
+  progress:   9.1%  (173,241/1,903,044 bars)
+  progress:   9.3%  (177,744/1,903,044 bars)
+  progress:   9.6%  (182,299/1,903,044 bars)
+  progress:   9.8%  (186,722/1,903,044 bars)
+  progress:  10.0%  (191,234/1,903,044 bars)
+  progress:  10.3%  (195,754/1,903,044 bars)
+  progress:  10.5%  (200,249/1,903,044 bars)
+  progress:  10.8%  (204,747/1,903,044 bars)
+  progress:  11.0%  (209,252/1,903,044 bars)
+  progress:  11.2%  (213,682/1,903,044 bars)
+  progress:  11.5%  (218,192/1,903,044 bars)
+  progress:  11.7%  (222,723/1,903,044 bars)
+  progress:  11.9%  (227,265/1,903,044 bars)
+  progress:  12.2%  (231,741/1,903,044 bars)
+  progress:  12.4%  (236,296/1,903,044 bars)
+  progress:  12.7%  (240,767/1,903,044 bars)
+  progress:  12.9%  (245,133/1,903,044 bars)
+  progress:  13.1%  (249,696/1,903,044 bars)
+  progress:  13.4%  (254,075/1,903,044 bars)
+  progress:  13.6%  (258,576/1,903,044 bars)
+  progress:  13.8%  (263,025/1,903,044 bars)
+  progress:  14.1%  (267,426/1,903,044 bars)
+  progress:  14.3%  (271,922/1,903,044 bars)
+  progress:  14.5%  (276,187/1,903,044 bars)
+  progress:  14.7%  (280,638/1,903,044 bars)
+  progress:  15.0%  (285,078/1,903,044 bars)
+  progress:  15.2%  (289,437/1,903,044 bars)
+  progress:  15.4%  (293,928/1,903,044 bars)
+  progress:  15.7%  (298,347/1,903,044 bars)
+  progress:  15.9%  (302,879/1,903,044 bars)
+  progress:  16.2%  (307,402/1,903,044 bars)
+  progress:  16.4%  (311,813/1,903,044 bars)
+  progress:  16.6%  (316,350/1,903,044 bars)
+  progress:  16.9%  (320,686/1,903,044 bars)
+  progress:  17.1%  (325,196/1,903,044 bars)
+  progress:  17.3%  (329,688/1,903,044 bars)
+  progress:  17.6%  (334,118/1,903,044 bars)
+  progress:  17.8%  (338,564/1,903,044 bars)
+  progress:  18.0%  (343,063/1,903,044 bars)
+  progress:  18.3%  (347,508/1,903,044 bars)
+  progress:  18.5%  (351,977/1,903,044 bars)
+  progress:  18.7%  (356,470/1,903,044 bars)
+  progress:  19.0%  (360,842/1,903,044 bars)
+  progress:  19.2%  (365,321/1,903,044 bars)
+  progress:  19.4%  (369,733/1,903,044 bars)
+  progress:  19.7%  (374,046/1,903,044 bars)
+  progress:  19.9%  (378,341/1,903,044 bars)
+  progress:  20.1%  (382,806/1,903,044 bars)
+  progress:  20.3%  (387,145/1,903,044 bars)
+  progress:  20.6%  (391,688/1,903,044 bars)
+  progress:  20.8%  (396,082/1,903,044 bars)
+  progress:  21.0%  (400,488/1,903,044 bars)
+  progress:  21.3%  (404,946/1,903,044 bars)
+  progress:  21.5%  (409,308/1,903,044 bars)
+  progress:  21.7%  (413,791/1,903,044 bars)
+  progress:  21.9%  (417,227/1,903,044 bars)
+  progress:  22.1%  (420,236/1,903,044 bars)
+  progress:  22.3%  (424,459/1,903,044 bars)
+  progress:  22.5%  (428,845/1,903,044 bars)
+  progress:  22.8%  (433,315/1,903,044 bars)
+  progress:  23.0%  (437,830/1,903,044 bars)
+  progress:  23.2%  (442,251/1,903,044 bars)
+  progress:  23.5%  (446,776/1,903,044 bars)
+  progress:  23.7%  (450,890/1,903,044 bars)
+  progress:  23.9%  (455,301/1,903,044 bars)
+  progress:  24.2%  (459,698/1,903,044 bars)
+  progress:  24.4%  (463,966/1,903,044 bars)
+  progress:  24.6%  (468,504/1,903,044 bars)
+  progress:  24.8%  (472,827/1,903,044 bars)
+  progress:  25.1%  (477,287/1,903,044 bars)
+  progress:  25.3%  (481,572/1,903,044 bars)
+  progress:  25.5%  (486,002/1,903,044 bars)
+  progress:  25.8%  (490,373/1,903,044 bars)
+  progress:  26.0%  (494,755/1,903,044 bars)
+  progress:  26.2%  (498,935/1,903,044 bars)
+  progress:  26.4%  (503,106/1,903,044 bars)
+  progress:  26.7%  (507,366/1,903,044 bars)
+  progress:  26.9%  (511,771/1,903,044 bars)
+  progress:  27.1%  (516,317/1,903,044 bars)
+  progress:  27.4%  (520,643/1,903,044 bars)
+  progress:  27.6%  (525,167/1,903,044 bars)
+  progress:  27.8%  (529,544/1,903,044 bars)
+  progress:  28.1%  (534,079/1,903,044 bars)
+  progress:  28.3%  (538,555/1,903,044 bars)
+  progress:  28.5%  (542,825/1,903,044 bars)
+  progress:  28.8%  (547,292/1,903,044 bars)
+  progress:  29.0%  (551,749/1,903,044 bars)
+  progress:  29.2%  (556,088/1,903,044 bars)
+  progress:  29.5%  (560,494/1,903,044 bars)
+  progress:  29.7%  (564,998/1,903,044 bars)
+  progress:  29.9%  (569,473/1,903,044 bars)
+  progress:  30.2%  (574,009/1,903,044 bars)
+  progress:  30.4%  (578,475/1,903,044 bars)
+  progress:  30.6%  (582,886/1,903,044 bars)
+  progress:  30.9%  (587,377/1,903,044 bars)
+  progress:  31.1%  (591,780/1,903,044 bars)
+  progress:  31.3%  (596,291/1,903,044 bars)
+  progress:  31.6%  (600,764/1,903,044 bars)
+  progress:  31.8%  (605,071/1,903,044 bars)
+  progress:  32.0%  (609,517/1,903,044 bars)
+  progress:  32.3%  (613,886/1,903,044 bars)
+  progress:  32.5%  (618,402/1,903,044 bars)
+  progress:  32.7%  (622,885/1,903,044 bars)
+  progress:  33.0%  (627,280/1,903,044 bars)
+  progress:  33.2%  (631,753/1,903,044 bars)
+  progress:  33.4%  (636,135/1,903,044 bars)
+  progress:  33.7%  (640,639/1,903,044 bars)
+  progress:  33.9%  (645,127/1,903,044 bars)
+  progress:  34.1%  (649,592/1,903,044 bars)
+  progress:  34.4%  (654,078/1,903,044 bars)
+  progress:  34.6%  (658,592/1,903,044 bars)
+  progress:  34.8%  (663,101/1,903,044 bars)
+  progress:  35.1%  (667,662/1,903,044 bars)
+  progress:  35.3%  (672,164/1,903,044 bars)
+  progress:  35.6%  (676,670/1,903,044 bars)
+  progress:  35.8%  (681,181/1,903,044 bars)
+  progress:  36.0%  (685,657/1,903,044 bars)
+  progress:  36.3%  (690,088/1,903,044 bars)
+  progress:  36.5%  (694,495/1,903,044 bars)
+  progress:  36.7%  (698,981/1,903,044 bars)
+  progress:  37.0%  (703,412/1,903,044 bars)
+  progress:  37.2%  (707,867/1,903,044 bars)
+  progress:  37.4%  (712,411/1,903,044 bars)
+  progress:  37.7%  (716,775/1,903,044 bars)
+  progress:  37.9%  (721,269/1,903,044 bars)
+  progress:  38.1%  (725,727/1,903,044 bars)
+  progress:  38.4%  (730,165/1,903,044 bars)
+  progress:  38.6%  (734,725/1,903,044 bars)
+  progress:  38.8%  (739,164/1,903,044 bars)
+  progress:  39.1%  (743,622/1,903,044 bars)
+  progress:  39.3%  (748,091/1,903,044 bars)
+  progress:  39.5%  (752,576/1,903,044 bars)
+  progress:  39.8%  (757,112/1,903,044 bars)
+  progress:  40.0%  (761,532/1,903,044 bars)
+  progress:  40.3%  (766,063/1,903,044 bars)
+  progress:  40.5%  (770,515/1,903,044 bars)
+  progress:  40.7%  (774,832/1,903,044 bars)
+  progress:  41.0%  (779,350/1,903,044 bars)
+  progress:  41.2%  (783,756/1,903,044 bars)
+  progress:  41.4%  (788,255/1,903,044 bars)
+  progress:  41.7%  (792,644/1,903,044 bars)
+  progress:  41.9%  (797,090/1,903,044 bars)
+  progress:  42.1%  (801,630/1,903,044 bars)
+  progress:  42.3%  (805,855/1,903,044 bars)
+  progress:  42.6%  (810,373/1,903,044 bars)
+  progress:  42.8%  (814,795/1,903,044 bars)
+  progress:  43.0%  (819,241/1,903,044 bars)
+  progress:  43.3%  (823,597/1,903,044 bars)
+  progress:  43.5%  (827,969/1,903,044 bars)
+  progress:  43.7%  (832,324/1,903,044 bars)
+  progress:  44.0%  (836,655/1,903,044 bars)
+  progress:  44.2%  (841,068/1,903,044 bars)
+  progress:  44.4%  (845,450/1,903,044 bars)
+  progress:  44.7%  (849,856/1,903,044 bars)
+  progress:  44.9%  (854,157/1,903,044 bars)
+  progress:  45.1%  (858,591/1,903,044 bars)
+  progress:  45.3%  (862,716/1,903,044 bars)
+  progress:  45.6%  (867,128/1,903,044 bars)
+  progress:  45.8%  (871,039/1,903,044 bars)
+  progress:  46.0%  (875,411/1,903,044 bars)
+  progress:  46.2%  (879,517/1,903,044 bars)
+  progress:  46.5%  (884,003/1,903,044 bars)
+  progress:  46.7%  (888,371/1,903,044 bars)
+  progress:  46.9%  (892,866/1,903,044 bars)
+  progress:  47.2%  (897,301/1,903,044 bars)
+  progress:  47.4%  (901,660/1,903,044 bars)
+  progress:  47.6%  (906,111/1,903,044 bars)
+  progress:  47.8%  (910,483/1,903,044 bars)
+  progress:  48.1%  (915,030/1,903,044 bars)
+  progress:  48.3%  (919,342/1,903,044 bars)
+  progress:  48.5%  (923,809/1,903,044 bars)
+  progress:  48.8%  (928,137/1,903,044 bars)
+  progress:  49.0%  (932,611/1,903,044 bars)
+  progress:  49.2%  (937,034/1,903,044 bars)
+  progress:  49.5%  (941,434/1,903,044 bars)
+  progress:  49.7%  (945,894/1,903,044 bars)
+  progress:  49.9%  (950,278/1,903,044 bars)
+  progress:  50.2%  (954,646/1,903,044 bars)
+  progress:  50.4%  (959,146/1,903,044 bars)
+  progress:  50.6%  (963,537/1,903,044 bars)
+  progress:  50.9%  (968,008/1,903,044 bars)
+  progress:  51.1%  (972,396/1,903,044 bars)
+  progress:  51.3%  (976,811/1,903,044 bars)
+  progress:  51.6%  (981,226/1,903,044 bars)
+  progress:  51.8%  (985,547/1,903,044 bars)
+  progress:  52.0%  (990,063/1,903,044 bars)
+  progress:  52.3%  (994,345/1,903,044 bars)
+  progress:  52.5%  (998,769/1,903,044 bars)
+  progress:  52.7%  (1,003,171/1,903,044 bars)
+  progress:  52.9%  (1,007,512/1,903,044 bars)
+  progress:  53.2%  (1,012,067/1,903,044 bars)
+  progress:  53.4%  (1,016,419/1,903,044 bars)
+  progress:  53.6%  (1,020,927/1,903,044 bars)
+  progress:  53.9%  (1,025,346/1,903,044 bars)
+  progress:  54.1%  (1,029,617/1,903,044 bars)
+  progress:  54.3%  (1,034,075/1,903,044 bars)
+  progress:  54.6%  (1,038,534/1,903,044 bars)
+  progress:  54.8%  (1,043,033/1,903,044 bars)
+  progress:  55.0%  (1,047,553/1,903,044 bars)
+  progress:  55.3%  (1,052,021/1,903,044 bars)
+  progress:  55.5%  (1,056,496/1,903,044 bars)
+  progress:  55.7%  (1,060,914/1,903,044 bars)
+  progress:  56.0%  (1,065,256/1,903,044 bars)
+  progress:  56.2%  (1,069,720/1,903,044 bars)
+  progress:  56.4%  (1,074,220/1,903,044 bars)
+  progress:  56.7%  (1,078,735/1,903,044 bars)
+  progress:  56.9%  (1,083,201/1,903,044 bars)
+  progress:  57.2%  (1,087,607/1,903,044 bars)
+  progress:  57.4%  (1,092,161/1,903,044 bars)
+  progress:  57.6%  (1,096,641/1,903,044 bars)
+  progress:  57.8%  (1,100,896/1,903,044 bars)
+  progress:  58.1%  (1,105,337/1,903,044 bars)
+  progress:  58.3%  (1,109,774/1,903,044 bars)
+  progress:  58.5%  (1,114,141/1,903,044 bars)
+  progress:  58.8%  (1,118,529/1,903,044 bars)
+  progress:  59.0%  (1,122,943/1,903,044 bars)
+  progress:  59.2%  (1,127,369/1,903,044 bars)
+  progress:  59.5%  (1,131,538/1,903,044 bars)
+  progress:  59.7%  (1,136,001/1,903,044 bars)
+  progress:  59.9%  (1,140,349/1,903,044 bars)
+  progress:  60.2%  (1,144,830/1,903,044 bars)
+  progress:  60.4%  (1,149,258/1,903,044 bars)
+  progress:  60.6%  (1,153,709/1,903,044 bars)
+  progress:  60.9%  (1,158,149/1,903,044 bars)
+  progress:  61.1%  (1,162,549/1,903,044 bars)
+  progress:  61.3%  (1,167,011/1,903,044 bars)
+  progress:  61.6%  (1,171,410/1,903,044 bars)
+  progress:  61.8%  (1,175,883/1,903,044 bars)
+  progress:  62.0%  (1,180,338/1,903,044 bars)
+  progress:  62.3%  (1,184,770/1,903,044 bars)
+  progress:  62.5%  (1,189,275/1,903,044 bars)
+  progress:  62.7%  (1,193,679/1,903,044 bars)
+  progress:  62.9%  (1,197,934/1,903,044 bars)
+  progress:  63.2%  (1,202,316/1,903,044 bars)
+  progress:  63.4%  (1,206,830/1,903,044 bars)
+  progress:  63.6%  (1,211,268/1,903,044 bars)
+  progress:  63.9%  (1,215,663/1,903,044 bars)
+  progress:  64.1%  (1,218,928/1,903,044 bars)
+  progress:  64.2%  (1,221,937/1,903,044 bars)
+  progress:  64.3%  (1,224,387/1,903,044 bars)
+  progress:  64.5%  (1,227,611/1,903,044 bars)
+  progress:  64.7%  (1,231,976/1,903,044 bars)
+  progress:  65.0%  (1,236,501/1,903,044 bars)
+  progress:  65.2%  (1,240,825/1,903,044 bars)
+  progress:  65.4%  (1,245,295/1,903,044 bars)
+  progress:  65.7%  (1,249,766/1,903,044 bars)
+  progress:  65.9%  (1,254,252/1,903,044 bars)
+  progress:  66.1%  (1,258,754/1,903,044 bars)
+  progress:  66.4%  (1,263,172/1,903,044 bars)
+  progress:  66.6%  (1,267,623/1,903,044 bars)
+  progress:  66.8%  (1,272,006/1,903,044 bars)
+  progress:  67.1%  (1,276,356/1,903,044 bars)
+  progress:  67.3%  (1,280,764/1,903,044 bars)
+  progress:  67.5%  (1,284,988/1,903,044 bars)
+  progress:  67.8%  (1,289,355/1,903,044 bars)
+  progress:  68.0%  (1,293,643/1,903,044 bars)
+  progress:  68.2%  (1,298,116/1,903,044 bars)
+  progress:  68.4%  (1,302,418/1,903,044 bars)
+  progress:  68.7%  (1,306,702/1,903,044 bars)
+  progress:  68.9%  (1,310,971/1,903,044 bars)
+  progress:  69.1%  (1,315,424/1,903,044 bars)
+  progress:  69.3%  (1,319,718/1,903,044 bars)
+  progress:  69.6%  (1,324,237/1,903,044 bars)
+  progress:  69.8%  (1,328,553/1,903,044 bars)
+  progress:  70.0%  (1,333,035/1,903,044 bars)
+  progress:  70.3%  (1,337,406/1,903,044 bars)
+  progress:  70.5%  (1,341,781/1,903,044 bars)
+  progress:  70.7%  (1,346,124/1,903,044 bars)
+  progress:  71.0%  (1,350,630/1,903,044 bars)
+  progress:  71.2%  (1,355,016/1,903,044 bars)
+  progress:  71.4%  (1,359,445/1,903,044 bars)
+  progress:  71.7%  (1,363,900/1,903,044 bars)
+  progress:  71.9%  (1,368,337/1,903,044 bars)
+  progress:  72.1%  (1,372,752/1,903,044 bars)
+  progress:  72.4%  (1,377,067/1,903,044 bars)
+  progress:  72.6%  (1,381,518/1,903,044 bars)
+  progress:  72.8%  (1,385,914/1,903,044 bars)
+  progress:  73.1%  (1,390,459/1,903,044 bars)
+  progress:  73.3%  (1,394,833/1,903,044 bars)
+  progress:  73.5%  (1,399,287/1,903,044 bars)
+  progress:  73.8%  (1,403,640/1,903,044 bars)
+  progress:  74.0%  (1,408,080/1,903,044 bars)
+  progress:  74.2%  (1,412,520/1,903,044 bars)
+  progress:  74.5%  (1,416,902/1,903,044 bars)
+  progress:  74.7%  (1,421,429/1,903,044 bars)
+  progress:  74.9%  (1,425,625/1,903,044 bars)
+  progress:  75.1%  (1,430,129/1,903,044 bars)
+  progress:  75.4%  (1,434,515/1,903,044 bars)
+  progress:  75.6%  (1,439,041/1,903,044 bars)
+  progress:  75.9%  (1,443,541/1,903,044 bars)
+  progress:  76.1%  (1,448,028/1,903,044 bars)
+  progress:  76.3%  (1,452,506/1,903,044 bars)
+  progress:  76.6%  (1,456,926/1,903,044 bars)
+  progress:  76.8%  (1,461,415/1,903,044 bars)
+  progress:  77.0%  (1,465,854/1,903,044 bars)
+  progress:  77.3%  (1,470,376/1,903,044 bars)
+  progress:  77.5%  (1,474,776/1,903,044 bars)
+  progress:  77.7%  (1,479,187/1,903,044 bars)
+  progress:  78.0%  (1,483,636/1,903,044 bars)
+  progress:  78.2%  (1,488,091/1,903,044 bars)
+  progress:  78.4%  (1,492,611/1,903,044 bars)
+  progress:  78.7%  (1,496,950/1,903,044 bars)
+  progress:  78.9%  (1,501,441/1,903,044 bars)
+  progress:  79.1%  (1,505,740/1,903,044 bars)
+  progress:  79.4%  (1,510,237/1,903,044 bars)
+  progress:  79.6%  (1,514,527/1,903,044 bars)
+  progress:  79.8%  (1,518,897/1,903,044 bars)
+  progress:  80.0%  (1,523,293/1,903,044 bars)
+  progress:  80.3%  (1,527,788/1,903,044 bars)
+  progress:  80.5%  (1,531,978/1,903,044 bars)
+  progress:  80.7%  (1,536,416/1,903,044 bars)
+  progress:  81.0%  (1,540,645/1,903,044 bars)
+  progress:  81.2%  (1,544,851/1,903,044 bars)
+  progress:  81.4%  (1,549,226/1,903,044 bars)
+  progress:  81.6%  (1,553,590/1,903,044 bars)
+  progress:  81.9%  (1,558,007/1,903,044 bars)
+  progress:  82.1%  (1,562,407/1,903,044 bars)
+  progress:  82.3%  (1,566,910/1,903,044 bars)
+  progress:  82.6%  (1,571,224/1,903,044 bars)
+  progress:  82.8%  (1,575,770/1,903,044 bars)
+  progress:  83.0%  (1,580,144/1,903,044 bars)
+  progress:  83.3%  (1,584,684/1,903,044 bars)
+  progress:  83.5%  (1,589,011/1,903,044 bars)
+  progress:  83.7%  (1,593,372/1,903,044 bars)
+  progress:  84.0%  (1,597,823/1,903,044 bars)
+  progress:  84.2%  (1,602,152/1,903,044 bars)
+  progress:  84.4%  (1,606,610/1,903,044 bars)
+  progress:  84.7%  (1,611,005/1,903,044 bars)
+  progress:  84.9%  (1,615,322/1,903,044 bars)
+  progress:  85.1%  (1,619,574/1,903,044 bars)
+  progress:  85.3%  (1,623,999/1,903,044 bars)
+  progress:  85.6%  (1,628,335/1,903,044 bars)
+  progress:  85.8%  (1,632,775/1,903,044 bars)
+  progress:  86.0%  (1,636,993/1,903,044 bars)
+  progress:  86.2%  (1,641,321/1,903,044 bars)
+  progress:  86.5%  (1,645,737/1,903,044 bars)
+  progress:  86.7%  (1,649,992/1,903,044 bars)
+  progress:  86.9%  (1,654,467/1,903,044 bars)
+  progress:  87.2%  (1,658,695/1,903,044 bars)
+  progress:  87.4%  (1,663,132/1,903,044 bars)
+  progress:  87.6%  (1,667,359/1,903,044 bars)
+  progress:  87.9%  (1,671,891/1,903,044 bars)
+  progress:  88.1%  (1,675,974/1,903,044 bars)
+  progress:  88.3%  (1,680,409/1,903,044 bars)
+  progress:  88.5%  (1,684,717/1,903,044 bars)
+  progress:  88.8%  (1,689,109/1,903,044 bars)
+  progress:  89.0%  (1,693,553/1,903,044 bars)
+  progress:  89.2%  (1,697,880/1,903,044 bars)
+  progress:  89.5%  (1,702,379/1,903,044 bars)
+  progress:  89.7%  (1,706,699/1,903,044 bars)
+  progress:  89.9%  (1,711,202/1,903,044 bars)
+  progress:  90.1%  (1,715,560/1,903,044 bars)
+  progress:  90.4%  (1,719,844/1,903,044 bars)
+  progress:  90.6%  (1,724,250/1,903,044 bars)
+  progress:  90.8%  (1,728,536/1,903,044 bars)
+  progress:  91.1%  (1,732,947/1,903,044 bars)
+  progress:  91.3%  (1,737,164/1,903,044 bars)
+  progress:  91.5%  (1,740,805/1,903,044 bars)
+  progress:  91.7%  (1,745,056/1,903,044 bars)
+  progress:  91.9%  (1,749,514/1,903,044 bars)
+  progress:  92.2%  (1,753,909/1,903,044 bars)
+  progress:  92.4%  (1,758,442/1,903,044 bars)
+  progress:  92.6%  (1,762,877/1,903,044 bars)
+  progress:  92.9%  (1,767,190/1,903,044 bars)
+  progress:  93.1%  (1,771,445/1,903,044 bars)
+  progress:  93.3%  (1,775,703/1,903,044 bars)
+  progress:  93.5%  (1,779,981/1,903,044 bars)
+  progress:  93.8%  (1,784,372/1,903,044 bars)
+  progress:  94.0%  (1,788,804/1,903,044 bars)
+  progress:  94.2%  (1,792,968/1,903,044 bars)
+  progress:  94.4%  (1,797,086/1,903,044 bars)
+  progress:  94.7%  (1,801,342/1,903,044 bars)
+  progress:  94.9%  (1,805,537/1,903,044 bars)
+  progress:  95.1%  (1,809,799/1,903,044 bars)
+  progress:  95.3%  (1,814,091/1,903,044 bars)
+  progress:  95.5%  (1,818,330/1,903,044 bars)
+  progress:  95.8%  (1,822,639/1,903,044 bars)
+  progress:  96.0%  (1,826,954/1,903,044 bars)
+  progress:  96.2%  (1,831,407/1,903,044 bars)
+  progress:  96.5%  (1,835,712/1,903,044 bars)
+  progress:  96.7%  (1,840,131/1,903,044 bars)
+  progress:  96.9%  (1,844,459/1,903,044 bars)
+  progress:  97.2%  (1,848,830/1,903,044 bars)
+  progress:  97.4%  (1,853,185/1,903,044 bars)
+  progress:  97.6%  (1,857,558/1,903,044 bars)
+  progress:  97.8%  (1,861,934/1,903,044 bars)
+  progress:  98.1%  (1,866,400/1,903,044 bars)
+  progress:  98.3%  (1,870,802/1,903,044 bars)
+  progress:  98.5%  (1,875,251/1,903,044 bars)
+  progress:  98.8%  (1,879,775/1,903,044 bars)
+  progress:  99.0%  (1,884,187/1,903,044 bars)
+  progress:  99.2%  (1,888,695/1,903,044 bars)
+  progress:  99.5%  (1,893,106/1,903,044 bars)
+  progress:  99.7%  (1,897,534/1,903,044 bars)
+  progress:  99.9%  (1,901,891/1,903,044 bars)
+  progress: 100.0%  (1,903,044/1,903,044 bars)
+Backtest Summary
+----------------
+
+Period:               2025-08-15 08:00:00+00:00 -> 2026-08-14 23:59:00+00:00
+Symbols:              AAPL, AMD, AMZN, GOOGL, META, MSFT, NVDA, PYPL, STX, TSLA
+Bars processed:       1,903,044
+Signals generated:    5021
+Signals published:    3
+Trades executed:      0
+Throttle fidelity:    LIMITED (flushed once per 1-minute bar-close, not continuously every throttle_window_seconds)
+
+Execution assumptions
+----------------------
+Entry slippage:       5.0 bps
+Exit slippage:        5.0 bps
+Spread:               10.0 bps
+Same-bar resolution:  STOP_FIRST
+EOD flatten:          ENABLED
+
+Timezone
+--------
+Input timezone:       UTC
+Internal timezone:    UTC
+Session timezone:     America/New_York
+
+Reproducibility
+----------------
+git_commit:           f7ff865db3d558015c975e8497fbb2ae1236998f
+backtester_version:   0.1.0
+strategy_version:     2ae6216bca70
+config_hash:          3556debe52af
+dataset_hash:         5e5412a960bf
+run_timestamp:        2026-08-27T14:27:12.989146+00:00
+
+Portfolio disclaimer
+---------------------
+This backtest evaluates TRADE-LEVEL strategy performance (R-multiples per signal). It does NOT model starting capital, position sizing, maximum portfolio exposure, concurrent-position limits, or buying power. Aggregate R/expectancy figures here describe the strategy's per-trade edge, not a realistic portfolio-level return.
+
+No trades were executed -- see `rejections` for the gate funnel (no fabricated metrics below).
+Report files written:
+  trades_csv           results\task74s_bounded_long_only_evaluation\stage3_replay\task74s_10symbol_full_trades.csv
+  trades_json          results\task74s_bounded_long_only_evaluation\stage3_replay\task74s_10symbol_full_trades.json
+  summary_json         results\task74s_bounded_long_only_evaluation\stage3_replay\task74s_10symbol_full_summary.json
+  summary_txt          results\task74s_bounded_long_only_evaluation\stage3_replay\task74s_10symbol_full_summary.txt
+  equity_curve_csv     results\task74s_bounded_long_only_evaluation\stage3_replay\task74s_10symbol_full_equity_curve.csv
+  rejected_signals_csv results\task74s_bounded_long_only_evaluation\stage3_replay\task74s_10symbol_full_rejected_signals.csv
+  data_quality_json    results\task74s_bounded_long_only_evaluation\stage3_replay\task74s_10symbol_full_data_quality.json
+  results_html         results\task74s_bounded_long_only_evaluation\stage3_replay\task74s_10symbol_full_results.html
+
+Open results\task74s_bounded_long_only_evaluation\stage3_replay\task74s_10symbol_full_results.html in a browser to view the full report.
+
+Research telemetry written (Task 10, observational only):
+  volatility_telemetry results\task74s_bounded_long_only_evaluation\stage3_replay\task74s_10symbol_full_research_volatility_telemetry.csv (1,901,854 rows)
+  candidate_telemetry  results\task74s_bounded_long_only_evaluation\stage3_replay\task74s_10symbol_full_research_candidate_telemetry.csv (5,021 rows)

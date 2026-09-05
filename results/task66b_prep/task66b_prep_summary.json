@@ -1,0 +1,117 @@
+{
+  "task": "Task 66B-PREP -- Full application E2E readiness audit + deterministic startup hardening",
+  "branch": "research/talonx-strategy-validation",
+  "starting_sha": "c431901f69f55ca12e94c366129e6f5dbe1d8f71",
+  "cleanup_authority": {
+    "active_talonx_or_piv_processes_found": 0,
+    "scheduled_talonx_or_piv_jobs_found": 1,
+    "scheduled_jobs_removed": ["cron job 31579260 -- a one-shot Task 66B PIV-runtime market-open session scheduled for 2026-08-25 09:07 ET, created before this task's objective changed from PIV to the normal full application; removed because it would have launched the wrong (narrower) runtime and this task explicitly forbids scheduling tomorrow's run"],
+    "redis_touched": false,
+    "ambiguous_ownership_items": []
+  },
+  "full_app_runtime_audit": {
+    "components_documented": 20,
+    "normal_runtime_entrypoint": "run_talonx.py main()",
+    "market_provider_selection": "Polygon WebSocket if POLYGON_API_KEY configured, else yfinance polling (automatic mid-run fallback on auth failure/exhausted reconnects)",
+    "premarket_provider": "yfinance (talonx_ingest.poller.fetch_watchlist_quotes, vectorized full-watchlist)",
+    "quant_path": "talonx_quant.consumer.QuantScanner + talonx_quant.fundamental_consumer.FundamentalScanner",
+    "brain_path": "talonx_brain.consumer.ResearchAgent (Gemini or Ollama, ChromaDB retrieval) -- degrades gracefully in production, hard-required by talonx_ops.preflight for E2E validation",
+    "core_path": "talonx_core.consumer.DecisionEngine",
+    "dispatch_path": "talonx_dispatch.consumer.DispatchAgent (owns TelegramReplyListener internally, dispatch_agent=self -- already full-parity, no restoration needed)",
+    "paper_execution_path": "talonx_paper.consumer.PaperTradingEngine / LongTermPaperEngine -- LOCAL simulated ledger (SQLite), never Alpaca",
+    "telegram_path": "Outbound: talonx_dispatch.telegram_client. Inbound /ping: talonx_dispatch.telegram_listener.TelegramReplyListener, started inside DispatchAgent.run()",
+    "differs_from_piv_in": ["market-data provider path", "broker/paper execution path", "Brain/Core/Dispatch participation", "readiness/staleness architecture", "reconciliation architecture"],
+    "runtimes_merged": false
+  },
+  "startup_hardening": {
+    "initial_quant_preseed_ordered_before_live_evaluation": true,
+    "preseed_verification_implemented": true,
+    "partial_preseed_fail_closed": true,
+    "zero_ready_startup_blocks_e2e_classification_not_process_start": true,
+    "reactive_preseed_preserved": true,
+    "synthetic_bars_created": false,
+    "no_double_preseed_of_initial_set": true,
+    "implementation": "talonx_quant/preseed_ordering.py::run_initial_preseed(), awaited in run_talonx.py's main() before any asyncio task is created",
+    "real_smoke_test": "results/task66b_prep/initial_preseed_report.json -- AAPL and MSFT both reached 120/120 1m bars, 200/200 HTF bars via real yfinance",
+    "tests_passed": 12
+  },
+  "full_app_preflight": {
+    "status_at_dirty_tree": "FULL_APP_E2E_BLOCKED (tracked_tree_clean only -- this task's own uncommitted work)",
+    "checks_total": 23,
+    "report_path": "results/task66b_prep/full_app_preflight.json",
+    "tests_passed": 11,
+    "note": "First manual run used the wrong interpreter ('python' resolved to a bare Python 3.14 install missing psutil/langchain-google-genai) and produced two false-negative checks -- caught immediately, corrected by re-running under this project's real py -3.12 interpreter (same one every other task in this repo uses), which passed both. Documented here for transparency, not omitted."
+  },
+  "brain_hard_requirement": {
+    "configured_provider": "gemini",
+    "operational_in_this_environment": true,
+    "production_degrade_philosophy_changed": false,
+    "note": "talonx_ops.preflight adds a stricter validation-time bar on top of run_talonx.py's existing degrade-and-continue behavior; the latter is completely unchanged"
+  },
+  "provider_and_execution_path_explicitness": {
+    "market_data_provider_configured": "YFINANCE_POLLING",
+    "paper_execution_path": "LOCAL_SIMULATED_LEDGER (talonx_paper, SQLite -- not a broker)",
+    "logged_at_startup": true,
+    "written_to_runtime_metadata_json": true,
+    "surfaced_in_eod_report": true,
+    "real_bug_found_and_fixed": "generate_eod_report.py's render_markdown() had an unbalanced list-literal bracket introduced while adding the new Run Metadata section (list closed with ']' instead of '])'), causing a SyntaxError on import. Caught by the new eod_report_capability preflight check on its first real run, fixed immediately, verified by re-running the check and re-importing the module."
+  },
+  "cross_path_comparator": {
+    "implemented": true,
+    "stages_total": 13,
+    "piv_applicable_stages": 4,
+    "read_only": true,
+    "tests_passed": 12,
+    "smoke_report_path": "results/task66b_prep/comparator_smoke_report.json",
+    "smoke_result": {"MISSING_EVENT": 4, "NOT_APPLICABLE_TO_PIV": 9, "MATCH": 0},
+    "known_gaps": "No full-app run has occurred yet, so 0 MATCH is the correct honest result today, not a defect. A real bug was found and fixed during this task's own smoke-testing: the full-app evidence loader initially attributed hollow 'evidence' to every watchlist ticker (39 symbols) just for being on the watchlist, with zero real pipeline activity -- fixed to only attach a symbol's evidence when at least one real stage has data, re-verified to correctly report 0 full-app symbols with evidence today."
+  },
+  "telegram_precheck": {
+    "inbound_ping_already_fully_wired": true,
+    "restoration_work_needed": false,
+    "duplicate_listener_risk": "Only if a separate talonx_piv session polls the SAME bot token concurrently -- verified zero such sessions active at end of this task",
+    "fields_ping_can_report_tomorrow": "uptime, CPU/RAM, WS heartbeat, real Quant/Core/Dispatch/Telegram pipeline funnel -- NOT PIV's 'unknown' placeholders for brain/core/dispatch, since those modules genuinely run in the full app"
+  },
+  "eod_reporting_readiness": {
+    "generate_eod_report_py_verified_capable_of": ["Quant suppression funnel", "Core suppression/actionable counts", "Dispatch alerts", "Telegram sent/failed", "Paper executed/ignored", "per-symbol verdicts", "portfolio summary"],
+    "metadata_added": ["market provider (configured)", "paper execution path", "commit SHA", "run mode (FULL_APP)", "session start time"],
+    "metadata_source": "talonx_ops/runtime_metadata.py -- best-effort, written by run_talonx.py's main() at startup, read optionally by generate_eod_report.py (degrades to 'unknown' if missing, same pattern every other optional store there already uses)",
+    "strategy_output_changed": false
+  },
+  "tests": {
+    "new_focused_tests": 45,
+    "new_focused_files": ["tests/test_task66b_prep_preseed_ordering.py (12)", "tests/test_task66b_prep_preflight.py (11)", "tests/test_task66b_prep_comparator.py (12)", "tests/test_task66b_prep_provider_and_metadata.py (10)"],
+    "existing_piv_suite_reverified": 101,
+    "full_regression_passed": 2029,
+    "full_regression_failed": 1,
+    "full_regression_skipped": 1,
+    "full_regression_xfailed": 15,
+    "new_failures": 0,
+    "known_pre_existing_failure": "tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset",
+    "delta_from_previous_baseline": {"previous_full_suite_passed": 1984, "new_tests_added": 45, "new_total_passed": 2029, "arithmetic_check": "1984 + 45 = 2029 -- matches exactly"}
+  },
+  "integrity": {
+    "protected_alpha_files_unchanged": true,
+    "protected_files_checked": ["talonx_quant/strategy.py", "talonx_quant/indicators.py", "talonx_quant/consumer.py", "talonx_quant/config.py", "talonx_quant/fprc_v1.py", "talonx_quant/orpb_v1.py"],
+    "orpb_fingerprint_unchanged": true,
+    "fprc_fingerprint_unchanged": true,
+    "alpha_tuning_performed": false,
+    "live_session_started": false,
+    "scheduler_created": false,
+    "real_capital_adapter_introduced": false
+  },
+  "safety_at_task_end": {
+    "active_full_app_or_piv_runners": 0,
+    "scheduled_talonx_jobs": 0,
+    "paper_or_piv_broker_open_orders": 0,
+    "paper_or_piv_broker_open_positions": 0
+  },
+  "conclusion": {
+    "full_app_readiness": "FULL_APP_E2E_READY once this task's own commit lands (only blocker at dirty-tree time was tracked_tree_clean)",
+    "tomorrow_target_start": "~07:00 ET / ~12:00 UK",
+    "tomorrow_validation_target": "Market -> Quant -> Brain -> Core -> Dispatch -> Paper -> Telegram (run_talonx.py, not talonx_piv)",
+    "alpha_status": "UNPROVEN",
+    "not_scheduled_by_this_task": true,
+    "not_started_by_this_task": true
+  }
+}

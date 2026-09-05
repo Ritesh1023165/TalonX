@@ -645,6 +645,16 @@ class DispatchAgent:
             logger.warning("Dropping unparseable alert: %s", exc)
             return
 
+        # Task 87B FC_01: an at-least-once redelivery of an alert we already
+        # fully processed must NOT record a second row or push a second
+        # Telegram. Still count it as "received" so the metric matches what
+        # Core's outbox sent, and ACK it so the outbox can mark it SENT.
+        if self.store is not None and self.store.alert_outbox_id_already_processed(alert.outbox_id):
+            await _incr_metric(self._client, "dispatch", "received")
+            await _incr_metric(self._client, "dispatch", "duplicate_alert_suppressed")
+            logger.info("Duplicate alert %s (outbox_id=%s) -- already processed, suppressed", alert.ticker, alert.outbox_id)
+            return
+
         self._alerts_processed += 1
         await _incr_metric(self._client, "dispatch", "received")
         alert_id = self.store.record_alert(alert)
@@ -652,6 +662,8 @@ class DispatchAgent:
             "Recorded alert #%d: %s %s (%s)",
             alert_id, alert.ticker, alert.action.value, alert.severity.value,
         )
+        if self.store is not None:
+            self.store.mark_alert_outbox_id_processed(alert.outbox_id, self.config.alerts_channel)
 
         await self._maybe_send_telegram(alert, alert_id)
 
@@ -662,6 +674,12 @@ class DispatchAgent:
             logger.warning("Dropping unparseable long-term alert: %s", exc)
             return
 
+        if self.store is not None and self.store.alert_outbox_id_already_processed(alert.outbox_id):
+            await _incr_metric(self._client, "dispatch", "received")
+            await _incr_metric(self._client, "dispatch", "duplicate_alert_suppressed")
+            logger.info("Duplicate long-term alert %s (outbox_id=%s) -- already processed, suppressed", alert.ticker, alert.outbox_id)
+            return
+
         self._long_term_alerts_processed += 1
         await _incr_metric(self._client, "dispatch", "received")
         alert_id = self.store.record_long_term_alert(alert)
@@ -669,6 +687,8 @@ class DispatchAgent:
             "Recorded long-term alert #LT%d: %s %s (%s)",
             alert_id, alert.ticker, alert.action.value, alert.severity.value,
         )
+        if self.store is not None:
+            self.store.mark_alert_outbox_id_processed(alert.outbox_id, self.config.alerts_channel_long_term)
 
         await self._maybe_send_long_term_telegram(alert, alert_id)
 

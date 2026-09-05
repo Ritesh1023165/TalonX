@@ -1,0 +1,18 @@
+{
+  "blocker_code": "EVALUATION_WINDOWS_NOT_COMPLETE_AS_OF_ATTEMPT_DATE",
+  "bootstrap_95_ci": null,
+  "classification": "VALIDATION_BLOCKED",
+  "cost_feasibility": "NOT_RUN",
+  "deployment": "MONDAY_DECISION_SHADOW_ONLY",
+  "five_bps_expectancy": null,
+  "five_bps_profit_factor": null,
+  "mandatory_gates": "FAIL",
+  "market_data_downloaded": false,
+  "replay_started": false,
+  "replication_required": false,
+  "task": 61,
+  "top3_winner_sensitivity": null,
+  "trades": null,
+  "window_manifest_sha256": "8f320fbf6dceff545afa940157b9926a016e7a91e42d2b17c8889275bc01749b",
+  "window_robustness": "NOT_RUN"
+}

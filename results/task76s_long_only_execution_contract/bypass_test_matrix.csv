@@ -1,0 +1,32 @@
+attempted_bypass,path_exercised,expected_outcome,test,result
+open a short (side=short/sell_short/etc.),direct order_intent,rejected UNSUPPORTED_ACTION_INTENT,test_unsupported_action_intent_rejected,PASS
+open a short (explicit case),direct order_intent,rejected UNSUPPORTED_ACTION_INTENT,test_direct_short_open_request_rejected_no_side_value_opens_a_short,PASS
+SELL while flat,direct order_intent,rejected SELL_WHILE_FLAT,test_direct_sell_while_flat_rejected,PASS
+oversized SELL,direct order_intent,rejected OVERSIZED_OR_DUPLICATE_SELL,test_oversized_sell_rejected,PASS
+sell exactly the held quantity,direct order_intent,permitted,test_exact_available_quantity_sell_permitted,PASS
+duplicate SELL with a different signal_id,direct order_intent,rejected OVERSIZED_OR_DUPLICATE_SELL,test_duplicate_sell_request_with_different_signal_id_rejected,PASS
+partial fill then a further oversized sell,direct order_intent + apply_broker_update,rejected (SELL_WHILE_FLAT -- pre-existing partial-close accounting collapses to CLOSED; see remaining_integration_work.md),test_partial_fill_of_a_closing_sell_still_blocks_a_second_sell,PASS
+sell for more than held (reverse into a short),direct order_intent,rejected OVERSIZED_OR_DUPLICATE_SELL,test_reversing_a_long_into_a_short_via_oversell_is_blocked,PASS
+invalid quantities (0/negative/NaN/inf),direct order_intent,rejected INVALID_QUANTITY,test_invalid_quantities_rejected,PASS
+boolean quantity (True/False as 1/0),direct order_intent,rejected INVALID_QUANTITY,test_bool_quantity_rejected,PASS
+unauthorized source (BRAIN/GEMINI/unknown),direct order_intent,rejected UNAUTHORIZED_SOURCE,test_unauthorized_source_rejected,PASS
+Brain-originated order modification,direct order_intent,rejected UNAUTHORIZED_SOURCE,test_brain_originated_order_modification_rejected,PASS
+known legitimate sources (STRATEGY/PIV_LIFECYCLE_PROBE),direct order_intent,permitted,test_known_sources_still_permitted,PASS
+buy while already holding (pyramiding),direct order_intent,rejected ALREADY_HOLDING_NO_PYRAMIDING,test_buy_while_already_holding_rejected_no_pyramiding,PASS
+second buy while first still pending (race),direct order_intent,rejected PENDING_ENTRY_EXISTS,test_second_buy_while_first_still_pending_rejected,PASS
+stale local belief of ownership (sell after already-closed),direct order_intent,rejected SELL_WHILE_FLAT,test_stale_local_state_does_not_prove_ownership,PASS
+new entry with paper_entry_enabled=false,direct order_intent,rejected PAPER_ENTRY_DISABLED_FOR_TICKER,test_paper_entry_disabled_for_ticker_blocks_new_buy,PASS
+disabling entry mid-position must not block the exit,direct order_intent,exit permitted,test_paper_entry_disabled_does_not_block_an_existing_sell,PASS
+unexpected broker-reported short blocks new entries,reconcile() + order_intent,rejected UNEXPECTED_SHORT_BLOCKS_NEW_ENTRIES,test_unexpected_short_blocks_all_new_entries,PASS
+real-capital account mode,AlpacaPaperClient.verify_paper_identity,rejected (PaperGuardError),test_real_capital_account_mode_rejected,PASS
+unknown/non-paper endpoint,AlpacaPaperClient.verify_paper_identity,rejected (PaperGuardError),test_unknown_non_paper_endpoint_rejected,PASS
+probe path bypassing paper_entry_disabled,lifecycle_probe.run_piv_lifecycle_probe,not run (blocked at the same boundary),test_probe_path_cannot_bypass_paper_entry_disabled,PASS
+probe path bypassing already-holding,lifecycle_probe.run_piv_lifecycle_probe,not run (blocked),test_probe_path_cannot_bypass_already_holding,PASS
+manual/direct caller as a bypass attempt,direct order_intent (standing in for a future manual/CLI path),rejected PAPER_ENTRY_DISABLED_FOR_TICKER,test_manual_direct_order_intent_call_is_not_a_bypass,PASS
+disable entries after opening -- protective exit,DecisionEngine stop exit,exit still executes,test_disable_entries_after_opening_protective_exit_still_works,PASS
+entry never enabled -- existing position still managed,DecisionEngine stop exit,exit still executes,test_entry_readiness_failure_does_not_disable_position_management,PASS
+target exit unaffected by the new contract,DecisionEngine target exit,exit still executes,test_target_hit_triggers_controlled_exit_unaffected_by_contract,PASS
+EOD retry duplicating cancel/close,run_eod_lifecycle called twice,idempotent -- no duplicate cancel/close,test_eod_retries_do_not_duplicate_cancel_close,PASS
+EOD retry losing original session identity,run_eod_lifecycle called twice,session_id unchanged across retries,test_original_session_id_remains_attached_across_retry,PASS
+reconciliation mismatch (zombie broker position) forcing a false PASSED,run_eod_lifecycle,resolves FAILED not PASSED; no SESSION_COMPLETED,test_reconciliation_mismatch_prevents_successful_terminal_verdict,PASS
+broker outage during cancel forcing a false PASSED,run_eod_lifecycle,resolves INCONCLUSIVE not PASSED,test_broker_failure_during_cancel_resolves_inconclusive_not_passed,PASS

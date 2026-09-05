@@ -1,0 +1,31 @@
+{
+  "contract": "EXECUTION_ECONOMICS_CONTRACT",
+  "problem": "Future NATURAL paper trades need profitability-grade evidence (slippage, gross/net PnL, R-multiples) captured automatically -- Task69P had zero natural trades so this was never exercised.",
+  "where_captured": "talonx_piv/lifecycle.py PaperLifecycle.apply_broker_update(), fed by optional reference_price/stop_price/signal_timestamp/strategy_id/horizon kwargs added to PaperLifecycle.order_intent() (plumbed from talonx_piv/decision_engine.py's _handle_entry/_check_exit, which have direct access to the QuantSignal that produced the order).",
+  "fields_on_POSITION_OPENED_event": {
+    "reference_price": "the QuantSignal.price at the moment the entry signal fired (the 'expected entry price')",
+    "slippage_abs": "fill_price - reference_price",
+    "slippage_bps": "slippage_abs / reference_price * 10000",
+    "strategy_id": "signal.signal_type.value (e.g. MACD_BULLISH_CROSS) -- the only strategy-variant identifier QuantSignal actually carries; not fabricated",
+    "horizon": "INTRADAY_SHORT (NATURAL_STRATEGY_HORIZON constant -- QuantScanner is intraday-only, see notification_contract.json)"
+  },
+  "fields_on_POSITION_CLOSED_event": {
+    "reference_price": "the exit's expected reference price -- position.stop_price if the exit reason was STOP, position.target_price if TARGET, else None (e.g. end-of-session forced flatten has no single 'expected' exit price)",
+    "slippage_abs / slippage_bps": "same formula as entry, against the exit reference_price",
+    "gross_pnl": "(exit_fill_price - entry_fill_price) * entry_quantity -- LONG_ONLY, so this is always a long P&L calculation",
+    "estimated_transaction_cost": "0.0 -- the PAPER broker models zero commissions/fees; carried explicitly (not omitted) so a future real cost model only has to change this one value, not the schema",
+    "net_pnl": "gross_pnl - estimated_transaction_cost (== gross_pnl today)",
+    "holding_seconds": "wall-clock seconds between the entry fill being recorded and the exit fill being recorded",
+    "gross_r / net_r": "gross_pnl / ((entry_price - stop_price) * quantity), and net_pnl / same denominator -- ONLY computed when the position has a defined stop_price (i.e. the strategy that opened it passed one). If no stop_price was ever recorded for the position, gross_r and net_r are explicitly None -- NEVER a fabricated 0 or an inferred stop. See PERMANENT PRODUCT TARGET instruction 'For strategies with no defined stop: do not fabricate R.'"
+  },
+  "quantity_handling": "PIV_QUANTITY is a fixed 1.0 share/contract for every natural PIV trade (operational-parity harness, not alpha-driven sizing -- unchanged from Task65B) -- gross_pnl/net_pnl scale with this fixed quantity, not a real position-sizing model.",
+  "probe_traffic_exclusion": "PIV_LIFECYCLE_PROBE orders flow through the exact same lifecycle.py code path (so execution-diagnostics fields ARE populated on probe fills too, which is useful for validating the mechanism itself) but every probe event still carries alpha_evidence=false and source=PIV_LIFECYCLE_PROBE, and reporting.build_session_report's natural_strategy vs piv_test_traffic split ensures probe P&L is never folded into natural_strategy.gross_pnl/net_pnl.",
+  "known_gaps_deferred": {
+    "real_transaction_cost_model": "Alpaca paper trading has no commissions; a future real-cost estimate (spread/slippage-based, or a modeled commission schedule) would replace the hardcoded 0.0 -- deferred, see production_readiness_gaps.json PRG-05",
+    "position_sizing_pnl_normalization": "PIV_QUANTITY=1.0 means gross_pnl is in raw dollars-per-share terms, not normalized to account risk % -- acceptable for PIV lifecycle validation, NOT sufficient on its own for Task70 profitability conclusions (Task70 should use its own dedicated backtest/holdout P&L accounting, not this PIV execution-economics capture, which is operational-evidence-grade, not research-grade)"
+  },
+  "tests": [
+    "tests/test_task69q_evidence_upgrade.py::test_execution_economics_captured_on_position_closed",
+    "tests/test_task69q_evidence_upgrade.py::test_no_fabricated_r_when_strategy_defines_no_stop"
+  ]
+}

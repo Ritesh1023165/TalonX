@@ -1,0 +1,27 @@
+{
+  "contract": "QUANT_DECISION_FUNNEL_CONTRACT",
+  "problem": "Task69P had candidates=1, published=0 but no accounting trail proving where the other candidate(s) went -- consumer.py's rejection reasons were never tallied by PIV.",
+  "non_invasive_tap_design": {
+    "principle": "talonx_quant/consumer.py, strategy.py, indicators.py, config.py are PROTECTED and untouched. Every candidate consumer.py evaluates terminates in exactly one of two calls it already makes: _record_rejection() (publishes a RejectedCandidateEvent to config.rejected_candidates_channel, 'talonx:quant:rejected') or _publish_signal() (publishes a QuantSignal to config.signals_channel, 'talonx:signals:quant'). talonx_piv/decision_engine.py's DecisionEngine now subscribes to BOTH channels (it already subscribed to signals_channel; rejected_candidates_channel is the only addition) and tallies from the outside, with zero changes to consumer.py's control flow.",
+    "location": "talonx_piv/decision_engine.py: DecisionEngine.start() subscribes both channels; flush_and_collect() drains both and tallies; funnel_summary() returns the reconciled totals."
+  },
+  "invariant": "candidates = published + rejected + pending + errored",
+  "field_definitions": {
+    "published": "count of QuantSignal messages this subscriber received on signals_channel (== natural_signal_count)",
+    "rejected": "sum of RejectedCandidateEvent.count for every message received on rejected_candidates_channel (the schema's own `count` field aggregates repeated identical rejections)",
+    "pending": "always 0 in this runtime -- QuantScanner's throttle window is flushed synchronously once per poll tick (_flush_throttle_window), so there is no cross-tick candidate state that is neither published nor rejected by the time flush_and_collect returns. If a future QuantScanner change introduces genuine async/deferred candidate state, this field must be revisited.",
+    "errored": "count of messages received on either channel that failed to parse as the expected schema (QuantSignal / RejectedCandidateEvent) -- a defensive counter, not expected to be nonzero in normal operation",
+    "unaccounted_candidates": "candidates - (published + rejected + pending + errored). By this construction it is definitionally 0 UNLESS a message published by QuantScanner was never delivered to (or never drained by) this subscriber at all -- e.g. a Redis pub/sub delivery gap between publish and subscribe, or a subscriber that wasn't yet subscribed when a message was published. This is therefore a genuine, meaningful reconciliation check: it measures pub/sub delivery integrity, not just internal bookkeeping. If it is ever >0 in a live session report, `reporting.build_session_report` sets quant_funnel_flag=UNACCOUNTED_CANDIDATES_DETECTED."
+  },
+  "additional_telemetry_captured": {
+    "evaluation_cycles": "incremented once per DecisionEngine.on_bars() call (i.e. once per poll tick that had >=1 decision-eligible symbol with a new bar)",
+    "symbols_evaluated_total": "sum of len(bars) across all on_bars() calls -- NOT distinct symbols; a symbol evaluated on 10 ticks counts 10 times, matching 'how much evaluation work happened' rather than 'how many distinct tickers'",
+    "rejected_breakdown": "dict[reason_code -> count], using consumer.py's EXISTING reason strings verbatim (e.g. LOW_VOLATILITY_REGIME, LOW_CONFLUENCE, LOW_RISK_REWARD, OPENING_BLACKOUT, CLOSING_BLACKOUT, PREMARKET_PROVIDER_UNSUPPORTED, PREMARKET_LIQUIDITY, TREND_GATE, LOSS_LOCKOUT, COOLDOWN, HTF_DATA_UNAVAILABLE, US_MARKET_SESSION_CLOSED, THROTTLE) -- no threshold or gate was touched, only observed"
+  },
+  "persistence": "DecisionEngine only lives for the duration of `cli.py start`'s live loop; SessionRunner writes funnel_summary() to config.state_dir/quant_funnel_report.json at end of run so the separate `cli.py eod` invocation (a different process) can fold it into the session report.",
+  "no_thresholds_changed": "Confirmed: no consumer.py/strategy.py file was modified. This tap only observes what QuantScanner already decided to publish/reject under its existing, unmodified gates.",
+  "tests": [
+    "tests/test_task69q_evidence_upgrade.py::test_quant_funnel_reconciles_published_plus_rejected",
+    "tests/test_task69q_evidence_upgrade.py::test_quant_funnel_counts_unparseable_messages_as_errored"
+  ]
+}

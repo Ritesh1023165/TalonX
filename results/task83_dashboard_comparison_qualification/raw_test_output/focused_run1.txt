@@ -1,0 +1,8 @@
+
+tests/test_task83_browser_dashboard.py::test_compare_view_not_run_when_no_evidence
+  C:\workspace\TalonX\tests\test_task83_browser_dashboard.py:198: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["compare_config"] = cfg
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+133 passed, 188 warnings in 7.50s

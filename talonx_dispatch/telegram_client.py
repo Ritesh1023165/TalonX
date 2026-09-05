@@ -52,11 +52,22 @@ class TelegramClient:
     def is_configured(self) -> bool:
         return bool(self.config.telegram_bot_token and self.config.telegram_chat_id)
 
-    async def send(self, text: str) -> None:
+    async def send(self, text: str, parse_mode: str | None = ParseMode.MARKDOWN) -> None:
         """
         No-op if not configured. Raises TelegramSendError after
         exhausting retries on a transient failure, or immediately on a
         non-retryable one (bad token, bot blocked/kicked from the chat).
+
+        `parse_mode` defaults to legacy Markdown (existing behavior, for
+        every pre-existing caller -- formatted alert pushes/alert-detail
+        replies that already escape their own Markdown). Pass `None` for
+        text that may contain arbitrary/dynamic content (ticker symbols,
+        status strings) not guaranteed to be valid Markdown -- e.g. an
+        unescaped `_`/`*`/`` ` ``/`[` in the text otherwise makes Telegram
+        reject the ENTIRE message with a 400 "can't parse entities" error
+        (confirmed live, 2026-08-18 incident: talonx_dispatch/telegram_listener.py's
+        /ping diagnostics embed the raw session-state label, e.g.
+        'pre_market', whose underscore broke Markdown parsing every time).
         """
         if not self.is_configured:
             return
@@ -68,7 +79,7 @@ class TelegramClient:
                     await bot.send_message(
                         chat_id=self.config.telegram_chat_id,
                         text=text,
-                        parse_mode=ParseMode.MARKDOWN,
+                        parse_mode=parse_mode,
                         disable_web_page_preview=True,
                     )
                 return

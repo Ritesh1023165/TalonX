@@ -59,6 +59,8 @@ from talonx_quant.store import QuantStateStore
 from talonx_watchlist.config import WatchlistConfig
 from talonx_watchlist.store import TickerWatchlistStore
 
+from talonx_ops.runtime_metadata import read_runtime_metadata
+
 logger = logging.getLogger("generate_eod_report")
 
 DEFAULT_TZ = "America/New_York"
@@ -116,6 +118,7 @@ class EODReport:
     phase2_available: bool = False
     valuation_snapshots: list[ValuationSnapshot] = field(default_factory=list)
     long_term_portfolio_summary: dict = field(default_factory=dict)
+    run_metadata: dict | None = None
 
 
 def _day_bounds(date_str: str, tz_name: str) -> tuple[datetime, datetime]:
@@ -292,6 +295,12 @@ def build_report(
         phase2_available=phase2_available,
         valuation_snapshots=_build_valuation_snapshots(audit_store),
         long_term_portfolio_summary=_build_long_term_portfolio_summary(paper_store),
+        # Task 66B-PREP Part 10: best-effort only -- None if run_talonx.py
+        # never wrote it (older run, write failed, or this report is being
+        # generated against a talonx_piv session, which doesn't write this
+        # file at all -- distinguishing full-app runs from PIV ones is
+        # exactly the point). Never fabricated if missing.
+        run_metadata=read_runtime_metadata(),
     )
 
 
@@ -308,6 +317,23 @@ def render_markdown(report: EODReport) -> str:
         f"- Trades executed: {report.total_trades_executed}",
         f"- Trades ignored: {report.total_trades_ignored}",
         f"- Telegram: {report.telegram_sent} sent, {report.telegram_failed} failed",
+        "",
+    ]
+    lines.append("## Run metadata")
+    lines.append("")
+    if report.run_metadata:
+        meta = report.run_metadata
+        lines.append(f"- Run mode: {meta.get('run_mode', 'unknown')}")
+        lines.append(f"- Commit SHA: {meta.get('commit_sha') or 'unknown'}")
+        lines.append(f"- Started at: {meta.get('started_at', 'unknown')}")
+        lines.append(f"- Market data provider (configured): {meta.get('market_data_provider_configured', 'unknown')}")
+        lines.append(f"- Paper execution path: {meta.get('paper_execution_path', 'unknown')}")
+    else:
+        lines.append(
+            "_Not available -- no runtime_metadata.json found (older run, write failed, or "
+            "this report covers a talonx_piv session, which does not write this file)._"
+        )
+    lines.extend([
         "",
         "## Portfolio summary",
         "",
@@ -332,7 +358,7 @@ def render_markdown(report: EODReport) -> str:
         "",
         "## Valuation & Margin of Safety Radar",
         "",
-    ]
+    ])
 
     if report.valuation_snapshots:
         lines.append(

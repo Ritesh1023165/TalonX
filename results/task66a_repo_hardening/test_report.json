@@ -1,0 +1,47 @@
+{
+  "focused_tests": {
+    "readiness_restart_persistence": {"file": "tests/test_task66a_readiness_persistence.py", "count": 17, "result": "PASSED"},
+    "readiness_restart_integration": {"file": "tests/test_task65_session_runner.py::test_readiness_survives_simulated_process_restart", "count": 1, "result": "PASSED"},
+    "runtime_parity_telegram_inbound": {"file": "tests/test_task66a_runtime_parity.py", "count": 8, "result": "PASSED"},
+    "existing_task64_65_65b_piv_suite": {
+      "files": [
+        "tests/test_task64_piv.py (22)", "tests/test_task65_piv.py (12)", "tests/test_task65_session_runner.py (10, incl. the new integration test)",
+        "tests/test_task65b_decision_engine.py (8)", "tests/test_task65b_lifecycle_probe.py (10)",
+        "tests/test_task65b_protected_fingerprints.py (2)", "tests/test_task65b_warmup.py (12)"
+      ],
+      "count": 76,
+      "result": "PASSED"
+    },
+    "combined_piv_suite_total": 101,
+    "combined_piv_suite_result": "101 passed in 2.22s"
+  },
+  "protected_files_verification": {
+    "zero_semantic_diff": true,
+    "files_checked": [
+      "talonx_quant/strategy.py", "talonx_quant/indicators.py",
+      "talonx_quant/consumer.py", "talonx_quant/config.py"
+    ],
+    "orpb_fingerprint_unchanged": true,
+    "orpb_fingerprint": "b1e283bd36eb0cb2ecc5303b104ec2bd8defc60f6eacef4879e7711d560d113f",
+    "fprc_fingerprint_unchanged": true,
+    "fprc_fingerprint": "be91c38047cf9aa9dbb6c8a948eaf52dd64ed4b16c7d8a70359388b58e5c2a64"
+  },
+  "full_regression": {
+    "passed": 1984,
+    "failed": 1,
+    "skipped": 1,
+    "xfailed": 15,
+    "duration_seconds": 407.18,
+    "new_failures": 0,
+    "known_pre_existing_failures": [
+      "tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset"
+    ],
+    "notes": "tests/test_yfinance_poller.py's two previously-flagged-as-pre-existing-and-unrelated timing-sensitive tests (test_healthy_cycle_does_not_reset_session, test_degraded_cycle_is_not_silently_treated_as_healthy) did not reproduce on this run either -- consistent with the Task 65B finding (confirmed via git stash against the clean base commit) that they are environment/timing-sensitive and unrelated to any PIV change, not a new or newly-relabeled failure."
+  },
+  "delta_from_previous_baseline": {
+    "previous_full_suite_passed": 1958,
+    "new_tests_added_today": 26,
+    "new_total_passed": 1984,
+    "arithmetic_check": "1958 + 26 = 1984 -- matches exactly, confirming no other test count drift"
+  }
+}

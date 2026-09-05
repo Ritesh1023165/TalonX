@@ -121,6 +121,36 @@ for the full before/after):**
   in a trending bull market RSI can sit elevated for hours, and shorting
   the first touch fights the trend rather than confirming a genuine
   reversal.
+  **RSI curl vs. RSI confluence, confirmed contract** (Task 28
+  `RSI_CONFLUENCE_STATE_BASED_CONFIRMED`, 2026-08-21): the curl defines a
+  trigger EVENT (RSI has just exited the extreme zone: `rsi_prev<30 AND
+  rsi>=30` bullish / `rsi_prev>70 AND rsi<=70` bearish), while the
+  confluence RSI leg above measures current STATE (`rsi<30` bullish /
+  `rsi>70` bearish) — complementary conditions by design, so an RSI-curl
+  candidate's own RSI value can never satisfy its own confluence RSI leg.
+  This is intentional, not a bug or an accidental limitation: it keeps
+  the trigger's own bundled evidence (reversal + volume, both already
+  required to fire at all) from being counted twice toward its own score.
+  Effective requirement: RSI reversal + volume alone produces a candidate
+  with confluence=1 (volume only); with `confluence_score_min=2`, a
+  same-bar MACD cross is the only other component available to an
+  RSI-curl candidate, so one is required for that candidate to clear this
+  gate. See `results/task28_rsi_confluence_requirement/` and
+  `results/task29_rsi_contract_lock/` for the full requirements analysis,
+  and `tests/test_quant_strategy.py`'s "RSI-Curl / Confluence Contract"
+  section for the regression tests that lock this in.
+- **Signal-family confluence contracts are NOT mathematically symmetric**
+  (each family's relationship to its own confluence score is a separate,
+  independently-defined contract, not one shared rule applied three ways):
+  a MACD-cross candidate's own crossover event automatically supplies its
+  MACD confluence point (the trigger check and the confluence-leg check
+  are the same underlying condition); an MA-cross candidate's own
+  crossover contributes **zero** points (there is no dedicated MA
+  confluence component at all); an RSI-curl candidate's own reversal
+  event contributes zero points via the RSI leg specifically (state-based
+  by design, above) but does contribute one point via the volume leg,
+  since volume surge is already required for the trigger to fire. Do not
+  assume any one family's behavior generalizes to another.
 - **Structural R:R filter** (`strategy.py`'s `_structural_risk_reward`,
   `TALONX_QUANT_ATR_STOP_MULTIPLIER` default 1.5,
   `TALONX_QUANT_MIN_RISK_REWARD_RATIO` default 1.5) — reward is measured
@@ -129,19 +159,44 @@ for the full before/after):**
   `P = (H+L+C)/3`, `R1 = 2P-L`, `S1 = 2P-H`, computed by
   `indicators.compute_daily_pivots` from the 15-min HTF buffer), not a
   second ATR multiple — a genuine market-derived target, not a
-  configuration-constant ratio. Risk is `atr_stop_multiplier x ATR` —
-  **the SAME multiplier `stop_price` is built from** (harmonized
-  2026-08-16 after a quant audit caught the gate evaluating against a
-  DIFFERENT, wider risk distance — the old separate
-  `pivot_stop_atr_multiplier`, 1.5x — than the stop actually executed
-  with — the old `atr_stop_multiplier`, 1.0x — so a trade could pass the
-  R:R gate at a nominal ratio while its actual executed R:R, measured
-  against the real stop, was materially different). `risk_reward_ratio` is
-  `None` (fail-closed, gate drops the candidate) until at least one full
-  prior regular session's pivot data is available. `target_price` uses
-  the SAME pivot level `risk_reward_ratio`'s reward side does when
-  available, falling back to `TALONX_QUANT_ATR_REWARD_MULTIPLIER` (2.0x
-  ATR) only while pivot data is still warming up.
+  configuration-constant ratio. `risk_reward_ratio` is `None` (fail-closed,
+  gate drops the candidate) until at least one full prior regular
+  session's pivot data is available. `target_price` uses the SAME pivot
+  level `risk_reward_ratio`'s reward side does when available, falling
+  back to `TALONX_QUANT_ATR_REWARD_MULTIPLIER` (2.0x ATR) only while pivot
+  data is still warming up.
+
+  **LONG stop geometry is market-structure-primary** (Task 35,
+  owner-confirmed ATR-RISK-001: `MARKET_STRUCTURE_PRIMARY` — corrects
+  Task 34's `CURRENT_ATR_STOPS_SYSTEMATICALLY_MISALIGNED_WITH_STRUCTURE`
+  finding). For a BULLISH candidate, `calculate_trade_geometry` uses the
+  same prior-session `S1` pivot support already computed for the target
+  side as the PRIMARY stop anchor whenever it is a valid, finite, positive
+  number strictly below the candidate's price — `stop_price` is that
+  level LITERALLY, with no buffer subtracted around it
+  (`STRUCTURAL_BUFFER_REQUIREMENT_NOT_DEFINED`: no existing repository
+  requirement defines one, and inventing one would be parameter tuning,
+  not spec alignment — see `results/task34_structural_stop_geometry/` and
+  `results/task35_structural_stop_implementation/`). Only when no valid
+  structural support exists does the stop fall back to the unmodified
+  `atr_stop_multiplier x ATR(14, 1-minute)` formula — every `QuantSignal`
+  records which path was used (`geometry_path`: `STRUCTURAL_PRIMARY` or
+  `ATR_FALLBACK`) and, on the fallback path, why (`fallback_reason`:
+  `NO_STRUCTURAL_SUPPORT` / `STRUCTURE_INVALID_OR_NONFINITE` /
+  `STRUCTURE_NOT_BELOW_ENTRY`). `risk` (and therefore `risk_reward_ratio`)
+  is always derived from the ACTUAL selected stop (`price - stop_price`),
+  never a stale ATR-only figure — correcting the stop can therefore
+  legitimately change whether a candidate clears the R:R gate, a
+  consequence of correctness, not a parameter change. BEARISH is
+  unchanged (still `atr_stop_multiplier x ATR`, unconditional) — the
+  owner's contract is scoped to LONG stops, since a BEARISH signal never
+  opens a new position under the LONG_ONLY lifecycle (Task 25A).
+  **`atr_move_multiplier`'s trigger-movement semantics and `min_atr_pct`'s
+  regime/volatility-floor semantics are both entirely unchanged and
+  out of scope here** — the former was owner-confirmed as-is
+  (ATR-TRIGGER-001), the latter remains a separate, not-yet-implemented
+  future task (ATR-REGIME-001: `MULTI_TIMEFRAME`, conceptually confirmed,
+  no implementation chosen).
 - **Post-loss lockout** (`consumer.py`, `TALONX_QUANT_LOSS_LOCKOUT_SECONDS`,
   default 4500 = 75 min) — `QuantScanner` also subscribes to
   `talonx:paper:trades` (talonx_paper's own execution feed) purely to
@@ -709,6 +764,18 @@ the range to reach an ATR-scaled stop/target.
   `consumer.py`'s `_GATE_NAMES`). Consumed by `talonx_dispatch` purely
   to persist a durable, per-candidate audit trail — see
   [dispatch.md](dispatch.md)'s own Rejection Trace Logging section.
+  **Reading the rejection counts** (clarified Task 27/29, 2026-08-21):
+  both the local aggregated `suppression_counts` and the per-candidate
+  `RejectedCandidateEvent` record only the FIRST gate that dropped a
+  given candidate, in the fixed gate order above — a `LOW_CONFLUENCE`
+  count means confluence was the first gate that rejected those
+  candidates; it does NOT mean they would otherwise have passed every
+  later gate (R:R, trend, entry blackouts, etc.). Some candidates
+  counted under an earlier gate would also have independently failed a
+  downstream one; see
+  `results/task27_strategy_feasibility_audit/first_failure_vs_all_failures.csv`
+  for a worked example. This does not change gate order or the metrics
+  themselves, only how the counts should be read.
 
 ## Long-term (fundamentals) path
 

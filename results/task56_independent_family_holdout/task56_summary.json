@@ -1,0 +1,90 @@
+{
+  "task": "Task 56 - Independent Family Holdout Validation",
+  "classification": "FAMILY_EFFECT_WEAKENED",
+  "deployment_state": "MONDAY_DECISION_SHADOW_ONLY",
+  "family_summary": {
+    "RSI": {
+      "family": "RSI",
+      "trades": 44,
+      "wins": 15,
+      "losses": 28,
+      "gross_total_R": 0.7226350248619953,
+      "gross_expectancy_R": 0.016423523292318075,
+      "gross_profit_factor": 1.0330178097785379,
+      "total_R_5bps": -10.544234787013044,
+      "expectancy_R_5bps": -0.23964169970484192,
+      "profit_factor_5bps": 0.6501034882615359
+    },
+    "MACD": {
+      "family": "MACD",
+      "trades": 61,
+      "wins": 19,
+      "losses": 42,
+      "gross_total_R": -1.2577979789860478,
+      "gross_expectancy_R": -0.020619638999771275,
+      "gross_profit_factor": 0.9663004886033899,
+      "total_R_5bps": -26.058308302153968,
+      "expectancy_R_5bps": -0.42718538200252404,
+      "profit_factor_5bps": 0.5419119534087987
+    }
+  },
+  "interpretability_floor": {
+    "passed": true,
+    "checks": {
+      "combined_at_least_60": true,
+      "rsi_at_least_20": true,
+      "macd_at_least_20": true,
+      "rsi_at_least_2_windows": true,
+      "macd_at_least_2_windows": true,
+      "rsi_at_least_5_symbols": true,
+      "macd_at_least_5_symbols": true
+    }
+  },
+  "robustness": {
+    "comparative_gross_hypothesis": true,
+    "comparative_5bps_hypothesis": true,
+    "windows_rsi_gt_macd_gross": 2,
+    "windows_rsi_gt_macd_5bps": 2,
+    "common_symbols": [
+      "ADBE",
+      "AMAT",
+      "AMD",
+      "AVGO",
+      "BKNG",
+      "CMCSA",
+      "GILD",
+      "INTC",
+      "INTU",
+      "KLAC",
+      "LRCX",
+      "META",
+      "MU",
+      "PANW",
+      "STX",
+      "VRTX"
+    ],
+    "common_symbol_support_pass": false,
+    "rsi_top3_winner_removal_comparative_pass": false,
+    "not_confined_to_one_symbol": true
+  },
+  "absolute_edge_questions": {
+    "rsi_gross_positive": true,
+    "rsi_5bps_positive": false,
+    "macd_gross_negative": true,
+    "macd_5bps_negative": true
+  },
+  "ma_summary": {
+    "family": "MA",
+    "trades": 0,
+    "wins": 0,
+    "losses": 0,
+    "gross_total_R": 0.0,
+    "gross_expectancy_R": null,
+    "gross_profit_factor": null,
+    "total_R_5bps": 0.0,
+    "expectancy_R_5bps": null,
+    "profit_factor_5bps": null
+  },
+  "strategy_action_authorized": false,
+  "capital_used": false
+}

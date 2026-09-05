@@ -1,0 +1,7 @@
+{
+  "symbol": "AAPL",
+  "window": "2025-08-15 to 2025-12-31",
+  "trade_count": 0,
+  "bootstrap_confidence_interval": null,
+  "reason": "Zero trades executed -- a bootstrap CI over zero observations is undefined and was not fabricated. See stage3_profitability_verdict.md."
+}

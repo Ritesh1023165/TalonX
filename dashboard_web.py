@@ -49,6 +49,10 @@ from pathlib import Path
 from aiohttp import WSMsgType, web
 
 from dashboard import CHANNELS, REDIS_URL, ChannelStats, handle_message
+from talonx_compare.config import CompareConfig
+from talonx_compare.dashboard_views import compare_view, original_view, piv_view
+from talonx_piv.config import PivConfig
+from talonx_piv.observability import build_integrated_projection
 from talonx_quant.config import QuantConfig
 
 logging.basicConfig(
@@ -256,6 +260,88 @@ async def index_handler(request: web.Request) -> web.FileResponse:
     return web.FileResponse(STATIC_DIR / "index.html")
 
 
+async def piv_status_handler(request: web.Request) -> web.Response:
+    """Task 78I Stage 4 -- ONE additive, read-only JSON endpoint exposing
+    talonx_piv's own session-scoped projection (talonx_piv.observability
+    .build_integrated_projection, already read-only, already reconciling
+    to its own durable ledgers -- see dashboard_reconciliation.json). Does
+    NOT touch `/`, `/static/*`, or `/ws`, and adds no order-placement or
+    safety-override control of any kind. This dashboard has zero prior
+    awareness of talonx_piv (a completely separate subsystem -- see
+    architecture_and_ownership.md); this route is the sole connection
+    point, read-only in both directions.
+
+    Computed fresh on every request (never cached), so this endpoint can
+    never show a stale value next to current data -- a read failure
+    (corrupt state file, missing directory, etc.) is reported explicitly
+    as an HTTP 500 with a clear error body, never silently as an empty-but-
+    plausible-looking 200."""
+    state_dir: Path = request.app["piv_state_dir"]
+    try:
+        projection = build_integrated_projection(state_dir)
+    except Exception as exc:  # noqa: BLE001 -- a read failure must be reported explicitly, never
+        # silently swallowed into a stale-looking success response.
+        return web.json_response(
+            {"error": f"PIV_STATUS_READ_FAILED: {type(exc).__name__}: {exc}", "state_dir": str(state_dir)},
+            status=500,
+        )
+    return web.json_response(projection)
+
+
+async def original_view_handler(request: web.Request) -> web.Response:
+    """Task 83 §3 -- read-only Original view. Redis health, the
+    Warmup/Quant/Brain/Core/Dispatch/Telegram stage funnel, and local
+    simulated-paper activity. A missing/unreachable source is reported as
+    its explicit health state, never as a plausible zero. GET only; no
+    launch/order/authorization/safety-control endpoint of any kind."""
+    import redis as _redis
+
+    client = None
+    try:
+        client = _redis.from_url(REDIS_URL, socket_connect_timeout=1.0, socket_timeout=1.0)
+        payload = await asyncio.to_thread(original_view, redis_client=client)
+    except Exception as exc:  # noqa: BLE001 -- a read failure is surfaced, never a silent 200
+        return web.json_response(
+            {"error": f"ORIGINAL_VIEW_READ_FAILED: {type(exc).__name__}: {exc}"}, status=500)
+    finally:
+        if client is not None:
+            try:
+                client.close()
+            except Exception:  # noqa: BLE001
+                pass
+    return web.json_response(payload)
+
+
+async def piv_view_handler(request: web.Request) -> web.Response:
+    """Task 83 §3 -- read-only PIV view: provider/readiness/freshness,
+    quant funnel, decisions, shadow, PAPER lifecycle, reconciliation, EOD,
+    plus UNVALIDATED status, feed/exec mode, real-capital prohibition and
+    the QuantStateStore capability limitation. GET only."""
+    state_dir: Path = request.app["piv_state_dir"]
+    try:
+        payload = await asyncio.to_thread(piv_view, state_dir=state_dir)
+    except Exception as exc:  # noqa: BLE001
+        return web.json_response(
+            {"error": f"PIV_VIEW_READ_FAILED: {type(exc).__name__}: {exc}",
+             "state_dir": str(state_dir)}, status=500)
+    return web.json_response(payload)
+
+
+async def compare_view_handler(request: web.Request) -> web.Response:
+    """Task 83 §3 -- read-only Compare view: per-stage totals, per-symbol
+    agreement/divergence, missing/late stages + reason codes, and the
+    separate Original-simulated vs PIV-shadow/PAPER outcome streams. GET
+    only; reads only the collector's date-partitioned evidence store."""
+    trading_date = request.query.get("date")
+    try:
+        payload = await asyncio.to_thread(
+            compare_view, config=request.app["compare_config"], trading_date=trading_date)
+    except Exception as exc:  # noqa: BLE001
+        return web.json_response(
+            {"error": f"COMPARE_VIEW_READ_FAILED: {type(exc).__name__}: {exc}"}, status=500)
+    return web.json_response(payload)
+
+
 async def on_startup(app: web.Application) -> None:
     app["redis_task"] = asyncio.create_task(_redis_consumer(app))
     app["broadcast_task"] = asyncio.create_task(_broadcaster(app))
@@ -273,8 +359,14 @@ async def on_cleanup(app: web.Application) -> None:
             pass
 
 
-def build_app() -> web.Application:
+def build_app(piv_state_dir: Path | None = None) -> web.Application:
     app = web.Application()
+    # Task 78I Stage 4: same default-resolution PivConfig().state_dir
+    # already uses (TALONX_PIV_STATE_DIR env var, else the existing
+    # results/task64_paper_piv_readiness/runtime default) -- never a new,
+    # separate default. Tests/rehearsal pass an isolated tmp_path directly.
+    app["piv_state_dir"] = piv_state_dir if piv_state_dir is not None else PivConfig().state_dir
+    app["compare_config"] = CompareConfig()
     app["stats"] = {watch.key: ChannelStats() for watch in CHANNELS}
     app["websockets"] = set()
     app["started_at"] = time.monotonic()
@@ -294,6 +386,11 @@ def build_app() -> web.Application:
 
     app.router.add_get("/ws", websocket_handler)
     app.router.add_get("/", index_handler)
+    app.router.add_get("/piv/status", piv_status_handler)
+    # Task 83 §3 -- three additive, GET-only, read-only views.
+    app.router.add_get("/views/original", original_view_handler)
+    app.router.add_get("/views/piv", piv_view_handler)
+    app.router.add_get("/views/compare", compare_view_handler)
     app.router.add_static("/static/", STATIC_DIR, show_index=False)
 
     app.on_startup.append(on_startup)
@@ -305,9 +402,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Live browser dashboard for the TalonX pipeline")
     parser.add_argument("--port", type=int, default=8787, help="Port to serve on (default: 8787)")
     parser.add_argument("--host", default="localhost", help="Host to bind (default: localhost)")
+    parser.add_argument("--piv-state-dir", default=None, help="Task 78I: override talonx_piv's state_dir for the /piv/status endpoint (default: PivConfig()'s own resolution, i.e. TALONX_PIV_STATE_DIR or its built-in default)")
     args = parser.parse_args()
 
-    app = build_app()
+    app = build_app(Path(args.piv_state_dir) if args.piv_state_dir else None)
     logger.info("Starting dashboard web server -- open http://%s:%d in your browser", args.host, args.port)
     web.run_app(app, host=args.host, port=args.port, print=None)
 

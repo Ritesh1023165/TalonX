@@ -1,0 +1,12 @@
+    app["broadcast_task"] = asyncio.create_task(_broadcaster(app))
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+  C:\workspace\TalonX\dashboard_web.py:348: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["buffer_poll_task"] = asyncio.create_task(_buffer_stats_poll(app))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+279 passed, 52 warnings in 33.84s

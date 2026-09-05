@@ -1,0 +1,39 @@
+{
+  "module": "talonx_piv/execution_ownership.py + talonx_piv/broker.py (enforcement point) + talonx_piv/cli.py::acquire_execution_ownership",
+  "mechanism": "OS-level advisory exclusive file lock (msvcrt.locking on Windows, fcntl.flock on POSIX) on a fixed, GLOBAL (never state_dir-scoped) lock file keyed by sha256(broker_endpoint|account_id)[:24].",
+  "why_not_a_pid_file": "A hand-written PID file left behind after a crash requires an 'is this PID still alive' check, which is inherently racy (PID reuse across time/reboots) and can be fooled by a live-but-unrelated process reusing the same PID. An OS-level advisory lock is released automatically by the kernel the instant the holding process exits for ANY reason (clean exit, crash, SIGKILL/taskkill /F) -- no in-process cleanup code needs to run. acquire()'s pass/fail logic depends SOLELY on the OS lock call; the PID/owner_label written into the lock file's content is diagnostic/operator-visible ONLY and is never read back by acquire() to make a decision -- proven by test_pid_in_lock_file_is_diagnostic_only_not_load_bearing.",
+  "scope": "account-level (broker_endpoint + account_id), NOT session-directory-level. Two application instances with DIFFERENT state_dir/TALONX_PIV_STATE_DIR but the SAME Alpaca paper account (same broker_endpoint + same account_id, learned only after AlpacaPaperClient.verify_paper_identity() succeeds) resolve to the IDENTICAL lock file path and therefore correctly collide. The lock directory itself is a FIXED, global location (default Path.home()/.talonx_piv/locks, overridable only via TALONX_PIV_LOCK_DIR for isolated tests/rehearsal), never derived from state_dir.",
+  "enforcement_point": "talonx_piv.broker.AlpacaPaperClient.submit_order / cancel_all_orders / close_all_positions -- the three actual broker-mutating calls. This covers order_intent (normal orders), the PIV_LIFECYCLE_PROBE path (same order_intent chokepoint), manual CLI kill-switch/cleanup, and EOD (eod_lifecycle.py calls lifecycle.broker.cancel_all_orders()/close_all_positions() directly, which is why gating was placed at the broker client itself rather than only on PaperLifecycle's own methods).",
+  "reads_never_gated": "open_orders/get_order/positions/verify_paper_identity never check ownership -- 'readers may continue without becoming execution writers'. Confirmed by source inspection (test_reads_never_require_ownership).",
+  "acquisition_sequence": "cli.py::acquire_execution_ownership(config, broker, bus) is called AFTER broker.verify_paper_identity() succeeds (account_id is only known then) and BEFORE any mutating action -- wired into the 'start' (after Preflight reports PIV_READY, before start_session), 'kill-switch', 'eod', and 'cleanup' command branches.",
+  "failure_mode": "Fail closed -- acquire_execution_ownership raises PaperGuardError (never returns a not-acquired lock silently), main() catches it as PIV_BLOCKED (exit code 2), and a BROKER_ERROR/EXECUTION_OWNERSHIP_ALREADY_HELD event is emitted. No command proceeds to any mutating action without a successfully acquired lock.",
+  "do_not_delete_to_start_another_instance": "No 'force' or 'break lock' option exists anywhere in this codebase's CLI or code -- a contended lock requires the operator to resolve it out-of-band (confirm the other process, wait for it to exit, or manually investigate), never an automated override.",
+  "abrupt_termination_and_recovery": "An abrupt process/host termination releases the OS lock immediately (proven by test_abrupt_process_kill_releases_the_os_lock_crash_safety, which kills a real child process holding the lock and confirms a new instance can acquire it afterward), but this does NOT by itself prove the broker's true state -- an order that was in flight at the moment of the crash may or may not have reached the broker. The next process to acquire ownership must still run PaperLifecycle.reconcile() (which also resolves any UNCONFIRMED_TIMEOUT order left by Task 77I's timeout handling) BEFORE treating the account as known-safe -- this is the supervisor's explicit startup-sequence requirement (Stage 2), not something the lock alone guarantees.",
+  "tests": {
+    "unit_level": [
+      "test_task78i_execution_ownership.py::test_account_lock_key_is_stable_and_scoped_to_endpoint_and_account",
+      "test_task78i_execution_ownership.py::test_single_process_acquire_and_release",
+      "test_task78i_execution_ownership.py::test_second_instance_same_process_cannot_acquire_while_first_holds",
+      "test_task78i_execution_ownership.py::test_different_account_keys_do_not_collide",
+      "test_task78i_execution_ownership.py::test_require_raises_when_not_acquired",
+      "test_task78i_execution_ownership.py::test_pid_in_lock_file_is_diagnostic_only_not_load_bearing",
+      "test_task78i_execution_ownership.py::test_context_manager_releases_on_exit",
+      "test_task78i_execution_ownership.py::test_no_ownership_configured_behaves_exactly_as_before",
+      "test_task78i_execution_ownership.py::test_submit_order_blocked_when_ownership_not_held",
+      "test_task78i_execution_ownership.py::test_submit_order_succeeds_when_ownership_held",
+      "test_task78i_execution_ownership.py::test_cancel_and_close_all_also_gated",
+      "test_task78i_execution_ownership.py::test_reads_never_require_ownership"
+    ],
+    "genuine_multiprocess_level": [
+      "test_task78i_execution_ownership.py::test_duplicate_process_competing_for_the_same_account_ownership_is_denied (spawns a real subprocess.Popen child, not a thread)",
+      "test_task78i_execution_ownership.py::test_abrupt_process_kill_releases_the_os_lock_crash_safety (spawns a real child, kills it abruptly, confirms lock release)"
+    ],
+    "cli_wiring_level": [
+      "test_task78i_cli_ownership.py::test_kill_switch_acquires_ownership_and_succeeds",
+      "test_task78i_cli_ownership.py::test_second_kill_switch_invocation_while_first_still_holds_lock_is_blocked",
+      "test_task78i_cli_ownership.py::test_cleanup_acquires_ownership_before_calling_paper_cleanup",
+      "test_task78i_cli_ownership.py::test_start_no_live_loop_acquires_ownership_when_ready"
+    ]
+  },
+  "all_passed": true
+}

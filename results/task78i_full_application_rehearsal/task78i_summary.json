@@ -1,0 +1,68 @@
+{
+  "task": "Task78I_INTEGRATION_COMPLETION_ORCHESTRATION_RECOVERY_REHEARSAL",
+  "starting_branch": "research/talonx-strategy-validation",
+  "starting_sha": "6f6193ff76fb4d459c1b1b95e7f284e23a38058e",
+  "stages": {
+    "stage0_baseline_and_architecture": "COMPLETE",
+    "stage1_close_integration_gaps": "COMPLETE",
+    "stage2_unified_supervisor": "COMPLETE",
+    "stage3_gemini_enrichment": "COMPLETE",
+    "stage4_dashboard_integration": "COMPLETE",
+    "stage5_offline_rehearsal": "COMPLETE"
+  },
+  "checkpoint_commits": {
+    "stage1": "54fdc9d", "stage2": "daa59ff", "stage3": "5f23831", "stage4": "f3a7e17", "stage5": "pending"
+  },
+  "four_gaps_closed": {
+    "shadow_independence": "AUDITED_NO_CORRECTION_NEEDED -- proven byte-identical outcome for PAPER enabled vs disabled",
+    "horizon_exits": "IMPLEMENTED -- DEFAULT_HORIZON_POLICY deliberately empty, no invented duration",
+    "status_projections": "IMPLEMENTED -- pure recompute, no mutable write-back field, decision_id threaded into order_intent",
+    "execution_ownership": "IMPLEMENTED -- OS-level advisory lock, account-scoped, proven with genuine competing OS subprocesses"
+  },
+  "new_modules": [
+    "talonx_piv/execution_ownership.py", "talonx_piv/supervisor.py", "talonx_piv/gemini_enrichment.py"
+  ],
+  "modified_modules": [
+    "talonx_piv/shadow_ledger.py", "talonx_piv/observability.py", "talonx_piv/lifecycle.py",
+    "talonx_piv/decision_engine.py", "talonx_piv/broker.py", "talonx_piv/cli.py",
+    "talonx_piv/preflight.py", "talonx_piv/session_runner.py", "talonx_piv/notification_outbox.py",
+    "dashboard_web.py"
+  ],
+  "protected_files_diff_since_6f6193f": 0,
+  "eod_lifecycle_py_diff_since_6f6193f": 0,
+  "talonx_brain_diff": 0,
+  "genuine_defect_found_and_fixed_in_stage5": "NotificationOutbox.dispatch_pending's retry-eligible status set did not include UNCERTAIN -- a record could get permanently stuck; fixed by including it (bounded by the same max_attempts)",
+  "tests": {
+    "collection_before_this_task": "2327 collected, 0 errors",
+    "collection_after_this_task": "2423 collected, 0 errors",
+    "full_suite_before_this_task": "2316 passed, 1 skipped, 10 xfailed",
+    "full_suite_after_this_task": "2412 passed, 1 skipped, 10 xfailed, 0 failures",
+    "reconciliation": "2412 - 2316 = 96, exactly matching the 96 new tests across 11 new test files -- zero unexplained regression",
+    "full_suite_duration_seconds": 785.96
+  },
+  "rehearsal": {
+    "scenarios_required": 20,
+    "scenarios_passed": 20,
+    "scenarios_failed": 0,
+    "evidence_label": "OFFLINE_APPLICATION_INTEGRATION_EVIDENCE",
+    "csv": "rehearsal_scenarios.csv"
+  },
+  "no_real_broker_mutations": true,
+  "no_real_notifications": true,
+  "no_real_gemini_calls": true,
+  "no_live_session": true,
+  "no_market_data_downloads": true,
+  "no_holdout_access": true,
+  "no_alpha_tuning_or_new_strategies": true,
+  "production_defaults": {
+    "strategy_approval_status": "UNVALIDATED for every real decision",
+    "paper_entry_settings_json": "does not exist by default -- no ticker entry-enabled",
+    "approval_registry": "not invented",
+    "gemini_enabled_by_default": false
+  },
+  "remaining_blockers": [],
+  "verdict": "READY_FOR_CONTROLLED_PAPER_REVIEW",
+  "verdict_caveat": "This verdict is not permission to launch a live session, approve a strategy, or enable trading -- see controlled_paper_review_checklist.md.",
+  "recommended_next_task": "build a strategy-approval registry (the one remaining structural gap that keeps every real decision at UNVALIDATED), OR conduct the controlled PAPER review itself under the operator_runbook.md/controlled_paper_review_checklist.md process",
+  "commits": ["54fdc9d", "daa59ff", "5f23831", "f3a7e17", "pending_stage5_commit"]
+}

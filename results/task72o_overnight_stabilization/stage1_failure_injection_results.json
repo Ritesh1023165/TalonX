@@ -1,0 +1,15 @@
+{
+  "injections_tested": [
+    {"case": "cancellation_failure", "test": "test_cancellation_failure_is_inconclusive_not_passed", "result": "INCONCLUSIVE, SESSION_COMPLETED never emitted, cancel_close_requested left False"},
+    {"case": "close_failure", "test": "test_close_failure_is_inconclusive_not_passed", "result": "INCONCLUSIVE, SESSION_COMPLETED never emitted"},
+    {"case": "reconciliation_broker_read_failure", "test": "test_reconciliation_broker_read_failure_is_inconclusive", "result": "INCONCLUSIVE, no crash propagated"},
+    {"case": "reconciliation_mismatch_delayed_convergence", "test": "test_reconciliation_mismatch_is_failed_not_passed / test_delayed_broker_convergence_then_idempotent_retry_passes", "result": "first call FAILED; retry after broker converges -> PASSED, cancel/close NOT re-issued"},
+    {"case": "process_interruption_mid_eod", "test": "test_process_interruption_during_eod_then_resume", "result": "resumed call completed reconciliation only, zero additional cancel/close calls"},
+    {"case": "cross_date_stale_state", "test": "test_cross_date_state_rejected", "result": "yesterday's PASSED state ignored; today's own cancel/close correctly issued"},
+    {"case": "different_session_same_date", "test": "test_different_session_id_same_date_does_not_reuse_prior_cancel_close", "result": "a different live_session_id's own cancel/close is issued independently, not conflated with an unrelated prior session"},
+    {"case": "unhandled_exception_in_loop", "test": "test_unhandled_exception_still_triggers_eod_then_reraises", "result": "EOD_STARTED observed; original exception still re-raised (not swallowed)"},
+    {"case": "missing_session_identity", "test": "test_no_session_identity_file_skips_eod_without_guessing", "result": "EOD_REQUIRES_KNOWN_LIVE_SESSION_IDENTITY recorded, zero broker calls, SESSION_COMPLETED never emitted"}
+  ],
+  "no_case_produced_a_fabricated_passed_status": true,
+  "no_broker_mutation_beyond_the_pre_existing_cancel_all_orders_close_all_positions_calls": true
+}

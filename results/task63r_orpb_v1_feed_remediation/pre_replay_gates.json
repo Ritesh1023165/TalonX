@@ -1,0 +1,2759 @@
+{
+  "all_mandatory_gates_passed": false,
+  "base_commit": "7d46bcd75763f583b5a405317ac8f12fb29c7870",
+  "code_proof": {
+    "command": "python -m pytest tests/test_orpb_v1.py -q -p no:cacheprovider",
+    "returncode": 0,
+    "stderr": "",
+    "stdout": "............                                                             [100%]\n12 passed in 0.05s"
+  },
+  "download_summary_sha256": "8e7228a257019bfc26c6c7567c9a150915981ba806ee11731069b8984311e4f4",
+  "feed_diagnostic_sha256": "245366ee6a39962ba6ae3f2172a373177ab56c49b8e1226ce0a0b86bd5460e0a",
+  "frozen_implementation_fingerprint": "b1e283bd36eb0cb2ecc5303b104ec2bd8defc60f6eacef4879e7711d560d113f",
+  "global_gates": {
+    "all_windows_coverage_quality_readiness": false,
+    "alpaca_provider_and_35_full_packages": true,
+    "code_level_causality_isolation_parity_proofs": true,
+    "current_candidate_and_fprc_zero_drift": true,
+    "frozen_implementation_fingerprint": true,
+    "frozen_source_and_config_hashes": true,
+    "frozen_supporting_hashes": true,
+    "no_future_or_extra_data": true,
+    "orpb_candidate_zero_drift": true,
+    "uniform_alpaca_sip_feed_proven": true
+  },
+  "provider": "alpaca",
+  "replay_started": false,
+  "resolved_feed": "sip",
+  "runtime_estimate": {
+    "basis": "one shared ORPB state-machine pass over regular-session bars",
+    "estimated_minutes_range": "1-5",
+    "evaluation_regular_bars": 791628
+  },
+  "source_file_sha256": {
+    "AAPL": "0c1748b7bcaacb24b8ca28da21eeb7071e03f3881dace821e0db68cf60a3237f",
+    "ADBE": "0c4cd542f6662865b65a96de1e1b0db0e5c0271c44e10ae68f1b0eb14b15672c",
+    "ADI": "46866fee8bec22c3b365c9f78f2ab5cd061d56a392ff57b04cb2c33b3cf33095",
+    "AMAT": "de151b97a59b96079de2e315a8b71ef3b3cae438df5aef3b58ee50adf088a588",
+    "AMD": "a5df5957887c34d53859f51b5be024984de16b0850197c6d397b50ecdd64bc69",
+    "AMZN": "c03c522ae22e4400f6de5bf888f8ecf5f0ed5b3bd7c76e556d51bb5f9849d94c",
+    "AVGO": "f2c9046c33b682d4c736b2472827306ecc34b4f2c62d8df712977303f95255dd",
+    "BKNG": "979188029058b4bc6c9d744f05d495ee911342746097ef3d0d199c364c8407c3",
+    "CMCSA": "677ffe13fff0c8e697b6128b2de82d06b27226c4f07fc92ace90e778bc6440e2",
+    "COST": "82d03030b4fa4ccd6bbdd5c86480458d83ce303abc7dec0cb68285e9cfa653a4",
+    "CSCO": "f99b622c67e1be7ce433f9a4613066e2f8a07636234d94f850059fc6073b68d8",
+    "GILD": "7ed61da594ef6449f153adea0c148afc13c63483fa89a3ab1f0ed575ddf1290c",
+    "GOOGL": "cc3c768bed618d0325897c4eddeca3d2d867460964677df661fef2a1528574b5",
+    "HON": "826aeb713d44198b42599914740d5d73e14c2b13e35bb8504df75bef5f38e1a9",
+    "INTC": "65e7262f76dfa4fdc248daed4479e09c28e7dfe270c0ec22dc47faf7f080c865",
+    "INTU": "52c70bb0b82219308958c410f39bfc09d4de662bd7ebdb7f865e8726b5c1a863",
+    "ISRG": "c0801052006fb2a85127caea1742ce61536948ba2ab7377681de41d15e7cf0e3",
+    "KLAC": "a241398c41248eb720ab1dbb4cc7c2d002852f6777e737bdf4947735e44361ec",
+    "LRCX": "8a6bab0aafceb7a2bee80ecbcff123108e3382d6e3bb9ebb033fd07e9f2f981f",
+    "MDLZ": "816c32c88dd43b186dce627a3b378d2c6c7cae2a7253975c30145faaa139792e",
+    "META": "becad30015722ec106acb3fffb223900bbeffaf3124bdedd1d882614eeb9c8e5",
+    "MSFT": "b4e3e335df410c8f5f7e98d2cb431f9dd3bfb10bc08cc4eac1439857f0ca8569",
+    "MU": "c8dd43c4782507e5fdf0e5916bc917b490b9514775e1c756293f9d022e180fb8",
+    "NFLX": "53419f77d70ae8401f2be5730ae32a26c55940b2c745fa9ce8f4868266f86119",
+    "NVDA": "0ce5f9aac5b971190b92658862f43bc2f49e8d904508dc6065c17351f4901b76",
+    "PANW": "2f80cb2f519ca431c119f62363f4347999e05a4fc4237c5ad8bbedf55ab612e8",
+    "PEP": "8182ade361da74decb912650cfdae5cebede7c233c05446f1c7c4e527365c886",
+    "PYPL": "825d1d23a853ea7ff70e049456b42a4e83715258bcb8749ea7a32cca101234e3",
+    "QCOM": "565c7dd87f2074cd8d429b1ef75bfe2a7997aa3a3277862c1404564d6484bb05",
+    "REGN": "247649fda8464075ed286f53e7cbb67927b0a7e3975be1547e8acb68fa172fdf",
+    "SBUX": "21d38486b73ebd8226008310e4b4e9ba6f627d1312e3516a8ddd9fbb6a793c96",
+    "STX": "ab7b5c5d36ea1ac2091e753a7d5f2aea85afb0c07e5393603f137c2984f2583c",
+    "TSLA": "24c8d7088ff011f955dd2b23e6815b38c7252ac1225930506d2290deda7d6b47",
+    "TXN": "a92443841ad6b6155408d4b68e86ded8e93eaf7cadb0bcd86e6940ac0bae8c15",
+    "VRTX": "e7c547788706666c45b391b4ac1d783aae3fd3a6df84ebae312a12755219cd6a"
+  },
+  "task": "63R",
+  "total_raw_bars": 1307932,
+  "total_regular_session_bars": 923888,
+  "windows": {
+    "O1": {
+      "coverage_failures": [],
+      "critical_corruption_symbols": [],
+      "evaluation_rows": 263318,
+      "evaluation_sessions": 20,
+      "gate_passed": false,
+      "opening_range_failures": [
+        "BKNG",
+        "KLAC"
+      ],
+      "per_symbol": {
+        "AAPL": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "ADBE": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7777,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 820,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3894,
+          "warmup_state_isolated": true
+        },
+        "ADI": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7780,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 894,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3890,
+          "warmup_state_isolated": true
+        },
+        "AMAT": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7799,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 783,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3898,
+          "warmup_state_isolated": true
+        },
+        "AMD": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "AMZN": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "AVGO": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "BKNG": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 3392,
+          "opening_range_coverage": {
+            "failures": [
+              "2025-02-10",
+              "2025-02-11"
+            ],
+            "pass": false,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 18
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 16045,
+          "warmup_dates_complete": true,
+          "warmup_rows": 1647,
+          "warmup_state_isolated": true
+        },
+        "CMCSA": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "COST": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7435,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 1754,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3774,
+          "warmup_state_isolated": true
+        },
+        "CSCO": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "GILD": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7799,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 781,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "GOOGL": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "HON": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7783,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 829,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3878,
+          "warmup_state_isolated": true
+        },
+        "INTC": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "INTU": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7534,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 2291,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3669,
+          "warmup_state_isolated": true
+        },
+        "ISRG": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7189,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 2019,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3725,
+          "warmup_state_isolated": true
+        },
+        "KLAC": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 6404,
+          "opening_range_coverage": {
+            "failures": [
+              "2025-02-07"
+            ],
+            "pass": false,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 19
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 5291,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3387,
+          "warmup_state_isolated": true
+        },
+        "LRCX": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 781,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "MDLZ": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7799,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 782,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "META": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "MSFT": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "MU": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "NFLX": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7772,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 834,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3892,
+          "warmup_state_isolated": true
+        },
+        "NVDA": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "PANW": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 792,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3899,
+          "warmup_state_isolated": true
+        },
+        "PEP": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 781,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "PYPL": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "QCOM": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "REGN": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 6136,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 5984,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3228,
+          "warmup_state_isolated": true
+        },
+        "SBUX": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 781,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "STX": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7673,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 1096,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3854,
+          "warmup_state_isolated": true
+        },
+        "TSLA": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "TXN": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7792,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 796,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "VRTX": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7054,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 3078,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3725,
+          "warmup_state_isolated": true
+        }
+      },
+      "symbols_present": 35,
+      "symbols_with_complete_opening_ranges": 33,
+      "warmup_rows": 132260,
+      "warmup_sessions": 10
+    },
+    "O2": {
+      "coverage_failures": [],
+      "critical_corruption_symbols": [],
+      "evaluation_rows": 263592,
+      "evaluation_sessions": 20,
+      "gate_passed": false,
+      "opening_range_failures": [
+        "BKNG"
+      ],
+      "per_symbol": {
+        "AAPL": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "ADBE": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7799,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 820,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3885,
+          "warmup_state_isolated": true
+        },
+        "ADI": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7744,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 894,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3897,
+          "warmup_state_isolated": true
+        },
+        "AMAT": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 783,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "AMD": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "AMZN": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "AVGO": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "BKNG": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 3480,
+          "opening_range_coverage": {
+            "failures": [
+              "2025-03-26"
+            ],
+            "pass": false,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 19
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 16045,
+          "warmup_dates_complete": true,
+          "warmup_rows": 1792,
+          "warmup_state_isolated": true
+        },
+        "CMCSA": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "COST": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7594,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 1754,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3763,
+          "warmup_state_isolated": true
+        },
+        "CSCO": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "GILD": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 781,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "GOOGL": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "HON": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7795,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 829,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3897,
+          "warmup_state_isolated": true
+        },
+        "INTC": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "INTU": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7350,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 2291,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3817,
+          "warmup_state_isolated": true
+        },
+        "ISRG": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7638,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 2019,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3737,
+          "warmup_state_isolated": true
+        },
+        "KLAC": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 6237,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 5291,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3370,
+          "warmup_state_isolated": true
+        },
+        "LRCX": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7799,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 781,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "MDLZ": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7799,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 782,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3899,
+          "warmup_state_isolated": true
+        },
+        "META": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "MSFT": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "MU": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "NFLX": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7795,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 834,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3896,
+          "warmup_state_isolated": true
+        },
+        "NVDA": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "PANW": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7792,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 792,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "PEP": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 781,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "PYPL": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "QCOM": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "REGN": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 6031,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 5984,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3062,
+          "warmup_state_isolated": true
+        },
+        "SBUX": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7799,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 781,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "STX": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7677,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 1096,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3866,
+          "warmup_state_isolated": true
+        },
+        "TSLA": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "TXN": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7793,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 796,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3899,
+          "warmup_state_isolated": true
+        },
+        "VRTX": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7070,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 3078,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3509,
+          "warmup_state_isolated": true
+        }
+      },
+      "symbols_present": 35,
+      "symbols_with_complete_opening_ranges": 34,
+      "warmup_rows": 132189,
+      "warmup_sessions": 10
+    },
+    "O3": {
+      "coverage_failures": [],
+      "critical_corruption_symbols": [],
+      "evaluation_rows": 264718,
+      "evaluation_sessions": 20,
+      "gate_passed": false,
+      "opening_range_failures": [
+        "BKNG"
+      ],
+      "per_symbol": {
+        "AAPL": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "ADBE": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7790,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 820,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3899,
+          "warmup_state_isolated": true
+        },
+        "ADI": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7772,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 894,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3866,
+          "warmup_state_isolated": true
+        },
+        "AMAT": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 783,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "AMD": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "AMZN": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "AVGO": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "BKNG": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 3516,
+          "opening_range_coverage": {
+            "failures": [
+              "2025-04-25",
+              "2025-04-30"
+            ],
+            "pass": false,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 18
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 16045,
+          "warmup_dates_complete": true,
+          "warmup_rows": 1631,
+          "warmup_state_isolated": true
+        },
+        "CMCSA": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "COST": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7523,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 1754,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3753,
+          "warmup_state_isolated": true
+        },
+        "CSCO": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "GILD": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 781,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "GOOGL": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "HON": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7795,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 829,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3899,
+          "warmup_state_isolated": true
+        },
+        "INTC": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "INTU": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7236,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 2291,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3706,
+          "warmup_state_isolated": true
+        },
+        "ISRG": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7509,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 2019,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3782,
+          "warmup_state_isolated": true
+        },
+        "KLAC": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 6761,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 5291,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3107,
+          "warmup_state_isolated": true
+        },
+        "LRCX": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 781,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3899,
+          "warmup_state_isolated": true
+        },
+        "MDLZ": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 782,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "META": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "MSFT": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "MU": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "NFLX": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7787,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 834,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3896,
+          "warmup_state_isolated": true
+        },
+        "NVDA": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "PANW": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7797,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 792,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3897,
+          "warmup_state_isolated": true
+        },
+        "PEP": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7799,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 781,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "PYPL": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "QCOM": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "REGN": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 6701,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 5984,
+          "warmup_dates_complete": true,
+          "warmup_rows": 2975,
+          "warmup_state_isolated": true
+        },
+        "SBUX": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 781,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "STX": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7780,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 1096,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3845,
+          "warmup_state_isolated": true
+        },
+        "TSLA": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7800,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 780,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3900,
+          "warmup_state_isolated": true
+        },
+        "TXN": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7799,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 796,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3898,
+          "warmup_state_isolated": true
+        },
+        "VRTX": {
+          "critical_corruption": false,
+          "duplicate_timestamps": 0,
+          "evaluation_dates_complete": true,
+          "evaluation_rows": 7153,
+          "opening_range_coverage": {
+            "failures": [],
+            "pass": true,
+            "required_buckets": [
+              "09:30",
+              "09:35",
+              "09:40",
+              "09:45",
+              "09:50",
+              "09:55"
+            ],
+            "session_count": 20,
+            "sessions_with_exactly_six_buckets": 20
+          },
+          "out_of_order_timestamps": 0,
+          "unexpected_intra_session_gap_bars": 3078,
+          "warmup_dates_complete": true,
+          "warmup_rows": 3540,
+          "warmup_state_isolated": true
+        }
+      },
+      "symbols_present": 35,
+      "symbols_with_complete_opening_ranges": 34,
+      "warmup_rows": 131593,
+      "warmup_sessions": 10
+    }
+  }
+}

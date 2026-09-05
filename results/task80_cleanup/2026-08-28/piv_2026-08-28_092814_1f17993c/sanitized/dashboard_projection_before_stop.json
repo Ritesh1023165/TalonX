@@ -1,0 +1,65 @@
+{
+  "captured_from": "http://localhost:8787/piv/status",
+  "captured_at_utc": "2026-08-28T20:39:21Z",
+  "capture_purpose": "Task 80 cleanup pre-stop snapshot",
+  "scope": {
+    "session_id": "piv_2026-08-28_092814_1f17993c",
+    "trading_date_et": "2026-08-28",
+    "runtime_sha": "8d2a8dd164b712bd7faa087dec27030dc9bfccce",
+    "config_hash": "1f17993cf4a3"
+  },
+  "decisions": {
+    "total": 0,
+    "by_recommendation": {},
+    "observational_watch_count": 0,
+    "actionable_approved_count": 0
+  },
+  "notifications": {
+    "total": 0,
+    "pending": 0,
+    "sent": 0,
+    "failed": 0,
+    "unknown": 0
+  },
+  "shadow": {
+    "total": 0,
+    "pending": 0,
+    "open": 0,
+    "closed": 0,
+    "unresolved": 0
+  },
+  "paper_orders": {
+    "total": 0,
+    "submitted": 0,
+    "filled": 0,
+    "rejected": 0,
+    "unknown": 0
+  },
+  "natural_strategy": {
+    "candidates_published": 0,
+    "orders": 0,
+    "fills": 0,
+    "positions_opened": 0,
+    "positions_closed": 0,
+    "gross_pnl": null,
+    "net_pnl": null
+  },
+  "piv_test_traffic": {
+    "orders": 0,
+    "fills": 0,
+    "positions_opened": 0,
+    "positions_closed": 0,
+    "alpha_evidence": false
+  },
+  "provider_and_data_health": {
+    "provider_state": "HEALTHY",
+    "data_not_ready": 532,
+    "stale_data": 515
+  },
+  "experimental": {
+    "decision_count": 0,
+    "notification_count": 0,
+    "shadow_count": 0,
+    "paper_order_count": 0
+  }
+}

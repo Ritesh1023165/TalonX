@@ -136,6 +136,17 @@ from talonx_ingest.config import MarketDataConfig, settings
 from talonx_ingest.earnings import fetch_earnings_calendar
 from talonx_ingest.edgar.client import EdgarClient
 from talonx_ingest.events.publisher import RedisEventPublisher
+from talonx_ingest.liveness import LivenessBeacon
+from talonx_ingest.startup_readiness import (
+    PHASE_BOOTSTRAP_SCHEDULED,
+    PHASE_CONSUMERS_STARTED,
+    PHASE_FULL_READY,
+    PHASE_MARKET_POLLERS_STARTED,
+    PHASE_PRESEED_COMPLETE,
+    PHASE_REDIS_CONNECTED,
+    StartupReadiness,
+    delayed_start,
+)
 from talonx_ingest.market_data.manager import MarketDataManager
 from talonx_ingest.market_data.run import make_on_event
 from talonx_ingest.market_data.yfinance_poll import YFinancePoller, fetch_extended_hours_quote
@@ -149,11 +160,12 @@ from talonx_ingest.storage.vector_store import VectorStore, get_vector_store
 from talonx_quant.config import QuantConfig
 from talonx_quant.consumer import QuantScanner
 from talonx_quant.fundamental_consumer import FundamentalScanner
+from talonx_quant.preseed_ordering import run_initial_preseed
 from talonx_quant.store import QuantStateStore
 from talonx_brain.config import BrainConfig
 from talonx_brain.consumer import ResearchAgent
 from talonx_brain.store import BrainStatsStore
-from talonx_core.config import CoreConfig
+from talonx_core.config import DEFAULT_ALERT_OUTBOX_PATH, CoreConfig
 from talonx_core.consumer import DecisionEngine
 from talonx_core.store import TickerStateStore
 from talonx_dispatch.consumer import DispatchAgent
@@ -163,6 +175,15 @@ from talonx_paper.store import PaperTradingStore
 from talonx_watchlist.config import WatchlistConfig
 from talonx_watchlist.store import TickerWatchlistStore
 
+from talonx_ops.provider_status import configured_market_data_provider, paper_execution_path_label
+from talonx_ops.runtime_metadata import write_runtime_metadata
+
+from talonx_ops.logging_setup import configure_logging
+
+# Minimal at import time (kept identical to the pre-FC_07 behaviour so
+# merely importing run_talonx has no global side effect for tests). The
+# full FC_07 setup -- rotating file handler, third-party WARNING levels,
+# regime_shadow noise filter -- is applied inside main() where it belongs.
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -205,7 +226,10 @@ class WatchlistDrivenMarketData:
     once -- rather than calling stream([]), which raises ValueError.
     """
 
-    def __init__(self, watchlist_store: TickerWatchlistStore, on_event, poll_interval_seconds: float):
+    def __init__(
+        self, watchlist_store: TickerWatchlistStore, on_event, poll_interval_seconds: float,
+        metrics_publisher=None,
+    ):
         self._store = watchlist_store
         self._on_event = on_event
         self._poll_interval = poll_interval_seconds
@@ -214,6 +238,10 @@ class WatchlistDrivenMarketData:
         self._task: asyncio.Task | None = None
         self._current_symbols: set[str] = set()
         self._was_idle_empty = False
+        # 2026-08-18 /ping observability fix: forwarded to each
+        # MarketDataManager this reconciler constructs -- see
+        # MarketDataManager.__init__'s own docstring. Optional/additive.
+        self._metrics_publisher = metrics_publisher
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -255,7 +283,7 @@ class WatchlistDrivenMarketData:
             return
 
         self._was_idle_empty = False
-        self._manager = MarketDataManager()
+        self._manager = MarketDataManager(metrics_publisher=self._metrics_publisher)
         self._task = asyncio.create_task(
             self._manager.stream(sorted(new_symbols), self._on_event), name="market_data_stream"
         )
@@ -560,6 +588,9 @@ class PreMarketPoller:
         self._active_earnings_symbols_fn = active_earnings_symbols_fn
         self._refresh_warn_seconds = refresh_warn_seconds
         self._stop_event = asyncio.Event()
+        # Task 87B FC_04: last computed (selected, excluded) -- also exposed
+        # for status inspection / tests without needing a poll cycle.
+        self.last_selection: tuple[list[str], dict[str, str]] = ([], {})
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -567,11 +598,22 @@ class PreMarketPoller:
     def _in_window(self) -> bool:
         return is_premarket_window()
 
-    def _symbols(self) -> set[str]:
-        symbols = set(self._store.list_active_symbols())
+    def _select(self) -> tuple[set[str], dict[str, str]]:
+        """Task 87B FC_04: return (selected, excluded{symbol: reason}) so
+        the dynamic 43->42 narrowing is self-explanatory in the logs. The
+        EXCLUSION ITSELF IS UNCHANGED -- a symbol currently owned by
+        EarningsFastTrackPoller is still deliberately left out here to
+        avoid two pollers double-publishing ticks for it."""
+        configured = set(self._store.list_active_symbols())
+        excluded: dict[str, str] = {}
         if self._active_earnings_symbols_fn is not None:
-            symbols -= self._active_earnings_symbols_fn()
-        return symbols
+            for sym in sorted(self._active_earnings_symbols_fn()):
+                if sym in configured:
+                    excluded[sym] = "EARNINGS_FAST_TRACK"  # alternate owner: EarningsFastTrackPoller
+        return configured - set(excluded), excluded
+
+    def _symbols(self) -> set[str]:
+        return self._select()[0]
 
     async def run(self) -> None:
         while not self._stop_event.is_set():
@@ -583,10 +625,20 @@ class PreMarketPoller:
                 pass  # normal case: interval elapsed -- poll again if still in window, or check again if not
 
     async def _poll_once(self) -> None:
-        symbols = sorted(self._symbols())
+        selected_set, excluded = self._select()
+        symbols = sorted(selected_set)
+        configured_n = len(selected_set) + len(excluded)
         if not symbols:
             return
-        logger.info("Pre-market vectorized poll for %d tracked symbol(s)", len(symbols))
+        self.last_selection = (symbols, excluded)
+        excl_desc = (
+            "{" + ", ".join(f"{s}:{r}" for s, r in sorted(excluded.items())) + "}"
+        ) if excluded else "{}"
+        logger.info(
+            "PreMarketPoller configured=%d selected=%d excluded=%s "
+            "(excluded symbols are covered by EarningsFastTrackPoller, not dropped)",
+            configured_n, len(symbols), excl_desc,
+        )
         try:
             quotes = await asyncio.to_thread(fetch_watchlist_quotes, symbols, self._refresh_warn_seconds)
         except Exception as exc:  # noqa: BLE001 -- a bad cycle shouldn't kill the poller
@@ -711,14 +763,28 @@ class WatchlistDrivenQuantPreseed:
     its own module docstring's "self-contained at the code level"
     convention) -- this class is the one place that bridges the two,
     driving QuantScanner.preseed_symbols() from here instead.
+
+    `already_preseeded_symbols` (Task 66B-PREP): main() now awaits
+    talonx_quant.preseed_ordering.run_initial_preseed() for the startup
+    watchlist BEFORE any task -- including this one -- is created, so live
+    market data / quant_scanner.run() can never reach QuantScanner ahead of
+    that hydration. Symbols already covered by that call are passed in here
+    so run()'s own "initial preseed" step below doesn't repeat it -- it
+    still runs for whatever's left (e.g. a ticker added to the watchlist
+    during that earlier await) and its REACTIVE preseed loop for symbols
+    added/resumed after startup is completely unchanged.
     """
 
-    def __init__(self, watchlist_store: TickerWatchlistStore, quant_scanner: QuantScanner, poll_interval_seconds: float):
+    def __init__(
+        self, watchlist_store: TickerWatchlistStore, quant_scanner: QuantScanner, poll_interval_seconds: float,
+        already_preseeded_symbols: set[str] | None = None,
+    ):
         self._store = watchlist_store
         self._scanner = quant_scanner
         self._poll_interval = poll_interval_seconds
         self._stop_event = asyncio.Event()
         self._known_active_symbols: set[str] = set()
+        self._already_preseeded_symbols = set(already_preseeded_symbols or ())
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -726,9 +792,10 @@ class WatchlistDrivenQuantPreseed:
     async def run(self) -> None:
         initial = sorted(self._store.list_active_symbols())
         self._known_active_symbols = set(initial)
-        if initial:
-            logger.info("Pre-seeding talonx_quant buffers for the current watchlist: %s", initial)
-            await self._scanner.preseed_symbols(initial)
+        pending_initial = [s for s in initial if s.upper() not in self._already_preseeded_symbols]
+        if pending_initial:
+            logger.info("Pre-seeding talonx_quant buffers for the current watchlist: %s", pending_initial)
+            await self._scanner.preseed_symbols(pending_initial)
 
         while not self._stop_event.is_set():
             try:
@@ -1028,6 +1095,26 @@ async def periodic_earnings_calendar_sync_loop(
 async def main() -> None:
     args = _parse_args()
 
+    # Task 87B FC_07: apply the full bounded/low-noise logging setup here
+    # (not at import) -- size-rotated file handler, httpx/yfinance/... at
+    # WARNING, and the regime_shadow per-symbol INFO spam collapsed to a
+    # periodic summary (TALONX_LOG_VERBOSE=1 keeps it all).
+    try:
+        configure_logging(level=logging.INFO)
+    except Exception as exc:  # noqa: BLE001 -- logging setup must never block startup
+        logger.warning("FC_07 logging setup failed, keeping basic logging: %s", exc)
+
+    # Task 82: one Original runtime is allowed to coexist with one PIV
+    # process only when the latter advertises the isolation profile that
+    # its own preflight has already validated. Duplicate Original runtimes
+    # and unmarked/uncertain PIV peers fail before any store is opened.
+    from talonx_core import process_guard
+    process_ok, process_detail = process_guard.no_competing_talonx_process(
+        current_role=process_guard.ORIGINAL_ROLE,
+    )
+    if not process_ok:
+        raise RuntimeError(f"Original startup blocked by runtime process policy: {process_detail}")
+
     watchlist_config = WatchlistConfig()
     watchlist_store = TickerWatchlistStore(watchlist_config.db_path)
     if args.tickers:
@@ -1074,7 +1161,42 @@ async def main() -> None:
         # docstring) -- shares the SAME quant_store/config the technical
         # scanner uses.
         fundamental_scanner = FundamentalScanner(config=quant_config, store=quant_store)
+
+    # Task 66B-PREP: deterministic startup ordering -- awaited HERE, before
+    # any asyncio task exists, so it fully completes (or fails per-symbol)
+    # before market data streaming / quant_scanner.run() can start. See
+    # talonx_quant/preseed_ordering.py's own docstring for the race this
+    # closes. Zero-ready is reported, never fatal here -- QuantScanner's
+    # existing live-accumulation fallback still applies unchanged; this is
+    # ordering only, not a new requirement on strategy readiness.
+    # Task 87B FC_06: bounded startup sequencing. The critical path (Redis
+    # connect, market pollers, core consumers) comes up first; the
+    # expensive background bootstrap loops are staggered so their heavy
+    # first cycles do not all collide at t=0 (the 2026-08-31 Redis
+    # incident's root cause).
+    startup_readiness = StartupReadiness()
+    bootstrap_stagger_seconds = _env_float("TALONX_STARTUP_BOOTSTRAP_STAGGER_SECONDS", 3.0)
+
+    initial_preseed_report = None
+    if quant_scanner is not None:
+        initial_watchlist_symbols = sorted(watchlist_store.list_active_symbols())
+        if initial_watchlist_symbols:
+            logger.info(
+                "Running initial Quant preseed for %s before starting live market data / "
+                "quant_scanner.run() ...", initial_watchlist_symbols,
+            )
+            initial_preseed_report = await run_initial_preseed(quant_scanner, initial_watchlist_symbols)
+            logger.info(
+                "Initial Quant preseed complete: %d/%d symbol(s) ready%s",
+                len(initial_preseed_report.ready_symbols), len(initial_watchlist_symbols),
+                " -- ZERO READY" if initial_preseed_report.is_blocked else "",
+            )
+        else:
+            logger.info("Watchlist is empty at startup -- skipping initial Quant preseed (nothing to seed).")
+    startup_readiness.mark(PHASE_PRESEED_COMPLETE)
+
     market_publisher = RedisEventPublisher()
+    startup_readiness._publisher = market_publisher
 
     research_agent: ResearchAgent | None = None
     brain_store: BrainStatsStore | None = None
@@ -1104,7 +1226,14 @@ async def main() -> None:
     decision_engine: DecisionEngine | None = None
     core_store: TickerStateStore | None = None
     if not args.skip_core:
-        core_config = CoreConfig()
+        # Task 87B FC_01: wire the durable decision-bearing alert outbox to a
+        # real on-disk path for the live runtime (a bare CoreConfig() in a
+        # unit test stays in-memory). An explicit env var still wins.
+        core_config = CoreConfig(
+            alert_outbox_path=os.environ.get(
+                "TALONX_CORE_ALERT_OUTBOX_PATH", DEFAULT_ALERT_OUTBOX_PATH
+            )
+        )
         if core_config.enable_persistence:
             try:
                 core_store = TickerStateStore(core_config.state_db_path)
@@ -1188,9 +1317,27 @@ async def main() -> None:
             refresh_warn_seconds=settings.market_data.premarket_refresh_warn_seconds,
         )
 
+    # Task 87B FC_03: market-INDEPENDENT ingest liveness beacon -- a timer
+    # beat that keeps /ping able to tell "ingest process/Redis down" from
+    # "market legitimately quiet" (post-close, thin pre-market, weekend).
+    liveness_beacon: LivenessBeacon | None = None
+    if not args.skip_market_data:
+        liveness_beacon = LivenessBeacon(
+            market_publisher,
+            active_poller_fn=lambda: ("premarket_vectorized" if is_premarket_window() else "streaming_yfinance"),
+            startup_readiness=startup_readiness,
+        )
+
     market_data_runner: WatchlistDrivenMarketData | None = None
     long_term_price_runner: LongTermPriceRunner | None = None
     if not args.skip_market_data:
+        # Task 66B-PREP explicitness (Part 5): which provider WILL be used
+        # is knowable statically from config, before MarketDataManager
+        # constructs anything -- log it plainly rather than only inside
+        # MarketDataManager.stream()'s own log line, so it's visible even
+        # to someone scanning startup logs for "did this use Polygon or
+        # yfinance today" without reading module internals.
+        logger.info("Market data provider (configured): %s", configured_market_data_provider())
         long_term_price_runner = LongTermPriceRunner(
             watchlist_store, make_on_event(market_publisher), watchlist_config.poll_interval_seconds,
             _env_float("TALONX_LT_PRICE_POLL_INTERVAL", 86400.0),
@@ -1200,6 +1347,7 @@ async def main() -> None:
         )
         market_data_runner = WatchlistDrivenMarketData(
             watchlist_store, make_on_event(market_publisher), watchlist_config.poll_interval_seconds,
+            metrics_publisher=market_publisher,
         )
 
     reactive_ingestion: WatchlistDrivenIngestion | None = None
@@ -1210,6 +1358,9 @@ async def main() -> None:
     if quant_scanner is not None:
         quant_preseed = WatchlistDrivenQuantPreseed(
             watchlist_store, quant_scanner, watchlist_config.poll_interval_seconds,
+            already_preseeded_symbols=(
+                set(initial_preseed_report.requested_symbols) if initial_preseed_report is not None else None
+            ),
         )
 
     # Gated on quant_store specifically (not just not args.skip_quant) --
@@ -1229,6 +1380,8 @@ async def main() -> None:
             earnings_fast_track_poller.stop()
         if premarket_poller is not None:
             premarket_poller.stop()
+        if liveness_beacon is not None:
+            liveness_beacon.stop()
         if quant_scanner is not None:
             quant_scanner.stop()
         if fundamental_scanner is not None:
@@ -1256,6 +1409,8 @@ async def main() -> None:
 
     if market_data_runner is not None:
         await market_publisher.connect()  # logs a warning and continues if Redis unavailable
+        startup_readiness.mark(PHASE_REDIS_CONNECTED)
+        await startup_readiness.publish()
 
     logger.info(
         "Starting TalonX (interval=%.1fh, ingestion=%s, market_data=%s, "
@@ -1269,6 +1424,31 @@ async def main() -> None:
         "enabled" if paper_trading_engine is not None else "disabled",
         "enabled" if long_term_paper_engine is not None else "disabled",
     )
+    if paper_trading_engine is not None or long_term_paper_engine is not None:
+        # Task 66B-PREP explicitness (Part 6): this is talonx_paper's own
+        # local simulated ledger (SQLite), never Alpaca -- unlike talonx_piv,
+        # which submits real (paper-mode) orders to Alpaca's broker
+        # endpoint. Stated explicitly here so a log/EOD reader never
+        # conflates the two execution paths.
+        logger.info("Paper execution path: %s", paper_execution_path_label())
+
+    # Task 66B-PREP (Parts 5/6/10): best-effort, additive, never fatal --
+    # gives generate_eod_report.py something concrete to attribute a report
+    # to (which provider/execution path/commit actually ran this session),
+    # and distinguishes a normal run_talonx.py run from a talonx_piv one.
+    try:
+        write_runtime_metadata(
+            run_mode="FULL_APP",
+            market_data_provider_configured=configured_market_data_provider() if market_data_runner is not None else "DISABLED",
+            paper_execution_path=paper_execution_path_label(),
+            quant_enabled=quant_scanner is not None,
+            brain_enabled=research_agent is not None,
+            core_enabled=decision_engine is not None,
+            dispatch_enabled=dispatch_agent is not None,
+            paper_trading_enabled=paper_trading_engine is not None,
+        )
+    except Exception as exc:  # noqa: BLE001 -- pure observability, never blocks startup
+        logger.warning("Failed to write runtime metadata (non-fatal): %s", exc)
 
     tasks = []
     if market_data_runner is not None:
@@ -1279,6 +1459,8 @@ async def main() -> None:
         tasks.append(asyncio.create_task(earnings_fast_track_poller.run(), name="earnings_fast_track"))
     if premarket_poller is not None:
         tasks.append(asyncio.create_task(premarket_poller.run(), name="premarket_poller"))
+    if liveness_beacon is not None:
+        tasks.append(asyncio.create_task(liveness_beacon.run(), name="liveness_beacon"))
     if quant_scanner is not None:
         tasks.append(asyncio.create_task(quant_scanner.run(), name="quant_scanner"))
     if fundamental_scanner is not None:
@@ -1293,41 +1475,59 @@ async def main() -> None:
         tasks.append(asyncio.create_task(paper_trading_engine.run(), name="paper_trading_engine"))
     if long_term_paper_engine is not None:
         tasks.append(asyncio.create_task(long_term_paper_engine.run(), name="long_term_paper_engine"))
+    # Task 87B FC_06: the critical path (pollers + core consumers, added
+    # above) starts at t=0; the expensive background bootstrap loops below
+    # -- whose FIRST cycle does heavy EDGAR + sentence-transformer
+    # embedding + XBRL work -- are staggered by a small bounded delay so
+    # they do not collide with the Redis connect / poller spin-up. Their
+    # steady-state cadence (args.interval_hours) is unchanged.
+    _stg = bootstrap_stagger_seconds
+    startup_readiness.mark(PHASE_MARKET_POLLERS_STARTED)
+    startup_readiness.mark(PHASE_CONSUMERS_STARTED)
     if not args.skip_ingestion:
-        tasks.append(
-            asyncio.create_task(
-                periodic_ingestion_loop(watchlist_store, args.interval_hours, stop_event),
-                name="periodic_ingestion",
-            )
-        )
-        tasks.append(
-            asyncio.create_task(
-                periodic_long_term_financials_loop(watchlist_store, args.interval_hours, stop_event),
-                name="periodic_long_term_financials",
-            )
-        )
+        tasks.append(asyncio.create_task(
+            delayed_start(
+                lambda: periodic_ingestion_loop(watchlist_store, args.interval_hours, stop_event),
+                _stg * 1, name="periodic_ingestion",
+            ), name="periodic_ingestion",
+        ))
+        tasks.append(asyncio.create_task(
+            delayed_start(
+                lambda: periodic_long_term_financials_loop(watchlist_store, args.interval_hours, stop_event),
+                _stg * 2, name="periodic_long_term_financials",
+            ), name="periodic_long_term_financials",
+        ))
     if not args.skip_earnings_sync:
-        tasks.append(
-            asyncio.create_task(
-                periodic_earnings_calendar_sync_loop(
+        tasks.append(asyncio.create_task(
+            delayed_start(
+                lambda: periodic_earnings_calendar_sync_loop(
                     watchlist_store, _env_float("TALONX_INGEST_EARNINGS_SYNC_INTERVAL_HOURS", 168.0), stop_event,
                 ),
-                name="periodic_earnings_calendar_sync",
-            )
-        )
+                _stg * 3, name="periodic_earnings_calendar_sync",
+            ), name="periodic_earnings_calendar_sync",
+        ))
     if reactive_ingestion is not None:
         tasks.append(asyncio.create_task(reactive_ingestion.run(), name="reactive_ingestion"))
     if quant_preseed is not None:
         tasks.append(asyncio.create_task(quant_preseed.run(), name="quant_preseed"))
     if run_long_term_factors_reconciliation:
-        tasks.append(
-            asyncio.create_task(
-                reconcile_missing_long_term_factors(
+        tasks.append(asyncio.create_task(
+            delayed_start(
+                lambda: reconcile_missing_long_term_factors(
                     watchlist_store, quant_store, stop_event, fundamental_scanner,
                 ),
-                name="reconcile_long_term_factors",
-            )
-        )
+                _stg * 4, name="reconcile_long_term_factors",
+            ), name="reconcile_long_term_factors",
+        ))
+    startup_readiness.mark(PHASE_BOOTSTRAP_SCHEDULED)
+
+    async def _mark_full_ready() -> None:
+        await asyncio.sleep(_stg * 5)
+        startup_readiness.mark(PHASE_FULL_READY)
+        await startup_readiness.publish()
+        logger.info("Startup fully ready: %s", startup_readiness.snapshot())
+
+    tasks.append(asyncio.create_task(_mark_full_ready(), name="startup_full_ready_marker"))
 
     if not tasks:
         logger.error("Everything was skipped -- nothing to run. Drop at least one --skip-* flag.")
@@ -1360,6 +1560,8 @@ async def main() -> None:
             earnings_fast_track_poller.stop()
         if premarket_poller is not None:
             premarket_poller.stop()
+        if liveness_beacon is not None:
+            liveness_beacon.stop()
         if quant_scanner is not None:
             quant_scanner.stop()
         if fundamental_scanner is not None:

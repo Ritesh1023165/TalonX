@@ -1,0 +1,11 @@
+{
+  "task": "69P Part 0 - clean start / process audit (BEFORE)",
+  "checked_utc": "2026-08-25T11:43:00Z",
+  "active_talonx_runners_before": 0,
+  "active_schedulers_before": 0,
+  "paper_open_orders_before": 0,
+  "paper_open_positions_before": 0,
+  "method": "PowerShell Get-Process (python/py name filter) + Get-ScheduledTask (talon name filter) for process/scheduler counts; talonx_piv.broker.AlpacaPaperClient.open_orders()/positions() (real, read-only Alpaca PAPER API calls) for broker state -- reconfirmed identically inside the same-run preflight check (open_paper_orders_queried=0, open_paper_positions_queried=0, internal_broker_reconciled internal=[] broker=[]), see preflight_result.json.",
+  "unrelated_programs_killed": false,
+  "duplicate_talonx_runtime_found": false
+}

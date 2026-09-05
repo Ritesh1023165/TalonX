@@ -1,0 +1,21 @@
+{
+  "purpose": "Exact reproduction of Task 72O's preregistered zero-trade AAPL replay, with --research-telemetry added for full candidate-level visibility. Written to Task 73S's own output directory -- Task 72O's own evidence files (results/task72o_overnight_stabilization/scratch_stage3/aapl_full_primarycost_*) are untouched.",
+  "command": "talonx_backtest --data data/historical_1m/task7b_alpaca_long_history --symbols AAPL --start 2025-08-15 --end 2025-12-31 --tz America/New_York --entry-slippage-bps 5 --exit-slippage-bps 5 --spread-bps 10 --out results/task73s_regression_and_zero_trade_diagnosis/stage2_reproduction --prefix aapl_repro --research-telemetry",
+  "symbol": "AAPL",
+  "requested_period": {"start": "2025-08-15", "end": "2025-12-31"},
+  "data_source": "data/historical_1m/task7b_alpaca_long_history/AAPL.csv (same file Task 72O used, untouched)",
+  "cost_assumption": {
+    "entry_slippage_bps": 5.0, "exit_slippage_bps": 5.0, "spread_bps": 10.0,
+    "meaning": "entry cost = entry_slippage(5bps) + spread/2(5bps) = 10bps total entry-side; exit cost = exit_slippage(5bps) + spread/2(5bps) = 10bps total exit-side; 20bps total round-trip -- verified directly from talonx_backtest/execution.py (see stage0_baseline_audit.md item 5)"
+  },
+  "result_byte_for_byte_identical_to_task72o": {
+    "bars_processed": 67002, "signals_generated": 6, "signals_published": 0, "trades_executed": 0,
+    "rejections_by_reason": {"LOW_VOLATILITY": 66648, "US_MARKET_SESSION_CLOSED": 4, "LOW_CONFLUENCE": 2}
+  },
+  "reproducibility": {
+    "runtime_sha_at_this_run": "13328eb (Stage 1's own commit, since this run happened after Stage 1)",
+    "config_hash": "3556debe52af",
+    "dataset_hash": "7b14ce2e50df",
+    "note": "config_hash/dataset_hash are IDENTICAL to Task 72O's own recorded values despite the different runtime_sha, confirming the underlying strategy config and input data are byte-for-byte unchanged between Task 72O and this reproduction -- only the codebase's unrelated commits since then differ."
+  }
+}

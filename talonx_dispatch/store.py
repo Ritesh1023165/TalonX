@@ -203,6 +203,18 @@ CREATE TABLE IF NOT EXISTS rejected_candidates (
 CREATE INDEX IF NOT EXISTS idx_rejected_candidates_ticker ON rejected_candidates (ticker);
 CREATE INDEX IF NOT EXISTS idx_rejected_candidates_rejected_at ON rejected_candidates (rejected_at);
 CREATE INDEX IF NOT EXISTS idx_rejected_candidates_reason ON rejected_candidates (reason);
+
+-- Task 87B FC_01: idempotency ledger for talonx_core.alert_outbox's
+-- at-least-once delivery. talonx_core may re-publish the SAME alert (same
+-- outbox_id) after a Redis outage / process restart; this table lets
+-- Dispatch process each distinct alert exactly once -- no duplicate
+-- record_alert(), no duplicate Telegram push -- while still ACKing the
+-- redelivery so the outbox can mark it SENT. Append-only, tiny.
+CREATE TABLE IF NOT EXISTS processed_alert_outbox_ids (
+    outbox_id      TEXT PRIMARY KEY,
+    channel        TEXT NOT NULL,
+    first_seen_at  TEXT NOT NULL
+);
 """
 
 
@@ -294,6 +306,30 @@ class AuditStore:
 
     def __exit__(self, *exc_info) -> None:
         self.close()
+
+    # ---- Task 87B FC_01: alert-outbox idempotency ----
+    def alert_outbox_id_already_processed(self, outbox_id: str) -> bool:
+        """True iff Dispatch has already fully processed the alert with this
+        stable delivery id (an earlier delivery, before an at-least-once
+        retry/replay). ``None``/empty id -> always False (legacy payload)."""
+        if not outbox_id:
+            return False
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT 1 FROM processed_alert_outbox_ids WHERE outbox_id = ?", (outbox_id,)
+            ).fetchone()
+        return row is not None
+
+    def mark_alert_outbox_id_processed(self, outbox_id: str, channel: str) -> None:
+        if not outbox_id:
+            return
+        with self._lock:
+            self._conn.execute(
+                "INSERT OR IGNORE INTO processed_alert_outbox_ids (outbox_id, channel, first_seen_at) "
+                "VALUES (?, ?, ?)",
+                (outbox_id, channel, datetime.now(timezone.utc).isoformat()),
+            )
+            self._conn.commit()
 
     def record_alert(self, alert: ActionableAlert) -> int:
         sig = alert.triggering_signal

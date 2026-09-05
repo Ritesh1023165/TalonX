@@ -1,0 +1,237 @@
+FFF.FFFFFFFF..                                                           [100%]
+================================== FAILURES ===================================
+______________ test_quantity_mismatch_same_symbol_is_not_matched ______________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-797/test_quantity_mismatch_same_sy0')
+
+    def test_quantity_mismatch_same_symbol_is_not_matched(tmp_path):
+        transport = ConfigurableTransport()
+        life, transport, _ = _life(tmp_path, transport=transport)
+        _open_internal_position(life, "AAPL", 10)
+        transport.positions = []
+        transport.add_position("AAPL", 1)  # broker only shows 1 share
+    
+        result = life.reconcile(now=FROZEN_NOW)
+    
+>       assert result["matched"] is False, "qty 10 (internal) vs 1 (broker) must not be matched"
+E       AssertionError: qty 10 (internal) vs 1 (broker) must not be matched
+E       assert True is False
+
+tests\test_task81_reconciliation_admission.py:177: AssertionError
+_______________________ test_side_mismatch_not_matched ________________________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-797/test_side_mismatch_not_matched0')
+
+    def test_side_mismatch_not_matched(tmp_path):
+        transport = ConfigurableTransport()
+        life, transport, _ = _life(tmp_path, transport=transport)
+        _open_internal_position(life, "AAPL", 5)
+        transport.positions = []
+        transport.add_position("AAPL", 5, side="short")  # same qty magnitude, wrong side
+    
+        result = life.reconcile(now=FROZEN_NOW)
+    
+>       assert result["matched"] is False
+E       assert True is False
+
+tests\test_task81_reconciliation_admission.py:192: AssertionError
+______________ test_untracked_broker_open_order_blocks_admission ______________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-797/test_untracked_broker_open_ord0')
+
+    def test_untracked_broker_open_order_blocks_admission(tmp_path):
+        transport = ConfigurableTransport()
+        life, transport, _ = _life(tmp_path, transport=transport)
+        # No internal positions, no internal orders. Broker shows an open BUY
+        # order this system never submitted.
+        transport.add_open_order("broker-xyz", "TSLA", 3, side="buy")
+    
+        result = life.reconcile(now=FROZEN_NOW)
+    
+>       assert result["matched"] is False, "an untracked broker open order is a mismatch"
+E       AssertionError: an untracked broker open order is a mismatch
+E       assert True is False
+
+tests\test_task81_reconciliation_admission.py:209: AssertionError
+_ test_single_order_refresh_failure_keeps_block_across_reconcile_and_restart __
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-797/test_single_order_refresh_fail0')
+
+    def test_single_order_refresh_failure_keeps_block_across_reconcile_and_restart(tmp_path):
+        transport = ConfigurableTransport()
+        life, transport, _ = _life(tmp_path, transport=transport)
+        # An adopted-but-pending internal order whose individual refresh fails.
+        entry = life.order_intent("s1", "AAPL", "buy", 1, source="STRATEGY")
+        broker_id = entry["id"]
+        transport.failing_order_ids.add(broker_id)
+    
+        # First reconcile: the per-order refresh raises. Must block.
+        result1 = life.reconcile(now=FROZEN_NOW)
+>       assert result1["matched"] is False
+E       assert True is False
+
+tests\test_task81_reconciliation_admission.py:244: AssertionError
+__________________ test_malformed_positions_response_blocks ___________________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-797/test_malformed_positions_respo0')
+
+    def test_malformed_positions_response_blocks(tmp_path):
+        transport = ConfigurableTransport()
+        life, transport, _ = _life(tmp_path, transport=transport)
+        transport.positions_body = {"message": "internal error"}  # a 200 with a dict, not a list
+    
+>       result = life.reconcile(now=FROZEN_NOW)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_task81_reconciliation_admission.py:283: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <talonx_piv.lifecycle.PaperLifecycle object at 0x0000015626EE1C40>
+now = datetime.datetime(2026, 8, 28, 15, 0, tzinfo=datetime.timezone.utc)
+
+    def reconcile(self, *, now: datetime | None = None) -> dict[str, Any]:
+        self._resolve_unconfirmed_orders()
+        self._resolve_uncertain_submissions(now=now)
+        self._refresh_non_terminal_orders()
+        broker_orders = self.broker.open_orders()
+        broker_positions = self.broker.positions()
+        internal_open = {v["symbol"] for v in self.state.positions.values() if v.get("status") == "OPEN"}
+>       broker_open = {str(v.get("symbol")) for v in broker_positions}
+                           ^^^^^
+E       AttributeError: 'str' object has no attribute 'get'
+
+talonx_piv\lifecycle.py:1231: AttributeError
+____________________ test_non_list_orders_response_blocks _____________________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-797/test_non_list_orders_response_0')
+
+    def test_non_list_orders_response_blocks(tmp_path):
+        transport = ConfigurableTransport()
+        life, transport, _ = _life(tmp_path, transport=transport)
+        transport.open_orders_body = None  # a 200 with null
+    
+>       result = life.reconcile(now=FROZEN_NOW)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_task81_reconciliation_admission.py:296: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+talonx_piv\lifecycle.py:1228: in reconcile
+    broker_orders = self.broker.open_orders()
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <talonx_piv.broker.AlpacaPaperClient object at 0x0000015626F10530>
+
+    def open_orders(self) -> list[dict[str, Any]]:
+        self._require_verified()
+        response = self.transport.get(f"{PAPER_ENDPOINT}/v2/orders", headers=self.headers, params={"status": "open"}, timeout=15)
+        response.raise_for_status()
+>       return list(response.json())
+               ^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: 'NoneType' object is not iterable
+
+talonx_piv\broker.py:78: TypeError
+__________________ test_position_with_unparseable_qty_blocks __________________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-797/test_position_with_unparseable0')
+
+    def test_position_with_unparseable_qty_blocks(tmp_path):
+        transport = ConfigurableTransport()
+        life, transport, _ = _life(tmp_path, transport=transport)
+        _open_internal_position(life, "AAPL", 1)
+        transport.positions = [{"symbol": "AAPL", "side": "long", "qty": "not-a-number"}]
+    
+        result = life.reconcile(now=FROZEN_NOW)
+    
+>       assert result["matched"] is False
+E       assert True is False
+
+tests\test_task81_reconciliation_admission.py:310: AssertionError
+____________ test_block_clears_only_after_complete_consistent_pass ____________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-797/test_block_clears_only_after_c0')
+
+    def test_block_clears_only_after_complete_consistent_pass(tmp_path):
+        transport = ConfigurableTransport()
+        life, transport, _ = _life(tmp_path, transport=transport)
+        _open_internal_position(life, "AAPL", 4)
+        transport.positions = []
+        transport.add_position("AAPL", 2)  # mismatch
+    
+        life.reconcile(now=FROZEN_NOW)
+>       assert life.state.reconciliation_flags["entry_admission_blocked"] is True
+E       assert False is True
+
+tests\test_task81_reconciliation_admission.py:326: AssertionError
+__________________ test_uncertain_submission_prevents_clear ___________________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-797/test_uncertain_submission_prev0')
+
+    def test_uncertain_submission_prevents_clear(tmp_path):
+        transport = ConfigurableTransport()
+        life, transport, _ = _life(tmp_path, transport=transport)
+        # Force a submit failure so the intent is SUBMIT_FAILED_UNCERTAIN.
+        original_post = transport.post
+    
+        def _boom(url, **kwargs):
+            raise RuntimeError("submit connection reset")
+    
+        transport.post = _boom
+        with pytest.raises(RuntimeError):
+            life.order_intent("s1", "AAPL", "buy", 1, source="STRATEGY")
+        transport.post = original_post
+    
+        assert any(i.get("status") == "SUBMIT_FAILED_UNCERTAIN" for i in life.state.intents.values())
+    
+        # Portfolios are empty on both sides, but an unresolved submission means
+        # the reconcile is not consistent/complete -- must not clear.
+        result = life.reconcile(now=FROZEN_NOW)
+>       assert life.state.reconciliation_flags["entry_admission_blocked"] is True
+E       assert False is True
+
+tests\test_task81_reconciliation_admission.py:355: AssertionError
+______________________ test_block_does_not_suppress_sell ______________________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-797/test_block_does_not_suppress_s0')
+
+    def test_block_does_not_suppress_sell(tmp_path):
+        transport = ConfigurableTransport()
+        life, transport, _ = _life(tmp_path, transport=transport)
+        _open_internal_position(life, "AAPL", 3)
+        transport.positions = []
+        transport.add_position("AAPL", 99)  # mismatch -> entry block
+    
+        life.reconcile(now=FROZEN_NOW)
+>       assert life.state.reconciliation_flags["entry_admission_blocked"] is True
+E       assert False is True
+
+tests\test_task81_reconciliation_admission.py:371: AssertionError
+________________ test_entry_block_does_not_disable_eod_cleanup ________________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-797/test_entry_block_does_not_disa0')
+
+    def test_entry_block_does_not_disable_eod_cleanup(tmp_path):
+        transport = ConfigurableTransport()
+        life, transport, _ = _life(tmp_path, transport=transport)
+        _open_internal_position(life, "AAPL", 2)
+        transport.positions = []
+        transport.add_position("AAPL", 5)  # mismatch -> entry block
+    
+        life.reconcile(now=FROZEN_NOW)
+>       assert life.state.reconciliation_flags["entry_admission_blocked"] is True
+E       assert False is True
+
+tests\test_task81_reconciliation_admission.py:388: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_task81_reconciliation_admission.py::test_quantity_mismatch_same_symbol_is_not_matched
+FAILED tests/test_task81_reconciliation_admission.py::test_side_mismatch_not_matched
+FAILED tests/test_task81_reconciliation_admission.py::test_untracked_broker_open_order_blocks_admission
+FAILED tests/test_task81_reconciliation_admission.py::test_single_order_refresh_failure_keeps_block_across_reconcile_and_restart
+FAILED tests/test_task81_reconciliation_admission.py::test_malformed_positions_response_blocks
+FAILED tests/test_task81_reconciliation_admission.py::test_non_list_orders_response_blocks
+FAILED tests/test_task81_reconciliation_admission.py::test_position_with_unparseable_qty_blocks
+FAILED tests/test_task81_reconciliation_admission.py::test_block_clears_only_after_complete_consistent_pass
+FAILED tests/test_task81_reconciliation_admission.py::test_uncertain_submission_prevents_clear
+FAILED tests/test_task81_reconciliation_admission.py::test_block_does_not_suppress_sell
+FAILED tests/test_task81_reconciliation_admission.py::test_entry_block_does_not_disable_eod_cleanup
+11 failed, 3 passed in 0.94s

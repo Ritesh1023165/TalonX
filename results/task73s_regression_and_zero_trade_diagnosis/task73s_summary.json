@@ -1,0 +1,53 @@
+{
+  "task": "Task73S_REGRESSION_AND_ZERO_TRADE_DIAGNOSIS",
+  "starting_branch": "research/talonx-strategy-validation",
+  "starting_sha": "df6da2b",
+  "stages": {
+    "stage0_baseline": {"status": "PASS"},
+    "stage1_fixture_repair": {"status": "PASS", "commit": "13328eb", "pushed": true},
+    "stage2_zero_trade_funnel": {"status": "PASS", "commit": "pending_stage4_commit"},
+    "stage3_control_fixture": {"status": "PASS_NO_DEFECT_FOUND", "commit": "pending_stage4_commit"},
+    "stage4_verdict": {"status": "COMPLETE"}
+  },
+  "regression_root_cause": {
+    "task72o_cited_rule": "3c97d9d (RSI-curl confirmation, 2026-08-21) -- INCORRECT",
+    "actual_rule": "83aee8b (MACD no-self-credit, 2026-08-22) -- CONFIRMED via --research-telemetry",
+    "actual_rejected_candidate": "macd_bearish_cross, confluence_score=1",
+    "second_blocker_found_and_fixed": "200-bar/15-min HTF trend gate, unsatisfiable by the original 2-day fixture",
+    "classification": "TEST_ISOLATION_DEFECT"
+  },
+  "cost_interpretation": {
+    "entry_slippage_bps": 5, "exit_slippage_bps": 5, "spread_bps": 10,
+    "total_entry_side_bps": 10, "total_exit_side_bps": 10, "total_round_trip_bps": 20,
+    "verified_from": "talonx_backtest/execution.py::apply_entry_cost/apply_exit_cost"
+  },
+  "zero_trade_funnel_summary": {
+    "bars_processed": 67002,
+    "rejections_by_reason": {"LOW_VOLATILITY": 66648, "US_MARKET_SESSION_CLOSED": 4, "LOW_CONFLUENCE": 2},
+    "signals_generated": 6, "signals_generated_bullish": 6, "signals_generated_bearish": 0,
+    "signals_published": 0, "trades_executed": 0,
+    "htf_warmup_blocking": false, "preroll_available": false, "preroll_material": false,
+    "timezone_verified_correct": true, "cost_affects_eligibility": false
+  },
+  "control_fixture_evidence": {
+    "eligible_setup_reaches_full_pipeline": true,
+    "rejected_setup_correctly_excluded": true,
+    "readiness_blocked_setup_correctly_returns_none": true,
+    "harness_defect_found": false,
+    "code_changed_in_stage3": false
+  },
+  "final_classification": "NO_ELIGIBLE_LONG_SETUPS",
+  "profitability_verdict": "INCONCLUSIVE",
+  "protected_files_unchanged": true,
+  "eod_code_unchanged": true,
+  "holdouts_accessed": [],
+  "external_notifications_sent": 0,
+  "broker_mutations": 0,
+  "files_changed": [
+    "examples/data/sample_AAPL_trade_1m.csv",
+    "tests/test_backtest_sample_data.py",
+    "tests/test_task73s_control_fixture.py"
+  ],
+  "commits": ["13328eb"],
+  "final_working_tree_status": "clean after Stage 4 commit+push (see final report)"
+}
