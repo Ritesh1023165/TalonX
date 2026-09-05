@@ -1,0 +1,48 @@
+# TalonX — Research Status
+
+*Consolidated conclusions. Detailed evidence lives under `results/task*/` (mostly local-only,
+gitignored) and `docs/research/TALONX_RESEARCH_LEDGER.md` (the append-only chronological history).
+Nothing here is re-derived; this is a pointer index.*
+
+## Headline
+
+**No robust, cost-survivable free intraday structural-long alpha was found.** The current
+Original strategy is deliberately selective and **UNPROVEN** — it is not a profitability claim.
+The free intraday structural-long research lane is **CLOSED**. The system's realised value is a
+descriptive human-in-the-loop **risk & event intelligence** product, not autonomous profit.
+
+## Task-by-task (chronological)
+
+| task(s) | question | verdict |
+|---|---|---|
+| pre-90 (15-63, FPRC_V1 / ORPB_V1) | earlier candidate architectures | retired; evidence + freeze protocols kept (`results/task55…63r`) |
+| **93** | is there any assessable edge in the frozen strategy across all available history? | `CURRENT_STRATEGY_EDGE_WEAK_OR_UNPROVEN` — 1 trade across 35 sym / 4.47M bars / 2025-01→2026-08; vol gate rejects 92.8% of bars |
+| **94** | alpha discovery — 49 pre-registered event studies (volatility / volume / momentum / regime / intraday) | `ALPHA_DISCOVERY_NO_CANDIDATE_PASSED` — 0/49; volatility is not the lever; Task 93's confluence signal was an April-2025 artifact; best (opening drift +0.048 R@5bps) is sub-threshold ≈ round-trip cost |
+| **95A** | do more regimes (2020-2026 Alpaca SIP, 25.8M bars) rescue the opening drift? | `INTRADAY_ALPHA_NOT_SUPPORTED_ACROSS_EXPANDED_REGIMES` — 0/5; opening drift *weakened* to +0.007 R@5bps; only `vol_low` regime helped but fails the cost burden; **binding wall = intraday drift ≈ 5 bps ≈ round-trip cost across ALL regimes / 6.6y** |
+| **95B** | swing horizon (3-10d), split-adj daily | `SWING_ALPHA_NO_CANDIDATE_PASSED` — economics fine (drift ÷ cost 2.8-9.2) but 68 studies → 0; momentum & breakout NEGATIVE-excess (mean-revert at 2-3d); oversold/gap = 2020/2023 V-bottom artifact |
+| **95C-D** | free earnings-event alpha (EDGAR `acceptanceDateTime` + XBRL first-filed) | `FREE_EVENT_ALPHA_NO_CANDIDATE_PASSED` — post-earnings reaction MEAN-REVERTS; actual EPS/rev growth adds no incremental info; point-in-time consensus (the untested high-evidence dimension) is not reachable free |
+| **95E / 95G** | cross-sectional ranking (35-name survivor set → 620-name point-in-time S&P panel) | `BROAD_CROSS_SECTIONAL_ALPHA_NO_CANDIDATE_PASSED` — relative momentum INVERTS to significantly negative; breadth + survivorship control *strengthened* the negative |
+| **95F** | free point-in-time universe feasibility | `FREE_BROAD_UNIVERSE_DATA_FEASIBLE` — S&P historical membership 2019-2026 from Wikipedia MediaWiki API (£0); 99.3% delisted-name coverage with correct exit-date truncation |
+| **95H-I** | free deterministic filing-event alpha (no NLP) | `DETERMINISTIC_FILING_ALPHA_NO_CANDIDATE_PASSED` — 101 experiments / 0; the one solid signed effect (big Risk-Factors change → −67 bps @k5) is bad-news / risk info, not long-only entry |
+| **95K** | can the deterministic NEGATIVE signals improve an independently-selected long book by exclusion? | `RISK_FILTER_NO_CANDIDATE_PASSED` — 63 experiments / 0; every flag's flagged-name forward return is still POSITIVE; **TalonX is not better at risk-avoidance than long-entry** |
+| **95J** | alpha-program synthesis | 8 hypothesis spaces CLOSED; `FREE_ALPHA_SPACE_LARGELY_EXHAUSTED` · `AUTONOMOUS_ALPHA_STOP_CURRENT_MANDATE` · product = `RISK_AND_EVENT_INTELLIGENCE_SYSTEM` (human-in-the-loop, no autonomous-profit claim) |
+| **96 (A-H)** | build the descriptive intelligence product | `DECISION_SUPPORT_PRODUCT_DESIGN_COMPLETE` → implemented: EDGAR event store, deterministic filing comparison, insider pipeline, explainable Information Significance, Telegram delivery, dashboard, MVP qualification. No predictive claim anywhere (CI-linted). |
+| **97** | catalyst-displacement long lane | failed — no edge |
+| **99 (A-L)** | restore & harden the live alert surface | Experimental lane restored (`TASK99A`); live intelligence bridge (`99B`); forward-outcome live wiring fix (`99G`); Telegram Markdown/entity escaping fix (`99H`); post-fix canary (`99I` — `PASS_NO_NATURAL_SETUP`); Task100 readiness audit + design closure (`99K`/`99L`) |
+| **101A** | event-first structural candidate backtest & gate-expectancy | `EVENT_FIRST_GATE_INSIGHT_FOUND` — observability improved, but no net alpha; gate-expectancy insight recorded |
+| **101B** | 15-min trend-gate counter-trend dip-reclaim | `TREND_GATE_LEAD_REJECTED` · `CLOSE_FREE_INTRADAY_STRUCTURAL_LONG_RESEARCH` |
+
+## What is preserved for future work
+
+The backtest engine, replay tooling, causal pre-roll, cost/friction models, point-in-time
+universe reconstruction, delisted-name handling, survivor-bias controls, forward-outcome tooling,
+and every dataset + preregistration + final report — see `results/task105_repository_cleanup/backtest_preservation_manifest.md`.
+`docs/BACKTESTING.md` explains how to run a materially new hypothesis without leaking future
+information.
+
+## What is NOT reopened
+
+Free intraday structural-long alpha (cost wall). Broad price/volume cross-sectional ranking
+(signal wall). Autonomous-profit framing (product decision `95J`). Reopening any of these
+requires a **materially new data or feature class** (point-in-time paid consensus, options,
+non-price information) and a separate authorised mandate — not a parameter sweep.
