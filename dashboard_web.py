@@ -52,6 +52,7 @@ from dashboard import CHANNELS, REDIS_URL, ChannelStats, handle_message
 from talonx_compare.config import CompareConfig
 from talonx_compare.dashboard_views import compare_view, original_view, piv_view
 from talonx_ops.authoritative_read_model import AuthoritativeReadModel
+from talonx_ops.dashboard_read import DashboardReadModel
 from talonx_piv.config import PivConfig
 from talonx_piv.observability import build_integrated_projection
 from talonx_quant.config import QuantConfig
@@ -171,6 +172,29 @@ def _authority_block() -> dict:
         block = {"error": repr(exc), "domains": [], "status_counts": {}, "producers": {}}
     _authority_cache = (time.monotonic(), block)
     return block
+
+
+# Task 100C: the six primary unified-cockpit sections. Each is a pure read over
+# the Task 100A/B authoritative sources (talonx_ops.dashboard_read), TTL-cached
+# so a burst of tab clicks does not re-open every SQLite file each time. Every
+# handler is GET-only and has zero write side effects.
+_SECTION_TTL_SECONDS = 4.0
+_section_cache: dict[str, tuple[float, dict]] = {}
+_UNIFIED_SECTIONS = ("overview", "premarket", "original_quant", "validation",
+                     "intelligence", "paper_eod")
+
+
+def _section_block(name: str) -> dict:
+    cached = _section_cache.get(name)
+    if cached is not None and (time.monotonic() - cached[0]) < _SECTION_TTL_SECONDS:
+        return cached[1]
+    try:
+        model = DashboardReadModel()
+        data = getattr(model, name)()
+    except Exception as exc:  # noqa: BLE001 -- a read failure is surfaced, never a silent 200
+        data = {"error": f"{type(exc).__name__}: {exc}", "section": name}
+    _section_cache[name] = (time.monotonic(), data)
+    return data
 
 
 def _snapshot(stats: dict[str, ChannelStats], started_at: float, buffer_stats: dict) -> dict:
@@ -367,6 +391,27 @@ async def compare_view_handler(request: web.Request) -> web.Response:
     return web.json_response(payload)
 
 
+async def section_handler(request: web.Request) -> web.Response:
+    """Task 100C -- GET /api/section/{name}. Read-only unified-cockpit section
+    data from talonx_ops.dashboard_read (Task 100A/B authoritative sources).
+    No write side effect of any kind."""
+    name = request.match_info.get("name", "")
+    if name not in _UNIFIED_SECTIONS:
+        return web.json_response({"error": f"unknown section '{name}'",
+                                  "sections": list(_UNIFIED_SECTIONS)}, status=404)
+    data = await asyncio.to_thread(_section_block, name)
+    status = 500 if isinstance(data, dict) and "error" in data else 200
+    return web.json_response(data, status=status)
+
+
+async def sections_all_handler(request: web.Request) -> web.Response:
+    """Task 100C -- GET /api/sections : all six sections in one read."""
+    out = {}
+    for name in _UNIFIED_SECTIONS:
+        out[name] = await asyncio.to_thread(_section_block, name)
+    return web.json_response(out)
+
+
 async def on_startup(app: web.Application) -> None:
     app["redis_task"] = asyncio.create_task(_redis_consumer(app))
     app["broadcast_task"] = asyncio.create_task(_broadcaster(app))
@@ -416,6 +461,9 @@ def build_app(piv_state_dir: Path | None = None) -> web.Application:
     app.router.add_get("/views/original", original_view_handler)
     app.router.add_get("/views/piv", piv_view_handler)
     app.router.add_get("/views/compare", compare_view_handler)
+    # Task 100C -- six additive, GET-only, read-only unified-cockpit sections.
+    app.router.add_get("/api/sections", sections_all_handler)
+    app.router.add_get("/api/section/{name}", section_handler)
     app.router.add_static("/static/", STATIC_DIR, show_index=False)
 
     app.on_startup.append(on_startup)
