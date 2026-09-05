@@ -143,6 +143,17 @@
   <div class="stat">total messages <b id="grand-total">0</b></div>
   <div class="stat">distinct tickers <b id="distinct-tickers">0</b></div>
 </header>
+<details id="authority-view" style="padding:8px 16px;border-bottom:1px solid var(--panel-border);font-size:12px">
+  <summary style="cursor:pointer;color:var(--muted)">Authoritative domain status <span id="authority-summary" style="color:var(--muted)"></span></summary>
+  <div id="authority-producers" style="color:var(--muted);font-size:11px;margin:6px 0"></div>
+  <table style="border-collapse:collapse;width:100%;max-width:1100px">
+    <thead><tr style="color:var(--muted);text-align:left">
+      <th style="padding:3px 10px 3px 0">domain</th><th style="padding:3px 10px">status</th>
+      <th style="padding:3px 10px">authoritative source</th><th style="padding:3px 0">note</th>
+    </tr></thead>
+    <tbody id="authority-body"></tbody>
+  </table>
+</details>
 <nav id="view-tabs" style="display:flex;gap:6px;padding:8px 16px;border-bottom:1px solid var(--panel-border)">
   <button class="view-tab" data-view="live" style="background:var(--panel);color:var(--fg);border:1px solid var(--panel-border);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px">Live pipeline</button>
   <button class="view-tab" data-view="original" style="background:var(--panel);color:var(--fg);border:1px solid var(--panel-border);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px">Original</button>
@@ -343,11 +354,44 @@ function renderBufferWarmup(bw) {
   }
 }
 
+// Task 100A: truthful per-domain status so a "0" tile is not misread as
+// ZERO_ACTIVITY when it is actually NO_ACTIVE_PRODUCER / STALE / SUPERSEDED.
+const AUTHORITY_COLOR = {
+  ACTIVE: "var(--good)", ZERO_ACTIVITY: "var(--muted)", NO_ACTIVE_PRODUCER: "var(--bad)",
+  STALE: "var(--warn)", SUPERSEDED: "var(--warn)", UNKNOWN: "var(--muted)",
+};
+function renderAuthority(a) {
+  if (!a) return;
+  const sumEl = document.getElementById("authority-summary");
+  const prodEl = document.getElementById("authority-producers");
+  const body = document.getElementById("authority-body");
+  if (a.error) { sumEl.textContent = "(read error)"; return; }
+  const sc = a.status_counts || {};
+  sumEl.textContent = "— " + Object.entries(sc).map(([k, v]) => `${v} ${k}`).join(", ");
+  const p = a.producers || {};
+  prodEl.textContent = "producers: " +
+    ["original", "experimental", "intelligence"].map(k =>
+      `${k}=${(p[k] && p[k].live) ? "live" : "down"}`).join("  ");
+  body.innerHTML = "";
+  for (const d of (a.domains || [])) {
+    const tr = document.createElement("tr");
+    tr.style.borderTop = "1px solid var(--panel-border)";
+    const src = d.superseded_source ? `${d.authoritative_source}  (was: ${d.superseded_source})` : d.authoritative_source;
+    tr.innerHTML =
+      `<td style="padding:3px 10px 3px 0;font-family:ui-monospace,Consolas,monospace">${d.domain}</td>` +
+      `<td style="padding:3px 10px;color:${AUTHORITY_COLOR[d.status] || "var(--muted)"}">${d.status}</td>` +
+      `<td style="padding:3px 10px;color:var(--muted)">${src || ""}</td>` +
+      `<td style="padding:3px 0;color:var(--muted)">${(d.note || "").slice(0, 160)}</td>`;
+    body.appendChild(tr);
+  }
+}
+
 function render(data) {
   document.getElementById("uptime").textContent = formatUptime(data.uptime_seconds);
   document.getElementById("grand-total").textContent = data.grand_total;
   document.getElementById("distinct-tickers").textContent = data.distinct_tickers;
   renderBufferWarmup(data.buffer_warmup);
+  renderAuthority(data.authority);
 
   for (const ch of data.channels) {
     const refs = ensureCard(ch);

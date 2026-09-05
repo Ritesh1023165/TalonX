@@ -51,6 +51,7 @@ from aiohttp import WSMsgType, web
 from dashboard import CHANNELS, REDIS_URL, ChannelStats, handle_message
 from talonx_compare.config import CompareConfig
 from talonx_compare.dashboard_views import compare_view, original_view, piv_view
+from talonx_ops.authoritative_read_model import AuthoritativeReadModel
 from talonx_piv.config import PivConfig
 from talonx_piv.observability import build_integrated_projection
 from talonx_quant.config import QuantConfig
@@ -149,6 +150,29 @@ async def _buffer_stats_poll(app: web.Application) -> None:
             pass  # normal case: poll interval elapsed
 
 
+# Task 100A: the Redis per-channel counters below are a live *transport* view;
+# a channel showing 0 can mean ZERO_ACTIVITY, NO_ACTIVE_PRODUCER, STALE or
+# SUPERSEDED and the raw counter cannot tell them apart. `_authority_block`
+# adds a per-domain truthful status read (talonx_ops.authoritative_read_model,
+# read-only, no write side effects) so the UI can label a 0 correctly. Cached
+# with a short TTL -- it opens a handful of SQLite files per refresh.
+_AUTHORITY_TTL_SECONDS = 15.0
+_authority_cache: tuple[float, dict] = (0.0, {})
+
+
+def _authority_block() -> dict:
+    global _authority_cache
+    age = time.monotonic() - _authority_cache[0]
+    if _authority_cache[1] and age < _AUTHORITY_TTL_SECONDS:
+        return _authority_cache[1]
+    try:
+        block = AuthoritativeReadModel().snapshot()
+    except Exception as exc:  # noqa: BLE001 -- never let the authority read break the dashboard
+        block = {"error": repr(exc), "domains": [], "status_counts": {}, "producers": {}}
+    _authority_cache = (time.monotonic(), block)
+    return block
+
+
 def _snapshot(stats: dict[str, ChannelStats], started_at: float, buffer_stats: dict) -> dict:
     elapsed = time.monotonic() - started_at
     all_tickers: set[str] = set()
@@ -183,6 +207,7 @@ def _snapshot(stats: dict[str, ChannelStats], started_at: float, buffer_stats: d
         "distinct_tickers": len(all_tickers),
         "channels": channels,
         "buffer_warmup": buffer_stats,
+        "authority": _authority_block(),
     }
 
 
