@@ -199,7 +199,28 @@ function renderPremarket(d){
        {label:'window', get:r=>r.window},{label:'session', get:r=>r.session},
        {label:'heads-up sent', get:r=>String(r.heads_up_sent)},
      ], 20)+srcLine(er.source)+`</div>`;
-  h+=`<div class="card"><h3>Premarket watch ${pill(pw.status)}</h3><div class="muted small">${esc(pw.note||'')}</div>`+srcLine(pw.source)+`</div>`;
+  {
+    const cov=pw.coverage||{}, fam=pw.events_by_family||{}, cnt=pw.counts_by_family||{};
+    let pwh=`<div class="card card-wide"><h3>Premarket watch ${pill(pw.status)}</h3>`;
+    pwh+=`<div class="small muted">session ${esc(pw.session_date||'—')} · updated ${pw.last_updated_at?esc(pw.last_updated_at.slice(0,19)):'—'}`+
+         (pw.last_updated_age_seconds!=null?` (${ageStr(pw.last_updated_age_seconds)} ago)`:'')+
+         ` · coverage ${num(cov.covered)}/${num(cov.active)}</div>`;
+    if(pw.note) pwh+=`<div class="muted small">${esc(pw.note)}</div>`;
+    const order=['GAP_UP','GAP_DOWN','ABNORMAL_VOLUME','BULLISH_WATCH','BEARISH_WATCH'];
+    const any=order.some(k=>(fam[k]||[]).length);
+    if(!any){ pwh+=`<div class="empty">no persisted movers for this session (or the field is NOT_AVAILABLE)</div>`; }
+    order.forEach(k=>{
+      const rows=fam[k]||[];
+      pwh+=`<div class="section-label" style="text-transform:none;margin-top:10px">${k} · ${num(cnt[k]||0)}</div>`;
+      pwh+=boundedTable(rows, [
+        {label:'symbol', get:r=>r.symbol},{label:'bias', get:r=>r.bias},
+        {label:'gap %', get:r=>r.gap_pct},{label:'rel vol', get:r=>r.relative_volume},
+        {label:'ref', get:r=>r.reference_price},{label:'detail', get:r=>r.detail},
+      ], 10);
+    });
+    pwh+=srcLine(pw.source)+`</div>`;
+    h+=pwh;
+  }
   h+=`<div class="card card-wide intel"><h3>Event context ${pill(ec.status)}</h3>`+
      boundedTable(ec.items, [
        {label:'symbol', get:r=>r.symbol},{label:'event type', get:r=>r.event_type},

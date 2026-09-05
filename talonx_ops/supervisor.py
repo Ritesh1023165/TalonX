@@ -678,8 +678,39 @@ def _status_snapshot() -> dict[str, Any]:
         latest = st.latest()
         st.close()
         out["eod_latest"] = latest.to_dict() if latest else None
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        out["eod_reconciled_today"] = bool(latest and latest.session_date == today)
     except Exception as exc:  # noqa: BLE001
         out["eod_error"] = repr(exc)
+
+    # Task 102 Phase 14: the operator's one-glance answers -- running? ready?
+    # feed healthy? shadow/intelligence alive? telegram? positions? EOD? URL?
+    try:
+        from talonx_ops.authoritative_read_model import AuthoritativeReadModel
+
+        arm = AuthoritativeReadModel()
+        op = arm.original_paper().values
+        ep = arm.experimental_paper().values
+        oa = arm.official_alerts().values
+        prod = out.get("producers", {})
+        mstate = (out.get("market") or {}).get("state", "UNKNOWN")
+        out["answers"] = {
+            "talonx_running": bool(prod.get("original", {}).get("live")),
+            "original_ready": bool(prod.get("original", {}).get("live")),
+            "market_feed_healthy": mstate in ("HEALTHY", "IDLE"),
+            "market_feed_state": mstate,
+            "experimental_shadow_alive": bool(prod.get("experimental", {}).get("live")),
+            "intelligence_alive": bool(prod.get("intelligence", {}).get("live")),
+            "telegram_send_ok": not (oa.get("failed_today") and not oa.get("sent_today")),
+            "telegram_receive_owner_count": out.get("telegram_get_updates_owners"),
+            "original_open_positions": op.get("open_positions"),
+            "experimental_open_positions": ep.get("open_positions"),
+            "eod_reconciled_today": out.get("eod_reconciled_today", False),
+            "dashboard_url": "http://localhost:8787",
+            "intelligence_deep_viewer": "http://localhost:8760",
+        }
+    except Exception as exc:  # noqa: BLE001
+        out["answers_error"] = repr(exc)
     return out
 
 

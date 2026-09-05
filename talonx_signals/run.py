@@ -51,6 +51,7 @@ from talonx_signals.intelligence_bridge import (
     overnight_event_labels,
 )
 from talonx_signals.premarket import PremarketSymbolInput, PremarketWatchEngine
+from talonx_signals.premarket_store import PremarketStateStore
 from talonx_signals.relaxed_profile import assert_control_profile_unchanged, build_experimental_quant_config
 from talonx_signals.schemas import PROFILE_CONTROL, PROFILE_EXPERIMENTAL, TradeGateStatus
 from talonx_signals.telemetry import ForwardOutcomeRecorder, ForwardOutcomeStore
@@ -96,6 +97,10 @@ class ExperimentalLane:
         self.post_earnings_bridge = PostEarningsBridge()
         self.bridge_metrics = BridgeMetrics()
         self.premarket_engine = PremarketWatchEngine()
+        # Task 102: durable projection of the pre-market surface (own SQLite
+        # file, WAL, idempotent on the deterministic watch_id). Passive -- read
+        # by nothing in the decision path; a write failure is swallowed below.
+        self.premarket_store = PremarketStateStore(cfg.state_dir / "premarket" / "premarket_state.db")
         self._intel_api = None            # lazily opened IntelligenceReadAPI
         self._watchlist = None
         self._last_price: dict[str, float] = {}
@@ -269,6 +274,14 @@ class ExperimentalLane:
             )
         except Exception:  # noqa: BLE001
             logger.exception("premarket refresh failed")
+        # Task 102: persist the (already-computed) surface as a passive, durable
+        # projection. Idempotent on watch_id; a failure here must never affect
+        # the lane or any trading decision.
+        if self._premarket_bundle is not None:
+            try:
+                self.premarket_store.upsert_bundle(self._premarket_bundle, now=now)
+            except Exception:  # noqa: BLE001
+                logger.exception("premarket persistence failed (non-fatal)")
         return self._premarket_bundle
 
     async def _bridge_loop(self, interval_seconds: float) -> None:
@@ -326,6 +339,7 @@ class ExperimentalLane:
         self.alert_store.close()
         self.outcome_store.close()
         self.paper.close()
+        self.premarket_store.close()
         for h in (self._intel_api, self._watchlist):
             try:
                 h and h.close()

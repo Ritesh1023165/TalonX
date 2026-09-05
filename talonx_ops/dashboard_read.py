@@ -276,16 +276,9 @@ class DashboardReadModel:
         out["earnings_radar"] = {"status": radar_status, "source": "watchlist.db upcoming_earnings",
                                  "items": radar}
 
-        # premarket watch candidates -- persisted only if the lane wrote them;
-        # Task 99F backlog #6: currently dashboard-live-only, no per-item history.
-        out["premarket_watch"] = {
-            "status": "NOT_PERSISTED",
-            "note": ("Gap up/down, abnormal/relative volume, bullish/bearish watch and event "
-                     "context are produced live by talonx_signals PremarketWatchEngine and are "
-                     "NOT persisted per item (Task 99F backlog #6). View them live on :8770 until "
-                     "persistence is added."),
-            "source": "talonx_signals.premarket.PremarketWatchEngine (live-only)",
-        }
+        # premarket watch candidates -- Task 102: now persisted by the
+        # Experimental lane into ~/.talonx/premarket/premarket_state.db.
+        out["premarket_watch"] = self._premarket_watch_block()
         # intelligence/event context that IS persisted (overnight SEC events)
         con = _ro(self.intel_ledger)
         ctx: list[dict] = []
@@ -306,6 +299,60 @@ class DashboardReadModel:
         out["event_context"] = {"status": "ACTIVE" if ctx else self.arm.intelligence().status.value,
                                 "source": "ingestion_ledger.db text_events", "items": ctx}
         return out
+
+    def _premarket_watch_block(self) -> dict[str, Any]:
+        """Task 102 -- read the durable pre-market projection. Distinguishes
+        ACTIVE / STALE / NO_SESSION_TODAY / NO_ACTIVE_PRODUCER / UNKNOWN; never
+        fabricates a 0 (a missing volume feed reads NOT_AVAILABLE)."""
+        db = self.exp / "premarket" / "premarket_state.db"
+        source = "~/.talonx/experimental/premarket/premarket_state.db (PremarketStateStore)"
+        if not db.exists():
+            return {"status": "UNKNOWN", "source": source,
+                    "note": "premarket_state.db not present (Experimental lane has not run since Task 102)"}
+        try:
+            from talonx_signals.premarket_store import PremarketStateStore
+
+            store = PremarketStateStore(db, read_only=True)
+            sess = store.current_session(now=self.now)
+            events: dict[str, list[dict]] = {}
+            counts: dict[str, int] = {}
+            if sess.get("session_date"):
+                counts = store.counts_for_session(sess["session_date"])
+                raw = store.events_for_session(sess["session_date"], limit_per_kind=25)
+                for kind, rows in raw.items():
+                    events[kind] = [{
+                        "watch_id": r["watch_id"], "symbol": r["symbol"], "kind": r["kind"],
+                        "bias": r["bias"], "gap_pct": r["gap_pct"],
+                        "relative_volume": r["relative_volume"] if r["relative_volume"] is not None else "NOT_AVAILABLE",
+                        "reference_price": r["reference_price"], "prev_close": r["prev_close"],
+                        "detail": r["detail"], "last_updated_at": r["last_updated_at"],
+                        "external_eligible": bool(r["external_eligible"]),
+                    } for r in rows]
+            store.close()
+        except Exception as exc:  # noqa: BLE001
+            return {"status": "UNKNOWN", "source": source, "note": f"read error: {exc!r}"}
+
+        exp_live = self.arm.experimental_producer().get("live")
+        status = sess.get("status", "UNKNOWN")
+        if status in ("NO_SESSION_TODAY",) and not exp_live:
+            status = "NO_ACTIVE_PRODUCER"
+        return {
+            "status": status,
+            "source": source,
+            "session_date": sess.get("session_date"),
+            "generated_at": sess.get("generated_at"),
+            "last_updated_at": sess.get("last_updated_at"),
+            "last_updated_age_seconds": sess.get("last_updated_age_seconds"),
+            "coverage": {
+                "configured": sess.get("watchlist_configured"),
+                "active": sess.get("watchlist_active"),
+                "covered": sess.get("watchlist_covered"),
+            },
+            "counts_by_family": counts,
+            "events_by_family": events,
+            "note": sess.get("note", ""),
+            "external_eligible": False,
+        }
 
     def _earnings_window(self, edate: str | None) -> str | None:
         if not edate:

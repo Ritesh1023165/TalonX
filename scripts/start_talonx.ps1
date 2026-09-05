@@ -1,5 +1,17 @@
 <#
 .SYNOPSIS
+    [LEGACY / COMPATIBILITY -- Task 102] Starts run_talonx.py + the Streamlit
+    dashboard (:8501) only. This is NOT the authoritative startup path any more.
+
+    The primary path is the Task 100B supervisor:
+        .\scripts\start_talonx_supervised.ps1
+    which starts Original + Experimental shadow + Intelligence + the :8787
+    cockpit under one supervision model (see results/task102_operational_finalization/operator_runbook.md).
+
+    This script is retained for rollback / a minimal Original-only bring-up and
+    for register_scheduled_tasks.ps1's existing 10am task. Not deleted.
+
+    Original synopsis:
     Starts run_talonx.py and the Streamlit dashboard together.
 .DESCRIPTION
     Ensures the Redis container (docker-compose.yaml's talonx-redis) is

@@ -391,6 +391,59 @@ async def compare_view_handler(request: web.Request) -> web.Response:
     return web.json_response(payload)
 
 
+async def admin_config_get(request: web.Request) -> web.Response:
+    """Task 102 -- GET /admin/config. Read-only: what the local admin surface
+    can do + the strategy/execution denylist + the audit tail. Only served when
+    the server is bound to a loopback host."""
+    if not request.app.get("admin_enabled", False):
+        return web.json_response({"enabled": False,
+                                  "reason": "admin config is only available on a loopback bind"}, status=403)
+    from talonx_ops.admin_config import ALLOWED_ACTIONS, AdminConfigService
+
+    svc = AdminConfigService()
+    try:
+        tail = svc.audit_tail(30)
+    finally:
+        svc.close()
+    return web.json_response({
+        "enabled": True,
+        "note": "Local operational config only. Strategy / execution / broker / short / "
+                "Experimental-promotion keys are permanently denied.",
+        "allowed_actions": list(ALLOWED_ACTIONS),
+        "requires": {"confirm": True},
+        "audit_tail": tail,
+    })
+
+
+async def admin_config_apply(request: web.Request) -> web.Response:
+    """Task 102 -- POST /admin/config/apply. Body: {action, params, confirm}.
+    Loopback-only; every attempt (accepted, rejected, refused) is audited."""
+    if not request.app.get("admin_enabled", False):
+        return web.json_response({"ok": False,
+                                  "reason": "admin config is only available on a loopback bind"}, status=403)
+    from talonx_ops.admin_config import AdminConfigService, ConfigDenied
+
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001
+        return web.json_response({"ok": False, "reason": "invalid JSON body"}, status=400)
+    action = str(body.get("action", ""))
+    params = body.get("params") or {}
+    confirm = bool(body.get("confirm", False))
+    if not isinstance(params, dict):
+        return web.json_response({"ok": False, "reason": "params must be an object"}, status=400)
+
+    svc = AdminConfigService()
+    try:
+        result = await asyncio.to_thread(svc.apply, action, params, confirm=confirm,
+                                         source="admin surface (:8787 /admin/config)")
+    except ConfigDenied as exc:
+        return web.json_response({"ok": False, "outcome": "REFUSED_DENYLIST", "reason": str(exc)}, status=403)
+    finally:
+        svc.close()
+    return web.json_response(result.to_dict(), status=200 if result.ok else 422)
+
+
 async def section_handler(request: web.Request) -> web.Response:
     """Task 100C -- GET /api/section/{name}. Read-only unified-cockpit section
     data from talonx_ops.dashboard_read (Task 100A/B authoritative sources).
@@ -429,8 +482,12 @@ async def on_cleanup(app: web.Application) -> None:
             pass
 
 
-def build_app(piv_state_dir: Path | None = None) -> web.Application:
+def build_app(piv_state_dir: Path | None = None, *, admin_enabled: bool = True) -> web.Application:
     app = web.Application()
+    # Task 102: the local admin-config surface (POST /admin/config/apply) is only
+    # served on a loopback bind. main() computes this from --host; the default
+    # bind is localhost, so tests/dev get it, a non-loopback bind does not.
+    app["admin_enabled"] = bool(admin_enabled)
     # Task 78I Stage 4: same default-resolution PivConfig().state_dir
     # already uses (TALONX_PIV_STATE_DIR env var, else the existing
     # results/task64_paper_piv_readiness/runtime default) -- never a new,
@@ -464,6 +521,10 @@ def build_app(piv_state_dir: Path | None = None) -> web.Application:
     # Task 100C -- six additive, GET-only, read-only unified-cockpit sections.
     app.router.add_get("/api/sections", sections_all_handler)
     app.router.add_get("/api/section/{name}", section_handler)
+    # Task 102 -- local-only operational config (loopback-gated, audited, no
+    # strategy/execution keys). GET is read-only; POST requires confirm=true.
+    app.router.add_get("/admin/config", admin_config_get)
+    app.router.add_post("/admin/config/apply", admin_config_apply)
     app.router.add_static("/static/", STATIC_DIR, show_index=False)
 
     app.on_startup.append(on_startup)
@@ -478,8 +539,12 @@ def main() -> None:
     parser.add_argument("--piv-state-dir", default=None, help="Task 78I: override talonx_piv's state_dir for the /piv/status endpoint (default: PivConfig()'s own resolution, i.e. TALONX_PIV_STATE_DIR or its built-in default)")
     args = parser.parse_args()
 
-    app = build_app(Path(args.piv_state_dir) if args.piv_state_dir else None)
-    logger.info("Starting dashboard web server -- open http://%s:%d in your browser", args.host, args.port)
+    from talonx_ops.admin_config import loopback_host
+
+    admin_ok = loopback_host(args.host)
+    app = build_app(Path(args.piv_state_dir) if args.piv_state_dir else None, admin_enabled=admin_ok)
+    logger.info("Starting dashboard web server -- open http://%s:%d in your browser "
+                "(admin config %s)", args.host, args.port, "enabled" if admin_ok else "DISABLED (non-loopback bind)")
     web.run_app(app, host=args.host, port=args.port, print=None)
 
 

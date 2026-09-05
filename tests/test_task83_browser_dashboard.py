@@ -44,18 +44,26 @@ async def test_all_routes_are_get_only(tmp_path):
         p = info.get("path") or info.get("prefix")
         methods.setdefault(p, set()).add(r.method)
     for p, ms in methods.items():
+        # Task 102: the loopback-gated /admin/config/apply is the ONE deliberate
+        # POST (the :8501 config-editing replacement -- denylisted + audited).
+        # Every other route stays GET/HEAD only.
+        if p and p.startswith("/admin/config"):
+            continue
         assert ms <= {"GET", "HEAD"}, f"{p} exposes non-GET methods: {ms}"
 
 
 @pytest.mark.asyncio
 async def test_no_mutating_endpoints(tmp_path):
-    """No route path hints at launch / order / auth / kill / settings."""
+    """No route path hints at launch / order / auth / kill / settings --
+    except the Task 102 /admin/config surface (deliberate, loopback-only)."""
     app = dashboard_web.build_app(piv_state_dir=tmp_path)
     banned = ("start", "launch", "order", "submit", "auth", "approve", "kill",
               "enable", "disable", "settings", "config", "shutdown", "activate")
     for r in app.router.routes():
         info = r.get_info()
         p = (info.get("path") or info.get("prefix") or "").lower()
+        if p.startswith("/admin/config"):
+            continue
         assert not any(b in p for b in banned), p
 
 
