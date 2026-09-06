@@ -87,13 +87,24 @@ def profit_factor(rets: pd.Series) -> float:
     return float(w / l) if l > 0 else float("inf")
 
 
-def max_drawdown_equalw(rets: pd.Series) -> float:
-    """Max drawdown of a sequential equal-$ per-episode equity curve."""
+def max_drawdown_equalw(rets: pd.Series) -> dict:
+    """Drawdown of the ADDITIVE equal-1-unit-per-episode cumulative-return
+    curve (entry-time ordered).  Additive, not compounded: episodes are
+    independent equal-notional paper positions, not one reinvested account.
+
+    Returns peak-to-trough in *position-units* and as a multiple of the
+    curve's final value (total P&L in the same units)."""
     if rets.empty:
-        return 0.0
-    eq = (1.0 + rets.sort_index().values).cumprod()
+        return {"units": 0.0, "vs_total_pnl": 0.0, "total_pnl_units": 0.0}
+    eq = np.cumsum(rets.values)
     peak = np.maximum.accumulate(eq)
-    return float((eq / peak - 1.0).min())
+    trough = float((eq - peak).min())
+    total = float(eq[-1])
+    return {
+        "units": trough,
+        "total_pnl_units": total,
+        "vs_total_pnl": float(trough / total) if total != 0 else float("nan"),
+    }
 
 
 # --------------------------------------------------------------------------
@@ -183,6 +194,9 @@ def metrics(rets: pd.Series) -> dict:
         profit_factor=profit_factor(rets),
         expectancy=float(rets.mean()),
         max_drawdown=max_drawdown_equalw(rets),
+        p05=float(rets.quantile(0.05)),
+        p01=float(rets.quantile(0.01)),
+        worst=float(rets.min()),
     )
 
 
@@ -199,17 +213,21 @@ def issuer_block_boot(df: pd.DataFrame, col: str, n_boot: int = N_BOOT) -> tuple
     return float(np.nanpercentile(means, 2.5)), float(np.nanpercentile(means, 97.5))
 
 
-def week_cluster_ci(df: pd.DataFrame, col: str) -> tuple[float, float]:
-    s = df.dropna(subset=[col]).copy()
-    s["wk"] = s["entry_session"].dt.to_period("W")
-    wk = s.groupby("wk")[col].mean()
-    m = wk.mean()
-    se = wk.std(ddof=1) / np.sqrt(len(wk)) if len(wk) > 1 else np.nan
-    return float(m - 1.96 * se), float(m + 1.96 * se)
+def week_cluster_ci(entry_session: pd.Series, values: pd.Series) -> tuple[float, float]:
+    d = pd.DataFrame({"e": pd.to_datetime(entry_session).values,
+                      "v": pd.to_numeric(values, errors="coerce").values}).dropna()
+    if d.empty:
+        return float("nan"), float("nan")
+    d["wk"] = d["e"].dt.to_period("W")
+    wk = d.groupby("wk")["v"].mean()
+    m = float(wk.mean())
+    se = float(wk.std(ddof=1) / np.sqrt(len(wk))) if len(wk) > 1 else float("nan")
+    return m - 1.96 * se, m + 1.96 * se
 
 
 # --------------------------------------------------------------------------
 def evaluate(df: pd.DataFrame, label: str) -> dict:
+    df = df.sort_values("entry_session").reset_index(drop=True)
     res: dict = {"label": label, "n": len(df)}
     disc, hold = split_discovery_holdout(df)
     for h in HORIZONS:
@@ -228,7 +246,7 @@ def evaluate(df: pd.DataFrame, label: str) -> dict:
         net20 = apply_cost(df[f"raw_{h}"], PRIMARY_COST)
         tmp = df.assign(_net=net20)
         hd["boot_ci_net20"] = issuer_block_boot(tmp, "_net")
-        hd["weekcluster_ci_net20"] = week_cluster_ci(tmp.rename(columns={"_net": f"raw_{h}"}), f"raw_{h}")
+        hd["weekcluster_ci_net20"] = week_cluster_ci(df["entry_session"], net20)
         # concentration
         conc = {}
         for k in (1, 3, 5):

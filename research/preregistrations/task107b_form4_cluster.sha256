@@ -11,3 +11,11 @@ research/scripts/task107b_form4_cluster.py  (frozen spec + constants)
 
 The forward-return evaluation (analysis.json) is produced ONLY after this commit is made.
 Any change to the spec after this lock invalidates the study and requires a new task.
+
+---
+POST-LOCK (disclosed in results/task107b_form4_cluster/final_report.md section 7):
+Two helper functions fixed AFTER the pre-registration commit a9ceefc, before the
+evaluation was accepted -- week_cluster_ci (crash on duplicate-column rename) and
+max_drawdown_equalw (compounded -> additive equal-unit curve). Frozen spec/constants
+(episode set, entry rule, horizons, costs, holdout cutoff, gate) UNCHANGED.
+research/scripts/task107b_form4_cluster.py  sha256 (post-fix) = 5bcd21f0607be28b41a349a58e823b879086c1ead6b027062fe731e2f3958824
