@@ -44,9 +44,13 @@ EXPERIMENTAL_FAMILIES = frozenset(
 #: Families that MAY join the one official external dispatch path (Original's
 #: own policy decides per-alert; the approved Task 96 intelligence/RADAR
 #: families are allowed here only where a locked contract already authorises).
+#: Task 110: ``insider_buy_cluster_v2`` is the ACTIVE_PAPER_V2 lane
+#: (INSIDER_BUY_CLUSTER_V2@1), an OFFICIAL Original-flow strategy profile,
+#: NOT an Experimental family -- it routes through the one official path.
 EXTERNAL_ELIGIBLE_FAMILIES = frozenset(
     {"original", "official", "actionable_alert", "long_term_alert",
-     "intelligence_card", "radar", "radar_alerts", "event_update", "event_updates"}
+     "intelligence_card", "radar", "radar_alerts", "event_update", "event_updates",
+     "insider_buy_cluster_v2"}
 )
 
 
