@@ -1,0 +1,13 @@
+# Task 107B - Form 4 insider-cluster study - pre-registration lock
+
+Frozen (UTC): 2026-09-06T00:41:59.546774+00:00
+Frozen at repo HEAD: bfcfbfd (Task 107A/B tooling added; no forward return computed yet)
+
+results/task107b_form4_cluster/preregistration.md
+  sha256 = 7dc04c59b138081bec73ebfc2ec0764fc291cf07a1ed4e1bb64613c099bf9b3a
+
+research/scripts/task107b_form4_cluster.py  (frozen spec + constants)
+  sha256 = 37ef6b84570d29633a042e2ce0043ba94cf916b86e3723b18e1d6cbd7f861899
+
+The forward-return evaluation (analysis.json) is produced ONLY after this commit is made.
+Any change to the spec after this lock invalidates the study and requires a new task.
