@@ -29,6 +29,33 @@ def _sessions() -> list[date]:
     return [ts.date() for ts in cal.sessions_in_range(start, end)]
 
 
+@lru_cache(maxsize=1)
+def _ord_map() -> dict[date, int]:
+    return {d: i for i, d in enumerate(_sessions())}
+
+
+@lru_cache(maxsize=1)
+def _session_set() -> frozenset[date]:
+    return frozenset(_sessions())
+
+
+def session_ordinal(d: date | datetime | str, *, anchor_forward: bool = True) -> int:
+    """Trading-day ordinal of ``d``.  If ``d`` is not itself a session and
+    ``anchor_forward`` is True, returns the ordinal of the next session."""
+    tgt = _as_date(d)
+    m = _ord_map()
+    i = m.get(tgt)
+    if i is not None:
+        return i
+    if anchor_forward:
+        return m[next_session_on_or_after(tgt)]
+    sess = _sessions()
+    for k in range(len(sess) - 1, -1, -1):
+        if sess[k] <= tgt:
+            return k
+    raise ValueError(f"no session on/before {tgt}")
+
+
 def _as_date(d: date | datetime | str) -> date:
     if isinstance(d, datetime):
         return d.date()
@@ -38,7 +65,7 @@ def _as_date(d: date | datetime | str) -> date:
 
 
 def is_session(d: date | datetime | str) -> bool:
-    return _as_date(d) in set(_sessions())
+    return _as_date(d) in _session_set()
 
 
 def next_session_on_or_after(d: date | datetime | str) -> date:
@@ -62,14 +89,10 @@ def add_sessions(d: date | datetime | str, n: int) -> date:
     """The session that is ``n`` trading days after session ``d``
     (``d`` must itself be a session; n>=0).  n=10 -> the frozen exit
     session."""
-    tgt = _as_date(d)
     sess = _sessions()
-    try:
-        i = sess.index(tgt)
-    except ValueError:
-        # d is not a session -> anchor on the next session, then step
-        tgt = next_session_on_or_after(tgt)
-        i = sess.index(tgt)
+    i = _ord_map().get(_as_date(d))
+    if i is None:
+        i = _ord_map()[next_session_on_or_after(d)]
     j = i + n
     if j >= len(sess):
         raise ValueError(f"session index {j} out of calendar range")
@@ -90,4 +113,6 @@ def trading_days_elapsed(entry_session: date | datetime | str, as_of: date | dat
     a, b = _as_date(entry_session), _as_date(as_of)
     if b < a:
         return 0
-    return sum(1 for s in _sessions() if a <= s <= b) - 1
+    ia = session_ordinal(a, anchor_forward=True)
+    ib = session_ordinal(b, anchor_forward=False)
+    return max(0, ib - ia)

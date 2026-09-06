@@ -120,11 +120,8 @@ def detect_episodes_for_issuer(
     # trading-day ordinal of each filing_date (anchor on the next session
     # if the filing landed on a weekend/holiday -- the window is a
     # trading-day span, exactly as the research code measures it)
-    def ordv(d: date) -> int:
-        return v2cal._sessions().index(v2cal.next_session_on_or_after(d))
-
     recs.sort(key=lambda r: (r.filing_date, r.owner_cik))
-    ords = [ordv(r.filing_date) for r in recs]
+    ords = [v2cal.session_ordinal(r.filing_date, anchor_forward=True) for r in recs]
 
     episodes: list[ClusterEpisode] = []
     i = 0

@@ -138,10 +138,22 @@ def settle_due_exits(
     cfg = config or V2Config()
     res = result or ProcessResult()
     for pos in paper.due_exits(store, as_of_session):
-        exit_session = _d(pos["target_exit_session"])
-        px = price_lookup(pos["symbol"], exit_session)
+        target_session = _d(pos["target_exit_session"])
+        px = price_lookup(pos["symbol"], target_session)
+        exit_session = target_session
         if not px or not px.get("close"):
-            # target day missing data -> hold; retry next tick (Phase 12)
+            # the exact +10-td session has no bar (half-day gap / data hole):
+            # fall FORWARD to the next available session close, up to 5
+            # sessions, rather than holding indefinitely or skipping.
+            for k in range(1, 6):
+                nxt = v2cal.add_sessions(target_session, k)
+                if nxt > _d(as_of_session):
+                    break
+                px = price_lookup(pos["symbol"], nxt)
+                if px and px.get("close"):
+                    exit_session = nxt
+                    break
+        if not px or not px.get("close"):
             res.skipped.append({"episode_id": pos["episode_id"], "symbol": pos["symbol"],
                                 "reason": "EXIT_BAR_MISSING_HOLD"})
             continue
@@ -201,4 +213,9 @@ def run_replay(
         else:
             process_episode(ep, store=store, bars_lookup=bars_lookup,
                             price_lookup=price_lookup, config=cfg, router=router, result=res)
+    # final catch-all pass -- settle anything still open at the last modelled session
+    if exit_days:
+        last = v2cal.add_sessions(exit_days[-1], cfg.hold_trading_days + 6)
+        settle_due_exits(store=store, as_of_session=last, price_lookup=price_lookup,
+                         config=cfg, router=router, result=res)
     return res
