@@ -6,10 +6,18 @@ Nothing here is re-derived; this is a pointer index.*
 
 ## Headline
 
-**No robust, cost-survivable free intraday structural-long alpha was found.** The current
-Original strategy is deliberately selective and **UNPROVEN** — it is not a profitability claim.
-The free intraday structural-long research lane is **CLOSED**. The system's realised value is a
-descriptive human-in-the-loop **risk & event intelligence** product, not autonomous profit.
+**No robust, cost-survivable free intraday *price/volume* structural-long alpha was found**
+(Tasks 93–101B). The current Original strategy is deliberately selective and **UNPROVEN** — it
+is not a profitability claim. The free intraday structural-long research lane is **CLOSED**.
+
+**One non-price signal cleared the paper bar (Task 107B, 2026-09):** causally-observed
+episodes of **≥ 2 distinct insiders buying on the open market** (SEC Form 4 code P, ≤ 10
+trading-day window) → `TASK107B_FORM4_PAPER_CANDIDATE`. On a liquid / index-membership-grade
+universe: +1.69 % mean net@20bps over 10 trading days, PF 1.67, discovery +1.81 % / holdout
++1.46 %, issuer-block **and** week-cluster 95 % CIs both strictly positive, SPY-excess +0.92 %.
+This is a **paper** candidate, not a proven real-money edge. Frozen as `INSIDER_BUY_CLUSTER_V2`
+(Task 109). The system's other realised value remains a descriptive human-in-the-loop **risk &
+event intelligence** product.
 
 ## Task-by-task (chronological)
 
@@ -31,6 +39,10 @@ descriptive human-in-the-loop **risk & event intelligence** product, not autonom
 | **99 (A-L)** | restore & harden the live alert surface | Experimental lane restored (`TASK99A`); live intelligence bridge (`99B`); forward-outcome live wiring fix (`99G`); Telegram Markdown/entity escaping fix (`99H`); post-fix canary (`99I` — `PASS_NO_NATURAL_SETUP`); Task100 readiness audit + design closure (`99K`/`99L`) |
 | **101A** | event-first structural candidate backtest & gate-expectancy | `EVENT_FIRST_GATE_INSIGHT_FOUND` — observability improved, but no net alpha; gate-expectancy insight recorded |
 | **101B** | 15-min trend-gate counter-trend dip-reclaim | `TREND_GATE_LEAD_REJECTED` · `CLOSE_FREE_INTRADAY_STRUCTURAL_LONG_RESEARCH` |
+| **106A** | is a catalyst × gap × RVOL × multi-day "V2" lane new? | `TASK106A_ABORT_ALREADY_TESTED` — it IS Task 97 Stage A Group A (`EXACTLY_TESTED`) + Task 95D (`MATERIALLY_EQUIVALENT`), both already rejected; audit only, no backtest run |
+| **107A** | is a broad insider open-market buy-cluster study feasible on free data? | `TASK107A_FORM4_FEASIBLE_WITH_LIMITATIONS` — SEC Form 3/4/5 bulk 2019Q1-2026Q1 (£0): 207,864 code-P purchases / 7,113 issuers; 16,511 causally-datable ≥2-distinct-owner episodes; 810 in the survivorship-correct panel, ~14,822 priced broad. 95I's n=15 was a 35-mega-cap filter artifact, never a rejection |
+| **107B** | do ≥2-distinct-insider open-market buy clusters predict positive +5/+10/+15d long returns? | **`TASK107B_FORM4_PAPER_CANDIDATE`** — pre-registered (`a9ceefc`) before outcomes. In-panel +10D: net@20 **+1.69 %**, PF 1.67, disc +1.81 % / hold +1.46 %, bootstrap CI [+1.0 %, +2.4 %] **and** week-cluster CI [+0.17 %, +2.0 %] both > 0, SPY-excess +0.92 %, all 10 frozen gates pass. Broad universe corroborates sign (net +0.60 %, bootstrap CI lower > 0) but is ≈ small-cap beta with a −80 % P&L drawdown → V2 is scoped to the liquid universe |
+| **109** | freeze the paper V2 spec | `TASK109_V2_FROZEN_READY_FOR_INTEGRATION` — `INSIDER_BUY_CLUSTER_V2`, long-only paper, entry next-session-open after the 2nd insider's filing, exit +10 td, liquidity-gated universe, max 20 concurrent. V1 preserved as `ARCHIVED_BASELINE`. No code implemented; Task 110 not started |
 
 ## What is preserved for future work
 
@@ -46,3 +58,8 @@ Free intraday structural-long alpha (cost wall). Broad price/volume cross-sectio
 (signal wall). Autonomous-profit framing (product decision `95J`). Reopening any of these
 requires a **materially new data or feature class** (point-in-time paid consensus, options,
 non-price information) and a separate authorised mandate — not a parameter sweep.
+
+The **non-price-information lane** was exercised under that clause in Task 107B (SEC Form 4
+insider open-market buying) and produced the `INSIDER_BUY_CLUSTER_V2` **paper** candidate.
+That is a paper-validation result, not a real-money edge; it does not reopen the price/volume
+lanes above.
