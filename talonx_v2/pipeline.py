@@ -137,25 +137,43 @@ def settle_due_exits(
 ) -> ProcessResult:
     cfg = config or V2Config()
     res = result or ProcessResult()
+    ff_max = cfg.exit_fallforward_max_sessions
     for pos in paper.due_exits(store, as_of_session):
         target_session = _d(pos["target_exit_session"])
-        px = price_lookup(pos["symbol"], target_session)
+        as_of = _d(as_of_session)
+
+        # FROZEN exit = close of the +10th trading session.  The ONLY
+        # adjustment permitted is a DATA-AVAILABILITY fall-forward: if that
+        # exact session's bar is missing, take the FIRST available close in
+        # the next `ff_max` sessions.  Never backwards.  Never "best price".
         exit_session = target_session
+        px = price_lookup(pos["symbol"], target_session)
         if not px or not px.get("close"):
-            # the exact +10-td session has no bar (half-day gap / data hole):
-            # fall FORWARD to the next available session close, up to 5
-            # sessions, rather than holding indefinitely or skipping.
-            for k in range(1, 6):
+            for k in range(1, ff_max + 1):
                 nxt = v2cal.add_sessions(target_session, k)
-                if nxt > _d(as_of_session):
+                if nxt > as_of:
+                    break                       # that session hasn't happened yet
+                cand = price_lookup(pos["symbol"], nxt)
+                if cand and cand.get("close"):
+                    px, exit_session = cand, nxt
                     break
-                px = price_lookup(pos["symbol"], nxt)
-                if px and px.get("close"):
-                    exit_session = nxt
-                    break
+
         if not px or not px.get("close"):
-            res.skipped.append({"episode_id": pos["episode_id"], "symbol": pos["symbol"],
-                                "reason": "EXIT_BAR_MISSING_HOLD"})
+            last_ff = v2cal.add_sessions(target_session, ff_max)
+            if as_of >= last_ff:
+                # all `ff_max` fall-forward sessions have passed with no bar
+                # -> EXPLICIT unresolved state.  Not a silent hold: the
+                # position is flagged, surfaced, and no longer retried.
+                store.mark_exit_unresolved(
+                    pos["position_id"],
+                    detail=f"no bar for {pos['symbol']} on {target_session.isoformat()} "
+                           f"or the next {ff_max} sessions (through {last_ff.isoformat()})")
+                res.skipped.append({"episode_id": pos["episode_id"], "symbol": pos["symbol"],
+                                    "reason": "EXIT_UNRESOLVED"})
+            else:
+                # still inside the fall-forward window -> hold, retry next tick
+                res.skipped.append({"episode_id": pos["episode_id"], "symbol": pos["symbol"],
+                                    "reason": "EXIT_BAR_PENDING_FALLFORWARD"})
             continue
         out = paper.close_position(store, pos, exit_price=float(px["close"]),
                                    exit_session=exit_session, config=cfg)

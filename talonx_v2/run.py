@@ -9,6 +9,11 @@ Modes
                   the bar files already on disk.  DEFAULT.
   --mode recover  print restart-recovery summary for an existing v2_lane.db
                   (open positions, overdue exits) and exit.
+  --mode live     the Tuesday companion loop -- detect causally-ripe
+                  episodes, open/hold/close the frozen 10-td paper
+                  positions, write a heartbeat + status file.  --once
+                  runs a single tick (dry-run / supervisor readiness).
+  --mode status   print the current v2_service_status.json and exit.
 
 This is NOT started by the Original supervisor automatically.  It is the
 V2 lane, run explicitly:  ``python -m talonx_v2.run --mode replay ...``.
@@ -68,7 +73,13 @@ def _bar_dir_lookup(bar_dirs: list[Path]):
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("talonx_v2.run")
-    ap.add_argument("--mode", choices=["replay", "recover"], default="replay")
+    ap.add_argument("--mode", choices=["replay", "recover", "live", "status"], default="replay")
+    ap.add_argument("--once", action="store_true", help="live mode: run one tick and exit")
+    ap.add_argument("--tick-seconds", type=int, default=300)
+    ap.add_argument("--form4-source", choices=["parquet", "insider"], default="parquet")
+    ap.add_argument("--status-path", default="")
+    ap.add_argument("--as-of", default="", help="live --once: pin the tick date (dry-run only)")
+    ap.add_argument("--live-lookback-days", type=int, default=45)
     ap.add_argument("--form4-parquet",
                     default="results/task107a_form4_feasibility/_build/form4_open_market_txn.parquet")
     ap.add_argument("--bar-dir", action="append", default=[
@@ -89,6 +100,32 @@ def main(argv: list[str] | None = None) -> int:
         summary = pipeline.paper.recover(store, as_of_session=date.today())
         print(json.dumps(summary, indent=2))
         return 0
+
+    if args.mode == "status":
+        from talonx_v2.service import V2Service
+        svc = V2Service(config=cfg, bar_dirs=[Path(p) for p in args.bar_dir],
+                        status_path=args.status_path or None)
+        try:
+            print(Path(svc.status_path).read_text())
+        except OSError:
+            print(json.dumps({"error": "no status file yet", "path": str(svc.status_path)}))
+        return 0
+
+    if args.mode == "live":
+        import logging
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+        from talonx_v2.service import V2Service
+        svc = V2Service(
+            config=cfg, bar_dirs=[Path(p) for p in args.bar_dir],
+            form4_kind=args.form4_source, form4_parquet=args.form4_parquet,
+            status_path=args.status_path or None,
+            since=None, live_lookback_days=args.live_lookback_days,
+        )
+        if args.once and args.as_of:
+            st = svc.tick(as_of=date.fromisoformat(args.as_of))
+            print(json.dumps(st, indent=2, default=str))
+            return 0
+        return svc.run(once=args.once, tick_seconds=args.tick_seconds)
 
     syms = {s.strip().upper() for s in args.symbols.split(",") if s.strip()} or None
     records = form4_source.from_research_parquet(

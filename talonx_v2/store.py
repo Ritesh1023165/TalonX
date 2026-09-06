@@ -208,6 +208,22 @@ class V2Store:
             )
             return int(cur.lastrowid)
 
+    def mark_exit_unresolved(self, position_id: int, *, detail: str = "") -> None:
+        """Explicit terminal-ish state: the +10-td exit bar and all
+        fall-forward sessions were missing.  Not OPEN (stops retrying),
+        not CLOSED (no realised P&L) -- loudly surfaced for the operator."""
+        with self._conn() as c:
+            c.execute(
+                "UPDATE positions SET status='EXIT_UNRESOLVED', source_meta=?, closed_at=? "
+                "WHERE position_id=? AND status='OPEN'",
+                (json.dumps({"exit_unresolved": True, "detail": detail}), _now(), position_id),
+            )
+
+    def unresolved_positions(self) -> list[dict]:
+        with self._conn() as c:
+            return [dict(r) for r in c.execute(
+                "SELECT * FROM positions WHERE status='EXIT_UNRESOLVED' ORDER BY entry_session")]
+
     def close_position(self, *, position_id, exit_session, exit_price, realized_pnl_usd,
                        realized_pnl_pct, trading_days_held) -> None:
         with self._conn() as c:

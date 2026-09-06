@@ -707,11 +707,89 @@ class DashboardReadModel:
         }
 
     # ------------------------------------------------------------------ #
+    # ACTIVE STRATEGY -- V2 (INSIDER_BUY_CLUSTER_V2)  [Task 112]
+    # Read-only over v2_lane.db + the V2 service status file.  V2 is an
+    # ACTIVE ORIGINAL-flow paper strategy, NOT Experimental -- it is
+    # surfaced under its own section, never merged into validation.
+    # ------------------------------------------------------------------ #
+    def v2_active_strategy(self) -> dict[str, Any]:
+        import json as _json
+        import os as _os
+
+        db = _os.environ.get("TALONX_V2_DB_PATH") or str(self.home / "v2_lane.db")
+        status_path = _os.environ.get("TALONX_V2_STATUS_PATH") or str(self.home / "v2_service_status.json")
+        out: dict[str, Any] = {
+            "generated_at": self.now.isoformat(),
+            "panel": "ACTIVE STRATEGY (Original flow)",
+            "not_experimental": True,
+            "strategy_version": "INSIDER_BUY_CLUSTER_V2@1",
+            "status_label": "PAPER_CANDIDATE",
+            "v1_baseline_available": True,
+            "v1_selectable": True,
+            "v2_selectable": True,
+            "real_capital": False,
+            "shorts": False,
+            "eod_forced_flatten": False,
+        }
+        # service heartbeat
+        try:
+            s = _json.loads(open(status_path).read())
+            age = _age_seconds(s.get("heartbeat_utc"), self.now)
+            out["service"] = {
+                "status": "ACTIVE" if (age is not None and age < float(s.get("heartbeat_ttl_s", 180)))
+                          else "NO_ACTIVE_PRODUCER",
+                "active_profile": s.get("active_profile"),
+                "heartbeat_age_s": round(age, 1) if age is not None else None,
+                "as_of": s.get("as_of"),
+                "cash": s.get("cash"),
+                "open_positions": s.get("open_positions"),
+                "exit_unresolved": s.get("exit_unresolved", []),
+                "eod_forced_flatten": s.get("eod_forced_flatten", False),
+            }
+        except OSError:
+            out["service"] = {"status": "NO_ACTIVE_PRODUCER", "note": "no v2 service status file"}
+        except Exception as exc:  # noqa: BLE001
+            out["service"] = {"status": "UNKNOWN", "note": f"{type(exc).__name__}: {exc}"}
+        # ledger
+        con = _ro(Path(db))
+        if con is None:
+            out["ledger"] = {"status": "NO_ACTIVE_PRODUCER", "note": "no v2_lane.db"}
+            return out
+        try:
+            if not _has_table(con, "positions"):
+                out["ledger"] = {"status": "ZERO_ACTIVITY", "note": "no positions table"}
+                return out
+            opens = _qall(con, "SELECT symbol, episode_id, entry_session, target_exit_session, "
+                               "entry_price, shares FROM positions WHERE status='OPEN' "
+                               "ORDER BY entry_session")
+            closed = _qall(con, "SELECT realized_pnl_usd FROM positions WHERE status='CLOSED'")
+            unresolved = _q1(con, "SELECT COUNT(*) FROM positions WHERE status='EXIT_UNRESOLVED'") or 0
+            realized = round(sum((r["realized_pnl_usd"] or 0.0) for r in closed), 2)
+            n_buys = _q1(con, "SELECT COUNT(*) FROM trades WHERE action='BUY'") or 0
+            n_sells = _q1(con, "SELECT COUNT(*) FROM trades WHERE action='SELL'") or 0
+            cash = _q1(con, "SELECT cash FROM portfolio WHERE id=1")
+            out["ledger"] = {
+                "status": "ACTIVE" if (opens or closed) else "ZERO_ACTIVITY",
+                "open_positions": [dict(r) for r in opens],
+                "n_open": len(opens),
+                "closed_positions": len(closed),
+                "exit_unresolved": int(unresolved),
+                "buys": int(n_buys),
+                "sells": int(n_sells),
+                "realized_pnl_usd": realized,
+                "cash": cash,
+            }
+        finally:
+            con.close()
+        return out
+
+    # ------------------------------------------------------------------ #
     def all_sections(self) -> dict[str, Any]:
         return {
             "overview": self.overview(),
             "premarket": self.premarket(),
             "original_quant": self.original_quant(),
+            "v2_active_strategy": self.v2_active_strategy(),   # Task 112
             "validation": self.validation(),
             "intelligence": self.intelligence(),
             "paper_eod": self.paper_eod(),

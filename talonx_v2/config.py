@@ -34,6 +34,11 @@ class V2Config:
     hold_trading_days: int = 10
     telemetry_horizons: tuple[int, ...] = (5, 10, 15)
     stop_loss_enabled: bool = False            # none in the frozen primary
+    # data-availability handling ONLY (Task 111 F2 / Task 112 Phase 5):
+    # if the exact +10-td session has no bar, take the FIRST available close
+    # in the next N sessions.  Never backwards, never best-price.  All N
+    # missing -> explicit EXIT_UNRESOLVED state, never a silent hold.
+    exit_fallforward_max_sessions: int = 5
 
     # --- risk rules (FROZEN) ---
     max_concurrent_positions: int = 20
@@ -57,6 +62,14 @@ class V2Config:
         default_factory=lambda: float(os.environ.get("TALONX_V2_STARTING_CASH_USD", "100000"))
     )
     friction_bps: float = 20.0                 # research primary friction (reporting only)
+
+    # --- live operational guard (NOT strategy semantics) ---
+    # the frozen rule is "enter at the OPEN of the first session strictly
+    # after the cluster fires".  If the live service is started cold with a
+    # backlog, it must NOT chase a stale entry at a historical price -- an
+    # episode whose eligible_entry_session is more than this many trading
+    # sessions before 'today' is recorded SKIPPED_ENTRY_STALE, not entered.
+    max_entry_staleness_sessions: int = 3
 
     # --- infra ---
     redis_channel_signal: str = "talonx:v2:signal"
@@ -82,3 +95,5 @@ class V2Config:
         assert self.liquidity_min_median_dollar_volume == 5_000_000.0
         assert self.liquidity_min_close == 5.0
         assert self.liquidity_lookback_sessions == 20
+        assert self.exit_fallforward_max_sessions == 5
+        assert self.max_entry_staleness_sessions >= 0

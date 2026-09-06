@@ -180,8 +180,8 @@ def _authority_block() -> dict:
 # handler is GET-only and has zero write side effects.
 _SECTION_TTL_SECONDS = 4.0
 _section_cache: dict[str, tuple[float, dict]] = {}
-_UNIFIED_SECTIONS = ("overview", "premarket", "original_quant", "validation",
-                     "intelligence", "paper_eod")
+_UNIFIED_SECTIONS = ("overview", "premarket", "original_quant", "v2_active_strategy",
+                     "validation", "intelligence", "paper_eod")
 
 
 def _section_block(name: str) -> dict:

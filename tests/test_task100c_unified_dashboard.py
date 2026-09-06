@@ -138,7 +138,7 @@ def _full_tree(home):
 def test_01_all_sections_load_with_stores_present(home):
     _full_tree(home)
     s = _model(home).all_sections()
-    assert set(s) == {"overview", "premarket", "original_quant", "validation", "intelligence", "paper_eod"}
+    assert set(s) == {"overview", "premarket", "original_quant", "v2_active_strategy", "validation", "intelligence", "paper_eod"}
     for v in s.values():
         assert "error" not in v
 
@@ -146,7 +146,7 @@ def test_01_all_sections_load_with_stores_present(home):
 def test_02_sections_load_with_optional_stores_missing(home):
     # empty tree, only the dir exists
     s = _model(home).all_sections()
-    assert set(s) == {"overview", "premarket", "original_quant", "validation", "intelligence", "paper_eod"}
+    assert set(s) == {"overview", "premarket", "original_quant", "v2_active_strategy", "validation", "intelligence", "paper_eod"}
     for v in s.values():
         assert "error" not in v
 
@@ -492,7 +492,7 @@ async def test_40_websocket_and_section_routes_stable(tmp_path):
         r = await c.get("/api/sections")
         assert r.status == 200
         body = await r.json()
-        assert set(body) == {"overview", "premarket", "original_quant", "validation",
+        assert set(body) == {"overview", "premarket", "original_quant", "v2_active_strategy", "validation",
                              "intelligence", "paper_eod"}
         for name in body:
             rr = await c.get("/api/section/" + name)

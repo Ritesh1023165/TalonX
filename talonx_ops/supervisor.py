@@ -569,6 +569,9 @@ def default_talonx_components(
     python: str | None = None,
     include_dashboard: bool = True,
     with_backfill: bool = True,
+    include_v2: bool = False,
+    v2_db: str | None = None,
+    v2_tick_seconds: int = 300,
 ) -> list[ComponentSpec]:
     py = python or sys.executable
     intel_argv = [py, "-m", "talonx_ingest.intelligence.service", "poll"]
@@ -609,6 +612,29 @@ def default_talonx_components(
             graceful_stop_s=30.0,
         ),
     ]
+    if include_v2:
+        # Task 112: the ACTIVE_PAPER_V2 companion lane (INSIDER_BUY_CLUSTER_V2).
+        # OPTIONAL / additive -- its failure never affects Original (same
+        # isolation posture as experimental / intelligence).  It owns only
+        # its own v2_lane.db; no broker, no real capital, no Telegram poller.
+        v2_argv = [py, "-m", "talonx_v2.run", "--mode", "live",
+                   "--tick-seconds", str(v2_tick_seconds)]
+        if v2_db:
+            v2_argv += ["--db", v2_db]
+        specs.append(
+            ComponentSpec(
+                name="v2",
+                argv=v2_argv,
+                classification=Classification.OPTIONAL,
+                start_order=25,          # after experimental, before intelligence
+                stop_order=8,            # stop early in shutdown, before intelligence/original
+                readiness_timeout_s=60.0,
+                readiness_grace_s=5.0,
+                readiness_probe=_v2_ready_probe,
+                restart_policy=RestartPolicy(max_restarts=None, backoff_base_s=15.0),
+                graceful_stop_s=30.0,
+            )
+        )
     if include_dashboard:
         specs.append(
             ComponentSpec(
@@ -624,6 +650,23 @@ def default_talonx_components(
             )
         )
     return specs
+
+
+def _v2_ready_probe() -> bool:
+    """V2 lane is 'ready' once its status file has a fresh heartbeat and
+    the expected strategy version."""
+    try:
+        import json as _json
+        import os as _os
+        from datetime import datetime as _dt, timezone as _tz
+
+        path = _os.environ.get("TALONX_V2_STATUS_PATH") or "v2_service_status.json"
+        s = _json.loads(open(path).read())
+        age = (_dt.now(_tz.utc) - _dt.fromisoformat(s["heartbeat_utc"])).total_seconds()
+        return age < float(s.get("heartbeat_ttl_s", 180)) and \
+            s.get("strategy_version") == "INSIDER_BUY_CLUSTER_V2@1"
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _original_ready_probe() -> bool:
