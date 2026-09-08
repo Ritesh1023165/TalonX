@@ -119,16 +119,20 @@ class V2Service:
             if self.cfg.max_entry_staleness_sessions > 0 else date.min
         episodes, stale = [], 0
         for e in all_ripe:
-            if e.eligible_entry_session < stale_cut and not self.store.episode_seen(e.episode_id):
-                self.store.record_disposition(
-                    episode_id=e.episode_id, symbol=e.symbol,
-                    disposition="SKIPPED_ENTRY_STALE", issuer_cik=e.issuer_cik,
-                    eligible_entry_session=e.eligible_entry_session.isoformat(),
-                    detail=f"eligible {e.eligible_entry_session.isoformat()} > "
-                           f"{self.cfg.max_entry_staleness_sessions} sessions before {ripe_through.isoformat()}")
+            if self.cfg.max_entry_staleness_sessions > 0 and e.eligible_entry_session < stale_cut:
+                # A stale episode is NEVER entered -- skip it on every tick,
+                # whether or not it has been seen before.  Only the disposition
+                # write is guarded so we don't rewrite it each tick.
+                if not self.store.episode_seen(e.episode_id):
+                    self.store.record_disposition(
+                        episode_id=e.episode_id, symbol=e.symbol,
+                        disposition="SKIPPED_ENTRY_STALE", issuer_cik=e.issuer_cik,
+                        eligible_entry_session=e.eligible_entry_session.isoformat(),
+                        detail=f"eligible {e.eligible_entry_session.isoformat()} > "
+                               f"{self.cfg.max_entry_staleness_sessions} sessions before {ripe_through.isoformat()}")
                 stale += 1
-            else:
-                episodes.append(e)
+                continue
+            episodes.append(e)
         self._stale_skipped = stale
 
         res = pipeline.ProcessResult()

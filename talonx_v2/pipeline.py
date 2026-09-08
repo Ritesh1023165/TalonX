@@ -58,8 +58,11 @@ def process_episode(
     res = result or ProcessResult()
 
     # --- idempotency (restart / replay / duplicate filing safe) ---
+    # A prior SKIPPED_ENTRY_STALE is terminal: a stale episode never becomes
+    # un-stale, so it must not be re-processed into an entry on a later tick.
     disp = store.episode_disposition(ep.episode_id)
-    if disp in ("ENTERED",) or store.position_for_episode(ep.episode_id) is not None:
+    if disp in ("ENTERED", "SKIPPED_ENTRY_STALE") \
+            or store.position_for_episode(ep.episode_id) is not None:
         res.skipped.append({"episode_id": ep.episode_id, "reason": "ALREADY_PROCESSED"})
         return res
 
