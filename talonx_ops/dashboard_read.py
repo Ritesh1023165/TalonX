@@ -29,6 +29,7 @@ Design:
 from __future__ import annotations
 
 import sqlite3
+from datetime import date as _date
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -187,17 +188,91 @@ class DashboardReadModel:
             "experimental_legacy_bookkeeping_rows": ea.values.get("external_sends", 0),
         }
         source_status = self._source_status_block()
+
+        # ---- ACTIVE V2 -- first-class on the Overview (Task 114 A2/A5.1) ----
+        try:
+            v2 = self.v2_active_strategy()
+            fn = v2.get("funnel", {}) or {}
+            f4 = fn.get("form4", {}) or {}
+            cl = fn.get("clusters", {}) or {}
+            tm = fn.get("terminal", {}) or {}
+            ldg = v2.get("ledger", {}) or {}
+            svc = v2.get("service", {}) or {}
+            active_v2 = {
+                "strategy": "INSIDER_BUY_CLUSTER_V2@1",
+                "role": "ACTIVE V2 -- current prospective candidate",
+                "campaign_day": v2.get("campaign", {}).get("campaign_day"),
+                "service_health": v2.get("health"),
+                "data_state": v2.get("data_state"),
+                "business_activity": v2.get("activity"),
+                "source": svc.get("form4_source"),
+                "last_tick_utc": svc.get("last_tick_utc"),
+                "heartbeat_age_s": svc.get("heartbeat_age_s"),
+                "form4_records_seen": svc.get("form4_records_seen"),
+                "code_p_today": f4.get("code_p_records_today"),
+                "code_p_issuers_today": f4.get("distinct_issuers_today"),
+                "single_insider_near_miss": cl.get("single_insider_near_miss_count"),
+                "clusters_ge2_distinct": cl.get("clusters_ge2_distinct_insiders"),
+                "stale_clusters_ignored": cl.get("stale_historical_clusters"),
+                "fresh_eligible_clusters": cl.get("fresh_eligible_clusters"),
+                "signals": tm.get("signals"), "buys": tm.get("buys"), "sells": tm.get("sells"),
+                "cash": ldg.get("cash"), "starting_campaign_cash": ldg.get("starting_campaign_cash"),
+                "open_positions": ldg.get("n_open"), "capacity": ldg.get("capacity"),
+                "allocated_capital": ldg.get("allocated_capital"),
+                "available_capital": ldg.get("available_capital"),
+                "realized_pnl_usd": ldg.get("realized_pnl_usd"),
+                "exit_unresolved": ldg.get("exit_unresolved"),
+                "eod_state": v2.get("eod", {}).get("state"),
+                "eod_forced_flatten": "OFF",
+                "hold_trading_sessions": 10,
+                "signal_lineage": "Form4 -> code-P -> cluster -> V2 Quant -> Brain -> BUY/SELL "
+                                  "-> Local Paper Engine -> Official Telegram -> :8787",
+                "interpretation": fn.get("interpretation"),
+            }
+        except Exception as exc:  # noqa: BLE001
+            active_v2 = {"error": f"{type(exc).__name__}: {exc}"}
+
+        needs_attention = self._overview_needs_attention(runtime, market, active_v2, alerts)
+
         return {
             "generated_at": self.now.isoformat(),
+            "active_v2": active_v2,          # <-- prioritized first-class block
             "runtime": runtime,
             "market": market,
             "alerts": alerts,
             "source_status": source_status,
+            "needs_attention": needs_attention,
             "session": {
                 "date": self._today(),
                 "phase": mh.session_phase or "unknown",
             },
         }
+
+    @staticmethod
+    def _overview_needs_attention(runtime, market, active_v2, alerts) -> list[str]:
+        """Only genuine current issues -- healthy zero activity is NOT an issue."""
+        out: list[str] = []
+        if runtime.get("original") == "FAILED":
+            out.append("Core Runtime (Original V1) is DOWN")
+        if market.get("state") in ("DISCONNECTED",):
+            out.append("Market feed DISCONNECTED")
+        if isinstance(active_v2, dict):
+            if active_v2.get("service_health") == "DOWN":
+                out.append("Active V2 companion is DOWN")
+            elif active_v2.get("service_health") == "DEGRADED":
+                out.append("Active V2 companion heartbeat DEGRADED")
+            if active_v2.get("source") not in (None, "insider"):
+                out.append(f"Active V2 source is '{active_v2.get('source')}' (expected insider)")
+            if active_v2.get("exit_unresolved"):
+                out.append(f"Active V2 has {active_v2.get('exit_unresolved')} EXIT_UNRESOLVED position(s)")
+            if active_v2.get("interpretation") == "REVIEW_POSSIBLE_SUPPRESSION":
+                out.append("Active V2: fresh eligible cluster with no signal -- review the funnel")
+        if alerts.get("official_failed"):
+            out.append(f"Official Telegram: {alerts.get('official_failed')} failed send(s) today")
+        rt = runtime.get("telegram_receive")
+        if rt == "DEGRADED":
+            out.append("Telegram receive: >1 getUpdates owner reported (check logical/network owner)")
+        return out
 
     def _overall_health(self, orig_live: bool, exp_live: bool, intel_live: bool, market_state: str) -> str:
         if not orig_live:
@@ -716,11 +791,20 @@ class DashboardReadModel:
         import json as _json
         import os as _os
 
-        db = _os.environ.get("TALONX_V2_DB_PATH") or str(self.home / "v2_lane.db")
-        status_path = _os.environ.get("TALONX_V2_STATUS_PATH") or str(self.home / "v2_service_status.json")
+        # V2 campaign ledger: env override, else the repo-root v2_lane.db
+        # (the frozen operational location), else the ~/.talonx fallback.
+        _repo_root = Path(__file__).resolve().parents[1]
+        db = (_os.environ.get("TALONX_V2_DB_PATH")
+              or (str(_repo_root / "v2_lane.db") if (_repo_root / "v2_lane.db").exists()
+                  else str(self.home / "v2_lane.db")))
+        status_path = (_os.environ.get("TALONX_V2_STATUS_PATH")
+                       or (str(_repo_root / "v2_service_status.json")
+                           if (_repo_root / "v2_service_status.json").exists()
+                           else str(self.home / "v2_service_status.json")))
         out: dict[str, Any] = {
             "generated_at": self.now.isoformat(),
-            "panel": "ACTIVE STRATEGY (Original flow)",
+            "panel": "Active V2 -- INSIDER_BUY_CLUSTER_V2@1",
+            "role": "ACTIVE V2 (current prospective candidate, Original-flow paper)",
             "not_experimental": True,
             "strategy_version": "INSIDER_BUY_CLUSTER_V2@1",
             "status_label": "PAPER_CANDIDATE",
@@ -730,16 +814,38 @@ class DashboardReadModel:
             "real_capital": False,
             "shorts": False,
             "eod_forced_flatten": False,
+            "eod_auto_close": "OFF",
+            "hold_trading_sessions": 10,
         }
-        # service heartbeat
+        # service heartbeat -- SERVICE HEALTH is distinct from data state and
+        # business activity (Task 114 A4).
         try:
             s = _json.loads(open(status_path).read())
             age = _age_seconds(s.get("heartbeat_utc"), self.now)
+            ttl = float(s.get("heartbeat_ttl_s", 180))
+            if age is None:
+                health = "DOWN"
+            elif age < ttl:
+                health = "HEALTHY"
+            elif age < ttl * 3:
+                health = "DEGRADED"
+            else:
+                health = "DOWN"
+            out["health"] = health
             out["service"] = {
-                "status": "ACTIVE" if (age is not None and age < float(s.get("heartbeat_ttl_s", 180)))
-                          else "NO_ACTIVE_PRODUCER",
+                # keep the legacy key for back-compat, but drive it from `health`
+                "status": "ACTIVE" if health == "HEALTHY" else (
+                    "DEGRADED" if health == "DEGRADED" else "NO_ACTIVE_PRODUCER"),
+                "health": health,
                 "active_profile": s.get("active_profile"),
+                "strategy_version": s.get("strategy_version"),
+                "form4_source": s.get("form4_source"),
+                "form4_records_seen": s.get("form4_records_seen"),
                 "heartbeat_age_s": round(age, 1) if age is not None else None,
+                "heartbeat_ttl_s": ttl,
+                "heartbeat_kind": s.get("heartbeat_kind"),
+                "tick": s.get("tick"),
+                "last_tick_utc": s.get("last_tick_utc"),
                 "as_of": s.get("as_of"),
                 "cash": s.get("cash"),
                 "open_positions": s.get("open_positions"),
@@ -747,41 +853,120 @@ class DashboardReadModel:
                 "eod_forced_flatten": s.get("eod_forced_flatten", False),
             }
         except OSError:
-            out["service"] = {"status": "NO_ACTIVE_PRODUCER", "note": "no v2 service status file"}
+            out["health"] = "DOWN"
+            out["service"] = {"status": "NO_ACTIVE_PRODUCER", "health": "DOWN",
+                              "note": "no v2 service status file"}
         except Exception as exc:  # noqa: BLE001
-            out["service"] = {"status": "UNKNOWN", "note": f"{type(exc).__name__}: {exc}"}
+            out["health"] = "UNKNOWN"
+            out["service"] = {"status": "UNKNOWN", "health": "UNKNOWN",
+                              "note": f"{type(exc).__name__}: {exc}"}
         # ledger
         con = _ro(Path(db))
         if con is None:
             out["ledger"] = {"status": "NO_ACTIVE_PRODUCER", "note": "no v2_lane.db"}
-            return out
+        else:
+            try:
+                if not _has_table(con, "positions"):
+                    out["ledger"] = {"status": "ZERO_ACTIVITY", "note": "no positions table"}
+                else:
+                    opens = _qall(con, "SELECT symbol, episode_id, entry_session, target_exit_session, "
+                                       "entry_price, shares, position_cost, opened_at FROM positions "
+                                       "WHERE status='OPEN' ORDER BY entry_session")
+                    closed = _qall(con, "SELECT realized_pnl_usd FROM positions WHERE status='CLOSED'")
+                    unresolved = _q1(con, "SELECT COUNT(*) FROM positions WHERE status='EXIT_UNRESOLVED'") or 0
+                    realized = round(sum((r["realized_pnl_usd"] or 0.0) for r in closed), 2)
+                    n_buys = _q1(con, "SELECT COUNT(*) FROM trades WHERE action='BUY'") or 0
+                    n_sells = _q1(con, "SELECT COUNT(*) FROM trades WHERE action='SELL'") or 0
+                    cash = _q1(con, "SELECT cash FROM portfolio WHERE id=1")
+                    open_cost = sum((r["position_cost"] or 0.0) for r in opens)
+                    out["ledger"] = {
+                        "status": "ACTIVE" if (opens or closed) else "ZERO_ACTIVITY",
+                        "open_positions": [self._v2_position_lifecycle(dict(r)) for r in opens],
+                        "n_open": len(opens),
+                        "closed_positions": len(closed),
+                        "exit_unresolved": int(unresolved),
+                        "buys": int(n_buys),
+                        "sells": int(n_sells),
+                        "realized_pnl_usd": realized,
+                        "starting_campaign_cash": 300_000.0,
+                        "cash": cash,
+                        "allocated_capital": round(open_cost, 2),
+                        "available_capital": None if cash is None else round(cash, 2),
+                        "capacity": f"{len(opens)}/20",
+                    }
+            finally:
+                con.close()
+
+        # ---- funnel + EOD state + data/activity + campaign (Task 114 A3/A4/A5) ----
         try:
-            if not _has_table(con, "positions"):
-                out["ledger"] = {"status": "ZERO_ACTIVITY", "note": "no positions table"}
-                return out
-            opens = _qall(con, "SELECT symbol, episode_id, entry_session, target_exit_session, "
-                               "entry_price, shares FROM positions WHERE status='OPEN' "
-                               "ORDER BY entry_session")
-            closed = _qall(con, "SELECT realized_pnl_usd FROM positions WHERE status='CLOSED'")
-            unresolved = _q1(con, "SELECT COUNT(*) FROM positions WHERE status='EXIT_UNRESOLVED'") or 0
-            realized = round(sum((r["realized_pnl_usd"] or 0.0) for r in closed), 2)
-            n_buys = _q1(con, "SELECT COUNT(*) FROM trades WHERE action='BUY'") or 0
-            n_sells = _q1(con, "SELECT COUNT(*) FROM trades WHERE action='SELL'") or 0
-            cash = _q1(con, "SELECT cash FROM portfolio WHERE id=1")
-            out["ledger"] = {
-                "status": "ACTIVE" if (opens or closed) else "ZERO_ACTIVITY",
-                "open_positions": [dict(r) for r in opens],
-                "n_open": len(opens),
-                "closed_positions": len(closed),
-                "exit_unresolved": int(unresolved),
-                "buys": int(n_buys),
-                "sells": int(n_sells),
-                "realized_pnl_usd": realized,
-                "cash": cash,
+            from talonx_ops.prospective.funnel import build_funnel
+            out["funnel"] = build_funnel(db_path=db, as_of=self.now.date())
+        except Exception as exc:  # noqa: BLE001
+            out["funnel"] = {"available": False, "error": f"{type(exc).__name__}: {exc}"}
+        try:
+            from talonx_ops.prospective.checkpoint import campaign_day, eod_state
+            out["eod"] = self._v2_eod_state(eod_state(self.now))
+            out["campaign"] = {
+                "start_date": "2026-09-08", "campaign_day": campaign_day(self.now),
+                "day1_outcome": "NO_NATURAL_V2_SIGNAL",
+                "natural_opportunities": out.get("funnel", {}).get("clusters", {}).get(
+                    "fresh_eligible_clusters", 0),
+                "trades_opened": out.get("ledger", {}).get("buys", 0),
+                "trades_closed": out.get("ledger", {}).get("sells", 0),
+                "prospective_sample_status": "SAMPLE_INSUFFICIENT",
+                "note": "prospective validation -- no profitability inference from zero-trade days",
             }
-        finally:
-            con.close()
+        except Exception:  # noqa: BLE001
+            out["eod"] = {"state": "UNKNOWN"}
+
+        fn = out.get("funnel", {})
+        out["data_state"] = "CURRENT" if fn.get("available") else (
+            "UNAVAILABLE" if fn.get("form4_error") else "UNKNOWN")
+        ldg = out.get("ledger", {})
+        if ldg.get("n_open", 0) > 0:
+            out["activity"] = "POSITION_OPEN"
+        elif ldg.get("buys", 0) > 0:
+            out["activity"] = "ACTIVITY"
+        elif fn.get("interpretation") == "NO_MARKET_OPPORTUNITY":
+            out["activity"] = "NO_OPPORTUNITIES"
+        else:
+            out["activity"] = "NO_OPPORTUNITIES"
         return out
+
+    @staticmethod
+    def _v2_position_lifecycle(row: dict[str, Any]) -> dict[str, Any]:
+        row = dict(row)
+        try:
+            from talonx_v2.calendar import trading_days_elapsed
+            entry = row.get("entry_session")
+            if entry:
+                held = trading_days_elapsed(_date.fromisoformat(str(entry)[:10]),
+                                            datetime.now(timezone.utc).date())
+                row["days_held"] = held
+                row["sessions_remaining"] = max(0, 10 - held)
+        except Exception:  # noqa: BLE001
+            pass
+        row["hold_trading_sessions"] = 10
+        row["eod_auto_close"] = "OFF"
+        return row
+
+    @staticmethod
+    def _v2_eod_state(es: dict[str, Any]) -> dict[str, Any]:
+        """Map the market-phase-aware EOD state to the dashboard vocabulary
+        (Task 114 A5.4): STALE only after a real missed deadline."""
+        st = es.get("state", "UNKNOWN")
+        # if a reconciliation row exists for today, PASS/PARTIAL supersedes
+        try:
+            from talonx_ops.eod_reconciliation import EodReconciliationStore
+            row = EodReconciliationStore(read_only=True).latest()
+            today = datetime.now(timezone.utc).date().isoformat()
+            if row is not None and str(getattr(row, "session_date", "")) == today:
+                st = {"RECONCILED": "RECONCILED_PASS", "PARTIAL": "PARTIAL",
+                      "MISMATCH": "FAILED"}.get(getattr(row, "status", ""), st)
+        except Exception:  # noqa: BLE001
+            pass
+        return {"state": st, "reason": es.get("reason"),
+                "close_utc": es.get("close_utc"), "deadline_utc": es.get("deadline_utc")}
 
     # ------------------------------------------------------------------ #
     def all_sections(self) -> dict[str, Any]:

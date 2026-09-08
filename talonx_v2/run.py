@@ -75,7 +75,10 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("talonx_v2.run")
     ap.add_argument("--mode", choices=["replay", "recover", "live", "status"], default="replay")
     ap.add_argument("--once", action="store_true", help="live mode: run one tick and exit")
-    ap.add_argument("--tick-seconds", type=int, default=300)
+    ap.add_argument("--tick-seconds", type=int, default=300,
+                    help="strategy evaluation cadence (seconds)")
+    ap.add_argument("--heartbeat-seconds", type=int, default=30,
+                    help="lightweight health-heartbeat cadence, decoupled from --tick-seconds")
     ap.add_argument("--form4-source", choices=["parquet", "insider"], default="parquet")
     ap.add_argument("--status-path", default="")
     ap.add_argument("--as-of", default="", help="live --once: pin the tick date (dry-run only)")
@@ -125,7 +128,8 @@ def main(argv: list[str] | None = None) -> int:
             st = svc.tick(as_of=date.fromisoformat(args.as_of))
             print(json.dumps(st, indent=2, default=str))
             return 0
-        return svc.run(once=args.once, tick_seconds=args.tick_seconds)
+        return svc.run(once=args.once, tick_seconds=args.tick_seconds,
+                       heartbeat_seconds=args.heartbeat_seconds)
 
     syms = {s.strip().upper() for s in args.symbols.split(",") if s.strip()} or None
     records = form4_source.from_research_parquet(

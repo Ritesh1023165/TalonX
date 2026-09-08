@@ -2,6 +2,41 @@
 
 The one obvious path. The Task 100B supervisor owns start / health / restart / stop.
 
+## Prospective V2 campaign day (Task 114 — the autonomous operator)
+
+For a prospective **INSIDER_BUY_CLUSTER_V2@1** validation day, use the deterministic
+autonomous operator instead of driving the supervisor by hand:
+
+```powershell
+# MORNING -- one command: preflight + start base stack + V2 companion + checkpoint daemon
+python -m talonx_ops.prospective start
+
+# DURING THE DAY -- nothing. Cockpit: http://localhost:8787 -> Overview -> Active V2.
+#   machine-readable checkpoint every 30 min + events.jsonl in results\prospective_<date>\
+#   quick read:  python -m talonx_ops.prospective status
+#   only act on CRITICAL events (locked-invariant breach) -- fail safe, do not tune.
+
+# EVENING -- one command: final checkpoint + reconciliation + report + graceful shutdown
+python -m talonx_ops.prospective close
+```
+
+- **Ledger continuity (locked):** `C:\workspace\TalonX\v2_lane.db` is the authoritative
+  carry-forward campaign ledger. The operator **never** resets, recreates, truncates or
+  reseeds it. `start`/`close` fail **closed** on a ledger-integrity problem — genuine
+  corruption is a manual restore from the newest `results\prospective_*\v2_lane.db.eod-copy`,
+  never a fresh $300k ledger.
+- **Heartbeat:** the V2 companion writes a lightweight health heartbeat every
+  `--heartbeat-seconds` (default 30), decoupled from `--tick-seconds` (default 300, strategy
+  evaluation only). A long strategy poll interval no longer makes the service look stale.
+- **Healthy zero-activity is normal.** `service_health HEALTHY` + `data_state CURRENT` +
+  `business_activity NO_OPPORTUNITIES` on a quiet day is a PASS, not a fault. A natural V2 BUY
+  is not required for an operational PASS.
+- **Open V2 position at close:** preserved OPEN in the ledger for its 10-trading-session hold.
+  There is no EOD forced flatten.
+- Full runbook: `results/task114_autonomous_operator/TASK115_OPERATOR_SHEET.md`.
+- Release: `54c9b40` · V1 fp `2ae6216bca70` · V2 fp `11107198c5b81237`.
+
+
 ## Prerequisites
 
 - Python 3.11/3.12 in `.venv` (`.venv/Scripts/python.exe` on Windows).

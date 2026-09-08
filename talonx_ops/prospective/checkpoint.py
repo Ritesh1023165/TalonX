@@ -1,0 +1,332 @@
+"""One machine-readable prospective-session checkpoint (Task 114 B3)."""
+from __future__ import annotations
+
+import json
+import sqlite3
+import subprocess
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
+
+from talonx_ops.prospective import (V1_FINGERPRINT_EXPECTED, V2_FINGERPRINT_EXPECTED,
+                                    V2_STRATEGY_VERSION, CAMPAIGN_START_DATE)
+from talonx_ops.prospective.funnel import build_funnel
+from talonx_ops.prospective.ledger_guard import check_ledger_continuity
+from talonx_ops.prospective.paths import V2_DB_PATH, V2_STATUS_PATH, now_pair
+from talonx_ops.prospective.telegram_owner import logical_poller_report
+
+
+def _git(*args: str) -> str:
+    try:
+        return subprocess.run(["git", *args], capture_output=True, text=True,
+                              cwd=Path(__file__).resolve().parents[2], timeout=15).stdout.strip()
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _v1_fp() -> str:
+    try:
+        from talonx_backtest.reproducibility import get_strategy_version
+        return get_strategy_version()
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _v2_fp() -> str:
+    try:
+        import importlib
+        m = importlib.import_module("research.scripts.task112_v2_release_fingerprint")
+        return m.v2_release_fingerprint().get("fingerprint", "")
+    except Exception:  # noqa: BLE001
+        try:
+            r = subprocess.run(
+                ["python", "research/scripts/task112_v2_release_fingerprint.py"],
+                capture_output=True, text=True, cwd=Path(__file__).resolve().parents[2], timeout=30)
+            return json.loads(r.stdout).get("fingerprint", "")
+        except Exception:  # noqa: BLE001
+            return ""
+
+
+def _v2_status() -> dict[str, Any]:
+    try:
+        return json.loads(Path(V2_STATUS_PATH).read_text())
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _age_s(ts: str | None, now: datetime) -> float | None:
+    if not ts:
+        return None
+    try:
+        return (now - datetime.fromisoformat(ts)).total_seconds()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _service_health(s: dict, now: datetime) -> dict[str, Any]:
+    hb = _age_s(s.get("heartbeat_utc"), now)
+    ttl = float(s.get("heartbeat_ttl_s", 180))
+    if not s:
+        health = "DOWN"
+    elif hb is None:
+        health = "DOWN"
+    elif hb < ttl:
+        health = "HEALTHY"
+    elif hb < ttl * 3:
+        health = "DEGRADED"
+    else:
+        health = "DOWN"
+    return {"health": health, "heartbeat_age_s": None if hb is None else round(hb, 1),
+            "heartbeat_ttl_s": ttl, "heartbeat_kind": s.get("heartbeat_kind"),
+            "tick": s.get("tick"), "last_tick_utc": s.get("last_tick_utc"),
+            "strategy_version": s.get("strategy_version"),
+            "active_profile": s.get("active_profile")}
+
+
+def _supervisor_status() -> dict[str, Any]:
+    try:
+        from talonx_ops.supervisor import _status_snapshot
+        return _status_snapshot()
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def _market() -> dict[str, Any]:
+    try:
+        from dataclasses import asdict, is_dataclass
+        from talonx_ops.market_health import market_health_view
+        v = market_health_view()
+        d = asdict(v) if is_dataclass(v) else vars(v)
+        return {"state": d.get("state"), "producer_live": d.get("producer_live"),
+                "symbols_priced": d.get("symbols_priced"),
+                "newest_tick_age_seconds": d.get("newest_tick_age_seconds"),
+                "coverage_ratio": d.get("coverage_ratio"),
+                "session_phase": d.get("session_phase")}
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def _intel() -> dict[str, Any]:
+    try:
+        import pathlib as _p
+        led = _p.Path.home() / ".talonx" / "ingestion_ledger.db"
+        con = sqlite3.connect(f"file:{led}?mode=ro", uri=True)
+        proc = con.execute("SELECT MAX(at_utc) FROM intel_processing_log").fetchone()[0]
+        newest_ev = con.execute("SELECT MAX(accepted_at_utc) FROM insider_transactions").fetchone()[0]
+        today = datetime.now(timezone.utc).date().isoformat()
+        events_today = con.execute(
+            "SELECT COUNT(*) FROM intel_event_processing WHERE discovered_at_utc >= ?", (today,)).fetchone()[0]
+        con.close()
+        now = datetime.now(timezone.utc)
+        return {"processing_log_age_s": _age_s(proc, now), "newest_insider_event_utc": newest_ev,
+                "intel_events_discovered_today": int(events_today)}
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def _experimental_external_sends_today() -> dict[str, Any]:
+    out: dict[str, Any] = {"override_active": None, "sent_today": 0, "held": 0}
+    try:
+        from talonx_signals.external_boundary import experimental_external_override_active
+        out["override_active"] = bool(experimental_external_override_active())
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        import pathlib as _p
+        db = _p.Path.home() / ".talonx" / "experimental" / "exp_alerts.db"
+        if db.exists():
+            con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+            today = datetime.now(timezone.utc).date().isoformat()
+            try:
+                out["sent_today"] = con.execute(
+                    "SELECT COUNT(*) FROM directional_alerts WHERE sent=1 AND created_at >= ?",
+                    (today,)).fetchone()[0]
+            except sqlite3.Error:
+                pass
+            try:
+                out["held"] = con.execute(
+                    "SELECT COUNT(*) FROM dispatch_log WHERE event='DRY_RUN_HELD' AND at >= ?",
+                    (today,)).fetchone()[0]
+            except sqlite3.Error:
+                pass
+            con.close()
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def _official_dispatch_today() -> dict[str, Any]:
+    try:
+        import pathlib as _p
+        db = _p.Path.home() / ".talonx" / "dispatch_audit.db"
+        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        today = datetime.now(timezone.utc).date().isoformat()
+        alerts = con.execute("SELECT COUNT(*) FROM alerts WHERE received_at >= ?", (today,)).fetchone()[0]
+        fails = con.execute(
+            "SELECT COUNT(*) FROM alerts WHERE received_at >= ? AND telegram_error IS NOT NULL",
+            (today,)).fetchone()[0]
+        con.close()
+        return {"alerts_today": int(alerts), "telegram_failures_today": int(fails)}
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def eod_state(now: datetime | None = None) -> dict[str, Any]:
+    """Market-phase-aware EOD state (Task 114 A5.4): NOT_DUE_YET before the
+    close, PENDING in the grace window, STALE only after the deadline is
+    actually missed."""
+    now = now or datetime.now(timezone.utc)
+    try:
+        import exchange_calendars as xc
+        cal = xc.get_calendar("XNYS")
+        d = now.date()
+        if not cal.is_session(d):
+            return {"state": "NOT_DUE_YET", "reason": "not an XNYS session today"}
+        close = cal.session_close(d).to_pydatetime()
+        deadline = close + timedelta(minutes=90)
+        if now < close:
+            return {"state": "NOT_DUE_YET", "reason": f"XNYS close {close.isoformat()} not reached",
+                    "close_utc": close.isoformat()}
+        if now < deadline:
+            return {"state": "PENDING", "reason": "within the post-close EOD grace window",
+                    "close_utc": close.isoformat(), "deadline_utc": deadline.isoformat()}
+        return {"state": "STALE", "reason": "EOD reconciliation deadline missed",
+                "close_utc": close.isoformat(), "deadline_utc": deadline.isoformat()}
+    except Exception as exc:  # noqa: BLE001
+        return {"state": "UNKNOWN", "reason": f"{type(exc).__name__}: {exc}"}
+
+
+def campaign_day(now: datetime | None = None) -> int:
+    now = now or datetime.now(timezone.utc)
+    try:
+        import exchange_calendars as xc
+        cal = xc.get_calendar("XNYS")
+        start = date.fromisoformat(CAMPAIGN_START_DATE)
+        d = now.date()
+        if d < start:
+            return 0
+        return len(cal.sessions_in_range(start.isoformat(), d.isoformat()))
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def capture(now: datetime | None = None) -> dict[str, Any]:
+    now = now or datetime.now(timezone.utc)
+    s = _v2_status()
+    v1fp, v2fp = _v1_fp(), _v2_fp()
+    ledger = check_ledger_continuity(V2_DB_PATH)
+    funnel = build_funnel(db_path=V2_DB_PATH, as_of=now.date())
+    poller = logical_poller_report()
+    market = _market()
+    intel = _intel()
+    exp = _experimental_external_sends_today()
+    official = _official_dispatch_today()
+    svc = _service_health(s, now)
+    eods = eod_state(now)
+
+    # data state (A4)
+    if funnel.get("available"):
+        data_state = "CURRENT"
+    elif "form4_error" in funnel:
+        data_state = "UNAVAILABLE"
+    else:
+        data_state = "UNKNOWN"
+
+    # business activity (A4)
+    term = funnel.get("terminal", {})
+    if term.get("open_positions", 0) > 0:
+        activity = "POSITION_OPEN"
+    elif term.get("buys", 0) > 0:
+        activity = "ACTIVITY"
+    elif funnel.get("interpretation") == "NO_MARKET_OPPORTUNITY":
+        activity = "NO_OPPORTUNITIES"
+    else:
+        activity = "NO_OPPORTUNITIES"
+
+    ck: dict[str, Any] = {
+        "checkpoint_version": 1,
+        "time": now_pair(),
+        "campaign": {"start_date": CAMPAIGN_START_DATE, "campaign_day": campaign_day(now),
+                     "day1_outcome": "NO_NATURAL_V2_SIGNAL"},
+        "release": {
+            "head_sha": _git("rev-parse", "HEAD"),
+            "head_short": _git("rev-parse", "--short", "HEAD"),
+            "tree_clean": _git("status", "--porcelain") == "",
+            "v1_fingerprint": v1fp, "v1_fingerprint_ok": v1fp == V1_FINGERPRINT_EXPECTED,
+            "v2_fingerprint": v2fp, "v2_fingerprint_ok": v2fp == V2_FINGERPRINT_EXPECTED,
+        },
+        "service_health": svc,
+        "data_state": data_state,
+        "business_activity": activity,
+        "v2": {
+            "strategy_version": s.get("strategy_version"),
+            "strategy_version_ok": s.get("strategy_version") == V2_STRATEGY_VERSION,
+            "source": s.get("form4_source", "insider" if s.get("form4_records_seen") else "unknown"),
+            "live_lookback_days": s.get("live_lookback_days"),
+            "form4_records_seen": s.get("form4_records_seen"),
+            "ripe_episodes_this_tick": s.get("ripe_episodes_this_tick"),
+            "stale_entry_skipped_this_tick": s.get("stale_entry_skipped_this_tick"),
+            "entries_this_tick": s.get("entries_this_tick"),
+            "exits_this_tick": s.get("exits_this_tick"),
+            "open_positions": s.get("open_positions"),
+            "cash": s.get("cash"),
+            "exit_unresolved": s.get("exit_unresolved", []),
+            "eod_forced_flatten": s.get("eod_forced_flatten", False),
+            "real_capital": s.get("real_capital", False),
+            "shorts": s.get("shorts", False),
+        },
+        "ledger": ledger.to_dict(),
+        "funnel": funnel,
+        "market": market,
+        "intelligence": intel,
+        "experimental": exp,
+        "official_dispatch": official,
+        "telegram_poller": poller.to_dict(),
+        "supervisor": _supervisor_status(),
+        "eod": eods,
+        "invariants": _invariant_flags(s, ledger, funnel, exp, poller, svc),
+    }
+    return ck
+
+
+def _stale_episode_entered(db_path, stale_ids: set[str]) -> bool:
+    if not stale_ids or not Path(db_path).exists():
+        return False
+    try:
+        con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        qs = ",".join("?" * len(stale_ids))
+        rows = con.execute(
+            f"SELECT p.episode_id FROM positions p WHERE p.episode_id IN ({qs})",
+            tuple(stale_ids)).fetchall()
+        con.close()
+        return len(rows) > 0
+    except sqlite3.Error:
+        return False
+
+
+def _invariant_flags(s, ledger, funnel, exp, poller, svc) -> dict[str, Any]:
+    """The hard CRITICAL/NO-GO checks (Task 114 B4).  Health-gated flags
+    only fire when the V2 service is actually up."""
+    from talonx_ops.prospective.paths import V2_DB_PATH
+    live = svc["health"] in ("HEALTHY", "DEGRADED")
+    flags: dict[str, bool] = {}
+    # always-meaningful ledger invariants (read straight from v2_lane.db)
+    flags["negative_cash"] = bool(ledger.cash is not None and ledger.cash < 0)
+    flags["ledger_equation_broken"] = any("equation broken" in p for p in ledger.problems)
+    flags["duplicate_buy"] = any("duplicate BUY" in p for p in ledger.problems)
+    flags["duplicate_position"] = any("duplicate position" in p for p in ledger.problems)
+    stale_ids = set(funnel.get("clusters", {}).get("stale_episode_ids", []))
+    flags["stale_episode_entered"] = _stale_episode_entered(V2_DB_PATH, stale_ids)
+    flags["experimental_external_send"] = bool(exp.get("sent_today"))
+    flags["experimental_override_active"] = bool(exp.get("override_active"))
+    flags["multiple_telegram_pollers"] = not poller.healthy
+    # service-gated invariants
+    flags["v2_eod_forced_flatten"] = live and bool(s.get("eod_forced_flatten"))
+    flags["v2_real_capital"] = live and bool(s.get("real_capital"))
+    flags["v2_shorts"] = live and bool(s.get("shorts"))
+    flags["v2_source_not_insider"] = live and (s.get("form4_source") not in (None, "insider")
+                                               or s.get("form4_records_seen") == 0)
+    flags["strategy_version_mismatch"] = live and s.get("strategy_version") != V2_STRATEGY_VERSION
+    flags["v2_process_dead"] = live is False and bool(s)  # a status file exists but service not fresh
+    flags["any_critical"] = any(v for k, v in flags.items() if k != "any_critical")
+    return flags

@@ -30,7 +30,12 @@ from talonx_v2.store import V2Store
 
 logger = logging.getLogger("talonx_v2.service")
 
+# Health-heartbeat TTL.  The heartbeat is written on its OWN lightweight
+# cadence (``heartbeat_seconds``), decoupled from the strategy evaluation
+# cadence (``tick_seconds``) -- so a long strategy poll interval never
+# makes the service look "stale" (Task 113 P2 / Task 114 B5).
 HEARTBEAT_TTL_S = 180
+HEARTBEAT_SECONDS_DEFAULT = 30
 
 
 class V2Service:
@@ -60,6 +65,7 @@ class V2Service:
         self._stop = False
         self._bar_cache: dict[str, list[dict]] = {}
         self._tick = 0
+        self._last_status: dict | None = None
 
     # ---- bar access (local CSV; no network) ----
     def _bars(self, sym: str) -> list[dict]:
@@ -154,9 +160,13 @@ class V2Service:
             "active_profile": active_profile().value,
             "heartbeat_utc": datetime.now(timezone.utc).isoformat(),
             "heartbeat_ttl_s": HEARTBEAT_TTL_S,
+            "heartbeat_kind": "TICK",
+            "last_tick_utc": datetime.now(timezone.utc).isoformat(),
             "tick": self._tick,
             "as_of": today.isoformat(),
             "db_path": self.cfg.db_path,
+            "form4_source": self.form4_kind,
+            "live_lookback_days": self.live_lookback_days,
             "form4_records_seen": n_records,
             "ripe_episodes_this_tick": n_ripe,
             "stale_entry_skipped_this_tick": getattr(self, "_stale_skipped", 0),
@@ -174,9 +184,38 @@ class V2Service:
             "real_capital": False,
             "shorts": False,
         }
-        self.status_path.parent.mkdir(parents=True, exist_ok=True)
-        self.status_path.write_text(json.dumps(status, indent=2, default=str))
+        self._atomic_write_status(status)
+        self._last_status = status
         return status
+
+    def _atomic_write_status(self, status: dict) -> None:
+        self.status_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.status_path.with_suffix(self.status_path.suffix + ".tmp")
+        tmp.write_text(json.dumps(status, indent=2, default=str))
+        tmp.replace(self.status_path)
+
+    def _write_heartbeat(self) -> None:
+        """Lightweight health heartbeat -- refresh ``heartbeat_utc`` (and the
+        cheap live ledger fields) on the status file WITHOUT running a
+        strategy evaluation.  Keeps the service 'fresh' between ticks."""
+        base = self._last_status
+        if base is None:
+            try:
+                base = json.loads(self.status_path.read_text())
+            except Exception:  # noqa: BLE001
+                return
+        s = dict(base)
+        s["heartbeat_utc"] = datetime.now(timezone.utc).isoformat()
+        s["heartbeat_kind"] = "LIGHTWEIGHT"
+        try:  # cheap SQLite reads only -- no cluster detection
+            s["cash"] = self.store.cash()
+            s["open_positions"] = self.store.n_open()
+            s["exit_unresolved"] = [{"symbol": u["symbol"], "episode_id": u["episode_id"]}
+                                    for u in self.store.unresolved_positions()]
+        except Exception:  # noqa: BLE001
+            pass
+        self._atomic_write_status(s)
+        self._last_status = s
 
     def ready(self) -> bool:
         """Readiness probe: status file fresh + correct profile + DB writable."""
@@ -192,14 +231,16 @@ class V2Service:
         return age < HEARTBEAT_TTL_S and s.get("strategy_version") == V2_VERSION
 
     # ---- loop ----
-    def run(self, *, once: bool, tick_seconds: int) -> int:
+    def run(self, *, once: bool, tick_seconds: int,
+            heartbeat_seconds: int = HEARTBEAT_SECONDS_DEFAULT) -> int:
         for sig in (signal.SIGINT, signal.SIGTERM):
             try:
                 signal.signal(sig, lambda *_: setattr(self, "_stop", True))
             except (ValueError, OSError):
                 pass
-        logger.info("talonx_v2 service start (once=%s tick=%ss db=%s)",
-                    once, tick_seconds, self.cfg.db_path)
+        hb = max(1, min(int(heartbeat_seconds), max(1, tick_seconds)))
+        logger.info("talonx_v2 service start (once=%s tick=%ss heartbeat=%ss db=%s)",
+                    once, tick_seconds, hb, self.cfg.db_path)
         while not self._stop:
             t0 = time.monotonic()
             try:
@@ -211,10 +252,19 @@ class V2Service:
                 logger.exception("tick failed")
             if once:
                 break
-            dt = tick_seconds - (time.monotonic() - t0)
-            end = time.monotonic() + max(1.0, dt)
+            # inter-tick: sleep in short slices, emitting a lightweight
+            # health heartbeat every ``hb`` seconds so the service never
+            # looks stale while waiting for the next strategy evaluation.
+            end = time.monotonic() + max(1.0, tick_seconds - (time.monotonic() - t0))
+            next_hb = time.monotonic() + hb
             while time.monotonic() < end and not self._stop:
                 time.sleep(0.5)
+                if time.monotonic() >= next_hb:
+                    try:
+                        self._write_heartbeat()
+                    except Exception:  # noqa: BLE001
+                        logger.exception("heartbeat write failed")
+                    next_hb = time.monotonic() + hb
         logger.info("talonx_v2 service stopped cleanly (open positions persist in %s)",
                     self.cfg.db_path)
         return 0
