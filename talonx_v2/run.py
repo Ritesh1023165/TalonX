@@ -83,6 +83,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--status-path", default="")
     ap.add_argument("--as-of", default="", help="live --once: pin the tick date (dry-run only)")
     ap.add_argument("--live-lookback-days", type=int, default=45)
+    ap.add_argument("--deliver", action="store_true",
+                    help="live mode: drain the durable V2 alert outbox each tick "
+                         "through OfficialExternalRouter + a dry-run (HOLD) transport")
     ap.add_argument("--pricing-mode", default="csv",
                     choices=["csv", "composite-yf", "composite-iex"],
                     help="daily-bar source: csv (frozen snapshot, default) | "
@@ -123,12 +126,22 @@ def main(argv: list[str] | None = None) -> int:
         import logging
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
         from talonx_v2.service import V2Service
+        router = transport = None
+        if args.deliver:
+            # durable alert outbox is ALWAYS written; --deliver additionally drains
+            # it each tick through the ONE official routing authority.  The default
+            # transport is a dry-run that HOLDS (records intent, sends nothing) --
+            # a real network transport is not wired by this build.
+            from talonx_ops.official_dispatch import OfficialExternalRouter
+            from talonx_v2.delivery import DryRunTransport
+            router, transport = OfficialExternalRouter(), DryRunTransport()
         svc = V2Service(
             config=cfg, bar_dirs=[Path(p) for p in args.bar_dir],
             form4_kind=args.form4_source, form4_parquet=args.form4_parquet,
             status_path=args.status_path or None,
             since=None, live_lookback_days=args.live_lookback_days,
             pricing_mode=args.pricing_mode,
+            router=router, transport=transport, deliver=args.deliver,
         )
         if args.once and args.as_of:
             st = svc.tick(as_of=date.fromisoformat(args.as_of))

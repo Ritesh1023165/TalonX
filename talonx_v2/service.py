@@ -23,9 +23,11 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from talonx_v2 import form4_source, paper, pipeline
-from talonx_v2.calendar import is_session, next_session_on_or_after
+from talonx_v2.calendar import (is_session, next_session_on_or_after,
+                                next_session_strictly_after)
 from talonx_v2.config import V2_VERSION, V2Config
 from talonx_v2.profile import active_profile
+from talonx_v2.schemas import V2Action
 from talonx_v2.store import V2Store
 
 logger = logging.getLogger("talonx_v2.service")
@@ -55,11 +57,20 @@ class V2Service:
                  status_path: str | None = None,
                  since: date | None = None,
                  live_lookback_days: int = 45,
-                 pricing_mode: str = "csv"):
+                 pricing_mode: str = "csv",
+                 router=None, transport=None, deliver: bool = False):
         self.cfg = config
         self.cfg.validate_frozen()
         self.store = V2Store(config.db_path, starting_cash=config.starting_cash_usd)
         self.bar_dirs = bar_dirs
+        # official-alert delivery (Task 117 overnight).  ``router`` =
+        # talonx_ops.official_dispatch.OfficialExternalRouter; ``transport`` = an
+        # injected boundary sink (default: dry-run HOLD).  ``deliver`` gates the
+        # per-tick outbox drain -- OFF unless an operator wires a real transport.
+        self._router = router
+        self._transport = transport
+        self._deliver = bool(deliver)
+        self._last_delivery: dict = {}
         # Pricing: "csv" (default) = the frozen CSV snapshot, byte-identical to
         # the pre-Task-117 behaviour.  Any other mode routes bar/price lookups
         # through talonx_v2.pricing.make_resolver (strict validation,
@@ -176,18 +187,59 @@ class V2Service:
 
         from talonx_v2.calendar import add_sessions
 
+        # Task 117 overnight P3: an unavailable Form-4 SOURCE blocks NEW
+        # event-based entries/intents -- but it must NOT block due-exit
+        # management of positions that are ALREADY open (those settle on
+        # reliable bar prices, independent of the SEC feed).
+        source_degraded: str | None = None
         try:
             records = self._records(as_of=today)
         except V2SourceError as exc:
-            # live source unavailable -- surface a DEGRADED status (operator-visible)
-            # and do NOT process a stale/empty episode set into entries.
-            status = self._write_status(today, 0, 0, pipeline.ProcessResult(),
-                                        source_degraded=str(exc))
-            logger.error("tick %s: SOURCE DEGRADED -- %s", self._tick, exc)
-            return status
+            records = None
+            source_degraded = str(exc)
+            logger.error("tick %s: SOURCE DEGRADED -- %s (existing positions still "
+                         "get due-exit evaluation)", self._tick, exc)
 
-        all_ripe = [e for e in pipeline.detect_episodes(records, config=self.cfg)
-                    if e.eligible_entry_session <= ripe_through]
+        res = pipeline.ProcessResult()
+        self._intents_created = 0
+        self._stale_skipped = 0
+        episodes: list = []
+
+        all_eps = pipeline.detect_episodes(records, config=self.cfg) if records is not None else []
+        all_ripe = [e for e in all_eps if e.eligible_entry_session <= ripe_through]
+
+        # --- PRE-OPEN ENTRY INTENT PASS (Task 117 overnight) ---------------
+        # An episode whose eligible entry session has NOT started gets a
+        # durable PENDING intent + an ACTIONABLE alert now (before that
+        # session's open).  It carries no economic weight -- the fill still
+        # runs the unchanged frozen pipeline at the eligible-entry-session
+        # OPEN and is then LINKED to this intent (delayed fill notification).
+        next_sess = next_session_strictly_after(ripe_through)
+        intents_created = 0
+        for e in all_eps:
+            if not (today < e.eligible_entry_session <= next_sess):
+                continue                                   # started/past, or too far ahead
+            if self.store.episode_disposition(e.episode_id) in ("ENTERED", "SKIPPED_ENTRY_STALE"):
+                continue
+            if self.store.entry_intent(e.episode_id) is not None:
+                continue
+            liq, dec = self._eval_causal_decision(e)
+            if dec.action is V2Action.BUY:
+                try:
+                    planned_exit = add_sessions(e.eligible_entry_session,
+                                                self.cfg.hold_trading_days).isoformat()
+                except Exception:  # noqa: BLE001
+                    planned_exit = ""
+                intent = self.store.upsert_entry_intent(
+                    e, dec, liq, horizon=self.cfg.hold_trading_days,
+                    planned_exit_session=planned_exit)
+                intents_created += 1
+                self._enqueue_alert(kind="ENTRY_INTENT", episode=e, decision=dec,
+                                    intent=intent, extra={
+                                        "target_entry_session": e.eligible_entry_session.isoformat(),
+                                        "planned_exit_session": planned_exit,
+                                        "actionable": True})
+        self._intents_created = intents_created
 
         # live guard: do NOT chase a stale entry at a historical price
         stale_cut = add_sessions(ripe_through, -self.cfg.max_entry_staleness_sessions) \
@@ -205,30 +257,175 @@ class V2Service:
                         eligible_entry_session=e.eligible_entry_session.isoformat(),
                         detail=f"eligible {e.eligible_entry_session.isoformat()} > "
                                f"{self.cfg.max_entry_staleness_sessions} sessions before {ripe_through.isoformat()}")
+                    intent = self.store.entry_intent(e.episode_id)
+                    if intent is not None and intent["status"] == "PENDING":
+                        self.store.mark_entry_intent(
+                            intent["intent_id"], "EXPIRED_STALE",
+                            detail=f"entry session {e.eligible_entry_session.isoformat()} went "
+                                   f"stale (> {self.cfg.max_entry_staleness_sessions} sessions) "
+                                   "before a FINAL entry bar was observed")
+                        self._enqueue_alert(kind="ENTRY_STALE", episode=e, decision=None,
+                                            intent=intent, extra={"expired": True})
                 stale += 1
                 continue
             episodes.append(e)
         self._stale_skipped = stale
 
-        res = pipeline.ProcessResult()
         for ep in episodes:
             # one noisy symbol must not starve the rest of the tick (Task 117
             # Phase 0 §2).  Nothing is persisted on a raised error, so the
             # episode is simply retried next tick -- no duplicate BUY risk.
+            pre_intent = self.store.entry_intent(ep.episode_id)
+            n_before = len(res.entries)
             try:
                 pipeline.process_episode(ep, store=self.store, bars_lookup=self._bars,
                                          price_lookup=self._price, config=self.cfg, result=res)
             except Exception:  # noqa: BLE001
                 logger.exception("episode_processing_failed episode_id=%s symbol=%s",
                                  ep.episode_id, ep.symbol)
+                continue
+            if len(res.entries) > n_before:
+                self._on_entry_recorded(ep, res.entries[-1], pre_intent, ripe_through)
         try:
+            n_exits_before = len(res.exits)
             pipeline.settle_due_exits(store=self.store, as_of_session=ripe_through,
                                       price_lookup=self._price, config=self.cfg, result=res)
+            for x in res.exits[n_exits_before:]:
+                self._on_exit_recorded(x)
         except Exception:  # noqa: BLE001
             logger.exception("settle_due_exits_failed as_of=%s", ripe_through)
 
-        status = self._write_status(today, len(records), len(episodes), res)
+        # drain the durable alert outbox (only when an operator wired a transport)
+        if self._deliver and self._router is not None:
+            try:
+                from talonx_v2.delivery import deliver_outbox
+                self._last_delivery = deliver_outbox(
+                    self.store, router=self._router, transport=self._transport)
+            except Exception:  # noqa: BLE001
+                logger.exception("deliver_outbox failed")
+
+        status = self._write_status(today, len(records or []), len(episodes), res,
+                                    source_degraded=source_degraded)
         return status
+
+    # ---- causal decision + alert helpers (Task 117 overnight) ----
+    def _eval_causal_decision(self, ep):
+        """Frozen liquidity gate + Brain for ``ep`` using ONLY bars strictly
+        before its eligible entry session (identical to what process_episode
+        derives -- no economic divergence, just evaluated earlier)."""
+        from talonx_v2 import brain_bridge, quant_bridge
+        from talonx_v2.liquidity import evaluate_liquidity
+        bars = self._bars(ep.symbol) or []
+        liq = evaluate_liquidity(bars, entry_session=ep.eligible_entry_session, config=self.cfg)
+        sig = quant_bridge.build_signal(ep, liq, config=self.cfg)
+        return liq, brain_bridge.contextualize(sig)
+
+    def _enqueue_alert(self, *, kind: str, episode, decision, intent, extra: dict | None = None):
+        import hashlib
+        extra = extra or {}
+        sym = episode.symbol.upper()
+        action = {"ENTRY_INTENT": "BUY", "ENTRY_FILL": "BUY",
+                  "EXIT_FILL": "SELL", "ENTRY_STALE": "INFO"}[kind]
+        ref = (extra.get("position_id") or extra.get("target_entry_session")
+               or extra.get("exit_session") or episode.eligible_entry_session.isoformat())
+        event_id = hashlib.sha256(f"{episode.episode_id}|{kind}|{ref}".encode()).hexdigest()[:24]
+        dedup_key = f"{episode.episode_id}:{action}:{kind}"
+        provenance = {
+            "episode_id": episode.episode_id, "kind": kind,
+            "issuer_cik": episode.issuer_cik,
+            "distinct_owner_ciks": list(episode.distinct_owner_ciks),
+            "activation_filing_date": episode.activation_filing_date.isoformat(),
+            "causal_event_ts": episode.causal_event_ts.isoformat(),
+            "eligible_entry_session": episode.eligible_entry_session.isoformat(),
+            "intent_id": (intent or {}).get("intent_id"),
+            "intent_created_at_utc": (intent or {}).get("created_at_utc"),
+            "decision_at_utc": (decision.decided_at.isoformat() if decision is not None else None),
+            "enqueued_at_utc": __import__("datetime").datetime.now(timezone.utc).isoformat(),
+            **{k: v for k, v in extra.items() if k != "position_id"},
+        }
+        if kind == "ENTRY_INTENT":
+            headline = (f"INSIDER BUY CLUSTER — PLANNED BUY — {sym}  "
+                        f"(open of {extra.get('target_entry_session')})")
+            body = (f"{decision.rationale}\n"
+                    f"ACTIONABLE: a market-on-open paper entry is planned for the OPEN of "
+                    f"{extra.get('target_entry_session')} (first XNYS session strictly after the "
+                    f"cluster fired). Planned exit {extra.get('planned_exit_session')} "
+                    f"(+{self.cfg.hold_trading_days} trading days). Multi-day horizon. Paper only.")
+        elif kind == "ENTRY_FILL":
+            delayed = extra.get("delayed")
+            headline = f"INSIDER BUY CLUSTER — BUY FILLED — {sym}"
+            body = (("(delayed notification of a previously-recorded paper intent) "
+                     if delayed else "")
+                    + f"Paper long opened at the {extra.get('entry_session')} OPEN "
+                    f"{extra.get('entry_price')}. Planned exit {extra.get('target_exit_session')}. "
+                    f"Paper only. Strategy INSIDER_BUY_CLUSTER_V2@1.")
+            if extra.get("backfill"):
+                body += (" NOTE: no earlier intent existed (cold-start backfill); the "
+                         f"{extra.get('entry_session')} open is a historical price and was "
+                         "not prospectively actionable.")
+        elif kind == "EXIT_FILL":
+            headline = f"INSIDER BUY CLUSTER — SELL / EXIT — {sym}"
+            body = (f"Closed the {sym} paper long at the {extra.get('exit_session')} CLOSE "
+                    f"{extra.get('exit_price')} ({extra.get('realized_pnl_pct', 0.0):+.2f}%, held "
+                    f"{extra.get('trading_days_held')} sessions). Paper only.")
+        else:  # ENTRY_STALE
+            headline = f"INSIDER BUY CLUSTER — entry expired — {sym}"
+            body = (f"The planned {sym} paper entry for {episode.eligible_entry_session.isoformat()} "
+                    f"expired without a FINAL entry bar within "
+                    f"{self.cfg.max_entry_staleness_sessions} sessions. No position opened. "
+                    "Informational only.")
+        payload = "\n".join([f"⚡ *{action}* — *{sym}*  INSIDER BUY CLUSTER",
+                             "—" * 12, headline, "", body,
+                             "", "[INSIDER_BUY_CLUSTER_V2@1 · PAPER_CANDIDATE · PAPER ONLY]"])
+        self.store.enqueue_alert(
+            event_id=event_id, episode_id=episode.episode_id, kind=kind, action=action,
+            symbol=sym, strategy_version="INSIDER_BUY_CLUSTER_V2@1", dedup_key=dedup_key,
+            payload_text=payload, provenance=provenance,
+            horizon_trading_days=self.cfg.hold_trading_days,
+            intent_id=(intent or {}).get("intent_id"), position_id=extra.get("position_id"))
+
+    def _on_entry_recorded(self, ep, entry: dict, pre_intent: dict | None, ripe_through) -> None:
+        pos = self.store.position_for_episode(ep.episode_id)
+        pid = pos["position_id"] if pos else None
+        delayed = pre_intent is not None
+        if pre_intent is not None and pre_intent["status"] == "PENDING":
+            self.store.mark_entry_intent(
+                pre_intent["intent_id"], "FILLED", position_id=pid,
+                fill_price=entry["entry_price"], fill_session=entry["entry_session"],
+                detail=f"reconciled at the {entry['entry_session']} open")
+        self._enqueue_alert(kind="ENTRY_FILL", episode=ep, decision=None,
+                            intent=pre_intent, extra={
+                                "position_id": pid, "entry_session": entry["entry_session"],
+                                "entry_price": entry["entry_price"],
+                                "target_exit_session": entry["target_exit_session"],
+                                "delayed": delayed, "backfill": pre_intent is None})
+
+    def _on_exit_recorded(self, x: dict) -> None:
+        class _E:
+            episode_id = x["episode_id"]
+            symbol = x["symbol"]
+            issuer_cik = ""
+            distinct_owner_ciks: tuple = ()
+            from datetime import date as _d, datetime as _dt, timezone as _tz
+            activation_filing_date = _d.fromisoformat(x["exit_session"])
+            causal_event_ts = _dt.now(_tz.utc)
+            eligible_entry_session = _d.fromisoformat(x["exit_session"])
+        self._enqueue_alert(kind="EXIT_FILL", episode=_E(), decision=None, intent=None,
+                            extra={"exit_session": x["exit_session"],
+                                   "exit_price": x["exit_price"],
+                                   "realized_pnl_pct": x.get("realized_pnl_pct", 0.0),
+                                   "trading_days_held": x.get("trading_days_held")})
+
+    def _outbox_summary(self) -> dict:
+        rows = self.store.all_outbox()
+        by_state: dict[str, int] = {}
+        for r in rows:
+            by_state[r["state"]] = by_state.get(r["state"], 0) + 1
+        return {"total": len(rows), "by_state": by_state,
+                "recent": [{"kind": r["kind"], "action": r["action"], "symbol": r["symbol"],
+                            "state": r["state"], "attempts": r["attempts"],
+                            "transport_ref": r["transport_ref"], "last_error": r["last_error"]}
+                           for r in rows[-8:]]}
 
     def _write_status(self, today: date, n_records: int, n_ripe: int, res,
                       *, source_degraded: str | None = None) -> dict:
@@ -264,6 +461,16 @@ class V2Service:
             "stale_entry_skipped_this_tick": getattr(self, "_stale_skipped", 0),
             "entries_this_tick": len(res.entries),
             "exits_this_tick": len(res.exits),
+            # pre-open intent + durable alert outbox (Task 117 overnight)
+            "entry_intents_created_this_tick": getattr(self, "_intents_created", 0),
+            "pending_entry_intents": [
+                {"symbol": i["symbol"], "episode_id": i["episode_id"],
+                 "target_entry_session": i["target_entry_session"],
+                 "created_at_utc": i["created_at_utc"]}
+                for i in self.store.pending_entry_intents()],
+            "alert_outbox": self._outbox_summary(),
+            "last_delivery": self._last_delivery or None,
+            "delivery_enabled": self._deliver,
             "open_positions": len(opens),
             "open_symbols": [o["symbol"] for o in opens],
             "exit_unresolved": [{"symbol": u["symbol"], "episode_id": u["episode_id"]}
