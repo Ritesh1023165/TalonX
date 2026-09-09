@@ -15,10 +15,16 @@ All three normalise to ``cluster_engine.PurchaseRecord``.
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from talonx_v2.cluster_engine import PurchaseRecord
+
+# When ``since`` is a DISSEMINATION-window bound we widen the underlying
+# transaction_date SQL filter by this slack and re-filter on the acceptance
+# date in Python, so a Form 4 filed late for an older transaction is not
+# silently dropped (Task 117 Phase 0 F3).
+_DISSEMINATION_SLACK_DAYS = 400
 
 
 def _to_date(v) -> date | None:
@@ -100,20 +106,32 @@ def from_research_parquet(
 def from_insider_store(store, *, symbols: list[str] | None = None,
                        since: date | None = None,
                        causal_cutoff: datetime | None = None) -> list[PurchaseRecord]:
-    """``store`` = talonx_ingest.intelligence.insider.store.InsiderStore."""
+    """``store`` = talonx_ingest.intelligence.insider.store.InsiderStore.
+
+    ``since`` bounds the DISSEMINATION window (contract: the episode "fires"
+    when the filing is *publicly disseminated* -- ``FILING_DATE`` / EDGAR
+    acceptance).  ``InsiderStore.query_transactions`` filters ``transaction_date``,
+    so the SQL bound is widened by ``_DISSEMINATION_SLACK_DAYS`` and the
+    dissemination-date filter is re-applied here -- a late-filed Form 4 for an
+    older transaction stays in the window.  ``causal_cutoff`` still bounds
+    acceptance from above (no future knowledge in an as-of replay).
+    """
     from talonx_ingest.intelligence.insider.domain import TransactionClass
 
+    query_since = (since - timedelta(days=_DISSEMINATION_SLACK_DAYS)) if since is not None else None
     syms = symbols or [None]
     recs: list[PurchaseRecord] = []
     for sym in syms:
         txns = store.query_transactions(
             symbol=sym, classification=TransactionClass.OPEN_MARKET_PURCHASE,
-            since=since, causal_cutoff=causal_cutoff, newest_first=False,
+            since=query_since, causal_cutoff=causal_cutoff, newest_first=False,
         )
         for t in txns:
             fd = t.filing_date or (t.accepted_at_utc.date() if t.accepted_at_utc else None)
             if fd is None or not t.symbol or not t.owner_cik:
                 continue
+            if since is not None and fd < since:
+                continue  # disseminated before the window -- exclude
             recs.append(PurchaseRecord(
                 symbol=t.symbol.upper(), issuer_cik=t.issuer_cik or "",
                 owner_cik=t.owner_cik, filing_date=fd, accession=t.accession or "",

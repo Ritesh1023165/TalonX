@@ -165,11 +165,31 @@ def _port_open(p: int) -> bool:
         s.close()
 
 
-def verify_running(session_dir: str | Path) -> dict[str, Any]:
+def verify_running(session_dir: str | Path, *, retries: int = 10,
+                  delay_s: float = 3.0) -> dict[str, Any]:
+    """Bounded retry over the ACTUAL required components (Task 117 Phase 0 4.1).
+
+    Startup is not "done" the moment a heartbeat file appears -- the
+    dashboard port bind, the supervisor, the companion process and the
+    checkpoint daemon each come up on their own schedule.  Poll until all
+    required signals are up or ``retries`` is exhausted; report per-check
+    plus how many attempts it took and whether it is ``ready``.
+    """
     info = read_pids(session_dir)
-    return {
-        "supervisor_alive": _alive(info.get("supervisor_pid")),
-        "v2_companion_alive": _alive(info.get("v2_companion_pid")),
-        "checkpoint_daemon_alive": _alive(info.get("checkpoint_daemon_pid")),
-        "dashboard_8787": _port_open(8787),
-    }
+    req = ("supervisor_pid", "v2_companion_pid")   # checkpoint daemon + port are best-effort
+    attempt = 0
+    checks: dict[str, Any] = {}
+    for attempt in range(1, max(1, retries) + 1):
+        checks = {
+            "supervisor_alive": _alive(info.get("supervisor_pid")),
+            "v2_companion_alive": _alive(info.get("v2_companion_pid")),
+            "checkpoint_daemon_alive": _alive(info.get("checkpoint_daemon_pid")),
+            "dashboard_8787": _port_open(8787),
+        }
+        if all(_alive(info.get(k)) for k in req):
+            break
+        if attempt < retries:
+            time.sleep(delay_s)
+    checks["attempts"] = attempt
+    checks["ready"] = all(_alive(info.get(k)) for k in req)
+    return checks

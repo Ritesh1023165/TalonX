@@ -38,6 +38,16 @@ HEARTBEAT_TTL_S = 180
 HEARTBEAT_SECONDS_DEFAULT = 30
 
 
+class V2SourceError(RuntimeError):
+    """The configured live Form-4 source (InsiderStore) could not be read.
+
+    Raised instead of silently substituting the historical research parquet:
+    a live tick that cannot see the authoritative feed must fail loudly
+    (stale heartbeat, DEGRADED source-health) rather than trade on
+    six-month-old fixture data (Task 117 Phase 0 F5).
+    """
+
+
 class V2Service:
     def __init__(self, *, config: V2Config, bar_dirs: list[Path],
                  form4_kind: str = "parquet",
@@ -66,6 +76,13 @@ class V2Service:
         self._bar_cache: dict[str, list[dict]] = {}
         self._tick = 0
         self._last_status: dict | None = None
+        # source-readiness telemetry (Task 117 Phase 0 F4/F5) -- distinct from
+        # the process heartbeat; a fresh heartbeat is NOT proof of a good source read.
+        self._source_state: dict = {
+            "configured": self.form4_kind, "actual": None, "ok": None,
+            "records": 0, "since": None, "causal_cutoff": None,
+            "last_ok_utc": None, "error": None,
+        }
 
     # ---- bar access (local CSV; no network) ----
     def _bars(self, sym: str) -> list[dict]:
@@ -98,15 +115,39 @@ class V2Service:
 
     # ---- form4 source ----
     def _records(self, *, as_of: date):
+        # ``since`` bounds the DISSEMINATION window (contract: "FILING_DATE /
+        # EDGAR acceptance"); the adapter re-filters on the acceptance date so a
+        # late-filed Form 4 for an older transaction is not dropped (F3).
         since = self.since or (as_of - timedelta(days=self.live_lookback_days))
+        # explicit as-of causal cutoff -- for a pinned dry-run/replay this excludes
+        # filings accepted after the modelled session; for real live it is
+        # end-of-today and excludes nothing (D-adapters requirement).
+        cutoff = datetime.combine(as_of, datetime.max.time().replace(microsecond=0),
+                                  tzinfo=timezone.utc)
+        self._source_state.update(since=since.isoformat(), causal_cutoff=cutoff.isoformat(),
+                                  configured=self.form4_kind)
+
         if self.form4_kind == "insider":
             try:
                 from talonx_ingest.intelligence.insider.store import InsiderStore
-                st = InsiderStore()  # default ingestion_ledger.db
-                return form4_source.from_insider_store(st, since=since)
+                st = InsiderStore()  # default ingestion_ledger.db (read side)
+                recs = form4_source.from_insider_store(st, since=since, causal_cutoff=cutoff)
             except Exception as exc:  # noqa: BLE001
-                logger.warning("insider store unavailable (%r) -> falling back to parquet", exc)
-        return form4_source.from_research_parquet(self.form4_parquet, since=since)
+                self._source_state.update(actual="insider", ok=False, records=0, error=repr(exc))
+                logger.error("live Form-4 source (InsiderStore) unavailable: %r -- NOT "
+                             "falling back to the historical parquet in live mode", exc)
+                raise V2SourceError(f"InsiderStore read failed: {exc!r}") from exc
+            self._source_state.update(actual="insider", ok=True, records=len(recs), error=None,
+                                      last_ok_utc=datetime.now(timezone.utc).isoformat())
+            return recs
+
+        # form4_kind == "parquet": EXPLICIT offline / replay selection only.
+        recs = form4_source.from_research_parquet(self.form4_parquet, since=since)
+        self._source_state.update(
+            actual="parquet", ok=True, records=len(recs), error=None,
+            last_ok_utc=datetime.now(timezone.utc).isoformat(),
+            note="OFFLINE research parquet -- explicit --form4-source parquet (NOT live)")
+        return recs
 
     # ---- one tick ----
     def tick(self, *, as_of: date | None = None) -> dict:
@@ -116,7 +157,16 @@ class V2Service:
 
         from talonx_v2.calendar import add_sessions
 
-        records = self._records(as_of=today)
+        try:
+            records = self._records(as_of=today)
+        except V2SourceError as exc:
+            # live source unavailable -- surface a DEGRADED status (operator-visible)
+            # and do NOT process a stale/empty episode set into entries.
+            status = self._write_status(today, 0, 0, pipeline.ProcessResult(),
+                                        source_degraded=str(exc))
+            logger.error("tick %s: SOURCE DEGRADED -- %s", self._tick, exc)
+            return status
+
         all_ripe = [e for e in pipeline.detect_episodes(records, config=self.cfg)
                     if e.eligible_entry_session <= ripe_through]
 
@@ -151,7 +201,8 @@ class V2Service:
         status = self._write_status(today, len(records), len(episodes), res)
         return status
 
-    def _write_status(self, today: date, n_records: int, n_ripe: int, res) -> dict:
+    def _write_status(self, today: date, n_records: int, n_ripe: int, res,
+                      *, source_degraded: str | None = None) -> dict:
         opens = paper.open_position_report(self.store, today)
         unresolved = self.store.unresolved_positions()
         status = {
@@ -160,12 +211,16 @@ class V2Service:
             "active_profile": active_profile().value,
             "heartbeat_utc": datetime.now(timezone.utc).isoformat(),
             "heartbeat_ttl_s": HEARTBEAT_TTL_S,
-            "heartbeat_kind": "TICK",
+            "heartbeat_kind": "DEGRADED_SOURCE" if source_degraded else "TICK",
             "last_tick_utc": datetime.now(timezone.utc).isoformat(),
             "tick": self._tick,
             "as_of": today.isoformat(),
             "db_path": self.cfg.db_path,
             "form4_source": self.form4_kind,
+            # source readiness -- separate from the heartbeat (F4): a fresh
+            # heartbeat is NOT proof of a complete/current filing read.
+            "source": dict(self._source_state, degraded=source_degraded),
+            "data_state": "DATA_UNAVAILABLE" if source_degraded else "CURRENT",
             "live_lookback_days": self.live_lookback_days,
             "form4_records_seen": n_records,
             "ripe_episodes_this_tick": n_ripe,

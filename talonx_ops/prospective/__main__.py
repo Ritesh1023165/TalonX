@@ -104,7 +104,12 @@ def cmd_close(args) -> int:
     ts = _terminal_summary(res, sd)
     atomic_write(sd / "terminal_summary.txt", ts)
     print(ts)
-    return {"PASS": 0, "PASS_WITH_FINDINGS": 0, "NOT_DUE_YET": 3, "FAIL": 1}.get(res.verdict, 1)
+    code = {"PASS": 0, "PASS_WITH_FINDINGS": 0, "NOT_DUE_YET": 3, "FAIL": 1}.get(res.verdict, 1)
+    # residual stack children after a shutdown attempt -> distinct non-zero
+    # exit (Task 117 Phase 0 4.3) so automation does not read it as clean.
+    if res.shutdown.get("performed") and res.shutdown.get("shutdown_clean") is False and code == 0:
+        code = 4
+    return code
 
 
 def _terminal_summary(res, sd) -> str:

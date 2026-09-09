@@ -168,15 +168,6 @@ def run_close(session_dir: str | Path, *, force: bool = False,
         asserts["v2_ledger_preserved_copy"] = "FAIL"
         findings.append(f"could not copy v2_lane.db evidence: {exc}")
 
-    fails = [k for k, v in asserts.items() if v == "FAIL"]
-    partials = [k for k, v in asserts.items() if v == "PARTIAL"]
-    if fails:
-        verdict = "FAIL"
-    elif partials or findings:
-        verdict = "PASS_WITH_FINDINGS"
-    else:
-        verdict = "PASS"
-
     shutdown: dict[str, Any] = {"performed": False}
     if do_shutdown:
         from talonx_ops.prospective.proc import stop_stack
@@ -190,6 +181,30 @@ def run_close(session_dir: str | Path, *, force: bool = False,
             shutdown["open_v2_positions_preserved"] = int(still_open) == v2_rec.get("open", 0)
         except Exception:  # noqa: BLE001
             shutdown["open_v2_positions_preserved"] = None
+
+        # Task 117 Phase 0 (4.3): the close must NOT report a clean PASS while
+        # required stack children are still running.  Residuals are a finding
+        # and feed the exit status -- never silently swallowed.
+        residual = shutdown.get("residual_talonx_processes") or []
+        shutdown["shutdown_clean"] = not residual
+        if residual:
+            asserts["controlled_shutdown_complete"] = "PARTIAL"
+            findings.append(
+                f"controlled shutdown incomplete: {len(residual)} residual TalonX "
+                f"process(es) after grace -- "
+                + ", ".join(f"pid {r.get('pid')} ({str(r.get('cmd',''))[:40]})" for r in residual[:6])
+                + " -- operator must run the base-stack teardown separately")
+        else:
+            asserts["controlled_shutdown_complete"] = "PASS"
+
+    fails = [k for k, v in asserts.items() if v == "FAIL"]
+    partials = [k for k, v in asserts.items() if v == "PARTIAL"]
+    if fails:
+        verdict = "FAIL"
+    elif partials or findings:
+        verdict = "PASS_WITH_FINDINGS"
+    else:
+        verdict = "PASS"
 
     return CloseResult(verdict=verdict, v2_reconciliation=v2_rec, base_reconciliation=base_rec,
                        asserts=asserts, findings=findings, shutdown=shutdown, final_checkpoint=ck)
