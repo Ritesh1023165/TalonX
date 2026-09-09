@@ -853,9 +853,22 @@ class DashboardReadModel:
                 "eod_forced_flatten": s.get("eod_forced_flatten", False),
             }
         except OSError:
-            out["health"] = "DOWN"
-            out["service"] = {"status": "NO_ACTIVE_PRODUCER", "health": "DOWN",
-                              "note": "no v2 service status file"}
+            # Task 117 Phase 0 L1: a just-started companion has no status file
+            # yet -- distinguish a bounded STARTING warmup from a crashed DOWN.
+            health = "DOWN"
+            note = "no v2 service status file"
+            try:
+                from talonx_ops.prospective.checkpoint import _session_started_utc, startup_grace
+                g = startup_grace({}, self.now, _session_started_utc(self.now))
+                if g["state"] == "STARTING":
+                    health, note = "STARTING", f"bounded warmup; deadline {g.get('deadline_utc')}"
+                elif g["state"] == "STARTUP_FAILED":
+                    health, note = "STARTUP_FAILED", g["reason"]
+            except Exception:  # noqa: BLE001
+                pass
+            out["health"] = health
+            out["service"] = {"status": "NO_ACTIVE_PRODUCER" if health != "STARTING" else "STARTING",
+                              "health": health, "note": note}
         except Exception as exc:  # noqa: BLE001
             out["health"] = "UNKNOWN"
             out["service"] = {"status": "UNKNOWN", "health": "UNKNOWN",
@@ -929,17 +942,54 @@ class DashboardReadModel:
         except Exception:  # noqa: BLE001
             pass
         src = svc_status.get("source", {}) or {}
+        # Task 117 Phase 0 S1: the V2 service's `last_ok_utc` is a *DB-read*
+        # timestamp -- proof the InsiderStore was readable, NOT proof the upstream
+        # SEC poll is current.  Upstream-poll freshness lives in
+        # ingestion_ledger.db `intel_processing_log`.  Surface BOTH, un-conflated.
+        poll_last_ok, poll_age = None, None
+        try:
+            _c = _ro(Path(self.intel_ledger))
+            if _c is not None:
+                try:
+                    poll_last_ok = _q1(_c, "SELECT MAX(at_utc) FROM intel_processing_log")
+                    poll_age = _age_seconds(poll_last_ok, self.now)
+                finally:
+                    _c.close()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            from talonx_ops.prospective import V2_FINGERPRINT_EXPECTED as _V2FP
+        except Exception:  # noqa: BLE001
+            _V2FP = "11107198c5b81237"
         readiness = {
             "form4_source_configured": svc_status.get("form4_source"),
             "form4_source_actual": src.get("actual"),
             "form4_source_ok": src.get("ok"),
             "form4_source_degraded": src.get("degraded"),
-            "form4_last_ok_utc": src.get("last_ok_utc"),
+            "form4_last_ok_utc": src.get("last_ok_utc"),          # kept for back-compat
+            "source_db_read_last_ok_utc": src.get("last_ok_utc"),  # explicit: DB read
+            "source_db_read_age_s": _age_seconds(src.get("last_ok_utc"), self.now),
+            "source_poll_last_ok_utc": poll_last_ok,               # explicit: upstream poll
+            "source_poll_age_s": None if poll_age is None else round(poll_age, 1),
             "form4_records_seen": svc_status.get("form4_records_seen"),
             "pricing_mode": svc_status.get("pricing_mode"),
             "pricing_adapter": svc_status.get("pricing_adapter"),
             "pricing_unavailable_recent": svc_status.get("pricing_unavailable_recent", []),
             "svc_data_state": svc_status.get("data_state"),
+            "v2_fingerprint_frozen": _V2FP,
+            # Task 117 Phase 0 S4: an explicit coverage denominator + source.
+            "coverage": {
+                "source": "InsiderStore @ ~/.talonx/ingestion_ledger.db "
+                          "(fed by talonx_ingest.intelligence.service poll)",
+                "issuers_evaluated": svc_status.get("form4_records_seen"),
+                "eligible_universe_denominator": "UNKNOWN -- frozen membership-OR-liquidity "
+                "universe not fully materialised; scope decision pending "
+                "(UNIVERSE_CONTRACT_DECISION_REQUIRED)",
+                "completeness": "INCOMPLETE",
+                "blind_spots": ["S&P MidCap 400 (no PIT membership file)",
+                                "SEC ~1-day daily-index lag",
+                                "non-index liquid names not polled"],
+            },
         }
         out["readiness"] = readiness
 
@@ -965,6 +1015,20 @@ class DashboardReadModel:
             out["activity"] = "INCOMPLETE_COVERAGE"
         else:
             out["activity"] = "NO_OPPORTUNITIES"
+
+        # Task 117 Phase 0 S1/S4/D2: coverage- and pricing-health are reported
+        # INDEPENDENTLY of `activity` -- an open position must NOT mask a degraded
+        # source or pricing feed behind a single precedence label.
+        poll_stale = (readiness["source_poll_age_s"] is not None
+                      and readiness["source_poll_age_s"] > 6 * 3600)
+        if src.get("ok") is False or readiness.get("svc_data_state") == "DATA_UNAVAILABLE":
+            out["coverage_state"] = "DATA_UNAVAILABLE"
+        elif poll_stale:
+            out["coverage_state"] = "DATA_STALE"
+        else:
+            out["coverage_state"] = "INCOMPLETE_COVERAGE"   # until the universe decision
+        out["pricing_state"] = ("DEGRADED" if readiness.get("pricing_unavailable_recent")
+                                else "READY")
         return out
 
     @staticmethod

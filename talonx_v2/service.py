@@ -212,10 +212,20 @@ class V2Service:
 
         res = pipeline.ProcessResult()
         for ep in episodes:
-            pipeline.process_episode(ep, store=self.store, bars_lookup=self._bars,
-                                     price_lookup=self._price, config=self.cfg, result=res)
-        pipeline.settle_due_exits(store=self.store, as_of_session=ripe_through,
-                                  price_lookup=self._price, config=self.cfg, result=res)
+            # one noisy symbol must not starve the rest of the tick (Task 117
+            # Phase 0 §2).  Nothing is persisted on a raised error, so the
+            # episode is simply retried next tick -- no duplicate BUY risk.
+            try:
+                pipeline.process_episode(ep, store=self.store, bars_lookup=self._bars,
+                                         price_lookup=self._price, config=self.cfg, result=res)
+            except Exception:  # noqa: BLE001
+                logger.exception("episode_processing_failed episode_id=%s symbol=%s",
+                                 ep.episode_id, ep.symbol)
+        try:
+            pipeline.settle_due_exits(store=self.store, as_of_session=ripe_through,
+                                      price_lookup=self._price, config=self.cfg, result=res)
+        except Exception:  # noqa: BLE001
+            logger.exception("settle_due_exits_failed as_of=%s", ripe_through)
 
         status = self._write_status(today, len(records), len(episodes), res)
         return status

@@ -295,7 +295,14 @@ class PricingResolver:
         # 20-session liquidity median (no future close/full-day volume leak).
         t = self.today()
         out = []
-        for r in self.adapter.history(symbol):
+        try:
+            hist = self.adapter.history(symbol)
+        except Exception:  # noqa: BLE001 -- transient provider fault -> empty history
+            # (the liquidity gate then reports NO_PRIOR_BARS / INSUFFICIENT_HISTORY,
+            # a non-terminal skip that retries next tick, rather than crashing the tick).
+            self.last[f"{symbol}|history"] = PriceUnavailable(symbol, "history", "PROVIDER_ERROR")
+            return out
+        for r in hist:
             b = validate_bar(r, symbol=symbol, want_session=str(r["date"])[:10],
                              today=t, source=self.adapter.name)
             if isinstance(b, Bar) and b.status == "FINAL":
@@ -309,7 +316,13 @@ class PricingResolver:
             r = PriceUnavailable(symbol, s, "FUTURE_SESSION")
             self.last[f"{symbol}|{s}"] = r
             return r
-        raw = self.adapter.session(symbol, session)
+        try:
+            raw = self.adapter.session(symbol, session)
+        except Exception:  # noqa: BLE001 -- a transient provider fault is an explicit
+            # *temporary* unavailability, never a tick-aborting crash (Task 117 Phase 0 §2).
+            r = PriceUnavailable(symbol, s, "PROVIDER_ERROR")
+            self.last[f"{symbol}|{s}"] = r
+            return r
         if raw is None:
             r = PriceUnavailable(symbol, s, "NO_BAR")
         else:

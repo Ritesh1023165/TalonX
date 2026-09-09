@@ -44,6 +44,85 @@ logger = logging.getLogger("talonx_ops.supervisor")
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# component argv markers -- a supervised child (and its .venv-shim grandchild)
+# always carries one of these in its command line.  Used to make the recursive
+# stop OWNERSHIP-SAFE: an unrelated process that happens to be a descendant, or a
+# reused PID, is never signalled (Task 117 Phase 0 Phase 7 / L2).
+_COMPONENT_MARKERS = ("run_talonx.py", "talonx_v2.run", "talonx_signals.run",
+                      "talonx_ingest.intelligence.service", "dashboard_web.py")
+
+
+def _owned_descendants(pid: int | None) -> list[dict]:
+    """Snapshot every live descendant of ``pid`` as {pid, create_time, cmd}.
+
+    On Windows ``Popen.terminate()`` (= ``TerminateProcess``) does NOT cascade to
+    a child spawned ``CREATE_NEW_PROCESS_GROUP`` whose ``.venv`` launcher re-execs
+    the real worker as a grandchild -- so the caller must know the tree up front to
+    reap the orphan it owns, and only that one (verified by create_time + cmdline).
+    """
+    if not pid:
+        return []
+    out: list[dict] = []
+    try:
+        import psutil
+        for p in psutil.Process(pid).children(recursive=True):
+            try:
+                out.append({"pid": p.pid, "create_time": p.create_time(),
+                            "cmd": " ".join(p.cmdline()[:6])})
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+    except Exception:  # noqa: BLE001 -- psutil absent / pid gone -> nothing owned
+        pass
+    return out
+
+
+def _same_owned_component(entry: dict) -> bool:
+    """True iff the snapshotted pid is still alive, still the same process
+    (create_time match -> not a reused PID) AND still a supervised component."""
+    try:
+        import psutil
+        p = psutil.Process(entry["pid"])
+        if abs(p.create_time() - entry["create_time"]) > 1.0:
+            return False
+        cl = " ".join(p.cmdline())
+        return any(m in cl for m in _COMPONENT_MARKERS)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _reap_owned_descendants(snapshot: list[dict], *, budget_s: float) -> dict[str, Any]:
+    """Ownership-gated tree reap of orphaned grandchildren AFTER the parent has
+    been terminated.  Graceful terminate -> wait within ``budget_s`` -> kill the
+    residue.  Only members that pass ``_same_owned_component`` are ever touched."""
+    live = [e for e in snapshot if _same_owned_component(e)]
+    if not live:
+        return {"orphans_reaped": [], "orphans_killed": [], "residual": [], "mode": "none"}
+    import psutil
+    for e in live:
+        try:
+            psutil.Process(e["pid"]).terminate()
+        except Exception:  # noqa: BLE001
+            pass
+    deadline = time.monotonic() + max(1.0, budget_s)
+    while time.monotonic() < deadline:
+        if not any(_same_owned_component(e) for e in live):
+            break
+        time.sleep(0.25)
+    killed = []
+    for e in live:
+        if _same_owned_component(e):
+            try:
+                psutil.Process(e["pid"]).kill()
+                killed.append(e["pid"])
+            except Exception:  # noqa: BLE001
+                pass
+    time.sleep(0.2)
+    residual = [{"pid": e["pid"], "cmd": e["cmd"]}
+                for e in live if _same_owned_component(e)]
+    return {"orphans_reaped": [e["pid"] for e in live if e["pid"] not in killed],
+            "orphans_killed": killed, "residual": residual,
+            "mode": "forced" if killed else "graceful"}
+
 
 # --------------------------------------------------------------------------- #
 # Pure model
@@ -157,6 +236,7 @@ class SupervisedComponent:
     restart_count: int = 0
     last_error: str | None = None
     last_exit_code: int | None = None
+    last_stop_mode: str | None = None        # graceful | forced | forced_descendant
     _restart_at: float | None = None         # monotonic deadline for the pending respawn
 
     @property
@@ -374,12 +454,25 @@ class Supervisor:
                 self._eod_persisted = True
             except Exception as exc:  # noqa: BLE001 -- EOD persistence must never crash shutdown
                 logger.warning("EOD reconciliation persist failed: %s", exc)
-        # step 10: verify
+        # step 10: verify -- direct children AND any owned descendant that
+        # outlived its parent (Task 117 Phase 0 L2: the old check saw only the
+        # direct handle and was blind to an orphaned .venv-shim grandchild).
         orphans = [c.name for c in self.components.values()
                    if c.handle is not None and c.handle.poll() is None]
-        if orphans:
-            logger.error("orphan children after stop_all: %s", orphans)
-        return {"stopped": seq, "orphans": orphans, "eod": eod_result}
+        residual_descendants: list[dict] = []
+        if os.name == "nt":
+            for c in self.components.values():
+                for e in _owned_descendants(c.pid):
+                    if _same_owned_component(e):
+                        residual_descendants.append({"component": c.name, **e})
+        if orphans or residual_descendants:
+            logger.error("orphan children after stop_all: direct=%s descendants=%s",
+                         orphans, residual_descendants)
+        stop_modes = {c.name: c.last_stop_mode for c in self.components.values()
+                      if c.last_stop_mode}
+        return {"stopped": seq, "orphans": orphans,
+                "residual_descendants": residual_descendants,
+                "stop_modes": stop_modes, "eod": eod_result}
 
     def _stop_component(self, c: SupervisedComponent) -> None:
         if c.handle is None or c.state in (ComponentState.STOPPED, ComponentState.NOT_STARTED):
@@ -390,6 +483,13 @@ class Supervisor:
             return
         c.state = ComponentState.STOPPING
         logger.info("stopping %s pid=%s", c.name, c.pid)
+        # Task 117 Phase 0 L2: snapshot the descendant tree BEFORE signalling --
+        # Popen.terminate() only hits the direct child; a .venv-shim grandchild
+        # orphans.  We reap exactly the owned orphans afterwards (create_time +
+        # component-cmdline verified).  On the fake-runner unit tests this is a
+        # no-op (psutil finds nothing), so existing behaviour is unchanged.
+        tree_snapshot = _owned_descendants(c.pid) if os.name == "nt" else []
+        stop_mode = "graceful"
         try:
             c.handle.terminate()
         except Exception as exc:  # noqa: BLE001
@@ -398,11 +498,23 @@ class Supervisor:
             c.handle.wait(timeout=c.spec.graceful_stop_s)
         except Exception:  # noqa: BLE001 -- TimeoutExpired or platform variant
             logger.warning("%s did not exit in %.0fs -- killing", c.name, c.spec.graceful_stop_s)
+            stop_mode = "forced"
             try:
                 c.handle.kill()
                 c.handle.wait(timeout=5)
             except Exception as exc:  # noqa: BLE001
                 logger.error("kill(%s) failed: %s", c.name, exc)
+        if tree_snapshot:
+            reap = _reap_owned_descendants(tree_snapshot, budget_s=max(2.0, c.spec.graceful_stop_s))
+            if reap["mode"] != "none":
+                logger.info("%s: reaped orphan descendants %s (mode=%s)",
+                            c.name, reap["orphans_reaped"] + reap["orphans_killed"], reap["mode"])
+            if reap["mode"] == "forced" and stop_mode == "graceful":
+                stop_mode = "forced_descendant"
+            if reap["residual"]:
+                c.last_error = f"residual descendants after stop: {reap['residual']}"
+                logger.error("%s: %s", c.name, c.last_error)
+        c.last_stop_mode = stop_mode
         c.last_exit_code = c.handle.poll()
         c.state = ComponentState.STOPPED
 

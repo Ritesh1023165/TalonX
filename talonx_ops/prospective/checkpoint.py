@@ -63,7 +63,63 @@ def _age_s(ts: str | None, now: datetime) -> float | None:
         return None
 
 
-def _service_health(s: dict, now: datetime) -> dict[str, Any]:
+# Task 117 Phase 0 L1: bounded first-checkpoint warmup.  A just-started service
+# has no status file yet -- without a grace window it is indistinguishable from a
+# crashed one.  The window is bounded; when it expires without readiness the state
+# is an EXPLICIT STARTUP_FAILED, never a silent pass.  Hard ledger / strategy
+# safety invariants are NEVER suppressed during the grace (see _invariant_flags).
+STARTUP_GRACE_S = 240
+
+
+def _session_started_utc(now: datetime) -> datetime | None:
+    """Start time of the most recent prospective session (session.pids.json)."""
+    try:
+        from talonx_ops.prospective.paths import session_dir
+        for d in (now.date(), (now - timedelta(days=1)).date()):
+            p = session_dir(d) / "session.pids.json"
+            if p.exists():
+                info = json.loads(p.read_text())
+                return datetime.fromisoformat(info["started_utc"])
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+def startup_grace(s: dict, now: datetime, started_utc: datetime | None) -> dict[str, Any]:
+    """NOT_IN_STARTUP | STARTING | STARTUP_FAILED, with a hard deadline."""
+    hb = _age_s(s.get("heartbeat_utc"), now)
+    fresh = hb is not None and hb < float(s.get("heartbeat_ttl_s", 180))
+    version_ok = s.get("strategy_version") == V2_STRATEGY_VERSION
+    data_ready = s.get("form4_records_seen") is not None and bool(s.get("tick"))
+    comps = {"heartbeat_fresh": bool(fresh), "strategy_version_ok": bool(version_ok),
+             "first_tick_data_ready": bool(data_ready)}
+    if fresh and version_ok and data_ready:
+        return {"state": "NOT_IN_STARTUP", "reason": "components + first data ready",
+                "components": comps}
+    if started_utc is None:
+        # no session marker -> can't grant grace; fall through to normal health
+        return {"state": "NOT_IN_STARTUP", "reason": "no session start marker",
+                "components": comps}
+    age = (now - started_utc).total_seconds()
+    deadline = started_utc + timedelta(seconds=STARTUP_GRACE_S)
+    if age <= STARTUP_GRACE_S:
+        return {"state": "STARTING", "reason": "within bounded warmup grace",
+                "started_utc": started_utc.isoformat(), "deadline_utc": deadline.isoformat(),
+                "seconds_remaining": round(STARTUP_GRACE_S - age, 1), "components": comps}
+    # STARTUP_FAILED is only meaningful in the window just after the deadline;
+    # once the session-start marker is old (> 3x grace) it is simply stale and
+    # normal DOWN/DEGRADED health stands.
+    if age <= STARTUP_GRACE_S * 3:
+        return {"state": "STARTUP_FAILED",
+                "reason": f"warmup grace {STARTUP_GRACE_S}s exhausted without readiness",
+                "started_utc": started_utc.isoformat(), "deadline_utc": deadline.isoformat(),
+                "components": comps}
+    return {"state": "NOT_IN_STARTUP", "reason": "session start marker is stale",
+            "started_utc": started_utc.isoformat(), "components": comps}
+
+
+def _service_health(s: dict, now: datetime,
+                    started_utc: datetime | None = None) -> dict[str, Any]:
     hb = _age_s(s.get("heartbeat_utc"), now)
     ttl = float(s.get("heartbeat_ttl_s", 180))
     if not s:
@@ -76,11 +132,19 @@ def _service_health(s: dict, now: datetime) -> dict[str, Any]:
         health = "DEGRADED"
     else:
         health = "DOWN"
+    warmup = startup_grace(s, now, started_utc)
+    # a bounded warmup masks DOWN/DEGRADED -> STARTING; an exhausted grace is an
+    # explicit failure, not a silent DOWN.
+    if warmup["state"] == "STARTING" and health in ("DOWN", "DEGRADED"):
+        health = "STARTING"
+    elif warmup["state"] == "STARTUP_FAILED":
+        health = "STARTUP_FAILED"
     return {"health": health, "heartbeat_age_s": None if hb is None else round(hb, 1),
             "heartbeat_ttl_s": ttl, "heartbeat_kind": s.get("heartbeat_kind"),
             "tick": s.get("tick"), "last_tick_utc": s.get("last_tick_utc"),
             "strategy_version": s.get("strategy_version"),
-            "active_profile": s.get("active_profile")}
+            "active_profile": s.get("active_profile"),
+            "startup": warmup}
 
 
 def _supervisor_status() -> dict[str, Any]:
@@ -221,7 +285,7 @@ def capture(now: datetime | None = None) -> dict[str, Any]:
     intel = _intel()
     exp = _experimental_external_sends_today()
     official = _official_dispatch_today()
-    svc = _service_health(s, now)
+    svc = _service_health(s, now, _session_started_utc(now))
     eods = eod_state(now)
 
     # data state (A4)
@@ -309,6 +373,7 @@ def _invariant_flags(s, ledger, funnel, exp, poller, svc) -> dict[str, Any]:
     only fire when the V2 service is actually up."""
     from talonx_ops.prospective.paths import V2_DB_PATH
     live = svc["health"] in ("HEALTHY", "DEGRADED")
+    starting = svc["health"] == "STARTING"          # bounded warmup -> not "dead"
     flags: dict[str, bool] = {}
     # always-meaningful ledger invariants (read straight from v2_lane.db)
     flags["negative_cash"] = bool(ledger.cash is not None and ledger.cash < 0)
@@ -327,6 +392,11 @@ def _invariant_flags(s, ledger, funnel, exp, poller, svc) -> dict[str, Any]:
     flags["v2_source_not_insider"] = live and (s.get("form4_source") not in (None, "insider")
                                                or s.get("form4_records_seen") == 0)
     flags["strategy_version_mismatch"] = live and s.get("strategy_version") != V2_STRATEGY_VERSION
-    flags["v2_process_dead"] = live is False and bool(s)  # a status file exists but service not fresh
+    # a status file exists but the service is not fresh -- EXCEPT during the
+    # bounded startup grace (Task 117 Phase 0 L1).  An exhausted grace is its
+    # own explicit CRITICAL.
+    flags["v2_process_dead"] = (live is False and not starting
+                                and svc["health"] != "STARTUP_FAILED" and bool(s))
+    flags["v2_startup_failed"] = svc["health"] == "STARTUP_FAILED"
     flags["any_critical"] = any(v for k, v in flags.items() if k != "any_critical")
     return flags
