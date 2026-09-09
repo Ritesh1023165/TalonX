@@ -146,3 +146,47 @@ def test_make_resolver_composite_iex_is_labelled_nonconformant(tmp_path):
 def test_make_resolver_rejects_unknown_mode(tmp_path):
     with pytest.raises(ValueError):
         make_resolver(mode="bloomberg", bar_dirs=[str(tmp_path)])
+
+
+# --------------------------------------------------------------------------- #
+# YFinanceBarAdapter + composite-yf + V2Service wiring (no network)
+# --------------------------------------------------------------------------- #
+class _FakeTicker:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def history(self, *a, **k):
+        import pandas as pd
+        df = pd.DataFrame(self._rows)
+        df["Date"] = pd.to_datetime(df["date"])
+        return df.rename(columns={"open": "Open", "close": "Close", "volume": "Volume"})[
+            ["Date", "Open", "Close", "Volume"]].set_index("Date")
+
+
+def test_yfinance_adapter_parses_history():
+    from talonx_v2.pricing import YFinanceBarAdapter
+    rows = [{"date": "2026-09-04", "open": 10.0, "close": 10.5, "volume": 1e6},
+            {"date": "2026-09-08", "open": 10.4, "close": 10.9, "volume": 1.2e6}]
+    a = YFinanceBarAdapter(ticker_factory=lambda s: _FakeTicker(rows))
+    assert a.CONFORMANT is True
+    assert [r["date"] for r in a.history("X")] == ["2026-09-04", "2026-09-08"]
+    assert a.session("X", date(2026, 9, 8))["close"] == 10.9
+    assert a.session("X", date(2026, 9, 7)) is None
+
+
+def test_make_resolver_composite_yf(tmp_path):
+    from talonx_v2.pricing import make_resolver
+    rows = [{"date": "2026-09-08", "open": 5.0, "close": 5.1, "volume": 9e5}]
+    r = make_resolver(mode="composite-yf", bar_dirs=[str(tmp_path)],
+                      yf_ticker_factory=lambda s: _FakeTicker(rows))
+    r.today = lambda: date(2026, 9, 9)
+    assert "yfinance" in r.adapter.name
+    assert r.price_lookup("X", date(2026, 9, 8)) == {"open": 5.0, "close": 5.1, "volume": 9e5}
+
+
+def test_v2service_pricing_mode_csv_is_default_unchanged(tmp_path):
+    from talonx_v2.service import V2Service
+    from talonx_v2.config import V2Config
+    svc = V2Service(config=V2Config(db_path=str(tmp_path / "v.db")), bar_dirs=[tmp_path],
+                    form4_kind="parquet", status_path=str(tmp_path / "s.json"))
+    assert svc.pricing_mode == "csv" and svc._resolver is None

@@ -919,16 +919,50 @@ class DashboardReadModel:
         except Exception:  # noqa: BLE001
             out["eod"] = {"state": "UNKNOWN"}
 
+        # ---- source & pricing readiness -- from the V2 service status file
+        #      (Task 117 Phase 0 Phase 5): a fresh heartbeat is NOT proof of a
+        #      current/complete filing read, and NO_OPPORTUNITIES must be
+        #      distinct from DATA_UNAVAILABLE / INCOMPLETE_COVERAGE.
+        svc_status: dict[str, Any] = {}
+        try:
+            svc_status = _json.loads(open(status_path).read())
+        except Exception:  # noqa: BLE001
+            pass
+        src = svc_status.get("source", {}) or {}
+        readiness = {
+            "form4_source_configured": svc_status.get("form4_source"),
+            "form4_source_actual": src.get("actual"),
+            "form4_source_ok": src.get("ok"),
+            "form4_source_degraded": src.get("degraded"),
+            "form4_last_ok_utc": src.get("last_ok_utc"),
+            "form4_records_seen": svc_status.get("form4_records_seen"),
+            "pricing_mode": svc_status.get("pricing_mode"),
+            "pricing_adapter": svc_status.get("pricing_adapter"),
+            "pricing_unavailable_recent": svc_status.get("pricing_unavailable_recent", []),
+            "svc_data_state": svc_status.get("data_state"),
+        }
+        out["readiness"] = readiness
+
         fn = out.get("funnel", {})
-        out["data_state"] = "CURRENT" if fn.get("available") else (
-            "UNAVAILABLE" if fn.get("form4_error") else "UNKNOWN")
+        # precedence: service DATA_UNAVAILABLE > funnel form4_error > CURRENT
+        if readiness.get("svc_data_state") == "DATA_UNAVAILABLE" or src.get("ok") is False:
+            out["data_state"] = "DATA_UNAVAILABLE"
+        elif fn.get("available"):
+            out["data_state"] = "CURRENT"
+        elif fn.get("form4_error"):
+            out["data_state"] = "DATA_UNAVAILABLE"
+        else:
+            out["data_state"] = "UNKNOWN"
+
         ldg = out.get("ledger", {})
-        if ldg.get("n_open", 0) > 0:
+        if out["data_state"] == "DATA_UNAVAILABLE":
+            out["activity"] = "DATA_UNAVAILABLE"
+        elif ldg.get("n_open", 0) > 0:
             out["activity"] = "POSITION_OPEN"
         elif ldg.get("buys", 0) > 0:
             out["activity"] = "ACTIVITY"
-        elif fn.get("interpretation") == "NO_MARKET_OPPORTUNITY":
-            out["activity"] = "NO_OPPORTUNITIES"
+        elif readiness.get("pricing_unavailable_recent"):
+            out["activity"] = "INCOMPLETE_COVERAGE"
         else:
             out["activity"] = "NO_OPPORTUNITIES"
         return out

@@ -202,6 +202,61 @@ class AlpacaIexBarAdapter:
 
 
 # --------------------------------------------------------------------------- #
+# yfinance adapter -- FROZEN-CONFORMANT CANDIDATE (Task 117 Phase 0 parity study)
+# --------------------------------------------------------------------------- #
+class YFinanceBarAdapter:
+    """Free consolidated daily bars, ``auto_adjust=True`` (split+dividend
+    adjusted OHLC, split-adjusted volume) -- the policy match to Alpaca
+    ``adjustment=all``.
+
+    Parity study (results/task117_phase0_free_data_and_lifecycle_*/provider_study):
+    22 symbols across the $5-close and $5M-median-$-volume boundaries,
+    1210 field comparisons, 660 candidate entry-session liquidity
+    classifications (580 PASS + 80 FAIL) -> **0 classification flips**,
+    close p99 relative diff 0.06%, volume p90 0.4%; no future/holiday/latest
+    substitution.  `CONFORMANT = True` **only within that tested domain**;
+    still not enabled for ACTIVE by default.
+    """
+    name = "yfinance:1d:auto_adjust=all"
+    CONFORMANT = True                       # within the Phase 0 parity-study domain
+
+    def __init__(self, *, ticker_factory: Callable[[str], object] | None = None,
+                 lookback_sessions: int = _LOOKBACK_LOAD_SESSIONS):
+        self._tf = ticker_factory
+        self._lb = lookback_sessions
+        self._cache: dict[str, list[dict]] = {}
+
+    def _fetch(self, symbol: str) -> list[dict]:
+        if symbol in self._cache:
+            return self._cache[symbol]
+        if self._tf is not None:
+            tk = self._tf(symbol)
+        else:  # pragma: no cover - network
+            import yfinance as yf
+            tk = yf.Ticker(symbol)
+        import datetime as _dt
+        start = (_dt.date.today() - _dt.timedelta(days=int(self._lb * 1.6) + 10)).isoformat()
+        h = tk.history(start=start, interval="1d", auto_adjust=True, actions=False)
+        rows: list[dict] = []
+        if h is not None and not h.empty:
+            h = h.reset_index()
+            for r in h.itertuples(index=False):
+                d = getattr(r, "Date", None) or getattr(r, "index", None)
+                rows.append({"date": str(d)[:10], "open": float(r.Open),
+                             "close": float(r.Close), "volume": float(r.Volume)})
+        rows.sort(key=lambda x: x["date"])
+        self._cache[symbol] = rows
+        return rows
+
+    def history(self, symbol: str) -> list[dict]:
+        return list(self._fetch(symbol))
+
+    def session(self, symbol: str, session: date) -> dict | None:
+        s = session.isoformat()
+        return next((r for r in self._fetch(symbol) if r["date"] == s), None)
+
+
+# --------------------------------------------------------------------------- #
 # composite: FINAL history from `hist`, recent tail from `live`
 # --------------------------------------------------------------------------- #
 class CompositeBarAdapter:
@@ -273,13 +328,26 @@ class PricingResolver:
 
 
 def make_resolver(*, mode: str, bar_dirs: list[str | Path],
-                  today: Callable[[], date] | None = None) -> PricingResolver:
-    """``mode`` in {"csv", "composite-iex"}.  Default live wiring is "csv"
-    (frozen-conformant).  "composite-iex" is for probes / a parity study
-    only -- its live tail is NON-CONFORMANT vs the SIP contract."""
+                  today: Callable[[], date] | None = None,
+                  yf_ticker_factory: Callable[[str], object] | None = None) -> PricingResolver:
+    """``mode``:
+      "csv"          -- frozen CSV snapshot only (default live wiring; the
+                        companion stays here until the provider decision is
+                        signed off).
+      "composite-yf" -- FINAL history from the CSV snapshot + the recent tail
+                        from yfinance (``auto_adjust=True``).  FROZEN-CONFORMANT
+                        CANDIDATE per the Phase 0 parity study; supply it via
+                        --pricing-mode composite-yf for a candidate run.  Never
+                        auto-enabled for ACTIVE.
+      "composite-iex" -- CSV history + Alpaca IEX tail.  NON-CONFORMANT
+                        (single-venue volume breaks the liquidity gate) --
+                        probes / study only.
+    """
     csv = CsvBarAdapter(bar_dirs)
     if mode == "csv":
         adapter: DailyBarAdapter = csv
+    elif mode == "composite-yf":
+        adapter = CompositeBarAdapter(csv, YFinanceBarAdapter(ticker_factory=yf_ticker_factory))
     elif mode == "composite-iex":
         adapter = CompositeBarAdapter(csv, AlpacaIexBarAdapter())
     else:

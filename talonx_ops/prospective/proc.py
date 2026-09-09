@@ -101,52 +101,153 @@ def start_stack(session_dir: str | Path, *, env: dict[str, str],
     return info
 
 
-def _terminate(pid: int | None, *, grace_s: float = 30.0) -> str:
-    if not pid or not _alive(pid):
-        return "not_running"
+_TALONX_MARKERS = ("run_talonx.py", "talonx_v2.run", "talonx_ops.supervisor",
+                   "talonx_ops.prospective", "talonx_signals.run",
+                   "talonx_ingest.intelligence.service", "dashboard_web.py")
+
+
+def _owned_tree(pid: int) -> list[dict]:
+    """Snapshot pid + every live descendant as {pid, create_time, cmd}.
+
+    Windows ``TerminateProcess`` / ``CTRL_BREAK`` do NOT cascade to a child
+    spawned ``CREATE_NEW_PROCESS_GROUP`` (each supervisor child is its own
+    group leader and its .venv shim spawns the real worker as a grandchild).
+    So the caller must know the descendants up-front to reap the orphans
+    it owns -- and ONLY those (verified by create_time + cmdline).
+    """
+    out: list[dict] = []
     try:
         import psutil
+        root = psutil.Process(pid)
+        procs = [root] + root.children(recursive=True)
+        for p in procs:
+            try:
+                out.append({"pid": p.pid, "create_time": p.create_time(),
+                            "cmd": " ".join(p.cmdline()[:6])})
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def _still_the_same(entry: dict) -> bool:
+    """True iff `entry`'s pid is alive AND is the same process we snapshotted
+    (create_time match) AND still looks like a TalonX component -- guards
+    against PID reuse and against touching an unrelated process."""
+    try:
+        import psutil
+        p = psutil.Process(entry["pid"])
+        if abs(p.create_time() - entry["create_time"]) > 1.0:
+            return False                       # PID reused
+        cl = " ".join(p.cmdline())
+        return any(m in cl for m in _TALONX_MARKERS)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _terminate(pid: int | None, *, grace_s: float = 30.0,
+               tree: list[dict] | None = None) -> dict:
+    """Ownership-verified, tree-aware stop of one session-owned process.
+
+    Returns {status, signalled, tree_size, reaped, residual}.  A single
+    ``grace_s`` budget covers the whole tree.  Only processes present in
+    ``tree`` (or discovered as descendants) that pass ``_still_the_same``
+    are ever terminated/killed.
+    """
+    if not pid or not _alive(pid):
+        return {"status": "not_running", "signalled": pid, "tree_size": 0,
+                "reaped": [], "residual": []}
+    import psutil
+    snapshot = tree if tree is not None else _owned_tree(pid)
+    deadline = time.monotonic() + grace_s
+
+    # OWNERSHIP GATE: only act on `pid` if it is still a TalonX component we
+    # snapshotted (create_time + cmdline).  A stale / reused registry pid for
+    # an unrelated process is left completely untouched.
+    root_entry = next((e for e in snapshot if e["pid"] == pid), None)
+    if root_entry is None or not _still_the_same(root_entry):
+        return {"status": "not_running", "signalled": pid, "tree_size": len(snapshot),
+                "reaped": [], "residual": [],
+                "note": "pid not a live TalonX component (stale/reused registry) -- untouched"}
+    try:
         p = psutil.Process(pid)
         if _IS_WIN:
             try:
                 p.send_signal(signal.CTRL_BREAK_EVENT)  # noqa: PLE1507
             except Exception:  # noqa: BLE001
-                p.terminate()
-        else:
-            p.terminate()
-        gone, alive = psutil.wait_procs([p], timeout=grace_s)
-        if alive:
-            for a in alive:
-                a.kill()
-            return "killed"
-        return "stopped"
-    except Exception as exc:  # noqa: BLE001
-        return f"error:{type(exc).__name__}"
+                pass
+    except psutil.NoSuchProcess:
+        pass
+
+    # graceful: terminate every owned tree member, wait within budget
+    for e in snapshot:
+        if _still_the_same(e):
+            try:
+                psutil.Process(e["pid"]).terminate()
+            except Exception:  # noqa: BLE001
+                pass
+    while time.monotonic() < deadline:
+        if not any(_still_the_same(e) for e in snapshot):
+            break
+        time.sleep(0.5)
+
+    # escalate: kill whatever owned tree member is still alive
+    killed = []
+    for e in snapshot:
+        if _still_the_same(e):
+            try:
+                psutil.Process(e["pid"]).kill()
+                killed.append(e["pid"])
+            except Exception:  # noqa: BLE001
+                pass
+    time.sleep(0.3)
+    residual = [e for e in snapshot if _still_the_same(e)]
+    status = ("stopped" if not residual and not killed else
+              "killed" if not residual else "residual")
+    return {"status": status, "signalled": pid, "tree_size": len(snapshot),
+            "reaped": killed, "residual": [{"pid": e["pid"], "cmd": e["cmd"]} for e in residual]}
 
 
-def stop_stack(session_dir: str | Path, *, grace_s: float = 45.0) -> dict[str, Any]:
+def stop_stack(session_dir: str | Path, *, grace_s: float = 45.0,
+               overall_budget_s: float = 120.0) -> dict[str, Any]:
+    """Bounded, ownership-verified teardown of the session-owned processes.
+
+    Windows note (Task 117 Phase 0 Phase 6): the supervisor spawns each
+    component with ``CREATE_NEW_PROCESS_GROUP`` and the .venv launcher
+    re-execs the real worker as a grandchild, so terminating the supervisor
+    (or its shim) reaps neither the worker nor the sibling stacks -- they
+    orphan and linger.  We therefore snapshot each session PID's descendant
+    tree BEFORE signalling and reap exactly those (verified by create_time +
+    cmdline), within one overall budget.
+    """
     sd = Path(session_dir)
     info = read_pids(sd)
-    # order: checkpoint daemon -> V2 companion -> supervisor (which does Phase-14)
     (sd / "stop.flag").write_text("stop", encoding="utf-8")
-    res = {"checkpoint_daemon": _terminate(info.get("checkpoint_daemon_pid"), grace_s=15),
-           "v2_companion": _terminate(info.get("v2_companion_pid"), grace_s=grace_s),
-           "supervisor": _terminate(info.get("supervisor_pid"), grace_s=grace_s)}
-    time.sleep(2.0)
-    # sweep for any residual talonx python
+
+    order = [("checkpoint_daemon", info.get("checkpoint_daemon_pid"), min(15.0, grace_s)),
+             ("v2_companion", info.get("v2_companion_pid"), grace_s),
+             ("supervisor", info.get("supervisor_pid"), grace_s)]
+    # snapshot every owned tree up-front (before anything is signalled)
+    trees = {name: _owned_tree(pid) for name, pid, _ in order if pid}
+
+    started = time.monotonic()
+    res: dict[str, Any] = {}
+    for name, pid, budget in order:
+        remaining = overall_budget_s - (time.monotonic() - started)
+        res[name] = _terminate(pid, grace_s=max(2.0, min(budget, remaining)),
+                               tree=trees.get(name))
+    time.sleep(1.0)
+
+    # residual = union of all owned tree members still alive (ownership-checked)
     residual = []
-    try:
-        import psutil
-        for p in psutil.process_iter(["pid", "name", "cmdline"]):
-            cl = " ".join(p.info.get("cmdline") or [])
-            if p.info.get("name", "").lower().startswith("python") and any(
-                    x in cl for x in ("run_talonx.py", "talonx_v2.run", "talonx_ops.supervisor",
-                                      "talonx_signals.run", "talonx_ingest.intelligence.service",
-                                      "dashboard_web.py")):
-                residual.append({"pid": p.info["pid"], "cmd": cl[:90]})
-    except Exception:  # noqa: BLE001
-        pass
+    for name, members in trees.items():
+        for e in members:
+            if _still_the_same(e):
+                residual.append({"pid": e["pid"], "cmd": e["cmd"], "owner": name})
     res["residual_talonx_processes"] = residual
+    res["overall_budget_s"] = overall_budget_s
+    res["elapsed_s"] = round(time.monotonic() - started, 1)
     res["ports"] = {str(port): _port_open(port) for port in (8787, 8760, 8770, 8501)}
     # PID registry
     pidf = REPO_ROOT / ".run" / "talonx.pids.json"

@@ -54,11 +54,25 @@ class V2Service:
                  form4_parquet: str | None = None,
                  status_path: str | None = None,
                  since: date | None = None,
-                 live_lookback_days: int = 45):
+                 live_lookback_days: int = 45,
+                 pricing_mode: str = "csv"):
         self.cfg = config
         self.cfg.validate_frozen()
         self.store = V2Store(config.db_path, starting_cash=config.starting_cash_usd)
         self.bar_dirs = bar_dirs
+        # Pricing: "csv" (default) = the frozen CSV snapshot, byte-identical to
+        # the pre-Task-117 behaviour.  Any other mode routes bar/price lookups
+        # through talonx_v2.pricing.make_resolver (strict validation,
+        # PROVISIONAL/FINAL, explicit unavailability).  Never auto-enabled for
+        # ACTIVE -- an operator opts in with --pricing-mode.
+        self.pricing_mode = pricing_mode
+        self._as_of_holder = {"d": None}
+        self._resolver = None
+        if pricing_mode != "csv":
+            from talonx_v2 import pricing as _pricing
+            self._resolver = _pricing.make_resolver(
+                mode=pricing_mode, bar_dirs=[str(p) for p in bar_dirs],
+                today=lambda: self._as_of_holder["d"] or datetime.now(timezone.utc).date())
         self.form4_kind = form4_kind
         self.form4_parquet = form4_parquet or \
             "results/task107a_form4_feasibility/_build/form4_open_market_txn.parquet"
@@ -84,8 +98,10 @@ class V2Service:
             "last_ok_utc": None, "error": None,
         }
 
-    # ---- bar access (local CSV; no network) ----
+    # ---- bar access ----
     def _bars(self, sym: str) -> list[dict]:
+        if self._resolver is not None:
+            return self._resolver.bars_lookup(sym)
         if sym in self._bar_cache:
             return self._bar_cache[sym]
         import pandas as pd
@@ -107,6 +123,8 @@ class V2Service:
         return []
 
     def _price(self, sym: str, session: date) -> dict | None:
+        if self._resolver is not None:
+            return self._resolver.price_lookup(sym, session)
         s = session.isoformat() if isinstance(session, date) else str(session)[:10]
         for row in self._bars(sym):
             if row["date"] == s:
@@ -153,6 +171,7 @@ class V2Service:
     def tick(self, *, as_of: date | None = None) -> dict:
         self._tick += 1
         today = as_of or datetime.now(timezone.utc).date()
+        self._as_of_holder["d"] = today          # pricing resolver's causal "today"
         ripe_through = today if is_session(today) else next_session_on_or_after(today)
 
         from talonx_v2.calendar import add_sessions
@@ -217,6 +236,14 @@ class V2Service:
             "as_of": today.isoformat(),
             "db_path": self.cfg.db_path,
             "form4_source": self.form4_kind,
+            "pricing_mode": self.pricing_mode,
+            "pricing_adapter": (self._resolver.adapter.name if self._resolver is not None
+                                else "csv:frozen_bar_dirs"),
+            "pricing_unavailable_recent": (
+                sorted({f"{k.split('|')[0]}:{getattr(v, 'reason', '')}"
+                        for k, v in list(self._resolver.last.items())[-40:]
+                        if not hasattr(v, "open")})[:20]
+                if self._resolver is not None else []),
             # source readiness -- separate from the heartbeat (F4): a fresh
             # heartbeat is NOT proof of a complete/current filing read.
             "source": dict(self._source_state, degraded=source_degraded),

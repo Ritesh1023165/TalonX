@@ -83,6 +83,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--status-path", default="")
     ap.add_argument("--as-of", default="", help="live --once: pin the tick date (dry-run only)")
     ap.add_argument("--live-lookback-days", type=int, default=45)
+    ap.add_argument("--pricing-mode", default="csv",
+                    choices=["csv", "composite-yf", "composite-iex"],
+                    help="daily-bar source: csv (frozen snapshot, default) | "
+                         "composite-yf (CSV history + yfinance tail, Phase-0 conformant candidate) | "
+                         "composite-iex (NON-CONFORMANT, study only)")
     ap.add_argument("--form4-parquet",
                     default="results/task107a_form4_feasibility/_build/form4_open_market_txn.parquet")
     ap.add_argument("--bar-dir", action="append", default=[
@@ -123,6 +128,7 @@ def main(argv: list[str] | None = None) -> int:
             form4_kind=args.form4_source, form4_parquet=args.form4_parquet,
             status_path=args.status_path or None,
             since=None, live_lookback_days=args.live_lookback_days,
+            pricing_mode=args.pricing_mode,
         )
         if args.once and args.as_of:
             st = svc.tick(as_of=date.fromisoformat(args.as_of))
