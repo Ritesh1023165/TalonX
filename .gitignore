@@ -68,3 +68,8 @@ reports/
 Thumbs.db
 .vscode/
 .idea/
+
+# Task 117: production V2 ledger backups (predeploy / eod copies)
+v2_lane.db.predeploy-*
+v2_lane.db.eod-copy*
+v2_lane.db.*-copy*
