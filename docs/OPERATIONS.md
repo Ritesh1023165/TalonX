@@ -45,12 +45,16 @@ python -m talonx_ops.prospective close
   fill to the intent (a delayed "BUY FILLED" notification). Cold-start with a backlog labels
   the fill "not prospectively actionable". Idempotent across ticks + restarts.
 - **Durable alert delivery.** Every V2 alert is written to `v2_alert_outbox` (`event_id` PK →
-  tick/restart dedup). `python -m talonx_v2.run --mode live --deliver` drains it each tick
-  through `OfficialExternalRouter` (the one routing authority; per-family store dedup) into an
-  injected transport. Default transport = **dry-run HOLD** (records intent, sends nothing).
-  States are explicit: `SENT` / `HELD` / `RETRY` (bounded backoff) / `FAILED` / `AMBIGUOUS`.
-  Experimental external delivery stays structurally blocked. No network transport is wired to
-  run by this release.
+  tick/restart dedup). `python -m talonx_v2.run --mode live --deliver [--transport dryrun|telegram]`
+  drains it each tick through `OfficialExternalRouter` (the one routing authority; per-family
+  store dedup). Default `--transport dryrun` = **HOLD** (records intent, sends nothing).
+  `--transport telegram` uses the real official `TelegramClient` (existing
+  `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` env; **still HOLDS if unset**; no second bot poller).
+  States: `SENT` / `HELD` / `RETRY` (bounded backoff) / `FAILED` (a non-retryable client error
+  short-circuits here — no retry storm) / `AMBIGUOUS` (send made, ACK lost — not auto-retried) /
+  `EXPIRED` (a PLANNED BUY past its `deliver_by_utc` = the target session's open — never sent
+  late as a fresh instruction). Dedup is at the `event_id` + router/`dispatch_audit` level —
+  **not** network-level exactly-once. Experimental external delivery stays structurally blocked.
 - **Exit management is decoupled from source failure.** An unavailable SEC Form-4 source blocks
   **new** event-based entries/intents only; positions already OPEN still get due-exit
   evaluation on reliable bar prices → the established pending / fall-forward / `EXIT_UNRESOLVED`
@@ -61,8 +65,12 @@ python -m talonx_ops.prospective close
   funnel `Form 4 → clusters → decisions → paper → delivery`; and the alert-delivery table
   (a TRADING lane, separate from Intelligence & Experimental).
 - **Coverage report:** `python -m talonx_ops.watchlist_coverage` — read-only per-ticker map of
-  configured horizon → serving method, V2 scope, eligibility, paper ledger. Intraday and
-  long-term have **no validated edge**; V2 is the only paper candidate.
+  configured horizon → serving method, V2 scope, eligibility, paper ledger. Uses the
+  authoritative `intelligence.service` resolution: **43 active watchlist names → 39 SEC-covered**
+  (BABA / BLSH / SKHY / SPCX are `known_non_filer` — no domestic SEC Form 4). Intraday and
+  long-term have **no validated edge**; V2 is the only paper candidate. Restricting V2
+  execution to the 39-name subset is a labelled candidate scope with **no Task 116 performance
+  inheritance** (see `results/task117_controlled_deployment_readiness_*/scope/`).
 
 
 ## Prerequisites
