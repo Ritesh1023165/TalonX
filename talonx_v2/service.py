@@ -295,12 +295,20 @@ class V2Service:
         except Exception:  # noqa: BLE001
             logger.exception("settle_due_exits_failed as_of=%s", ripe_through)
 
-        # drain the durable alert outbox (only when an operator wired a transport)
+        # drain the durable alert outbox (only when an operator wired a transport).
+        # For a PINNED as-of tick (replay / dry-run) the delivery clock is that
+        # session ~close, so notification deadlines are evaluated on the modelled
+        # timeline; a live tick (as_of is None) uses the real wall clock.
         if self._deliver and self._router is not None:
             try:
+                from datetime import time as _time
+
                 from talonx_v2.delivery import deliver_outbox
+                deliver_now = (None if as_of is None else
+                               datetime.combine(today, _time(20, 0), tzinfo=timezone.utc))
                 self._last_delivery = deliver_outbox(
-                    self.store, router=self._router, transport=self._transport)
+                    self.store, router=self._router, transport=self._transport,
+                    now=deliver_now)
             except Exception:  # noqa: BLE001
                 logger.exception("deliver_outbox failed")
 
@@ -376,12 +384,24 @@ class V2Service:
                     "Informational only.")
         payload = "\n".join([f"⚡ *{action}* — *{sym}*  INSIDER BUY CLUSTER",
                              "—" * 12, headline, "", body,
-                             "", "[INSIDER_BUY_CLUSTER_V2@1 · PAPER_CANDIDATE · PAPER ONLY]"])
+                             "", "[INSIDER_BUY_CLUSTER_V2@1 · PAPER_CANDIDATE · PAPER ONLY · dry-run/candidate]"])
+        # actionable-instruction deadline: a PLANNED BUY is only deliverable
+        # BEFORE its target session's XNYS open (Task 117 deployment-readiness).
+        deliver_by = None
+        if kind == "ENTRY_INTENT":
+            try:
+                import exchange_calendars as _xc
+                _open = _xc.get_calendar("XNYS").session_open(
+                    episode.eligible_entry_session.isoformat()).to_pydatetime()
+                deliver_by = _open.astimezone(timezone.utc).isoformat()
+            except Exception:  # noqa: BLE001 -- fall back to start-of-session-day UTC
+                deliver_by = datetime.combine(episode.eligible_entry_session,
+                                              datetime.min.time(), tzinfo=timezone.utc).isoformat()
         self.store.enqueue_alert(
             event_id=event_id, episode_id=episode.episode_id, kind=kind, action=action,
             symbol=sym, strategy_version="INSIDER_BUY_CLUSTER_V2@1", dedup_key=dedup_key,
             payload_text=payload, provenance=provenance,
-            horizon_trading_days=self.cfg.hold_trading_days,
+            horizon_trading_days=self.cfg.hold_trading_days, deliver_by_utc=deliver_by,
             intent_id=(intent or {}).get("intent_id"), position_id=extra.get("position_id"))
 
     def _on_entry_recorded(self, ep, entry: dict, pre_intent: dict | None, ripe_through) -> None:

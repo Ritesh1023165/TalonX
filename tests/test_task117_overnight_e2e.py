@@ -201,23 +201,29 @@ def test_p6_interrupted_delivery_survives_restart(tmp_path, monkeypatch):
     import talonx_ingest.intelligence.insider.store as _stmod
     monkeypatch.setattr(_stmod, "InsiderStore", lambda *a, **k: store)
 
-    # transport raises on the first send -> the alert is RETRY, persisted
-    rt = RecordingTransport(outcomes=[{"raise": True, "detail": "telegram 502"}])
+    # ENTRY_INTENT delivers on the ACT tick; force the transport to RAISE on the
+    # ENTRY_FILL send (a notification -- no deadline) so RETRY-survives-restart is
+    # the pure property under test.
+    rt = RecordingTransport(outcomes=[{"ok": True, "ref": "rec-intent"},
+                                      {"raise": True, "detail": "telegram 502"}])
     svc = _svc(tmp_path, bd, store, transport=rt, home=home)
-    svc.tick(as_of=ACT)
+    svc.tick(as_of=ACT)                                 # ENTRY_INTENT -> SENT
+    svc.tick(as_of=ENTRY)                               # ENTRY_FILL send RAISES -> RETRY
     s = V2Store(str(tmp_path / "v2_lane.db"), starting_cash=300_000.0)
-    row = s.all_outbox()[0]
-    assert row["state"] == "RETRY" and row["attempts"] == 1 and row["next_attempt_utc"]
+    fill = [o for o in s.all_outbox() if o["kind"] == "ENTRY_FILL"][0]
+    assert fill["state"] == "RETRY" and fill["attempts"] == 1 and fill["next_attempt_utc"]
+    assert [t["action"] for t in s.trades()] == ["BUY"]     # paper outcome independent of delivery
 
-    # RESTART -> a fresh service + drain later; the pending alert is still there
+    # RESTART -> a fresh store + drain later; the pending fill notification is still there
     del svc
     s2 = V2Store(str(tmp_path / "v2_lane.db"), starting_cash=300_000.0)
-    assert s2.all_outbox()[0]["state"] == "RETRY"
+    assert [o for o in s2.all_outbox() if o["kind"] == "ENTRY_FILL"][0]["state"] == "RETRY"
     summ = deliver_outbox(s2, router=OfficialExternalRouter(home=home),
                           transport=RecordingTransport(),
                           now=datetime.now(timezone.utc) + timedelta(seconds=600))
     assert summ["sent"] == 1
-    assert V2Store(str(tmp_path / "v2_lane.db"), 300_000.0).all_outbox()[0]["state"] == "SENT"
+    assert [o for o in V2Store(str(tmp_path / "v2_lane.db"), 300_000.0).all_outbox()
+            if o["kind"] == "ENTRY_FILL"][0]["state"] == "SENT"
 
 
 def test_p6_open_position_source_failure_still_exits(tmp_path, monkeypatch):

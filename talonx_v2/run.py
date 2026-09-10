@@ -85,7 +85,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--live-lookback-days", type=int, default=45)
     ap.add_argument("--deliver", action="store_true",
                     help="live mode: drain the durable V2 alert outbox each tick "
-                         "through OfficialExternalRouter + a dry-run (HOLD) transport")
+                         "through OfficialExternalRouter + the selected --transport")
+    ap.add_argument("--transport", choices=["dryrun", "telegram"], default="dryrun",
+                    help="delivery transport when --deliver is set: dryrun (HOLD, default) | "
+                         "telegram (the real official Telegram sender; HOLDS unless "
+                         "TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID are configured)")
     ap.add_argument("--pricing-mode", default="csv",
                     choices=["csv", "composite-yf", "composite-iex"],
                     help="daily-bar source: csv (frozen snapshot, default) | "
@@ -129,12 +133,16 @@ def main(argv: list[str] | None = None) -> int:
         router = transport = None
         if args.deliver:
             # durable alert outbox is ALWAYS written; --deliver additionally drains
-            # it each tick through the ONE official routing authority.  The default
-            # transport is a dry-run that HOLDS (records intent, sends nothing) --
-            # a real network transport is not wired by this build.
+            # it each tick through the ONE official routing authority.  Default
+            # transport is dry-run HOLD; --transport telegram uses the real
+            # official sender (which itself HOLDS unless creds are configured).
             from talonx_ops.official_dispatch import OfficialExternalRouter
-            from talonx_v2.delivery import DryRunTransport
-            router, transport = OfficialExternalRouter(), DryRunTransport()
+            from talonx_v2.delivery import DryRunTransport, OfficialTelegramTransport
+            router = OfficialExternalRouter()
+            transport = (OfficialTelegramTransport() if args.transport == "telegram"
+                         else DryRunTransport())
+            logging.getLogger("talonx_v2.run").info(
+                "V2 delivery ENABLED -- transport=%s", transport.name)
         svc = V2Service(
             config=cfg, bar_dirs=[Path(p) for p in args.bar_dir],
             form4_kind=args.form4_source, form4_parquet=args.form4_parquet,

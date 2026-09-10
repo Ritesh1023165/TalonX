@@ -124,11 +124,16 @@ CREATE TABLE IF NOT EXISTS v2_alert_outbox (
     dedup_key             TEXT NOT NULL,
     payload_text          TEXT NOT NULL,
     provenance_json       TEXT NOT NULL,
-    state                 TEXT NOT NULL,          -- PENDING | SENT | HELD | FAILED | AMBIGUOUS
+    state                 TEXT NOT NULL,          -- PENDING | SENT | HELD | FAILED | AMBIGUOUS | RETRY | EXPIRED
     attempts              INTEGER NOT NULL DEFAULT 0,
     next_attempt_utc      TEXT,
     last_error            TEXT,
     transport_ref         TEXT,
+    -- Task 117 deployment-readiness: an actionable-instruction alert (PLANNED
+    -- BUY / ENTRY_INTENT) is only deliverable BEFORE this instant; past it the
+    -- worker marks it EXPIRED so a queued instruction never emerges after the
+    -- open as fresh.  NULL for pure notifications (ENTRY_FILL / EXIT_FILL / ...).
+    deliver_by_utc        TEXT,
     created_at_utc        TEXT NOT NULL,
     updated_at_utc        TEXT NOT NULL,
     sent_at_utc           TEXT
@@ -167,6 +172,11 @@ class V2Store:
     def _init(self) -> None:
         with self._conn() as c:
             c.executescript(_SCHEMA)
+            # additive, idempotent column migration for an outbox table that was
+            # created by an earlier build (Task 117 deployment-readiness).
+            cols = {r[1] for r in c.execute("PRAGMA table_info(v2_alert_outbox)")}
+            if cols and "deliver_by_utc" not in cols:
+                c.execute("ALTER TABLE v2_alert_outbox ADD COLUMN deliver_by_utc TEXT")
             row = c.execute("SELECT cash FROM portfolio WHERE id=1").fetchone()
             if row is None:
                 c.execute("INSERT INTO portfolio (id, cash) VALUES (1, ?)", (self._starting_cash,))
@@ -400,8 +410,14 @@ class V2Store:
     def enqueue_alert(self, *, event_id: str, episode_id: str, kind: str, action: str,
                       symbol: str, strategy_version: str, dedup_key: str, payload_text: str,
                       provenance: dict, horizon_trading_days: int | None = None,
-                      intent_id: str | None = None, position_id: int | None = None) -> bool:
-        """Idempotent enqueue.  Returns True if a new row was written."""
+                      intent_id: str | None = None, position_id: int | None = None,
+                      deliver_by_utc: str | None = None) -> bool:
+        """Idempotent enqueue.  Returns True if a new row was written.
+
+        ``deliver_by_utc`` -- for an actionable-instruction alert (ENTRY_INTENT):
+        the instant after which the instruction is no longer actionable; the
+        delivery worker EXPIRES it rather than sending it late as fresh.
+        """
         with self._conn() as c:
             exists = c.execute("SELECT 1 FROM v2_alert_outbox WHERE event_id=?",
                                (event_id,)).fetchone() is not None
@@ -411,11 +427,11 @@ class V2Store:
                 """INSERT INTO v2_alert_outbox
                    (event_id, episode_id, intent_id, position_id, kind, action, symbol,
                     strategy_version, horizon_trading_days, dedup_key, payload_text,
-                    provenance_json, state, attempts, created_at_utc, updated_at_utc)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'PENDING', 0, ?, ?)""",
+                    provenance_json, state, attempts, deliver_by_utc, created_at_utc, updated_at_utc)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'PENDING', 0, ?, ?, ?)""",
                 (event_id, episode_id, intent_id, position_id, kind, action, symbol.upper(),
                  strategy_version, horizon_trading_days, dedup_key, payload_text,
-                 json.dumps(provenance, default=str), _utcnow(), _utcnow()),
+                 json.dumps(provenance, default=str), deliver_by_utc, _utcnow(), _utcnow()),
             )
             return True
 

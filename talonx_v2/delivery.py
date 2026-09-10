@@ -103,6 +103,65 @@ class RedisDispatchPublishTransport:
         return {"ok": True, "ref": f"redis_publish:{self._channel}:subs={n}"}
 
 
+class OfficialTelegramTransport:
+    """The REAL official Telegram transport for the V2 outbox.
+
+    Wraps ``talonx_dispatch.telegram_client.TelegramClient`` -- the ONE official
+    sender the DispatchAgent already uses.  It:
+      * uses the existing ``TELEGRAM_BOT_TOKEN`` / ``TELEGRAM_CHAT_ID`` env
+        mechanism (no new config, no second bot poller);
+      * HOLDS (sends nothing) when not configured -- safe default;
+      * sends with ``parse_mode=None`` (the V2 card carries raw ``*``/``_``;
+        Telegram would 400 the whole message otherwise -- 2026-08-18 incident);
+      * maps a non-retryable client error (bad token / bot blocked) to a
+        ``permanent`` failure so the worker does not burn its retry budget;
+      * maps an exhausted-retries client error to a transient not-ok
+        (worker retries with its own bounded backoff, then FAILED, still visible).
+
+    Nothing here changes routing -- ``deliver_outbox`` still asks
+    ``OfficialExternalRouter`` first.  Delivery is enabled ONLY by the caller
+    passing this transport with ``deliver=True``; the default stays dry-run HOLD.
+    """
+
+    name = "official_telegram"
+
+    def __init__(self, *, client: object | None = None):
+        self._client = client
+
+    def _resolve(self):
+        if self._client is not None:
+            return self._client
+        from talonx_dispatch.telegram_client import TelegramClient  # pragma: no cover
+        return TelegramClient()
+
+    def send(self, payload_text: str, *, meta: dict[str, Any]) -> dict[str, Any]:
+        import asyncio
+        client = self._resolve()
+        if not getattr(client, "is_configured", False):
+            return {"held": True,
+                    "detail": "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not configured -- HOLD"}
+        try:
+            from talonx_dispatch.telegram_client import TelegramSendError
+        except Exception:  # noqa: BLE001 -- narrow import guard for tests with a stub client
+            TelegramSendError = Exception  # type: ignore
+        try:
+            coro = client.send(payload_text, parse_mode=None)
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                asyncio.run(coro)
+            else:  # pragma: no cover - the worker is sync; this is defensive
+                raise RuntimeError("OfficialTelegramTransport.send called inside a running loop")
+        except TelegramSendError as exc:  # type: ignore[misc]
+            txt = str(exc)
+            permanent = "non-retryable" in txt
+            return {"ok": False, "permanent": permanent, "detail": f"telegram: {txt}"}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "detail": f"telegram transport error: {exc!r}"}
+        cid = str(meta.get("dedup_key", ""))
+        return {"ok": True, "ref": f"telegram:sent:{cid}"}
+
+
 def _backoff_s(attempts: int) -> int:
     return min(_BACKOFF_CAP_S, _BACKOFF_BASE_S * (2 ** max(0, attempts - 1)))
 
@@ -124,6 +183,23 @@ def deliver_outbox(store, *, router, transport: Transport | None = None,
     for row in store.outbox_due(now_iso=now_iso):
         summary["considered"] += 1
         eid, dedup = row["event_id"], row["dedup_key"]
+
+        # NOTIFICATION DEADLINE (Task 117 deployment-readiness): an
+        # actionable-instruction alert (ENTRY_INTENT / PLANNED BUY) must NOT be
+        # sent after its window -- a queued instruction that emerges post-open is
+        # no longer actionable.  Expire it instead.  Pure notifications
+        # (ENTRY_FILL / EXIT_FILL / ENTRY_STALE) carry no deadline.
+        deadline = row.get("deliver_by_utc")
+        if deadline and now_iso >= deadline:
+            store.update_outbox(eid, state="EXPIRED",
+                                last_error=f"actionable-instruction deadline {deadline} passed "
+                                           "-- not delivered as fresh; the planned open is no "
+                                           "longer actionable")
+            summary.setdefault("expired", 0)
+            summary["expired"] += 1
+            summary["events"].append({"event_id": eid, "state": "EXPIRED", "reason": "deadline"})
+            continue
+
         rd = router.decide(FAMILY, dedup)
         if not getattr(rd, "eligible", False):
             store.update_outbox(eid, state="HELD", last_error=f"router: {rd.reason}")
@@ -166,10 +242,11 @@ def deliver_outbox(store, *, router, transport: Transport | None = None,
             st = "HELD"
         else:
             detail = str(res.get("detail", "transport returned not-ok"))
-            if attempts >= max_attempts:
+            if res.get("permanent") or attempts >= max_attempts:
+                why = ("permanent transport failure" if res.get("permanent")
+                       else f"max attempts ({max_attempts})")
                 store.update_outbox(eid, state="FAILED", attempts=attempts,
-                                    last_error=f"max attempts ({max_attempts}): {detail}",
-                                    next_attempt_utc=None)
+                                    last_error=f"{why}: {detail}", next_attempt_utc=None)
                 summary["failed"] += 1
                 st = "FAILED"
             else:
