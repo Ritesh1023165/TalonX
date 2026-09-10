@@ -50,10 +50,17 @@ def _submissions() -> dict:
 @pytest.mark.parametrize(
     "raw,expected",
     [
-        ("2026-07-31T18:05:12.000Z", datetime(2026, 7, 31, 18, 5, 12, tzinfo=timezone.utc)),
-        ("2026-07-31T18:05:12Z", datetime(2026, 7, 31, 18, 5, 12, tzinfo=timezone.utc)),
+        # SEC ``submissions`` convention: a bare Z / +00:00 / naive value is an
+        # EASTERN wall-clock -- localize to America/New_York, convert to UTC.
+        # 2026-07-31 is EDT (UTC-4): 18:05 ET -> 22:05 UTC.
+        ("2026-07-31T18:05:12.000Z", datetime(2026, 7, 31, 22, 5, 12, tzinfo=timezone.utc)),
+        ("2026-07-31T18:05:12Z", datetime(2026, 7, 31, 22, 5, 12, tzinfo=timezone.utc)),
+        ("2026-07-31T18:05:12+00:00", datetime(2026, 7, 31, 22, 5, 12, tzinfo=timezone.utc)),
+        ("2026-07-31 18:05:12", datetime(2026, 7, 31, 22, 5, 12, tzinfo=timezone.utc)),
+        # 2026-01-15 is EST (UTC-5): 18:05 ET -> 23:05 UTC.
+        ("2026-01-15T18:05:12Z", datetime(2026, 1, 15, 23, 5, 12, tzinfo=timezone.utc)),
+        # an EXPLICIT non-zero offset (efts.sec.gov / RSS) is trusted verbatim.
         ("2026-07-31T14:05:12-04:00", datetime(2026, 7, 31, 18, 5, 12, tzinfo=timezone.utc)),
-        ("2026-07-31 18:05:12", datetime(2026, 7, 31, 18, 5, 12, tzinfo=timezone.utc)),
         ("", None),
         (None, None),
         ("garbage", None),
@@ -67,7 +74,9 @@ def test_iter_normalized_filings_reads_acceptance_and_items():
     filings = {f.accession: f for f in iter_normalized_filings(_submissions(), symbol="AAPL")}
     earn = filings["0000320193-26-000070"]
     assert earn.form == "8-K"
-    assert earn.acceptance_datetime == datetime(2026, 7, 31, 18, 5, 12, tzinfo=timezone.utc)
+    # 18:05:12 ET (EDT) -> 22:05:12 UTC; the Eastern assumption is flagged.
+    assert earn.acceptance_datetime == datetime(2026, 7, 31, 22, 5, 12, tzinfo=timezone.utc)
+    assert DataQualityFlag.ACCEPTANCE_TZ_ASSUMED_EASTERN.value in earn.flags
     assert earn.items == ("2.02", "9.01")
     assert earn.cik == "0000320193"
     assert earn.symbol == "AAPL"

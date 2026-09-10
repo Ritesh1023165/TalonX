@@ -913,7 +913,7 @@ class DashboardReadModel:
                     open_cost = sum((r["position_cost"] or 0.0) for r in opens)
                     out["ledger"] = {
                         "status": "ACTIVE" if (opens or closed) else "ZERO_ACTIVITY",
-                        "open_positions": [self._v2_position_lifecycle(dict(r)) for r in opens],
+                        "open_positions": [self._v2_position_lifecycle(dict(r), now=self.now) for r in opens],
                         "n_open": len(opens),
                         "closed_positions": len(closed),
                         "exit_unresolved": int(unresolved),
@@ -937,7 +937,7 @@ class DashboardReadModel:
             out["funnel"] = {"available": False, "error": f"{type(exc).__name__}: {exc}"}
         try:
             from talonx_ops.prospective.checkpoint import campaign_day, eod_state
-            out["eod"] = self._v2_eod_state(eod_state(self.now))
+            out["eod"] = self._v2_eod_state(eod_state(self.now), now=self.now)
             out["campaign"] = {
                 "start_date": "2026-09-08", "campaign_day": campaign_day(self.now),
                 "day1_outcome": "NO_NATURAL_V2_SIGNAL",
@@ -1051,14 +1051,14 @@ class DashboardReadModel:
         return out
 
     @staticmethod
-    def _v2_position_lifecycle(row: dict[str, Any]) -> dict[str, Any]:
+    def _v2_position_lifecycle(row: dict[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
         row = dict(row)
+        _asof = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).date()
         try:
             from talonx_v2.calendar import trading_days_elapsed
             entry = row.get("entry_session")
             if entry:
-                held = trading_days_elapsed(_date.fromisoformat(str(entry)[:10]),
-                                            datetime.now(timezone.utc).date())
+                held = trading_days_elapsed(_date.fromisoformat(str(entry)[:10]), _asof)
                 row["days_held"] = held
                 row["sessions_remaining"] = max(0, 10 - held)
         except Exception:  # noqa: BLE001
@@ -1068,22 +1068,39 @@ class DashboardReadModel:
         return row
 
     @staticmethod
-    def _v2_eod_state(es: dict[str, Any]) -> dict[str, Any]:
+    def _v2_eod_state(es: dict[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
         """Map the market-phase-aware EOD state to the dashboard vocabulary
-        (Task 114 A5.4): STALE only after a real missed deadline."""
+        (Task 114 A5.4): STALE only after a real missed deadline.
+
+        D3: a reconciliation row only supersedes when its ``session_date``
+        matches the CURRENT session (``now``), never merely today's wall clock.
+        A stale row from a prior session is ignored and surfaced separately so
+        the tile never shows another day's PARTIAL/PASS as if it were current.
+        """
         st = es.get("state", "UNKNOWN")
-        # if a reconciliation row exists for today, PASS/PARTIAL supersedes
+        ref = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).date().isoformat()
+        stale_row_session = None
         try:
             from talonx_ops.eod_reconciliation import EodReconciliationStore
             row = EodReconciliationStore(read_only=True).latest()
-            today = datetime.now(timezone.utc).date().isoformat()
-            if row is not None and str(getattr(row, "session_date", "")) == today:
-                st = {"RECONCILED": "RECONCILED_PASS", "PARTIAL": "PARTIAL",
-                      "MISMATCH": "FAILED"}.get(getattr(row, "status", ""), st)
+            if row is not None:
+                row_session = str(getattr(row, "session_date", ""))
+                if row_session == ref:
+                    st = {"RECONCILED": "RECONCILED_PASS", "PARTIAL": "PARTIAL",
+                          "MISMATCH": "FAILED"}.get(getattr(row, "status", ""), st)
+                elif row_session:
+                    stale_row_session = row_session
         except Exception:  # noqa: BLE001
             pass
-        return {"state": st, "reason": es.get("reason"),
-                "close_utc": es.get("close_utc"), "deadline_utc": es.get("deadline_utc")}
+        out = {"state": st, "reason": es.get("reason"),
+               "close_utc": es.get("close_utc"), "deadline_utc": es.get("deadline_utc"),
+               "session_date": ref}
+        if stale_row_session:
+            out["prior_reconciliation_session"] = stale_row_session
+            out["prior_reconciliation_note"] = (
+                f"latest reconciliation row is for {stale_row_session}, "
+                f"not the current session {ref} -- not applied to this tile")
+        return out
 
     # ------------------------------------------------------------------ #
     def all_sections(self) -> dict[str, Any]:

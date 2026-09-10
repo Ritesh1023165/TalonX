@@ -14,11 +14,27 @@ and is explicit about it.
 """
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 
 from talonx_ingest.intelligence.domain import DataQualityFlag, ExhibitRef
+
+# SEC EDGAR renders every acceptance wall-clock in US Eastern (the 5:30 PM ET
+# cutoff that rolls a filing to the next business day is an Eastern rule).
+# The ``data.sec.gov/submissions`` feed nonetheless stamps ``acceptanceDateTime``
+# with a bare ``...Z`` -- a UTC *marker* on an Eastern *wall-clock*. Treating
+# that ``Z`` literally puts every acceptance instant 4h (EDT) / 5h (EST) in the
+# past, which mis-buckets after-close filings as RTH and biases as-of replay
+# causal cutoffs. When True, a bare ``Z`` / ``+00:00`` / naive value is
+# localized to America/New_York and converted to true UTC (explicit non-zero
+# offsets, e.g. from ``efts.sec.gov``, are always trusted as-is). Flip to False
+# only to reproduce the historical (pre-fix) ingestion exactly.
+EDGAR_ACCEPTANCE_ASSUMES_EASTERN = True
+_EDGAR_ET = ZoneInfo("America/New_York")
+_EXPLICIT_OFFSET_RE = re.compile(r"[+-]\d{2}:?\d{2}$")
 from talonx_ingest.intelligence.identity import AccessionFormatError, normalize_accession
 from talonx_ingest.intelligence.taxonomy import is_amendment, normalize_items
 
@@ -44,29 +60,66 @@ class NormalizedFiling:
     flags: tuple[str, ...] = field(default_factory=tuple)
 
 
-def parse_acceptance_datetime(raw: str | None) -> datetime | None:
-    """Parse EDGAR ``acceptanceDateTime`` to a tz-aware UTC datetime.
+def parse_acceptance_datetime_ex(
+    raw: str | None,
+) -> tuple[datetime | None, tuple[str, ...]]:
+    """Parse EDGAR ``acceptanceDateTime`` to a tz-aware **true-UTC** datetime,
+    returning ``(dt, flags)``.
 
     Seen formats: ``2026-07-29T16:04:53.000Z``, ``2026-07-29T16:04:53Z``,
-    ``2026-07-29T16:04:53-04:00``, and (rarely) ``2026-07-29 16:04:53``.
-    Returns ``None`` for missing/empty/unparseable input -- the caller
+    ``2026-07-29T16:04:53-04:00``, ``2026-07-29T16:04:53+00:00`` and (rarely)
+    ``2026-07-29 16:04:53``.
+
+    - An explicit **non-zero** UTC offset (``-04:00`` / ``+05:30`` ...) is
+      trusted verbatim and converted to UTC. No flag.
+    - A bare ``Z``, a literal ``+00:00``, or no offset at all is the SEC
+      ``submissions`` convention: an **Eastern** wall-clock wearing a UTC
+      marker. When ``EDGAR_ACCEPTANCE_ASSUMES_EASTERN`` it is localized to
+      ``America/New_York`` (DST-correct) and converted to true UTC, and
+      ``acceptance_tz_assumed_eastern`` is flagged. When the switch is off the
+      old behaviour (assume the marker is real UTC) is kept.
+
+    Returns ``(None, ())`` for missing/empty/unparseable input -- the caller
     then flags ``missing_acceptance_timestamp``.
     """
     if not raw:
-        return None
+        return None, ()
     s = str(raw).strip()
     if not s:
-        return None
-    s = s.replace("Z", "+00:00")
+        return None, ()
     if "T" not in s and " " in s:
         s = s.replace(" ", "T", 1)
+
+    explicit_offset = bool(_EXPLICIT_OFFSET_RE.search(s)) and not s.endswith(
+        ("+00:00", "-00:00", "+0000", "-0000")
+    )
+    s_iso = s.replace("Z", "+00:00")
     try:
-        dt = datetime.fromisoformat(s)
+        dt = datetime.fromisoformat(s_iso)
     except ValueError:
-        return None
+        return None, ()
+
+    if explicit_offset:
+        # a real offset (efts.sec.gov / RSS) -- trust it
+        return dt.astimezone(timezone.utc), ()
+
+    # bare Z / +00:00 / naive -> EDGAR Eastern wall-clock convention
+    if EDGAR_ACCEPTANCE_ASSUMES_EASTERN:
+        naive = dt.replace(tzinfo=None)
+        return (
+            naive.replace(tzinfo=_EDGAR_ET).astimezone(timezone.utc),
+            (DataQualityFlag.ACCEPTANCE_TZ_ASSUMED_EASTERN.value,),
+        )
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+    return dt.astimezone(timezone.utc), ()
+
+
+def parse_acceptance_datetime(raw: str | None) -> datetime | None:
+    """Back-compat thin wrapper over :func:`parse_acceptance_datetime_ex`
+    that drops the data-quality flags. New callers that persist provenance
+    should use the ``_ex`` form so the Eastern-assumption is auditable."""
+    return parse_acceptance_datetime_ex(raw)[0]
 
 
 def _parse_date(raw: str | None) -> date | None:
@@ -175,9 +228,10 @@ def iter_normalized_filings(
             continue  # a filing we cannot address by id is not a usable event
 
         flags: list[str] = []
-        acc_dt = parse_acceptance_datetime(
+        acc_dt, acc_flags = parse_acceptance_datetime_ex(
             acc_dt_list[i] if i < len(acc_dt_list) else None
         )
+        flags.extend(acc_flags)
         if acc_dt is None:
             flags.append(DataQualityFlag.MISSING_ACCEPTANCE_TIMESTAMP.value)
 

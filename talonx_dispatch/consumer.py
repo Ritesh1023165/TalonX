@@ -572,6 +572,14 @@ class DispatchAgent:
                 self.watchlist_store.mark_heads_up_sent(ticker)
                 self._earnings_heads_up_sent += 1
                 sent += 1
+                # D7: every official Telegram domain lands in last_telegram_push
+                # so a "last official send" surface is complete, not just the
+                # intraday + long-term-alert domains.
+                try:
+                    self.store.save_last_telegram_push(
+                        ticker, "earnings_heads_up", now, None)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("last_telegram_push persist (heads-up) failed for %s: %s", ticker, exc)
                 logger.info("Earnings heads-up push sent for %s (reports %s)", ticker, row["earnings_date"])
             except TelegramSendError as exc:
                 logger.error("Earnings heads-up push failed for %s: %s", ticker, exc)

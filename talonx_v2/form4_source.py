@@ -17,8 +17,25 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from talonx_v2.cluster_engine import PurchaseRecord
+
+# SEC acceptance / EDGAR filing dates are US Eastern; V2's contract is defined
+# on NYSE *sessions*, so when we fall back to the acceptance instant for a
+# missing filing_date we key on its Eastern calendar date -- never the UTC date
+# (a 22:00 ET filing is disseminated on the ET day, not the next UTC day).
+_ET = ZoneInfo("America/New_York")
+
+
+def _dissemination_date(accepted_at_utc: datetime | None) -> date | None:
+    if accepted_at_utc is None:
+        return None
+    dt = accepted_at_utc
+    if dt.tzinfo is None:
+        from datetime import timezone as _tz
+        dt = dt.replace(tzinfo=_tz.utc)
+    return dt.astimezone(_ET).date()
 
 # When ``since`` is a DISSEMINATION-window bound we widen the underlying
 # transaction_date SQL filter by this slack and re-filter on the acceptance
@@ -127,7 +144,7 @@ def from_insider_store(store, *, symbols: list[str] | None = None,
             since=query_since, causal_cutoff=causal_cutoff, newest_first=False,
         )
         for t in txns:
-            fd = t.filing_date or (t.accepted_at_utc.date() if t.accepted_at_utc else None)
+            fd = t.filing_date or _dissemination_date(t.accepted_at_utc)
             if fd is None or not t.symbol or not t.owner_cik:
                 continue
             if since is not None and fd < since:

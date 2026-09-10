@@ -25,7 +25,13 @@ from talonx_v2.service import V2Service
 from talonx_v2.store import V2Store
 
 PROD_LEDGER = Path(__file__).resolve().parents[1] / "v2_lane.db"
-EXPECTED_MD5 = "c09c6a88188e65fd987b54f672a9759e"
+# The Task 117 controlled activation applied the additive migration to the live
+# ledger (verified logical continuity). These isolated-copy tests now run against
+# the ALREADY-MIGRATED ledger: the additive tables exist and re-opening a
+# V2Store is a clean no-op. Pre-migration hash was c09c6a88188e65fd987b54f672a9759e.
+_PRE_MIGRATION_MD5 = "c09c6a88188e65fd987b54f672a9759e"
+_POST_MIGRATION_MD5 = "29e57dbcd1a567fbc4bb0e73efdba95f"
+EXPECTED_MD5 = {_PRE_MIGRATION_MD5, _POST_MIGRATION_MD5}
 
 pytestmark = pytest.mark.skipif(not PROD_LEDGER.exists(), reason="no production v2_lane.db")
 
@@ -37,8 +43,12 @@ def _md5(p: Path) -> str:
 def _iso_copy(tmp_path) -> Path:
     dst = tmp_path / "v2_lane.db"
     shutil.copy2(PROD_LEDGER, dst)
-    assert _md5(dst) == EXPECTED_MD5, "isolated copy must match the expected production hash"
+    assert _md5(dst) in EXPECTED_MD5, "isolated copy must match a known production hash"
     return dst
+
+
+def _already_migrated(db: Path) -> bool:
+    return {"pending_entry_intents", "v2_alert_outbox"}.issubset(set(_logical(db)["tables"]))
 
 
 def _logical(db: Path) -> dict:
@@ -66,10 +76,12 @@ def test_migration_preserves_all_existing_state(tmp_path):
     assert before["cash"] == 300000.0
     assert before["positions"] == 0 and before["trades"] == 0
     assert before["dispositions"] == [("07242bc857569f60", "SKIPPED_ENTRY_STALE")]
-    assert "pending_entry_intents" not in before["tables"]
-    assert "v2_alert_outbox" not in before["tables"]
+    if not _already_migrated(db):
+        assert "pending_entry_intents" not in before["tables"]
+        assert "v2_alert_outbox" not in before["tables"]
 
-    # migrate: opening a V2Store runs the additive CREATE TABLE IF NOT EXISTS + ALTER
+    # migrate (or, on the already-migrated ledger, a clean no-op): opening a
+    # V2Store runs the additive CREATE TABLE IF NOT EXISTS + ALTER
     V2Store(str(db), starting_cash=300000.0)
     after = _logical(db)
     assert after["cash"] == 300000.0
@@ -100,6 +112,7 @@ def test_alter_migration_on_a_preexisting_outbox_without_the_new_column(tmp_path
     # forge a legacy outbox table (no deliver_by_utc)
     con = sqlite3.connect(str(db))
     con.executescript("""
+        DROP TABLE IF EXISTS v2_alert_outbox;
         CREATE TABLE v2_alert_outbox (
           event_id TEXT PRIMARY KEY, episode_id TEXT NOT NULL, intent_id TEXT,
           position_id INTEGER, kind TEXT NOT NULL, action TEXT NOT NULL, symbol TEXT NOT NULL,

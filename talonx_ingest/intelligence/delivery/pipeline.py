@@ -153,8 +153,10 @@ class DrainResult:
     delivered: int = 0
     retried: int = 0
     failed: int = 0
+    expired: int = 0
     skipped_not_configured: bool = False
     delivery_ids: list[str] = field(default_factory=list)
+    expired_ids: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -254,13 +256,26 @@ async def process_pending(
     dry_run: bool = False,
     metrics: DeliveryMetrics | None = None,
     now: datetime | None = None,
+    enforce_age_cutoff: bool = False,
+    max_age_seconds: "dict[str, int] | int | None" = None,
 ) -> DrainResult:
     """Drain due PENDING rows to the sender, CRITICAL first. Persist-before-
     send is already guaranteed by ``enqueue``; here we only transition
-    PENDING -> SENT / retry / FAILED. Safe to call repeatedly and after a
-    restart (state lives in the outbox)."""
+    PENDING -> SENT / retry / FAILED / EXPIRED. Safe to call repeatedly and
+    after a restart (state lives in the outbox).
+
+    D5: pass ``enforce_age_cutoff=True`` (the runner / activation path does) to
+    move rows older than their per-route cutoff to EXPIRED *before* any send --
+    so the first real drain of a historical backlog expires it instead of
+    flooding Telegram. Default off so the pure drain mechanics are unchanged
+    for existing callers.
+    """
     now = now or datetime.now(timezone.utc)
     result = DrainResult()
+
+    if enforce_age_cutoff:
+        result.expired_ids = outbox.expire_stale(now=now, max_age_seconds=max_age_seconds)
+        result.expired = len(result.expired_ids)
 
     active = NullSender() if dry_run else sender
     if not dry_run and not sender.configured:

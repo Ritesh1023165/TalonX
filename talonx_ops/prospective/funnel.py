@@ -27,12 +27,40 @@ def _today_utc() -> date:
     return datetime.now(timezone.utc).date()
 
 
+def _resolved_execution_scope() -> list[str] | None:
+    """The enforced V2 execution allowlist (POLLED SEC-covered issuers), or
+    ``None`` if it cannot be resolved offline. Same source the live companion
+    uses via ``run.py --execution-scope resolved-active-watchlist`` (D1)."""
+    try:
+        from talonx_ops.watchlist_coverage import build_coverage_map
+        allow = sorted(c["symbol"] for c in build_coverage_map()["tickers"]
+                       if c.get("v2_collection_scope") == "POLLED")
+        return allow or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def build_funnel(*, db_path: str | Path, as_of: date | None = None,
-                 lookback_days: int = 45) -> dict[str, Any]:
+                 lookback_days: int = 45,
+                 execution_allowlist: list[str] | None | str = "auto") -> dict[str, Any]:
+    """``execution_allowlist``:
+      * ``"auto"`` (default) -> resolve the enforced V2 scope and filter to it,
+        matching what the live companion actually evaluates (D1 fix);
+      * an explicit ``list[str]`` -> filter to exactly those symbols;
+      * ``None`` -> unrestricted (the pre-D1 behaviour; historical replay only).
+    """
     as_of = as_of or _today_utc()
+    if execution_allowlist == "auto":
+        execution_allowlist = _resolved_execution_scope()
+    allow_set = ({s.upper() for s in execution_allowlist}
+                 if execution_allowlist is not None else None)
     out: dict[str, Any] = {
         "as_of": as_of.isoformat(),
-        "scope": {"today_utc": as_of.isoformat(), "window_days": lookback_days},
+        "scope": {
+            "today_utc": as_of.isoformat(), "window_days": lookback_days,
+            "execution_scope_enforced": allow_set is not None,
+            "execution_scope_count": (len(allow_set) if allow_set is not None else None),
+        },
         "available": False,
     }
 
@@ -45,6 +73,8 @@ def build_funnel(*, db_path: str | Path, as_of: date | None = None,
         since = as_of - timedelta(days=lookback_days)
         window = st.query_transactions(classification=TransactionClass.OPEN_MARKET_PURCHASE,
                                        since=since, newest_first=False)
+        if allow_set is not None:
+            window = [t for t in window if (t.symbol or "").upper() in allow_set]
         code_p_today = [t for t in window
                         if getattr(t, "accepted_at_utc", None)
                         and t.accepted_at_utc.date() == as_of]
@@ -59,7 +89,9 @@ def build_funnel(*, db_path: str | Path, as_of: date | None = None,
         from talonx_v2 import form4_source, pipeline
         from talonx_v2.config import V2Config
         cfg = V2Config()
-        recs = form4_source.from_insider_store(st, since=since)
+        recs = form4_source.from_insider_store(
+            st, since=since,
+            symbols=(sorted(allow_set) if allow_set is not None else None))
         episodes = pipeline.detect_episodes(recs, config=cfg)
         # single-insider near-misses: issuers with >=1 code-P record in the
         # window but no >=2-distinct-owner cluster

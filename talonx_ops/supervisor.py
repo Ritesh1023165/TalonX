@@ -644,27 +644,59 @@ class Supervisor:
 # process-scan helpers (Phase 4)
 # --------------------------------------------------------------------------- #
 def count_telegram_get_updates_owners() -> int:
-    """How many running processes host the ONE Telegram ``get_updates`` poller.
+    """How many LOGICAL processes host the ONE Telegram ``get_updates`` poller.
 
     The poller lives inside ``run_talonx.py``'s ``DispatchAgent`` -- so this
-    counts live ``run_talonx.py`` processes that did not disable dispatch. Best
-    effort: returns 0 if ``psutil`` is unavailable.
+    counts live ``run_talonx.py`` processes that did not disable dispatch.
+
+    D2: on Windows a venv launcher (``.venv/Scripts/python.exe run_talonx.py``)
+    spawns a worker child under a different interpreter that ALSO matches
+    ``run_talonx.py``. That shim+worker pair is ONE logical poller -- a match
+    whose parent (or grandparent) is itself a match is a shim child and is not
+    counted. Best effort: returns 0 if ``psutil`` is unavailable.
     """
     try:
         import psutil
     except Exception:  # noqa: BLE001
         return 0
-    n = 0
-    for p in psutil.process_iter(["cmdline"]):
+
+    matched: dict[int, "psutil.Process"] = {}
+    for p in psutil.process_iter(["cmdline", "pid", "name"]):
         try:
-            cl = " ".join(p.info.get("cmdline") or [])
+            parts = p.info.get("cmdline") or []
         except Exception:  # noqa: BLE001
             continue
-        if not cl:
-            continue
-        if "run_talonx.py" in cl and "--skip-dispatch" not in cl:
-            n += 1
-    return n
+        cl = " ".join(parts)
+        # a real launch has ``run_talonx.py`` as its own argv token (or a path
+        # ending in it) -- not merely a substring of some other command line
+        # that happens to mention it (e.g. this probe, a shell wrapper).
+        is_launch = any(
+            tok == "run_talonx.py" or tok.replace("\\", "/").endswith("/run_talonx.py")
+            for tok in parts
+        )
+        if is_launch and "--skip-dispatch" not in cl:
+            matched[p.pid] = p
+
+    if len(matched) <= 1:
+        return len(matched)
+
+    logical = 0
+    for pid, proc in matched.items():
+        anc = proc
+        is_shim_child = False
+        for _ in range(6):  # bounded ancestor walk
+            try:
+                anc = anc.parent()
+            except Exception:  # noqa: BLE001
+                anc = None
+            if anc is None:
+                break
+            if anc.pid in matched:
+                is_shim_child = True
+                break
+        if not is_shim_child:
+            logical += 1
+    return logical or 1
 
 
 def assert_single_telegram_owner() -> None:

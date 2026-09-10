@@ -40,6 +40,8 @@ STATE_PENDING = "PENDING"
 STATE_SENT = "SENT"
 STATE_FAILED = "FAILED"
 STATE_SUPPRESSED = "SUPPRESSED"
+STATE_EXPIRED = "EXPIRED"        # D5: a PENDING row older than its route cutoff --
+                                # terminal, never deleted, never sent
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_meta (
@@ -381,6 +383,60 @@ class DeliveryOutbox:
             sql += " LIMIT ?"
             params.append(int(limit))
         return [self._row(r) for r in self._conn.execute(sql, params).fetchall()]
+
+    def expire_stale(
+        self, *, now: datetime | None = None,
+        max_age_seconds: "dict[str, int] | int | None" = None,
+    ) -> list[str]:
+        """Move PENDING rows older than their per-route cutoff to EXPIRED.
+
+        Audit-preserving: a state transition with an ``EXPIRED`` log entry, not
+        a delete. Idempotent. Returns the delivery_ids expired. ``max_age_seconds``
+        is a ``{route: seconds}`` map (missing route -> default) or a single int
+        for all routes; ``None`` uses ``config.CARD_MAX_AGE_SECONDS``.
+        """
+        from datetime import timedelta
+
+        from talonx_ingest.intelligence.delivery.config import (
+            CARD_MAX_AGE_DEFAULT_SECONDS, CARD_MAX_AGE_SECONDS,
+        )
+
+        now = now or datetime.now(timezone.utc)
+        if max_age_seconds is None:
+            route_max = dict(CARD_MAX_AGE_SECONDS)
+            default_max = CARD_MAX_AGE_DEFAULT_SECONDS
+        elif isinstance(max_age_seconds, int):
+            route_max, default_max = {}, max_age_seconds
+        else:
+            route_max = dict(max_age_seconds)
+            default_max = CARD_MAX_AGE_DEFAULT_SECONDS
+
+        expired: list[str] = []
+        rows = self._conn.execute(
+            "SELECT delivery_id, route, enqueued_at_utc FROM intelligence_delivery "
+            "WHERE state = ?", (STATE_PENDING,),
+        ).fetchall()
+        for r in rows:
+            enq = _dt(r["enqueued_at_utc"])
+            if enq is None:
+                continue
+            cutoff_s = route_max.get(r["route"], default_max)
+            if now - enq <= timedelta(seconds=cutoff_s):
+                continue
+            age_h = (now - enq).total_seconds() / 3600.0
+            self._conn.execute(
+                "UPDATE intelligence_delivery SET state=?, next_retry_at_utc=NULL, "
+                "updated_at_utc=?, suppress_reason=? WHERE delivery_id=?",
+                (STATE_EXPIRED, _iso(now),
+                 f"stale_card: {age_h:.1f}h old > {cutoff_s / 3600:.0f}h {r['route']} cutoff",
+                 r["delivery_id"]),
+            )
+            self._log(r["delivery_id"], "EXPIRED",
+                      f"{age_h:.1f}h old (> {cutoff_s / 3600:.0f}h {r['route']} cutoff)")
+            expired.append(r["delivery_id"])
+        if expired:
+            self._conn.commit()
+        return expired
 
     def counts_by_state(self) -> dict[str, int]:
         rows = self._conn.execute(

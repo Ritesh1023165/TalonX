@@ -126,6 +126,11 @@ class DataQualityFlag(str, Enum):
     AMBIGUOUS_SESSION_BUCKET = "ambiguous_session_bucket"
     SESSION_CALENDAR_UNAVAILABLE = "session_calendar_unavailable"
     MISSING_REPORT_PERIOD_END = "missing_report_period_end"
+    # The raw EDGAR acceptanceDateTime carried no usable UTC offset (a bare
+    # ``Z``/``+00:00`` marker or none at all). SEC EDGAR renders acceptance
+    # wall-clock in US Eastern, so it was localized to America/New_York and
+    # converted to true UTC. See ``edgar_normalize.parse_acceptance_datetime``.
+    ACCEPTANCE_TZ_ASSUMED_EASTERN = "acceptance_tz_assumed_eastern"
 
 
 # Keys that must never appear on a card -- a predictive/directional claim.

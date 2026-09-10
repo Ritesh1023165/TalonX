@@ -32,7 +32,9 @@ from talonx_v2.service import V2Service
 from talonx_v2.store import V2Store
 
 PROD = Path(__file__).resolve().parents[1] / "v2_lane.db"
-EXPECTED_MD5 = "c09c6a88188e65fd987b54f672a9759e"
+# pre-migration hash c09c6a88...; post Task 117 activation migration 29e57dbc...
+EXPECTED_MD5 = {"c09c6a88188e65fd987b54f672a9759e",
+                "29e57dbcd1a567fbc4bb0e73efdba95f"}
 pytestmark = pytest.mark.skipif(not PROD.exists(), reason="no production v2_lane.db")
 
 SYM = "RHRS"
@@ -107,7 +109,7 @@ def test_bounded_controlled_deployment_rehearsal(tmp_path, monkeypatch):
     home = tmp_path / "home"; home.mkdir()
     ledger = tmp_path / "v2_lane.db"
     shutil.copy2(PROD, ledger)
-    assert hashlib.md5(ledger.read_bytes()).hexdigest() == EXPECTED_MD5
+    assert hashlib.md5(ledger.read_bytes()).hexdigest() in EXPECTED_MD5
 
     store = _iso_insider(tmp_path)
     import talonx_ingest.intelligence.insider.store as _stmod
@@ -227,4 +229,4 @@ def test_bounded_controlled_deployment_rehearsal(tmp_path, monkeypatch):
         assert o["episode_id"] == episode_id
     (tmp_path / "rehearsal_correlation.json").write_text(json.dumps(corr, indent=2, default=str))
     # the ISOLATED copy changed (additive tables) but the PRODUCTION ledger is untouched
-    assert hashlib.md5(PROD.read_bytes()).hexdigest() == EXPECTED_MD5
+    assert hashlib.md5(PROD.read_bytes()).hexdigest() in EXPECTED_MD5

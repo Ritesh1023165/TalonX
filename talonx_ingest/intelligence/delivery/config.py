@@ -52,6 +52,28 @@ IMMEDIATE_MIN_BAND: SignificanceBand = SignificanceBand.HIGH
 ROUTE_IMMEDIATE = "IMMEDIATE"
 ROUTE_DIGEST = "DIGEST"
 
+# ---------------------------------------------------------------------------
+# age / cutoff policy for the outbox drain (D5).
+#
+# An informational card is only actionable while it is fresh. A PENDING row
+# older than the per-route cutoff is EXPIRED (a terminal, audit-preserving
+# state -- it is never deleted and never marked SENT). This is what stops an
+# activation from flooding Telegram with a historical backlog: on the first
+# real drain every stale row transitions straight to EXPIRED.
+#
+# User-facing behaviour: an IMMEDIATE HIGH/CRITICAL card that could not be
+# delivered within 6 hours of the filing's acceptance is dropped rather than
+# sent late as if fresh; a DIGEST card has a 24-hour window (one trading day).
+# CRITICAL rows are NOT exempt -- a stale "CRITICAL" alert is still stale;
+# they are surfaced individually for human review (see
+# ``intelligence_delivery_closure.md``), not auto-sent.
+# ---------------------------------------------------------------------------
+CARD_MAX_AGE_SECONDS: dict[str, int] = {
+    ROUTE_IMMEDIATE: 6 * 3600,
+    ROUTE_DIGEST: 24 * 3600,
+}
+CARD_MAX_AGE_DEFAULT_SECONDS = 24 * 3600
+
 #: strict delivery ordering when draining the outbox — CRITICAL first.
 BAND_DELIVERY_ORDER: dict[SignificanceBand, int] = {
     SignificanceBand.CRITICAL: 0,
