@@ -157,8 +157,30 @@ function boundedTable(rows, cols, cap){
 }
 
 function renderOverview(d){
-  const r=d.runtime||{}, m=d.market||{}, a=d.alerts||{};
+  const r=d.runtime||{}, m=d.market||{}, a=d.alerts||{}, v2=d.active_v2||{};
   let h=`<h2 class="section-title">Overview — system operational picture</h2><div class="grid">`;
+  // Active V2 summary -- first-class on the Overview (Task 117)
+  if(!v2.error){
+    const del=v2.delivery||{};
+    h+=`<div class="card card-wide" style="border-left-color:#7c9cff"><h3>Active V2 — ${esc(v2.strategy||'INSIDER_BUY_CLUSTER_V2@1')} `+
+       `<span class="muted small">multi-day · PAPER CANDIDATE · ${v2.candidate_pricing?'candidate pricing':'frozen csv pricing'} · `+
+       `delivery ${del.enabled?'ON':'OFF (dry-run)'} · fp ${esc(v2.v2_fingerprint||'—')}</span></h3>`+
+       `<div class="grid">`+
+       `<div>`+kv('process health', pill(v2.service_health))+kv('data state', pill(v2.data_state))+
+         kv('coverage', pill(v2.coverage_state))+kv('pricing', pill(v2.pricing_state))+
+         kv('activity', pill(v2.business_activity))+`</div>`+
+       `<div>`+kv('campaign cash', num(v2.cash)+' / '+num(v2.starting_campaign_cash))+
+         kv('open / capacity', (v2.open_positions==null?'—':v2.open_positions)+' / '+(v2.capacity||'—'))+
+         kv('BUY / SELL (lifetime)', (v2.buys==null?'—':v2.buys)+' / '+(v2.sells==null?'—':v2.sells))+
+         kv('realized P&L', num(v2.realized_pnl_usd))+kv('EXIT_UNRESOLVED', num(v2.exit_unresolved))+`</div>`+
+       `<div>`+kv('pre-open intents PENDING', num(v2.pending_entry_intents))+
+         kv('delivery SENT / HELD / RETRY', `${num(del.sent)} / ${num(del.held)} / ${num(del.retry)}`)+
+         kv('delivery FAILED / AMBIGUOUS / EXPIRED', `${num(del.failed)} / ${num(del.ambiguous)} / ${num(del.by_state&&del.by_state.EXPIRED||0)}`)+
+         kv('EOD state', pill(v2.eod_state))+kv('interpretation', pill(v2.interpretation))+`</div>`+
+       `</div><div class="muted small">${esc(v2.delayed_fill_semantics||'')} — full detail on the Active V2 tab.</div></div>`;
+  } else {
+    h+=`<div class="card card-wide"><h3>Active V2</h3><div class="banner warn">read error: ${esc(v2.error)}</div></div>`;
+  }
   h+=`<div class="card"><h3>Runtime</h3>`+
      kv('overall', pill(r.overall))+kv('Original', pill(r.original))+kv('Experimental', pill(r.experimental))+
      kv('Intelligence', pill(r.intelligence))+kv('Telegram send', pill(r.telegram_send))+

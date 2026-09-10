@@ -228,6 +228,19 @@ class DashboardReadModel:
                 "signal_lineage": "Form4 -> code-P -> cluster -> V2 Quant -> Brain -> BUY/SELL "
                                   "-> Local Paper Engine -> Official Telegram -> :8787",
                 "interpretation": fn.get("interpretation"),
+                # Task 117: the 5 independent signals + delivery + candidate/dry-run,
+                # surfaced on the Overview (not just the Active V2 tab).
+                "coverage_state": v2.get("coverage_state"),
+                "pricing_state": v2.get("pricing_state"),
+                "pricing_mode": v2.get("readiness", {}).get("pricing_mode"),
+                "candidate_pricing": (v2.get("readiness", {}).get("pricing_mode") not in (None, "csv")),
+                "delivery": {"enabled": svc.get("delivery_enabled"),
+                             **(fn.get("delivery", {}) or {})},
+                "pending_entry_intents": len(svc.get("pending_entry_intents", []) or []),
+                "v2_fingerprint": v2.get("readiness", {}).get("v2_fingerprint_frozen"),
+                "delayed_fill_semantics": ("PLANNED BUY alerts fire before the open; the paper "
+                                           "fill records on S+1 at S's open (whole-session "
+                                           "provisional deferral) as a delayed notification"),
             }
         except Exception as exc:  # noqa: BLE001
             active_v2 = {"error": f"{type(exc).__name__}: {exc}"}
