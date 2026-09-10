@@ -46,6 +46,10 @@
   .pill.DEGRADED,.pill.STALE,.pill.SUPERSEDED,.pill.PARTIAL { background:#3a2c07; color:var(--warn); }
   .pill.FAILED,.pill.NO_ACTIVE_PRODUCER,.pill.DOWN,.pill.DISCONNECTED,.pill.BLOCKED { background:#3a1113; color:var(--bad); }
   .pill.BLOCKED { background:#08351f; color:var(--good); } /* boundary BLOCKED = good */
+  .pill.CURRENT,.pill.SENT,.pill.NO_OPPORTUNITIES { background:#08351f; color:var(--good); }
+  .pill.STARTING,.pill.POSITION_OPEN,.pill.ACTIVITY,.pill.PENDING,.pill.RETRY { background:#20262e; color:var(--muted); }
+  .pill.INCOMPLETE_COVERAGE,.pill.HELD,.pill.AMBIGUOUS,.pill.DATA_STALE { background:#3a2c07; color:var(--warn); }
+  .pill.DATA_UNAVAILABLE,.pill.STARTUP_FAILED { background:#3a1113; color:var(--bad); }
   .banner { border-radius:8px; padding:8px 12px; font-size:12px; margin-bottom:12px; }
   .banner.internal { background:#241a3a; color:#c4b5fd; border:1px solid #3b2d63; }
   .banner.info { background:#12202b; color:#93c5fd; border:1px solid #223a4d; }
@@ -91,6 +95,7 @@
   <button data-sec="overview" class="active">Overview</button>
   <button data-sec="premarket">Premarket</button>
   <button data-sec="original_quant">Original Quant</button>
+  <button data-sec="v2_active_strategy">Active V2</button>
   <button data-sec="validation">Validation</button>
   <button data-sec="intelligence">Intelligence</button>
   <button data-sec="paper_eod">Paper / EOD</button>
@@ -345,8 +350,91 @@ function renderPaperEod(d){
   return h;
 }
 
+function renderV2(d){
+  const sv=d.service||{}, l=d.ledger||{}, r=d.readiness||{}, cov=(r.coverage||{}),
+        f=d.funnel||{}, f4=f.form4||{}, cl=f.clusters||{}, tm=f.terminal||{},
+        intt=f.intents||{}, del=f.delivery||{};
+  let h=`<h2 class="section-title">Active V2 — INSIDER_BUY_CLUSTER_V2@1 <span class="muted small">multi-day insider buy-cluster · PAPER CANDIDATE · descriptive, not a profit claim</span></h2>`;
+  h+=`<div class="grid">`;
+  // strategy / fingerprint
+  h+=`<div class="card"><h3>Strategy</h3>`+
+     kv('version', d.strategy_version)+kv('fingerprint', r.v2_fingerprint_frozen||'—')+
+     kv('status', d.status_label)+kv('horizon', (sv.horizon_trading_days||10)+' trading days')+
+     kv('real capital', pill(d.real_capital?'YES':'BLOCKED'))+kv('shorts', pill(d.shorts?'YES':'BLOCKED'))+
+     `<div class="src">read-only · V2 is one multi-day strategy in the product; it does not serve intraday or fundamental analysis</div></div>`;
+  // FIVE INDEPENDENT bands
+  h+=`<div class="card"><h3>Health — 5 independent signals</h3>`+
+     kv('process health', pill(sv.health||d.health))+
+     kv('data state', pill(d.data_state))+
+     kv('coverage', pill(d.coverage_state))+
+     kv('pricing', pill(d.pricing_state))+
+     kv('activity', pill(d.activity))+
+     `<div class="muted small">an open position never masks a degraded coverage/pricing signal — each is shown on its own line</div></div>`;
+  // process detail
+  h+=`<div class="card"><h3>Process</h3>`+
+     kv('heartbeat', sv.heartbeat_kind+' · '+ageStr(sv.heartbeat_age_s)+' ago')+
+     kv('tick', sv.tick)+kv('last tick', sv.last_tick_utc)+
+     kv('form4 source', sv.form4_source)+kv('records seen', sv.form4_records_seen)+
+     kv('delivery drain', pill(sv.delivery_enabled?'ON':'OFF'))+
+     `<div class="muted small">${esc(sv.note||'')}</div></div>`;
+  // event source readiness — DB-read vs upstream-poll, un-conflated
+  h+=`<div class="card"><h3>Event source readiness</h3>`+
+     kv('source ok', pill(r.form4_source_ok===false?'FAILED':(r.form4_source_ok?'READY':'UNKNOWN')))+
+     kv('DB read last ok', r.source_db_read_last_ok_utc)+kv('DB read age', ageStr(r.source_db_read_age_s))+
+     kv('upstream poll last ok', r.source_poll_last_ok_utc)+kv('upstream poll age', ageStr(r.source_poll_age_s))+
+     kv('degraded', r.form4_source_degraded||'—')+`</div>`;
+  // coverage denominator + pricing
+  h+=`<div class="card"><h3>Coverage &amp; pricing</h3>`+
+     kv('coverage source', cov.source)+kv('issuers evaluated', cov.issuers_evaluated)+
+     kv('eligible-universe denominator', esc(cov.eligible_universe_denominator||'—'))+
+     kv('completeness', pill(cov.completeness))+
+     kv('pricing mode', r.pricing_mode)+kv('pricing adapter', r.pricing_adapter)+
+     kv('pricing unavailable', (r.pricing_unavailable_recent||[]).join(', ')||'none')+`</div>`;
+  // $300k campaign ledger
+  h+=`<div class="card card-wide"><h3>$300,000 campaign ledger ${pill(l.status)}</h3><div class="grid">`+
+     `<div>`+kv('starting cash', num(l.starting_campaign_cash))+kv('cash', num(l.cash))+
+       kv('available', num(l.available_capital))+kv('allocated', num(l.allocated_capital))+
+       kv('capacity', l.capacity)+`</div>`+
+     `<div>`+kv('open positions', l.n_open)+kv('closed positions', l.closed_positions)+
+       kv('BUY / SELL (lifetime)', (l.buys==null?'—':l.buys)+' / '+(l.sells==null?'—':l.sells))+
+       kv('realized P&L', num(l.realized_pnl_usd))+kv('EXIT_UNRESOLVED', l.exit_unresolved)+`</div></div>`+
+     boundedTable(l.open_positions||[], [
+        {label:'symbol', get:p=>p.symbol}, {label:'entry session', get:p=>p.entry_session},
+        {label:'entry px', get:p=>p.entry_price}, {label:'planned exit', get:p=>p.target_exit_session},
+        {label:'days held', get:p=>p.days_held}, {label:'shares', get:p=>p.shares}], 20)+
+     `</div>`;
+  // PENDING pre-open intents (actionable, not yet filled)
+  h+=`<div class="card card-wide"><h3>Pre-open entry intents (actionable — filled at the session OPEN)</h3>`+
+     boundedTable((intt.pending && intt.pending.length? intt.pending : (sv.pending_entry_intents||[])), [
+        {label:'symbol', get:i=>i.symbol}, {label:'target entry session', get:i=>i.target_entry_session},
+        {label:'intent created (UTC)', get:i=>i.created_at_utc}], 20)+
+     `<div class="muted small">by status: ${esc(JSON.stringify(intt.by_status||{}))}</div></div>`;
+  // FUNNEL: Form4 -> purchases -> distinct owners -> clusters -> eligibility/staleness -> decisions -> paper -> delivery
+  h+=`<div class="card card-wide"><h3>Funnel — Form 4 → clusters → decisions → paper → delivery</h3><div class="tblwrap"><table class="tbl"><tbody>`+
+     `<tr><td>Form 4 code-P records (window / today)</td><td>${num(f4.code_p_records_window)} / ${num(f4.code_p_records_today)}</td></tr>`+
+     `<tr><td>distinct issuers with code-P (window / today)</td><td>${num(f4.distinct_issuers_window)} / ${num(f4.distinct_issuers_today)}</td></tr>`+
+     `<tr><td>single-insider near-miss issuers <span class="muted">(reason: only 1 distinct owner)</span></td><td>${num(cl.single_insider_near_miss_count)} ${esc((cl.single_insider_near_miss_issuers||[]).join(', '))}</td></tr>`+
+     `<tr><td>≥2-distinct-owner clusters</td><td>${num(cl.clusters_ge2_distinct_insiders)} ${esc((cl.cluster_symbols||[]).join(', '))}</td></tr>`+
+     `<tr><td>stale (reason: entry > 3 sessions old) / fresh-eligible / not-yet-eligible</td><td>${num(cl.stale_historical_clusters)} / ${num(cl.fresh_eligible_clusters)} / ${num(cl.not_yet_eligible_clusters)}</td></tr>`+
+     `<tr><td>pre-open intents PENDING (decision made, awaiting the open)</td><td>${num(intt.pending_count)}</td></tr>`+
+     `<tr><td>V2 signals / BUY paper actions / SELL paper actions</td><td>${num(tm.signals)} / ${num(tm.buys)} / ${num(tm.sells)}</td></tr>`+
+     `<tr><td><b>delivery</b> — SENT / HELD / RETRY / FAILED / AMBIGUOUS / PENDING</td><td>${num(del.sent)} / ${num(del.held)} / ${num(del.retry)} / ${num(del.failed)} / ${num(del.ambiguous)} / ${num(del.pending)}</td></tr>`+
+     `<tr><td>interpretation</td><td>${pill(f.interpretation)}</td></tr>`+
+     `</tbody></table></div></div>`;
+  // delivery detail — Trading vs Intelligence vs Experimental are SEPARATE lanes
+  h+=`<div class="card card-wide"><h3>Alert delivery — this is a TRADING lane (separate from Intelligence &amp; Experimental)</h3>`+
+     boundedTable(del.recent||(sv.alert_outbox&&sv.alert_outbox.recent)||[], [
+        {label:'kind', get:x=>x.kind}, {label:'action', get:x=>x.action}, {label:'symbol', get:x=>x.symbol},
+        {label:'state', get:x=>x.state}, {label:'attempts', get:x=>x.attempts},
+        {label:'transport ref', get:x=>x.transport_ref}, {label:'last error', get:x=>x.last_error}], 12)+
+     `<div class="muted small">Experimental external delivery is structurally blocked; Intelligence alerts are informational and rendered under the Intelligence tab.</div></div>`;
+  h+=`</div>`;
+  return h;
+}
+
 const SECTION_RENDER = {
   overview: renderOverview, premarket: renderPremarket, original_quant: renderOriginalQuant,
+  v2_active_strategy: renderV2,
   validation: renderValidation, intelligence: renderIntelligence, paper_eod: renderPaperEod,
 };
 
@@ -451,7 +539,13 @@ function connect(){
   ws.onerror=()=>ws.close();
 }
 connect();
-loadSection('overview');
+/* deep-linkable tabs: #<section> selects it on load and on hashchange (read-only) */
+function sectionFromHash(){
+  const h=(location.hash||'').replace(/^#/,'');
+  return SECTION_RENDER[h] ? h : null;
+}
+window.addEventListener('hashchange', ()=>{ const s=sectionFromHash(); if(s) loadSection(s); });
+loadSection(sectionFromHash() || 'overview');
 setInterval(()=>{ if(activeSection && !activeLegacy) loadSection(activeSection); else if(activeLegacy && activeLegacy!=='live') loadLegacy(activeLegacy); }, 6000);
 </script>
 </body>

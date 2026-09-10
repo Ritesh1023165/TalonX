@@ -113,6 +113,36 @@ def build_funnel(*, db_path: str | Path, as_of: date | None = None,
                 "sells": int(sells),
                 "open_positions": int(n_open),
             }
+            # ---- decisions -> paper actions -> DELIVERY (Task 117 overnight) ----
+            def _has(tbl: str) -> bool:
+                return con.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (tbl,)
+                ).fetchone() is not None
+            if _has("pending_entry_intents"):
+                by_st: dict[str, int] = {}
+                for r in con.execute("SELECT status, COUNT(*) c FROM pending_entry_intents GROUP BY status"):
+                    by_st[r[0]] = r[1]
+                pend = [dict(r) for r in con.execute(
+                    "SELECT symbol, episode_id, target_entry_session, created_at_utc "
+                    "FROM pending_entry_intents WHERE status='PENDING' ORDER BY target_entry_session")]
+                out["intents"] = {"by_status": by_st, "pending": pend,
+                                  "pending_count": len(pend)}
+            if _has("v2_alert_outbox"):
+                by_state: dict[str, int] = {}
+                by_kind: dict[str, int] = {}
+                for r in con.execute("SELECT state, COUNT(*) c FROM v2_alert_outbox GROUP BY state"):
+                    by_state[r[0]] = r[1]
+                for r in con.execute("SELECT kind, COUNT(*) c FROM v2_alert_outbox GROUP BY kind"):
+                    by_kind[r[0]] = r[1]
+                recent = [dict(r) for r in con.execute(
+                    "SELECT kind, action, symbol, state, attempts, transport_ref, last_error, "
+                    "created_at_utc, sent_at_utc FROM v2_alert_outbox ORDER BY created_at_utc DESC LIMIT 12")]
+                out["delivery"] = {
+                    "by_state": by_state, "by_kind": by_kind, "recent": recent,
+                    "sent": by_state.get("SENT", 0), "held": by_state.get("HELD", 0),
+                    "failed": by_state.get("FAILED", 0), "retry": by_state.get("RETRY", 0),
+                    "pending": by_state.get("PENDING", 0), "ambiguous": by_state.get("AMBIGUOUS", 0),
+                }
             con.close()
         except sqlite3.Error as exc:
             out["terminal_error"] = str(exc)

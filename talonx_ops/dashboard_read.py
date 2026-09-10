@@ -851,6 +851,12 @@ class DashboardReadModel:
                 "open_positions": s.get("open_positions"),
                 "exit_unresolved": s.get("exit_unresolved", []),
                 "eod_forced_flatten": s.get("eod_forced_flatten", False),
+                # Task 117 overnight: pre-open intents + durable alert outbox
+                "entry_intents_created_this_tick": s.get("entry_intents_created_this_tick"),
+                "pending_entry_intents": s.get("pending_entry_intents", []),
+                "alert_outbox": s.get("alert_outbox"),
+                "last_delivery": s.get("last_delivery"),
+                "delivery_enabled": s.get("delivery_enabled"),
             }
         except OSError:
             # Task 117 Phase 0 L1: a just-started companion has no status file
