@@ -37,6 +37,7 @@ def _enq(ob, *, symbol, accession, enqueued_at):
 
 
 def _drain(ob, sender, **kw):
+    kw.setdefault("mode", "enabled")
     return asyncio.run(process_pending(ob, sender, **kw))
 
 

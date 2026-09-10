@@ -58,6 +58,7 @@ class SenderResult:
     error: str | None = None
     retry_after_seconds: float | None = None
     permanent: bool = False
+    ambiguous: bool = False   # request left but the outcome is unconfirmable
 
 
 class SenderProtocol(Protocol):
@@ -139,7 +140,16 @@ class TelegramSenderAdapter:
             return SenderResult(ok=True)
         except TelegramSendError as exc:
             msg = str(exc)
-            return SenderResult(ok=False, error=msg, permanent=("non-retryable" in msg))
+            low = msg.lower()
+            if "non-retryable" in low or "invalid" in low or "forbidden" in low or "chat not found" in low:
+                return SenderResult(ok=False, error=msg, permanent=True)
+            # a timeout / 5xx AFTER the request left is unconfirmable -- do NOT
+            # blind-retry (could double-send); mark the row AMBIGUOUS.
+            if "timeout" in low or "timed out" in low or " 5" in msg or "ambig" in low:
+                return SenderResult(ok=False, error=msg, ambiguous=True)
+            return SenderResult(ok=False, error=msg)
+        except TimeoutError as exc:
+            return SenderResult(ok=False, error=f"timeout: {exc!r}", ambiguous=True)
         except Exception as exc:  # noqa: BLE001 - any other transport error is transient
             return SenderResult(ok=False, error=repr(exc))
 
@@ -149,14 +159,21 @@ class TelegramSenderAdapter:
 # ---------------------------------------------------------------------------
 @dataclass
 class DrainResult:
+    mode: str = "enabled"
     attempted: int = 0
-    delivered: int = 0
+    delivered: int = 0        # real transport ack, mode="enabled" only
     retried: int = 0
     failed: int = 0
     expired: int = 0
+    held: int = 0             # left PENDING because delivery is disabled
+    held_reason: str | None = None
+    simulated: int = 0        # would-send count, outbox NOT mutated
+    ambiguous: int = 0
     skipped_not_configured: bool = False
     delivery_ids: list[str] = field(default_factory=list)
     expired_ids: list[str] = field(default_factory=list)
+    simulated_ids: list[str] = field(default_factory=list)
+    ambiguous_ids: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -247,51 +264,94 @@ def _backoff(attempts: int) -> float:
     return min(RETRY_MAX_SECONDS, RETRY_BASE_SECONDS * (2 ** max(0, attempts)))
 
 
+MODE_ENABLED = "enabled"
+MODE_DISABLED = "disabled"
+MODE_SIMULATE = "simulate"
+
+
 async def process_pending(
     outbox: DeliveryOutbox,
     sender: SenderProtocol,
     *,
+    mode: str | None = None,
     route: str | None = None,
     limit: int | None = None,
-    dry_run: bool = False,
+    dry_run: bool = False,                       # back-compat alias for mode="simulate"
     metrics: DeliveryMetrics | None = None,
     now: datetime | None = None,
     enforce_age_cutoff: bool = False,
     max_age_seconds: "dict[str, int] | int | None" = None,
+    event_time_lookup=None,
 ) -> DrainResult:
-    """Drain due PENDING rows to the sender, CRITICAL first. Persist-before-
-    send is already guaranteed by ``enqueue``; here we only transition
-    PENDING -> SENT / retry / FAILED / EXPIRED. Safe to call repeatedly and
-    after a restart (state lives in the outbox).
+    """Process due PENDING rows, CRITICAL first. Persist-before-send is
+    guaranteed by ``enqueue``. Safe to call repeatedly and after a restart.
 
-    D5: pass ``enforce_age_cutoff=True`` (the runner / activation path does) to
-    move rows older than their per-route cutoff to EXPIRED *before* any send --
-    so the first real drain of a historical backlog expires it instead of
-    flooding Telegram. Default off so the pure drain mechanics are unchanged
-    for existing callers.
+    ``mode``:
+      * ``"enabled"``  -- the ONLY mode that can produce ``SENT``. A row is
+        marked SENT only on a real transport ack; a transient failure -> RETRY;
+        permanent -> FAILED; an unconfirmable outcome -> AMBIGUOUS (durable,
+        never blind-retried).
+      * ``"disabled"`` (default when neither ``mode`` nor ``dry_run`` given) --
+        no sender is called and NO row is mutated. Eligible rows stay PENDING
+        and are reported as ``held`` with ``held_reason="delivery_disabled"``.
+      * ``"simulate"`` -- renders the drain PLAN (which rows, in what order) on
+        an isolated basis; the outbox is NOT mutated and nothing is represented
+        as delivered. ``dry_run=True`` maps here.
+
+    ``enforce_age_cutoff`` (D5) is an EXPLICIT, separate step: when passed it
+    calls ``outbox.expire_stale`` first. It is independent of ``mode`` -- but a
+    caller in ``"disabled"`` mode must opt in on purpose (backlog expiry is not
+    a side effect of a disabled drain).
     """
+    if mode is None:
+        mode = MODE_SIMULATE if dry_run else MODE_DISABLED
     now = now or datetime.now(timezone.utc)
-    result = DrainResult()
+    result = DrainResult(mode=mode)
 
     if enforce_age_cutoff:
-        result.expired_ids = outbox.expire_stale(now=now, max_age_seconds=max_age_seconds)
+        result.expired_ids = outbox.expire_stale(
+            now=now, max_age_seconds=max_age_seconds, event_time_lookup=event_time_lookup,
+        )
         result.expired = len(result.expired_ids)
 
-    active = NullSender() if dry_run else sender
-    if not dry_run and not sender.configured:
-        result.skipped_not_configured = True
+    rows = outbox.pending(route=route, now=now, limit=limit)
+
+    if mode == MODE_DISABLED:
+        result.held = len(rows)
+        result.held_reason = "delivery_disabled"
+        for row in rows:
+            outbox._log(row.delivery_id, "HELD", "delivery disabled -- left PENDING")
+        outbox._conn.commit()
         return result
 
-    rows = outbox.pending(route=route, now=now, limit=limit)
+    if mode == MODE_SIMULATE:
+        result.simulated = len(rows)
+        result.simulated_ids = [r.delivery_id for r in rows]
+        return result                            # outbox untouched
+
+    # ---- mode == "enabled" -------------------------------------------------
+    if not sender.configured:
+        result.skipped_not_configured = True
+        result.held = len(rows)
+        result.held_reason = "transport_not_configured"
+        return result
+
     for row in rows:
         result.attempted += 1
-        res = await active.send(row)
+        res = await sender.send(row)
         if res.ok:
             outbox.mark_sent(row.delivery_id, now=now)
             result.delivered += 1
             result.delivery_ids.append(row.delivery_id)
             if metrics is not None:
                 metrics.record_delivered(is_update=(row.disposition == "UPDATE"))
+            continue
+        if res.ambiguous:
+            outbox.mark_ambiguous(row.delivery_id, res.error or "unconfirmable outcome", now=now)
+            result.ambiguous += 1
+            result.ambiguous_ids.append(row.delivery_id)
+            if metrics is not None and hasattr(metrics, "record_failure"):
+                metrics.record_failure()
             continue
         retry_after = res.retry_after_seconds
         if retry_after is None and not res.permanent:

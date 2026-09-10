@@ -168,6 +168,18 @@ def run_close(session_dir: str | Path, *, force: bool = False,
         asserts["v2_ledger_preserved_copy"] = "FAIL"
         findings.append(f"could not copy v2_lane.db evidence: {exc}")
 
+    # D6: lane-scoped candidate/evaluation accounting snapshot (Original /
+    # Experimental / V2 kept separate; off-counter dispositions recorded;
+    # in-flight work listed; the historical 94-gap NOT reported as resolved).
+    try:
+        from talonx_ops.prospective.lane_accounting import build_lane_accounting
+        la = build_lane_accounting(v2_db=V2_DB_PATH)
+        atomic_write(sd / "lane_accounting_eod.json", json.dumps(la, indent=2, default=str))
+        asserts["lane_accounting_snapshot"] = "PASS"
+    except Exception as exc:  # noqa: BLE001
+        asserts["lane_accounting_snapshot"] = "PARTIAL"
+        findings.append(f"lane accounting snapshot incomplete: {exc}")
+
     shutdown: dict[str, Any] = {"performed": False}
     if do_shutdown:
         from talonx_ops.prospective.proc import stop_stack

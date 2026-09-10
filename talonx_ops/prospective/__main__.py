@@ -21,7 +21,18 @@ from talonx_ops.prospective.paths import (atomic_write, ensure_session_dir, now_
                                           resolve_env, session_dir)
 
 
-def _print_morning(pre, verify, session, env):
+_VERDICT_LINE = {
+    "READY": "READY -- stack up. Dashboard: http://localhost:8787  --  no intervention needed.",
+    "STARTING": "STARTING -- mandatory components not all confirmed yet; re-check with "
+                "'python -m talonx_ops.prospective status' shortly.",
+    "NOT_STARTED": "NOT_STARTED -- nothing was spawned (resolve the STOP rows above).",
+    "FAILED_WITH_RESIDUALS": "FAILED_WITH_RESIDUALS -- a mandatory component did not come up; "
+                             "what was spawned has been cleaned up (see start_cleanup.json). "
+                             "Do NOT re-run blindly.",
+}
+
+
+def _print_morning(pre, verify, session, env, *, verdict: str = "READY"):
     tp = now_pair()
     print("=" * 66)
     print(f"  PROSPECTIVE V2 -- MORNING START   {tp['europe_london']} (Europe/London)")
@@ -39,19 +50,17 @@ def _print_morning(pre, verify, session, env):
     print(f"  env (non-secret) : profile={env['TALONX_ACTIVE_STRATEGY_PROFILE']} "
           f"cash={env['TALONX_V2_STARTING_CASH_USD']}")
     print("=" * 66)
-    if pre.overall == "NOT_READY":
-        print("  NO-GO -- session NOT started. Resolve the STOP rows above.")
-    elif pre.overall == "READY_WITH_FINDINGS":
-        print("  STARTED (with findings). Dashboard: http://localhost:8787")
-    else:
-        print("  STARTED. Dashboard: http://localhost:8787  --  no intervention needed.")
+    print(f"  startup verdict  : {verdict}")
+    print(f"  {_VERDICT_LINE.get(verdict, verdict)}")
     print("  Evening:  python -m talonx_ops.prospective close")
     print("=" * 66)
 
 
 def cmd_start(args) -> int:
     from talonx_ops.prospective.preflight import run_preflight
-    from talonx_ops.prospective.proc import start_stack, verify_running
+    from talonx_ops.prospective.proc import (
+        ConcurrentStartError, start_stack, startup_verdict, verify_running,
+    )
 
     sd = ensure_session_dir()
     env = resolve_env()
@@ -61,35 +70,66 @@ def cmd_start(args) -> int:
     atomic_write(sd / "preflight.md", pre.to_markdown())
 
     if pre.overall == "NOT_READY" and not args.force:
-        _print_morning(pre, None, sd, env)
+        _print_morning(pre, None, sd, env, verdict="NOT_STARTED")
         return 2
 
-    info = start_stack(sd, env=env, tick_seconds=args.tick_seconds,
-                       heartbeat_seconds=args.heartbeat_seconds,
-                       live_lookback_days=args.live_lookback_days,
-                       checkpoint_every_s=args.every,
-                       pricing_mode=args.pricing_mode,
-                       execution_scope=args.execution_scope,
-                       deliver=args.deliver, transport=args.transport)
-    # wait for the companion's first heartbeat
-    deadline = time.monotonic() + 90
+    try:
+        info = start_stack(sd, env=env, tick_seconds=args.tick_seconds,
+                           heartbeat_seconds=args.heartbeat_seconds,
+                           live_lookback_days=args.live_lookback_days,
+                           checkpoint_every_s=args.every,
+                           pricing_mode=args.pricing_mode,
+                           execution_scope=args.execution_scope,
+                           deliver=args.deliver, transport=args.transport,
+                           allow_when_running=getattr(args, "force", False))
+    except ConcurrentStartError as exc:
+        print("=" * 66)
+        print("  PROSPECTIVE V2 -- START REFUSED (a stack is already running)")
+        print(f"  {exc}")
+        print("  Use 'python -m talonx_ops.prospective close' first, or --force to override.")
+        print("=" * 66)
+        atomic_write(sd / "start_verify.json", json.dumps(
+            {"verdict": "REFUSED_ALREADY_RUNNING", "detail": str(exc)}, indent=2))
+        return 3
+
+    # D4: bounded readiness wait -> a FIRST-CLASS verdict, from the actual
+    # process/heartbeat state (not a preflight snapshot that races the port).
+    GRACE_S = 120
+    deadline = time.monotonic() + GRACE_S
+    heartbeat_fresh = False
     while time.monotonic() < deadline:
         try:
             s = json.loads(Path(env["TALONX_V2_STATUS_PATH"]).read_text())
             age = (datetime.now(timezone.utc) - datetime.fromisoformat(s["heartbeat_utc"])).total_seconds()
             if age < 180 and s.get("strategy_version"):
+                heartbeat_fresh = True
                 break
         except Exception:  # noqa: BLE001
             pass
         time.sleep(3)
 
+    within_grace = time.monotonic() < deadline
     post = run_preflight(expected_sha=args.expected_sha, require_stack_up=True)
     atomic_write(sd / "preflight_poststart.json", json.dumps(post.to_dict(), indent=2, default=str))
     verify = verify_running(sd)
-    atomic_write(sd / "start_verify.json", json.dumps({"procs": info, "verify": verify,
-                                                       "poststart_overall": post.overall}, indent=2, default=str))
-    _print_morning(post, verify, sd, env)
-    return 0 if post.overall != "NOT_READY" else 2
+    verdict = startup_verdict(info, verify, heartbeat_fresh=heartbeat_fresh,
+                              within_grace=within_grace)
+
+    if verdict == "FAILED_WITH_RESIDUALS":
+        # ownership-safe cleanup of what we just spawned
+        try:
+            from talonx_ops.prospective.proc import stop_stack
+            cleanup = stop_stack(sd)
+        except Exception as exc:  # noqa: BLE001
+            cleanup = {"error": repr(exc)}
+        atomic_write(sd / "start_cleanup.json", json.dumps(cleanup, indent=2, default=str))
+
+    atomic_write(sd / "start_verify.json", json.dumps(
+        {"procs": info, "verify": verify, "poststart_overall": post.overall,
+         "verdict": verdict, "heartbeat_fresh": heartbeat_fresh}, indent=2, default=str))
+    _print_morning(post, verify, sd, env, verdict=verdict)
+    return {"READY": 0, "STARTING": 0, "NOT_STARTED": 2,
+            "FAILED_WITH_RESIDUALS": 4}.get(verdict, 2)
 
 
 def cmd_close(args) -> int:

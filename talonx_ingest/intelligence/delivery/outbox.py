@@ -42,6 +42,8 @@ STATE_FAILED = "FAILED"
 STATE_SUPPRESSED = "SUPPRESSED"
 STATE_EXPIRED = "EXPIRED"        # D5: a PENDING row older than its route cutoff --
                                 # terminal, never deleted, never sent
+STATE_AMBIGUOUS = "AMBIGUOUS"    # a send whose outcome could not be confirmed --
+                                # durable, NOT auto-retried, needs a human decision
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_meta (
@@ -360,6 +362,21 @@ class DeliveryOutbox:
         self._conn.commit()
         return STATE_PENDING
 
+    def mark_ambiguous(self, delivery_id: str, detail: str, *, now: datetime | None = None) -> str:
+        """A send whose outcome the transport could not confirm (e.g. a timeout
+        AFTER the request left, a 5xx with an unknown body). The row goes to a
+        durable AMBIGUOUS state: it is NOT auto-retried (a blind retry could
+        double-send) and NOT marked SENT. A human resolves it."""
+        now = now or datetime.now(timezone.utc)
+        self._conn.execute(
+            "UPDATE intelligence_delivery SET state=?, last_error=?, next_retry_at_utc=NULL, "
+            "updated_at_utc=? WHERE delivery_id=? AND state=?",
+            (STATE_AMBIGUOUS, detail[:500], _iso(now), delivery_id, STATE_PENDING),
+        )
+        self._log(delivery_id, "AMBIGUOUS", detail[:200])
+        self._conn.commit()
+        return STATE_AMBIGUOUS
+
     # ------------------------------------------------------------------
     def pending(
         self, *, route: str | None = None, now: datetime | None = None, limit: int | None = None
@@ -387,6 +404,7 @@ class DeliveryOutbox:
     def expire_stale(
         self, *, now: datetime | None = None,
         max_age_seconds: "dict[str, int] | int | None" = None,
+        event_time_lookup=None,
     ) -> list[str]:
         """Move PENDING rows older than their per-route cutoff to EXPIRED.
 
@@ -394,6 +412,11 @@ class DeliveryOutbox:
         a delete. Idempotent. Returns the delivery_ids expired. ``max_age_seconds``
         is a ``{route: seconds}`` map (missing route -> default) or a single int
         for all routes; ``None`` uses ``config.CARD_MAX_AGE_SECONDS``.
+
+        Freshness is measured from the **older** of (the public event time, if
+        ``event_time_lookup(event_id)`` returns one) and the enqueue time -- so
+        an old filing enqueued today does NOT count as fresh. The transition
+        reason records which basis triggered it.
         """
         from datetime import timedelta
 
@@ -413,26 +436,34 @@ class DeliveryOutbox:
 
         expired: list[str] = []
         rows = self._conn.execute(
-            "SELECT delivery_id, route, enqueued_at_utc FROM intelligence_delivery "
+            "SELECT delivery_id, route, event_id, enqueued_at_utc FROM intelligence_delivery "
             "WHERE state = ?", (STATE_PENDING,),
         ).fetchall()
         for r in rows:
             enq = _dt(r["enqueued_at_utc"])
-            if enq is None:
+            evt = None
+            if event_time_lookup is not None:
+                try:
+                    evt = event_time_lookup(r["event_id"])
+                except Exception:  # noqa: BLE001
+                    evt = None
+            candidates = [t for t in (enq, evt) if t is not None]
+            if not candidates:
                 continue
+            basis = min(candidates)
+            which = "event_time" if (evt is not None and basis == evt) else "enqueue_time"
             cutoff_s = route_max.get(r["route"], default_max)
-            if now - enq <= timedelta(seconds=cutoff_s):
+            if now - basis <= timedelta(seconds=cutoff_s):
                 continue
-            age_h = (now - enq).total_seconds() / 3600.0
+            age_h = (now - basis).total_seconds() / 3600.0
+            reason = (f"stale_card: {age_h:.1f}h old by {which} "
+                      f"> {cutoff_s / 3600:.0f}h {r['route']} cutoff")
             self._conn.execute(
                 "UPDATE intelligence_delivery SET state=?, next_retry_at_utc=NULL, "
                 "updated_at_utc=?, suppress_reason=? WHERE delivery_id=?",
-                (STATE_EXPIRED, _iso(now),
-                 f"stale_card: {age_h:.1f}h old > {cutoff_s / 3600:.0f}h {r['route']} cutoff",
-                 r["delivery_id"]),
+                (STATE_EXPIRED, _iso(now), reason, r["delivery_id"]),
             )
-            self._log(r["delivery_id"], "EXPIRED",
-                      f"{age_h:.1f}h old (> {cutoff_s / 3600:.0f}h {r['route']} cutoff)")
+            self._log(r["delivery_id"], "EXPIRED", reason)
             expired.append(r["delivery_id"])
         if expired:
             self._conn.commit()

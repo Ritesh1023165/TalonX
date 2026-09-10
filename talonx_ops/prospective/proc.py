@@ -63,17 +63,91 @@ def _alive(pid: int | None) -> bool:
         return False
 
 
+class ConcurrentStartError(RuntimeError):
+    """A live prospective stack (supervisor or V2 companion) already owns the
+    V2 lane -- starting again would create a second ledger writer."""
+
+
+def _live_prior_stack() -> list[dict]:
+    """Any RUNNING process that would collide with a fresh start: a
+    ``talonx_v2.run --mode live`` companion (a second ``v2_lane.db`` writer),
+    a ``talonx_ops.supervisor run``, or a ``prospective session-loop``.
+    Best-effort; empty if psutil is unavailable."""
+    hits: list[dict] = []
+    try:
+        import psutil
+    except Exception:  # noqa: BLE001
+        return hits
+    markers = (
+        ("talonx_v2.run", "--mode"),        # the live V2 companion (ledger writer)
+        ("talonx_ops.supervisor", "run"),
+        ("talonx_ops.prospective", "session-loop"),
+    )
+    self_pid = os.getpid()
+    for p in psutil.process_iter(["pid", "cmdline", "create_time"]):
+        if p.pid == self_pid:
+            continue
+        try:
+            cl = " ".join(p.info.get("cmdline") or [])
+        except Exception:  # noqa: BLE001
+            continue
+        if not cl or "pytest" in cl:
+            continue
+        for a, b in markers:
+            if a in cl and b in cl:
+                hits.append({"pid": p.pid, "cmd": cl[:160],
+                             "create_time": p.info.get("create_time")})
+                break
+    return hits
+
+
+def assert_no_live_prior_stack() -> None:
+    live = _live_prior_stack()
+    if live:
+        raise ConcurrentStartError(
+            "refusing to start: a prospective stack is already running -- "
+            + "; ".join(f"pid {h['pid']} ({h['cmd']})" for h in live)
+        )
+
+
+def startup_verdict(info: dict[str, Any], verify: dict[str, Any], *,
+                    heartbeat_fresh: bool, within_grace: bool) -> str:
+    """One of NOT_STARTED / STARTING / READY / FAILED_WITH_RESIDUALS.
+
+    A missing MANDATORY component (supervisor OR companion) is never a
+    cosmetic warning -- it makes the verdict STARTING (still in grace) or
+    FAILED_WITH_RESIDUALS (grace elapsed and something is left running).
+    """
+    sup = bool(verify.get("supervisor_alive"))
+    comp = bool(verify.get("v2_companion_alive"))
+    residual = bool(_live_prior_stack())
+    if sup and comp and heartbeat_fresh:
+        return "READY"
+    if not sup and not comp:
+        return "FAILED_WITH_RESIDUALS" if residual else "NOT_STARTED"
+    # partial: some mandatory component up, some not
+    if within_grace:
+        return "STARTING"
+    return "FAILED_WITH_RESIDUALS"
+
+
 def start_stack(session_dir: str | Path, *, env: dict[str, str],
                 tick_seconds: int = 300, heartbeat_seconds: int = 30,
                 live_lookback_days: int = 45, with_dashboard: bool = True,
                 with_checkpoint_daemon: bool = True,
                 checkpoint_every_s: int = 1800,
                 pricing_mode: str = "csv", execution_scope: str = "none",
-                deliver: bool = False, transport: str = "dryrun") -> dict[str, Any]:
+                deliver: bool = False, transport: str = "dryrun",
+                allow_when_running: bool = False) -> dict[str, Any]:
     sd = Path(session_dir)
     sd.mkdir(parents=True, exist_ok=True)
     logs = sd / "logs"
     py = sys.executable
+
+    # D4: a repeated / concurrent ``prospective start`` must not spawn a second
+    # supervisor + companion (a second v2_lane.db writer).
+    if not allow_when_running:
+        assert_no_live_prior_stack()
 
     sup_argv = [py, "-m", "talonx_ops.supervisor", "run"]
     if not with_dashboard:

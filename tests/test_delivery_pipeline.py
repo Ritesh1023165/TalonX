@@ -34,6 +34,7 @@ from _delivery_helpers import make_card, mk_comparison, mk_event
 
 
 def _drain(ob, sender, **kw):
+    kw.setdefault("mode", "enabled")   # these tests exercise the enabled path
     return asyncio.run(process_pending(ob, sender, **kw))
 
 
@@ -128,15 +129,38 @@ def test_restart_between_enqueue_and_send_loses_nothing(ledger_path):
     ob2.close()
 
 
-def test_dry_run_does_not_send_externally(ledger_path):
+def test_simulate_never_marks_sent_or_touches_the_transport(ledger_path):
+    """Corrected semantics (Task 117): simulation is isolated -- it renders the
+    drain PLAN, never calls the real transport, and NEVER marks a row SENT."""
     ob = DeliveryOutbox(ledger_path)
     card, _ = make_card()
     did = delivery_id(card.alert_id)
     enqueue_card(card, outbox=ob)
     real = RecordingSender()
-    res = _drain(ob, real, dry_run=True)
-    assert res.delivered == 1                 # lifecycle exercised
-    assert real.sent == []                    # ...but the real sender was untouched
+    res = _drain(ob, real, mode="simulate")
+    assert res.delivered == 0 and res.simulated == 1 and did in res.simulated_ids
+    assert real.sent == []                    # the real sender was untouched
+    assert ob.get(did).state == STATE_PENDING  # NOT SENT -- still deliverable
+    # dry_run=True is the back-compat alias for mode="simulate"
+    res2 = asyncio.run(process_pending(ob, real, dry_run=True))
+    assert res2.mode == "simulate" and ob.get(did).state == STATE_PENDING
+    ob.close()
+
+
+def test_disabled_delivery_holds_fresh_rows_pending_with_a_reason(ledger_path):
+    ob = DeliveryOutbox(ledger_path)
+    card, _ = make_card()
+    did = delivery_id(card.alert_id)
+    enqueue_card(card, outbox=ob)
+    real = RecordingSender()
+    res = asyncio.run(process_pending(ob, real, mode="disabled"))
+    assert res.held == 1 and res.held_reason == "delivery_disabled"
+    assert res.delivered == 0 and real.sent == []
+    assert ob.get(did).state == STATE_PENDING          # still deliverable
+    kinds = [l["kind"] for l in ob.logs(did)]
+    assert "HELD" in kinds and "SENT" not in kinds
+    # ...and enabling later delivers the SAME row (nothing lost)
+    assert _drain(ob, real, mode="enabled").delivered == 1
     assert ob.get(did).state == STATE_SENT
     ob.close()
 

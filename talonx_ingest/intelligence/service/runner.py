@@ -43,6 +43,17 @@ from talonx_watchlist.store import TickerWatchlistStore
 logger = logging.getLogger("talonx_ingest.intelligence.service.runner")
 
 
+class _InertSender:
+    """Placeholder passed to ``process_pending`` in ``mode="disabled"`` -- it is
+    never called (disabled mode does not invoke a sender), it only satisfies the
+    signature."""
+
+    configured = False
+
+    async def send(self, row):  # pragma: no cover - never reached in disabled mode
+        raise RuntimeError("inert sender must not be called")
+
+
 class IntelligenceService:
     def __init__(self, config: ServiceConfig | None = None):
         self.config = config or ServiceConfig.from_env()
@@ -156,6 +167,76 @@ class IntelligenceService:
         )
         return res
 
+    async def deliver_cycle(self, *, now: datetime | None = None) -> dict | None:
+        """One bounded intelligence-card delivery pass, inside the poll loop.
+
+        Uses the EXISTING official transport (``talonx_dispatch.telegram_client``
+        via ``TelegramSenderAdapter``) -- no second poller, no parallel loop.
+
+        * ``deliver_intelligence_cards`` off (default) -> ``mode="disabled"``:
+          eligible rows stay PENDING with ``held_reason``, nothing sent/mutated.
+        * on + ``dry_run_delivery`` False + transport configured -> ``mode="enabled"``
+          with the D5 age cutoff. IMMEDIATE first (route order), then DIGEST, so
+          a DIGEST card is not sent as if it were IMMEDIATE.
+        * a hard ``asyncio.wait_for`` timeout means a slow/backing-off transport
+          never blocks source polling.
+        """
+        if self.stores is None:
+            return None
+        from talonx_ingest.intelligence.delivery.pipeline import (
+            TelegramSenderAdapter, process_pending,
+        )
+
+        enabled = (
+            bool(self.config.deliver_intelligence_cards)
+            and not self.config.dry_run_delivery
+        )
+        mode = "enabled" if enabled else "disabled"
+        sender = TelegramSenderAdapter() if enabled else _InertSender()
+
+        def _event_time(event_id: str):
+            try:
+                ev = self.stores.events.get_event(event_id)
+                return getattr(ev, "accepted_at_utc", None) if ev is not None else None
+            except Exception:  # noqa: BLE001
+                return None
+
+        summary: dict = {"mode": mode}
+        try:
+            for route in ("IMMEDIATE", "DIGEST"):
+                res = await asyncio.wait_for(
+                    process_pending(
+                        self.stores.outbox, sender, mode=mode, route=route,
+                        limit=self.config.deliver_cards_per_cycle,
+                        enforce_age_cutoff=(
+                            enabled and self.config.deliver_cards_enforce_age_cutoff
+                        ),
+                        event_time_lookup=_event_time,
+                        now=now,
+                    ),
+                    timeout=self.config.deliver_cards_timeout_seconds,
+                )
+                summary[route] = {
+                    "delivered": res.delivered, "held": res.held,
+                    "simulated": res.simulated, "retried": res.retried,
+                    "failed": res.failed, "ambiguous": res.ambiguous,
+                    "expired": res.expired,
+                    "held_reason": res.held_reason,
+                    "skipped_not_configured": res.skipped_not_configured,
+                }
+        except asyncio.TimeoutError:
+            logger.warning(
+                "intelligence-card delivery drain timed out (%ss); poll loop continues",
+                self.config.deliver_cards_timeout_seconds,
+            )
+            summary["timed_out"] = True
+        if any(
+            isinstance(v, dict) and (v.get("delivered") or v.get("failed") or v.get("ambiguous") or v.get("expired"))
+            for v in summary.values()
+        ):
+            logger.info("intelligence-card delivery: %s", summary)
+        return summary
+
     async def drain_retries(self, *, now: datetime | None = None, limit: int = 50) -> int:
         assert self.stores is not None and self.enrichment is not None
         now = now or datetime.now(timezone.utc)
@@ -210,6 +291,7 @@ class IntelligenceService:
             now = datetime.now(timezone.utc)
             res = await self.poll_cycle(now=now)
             await self.drain_retries(now=now)
+            delivery = await self.deliver_cycle(now=now)
 
             summary = {
                 "at_utc": now.isoformat(),
@@ -219,6 +301,7 @@ class IntelligenceService:
                 "new_events": len(res.new_event_ids),
                 "new_form4": res.new_form4_filings,
                 "freshness": res.submissions_freshness,
+                "delivery": delivery,
                 "errors": res.errors[:10],
             }
             cycle_summaries.append(summary)

@@ -1,0 +1,13 @@
+file,lines_or_rows,sha256,source
+acceptance_matrix.md,110,49d400b50fb700455f22077f8a53620be7e86a8261bcf9c771faccacafd09b2e,this task
+backlog_rehearsal.md,74,fadb9b473bf8fffbeaf95bf264be362a8c26825f4a6cd00e0888d377ba6a0031,results/task117_delivery_timestamp_completion_evidence/backlog_rehearsal.json (isolated copy of ingestion_ledger.db.postclose)
+dashboard_acceptance.md,56,77f42b8073a0662dafa5cdf89a83638fd5c261d19556ba3b18eb98985892028e,talonx_ops/dashboard_read.py + talonx_ingest/intelligence/delivery/outbox.py + runner integration tests
+delivery_integration.md,69,b9eb8245a5b3ad839c72dda455934749cabb803fbe4593c21b3b2c1fe90c8990,"talonx_ingest/intelligence/{delivery,service}/* + tests/test_task117_delivery_runner_integration.py"
+deployment_candidate.md,72,27856c40846620088ae19ddacc04c20357ce2b20e682434d057b8f4704d6213d,this change set
+insiderstore_before_after.md,46,5bceea975024b1f604469aa25c2c72e5a1ef673ceeab53bef92bbc23ead66a95,"~/.talonx/ingestion_ledger.db (read-only, md5 2ae2105c...); timestamp_correction_manifest.csv"
+remaining_gaps.md,73,cdba45210410855e46185b6513340c4b4baea8c9f2211e124da1c20053483a27,this task
+rollback.md,45,ff5622d29296ed576385d5aa55ed10d17c6445630d5b84a97a96803058260c31,this change set
+startup_accounting_acceptance.md,110,22619b2d336c661a18ef805aa249fc2e44d2ddc2d8aaeb2bb90396ca0efc29f9,"talonx_ops/prospective/{proc,__main__,lane_accounting,close}.py + Redis metrics:2026-09-10:quant:* (retained) + tests"
+timestamp_correction_manifest.csv,23,56e8391293c89d37f04a450348647eb004f29fffb3631b44909c61e3c5a4d904,same as timestamp_source_contract.md + results/task117_day3_eod_20260910T202656Z/db/ingestion_ledger.db.postclose
+timestamp_source_contract.md,76,3579d720a43b70eccc8e9301814f4f3b7759ca2494e277ffd7b119b8d7f904ad,"results/task117_phase0_source_coverage_audit_20260909T205439Z/primary_sources/{form4_txt,uber}/*.txt + scripts/{aapl,uber}_sub.json"
+evidence_manifest.csv,13,(self),self

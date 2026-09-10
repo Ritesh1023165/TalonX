@@ -92,6 +92,16 @@ class ServiceConfig:
     # 96B qualification never sends externally unless this is explicitly
     # flipped AND Telegram is configured (Phase 13).
     dry_run_delivery: bool = True
+    # Task 117: the intelligence-card delivery drain wired into the poll loop.
+    # ``deliver_intelligence_cards`` is the EXPLICIT enablement -- default off:
+    # the drain still runs each cycle but in "disabled" mode (eligible rows stay
+    # PENDING with a reason, nothing is sent, nothing is mutated). Set it True
+    # AND ``dry_run_delivery=False`` AND have Telegram configured to actually
+    # deliver. Per-cycle cap + a hard timeout keep it off the poll path.
+    deliver_intelligence_cards: bool = False
+    deliver_cards_per_cycle: int = 20
+    deliver_cards_enforce_age_cutoff: bool = True
+    deliver_cards_timeout_seconds: float = 20.0
 
     # -- paths ----------------------------------------------------------
     ledger_path: str | None = None
@@ -155,6 +165,14 @@ class ServiceConfig:
             live_priority=_env_bool("TALONX_INTEL_LIVE_PRIORITY", True),
             enable_xbrl=_env_bool("TALONX_INTEL_ENABLE_XBRL", True),
             dry_run_delivery=_env_bool("TALONX_INTEL_DRY_RUN_DELIVERY", True),
+            deliver_intelligence_cards=_env_bool("TALONX_INTEL_DELIVER_CARDS", False),
+            deliver_cards_per_cycle=_env_int("TALONX_INTEL_DELIVER_PER_CYCLE", 20),
+            deliver_cards_enforce_age_cutoff=_env_bool(
+                "TALONX_INTEL_DELIVER_AGE_CUTOFF", True
+            ),
+            deliver_cards_timeout_seconds=_env_float(
+                "TALONX_INTEL_DELIVER_TIMEOUT_SECONDS", 20.0
+            ),
             ledger_path=os.environ.get("TALONX_LEDGER_PATH") or None,
             state_dir=Path(
                 os.environ.get(

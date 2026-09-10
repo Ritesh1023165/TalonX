@@ -22,19 +22,33 @@ from zoneinfo import ZoneInfo
 
 from talonx_ingest.intelligence.domain import DataQualityFlag, ExhibitRef
 
-# SEC EDGAR renders every acceptance wall-clock in US Eastern (the 5:30 PM ET
-# cutoff that rolls a filing to the next business day is an Eastern rule).
-# The ``data.sec.gov/submissions`` feed nonetheless stamps ``acceptanceDateTime``
-# with a bare ``...Z`` -- a UTC *marker* on an Eastern *wall-clock*. Treating
-# that ``Z`` literally puts every acceptance instant 4h (EDT) / 5h (EST) in the
-# past, which mis-buckets after-close filings as RTH and biases as-of replay
-# causal cutoffs. When True, a bare ``Z`` / ``+00:00`` / naive value is
-# localized to America/New_York and converted to true UTC (explicit non-zero
-# offsets, e.g. from ``efts.sec.gov``, are always trusted as-is). Flip to False
-# only to reproduce the historical (pre-fix) ingestion exactly.
-EDGAR_ACCEPTANCE_ASSUMES_EASTERN = True
-_EDGAR_ET = ZoneInfo("America/New_York")
+# --------------------------------------------------------------------------- #
+# Acceptance-timestamp source contract  (see timestamp_source_contract.md)
+#
+# VERIFIED by a 10-accession cross-reference of the raw Form-4 SGML header
+# ``<ACCEPTANCE-DATETIME>YYYYMMDDHHMMSS`` (US/Eastern, naive) against the
+# ``data.sec.gov/submissions`` JSON ``acceptanceDateTime`` (``...000Z``) for the
+# same filings, all in EDT:
+#
+#   SGML 2026-08-27T18:30:30  ==  JSON 2026-08-27T22:30:30.000Z   (18:30 EDT = 22:30 UTC)
+#   ... 10/10 show JSON = SGML-Eastern + 4h  ==>  the submissions JSON
+#   ``acceptanceDateTime`` is a GENUINE UTC instant. The ``Z`` is correct.
+#
+# So a ``Z`` / ``+00:00`` value FROM THE SUBMISSIONS FEED means UTC -- it is NOT
+# reinterpreted. Only the raw SGML ``<ACCEPTANCE-DATETIME>`` field (which this
+# pipeline does not currently parse) is Eastern-naive; a caller that parses it
+# passes ``source="sgml_header"`` to get Eastern localization.
+# --------------------------------------------------------------------------- #
+_ET = ZoneInfo("America/New_York")
 _EXPLICIT_OFFSET_RE = re.compile(r"[+-]\d{2}:?\d{2}$")
+
+#: which raw source field a value came from -> how to read a value that carries
+#: no usable UTC offset. "submissions" (the wired path) == UTC.
+ACCEPTANCE_SOURCE_TZ: dict[str, str] = {
+    "submissions": "UTC",        # data.sec.gov/submissions acceptanceDateTime -- VERIFIED UTC
+    "sgml_header": "US/Eastern",  # Archives *.hdr.sgml <ACCEPTANCE-DATETIME> -- VERIFIED Eastern-naive
+    "fulltext": "UTC",           # efts.sec.gov -- carries an explicit offset anyway
+}
 from talonx_ingest.intelligence.identity import AccessionFormatError, normalize_accession
 from talonx_ingest.intelligence.taxonomy import is_amendment, normalize_items
 
@@ -61,32 +75,42 @@ class NormalizedFiling:
 
 
 def parse_acceptance_datetime_ex(
-    raw: str | None,
+    raw: str | None, *, source: str = "submissions",
 ) -> tuple[datetime | None, tuple[str, ...]]:
-    """Parse EDGAR ``acceptanceDateTime`` to a tz-aware **true-UTC** datetime,
+    """Parse a SEC acceptance timestamp to a tz-aware **true-UTC** datetime,
     returning ``(dt, flags)``.
 
     Seen formats: ``2026-07-29T16:04:53.000Z``, ``2026-07-29T16:04:53Z``,
-    ``2026-07-29T16:04:53-04:00``, ``2026-07-29T16:04:53+00:00`` and (rarely)
-    ``2026-07-29 16:04:53``.
+    ``2026-07-29T16:04:53-04:00``, ``2026-07-29T16:04:53+00:00``,
+    ``2026-07-29 16:04:53`` and the raw SGML ``20260729160453``.
+
+    Rules (see ``timestamp_source_contract.md``):
 
     - An explicit **non-zero** UTC offset (``-04:00`` / ``+05:30`` ...) is
       trusted verbatim and converted to UTC. No flag.
-    - A bare ``Z``, a literal ``+00:00``, or no offset at all is the SEC
-      ``submissions`` convention: an **Eastern** wall-clock wearing a UTC
-      marker. When ``EDGAR_ACCEPTANCE_ASSUMES_EASTERN`` it is localized to
-      ``America/New_York`` (DST-correct) and converted to true UTC, and
-      ``acceptance_tz_assumed_eastern`` is flagged. When the switch is off the
-      old behaviour (assume the marker is real UTC) is kept.
+    - A bare ``Z`` / ``+00:00`` marker is read per the ``source`` contract:
+      ``"submissions"`` (the wired path) -> **genuine UTC** (VERIFIED: the
+      submissions JSON already converts the SGML-Eastern wall-clock to UTC).
+    - A **naive** value (no offset at all) is read per the ``source``
+      contract: ``"submissions"``/``"fulltext"`` -> UTC (+ an
+      ``acceptance_offset_absent`` flag, since naive is technically
+      ambiguous); ``"sgml_header"`` -> **US/Eastern**, localized DST-correct
+      (+ ``acceptance_tz_source_sgml_eastern``). A non-existent spring-forward
+      wall-clock is pushed forward one hour; an ambiguous fall-back one is
+      taken as the earlier (pre-transition) instant -- both flagged
+      ``acceptance_dst_wallclock_adjusted``.
 
-    Returns ``(None, ())`` for missing/empty/unparseable input -- the caller
-    then flags ``missing_acceptance_timestamp``.
+    Returns ``(None, ())`` for missing/empty/unparseable input.
     """
     if not raw:
         return None, ()
     s = str(raw).strip()
     if not s:
         return None, ()
+
+    # raw SGML compact form: 14 digits, no separators
+    if len(s) == 14 and s.isdigit():
+        s = f"{s[0:4]}-{s[4:6]}-{s[6:8]}T{s[8:10]}:{s[10:12]}:{s[12:14]}"
     if "T" not in s and " " in s:
         s = s.replace(" ", "T", 1)
 
@@ -99,27 +123,46 @@ def parse_acceptance_datetime_ex(
     except ValueError:
         return None, ()
 
-    if explicit_offset:
-        # a real offset (efts.sec.gov / RSS) -- trust it
+    if explicit_offset or dt.tzinfo is not None:
+        # a real offset, or a bare Z / +00:00 marker -> that IS the instant.
+        # (submissions JSON is VERIFIED-UTC; efts.sec.gov carries a real offset.)
         return dt.astimezone(timezone.utc), ()
 
-    # bare Z / +00:00 / naive -> EDGAR Eastern wall-clock convention
-    if EDGAR_ACCEPTANCE_ASSUMES_EASTERN:
-        naive = dt.replace(tzinfo=None)
-        return (
-            naive.replace(tzinfo=_EDGAR_ET).astimezone(timezone.utc),
-            (DataQualityFlag.ACCEPTANCE_TZ_ASSUMED_EASTERN.value,),
-        )
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc), ()
+    # ---- naive value: read per the source contract ----------------------
+    contract = ACCEPTANCE_SOURCE_TZ.get(source, "UTC")
+    if contract == "US/Eastern":
+        from datetime import timedelta
+
+        adjusted = False
+        local0 = dt.replace(tzinfo=_ET, fold=0)
+        local1 = dt.replace(tzinfo=_ET, fold=1)
+        roundtrips = local0.astimezone(timezone.utc).astimezone(_ET).replace(tzinfo=None) == dt
+        if not roundtrips:
+            # spring-forward GAP: the wall-clock does not exist -> +1h.
+            local = (dt + timedelta(hours=1)).replace(tzinfo=_ET)
+            adjusted = True
+        elif local0.utcoffset() != local1.utcoffset():
+            # fall-back OVERLAP: the wall-clock occurs twice -> earlier (fold=0).
+            local = local0
+        else:
+            local = local0
+        flags = (DataQualityFlag.ACCEPTANCE_TZ_SOURCE_SGML_EASTERN.value,)
+        if adjusted:
+            flags += (DataQualityFlag.ACCEPTANCE_DST_WALLCLOCK_ADJUSTED.value,)
+        return local.astimezone(timezone.utc), flags
+
+    # default: naive == UTC, but note the missing offset
+    return (
+        dt.replace(tzinfo=timezone.utc),
+        (DataQualityFlag.ACCEPTANCE_OFFSET_ABSENT.value,),
+    )
 
 
-def parse_acceptance_datetime(raw: str | None) -> datetime | None:
+def parse_acceptance_datetime(raw: str | None, *, source: str = "submissions") -> datetime | None:
     """Back-compat thin wrapper over :func:`parse_acceptance_datetime_ex`
     that drops the data-quality flags. New callers that persist provenance
-    should use the ``_ex`` form so the Eastern-assumption is auditable."""
-    return parse_acceptance_datetime_ex(raw)[0]
+    should use the ``_ex`` form."""
+    return parse_acceptance_datetime_ex(raw, source=source)[0]
 
 
 def _parse_date(raw: str | None) -> date | None:
@@ -229,7 +272,7 @@ def iter_normalized_filings(
 
         flags: list[str] = []
         acc_dt, acc_flags = parse_acceptance_datetime_ex(
-            acc_dt_list[i] if i < len(acc_dt_list) else None
+            acc_dt_list[i] if i < len(acc_dt_list) else None, source="submissions"
         )
         flags.extend(acc_flags)
         if acc_dt is None:

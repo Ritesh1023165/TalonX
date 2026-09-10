@@ -126,11 +126,17 @@ class DataQualityFlag(str, Enum):
     AMBIGUOUS_SESSION_BUCKET = "ambiguous_session_bucket"
     SESSION_CALENDAR_UNAVAILABLE = "session_calendar_unavailable"
     MISSING_REPORT_PERIOD_END = "missing_report_period_end"
-    # The raw EDGAR acceptanceDateTime carried no usable UTC offset (a bare
-    # ``Z``/``+00:00`` marker or none at all). SEC EDGAR renders acceptance
-    # wall-clock in US Eastern, so it was localized to America/New_York and
-    # converted to true UTC. See ``edgar_normalize.parse_acceptance_datetime``.
-    ACCEPTANCE_TZ_ASSUMED_EASTERN = "acceptance_tz_assumed_eastern"
+    # A parsed acceptance value carried NO usable UTC offset at all (naive).
+    # For the wired ``submissions`` source contract it is read as UTC, but the
+    # absence is recorded. See ``timestamp_source_contract.md``.
+    ACCEPTANCE_OFFSET_ABSENT = "acceptance_offset_absent"
+    # A naive acceptance value came from the raw SGML ``<ACCEPTANCE-DATETIME>``
+    # header, whose contract is US/Eastern (VERIFIED). It was localized to
+    # America/New_York and converted to UTC.
+    ACCEPTANCE_TZ_SOURCE_SGML_EASTERN = "acceptance_tz_source_sgml_eastern"
+    # The naive Eastern wall-clock fell in a DST gap/overlap and was nudged to
+    # a real instant (spring-forward -> +1h; fall-back -> earlier instant).
+    ACCEPTANCE_DST_WALLCLOCK_ADJUSTED = "acceptance_dst_wallclock_adjusted"
 
 
 # Keys that must never appear on a card -- a predictive/directional claim.

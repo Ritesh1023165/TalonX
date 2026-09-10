@@ -42,12 +42,10 @@ def _submissions() -> dict:
                     "0000320193-26-000050",
                     "0000320193-26-000051",
                 ],
-                # SEC stamps acceptanceDateTime with a bare Z on an EASTERN
-                # wall-clock -- the value below IS the ET wall-clock.
                 "acceptanceDateTime": [
-                    "2026-07-31T16:05:12.000Z",  # 16:05 ET -> AMC  (-> 20:05:12 UTC)
-                    "2026-07-31T07:00:00.000Z",  # 07:00 ET -> BMO
-                    "2026-06-15T13:45:00.000Z",  # 13:45 ET -> RTH
+                    "2026-07-31T20:05:12.000Z",  # 16:05 ET -> AMC
+                    "2026-07-31T11:00:00.000Z",  # 07:00 ET -> BMO
+                    "2026-06-15T17:45:00.000Z",  # 13:45 ET -> RTH
                     "2026-06-13T14:00:00.000Z",  # Saturday -> NON_TRADING_DAY
                 ],
                 "filingDate": ["2026-07-31", "2026-07-31", "2026-06-15", "2026-06-13"],
