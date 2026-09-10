@@ -68,10 +68,15 @@ class V2Service:
         # issuers whose symbol is in this allowlist are considered for a cluster /
         # entry -- enforced in code, not merely described.  The InsiderStore can
         # carry a broad historical backfill; this pins the live execution universe
-        # to the approved, resolved, SEC-covered set.  None = unrestricted (the
-        # prior behaviour; only for offline replay / tests).
-        self.execution_allowlist = (frozenset(s.upper() for s in execution_allowlist)
-                                    if execution_allowlist else None)
+        # to the approved, resolved, SEC-covered set.
+        #   None  -> unrestricted (offline replay / tests only)
+        #   []    -> FAIL CLOSED: an empty allowlist enters NOTHING -- it must
+        #            NEVER silently become unrestricted.
+        self.execution_allowlist = (None if execution_allowlist is None
+                                    else frozenset(s.upper() for s in execution_allowlist))
+        if self.execution_allowlist is not None and not self.execution_allowlist:
+            logger.warning("V2 execution allowlist is EMPTY -- fail closed: no issuer will "
+                           "ever be entered until a non-empty scope is supplied")
         # official-alert delivery (Task 117 overnight).  ``router`` =
         # talonx_ops.official_dispatch.OfficialExternalRouter; ``transport`` = an
         # injected boundary sink (default: dry-run HOLD).  ``deliver`` gates the

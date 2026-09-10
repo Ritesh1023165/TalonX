@@ -67,7 +67,9 @@ def start_stack(session_dir: str | Path, *, env: dict[str, str],
                 tick_seconds: int = 300, heartbeat_seconds: int = 30,
                 live_lookback_days: int = 45, with_dashboard: bool = True,
                 with_checkpoint_daemon: bool = True,
-                checkpoint_every_s: int = 1800) -> dict[str, Any]:
+                checkpoint_every_s: int = 1800,
+                pricing_mode: str = "csv", execution_scope: str = "none",
+                deliver: bool = False, transport: str = "dryrun") -> dict[str, Any]:
     sd = Path(session_dir)
     sd.mkdir(parents=True, exist_ok=True)
     logs = sd / "logs"
@@ -80,10 +82,17 @@ def start_stack(session_dir: str | Path, *, env: dict[str, str],
 
     time.sleep(2.0)  # let the supervisor claim the Telegram poller before the companion
 
+    # the ONE V2 companion (Task 112T T1: never supervisor include_v2).  Task 117
+    # final activation: the deployment pricing / execution-scope / delivery flags
+    # are passed HERE so 'prospective start' launches the correctly-configured
+    # companion -- no second manual companion, no scope-unenforced process.
     v2_argv = [py, "-m", "talonx_v2.run", "--mode", "live", "--form4-source", "insider",
                "--db", str(V2_DB_PATH), "--status-path", str(V2_STATUS_PATH),
                "--tick-seconds", str(tick_seconds), "--heartbeat-seconds", str(heartbeat_seconds),
-               "--live-lookback-days", str(live_lookback_days)]
+               "--live-lookback-days", str(live_lookback_days),
+               "--pricing-mode", pricing_mode, "--execution-scope", execution_scope]
+    if deliver:
+        v2_argv += ["--deliver", "--transport", transport]
     v2_pid = _spawn(v2_argv, log_path=logs / "v2_companion.log", env=env)
 
     daemon_pid = None

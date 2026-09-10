@@ -67,7 +67,10 @@ def cmd_start(args) -> int:
     info = start_stack(sd, env=env, tick_seconds=args.tick_seconds,
                        heartbeat_seconds=args.heartbeat_seconds,
                        live_lookback_days=args.live_lookback_days,
-                       checkpoint_every_s=args.every)
+                       checkpoint_every_s=args.every,
+                       pricing_mode=args.pricing_mode,
+                       execution_scope=args.execution_scope,
+                       deliver=args.deliver, transport=args.transport)
     # wait for the companion's first heartbeat
     deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
@@ -194,6 +197,15 @@ def main(argv=None) -> int:
     s.add_argument("--live-lookback-days", type=int, default=45)
     s.add_argument("--every", type=int, default=1800)
     s.add_argument("--force", action="store_true")
+    # Task 117 final activation: the V2 companion deployment config, passed
+    # straight through to `talonx_v2.run` so `prospective start` launches the
+    # ONE correctly-configured companion.
+    s.add_argument("--pricing-mode", default="csv",
+                   choices=["csv", "composite-yf", "composite-iex"])
+    s.add_argument("--execution-scope", default="none",
+                   choices=["none", "resolved-active-watchlist"])
+    s.add_argument("--deliver", action="store_true")
+    s.add_argument("--transport", default="dryrun", choices=["dryrun", "telegram"])
 
     c = sub.add_parser("close"); c.set_defaults(fn=cmd_close)
     c.add_argument("--session-dir", default="")

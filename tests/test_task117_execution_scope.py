@@ -111,3 +111,94 @@ def test_frozen_replay_unaffected_when_allowlist_is_none(tmp_path):
     assert svc.execution_allowlist is None
     recs = from_rows(_cluster_rows("INSCOPE"))
     assert svc._apply_execution_allowlist(recs, stage="records") is recs
+
+
+# --------------------------------------------------------------------------- fail-closed
+def test_empty_allowlist_fails_closed_enters_nothing(tmp_path):
+    svc = _svc(tmp_path, allowlist=[])                 # explicitly empty -> NOT unrestricted
+    assert svc.execution_allowlist is not None and len(svc.execution_allowlist) == 0
+    svc._records = lambda *, as_of: from_rows(_cluster_rows("INSCOPE") + _cluster_rows("OUTSCOPE"))
+    st = svc.tick(as_of=date(2026, 8, 18))
+    s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
+    assert st["execution_scope_enforced"] is True and st["execution_scope_count"] == 0
+    assert s.all_positions() == [] and s.trades() == []
+
+
+def test_run_py_fails_closed_when_scope_resolves_empty(tmp_path, monkeypatch):
+    from talonx_v2 import run as _run
+    from talonx_ops import watchlist_coverage as wc
+    monkeypatch.setattr(wc, "build_coverage_map",
+                        lambda **k: {"tickers": [{"symbol": "X", "v2_collection_scope": "NOT_POLLED"}]})
+    with pytest.raises(SystemExit) as ei:
+        _run.main(["--mode", "live", "--once", "--as-of", "2026-08-18",
+                   "--form4-source", "insider", "--execution-scope", "resolved-active-watchlist",
+                   "--db", str(tmp_path / "v.db"), "--status-path", str(tmp_path / "s.json")])
+    assert "fail closed" in str(ei.value).lower()
+
+
+def test_run_py_fails_closed_when_resolver_errors(tmp_path, monkeypatch):
+    from talonx_v2 import run as _run
+    from talonx_ops import watchlist_coverage as wc
+    monkeypatch.setattr(wc, "build_coverage_map",
+                        lambda **k: (_ for _ in ()).throw(RuntimeError("resolver down")))
+    with pytest.raises(SystemExit) as ei:
+        _run.main(["--mode", "live", "--once", "--as-of", "2026-08-18",
+                   "--form4-source", "insider", "--execution-scope", "resolved-active-watchlist",
+                   "--db", str(tmp_path / "v.db"), "--status-path", str(tmp_path / "s.json")])
+    assert "fail closed" in str(ei.value).lower()
+
+
+# --------------------------------------------------------------------------- exits not blocked
+def test_scope_does_not_block_exiting_an_existing_position(tmp_path):
+    # open a position in INSCOPE, then re-instantiate with an allowlist that
+    # NO LONGER contains it -- the +10td exit must still settle.
+    from talonx_v2 import calendar as vc
+    bd = _bars(tmp_path, ["INSCOPE"])
+    cfg = V2Config(db_path=str(tmp_path / "v.db"), starting_cash_usd=300_000.0)
+    svc1 = V2Service(config=cfg, bar_dirs=[bd], form4_kind="parquet",
+                     status_path=str(tmp_path / "s.json"), execution_allowlist=["INSCOPE"])
+    svc1._records = lambda *, as_of: from_rows(_cluster_rows("INSCOPE"))
+    svc1.tick(as_of=date(2026, 8, 18))
+    s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
+    assert s.n_open() == 1
+    exit_session = vc.add_sessions(date(2026, 8, 17), 10)
+
+    # RESTART with INSCOPE removed from the allowlist
+    svc2 = V2Service(config=cfg, bar_dirs=[bd], form4_kind="parquet",
+                     status_path=str(tmp_path / "s.json"), execution_allowlist=["OTHER"])
+    svc2._records = lambda *, as_of: from_rows(_cluster_rows("INSCOPE"))
+    svc2.tick(as_of=exit_session)
+    s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
+    assert s.n_open() == 0                                   # the exit STILL happened
+    assert [t["action"] for t in s.trades()] == ["BUY", "SELL"]
+
+
+def test_restart_preserves_the_enforced_scope(tmp_path):
+    bd = _bars(tmp_path, ["INSCOPE", "OUTSCOPE"])
+    cfg = V2Config(db_path=str(tmp_path / "v.db"), starting_cash_usd=300_000.0)
+    for _ in range(2):                                       # two fresh instances, same allowlist
+        svc = V2Service(config=cfg, bar_dirs=[bd], form4_kind="parquet",
+                        status_path=str(tmp_path / "s.json"), execution_allowlist=["INSCOPE"])
+        svc._records = lambda *, as_of: from_rows(_cluster_rows("INSCOPE") + _cluster_rows("OUTSCOPE"))
+        svc.tick(as_of=date(2026, 8, 18))
+    s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
+    assert [p["symbol"] for p in s.all_positions()] == ["INSCOPE"]
+    import sqlite3
+    con = sqlite3.connect(str(tmp_path / "v.db"))
+    assert {r[0] for r in con.execute("SELECT symbol FROM processed_episodes")} == {"INSCOPE"}
+    con.close()
+
+
+# --------------------------------------------------------------------------- prospective wiring
+def test_prospective_start_stack_passes_the_deployment_flags(monkeypatch, tmp_path):
+    from talonx_ops.prospective import proc as _proc
+    captured = []
+    monkeypatch.setattr(_proc, "_spawn", lambda argv, **k: (captured.append(argv), 4242)[1])
+    monkeypatch.setattr(_proc.time, "sleep", lambda *_: None)
+    _proc.start_stack(tmp_path, env={}, tick_seconds=150,
+                      pricing_mode="composite-yf", execution_scope="resolved-active-watchlist",
+                      deliver=True, transport="telegram", with_checkpoint_daemon=False)
+    v2 = next(a for a in captured if "talonx_v2.run" in a)
+    assert "--pricing-mode" in v2 and v2[v2.index("--pricing-mode") + 1] == "composite-yf"
+    assert "--execution-scope" in v2 and v2[v2.index("--execution-scope") + 1] == "resolved-active-watchlist"
+    assert "--deliver" in v2 and "--transport" in v2 and v2[v2.index("--transport") + 1] == "telegram"

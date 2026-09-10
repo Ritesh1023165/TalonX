@@ -153,14 +153,27 @@ def main(argv: list[str] | None = None) -> int:
             logging.getLogger("talonx_v2.run").info(
                 "V2 delivery ENABLED -- transport=%s", transport.name)
         allowlist = None
+        _scope_requested = bool(args.execution_scope_file) or args.execution_scope != "none"
         if args.execution_scope_file:
             allowlist = [ln.strip().upper() for ln in
                          Path(args.execution_scope_file).read_text().splitlines()
                          if ln.strip() and not ln.strip().startswith("#")]
         elif args.execution_scope == "resolved-active-watchlist":
-            from talonx_ops.watchlist_coverage import build_coverage_map
-            allowlist = sorted(c["symbol"] for c in build_coverage_map()["tickers"]
-                               if c["v2_collection_scope"] == "POLLED")
+            try:
+                from talonx_ops.watchlist_coverage import build_coverage_map
+                allowlist = sorted(c["symbol"] for c in build_coverage_map()["tickers"]
+                                   if c["v2_collection_scope"] == "POLLED")
+            except Exception as exc:  # noqa: BLE001
+                raise SystemExit(
+                    f"FATAL: --execution-scope resolved-active-watchlist could not be "
+                    f"resolved ({exc!r}) -- refusing to start (fail closed, not unrestricted)."
+                ) from exc
+        # FAIL CLOSED: a requested scope that resolves to 0 issuers must NOT
+        # become unrestricted execution.
+        if _scope_requested and not allowlist:
+            raise SystemExit(
+                "FATAL: --execution-scope was requested but resolved to 0 allowed issuers "
+                "-- refusing to start (fail closed, not unrestricted).")
         if allowlist is not None:
             logging.getLogger("talonx_v2.run").info(
                 "V2 execution scope ENFORCED -- %d allowed issuers: %s",
