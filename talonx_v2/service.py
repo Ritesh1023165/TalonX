@@ -58,11 +58,20 @@ class V2Service:
                  since: date | None = None,
                  live_lookback_days: int = 45,
                  pricing_mode: str = "csv",
-                 router=None, transport=None, deliver: bool = False):
+                 router=None, transport=None, deliver: bool = False,
+                 execution_allowlist: list[str] | None = None):
         self.cfg = config
         self.cfg.validate_frozen()
         self.store = V2Store(config.db_path, starting_cash=config.starting_cash_usd)
         self.bar_dirs = bar_dirs
+        # EXECUTION SCOPE ENFORCEMENT (Task 117 final activation).  When set, ONLY
+        # issuers whose symbol is in this allowlist are considered for a cluster /
+        # entry -- enforced in code, not merely described.  The InsiderStore can
+        # carry a broad historical backfill; this pins the live execution universe
+        # to the approved, resolved, SEC-covered set.  None = unrestricted (the
+        # prior behaviour; only for offline replay / tests).
+        self.execution_allowlist = (frozenset(s.upper() for s in execution_allowlist)
+                                    if execution_allowlist else None)
         # official-alert delivery (Task 117 overnight).  ``router`` =
         # talonx_ops.official_dispatch.OfficialExternalRouter; ``transport`` = an
         # injected boundary sink (default: dry-run HOLD).  ``deliver`` gates the
@@ -166,17 +175,36 @@ class V2Service:
                 logger.error("live Form-4 source (InsiderStore) unavailable: %r -- NOT "
                              "falling back to the historical parquet in live mode", exc)
                 raise V2SourceError(f"InsiderStore read failed: {exc!r}") from exc
+            recs = self._apply_execution_allowlist(recs, stage="records")
             self._source_state.update(actual="insider", ok=True, records=len(recs), error=None,
                                       last_ok_utc=datetime.now(timezone.utc).isoformat())
             return recs
 
         # form4_kind == "parquet": EXPLICIT offline / replay selection only.
         recs = form4_source.from_research_parquet(self.form4_parquet, since=since)
+        recs = self._apply_execution_allowlist(recs, stage="records")
         self._source_state.update(
             actual="parquet", ok=True, records=len(recs), error=None,
             last_ok_utc=datetime.now(timezone.utc).isoformat(),
             note="OFFLINE research parquet -- explicit --form4-source parquet (NOT live)")
         return recs
+
+    def _apply_execution_allowlist(self, items, *, stage: str):
+        """Drop anything whose issuer symbol is not in the approved execution
+        allowlist.  ``items`` is a list of PurchaseRecord (stage='records') or
+        ClusterEpisode (stage='episodes').  No-op when no allowlist is set."""
+        if self.execution_allowlist is None:
+            return items
+        kept, dropped = [], []
+        for it in items:
+            sym = getattr(it, "symbol", "").upper()
+            (kept if sym in self.execution_allowlist else dropped).append(it)
+        if dropped:
+            self._allowlist_dropped = getattr(self, "_allowlist_dropped", 0) + len(dropped)
+            logger.info("execution allowlist: dropped %d out-of-scope %s (e.g. %s); kept %d",
+                        len(dropped), stage,
+                        sorted({getattr(d, "symbol", "?") for d in dropped})[:8], len(kept))
+        return kept
 
     # ---- one tick ----
     def tick(self, *, as_of: date | None = None) -> dict:
@@ -203,9 +231,13 @@ class V2Service:
         res = pipeline.ProcessResult()
         self._intents_created = 0
         self._stale_skipped = 0
+        self._allowlist_dropped = 0
         episodes: list = []
 
         all_eps = pipeline.detect_episodes(records, config=self.cfg) if records is not None else []
+        # defense-in-depth: even if a record slipped through, no episode outside
+        # the approved execution scope is ever considered for a cluster/entry.
+        all_eps = self._apply_execution_allowlist(all_eps, stage="episodes")
         all_ripe = [e for e in all_eps if e.eligible_entry_session <= ripe_through]
 
         # --- PRE-OPEN ENTRY INTENT PASS (Task 117 overnight) ---------------
@@ -481,6 +513,11 @@ class V2Service:
             "stale_entry_skipped_this_tick": getattr(self, "_stale_skipped", 0),
             "entries_this_tick": len(res.entries),
             "exits_this_tick": len(res.exits),
+            # execution scope enforcement (Task 117 final activation)
+            "execution_scope_enforced": self.execution_allowlist is not None,
+            "execution_scope_count": (len(self.execution_allowlist)
+                                      if self.execution_allowlist is not None else None),
+            "execution_scope_out_of_scope_dropped_this_tick": getattr(self, "_allowlist_dropped", 0),
             # pre-open intent + durable alert outbox (Task 117 overnight)
             "entry_intents_created_this_tick": getattr(self, "_intents_created", 0),
             "pending_entry_intents": [

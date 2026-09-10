@@ -83,6 +83,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--status-path", default="")
     ap.add_argument("--as-of", default="", help="live --once: pin the tick date (dry-run only)")
     ap.add_argument("--live-lookback-days", type=int, default=45)
+    ap.add_argument("--execution-scope", default="none",
+                    choices=["none", "resolved-active-watchlist"],
+                    help="live mode: enforce the V2 execution universe. "
+                         "'resolved-active-watchlist' = ONLY issuers the authoritative "
+                         "intelligence.service resolver marks SEC-covered active (POLLED). "
+                         "'none' (default) = unrestricted -- offline replay / tests only.")
+    ap.add_argument("--execution-scope-file", default="",
+                    help="live mode: a text file of allowed issuer symbols (one per line); "
+                         "overrides --execution-scope when given.")
     ap.add_argument("--deliver", action="store_true",
                     help="live mode: drain the durable V2 alert outbox each tick "
                          "through OfficialExternalRouter + the selected --transport")
@@ -143,11 +152,25 @@ def main(argv: list[str] | None = None) -> int:
                          else DryRunTransport())
             logging.getLogger("talonx_v2.run").info(
                 "V2 delivery ENABLED -- transport=%s", transport.name)
+        allowlist = None
+        if args.execution_scope_file:
+            allowlist = [ln.strip().upper() for ln in
+                         Path(args.execution_scope_file).read_text().splitlines()
+                         if ln.strip() and not ln.strip().startswith("#")]
+        elif args.execution_scope == "resolved-active-watchlist":
+            from talonx_ops.watchlist_coverage import build_coverage_map
+            allowlist = sorted(c["symbol"] for c in build_coverage_map()["tickers"]
+                               if c["v2_collection_scope"] == "POLLED")
+        if allowlist is not None:
+            logging.getLogger("talonx_v2.run").info(
+                "V2 execution scope ENFORCED -- %d allowed issuers: %s",
+                len(allowlist), ", ".join(allowlist))
         svc = V2Service(
             config=cfg, bar_dirs=[Path(p) for p in args.bar_dir],
             form4_kind=args.form4_source, form4_parquet=args.form4_parquet,
             status_path=args.status_path or None,
             since=None, live_lookback_days=args.live_lookback_days,
+            execution_allowlist=allowlist,
             pricing_mode=args.pricing_mode,
             router=router, transport=transport, deliver=args.deliver,
         )
