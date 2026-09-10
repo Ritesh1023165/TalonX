@@ -1,0 +1,34 @@
+session,date,sha,observation_cutoff,lane_scope,metric,value,category,in_metrics_quant_counter,notes
+S1,2026-09-08,54c9b40,end_of_day,Original intraday,quant_publications,0,terminal,n/a,"every candidate suppressed; no numeric evaluated snapshot preserved"
+S1,2026-09-08,54c9b40,end_of_day,Experimental,directional_alerts,57,terminal,n/a,"dispatch_log 115 all RECORDED/DRY_RUN_HELD; 0 paper trades; 0 external"
+S1,2026-09-08,54c9b40,end_of_day,V2,code_p_records,24,input,n/a,"-> 1 cluster (ABCL) -> stale -> 0 signals"
+S1,2026-09-08,54c9b40,end_of_day,V2,fresh_eligible_clusters,0,terminal,n/a,ABCL stale
+S1,2026-09-08,54c9b40,end_of_day,ALL,residual_unexplained,NOT_COMPUTABLE,residual,n/a,"no metrics:quant:* / evaluated snapshot preserved for S1"
+S2,2026-09-09,9bec279,pre_eod_1720Z,Original+Experimental comingled,pre_eval_dropped_duplicate_bars,25338,pre_evaluation_drop,no,"not in evaluated pool"
+S2,2026-09-09,9bec279,pre_eod_1720Z,Original+Experimental comingled,pre_eval_failed_min_volatility,14278,pre_evaluation_drop,no,"not in evaluated pool"
+S2,2026-09-09,9bec279,pre_eod_1720Z,Original+Experimental comingled,evaluated,121,pool_total,yes,"shared metrics:quant:evaluated (no lane suffix)"
+S2,2026-09-09,9bec279,pre_eod_1720Z,Original+Experimental comingled,failed_confluence,74,terminal_disposition,yes,
+S2,2026-09-09,9bec279,pre_eod_1720Z,Original+Experimental comingled,dropped_opening_blackout,25,terminal_disposition,yes,
+S2,2026-09-09,9bec279,pre_eod_1720Z,Experimental,published,9,terminal_disposition,yes,"ALL 9 in experimental.log (talonx:exp:*); 0 in original.log; never routed downstream"
+S2,2026-09-09,9bec279,pre_eod_1720Z,Original+Experimental comingled,failed_rr_gate,4,terminal_disposition,yes,
+S2,2026-09-09,9bec279,pre_eod_1720Z,Original+Experimental comingled,failed_trend_gate,2,terminal_disposition,yes,
+S2,2026-09-09,9bec279,pre_eod_1720Z,Original+Experimental comingled,dropped_uk_session_closed,2,terminal_disposition,yes,
+S2,2026-09-09,9bec279,pre_eod_1720Z,Original+Experimental comingled,dropped_us_session_closed,1,terminal_disposition,yes,
+S2,2026-09-09,9bec279,pre_eod_1720Z,Original+Experimental comingled,throttle_cooldown_revalidation,4,terminal_disposition,no,"only on talonx:quant:rejected + rejected_candidates DB; the residual class"
+S2,2026-09-09,9bec279,pre_eod_1720Z,Original+Experimental comingled,sum_terminal,121,check,mixed,"74+25+9+4+2+2+1+4 = 121"
+S2,2026-09-09,9bec279,pre_eod_1720Z,ALL,residual_unexplained,0,residual,n/a,"CLOSES EXACTLY"
+S2,2026-09-09,9bec279,eod,V2,code_p_records,24,input,n/a,"-> 1 cluster ABCL -> stale -> 0 signals / 0 buys / 0 sells / 0 open; ledger equation intact"
+S3,2026-09-10,e1de6c1,ping_1624Z,Original+Experimental comingled,candidates_reported,126,pool_total_reported,yes,"ping text; Redis metrics:quant:* snapshot NOT preserved"
+S3,2026-09-10,e1de6c1,ping_1624Z,Original intraday,displayed_rejection_confluence,18,terminal_disposition_displayed,yes,"unchanged ping->EOD"
+S3,2026-09-10,e1de6c1,ping_1624Z,Original intraday,displayed_rejection_opening_blackout,10,terminal_disposition_displayed,yes,"unchanged ping->EOD"
+S3,2026-09-10,e1de6c1,ping_1624Z,Original intraday,displayed_rejection_trend,1,terminal_disposition_displayed,yes,"unchanged ping->EOD (VRT 14:57Z)"
+S3,2026-09-10,e1de6c1,ping_1624Z,Original+Experimental comingled,publications_reported,3,terminal_disposition,yes,"= 3 Experimental WOULD_PASS directional alerts before 16:24:25Z (SHOP 14:28Z, BLSH 15:22Z, SKHY 16:10Z); exact count match"
+S3,2026-09-10,e1de6c1,ping_1624Z,display,residual_by_display_arithmetic,94,residual,n/a,"126 - 18 - 10 - 1 - 3 = 94 -- UNRESOLVED; structurally = Experimental terminal rejections + off-counter class + non-displayed Original gate rejections; not closable without the S3 Redis metrics snapshot"
+S3,2026-09-10,e1de6c1,eod,Original intraday,rejected_candidates_total_today,15002,terminal_disposition_persisted,partly,"14973 volatility_gate + 18 confluence_gate + 10 opening_blackout_gate + 1 trend_gate (dispatch_audit.rejected_candidates)"
+S3,2026-09-10,e1de6c1,eod,Original intraday,volatility_gate,14973,pre_evaluation_drop,no,"LOW_VOLATILITY; excluded from 'displayed rejections'"
+S3,2026-09-10,e1de6c1,eod,Original intraday,published_quant_signals_today,0,terminal,yes,"dashboard original_quant; dispatch_audit.alerts all-time = 0"
+S3,2026-09-10,e1de6c1,eod,Experimental,directional_alerts_all_day,116,terminal,n/a,"8 WOULD_PASS / 102 LOW_CONFLUENCE / 4 TREND_GATE / 2 LOW_RISK_REWARD; sent=0; DRY_RUN_HELD"
+S3,2026-09-10,e1de6c1,eod,Experimental,paper_trades_today,3,terminal,n/a,"AMD 16:51Z, STX 18:45Z, SPCX 19:29Z -- all AFTER the 16:24Z cutoff; open, unrealized"
+S3,2026-09-10,e1de6c1,eod,V2,code_p_records_window/today,24/0,input,n/a,"scope-enforced 39; 17 out-of-scope dropped/tick; 8 kept"
+S3,2026-09-10,e1de6c1,eod,V2,fresh_eligible_clusters,0,terminal,n/a,"1 cluster ABCL, stale (SKIPPED_ENTRY_STALE); 0 signals/intents/buys/sells"
+S3,2026-09-10,e1de6c1,eod,ALL,residual_unexplained,UNRESOLVED,residual,n/a,"S3 Redis metrics:quant:* snapshot not preserved; funnel not closable to exact integer"
