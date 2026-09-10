@@ -86,26 +86,61 @@ def _rows(db: Path) -> list[dict]:
         con.close()
 
 
-def _us_listed(exchange: str) -> bool:
-    ex = (exchange or "").upper()
-    return any(k in ex for k in ("NYSE", "NASDAQ")) and "KRX" not in ex
+def _authoritative_scope(home: Path) -> dict[str, str] | None:
+    """The REAL ``intelligence.service`` scope resolution (offline, from the
+    cached SEC ``company_tickers.json``): {symbol -> 'RESOLVABLE' | reason}.
+    Returns None if the directory cache is absent (then a heuristic is used)."""
+    try:
+        import json as _json
+        from talonx_ingest.intelligence.service.cik_directory import CikDirectory
+        from talonx_ingest.intelligence.service.watchlist_source import resolve_watchlist
+        ct_path = home / "intelligence" / "company_tickers.json"
+        if not ct_path.exists():
+            return None
+        direc = CikDirectory.from_company_tickers(_json.load(open(ct_path)), from_cache=True)
+        try:
+            from talonx_watchlist.store import TickerWatchlistStore
+            store = TickerWatchlistStore(str(home / "watchlist.db"))
+        except Exception:  # noqa: BLE001
+            return None
+        res = resolve_watchlist(store, direc, explicit_exclusions=(), include_paused=False)
+        m: dict[str, str] = {s: "RESOLVABLE" for s in res.effective}
+        for e in res.excluded:
+            m[e.symbol] = f"EXCLUDED: {e.reason}"
+        for u in res.unresolved:
+            m[u.symbol] = f"UNRESOLVED: {u.reason}"
+        return m
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def build_coverage_map(*, home: Path | None = None) -> dict[str, Any]:
     home = home or _HOME
     rows = _rows(home / "watchlist.db")
+    scope = _authoritative_scope(home)          # None -> heuristic fallback
     out: list[TickerCoverage] = []
     for r in rows:
         sym = r["symbol"]
         active = r["status"] == "active"
         horizon = r["strategy_horizon"] or "UNKNOWN"
         wants_multiday = horizon in ("DUAL_HORIZON", "SWING", "MULTI_DAY")
-        us = _us_listed(r["exchange"])
 
-        # V2 collection scope: intelligence.service polls the resolvable ACTIVE
-        # watchlist.  A US-listed active name is polled; a paused / non-US /
-        # private name is not.
-        polled = active and us
+        # V2 collection scope: the AUTHORITATIVE intelligence.service resolution
+        # (resolvable ACTIVE watchlist) when available, else a listing heuristic.
+        if scope is not None:
+            sc = scope.get(sym, "UNRESOLVED: not in resolution")
+            polled = sc == "RESOLVABLE"
+            scope_detail = sc
+        else:
+            ex = (r["exchange"] or "").upper()
+            us = any(k in ex for k in ("NYSE", "NASDAQ")) and "KRX" not in ex
+            polled = active and us
+            if polled:
+                scope_detail = "RESOLVABLE (heuristic)"
+            elif not us:
+                scope_detail = f"UNRESOLVED: non-US listing ({r['exchange']}) -- heuristic"
+            else:
+                scope_detail = "EXCLUDED: not active -- heuristic"
         v2_scope = "POLLED" if polled else "NOT_POLLED"
 
         if not wants_multiday:
@@ -114,12 +149,12 @@ def build_coverage_map(*, home: Path | None = None) -> dict[str, Any]:
             v2_alert = "N/A (V2 lane)"
             v2_paper = "N/A (V2 lane)"
             reason = "owner did not request a multi-day horizon here"
-        elif not us:
-            v2_elig = "INELIGIBLE -- non-US listing (SEC Form 4 not filed; V2 is a US insider signal)"
+        elif not polled and scope_detail.startswith("UNRESOLVED"):
+            v2_elig = "INELIGIBLE -- not an SEC domestic Form 4 filer"
             v2_evi = "n/a"
             v2_alert = "none (V2)"
             v2_paper = "none (V2)"
-            reason = f"{r['exchange']} -- outside the SEC Form 4 domain"
+            reason = scope_detail.split(": ", 1)[-1]
         elif not polled:
             v2_elig = "UNKNOWN -- issuer not currently in the V2 SEC collection scope"
             v2_evi = "no cluster history (not ingested)"
@@ -154,16 +189,25 @@ def build_coverage_map(*, home: Path | None = None) -> dict[str, Any]:
             v2_collection_scope=v2_scope,
             v2_strategy_eligibility=v2_elig, v2_evidence_status=v2_evi,
             v2_alert_capability=v2_alert, v2_paper_portfolio=v2_paper,
-            unsupported_reason=reason,
+            unsupported_reason=(reason if polled or reason
+                                else scope_detail.split(": ", 1)[-1]),
         ))
 
     n_active = sum(1 for r in rows if r["status"] == "active")
     n_dual = sum(1 for r in rows if (r["strategy_horizon"] or "") == "DUAL_HORIZON")
     n_polled = sum(1 for c in out if c.v2_collection_scope == "POLLED")
+    active_not_polled = sorted(
+        {c.symbol: c.unsupported_reason for c in out
+         if c.status == "active" and c.v2_collection_scope == "NOT_POLLED"}.items())
     return {
+        "scope_resolution": "authoritative (intelligence.service resolve_watchlist)" if scope
+        else "heuristic (SEC directory cache absent)",
+        "active_not_polled": [{"symbol": s, "reason": why} for s, why in active_not_polled],
         "scopes": {
-            "1_collection": (f"SEC Form 4 ingested for the resolvable ACTIVE US-listed "
-                             f"watchlist -- {n_polled} of {len(rows)} configured tickers. "
+            "1_collection": (f"SEC Form 4 ingested for the RESOLVABLE ACTIVE watchlist "
+                             f"(intelligence.service resolve_watchlist) -- {n_polled} of "
+                             f"{n_active} active / {len(rows)} configured tickers. "
+                             f"Active-but-not-covered: {[s for s,_ in active_not_polled]}. "
                              "NOT broadened by this task."),
             "2_user_alert": (f"owner configured {len(rows)} tickers "
                              f"({n_active} active); {n_dual} with a DUAL_HORIZON "
