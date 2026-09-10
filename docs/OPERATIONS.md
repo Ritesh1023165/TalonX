@@ -36,6 +36,34 @@ python -m talonx_ops.prospective close
 - Full runbook: `results/task114_autonomous_operator/TASK115_OPERATOR_SHEET.md`.
 - Release: `54c9b40` · V1 fp `2ae6216bca70` · V2 fp `11107198c5b81237`.
 
+### V2 alert / paper / delivery path (Task 117 overnight — additive, frozen economics unchanged)
+
+- **Pre-open entry intent.** When a cluster fires and its eligible entry session has not yet
+  started, the companion persists a durable `pending_entry_intents` row in `v2_lane.db` and
+  emits an **actionable** "PLANNED BUY at the OPEN of `<S>`" alert. On a later tick, once
+  `<S>`'s bar is FINAL, the **unchanged** frozen pipeline fills at `<S>`'s open and links the
+  fill to the intent (a delayed "BUY FILLED" notification). Cold-start with a backlog labels
+  the fill "not prospectively actionable". Idempotent across ticks + restarts.
+- **Durable alert delivery.** Every V2 alert is written to `v2_alert_outbox` (`event_id` PK →
+  tick/restart dedup). `python -m talonx_v2.run --mode live --deliver` drains it each tick
+  through `OfficialExternalRouter` (the one routing authority; per-family store dedup) into an
+  injected transport. Default transport = **dry-run HOLD** (records intent, sends nothing).
+  States are explicit: `SENT` / `HELD` / `RETRY` (bounded backoff) / `FAILED` / `AMBIGUOUS`.
+  Experimental external delivery stays structurally blocked. No network transport is wired to
+  run by this release.
+- **Exit management is decoupled from source failure.** An unavailable SEC Form-4 source blocks
+  **new** event-based entries/intents only; positions already OPEN still get due-exit
+  evaluation on reliable bar prices → the established pending / fall-forward / `EXIT_UNRESOLVED`
+  states. No forced liquidation at invented prices.
+- **Dashboard.** `http://localhost:8787` has an **Active V2** tab: strategy/version/fingerprint;
+  five independent signals (process / data / coverage / pricing / activity — an open position
+  never masks degraded coverage/pricing); the $300k ledger; PENDING pre-open intents; the full
+  funnel `Form 4 → clusters → decisions → paper → delivery`; and the alert-delivery table
+  (a TRADING lane, separate from Intelligence & Experimental).
+- **Coverage report:** `python -m talonx_ops.watchlist_coverage` — read-only per-ticker map of
+  configured horizon → serving method, V2 scope, eligibility, paper ledger. Intraday and
+  long-term have **no validated edge**; V2 is the only paper candidate.
+
 
 ## Prerequisites
 
