@@ -18,7 +18,7 @@ or reseeds ``v2_lane.db`` -- fails closed on ledger-integrity problems.
 """
 from __future__ import annotations
 
-RELEASE_SHA_EXPECTED = "5aed385"  # Task 117 final activation release
+RELEASE_SHA_EXPECTED = "0d52e7c"  # Task 117 final activation release
 V2_FINGERPRINT_EXPECTED = "11107198c5b81237"
 V1_FINGERPRINT_EXPECTED = "2ae6216bca70"
 V2_STRATEGY_VERSION = "INSIDER_BUY_CLUSTER_V2@1"
