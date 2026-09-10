@@ -220,6 +220,12 @@ class V2Service:
 
         from talonx_v2.calendar import add_sessions
 
+        # reset per-tick counters BEFORE _records() so the records-stage
+        # execution-allowlist drop count is included in this tick's status.
+        self._intents_created = 0
+        self._stale_skipped = 0
+        self._allowlist_dropped = 0
+
         # Task 117 overnight P3: an unavailable Form-4 SOURCE blocks NEW
         # event-based entries/intents -- but it must NOT block due-exit
         # management of positions that are ALREADY open (those settle on
@@ -234,9 +240,6 @@ class V2Service:
                          "get due-exit evaluation)", self._tick, exc)
 
         res = pipeline.ProcessResult()
-        self._intents_created = 0
-        self._stale_skipped = 0
-        self._allowlist_dropped = 0
         episodes: list = []
 
         all_eps = pipeline.detect_episodes(records, config=self.cfg) if records is not None else []
