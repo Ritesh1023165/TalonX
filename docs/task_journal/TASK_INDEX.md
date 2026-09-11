@@ -16,7 +16,7 @@ and `docs/RESEARCH_STATUS.md` — linked here, not repeated.
 | 117 (controlled activation) | 2026-09-11 | release | `LIVE_PAPER_SESSION_STARTED`, `fb4b071` | `docs/audits/task117_controlled_activation_2026-09-11/` | NOT_AVAILABLE |
 | 118 (dataset inventory) | 2026-09-11 | research (`research/talonx-profitability-2026-09`) | inventory complete, `863d1ed` | `docs/research/TASK118_INVENTORY.md` | NOT_AVAILABLE |
 | 118 (Deliverable A baseline) | 2026-09-11 | research | `BASELINE_COMPLETE` (small-sample), `c85a72f` | `docs/research/TASK118_BASELINE_A_RESULTS.md` | NOT_AVAILABLE |
-| **118 (profitability diagnostics + task journal)** | 2026-09-11 | research | see `entries/2026-09-11_task118_profitability_diagnostics/outcome.md` | `docs/research/TASK118_BASELINE_RECONCILIATION.md`, `TASK118_ORIGINAL_SELECTIVITY.md`, `TASK118_EXPERIMENTAL_OUTCOMES.md`, `TASK118_NEXT_EXPERIMENT.md`, this journal | **AVAILABLE** — `entries/2026-09-11_task118_profitability_diagnostics/request.md` |
+| **118 (profitability diagnostics + task journal)** | 2026-09-11 | research | see `entries/2026-09-11_task118_profitability_diagnostics/outcome.md`, commit `c0cfa5d` | `docs/research/TASK118_BASELINE_RECONCILIATION.md`, `TASK118_ORIGINAL_SELECTIVITY.md`, `TASK118_EXPERIMENTAL_OUTCOMES.md`, `TASK118_NEXT_EXPERIMENT.md`, this journal | **AVAILABLE** — `entries/2026-09-11_task118_profitability_diagnostics/request.md` |
 
 ## Cross-branch note
 
