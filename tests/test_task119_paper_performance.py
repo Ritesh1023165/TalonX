@@ -212,8 +212,16 @@ def test_costs_not_double_deducted(tmp_path):
     out = build_paper_performance(home=home, exp_home=exp, v2_db=tmp_path / "v2_lane.db",
                                    now=NOW, check_processes=False)
     costs = out["lanes"]["experimental"]["costs"]
-    assert costs["modeled"] is False
-    assert "UNMODELED" in costs["note"]
+    # Spread/slippage IS modeled (apply_spread, baked into fill prices);
+    # commissions/fees are NOT -- these must stay distinct, never a blanket
+    # "everything is unmodeled" claim.
+    assert costs["modeled"] is True
+    assert "MODELED" in costs["spread_slippage"]
+    assert "NOT modelled" in costs["explicit_commissions_fees"]
+    assert "NOT" in costs["summary"] and "net of all costs" in costs["summary"]
+    v2_costs = out["lanes"]["v2"]["costs"]
+    assert v2_costs["modeled"] is False
+    assert "NOT modelled" in v2_costs["spread_slippage"]
     # a closed trade's own cost annotation must say the same, never a second deduction
     _mk_paper_db(
         exp / "experimental_paper.db", initial_balance=100_000, current_cash=99_786.28136765287,
@@ -230,7 +238,8 @@ def test_costs_not_double_deducted(tmp_path):
                                     now=NOW, check_processes=False)
     ct = out2["lanes"]["experimental"]["closed_trades"][0]
     assert ct["realized_pnl_usd"] == pytest.approx(-213.71863234713055)
-    assert "UNMODELED" in ct["costs"]
+    assert "NOT" in ct["costs"] and "net of all costs" in ct["costs"]
+    assert "spread" in ct["costs"].lower()
 
 
 # --------------------------------------------------------------------------- #
@@ -298,6 +307,49 @@ def test_stale_historical_mark_labelled_distinctly():
 def test_unavailable_mark_timestamp():
     cls = classify_valuation_timestamp(None, now=NOW)
     assert cls["classification"] == "UNAVAILABLE"
+
+
+def test_non_session_day_distinct_from_unavailable():
+    # 2026-09-12 is a Saturday.
+    cls = classify_valuation_timestamp("2026-09-12T15:00:00+00:00", now=NOW)
+    assert cls["classification"] == "NON_SESSION_DAY"
+    assert cls["regular_open_utc"] is None and cls["regular_close_utc"] is None
+
+
+def test_half_day_uses_real_open_not_close_minus_6h30m():
+    """Task 119A regression: the post-Thanksgiving half day (2026-11-27)
+    closes at 18:00 UTC and opens at 14:30 UTC (a 3.5h session) -- the old
+    close-6h30m approximation would have placed the approximated open at
+    11:30 UTC, 3 hours too early. A mark at 12:00 UTC (before the REAL
+    open) must classify PRE_MARKET, not REGULAR_SESSION."""
+    half_day_now = datetime(2026, 11, 27, 19, 0, tzinfo=timezone.utc)
+    cls = classify_valuation_timestamp("2026-11-27T12:00:00+00:00", now=half_day_now)
+    assert cls["classification"] == "PRE_MARKET"
+    assert cls["regular_open_utc"] == "2026-11-27T14:30:00+00:00"
+    assert cls["regular_close_utc"] == "2026-11-27T18:00:00+00:00"
+    # a mark just after the real (early) close is POST_CLOSE, not REGULAR_SESSION
+    cls2 = classify_valuation_timestamp("2026-11-27T18:30:00+00:00", now=half_day_now)
+    assert cls2["classification"] == "POST_CLOSE"
+
+
+def test_dst_winter_open_is_1430_utc():
+    cls = classify_valuation_timestamp("2026-11-27T15:00:00+00:00",
+                                       now=datetime(2026, 11, 27, 19, 0, tzinfo=timezone.utc))
+    assert cls["classification"] == "REGULAR_SESSION"
+    assert cls["regular_open_utc"] == "2026-11-27T14:30:00+00:00"
+
+
+def test_calendar_mechanism_failure_reports_unknown_not_non_session_day(monkeypatch):
+    import talonx_signals.market_sessions as ms
+
+    def _boom(_d):
+        raise RuntimeError("calendar backend unavailable")
+
+    monkeypatch.setattr(ms, "session_open_utc", _boom)
+    monkeypatch.setattr(ms, "session_close_utc", _boom)
+    cls = classify_valuation_timestamp("2026-09-11T15:00:00+00:00", now=NOW)
+    assert cls["classification"] == "UNKNOWN"
+    assert "could not be established" in cls["note"]
 
 
 # --------------------------------------------------------------------------- #
@@ -462,5 +514,16 @@ def test_dashboard_read_model_exposes_paper_performance(tmp_path, monkeypatch):
     dr = DashboardReadModel(home=home, exp_home=exp, now=NOW, check_processes=False)
     out = dr.paper_performance()
     assert set(out["lanes"]) >= {"original", "experimental", "v2", "piv", "intelligence"}
+    # Task 119A A1: no separate routed "paper_performance" section -- its
+    # data is folded into paper_eod() (Original/Experimental/PIV) and
+    # v2_active_strategy() (V2), the ONE destination for each lane.
     all_sec = dr.all_sections()
-    assert "paper_performance" in all_sec
+    assert "paper_performance" not in all_sec
+    assert set(all_sec) == {"overview", "premarket", "original_quant", "v2_active_strategy",
+                            "validation", "intelligence", "paper_eod"}
+    eod = dr.paper_eod()
+    assert eod["original_local_paper"]["performance"]["lane"] == "ORIGINAL"
+    assert eod["experimental_validation_paper"]["performance"]["lane"] == "EXPERIMENTAL"
+    assert "v2_paper" not in eod  # V2 stays in its own existing destination, not duplicated here
+    v2sec = dr.v2_active_strategy()
+    assert v2sec["ledger"]["performance"]["lane"] == "V2"

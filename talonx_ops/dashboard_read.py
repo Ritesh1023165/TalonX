@@ -840,14 +840,32 @@ class DashboardReadModel:
         return out
 
     def paper_eod(self) -> dict[str, Any]:
+        """Task 100B/100C base + Task 119A: the ONE paper-portfolios-and-
+        reconciliation destination. Task 119 originally added a second,
+        separate "Paper Performance" tab with richer per-lane P&L/equity/
+        reconciliation data alongside this section's pre-existing thin
+        open-positions/cash summary -- a duplicate navigation destination
+        showing overlapping numbers. That tab is retired; its data (via
+        talonx_ops.paper_performance.build_paper_performance -- unchanged,
+        still the one accounting implementation) is folded in HERE, under
+        each lane's existing block as a nested "performance" key, so there
+        is exactly one place a user reads paper-portfolio state and it is
+        never split into two cards that could show inconsistent totals.
+        Every pre-existing top-level key on this method is BYTE-UNCHANGED
+        (back-compat for any existing caller) -- only "performance" is new.
+        """
         op = self.arm.original_paper()
         ep = self.arm.experimental_paper()
         piv = self.arm.piv()
         eod = self.arm.eod_reconciliation()
+        perf = self.paper_performance()
+        lanes = perf.get("lanes", {})
         return {
             "generated_at": self.now.isoformat(),
             "separation_note": "Original / Experimental / PIV paper are SEPARATE ledgers -- never one merged positions count.",
             "official_telegram_last_send": self._official_telegram_last_send(),
+            "session_date": perf.get("session_date"),
+            "regular_session_close_utc": perf.get("regular_session_close_utc"),
             "original_local_paper": {
                 "attribution": "ORIGINAL / local-only (no broker)",
                 "status": op.status.value,
@@ -855,6 +873,7 @@ class DashboardReadModel:
                 "trades_all_time": op.values.get("trades_all_time"),
                 "current_cash": op.values.get("current_cash"),
                 "note": op.note,
+                "performance": lanes.get("original"),
             },
             "experimental_validation_paper": {
                 "attribution": "EXPERIMENTAL / validation-only, simulated, no real capital",
@@ -864,6 +883,7 @@ class DashboardReadModel:
                 "trades_all_time": ep.values.get("trades_all_time"),
                 "current_cash": ep.values.get("current_cash"),
                 "note": ep.note,
+                "performance": lanes.get("experimental"),
             },
             "piv_alpaca_paper": {
                 "attribution": "PIV / Alpaca PAPER (independent; structurally cannot route real capital)",
@@ -872,6 +892,16 @@ class DashboardReadModel:
                 "positions": "NOT_CHECKED",
                 "orders": "NOT_CHECKED",
                 "checked": False,
+                # Task 119A A2: an inactive/unconfigured PIV is its own,
+                # independent fact -- it must never read as (or be caused
+                # by) a failure of Original/Experimental local paper
+                # accounting, which are checked above and are unaffected
+                # by PIV's state either way.
+                "clarification": ("PIV is a separate, independent paper-trading subsystem "
+                                  "(Alpaca sandbox). NOT_CHECKED here means no network read was "
+                                  "performed by this read-only surface -- it does NOT mean, and "
+                                  "must not be read as, a failure of Original or Experimental "
+                                  "local paper accounting, which are unaffected by PIV's state."),
             },
             "eod_reconciliation": {
                 "status": eod.status.value,
@@ -880,6 +910,12 @@ class DashboardReadModel:
                 "last_update": eod.last_update,
                 "note": eod.note,
             },
+            # V2's own richer accounting (equity/reconciliation/cost breakdown)
+            # is folded into its ALREADY-existing single destination --
+            # v2_active_strategy()'s "$300,000 campaign ledger" card -- not
+            # duplicated here too (V2 never had a paper_eod entry before
+            # Task 119, and this method must not create a second one).
+            "intelligence_note": (lanes.get("intelligence") or {}).get("note"),
         }
 
     # ------------------------------------------------------------------ #
@@ -1014,6 +1050,18 @@ class DashboardReadModel:
                         "available_capital": None if cash is None else round(cash, 2),
                         "capacity": f"{len(opens)}/20",
                     }
+                    # Task 119A A1: fold V2's richer accounting (equity,
+                    # arithmetic reconciliation, cost-treatment breakdown,
+                    # marked open-position value) into this SAME ledger
+                    # block -- V2's one existing destination -- instead of
+                    # a second "Paper Performance" tab duplicating it.
+                    try:
+                        from talonx_ops.paper_performance import build_v2_paper_performance
+                        out["ledger"]["performance"] = build_v2_paper_performance(
+                            Path(db), home=self.home, now=self.now)
+                    except Exception as exc:  # noqa: BLE001
+                        out["ledger"]["performance"] = {"status": "UNKNOWN",
+                                                        "note": f"{type(exc).__name__}: {exc}"}
             finally:
                 con.close()
 
@@ -1191,14 +1239,17 @@ class DashboardReadModel:
         return out
 
     # ------------------------------------------------------------------ #
-    # ------------------------------------------------------------------ #
-    # PAPER PERFORMANCE -- Task 119 (Task 118H Option 3). An attributable,
-    # per-lane realized/unrealized P&L, open-position and reconciliation
-    # surface -- EXTENDS paper_eod() above (which stays unchanged for
-    # back-compat), does not replace or duplicate it. Delegates the actual
-    # accounting to talonx_ops.paper_performance so there is exactly one
-    # implementation of "what did each lane earn" shared with any other
-    # caller (tests, offline reports).
+    # PAPER PERFORMANCE -- Task 119 (Task 118H Option 3), corrected Task
+    # 119A A1: an attributable, per-lane realized/unrealized P&L,
+    # open-position and reconciliation accessor. NOT a routed dashboard
+    # section on its own (Task 119's separate "Paper Performance" tab was
+    # a duplicate navigation destination and has been retired) -- its data
+    # is folded into the ONE existing destination for each lane instead:
+    # paper_eod() (Original/Experimental/PIV) and v2_active_strategy()
+    # (V2), both of which call into this method/module. Kept as a public
+    # method because it is directly useful and directly tested on its own
+    # (tests/test_task119_paper_performance.py), not because it is a
+    # second user-facing surface.
     # ------------------------------------------------------------------ #
     def paper_performance(self) -> dict[str, Any]:
         import os as _os
@@ -1222,6 +1273,5 @@ class DashboardReadModel:
             "v2_active_strategy": self.v2_active_strategy(),   # Task 112
             "validation": self.validation(),
             "intelligence": self.intelligence(),
-            "paper_eod": self.paper_eod(),
-            "paper_performance": self.paper_performance(),     # Task 119
+            "paper_eod": self.paper_eod(),                     # includes folded-in Task 119 performance data
         }

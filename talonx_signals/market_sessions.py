@@ -85,6 +85,42 @@ def session_close_utc(d: date) -> datetime | None:
         return None
 
 
+_FALLBACK_OPEN = time(9, 30)
+
+
+def session_open_utc(d: date) -> datetime | None:
+    """The regular-session OPEN instant (UTC, tz-aware) for calendar date
+    ``d``, or ``None`` if ``d`` is not a valid NYSE trading day.
+
+    Task 119A: added alongside ``session_close_utc`` so callers needing a
+    session's open boundary (not just its close) read it from the SAME
+    exchange_calendars-backed source rather than approximating it as
+    ``close - 6h30m`` -- that approximation is correct on a full session
+    but WRONG on an early-close (half) day, e.g. the post-Thanksgiving
+    half day closes at 18:00 UTC / opens at 14:30 UTC (3.5h session, not
+    6.5h) -- ``close - 6h30m`` would place the approximated open 3 hours
+    before the real one. ``cal.session_open`` is correct for full and
+    half days alike, and is DST-aware (9:30 ET is 13:30 UTC in summer,
+    14:30 UTC in winter)."""
+    cal = _get_calendar()
+    if cal is None:
+        if d.weekday() >= 5:
+            return None
+        local_open = datetime.combine(d, _FALLBACK_OPEN, tzinfo=ET)
+        return local_open.astimezone(timezone.utc)
+    try:
+        import pandas as pd
+
+        ts = pd.Timestamp(d)
+        if not bool(cal.is_session(ts)):
+            return None
+        open_ = cal.session_open(ts)
+        return open_.to_pydatetime().astimezone(timezone.utc)
+    except Exception:  # noqa: BLE001 - never let a calendar quirk raise into the caller
+        logger.exception("session_open_utc failed for %s; treating as unknown", d)
+        return None
+
+
 def next_session_close_utc(d: date) -> datetime | None:
     """The close instant (UTC) of the first valid NYSE trading session
     strictly after ``d``. Weekend/holiday-aware via exchange_calendars;

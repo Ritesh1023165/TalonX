@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import date as _date
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -63,6 +63,54 @@ RECOVERY_AFFECTED_EVIDENCE_NOTE = (
     "pooled with a clean track record. See "
     "docs/research/SESSION_2026-09-11_OUTCOMES.md."
 )
+
+# --------------------------------------------------------------------------- #
+# Cost treatment (Task 119A A2 correction) -- Task 119 originally labelled
+# every lane's costs "UNMODELED," which was WRONG for Original/Experimental:
+# talonx_paper/engine.py's apply_spread() DOES simulate a bid-ask spread
+# (talonx_paper/config.py's simulated_spread_bps, default 5.0 bps / 0.05% per
+# side -- a BUY pays half the spread more, a SELL receives half the spread
+# less) and it is applied to EVERY fill (talonx_paper/consumer.py), baked
+# directly into the stored entry_price/execution_price -- confirmed by
+# reading the source, not asserted from memory. What is genuinely NOT
+# modelled is an explicit flat commission (deliberately -- most modern
+# retail brokers are commission-free, per that module's own docstring) and
+# any market-impact/size-dependent slippage beyond the fixed bps spread.
+# V2 (talonx_v2/paper.py) applies NO spread adjustment at all -- entry_price/
+# exit_price are used exactly as passed in from the pricing adapter -- so
+# V2's figures are the most "optimistic" of the three lanes (zero simulated
+# friction of any kind), a materially different and more meaningful
+# distinction than a blanket "UNMODELED" label for every lane alike.
+_TALONX_PAPER_COST_BREAKDOWN = {
+    "spread_slippage": ("MODELED -- talonx_paper.engine.apply_spread(), default "
+                        "simulated_spread_bps=5.0 (0.05%) per side, applied to EVERY "
+                        "fill and baked into the stored entry_price/execution_price "
+                        "(not a separate line item; the exact bps in force at the time "
+                        "of an individual historical trade is not itself recorded per-row)"),
+    "explicit_commissions_fees": ("NOT modelled -- deliberate (assumes a commission-free "
+                                  "retail broker, per talonx_paper/config.py's own docstring)"),
+    "additional_modeled_costs": "none (no market-impact, financing, or borrow cost modelled)",
+    "unmodeled_costs": ("commissions/fees; any market-impact/size-dependent slippage beyond "
+                        "the fixed bid-ask spread"),
+    "summary": ("Realized P&L is net of the simulated bid-ask spread (already reflected in "
+               "the stored fill prices) but gross of commissions (assumed zero) and any "
+               "size-dependent slippage -- NOT \"net of all costs.\""),
+    "unrealized_caveat": ("cost_basis already reflects the entry-side spread; the current "
+                          "mark is a raw quote with no exit-side spread applied -- an actual "
+                          "exit right now would cross the spread again and realize slightly "
+                          "less than this mark-to-market figure. Not commission-adjusted."),
+    "modeled": True,
+}
+_V2_COST_BREAKDOWN = {
+    "spread_slippage": "NOT modelled -- V2 (talonx_v2/paper.py) fills at the exact quoted price with no spread adjustment (confirmed by reading the source)",
+    "explicit_commissions_fees": "NOT modelled",
+    "additional_modeled_costs": "none",
+    "unmodeled_costs": "spread/slippage of any kind, commissions/fees",
+    "summary": ("V2's realized/unrealized P&L are fully GROSS -- no friction of any kind is "
+               "simulated (unlike Original/Experimental's spread-adjusted fills) -- the most "
+               "optimistic of the three lanes, not \"net of all costs.\""),
+    "modeled": False,
+}
 
 
 def _ro(path: Path) -> sqlite3.Connection | None:
@@ -117,47 +165,77 @@ def _age_seconds(ts: str | None, now: datetime) -> float | None:
 def classify_valuation_timestamp(ts: str | None, *, now: datetime) -> dict[str, Any]:
     """Session classification for a price mark's timestamp.
 
-    Uses ``talonx_signals.market_sessions.session_close_utc`` (the SAME
-    exchange_calendars-backed regular-close instant already authoritative
-    elsewhere in this repo -- e.g. Task 99G forward-outcome resolution) --
-    never a re-derived approximation with its own drift risk. The regular
-    session's open is approximated as close - 6h30m (the standard NYSE
-    regular-session length on every trading day, full or half); this module
-    only needs OPEN/CLOSE/POST_CLOSE/PRE_MARKET labelling, not a precise
-    half-day open (which NYSE does not vary anyway).
+    Task 119A correction: uses BOTH
+    ``talonx_signals.market_sessions.session_open_utc`` AND
+    ``session_close_utc`` -- the SAME exchange_calendars-backed instants
+    already authoritative elsewhere in this repo (Task 99G forward-outcome
+    resolution) -- for the session boundary, instead of Task 119's
+    ``close - 6h30m`` approximation. That approximation is correct on a
+    full session but WRONG on an early-close (half) day (e.g. the
+    post-Thanksgiving half day is a 3.5h session, not 6.5h) -- fixed here
+    by reading the real open, which is also correctly DST-aware.
+
+    Distinguishes ``NON_SESSION_DAY`` (the calendar affirmatively says
+    ``ts``'s date is not a trading day -- a weekend/holiday, independently
+    confirmed via ``talonx_v2.calendar.is_session``, an established fact)
+    from ``UNKNOWN`` (the calendar mechanism itself could not be consulted
+    -- e.g. ``exchange_calendars`` unavailable/raised) -- per this task's
+    own instruction: "If session classification cannot be established,
+    show UNKNOWN," never silently folded into NON_SESSION_DAY.
+
+    Naive (tz-less) timestamps: every timestamp actually written by this
+    repo's paper-trading stores carries an explicit UTC offset (confirmed
+    by reading the real ledger schema/values) -- a naive string is treated
+    as UTC by ``_parse_ts`` purely as a defensive fallback, not because
+    that is a verified source contract for any producer.
     """
     dt = _parse_ts(ts)
     if dt is None:
         return {"classification": "UNAVAILABLE", "mark_timestamp": None, "mark_age_seconds": None,
-                "session_date": None, "regular_close_utc": None}
-    try:
-        from talonx_signals.market_sessions import session_close_utc
-        close = session_close_utc(dt.date())
-    except Exception:  # noqa: BLE001
-        close = None
+                "session_date": None, "regular_open_utc": None, "regular_close_utc": None}
     age = (now - dt).total_seconds()
-    if close is None:
-        classification = "NON_SESSION_DAY"
+    d = dt.date()
+    try:
+        from talonx_v2.calendar import is_session as _is_session
+        affirmed_non_session = not _is_session(d)
+    except Exception:  # noqa: BLE001
+        affirmed_non_session = None  # the independent check itself failed -- can't affirm either way
+    try:
+        from talonx_signals.market_sessions import session_open_utc, session_close_utc
+        open_ = session_open_utc(d)
+        close = session_close_utc(d)
+        calendar_failed = False
+    except Exception:  # noqa: BLE001
+        open_ = close = None
+        calendar_failed = True
+
+    if calendar_failed:
+        classification = "UNKNOWN"
+    elif close is None or open_ is None:
+        # market_sessions agrees no session exists for this date.
+        classification = "NON_SESSION_DAY" if affirmed_non_session is not False else "UNKNOWN"
+    elif dt < open_:
+        classification = "PRE_MARKET"
+    elif dt <= close:
+        classification = "REGULAR_SESSION"
     else:
-        open_ = close - timedelta(hours=6, minutes=30)
-        if dt < open_:
-            classification = "PRE_MARKET"
-        elif dt <= close:
-            classification = "REGULAR_SESSION"
-        else:
-            classification = "POST_CLOSE"
-    is_today = dt.date() == now.astimezone(timezone.utc).date()
-    if not is_today and classification != "UNAVAILABLE":
+        classification = "POST_CLOSE"
+
+    is_today = d == now.astimezone(timezone.utc).date()
+    if not is_today and classification in ("PRE_MARKET", "REGULAR_SESSION", "POST_CLOSE"):
         classification = "STALE_HISTORICAL"
     return {
         "classification": classification,
         "mark_timestamp": dt.isoformat(),
         "mark_age_seconds": round(age, 1),
-        "session_date": dt.date().isoformat(),
+        "session_date": d.isoformat(),
+        "regular_open_utc": open_.isoformat() if open_ else None,
         "regular_close_utc": close.isoformat() if close else None,
         "note": ("post-close mark -- NOT an official regular-session closing price"
                  if classification == "POST_CLOSE" else
                  "historical mark from a prior calendar day" if classification == "STALE_HISTORICAL"
+                 else "not a valid NYSE trading day" if classification == "NON_SESSION_DAY"
+                 else "session classification could not be established" if classification == "UNKNOWN"
                  else None),
     }
 
@@ -284,8 +362,7 @@ def _lane_paper_snapshot(
                 entry["unrealized_pnl_usd"] = round(upnl, 4)
                 entry["unrealized_pnl_pct"] = (round((upnl / r["cost_basis"]) * 100, 4)
                                                if r["cost_basis"] else None)
-                entry["unrealized_status"] = ("GROSS -- no commission/fee/slippage modelled "
-                                              "(UNMODELED, not zero)")
+                entry["unrealized_status"] = _TALONX_PAPER_COST_BREAKDOWN["unrealized_caveat"]
             entry["last_exit_evaluation"] = {
                 "status": "NOT_TRACKED",
                 "note": ("no dedicated exit-evaluation log exists; the mark timestamp above is "
@@ -320,8 +397,7 @@ def _lane_paper_snapshot(
                 "recovery_affected": recovery,
                 "recovery_affected_reason": recovery_affected_note if recovery else None,
                 "provenance": "CONFIRMED -- talonx_paper.store.trade_history (authoritative ledger row)",
-                "costs": "UNMODELED -- no commission/fee/slippage in talonx_paper.engine "
-                         "(gross == net for this ledger)",
+                "costs": _TALONX_PAPER_COST_BREAKDOWN["summary"],
             })
 
         buys = _qall(con, "SELECT ticker, timestamp FROM trade_history WHERE order_type='BUY'") \
@@ -381,9 +457,7 @@ def _lane_paper_snapshot(
                            "COMPLETE" if marked_value_complete else
                            "UNAVAILABLE -- unavailable, not an empty profitable portfolio"),
             },
-            "costs": {"modeled": False,
-                      "note": "no commission/fee/slippage modelled anywhere in talonx_paper.engine "
-                              "(confirmed by source read); treated as UNMODELED, never subtracted twice"},
+            "costs": dict(_TALONX_PAPER_COST_BREAKDOWN),
             "equity": {
                 "value": round(equity_value, 4) if equity_value is not None else None,
                 "status": equity_status,
@@ -475,7 +549,7 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
                 unrealized_total += upnl
                 entry["marked_value"] = round(mv, 4)
                 entry["unrealized_pnl_usd"] = round(upnl, 4)
-                entry["unrealized_status"] = "GROSS -- no commission/fee/slippage modelled"
+                entry["unrealized_status"] = _V2_COST_BREAKDOWN["summary"]
             open_detail.append(entry)
 
         closed_detail = [{
@@ -488,7 +562,7 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
             "exit_reason": "10-trading-day hold horizon (frozen V2 contract)",
             "recovery_affected": False, "recovery_affected_reason": None,
             "provenance": "CONFIRMED -- v2_lane.db.positions (authoritative campaign ledger row)",
-            "costs": "UNMODELED -- no commission/fee/slippage in V2's paper fill logic",
+            "costs": _V2_COST_BREAKDOWN["summary"],
         } for r in closed]
 
         buy_count = _q1(con, "SELECT COUNT(*) FROM trades WHERE action='BUY'") if _has_table(con, "trades") else 0
@@ -532,7 +606,7 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
                               "status": ("N/A -- zero open positions (a valid 0)" if not opens else
                                         "COMPLETE" if marked_value_complete else
                                         "UNAVAILABLE -- unavailable, not an empty profitable portfolio")},
-            "costs": {"modeled": False, "note": "no commission/fee/slippage modelled in V2's paper fill logic"},
+            "costs": dict(_V2_COST_BREAKDOWN),
             "equity": {"value": round(equity_value, 4) if equity_value is not None else None,
                       "status": equity_status, "formula": "cash + marked open-position value",
                       "note": None if equity_status == "COMPLETE" else
@@ -547,6 +621,25 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
         }
     finally:
         con.close()
+
+
+def build_v2_paper_performance(
+    v2_db: Path, *, home: Path | None = None, now: datetime | None = None,
+) -> dict[str, Any]:
+    """Public entrypoint for V2's richer accounting alone -- used by
+    ``v2_active_strategy()`` (Task 119A A1) so V2's equity/reconciliation/
+    cost breakdown is folded into its ONE existing destination (the Active
+    V2 tab's campaign-ledger card) rather than duplicated on a second tab.
+    ``home`` (Original's ``~/.talonx``, for the shared ``latest_prices``
+    mark fallback) is optional -- without it, marks come only from
+    ``v2_db``'s own tables (which has none), so unrealized P&L reads
+    UNAVAILABLE rather than silently using a different, uncontrolled
+    source.
+    """
+    now = now or datetime.now(timezone.utc)
+    session_date = now.astimezone(timezone.utc).date().isoformat()
+    price_source = (Path(home) / "paper_trading.db") if home is not None else None
+    return _v2_snapshot(Path(v2_db), now=now, session_date=session_date, price_source_db=price_source)
 
 
 def build_paper_performance(

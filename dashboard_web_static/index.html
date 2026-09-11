@@ -99,7 +99,6 @@
   <button data-sec="validation">Validation</button>
   <button data-sec="intelligence">Intelligence</button>
   <button data-sec="paper_eod">Paper / EOD</button>
-  <button data-sec="paper_performance">Paper Performance</button>
 </nav>
 <nav id="legacy">
   <span class="muted small" style="align-self:center;margin-right:4px">legacy views:</span>
@@ -365,23 +364,81 @@ function renderIntelligence(d){
   return h;
 }
 
+function costLine(co){
+  if(!co) return 'UNMODELED';
+  if(typeof co==='string') return esc(co);
+  return esc(co.summary||co.note||'UNMODELED');
+}
+
+// Task 119A A1: ONE card per lane, combining the pre-existing thin
+// ARM-based summary (attribution/status/note) with the folded-in richer
+// per-lane accounting (perf) when available -- never two separate cards
+// for the same lane's numbers.
+function lanePaperCard(cls, title, base, perf, extraBanner){
+  base = base||{};
+  let h=`<div class="card ${cls} card-wide"><h3>${esc(title)}${perf&&perf.strategy_identity? ' — '+esc(perf.strategy_identity):''} ${pill(base.status)}</h3>`;
+  if(extraBanner) h+=`<div class="banner internal small" style="margin:0 0 8px">${esc(extraBanner)}</div>`;
+  h+=`<div class="muted small" style="margin-bottom:6px">${esc(base.attribution||(perf&&perf.attribution)||'')}</div>`;
+  if(!perf){
+    h+=`<div class="grid"><div>`+kv('open positions', num(base.open_positions))+kv('trades all-time', num(base.trades_all_time))+
+       kv('current cash', num(base.current_cash))+`</div></div>`+
+       `<div class="muted small">${esc(base.note||'')}</div></div>`;
+    return h;
+  }
+  const op=perf.open_positions||{}, rp=perf.realized_pnl||{}, up=perf.unrealized_pnl||{}, eq=perf.equity||{},
+        rc=perf.reconciliation||{}, tc=perf.trade_counts||{}, per=perf.period||{}, sc=perf.starting_capital||{}, co=perf.costs;
+  h+=`<div class="grid">`;
+  h+=`<div>`+kv('as-of / period', esc(per.as_of_date))+
+     kv('campaign start', per.campaign_start? esc(String(per.campaign_start).slice(0,19)) : esc(per.campaign_start_basis))+
+     kv('starting capital', num(sc.amount))+kv('cash', num(perf.cash))+
+     kv('open positions', op.count)+kv('open cost basis', num(op.cost_basis_total))+
+     kv('marked open value', num(op.marked_value_total)+' '+pill(op.marked_value_status&&op.marked_value_status.split(' ')[0]))+
+     `</div>`;
+  h+=`<div>`+kv('realized P&L (campaign)', num(rp.campaign_to_date))+
+     kv('unrealized P&L', (up.total==null?'—':num(up.total))+' '+pill((up.status||'').split(' ')[0]))+
+     kv('costs', costLine(co))+
+     kv('equity (cash+marked open)', num(eq.value)+' '+pill(eq.status))+
+     kv('reconciliation', pill(rc.status))+
+     kv('entries/exits today', num(tc.entries_today)+' / '+num(tc.exits_today))+
+     kv('entries/exits campaign', num(tc.entries_campaign_to_date)+' / '+num(tc.exits_campaign_to_date))+
+     `</div></div>`;
+  if(co && co.spread_slippage) h+=`<div class="src">cost model: spread/slippage — ${esc(co.spread_slippage)} · commissions/fees — ${esc(co.explicit_commissions_fees)}</div>`;
+  if(eq.note) h+=`<div class="muted small">${esc(eq.note)}</div>`;
+  if(rc.status && rc.status!=='UNAVAILABLE') h+=`<div class="src">reconciliation: expected_cash=${num(rc.expected_cash)} actual_cash=${num(rc.actual_cash)} diff=${num(rc.diff)} — ${esc(rc.basis||'')}</div>`;
+  h+=boundedTable(op.detail||[], [
+     {label:'symbol', get:p=>p.symbol}, {label:'entry time', get:p=>p.entry_time&&String(p.entry_time).slice(0,19)},
+     {label:'qty', get:p=>p.quantity}, {label:'cost basis', get:p=>p.cost_basis},
+     {label:'mark', get:p=>p.mark}, {label:'mark session', get:p=>p.mark_session_classification},
+     {label:'mark age', get:p=>ageStr(p.mark_age_seconds)},
+     {label:'unrealized $', get:p=>p.unrealized_pnl_usd}, {label:'obligation', get:p=>p.pending_exit_obligation}], 20);
+  if((op.detail||[]).some(p=>p.mark_note)) h+=`<div class="muted small">${(op.detail||[]).filter(p=>p.mark_note).map(p=>esc(p.symbol)+': '+esc(p.mark_note)).join(' · ')}</div>`;
+  h+=`<details><summary>closed trades (${(perf.closed_trades||[]).length})</summary>`+
+     boundedTable(perf.closed_trades||[], [
+        {label:'symbol', get:t=>t.symbol}, {label:'exit time', get:t=>t.exit_event_time&&String(t.exit_event_time).slice(0,19)},
+        {label:'qty', get:t=>t.quantity}, {label:'entry px', get:t=>t.entry_price}, {label:'exit px', get:t=>t.exit_price},
+        {label:'realized $', get:t=>t.realized_pnl_usd}, {label:'exit reason', get:t=>t.exit_reason},
+        {label:'recovery-affected', get:t=>t.recovery_affected?'YES':'no'}, {label:'provenance', get:t=>t.provenance&&String(t.provenance).slice(0,9)}], 20)+
+     `</details>`;
+  const flagged=(perf.closed_trades||[]).filter(t=>t.recovery_affected);
+  if(flagged.length) h+=`<div class="banner warn">${flagged.length} recovery-affected closed trade(s): ${esc(flagged[0].recovery_affected_reason||'')}</div>`;
+  h+=`</div>`;
+  return h;
+}
+
 function renderPaperEod(d){
   const o=d.original_local_paper||{}, e=d.experimental_validation_paper||{}, p=d.piv_alpaca_paper||{}, r=d.eod_reconciliation||{};
-  let h=`<h2 class="section-title">Paper / EOD</h2>`+
-    `<div class="banner warn">${esc(d.separation_note||'')}</div><div class="grid">`;
-  h+=`<div class="card orig"><h3>Original local paper</h3>`+
-     kv('attribution', o.attribution)+kv('status', pill(o.status))+
-     kv('open positions', num(o.open_positions))+kv('trades all-time', num(o.trades_all_time))+
-     kv('current cash', num(o.current_cash))+`<div class="muted small">${esc(o.note||'')}</div></div>`;
-  h+=`<div class="card exp"><h3>Experimental validation paper</h3>`+
-     `<div class="banner internal small" style="margin:0 0 8px">internal only — simulated, no real capital</div>`+
-     kv('attribution', e.attribution)+kv('status', pill(e.status))+
-     kv('open positions', num(e.open_positions))+kv('trades all-time', num(e.trades_all_time))+
-     kv('current cash', num(e.current_cash))+`<div class="muted small">${esc(e.note||'')}</div></div>`;
+  let h=`<h2 class="section-title">Paper / EOD — portfolios and reconciliation</h2>`+
+    `<div class="banner warn">${esc(d.separation_note||'')}</div>`+
+    `<div class="src">session date ${esc(d.session_date)} · regular session close (UTC) ${esc(d.regular_session_close_utc)}</div>`+
+    `<div class="grid">`;
+  h+=lanePaperCard('orig', 'Original local paper', o, o.performance);
+  h+=lanePaperCard('exp', 'Experimental validation paper', e, e.performance,
+                   'internal only — simulated, no real capital');
   h+=`<div class="card"><h3>PIV / Alpaca PAPER</h3>`+
      kv('attribution', p.attribution)+kv('status', pill(p.status))+
      kv('positions', pill(p.positions))+kv('orders', pill(p.orders))+
-     `<div class="muted small">${esc(p.note||'')}</div></div>`;
+     `<div class="muted small">${esc(p.clarification||p.note||'')}</div></div>`;
+  if(d.intelligence_note) h+=`<div class="card"><h3>Intelligence</h3>`+kv('attributable paper ledger', pill('NO'))+`<div class="muted small">${esc(d.intelligence_note)}</div></div>`;
   const ot=d.official_telegram_last_send;
   if(ot){
     h+=`<div class="card card-wide"><h3>Official Telegram — last confirmed send</h3>`+
@@ -393,62 +450,9 @@ function renderPaperEod(d){
   h+=`<div class="card card-wide"><h3>EOD reconciliation ${pill(r.status)}</h3>`+
      kv('authoritative source', r.authoritative_source)+kv('last update', r.last_update)+
      `<div class="muted small">${esc(r.note||'')}</div>`+
-     `<details open><summary>reconciliation detail</summary><pre class="json">${esc(JSON.stringify(r.values||{},null,1))}</pre></details></div>`;
+     `<details open><summary>reconciliation detail</summary><pre class="json">${esc(JSON.stringify(r.values||{},null,1))}</pre></details>`+
+     `<div class="src">This EXACT/PARTIAL arithmetic check is independent of valuation-mark freshness, cost-model completeness, recovery-affected provenance and PIV — an EXACT reconciliation here never implies those other, separately-shown checks are also verified.</div></div>`;
   h+=`</div>`;
-  return h;
-}
-
-function laneCard(l){
-  if(!l) return '';
-  const op=l.open_positions||{}, rp=l.realized_pnl||{}, up=l.unrealized_pnl||{}, eq=l.equity||{},
-        rc=l.reconciliation||{}, tc=l.trade_counts||{}, per=l.period||{}, sc=l.starting_capital||{}, co=l.costs||{};
-  let h=`<div class="card card-wide"><h3>${esc(l.lane)} — ${esc(l.strategy_identity||'')} ${pill(l.status)}</h3>`+
-    `<div class="muted small" style="margin-bottom:6px">${esc(l.attribution||'')}</div><div class="grid">`;
-  h+=`<div>`+kv('as-of / period', esc(per.as_of_date))+
-     kv('campaign start', per.campaign_start? esc(String(per.campaign_start).slice(0,19)) : esc(per.campaign_start_basis))+
-     kv('starting capital', num(sc.amount))+kv('cash', num(l.cash))+
-     kv('open positions', op.count)+kv('open cost basis', num(op.cost_basis_total))+
-     kv('marked open value', num(op.marked_value_total)+' '+pill(op.marked_value_status&&op.marked_value_status.split(' ')[0]))+
-     `</div>`;
-  h+=`<div>`+kv('realized P&L (campaign)', num(rp.campaign_to_date))+
-     kv('unrealized P&L', (up.total==null?'—':num(up.total))+' '+pill((up.status||'').split(' ')[0]))+
-     kv('costs', esc(co.note||'UNMODELED'))+
-     kv('equity (cash+marked open)', num(eq.value)+' '+pill(eq.status))+
-     kv('reconciliation', pill(rc.status))+
-     kv('entries/exits today', num(tc.entries_today)+' / '+num(tc.exits_today))+
-     kv('entries/exits campaign', num(tc.entries_campaign_to_date)+' / '+num(tc.exits_campaign_to_date))+
-     `</div></div>`;
-  if(eq.note) h+=`<div class="muted small">${esc(eq.note)}</div>`;
-  if(rc.status && rc.status!=='UNAVAILABLE') h+=`<div class="src">reconciliation: expected_cash=${num(rc.expected_cash)} actual_cash=${num(rc.actual_cash)} diff=${num(rc.diff)} — ${esc(rc.basis||'')}</div>`;
-  h+=boundedTable(op.detail||[], [
-     {label:'symbol', get:p=>p.symbol}, {label:'entry time', get:p=>p.entry_time&&String(p.entry_time).slice(0,19)},
-     {label:'qty', get:p=>p.quantity}, {label:'cost basis', get:p=>p.cost_basis},
-     {label:'mark', get:p=>p.mark}, {label:'mark session', get:p=>p.mark_session_classification},
-     {label:'mark age', get:p=>ageStr(p.mark_age_seconds)},
-     {label:'unrealized $', get:p=>p.unrealized_pnl_usd}, {label:'obligation', get:p=>p.pending_exit_obligation}], 20);
-  if((op.detail||[]).some(p=>p.mark_note)) h+=`<div class="muted small">${(op.detail||[]).filter(p=>p.mark_note).map(p=>esc(p.symbol)+': '+esc(p.mark_note)).join(' · ')}</div>`;
-  h+=`<details><summary>closed trades (${(l.closed_trades||[]).length})</summary>`+
-     boundedTable(l.closed_trades||[], [
-        {label:'symbol', get:t=>t.symbol}, {label:'exit time', get:t=>t.exit_event_time&&String(t.exit_event_time).slice(0,19)},
-        {label:'qty', get:t=>t.quantity}, {label:'entry px', get:t=>t.entry_price}, {label:'exit px', get:t=>t.exit_price},
-        {label:'realized $', get:t=>t.realized_pnl_usd}, {label:'exit reason', get:t=>t.exit_reason},
-        {label:'recovery-affected', get:t=>t.recovery_affected?'YES':'no'}, {label:'provenance', get:t=>t.provenance&&String(t.provenance).slice(0,9)}], 20)+
-     `</details>`;
-  const flagged=(l.closed_trades||[]).filter(t=>t.recovery_affected);
-  if(flagged.length) h+=`<div class="banner warn">${flagged.length} recovery-affected closed trade(s): ${esc(flagged[0].recovery_affected_reason||'')}</div>`;
-  h+=`</div>`;
-  return h;
-}
-
-function renderPaperPerformance(d){
-  const L=d.lanes||{};
-  let h=`<h2 class="section-title">Paper Performance — per-lane P&amp;L, open positions and reconciliation</h2>`+
-    `<div class="banner warn">${esc(d.cross_lane_note||'')}</div>`+
-    `<div class="src">session date ${esc(d.session_date)} · regular session close (UTC) ${esc(d.regular_session_close_utc)} · generated ${esc(d.generated_utc)}</div>`;
-  h+=laneCard(L.original)+laneCard(L.experimental)+laneCard(L.v2);
-  const piv=L.piv||{}, intel=L.intelligence||{};
-  h+=`<div class="card"><h3>PIV / Alpaca PAPER</h3>`+kv('status', pill(piv.status))+`<div class="muted small">${esc(piv.note||'')}</div></div>`;
-  h+=`<div class="card"><h3>Intelligence</h3>`+kv('attributable paper ledger', pill(intel.attributable_paper_ledger?'YES':'NO'))+`<div class="muted small">${esc(intel.note||'')}</div></div>`;
   return h;
 }
 
@@ -492,14 +496,19 @@ function renderV2(d){
      kv('completeness', pill(cov.completeness))+
      kv('pricing mode', r.pricing_mode)+kv('pricing adapter', r.pricing_adapter)+
      kv('pricing unavailable', (r.pricing_unavailable_recent||[]).join(', ')||'none')+`</div>`;
-  // $300k campaign ledger
+  // $300k campaign ledger -- Task 119A A1: V2's richer accounting
+  // (equity/reconciliation/cost breakdown) is folded in HERE, its one
+  // existing destination, rather than a second tab.
+  const vperf=l.performance||{}, veq=vperf.equity||{}, vrc=vperf.reconciliation||{}, vco=vperf.costs;
   h+=`<div class="card card-wide"><h3>$300,000 campaign ledger ${pill(l.status)}</h3><div class="grid">`+
      `<div>`+kv('starting cash', num(l.starting_campaign_cash))+kv('cash', num(l.cash))+
        kv('available', num(l.available_capital))+kv('allocated', num(l.allocated_capital))+
-       kv('capacity', l.capacity)+`</div>`+
+       kv('capacity', l.capacity)+kv('equity (cash+marked open)', num(veq.value)+' '+pill(veq.status))+`</div>`+
      `<div>`+kv('open positions', l.n_open)+kv('closed positions', l.closed_positions)+
        kv('BUY / SELL (lifetime)', (l.buys==null?'—':l.buys)+' / '+(l.sells==null?'—':l.sells))+
-       kv('realized P&L', num(l.realized_pnl_usd))+kv('EXIT_UNRESOLVED', l.exit_unresolved)+`</div></div>`+
+       kv('realized P&L', num(l.realized_pnl_usd))+kv('EXIT_UNRESOLVED', l.exit_unresolved)+
+       kv('reconciliation', pill(vrc.status))+kv('costs', costLine(vco))+`</div></div>`+
+     (vrc.status && vrc.status!=='UNAVAILABLE'? `<div class="src">reconciliation: expected_cash=${num(vrc.expected_cash)} actual_cash=${num(vrc.actual_cash)} diff=${num(vrc.diff)} — ${esc(vrc.basis||'')}</div>`:'')+
      boundedTable(l.open_positions||[], [
         {label:'symbol', get:p=>p.symbol}, {label:'entry session', get:p=>p.entry_session},
         {label:'entry px', get:p=>p.entry_price}, {label:'planned exit', get:p=>p.target_exit_session},
@@ -538,7 +547,6 @@ const SECTION_RENDER = {
   overview: renderOverview, premarket: renderPremarket, original_quant: renderOriginalQuant,
   v2_active_strategy: renderV2,
   validation: renderValidation, intelligence: renderIntelligence, paper_eod: renderPaperEod,
-  paper_performance: renderPaperPerformance,
 };
 
 let activeSection = "overview";

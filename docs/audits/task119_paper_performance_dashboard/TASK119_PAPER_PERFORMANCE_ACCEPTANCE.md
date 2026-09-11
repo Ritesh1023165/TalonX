@@ -1,5 +1,26 @@
 # Task 119 — attributable paper-performance dashboard: acceptance
 
+> **2026-09-12 (Task119A) correction — do not treat this document's claims
+> below as the final state.** Task 119 added a SEPARATE "Paper Performance"
+> tab alongside the pre-existing "Paper / EOD" tab, duplicating
+> Original/Experimental's numbers across two destinations with different
+> period labels and no reconciliation between them. It also mislabelled
+> Original/Experimental's costs as blanket "UNMODELED" when
+> `talonx_paper.engine.apply_spread()` in fact DOES simulate a bid-ask
+> spread (baked into every fill price) — only explicit commissions/fees
+> are unmodeled. It also approximated the regular-session open as
+> `close - 6h30m`, which is wrong on an early-close (half) day. All three
+> are corrected in Task 119A — see
+> `docs/audits/task119a_paper_eod_integration/TASK119A_CORRECTIONS_AND_INTEGRATION.md`
+> for the full account, and the workflow lesson: **acceptance must cover
+> the actual requested user journey (one destination for paper portfolios
+> and reconciliation), not merely passing fixtures for a different,
+> additional-tab implementation that technically worked but did not match
+> what was asked.** The screenshots and reconciliation table referenced
+> below still accurately describe the tab AS IT EXISTED at Task 119's own
+> completion; that tab no longer exists post-Task-119A — its data is now
+> folded into Paper/EOD and Active V2, per the corrected document above.
+
 **Branch**: `hotfix/task119-paper-performance-dashboard`, parent `d4177b3`
 (release `research/talonx-strategy-validation`'s HEAD at task start —
 verified, not assumed, at start of this task).
