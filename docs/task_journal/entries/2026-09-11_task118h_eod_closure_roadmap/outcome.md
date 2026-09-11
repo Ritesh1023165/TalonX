@@ -1,0 +1,19 @@
+1. **EOD verdict**: **EOD_PASS_WITH_FINDINGS.** Close was due at task start (checked 20:09:11Z, past the 20:00:00Z expected close, well within the 21:30:00Z deadline — no lateness to document). Executed `python -m talonx_ops.prospective close` at `2026-09-11T20:09:38+01:00` (20:09:38Z). Canonical verdict **PASS_WITH_FINDINGS**; one finding (`base_reconciliation: PARTIAL`, no PIV reader — known, pre-existing, non-blocking, `mismatches: []`).
+
+2. **SHAs**: release `5c0b3f3ccfef45ff8438e75f8f614b738deefc9a` (unchanged — EOD is not a code deployment) → docs `d4177b3`. Research `7d2c417` → this commit. Both pushed.
+
+3. **Per-lane activity**: Original 0 published/0 pushed today. V2 0 signals/0 trades, cash unchanged $300,000. Intelligence: 6 cards → 1 Telegram message (unchanged since this morning). Experimental: **4 exits today** (VRT/STX/AMD/BLSH — confirmed via the canonical EOD's own `trades_today: 4` field, not asserted from memory); the 5 entries span 2026-09-09/10, **not** "five entries today."
+
+4. **Experimental / SPCX**: realized total reconfirmed exactly **−$324.4662160270568** (`mismatches: []` at canonical close). **SPCX still open** at close — final pre-shutdown mark **$151.2100** (2026-09-11T20:08:00Z, the last real observation before shutdown) → **unrealized +$50.30 (+2.01%)**. No fill forced or backdated; price never reached target ($152.0633). Carries over to Monday under its existing policy. VRT/STX/AMD/BLSH remain flagged recovery-affected, not pooled with a clean track record.
+
+5. **V2 reconciliation**: cash $300,000 (start=end), 0/0/0 open/closed/unresolved, ABCL episode `07242bc857569f60` unchanged (terminal), fingerprint `11107198c5b81237` unchanged, all named invariant asserts PASS.
+
+6. **Shutdown/Redis**: verified independently — all 3 session pids (`11700`, `552`, `16524`) confirmed gone via `psutil`; no listening socket on any TalonX port; `redis.ping() → True`, retained and responsive, not flushed/restarted. No unintended respawn.
+
+7. **Remaining issues / next-session readiness**: heartbeat-lapse locus and "45 candidates" source still unresolved (no new evidence). Mid-session (non-startup) bulk-failure recovery remains an explicit, known gap (today's fix is startup-only). Go/no-go conditions for the next start stated in `NEXT_SESSION_HANDOFF.md`; **no GO declared here** — that decision belongs to next-session preflight.
+
+8. **Selected next task**: **Option 3 — an attributable, per-lane paper-performance reconciliation surface** (realized/unrealized P&L, trade counts, recovery-affected flags, shown together per lane). Advances the stated requirement "attributable local paper portfolios" / "dashboard and paper results must remain attributable by lane" directly. Uses **zero new data** — every figure already exists, independently reconciled (`mismatches: []` today). **Acceptance criteria**: exact agreement with canonical EOD figures; recovery-affected trades visibly flagged; timestamped/staleness-labelled valuations, never a fabricated zero; no strategy/threshold/scope read or write. Rejected alternatives: extending volatility tracking to Experimental (still just "wait for more data," Option 1) and re-testing Original's volatility threshold economics (already closed by Task 95A at much higher power, Option 2). **Specified here, not implemented** — an EOD/roadmap task, not new engineering under time pressure.
+
+9. **Links**: `docs/research/{SESSION_2026-09-11_FINAL,NEXT_SESSION_HANDOFF,PRODUCT_REQUIREMENTS_AND_NEXT_DECISION}.md` (this commit).
+
+**Operational success** (clean canonical close, all invariants green, full continuity) is **not** substituted for **profitability evidence** — none is established for any live-scope lane; SPCX's positive swing and Experimental's now-working exit mechanism are explicitly not treated as such.

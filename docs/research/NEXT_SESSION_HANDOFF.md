@@ -1,83 +1,97 @@
-# Next-session handoff (prepared 2026-09-11, ~16:22 UTC)
+# Next-session handoff (finalized 2026-09-11, post-canonical-close)
 
-**Do not auto-start the next session — this is a handoff document, not a
-scheduler.**
+**Do not launch the next session automatically — this is a handoff
+document, not a scheduler. No GO is declared here; GO/NO-GO is a
+preflight-time decision at next start.**
 
 ## Candidate release for the next session
 
-- **SHA**: `5c0b3f3ccfef45ff8438e75f8f614b738deefc9a` (release branch
-  `research/talonx-strategy-validation`) — the currently-running,
-  live-accepted revision.
+- **SHA**: `5c0b3f3ccfef45ff8438e75f8f614b738deefc9a` (unchanged since
+  Task 118F's deployment; this session's canonical close made no code
+  change).
 - **Effective configuration**: V2 fingerprint `11107198c5b81237`, 39-name
   `resolved-active-watchlist` execution scope, 45-day lookback,
   `composite-yf` pricing, official V2/Intelligence Telegram delivery
   enabled, Experimental external delivery OFF, `--tick-seconds 150
   --heartbeat-seconds 30`.
-- **Env vars required before `start`** (unchanged since Task 117):
-  `TALONX_INTEL_DELIVER_CARDS=1`, `TALONX_INTEL_DRY_RUN_DELIVERY=0`,
-  `TALONX_INTEL_DELIVER_PER_CYCLE=20`,
+- **Env vars required before `start`**: `TALONX_INTEL_DELIVER_CARDS=1`,
+  `TALONX_INTEL_DRY_RUN_DELIVERY=0`, `TALONX_INTEL_DELIVER_PER_CYCLE=20`,
   `TALONX_INTEL_DELIVER_TIMEOUT_SECONDS=20`,
   `TALONX_INTEL_DELIVER_DIGEST_INTERVAL_SECONDS=21600`,
   `TALONX_INTEL_DELIVER_AGE_CUTOFF=1`.
 
-## Warmup recovery — observable acceptance criteria for the next startup
+## Startup / warmup recovery procedure and readiness checks
 
-Expect, in `original.log`, shortly after `Initial Quant preseed complete:
-N/43 symbol(s) ready`:
-```
-Bounded preseed recovery sweep complete: R/M previously not-ready
-symbol(s) recovered in Xs (still incomplete: [...])
-```
-This fires **only** if `N < 43` at startup. Any still-incomplete symbol
-after the sweep is expected to close via ordinary live accumulation
-within the session (today: ~4 bars / a few minutes for the one remaining
-case). **This is a bounded, once-per-startup sweep — not continuous
-mid-session recovery.** If a bulk provider failure recurs mid-session
-(not at startup), no automatic recovery exists for it; that remains a
-known, undecided-scope gap for a future task, not silently claimed as
-covered.
+1. `python -m talonx_ops.prospective preflight --expected-sha 5c0b3f3...`
+   — all 17 gates must read `[OK]`.
+2. `python -m talonx_ops.prospective start ...` (same flags as today,
+   §Candidate release above).
+3. Watch `original.log` for `Initial Quant preseed complete: N/43` then,
+   **only if N<43**, `Bounded preseed recovery sweep complete: R/M ...`.
+4. **Per-symbol unsupported-data handling**: any symbol still not-ready
+   after the sweep is reported explicitly (never silently treated as
+   ready) and is expected to close via ordinary live accumulation during
+   the session — if a symbol remains persistently not-ready across
+   multiple sessions, that is new evidence worth a fresh, bounded
+   investigation (not covered by today's fix, which is a one-shot
+   startup sweep only).
+5. Verify readiness independently against `quant.db.bar_buffer`
+   (≥120 1-minute bars), not the log summary alone.
 
-## Known data limitations / unresolved findings (carried forward, not re-litigated)
+## Open-position and pending-notification obligations
 
-- Task 118C's heartbeat-lapse locus (exact producer-write-vs-reader-read
-  cause of the one 14:29:18Z DISCONNECTED reading) — unresolved.
-- The historical "45 candidates" counter's exact source query — unresolved.
+- **Experimental: SPCX carries over**, 16.865960 sh, entry $148.2276,
+  stop $144.6133, target $152.0633 — resolves under its existing policy
+  on its own next qualifying tick; no manual action.
+- **V2**: 0 open positions, no pending entry/exit obligations, ABCL
+  episode `07242bc857569f60` remains terminal (`SKIPPED_ENTRY_STALE`).
+- **Intelligence**: 0 pending cards at last check.
+- **No other obligation carries over.**
+
+## Feed / exit-evaluation / delivery verification (next session)
+
+- Confirm `talonx:ingest:liveness` key is present, TTL refreshing, and
+  `last_market_event_age_seconds` stays low during the regular session.
+- Confirm at least one Experimental exit-check log line appears for SPCX
+  shortly after open (proves the exit path is live, independent of any
+  new entry).
+- Confirm Intelligence `card_delivery.messages_sent_today` (not just
+  `sent_today`) if any new digest fires.
+
+## Canonical EOD procedure (unchanged)
+
+`python -m talonx_ops.prospective close`, at/after the verified XNYS
+close for that session, target completion within 90 minutes. Verify
+`base_reconciliation.mismatches == []` and clean shutdown (`psutil` pid
+check + port check + `redis.ping()`), exactly as done today.
+
+## Known limitations (carried forward)
+
+- Heartbeat-lapse locus (Task 118C) — unresolved.
+- Historical "45 candidates" counter source — unresolved.
 - SHOP has no local daily-bar price coverage in the frozen research
-  dataset (unrelated to live trading; a research-replay-only gap).
+  dataset (research-replay-only; irrelevant to live trading).
+- The bounded recovery sweep is startup-only — a mid-session bulk
+  provider failure has no automatic recovery (explicit, known gap).
 
-## Open positions / pending notifications / next lifecycle actions
+## Explicit go/no-go conditions for next start
 
-- **V2**: 0 open positions, $300,000 cash, no pending entry/exit
-  obligations. ABCL episode `07242bc857569f60` remains `SKIPPED_ENTRY_STALE`
-  (terminal, no action needed).
-- **Experimental**: **SPCX open** (16.86596 sh, entry $148.2276, stop
-  $144.6133, target $152.0633) — carries over to the next session under
-  its existing stop/target/gap policy; no manual action required or
-  authorized.
-- **Intelligence**: no pending PENDING-state cards at last check
-  (`PENDING: 0`); nothing outstanding.
-- **Immediate required operator action** (today, not next-session): run
-  `python -m talonx_ops.prospective close` at/after
-  **2026-09-11T20:00:00Z**, complete by **2026-09-11T21:30:00Z** — see
-  `TASK118G_FINAL_ACCEPTANCE.md` for the pre-close acceptance evidence
-  this handoff is based on.
+**GO** if: preflight all-`[OK]`, no live prior stack detected, V2 ledger
+continuity confirmed, Redis reachable. **NO-GO / investigate first** if:
+any preflight gate fails, a competing writer is detected, or the V2
+ledger fingerprint/md5 differs unexpectedly from this session's final
+state. **This decision is made at next-session preflight time, not here.**
 
 ## Next market session
 
-**Monday 2026-09-14** (verified via `talonx_v2.calendar.is_session` —
-2026-09-12/13 are a Saturday/Sunday, correctly non-sessions).
+**Monday 2026-09-14**, re-verified via `talonx_v2.calendar.is_session`
+(2026-09-12/13 correctly read as non-sessions).
 
-## One next research action
+## One next research/product action
 
-**Same as Task 118E/F's `ONE_TESTABLE_HYPOTHESIS` / `EXPLORATORY_ASSOCIATION_SUPPORTS_ONE_FURTHER_TEST`**
-— unchanged, not re-opened or re-optimized in this task: track pre-entry
-realized volatility for every new **live** 39-name-scope entry going
-forward, and once N≥10 new live entries accumulate, test (within-scope
-only) whether higher-volatility entries realize worse net returns,
-matching the already-published protocol in
-`docs/research/TASK118F_VOLATILITY_RETURN_TEST.md`. **New information
-this provides**: the only genuinely unused data available to this
-programme — every other analysis this session (A/B/C comparison,
-composition check, volatility-return test) reused the same already-
-inspected 2024–2026 history. No further backtest or historical re-slice
-is proposed as a substitute.
+See `PRODUCT_REQUIREMENTS_AND_NEXT_DECISION.md` — **Option 3, selected**:
+an attributable, per-lane paper-performance reconciliation surface
+(zero new data, reuses existing reconciled figures, produces a usable
+capability with stated acceptance criteria). Live volatility tracking
+(Task 118E/F protocol) continues in parallel but is explicitly not the
+sole programme.
