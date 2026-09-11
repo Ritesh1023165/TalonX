@@ -137,4 +137,16 @@ strategy/threshold/config change in the release worktree.
 `run_baseline_a_300k_diagnostic.py`; this journal's `TASK_INDEX.md` row.
 
 ## Later corrections
-None yet.
+**2026-09-11 (Task 118A)**: three corrections found on review, all
+appended (never edited into the original text) — see
+`docs/research/TASK118A_RESEARCH_CORRECTIONS.md` for full detail: (1) the
+next-experiment rejection criterion was ambiguously/backwards worded,
+replaced with an unambiguous bounded observation protocol (N≥30, monthly
+review, ≥60 days, block-bootstrap CI, entirely-negative-CI as the actual
+adverse-result trigger); (2) the −$23,042.30 drawdown is base-independent
+in dollars but not in percentage — the $300,000 live-campaign base gives
+−7.68%, not the −0.23% reported against the $10,000,000 book alone; (3)
+"every free-data alpha space is closed" corrected to name the ten specific
+tested hypothesis families (Task 93/94/95A/95B/95D/95E-G/95I/95K/97/106A)
+and their individual limiting findings, rather than an unqualified blanket
+claim.

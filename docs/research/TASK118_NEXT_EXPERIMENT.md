@@ -1,5 +1,15 @@
 # Task 118 Part 5 — decision table and recommended next experiment (2026-09-11)
 
+> **2026-09-11 (Task 118A) corrections appended, original text below
+> unedited**: (1) the rejection criterion below was ambiguously worded and
+> could be read backwards (a positive-side CI is evidence FOR the scope,
+> never a rejection trigger) — see `TASK118A_RESEARCH_CORRECTIONS.md`
+> Correction 1 for the corrected, unambiguous bounded observation protocol,
+> which supersedes the informal criterion stated here. (2) "every
+> alternative free-data alpha space is already closed" (below) is corrected
+> to name the ten specific tested hypothesis families and their individual
+> limiting findings — see Correction 3.
+
 ## Decision table
 
 | lane | available evidence | economic result | limiting factor | next experiment | promotion requirement |

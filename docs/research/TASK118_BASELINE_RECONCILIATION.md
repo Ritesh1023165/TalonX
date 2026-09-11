@@ -183,6 +183,12 @@ expectancy −2.926%/trade, profit factor 0.315** — identical to the original
 Deliverable A report (`baseline_a_summary.json`) to within float rounding.
 No discrepancy found.
 
+> **2026-09-11 (Task 118A) correction appended, original text below
+> unedited**: the −$23,042.30 dollar drawdown is base-independent, but its
+> **percentage** is not — the $300,000 live-campaign base gives **−7.68%**,
+> not the −0.23% computed below against the $10,000,000 book. See
+> `TASK118A_RESEARCH_CORRECTIONS.md` Correction 2 for the full reconciliation.
+
 ### C.3 Portfolio drawdown — the −42.7% figure is NOT a portfolio drawdown
 
 The original report's `max_drawdown_equal_weight_running_return: −42.7%` is
