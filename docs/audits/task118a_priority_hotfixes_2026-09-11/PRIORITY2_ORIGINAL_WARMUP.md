@@ -6,6 +6,19 @@ Read-only investigation only, per this task's boundary ("no intraday production
 fixes... do not lower thresholds... do not manufacture bars... bounded
 requests only").
 
+> **2026-09-11 (Task 118G) correction, original text below unedited**:
+> the *provider* failure was correctly found transient, and no
+> provider-side code defect existed — that conclusion stands. However, a
+> separate, real **application-side** defect was later found (Task 118F,
+> not this task): `QuantScanner._preseed_1m_if_needed`'s "attempted"
+> marker was set unconditionally on the first attempt, regardless of
+> success or failure, silently preventing any retry for the rest of the
+> process's life — this is why natural live-tick accumulation was left as
+> the *only* recovery path, and why it took hours for the slowest
+> symbols. Task 118F root-caused, fixed, tested, and deployed a bounded
+> recovery sweep for exactly this gap — see
+> `docs/audits/task118f_resilient_warmup/`.
+
 ## What was traced
 
 - `min_bars_required = 120` (1-minute buffer), `htf_sma_period = 200`
