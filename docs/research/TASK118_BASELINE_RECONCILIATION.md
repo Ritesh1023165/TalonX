@@ -188,6 +188,11 @@ No discrepancy found.
 > **percentage** is not — the $300,000 live-campaign base gives **−7.68%**,
 > not the −0.23% computed below against the $10,000,000 book. See
 > `TASK118A_RESEARCH_CORRECTIONS.md` Correction 2 for the full reconciliation.
+>
+> **2026-09-11 (Task 118B) further correction**: −$23,042.30 is **cash-path**
+> drawdown (`portfolio_cash_after` is uninvested cash only), not portfolio
+> drawdown — the real, mark-to-market equity drawdown is **−$7,132.76**
+> (−0.0713% / −2.3560%). See `TASK118B_EQUITY_RECONCILIATION.md`.
 
 ### C.3 Portfolio drawdown — the −42.7% figure is NOT a portfolio drawdown
 

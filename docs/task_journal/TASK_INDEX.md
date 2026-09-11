@@ -18,6 +18,7 @@ and `docs/RESEARCH_STATUS.md` — linked here, not repeated.
 | 118 (Deliverable A baseline) | 2026-09-11 | research | `BASELINE_COMPLETE` (small-sample), `c85a72f` | `docs/research/TASK118_BASELINE_A_RESULTS.md` | NOT_AVAILABLE |
 | **118 (profitability diagnostics + task journal)** | 2026-09-11 | research | see `entries/2026-09-11_task118_profitability_diagnostics/outcome.md`, commit `c0cfa5d` | `docs/research/TASK118_BASELINE_RECONCILIATION.md`, `TASK118_ORIGINAL_SELECTIVITY.md`, `TASK118_EXPERIMENTAL_OUTCOMES.md`, `TASK118_NEXT_EXPERIMENT.md`, this journal | **AVAILABLE** — `entries/2026-09-11_task118_profitability_diagnostics/request.md` |
 | **118A (priority hotfixes + controlled restart)** | 2026-09-11 | release (`research/talonx-strategy-validation`) + this journal (research) | `HOTFIX_DEPLOYED_AND_RESTART_VERIFIED`, deployed `c88f4d4` | `docs/audits/task118a_priority_hotfixes_2026-09-11/` (release branch), `docs/research/TASK118A_RESEARCH_CORRECTIONS.md` (this branch) | **AVAILABLE** — `entries/2026-09-11_task118a_priority_hotfixes/request.md` |
+| **118B (exit-timing, equity correction, readiness)** | 2026-09-11 | research (+ release doc-only `813bfc0`) | `VALID_UNDER_EXISTING_PAPER_POLICY` (VRT); runtime unchanged (no defect proven) | `docs/research/TASK118B_EXIT_TIMING.md`, `TASK118B_EQUITY_RECONCILIATION.md`, `TASK118B_READINESS.md`, `TASK118B_RESEARCH_PROTOCOL.md` | **AVAILABLE** — `entries/2026-09-11_task118b_exit_equity_readiness/request.md` |
 
 ## Cross-branch note
 

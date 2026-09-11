@@ -7,6 +7,14 @@ review, each dated, each explaining exactly what was wrong and what the
 corrected statement is. Both original files now carry a one-line pointer to
 this document at the top of the relevant section.
 
+> **2026-09-11 (Task 118B) further correction, original text below
+> unedited**: this protocol still under-specified the estimand, ignored
+> issuer-repetition clustering, conflated "this scope's expectancy is
+> negative" with "this scope underperforms the broader panel", and did
+> not account for repeated-look multiplicity. See
+> `TASK118B_RESEARCH_PROTOCOL.md` for the fully revised protocol, which
+> supersedes the bounded observation protocol below.
+
 ## Correction 1 — the rejection criterion in `TASK118_NEXT_EXPERIMENT.md` was ambiguously/backwards worded
 
 **Original text** (§"What would cause rejection of this recommendation"):
@@ -43,6 +51,14 @@ and the monthly/60-day cadence are stated before any further live data is
 observed, and are visibly less favorable to a "pass" than the frequency
 with which the underlying frozen contract itself was validated (Task
 107B/109/112R used hundreds to low-thousands of episodes).
+
+> **2026-09-11 (Task 118B) further correction, original text below
+> unedited**: the −$23,042.30 / −0.23% / −7.68% figures below are
+> **cash-path**, not portfolio drawdown — `portfolio_cash_after` is
+> uninvested cash only; buying an asset reduces cash without an
+> equivalent economic loss. The **real, mark-to-market equity drawdown**
+> is **−$7,132.76** (**−0.0713%** on $10m, **−2.3560%** on $300k) — see
+> `TASK118B_EQUITY_RECONCILIATION.md` for the full daily equity series.
 
 ## Correction 2 — the −$23,042.30 "drawdown" figure needed reconciliation, and is base-dependent
 
