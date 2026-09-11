@@ -1,0 +1,18 @@
+episode_id,symbol,issuer_cik,eligible_entry_session,disposition,detail
+0009dfdd76e7a9be,ACHR,0001824502,2024-11-27,ENTERED,pos=1 shares=1331.5579 target_exit=2024-12-12
+ea33adce86d722ee,ABCL,0001703057,2025-03-12,SKIPPED_ENTRY_STALE,eligible 2025-03-12 > 3 sessions before 2025-04-22
+ee4390367dab6d2d,ABCL,0001703057,2025-03-12,SKIPPED_CLOSE_2.23_LT_5.0,"Insider buy-cluster observed, but the issuer fails the frozen liquidity / index-membership eligibility gate -- informational only, no paper entry."
+3ea1497b79c8911a,MSTR,0001050446,2025-03-25,ENTERED,pos=2 shares=30.0111 target_exit=2025-04-08
+5de3e6757ff8cddb,UNH,0000731766,2025-05-19,ENTERED,pos=3 shares=33.9294 target_exit=2025-06-03
+3bbaa44a794190aa,MSTR,0001050446,2025-06-10,ENTERED,pos=4 shares=25.4298 target_exit=2025-06-25
+9880aa4598fb78ba,MSTR,0001050446,2025-06-10,SKIPPED_ENTRY_STALE,eligible 2025-06-10 > 3 sessions before 2025-07-14
+b154c83c2445af2c,MSTR,0001050446,2025-07-30,ENTERED,pos=5 shares=25.2029 target_exit=2025-08-13
+d78e71460b0940d1,ADC,0000917251,2025-10-07,ENTERED,pos=6 shares=148.0385 target_exit=2025-10-21
+94bb9a8e6b7b1a0a,ADC,0000917251,2025-10-10,SKIPPED_ENTRY_STALE,eligible 2025-10-10 > 3 sessions before 2025-11-18
+9b53daa2461b31ce,ADC,0000917251,2026-01-13,ENTERED,pos=7 shares=144.0300 target_exit=2026-01-28
+c683447b53fae98a,MSTR,0001050446,2026-01-13,ENTERED,pos=8 shares=60.8088 target_exit=2026-01-28
+d84bd650bec6cb07,ADC,0000917251,2026-01-14,SKIPPED_ENTRY_STALE,eligible 2026-01-14 > 3 sessions before 2026-02-13
+f571361bac79da4f,MSTR,0001050446,2026-01-22,SKIPPED_ENTRY_STALE,eligible 2026-01-22 > 3 sessions before 2026-02-24
+f2dd3e65b6a1a618,ABT,0000001800,2026-02-09,ENTERED,pos=9 shares=91.9371 target_exit=2026-02-24
+d45a4ce35b6f8716,IBM,0000051143,2026-02-26,ENTERED,pos=10 shares=42.3263 target_exit=2026-03-12
+ff02d77f5d8843e0,ABCL,0001703057,2026-03-02,SKIPPED_CLOSE_3.61_LT_5.0,"Insider buy-cluster observed, but the issuer fails the frozen liquidity / index-membership eligibility gate -- informational only, no paper entry."

@@ -1,0 +1,26 @@
+# Task index
+
+One row per task. Links to the existing evidence bundle(s) rather than
+duplicating them. `prompt` column: `AVAILABLE` (captured in this journal's
+`entries/`) or `NOT_AVAILABLE` (not separately captured as a file for that
+task — its own audit/research document's prose is the only record, and is
+linked instead of reconstructed). Full narrative history predating this
+journal (Tasks 1–116) lives in `docs/research/TALONX_RESEARCH_LEDGER.md`
+and `docs/RESEARCH_STATUS.md` — linked here, not repeated.
+
+| task | date | branch(es) | verdict | evidence | prompt |
+|---|---|---|---|---|---|
+| 1–116 | 2026 (various) | mixed | see `docs/RESEARCH_STATUS.md` §Task-by-task | `docs/research/TALONX_RESEARCH_LEDGER.md`, `docs/RESEARCH_STATUS.md` | NOT_AVAILABLE (predates this journal; not reconstructed per this journal's own scope) |
+| 117 (overnight release closure) | 2026-09-10/11 | release (`research/talonx-strategy-validation`) | `READY_FOR_CONTROLLED_ACTIVATION_REVIEW` | `docs/audits/task117_overnight_release_closure/` | NOT_AVAILABLE |
+| 117 (final-activation corrections) | 2026-09-11 | release | corrections applied, `827366f` | `docs/audits/task117_final_activation_corrections/` | NOT_AVAILABLE |
+| 117 (controlled activation) | 2026-09-11 | release | `LIVE_PAPER_SESSION_STARTED`, `fb4b071` | `docs/audits/task117_controlled_activation_2026-09-11/` | NOT_AVAILABLE |
+| 118 (dataset inventory) | 2026-09-11 | research (`research/talonx-profitability-2026-09`) | inventory complete, `863d1ed` | `docs/research/TASK118_INVENTORY.md` | NOT_AVAILABLE |
+| 118 (Deliverable A baseline) | 2026-09-11 | research | `BASELINE_COMPLETE` (small-sample), `c85a72f` | `docs/research/TASK118_BASELINE_A_RESULTS.md` | NOT_AVAILABLE |
+| **118 (profitability diagnostics + task journal)** | 2026-09-11 | research | see `entries/2026-09-11_task118_profitability_diagnostics/outcome.md` | `docs/research/TASK118_BASELINE_RECONCILIATION.md`, `TASK118_ORIGINAL_SELECTIVITY.md`, `TASK118_EXPERIMENTAL_OUTCOMES.md`, `TASK118_NEXT_EXPERIMENT.md`, this journal | **AVAILABLE** — `entries/2026-09-11_task118_profitability_diagnostics/request.md` |
+
+## Cross-branch note
+
+This journal lives on the research branch. Task 117's three audit bundles
+above live on the release branch (`research/talonx-strategy-validation`) —
+linked by path for a reader with that branch checked out; this journal does
+not merge or copy their content across branches.

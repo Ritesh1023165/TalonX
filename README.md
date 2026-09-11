@@ -143,6 +143,15 @@ copy .env.example .env         # set TALONX_SEC_USER_AGENT
 .venv\Scripts\python.exe -m pytest tests/ -q
 ```
 
+**Task journal** (added Task 118, 2026-09-11): any task that materially
+changes running behavior, touches production state, or is itself a
+research/audit deliverable should record an entry under
+`docs/task_journal/entries/<date>_task<N>_<short-slug>/` (`request.md`,
+`outcome.md`, `record.md` — see `docs/task_journal/TEMPLATE.md`) and add one
+row to `docs/task_journal/TASK_INDEX.md`. This indexes and links the
+existing `docs/audits/*`/`docs/research/*` evidence bundles rather than
+replacing them — see `docs/task_journal/README.md` for the full convention.
+
 ## 17. Historical research conclusions
 
 Tasks 93-95K + 97 + 101A/B: **no robust, cost-survivable free intraday structural-long alpha**
