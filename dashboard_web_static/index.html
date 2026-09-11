@@ -99,6 +99,7 @@
   <button data-sec="validation">Validation</button>
   <button data-sec="intelligence">Intelligence</button>
   <button data-sec="paper_eod">Paper / EOD</button>
+  <button data-sec="paper_performance">Paper Performance</button>
 </nav>
 <nav id="legacy">
   <span class="muted small" style="align-self:center;margin-right:4px">legacy views:</span>
@@ -397,6 +398,60 @@ function renderPaperEod(d){
   return h;
 }
 
+function laneCard(l){
+  if(!l) return '';
+  const op=l.open_positions||{}, rp=l.realized_pnl||{}, up=l.unrealized_pnl||{}, eq=l.equity||{},
+        rc=l.reconciliation||{}, tc=l.trade_counts||{}, per=l.period||{}, sc=l.starting_capital||{}, co=l.costs||{};
+  let h=`<div class="card card-wide"><h3>${esc(l.lane)} — ${esc(l.strategy_identity||'')} ${pill(l.status)}</h3>`+
+    `<div class="muted small" style="margin-bottom:6px">${esc(l.attribution||'')}</div><div class="grid">`;
+  h+=`<div>`+kv('as-of / period', esc(per.as_of_date))+
+     kv('campaign start', per.campaign_start? esc(String(per.campaign_start).slice(0,19)) : esc(per.campaign_start_basis))+
+     kv('starting capital', num(sc.amount))+kv('cash', num(l.cash))+
+     kv('open positions', op.count)+kv('open cost basis', num(op.cost_basis_total))+
+     kv('marked open value', num(op.marked_value_total)+' '+pill(op.marked_value_status&&op.marked_value_status.split(' ')[0]))+
+     `</div>`;
+  h+=`<div>`+kv('realized P&L (campaign)', num(rp.campaign_to_date))+
+     kv('unrealized P&L', (up.total==null?'—':num(up.total))+' '+pill((up.status||'').split(' ')[0]))+
+     kv('costs', esc(co.note||'UNMODELED'))+
+     kv('equity (cash+marked open)', num(eq.value)+' '+pill(eq.status))+
+     kv('reconciliation', pill(rc.status))+
+     kv('entries/exits today', num(tc.entries_today)+' / '+num(tc.exits_today))+
+     kv('entries/exits campaign', num(tc.entries_campaign_to_date)+' / '+num(tc.exits_campaign_to_date))+
+     `</div></div>`;
+  if(eq.note) h+=`<div class="muted small">${esc(eq.note)}</div>`;
+  if(rc.status && rc.status!=='UNAVAILABLE') h+=`<div class="src">reconciliation: expected_cash=${num(rc.expected_cash)} actual_cash=${num(rc.actual_cash)} diff=${num(rc.diff)} — ${esc(rc.basis||'')}</div>`;
+  h+=boundedTable(op.detail||[], [
+     {label:'symbol', get:p=>p.symbol}, {label:'entry time', get:p=>p.entry_time&&String(p.entry_time).slice(0,19)},
+     {label:'qty', get:p=>p.quantity}, {label:'cost basis', get:p=>p.cost_basis},
+     {label:'mark', get:p=>p.mark}, {label:'mark session', get:p=>p.mark_session_classification},
+     {label:'mark age', get:p=>ageStr(p.mark_age_seconds)},
+     {label:'unrealized $', get:p=>p.unrealized_pnl_usd}, {label:'obligation', get:p=>p.pending_exit_obligation}], 20);
+  if((op.detail||[]).some(p=>p.mark_note)) h+=`<div class="muted small">${(op.detail||[]).filter(p=>p.mark_note).map(p=>esc(p.symbol)+': '+esc(p.mark_note)).join(' · ')}</div>`;
+  h+=`<details><summary>closed trades (${(l.closed_trades||[]).length})</summary>`+
+     boundedTable(l.closed_trades||[], [
+        {label:'symbol', get:t=>t.symbol}, {label:'exit time', get:t=>t.exit_event_time&&String(t.exit_event_time).slice(0,19)},
+        {label:'qty', get:t=>t.quantity}, {label:'entry px', get:t=>t.entry_price}, {label:'exit px', get:t=>t.exit_price},
+        {label:'realized $', get:t=>t.realized_pnl_usd}, {label:'exit reason', get:t=>t.exit_reason},
+        {label:'recovery-affected', get:t=>t.recovery_affected?'YES':'no'}, {label:'provenance', get:t=>t.provenance&&String(t.provenance).slice(0,9)}], 20)+
+     `</details>`;
+  const flagged=(l.closed_trades||[]).filter(t=>t.recovery_affected);
+  if(flagged.length) h+=`<div class="banner warn">${flagged.length} recovery-affected closed trade(s): ${esc(flagged[0].recovery_affected_reason||'')}</div>`;
+  h+=`</div>`;
+  return h;
+}
+
+function renderPaperPerformance(d){
+  const L=d.lanes||{};
+  let h=`<h2 class="section-title">Paper Performance — per-lane P&amp;L, open positions and reconciliation</h2>`+
+    `<div class="banner warn">${esc(d.cross_lane_note||'')}</div>`+
+    `<div class="src">session date ${esc(d.session_date)} · regular session close (UTC) ${esc(d.regular_session_close_utc)} · generated ${esc(d.generated_utc)}</div>`;
+  h+=laneCard(L.original)+laneCard(L.experimental)+laneCard(L.v2);
+  const piv=L.piv||{}, intel=L.intelligence||{};
+  h+=`<div class="card"><h3>PIV / Alpaca PAPER</h3>`+kv('status', pill(piv.status))+`<div class="muted small">${esc(piv.note||'')}</div></div>`;
+  h+=`<div class="card"><h3>Intelligence</h3>`+kv('attributable paper ledger', pill(intel.attributable_paper_ledger?'YES':'NO'))+`<div class="muted small">${esc(intel.note||'')}</div></div>`;
+  return h;
+}
+
 function renderV2(d){
   const sv=d.service||{}, l=d.ledger||{}, r=d.readiness||{}, cov=(r.coverage||{}),
         f=d.funnel||{}, f4=f.form4||{}, cl=f.clusters||{}, tm=f.terminal||{},
@@ -483,6 +538,7 @@ const SECTION_RENDER = {
   overview: renderOverview, premarket: renderPremarket, original_quant: renderOriginalQuant,
   v2_active_strategy: renderV2,
   validation: renderValidation, intelligence: renderIntelligence, paper_eod: renderPaperEod,
+  paper_performance: renderPaperPerformance,
 };
 
 let activeSection = "overview";

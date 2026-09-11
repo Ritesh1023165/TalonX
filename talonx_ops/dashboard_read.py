@@ -1191,6 +1191,29 @@ class DashboardReadModel:
         return out
 
     # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------ #
+    # PAPER PERFORMANCE -- Task 119 (Task 118H Option 3). An attributable,
+    # per-lane realized/unrealized P&L, open-position and reconciliation
+    # surface -- EXTENDS paper_eod() above (which stays unchanged for
+    # back-compat), does not replace or duplicate it. Delegates the actual
+    # accounting to talonx_ops.paper_performance so there is exactly one
+    # implementation of "what did each lane earn" shared with any other
+    # caller (tests, offline reports).
+    # ------------------------------------------------------------------ #
+    def paper_performance(self) -> dict[str, Any]:
+        import os as _os
+
+        from talonx_ops.paper_performance import build_paper_performance
+
+        _repo_root = Path(__file__).resolve().parents[1]
+        v2_db = (_os.environ.get("TALONX_V2_DB_PATH")
+                 or (str(_repo_root / "v2_lane.db") if (_repo_root / "v2_lane.db").exists()
+                     else str(self.home / "v2_lane.db")))
+        return build_paper_performance(
+            home=self.home, exp_home=self.exp, v2_db=Path(v2_db),
+            now=self.now, check_processes=self.check_processes,
+        )
+
     def all_sections(self) -> dict[str, Any]:
         return {
             "overview": self.overview(),
@@ -1200,4 +1223,5 @@ class DashboardReadModel:
             "validation": self.validation(),
             "intelligence": self.intelligence(),
             "paper_eod": self.paper_eod(),
+            "paper_performance": self.paper_performance(),     # Task 119
         }

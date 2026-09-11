@@ -181,7 +181,7 @@ def _authority_block() -> dict:
 _SECTION_TTL_SECONDS = 4.0
 _section_cache: dict[str, tuple[float, dict]] = {}
 _UNIFIED_SECTIONS = ("overview", "premarket", "original_quant", "v2_active_strategy",
-                     "validation", "intelligence", "paper_eod")
+                     "validation", "intelligence", "paper_eod", "paper_performance")
 
 
 def _section_block(name: str) -> dict:
