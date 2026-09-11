@@ -9,9 +9,9 @@ Not a claim that all possible defects are eliminated — see `remaining_blockers
 |---|---|
 | branch | `research/talonx-strategy-validation` |
 | starting SHA | `b485e3f86508ae5e75aa1ed8a9cd71410c76e7e7` |
-| final SHA | `__FINAL_SHA__` |
+| final SHA | `71bbf47240bff45940779f54ba33c611cd7b03f3` |
 | previous SHA (rollback target) | `b485e3f86508ae5e75aa1ed8a9cd71410c76e7e7` |
-| push | `__PUSH_RESULT__` |
+| push | `pushed b485e3f..71bbf47 (no main merge, no force-push)` |
 | V2 fingerprint | `11107198c5b81237` — **unchanged** |
 | V1 fingerprint | `2ae6216bca70` — **unchanged** |
 | production `ingestion_ledger.db` md5 | `2ae2105c6f51a4af4b3b80dc06e5f30f` — **unchanged** |
@@ -30,7 +30,7 @@ Not a claim that all possible defects are eliminated — see `remaining_blockers
 | **§4 dashboard + accounting** | actual :8787 SPA rendered vs isolated fixture (7 `ISOLATED_FIXTURE_*.png`); new **Card delivery** (6 states) + **Official Telegram — last confirmed send** cards in read model **and** SPA frontend; V2 5-signal health split, scoped funnel, EOD state, false-zero guard all visible. Accounting: no throttle/cooldown/reval records exist → residual is `UNEXPLAINED_FROM_RECORDS`, not defined by arithmetic; 16:24 ping `NOT_RECONSTRUCTABLE`; 94-gap `SUPERSEDED_BY_FINAL_DAY_RECONCILIATION`; comingled Redis counter not shown as official publications. 4 lane-accounting + 445 dashboard/prospective regression. |
 | **§5 timestamp contract** | genuine `Z`/`+00:00` kept as UTC (single `astimezone`); naive read only under explicit source contract; SGML-Eastern path separate (implemented, tested, not wired); caller scan (`sessions.to_et`, `insider/store._iso/_dt`) all guard `tzinfo is None` — no double conversion; no production history shifted (Task E manifest 0 VERIFIED_CORRECTION); S1–S3 ~4 h anomaly stays `UNRESOLVED` and visible. 194 timestamp/edgar/insider/v2 regression. |
 | **§6 bounded rehearsal** | `test_task117_release_rehearsal.py::test_bounded_release_rehearsal` → `release_rehearsal.json` `overall_PASS: true` — disabled→enabled same event, fresh+stale backlog, digest schedule + restart dedup, clean transient (retry-eligible), timeout after possible acceptance → AMBIGUOUS (not retried), restart with in-flight → recovered AMBIGUOUS, two competing starts → one owner + `--force` refused. V2 source-failure-with-open-position in `test_task117_overnight_e2e.py`. No dup delivery / false SENT / dup writer / lost pending; ownership-safe release. No full-day disabled live session run. |
-| **§7 profitability handoff** | `profitability_research_contract.md` written; isolated worktree `C:\workspace\TalonX-task118-profitability` (branch `research/talonx-profitability-2026-09`) created from the release SHA; promotion criteria fixed before any tuning; no run executed, nothing merged into the release branch, no strategy change. |
+| **§7 profitability handoff** | `profitability_research_contract.md` written; isolated worktree `C:\workspace\TalonX-task118-profitability` (branch `research/talonx-profitability-2026-09`, local commit `6c27914`) created from `research/talonx-strategy-validation-framework` `a3b6f58` — the branch that carries `talonx_research/` (the `replay_engine` that refuses `v2_lane.db`); first step there is to merge/verify the accepted release commit. Promotion criteria fixed before any tuning; no run executed, nothing merged into the release branch, no strategy change. |
 | **§8 package** | this directory — 11 files + 7 screenshots; `deployment_candidate.md` has the exact supported commands/flags/config propagation/backup/readiness gates; EOD described as operator-driven `prospective close` (checkpoint daemon does not reconcile); coherent commit + normal push. |
 
 ## Delivery cancellation / restart / invalid-mode results
@@ -74,16 +74,16 @@ mutation.
 ## Exact short activation procedure still requiring execution
 
 Full detail in `deployment_candidate.md`. In brief:
-1. `python -m talonx_ops.prospective preflight --expected-sha __FINAL_SHA__`
+1. `python -m talonx_ops.prospective preflight --expected-sha 71bbf47240bff45940779f54ba33c611cd7b03f3`
 2. back up `v2_lane.db` / `ingestion_ledger.db` / `.env` (copy)
-3. `python -m talonx_ops.prospective start --expected-sha __FINAL_SHA__ --tick-seconds 150 --heartbeat-seconds 30 --live-lookback-days 5 --pricing-mode composite-yf --execution-scope resolved-active-watchlist --deliver --transport telegram` → wait for `READY` (sup + companion + :8787 + heartbeat)
+3. `python -m talonx_ops.prospective start --expected-sha 71bbf47240bff45940779f54ba33c611cd7b03f3 --tick-seconds 150 --heartbeat-seconds 30 --live-lookback-days 5 --pricing-mode composite-yf --execution-scope resolved-active-watchlist --deliver --transport telegram` → wait for `READY` (sup + companion + :8787 + heartbeat)
 4. drain the Intelligence backlog on a copy, apply `expire_stale` once to the live ledger while delivery is still disabled
 5. `set TALONX_INTEL_DELIVER_CARDS=1 & set TALONX_INTEL_DRY_RUN_DELIVERY=0` then `python -m talonx_ingest.intelligence.service poll --duration 3600 --send --i-understand-external-send`
 6. EOD: `python -m talonx_ops.prospective close`
 
 ## Profitability research — first action tomorrow
 
-In `C:\workspace\TalonX-task118-profitability`: rebase onto `__FINAL_SHA__`,
+In `C:\workspace\TalonX-task118-profitability`: merge/cherry-pick `71bbf47240bff45940779f54ba33c611cd7b03f3` and verify the fingerprint,
 produce `results/task118_profitability/INVENTORY.md` (datasets + prior-rejection
 history), freeze the 39-CIK membership list with its resolution date — **then**
 run deliverable A (exact V2 39-name baseline, 20 bps costs, chronological
@@ -92,8 +92,8 @@ optimisation. See `profitability_research_contract.md`.
 
 ## GitHub evidence
 
-- Bundle: `docs/audits/task117_overnight_release_closure/` at `__FINAL_SHA__`
+- Bundle: `docs/audits/task117_overnight_release_closure/` at `71bbf47240bff45940779f54ba33c611cd7b03f3`
 - Prior Task 117 bundles: `docs/audits/task117_output_closure/`,
   `docs/audits/task117_delivery_timestamp_completion/`, `docs/audits/2026-09-10/`
-- Commit: `__FINAL_SHA__` on `research/talonx-strategy-validation` (pushed,
+- Commit: `71bbf47240bff45940779f54ba33c611cd7b03f3` on `research/talonx-strategy-validation` (pushed,
   no main merge, no force-push)
