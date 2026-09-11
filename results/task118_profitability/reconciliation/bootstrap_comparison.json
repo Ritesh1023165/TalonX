@@ -1,0 +1,62 @@
+{
+  "seed": 118118,
+  "repetitions": 5000,
+  "resampling_unit": "issuer (block bootstrap)",
+  "estimand": "per-trade net expectancy, 20bps round-trip cost convention",
+  "A": {
+    "n_trades": 10,
+    "n_issuer_blocks": 6,
+    "point_mean": -0.029261499999999996,
+    "bootstrap": {
+      "mean": -0.023335651860024915,
+      "ci95": [
+        -0.07055133333333334,
+        0.02643625
+      ],
+      "n_reps": 5000
+    }
+  },
+  "B": {
+    "n_trades": 147,
+    "n_issuer_blocks": 101,
+    "point_mean": 0.021541194907169176,
+    "bootstrap": {
+      "mean": 0.021615709898906467,
+      "ci95": [
+        0.009367728399771716,
+        0.034774620273618585
+      ],
+      "n_reps": 5000
+    }
+  },
+  "C": {
+    "n_trades": 157,
+    "n_issuer_blocks": 107,
+    "point_mean": 0.01830535596210707,
+    "bootstrap": {
+      "mean": 0.01830428109131664,
+      "ci95": [
+        0.005409483932921023,
+        0.03169433603274263
+      ],
+      "n_reps": 5000
+    }
+  },
+  "diff_A_minus_B_independent_resampling": {
+    "mean": -0.04495136175893138,
+    "ci95": [
+      -0.09478580634987785,
+      0.007583471636934996
+    ],
+    "n_reps": 5000
+  },
+  "diff_A_minus_C_joint_resampling_valid_reps": {
+    "mean": -0.04118650939037988,
+    "ci95": [
+      -0.09192995854291491,
+      0.010636114156691506
+    ],
+    "n_reps": 4988
+  },
+  "caveat_A_low_block_count": "Population A has only 6 distinct issuer blocks (one, MSTR, contributing 4/10 trades) -- a 6-block bootstrap has very few distinct achievable resample configurations; treat A's own interval, and any A-involving difference, as indicative only, not a well-powered inference."
+}

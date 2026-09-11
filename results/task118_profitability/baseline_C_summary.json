@@ -1,0 +1,48 @@
+{
+  "tag": "C",
+  "n_symbols_requested": 626,
+  "n_symbols_price_covered": 625,
+  "n_symbols_price_uncovered": 1,
+  "uncovered_symbols": [
+    "SHOP"
+  ],
+  "fingerprint": "11107198c5b81237",
+  "window": {
+    "start": "2024-09-01",
+    "end": "2026-03-31"
+  },
+  "cost_convention_bps_round_trip": 20,
+  "starting_cash_usd": 10000000.0,
+  "episode_dispositions": {
+    "ENTERED": 157,
+    "SKIPPED_CLOSE_2.23_LT_5.0": 1,
+    "SKIPPED_CLOSE_3.61_LT_5.0": 1,
+    "SKIPPED_CLOSE_3.69_LT_5.0": 1,
+    "SKIPPED_CLOSE_3.89_LT_5.0": 1,
+    "SKIPPED_CLOSE_4.43_LT_5.0": 1,
+    "SKIPPED_CLOSE_4.61_LT_5.0": 1,
+    "SKIPPED_CLOSE_4.76_LT_5.0": 1,
+    "SKIPPED_ENTRY_STALE": 226,
+    "SKIPPED_IN_COOLDOWN_UNTIL_2025-02-13": 1,
+    "SKIPPED_IN_COOLDOWN_UNTIL_2025-03-11": 1,
+    "SKIPPED_IN_COOLDOWN_UNTIL_2025-03-19": 1,
+    "SKIPPED_IN_COOLDOWN_UNTIL_2026-01-22": 1,
+    "SKIPPED_IN_COOLDOWN_UNTIL_2026-02-24": 3,
+    "SKIPPED_IN_COOLDOWN_UNTIL_2026-03-12": 1,
+    "SKIPPED_SYMBOL_ALREADY_OPEN": 4
+  },
+  "n_closed_trades": 157,
+  "n_distinct_issuers": 107,
+  "net_expectancy_mean_20bps": 0.01830535596210707,
+  "win_rate": 0.6178343949044586,
+  "total_net_pnl_usd": 28739.4088605081,
+  "elapsed_seconds": 34.5,
+  "portfolio": {
+    "starting_cash": 10000000.0,
+    "ending_cash": 10031879.408860516,
+    "n_open_end": 0,
+    "n_closed": 157,
+    "n_exit_unresolved": 0
+  },
+  "profit_factor": 1.9760868624358088
+}
