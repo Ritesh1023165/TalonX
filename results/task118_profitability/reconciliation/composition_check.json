@@ -1,0 +1,17 @@
+{
+  "predeclared_feature": "20-trading-day pre-entry realized volatility, annualized %, issuer-level (first entry date), point-in-time from local bar CSVs",
+  "omitted_features": [
+    "sector (no point-in-time source available this session)",
+    "market-cap tier (no point-in-time source available this session)"
+  ],
+  "A_issuers_used": 6,
+  "A_issuers_missing_data": [],
+  "B_issuers_used": 101,
+  "B_issuers_missing_data_count": 0,
+  "A_mean_pre_entry_vol_pct": 77.59311172025352,
+  "B_mean_pre_entry_vol_pct_all_101": 52.56352647636066,
+  "A_percentile_within_random_6_issuer_draws_of_B": 96.8,
+  "draws": 5000,
+  "seed": 118118,
+  "interpretation": "A descriptive association only -- not a causal claim. A's percentile position in the null distribution of random-B-subset mean pre-entry volatility; a non-extreme percentile means insufficient evidence of a systematic volatility difference, not proof A and B are identically composed."
+}

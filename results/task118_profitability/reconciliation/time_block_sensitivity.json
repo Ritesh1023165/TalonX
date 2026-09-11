@@ -1,0 +1,22 @@
+{
+  "method": "month-of-entry block bootstrap (predeclared sensitivity to the issuer-block bootstrap in TASK118D_SCOPE_COMPARISON.md)",
+  "seed": 118118,
+  "repetitions": 5000,
+  "A_time_blocks": 8,
+  "B_time_blocks": 19,
+  "A_ci95": [
+    -0.10273311111111111,
+    0.01669609090909091
+  ],
+  "A_mean": -0.030572072717920964,
+  "B_ci95": [
+    0.0055835974912317975,
+    0.038212975656978364
+  ],
+  "B_mean": 0.02194574830921492,
+  "diff_A_minus_B_ci95": [
+    -0.12677529391997822,
+    -0.0014148910762815797
+  ],
+  "diff_A_minus_B_mean": -0.05251782102713588
+}
