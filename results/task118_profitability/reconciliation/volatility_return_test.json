@@ -1,0 +1,69 @@
+{
+  "protocol": "see module docstring -- predeclared before computation",
+  "feature": "20-trading-day pre-entry realized volatility, annualized %",
+  "estimand": "OLS slope of net_return_20bps on pre_entry_vol_pct",
+  "seed": 118118,
+  "repetitions": 5000,
+  "A_primary": {
+    "n_trades": 10,
+    "n_issuer_blocks": 6,
+    "n_month_blocks": 8,
+    "intercept": 0.08248013763558874,
+    "slope_point_estimate": -0.0017328393543844995,
+    "slope_ci95_issuer_block": [
+      -0.0034902133418764094,
+      -0.0002461005551344362
+    ],
+    "slope_ci95_month_block": [
+      -0.003247029164668867,
+      -0.00029562310977195553
+    ]
+  },
+  "B_primary": {
+    "n_trades": 147,
+    "n_issuer_blocks": 101,
+    "n_month_blocks": 19,
+    "intercept": 0.008863738268172078,
+    "slope_point_estimate": 0.00025630990305410407,
+    "slope_ci95_issuer_block": [
+      -0.00013860479839551768,
+      0.0008101066483129927
+    ],
+    "slope_ci95_month_block": [
+      -0.00020554681136530494,
+      0.0007191853353222774
+    ]
+  },
+  "A_missing_history": [],
+  "B_missing_history_count": 0,
+  "pooled_secondary_do_not_interpret_as_within_population": {
+    "n_trades": 157,
+    "n_issuer_blocks": 107,
+    "n_month_blocks": 19,
+    "intercept": 0.016627031361697596,
+    "slope_point_estimate": 3.328795177081216e-05,
+    "slope_ci95_issuer_block": [
+      -0.0005090421106098172,
+      0.0005770589850117156
+    ],
+    "slope_ci95_month_block": [
+      -0.000399113318382588,
+      0.0004478675124071418
+    ]
+  },
+  "A_sensitivity_drop_MSTR": {
+    "n_trades": 6,
+    "n_issuer_blocks": 5,
+    "n_month_blocks": 5,
+    "intercept": 0.04946305341430674,
+    "slope_point_estimate": -0.0006583129589735748,
+    "slope_ci95_issuer_block": [
+      -0.0013251916338235814,
+      0.0001572936305953742
+    ],
+    "slope_ci95_month_block": [
+      -0.0010832848283895745,
+      0.0003044370737617637
+    ]
+  }
+}

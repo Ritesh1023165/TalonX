@@ -22,6 +22,7 @@ and `docs/RESEARCH_STATUS.md` — linked here, not repeated.
 | **118C (feed incident, recovery, readiness)** | 2026-09-11 | research (+ release doc-only `0209ada`) | `RECOVERED_TRANSIENT`; runtime unchanged (no defect proven) | `docs/audits/task118c_feed_incident_20260911T143728Z/INCIDENT_REPORT.md` (release branch) | **AVAILABLE** — `entries/2026-09-11_task118c_feed_incident/request.md` |
 | **118D (matched-scope comparison + live evidence)** | 2026-09-11 | research | A vs B vs C comparison, runtime unchanged | `docs/research/TASK118D_SCOPE_COMPARISON.md`, `TASK118D_LIVE_EVIDENCE.md` | **AVAILABLE** — `entries/2026-09-11_task118d_scope_comparison/request.md` |
 | **118E (readiness/SPCX/decision)** | 2026-09-11 | research | `ONE_TESTABLE_HYPOTHESIS` (exploratory); runtime unchanged (no defect proven) | `docs/research/TASK118E_READINESS_SPCX_DECISION.md` | **AVAILABLE** — `entries/2026-09-11_task118e_readiness_spcx_decision/request.md` |
+| **118F (resilient warmup + volatility test)** | 2026-09-11 | release (deployed `5c0b3f3`) + research | Deployed live, readiness 30/43→42/43; `EXPLORATORY_ASSOCIATION_SUPPORTS_ONE_FURTHER_TEST` | `docs/audits/task118f_resilient_warmup/` (release branch), `docs/research/TASK118F_VOLATILITY_RETURN_TEST.md` (this branch) | **AVAILABLE** — `entries/2026-09-11_task118f_resilient_warmup_volatility_test/request.md` |
 
 ## Cross-branch note
 
