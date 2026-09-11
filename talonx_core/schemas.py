@@ -182,6 +182,13 @@ class ActionableAlert(BaseModel):
     correlated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+    # Task 87B FC_01: stable id set by talonx_core.alert_outbox for
+    # at-least-once transport with at-most-once user-facing delivery --
+    # talonx_dispatch de-duplicates on it. Optional/None for any alert
+    # constructed outside the outbox path (tests, legacy). Delivery-
+    # reliability plumbing only; no effect on alert content or policy.
+    outbox_id: str | None = None
+
     def to_redis_payload(self) -> str:
         return self.model_dump_json()
 
@@ -298,6 +305,13 @@ class LongTermActionableAlert(BaseModel):
 
     correlated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # Task 87B FC_01: stable id set by talonx_core.alert_outbox for
+    # at-least-once transport with at-most-once user-facing delivery --
+    # talonx_dispatch de-duplicates on it. Optional/None for any alert
+    # constructed outside the outbox path (tests, legacy). Delivery-
+    # reliability plumbing only; no effect on alert content or policy.
+    outbox_id: str | None = None
 
     def to_redis_payload(self) -> str:
         return self.model_dump_json()

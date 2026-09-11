@@ -44,6 +44,46 @@ _SMOKE_CSV = _REPO_ROOT / "examples" / "data" / "sample_AAPL_1m.csv"
 _TRADE_CSV = _REPO_ROOT / "examples" / "data" / "sample_AAPL_trade_1m.csv"
 _MULTI_CSV = _REPO_ROOT / "examples" / "data" / "sample_multi_trade_1m.csv"
 
+# Task 25A finding (2026-08-20): sample_AAPL_trade_1m.csv's one demo
+# trade and ALL THREE of sample_multi_trade_1m.csv's TSTW/TSTL/TSTE
+# demo trades turned out to be built entirely around a BEARISH
+# macd_bearish_cross signal opening a short position while flat --
+# i.e. these "documented, deterministic" example datasets were
+# unknowingly relying on the exact long/short bug Task 24/25A fixes
+# (see results/task24_requirements_parity_audit/long_short_flow.md).
+# Under the corrected LONG_ONLY lifecycle these signals are, correctly,
+# NO_ACTIVE_POSITION no-ops -- zero trades.
+#
+# sample_AAPL_trade_1m.csv was regenerated in Task 73S
+# (results/task73s_regression_and_zero_trade_diagnosis/stage1_fixture_diff_explanation.md):
+# ~9 trading days of quiet, LOW_VOLATILITY-rejected pre-roll data were
+# prepended (purely to satisfy the ALREADY-EXISTING, unmodified 200-bar/
+# 15-min HTF trend-gate warmup requirement -- trend_gate_applicable is
+# BULLISH-only, see talonx_quant/consumer.py), and a genuine BULLISH
+# macd_bullish_cross recovery (RSI+volume confluence legs, clearing the
+# HTF trend gate and structural R:R) was appended, producing one real
+# long trade -- entry, TARGET exit, trades.csv/equity_curve.csv, and
+# HTML report metrics are now genuinely exercised. The xfail marker
+# below no longer applies to this fixture and has been removed from
+# its tests (this comment documents why, per the marker's own original
+# instruction: "an eventual CSV regeneration is forced to remove this
+# marker, not silently leave it stale").
+#
+# sample_multi_trade_1m.csv (TSTW/TSTL/TSTE) was NOT touched by Task 73S
+# (out of scope for that task's specific regression target) and remains
+# the pending BLOCKING FOLLOW-UP tracked in
+# results/task25a_long_only_parity_fix/task25a_summary.md.
+# Task 81-R2 (2026-08-29): sample_multi_trade_1m.csv has now been
+# regenerated deterministically via the UNCHANGED strategy
+# (scripts/gen_sample_multi_trade_1m.py; spec in
+# results/task81_r2_consolidated_closure/fixture_spec.md). It reuses the
+# exact known-good bar sequence of sample_AAPL_trade_1m.csv through its
+# entry bar, then appends a different post-entry path per symbol so
+# TSTW -> TARGET, TSTL -> STOP (clean -1R), TSTE -> END_OF_SESSION (small
+# positive R). The xfail marker that stood here is removed -- every
+# test below now exercises three genuine long trades. All synthetic
+# outcomes: TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE.
+
 
 def _run(csv_path: Path, out_dir: Path):
     exit_code = cli.main(["--data", str(csv_path), "--symbol", "AAPL", "--tz", "America/New_York", "--out", str(out_dir)])

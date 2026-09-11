@@ -1,0 +1,9 @@
+tasks,exposure_description,conservative_start,conservative_end,evaluation_overlap
+"37-38,41",Task37 A/B/C reused for volatility development,2025-08-29,2026-07-31,False
+39-45,design/implementation; any empirical inputs reuse Task37 or recent 2026 startup data,2025-08-29,2026-08-23,False
+46-53,X/Y/Z evaluation plus Task53 causal warmups; reused by Tasks47-52,2025-10-13,2026-06-09,False
+54,W1/W2/W3 warmup and evaluation packages,2025-09-15,2026-05-18,False
+55,Task53/54 trade evidence only,2025-09-29,2026-05-18,False
+56,H1/H2/H3 warmup and independent evaluation packages,2025-12-11,2026-07-09,False
+57,Task53/54/56 trade evidence only,2025-09-29,2026-07-09,False
+58,Task53/54/56 trades and corresponding entry/exit bar context,2025-09-29,2026-07-09,False

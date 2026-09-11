@@ -1,0 +1,9 @@
+component,required,failure_behavior,test
+preflight,required,PIV_BLOCKED -- supervise exits code 2 before constructing any component,test_task78i_cli_supervise.py::test_supervise_blocked_when_preflight_fails
+execution_ownership,required,PIV_BLOCKED -- supervise exits code 2 before start_session,test_task78i_cli_supervise.py::test_supervise_second_instance_blocked_by_ownership
+session_runner,required,bounded restart (default max 3, 30s backoff) then TerminalSupervisorFailure -> PIV_BLOCKED,test_task78i_supervisor.py::test_exhausting_restarts_raises_terminal_failure
+decision_engine,required iff decision_path_enabled,constructed only when Redis-backed decision path is enabled; NOT_STARTED (not FAILED) when intentionally disabled,test_task78i_supervisor.py::test_not_started_component_reports_starting
+telegram_inbound,optional,DEGRADED overall (never FAILED) if disabled or unavailable,test_task78i_supervisor.py::test_optional_component_failure_degrades_not_fails
+notification_dispatch,optional (Stage 1/2),notification failure never suppresses decision/shadow recording (Task 77I independence, re-proven at engine level),test_task77i_alert_shadow_independence.py::test_notification_adapter_outage_never_prevents_shadow_or_broker_entry
+gemini_enrichment,optional (Stage 3),enrichment failure never blocks decisions/alerts,see gemini_authority_boundary.md
+dashboard,optional (Stage 4),dashboard failure must not affect position protection -- dashboard route is read-only and has no reference to any mutating broker/lifecycle method,see dashboard_reconciliation.json

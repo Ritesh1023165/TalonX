@@ -58,6 +58,7 @@ from talonx_paper.engine import (
     check_stop_take,
     decide_long_term_trade,
     decide_trade,
+    fill_geometry_is_valid,
     seconds_until_next_eod_flatten,
 )
 from talonx_paper.schemas import (
@@ -335,6 +336,26 @@ class PaperTradingEngine:
 
     async def _execute_buy(self, alert: ActionableAlert, decision: TradeDecision) -> None:
         fill_price = apply_spread(decision.price, self.config.simulated_spread_bps, "BUY")
+
+        # Task 25B (Task 24 P1 finding): the fill (screening price +
+        # simulated spread) can land outside the screening-time stop/
+        # target bracket -- reject fail-closed rather than persist an
+        # invalid position, BEFORE any sizing/cash allocation happens
+        # (no partial state). See engine.fill_geometry_is_valid's own
+        # docstring for why this validates rather than recomputes.
+        stop_price = alert.triggering_signal.stop_price
+        target_price = alert.triggering_signal.target_price
+        if not fill_geometry_is_valid(fill_price, stop_price, target_price):
+            self._trades_ignored += 1
+            logger.warning(
+                "Paper trade ignored for %s: FILL_GEOMETRY_INVALID (fill=$%.4f, stop=%s, target=%s)",
+                alert.ticker, fill_price, stop_price, target_price,
+            )
+            self.store.record_ignored(
+                alert.ticker, "FILL_GEOMETRY_INVALID", alert.action, fill_price, alert.correlated_at,
+            )
+            return
+
         summary = self.store.get_portfolio_summary()
         sized = calculate_buy(summary["current_cash"], summary["trade_allocation_usd"], fill_price)
         if sized is None:

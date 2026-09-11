@@ -1,0 +1,40 @@
+{
+  "interpreter_executable": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+  "python_version": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "venv": {
+    "path": ".venv",
+    "created": "2026-08-07",
+    "include_system_site_packages": false,
+    "site_packages_dir_mtime_before_repair": "2026-08-14 14:36:58",
+    "note": "site-packages directory mtime unchanged since 2026-08-14 up to the moment of this audit's reproduction -- no package add/remove touched it in that interval, prior to this task's own repair"
+  },
+  "before_repair": {
+    "pip_show_exchange_calendars": "WARNING: Package(s) not found: exchange-calendars",
+    "collect_only_result": "2179 tests collected, 2 errors",
+    "affected_modules": ["tests/test_task61_validation_protocol.py", "tests/test_task61r_temporal_freeze.py"],
+    "collection_error": "ModuleNotFoundError: No module named 'exchange_calendars'",
+    "full_run_behavior_with_no_override_flag": "aborts entirely -- 'Interrupted: 2 errors during collection', zero tests executed",
+    "flags_used_for_reproduction": "none (plain 'python -m pytest --collect-only -q' and 'python -m pytest -q')"
+  },
+  "dependency_declaration": {
+    "declared_in": "research/requirements-task61.txt",
+    "pin": "exchange-calendars==4.13.2",
+    "declared_since_commit": "24afb11",
+    "in_main_dev_or_runtime_requirements": false,
+    "test_files_have_skip_guard": false,
+    "conftest_collection_ignore_rule": false
+  },
+  "root_cause_classification": "missing_test_extra_declaration_no_skip_guard",
+  "repair_performed": {
+    "command": "python -m pip install -r research/requirements-task61.txt",
+    "installed": ["exchange-calendars-4.13.2", "korean_lunar_calendar-0.4.0", "pyluach-2.3.0", "toolz-1.1.0"],
+    "source": "pip local wheel cache (no network download required -- exact wheel was previously fetched to this machine at some prior point)",
+    "scope": "existing declared dependency restored into the project's own established venv; no global install, no version change, no broad upgrade"
+  },
+  "after_repair": {
+    "collect_only_result": "2185 tests collected, 0 errors",
+    "affected_module_result": "6 passed",
+    "pip_show_exchange_calendars": "exchange-calendars 4.13.2, installed"
+  },
+  "unresolved_evidentiary_gap": "Cannot establish whether exchange-calendars was present in this .venv during Task 73S's full-suite run (commit 848de0d, same calendar day as this audit) -- that run's saved log (stage4_final_full_suite_results.txt) is truncated (no banner, no collected-items line, no invocation command preserved). Task 74S's claim that the dependency was present 'two days ago' is withdrawn as unsupported (see task74s_evidence_addendum.md) -- the two runs are in fact hours apart on the same day, not two days apart."
+}

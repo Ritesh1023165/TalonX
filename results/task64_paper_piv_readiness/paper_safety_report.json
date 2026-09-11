@@ -1,0 +1,13 @@
+{
+  "alpaca_paper_identity_verified": true,
+  "broker_endpoint": "https://paper-api.alpaca.markets",
+  "cleanup_requires_explicit_confirmation": true,
+  "duplicate_intents_fail_closed": true,
+  "live_endpoint_supported": false,
+  "no_orders_submitted_during_task64": true,
+  "paper_open_orders_observed": 0,
+  "paper_open_positions_observed": 0,
+  "real_capital": false,
+  "sip_probe": "HTTP_403_BLOCKED",
+  "telegram_probe": "PASS"
+}

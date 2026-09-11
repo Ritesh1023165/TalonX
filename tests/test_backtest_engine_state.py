@@ -36,7 +36,13 @@ def _signal(
         message="test", price=price, atr=atr, confluence_score=confluence, risk_reward_ratio=rr,
         volume_surge_ratio=volume_surge, trend_aligned=trend_aligned,
         stop_price=price - 1.5 * atr, target_price=price + 10.0,
-        pivot_resistance=price + 10.0, pivot_support=price - 10.0,
+        # pivot_support(price+10) is deliberately >= price -- invalid as a
+        # Task 35 structural stop anchor, so _revalidate's geometry
+        # recompute stays on the pre-Task-35 ATR-fallback path this
+        # fixture's BULLISH-only signals were designed around (this file
+        # is about confluence/R:R/volume/trend gate and throttle-ranking
+        # behavior, not structural-stop geometry itself).
+        pivot_resistance=price + 10.0, pivot_support=price + 10.0,
         session="regular", bar_timestamp=_NOW, signal_generated_at=_NOW,
     )
 

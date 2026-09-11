@@ -1,0 +1,24 @@
+{
+  "natural_strategy_lifecycle_observed": false,
+  "natural_strategy_lifecycle_reason": "Zero natural STRATEGY-sourced signals occurred. Run 1 crashed at 10:33:58 ET before enough post-warmup live evaluation could accumulate. Run 2 (restart) had 35/35 symbols warmup-ready but 0/35 session-readiness-ready, because SessionReadinessValidator's in-memory state does not survive a process restart -- see session_event_summary.json's known_limitation_discovered. This is not a decision-path defect: the real QuantScanner, with real causal warmup, was never given a symbol that was both readiness-eligible and warmup-eligible simultaneously today.",
+  "piv_probe_used": true,
+  "piv_probe_trigger_time_et": "15:00:51",
+  "piv_probe_symbol": "AAPL",
+  "piv_probe_order_count": 2,
+  "piv_probe_fill_count": 2,
+  "piv_probe_entry_fill_price": 311.47,
+  "piv_probe_exit_fill_price": 311.4,
+  "piv_probe_exit_reason": "controlled operator-initiated exit ~60s after entry, per lifecycle_probe.py's close_piv_lifecycle_probe",
+  "strategy_signal_count": 0,
+  "strategy_order_count": 0,
+  "strategy_fill_count": 0,
+  "full_order_lifecycle_validated": true,
+  "full_order_lifecycle_validated_via": "PIV_LIFECYCLE_PROBE (natural strategy path did not produce an order today -- see natural_strategy_lifecycle_reason)",
+  "lifecycle_stages_exercised": [
+    "SIGNAL", "ORDER_INTENT", "PAPER_ORDER_SUBMITTED", "broker acknowledgement (poll_order_until_terminal)",
+    "FILLED", "POSITION_OPENED", "EXIT_REQUESTED", "controlled exit ORDER_INTENT/PAPER_ORDER_SUBMITTED/FILLED",
+    "EOD reconciliation (matched=true, zero residual)"
+  ],
+  "alpha_evidence": false,
+  "alpha_evidence_note": "Every event today, natural-path or probe, is tagged source + alpha_evidence=false. The probe's entry/exit prices (311.47 buy, 311.40 sell) are execution-mechanics evidence only -- not a trading result, not counted toward any P&L/expectancy figure, and excluded from all strategy statistics by construction (a separate code path from talonx_quant.strategy entirely)."
+}

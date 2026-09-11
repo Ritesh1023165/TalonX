@@ -220,6 +220,7 @@ class DispatchAgent:
         store: AuditStore | None = None,
         telegram_client: TelegramClient | None = None,
         watchlist_store: TickerWatchlistStore | None = None,
+        extra_resolvers=None,
     ):
         self.config = config or DispatchConfig()
         self.store = store or AuditStore(self.config.audit_db_path)
@@ -228,8 +229,14 @@ class DispatchAgent:
         # /ping health check's uptime source -- process start, not just
         # this consumer loop's connect time (matches "Server Status: Active").
         self.started_at = datetime.now(timezone.utc)
+        # Task 100B: `extra_resolvers` are ordered `str -> str | None` callables
+        # tried BEFORE the numeric/LT alert-id path (see TelegramReplyListener's
+        # own docstring). run_talonx.py passes the Experimental D/X/R/E reply
+        # resolver here so there is still exactly ONE get_updates poller. The
+        # Original app passing None keeps behaviour byte-identical.
         self.reply_listener = TelegramReplyListener(
-            self.store, self.config, self.telegram_client, dispatch_agent=self
+            self.store, self.config, self.telegram_client, dispatch_agent=self,
+            extra_resolvers=extra_resolvers,
         )
         self._client = None
         self._stop_event = asyncio.Event()
@@ -565,6 +572,14 @@ class DispatchAgent:
                 self.watchlist_store.mark_heads_up_sent(ticker)
                 self._earnings_heads_up_sent += 1
                 sent += 1
+                # D7: every official Telegram domain lands in last_telegram_push
+                # so a "last official send" surface is complete, not just the
+                # intraday + long-term-alert domains.
+                try:
+                    self.store.save_last_telegram_push(
+                        ticker, "earnings_heads_up", now, None)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("last_telegram_push persist (heads-up) failed for %s: %s", ticker, exc)
                 logger.info("Earnings heads-up push sent for %s (reports %s)", ticker, row["earnings_date"])
             except TelegramSendError as exc:
                 logger.error("Earnings heads-up push failed for %s: %s", ticker, exc)
@@ -645,6 +660,16 @@ class DispatchAgent:
             logger.warning("Dropping unparseable alert: %s", exc)
             return
 
+        # Task 87B FC_01: an at-least-once redelivery of an alert we already
+        # fully processed must NOT record a second row or push a second
+        # Telegram. Still count it as "received" so the metric matches what
+        # Core's outbox sent, and ACK it so the outbox can mark it SENT.
+        if self.store is not None and self.store.alert_outbox_id_already_processed(alert.outbox_id):
+            await _incr_metric(self._client, "dispatch", "received")
+            await _incr_metric(self._client, "dispatch", "duplicate_alert_suppressed")
+            logger.info("Duplicate alert %s (outbox_id=%s) -- already processed, suppressed", alert.ticker, alert.outbox_id)
+            return
+
         self._alerts_processed += 1
         await _incr_metric(self._client, "dispatch", "received")
         alert_id = self.store.record_alert(alert)
@@ -652,6 +677,8 @@ class DispatchAgent:
             "Recorded alert #%d: %s %s (%s)",
             alert_id, alert.ticker, alert.action.value, alert.severity.value,
         )
+        if self.store is not None:
+            self.store.mark_alert_outbox_id_processed(alert.outbox_id, self.config.alerts_channel)
 
         await self._maybe_send_telegram(alert, alert_id)
 
@@ -662,6 +689,12 @@ class DispatchAgent:
             logger.warning("Dropping unparseable long-term alert: %s", exc)
             return
 
+        if self.store is not None and self.store.alert_outbox_id_already_processed(alert.outbox_id):
+            await _incr_metric(self._client, "dispatch", "received")
+            await _incr_metric(self._client, "dispatch", "duplicate_alert_suppressed")
+            logger.info("Duplicate long-term alert %s (outbox_id=%s) -- already processed, suppressed", alert.ticker, alert.outbox_id)
+            return
+
         self._long_term_alerts_processed += 1
         await _incr_metric(self._client, "dispatch", "received")
         alert_id = self.store.record_long_term_alert(alert)
@@ -669,6 +702,8 @@ class DispatchAgent:
             "Recorded long-term alert #LT%d: %s %s (%s)",
             alert_id, alert.ticker, alert.action.value, alert.severity.value,
         )
+        if self.store is not None:
+            self.store.mark_alert_outbox_id_processed(alert.outbox_id, self.config.alerts_channel_long_term)
 
         await self._maybe_send_long_term_telegram(alert, alert_id)
 

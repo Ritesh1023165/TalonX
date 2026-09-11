@@ -1,0 +1,34 @@
+{
+  "bootstrap_95_ci": [
+    -0.5788469027753699,
+    0.15163209913133757
+  ],
+  "classification": "ORPB_V1_REJECTED",
+  "clean_coverage_percent": 99.71428571428571,
+  "cost_feasibility_pass": true,
+  "data_not_ready_symbol_sessions": 6,
+  "deployment": "MONDAY_DECISION_SHADOW_ONLY",
+  "expected_symbol_sessions": 2100,
+  "five_bps_expectancy_R": -0.2431619210022293,
+  "five_bps_profit_factor": 0.6259099259686194,
+  "gross_expectancy_R": -0.1312468864801576,
+  "mandatory_criteria": "FAIL",
+  "no_fabrication_interpolation": true,
+  "orpb_alpha_fingerprint_unchanged": true,
+  "readiness_correction_frozen_before_outcomes": true,
+  "replication_required": false,
+  "symbols_traded": 26,
+  "task": "63P",
+  "top3_sensitivity_5bps_expectancy_R": -0.4884200908360532,
+  "trades": 46,
+  "trades_by_window": {
+    "O1": 13,
+    "O2": 10,
+    "O3": 23
+  },
+  "window_5bps_expectancy": {
+    "O1": -0.38491611751168703,
+    "O2": -0.25119545788961906,
+    "O3": -0.1595471417197577
+  }
+}

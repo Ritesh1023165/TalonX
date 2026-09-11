@@ -1,0 +1,5 @@
+# Task 83-R1 §6.9 -- evidence committed under this path is pinned to LF so
+# a manifest generated on one platform verifies from a fresh clone on
+# another. The evidence manifest additionally hashes git-normalized (LF)
+# bytes, so verification holds even where a checkout ignores this file.
+results/task83_r1_production_collector_closure/** text eol=lf

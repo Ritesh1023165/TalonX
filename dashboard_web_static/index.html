@@ -3,397 +3,664 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>TalonX Pipeline Dashboard</title>
+<title>TalonX Cockpit</title>
 <style>
   :root {
-    --bg: #0b0f14;
-    --panel: #121821;
-    --panel-border: #1f2937;
-    --text: #e5e7eb;
-    --muted: #8b96a5;
-    --good: #34d399;
-    --warn: #fbbf24;
-    --bad: #f87171;
+    --bg: #0b0f14; --panel: #121821; --panel-2:#0f151d; --panel-border: #1f2937;
+    --text: #e5e7eb; --muted: #8b96a5; --good: #34d399; --warn: #fbbf24; --bad: #f87171;
+    --accent:#6b7280; --orig:#22d3ee; --exp:#a78bfa; --intel:#60a5fa;
   }
   * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  }
-  header {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-    padding: 16px 24px;
-    border-bottom: 1px solid var(--panel-border);
-    flex-wrap: wrap;
-  }
-  header h1 {
-    font-size: 18px;
-    margin: 0;
-    font-weight: 600;
-  }
-  .status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--muted);
-  }
-  .status-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: var(--bad);
-    transition: background 0.3s;
-  }
-  .status-dot.connected { background: var(--good); }
-  .status-dot.reconnecting { background: var(--warn); }
-  .stat {
-    font-size: 13px;
-    color: var(--muted);
-  }
-  .stat b { color: var(--text); font-size: 15px; }
-  main {
-    padding: 20px 24px 40px;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-    gap: 16px;
-  }
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--panel-border);
-    border-left: 3px solid var(--accent, #6b7280);
-    border-radius: 10px;
-    padding: 16px 18px;
-  }
-  .card-wide { grid-column: 1 / -1; }
-  .bw-summary { display: flex; gap: 28px; margin: 2px 0 14px; flex-wrap: wrap; }
-  .bw-stat { font-size: 12px; color: var(--muted); }
-  .bw-stat b { color: var(--text); font-size: 22px; display: block; line-height: 1.2; }
-  .bw-stat.all-ready b { color: var(--good); }
-  .bw-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
-  .bw-table th { text-align: left; color: var(--muted); font-weight: 500; padding: 4px 10px 6px 0; border-bottom: 1px solid var(--panel-border); }
-  .bw-table td { padding: 5px 10px 5px 0; border-bottom: 1px solid #1a212c; font-family: ui-monospace, "SF Mono", Consolas, monospace; }
-  .bw-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-  .bw-dot.ready { background: var(--good); }
-  .bw-dot.not-ready { background: var(--warn); }
-  .bw-more { color: var(--muted); font-size: 11px; margin-top: 8px; }
-  .card-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 10px;
-  }
-  .card-title { font-size: 14px; font-weight: 600; }
-  .card-channel { font-size: 11px; color: var(--muted); font-family: ui-monospace, "SF Mono", Consolas, monospace; }
-  .card-total { font-size: 28px; font-weight: 700; line-height: 1; }
-  .card-rate { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .sparkline { width: 100%; height: 40px; margin: 10px 0 4px; display: block; }
-  .bars { margin-top: 8px; }
-  .bar-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    margin-bottom: 4px;
-  }
-  .bar-label {
-    width: 56px;
-    flex-shrink: 0;
-    color: var(--muted);
-    font-family: ui-monospace, "SF Mono", Consolas, monospace;
-    text-align: right;
-  }
-  .bar-track {
-    flex: 1;
-    background: #1a212c;
-    border-radius: 3px;
-    height: 12px;
-    overflow: hidden;
-  }
-  .bar-fill {
-    height: 100%;
-    border-radius: 3px;
-    background: var(--accent, #6b7280);
-    transition: width 0.4s ease;
-  }
-  .bar-count { width: 34px; flex-shrink: 0; color: var(--muted); font-size: 11px; text-align: right; }
-  .bar-label.wide { width: 150px; }
-  .empty { color: var(--muted); font-size: 12px; font-style: italic; }
-  .unparseable { color: var(--warn); font-size: 11px; margin-top: 6px; }
-  .section-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin: 10px 0 4px; }
-  .numeric-total { font-size: 13px; margin-top: 8px; }
-  .numeric-total b.pos { color: var(--good); }
-  .numeric-total b.neg { color: var(--bad); }
-  footer {
-    padding: 12px 24px 30px;
-    color: var(--muted);
-    font-size: 11px;
-  }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size:14px; }
+  header { display:flex; align-items:center; gap:20px; padding:12px 20px;
+    border-bottom:1px solid var(--panel-border); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0; font-weight:600; }
+  .status { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); }
+  .status-dot { width:9px; height:9px; border-radius:50%; background:var(--bad); transition:background .3s; }
+  .status-dot.connected { background:var(--good); }
+  .status-dot.reconnecting { background:var(--warn); }
+  .stat { font-size:12px; color:var(--muted); } .stat b { color:var(--text); font-size:14px; }
+  nav#primary { display:flex; gap:4px; padding:8px 16px; border-bottom:1px solid var(--panel-border); flex-wrap:wrap; }
+  nav#primary button { background:var(--panel); color:var(--text); border:1px solid var(--panel-border);
+    border-radius:6px; padding:6px 12px; cursor:pointer; font-size:12px; }
+  nav#primary button.active { border-color:var(--good); color:#fff; background:#16202b; }
+  nav#legacy { display:flex; gap:4px; padding:6px 16px; border-bottom:1px solid var(--panel-border); flex-wrap:wrap; }
+  nav#legacy button { background:transparent; color:var(--muted); border:1px solid var(--panel-border);
+    border-radius:6px; padding:4px 10px; cursor:pointer; font-size:11px; }
+  nav#legacy button.active { color:#fff; border-color:var(--muted); }
+  main { padding:16px 20px 48px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px; }
+  .card { background:var(--panel); border:1px solid var(--panel-border); border-left:3px solid var(--accent);
+    border-radius:10px; padding:14px 16px; }
+  .card.orig { border-left-color:var(--orig); } .card.exp { border-left-color:var(--exp); }
+  .card.intel { border-left-color:var(--intel); }
+  .card h3 { margin:0 0 8px; font-size:13px; font-weight:600; letter-spacing:.02em; }
+  .card-wide { grid-column:1/-1; }
+  .kv { display:flex; justify-content:space-between; gap:12px; padding:3px 0; border-bottom:1px solid #1a212c; font-size:13px; }
+  .kv:last-child { border-bottom:none; }
+  .kv .k { color:var(--muted); } .kv .v { font-family:ui-monospace,Consolas,monospace; text-align:right; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+  .pill.ACTIVE,.pill.READY,.pill.HEALTHY,.pill.RECONCILED { background:#08351f; color:var(--good); }
+  .pill.ZERO_ACTIVITY,.pill.NOT_DUE,.pill.UNKNOWN,.pill.NOT_CHECKED,.pill.NOT_PERSISTED { background:#20262e; color:var(--muted); }
+  .pill.DEGRADED,.pill.STALE,.pill.SUPERSEDED,.pill.PARTIAL { background:#3a2c07; color:var(--warn); }
+  .pill.FAILED,.pill.NO_ACTIVE_PRODUCER,.pill.DOWN,.pill.DISCONNECTED,.pill.BLOCKED { background:#3a1113; color:var(--bad); }
+  .pill.BLOCKED { background:#08351f; color:var(--good); } /* boundary BLOCKED = good */
+  .pill.CURRENT,.pill.SENT,.pill.NO_OPPORTUNITIES { background:#08351f; color:var(--good); }
+  .pill.STARTING,.pill.POSITION_OPEN,.pill.ACTIVITY,.pill.PENDING,.pill.RETRY { background:#20262e; color:var(--muted); }
+  .pill.INCOMPLETE_COVERAGE,.pill.HELD,.pill.AMBIGUOUS,.pill.DATA_STALE { background:#3a2c07; color:var(--warn); }
+  .pill.DATA_UNAVAILABLE,.pill.STARTUP_FAILED { background:#3a1113; color:var(--bad); }
+  .banner { border-radius:8px; padding:8px 12px; font-size:12px; margin-bottom:12px; }
+  .banner.internal { background:#241a3a; color:#c4b5fd; border:1px solid #3b2d63; }
+  .banner.info { background:#12202b; color:#93c5fd; border:1px solid #223a4d; }
+  .banner.warn { background:#2c2207; color:var(--warn); border:1px solid #4d3c12; }
+  table.tbl { width:100%; border-collapse:collapse; font-size:12px; margin-top:6px; }
+  table.tbl th { text-align:left; color:var(--muted); font-weight:500; padding:4px 8px 6px 0; border-bottom:1px solid var(--panel-border); }
+  table.tbl td { padding:4px 8px 4px 0; border-bottom:1px solid #1a212c; font-family:ui-monospace,Consolas,monospace; }
+  .tblwrap { overflow-x:auto; }
+  details { margin-top:8px; } summary { cursor:pointer; color:var(--muted); font-size:12px; }
+  .muted { color:var(--muted); } .small { font-size:11px; }
+  a { color:#7dd3fc; }
+  .src { font-size:10px; color:var(--muted); margin-top:6px; font-family:ui-monospace,Consolas,monospace; }
+  footer { padding:12px 20px 30px; color:var(--muted); font-size:11px; }
+  h2.section-title { font-size:15px; margin:2px 0 12px; }
+  /* legacy live cards reuse */
+  .bars { margin-top:8px; } .bar-row { display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:4px; }
+  .bar-label { width:56px; flex-shrink:0; color:var(--muted); font-family:ui-monospace,Consolas,monospace; text-align:right; }
+  .bar-label.wide { width:150px; }
+  .bar-track { flex:1; background:#1a212c; border-radius:3px; height:12px; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:3px; background:var(--accent); }
+  .bar-count { width:34px; flex-shrink:0; color:var(--muted); font-size:11px; text-align:right; }
+  .empty { color:var(--muted); font-size:12px; font-style:italic; }
+  .card-total { font-size:26px; font-weight:700; line-height:1; }
+  .card-rate { font-size:12px; color:var(--muted); margin-top:2px; }
+  .sparkline { width:100%; height:36px; margin:8px 0 4px; display:block; }
+  .card-channel { font-size:11px; color:var(--muted); font-family:ui-monospace,Consolas,monospace; }
+  pre.json { white-space:pre-wrap; font-size:11px; background:var(--panel-2); border:1px solid var(--panel-border);
+    border-radius:6px; padding:8px; overflow:auto; max-height:340px; }
+  @media (max-width:640px) { .grid { grid-template-columns:1fr; } header { gap:10px; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>TalonX Pipeline Dashboard</h1>
+  <h1>TalonX Cockpit <span class="muted small">:8787 primary</span></h1>
   <div class="status"><span class="status-dot" id="status-dot"></span><span id="status-text">connecting...</span></div>
   <div class="stat">uptime <b id="uptime">00:00:00</b></div>
-  <div class="stat">total messages <b id="grand-total">0</b></div>
-  <div class="stat">distinct tickers <b id="distinct-tickers">0</b></div>
+  <div class="stat">msgs <b id="grand-total">0</b></div>
+  <div class="stat">tickers <b id="distinct-tickers">0</b></div>
+  <div class="stat" id="overall-health-wrap" style="display:none">system <b id="overall-health">—</b></div>
 </header>
-<main id="cards">
-  <div class="card card-wide" style="--accent:#2dd4bf">
-    <div class="card-head">
-      <div>
-        <div class="card-title">M2 - Bar buffer warm-up</div>
-        <div class="card-channel">quant.db :: bar_buffer (talonx_quant, not Redis -- polled every 10s)</div>
+
+<nav id="primary">
+  <button data-sec="overview" class="active">Overview</button>
+  <button data-sec="premarket">Premarket</button>
+  <button data-sec="original_quant">Original Quant</button>
+  <button data-sec="v2_active_strategy">Active V2</button>
+  <button data-sec="validation">Validation</button>
+  <button data-sec="intelligence">Intelligence</button>
+  <button data-sec="paper_eod">Paper / EOD</button>
+</nav>
+<nav id="legacy">
+  <span class="muted small" style="align-self:center;margin-right:4px">legacy views:</span>
+  <button data-view="live">Live pipeline</button>
+  <button data-view="original">Original (raw)</button>
+  <button data-view="piv">PIV</button>
+  <button data-view="compare">Compare</button>
+  <button data-view="authority">Domain status</button>
+</nav>
+
+<main>
+  <div id="section-view"></div>
+
+  <div id="live-view" style="display:none">
+    <div class="grid" id="cards">
+      <div class="card card-wide" style="border-left-color:#2dd4bf">
+        <h3>M2 — Bar buffer warm-up</h3>
+        <div class="card-channel">quant.db :: bar_buffer (polled every 10s)</div>
+        <div id="bw-unavailable" class="empty" style="display:none">quant.db not found yet, or bar_buffer still empty.</div>
+        <div id="bw-content">
+          <div style="display:flex;gap:24px;margin:8px 0 12px;flex-wrap:wrap">
+            <div class="small muted"><b id="bw-1m-ready" style="color:var(--text);font-size:20px;display:block">0/0</b>1-min ready (<span id="bw-1m-threshold">120</span>)</div>
+            <div class="small muted"><b id="bw-15m-ready" style="color:var(--text);font-size:20px;display:block">0/0</b>15-min HTF ready (<span id="bw-15m-threshold">200</span>)</div>
+          </div>
+          <div class="tblwrap"><table class="tbl"><thead><tr><th>Symbol</th><th>1m</th><th>15m HTF</th></tr></thead><tbody id="bw-tbody"></tbody></table></div>
+          <div class="small muted" id="bw-more" style="display:none"></div>
+        </div>
       </div>
-    </div>
-    <div id="bw-unavailable" class="empty" style="display:none">quant.db not found yet, or bar_buffer is still empty -- waiting for the quant scanner to checkpoint.</div>
-    <div id="bw-content">
-      <div class="bw-summary">
-        <div class="bw-stat" id="bw-1m-wrap"><b id="bw-1m-ready">0/0</b>1-min buffer ready (<span id="bw-1m-threshold">120</span> bars)</div>
-        <div class="bw-stat" id="bw-15m-wrap"><b id="bw-15m-ready">0/0</b>15-min HTF buffer ready (<span id="bw-15m-threshold">200</span> bars)</div>
-      </div>
-      <div class="section-label">Session mix (checkpointed bars)</div>
-      <div class="bars" id="bw-sessions"></div>
-      <div class="section-label">Per-ticker warm-up</div>
-      <table class="bw-table">
-        <thead><tr><th>Symbol</th><th>1m buffer</th><th>15m HTF buffer</th></tr></thead>
-        <tbody id="bw-tbody"></tbody>
-      </table>
-      <div class="bw-more" id="bw-more" style="display:none"></div>
     </div>
   </div>
+
+  <div id="fetch-view" style="display:none">
+    <div id="fetch-meta" class="muted small" style="margin-bottom:8px"></div>
+    <div id="fetch-body"></div>
+  </div>
 </main>
-<footer>Live, read-only view -- counts reset if this server restarts. Not a historical record.</footer>
+<footer>Read-only operational cockpit. No order, broker, config-edit or send action on this dashboard. Counts under "Live pipeline" reset on server restart.</footer>
 
 <script>
-const ACCENTS = {
-  filings: "#60a5fa",
-  market:  "#22d3ee",
-  signals: "#a78bfa",
-  reports: "#fbbf24",
-  alerts:  "#f87171",
-  paper_trades: "#34d399",
-  // Phase 2 (LONG_TERM horizon) -- same hues as their intraday
-  // counterparts above, one shade lighter/desaturated to read as a
-  // related-but-distinct pair at a glance.
-  fundamentals_events: "#93c5fd",
-  fundamental_signals: "#c4b5fd",
-  reports_longterm: "#fcd34d",
-  alerts_longterm: "#fca5a5",
-  paper_trades_longterm: "#6ee7b7",
+const $ = (id) => document.getElementById(id);
+function pill(s){ return `<span class="pill ${String(s||'UNKNOWN').replace(/[^A-Z_]/g,'')||'UNKNOWN'}">${s==null?'—':s}</span>`; }
+function kv(k,v){ return `<div class="kv"><span class="k">${k}</span><span class="v">${v==null||v===''?'—':v}</span></div>`; }
+function num(v){ return (v==null)?'—':(typeof v==='number'? (Number.isInteger(v)? v : v.toFixed(2)) : v); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function ageStr(sec){ if(sec==null) return '—'; if(sec<90) return Math.round(sec)+'s'; if(sec<5400) return Math.round(sec/60)+'m'; return (sec/3600).toFixed(1)+'h'; }
+function srcLine(s){ return s? `<div class="src">source: ${esc(s)}</div>` : ''; }
+
+/* ---------- primary section renderers ---------- */
+function boundedTable(rows, cols, cap){
+  cap = cap || 12;
+  if(!rows || !rows.length) return `<div class="empty">none</div>`;
+  const head = cols.map(c=>`<th>${c.label}</th>`).join('');
+  const body = rows.slice(0,cap).map(r=>`<tr>${cols.map(c=>`<td>${esc(num(c.get(r)))}</td>`).join('')}</tr>`).join('');
+  const more = rows.length>cap ? `<div class="small muted">+${rows.length-cap} more (bounded view)</div>` : '';
+  return `<div class="tblwrap"><table class="tbl"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${more}`;
+}
+
+function renderOverview(d){
+  const r=d.runtime||{}, m=d.market||{}, a=d.alerts||{}, v2=d.active_v2||{};
+  let h=`<h2 class="section-title">Overview — system operational picture</h2><div class="grid">`;
+  // Active V2 summary -- first-class on the Overview (Task 117)
+  if(!v2.error){
+    const del=v2.delivery||{};
+    h+=`<div class="card card-wide" style="border-left-color:#7c9cff"><h3>Active V2 — ${esc(v2.strategy||'INSIDER_BUY_CLUSTER_V2@1')} `+
+       `<span class="muted small">multi-day · PAPER CANDIDATE · ${v2.candidate_pricing?'candidate pricing':'frozen csv pricing'} · `+
+       `delivery ${del.enabled?'ON':'OFF (dry-run)'} · fp ${esc(v2.v2_fingerprint||'—')}</span></h3>`+
+       `<div class="grid">`+
+       `<div>`+kv('process health', pill(v2.service_health))+kv('data state', pill(v2.data_state))+
+         kv('coverage', pill(v2.coverage_state))+kv('pricing', pill(v2.pricing_state))+
+         kv('activity', pill(v2.business_activity))+`</div>`+
+       `<div>`+kv('campaign cash', num(v2.cash)+' / '+num(v2.starting_campaign_cash))+
+         kv('open / capacity', (v2.open_positions==null?'—':v2.open_positions)+' / '+(v2.capacity||'—'))+
+         kv('BUY / SELL (lifetime)', (v2.buys==null?'—':v2.buys)+' / '+(v2.sells==null?'—':v2.sells))+
+         kv('realized P&L', num(v2.realized_pnl_usd))+kv('EXIT_UNRESOLVED', num(v2.exit_unresolved))+`</div>`+
+       `<div>`+kv('pre-open intents PENDING', num(v2.pending_entry_intents))+
+         kv('delivery SENT / HELD / RETRY', `${num(del.sent)} / ${num(del.held)} / ${num(del.retry)}`)+
+         kv('delivery FAILED / AMBIGUOUS / EXPIRED', `${num(del.failed)} / ${num(del.ambiguous)} / ${num(del.by_state&&del.by_state.EXPIRED||0)}`)+
+         kv('EOD state', pill(v2.eod_state))+kv('interpretation', pill(v2.interpretation))+`</div>`+
+       `</div><div class="muted small">${esc(v2.delayed_fill_semantics||'')} — full detail on the Active V2 tab.</div></div>`;
+  } else {
+    h+=`<div class="card card-wide"><h3>Active V2</h3><div class="banner warn">read error: ${esc(v2.error)}</div></div>`;
+  }
+  h+=`<div class="card"><h3>Runtime</h3>`+
+     kv('overall', pill(r.overall))+kv('Original', pill(r.original))+kv('Experimental', pill(r.experimental))+
+     kv('Intelligence', pill(r.intelligence))+kv('Telegram send', pill(r.telegram_send))+
+     kv('Telegram receive', pill(r.telegram_receive))+kv('Forward outcomes', pill(r.forward_outcomes))+
+     kv('EOD', pill(r.eod))+
+     `<details><summary>producer notes</summary><pre class="json">${esc(JSON.stringify(r.notes||{},null,1))}</pre></details></div>`;
+  h+=`<div class="card orig"><h3>Market</h3>`+
+     kv('feed state', pill(m.state))+kv('session', m.session_phase||'—')+
+     kv('last event', m.last_event? esc(m.last_event.slice(0,19)) : '—')+
+     kv('last event age', ageStr(m.last_event_age_seconds))+
+     kv('last bar age', ageStr(m.last_bar_age_seconds))+
+     kv('active poller', m.active_poller||'—')+
+     kv('configured symbols', num(m.configured_symbols))+kv('selected symbols', num(m.selected_symbols))+
+     kv('usable coverage', m.usable_coverage==null?'—':(m.usable_coverage*100).toFixed(1)+'%')+
+     kv('symbols priced', num(m.symbols_priced))+
+     kv('provider failures / retries', `${num(m.provider_failures)} / ${num(m.provider_retries)}`)+
+     kv('Redis failures / reconnects', `${num(m.redis_failures)} / ${num(m.redis_reconnects)}`)+
+     srcLine(m.source)+`</div>`;
+  h+=`<div class="card"><h3>Alerts</h3>`+
+     kv('official generated', num(a.official_generated))+kv('official sent', num(a.official_sent))+
+     kv('official failed', num(a.official_failed))+kv('official held / deduped', num(a.official_held_deduped))+
+     kv('official status', pill(a.official_status))+
+     kv('Experimental external', pill(a.experimental_external_boundary))+
+     kv('Experimental live sends', num(a.experimental_live_external_sends))+
+     kv('Experimental eligible', String(a.experimental_external_eligible))+
+     `<div class="small muted">legacy dry-run bookkeeping rows: ${num(a.experimental_legacy_bookkeeping_rows)} (not live sends)</div></div>`;
+  h+=`<div class="card card-wide"><h3>Source status (false-zero guard)</h3><div class="tblwrap"><table class="tbl">`+
+     `<thead><tr><th>domain</th><th>status</th><th>authoritative source</th><th>note</th></tr></thead><tbody>`+
+     (d.source_status||[]).map(s=>`<tr><td>${esc(s.domain)}</td><td>${pill(s.status)}</td>`+
+       `<td class="muted">${esc(s.authoritative_source)}</td><td class="muted">${esc((s.note||'').slice(0,140))}</td></tr>`).join('')+
+     `</tbody></table></div></div>`;
+  h+=`</div>`;
+  return h;
+}
+
+function renderPremarket(d){
+  const er=d.earnings_radar||{}, pw=d.premarket_watch||{}, ec=d.event_context||{};
+  let h=`<h2 class="section-title">Premarket</h2>`+
+    `<div class="banner info">${esc(d.disclaimer||'')}</div><div class="grid">`;
+  h+=`<div class="card card-wide"><h3>Earnings radar ${pill(er.status)}</h3>`+
+     boundedTable(er.items, [
+       {label:'symbol', get:r=>r.symbol},{label:'earnings date', get:r=>r.earnings_date},
+       {label:'window', get:r=>r.window},{label:'session', get:r=>r.session},
+       {label:'heads-up sent', get:r=>String(r.heads_up_sent)},
+     ], 20)+srcLine(er.source)+`</div>`;
+  {
+    const cov=pw.coverage||{}, fam=pw.events_by_family||{}, cnt=pw.counts_by_family||{};
+    let pwh=`<div class="card card-wide"><h3>Premarket watch ${pill(pw.status)}</h3>`;
+    pwh+=`<div class="small muted">session ${esc(pw.session_date||'—')} · updated ${pw.last_updated_at?esc(pw.last_updated_at.slice(0,19)):'—'}`+
+         (pw.last_updated_age_seconds!=null?` (${ageStr(pw.last_updated_age_seconds)} ago)`:'')+
+         ` · coverage ${num(cov.covered)}/${num(cov.active)}</div>`;
+    if(pw.note) pwh+=`<div class="muted small">${esc(pw.note)}</div>`;
+    const order=['GAP_UP','GAP_DOWN','ABNORMAL_VOLUME','BULLISH_WATCH','BEARISH_WATCH'];
+    const any=order.some(k=>(fam[k]||[]).length);
+    if(!any){ pwh+=`<div class="empty">no persisted movers for this session (or the field is NOT_AVAILABLE)</div>`; }
+    order.forEach(k=>{
+      const rows=fam[k]||[];
+      pwh+=`<div class="section-label" style="text-transform:none;margin-top:10px">${k} · ${num(cnt[k]||0)}</div>`;
+      pwh+=boundedTable(rows, [
+        {label:'symbol', get:r=>r.symbol},{label:'bias', get:r=>r.bias},
+        {label:'gap %', get:r=>r.gap_pct},{label:'rel vol', get:r=>r.relative_volume},
+        {label:'ref', get:r=>r.reference_price},{label:'detail', get:r=>r.detail},
+      ], 10);
+    });
+    pwh+=srcLine(pw.source)+`</div>`;
+    h+=pwh;
+  }
+  h+=`<div class="card card-wide intel"><h3>Event context ${pill(ec.status)}</h3>`+
+     boundedTable(ec.items, [
+       {label:'symbol', get:r=>r.symbol},{label:'event type', get:r=>r.event_type},
+       {label:'accepted at', get:r=>r.accepted_at},
+     ], 15)+srcLine(ec.source)+`</div>`;
+  h+=`</div>`;
+  return h;
+}
+
+function renderOriginalQuant(d){
+  const f=d.funnel||{}, t=d.thresholds||{};
+  let h=`<h2 class="section-title">Original Quant — the funnel, made legible</h2>`;
+  h+=`<div class="banner info">Thresholds (frozen): ATR ${t.min_atr_pct} · confluence ${t.confluence_score_min} · R:R ${t.min_risk_reward_ratio}. `+
+     esc(d.research_candidates_note||'')+`</div><div class="grid">`;
+  h+=`<div class="card orig card-wide"><h3>Funnel</h3>`+
+     kv('bars observed (buffered)', num(f.bars_observed_buffered))+
+     kv('suppressions today', num(f.suppressions_today))+
+     kv('published Quant signals today', num(f.published_quant_signals_today))+
+     kv('Quant → Brain handoffs today', num(f.quant_to_brain_handoffs_today))+
+     kv('Brain reports today', num(f.brain_reports_today))+
+     kv('official alerts today', num(f.official_alerts_today))+
+     kv('official alerts all-time', num(f.official_alerts_all_time))+
+     kv('local paper trades all-time', num(f.local_paper_trades_all_time))+`</div>`;
+  h+=`<div class="card"><h3>Quant state</h3><div style="font-size:15px;margin:4px 0">${pill(d.quant_state)}</div>`+
+     `<div class="muted small">${esc(d.quant_state_note||'')}</div></div>`;
+  h+=`<div class="card"><h3>Brain state</h3><div style="font-size:15px;margin:4px 0">${pill(d.brain_state)}</div>`+
+     `<div class="muted small">${esc(d.brain_state_note||'')}</div></div>`;
+  h+=`<div class="card orig card-wide"><h3>Rejection reasons (today)</h3>`+
+     boundedTable(f.by_reason, [
+       {label:'reason', get:r=>r.reason},{label:'count', get:r=>r.count},{label:'%', get:r=>r.pct},
+     ], 20)+`</div>`;
+  h+=`<div class="card card-wide"><h3>Source status</h3><pre class="json">${esc(JSON.stringify(d.source_status||{},null,1))}</pre></div>`;
+  h+=`</div>`;
+  return h;
+}
+
+function renderValidation(d){
+  const g=d.gate_breakdown||{}, dir=d.direction_breakdown||{}, fo=d.forward_outcomes||{}, cmp=d.original_vs_experimental||{};
+  let h=`<h2 class="section-title">Validation</h2>`+
+    `<div class="banner internal"><b>${esc(d.label)}</b><br>${esc(d.no_send_action)} `+
+    `External dispatchable: <b>${String(d.external_dispatchable)}</b>. Boundary: ${pill(d.external_boundary)}.</div><div class="grid">`;
+  h+=`<div class="card exp"><h3>Experimental V1 state</h3>`+
+     kv('lane', pill(d.experimental_state))+kv('reason', d.experimental_state_reason)+
+     kv('profile', `ATR ${d.frozen_profile.min_atr_pct} · confl ${d.frozen_profile.confluence_score_min} · R:R ${d.frozen_profile.min_risk_reward_ratio}`)+
+     kv('live external sends', num(d.live_external_sends))+
+     `<div class="small muted">legacy dry-run bookkeeping rows: ${num(d.legacy_bookkeeping_rows)}</div></div>`;
+  h+=`<div class="card exp"><h3>Directional (sampled)</h3>`+
+     kv('BULLISH', num(dir.BULLISH))+kv('BEARISH', num(dir.BEARISH))+
+     kv('WOULD_PASS', num(g.WOULD_PASS))+kv('WOULD_REJECT', num(g.WOULD_REJECT))+kv('other', num(g.OTHER))+`</div>`;
+  h+=`<div class="card exp"><h3>Reject reasons</h3>`+
+     boundedTable(d.reject_reasons, [{label:'reason', get:r=>r.reason},{label:'count', get:r=>r.count}], 12)+`</div>`;
+  h+=`<div class="card exp card-wide"><h3>Recent directional alerts (internal)</h3>`+
+     boundedTable(d.directional_recent, [
+       {label:'id', get:r=>r.alert_id},{label:'symbol', get:r=>r.symbol},{label:'dir', get:r=>r.direction},
+       {label:'setup', get:r=>r.setup_type},{label:'score', get:r=>r.setup_score},
+       {label:'gate', get:r=>r.trade_gate_status},{label:'reject', get:r=>r.trade_gate_reject_reason},
+       {label:'ts', get:r=>r.bar_timestamp},
+     ], 15)+`</div>`;
+  h+=`<div class="card exp card-wide"><h3>Forward outcomes ${pill(fo.status)} — Task 99G</h3>`+
+     `<div style="display:flex;gap:20px;flex-wrap:wrap;margin:6px 0" class="small muted">`+
+     Object.entries(fo.summary||{}).map(([k,v])=>`<span><b style="color:var(--text);font-size:16px;display:block">${v}</b>${k}</span>`).join('')+`</div>`+
+     boundedTable(fo.recent, [
+       {label:'obs', get:r=>r.obs_id},{label:'symbol', get:r=>r.symbol},{label:'ref', get:r=>r.reference_price},
+       {label:'MFE', get:r=>r.mfe},{label:'MAE', get:r=>r.mae},
+       {label:'+30m', get:r=>r.r_30m},{label:'+60m', get:r=>r.r_60m},{label:'EOD', get:r=>r.r_eod},{label:'+1D', get:r=>r.r_1d},
+       {label:'status', get:r=>r.status},
+     ], 15)+srcLine(fo.source)+`</div>`;
+  h+=`<div class="card exp card-wide"><h3>Original vs Experimental (informational)</h3>`+
+     `<div class="muted small">${esc(cmp.note||'')}</div><pre class="json">${esc(JSON.stringify({original:cmp.original,experimental:cmp.experimental},null,1))}</pre></div>`;
+  h+=`</div>`;
+  return h;
+}
+
+function renderIntelligence(d){
+  let h=`<h2 class="section-title">Intelligence — descriptive event/risk summary</h2>`+
+    `<div class="banner info">${esc(d.disclaimer||'')} Full evidence: <a href="${esc(d.deep_link)}" target="_blank">:8760 deep viewer →</a></div><div class="grid">`;
+  h+=`<div class="card intel"><h3>Service</h3>`+
+     kv('status', pill(d.status))+
+     kv('producer live', String(d.producer&&d.producer.live))+
+     kv('heartbeat', d.producer&&d.producer.heartbeat_at? esc(d.producer.heartbeat_at.slice(0,19)):'—')+
+     kv('newest event', d.newest_event? esc(String(d.newest_event).slice(0,19)):'—')+
+     `<div class="muted small">${esc((d.note||'').slice(0,240))}</div>`+srcLine(d.authoritative_source)+`</div>`;
+  h+=`<div class="card intel"><h3>Counts</h3>`+
+     Object.entries(d.counts||{}).map(([k,v])=>kv(k, num(v))).join('')+
+     `<details><summary>deep links</summary>`+
+     Object.entries(d.deep_links||{}).map(([k,v])=>`<div><a href="${esc(v)}" target="_blank">${k} →</a></div>`).join('')+`</details></div>`;
+  const cd=d.card_delivery;
+  if(cd){
+    const bs=cd.by_state||{};
+    h+=`<div class="card intel"><h3>Card delivery</h3>`+
+       kv('disabled / pending', num(bs.PENDING))+
+       kv('sending (in-flight)', num(bs.IN_FLIGHT))+
+       kv('sent', num(bs.SENT))+
+       kv('sending-ambiguous', num(bs.AMBIGUOUS))+
+       kv('failed', num(bs.FAILED))+
+       kv('expired', num(bs.EXPIRED))+
+       kv('suppressed', num(bs.SUPPRESSED))+
+       kv('sent today', num(cd.sent_today))+
+       kv('last card sent', cd.last_card_sent_utc? esc(String(cd.last_card_sent_utc).slice(0,19)) : '—')+
+       kv('last digest sent', cd.last_digest_sent_utc? esc(String(cd.last_digest_sent_utc).slice(0,19)) : '—')+
+       kv('queued, not sent', num(cd.queued_not_sent))+
+       `<div class="muted small">${esc(cd.note||'')}</div></div>`;
+  }
+  h+=`<div class="card intel card-wide"><h3>Latest events</h3>`+
+     boundedTable(d.latest_events, [
+       {label:'event id', get:r=>r.event_id},{label:'symbol', get:r=>r.symbol},
+       {label:'type', get:r=>r.event_type},{label:'accepted at', get:r=>r.accepted_at},
+     ], 15)+`</div>`;
+  h+=`<div class="card intel card-wide"><h3>Significance-ranked</h3>`+
+     boundedTable(d.significance_ranked, [
+       {label:'event id', get:r=>r.event_id},{label:'band', get:r=>r.band},{label:'score', get:r=>r.score},
+     ], 15)+`</div>`;
+  h+=`</div>`;
+  return h;
+}
+
+function costLine(co){
+  if(!co) return 'UNMODELED';
+  if(typeof co==='string') return esc(co);
+  return esc(co.summary||co.note||'UNMODELED');
+}
+
+// Task 119A A1: ONE card per lane, combining the pre-existing thin
+// ARM-based summary (attribution/status/note) with the folded-in richer
+// per-lane accounting (perf) when available -- never two separate cards
+// for the same lane's numbers.
+function lanePaperCard(cls, title, base, perf, extraBanner){
+  base = base||{};
+  let h=`<div class="card ${cls} card-wide"><h3>${esc(title)}${perf&&perf.strategy_identity? ' — '+esc(perf.strategy_identity):''} ${pill(base.status)}</h3>`;
+  if(extraBanner) h+=`<div class="banner internal small" style="margin:0 0 8px">${esc(extraBanner)}</div>`;
+  h+=`<div class="muted small" style="margin-bottom:6px">${esc(base.attribution||(perf&&perf.attribution)||'')}</div>`;
+  if(!perf){
+    h+=`<div class="grid"><div>`+kv('open positions', num(base.open_positions))+kv('trades all-time', num(base.trades_all_time))+
+       kv('current cash', num(base.current_cash))+`</div></div>`+
+       `<div class="muted small">${esc(base.note||'')}</div></div>`;
+    return h;
+  }
+  const op=perf.open_positions||{}, rp=perf.realized_pnl||{}, up=perf.unrealized_pnl||{}, eq=perf.equity||{},
+        rc=perf.reconciliation||{}, tc=perf.trade_counts||{}, per=perf.period||{}, sc=perf.starting_capital||{}, co=perf.costs;
+  h+=`<div class="grid">`;
+  h+=`<div>`+kv('as-of / period', esc(per.as_of_date))+
+     kv('campaign start', per.campaign_start? esc(String(per.campaign_start).slice(0,19)) : esc(per.campaign_start_basis))+
+     kv('starting capital', num(sc.amount))+kv('cash', num(perf.cash))+
+     kv('open positions', op.count)+kv('open cost basis', num(op.cost_basis_total))+
+     kv('marked open value', num(op.marked_value_total)+' '+pill(op.marked_value_status&&op.marked_value_status.split(' ')[0]))+
+     `</div>`;
+  h+=`<div>`+kv('realized P&L (campaign)', num(rp.campaign_to_date))+
+     kv('unrealized P&L', (up.total==null?'—':num(up.total))+' '+pill((up.status||'').split(' ')[0]))+
+     kv('costs', costLine(co))+
+     kv('equity (cash+marked open)', num(eq.value)+' '+pill(eq.status))+
+     kv('reconciliation', pill(rc.status))+
+     kv('entries/exits today', num(tc.entries_today)+' / '+num(tc.exits_today))+
+     kv('entries/exits campaign', num(tc.entries_campaign_to_date)+' / '+num(tc.exits_campaign_to_date))+
+     `</div></div>`;
+  if(co && co.spread_slippage) h+=`<div class="src">cost model: spread/slippage — ${esc(co.spread_slippage)} · commissions/fees — ${esc(co.explicit_commissions_fees)}</div>`;
+  if(eq.note) h+=`<div class="muted small">${esc(eq.note)}</div>`;
+  if(rc.status && rc.status!=='UNAVAILABLE') h+=`<div class="src">reconciliation: expected_cash=${num(rc.expected_cash)} actual_cash=${num(rc.actual_cash)} diff=${num(rc.diff)} — ${esc(rc.basis||'')}</div>`;
+  h+=boundedTable(op.detail||[], [
+     {label:'symbol', get:p=>p.symbol}, {label:'entry time', get:p=>p.entry_time&&String(p.entry_time).slice(0,19)},
+     {label:'qty', get:p=>p.quantity}, {label:'cost basis', get:p=>p.cost_basis},
+     {label:'mark', get:p=>p.mark}, {label:'mark session', get:p=>p.mark_session_classification},
+     {label:'mark age', get:p=>ageStr(p.mark_age_seconds)},
+     {label:'unrealized $', get:p=>p.unrealized_pnl_usd}, {label:'obligation', get:p=>p.pending_exit_obligation}], 20);
+  if((op.detail||[]).some(p=>p.mark_note)) h+=`<div class="muted small">${(op.detail||[]).filter(p=>p.mark_note).map(p=>esc(p.symbol)+': '+esc(p.mark_note)).join(' · ')}</div>`;
+  h+=`<details><summary>closed trades (${(perf.closed_trades||[]).length})</summary>`+
+     boundedTable(perf.closed_trades||[], [
+        {label:'symbol', get:t=>t.symbol}, {label:'exit time', get:t=>t.exit_event_time&&String(t.exit_event_time).slice(0,19)},
+        {label:'qty', get:t=>t.quantity}, {label:'entry px', get:t=>t.entry_price}, {label:'exit px', get:t=>t.exit_price},
+        {label:'realized $', get:t=>t.realized_pnl_usd}, {label:'exit reason', get:t=>t.exit_reason},
+        {label:'recovery-affected', get:t=>t.recovery_affected?'YES':'no'}, {label:'provenance', get:t=>t.provenance&&String(t.provenance).slice(0,9)}], 20)+
+     `</details>`;
+  const flagged=(perf.closed_trades||[]).filter(t=>t.recovery_affected);
+  if(flagged.length) h+=`<div class="banner warn">${flagged.length} recovery-affected closed trade(s): ${esc(flagged[0].recovery_affected_reason||'')}</div>`;
+  h+=`</div>`;
+  return h;
+}
+
+function renderPaperEod(d){
+  const o=d.original_local_paper||{}, e=d.experimental_validation_paper||{}, p=d.piv_alpaca_paper||{}, r=d.eod_reconciliation||{};
+  let h=`<h2 class="section-title">Paper / EOD — portfolios and reconciliation</h2>`+
+    `<div class="banner warn">${esc(d.separation_note||'')}</div>`+
+    `<div class="src">session date ${esc(d.session_date)} · regular session close (UTC) ${esc(d.regular_session_close_utc)}</div>`+
+    `<div class="grid">`;
+  h+=lanePaperCard('orig', 'Original local paper', o, o.performance);
+  h+=lanePaperCard('exp', 'Experimental validation paper', e, e.performance,
+                   'internal only — simulated, no real capital');
+  h+=`<div class="card"><h3>PIV / Alpaca PAPER</h3>`+
+     kv('attribution', p.attribution)+kv('status', pill(p.status))+
+     kv('positions', pill(p.positions))+kv('orders', pill(p.orders))+
+     `<div class="muted small">${esc(p.clarification||p.note||'')}</div></div>`;
+  if(d.intelligence_note) h+=`<div class="card"><h3>Intelligence</h3>`+kv('attributable paper ledger', pill('NO'))+`<div class="muted small">${esc(d.intelligence_note)}</div></div>`;
+  const ot=d.official_telegram_last_send;
+  if(ot){
+    h+=`<div class="card card-wide"><h3>Official Telegram — last confirmed send</h3>`+
+       kv('intraday alert', ot.last_push_intraday? esc(String(ot.last_push_intraday).slice(0,19)) : '—')+
+       kv('long-term alert', ot.last_push_long_term? esc(String(ot.last_push_long_term).slice(0,19))+(ot.long_term_alert&&ot.long_term_alert.ticker? ' ('+esc(ot.long_term_alert.ticker)+')':'') : '—')+
+       kv('earnings heads-up', ot.last_push_earnings_heads_up? esc(String(ot.last_push_earnings_heads_up).slice(0,19)) : '—')+
+       `<div class="muted small">${esc(ot.note||'')}</div></div>`;
+  }
+  h+=`<div class="card card-wide"><h3>EOD reconciliation ${pill(r.status)}</h3>`+
+     kv('authoritative source', r.authoritative_source)+kv('last update', r.last_update)+
+     `<div class="muted small">${esc(r.note||'')}</div>`+
+     `<details open><summary>reconciliation detail</summary><pre class="json">${esc(JSON.stringify(r.values||{},null,1))}</pre></details>`+
+     `<div class="src">This EXACT/PARTIAL arithmetic check is independent of valuation-mark freshness, cost-model completeness, recovery-affected provenance and PIV — an EXACT reconciliation here never implies those other, separately-shown checks are also verified.</div></div>`;
+  h+=`</div>`;
+  return h;
+}
+
+function renderV2(d){
+  const sv=d.service||{}, l=d.ledger||{}, r=d.readiness||{}, cov=(r.coverage||{}),
+        f=d.funnel||{}, f4=f.form4||{}, cl=f.clusters||{}, tm=f.terminal||{},
+        intt=f.intents||{}, del=f.delivery||{};
+  let h=`<h2 class="section-title">Active V2 — INSIDER_BUY_CLUSTER_V2@1 <span class="muted small">multi-day insider buy-cluster · PAPER CANDIDATE · descriptive, not a profit claim</span></h2>`;
+  h+=`<div class="grid">`;
+  // strategy / fingerprint
+  h+=`<div class="card"><h3>Strategy</h3>`+
+     kv('version', d.strategy_version)+kv('fingerprint', r.v2_fingerprint_frozen||'—')+
+     kv('status', d.status_label)+kv('horizon', (sv.horizon_trading_days||10)+' trading days')+
+     kv('real capital', pill(d.real_capital?'YES':'BLOCKED'))+kv('shorts', pill(d.shorts?'YES':'BLOCKED'))+
+     `<div class="src">read-only · V2 is one multi-day strategy in the product; it does not serve intraday or fundamental analysis</div></div>`;
+  // FIVE INDEPENDENT bands
+  h+=`<div class="card"><h3>Health — 5 independent signals</h3>`+
+     kv('process health', pill(sv.health||d.health))+
+     kv('data state', pill(d.data_state))+
+     kv('coverage', pill(d.coverage_state))+
+     kv('pricing', pill(d.pricing_state))+
+     kv('activity', pill(d.activity))+
+     `<div class="muted small">an open position never masks a degraded coverage/pricing signal — each is shown on its own line</div></div>`;
+  // process detail
+  h+=`<div class="card"><h3>Process</h3>`+
+     kv('heartbeat', sv.heartbeat_kind+' · '+ageStr(sv.heartbeat_age_s)+' ago')+
+     kv('tick', sv.tick)+kv('last tick', sv.last_tick_utc)+
+     kv('form4 source', sv.form4_source)+kv('records seen', sv.form4_records_seen)+
+     kv('delivery drain', pill(sv.delivery_enabled?'ON':'OFF'))+
+     `<div class="muted small">${esc(sv.note||'')}</div></div>`;
+  // event source readiness — DB-read vs upstream-poll, un-conflated
+  h+=`<div class="card"><h3>Event source readiness</h3>`+
+     kv('source ok', pill(r.form4_source_ok===false?'FAILED':(r.form4_source_ok?'READY':'UNKNOWN')))+
+     kv('DB read last ok', r.source_db_read_last_ok_utc)+kv('DB read age', ageStr(r.source_db_read_age_s))+
+     kv('upstream poll last ok', r.source_poll_last_ok_utc)+kv('upstream poll age', ageStr(r.source_poll_age_s))+
+     kv('degraded', r.form4_source_degraded||'—')+`</div>`;
+  // coverage denominator + pricing
+  h+=`<div class="card"><h3>Coverage &amp; pricing</h3>`+
+     kv('coverage source', cov.source)+kv('issuers evaluated', cov.issuers_evaluated)+
+     kv('eligible-universe denominator', esc(cov.eligible_universe_denominator||'—'))+
+     kv('completeness', pill(cov.completeness))+
+     kv('pricing mode', r.pricing_mode)+kv('pricing adapter', r.pricing_adapter)+
+     kv('pricing unavailable', (r.pricing_unavailable_recent||[]).join(', ')||'none')+`</div>`;
+  // $300k campaign ledger -- Task 119A A1: V2's richer accounting
+  // (equity/reconciliation/cost breakdown) is folded in HERE, its one
+  // existing destination, rather than a second tab.
+  const vperf=l.performance||{}, veq=vperf.equity||{}, vrc=vperf.reconciliation||{}, vco=vperf.costs;
+  h+=`<div class="card card-wide"><h3>$300,000 campaign ledger ${pill(l.status)}</h3><div class="grid">`+
+     `<div>`+kv('starting cash', num(l.starting_campaign_cash))+kv('cash', num(l.cash))+
+       kv('available', num(l.available_capital))+kv('allocated', num(l.allocated_capital))+
+       kv('capacity', l.capacity)+kv('equity (cash+marked open)', num(veq.value)+' '+pill(veq.status))+`</div>`+
+     `<div>`+kv('open positions', l.n_open)+kv('closed positions', l.closed_positions)+
+       kv('BUY / SELL (lifetime)', (l.buys==null?'—':l.buys)+' / '+(l.sells==null?'—':l.sells))+
+       kv('realized P&L', num(l.realized_pnl_usd))+kv('EXIT_UNRESOLVED', l.exit_unresolved)+
+       kv('reconciliation', pill(vrc.status))+kv('costs', costLine(vco))+`</div></div>`+
+     (vrc.status && vrc.status!=='UNAVAILABLE'? `<div class="src">reconciliation: expected_cash=${num(vrc.expected_cash)} actual_cash=${num(vrc.actual_cash)} diff=${num(vrc.diff)} — ${esc(vrc.basis||'')}</div>`:'')+
+     boundedTable(l.open_positions||[], [
+        {label:'symbol', get:p=>p.symbol}, {label:'entry session', get:p=>p.entry_session},
+        {label:'entry px', get:p=>p.entry_price}, {label:'planned exit', get:p=>p.target_exit_session},
+        {label:'days held', get:p=>p.days_held}, {label:'shares', get:p=>p.shares}], 20)+
+     `</div>`;
+  // PENDING pre-open intents (actionable, not yet filled)
+  h+=`<div class="card card-wide"><h3>Pre-open entry intents (actionable — filled at the session OPEN)</h3>`+
+     boundedTable((intt.pending && intt.pending.length? intt.pending : (sv.pending_entry_intents||[])), [
+        {label:'symbol', get:i=>i.symbol}, {label:'target entry session', get:i=>i.target_entry_session},
+        {label:'intent created (UTC)', get:i=>i.created_at_utc}], 20)+
+     `<div class="muted small">by status: ${esc(JSON.stringify(intt.by_status||{}))}</div></div>`;
+  // FUNNEL: Form4 -> purchases -> distinct owners -> clusters -> eligibility/staleness -> decisions -> paper -> delivery
+  h+=`<div class="card card-wide"><h3>Funnel — Form 4 → clusters → decisions → paper → delivery</h3><div class="tblwrap"><table class="tbl"><tbody>`+
+     `<tr><td>Form 4 code-P records (window / today)</td><td>${num(f4.code_p_records_window)} / ${num(f4.code_p_records_today)}</td></tr>`+
+     `<tr><td>distinct issuers with code-P (window / today)</td><td>${num(f4.distinct_issuers_window)} / ${num(f4.distinct_issuers_today)}</td></tr>`+
+     `<tr><td>single-insider near-miss issuers <span class="muted">(reason: only 1 distinct owner)</span></td><td>${num(cl.single_insider_near_miss_count)} ${esc((cl.single_insider_near_miss_issuers||[]).join(', '))}</td></tr>`+
+     `<tr><td>≥2-distinct-owner clusters</td><td>${num(cl.clusters_ge2_distinct_insiders)} ${esc((cl.cluster_symbols||[]).join(', '))}</td></tr>`+
+     `<tr><td>stale (reason: entry > 3 sessions old) / fresh-eligible / not-yet-eligible</td><td>${num(cl.stale_historical_clusters)} / ${num(cl.fresh_eligible_clusters)} / ${num(cl.not_yet_eligible_clusters)}</td></tr>`+
+     `<tr><td>pre-open intents PENDING (decision made, awaiting the open)</td><td>${num(intt.pending_count)}</td></tr>`+
+     `<tr><td>V2 signals / BUY paper actions / SELL paper actions</td><td>${num(tm.signals)} / ${num(tm.buys)} / ${num(tm.sells)}</td></tr>`+
+     `<tr><td><b>delivery</b> — SENT / HELD / RETRY / FAILED / AMBIGUOUS / PENDING</td><td>${num(del.sent)} / ${num(del.held)} / ${num(del.retry)} / ${num(del.failed)} / ${num(del.ambiguous)} / ${num(del.pending)}</td></tr>`+
+     `<tr><td>interpretation</td><td>${pill(f.interpretation)}</td></tr>`+
+     `</tbody></table></div></div>`;
+  // delivery detail — Trading vs Intelligence vs Experimental are SEPARATE lanes
+  h+=`<div class="card card-wide"><h3>Alert delivery — this is a TRADING lane (separate from Intelligence &amp; Experimental)</h3>`+
+     boundedTable(del.recent||(sv.alert_outbox&&sv.alert_outbox.recent)||[], [
+        {label:'kind', get:x=>x.kind}, {label:'action', get:x=>x.action}, {label:'symbol', get:x=>x.symbol},
+        {label:'state', get:x=>x.state}, {label:'attempts', get:x=>x.attempts},
+        {label:'transport ref', get:x=>x.transport_ref}, {label:'last error', get:x=>x.last_error}], 12)+
+     `<div class="muted small">Experimental external delivery is structurally blocked; Intelligence alerts are informational and rendered under the Intelligence tab.</div></div>`;
+  h+=`</div>`;
+  return h;
+}
+
+const SECTION_RENDER = {
+  overview: renderOverview, premarket: renderPremarket, original_quant: renderOriginalQuant,
+  v2_active_strategy: renderV2,
+  validation: renderValidation, intelligence: renderIntelligence, paper_eod: renderPaperEod,
 };
 
-const cardsEl = document.getElementById("cards");
-const cardEls = {};
+let activeSection = "overview";
+let activeLegacy = null;
 
-function ensureCard(ch) {
-  if (cardEls[ch.key]) return cardEls[ch.key];
-
-  const accent = ACCENTS[ch.key] || "#6b7280";
-  const card = document.createElement("div");
-  card.className = "card";
-  card.style.setProperty("--accent", accent);
-  card.innerHTML = `
-    <div class="card-head">
-      <div>
-        <div class="card-title">${ch.label}</div>
-        <div class="card-channel">${ch.channel}</div>
-      </div>
-      <div style="text-align:right">
-        <div class="card-total" data-field="total">0</div>
-        <div class="card-rate"><span data-field="rate">0</span>/min</div>
-      </div>
-    </div>
-    <svg class="sparkline" data-field="sparkline" viewBox="0 0 200 40" preserveAspectRatio="none"></svg>
-    <div class="section-label" data-field="categories-label" style="display:none"></div>
-    <div class="bars" data-field="categories"></div>
-    <div class="numeric-total" data-field="numeric-total" style="display:none"></div>
-    <div class="section-label">Top tickers</div>
-    <div class="bars" data-field="bars"></div>
-    <div class="unparseable" data-field="unparseable" style="display:none"></div>
-  `;
-  cardsEl.appendChild(card);
-  const refs = {
-    root: card,
-    total: card.querySelector('[data-field="total"]'),
-    rate: card.querySelector('[data-field="rate"]'),
-    sparkline: card.querySelector('[data-field="sparkline"]'),
-    bars: card.querySelector('[data-field="bars"]'),
-    categoriesLabel: card.querySelector('[data-field="categories-label"]'),
-    categories: card.querySelector('[data-field="categories"]'),
-    numericTotal: card.querySelector('[data-field="numeric-total"]'),
-    unparseable: card.querySelector('[data-field="unparseable"]'),
-    accent,
-  };
-  cardEls[ch.key] = refs;
-  return refs;
+async function loadSection(name){
+  activeSection = name; activeLegacy = null;
+  document.querySelectorAll('#primary button').forEach(b=>b.classList.toggle('active', b.dataset.sec===name));
+  document.querySelectorAll('#legacy button').forEach(b=>b.classList.remove('active'));
+  $('live-view').style.display='none'; $('fetch-view').style.display='none';
+  const host=$('section-view'); host.style.display='';
+  host.innerHTML = `<div class="muted small">loading ${name}…</div>`;
+  try{
+    const resp = await fetch('/api/section/'+name);
+    const data = await resp.json();
+    if(!resp.ok){ host.innerHTML = `<div class="banner warn">read failed</div><pre class="json">${esc(JSON.stringify(data,null,1))}</pre>`; return; }
+    host.innerHTML = (SECTION_RENDER[name]||((d)=>`<pre class="json">${esc(JSON.stringify(d,null,1))}</pre>`))(data);
+    if(data.runtime && data.runtime.overall){ $('overall-health-wrap').style.display=''; $('overall-health').textContent = data.runtime.overall; }
+  }catch(err){ host.innerHTML = `<div class="banner warn">fetch error: ${esc(err)}</div>`; }
 }
+document.querySelectorAll('#primary button').forEach(b=>b.addEventListener('click', ()=>loadSection(b.dataset.sec)));
 
-function renderSparkline(svg, history) {
-  if (!history || history.length === 0) {
-    svg.innerHTML = "";
-    return;
-  }
-  const max = Math.max(1, ...history);
-  const w = 200, h = 40;
-  const step = history.length > 1 ? w / (history.length - 1) : 0;
-  const points = history.map((v, i) => {
-    const x = i * step;
-    const y = h - (v / max) * (h - 4) - 2;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
-  svg.innerHTML = `<polyline points="${points}" fill="none" stroke="var(--accent, #6b7280)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />`;
-}
+/* ---------- legacy views (unchanged behaviour) ---------- */
+function healthBadge(h){ if(!h||!h.state) return ''; return `${pill(h.state)} <span class="muted">— ${esc(h.detail||'')}${h.last_update?' · '+esc(h.last_update):''}</span>`; }
+function jsonBlock(o){ return `<pre class="json">${esc(JSON.stringify(o,null,2))}</pre>`; }
+function kv2(l,v){ return `<div style="margin:2px 0"><span class="muted">${l}:</span> <b>${v}</b></div>`; }
 
-function renderBars(container, entries, emptyText, wide) {
-  if (!entries || entries.length === 0) {
-    container.innerHTML = `<div class="empty">${emptyText}</div>`;
-    return;
-  }
-  const max = Math.max(...entries.map(([, c]) => c));
-  const labelClass = wide ? "bar-label wide" : "bar-label";
-  container.innerHTML = entries.map(([label, count]) => {
-    const pct = Math.max(4, (count / max) * 100);
-    return `
-      <div class="bar-row">
-        <div class="${labelClass}" title="${label}">${label}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
-        <div class="bar-count">${count}</div>
-      </div>`;
-  }).join("");
-}
-
-function formatUptime(seconds) {
-  const s = Math.floor(seconds);
-  const hh = String(Math.floor(s / 3600)).padStart(2, "0");
-  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
-  const ss = String(s % 60).padStart(2, "0");
-  return `${hh}:${mm}:${ss}`;
-}
-
-function renderBufferWarmup(bw) {
-  const unavailableEl = document.getElementById("bw-unavailable");
-  const contentEl = document.getElementById("bw-content");
-  if (!bw || bw.db_unavailable) {
-    unavailableEl.style.display = "block";
-    contentEl.style.display = "none";
-    return;
-  }
-  unavailableEl.style.display = "none";
-  contentEl.style.display = "block";
-
-  const s = bw.summary || { total: 0, ready_1m: 0, ready_15m: 0 };
-  document.getElementById("bw-1m-ready").textContent = `${s.ready_1m}/${s.total}`;
-  document.getElementById("bw-15m-ready").textContent = `${s.ready_15m}/${s.total}`;
-  document.getElementById("bw-1m-threshold").textContent = bw.min_bars_required;
-  document.getElementById("bw-15m-threshold").textContent = bw.htf_sma_period;
-  document.getElementById("bw-1m-wrap").classList.toggle("all-ready", s.total > 0 && s.ready_1m === s.total);
-  document.getElementById("bw-15m-wrap").classList.toggle("all-ready", s.total > 0 && s.ready_15m === s.total);
-
-  const sessionEntries = Object.entries(bw.session_counts || {}).sort((a, b) => b[1] - a[1]);
-  renderBars(document.getElementById("bw-sessions"), sessionEntries, "no bars checkpointed yet", true);
-
-  const symbols = bw.symbols || [];
-  const notReady = symbols.filter((x) => !x.ready_1m || !x.ready_15m);
-  const listed = notReady.length > 0 ? notReady : symbols;
-  const shown = listed.slice(0, 12);
-  const tbody = document.getElementById("bw-tbody");
-  if (shown.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="3" class="empty">no tickers checkpointed yet</td></tr>`;
-  } else {
-    tbody.innerHTML = shown
-      .map(
-        (x) => `
-      <tr>
-        <td>${x.symbol}</td>
-        <td><span class="bw-dot ${x.ready_1m ? "ready" : "not-ready"}"></span>${x.bar_1m}/${bw.min_bars_required}</td>
-        <td><span class="bw-dot ${x.ready_15m ? "ready" : "not-ready"}"></span>${x.bar_15m}/${bw.htf_sma_period}</td>
-      </tr>`
-      )
-      .join("");
-  }
-
-  const moreEl = document.getElementById("bw-more");
-  const remaining = listed.length - shown.length;
-  if (remaining > 0) {
-    moreEl.style.display = "block";
-    moreEl.style.color = "var(--muted)";
-    moreEl.textContent = notReady.length > 0 ? `+${remaining} more still warming up` : `+${remaining} more, all ready`;
-  } else if (notReady.length === 0 && symbols.length > 0) {
-    moreEl.style.display = "block";
-    moreEl.style.color = "var(--good)";
-    moreEl.textContent = `All ${symbols.length} ticker(s) fully warmed up`;
-  } else {
-    moreEl.style.display = "none";
-  }
-}
-
-function render(data) {
-  document.getElementById("uptime").textContent = formatUptime(data.uptime_seconds);
-  document.getElementById("grand-total").textContent = data.grand_total;
-  document.getElementById("distinct-tickers").textContent = data.distinct_tickers;
-  renderBufferWarmup(data.buffer_warmup);
-
-  for (const ch of data.channels) {
-    const refs = ensureCard(ch);
-    refs.total.textContent = ch.total;
-    refs.rate.textContent = ch.rate_per_min;
-    renderSparkline(refs.sparkline, ch.history);
-    renderBars(refs.bars, ch.top_tickers, "no tickers yet");
-
-    if (ch.categories && ch.categories.length > 0) {
-      refs.categoriesLabel.style.display = "block";
-      refs.categoriesLabel.textContent = ch.category_label || "Breakdown";
-      renderBars(refs.categories, ch.categories, "no data yet", true);
-    } else {
-      refs.categoriesLabel.style.display = "none";
-      refs.categories.innerHTML = "";
+async function loadLegacy(view){
+  activeLegacy = view;
+  document.querySelectorAll('#legacy button').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
+  document.querySelectorAll('#primary button').forEach(b=>b.classList.remove('active'));
+  $('section-view').style.display='none';
+  if(view==='live'){ $('live-view').style.display=''; $('fetch-view').style.display='none'; return; }
+  $('live-view').style.display='none'; $('fetch-view').style.display='';
+  const meta=$('fetch-meta'), body=$('fetch-body');
+  meta.textContent = 'loading '+view+' …';
+  try{
+    if(view==='authority'){
+      const resp=await fetch('/api/section/overview'); const d=await resp.json();
+      meta.textContent='GET /api/section/overview · read-only';
+      body.innerHTML = `<div class="tblwrap"><table class="tbl"><thead><tr><th>domain</th><th>status</th><th>source</th><th>note</th></tr></thead><tbody>`+
+        (d.source_status||[]).map(s=>`<tr><td>${esc(s.domain)}</td><td>${pill(s.status)}</td><td class="muted">${esc(s.authoritative_source)}</td><td class="muted">${esc((s.note||'').slice(0,180))}</td></tr>`).join('')+
+        `</tbody></table></div>`;
+      return;
     }
-
-    if (ch.numeric_total !== null && ch.numeric_total !== undefined) {
-      const cls = ch.numeric_total >= 0 ? "pos" : "neg";
-      const sign = ch.numeric_total >= 0 ? "+" : "";
-      refs.numericTotal.style.display = "block";
-      refs.numericTotal.innerHTML = `${ch.numeric_label}: <b class="${cls}">${sign}${ch.numeric_total.toFixed(2)}</b>`;
-    } else {
-      refs.numericTotal.style.display = "none";
-    }
-
-    if (ch.unparseable > 0) {
-      refs.unparseable.style.display = "block";
-      refs.unparseable.textContent = `${ch.unparseable} unparseable message(s)`;
-    }
+    const resp = await fetch("/views/" + view); const data = await resp.json();
+    if(!resp.ok){ body.innerHTML = jsonBlock(data); meta.textContent='read failed'; return; }
+    meta.textContent = "GET /views/" + view + " · read-only · " + (data.as_of||data.trading_date||'');
+    body.innerHTML = renderLegacyView(view, data);
+  }catch(e){ body.innerHTML = `<div class="banner warn">fetch error: ${esc(e)}</div>`; }
+}
+function renderLegacyView(view, d){
+  if(view==='original'){
+    let h=`<h3>Original (raw pipeline view)</h3>`+kv2('run', healthBadge(d.run_health))+kv2('redis', healthBadge(d.redis_health))+kv2('metrics', healthBadge(d.metrics_health));
+    h+=`<div class="tblwrap"><table class="tbl"><thead><tr><th>Stage</th><th>Total</th><th>Health</th></tr></thead><tbody>`+
+      (d.lifecycle_stages||[]).map(s=>`<tr><td>${esc(s.stage)}</td><td>${s.total}</td><td>${healthBadge(s.health)}</td></tr>`).join('')+`</tbody></table></div>`;
+    h+=`<h3>Telegram (owner: ${esc(d.telegram&&d.telegram.owner)})</h3>`+jsonBlock(d.telegram)+
+       `<h3>Local simulated-paper</h3>`+jsonBlock(d.simulated_paper);
+    return h;
   }
+  if(view==='piv'){
+    let h=`<h3>PIV</h3>`+kv2('session',(d.identity&&d.identity.session_id||'—'))+kv2('strategy', d.strategy_approval_status+' / profitability '+d.profitability)+
+      kv2('feed mode', d.feed_mode)+kv2('execution mode', d.execution_mode)+kv2('real capital', d.real_capital_prohibited?'PROHIBITED':'?');
+    h+=`<h3>Provider / funnel / decisions</h3>`+jsonBlock({provider_state:d.provider_state, quant_funnel:d.quant_funnel, decisions:d.decisions});
+    h+=`<h3>Reconciliation / EOD</h3>`+jsonBlock({reconciliation:d.reconciliation, eod:d.eod});
+    return h;
+  }
+  let h=`<h3>Compare (Original vs PIV)</h3>`+kv2('trading date', d.trading_date||'—')+kv2('archive', healthBadge(d.health));
+  h+=`<h3>Per-stage totals</h3>`+jsonBlock(d.per_stage_totals)+`<h3>Outcome streams (never combined)</h3>`+jsonBlock(d.outcome_streams);
+  return h;
 }
+document.querySelectorAll('#legacy button').forEach(b=>b.addEventListener('click', ()=>loadLegacy(b.dataset.view)));
 
-function setStatus(state) {
-  const dot = document.getElementById("status-dot");
-  const text = document.getElementById("status-text");
-  dot.className = "status-dot" + (state === "connected" ? " connected" : state === "reconnecting" ? " reconnecting" : "");
-  text.textContent = state;
+/* ---------- live websocket (unchanged) ---------- */
+function formatUptime(seconds){ const s=Math.floor(seconds); const p=n=>String(n).padStart(2,'0');
+  return `${p(Math.floor(s/3600))}:${p(Math.floor((s%3600)/60))}:${p(s%60)}`; }
+function renderBufferWarmup(bw){
+  const u=$('bw-unavailable'), c=$('bw-content');
+  if(!bw||bw.db_unavailable){ u.style.display='block'; c.style.display='none'; return; }
+  u.style.display='none'; c.style.display='block';
+  const s=bw.summary||{total:0,ready_1m:0,ready_15m:0};
+  $('bw-1m-ready').textContent=`${s.ready_1m}/${s.total}`; $('bw-15m-ready').textContent=`${s.ready_15m}/${s.total}`;
+  $('bw-1m-threshold').textContent=bw.min_bars_required; $('bw-15m-threshold').textContent=bw.htf_sma_period;
+  const symbols=bw.symbols||[]; const notReady=symbols.filter(x=>!x.ready_1m||!x.ready_15m);
+  const listed=notReady.length? notReady : symbols; const shown=listed.slice(0,12); const tb=$('bw-tbody');
+  tb.innerHTML = shown.length? shown.map(x=>`<tr><td>${esc(x.symbol)}</td><td>${x.bar_1m}/${bw.min_bars_required}</td><td>${x.bar_15m}/${bw.htf_sma_period}</td></tr>`).join('')
+    : `<tr><td colspan="3" class="empty">no tickers checkpointed yet</td></tr>`;
+  const more=$('bw-more'); const rem=listed.length-shown.length;
+  more.style.display = rem>0? 'block':'none'; if(rem>0) more.textContent = `+${rem} more`;
 }
-
-function connect() {
-  const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  const ws = new WebSocket(`${proto}//${location.host}/ws`);
-  let backoff = 1000;
-
-  ws.onopen = () => { setStatus("connected"); backoff = 1000; };
-  ws.onmessage = (evt) => render(JSON.parse(evt.data));
-  ws.onclose = () => {
-    setStatus("reconnecting");
-    setTimeout(connect, backoff);
-    backoff = Math.min(backoff * 1.5, 15000);
-  };
-  ws.onerror = () => ws.close();
+function setStatus(state){ const d=$('status-dot'), t=$('status-text');
+  d.className='status-dot'+(state==='connected'?' connected':state==='reconnecting'?' reconnecting':''); t.textContent=state; }
+function connect(){
+  // headless-capture affordance: ?nows disables the live socket so a
+  // virtual-time screenshot can settle (no behaviour change without the param).
+  if(/[?&]nows\b/.test(location.search)){ setStatus('offline'); return; }
+  const proto = location.protocol==='https:'?'wss:':'ws:';
+  const ws = new WebSocket(`${proto}//${location.host}/ws`); let backoff=1000;
+  ws.onopen=()=>{ setStatus('connected'); backoff=1000; };
+  ws.onmessage=(evt)=>{ const data=JSON.parse(evt.data);
+    $('uptime').textContent=formatUptime(data.uptime_seconds); $('grand-total').textContent=data.grand_total;
+    $('distinct-tickers').textContent=data.distinct_tickers; renderBufferWarmup(data.buffer_warmup); };
+  ws.onclose=()=>{ setStatus('reconnecting'); setTimeout(connect, backoff); backoff=Math.min(backoff*1.5,15000); };
+  ws.onerror=()=>ws.close();
 }
-
 connect();
+/* deep-linkable tabs: #<section> selects it on load and on hashchange (read-only) */
+function sectionFromHash(){
+  const h=(location.hash||'').replace(/^#/,'');
+  return SECTION_RENDER[h] ? h : null;
+}
+window.addEventListener('hashchange', ()=>{ const s=sectionFromHash(); if(s) loadSection(s); });
+loadSection(sectionFromHash() || 'overview');
+setInterval(()=>{ if(activeSection && !activeLegacy) loadSection(activeSection); else if(activeLegacy && activeLegacy!=='live') loadLegacy(activeLegacy); }, 6000);
 </script>
 </body>
 </html>

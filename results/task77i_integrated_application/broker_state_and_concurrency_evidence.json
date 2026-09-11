@@ -1,0 +1,50 @@
+{
+  "purpose": "Task 77I Stage 1 -- authoritative position/open-order reconciliation, freshness/unknown-state handling, atomic reservations, idempotent retries, and timed-out-submission handling. Disclosed, not overclaimed.",
+  "existing_locking_architecture": {
+    "found": false,
+    "search_performed": "grep for filelock/FileLock/msvcrt/fcntl/portalocker/flock across the repository",
+    "conclusion": "No cross-process advisory locking exists anywhere in this codebase today. This task does not add one -- see implementation_plan.md's 'Concurrency -- disclosed, not invented' section for why, and what already holds instead."
+  },
+  "within_process_atomicity": {
+    "order_intent_is_synchronous_no_await": true,
+    "every_guard_reads_freshly_mutated_self_state": true,
+    "conclusion": "Two 'competing' order_intent calls originating in the same live-session process (the only process that ever calls order_intent -- see execution_path_inventory.md) cannot interleave; the second call always observes the first's effect."
+  },
+  "cross_process_writers": {
+    "order_intent_reachable_from_a_second_process": false,
+    "reachable_bulk_paths_from_a_second_process": ["cli.py kill-switch", "cli.py eod", "cli.py cleanup"],
+    "conclusion": "The one per-order-mutating code path (order_intent) has no real multi-process writer in the current architecture; bulk-flatten paths reachable from a second process were already exempt from per-order validation before this task and remain so."
+  },
+  "authoritative_reconciliation": {
+    "function": "PaperLifecycle.reconcile",
+    "always_queries_fresh_broker_state": true,
+    "resolves_unconfirmed_timeout_orders": true,
+    "flags_unexpected_broker_short": true,
+    "never_auto_remediates": true
+  },
+  "timed_out_submission_handling": {
+    "before": "poll_order_until_terminal returned silently on timeout; nothing marked the order's true outcome as unknown; nothing prevented treating it as inert.",
+    "after": "order.status set to sentinel 'UNCONFIRMED_TIMEOUT' (outside _TERMINAL_ORDER_STATUSES, so oversell/pyramiding/pending-entry guards continue to treat it as outstanding); a BROKER_ERROR event is emitted; reconcile() actively resolves it via a fresh broker.get_order() read on every call.",
+    "never_blindly_resubmitted": "the duplicate-intent-id guard (stable_id from signal_id+symbol+side+quantity) already prevents resubmitting the SAME signal_id, and PENDING_ENTRY_EXISTS/OVERSIZED_OR_DUPLICATE_SELL block a DIFFERENT signal_id for the same symbol while the order remains unresolved.",
+    "tests": [
+      "test_task77i_runtime_safety.py::test_timeout_marks_order_unconfirmed_not_terminal",
+      "test_task77i_runtime_safety.py::test_unconfirmed_timeout_blocks_a_duplicate_entry_for_the_same_symbol",
+      "test_task77i_runtime_safety.py::test_reconcile_resolves_an_unconfirmed_order_against_a_fresh_broker_read",
+      "test_task77i_runtime_safety.py::test_reconcile_leaves_order_unresolved_if_broker_read_still_fails"
+    ]
+  },
+  "restart_recovery": {
+    "mechanism": "LifecycleState is a full-file JSON rewrite, re-loaded in PaperLifecycle.__init__ -- a freshly-constructed instance pointed at the same state_path sees exactly the same intents/orders/positions/open_position_by_symbol/reconciliation_flags as before the restart.",
+    "tests": [
+      "test_task77i_runtime_safety.py::test_restart_preserves_pending_reservations_and_guards",
+      "test_task77i_runtime_safety.py::test_restart_preserves_open_position_and_oversell_guard",
+      "test_task77i_shadow_ledger.py::test_restart_preserves_shadow_state",
+      "test_task77i_notification_outbox.py::test_states_persist_across_restart",
+      "test_task77i_notification_outbox.py::test_restart_does_not_create_duplicate_work_for_the_same_situation",
+      "test_task77i_decision_ledger.py::test_persists_and_reloads_across_a_new_instance"
+    ]
+  },
+  "shadow_holding_never_authorises_a_broker_sell": {
+    "structural_proof": "ShadowLedger has zero import of, or reference to, PaperLifecycle/AlpacaPaperClient/order_intent anywhere in shadow_ledger.py -- confirmed by grep. It cannot call order_intent even if it wanted to; the two systems are connected only by a shared, read-only decision_id."
+  }
+}

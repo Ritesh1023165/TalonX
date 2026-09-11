@@ -1,0 +1,79 @@
+{
+  "task": "Task75S_EVIDENCE_CLOSURE_AND_NON_TUNING_GATE_AUDIT",
+  "starting_branch": "research/talonx-strategy-validation",
+  "starting_sha": "45814d28be3c081bbb8e3541801b60aa0bb50376",
+  "stages": {
+    "stage0_baseline": {"status": "PASS"},
+    "stage1_dependency_closure": {"status": "PASS_REPAIRED"},
+    "stage2_scope_provenance_audit": {"status": "PASS_WITH_DISCLOSED_QUALIFICATION"},
+    "stage3_candidate_trace": {"status": "PASS"},
+    "stage4_gate_correctness_audit": {"status": "COMPLETE_NO_DEFECT_FOUND"},
+    "stage5_close_evidence": {"status": "COMPLETE"}
+  },
+  "collection_discrepancy": {
+    "before_repair": "2179 tests collected, 2 errors (ModuleNotFoundError: exchange_calendars); run aborts entirely with no override flag",
+    "root_cause": "missing_test_extra_declaration_no_skip_guard",
+    "dependency": "exchange-calendars==4.13.2, declared only in research/requirements-task61.txt",
+    "repair": "pip install -r research/requirements-task61.txt (already-declared, already-pinned, project's own venv)",
+    "after_repair": "2185 tests collected, 0 errors",
+    "affected_module_result": "6 passed",
+    "full_suite_after_repair": "2174 passed, 1 skipped, 10 xfailed, 0 collection errors",
+    "reconciliation_vs_task74s_2168": "2168 (Task74S's --ignore run) + 6 (previously uncollectable) = 2174 -- exact match",
+    "task74s_claim_withdrawn": "the dependency was NOT established to have been present 'two days ago' -- the two runs are ~7.5 hours apart on the same calendar day, and no evidence establishes the package was ever installed in this venv before this task's own repair"
+  },
+  "scope_audit": {
+    "universe_verdict": "MATCHES_REQUESTED_SCOPE",
+    "universe_note": "one secondary sentence in evaluation_protocol.md cited a prior task's outcome (Task 37) as corroboration -- flagged, not the actual basis, selection unchanged",
+    "window_verdict": "PREREGISTERED_BUT_WIDER_THAN_ESTABLISHED_DEFAULT_CONVENTION",
+    "window_note": "full ~1yr history (13 buckets) used instead of the established 2025-08-15..2025-12-31 development-period convention; preregistered before execution but not provenance-grounded like the universe choice",
+    "outcome_invariance": "restricting to the narrower default sub-range (1342 of 5021 candidates) still shows zero trades -- conclusion unchanged either way",
+    "holdout_verdict": "MATCHES_REQUESTED_SCOPE",
+    "holdout_note": "verified against actual reserved-data file manifests, not merely assumed symbol-disjointness -- zero overlap confirmed"
+  },
+  "candidate_trace": {
+    "method": "reprocessed preserved telemetry only, no rerun of the 1.9M-bar evaluation",
+    "four_surviving_candidates": [
+      {"symbol": "STX", "timestamp_utc": "2025-10-22 14:43:00+00:00", "actual_rejection_reason": "TREND_GATE"},
+      {"symbol": "AMD", "timestamp_utc": "2025-11-20 20:55:00+00:00", "actual_rejection_reason": "CLOSING_BLACKOUT"},
+      {"symbol": "PYPL", "timestamp_utc": "2026-08-14 19:44:00+00:00", "signal_type": "rsi_oversold_volume_surge", "actual_rejection_reason": "CLOSING_BLACKOUT"},
+      {"symbol": "PYPL", "timestamp_utc": "2026-08-14 19:44:00+00:00", "signal_type": "ma_golden_cross", "actual_rejection_reason": "CLOSING_BLACKOUT"}
+    ],
+    "gate_order_established": ["LOW_VOLATILITY", "OPENING_BLACKOUT", "CLOSING_BLACKOUT", "LOSS_LOCKOUT", "COOLDOWN", "LOW_CONFLUENCE", "LOW_RISK_REWARD", "TREND_GATE"],
+    "resolves_task74s_open_question": true,
+    "correctness_defect_found": false
+  },
+  "gate_correctness_audit": {
+    "gates_audited": ["LOW_VOLATILITY", "LOW_CONFLUENCE"],
+    "verdict": "GATES_IMPLEMENTED_CORRECTLY",
+    "code_changed": false,
+    "thresholds_changed": false,
+    "boundary_tests": "below/at/above threshold, both real telemetry and direct labeled function calls -- all match documented behavior",
+    "high_rejection_rate_treated_as_defect_evidence": false
+  },
+  "final_verdicts": {
+    "environment_test_completeness": "PASS (after repair)",
+    "scope_compliance": "PASS_WITH_DISCLOSED_WINDOW_QUALIFICATION",
+    "funnel_accounting": "PASS -- fully reconciled, explicit denominators",
+    "gate_implementation_correctness": "PASS -- no defect found",
+    "research_interpretation": "NO_ELIGIBLE_LONG_SETUPS_IN_TESTED_DEVELOPMENT_SCOPE",
+    "overall_labels": [
+      "NO_ELIGIBLE_LONG_SETUPS_IN_TESTED_DEVELOPMENT_SCOPE",
+      "NOT_SUITABLE_FOR_CURRENT_SIGNAL_FREQUENCY_OBJECTIVE",
+      "PROFITABILITY_UNDETERMINED"
+    ],
+    "not_proof_strategy_can_never_trade_or_be_profitable": true
+  },
+  "protected_files_unchanged": true,
+  "eod_code_unchanged": true,
+  "holdouts_accessed": [],
+  "market_data_downloads": 0,
+  "broker_mutations": 0,
+  "external_notifications_sent": 0,
+  "live_session_activity": 0,
+  "environment_changes": ["pip install exchange-calendars==4.13.2 (+3 transitive deps) into .venv, per research/requirements-task61.txt"],
+  "repo_files_changed": [],
+  "addendum_published": "results/task74s_bounded_long_only_evaluation/task74s_evidence_addendum.md",
+  "next_task_recommended": "bounded non-tuning hypothesis-discovery into LOW_VOLATILITY/LOW_CONFLUENCE bind for this universe/period",
+  "next_task_started": false,
+  "commits": ["pending_final_commit"]
+}

@@ -1,0 +1,44 @@
+STAGE 3 RUN LOG
+
+Preregistration written BEFORE any run: stage3_preregistration.json
+(candidate=TALONX_PRODUCTION_QUANTSCANNER_INTRADAY_LONG_ONLY_V1, regime=
+range_chop_2025, universe initially AAPL+MSFT+NVDA).
+
+Attempt 1: 3-symbol run (AAPL,MSFT,NVDA), range_chop_2025, cost-sensitivity
+enabled -- 218,781 total bars. Progress after ~3 min: 1.4%. Projected
+runtime too long for overnight token/time budget (~90+ min). STOPPED
+(TaskStop) before any candidate was cherry-picked or any result seen --
+purely a scope/performance decision made blind to any output, not a
+result-driven change (no preregistered parameter was altered).
+
+Attempt 2 (this run, kept): single-symbol AAPL only, same regime, same
+cost-sensitivity setting, same frozen candidate/config. 67,002 bars.
+Scope reduction disclosed in stage3_preregistration.json's universe
+notes and in stage3_profitability_verdict.md.
+
+Command:
+.venv/Scripts/python.exe -m scripts.run_historical_regimes \
+  --data-dir data/historical_1m/task7b_alpaca_long_history \
+  --symbols AAPL --regimes range_chop_2025 \
+  --out-dir results/task72o_overnight_stabilization/scratch_stage3/reports \
+  --tz America/New_York
+
+Attempt 3: still too slow via the cost-sensitivity 4-scenario sweep
+(each scenario = a full re-run). Stopped, switched to talonx_backtest's
+own direct CLI (--entry-slippage-bps/--exit-slippage-bps/--spread-bps)
+for a SINGLE-PASS run at ONE established cost point instead of a 4x
+sweep -- the 5/5/10bps assumption is docs/backtesting.md's own worked
+example, not invented.
+
+Attempt 4 (kept, 1-month probe): AAPL, 2025-08-15 to 2025-09-15, 5/5/10bps.
+14,288 bars, 0 signals generated (14,110 LOW_VOLATILITY rejections).
+
+Attempt 5 (kept, final, full-window): AAPL, 2025-08-15 to 2025-12-31,
+5/5/10bps. 67,002 bars, 6 signals generated / 0 published / 0 trades
+(66,648 LOW_VOLATILITY, 4 US_MARKET_SESSION_CLOSED, 2 LOW_CONFLUENCE).
+See stage3_profitability_verdict.md for the classification (INCONCLUSIVE
+-- zero trades, not a negative result).
+
+No further runs attempted this task (time budget). Report artifacts
+(aapl_full_primarycost_*, aapl_1m_primarycost_*) retained under
+results/task72o_overnight_stabilization/scratch_stage3/ as raw evidence.

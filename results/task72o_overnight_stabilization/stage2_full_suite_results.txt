@@ -1,0 +1,12 @@
+No code was changed during Stage 2 (BLOCKED, evidence-only). The full
+repository suite result is therefore IDENTICAL to Stage 1's own run
+(same commit 3be9eac, same working tree):
+
+1 failed, 2159 passed, 1 skipped, 15 xfailed, 397.17s (0:06:37)
+FAILED tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset
+
+Repeated isolated run of the failing test alone (this stage,
+stage2_failure_reproduction.txt): 1 failed in 6.32s, same assertion,
+same root cause. Not re-run a third/whole-suite time to conserve
+overnight token budget, since zero code changed between the Stage 1 full
+run and now.

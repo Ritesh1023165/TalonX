@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "session_id": "piv_2026-08-28_092814_1f17993c",
+  "trading_date_et": "2026-08-28",
+  "runtime_sha": "8d2a8dd164b712bd7faa087dec27030dc9bfccce",
+  "hash_algorithm": "SHA256",
+  "files": [
+    {
+      "path": "dashboard_projection_before_stop.json",
+      "bytes": 1413,
+      "sha256": "054c8dd4774bc4cf1763f32d9dcac4136cd7aa35a3897f666189970befe5e321"
+    },
+    {
+      "path": "latest_session_report.json",
+      "bytes": 5607,
+      "sha256": "26db77e6a5d79355d165ce06abd96666513c2d1976004a3fa3b2a01b2d4dcaa9"
+    },
+    {
+      "path": "local_raw_manifest_sha256.json",
+      "bytes": 8832,
+      "sha256": "344d11b78f700ea1cca996e687dbdead6c304531204576bb301533b76d62da93"
+    },
+    {
+      "path": "task80_cleanup_report.md",
+      "bytes": 7703,
+      "sha256": "e8a7c4c6f605f56320c471308560eef0a7f59826bafb55f58696e872d3844964"
+    },
+    {
+      "path": "weekend_analysis_handoff.md",
+      "bytes": 2287,
+      "sha256": "38e75ad387d61509ed72810ffb8d63ee81eeff7827aa8f4fa7ed11725c20688b"
+    }
+  ]
+}

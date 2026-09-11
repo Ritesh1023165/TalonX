@@ -59,6 +59,28 @@ the final report's "Known Limitations" section):
     one historical minute is treated as one throttle window and flushed
     immediately, rather than continuously every 15s. See
     BacktestConfig.throttle_fidelity.
+
+Position lifecycle -- LONG_ONLY (Task 24/25A canonical requirement,
+corrected 2026-08-20; previously this engine opened a genuine short on
+every BEARISH signal, contradicting live/paper's own semantics -- see
+results/task24_requirements_parity_audit/long_short_flow.md and
+results/task25a_long_only_parity_fix/task25a_summary.md):
+    FLAT   + qualifying BULLISH -> schedule a LONG entry (_pending_entry),
+             filled at the next bar's open, same as before.
+    LONG   + qualifying BULLISH -> no additional/overlapping position
+             (unless allow_overlapping_trades) -- unchanged.
+    FLAT   + qualifying BEARISH -> no position opened. Recorded as
+             "NO_ACTIVE_POSITION", the same reason talonx_paper.
+             decide_trade uses for the identical case -- never silently
+             dropped.
+    LONG   + qualifying BEARISH -> schedules an alert-driven exit
+             (_pending_exit), filled at the next bar's open (same
+             next-bar convention as an entry, to avoid lookahead on the
+             exit price), exit_reason="SIGNAL_EXIT" -- distinct from
+             STOP/TARGET/END_OF_SESSION/DATA_END. Mirrors talonx_paper's
+             CONFIRMED_BEARISH/CONTRADICTED -> SELL.
+This engine never opens a short; TradeSimulator.open_position raises if
+ever handed a non-BULLISH signal, as a fail-closed invariant check.
 """
 from __future__ import annotations
 
@@ -76,12 +98,17 @@ from talonx_quant.buffer import RollingBarBuffer
 from talonx_quant.config import QuantConfig
 from talonx_quant.consumer import (
     _GATE_NAMES,
+    _confluence_eligible,
+    _evaluate_active_volatility_gate,
     _fails_min_volatility,
     _opportunity_score,
     _partition,
     _trend_gate_applicable,
 )
-from talonx_quant.indicators import compute_daily_pivots, compute_htf_trend, compute_indicators
+from talonx_quant.indicators import (
+    VolatilityRegimeSnapshot, classify_regime_shadow_disagreement, compute_daily_pivots, compute_htf_trend,
+    compute_indicators, compute_volatility_regime, evaluate_regime,
+)
 from talonx_quant.schemas import QuantSignal, SignalDirection
 from talonx_quant.session import get_entry_blackout, get_session
 from talonx_quant.strategy import calculate_trade_geometry, evaluate_signals
@@ -137,6 +164,18 @@ class _PendingEntry:
 
 
 @dataclass
+class _PendingExit:
+    """A published BEARISH/CONTRADICTED signal awaiting execution at its
+    symbol's next bar -- the LONG_ONLY-lifecycle counterpart of
+    _PendingEntry (Task 25A). Carries only the triggering signal; unlike
+    an entry, an alert-driven exit doesn't need an opportunity_score
+    (it never competes for throttle ranking against other exits -- see
+    _flush_throttle)."""
+
+    signal: QuantSignal
+
+
+@dataclass
 class RejectionRecord:
     ticker: str
     reason: str
@@ -155,6 +194,19 @@ class BacktestResult:
     end: pd.Timestamp | None
     symbols: list[str]
     bars_processed: int = 0
+    # Task 53: count of PRE-ROLL/WARMUP rows fed through _warmup_symbol_bar
+    # (market-state buffers only -- see that method's own docstring). Zero
+    # unless run() was called with warmup_df. Reported separately so a
+    # caller can never mistake it for an evaluation bar -- bars_processed
+    # above is unaffected by warmup, by construction.
+    warmup_bars_processed: int = 0
+    # Research telemetry (Task 10) -- always empty unless BacktestEngine
+    # was constructed with research_telemetry=True; see that flag's own
+    # docstring. Purely observational, never consulted by any gate/
+    # decision, so a caller that ignores these two fields sees identical
+    # behavior/artifacts to before this feature existed.
+    volatility_telemetry: list[dict] = field(default_factory=list)
+    candidate_telemetry: list[dict] = field(default_factory=list)
 
 
 class BacktestEngine:
@@ -162,18 +214,42 @@ class BacktestEngine:
     backtest run (state is not reusable across runs -- create a new
     instance)."""
 
-    def __init__(self, config: BacktestConfig | None = None):
+    def __init__(self, config: BacktestConfig | None = None, research_telemetry: bool = False):
+        """`research_telemetry` (Task 10, default False): opt-in capture
+        of two OBSERVATIONAL-ONLY lists (volatility_telemetry,
+        candidate_telemetry -- see their append sites below) for
+        research into per-symbol gate behavior. Purely additive: every
+        value captured is read from an object the gate pipeline already
+        computed (IndicatorSnapshot, QuantSignal, _fails_min_volatility's
+        own return value) -- nothing is recalculated with different
+        logic, no gate/threshold/ordering changes, and the existing
+        signal_log/trades/rejections outputs are completely untouched by
+        this flag. When False (the default), neither list is ever
+        appended to, so behavior and cost are identical to before this
+        flag existed -- see
+        tests/test_backtest_research_telemetry.py's parity test."""
         self.config = config or BacktestConfig()
+        self.research_telemetry = research_telemetry
         qc = self.config.quant_config
 
         self.buffer = RollingBarBuffer(qc.max_bars_per_symbol)
         self.buffer_htf = RollingBarBuffer(qc.htf_max_bars)
         self.htf_aggregator = HtfBarAggregator(qc.htf_bar_interval_minutes, rth_only=qc.rth_only_htf_sma)
+        # Task 40: multi-timeframe volatility REGIME state (observability
+        # only -- see compute_volatility_regime's own docstring). The 15m
+        # leg reuses buffer_htf/htf_aggregator above unchanged; this is
+        # ONLY the new 60-minute leg, built from the exact same, already-
+        # proven RollingBarBuffer/HtfBarAggregator classes -- deliberately
+        # continuous (rth_only=False) per Task 39's session-policy design,
+        # not a runtime-tunable knob.
+        self.buffer_60m = RollingBarBuffer(qc.regime_60m_max_bars)
+        self.aggregator_60m = HtfBarAggregator(qc.regime_60m_bar_interval_minutes, rth_only=False)
         self.simulator = TradeSimulator(self.config.execution)
 
         self._cooldown_until: dict[str, pd.Timestamp] = {}
         self._loss_lockout_until: dict[str, pd.Timestamp] = {}
         self._pending_entry: dict[str, _PendingEntry] = {}
+        self._pending_exit: dict[str, _PendingExit] = {}
         self._flattened_dates: set = set()
 
         self.trades: list[Trade] = []
@@ -184,11 +260,48 @@ class BacktestEngine:
         # regression fixture): a candidate's own reported price/RSI/R:R
         # here must never depend on a bar with a LATER timestamp than
         # the candidate itself. Not used by the engine's own control
-        # flow.
+        # flow. UNCONDITIONAL (pre-dates research_telemetry) --
+        # tests/test_backtest_regression.py and test_backtest_lookahead.py
+        # assert exact equality against this list's dict shape, so it
+        # must never be extended/changed; candidate_telemetry below is a
+        # deliberately separate list for Task 10's richer fields instead.
         self.signal_log: list[dict] = []
+        # Task 10 research telemetry -- see research_telemetry docstring
+        # above. One row per bar with a valid indicator snapshot
+        # (volatility_telemetry) / one row per raw candidate signal
+        # (candidate_telemetry), only when research_telemetry=True.
+        self.volatility_telemetry: list[dict] = []
+        self.candidate_telemetry: list[dict] = []
+        # Task 40: latest multi-timeframe VolatilityRegimeSnapshot per
+        # symbol (observability -- never consulted by any gate/decision).
+        # regime_telemetry (one row per bar with a valid 1-min snapshot,
+        # same population as volatility_telemetry) is captured ONLY when
+        # research_telemetry=True, matching that flag's existing
+        # observational-only convention.
+        self.volatility_regime_snapshots: dict[str, VolatilityRegimeSnapshot] = {}
+        self.regime_telemetry: list[dict] = []
+        # Task 42: shadow comparison of the EXISTING min_atr_pct decision
+        # against the new Contract B evaluator -- opt-in (research_
+        # telemetry=True), same convention as regime_telemetry above.
+        # Never consulted by any gate/signal decision.
+        self.regime_shadow_comparisons: list[dict] = []
         self.signals_generated = 0
         self.signals_published = 0
         self.bars_processed = 0
+        # Task 53: causal pre-roll/warmup bar count -- tracked SEPARATELY
+        # from bars_processed (evaluation-only). See _warmup_symbol_bar's
+        # own docstring: warmup rows update market-state buffers ONLY, so
+        # they must never be counted toward evaluation metrics
+        # (bars_processed/trades-per-week denominators/P&L accounting).
+        self.warmup_bars_processed = 0
+        # Task 35 fallback accounting -- counts the geometry_path actually
+        # used at OPEN time (after fill-time reconciliation, the final,
+        # definitive selection -- see _process_symbol_bar's pending-entry
+        # branch), keyed by geometry_path, plus a fallback_reason
+        # breakdown for the ATR_FALLBACK count. Descriptive counters only,
+        # not a gate or a tuning metric.
+        self.geometry_path_counts: dict[str, int] = {}
+        self.fallback_reason_counts: dict[str, int] = {}
         self._last_close: dict[str, float] = {}
         self._last_timestamp: dict[str, pd.Timestamp] = {}
 
@@ -201,12 +314,37 @@ class BacktestEngine:
         df: pd.DataFrame,
         progress_callback: Callable[[int, int], None] | None = None,
         progress_interval_seconds: float = 2.0,
+        warmup_df: pd.DataFrame | None = None,
     ) -> BacktestResult:
         """`df`: normalized columns [timestamp, symbol, open, high, low,
         close, volume], tz-aware UTC (see talonx_backtest.data). Must
         already be sorted/deduped -- this engine does not repair data
         (see data.sort_and_dedupe); pass through check_dataset_quality
         first.
+
+        `warmup_df` (Task 53, optional, same column contract as `df`):
+        PRE-ROLL/WARMUP data, causally strictly earlier than `df` --
+        reconstructs 1m/15m/60m market-state buffers (RollingBarBuffer/
+        HtfBarAggregator, the SAME objects/functions evaluation uses) so
+        indicators/HTF-SMA/regime state can be genuinely ready at the
+        FIRST evaluation bar, instead of every isolated evaluation window
+        starting cold. Fed through _warmup_symbol_bar -- state-only: never
+        generates candidates, rejections, signals, trades, cooldown,
+        loss-lockout, or throttle activity, and never counts toward
+        bars_processed/evaluation metrics (see warmup_bars_processed on
+        the returned BacktestResult instead). `run(df)` with no
+        `warmup_df` (the default) is byte-for-byte the pre-Task-53
+        behavior -- see tests/test_backtest_preroll.py's own backward-
+        compatibility proof.
+
+        Causality is enforced, not assumed: raises ValueError if any
+        warmup_df row's timestamp is >= any df row's timestamp (no future
+        bars, no evaluation-window leakage) -- see step 6's own boundary
+        contract. No trade/pending-entry/pending-exit/cooldown/loss-
+        lockout state can carry from warmup into evaluation, because
+        _warmup_symbol_bar never touches any of those structures --
+        warmup is indicator-state initialization only, never a shadow
+        replay of the strategy itself.
 
         `progress_callback`, if given, is called as `callback(bars_done,
         bars_total)` -- throttled to at most once every
@@ -218,12 +356,29 @@ class BacktestEngine:
         called at least once at completion (bars_done == bars_total),
         even for a run so fast the interval never elapses. A None
         callback (the default) costs nothing extra -- no timing calls,
-        no branches taken in the hot per-bar loop beyond the None check."""
+        no branches taken in the hot per-bar loop beyond the None check.
+        `bars_total`/progress reporting cover EVALUATION bars only --
+        warmup is not part of that count."""
+        if warmup_df is not None and not warmup_df.empty and not df.empty:
+            max_warmup_ts = warmup_df["timestamp"].max()
+            min_eval_ts = df["timestamp"].min()
+            if max_warmup_ts >= min_eval_ts:
+                raise ValueError(
+                    f"warmup_df must be strictly earlier than df (no future bars, no evaluation-"
+                    f"window leakage): max warmup timestamp {max_warmup_ts} >= "
+                    f"min evaluation timestamp {min_eval_ts}"
+                )
+
         if df.empty:
             return BacktestResult(
                 trades=[], rejections=[], signals_generated=0, signals_published=0,
                 config=self.config, start=None, end=None, symbols=[],
             )
+
+        if warmup_df is not None and not warmup_df.empty:
+            warmup_ordered = warmup_df.sort_values(["timestamp", "symbol"], kind="mergesort")
+            for _, row in warmup_ordered.iterrows():
+                self._warmup_symbol_bar(row["symbol"], row["timestamp"], row)
 
         ordered = df.sort_values(["timestamp", "symbol"], kind="mergesort")
         symbols = sorted(ordered["symbol"].unique().tolist())
@@ -260,37 +415,26 @@ class BacktestEngine:
             end=ordered["timestamp"].iloc[-1],
             symbols=symbols,
             bars_processed=self.bars_processed,
+            warmup_bars_processed=self.warmup_bars_processed,
+            volatility_telemetry=self.volatility_telemetry,
+            candidate_telemetry=self.candidate_telemetry,
         )
 
     # ------------------------------------------------------------------
     # Per-bar processing
     # ------------------------------------------------------------------
 
-    def _process_symbol_bar(self, symbol: str, timestamp: pd.Timestamp, row, candidates: list[QuantSignal]) -> None:
+    def _feed_market_state(self, symbol: str, timestamp: pd.Timestamp, row) -> None:
+        """Task 53: the ONE place a closed historical bar is fed into the
+        SAME buffers live uses (RollingBarBuffer/HtfBarAggregator, 1m/15m/
+        60m) -- factored out of _process_symbol_bar so the exact same code
+        path can be reused, unchanged, by both normal evaluation
+        (_process_symbol_bar) and state-only warmup (_warmup_symbol_bar).
+        Pure market-state update: no candidate generation, no gates, no
+        trade lifecycle, no cooldown/loss-lockout, no bars_processed
+        increment (callers own that decision -- evaluation counts it,
+        warmup counts it separately, see warmup_bars_processed)."""
         symbol = symbol.upper()
-        self.bars_processed += 1
-
-        # --- Trade lifecycle: entry / exit checks come BEFORE this bar's
-        # data feeds indicator computation, matching "a signal published
-        # off bar N enters at bar N+1's open, then bar N+1's own
-        # high/low can immediately close it" (spec section 6).
-        pending = self._pending_entry.pop(symbol, None)
-        if pending is not None and (self.config.allow_overlapping_trades or not self.simulator.has_open(symbol)):
-            self.simulator.open_position(
-                pending.signal, timestamp, float(row["open"]),
-                opportunity_score=pending.opportunity_score,
-            )
-            trade = self.simulator.check_exit(symbol, timestamp, float(row["high"]), float(row["low"]))
-            if trade is not None:
-                self.trades.append(trade)
-                self._maybe_arm_loss_lockout(symbol, trade, timestamp)
-        elif self.simulator.has_open(symbol):
-            trade = self.simulator.check_exit(symbol, timestamp, float(row["high"]), float(row["low"]))
-            if trade is not None:
-                self.trades.append(trade)
-                self._maybe_arm_loss_lockout(symbol, trade, timestamp)
-
-        # --- Feed the closed historical bar into the SAME buffers live uses.
         self.buffer.add_bar(
             symbol=symbol, timestamp=timestamp, open_=float(row["open"]), high=float(row["high"]),
             low=float(row["low"]), close=float(row["close"]), volume=float(row["volume"]),
@@ -306,8 +450,104 @@ class BacktestEngine:
                 high=finalized["high"], low=finalized["low"], close=finalized["close"],
                 volume=finalized["volume"],
             )
+        # Task 40: 60-minute regime leg -- identical pattern to the 15m
+        # block immediately above, just a second HtfBarAggregator/
+        # RollingBarBuffer pair at a different interval. No new bucketing
+        # logic.
+        finalized_60m = self.aggregator_60m.update(
+            symbol=symbol, timestamp=timestamp, open_=float(row["open"]), high=float(row["high"]),
+            low=float(row["low"]), close=float(row["close"]), volume=float(row["volume"]),
+        )
+        if finalized_60m is not None:
+            self.buffer_60m.add_bar(
+                symbol=symbol, timestamp=finalized_60m["timestamp"], open_=finalized_60m["open"],
+                high=finalized_60m["high"], low=finalized_60m["low"], close=finalized_60m["close"],
+                volume=finalized_60m["volume"],
+            )
         self._last_close[symbol] = float(row["close"])
         self._last_timestamp[symbol] = timestamp
+
+    def _warmup_symbol_bar(self, symbol: str, timestamp: pd.Timestamp, row) -> None:
+        """Task 53: state-only pre-roll. Updates 1m/15m/60m market-state
+        buffers (via _feed_market_state, byte-identical to what evaluation
+        does) and NOTHING else -- explicitly does NOT: generate candidates,
+        record rejections, publish signals, open/close trades, arm
+        cooldown/loss-lockout, enter the throttle queue, or increment
+        bars_processed (see warmup_bars_processed instead). No pending
+        entry/exit, no open position, and no cooldown/loss-lockout can
+        exist after warmup -- none of those dicts are ever touched here,
+        so there is nothing to carry across the warmup/evaluation
+        boundary by construction, not by a separate reset step."""
+        self._feed_market_state(symbol, timestamp, row)
+        self.warmup_bars_processed += 1
+
+    def _process_symbol_bar(self, symbol: str, timestamp: pd.Timestamp, row, candidates: list[QuantSignal]) -> None:
+        symbol = symbol.upper()
+        self.bars_processed += 1
+
+        # --- Trade lifecycle: entry / exit checks come BEFORE this bar's
+        # data feeds indicator computation, matching "a signal published
+        # off bar N enters at bar N+1's open, then bar N+1's own
+        # high/low can immediately close it" (spec section 6). LONG_ONLY
+        # lifecycle (Task 25A): a pending SIGNAL_EXIT (from a BEARISH/
+        # CONTRADICTED candidate scheduled while long) is resolved
+        # FIRST, at this bar's open, before any new entry -- an exit
+        # frees the symbol up for a same-bar re-entry, never the reverse.
+        pending_exit = self._pending_exit.pop(symbol, None)
+        if pending_exit is not None and self.simulator.has_open(symbol):
+            fill_price = float(row["open"])
+            trade = self.simulator.close_on_signal_exit(symbol, timestamp, fill_price, pending_exit.signal)
+            if trade is not None:
+                self.trades.append(trade)
+                self._maybe_arm_loss_lockout(symbol, trade, timestamp)
+        elif pending_exit is not None:
+            # Something else (EOD flatten, most commonly) already closed
+            # this symbol between scheduling and fill time -- nothing to
+            # exit. Never silently dropped, same reason talonx_paper
+            # uses for the identical "no active position" case.
+            self._reject(symbol, "NO_ACTIVE_POSITION", 1, timestamp)
+
+        pending = self._pending_entry.pop(symbol, None)
+        if pending is not None:
+            local_date = timestamp.astimezone(_ET).date()
+            if local_date in self._flattened_dates:
+                # Task 24 finding: the once-per-day EOD-flatten guard
+                # does not by itself prevent a NEW position from opening
+                # after that day's flatten checkpoint has already run.
+                # Task 25A closes that gap explicitly: no new entry may
+                # open for a date once it has been flattened.
+                self._reject(symbol, "POST_EOD_FLATTEN_NO_NEW_ENTRY", 1, timestamp)
+            elif self.config.allow_overlapping_trades or not self.simulator.has_open(symbol):
+                fill_price = float(row["open"])
+                fill_signal = self._finalize_fill_geometry(pending.signal, fill_price, timestamp)
+                if fill_signal is not None:
+                    # Task 35 fallback accounting -- the geometry actually
+                    # opened with, after fill-time reconciliation (the
+                    # final, definitive selection for this trade).
+                    if fill_signal.direction == SignalDirection.BULLISH and fill_signal.geometry_path:
+                        self.geometry_path_counts[fill_signal.geometry_path] = (
+                            self.geometry_path_counts.get(fill_signal.geometry_path, 0) + 1
+                        )
+                        if fill_signal.fallback_reason:
+                            self.fallback_reason_counts[fill_signal.fallback_reason] = (
+                                self.fallback_reason_counts.get(fill_signal.fallback_reason, 0) + 1
+                            )
+                    self.simulator.open_position(
+                        fill_signal, timestamp, fill_price,
+                        opportunity_score=pending.opportunity_score,
+                    )
+                    trade = self.simulator.check_exit(symbol, timestamp, float(row["high"]), float(row["low"]))
+                    if trade is not None:
+                        self.trades.append(trade)
+                        self._maybe_arm_loss_lockout(symbol, trade, timestamp)
+        elif self.simulator.has_open(symbol):
+            trade = self.simulator.check_exit(symbol, timestamp, float(row["high"]), float(row["low"]))
+            if trade is not None:
+                self.trades.append(trade)
+                self._maybe_arm_loss_lockout(symbol, trade, timestamp)
+
+        # --- Feed the closed historical bar into the SAME buffers live uses.
+        self._feed_market_state(symbol, timestamp, row)
 
         qc = self.config.quant_config
         df_1m = self.buffer.get_dataframe(symbol)
@@ -315,8 +555,74 @@ class BacktestEngine:
         if snapshot is None:
             return  # warm-up -- identical "insufficient data -> no signal" posture as live
 
-        if _fails_min_volatility(snapshot, qc):
-            self._reject(symbol, "LOW_VOLATILITY", 1, timestamp)
+        # Task 40: regime snapshot computed for EVERY post-warm-up bar,
+        # unconditionally -- deliberately BEFORE the volatility gate below
+        # so it is available regardless of that gate's outcome (this is
+        # observability state, not an eligibility input; see
+        # compute_volatility_regime's docstring). Reuses buffer_htf's
+        # dataframe exactly as compute_htf_trend/compute_daily_pivots
+        # already do -- no new 15m read path.
+        regime_snapshot = compute_volatility_regime(
+            self.buffer_htf.get_dataframe(symbol), self.buffer_60m.get_dataframe(symbol),
+            qc.atr_period, timestamp,
+        )
+        self.volatility_regime_snapshots[symbol] = regime_snapshot
+        if self.research_telemetry:
+            self.regime_telemetry.append({
+                "timestamp": timestamp, "symbol": symbol,
+                "atr_15m": regime_snapshot.atr_15m, "atr_pct_15m": regime_snapshot.atr_pct_15m,
+                "ready_15m": regime_snapshot.ready_15m,
+                "atr_60m": regime_snapshot.atr_60m, "atr_pct_60m": regime_snapshot.atr_pct_60m,
+                "ready_60m": regime_snapshot.ready_60m,
+            })
+
+        fails_volatility = _fails_min_volatility(snapshot, qc)
+        # Task 45: regime_result must be available regardless of
+        # research_telemetry -- MULTITIMEFRAME_EXPERIMENTAL mode's active
+        # gate decision below depends on it, and the gate itself must not
+        # require telemetry to be enabled. Moved out of the
+        # research_telemetry block below (was Task 42's own placement);
+        # evaluate_regime is a cheap, pure computation, so this has no
+        # behavior/cost implication for CURRENT_1M runs.
+        regime_result = evaluate_regime(regime_snapshot)
+        if self.research_telemetry:
+            # Same formula _fails_min_volatility itself uses internally
+            # (talonx_quant/consumer.py) -- copied for DISPLAY only, not
+            # a second implementation the gate could diverge from; the
+            # actual gate decision below still comes from
+            # fails_volatility, the one value both this telemetry row
+            # and the reject-or-continue branch share.
+            atr_pct = (snapshot.atr / snapshot.price * 100) if (snapshot.atr is not None and snapshot.price) else None
+            self.volatility_telemetry.append({
+                "timestamp": timestamp, "symbol": symbol, "price": snapshot.price,
+                "atr": snapshot.atr, "atr_pct": atr_pct,
+                "volatility_threshold": qc.min_atr_pct, "passes_volatility": not fails_volatility,
+            })
+            # Task 42: shadow comparison, EXISTING decision (fails_volatility,
+            # already computed above, unchanged) vs. the new Contract B
+            # evaluator -- observability only, gated by the same
+            # research_telemetry flag as every other row in this block.
+            # Never read by the reject-or-continue branch immediately below.
+            old_passes = not fails_volatility
+            self.regime_shadow_comparisons.append({
+                "timestamp": timestamp, "symbol": symbol,
+                "current_atr_pct_1m": atr_pct, "current_passes_min_atr_pct": old_passes,
+                "new_regime_ready": regime_result.ready, "new_regime_eligible": regime_result.eligible,
+                "regime_reason": regime_result.reason,
+                "atr_pct_15m": regime_result.atr_pct_15m, "atr_pct_60m": regime_result.atr_pct_60m,
+                "regime_as_of": regime_result.as_of,
+                "disagreement_category": classify_regime_shadow_disagreement(old_passes, regime_result),
+            })
+
+        # Task 45: mode-aware ACTIVE gate decision -- the ONE dispatch
+        # point, shared unchanged with talonx_quant.consumer. CURRENT_1M
+        # (the default) reuses fails_volatility byte-for-byte, proven in
+        # results/task45_experimental_regime_gate/current_mode_regression.json.
+        gate_fails, rejection_reason, _detail_reason = _evaluate_active_volatility_gate(
+            fails_volatility, regime_result, qc,
+        )
+        if gate_fails:
+            self._reject(symbol, rejection_reason, 1, timestamp)
             return
 
         df_htf = self.buffer_htf.get_dataframe(symbol)
@@ -332,6 +638,50 @@ class BacktestEngine:
                 "direction": s.direction.value, "price": s.price, "rsi": s.rsi,
                 "confluence_score": s.confluence_score, "risk_reward_ratio": s.risk_reward_ratio,
             })
+        if self.research_telemetry:
+            # Every raw candidate, same point in the pipeline as
+            # signal_log above (before ANY gate) -- so rejected AND
+            # eventually-published candidates are both represented.
+            # Every field is read directly off the QuantSignal `s`
+            # strategy.py already built; confluence_score is the
+            # AGGREGATE 0-3 int strategy.py computes (its own
+            # RSI-zone/MACD-cross/volume-threshold sub-conditions are
+            # local, unexposed values inside _confluence_score -- not
+            # reconstructed here, see docs/backtesting.md's Task 10
+            # note). trend_aligned is the one genuinely-exposed
+            # per-signal gate boolean (None when the trend gate doesn't
+            # apply to this signal, not "failed" -- same meaning as
+            # everywhere else it's used).
+            for s in signals:
+                self.candidate_telemetry.append({
+                    "timestamp": timestamp, "symbol": symbol, "direction": s.direction.value,
+                    "signal_type": s.signal_type.value, "session": s.session, "price": s.price,
+                    "rsi": s.rsi, "macd": s.macd, "macd_signal_line": s.macd_signal_line,
+                    "volume_surge_ratio": s.volume_surge_ratio,
+                    "confluence_score": s.confluence_score, "risk_reward_ratio": s.risk_reward_ratio,
+                    "trend_component": s.trend_aligned,
+                    # Task 52: surface Task 51's confirmation telemetry directly (None under
+                    # LEGACY, populated under INDEPENDENT_CONFIRMATION_EXPERIMENTAL) -- avoids
+                    # the macd_prev-unavailable reconstruction limitation Task 51's static
+                    # rescore had to document as a caveat; a fresh replay captures the real
+                    # per-candidate confirmation state directly off the QuantSignal itself.
+                    "confirmation_count": s.confirmation_count, "confirmation_macd": s.confirmation_macd,
+                    "confirmation_rsi": s.confirmation_rsi, "confirmation_volume": s.confirmation_volume,
+                    "confirmation_contract": s.confirmation_contract,
+                })
+
+        # US Market Closed Session Rejection (Task 24 P1 / Task 25A parity
+        # fix): live's consumer.py rejects a bar whose session tag is
+        # "closed" before any other gate (matching the 2026-08-18
+        # correctness fix there) -- this engine had no equivalent check
+        # at all, so a dataset containing closed-session rows could sail
+        # straight through every downstream gate. Same position in the
+        # pipeline as live (right after evaluate_signals, before the
+        # blackout gates); same "check signals[0], they all share one
+        # session tag" shortcut live uses.
+        if signals and signals[0].session == "closed":
+            self._reject(symbol, "US_MARKET_SESSION_CLOSED", len(signals), timestamp)
+            return
 
         blackout = get_entry_blackout(snapshot.bar_timestamp)
         if blackout == "opening":
@@ -352,7 +702,7 @@ class BacktestEngine:
             self._reject(symbol, "COOLDOWN", len(signals), timestamp)
             return
 
-        qualifying = [s for s in signals if (s.confluence_score or 0) >= qc.confluence_score_min]
+        qualifying = [s for s in signals if _confluence_eligible(s, qc)]
         if not qualifying:
             self._reject(symbol, "LOW_CONFLUENCE", len(signals), timestamp)
             return
@@ -431,9 +781,25 @@ class BacktestEngine:
             if revalidated is None:
                 continue
 
+            # Publication itself (and the cooldown it arms) happens
+            # regardless of direction, matching live's _publish_signal --
+            # talonx_quant has no concept of position state, so it
+            # publishes a fully gate-checked BEARISH signal exactly the
+            # same way it publishes a BULLISH one. What differs is what
+            # a LONG_ONLY consumer does with it next (Task 24/25A): a
+            # BULLISH signal always schedules an entry; a BEARISH one
+            # only schedules an exit if a long is currently open, and is
+            # otherwise recorded as NO_ACTIVE_POSITION -- never queued
+            # as a new (short) position the way this engine used to.
             self.signals_published += 1
             self._arm_cooldown(symbol, timestamp)
-            self._pending_entry[symbol] = _PendingEntry(signal=revalidated, opportunity_score=score)
+
+            if revalidated.direction == SignalDirection.BULLISH:
+                self._pending_entry[symbol] = _PendingEntry(signal=revalidated, opportunity_score=score)
+            elif self.simulator.has_open(symbol):
+                self._pending_exit[symbol] = _PendingExit(signal=revalidated)
+            else:
+                self._reject(symbol, "NO_ACTIVE_POSITION", 1, timestamp)
 
         if dropped:
             by_ticker: dict[str, int] = {}
@@ -483,6 +849,78 @@ class BacktestEngine:
             "target_price": geometry.target_price,
             "risk_reward_ratio": geometry.risk_reward_ratio,
             "signal_age_ms": age_seconds * 1000.0,
+            # Task 35: keep geometry_path/fallback_reason/structural_level
+            # in lockstep with the stop/target/ratio re-derived above.
+            "geometry_path": geometry.geometry_path,
+            "fallback_reason": geometry.fallback_reason,
+            "structural_level": geometry.structural_level,
+            "structural_level_type": geometry.structural_level_type,
+        })
+
+    def _finalize_fill_geometry(self, signal: QuantSignal, fill_price: float, now: pd.Timestamp) -> QuantSignal | None:
+        """2026-08-19 correctness fix (Task 13 defect): _revalidate above
+        re-derives stop_price/target_price against the bar-close price at
+        THROTTLE-FLUSH time, but the actual fill happens a full bar later,
+        at bar N+1's OPEN (see _process_symbol_bar's own docstring on the
+        "signal at bar N -> entry at bar N+1's open" convention). Between
+        those two prices, a real gap can leave the revalidated stop_price
+        on the WRONG SIDE of the price the position actually fills at --
+        execution.py's risk calc uses abs(entry_price_raw - stop_price),
+        which silently tolerates this rather than rejecting it, so the
+        resulting "STOP" exit was actually a favorable move mislabeled as
+        a loss-side exit (always net_R=+1.0 exactly -- confirmed via Task
+        13's audit against 6 real historical trades).
+
+        Deliberately NARROW: only recomputes when the pre-existing
+        geometry has ALREADY been invalidated by the fill price (fails the
+        required stop < entry < target / target < entry < stop invariant).
+        The far more common case -- fill price differs slightly from the
+        revalidation price but stop/target still correctly bracket it --
+        is left completely untouched, preserving the existing, intentional
+        "execution_rr can legitimately diverge from screening_rr due to
+        normal fill-price drift" behavior (see
+        tests/test_backtest_execution.py::
+        test_execution_rr_uses_the_real_fill_price_not_the_screening_reference_price).
+
+        When recomputation IS needed, this reuses calculate_trade_geometry
+        (the exact same function _revalidate already calls) anchored to the
+        REAL fill price, and applies the SAME min_risk_reward_ratio gate a
+        fresh candidate would have to clear -- rejecting (never silently
+        keeping invalid geometry) if the gap is severe enough that even a
+        freshly-anchored trade wouldn't qualify. screening_rr (signal.
+        risk_reward_ratio) is deliberately NEVER overwritten here -- it is
+        documented (execution.py) as the strategy's gate-time R:R, never
+        recalculated against the fill; only the actual protective
+        stop/target levels the position trades against are re-anchored.
+        Returns None (and records a GEOMETRY_INVALIDATED_AT_FILL rejection)
+        if no valid geometry exists even at the real fill price."""
+        if signal.stop_price is None or signal.target_price is None:
+            return signal  # nothing to validate against -- unchanged, pre-existing behavior (see test_execution_rr_is_none_when_stop_price_is_missing)
+
+        if signal.direction == SignalDirection.BULLISH:
+            geometry_valid = signal.stop_price < fill_price < signal.target_price
+        else:
+            geometry_valid = signal.target_price < fill_price < signal.stop_price
+        if geometry_valid:
+            return signal
+
+        qc = self.config.quant_config
+        geometry = calculate_trade_geometry(
+            fill_price, signal.atr, signal.direction, signal.pivot_resistance, signal.pivot_support, qc,
+        )
+        if geometry is None or geometry.risk_reward_ratio is None or geometry.risk_reward_ratio < qc.min_risk_reward_ratio:
+            self._reject(signal.ticker.upper(), "GEOMETRY_INVALIDATED_AT_FILL", 1, now)
+            return None
+        return signal.model_copy(update={
+            "stop_price": geometry.stop_price, "target_price": geometry.target_price,
+            # Task 35: this recompute path is the ACTUAL fill-anchored
+            # geometry -- must overwrite the screening-time geometry_path/
+            # fallback_reason too, since re-anchoring to the real fill
+            # price can select a different path than screening did (e.g.
+            # a gap that puts price below where structure was valid at
+            # screening now makes it invalid, or vice versa).
+            "geometry_path": geometry.geometry_path, "fallback_reason": geometry.fallback_reason,
+            "structural_level": geometry.structural_level, "structural_level_type": geometry.structural_level_type,
         })
 
     # ------------------------------------------------------------------

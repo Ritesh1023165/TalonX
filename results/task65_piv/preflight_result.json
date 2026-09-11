@@ -1,0 +1,113 @@
+{
+  "canonical_alpha_evidence": false,
+  "checks": [
+    {
+      "detail": "b935588b69967081eebacb8f9ae8d3685ae1e578",
+      "name": "approved_sha",
+      "passed": true
+    },
+    {
+      "detail": "clean",
+      "name": "tracked_tree_clean",
+      "passed": true
+    },
+    {
+      "detail": "0f5e96c0e10b51458a1e5610c1a035a8e6581cfea5e5524832b58c318589c917",
+      "name": "config_hash",
+      "passed": true
+    },
+    {
+      "detail": "PAPER endpoint=https://paper-api.alpaca.markets account=***YZF7",
+      "name": "paper_account_verified",
+      "passed": true
+    },
+    {
+      "detail": "0",
+      "name": "open_paper_orders_queried",
+      "passed": true
+    },
+    {
+      "detail": "0",
+      "name": "open_paper_positions_queried",
+      "passed": true
+    },
+    {
+      "detail": "internal=[] broker=[]",
+      "name": "internal_broker_reconciled",
+      "passed": true
+    },
+    {
+      "detail": "HTTP 200 feed_mode=IEX_PAPER_PIV feed=iex timestamp=2026-08-24T18:41:56.120861459Z",
+      "name": "market_data_feed_accessible",
+      "passed": true
+    },
+    {
+      "detail": "feed_mode=IEX_PAPER_PIV classification=OPERATIONAL_PIV_ONLY_NOT_ALPHA_EVIDENCE",
+      "name": "feed_mode_classification",
+      "passed": true
+    },
+    {
+      "detail": "PIV_TEST_DECISION_PATH=true, decision engine reachable via Redis at redis://localhost:6379/0",
+      "name": "decision_path_mode",
+      "passed": true
+    },
+    {
+      "detail": "yfinance importable -- full 35-symbol preseed+verify runs at session start, not preflight",
+      "name": "warmup_mechanism_capability",
+      "passed": true
+    },
+    {
+      "detail": "XNYS/ET configured",
+      "name": "timezone_and_xnys",
+      "passed": true
+    },
+    {
+      "detail": "35 symbols",
+      "name": "universe_loaded",
+      "passed": true
+    },
+    {
+      "detail": "120s",
+      "name": "stale_detection_armed",
+      "passed": true
+    },
+    {
+      "detail": "Task64 reusable validator",
+      "name": "readiness_validator_loaded",
+      "passed": true
+    },
+    {
+      "detail": "results\\task64_paper_piv_readiness\\runtime",
+      "name": "logging_writable",
+      "passed": true
+    },
+    {
+      "detail": "results\\task64_paper_piv_readiness\\runtime\\piv_events.jsonl",
+      "name": "telemetry_enabled",
+      "passed": true
+    },
+    {
+      "detail": "HTTP 200",
+      "name": "telegram_reachable",
+      "passed": true
+    },
+    {
+      "detail": "persistent fail-closed lifecycle switch",
+      "name": "kill_switch_available",
+      "passed": true
+    },
+    {
+      "detail": "15:50",
+      "name": "eod_flatten_configured",
+      "passed": true
+    },
+    {
+      "detail": "stable intent id persisted before submit",
+      "name": "duplicate_order_protection",
+      "passed": true
+    }
+  ],
+  "feed_mode": "IEX_PAPER_PIV",
+  "generated_at": "2026-08-24T18:42:12.374706+00:00",
+  "status": "PIV_READY"
+}

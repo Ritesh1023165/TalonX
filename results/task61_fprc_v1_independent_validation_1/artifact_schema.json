@@ -1,0 +1,56 @@
+{
+  "after_all_pre_replay_gates_pass": {
+    "identical_trade_accounting": [
+      "0bps",
+      "5bps_per_side"
+    ],
+    "required_report_groups": [
+      "aggregate",
+      "window",
+      "symbol",
+      "time_bucket",
+      "geometry_cost_bucket",
+      "exit_path",
+      "forward_excursion",
+      "winner_loser_sensitivity",
+      "concentration",
+      "trigger_confirmation_fill_parity",
+      "bootstrap_95_ci",
+      "interpretability_criteria",
+      "economic_robustness_criteria"
+    ],
+    "trade_ledger": [
+      "task_window",
+      "symbol",
+      "entry_timestamp",
+      "exit_timestamp",
+      "entry_price",
+      "stop_price",
+      "exit_price",
+      "exit_reason",
+      "gross_R",
+      "cost_R_5bps",
+      "net_R_5bps",
+      "holding_minutes",
+      "MFE_R",
+      "MAE_R"
+    ]
+  },
+  "always_required": {
+    "task61_conclusion.md": "classification rationale and deployment boundary",
+    "task61_summary.json": "classification and compact mandatory metrics",
+    "task61_summary.md": "human-readable result",
+    "validation_gates.json": "ordered gate states and replay/data-access counters",
+    "window_manifest.json": "resolved calendar, universe, fingerprints, and source hashes"
+  },
+  "blocked_only": {
+    "validation_blocker.json": "exact blocker, affected windows/sessions, and stop action"
+  },
+  "classification_enum": [
+    "FPRC_V1_REPLICATION_REQUIRED",
+    "FPRC_V1_REJECTED",
+    "VALIDATION_BLOCKED"
+  ],
+  "schema_version": 1,
+  "task": 61
+}

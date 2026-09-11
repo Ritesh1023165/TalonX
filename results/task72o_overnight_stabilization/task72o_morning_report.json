@@ -1,0 +1,30 @@
+{
+  "task": "Task72O_OVERNIGHT_STABILIZATION",
+  "starting_branch": "research/talonx-strategy-validation",
+  "starting_sha": "3fa0c51",
+  "final_sha": "7ed27c7",
+  "working_tree_status": "clean, pushed, origin in sync",
+  "stages": {
+    "stage0_baseline_audit": {"status": "PASS", "commit": null},
+    "stage1_eod_automation": {"status": "PASS", "commit": "3be9eac", "pushed": true},
+    "stage2_known_failure": {"status": "BLOCKED", "commit": null, "root_cause_classified": "TEST_ISOLATION_DEFECT"},
+    "stage3_profitability_evidence": {"status": "PASS", "commit": "7ed27c7", "pushed": true, "classification": "INCONCLUSIVE"},
+    "stage4_morning_report": {"status": "COMPLETE"}
+  },
+  "test_results": {
+    "stage1_targeted": "22/22 passed",
+    "directly_related_piv_suite": "220/220 passed",
+    "full_repo_suite": "2159 passed, 1 failed (known, root-caused), 1 skipped, 15 xfailed"
+  },
+  "eod_lifecycle_verdict": "PASS -- idempotent, ordered, linked to original live session_id, SESSION_COMPLETED gated on reconciliation PASSED only",
+  "regression_failure_verdict": "TEST_ISOLATION_DEFECT -- stale examples/data/sample_AAPL_trade_1m.csv fixture, fix deferred (not a protected-file issue)",
+  "eligible_long_only_candidates": ["TALONX_PRODUCTION_QUANTSCANNER_INTRADAY_LONG_ONLY_V1"],
+  "profitability_classification": "INCONCLUSIVE",
+  "profitability_evidence": {"symbol": "AAPL", "window": "2025-08-15 to 2025-12-31", "cost_bps": "5/5/10", "signals_generated": 6, "signals_published": 0, "trades_executed": 0},
+  "holdouts_accessed": [],
+  "downloads_performed": [],
+  "broker_order_mutations": 0,
+  "live_session_started": false,
+  "recommendation": "GO",
+  "recommendation_scope": "operational/observational infrastructure session only -- NOT alpha validation (no candidate reached VALIDATED_AND_REPLICATED); all explicit GO gates (71S-R1 sound, EOD lifecycle passes, clean repo, known SHA/config, PAPER-only intact, no unexplained regression, clear objective) are satisfied"
+}

@@ -1,0 +1,124 @@
+........................................................................ [  2%]
+........................................................................ [  5%]
+........................................................................ [  7%]
+........................................................................ [ 10%]
+........................................................................ [ 12%]
+........................................................................ [ 15%]
+........................................................................ [ 17%]
+........................................................................ [ 20%]
+........................................................................ [ 22%]
+........................................................................ [ 25%]
+........................................................................ [ 27%]
+........................................................................ [ 30%]
+........................................................................ [ 32%]
+........................................................................ [ 35%]
+........................................................................ [ 37%]
+........................................................................ [ 40%]
+........................................................................ [ 42%]
+........................................................................ [ 45%]
+........................................................................ [ 47%]
+........................................................................ [ 50%]
+........................................................................ [ 52%]
+........................................................................ [ 55%]
+........................................................................ [ 57%]
+........................................................................ [ 60%]
+........................................................................ [ 62%]
+........................................................................ [ 65%]
+........................................................................ [ 67%]
+........................................................................ [ 70%]
+........................................................................ [ 72%]
+........................................................................ [ 75%]
+........................................................................ [ 77%]
+........................................................................ [ 80%]
+........................................................................ [ 82%]
+........................................................................ [ 85%]
+........................................................................ [ 87%]
+........................................................................ [ 90%]
+........................................................................ [ 92%]
+........................................................................ [ 95%]
+........................................................................ [ 97%]
+.............................................................            [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\pandas_ta\__init__.py:37
+  C:\workspace\TalonX\.venv\Lib\site-packages\pandas_ta\__init__.py:37: Pandas4Warning: The 'mode.copy_on_write' option is deprecated. Copy-on-Write can no longer be disabled (it is always enabled with pandas >= 3.0), and setting the option has no impact. This option will be removed in pandas 4.0.
+    from pandas_ta.core import AnalysisIndicators
+
+tests/test_task78i_dashboard_integration.py: 5 warnings
+tests/test_task83_browser_dashboard.py: 13 warnings
+  C:\workspace\TalonX\dashboard_web.py:368: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["piv_state_dir"] = piv_state_dir if piv_state_dir is not None else PivConfig().state_dir
+
+tests/test_task78i_dashboard_integration.py: 5 warnings
+tests/test_task83_browser_dashboard.py: 13 warnings
+  C:\workspace\TalonX\dashboard_web.py:369: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["compare_config"] = CompareConfig()
+
+tests/test_task78i_dashboard_integration.py: 5 warnings
+tests/test_task83_browser_dashboard.py: 13 warnings
+  C:\workspace\TalonX\dashboard_web.py:370: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["stats"] = {watch.key: ChannelStats() for watch in CHANNELS}
+
+tests/test_task78i_dashboard_integration.py: 5 warnings
+tests/test_task83_browser_dashboard.py: 13 warnings
+  C:\workspace\TalonX\dashboard_web.py:371: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["websockets"] = set()
+
+tests/test_task78i_dashboard_integration.py: 5 warnings
+tests/test_task83_browser_dashboard.py: 13 warnings
+  C:\workspace\TalonX\dashboard_web.py:372: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["started_at"] = time.monotonic()
+
+tests/test_task78i_dashboard_integration.py: 5 warnings
+tests/test_task83_browser_dashboard.py: 13 warnings
+  C:\workspace\TalonX\dashboard_web.py:373: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["stop_event"] = asyncio.Event()
+
+tests/test_task78i_dashboard_integration.py: 5 warnings
+tests/test_task83_browser_dashboard.py: 13 warnings
+  C:\workspace\TalonX\dashboard_web.py:374: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["quant_config"] = QuantConfig()
+
+tests/test_task78i_dashboard_integration.py: 5 warnings
+tests/test_task83_browser_dashboard.py: 13 warnings
+  C:\workspace\TalonX\dashboard_web.py:383: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["buffer_stats"] = {
+
+tests/test_task78i_dashboard_integration.py: 4 warnings
+tests/test_task83_browser_dashboard.py: 10 warnings
+  C:\workspace\TalonX\dashboard_web.py:346: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["redis_task"] = asyncio.create_task(_redis_consumer(app))
+
+tests/test_task78i_dashboard_integration.py: 4 warnings
+tests/test_task83_browser_dashboard.py: 10 warnings
+  C:\workspace\TalonX\dashboard_web.py:347: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["broadcast_task"] = asyncio.create_task(_broadcaster(app))
+
+tests/test_task78i_dashboard_integration.py: 4 warnings
+tests/test_task83_browser_dashboard.py: 10 warnings
+  C:\workspace\TalonX\dashboard_web.py:348: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["buffer_poll_task"] = asyncio.create_task(_buffer_stats_poll(app))
+
+tests/test_task83_browser_dashboard.py::test_compare_view_sections
+  C:\workspace\TalonX\tests\test_task83_browser_dashboard.py:173: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["compare_config"] = cfg
+
+tests/test_task83_browser_dashboard.py::test_compare_view_not_run_when_no_evidence
+  C:\workspace\TalonX\tests\test_task83_browser_dashboard.py:198: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["compare_config"] = cfg
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+2869 passed, 189 warnings in 3316.43s (0:55:16)
+EXIT=0

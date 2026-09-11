@@ -1,0 +1,14 @@
+{
+  "task": "69P Part 7 - Quant/signal pipeline observation",
+  "checked_utc": "2026-08-25T19:05:00Z",
+  "quant_published_via_redis_metric": 0,
+  "quant_evaluated_via_redis_metric": 1,
+  "quant_evaluated_note": "Confirms QuantScanner IS live and evaluating (shares the same Redis client as the PIV Telegram-parity fix's dispatch_agent shim, see runtime_parity_report.json) -- further corroborates that talonx_ingest's own metrics:{date}:ingest:* keys (bars_read=None, confirmed via direct Redis read) are absent because PIV genuinely never uses that pipeline, not because nothing is happening. Consistent with the ENGINE_DEFECT=OBSERVABILITY_STATE_NOT_SHARED finding.",
+  "published_signals_today": 0,
+  "redis_observed_signals": 0,
+  "downstream_received_signals": 0,
+  "quant_to_redis_mismatch": "N/A -- zero published, nothing to mismatch",
+  "redis_to_downstream_mismatch": "N/A -- zero published, nothing to mismatch",
+  "rejection_stage_breakdown": "Not separately queried (would require the audit-trail rejected_candidates table specific to talonx_dispatch, which PIV does not use) -- QuantScanner's own internal gating (confluence/risk-reward/blackout/trend/cooldown/etc, all UNCHANGED, per protected-file guarantee) is responsible for the zero-published outcome; no anomaly indicated by any other signal today.",
+  "verdict": "STRATEGY_BEHAVIOR_EXPECTED -- zero published signals on a day with ~14 decision-eligible symbols is a valid strategy outcome, not evidence of any pipeline defect. The one exercised order lifecycle today (entry+exit) came entirely from the pre-registered PIV_LIFECYCLE_PROBE fallback, not from QuantScanner -- see paper_lifecycle_coverage.json."
+}

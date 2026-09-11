@@ -40,6 +40,19 @@ class HtfBarAggregator:
         self.rth_only = rth_only
         self._accumulators: dict[str, dict] = {}
 
+    def reset(self, symbol: str) -> None:
+        """Task 44: discards any in-flight (not-yet-finalized) accumulator
+        for `symbol`, without touching other symbols or emitting a
+        (necessarily partial) finalized bucket for the discarded one.
+        Exists specifically for a caller about to re-feed a KNOWN-clean,
+        full historical range (e.g. a warmup bootstrap) that must not be
+        allowed to accumulate on top of whatever partial bucket state
+        already existed for that symbol -- update()'s own += accumulation
+        has no way to distinguish "one more legitimate live tick for the
+        bucket already forming" from "a bootstrap re-feed that happens to
+        overlap it," so the caller must explicitly clear first."""
+        self._accumulators.pop(symbol.upper(), None)
+
     def update(
         self,
         symbol: str,

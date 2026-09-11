@@ -1,0 +1,83 @@
+{
+  "components": [
+    {
+      "component": "market_data_provider",
+      "covered_by_preflight_check": "market_data_feed_accessible",
+      "notes": "Alpaca REST bars/latest, explicit feed_mode-pinned, no fallback.",
+      "present_in_piv_runtime": true
+    },
+    {
+      "component": "warmup_preseed",
+      "covered_by_preflight_check": "warmup_mechanism_capability",
+      "notes": "QuantScanner.preseed_symbols() via yfinance, causal, fail-closed per symbol (Task 65B).",
+      "present_in_piv_runtime": true
+    },
+    {
+      "component": "session_readiness_validator",
+      "covered_by_preflight_check": null,
+      "notes": "Always constructed by SessionRunner; restart-safe as of Task 66A Part 1 (session_readiness_state.json).",
+      "present_in_piv_runtime": true
+    },
+    {
+      "component": "quant_scanner",
+      "covered_by_preflight_check": "decision_path_mode",
+      "notes": "Real, unmodified talonx_quant.consumer.QuantScanner, driven by decision_engine.py.",
+      "present_in_piv_runtime": true
+    },
+    {
+      "component": "redis",
+      "covered_by_preflight_check": "decision_path_mode",
+      "notes": "Required when TALONX_PIV_DECISION_PATH is enabled; fail-closed if unreachable.",
+      "present_in_piv_runtime": true
+    },
+    {
+      "component": "decision_engine",
+      "covered_by_preflight_check": "decision_path_mode",
+      "notes": "talonx_piv.decision_engine.DecisionEngine.",
+      "present_in_piv_runtime": true
+    },
+    {
+      "component": "paper_broker_lifecycle",
+      "covered_by_preflight_check": "paper_account_verified",
+      "notes": "AlpacaPaperClient + PaperLifecycle, immutable paper endpoint.",
+      "present_in_piv_runtime": true
+    },
+    {
+      "component": "telegram_outbound",
+      "covered_by_preflight_check": "telegram_reachable",
+      "notes": "Existing EventBus -> telegram.sender fan-out (Task 64).",
+      "present_in_piv_runtime": true
+    },
+    {
+      "component": "telegram_inbound_command_listener",
+      "covered_by_preflight_check": "telegram_inbound_capability",
+      "notes": "Reuses talonx_dispatch.telegram_listener.TelegramReplyListener (dispatch_agent=None) -- restored in Task 66A; omitted in Task 65B. See telegram_inbound.py for the single-poller-per-token caveat.",
+      "present_in_piv_runtime": true
+    },
+    {
+      "component": "health_metrics_status",
+      "covered_by_preflight_check": "telegram_inbound_capability",
+      "notes": "The /ping reply itself -- degraded (many fields 'unknown') without a full run_talonx.py DispatchAgent to source pipeline-stage metrics from, since PIV doesn't run brain/core/dispatch.",
+      "present_in_piv_runtime": true
+    },
+    {
+      "component": "reconciliation",
+      "covered_by_preflight_check": "internal_broker_reconciled",
+      "notes": "PaperLifecycle.reconcile(), also run at EOD.",
+      "present_in_piv_runtime": true
+    },
+    {
+      "component": "kill_switch",
+      "covered_by_preflight_check": "kill_switch_available",
+      "notes": "PaperLifecycle.activate_kill_switch(); SessionRunner.run() checks lifecycle.reload() every tick.",
+      "present_in_piv_runtime": true
+    },
+    {
+      "component": "eod_handling",
+      "covered_by_preflight_check": "eod_flatten_configured",
+      "notes": "cli.py eod command; PaperLifecycle.eod_flatten().",
+      "present_in_piv_runtime": true
+    }
+  ],
+  "status": "RUNTIME_PARITY_PASS"
+}

@@ -1,0 +1,39 @@
+Backtest Summary
+----------------
+
+Period:               2025-08-15 08:00:00+00:00 -> 2025-09-12 23:59:00+00:00
+Symbols:              AAPL
+Bars processed:       14,288
+Signals generated:    0
+Signals published:    0
+Trades executed:      0
+Throttle fidelity:    LIMITED (flushed once per 1-minute bar-close, not continuously every throttle_window_seconds)
+
+Execution assumptions
+----------------------
+Entry slippage:       5.0 bps
+Exit slippage:        5.0 bps
+Spread:               10.0 bps
+Same-bar resolution:  STOP_FIRST
+EOD flatten:          ENABLED
+
+Timezone
+--------
+Input timezone:       America/New_York
+Internal timezone:    UTC
+Session timezone:     America/New_York
+
+Reproducibility
+----------------
+git_commit:           3be9eaccdda659f875ee77a06a65a0b1afcb0160
+backtester_version:   0.1.0
+strategy_version:     2ae6216bca70
+config_hash:          3556debe52af
+dataset_hash:         7b14ce2e50df
+run_timestamp:        2026-08-27T01:14:39.396452+00:00
+
+Portfolio disclaimer
+---------------------
+This backtest evaluates TRADE-LEVEL strategy performance (R-multiples per signal). It does NOT model starting capital, position sizing, maximum portfolio exposure, concurrent-position limits, or buying power. Aggregate R/expectancy figures here describe the strategy's per-trade edge, not a realistic portfolio-level return.
+
+No trades were executed -- see `rejections` for the gate funnel (no fabricated metrics below).

@@ -1,0 +1,38 @@
+{
+  "module": "talonx_piv/decision_ledger.py::DecisionRecord",
+  "persisted_as": "{state_dir}/decision_ledger.json (a dict keyed by decision_id, full-file JSON rewrite -- same pattern as LifecycleState)",
+  "fields": {
+    "decision_id": "stable_id(...) -- deterministic per (kind, symbol, bar/signal timestamp); the cross-reference key every other ledger (notification, shadow) links back to",
+    "event_id": "today identical to decision_id (one decision, one record) -- kept as a distinct field so a future many-events-per-decision model does not require a schema change",
+    "session_id": "the live PIV session this decision belongs to (EventBus.session_id)",
+    "trading_date_et": "America/New_York calendar date, via events.trading_date_for",
+    "runtime_sha": "identity.runtime_sha, when available (cli.py always supplies it in production)",
+    "config_hash": "identity.config_hash, when available",
+    "symbol": "uppercased ticker",
+    "timestamp": "decide()'s own ISO timestamp",
+    "market_view": "BULLISH | BEARISH | NEUTRAL",
+    "recommendation": "BUY | HOLD | SELL_TO_CLOSE | NO_TRADE",
+    "reason_codes": "list[str] -- decide()'s own explanatory reason codes, unmodified",
+    "strategy_id": "the QuantSignal's signal_type, when this decision originated from a published signal",
+    "strategy_version": "always null today -- no versioned strategy registry exists",
+    "strategy_approval_status": "UNVALIDATED for every real decision; APPROVED only ever appears in a TEST_FIXTURE_ONLY-labeled record",
+    "data_readiness": "READY | DATA_NOT_READY | PENDING",
+    "data_provider": "reserved, currently always null -- session_runner.py does not yet plumb a provider-identity string through to decide()",
+    "entry_price": "passthrough only, never fabricated (decision_contract's own invariant)",
+    "stop_price": "passthrough only",
+    "target_price": "passthrough only",
+    "horizon": "e.g. INTRADAY_SHORT",
+    "paper_entry_enabled": "the per-ticker PaperEntrySettings value AT DECISION TIME",
+    "evidence_category": "natural | observational | test_probe -- 'natural' for every real DecisionEngine call today (no observational/probe caller wired to this ledger yet -- see remaining_integration_work.md)",
+    "decision_execution_status": "decide()'s OWN ExecutionStatus (NO_ACTION/ENTRY_ELIGIBLE/ENTRY_BLOCKED_PAPER_DISABLED/ENTRY_BLOCKED_UNVALIDATED_STRATEGY/EXIT_ELIGIBLE), fixed at decision time",
+    "notification_status": "NOT_APPLICABLE | PENDING | RETRY | SENT | FAILED | UNCERTAIN -- mutated by NotificationOutbox as delivery proceeds (see alert_delivery_contract.md); NOT_APPLICABLE for a decision classify() found not alert-worthy",
+    "shadow_status": "reserved for a future direct write-back from ShadowLedger (today ShadowLedger is queried independently by decision_id rather than writing back into this field -- see remaining_integration_work.md)",
+    "execution_status": "reserved for a future direct write-back of the real order_intent/apply_broker_update outcome (today that is queried from LifecycleState/piv_events.jsonl by correlation_id, not mirrored into this field -- see remaining_integration_work.md)",
+    "recorded_at": "wall-clock time record() was called"
+  },
+  "invariants": [
+    "record() is idempotent per decision_id -- a duplicate call (restart, retry) returns the EXISTING record unchanged, never overwriting notification_status/shadow_status/etc. already set.",
+    "An eligible BUY (recommendation==BUY) remains recorded even when decision_execution_status==ENTRY_BLOCKED_PAPER_DISABLED or the subsequent order_intent call raises PaperGuardError -- the record reflects the DECISION, not the outcome.",
+    "No level (entry_price/stop_price/target_price) is ever fabricated -- always a direct passthrough from decision_contract.Decision, which itself never invents one."
+  ]
+}

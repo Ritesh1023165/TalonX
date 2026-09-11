@@ -1,0 +1,2 @@
+symbol,window,metric,all_trades,top_winner_removed,note
+AAPL,2025-08-15_to_2025-12-31,trade_count,0,0,zero trades -- outlier/top-winner-removal analysis not computable, not fabricated

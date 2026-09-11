@@ -1,0 +1,15 @@
+{
+  "module": "talonx_piv/observability.py::build_decision_status",
+  "design": "PURE function of on-disk ledger state (decision_ledger.json, notification_outbox.json, shadow_ledger.json, lifecycle_state.json). No separately-mutable status field is written back into DecisionRecord -- the decision_execution_status field (set once, at record() time, from decide()'s own ExecutionStatus) is the ONLY status stored on the immutable decision fact itself. notification_status/shadow_status/execution_status are ALWAYS recomputed fresh by joining the current, authoritative linked records.",
+  "why_this_design_over_write_back": "A write-back design (mutating DecisionRecord.notification_status in place as events arrive) would need explicit event-ordering/regression protection (a late or out-of-order update must not overwrite a more-advanced status with a stale one). A pure recompute has NO such failure mode by construction -- every call reflects exactly the current ledger truth, and two consecutive calls against unchanged state are always identical (idempotent).",
+  "join_keys": {
+    "notification": "NotificationRecord.decision_id (set once, at enqueue() time)",
+    "shadow": "ShadowPosition.decision_id (set once, at consider_entry() time)",
+    "execution": "LifecycleState.intents[*].decision_id (Task 78I Stage 1C addition -- order_intent's new optional decision_id parameter, threaded from decision_engine.py)"
+  },
+  "disclosed_limitation": "NotificationOutbox deduplicates by (ticker, trading_date_et, classification, recommendation, reason_codes) -- NOT by decision_id. A decision whose identical situation was already queued/sent under an EARLIER decision_id (the normal case for 'still bullish but unvalidated on every tick') will show notification_status=NOT_APPLICABLE for itself even though an equivalent alert WAS sent for an earlier, dedup-equivalent decision. This is disclosed, not silently wrong -- the projection never fabricates SENT for a decision it cannot directly trace. See remaining_issues.md.",
+  "late_event_proof": "test_task78i_status_projection.py::test_late_event_updates_status_without_regression -- builds the projection before a fill is persisted (PENDING), persists the fill, rebuilds (FILLED), rebuilds again (identical to the previous rebuild -- no regression).",
+  "restart_proof": "test_task78i_status_projection.py::test_rebuild_after_restart_produces_identical_result -- two independent calls against the same unchanged files produce byte-identical results.",
+  "dashboard_stale_pending_requirement": "Because every call recomputes fresh from disk, a dashboard/report calling build_decision_status can never show a stale PENDING beside completed ledger activity -- the completed activity (e.g. a filled order) is read from the SAME lifecycle_state.json read that would also show it as complete.",
+  "all_tests_passed": true
+}

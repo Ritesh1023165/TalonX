@@ -86,6 +86,17 @@ def _build_parser() -> argparse.ArgumentParser:
         "--progress-interval", type=float, default=2.0,
         help="Seconds between progress updates (default: 2.0). Ignored if --no-progress is set.",
     )
+    parser.add_argument(
+        "--research-telemetry", action="store_true",
+        help="Opt-in, observational-only capture of raw per-bar volatility-gate values "
+             "(<prefix>_research_volatility_telemetry.csv) and per-candidate-signal values "
+             "(<prefix>_research_candidate_telemetry.csv), written alongside the normal report "
+             "files. Off by default -- a run without this flag writes exactly the same artifact "
+             "set as before this option existed, and produces identical trades/signals/rejections "
+             "either way (see tests/test_backtest_research_telemetry.py). Intended for short, "
+             "targeted research windows, not full annual runs -- one row per evaluated bar for "
+             "volatility telemetry adds up fast over months of data.",
+    )
     return parser
 
 
@@ -191,7 +202,7 @@ def main(argv: list[str] | None = None) -> int:
     print("=" * 70)
     print("BACKTEST RESULT")
     print("=" * 70)
-    engine = BacktestEngine(config)
+    engine = BacktestEngine(config, research_telemetry=args.research_telemetry)
     result = engine.run(df, progress_callback=progress_callback, progress_interval_seconds=args.progress_interval)
     print(result_summary_text(result, input_timezone=args.tz, dataset_path=args.data, dataset_symbols=dataset_symbols))
 
@@ -223,6 +234,17 @@ def main(argv: list[str] | None = None) -> int:
     for label, out_path in paths.items():
         print(f"  {label:20s} {out_path}")
     print(f"\nOpen {paths['results_html']} in a browser to view the full report.")
+
+    if args.research_telemetry:
+        out_dir = Path(args.out)
+        vol_path = out_dir / f"{args.prefix}_research_volatility_telemetry.csv"
+        cand_path = out_dir / f"{args.prefix}_research_candidate_telemetry.csv"
+        pd.DataFrame(result.volatility_telemetry).to_csv(vol_path, index=False)
+        pd.DataFrame(result.candidate_telemetry).to_csv(cand_path, index=False)
+        print("\nResearch telemetry written (Task 10, observational only):")
+        print(f"  volatility_telemetry {vol_path} ({len(result.volatility_telemetry):,} rows)")
+        print(f"  candidate_telemetry  {cand_path} ({len(result.candidate_telemetry):,} rows)")
+
     return 0
 
 

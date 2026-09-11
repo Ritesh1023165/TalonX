@@ -1,0 +1,94 @@
+{
+  "task": "Task76S_LONG_ONLY_DECISION_AND_PAPER_EXECUTION_SAFETY",
+  "starting_branch": "research/talonx-strategy-validation",
+  "starting_sha": "b0c11b73b47bb2bb9deece0a374569c75b45abfb",
+  "stages": {
+    "stage0_verify_map_paths": {"status": "PASS", "no_protected_file_dependency": true},
+    "stage1_decision_contract": {"status": "COMPLETE", "module": "talonx_piv/decision_contract.py"},
+    "stage2_paper_entry_setting": {"status": "COMPLETE", "module": "talonx_piv/execution_settings.py"},
+    "stage3_broker_boundary": {"status": "COMPLETE", "module": "talonx_piv/lifecycle.py (order_intent hardened in place)"},
+    "stage4_protective_exit_eod": {"status": "COMPLETE_NO_REGRESSION"},
+    "stage5_deterministic_verification": {"status": "COMPLETE", "new_tests": 72}
+  },
+  "files_changed": {
+    "new": [
+      "talonx_piv/decision_contract.py", "talonx_piv/execution_settings.py",
+      "tests/test_task76s_decision_contract.py", "tests/test_task76s_execution_settings.py",
+      "tests/test_task76s_broker_boundary.py", "tests/test_task76s_protective_exit_eod.py"
+    ],
+    "modified": [
+      "talonx_piv/lifecycle.py", "talonx_piv/cli.py",
+      "tests/test_task64_piv.py", "tests/test_task65b_decision_engine.py",
+      "tests/test_task65b_lifecycle_probe.py", "tests/test_task69q_evidence_upgrade.py"
+    ]
+  },
+  "protected_files_diff": 0,
+  "eod_lifecycle_py_modified": false,
+  "decision_contract": {
+    "distinct_concepts": ["market_view", "recommendation", "strategy_approval_status", "execution_status", "execution_result(external)"],
+    "recommendations": ["BUY", "HOLD", "SELL_TO_CLOSE", "NO_TRADE"],
+    "hard_invariant": "SELL_TO_CLOSE reachable only via has_open_long AND approved_exit_condition -- never from market_view alone",
+    "strategy_approval_default": "UNVALIDATED (no production approval mechanism exists; not invented here)",
+    "levels_invented": false
+  },
+  "paper_entry_setting": {
+    "controls": "new PAPER entries only",
+    "default_when_missing_or_malformed": "disabled",
+    "affects_alpha_or_recommendation": false,
+    "affects_protective_exits_eod_reconciliation": false,
+    "wired_into_production": "talonx_piv/cli.py::runtime() loads {state_dir}/paper_entry_settings.json"
+  },
+  "broker_boundary": {
+    "enforcement_point": "talonx_piv.lifecycle.PaperLifecycle.order_intent",
+    "callers_covered": [
+      "decision_engine.py::_handle_entry", "decision_engine.py::_check_exit",
+      "lifecycle_probe.py::run_piv_lifecycle_probe", "lifecycle_probe.py::close_piv_lifecycle_probe"
+    ],
+    "bulk_flatten_paths_unaffected": [
+      "eod_lifecycle.run_eod_lifecycle", "PaperLifecycle.activate_kill_switch",
+      "PaperLifecycle.eod_flatten", "lifecycle.paper_cleanup"
+    ],
+    "rejection_reasons": [
+      "UNSUPPORTED_ACTION_INTENT", "INVALID_QUANTITY", "UNAUTHORIZED_SOURCE",
+      "ALREADY_HOLDING_NO_PYRAMIDING", "PENDING_ENTRY_EXISTS", "PAPER_ENTRY_DISABLED_FOR_TICKER",
+      "UNEXPECTED_SHORT_BLOCKS_NEW_ENTRIES", "SELL_WHILE_FLAT", "OVERSIZED_OR_DUPLICATE_SELL"
+    ],
+    "shorts_structurally_impossible": true,
+    "no_automatic_short_remediation": true
+  },
+  "tests": {
+    "new_task76s_tests": 72,
+    "new_task76s_all_passed": true,
+    "collection_before_this_task": "2185 collected, 0 errors",
+    "collection_after_this_task": "2257 collected, 0 errors",
+    "full_suite_before_this_task": "2174 passed, 1 skipped, 10 xfailed",
+    "full_suite_after_this_task": "2246 passed, 1 skipped, 10 xfailed, 0 collection errors",
+    "reconciliation": "2246 - 2174 = 72, exactly matching the 72 new tests -- zero unexplained regression",
+    "pre_existing_eod_suite": "tests/test_task72o_eod_lifecycle.py -- 22 passed, unchanged"
+  },
+  "no_real_broker_mutations": true,
+  "no_real_notifications": true,
+  "no_live_session": true,
+  "no_market_data_downloads": true,
+  "no_holdout_access": true,
+  "no_threshold_tuning_or_strategy_search": true,
+  "historical_research_reproducibility": "unaffected -- no archived short-strategy result file touched",
+  "acceptance_criteria": {
+    "runtime_entry_paths_cannot_bypass_long_only": true,
+    "sell_cannot_open_or_reverse_into_short": true,
+    "broker_uncertainty_fails_closed": true,
+    "paper_entry_settings_do_not_alter_decisions_or_protection": true,
+    "unvalidated_strategies_remain_unvalidated": true,
+    "no_alpha_thresholds_or_protected_files_changed": true,
+    "historical_research_behaviour_reproducible": true,
+    "eod_session_identity_correct": true,
+    "all_verification_uses_isolated_fakes": true,
+    "full_collection_zero_errors": true,
+    "no_unexplained_test_regression": true,
+    "all_criteria_met": true
+  },
+  "remaining_blockers": [],
+  "remaining_integration_work_file": "remaining_integration_work.md",
+  "recommended_next_task": "execution-independent alerts and shadow tracking",
+  "commits": ["pending_final_commit"]
+}

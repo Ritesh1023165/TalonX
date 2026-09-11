@@ -10,3 +10,8 @@ yfinance>=0.2.40
 pydantic>=2.0
 redis>=5.0
 feedparser>=6.0
+# Event-intelligence session bucketing (talonx_ingest.intelligence.sessions):
+# NYSE trading-day / holiday / half-day calendar. The module degrades to a
+# weekday-only fallback (flagged) if this is absent, but the live product
+# needs it for correct BMO/RTH/AMC/NON_TRADING_DAY classification.
+exchange-calendars>=4.5

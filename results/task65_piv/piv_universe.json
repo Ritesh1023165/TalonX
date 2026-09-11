@@ -1,0 +1,20 @@
+{
+  "decision": "USE_FULL_35_SYMBOL_UNIVERSE",
+  "piv_test_universe_subset_required": false,
+  "universe_size": 35,
+  "universe": [
+    "AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX",
+    "ADBE", "ADI", "AMAT", "AVGO", "BKNG", "CMCSA", "COST", "CSCO", "GILD", "HON",
+    "INTC", "INTU", "ISRG", "KLAC", "LRCX", "MDLZ", "MU", "NFLX", "PANW", "PEP",
+    "QCOM", "REGN", "SBUX", "TXN", "VRTX"
+  ],
+  "selection_rule": "Identity: the existing, already-frozen 35-symbol PIV universe (talonx_piv.config.DEFAULT_UNIVERSE), unchanged from Task 64. No new selection or filtering was applied for Task 65.",
+  "reasoning": [
+    "The runtime implementation (talonx_piv/session_runner.py) obtains live data via Alpaca's stateless, batched multi-symbol REST endpoints (/v2/stocks/bars/latest and /v2/stocks/trades/latest), not a persistent WebSocket stream subscription.",
+    "Alpaca's documented simultaneous-symbol subscription limits apply to the streaming WebSocket API tiers (a persistent per-connection subscription count), which this design does not use at all.",
+    "A single batched REST call requesting all 35 symbols at once (feed=iex, explicit, no fallback) returned HTTP 200 with all 35 symbols present in the response and zero missing symbols -- see iex_piv_feed_report.json for the raw evidence, captured live before market open on 2026-08-24.",
+    "Because one poll of the full universe costs exactly one HTTP request regardless of universe size, there is no provider- or runtime-imposed ceiling below 35 for this polling design. No PIV_TEST_UNIVERSE subset is required; the largest safe universe (all 35) is used, per the plan's preference for the largest safe universe over an arbitrarily small subset."
+  ],
+  "not_guessed": "This conclusion is based on a live HTTP request against the real Alpaca IEX data endpoint (see iex_piv_feed_report.json), not an assumption about API limits.",
+  "no_optimization": "This selection was made before observing any market outcome for today's session and is independent of price action -- it is the pre-existing frozen universe, not a symbol-picking exercise."
+}

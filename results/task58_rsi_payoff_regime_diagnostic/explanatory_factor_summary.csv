@@ -1,0 +1,6 @@
+rank,factor,descriptive_strength,evidence
+1,prior winner-tail / window concentration,STRONG,remove prior top3: expectancy 0.621R->0.058R; top two windows supplied 75.4% of prior 2R+ R
+2,weaker post-entry favorable excursion,STRONG,median winner MFE 4.240R->2.200R while median realization ratio stayed 0.708->0.718
+3,exit-path mix and longer EOD holds,MODERATE,EOD share 19.6%->36.4%; median hold 25.5->64.5m
+4,HTF / accepted volatility depth,TENTATIVE_NOT_REPRODUCED,prior 2R+ ATR depth was higher in Task54 but not Task53; no stable pre-entry regime separator
+5,wider stop geometry as R denominator,SECONDARY,winner median stop risk 0.461%->0.557%; cost geometry still improved

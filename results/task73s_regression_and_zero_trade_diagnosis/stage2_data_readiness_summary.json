@@ -1,0 +1,18 @@
+{
+  "input_rows_in_window": 67021,
+  "engine_bars_processed": 67002,
+  "boundary_discrepancy_rows": 19,
+  "boundary_discrepancy_pct": 0.03,
+  "boundary_discrepancy_explanation": "minor --start/--end inclusivity difference between the engine's own date filter and this stage's independent pandas-based check; verified immaterial to the zero-trade finding",
+  "duplicate_timestamps": 0,
+  "out_of_order_timestamps": 0,
+  "unexpected_intra_session_gap_bars": 1358,
+  "unexpected_intra_session_gap_pct": 2.03,
+  "has_critical_corruption": false,
+  "available_preroll_bars_before_requested_start": 0,
+  "preroll_explanation": "AAPL.csv's own earliest row is exactly the requested --start date -- no earlier data exists in this file to serve as warmup",
+  "required_warmup_bars_approx": "120-200",
+  "htf_200_bar_warmup_blocking": false,
+  "htf_warmup_evidence": "HTF_DATA_UNAVAILABLE never appears in rejections_by_reason for this real ~1-year dataset (unlike the tiny 2-day fixture repaired in Stage 1) -- the 200-bar 15-min RTH buffer completes within the first ~8 trading days, negligible against the 4.5-month window",
+  "timezone_correctness": "verified: --tz America/New_York correctly interprets the naive source timestamps as US-Eastern before converting to UTC internally; session classification (regular/closed) in the candidate telemetry aligns exactly with 09:30-16:00 ET for 'regular'-tagged rows and falls outside that window for 'closed'-tagged rows (verified per-row, see stage2_zero_trade_diagnosis.md)"
+}

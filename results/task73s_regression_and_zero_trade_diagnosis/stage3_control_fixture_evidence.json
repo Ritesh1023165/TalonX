@@ -1,0 +1,33 @@
+{
+  "label": "TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE",
+  "purpose": "Prove the production replay/decision path CAN reach signal publication -> simulated order -> simulated fill -> simulated exit -> trade ledger when given an eligible, unmodified-gate-clearing setup, and separately demonstrate a REJECTED setup and a READINESS-BLOCKED (insufficient-warmup) setup -- using the frozen, unmodified talonx_quant/{strategy,indicators,consumer,config}.py throughout. All broker interaction is the offline talonx_backtest.TradeSimulator -- no real or PAPER broker is reachable from any code path exercised here.",
+
+  "case_1_eligible_long_setup_reaches_full_pipeline": {
+    "evidence_source": "Stage 1's fixture repair (examples/data/sample_AAPL_trade_1m.csv), reused here as the control-fixture proof rather than duplicated from scratch",
+    "injection_point_disclosure": "A constructed OHLCV price/volume sequence was APPENDED to the existing fixture (not injected as a synthetic QuantSignal object) -- 3 further decline bars then an 8(+3)-bar +0.7%/bar recovery at 5,250 volume, preceded by ~9 trading days of synthetic quiet pre-roll (to satisfy the unmodified 200-bar HTF warmup requirement). This proves the harness reaches every downstream stage GIVEN a real trigger condition constructed via raw price data -- it does NOT prove QuantScanner naturally generates this exact setup from real market data (see stage2_zero_trade_diagnosis.md for the separate, real-data finding that no such setup occurred naturally in the actual AAPL Aug-Dec 2025 window).",
+    "pipeline_stages_proven": {
+      "signal_publication": "signal_type=macd_bullish_cross, direction=bullish, confluence_score=2 (== confluence_score_min, not weakened)",
+      "simulated_order_creation": "entry scheduled at next bar's open per talonx_backtest/engine.py's _PendingEntry mechanism",
+      "simulated_fill": "entry_price=96.1226 (next-bar open, matches TradeSimulator's documented no-lookahead fill rule)",
+      "simulated_exit": "exit_reason=TARGET, exit_price=99.5775 (computed target reached, not DATA_END/forced)",
+      "trade_ledger": "one row in *_trades.csv/*_trades.json with full geometry/R fields populated"
+    },
+    "not_counted_as_profitability_evidence": true,
+    "reference": "results/task73s_regression_and_zero_trade_diagnosis/stage1_fixture_diff_explanation.md"
+  },
+
+  "case_2_rejected_setup": {
+    "evidence_source": "The SAME fixture's own pre-existing bearish macd_bearish_cross candidate at 2026-01-06 15:21:00Z (untouched by Stage 1's repair -- present in both the original and repaired fixture)",
+    "outcome": "confluence_score=1 (< confluence_score_min=2) -> rejected LOW_CONFLUENCE, never published, zero order/fill/ledger entry",
+    "proves": "a candidate that reaches strategy evaluation but fails a gate is correctly excluded from every downstream stage -- the harness does not leak a rejected candidate through to execution"
+  },
+
+  "case_3_readiness_blocked_setup": {
+    "evidence_source": "A fresh, minimal 5-bar synthetic DataFrame (2026-03-02 09:30 ET onward, 1-minute bars) fed directly through the unmodified talonx_quant.indicators.compute_indicators",
+    "outcome": "compute_indicators returns None (insufficient bars for RSI(14)/MACD(12,26,9)/ATR(14) -- far short of the ~14-26 bars those need)",
+    "harness_behavior": "talonx_backtest/engine.py line ~554-556: `if snapshot is None: return  # warm-up -- identical insufficient-data -> no-signal posture as live` -- the bar is silently skipped, generating ZERO candidates and ZERO rejection records (not even logged as a rejection -- a genuinely different, earlier-stage gate than confluence/volatility/session)",
+    "proves": "the harness fails closed on insufficient data exactly like the live system, never fabricating an indicator reading to force an evaluation"
+  },
+
+  "conclusion": "All three cases behave exactly as the unmodified, frozen strategy code specifies. No harness defect was found in any of these three control cases -- see stage3_harness_before_after.md."
+}

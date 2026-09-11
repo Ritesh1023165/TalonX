@@ -445,6 +445,16 @@ class ResearchAgent:
         try:
             await self._client.publish(self.config.reports_channel, report.to_redis_payload())
             self._reports_published += 1
+            # 2026-08-18 /ping observability fix: a genuine "report produced"
+            # counter, deliberately NOT tied to llm_calls -- this fires
+            # uniformly for every report that reaches this point regardless
+            # of whether _generate_report returned an LLM-generated, cached,
+            # stale-fallback, degraded, or cold-start-bypass report (all of
+            # them flow through here), unlike llm_calls, which only
+            # increments on an actual LLM invocation and would silently
+            # undercount fallback/cached/cold-start reports if used as a
+            # "reports generated" proxy.
+            await _incr_metric(self._client, "brain", "reports_generated")
             logger.info(
                 "Report: %s %s (confidence %.2f, %d citations) -- %s",
                 report.ticker, report.verdict.value, report.confidence,
@@ -594,6 +604,12 @@ class ResearchAgent:
         try:
             await self._client.publish(self.config.reports_channel_long_term, report.to_redis_payload())
             self._long_term_reports_published += 1
+            # Same genuine "report produced" counter the intraday path
+            # increments in _publish_report -- shared Redis key (both
+            # horizons count as one "reports_generated" total, matching how
+            # "received" already combines intraday QuantSignal and
+            # FundamentalFactorSignal counts).
+            await _incr_metric(self._client, "brain", "reports_generated")
             logger.info(
                 "Long-term report: %s moat=%s quality=%d/10 fair_value=%.2f -- %s",
                 report.ticker, report.moat_rating.value, report.quality_score,

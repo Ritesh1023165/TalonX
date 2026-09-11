@@ -1,0 +1,2 @@
+symbol,window,cost_scenario,entry_slippage_bps,exit_slippage_bps,spread_bps,trade_count,total_R
+AAPL,2025-08-15_to_2025-12-31,primary_established_cost,5,5,10,0,n/a

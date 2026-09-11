@@ -1,0 +1,26 @@
+{
+  "artifacts": [
+    {
+      "bytes": 2872,
+      "file": "architecture_and_ownership.md",
+      "sha256": "71247f7014663eeaab6f83a5247b66652a0f7d121214b1c6337937175efba49f"
+    },
+    {
+      "bytes": 983,
+      "file": "handoff.md",
+      "sha256": "b98f45381c9308ec500876f8f2194580a026b895354c737506a67000d0afc8f4"
+    },
+    {
+      "bytes": 1198,
+      "file": "negative_controls.md",
+      "sha256": "efdcb787b1e65a4edf9e6f493e94337cc713c84abfe8cd800dfb1895a25ce525"
+    },
+    {
+      "bytes": 2323,
+      "file": "verification_report.md",
+      "sha256": "bba940f09036d6c324a96c7950fb430c61dc9c70d7cb4cd3f88bf544d9da9c4e"
+    }
+  ],
+  "starting_sha": "9c5d555bf3dc80551505dfec8f9b0961af71964c",
+  "task": "Task 82 Runtime Isolation"
+}

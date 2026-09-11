@@ -55,6 +55,7 @@ def poller(monkeypatch) -> YFinancePoller:
 
 @pytest.mark.asyncio
 async def test_healthy_cycle_does_not_reset_session(poller, monkeypatch):
+    monkeypatch.setattr(poll_module, "is_premarket_window", lambda: False)
     symbols = ["AAPL", "MSFT", "NVDA"]
     monkeypatch.setattr(poller, "_fetch_snapshots", lambda syms: [_event(s) for s in syms])
     reset_mock = MagicMock()
@@ -74,6 +75,7 @@ async def test_healthy_cycle_does_not_reset_session(poller, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_degraded_cycle_is_not_silently_treated_as_healthy(poller, monkeypatch):
+    monkeypatch.setattr(poll_module, "is_premarket_window", lambda: False)
     # 3 symbols requested, only 1 comes back -- 67% failure, above the 50% threshold.
     symbols = ["AAPL", "MSFT", "NVDA"]
     monkeypatch.setattr(poller, "_fetch_snapshots", lambda syms: [_event("AAPL")])
@@ -93,6 +95,21 @@ async def test_degraded_cycle_is_not_silently_treated_as_healthy(poller, monkeyp
     # normal poll-interval sleep (_sleep_or_stop was never reached because
     # the degraded-cycle branch `continue`s past it).
     poller._sleep_or_stop.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_premarket_cycle_fetches_but_suppresses_non_authoritative_callbacks(poller, monkeypatch):
+    symbols = ["AAPL", "MSFT", "NVDA"]
+    fetched = MagicMock(return_value=[_event(s) for s in symbols])
+    monkeypatch.setattr(poller, "_fetch_snapshots", fetched)
+    monkeypatch.setattr(poll_module, "is_premarket_window", lambda: True)
+    monkeypatch.setattr(poller, "_sleep_or_stop", AsyncMock(side_effect=lambda _: poller.stop()))
+    on_event = AsyncMock()
+
+    await poller.stream(symbols, on_event)
+
+    fetched.assert_called_once_with(symbols)
+    on_event.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -397,6 +414,118 @@ def test_fetch_snapshots_distinguishes_provider_exception_from_no_usable_row(mon
 
     assert exception_path_events == []
     assert no_usable_row_events == []
+
+
+# --- 2026-08-18 /ping observability completion: provider failure/retry/
+# rate-limit counters -- genuine, in-process, directly testable without any
+# real network or event loop (requests_failed/rate_limited are incremented
+# as plain instance-attribute writes inside the sync _fetch_snapshots). ---
+
+def test_fetch_snapshots_successful_poll_does_not_increment_failures(monkeypatch):
+    poller = YFinancePoller(_config())
+    _install_fake_yfinance(monkeypatch, {"AAPL": _FakeTicker(_FakeFastInfo(150.0, 500_000.0))})
+
+    poller._fetch_snapshots(["AAPL"])
+
+    assert poller.requests_failed == 0
+    assert poller.rate_limited == 0
+
+
+def test_fetch_snapshots_provider_exception_increments_requests_failed(monkeypatch):
+    poller = YFinancePoller(_config())
+    _install_fake_yfinance(monkeypatch, {"AAPL": _FakeTicker(raise_on_access=True)})
+
+    poller._fetch_snapshots(["AAPL"])
+
+    assert poller.requests_failed == 1
+    assert poller.rate_limited == 0
+
+
+def test_fetch_snapshots_no_usable_row_does_not_count_as_a_failure(monkeypatch):
+    # Ordinary "no new bar" response (fast_info returns cleanly, no
+    # last_price yet) must NOT be counted as a provider failure.
+    poller = YFinancePoller(_config())
+    _install_fake_yfinance(monkeypatch, {"AAPL": _FakeTicker(_FakeFastInfo(last_price=None, last_volume=500_000.0))})
+
+    poller._fetch_snapshots(["AAPL"])
+
+    assert poller.requests_failed == 0
+
+
+def test_fetch_snapshots_rate_limit_exception_increments_rate_limited(monkeypatch):
+    class _RateLimitedTicker(_FakeTicker):
+        @property
+        def fast_info(self):
+            raise ConnectionError("HTTP Error 429: Too Many Requests")
+
+    poller = YFinancePoller(_config())
+    _install_fake_yfinance(monkeypatch, {"AAPL": _RateLimitedTicker()})
+
+    poller._fetch_snapshots(["AAPL"])
+
+    assert poller.requests_failed == 1
+    assert poller.rate_limited == 1
+
+
+def test_fetch_snapshots_non_rate_limit_exception_does_not_count_as_rate_limited(monkeypatch):
+    poller = YFinancePoller(_config())
+    _install_fake_yfinance(monkeypatch, {"AAPL": _FakeTicker(raise_on_access=True)})  # plain ConnectionError
+
+    poller._fetch_snapshots(["AAPL"])
+
+    assert poller.requests_failed == 1
+    assert poller.rate_limited == 0
+
+
+@pytest.mark.asyncio
+async def test_stream_flushes_provider_failures_to_metrics_publisher(poller, monkeypatch):
+    metrics_publisher = AsyncMock()
+    poller._metrics_publisher = metrics_publisher
+
+    def fake_fetch(syms):
+        poller._requests_failed += 2  # simulates 2 per-symbol exceptions this cycle
+        return [_event(s) for s in syms]  # every symbol still "succeeds" overall -- a healthy, not degraded, cycle
+
+    monkeypatch.setattr(poller, "_fetch_snapshots", fake_fetch)
+    monkeypatch.setattr(poller, "_sleep_or_stop", AsyncMock(side_effect=lambda s: poller.stop()))
+
+    await poller.stream(["AAPL", "MSFT", "NVDA"], AsyncMock())
+
+    failure_calls = [c for c in metrics_publisher.incr_metric.await_args_list if c.args[1] == "provider_requests_failed"]
+    assert len(failure_calls) == 1
+    assert failure_calls[0].args[2] == 2
+
+
+@pytest.mark.asyncio
+async def test_stream_successful_cycle_does_not_flush_any_provider_metric(poller, monkeypatch):
+    metrics_publisher = AsyncMock()
+    poller._metrics_publisher = metrics_publisher
+
+    monkeypatch.setattr(poller, "_fetch_snapshots", lambda syms: [_event(s) for s in syms])
+    monkeypatch.setattr(poller, "_sleep_or_stop", AsyncMock(side_effect=lambda s: poller.stop()))
+
+    await poller.stream(["AAPL"], AsyncMock())
+
+    metrics_publisher.incr_metric.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_stream_hard_failure_flushes_a_retry_to_metrics_publisher(poller, monkeypatch):
+    metrics_publisher = AsyncMock()
+    poller._metrics_publisher = metrics_publisher
+
+    def raise_error(syms):
+        poller.stop()  # stop after this one failed cycle
+        raise ConnectionError("cycle failed")
+
+    monkeypatch.setattr(poller, "_fetch_snapshots", raise_error)
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+
+    await poller.stream(["AAPL"], AsyncMock())
+
+    retry_calls = [c for c in metrics_publisher.incr_metric.await_args_list if c.args[1] == "provider_retries"]
+    assert len(retry_calls) == 1
+    assert retry_calls[0].args[2] == 1
 
 
 def test_fetch_snapshots_one_ticker_failure_does_not_break_others(monkeypatch):

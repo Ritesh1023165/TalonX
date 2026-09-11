@@ -1,0 +1,53 @@
+{
+  "task": "Task77I_INTEGRATED_SAFETY_ALERTS_SHADOW_OBSERVABILITY",
+  "starting_branch": "research/talonx-strategy-validation",
+  "starting_sha": "2c597c0e38077c390f1c4280d84dc5816e6a4d97",
+  "stages": {
+    "stage0_baseline_and_plan": "COMPLETE",
+    "stage1_runtime_safety": "COMPLETE",
+    "stage2_alerts": "COMPLETE",
+    "stage3_shadow": "COMPLETE",
+    "stage4_observability": "COMPLETE"
+  },
+  "commit_structure_note": "Stages 1-3's runtime CODE (lifecycle.py fixes, decision_contract wiring, and all three new ledger modules) landed together in one commit (3a7e404) because DecisionEngine's three-independent-branch design is one cohesive integrated change; each stage's own commit thereafter carries that stage's distinct evidence/documentation/additional tests. See stage_status.json's own note for the full rationale.",
+  "new_modules": [
+    "talonx_piv/decision_ledger.py", "talonx_piv/notification_outbox.py",
+    "talonx_piv/shadow_ledger.py", "talonx_piv/observability.py"
+  ],
+  "modified_modules": [
+    "talonx_piv/lifecycle.py", "talonx_piv/decision_engine.py", "talonx_piv/cli.py",
+    "talonx_piv/session_runner.py", "talonx_piv/reporting.py"
+  ],
+  "protected_files_diff_since_2c597c0": 0,
+  "eod_lifecycle_py_diff_since_2c597c0": 0,
+  "key_behavior_change": "A real, natural QuantScanner BULLISH signal can no longer reach order_intent at all -- strategy_approval_status is hardcoded UNVALIDATED for every real caller. Shadow tracking is deliberately gated on the same actionability bar, so it is also currently inert for real traffic (by design, not a bug -- see shadow_simulation_policy.md).",
+  "partial_fill_bug_fixed": true,
+  "timeout_uncertainty_handled": true,
+  "three_independent_branches_proven": true,
+  "no_real_broker_mutations": true,
+  "no_real_notifications": true,
+  "no_live_session": true,
+  "no_holdout_access": true,
+  "no_alpha_tuning": true,
+  "dashboard_redesign": false,
+  "new_test_files": [
+    "tests/test_task77i_runtime_safety.py", "tests/test_task77i_decision_ledger.py",
+    "tests/test_task77i_notification_outbox.py", "tests/test_task77i_shadow_ledger.py",
+    "tests/test_task77i_decision_engine_wiring.py", "tests/test_task77i_alert_shadow_independence.py",
+    "tests/test_task77i_observability.py", "tests/test_task77i_end_to_end.py"
+  ],
+  "modified_test_files": [
+    "tests/test_task65b_decision_engine.py", "tests/test_task76s_broker_boundary.py",
+    "tests/test_task76s_protective_exit_eod.py"
+  ],
+  "tests": {
+    "collection_before_this_task": "2257 collected, 0 errors",
+    "collection_after_this_task": "2327 collected, 0 errors",
+    "full_suite_before_this_task": "2246 passed, 1 skipped, 10 xfailed",
+    "full_suite_after_this_task": "2316 passed, 1 skipped, 10 xfailed, 0 failures",
+    "reconciliation": "2316 - 2246 = 70, exactly matching 69 new-file tests + 1 net addition in test_task76s_broker_boundary.py -- zero unexplained regression"
+  },
+  "remaining_blockers": [],
+  "recommended_next_task": "full application orchestration and offline failure/recovery rehearsal",
+  "commits": ["3a7e404", "bac0845", "b82f3c9", "pending_stage4_commit"]
+}

@@ -1,0 +1,25 @@
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-828/test_cli_start_refuses_on_miss0')
+capsys = <_pytest.capture.CaptureFixture object at 0x000001F5C7B32570>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001F5C7B327B0>
+
+    def test_cli_start_refuses_on_missing_identity_with_exposure(tmp_path, capsys, monkeypatch):
+        from talonx_piv import cli
+        monkeypatch.setenv("TALONX_PIV_STATE_DIR", str(tmp_path))
+        monkeypatch.setenv("TALONX_PIV_APPROVED_SHA", "abc")
+        _write_lifecycle(tmp_path, positions=_OPEN_POS)
+    
+        rc = cli.main(["start", "--approved-sha", "abc", "--no-live-loop"])
+        err = capsys.readouterr().err
+        assert rc == 2
+>       assert "PIV_BLOCKED_RECOVERY_REQUIRED" in err
+E       AssertionError: assert 'PIV_BLOCKED_RECOVERY_REQUIRED' in 'PIV_BLOCKED\n'
+
+tests\test_task81_r1_missing_identity_recovery.py:206: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_task81_r1_missing_identity_recovery.py::test_missing_identity_with_open_position_requires_recovery
+FAILED tests/test_task81_r1_missing_identity_recovery.py::test_recovery_required_does_not_write_identity
+FAILED tests/test_task81_r1_missing_identity_recovery.py::test_assessment_fields_are_consistent
+FAILED tests/test_task81_r1_missing_identity_recovery.py::test_recovery_matrix
+FAILED tests/test_task81_r1_missing_identity_recovery.py::test_cli_start_refuses_on_missing_identity_with_exposure
+5 failed, 3 passed in 9.02s

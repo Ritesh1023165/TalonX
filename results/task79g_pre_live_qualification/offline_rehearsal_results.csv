@@ -1,0 +1,18 @@
+required_scenario,mapped_test(s),result,notes
+healthy operation,test_task78i_stage5_rehearsal.py::test_01_clean_startup_through_readiness,PASSED,re-run this task as part of the full suite (2412/2412 non-skipped/xfailed passed)
+PAPER entry disabled,test_task78i_stage5_rehearsal.py::test_03_and_04_approved_fixture_paper_disabled_then_enabled + test_task77i_decision_engine_wiring.py::test_paper_entry_disabled_preserves_buy_decision_but_blocks_broker_entry,PASSED,
+unvalidated candidate,test_task78i_stage5_rehearsal.py::test_02_unvalidated_configuration_entry_blocked + test_task77i_decision_engine_wiring.py::test_unvalidated_strategy_cannot_generate_actionable_buy_even_when_approved_and_bullish_market,PASSED,
+bearish signal without a holding,test_task77i_decision_engine_wiring.py::test_bearish_while_flat_cannot_create_a_short + test_task78i_stage5_rehearsal.py::test_04 (bearish covered structurally by decide()),PASSED,
+authorised exit with entry disabled,test_task76s_protective_exit_eod.py::test_disable_entries_after_opening_protective_exit_still_works,PASSED,
+stale/not-ready data,test_task65_session_runner.py::test_missing_opening_minute_marks_symbol_data_not_ready + test_task78i_stage5_rehearsal.py::test_08_sparse_data_and_recovery,PASSED,
+Gemini timeout and malicious response,test_task78i_gemini_enrichment.py::test_timeout_resolves_timeout_status + test_injected_action_price_approval_fields_are_never_extracted_or_stored + test_task78i_stage5_rehearsal.py::test_07_gemini_timeout_malformed_and_injection,PASSED,
+notification uncertainty/retry,test_task77i_notification_outbox.py + test_task78i_stage5_rehearsal.py::test_06_notification_failure_and_restart_recovery,PASSED,exercises the Task78I Stage5 UNCERTAIN-retry fix
+broker timeout,test_task77i_runtime_safety.py::test_timeout_marks_order_unconfirmed_not_terminal + test_task78i_stage5_rehearsal.py::test_10/test_12,PASSED,
+partial fills,test_task76s_broker_boundary.py partial-fill tests (2) + test_task78i_stage5_rehearsal.py::test_10_partial_fills_competing_exits_uncertain_submission,PASSED,
+duplicate events,test_task76s_broker_boundary.py duplicate-intent-id tests,PASSED,
+lock conflict/crash,test_task78i_execution_ownership.py::test_duplicate_process_competing_for_the_same_account_ownership_is_denied + test_abrupt_process_kill_releases_the_os_lock_crash_safety (genuine subprocess) + test_task78i_stage5_rehearsal.py::test_11/test_20,PASSED,genuine competing OS subprocess, not threads
+stale session state,test_task78i_stage5_rehearsal.py::test_18_cross_date_state_rejected + test_task72o_eod_lifecycle.py::test_cross_date_state_rejected,PASSED,
+sparse IEX bars,test_task71s_r1_live_iex_semantics.py + test_task78i_stage5_rehearsal.py::test_08,PASSED,
+EOD re-entry,test_task72o_eod_lifecycle.py::test_delayed_broker_convergence_then_idempotent_retry_passes + test_task78i_stage5_rehearsal.py::test_17_interrupted_eod_then_safe_recovery,PASSED,
+dashboard/ledger reconciliation,test_task78i_dashboard_integration.py + test_task78i_stage5_rehearsal.py::test_19_full_reconciliation,PASSED,
+full_suite_reconciliation,pytest -q (full repository),PASSED,"2412 passed, 1 skipped, 10 xfailed, 0 failures -- exact match to Task 78I's reported 2,412/1/10 -- collection 2423, 0 errors, exact match"

@@ -1,0 +1,21 @@
+{
+  "task": "Task71S_R1_LIVE_IEX_SEMANTICS",
+  "claim": "Repeated ordinary sparsity never generates a notification storm, for either the raw feed-observability event or the new decision-relevant one, and events remain distinguishable across different symbols despite EventBus's own Telegram-dedup key not including `symbol`.",
+  "mechanisms": {
+    "per_episode_dedup_stale_flagged": {
+      "description": "session_runner.py's pre-existing `_stale_flagged` set (unmodified) ensures STALE_DATA (and now the paired DATA_NOT_READY) fires exactly ONCE per stale episode, not once per tick while still stale.",
+      "test_evidence": "tests/test_task65_session_runner.py::test_stale_data_flagged_once_when_no_new_bar_arrives (pre-existing, still passing byte-for-byte unchanged)"
+    },
+    "quiet_tick_never_emits": {
+      "description": "FreshnessTracker.observe_quiet_tick (called for every ordinary 'no new bar yet, still within threshold' tick) returns a classification value but session_runner.py never emits an event from it -- only increments a rolling counter. However many quiet ticks occur (REGN-scale: hundreds per day), zero events result.",
+      "test_evidence": "tests/test_task71s_r1_live_iex_semantics.py::test_integration_quiet_tick_never_emits_any_event, test_repetitive_sparse_intervals_do_not_generate_notification_storms"
+    },
+    "eventbus_telegram_dedup_key_gap_and_mitigation": {
+      "description": "EventBus._key(event) builds its Telegram dedup key from (event, correlation_id, broker_order_id, status, reason) -- notably NOT `symbol`. This is a pre-existing characteristic of talonx_piv/events.py, not introduced by this task. Without mitigation, two DIFFERENT symbols emitting the new DATA_NOT_READY(reason='INSUFFICIENT_RECENT_IEX_PRINTS', status='EXCLUDED_FROM_DECISION_PATH') event with the IDENTICAL literal reason string would collide: only the FIRST symbol's Telegram send would go through; the second would be locally logged (EventBus.emit always writes to piv_events.jsonl regardless of Telegram dedup) but its Telegram notification would be silently suppressed.",
+      "mitigation": "This task's new DATA_NOT_READY event embeds the symbol directly in `reason` (f'INSUFFICIENT_RECENT_IEX_PRINTS:{symbol}'), making each symbol's reason string distinct and therefore its own separate Telegram-dedup key -- avoiding a NEW instance of this cross-symbol collision for the event this task adds.",
+      "scope_note": "This task does NOT modify EventBus._key itself (out of scope -- it is shared by every other event type in the system and a broader fix was judged too large a change for 'the smallest safe correction'). Pre-existing events that share a literal reason/status across symbols (e.g. readiness.py's own DATA_NOT_READY at 10:00 ET finalization, reason='MISSING_REQUIRED_OPENING_MINUTES' for every not-ready symbol) retain this same pre-existing characteristic, unrelated to and unchanged by this task.",
+      "recorded_as": "remaining_stabilization_issues.md item 3"
+    }
+  },
+  "conclusion": "No notification storm is possible from ordinary sparsity: quiet ticks never emit; stale/recovery transitions emit at most once per episode per symbol via the pre-existing dedup; and this task's own new event type avoids introducing a NEW cross-symbol Telegram-suppression collision by embedding the symbol in its reason string."
+}

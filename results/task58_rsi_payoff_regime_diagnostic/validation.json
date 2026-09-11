@@ -1,0 +1,81 @@
+{
+  "source_reproduction": [
+    {
+      "task": "Task53",
+      "actual": {
+        "n": 17,
+        "gross": 6.205053729136223,
+        "gross_expectancy": 0.3650031605374249,
+        "winners": 4,
+        "win_rate": 0.23529411764705882,
+        "average_winning_R": 4.801263432284056,
+        "average_losing_R": -1.0,
+        "net5": 0.5431955058463398
+      },
+      "expected": {
+        "n": 17,
+        "gross": 6.205053729136223,
+        "net5": 0.5431955058463391
+      },
+      "passed": true
+    },
+    {
+      "task": "Task54",
+      "actual": {
+        "n": 39,
+        "gross": 28.573458557795476,
+        "gross_expectancy": 0.7326527835332174,
+        "winners": 15,
+        "win_rate": 0.38461538461538464,
+        "average_winning_R": 3.504897237186364,
+        "average_losing_R": -1.0,
+        "net5": 15.303118681689195
+      },
+      "expected": {
+        "n": 39,
+        "gross": 28.573458557795476,
+        "net5": 15.303118681690709
+      },
+      "passed": true
+    },
+    {
+      "task": "Task56",
+      "actual": {
+        "n": 44,
+        "gross": 0.7226350248619948,
+        "gross_expectancy": 0.016423523292318064,
+        "winners": 15,
+        "win_rate": 0.3409090909090909,
+        "average_winning_R": 1.507256953462792,
+        "average_losing_R": -0.7816506884671387,
+        "net5": -10.544234787014368
+      },
+      "expected": {
+        "n": 44,
+        "gross": 0.7226350248619953,
+        "net5": -10.544234787013044
+      },
+      "passed": true
+    }
+  ],
+  "all_source_reproduction_passed": true,
+  "rsi_counts": {
+    "Task53": 17,
+    "Task54": 39,
+    "Task56": 44
+  },
+  "duplicate_source_trades": 0,
+  "family_mapping": "signal_type prefix rsi_ => RSI; 100/100",
+  "max_abs_mfe_price_reconstruction_diff": 9.999999997489795e-05,
+  "max_abs_mae_price_reconstruction_diff": 0.0,
+  "mfe_mae_price_precision_tolerance": 0.00011,
+  "mfe_mae_causally_bounded": true,
+  "forward_horizons_never_cross_session_close": true,
+  "strategy_replay_occurred": false,
+  "new_market_data_downloaded": false,
+  "strategy_or_config_modified_by_script": false,
+  "deterministic_reproduction": {
+    "verified": true,
+    "method": "two consecutive full runs; 17/17 artifact SHA-256 hashes identical"
+  }
+}

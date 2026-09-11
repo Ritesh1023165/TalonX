@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "candidate": "ORPB_V1",
+  "always_required": [
+    "pre_replay_gates.json",
+    "validation_summary.json",
+    "validation_summary.md",
+    "validation_conclusion.md"
+  ],
+  "blocked_only": [
+    "validation_blocker.json"
+  ],
+  "after_all_gates_pass": {
+    "files": [
+      "trades.csv",
+      "rejections.csv",
+      "aggregate_economics.json",
+      "window_economics.csv",
+      "symbol_economics.csv",
+      "time_bucket_economics.csv",
+      "geometry_cost_economics.csv",
+      "exit_path_economics.csv",
+      "excursion.csv",
+      "winner_loser_sensitivity.csv",
+      "concentration.json",
+      "parity_diagnostics.json",
+      "criteria.json",
+      "replay_manifest.json"
+    ],
+    "trade_columns": [
+      "window",
+      "ticker",
+      "breakout_timestamp",
+      "confirmation_timestamp",
+      "entry_timestamp",
+      "entry_price",
+      "stop_price",
+      "exit_timestamp",
+      "exit_price",
+      "exit_reason",
+      "gross_r",
+      "actual_fill_feasibility_cost_r_5bps",
+      "actual_cost_r_5bps",
+      "net_r_5bps",
+      "mfe_r",
+      "mae_r",
+      "holding_minutes"
+    ],
+    "identical_trade_accounting": [
+      "0bps",
+      "5bps_per_side"
+    ]
+  },
+  "classification_enum": [
+    "ORPB_V1_REPLICATION_REQUIRED",
+    "ORPB_V1_REJECTED",
+    "VALIDATION_BLOCKED"
+  ]
+}
