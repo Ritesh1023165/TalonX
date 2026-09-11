@@ -463,17 +463,42 @@ _DIGEST_META_KEY = "last_digest_bucket"
 _DIGEST_SENT_AT_KEY = "last_digest_sent_utc"
 
 
+def _digest_row_summary(r) -> str:
+    """Task 118A P3: a plain-text, event-facts-only summary line for one
+    digest row -- ticker (by the caller), a concise event description (the
+    row's OWN event_id, never invented), an observation time (the row's own
+    enqueue time -- labelled as such, not claimed to be the SEC acceptance
+    time), and a source link if the row carries one. This digest message is
+    sent with parse_mode=None (plain text): it must NEVER embed HTML markup
+    -- r.text (rendered for parse_mode="HTML" individual card sends, and
+    starting with a literal "<b>...</b>" band line) is deliberately never
+    used here, unlike the previous implementation."""
+    from talonx_ingest.intelligence.delivery.config import EVENT_TYPE_LABEL
+    from talonx_ingest.intelligence.domain import EventType
+
+    etype_raw = r.event_id.rsplit(":", 1)[-1] if r.event_id else None
+    try:
+        desc = EVENT_TYPE_LABEL.get(EventType(etype_raw), etype_raw or "event")
+    except ValueError:
+        desc = etype_raw or "event"
+    when = r.enqueued_at_utc.strftime("%Y-%m-%dT%H:%MZ") if r.enqueued_at_utc else "time unknown"
+    link = f" {r.evidence_urls[0]}" if getattr(r, "evidence_urls", None) else ""
+    return f"{desc} (enqueued {when}){link}"
+
+
 def _digest_text_from_rows(rows: list, now: datetime) -> str:
     from talonx_ingest.intelligence.delivery.config import MAX_DIGEST_ROWS
 
     rank = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, None: 4}
     srt = sorted(rows, key=lambda r: (rank.get(r.band, 4), r.symbol, r.event_id))
     shown = srt[:MAX_DIGEST_ROWS]
+    # Task 118A P3: this batch is being sent right now (the caller only
+    # reaches this function once `due` is True) -- "held" described rows
+    # still PENDING elsewhere in the outbox, which these are not.
     lines = [f"TalonX Intelligence digest - {now.strftime('%Y-%m-%dT%H:%MZ')}",
-             f"{len(srt)} held event(s)"]
+             f"{len(srt)} event(s) in this digest"]
     for r in shown:
-        first_line = (r.text or "").splitlines()[0][:80] if r.text else r.symbol
-        lines.append(f"- {r.symbol}: {first_line}")
+        lines.append(f"- {r.symbol}: {_digest_row_summary(r)}")
     if len(srt) > len(shown):
         lines.append(f"+ {len(srt) - len(shown)} more - open the dashboard")
     lines.append("Informational only - not a recommendation.")

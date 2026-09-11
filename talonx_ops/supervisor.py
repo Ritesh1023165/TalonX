@@ -866,7 +866,13 @@ def _status_snapshot() -> dict[str, Any]:
         st.close()
         out["eod_latest"] = latest.to_dict() if latest else None
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        out["eod_reconciled_today"] = bool(latest and latest.session_date == today)
+        # Task 118A P3: a same-day record whose own status is not a
+        # completed reconciliation (e.g. PARTIAL, from an intraday/pre-open
+        # shutdown snapshot) must never read as "today already reconciled"
+        # -- matches the same fix in authoritative_read_model.py.
+        out["eod_reconciled_today"] = bool(
+            latest and latest.session_date == today
+            and latest.status in ("RECONCILED", "RECONCILED_WITH_MISMATCH"))
     except Exception as exc:  # noqa: BLE001
         out["eod_error"] = repr(exc)
 

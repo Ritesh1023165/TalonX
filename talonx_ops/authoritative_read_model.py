@@ -650,9 +650,20 @@ class AuthoritativeReadModel:
                 {"sessions_recorded": 0},
                 note="store exists but no session has been reconciled yet")
         rec = (today or latest).to_dict()
+        # Task 118A P3: "today_reconciled" previously meant only "a record
+        # exists for today's date" -- true even for a PARTIAL snapshot
+        # persisted by an intraday/pre-open shutdown, well before the
+        # actual session close. That reads as "today's EOD already
+        # happened" to anyone not also inspecting the nested `status`
+        # field. `today_has_a_record` keeps that original (accurate, if
+        # differently named) meaning; `today_reconciled` now means what it
+        # says -- a genuinely completed reconciliation for today.
+        _today_status = rec["status"] if today is not None else None
         vals = {
             "latest_session": latest.session_date,
-            "today_reconciled": today is not None,
+            "today_has_a_record": today is not None,
+            "today_record_status": _today_status,
+            "today_reconciled": _today_status in ("RECONCILED", "RECONCILED_WITH_MISMATCH"),
             "status": rec["status"],
             "original_paper": rec["original_paper"],
             "experimental_paper": rec["experimental_paper"],

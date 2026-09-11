@@ -194,6 +194,22 @@ class ExperimentalAlertStore:
             )
             self._conn.commit()
 
+    def get_open_trade_id(self, symbol: str) -> str | None:
+        """Task 118A P1: find the still-open (``exit IS NULL``) BUY row's
+        ``trade_id`` for ``symbol``, so an exit can be recorded via
+        ``update_trade`` on the SAME row -- never as a second, separately
+        id'd row (this table models one round trip per row: BUY fields at
+        insert, exit fields filled in later). Most-recent-first defensively,
+        though the store never allows two open positions for one symbol."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT trade_id FROM experimental_trades "
+                "WHERE symbol=? AND side='BUY' AND exit IS NULL "
+                "ORDER BY created_at DESC LIMIT 1",
+                (symbol.upper(),),
+            ).fetchone()
+        return row[0] if row else None
+
     def record_radar(self, row: dict) -> bool:
         r = {k: row.get(k) for k in (
             "radar_id", "symbol", "company", "reporting_when", "current_price",

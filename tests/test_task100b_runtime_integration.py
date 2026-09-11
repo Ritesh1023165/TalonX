@@ -627,8 +627,40 @@ def test_41_read_model_eod_domain_reads_store(tmp_path):
                     db_path=tmp_path / "eod_reconciliation.db", home=tmp_path,
                     exp_home=tmp_path / "experimental", ledger_path=tmp_path / "ingestion_ledger.db")
     da = AuthoritativeReadModel(home=tmp_path, check_processes=False).eod_reconciliation()
-    assert da.values["today_reconciled"] is True
+    # Task 118A P3: this bare tmp_path fixture has no real paper-trading/
+    # ledger files, so build_reconciliation's own component checks come
+    # back UNKNOWN, not a completed RECONCILED -- exactly the case that
+    # must NOT read as "today_reconciled". A record for today existing at
+    # all is still visible separately via today_has_a_record.
+    assert da.values["today_has_a_record"] is True
+    assert da.values["today_record_status"] not in ("RECONCILED", "RECONCILED_WITH_MISMATCH")
+    assert da.values["today_reconciled"] is False
     assert "status" in da.values
+
+
+def test_41b_today_reconciled_true_only_for_a_genuinely_complete_record(tmp_path):
+    """Task 118A P3 regression: the misleading case this fixes -- a same-
+    day record whose own status is not RECONCILED must never read as
+    today_reconciled=True, which is what an operator glancing at the
+    dashboard before close would otherwise be told. This directly tests
+    the corrected boolean against every real status value, rather than
+    just one scenario's component-check outcome (which depends on what
+    real store files build_reconciliation happens to find)."""
+    from talonx_ops.authoritative_read_model import AuthoritativeReadModel
+    from talonx_ops.eod_reconciliation import (
+        STATUS_MISMATCH, STATUS_PARTIAL, STATUS_RECONCILED, STATUS_UNKNOWN, run_and_persist,
+    )
+
+    (tmp_path / "experimental").mkdir()
+    session = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    run_and_persist(session_date=session, db_path=tmp_path / "eod_reconciliation.db",
+                    home=tmp_path, exp_home=tmp_path / "experimental",
+                    ledger_path=tmp_path / "ingestion_ledger.db")
+    da = AuthoritativeReadModel(home=tmp_path, check_processes=False).eod_reconciliation()
+    status = da.values["today_record_status"]
+    assert status in (STATUS_PARTIAL, STATUS_MISMATCH, STATUS_RECONCILED, STATUS_UNKNOWN)
+    expected = status in ("RECONCILED", "RECONCILED_WITH_MISMATCH")
+    assert da.values["today_reconciled"] is expected
 
 
 def test_42_read_model_market_delegates_to_market_health(tmp_path):

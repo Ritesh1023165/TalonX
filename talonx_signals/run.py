@@ -33,6 +33,7 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import signal
 import sys
 from datetime import datetime, timedelta, timezone
@@ -61,6 +62,13 @@ logger = logging.getLogger("talonx_signals.run")
 
 _CONTROL_SIGNALS = "talonx:signals:quant"
 _CONTROL_REJECTED = "talonx:quant:rejected"
+
+# Task 118A P1: a market:stream tick older than this (or with a negative
+# age -- clock skew) is treated as stale for EXIT purposes -- an explicit
+# skip, never an invented fill. Kept generous relative to the live
+# producer's own publish cadence so a normal short gap in ticks never
+# false-trips this.
+_EXIT_TICK_MAX_AGE_SECONDS = int(os.getenv("TALONX_EXPERIMENTAL_EXIT_MAX_TICK_AGE_S", "300"))
 
 
 def _parse_event_ts(raw: str | None) -> datetime | None:
@@ -195,6 +203,67 @@ class ExperimentalLane:
                         symbol, trade["entry"], trade["admitted_by"])
 
     # ------------------------------------------------------------------
+    # Task 118A P1 -- the existing check_exits()/flatten_all() exit
+    # lifecycle (talonx_signals.experimental_paper.ExperimentalPaperEngine)
+    # was never invoked from this loop. Wired here, on every live market
+    # tick, mirroring talonx_paper.consumer._handle_market_tick's proven
+    # pattern (Original's own, already-live stop/target exit check) --
+    # independent of entry-signal generation, entry gates, and new-entry
+    # lockouts: this runs for ANY symbol with an open Experimental
+    # position, whether or not that tick also carries a fresh candidate.
+    def _maybe_check_exit(self, symbol: str, price: float, price_ts: datetime | None,
+                          *, now: datetime | None = None) -> None:
+        if not symbol or price is None or price <= 0:
+            return  # invalid/missing price -- no fill is ever invented
+        now = now or datetime.now(timezone.utc)
+        if price_ts is not None:
+            age = (now - price_ts).total_seconds()
+            if age < 0 or age > _EXIT_TICK_MAX_AGE_SECONDS:
+                logger.warning(
+                    "Experimental exit check for %s: stale/invalid tick "
+                    "(age=%.0fs > %ds) -- leaving position pending, no fill invented",
+                    symbol, age, _EXIT_TICK_MAX_AGE_SECONDS,
+                )
+                return
+        eval_ts = price_ts or now  # prefer the tick's own (causal) time
+        exit_trade = self.paper.check_exits(symbol, price, now=eval_ts)
+        if not exit_trade:
+            return
+        self._record_experimental_exit(exit_trade)
+
+    def _record_experimental_exit(self, exit_trade: dict) -> None:
+        """The authoritative position/cash transition already happened
+        atomically inside check_exits -> close_long -> PaperTradingStore
+        .execute_sell (DELETE positions + INSERT trade_history + UPDATE
+        portfolio_state, one commit). This only reconciles the separate
+        DISPLAY/dispatch log (exp_alerts.db.experimental_trades, one row
+        per round trip) so it stops showing a closed position as open --
+        it is best-effort and never re-attempted destructively: a symbol
+        with no matching open display row just logs a warning, it never
+        fabricates one."""
+        symbol = exit_trade["symbol"]
+        orig_id = self.alert_store.get_open_trade_id(symbol)
+        if orig_id is None:
+            logger.warning(
+                "Experimental exit for %s (trade_id=%s) has no matching open "
+                "display-log row -- ledger already closed correctly; display "
+                "log left as-is rather than inventing a row",
+                symbol, exit_trade["trade_id"],
+            )
+        else:
+            self.alert_store.update_trade(
+                orig_id,
+                exit=exit_trade["exit"], exit_reason=exit_trade["exit_reason"],
+                gross_pnl=exit_trade["gross_pnl"], est_costs=exit_trade["est_costs"],
+                net_pnl=exit_trade["net_pnl"], r_multiple=exit_trade.get("r_multiple"),
+                closed_at=exit_trade["closed_at"],
+            )
+        logger.info(
+            "experimental paper SELL %s @ %.4f (%s, net_pnl=%s)",
+            symbol, exit_trade["exit"], exit_trade["exit_reason"], exit_trade.get("net_pnl"),
+        )
+
+    # ------------------------------------------------------------------
     async def consume(self) -> None:
         import redis.asyncio as aioredis
 
@@ -230,6 +299,14 @@ class ExperimentalLane:
                                 self.recorder.on_market_bar(sym, bar_ts, float(px))
                             except Exception:  # noqa: BLE001
                                 logger.exception("forward-outcome bar update failed for %s", sym)
+                        # Task 118A P1 -- the exit check runs for EVERY tick
+                        # of an open-position symbol, independent of entry
+                        # signals/gates/lockouts (unlike the BUY path above,
+                        # which only fires from a quant candidate message).
+                        try:
+                            self._maybe_check_exit(sym, float(px), bar_ts)
+                        except Exception:  # noqa: BLE001 - one bad exit check never stops the lane
+                            logger.exception("experimental exit check failed for %s", sym)
                     continue
                 try:
                     await self.handle_message(msg["channel"], payload)

@@ -752,6 +752,19 @@ class DashboardReadModel:
                 sent_today = _q1(
                     con, "SELECT COUNT(*) FROM intelligence_delivery "
                     "WHERE state='SENT' AND substr(sent_at_utc,1,10)=?", (today,)) or 0
+                # Task 118A P3: sent_today counts CARD ROWS -- a DIGEST batch
+                # marks every aggregated card row SENT under one shared
+                # attempt_id (the digest_id, pipeline.py::process_digest),
+                # so N cards in one digest is N rows but ONE actual Telegram
+                # message. messages_sent_today counts the real message
+                # count: every IMMEDIATE row is its own message; every
+                # DIGEST attempt_id counts once regardless of how many
+                # cards it aggregated.
+                messages_sent_today = _q1(
+                    con,
+                    "SELECT COUNT(DISTINCT CASE WHEN route='IMMEDIATE' THEN delivery_id "
+                    "ELSE COALESCE(attempt_id, delivery_id) END) FROM intelligence_delivery "
+                    "WHERE state='SENT' AND substr(sent_at_utc,1,10)=?", (today,)) or 0
                 last_sent = _q1(
                     con, "SELECT MAX(sent_at_utc) FROM intelligence_delivery WHERE state='SENT'")
                 last_digest = None
@@ -773,12 +786,15 @@ class DashboardReadModel:
                         "SUPPRESSED": int(by_state.get("SUPPRESSED", 0)),
                     },
                     "sent_today": sent_today,
+                    "messages_sent_today": messages_sent_today,
                     "last_card_sent_utc": last_sent,
                     "last_digest_sent_utc": last_digest,
                     "queued_not_sent": pending + int(by_state.get("IN_FLIGHT", 0)),
                     "note": ("cards QUEUED is not cards SENT. 0 SENT with a healthy poll "
                              "loop = delivery disabled or transport not configured -- see "
-                             "the runner's per-cycle delivery summary."),
+                             "the runner's per-cycle delivery summary. sent_today counts CARD "
+                             "ROWS; a DIGEST aggregates several cards into ONE Telegram message "
+                             "-- see messages_sent_today for the actual message count."),
                 }
             con.close()
         out["latest_events"] = latest
