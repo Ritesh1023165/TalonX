@@ -192,6 +192,15 @@ def test_restart_preserves_the_enforced_scope(tmp_path):
 # --------------------------------------------------------------------------- prospective wiring
 def test_prospective_start_stack_passes_the_deployment_flags(monkeypatch, tmp_path):
     from talonx_ops.prospective import proc as _proc
+    from talonx_ops.prospective.lock import SingleWriterLock
+    # Isolate the single-writer lock onto a tmp ledger -- start_stack() always
+    # acquires SingleWriterLock(V2_DB_PATH) internally; without this override
+    # this test would take/leak a REAL lock next to the production
+    # v2_lane.db (confirmed: a prior run of this exact test left a stray
+    # v2_lane.db.startlock, with a fake pid, sitting next to the live
+    # ledger). Never touch V2_DB_PATH from a test.
+    iso_ledger = tmp_path / "iso_v2_lane.db"
+    monkeypatch.setattr(_proc, "SingleWriterLock", lambda _p: SingleWriterLock(iso_ledger))
     captured = []
     monkeypatch.setattr(_proc, "_spawn", lambda argv, **k: (captured.append(argv), 4242)[1])
     monkeypatch.setattr(_proc.time, "sleep", lambda *_: None)
@@ -202,3 +211,7 @@ def test_prospective_start_stack_passes_the_deployment_flags(monkeypatch, tmp_pa
     assert "--pricing-mode" in v2 and v2[v2.index("--pricing-mode") + 1] == "composite-yf"
     assert "--execution-scope" in v2 and v2[v2.index("--execution-scope") + 1] == "resolved-active-watchlist"
     assert "--deliver" in v2 and "--transport" in v2 and v2[v2.index("--transport") + 1] == "telegram"
+    # the isolated lock was taken (and rebound to the fake v2_companion pid,
+    # 4242) -- confirms real lock plumbing ran, on the isolated ledger only
+    assert iso_ledger.with_suffix(".db.startlock").exists()
+    assert not (tmp_path / "v2_lane.db.startlock").exists()

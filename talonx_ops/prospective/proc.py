@@ -13,6 +13,7 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -64,7 +65,7 @@ def _alive(pid: int | None) -> bool:
 
 
 from talonx_ops.prospective.lock import (  # noqa: E402
-    ConcurrentStartError, SingleWriterLock, StaleLockError,
+    ConcurrentStartError, LockStateUnknownError, SingleWriterLock, StaleLockError,
 )
 
 
@@ -154,12 +155,21 @@ def start_stack(session_dir: str | Path, *, env: dict[str, str],
 
     # D4 / Section 3: ATOMIC single-writer guard. os.open(O_CREAT|O_EXCL) keyed
     # on the V2 ledger identity -- two racing starts: exactly one creates the
-    # lock, the other sees a LIVE owner and refuses. Held across spawn + pid
-    # registration; released by stop_stack (or the cleanup below on failure).
-    # --force (allow_when_running) breaks a STALE lock (owner verified gone) but
-    # NEVER a live one.
+    # lock, the other sees a LIVE owner and refuses. --force (allow_when_running)
+    # breaks a STALE lock (owner verified gone) but NEVER a live one, and NEVER
+    # an 'unknown' (corrupt/incomplete) one either.
+    #
+    # Lifecycle: acquired here by this short-lived CLI process, then REBOUND
+    # (inside _start_stack_locked) to the pid of the actual long-lived ledger
+    # writer -- the V2 companion -- before this command returns, so the lock's
+    # liveness tracks the writer even after 'start' itself exits. The
+    # owner_token travels across that rebind; only a holder of the matching
+    # token may ever release it (see stop_stack).
     _lock = SingleWriterLock(V2_DB_PATH)
-    _lock.acquire(force=allow_when_running, break_stale=allow_when_running)
+    try:
+        _lock.acquire(force=allow_when_running, break_stale=allow_when_running)
+    except LockStateUnknownError:
+        raise  # never silently bypassed by --force; needs explicit recovery
     try:
         # secondary, best-effort process scan (covers a stack started without
         # the lock, e.g. a stale-lock break where the old owner is somehow back)
@@ -169,57 +179,88 @@ def start_stack(session_dir: str | Path, *, env: dict[str, str],
                 raise ConcurrentStartError(
                     "process scan found a live prospective stack: "
                     + "; ".join(f"pid {h['pid']}" for h in live))
-        return _start_stack_locked(
-            sd, logs, py, env=env, tick_seconds=tick_seconds,
-            heartbeat_seconds=heartbeat_seconds, live_lookback_days=live_lookback_days,
-            with_dashboard=with_dashboard, with_checkpoint_daemon=with_checkpoint_daemon,
-            checkpoint_every_s=checkpoint_every_s, pricing_mode=pricing_mode,
-            execution_scope=execution_scope, deliver=deliver, transport=transport,
-            lock_path=str(_lock.lock_path),
-        )
     except BaseException:
-        _lock.release()          # partial failure -> do not leave the lock held
+        _lock.release()          # nothing spawned yet -- always safe here
         raise
+    # From here on, _start_stack_locked owns the release-or-keep decision on
+    # failure (it may have spawned processes that need ownership-verified
+    # rollback before the lock can be safely released).
+    return _start_stack_locked(
+        sd, logs, py, env=env, tick_seconds=tick_seconds,
+        heartbeat_seconds=heartbeat_seconds, live_lookback_days=live_lookback_days,
+        with_dashboard=with_dashboard, with_checkpoint_daemon=with_checkpoint_daemon,
+        checkpoint_every_s=checkpoint_every_s, pricing_mode=pricing_mode,
+        execution_scope=execution_scope, deliver=deliver, transport=transport,
+        lock=_lock,
+    )
 
 
 def _start_stack_locked(sd, logs, py, *, env, tick_seconds, heartbeat_seconds,
                         live_lookback_days, with_dashboard, with_checkpoint_daemon,
                         checkpoint_every_s, pricing_mode, execution_scope, deliver,
-                        transport, lock_path) -> dict[str, Any]:
-    sup_argv = [py, "-m", "talonx_ops.supervisor", "run"]
-    if not with_dashboard:
-        sup_argv.append("--no-dashboard")
-    sup_pid = _spawn(sup_argv, log_path=logs / "supervisor.log", env=env)
+                        transport, lock: "SingleWriterLock") -> dict[str, Any]:
+    lock_path = str(lock.lock_path)
+    spawned: list[tuple[str, int]] = []
+    try:
+        sup_argv = [py, "-m", "talonx_ops.supervisor", "run"]
+        if not with_dashboard:
+            sup_argv.append("--no-dashboard")
+        sup_pid = _spawn(sup_argv, log_path=logs / "supervisor.log", env=env)
+        spawned.append(("supervisor", sup_pid))
 
-    time.sleep(2.0)  # let the supervisor claim the Telegram poller before the companion
+        time.sleep(2.0)  # let the supervisor claim the Telegram poller before the companion
 
-    # the ONE V2 companion (Task 112T T1: never supervisor include_v2).  Task 117
-    # final activation: the deployment pricing / execution-scope / delivery flags
-    # are passed HERE so 'prospective start' launches the correctly-configured
-    # companion -- no second manual companion, no scope-unenforced process.
-    v2_argv = [py, "-m", "talonx_v2.run", "--mode", "live", "--form4-source", "insider",
-               "--db", str(V2_DB_PATH), "--status-path", str(V2_STATUS_PATH),
-               "--tick-seconds", str(tick_seconds), "--heartbeat-seconds", str(heartbeat_seconds),
-               "--live-lookback-days", str(live_lookback_days),
-               "--pricing-mode", pricing_mode, "--execution-scope", execution_scope]
-    if deliver:
-        v2_argv += ["--deliver", "--transport", transport]
-    v2_pid = _spawn(v2_argv, log_path=logs / "v2_companion.log", env=env)
+        # the ONE V2 companion (Task 112T T1: never supervisor include_v2).  Task 117
+        # final activation: the deployment pricing / execution-scope / delivery flags
+        # are passed HERE so 'prospective start' launches the correctly-configured
+        # companion -- no second manual companion, no scope-unenforced process.
+        v2_argv = [py, "-m", "talonx_v2.run", "--mode", "live", "--form4-source", "insider",
+                   "--db", str(V2_DB_PATH), "--status-path", str(V2_STATUS_PATH),
+                   "--tick-seconds", str(tick_seconds), "--heartbeat-seconds", str(heartbeat_seconds),
+                   "--live-lookback-days", str(live_lookback_days),
+                   "--pricing-mode", pricing_mode, "--execution-scope", execution_scope]
+        if deliver:
+            v2_argv += ["--deliver", "--transport", transport]
+        v2_pid = _spawn(v2_argv, log_path=logs / "v2_companion.log", env=env)
+        spawned.append(("v2_companion", v2_pid))
 
-    daemon_pid = None
-    if with_checkpoint_daemon:
-        d_argv = [py, "-m", "talonx_ops.prospective", "session-loop",
-                  "--session-dir", str(sd), "--every", str(checkpoint_every_s)]
-        daemon_pid = _spawn(d_argv, log_path=logs / "checkpoint_daemon.log", env=env)
+        # Rebind the lock to the ACTUAL ledger writer's pid (+ its own
+        # create_time) now that it exists. From this instant the lock's
+        # liveness no longer depends on this 'start' CLI process staying
+        # alive -- a second 'start' (or --force) sees the companion, not a
+        # stale CLI pid, and correctly refuses.
+        lock.rebind_owner(pid=v2_pid)
 
-    info = {"supervisor_pid": sup_pid, "v2_companion_pid": v2_pid,
-            "checkpoint_daemon_pid": daemon_pid,
-            "started_utc": __import__("datetime").datetime.now(
-                __import__("datetime").timezone.utc).isoformat(),
-            "v2_argv": v2_argv,
-            "startlock_path": lock_path}
-    atomic_write(_pids_file(sd), json.dumps(info, indent=2))
-    return info
+        daemon_pid = None
+        if with_checkpoint_daemon:
+            d_argv = [py, "-m", "talonx_ops.prospective", "session-loop",
+                      "--session-dir", str(sd), "--every", str(checkpoint_every_s)]
+            daemon_pid = _spawn(d_argv, log_path=logs / "checkpoint_daemon.log", env=env)
+            spawned.append(("checkpoint_daemon", daemon_pid))
+
+        info = {"supervisor_pid": sup_pid, "v2_companion_pid": v2_pid,
+                "checkpoint_daemon_pid": daemon_pid,
+                "started_utc": __import__("datetime").datetime.now(
+                    __import__("datetime").timezone.utc).isoformat(),
+                "v2_argv": v2_argv,
+                "startlock_path": lock_path,
+                "startlock_owner_token": lock._owner_token}
+        atomic_write(_pids_file(sd), json.dumps(info, indent=2))
+        return info
+    except BaseException:
+        # Bounded rollback (Task 117 final-activation correction, item 4e):
+        # terminate exactly what THIS start attempt spawned, ownership-verified,
+        # within a bounded grace period per process. Only release the lock if
+        # the rollback actually leaves no residual writer -- otherwise a
+        # second start could still race a surviving companion onto the same
+        # ledger, so the lock is deliberately KEPT (protection remains).
+        residual: list[dict] = []
+        for _name, pid in spawned:
+            r = _terminate(pid, grace_s=10.0)
+            residual.extend(r.get("residual", []))
+        if not residual:
+            lock.release()
+        raise
 
 
 _TALONX_MARKERS = ("run_talonx.py", "talonx_v2.run", "talonx_ops.supervisor",
@@ -252,78 +293,166 @@ def _owned_tree(pid: int) -> list[dict]:
     return out
 
 
-def _still_the_same(entry: dict) -> bool:
+def _run_bounded(fn, timeout_s: float, default):
+    """Run ``fn`` (no args) in a daemon thread and wait up to ``timeout_s``.
+
+    Returns ``fn()``'s result, or ``default`` if it did not finish in time --
+    the thread is abandoned (daemon, so it never blocks process exit) rather
+    than joined forever. Needed because some ``psutil`` Windows queries have
+    no native timeout and have been observed (see ``_still_the_same``) to
+    block indefinitely under specific process-lifecycle timing."""
+    box: dict = {"done": False, "value": default}
+
+    def _worker():
+        try:
+            box["value"] = fn()
+        except Exception:  # noqa: BLE001
+            box["value"] = default
+        finally:
+            box["done"] = True
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+    t.join(timeout_s)
+    return box["value"] if box["done"] else default
+
+
+def _still_the_same(entry: dict, *, cache: dict | None = None) -> bool:
     """True iff `entry`'s pid is alive AND is the same process we snapshotted
     (create_time match) AND still looks like a TalonX component -- guards
-    against PID reuse and against touching an unrelated process."""
-    try:
-        import psutil
-        p = psutil.Process(entry["pid"])
-        if abs(p.create_time() - entry["create_time"]) > 1.0:
-            return False                       # PID reused
-        cl = " ".join(p.cmdline())
-        return any(m in cl for m in _TALONX_MARKERS)
-    except Exception:  # noqa: BLE001
-        return False
+    against PID reuse and against touching an unrelated process.
+
+    Two Windows-specific hazards, both confirmed by direct reproduction
+    during Task 117 final-activation testing (real ``.venv``-shim +
+    re-exec'd grandchild processes, the exact shape the supervisor/V2
+    companion spawn as):
+
+    1. The cmdline check reads the target process's memory, which can block
+       if the target is concurrently being torn down -- so the cmdline
+       verdict is computed AT MOST ONCE per ``(pid, create_time)`` and
+       cached. Pass the SAME ``cache`` dict across every call within one
+       polling loop (``_terminate`` and ``stop_stack``'s residual check do
+       this) so only the very first, pre-termination read ever touches the
+       target's memory.
+    2. Even a bare ``psutil.Process(pid)`` construction / liveness query can
+       itself block indefinitely -- observed specifically right after a
+       process's PARENT has just fully exited (Windows reparenting timing).
+       So the whole liveness+identity check runs under a bounded timeout; on
+       timeout we conservatively report "still present" (never silently
+       "gone", never silently "clean") so a caller reports an honest
+       residual/keeps polling instead of freezing."""
+    pid = entry["pid"]
+
+    def _check() -> bool:
+        try:
+            import psutil
+            if not (psutil.pid_exists(pid) and psutil.Process(pid).is_running()):
+                return False
+            p = psutil.Process(pid)
+            ct = p.create_time()
+            if abs(ct - entry["create_time"]) > 1.0:
+                return False                       # PID reused
+        except Exception:  # noqa: BLE001
+            return False
+        key = (pid, round(ct, 3))
+        if cache is not None and key in cache:
+            return cache[key]
+        try:
+            cl = " ".join(p.cmdline())
+            ok = any(m in cl for m in _TALONX_MARKERS)
+        except Exception:  # noqa: BLE001
+            ok = False
+        if cache is not None:
+            cache[key] = ok
+        return ok
+
+    return _run_bounded(_check, 2.0, True)
 
 
 def _terminate(pid: int | None, *, grace_s: float = 30.0,
-               tree: list[dict] | None = None) -> dict:
+               tree: list[dict] | None = None, cache: dict | None = None) -> dict:
     """Ownership-verified, tree-aware stop of one session-owned process.
 
     Returns {status, signalled, tree_size, reaped, residual}.  A single
     ``grace_s`` budget covers the whole tree.  Only processes present in
     ``tree`` (or discovered as descendants) that pass ``_still_the_same``
     are ever terminated/killed.
+
+    ``cache`` (optional) is the ``_still_the_same`` cmdline-verdict cache --
+    pass the SAME dict in if a caller (``stop_stack``) will re-check these
+    same entries afterward, so the risky cmdline memory-read never happens
+    more than once per process even across that later check.
     """
     if not pid or not _alive(pid):
         return {"status": "not_running", "signalled": pid, "tree_size": 0,
                 "reaped": [], "residual": []}
     import psutil
     snapshot = tree if tree is not None else _owned_tree(pid)
+    cache = {} if cache is None else cache
     deadline = time.monotonic() + grace_s
 
     # OWNERSHIP GATE: only act on `pid` if it is still a TalonX component we
     # snapshotted (create_time + cmdline).  A stale / reused registry pid for
-    # an unrelated process is left completely untouched.
+    # an unrelated process is left completely untouched. This is the ONLY
+    # cmdline read every entry needs -- it happens here, before anything is
+    # signalled, while every process is still definitely alive and not
+    # mid-teardown; every later poll in this function reuses ``cache``.
     root_entry = next((e for e in snapshot if e["pid"] == pid), None)
-    if root_entry is None or not _still_the_same(root_entry):
+    if root_entry is None or not _still_the_same(root_entry, cache=cache):
         return {"status": "not_running", "signalled": pid, "tree_size": len(snapshot),
                 "reaped": [], "residual": [],
                 "note": "pid not a live TalonX component (stale/reused registry) -- untouched"}
-    try:
-        p = psutil.Process(pid)
-        if _IS_WIN:
-            try:
-                p.send_signal(signal.CTRL_BREAK_EVENT)  # noqa: PLE1507
-            except Exception:  # noqa: BLE001
-                pass
-    except psutil.NoSuchProcess:
-        pass
+    for e in snapshot:
+        _still_the_same(e, cache=cache)   # warm the cache for every entry up-front
+
+    # Every psutil call below that manipulates or re-queries a process that
+    # may be mid-teardown is bounded the same way _still_the_same() is (see
+    # its docstring) -- a raw psutil.Process(pid).terminate()/.kill()/
+    # .send_signal() has been observed to hang exactly like the identity
+    # check did, for the same Windows process-lifecycle reason.
+    def _signal_break():
+        try:
+            psutil.Process(pid).send_signal(signal.CTRL_BREAK_EVENT)  # noqa: PLE1507
+        except Exception:  # noqa: BLE001
+            pass
+        return True
+    if _IS_WIN:
+        _run_bounded(_signal_break, 2.0, None)
 
     # graceful: terminate every owned tree member, wait within budget
-    for e in snapshot:
-        if _still_the_same(e):
+    def _terminate_one(target_pid):
+        def _do():
             try:
-                psutil.Process(e["pid"]).terminate()
+                psutil.Process(target_pid).terminate()
             except Exception:  # noqa: BLE001
                 pass
+            return True
+        return _run_bounded(_do, 2.0, None)
+
+    for e in snapshot:
+        if _still_the_same(e, cache=cache):
+            _terminate_one(e["pid"])
     while time.monotonic() < deadline:
-        if not any(_still_the_same(e) for e in snapshot):
+        if not any(_still_the_same(e, cache=cache) for e in snapshot):
             break
         time.sleep(0.5)
 
     # escalate: kill whatever owned tree member is still alive
+    def _kill_one(target_pid):
+        def _do():
+            try:
+                psutil.Process(target_pid).kill()
+                return True
+            except Exception:  # noqa: BLE001
+                return False
+        return _run_bounded(_do, 2.0, False)
+
     killed = []
     for e in snapshot:
-        if _still_the_same(e):
-            try:
-                psutil.Process(e["pid"]).kill()
-                killed.append(e["pid"])
-            except Exception:  # noqa: BLE001
-                pass
+        if _still_the_same(e, cache=cache) and _kill_one(e["pid"]):
+            killed.append(e["pid"])
     time.sleep(0.3)
-    residual = [e for e in snapshot if _still_the_same(e)]
+    residual = [e for e in snapshot if _still_the_same(e, cache=cache)]
     status = ("stopped" if not residual and not killed else
               "killed" if not residual else "residual")
     return {"status": status, "signalled": pid, "tree_size": len(snapshot),
@@ -351,20 +480,26 @@ def stop_stack(session_dir: str | Path, *, grace_s: float = 45.0,
              ("supervisor", info.get("supervisor_pid"), grace_s)]
     # snapshot every owned tree up-front (before anything is signalled)
     trees = {name: _owned_tree(pid) for name, pid, _ in order if pid}
+    # one _still_the_same cmdline-verdict cache PER tree, shared between the
+    # _terminate() call below and the residual re-check afterward -- a
+    # process's memory is only ever read once, before it is told to die
+    # (Task 117 final-activation correction: re-reading cmdline on a process
+    # mid-termination can block indefinitely on Windows).
+    caches = {name: {} for name in trees}
 
     started = time.monotonic()
     res: dict[str, Any] = {}
     for name, pid, budget in order:
         remaining = overall_budget_s - (time.monotonic() - started)
         res[name] = _terminate(pid, grace_s=max(2.0, min(budget, remaining)),
-                               tree=trees.get(name))
+                               tree=trees.get(name), cache=caches.get(name))
     time.sleep(1.0)
 
     # residual = union of all owned tree members still alive (ownership-checked)
     residual = []
     for name, members in trees.items():
         for e in members:
-            if _still_the_same(e):
+            if _still_the_same(e, cache=caches.get(name)):
                 residual.append({"pid": e["pid"], "cmd": e["cmd"], "owner": name})
     res["residual_talonx_processes"] = residual
     res["overall_budget_s"] = overall_budget_s
@@ -378,16 +513,21 @@ def stop_stack(session_dir: str | Path, *, grace_s: float = 45.0,
     # release the single-writer lock IFF the stack is actually down (no
     # residuals). If residuals remain, the ledger may still be being written --
     # keep the lock so a fresh start still refuses until teardown completes.
+    # Release is entitlement-gated by owner_token (Task 117 final-activation
+    # correction): this session may only remove the lock IT created, even
+    # though the lock's recorded pid was rebound away from the 'start' CLI to
+    # the V2 companion during startup -- never an unconditional path-unlink.
     lock_released = None
     if not residual:
+        token = info.get("startlock_owner_token")
         try:
-            lp = info.get("startlock_path")
-            lock_p = Path(lp) if lp else SingleWriterLock(V2_DB_PATH).lock_path
-            if lock_p.exists():
-                lock_p.unlink()
-                lock_released = True
+            if token:
+                ok = SingleWriterLock.release_by_token(V2_DB_PATH, token)
+                lock_released = True if ok else "token_mismatch_or_absent"
             else:
-                lock_released = "absent"
+                lk = SingleWriterLock(V2_DB_PATH)
+                lock_released = "absent" if not lk.lock_path.exists() else \
+                    "no_owner_token_recorded -- left in place (cannot verify entitlement)"
         except Exception as exc:  # noqa: BLE001
             lock_released = f"error: {exc!r}"
     else:

@@ -213,6 +213,7 @@ class IntelligenceService:
                 process_pending(
                     self.stores.outbox, sender, mode=mode, route="IMMEDIATE",
                     limit=self.config.deliver_cards_per_cycle,
+                    now=now,
                     enforce_age_cutoff=(
                         enabled and self.config.deliver_cards_enforce_age_cutoff),
                     event_time_lookup=_event_time,
@@ -224,6 +225,7 @@ class IntelligenceService:
                     self.stores.outbox, sender, mode=mode,
                     interval_seconds=self.config.deliver_digest_interval_seconds,
                     limit=self.config.deliver_cards_per_cycle,
+                    now=now,
                     enforce_age_cutoff=(
                         enabled and self.config.deliver_cards_enforce_age_cutoff),
                     event_time_lookup=_event_time,

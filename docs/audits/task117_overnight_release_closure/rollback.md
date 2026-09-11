@@ -1,5 +1,11 @@
 # Rollback — Task 117 overnight release
 
+**Corrected and superseded by `docs/audits/task117_final_activation_corrections/rollback.md`**
+(wrong `~/.talonx\v2_lane.db` path below; corrected doc uses the real
+`<REPO_ROOT>\v2_lane.db` path, prefers compatible-code rollback over any
+DB restore, and never blindly restores over post-activation writes). Kept
+here for history; follow the corrected doc.
+
 ## What this release changed (all reversible)
 
 | area | change | reverse |
