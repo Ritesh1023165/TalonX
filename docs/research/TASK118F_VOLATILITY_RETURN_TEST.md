@@ -4,6 +4,17 @@
 results below are exploratory (already-inspected A/B/C history, per
 Task 118D/E) — none is a fresh holdout, and none is presented as one.
 
+> **2026-09-11 (Task 118G) precision note, appended**: A's own within
+> -population slope is **−0.001733** (net return per +1 annualized-vol
+> percentage point, N=10 trades / 6 issuers). That the issuer-block and
+> month-of-entry bootstraps **agree** is **sensitivity evidence computed
+> on the exact same 10 trades** — it shows the result is not an artifact
+> of one arbitrary resampling choice, but it is **not** independent
+> confirmation (no new data enters either bootstrap). Independent
+> confirmation requires the genuinely new, future live data named in
+> §"Research decision" below and in `NEXT_SESSION_HANDOFF.md` — restated
+> here explicitly, not left implicit.
+
 ## Predeclared protocol (see `volatility_return_test.py` docstring for the
 byte-exact version, written before any result was computed)
 

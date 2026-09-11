@@ -3,6 +3,17 @@
 Cutoff for the live sections: **2026-09-11T15:22–15:26 UTC** (regular
 session, open since 13:30 UTC).
 
+> **2026-09-11 (Task 118G) correction, original text below unedited**:
+> this task's own "no code/config recovery action was taken" decision was
+> correct for **this task's** bounded time budget, but is now
+> **superseded** — Task 118F built, tested, and deployed exactly the
+> bounded recovery mechanism this task declined to attempt, and the
+> deployed fix was observed live recovering readiness (30/43 → 42/43
+> immediately, 43/43 shortly after). See
+> `docs/audits/task118f_resilient_warmup/` (release branch) and
+> `TASK118G_FINAL_ACCEPTANCE.md` (this branch) for the implementation and
+> live acceptance evidence.
+
 ## Part 1/2 — readiness: actual gap and recovery decision
 
 Live snapshot (`quant.db.bar_buffer`, 1-minute, `min_bars_required=120`):
