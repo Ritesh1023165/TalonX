@@ -160,7 +160,7 @@ from talonx_ingest.storage.vector_store import VectorStore, get_vector_store
 from talonx_quant.config import QuantConfig
 from talonx_quant.consumer import QuantScanner
 from talonx_quant.fundamental_consumer import FundamentalScanner
-from talonx_quant.preseed_ordering import run_initial_preseed
+from talonx_quant.preseed_ordering import run_initial_preseed, run_bounded_recovery_sweep
 from talonx_quant.store import QuantStateStore
 from talonx_brain.config import BrainConfig
 from talonx_brain.consumer import ResearchAgent
@@ -1191,6 +1191,26 @@ async def main() -> None:
                 len(initial_preseed_report.ready_symbols), len(initial_watchlist_symbols),
                 " -- ZERO READY" if initial_preseed_report.is_blocked else "",
             )
+            # Task 118F: a bulk provider failure (evidenced 2026-09-11,
+            # docs/audits/task118f_resilient_warmup/) can leave many
+            # symbols not-ready after the ABOVE call alone, with no other
+            # recovery besides slow live-tick accumulation (which took
+            # multiple hours for the slowest names). This bounded, one-shot
+            # sweep -- run in the SAME pre-market-data safety window as the
+            # call above, never overlapping it with a restart or with live
+            # ticks -- gives exactly the not-ready symbols one further
+            # bounded chance via the same already-proven fetch path.
+            not_ready_count = len(initial_watchlist_symbols) - len(initial_preseed_report.ready_symbols)
+            if not_ready_count:
+                recovery_report = await run_bounded_recovery_sweep(quant_scanner, initial_preseed_report)
+                logger.info(
+                    "Bounded preseed recovery sweep complete: %d/%d previously not-ready "
+                    "symbol(s) recovered in %.1fs%s (still incomplete: %s)",
+                    len(recovery_report.recovered_symbols), not_ready_count,
+                    recovery_report.elapsed_seconds,
+                    " -- BUDGET EXHAUSTED" if recovery_report.budget_exhausted else "",
+                    recovery_report.still_incomplete_symbols,
+                )
         else:
             logger.info("Watchlist is empty at startup -- skipping initial Quant preseed (nothing to seed).")
     startup_readiness.mark(PHASE_PRESEED_COMPLETE)
