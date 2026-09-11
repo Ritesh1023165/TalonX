@@ -59,6 +59,7 @@ class SenderResult:
     retry_after_seconds: float | None = None
     permanent: bool = False
     ambiguous: bool = False   # request left but the outcome is unconfirmable
+    message_id: str | int | None = None   # transport ack id on ok
 
 
 class SenderProtocol(Protocol):
@@ -136,22 +137,41 @@ class TelegramSenderAdapter:
         from talonx_dispatch.telegram_client import TelegramSendError
 
         try:
-            await self._client.send(row.text, parse_mode=row.parse_mode)
-            return SenderResult(ok=True)
+            # retry_ambiguous=False: the LOWER layer must not blind-retry a
+            # post-request timeout / network drop (could double-send). It raises
+            # TelegramAmbiguousError instead -- caught below and surfaced as
+            # ambiguous so the OUTBOX (not the transport) owns the decision.
+            res = await self._client.send(
+                row.text, parse_mode=row.parse_mode, retry_ambiguous=False,
+            )
+            mid = None
+            try:
+                mid = getattr(res, "message_id", None) if res is not None else None
+            except Exception:  # noqa: BLE001
+                mid = None
+            return SenderResult(ok=True, message_id=mid)
+        except asyncio.CancelledError:
+            # a cancel DURING a send: the request may have reached Telegram.
+            raise _SendCancelled()
         except TelegramSendError as exc:
             msg = str(exc)
             low = msg.lower()
-            if "non-retryable" in low or "invalid" in low or "forbidden" in low or "chat not found" in low:
-                return SenderResult(ok=False, error=msg, permanent=True)
-            # a timeout / 5xx AFTER the request left is unconfirmable -- do NOT
-            # blind-retry (could double-send); mark the row AMBIGUOUS.
-            if "timeout" in low or "timed out" in low or " 5" in msg or "ambig" in low:
+            if getattr(exc, "ambiguous", False) or "ambiguous" in low or "unconfirmed" in low:
                 return SenderResult(ok=False, error=msg, ambiguous=True)
-            return SenderResult(ok=False, error=msg)
-        except TimeoutError as exc:
+            if ("non-retryable" in low or "invalid" in low or "forbidden" in low
+                    or "chat not found" in low or "bad request" in low):
+                return SenderResult(ok=False, error=msg, permanent=True)
+            if "timeout" in low or "timed out" in low or "network" in low:
+                return SenderResult(ok=False, error=msg, ambiguous=True)
+            return SenderResult(ok=False, error=msg)   # clean transient -> retry
+        except (TimeoutError, asyncio.TimeoutError) as exc:
             return SenderResult(ok=False, error=f"timeout: {exc!r}", ambiguous=True)
         except Exception as exc:  # noqa: BLE001 - any other transport error is transient
             return SenderResult(ok=False, error=repr(exc))
+
+
+class _SendCancelled(Exception):
+    """Internal: a send was cancelled while it may have been in flight."""
 
 
 # ---------------------------------------------------------------------------
@@ -174,6 +194,8 @@ class DrainResult:
     expired_ids: list[str] = field(default_factory=list)
     simulated_ids: list[str] = field(default_factory=list)
     ambiguous_ids: list[str] = field(default_factory=list)
+    message_ids: dict = field(default_factory=dict)     # delivery_id -> transport message id
+    errors: list[str] = field(default_factory=list)     # unexpected per-row errors (visible, not swallowed)
 
 
 # ---------------------------------------------------------------------------
@@ -267,6 +289,11 @@ def _backoff(attempts: int) -> float:
 MODE_ENABLED = "enabled"
 MODE_DISABLED = "disabled"
 MODE_SIMULATE = "simulate"
+_VALID_MODES = frozenset({MODE_ENABLED, MODE_DISABLED, MODE_SIMULATE})
+
+
+class InvalidDeliveryMode(ValueError):
+    """An unrecognised ``mode`` -- fail closed, never fall through to sending."""
 
 
 async def process_pending(
@@ -282,6 +309,7 @@ async def process_pending(
     enforce_age_cutoff: bool = False,
     max_age_seconds: "dict[str, int] | int | None" = None,
     event_time_lookup=None,
+    stale_in_flight_seconds: float = 90.0,
 ) -> DrainResult:
     """Process due PENDING rows, CRITICAL first. Persist-before-send is
     guaranteed by ``enqueue``. Safe to call repeatedly and after a restart.
@@ -305,8 +333,23 @@ async def process_pending(
     """
     if mode is None:
         mode = MODE_SIMULATE if dry_run else MODE_DISABLED
-    now = now or datetime.now(timezone.utc)
+    # (1A) validate the mode BEFORE any expiry / DB mutation / network activity.
+    if mode not in _VALID_MODES:
+        raise InvalidDeliveryMode(
+            f"delivery mode {mode!r} is not one of {sorted(_VALID_MODES)} -- refusing "
+            f"(fail closed; no expiry, no send)"
+        )
+    # (1D) decision time = NOW, not a stale timestamp captured before the poll.
+    now = datetime.now(timezone.utc) if now is None else now
     result = DrainResult(mode=mode)
+
+    # (1B) recover any row stuck IN_FLIGHT from a previous drainer that died /
+    # was cancelled mid-send -> AMBIGUOUS (never blind re-send). Cheap; runs in
+    # every mode so a disabled/simulate cycle still surfaces a stuck claim.
+    recovered = outbox.recover_in_flight(now=now, stale_after_seconds=stale_in_flight_seconds)
+    if recovered:
+        result.ambiguous += len(recovered)
+        result.ambiguous_ids.extend(recovered)
 
     if enforce_age_cutoff:
         result.expired_ids = outbox.expire_stale(
@@ -336,29 +379,66 @@ async def process_pending(
         result.held_reason = "transport_not_configured"
         return result
 
+    import uuid as _uuid
+
     for row in rows:
+        send_now = datetime.now(timezone.utc)          # (1D) per-row decision time
+        attempt_id = _uuid.uuid4().hex[:16]
+        # (1B) persist-before-network: claim PENDING -> IN_FLIGHT, committed,
+        # BEFORE the transport is touched. A competing drainer that lost the
+        # claim gets False and skips -- no double logical delivery.
+        if not outbox.claim_for_send(row.delivery_id, attempt_id, now=send_now):
+            continue
         result.attempted += 1
-        res = await sender.send(row)
+        try:
+            res = await sender.send(row)
+        except _SendCancelled:
+            # cancelled mid-send: the request may have reached Telegram.
+            outbox.mark_ambiguous(
+                row.delivery_id, "send cancelled while possibly in flight", now=send_now)
+            result.ambiguous += 1
+            result.ambiguous_ids.append(row.delivery_id)
+            raise                                      # propagate the shutdown signal
+        except asyncio.CancelledError:
+            outbox.mark_ambiguous(
+                row.delivery_id, "task cancelled during send", now=send_now)
+            result.ambiguous += 1
+            result.ambiguous_ids.append(row.delivery_id)
+            raise
+        except Exception as exc:  # noqa: BLE001
+            # an UNEXPECTED sender error: we crossed (or may have crossed) the
+            # boundary -> ambiguous, never a blind retry, never swallowed.
+            outbox.mark_ambiguous(
+                row.delivery_id, f"unexpected sender error: {exc!r}", now=send_now)
+            result.ambiguous += 1
+            result.ambiguous_ids.append(row.delivery_id)
+            result.errors.append(f"{row.delivery_id}: {exc!r}")
+            continue
+
         if res.ok:
-            outbox.mark_sent(row.delivery_id, now=now)
+            outbox.mark_sent(row.delivery_id, message_id=res.message_id, now=send_now)
             result.delivered += 1
             result.delivery_ids.append(row.delivery_id)
+            if res.message_id is not None:
+                result.message_ids[row.delivery_id] = str(res.message_id)
             if metrics is not None:
                 metrics.record_delivered(is_update=(row.disposition == "UPDATE"))
             continue
         if res.ambiguous:
-            outbox.mark_ambiguous(row.delivery_id, res.error or "unconfirmable outcome", now=now)
+            outbox.mark_ambiguous(row.delivery_id, res.error or "unconfirmable outcome", now=send_now)
             result.ambiguous += 1
             result.ambiguous_ids.append(row.delivery_id)
             if metrics is not None and hasattr(metrics, "record_failure"):
                 metrics.record_failure()
             continue
+        # a CLEAN rejection (rate limit / bad-request / other non-timeout):
+        # Telegram did NOT accept it -> safe to release + retry.
         retry_after = res.retry_after_seconds
         if retry_after is None and not res.permanent:
             retry_after = _backoff(row.attempts + 1)
         new_state = outbox.mark_failed(
             row.delivery_id, res.error or "unknown error",
-            retry_after_seconds=retry_after, permanent=res.permanent, now=now,
+            retry_after_seconds=retry_after, permanent=res.permanent, now=send_now,
         )
         if new_state == STATE_FAILED:
             result.failed += 1
@@ -373,3 +453,146 @@ async def process_pending(
 
 def process_pending_sync(*args, **kwargs) -> DrainResult:
     return asyncio.run(process_pending(*args, **kwargs))
+
+
+# ---------------------------------------------------------------------------
+# digest -- DIGEST-route rows are AGGREGATED into one periodic message, not
+# sent individually. Restart-safe via a persisted last-sent bucket.
+# ---------------------------------------------------------------------------
+_DIGEST_META_KEY = "last_digest_bucket"
+_DIGEST_SENT_AT_KEY = "last_digest_sent_utc"
+
+
+def _digest_text_from_rows(rows: list, now: datetime) -> str:
+    from talonx_ingest.intelligence.delivery.config import MAX_DIGEST_ROWS
+
+    rank = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, None: 4}
+    srt = sorted(rows, key=lambda r: (rank.get(r.band, 4), r.symbol, r.event_id))
+    shown = srt[:MAX_DIGEST_ROWS]
+    lines = [f"TalonX Intelligence digest - {now.strftime('%Y-%m-%dT%H:%MZ')}",
+             f"{len(srt)} held event(s)"]
+    for r in shown:
+        first_line = (r.text or "").splitlines()[0][:80] if r.text else r.symbol
+        lines.append(f"- {r.symbol}: {first_line}")
+    if len(srt) > len(shown):
+        lines.append(f"+ {len(srt) - len(shown)} more - open the dashboard")
+    lines.append("Informational only - not a recommendation.")
+    return "\n".join(lines)
+
+
+async def process_digest(
+    outbox: DeliveryOutbox,
+    sender: SenderProtocol,
+    *,
+    mode: str,
+    interval_seconds: float,
+    now: datetime | None = None,
+    limit: int | None = None,
+    enforce_age_cutoff: bool = True,
+    max_age_seconds: "dict[str, int] | int | None" = None,
+    event_time_lookup=None,
+    stale_in_flight_seconds: float = 90.0,
+) -> DrainResult:
+    """Aggregate + deliver the DIGEST route on a schedule.
+
+    Not due -> the DIGEST rows stay PENDING and are reported as ``held``
+    (``held_reason="digest_not_due"``). Due + enabled -> stale rows are
+    expired, the rest are claimed as ONE batch, rendered into ONE message,
+    sent once, and all marked SENT referencing the digest id. Restart-safe:
+    the last-sent time-bucket is persisted, so a restart in the same window
+    does not re-send.
+    """
+    if mode not in _VALID_MODES:
+        raise InvalidDeliveryMode(f"delivery mode {mode!r} invalid")
+    now = datetime.now(timezone.utc) if now is None else now
+    result = DrainResult(mode=mode)
+    result.ambiguous_ids.extend(
+        outbox.recover_in_flight(now=now, stale_after_seconds=stale_in_flight_seconds))
+    result.ambiguous = len(result.ambiguous_ids)
+
+    bucket = int(now.timestamp() // max(1.0, interval_seconds))
+    last_bucket = outbox.get_meta(_DIGEST_META_KEY)
+    due = last_bucket is None or int(last_bucket) < bucket
+
+    if enforce_age_cutoff:
+        result.expired_ids = outbox.expire_stale(
+            now=now, max_age_seconds=max_age_seconds, event_time_lookup=event_time_lookup)
+        result.expired = len(result.expired_ids)
+
+    rows = outbox.digest_pending(now=now, limit=limit)
+    if not due:
+        result.held = len(rows)
+        result.held_reason = "digest_not_due"
+        return result
+    if mode == MODE_DISABLED:
+        result.held = len(rows)
+        result.held_reason = "delivery_disabled"
+        for r in rows:
+            outbox._log(r.delivery_id, "HELD", "digest due but delivery disabled -- PENDING")
+        outbox._conn.commit()
+        return result
+    if mode == MODE_SIMULATE:
+        result.simulated = len(rows)
+        result.simulated_ids = [r.delivery_id for r in rows]
+        return result
+    if not rows:
+        # nothing to aggregate -- still advance the bucket so we don't recheck
+        outbox.set_meta(_DIGEST_META_KEY, str(bucket))
+        outbox.set_meta(_DIGEST_SENT_AT_KEY, now.isoformat())
+        return result
+    if not sender.configured:
+        result.skipped_not_configured = True
+        result.held = len(rows)
+        result.held_reason = "transport_not_configured"
+        return result
+
+    import types
+    import uuid as _uuid
+
+    digest_id = f"digest-{bucket}-{_uuid.uuid4().hex[:8]}"
+    claimed = outbox.claim_digest_batch([r.delivery_id for r in rows], digest_id, now=now)
+    if not claimed:
+        return result
+    text = _digest_text_from_rows([r for r in rows if r.delivery_id in claimed], now)
+    synthetic = types.SimpleNamespace(
+        delivery_id=digest_id, text=text, parse_mode=None, disposition="NEW",
+        band=None, route="DIGEST", symbol="DIGEST", event_id=digest_id)
+    result.attempted += 1
+    try:
+        res = await sender.send(synthetic)
+    except _SendCancelled:
+        for did in claimed:
+            outbox.mark_ambiguous(did, f"digest {digest_id} cancelled in flight", now=now)
+        result.ambiguous += len(claimed); result.ambiguous_ids.extend(claimed)
+        raise
+    except asyncio.CancelledError:
+        for did in claimed:
+            outbox.mark_ambiguous(did, f"digest {digest_id} task cancelled", now=now)
+        result.ambiguous += len(claimed); result.ambiguous_ids.extend(claimed)
+        raise
+    except Exception as exc:  # noqa: BLE001
+        for did in claimed:
+            outbox.mark_ambiguous(did, f"digest {digest_id} unexpected error: {exc!r}", now=now)
+        result.ambiguous += len(claimed); result.ambiguous_ids.extend(claimed)
+        result.errors.append(f"{digest_id}: {exc!r}")
+        return result
+
+    if res.ok:
+        outbox.mark_digest_sent(claimed, digest_id, message_id=res.message_id, now=now)
+        outbox.set_meta(_DIGEST_META_KEY, str(bucket))
+        outbox.set_meta(_DIGEST_SENT_AT_KEY, now.isoformat())
+        result.delivered += len(claimed)
+        result.delivery_ids.extend(claimed)
+        if res.message_id is not None:
+            result.message_ids[digest_id] = str(res.message_id)
+    elif res.ambiguous:
+        for did in claimed:
+            outbox.mark_ambiguous(did, res.error or f"digest {digest_id} unconfirmed", now=now)
+        result.ambiguous += len(claimed); result.ambiguous_ids.extend(claimed)
+    else:
+        # clean rejection -> release the batch back to PENDING for the next window
+        for did in claimed:
+            outbox.mark_failed(did, res.error or f"digest {digest_id} rejected",
+                               retry_after_seconds=_backoff(1), permanent=res.permanent, now=now)
+        result.retried += len(claimed)
+    return result

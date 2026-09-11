@@ -27,7 +27,7 @@ from datetime import timedelta
 
 from telegram import Bot
 from telegram.constants import ParseMode
-from telegram.error import Forbidden, InvalidToken, RetryAfter, TelegramError
+from telegram.error import Forbidden, InvalidToken, NetworkError, RetryAfter, TelegramError, TimedOut
 
 from talonx_dispatch.config import DispatchConfig
 
@@ -36,6 +36,19 @@ logger = logging.getLogger("talonx_dispatch.telegram_client")
 
 class TelegramSendError(Exception):
     """Raised after exhausting retries -- caller decides how to record the failure."""
+
+    def __init__(self, *a, ambiguous: bool = False):
+        super().__init__(*a)
+        self.ambiguous = ambiguous
+
+
+class TelegramAmbiguousError(TelegramSendError):
+    """The request left the process but the outcome could not be confirmed
+    (post-send timeout / network drop). Telegram may or may not have the
+    message. The caller MUST NOT blind-retry -- resolve it as AMBIGUOUS."""
+
+    def __init__(self, *a):
+        super().__init__(*a, ambiguous=True)
 
 
 def _jittered_backoff(attempt: int, base: float, max_delay: float) -> float:
@@ -52,7 +65,10 @@ class TelegramClient:
     def is_configured(self) -> bool:
         return bool(self.config.telegram_bot_token and self.config.telegram_chat_id)
 
-    async def send(self, text: str, parse_mode: str | None = ParseMode.MARKDOWN) -> None:
+    async def send(
+        self, text: str, parse_mode: str | None = ParseMode.MARKDOWN,
+        *, retry_ambiguous: bool = True,
+    ):
         """
         No-op if not configured. Raises TelegramSendError after
         exhausting retries on a transient failure, or immediately on a
@@ -70,33 +86,56 @@ class TelegramClient:
         'pre_market', whose underscore broke Markdown parsing every time).
         """
         if not self.is_configured:
-            return
+            return None
 
         attempt = 0
         while True:
             try:
                 async with Bot(token=self.config.telegram_bot_token) as bot:
-                    await bot.send_message(
+                    return await bot.send_message(
                         chat_id=self.config.telegram_chat_id,
                         text=text,
                         parse_mode=parse_mode,
                         disable_web_page_preview=True,
                     )
-                return
             except (InvalidToken, Forbidden) as exc:
                 # Config/permission problem, not a transient failure -- retrying won't help.
                 raise TelegramSendError(f"Telegram send failed (non-retryable): {exc}") from exc
             except RetryAfter as exc:
+                # A 429 means Telegram REJECTED the request -- it is NOT ambiguous;
+                # safe to wait and retry per Telegram's own hint.
                 attempt += 1
                 if attempt > self.config.telegram_max_retries:
                     raise TelegramSendError(
                         f"Exhausted {self.config.telegram_max_retries} retries: {exc}"
                     ) from exc
-                # Telegram tells us exactly how long to wait -- use that instead of our own backoff.
                 wait = exc.retry_after.total_seconds() if isinstance(exc.retry_after, timedelta) else float(exc.retry_after)
                 logger.warning("Telegram rate limit hit; retrying in %.1fs (attempt %d)", wait, attempt)
                 await asyncio.sleep(wait)
+            except (TimedOut, NetworkError) as exc:
+                # The request may have reached Telegram AFTER we gave up waiting
+                # for the ack. Blind-retrying here can double-send.
+                if not retry_ambiguous:
+                    raise TelegramAmbiguousError(
+                        f"Telegram send outcome unconfirmed ({type(exc).__name__}: {exc})"
+                    ) from exc
+                attempt += 1
+                if attempt > self.config.telegram_max_retries:
+                    raise TelegramSendError(
+                        f"Exhausted {self.config.telegram_max_retries} retries: {exc}"
+                    ) from exc
+                wait = _jittered_backoff(
+                    attempt, self.config.telegram_backoff_base_seconds,
+                    self.config.telegram_backoff_max_seconds,
+                )
+                logger.warning(
+                    "Telegram network error (%s); retrying in %.1fs (attempt %d/%d)",
+                    exc, wait, attempt, self.config.telegram_max_retries,
+                )
+                await asyncio.sleep(wait)
             except TelegramError as exc:
+                # a clean, definite error (bad request, chat migrated, ...) --
+                # Telegram did not accept the message; retry within budget.
                 attempt += 1
                 if attempt > self.config.telegram_max_retries:
                     raise TelegramSendError(

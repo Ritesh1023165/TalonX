@@ -161,10 +161,25 @@ def build_lane_accounting(*, now: datetime | None = None,
     }
 
     metrics = _redis_quant_metrics(day)
-
-    # ---- funnel closure from the comingled counter, IF present ----------
-    closure: dict[str, Any] = {"status": "NO_METRICS_SNAPSHOT"}
     mk = metrics.get("keys") or {}
+
+    # ---- verify off-counter dispositions FROM RECORDS (not as a remainder) --
+    dispatch = _HOME / "dispatch_audit.db"
+    off_counter_records = {
+        "throttle": _q1(dispatch, "SELECT COUNT(*) FROM rejected_candidates WHERE "
+                        "substr(rejected_at,1,10)=? AND (gate LIKE '%throttle%' OR reason LIKE '%THROTTLE%')", (day,)) or 0,
+        "cooldown": _q1(dispatch, "SELECT COUNT(*) FROM rejected_candidates WHERE "
+                        "substr(rejected_at,1,10)=? AND (gate LIKE '%cooldown%' OR reason LIKE '%COOLDOWN%')", (day,)) or 0,
+        "revalidation": _q1(dispatch, "SELECT COUNT(*) FROM rejected_candidates WHERE "
+                            "substr(rejected_at,1,10)=? AND (gate LIKE '%reval%' OR reason LIKE '%REVAL%')", (day,)) or 0,
+        "lockout": _q1(dispatch, "SELECT COUNT(*) FROM rejected_candidates WHERE "
+                       "substr(rejected_at,1,10)=? AND (gate LIKE '%lockout%' OR reason LIKE '%LOCKOUT%')", (day,)) or 0,
+        "source": "dispatch_audit.rejected_candidates (the talonx:quant:rejected sink)",
+    }
+    off_counter_total = sum(v for k, v in off_counter_records.items() if isinstance(v, int))
+
+    # ---- final-day funnel from the comingled counter (SEPARATE from the ping) --
+    closure: dict[str, Any] = {"status": "NO_METRICS_SNAPSHOT"}
     ev = mk.get(f"metrics:{day}:quant:evaluated")
     if isinstance(ev, int):
         _terminal_prefixes = ("failed_", "dropped_", "published")
@@ -179,22 +194,27 @@ def build_lane_accounting(*, now: datetime | None = None,
         counter_sum = sum(terminal.values())
         residual = ev - counter_sum
         closure = {
-            "status": "CLOSED" if 0 <= residual <= 8 else "RESIDUAL_UNEXPLAINED",
+            "status": "COUNTER_RECONCILED" if residual == 0 else "COUNTER_RESIDUAL",
             "evaluated": ev,
             "terminal_with_counter": terminal,
             "terminal_with_counter_sum": counter_sum,
             "residual": residual,
-            "residual_class": "THROTTLE / COOLDOWN / failed-revalidation "
-                              "(recorded on talonx:quant:rejected + rejected_candidates, "
-                              "not in metrics:quant:*)" if 0 <= residual <= 8 else "unexplained",
+            "residual_explained_by_records": (
+                residual == off_counter_total and off_counter_total > 0),
+            "residual_attribution": (
+                f"matches {off_counter_total} throttle/cooldown/revalidation record(s)"
+                if (residual == off_counter_total and off_counter_total > 0) else
+                "NO corresponding disposition records found -- the residual is NOT "
+                "attributed to throttle/cooldown/revalidation (there are none on this "
+                "day) and is NOT defined as the arithmetic remainder. UNEXPLAINED_FROM_RECORDS."),
             "pre_evaluation_drops_excluded": {
                 "dropped_duplicate_bars": mk.get(f"metrics:{day}:quant:dropped_duplicate_bars"),
                 "failed_min_volatility": mk.get(f"metrics:{day}:quant:failed_min_volatility"),
             },
-            "published_all_experimental": mk.get(f"metrics:{day}:quant:published") == experimental["would_pass"],
-            "note": "the mid-session ping's '126 candidates / 3 publications' was a partial "
-                    "snapshot; this is the EOD comingled counter. published == the Experimental "
-                    "WOULD_PASS count (Original published 0, V2 published 0).",
+            "published_counter": mk.get(f"metrics:{day}:quant:published"),
+            "published_is_comingled": True,
+            "original_official_publications": original["published_intraday_alerts"],  # dispatch_audit.alerts
+            "v2_publications": 0,
         }
 
     return {
@@ -203,23 +223,36 @@ def build_lane_accounting(*, now: datetime | None = None,
         "lanes": {"original_intraday": original,
                   "experimental": experimental,
                   "v2_trading": v2_acc},
-        "comingled_metrics_quant": metrics,
-        "funnel_closure": closure,
+        "comingled_metrics_quant": {
+            **metrics,
+            "warning": "metrics:<date>:quant:* is COMINGLED Original+Experimental with NO lane "
+                       "suffix. Its 'published' is NOT an Original official-publication count. "
+                       "Original official publications = dispatch_audit.alerts "
+                       f"({original['published_intraday_alerts']} today). V2 publications = 0. "
+                       "The dashboard does not display this counter as Original's.",
+        },
+        "off_counter_dispositions_from_records": off_counter_records,
+        "final_day_funnel_closure": closure,
         "in_flight": in_flight,
+        "historical_16_24_ping_snapshot": {
+            "reported": "candidates 126; displayed rejections confluence 18 / opening-blackout 10 "
+                        "/ trend 1; quant publications 3",
+            "status": "NOT_RECONSTRUCTABLE",
+            "why": "metrics:<date>:quant:* counters are CUMULATIVE, not point-in-time; there is "
+                   "no 16:24:25Z snapshot of them. The final-day counter (evaluated=%s) cannot "
+                   "reconstruct the mid-session 126/3. Final-day reconciliation and the ping "
+                   "attribution are kept SEPARATE." % (closure.get("evaluated")),
+        },
         "historical_94_candidate_gap": {
-            "status": ("RESOLVED_WITH_EVIDENCE" if closure.get("status") == "CLOSED"
-                       else "UNRESOLVED"),
-            "resolution": (
-                f"EOD comingled counter: evaluated={closure.get('evaluated')} = "
-                f"sum(terminal counters)={closure.get('terminal_with_counter_sum')} + "
-                f"residual={closure.get('residual')} (THROTTLE/COOLDOWN/revalidation, "
-                f"off-counter). published={mk.get(f'metrics:{day}:quant:published')} == "
-                f"Experimental WOULD_PASS. Same mechanism that closed Sep-9 exactly. "
-                f"The '94' was the 16:24Z ping's 126/3 measured against the EOD *displayed* "
-                f"3-gate breakdown, not the EOD comingled counter."
-            ) if closure.get("status") == "CLOSED" else
-            "no metrics:<date>:quant:* snapshot reachable; cannot close to an integer -- "
-            "NOT reported as resolved.",
+            "status": "SUPERSEDED_BY_FINAL_DAY_RECONCILIATION",
+            "note": "the '94' arose from '126 - 18 - 10 - 1 - 3' (the 16:24 ping vs the EOD "
+                    "displayed 3-gate breakdown) -- an apples-to-oranges subtraction. The "
+                    "final-day funnel is reconciled against the comingled counter above "
+                    "(evaluated=%s, terminal-with-counter=%s, residual=%s %s). The residual "
+                    "is NOT the 94 and is NOT defined as throttle/cooldown/revalidation "
+                    "(no such records exist for the day)." % (
+                        closure.get("evaluated"), closure.get("terminal_with_counter_sum"),
+                        closure.get("residual"), closure.get("residual_attribution", "")),
         },
         "lane_attribution_defect": {
             "D6": "metrics:<date>:quant:* keys carry no lane suffix; Original + Experimental "

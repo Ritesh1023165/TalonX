@@ -63,9 +63,9 @@ def _alive(pid: int | None) -> bool:
         return False
 
 
-class ConcurrentStartError(RuntimeError):
-    """A live prospective stack (supervisor or V2 companion) already owns the
-    V2 lane -- starting again would create a second ledger writer."""
+from talonx_ops.prospective.lock import (  # noqa: E402
+    ConcurrentStartError, SingleWriterLock, StaleLockError,
+)
 
 
 def _live_prior_stack() -> list[dict]:
@@ -110,22 +110,30 @@ def assert_no_live_prior_stack() -> None:
         )
 
 
+#: components that MUST be up for READY (a missing one is never cosmetic).
+MANDATORY_STARTUP = ("supervisor_alive", "v2_companion_alive", "dashboard_8787")
+
+
 def startup_verdict(info: dict[str, Any], verify: dict[str, Any], *,
                     heartbeat_fresh: bool, within_grace: bool) -> str:
     """One of NOT_STARTED / STARTING / READY / FAILED_WITH_RESIDUALS.
 
-    A missing MANDATORY component (supervisor OR companion) is never a
-    cosmetic warning -- it makes the verdict STARTING (still in grace) or
-    FAILED_WITH_RESIDUALS (grace elapsed and something is left running).
+    READY requires EVERY mandatory component (supervisor, V2 companion,
+    the :8787 dashboard) AND a fresh first-tick heartbeat -- not merely a
+    live supervisor + companion. A missing mandatory component is never a
+    cosmetic warning: STARTING while in grace, FAILED_WITH_RESIDUALS after.
     """
     sup = bool(verify.get("supervisor_alive"))
     comp = bool(verify.get("v2_companion_alive"))
+    dash = bool(verify.get("dashboard_8787"))
+    mandatory_up = sup and comp and dash
     residual = bool(_live_prior_stack())
-    if sup and comp and heartbeat_fresh:
+
+    if mandatory_up and heartbeat_fresh:
         return "READY"
     if not sup and not comp:
         return "FAILED_WITH_RESIDUALS" if residual else "NOT_STARTED"
-    # partial: some mandatory component up, some not
+    # something is up but not everything mandatory (incl. dashboard / heartbeat)
     if within_grace:
         return "STARTING"
     return "FAILED_WITH_RESIDUALS"
@@ -144,11 +152,40 @@ def start_stack(session_dir: str | Path, *, env: dict[str, str],
     logs = sd / "logs"
     py = sys.executable
 
-    # D4: a repeated / concurrent ``prospective start`` must not spawn a second
-    # supervisor + companion (a second v2_lane.db writer).
-    if not allow_when_running:
-        assert_no_live_prior_stack()
+    # D4 / Section 3: ATOMIC single-writer guard. os.open(O_CREAT|O_EXCL) keyed
+    # on the V2 ledger identity -- two racing starts: exactly one creates the
+    # lock, the other sees a LIVE owner and refuses. Held across spawn + pid
+    # registration; released by stop_stack (or the cleanup below on failure).
+    # --force (allow_when_running) breaks a STALE lock (owner verified gone) but
+    # NEVER a live one.
+    _lock = SingleWriterLock(V2_DB_PATH)
+    _lock.acquire(force=allow_when_running, break_stale=allow_when_running)
+    try:
+        # secondary, best-effort process scan (covers a stack started without
+        # the lock, e.g. a stale-lock break where the old owner is somehow back)
+        if not allow_when_running:
+            live = _live_prior_stack()
+            if live:
+                raise ConcurrentStartError(
+                    "process scan found a live prospective stack: "
+                    + "; ".join(f"pid {h['pid']}" for h in live))
+        return _start_stack_locked(
+            sd, logs, py, env=env, tick_seconds=tick_seconds,
+            heartbeat_seconds=heartbeat_seconds, live_lookback_days=live_lookback_days,
+            with_dashboard=with_dashboard, with_checkpoint_daemon=with_checkpoint_daemon,
+            checkpoint_every_s=checkpoint_every_s, pricing_mode=pricing_mode,
+            execution_scope=execution_scope, deliver=deliver, transport=transport,
+            lock_path=str(_lock.lock_path),
+        )
+    except BaseException:
+        _lock.release()          # partial failure -> do not leave the lock held
+        raise
 
+
+def _start_stack_locked(sd, logs, py, *, env, tick_seconds, heartbeat_seconds,
+                        live_lookback_days, with_dashboard, with_checkpoint_daemon,
+                        checkpoint_every_s, pricing_mode, execution_scope, deliver,
+                        transport, lock_path) -> dict[str, Any]:
     sup_argv = [py, "-m", "talonx_ops.supervisor", "run"]
     if not with_dashboard:
         sup_argv.append("--no-dashboard")
@@ -179,7 +216,8 @@ def start_stack(session_dir: str | Path, *, env: dict[str, str],
             "checkpoint_daemon_pid": daemon_pid,
             "started_utc": __import__("datetime").datetime.now(
                 __import__("datetime").timezone.utc).isoformat(),
-            "v2_argv": v2_argv}
+            "v2_argv": v2_argv,
+            "startlock_path": lock_path}
     atomic_write(_pids_file(sd), json.dumps(info, indent=2))
     return info
 
@@ -336,6 +374,25 @@ def stop_stack(session_dir: str | Path, *, grace_s: float = 45.0,
     pidf = REPO_ROOT / ".run" / "talonx.pids.json"
     res["pid_registry_cleared"] = not pidf.exists()
     res["v2_lane_db_intact"] = Path(V2_DB_PATH).exists()
+
+    # release the single-writer lock IFF the stack is actually down (no
+    # residuals). If residuals remain, the ledger may still be being written --
+    # keep the lock so a fresh start still refuses until teardown completes.
+    lock_released = None
+    if not residual:
+        try:
+            lp = info.get("startlock_path")
+            lock_p = Path(lp) if lp else SingleWriterLock(V2_DB_PATH).lock_path
+            if lock_p.exists():
+                lock_p.unlink()
+                lock_released = True
+            else:
+                lock_released = "absent"
+        except Exception as exc:  # noqa: BLE001
+            lock_released = f"error: {exc!r}"
+    else:
+        lock_released = "kept -- residuals present"
+    res["startlock_released"] = lock_released
     return res
 
 

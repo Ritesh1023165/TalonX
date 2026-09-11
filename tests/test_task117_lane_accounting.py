@@ -49,11 +49,14 @@ def test_gap_is_unresolved_without_a_metrics_snapshot(tmp_path, monkeypatch):
     monkeypatch.setattr(la, "_HOME", tmp_path / "nohome")
     monkeypatch.setattr(la, "_redis_quant_metrics", lambda day: {"present": False})
     out = la.build_lane_accounting(now=NOW, v2_db=_mk_v2(tmp_path))
-    assert out["funnel_closure"]["status"] == "NO_METRICS_SNAPSHOT"
-    assert out["historical_94_candidate_gap"]["status"] == "UNRESOLVED"
+    assert out["final_day_funnel_closure"]["status"] == "NO_METRICS_SNAPSHOT"
+    # Task 117 §4: the 94 arose from an apples-to-oranges ping subtraction; it is
+    # SUPERSEDED by the final-day reconciliation, never presented as "resolved".
+    assert out["historical_94_candidate_gap"]["status"] == "SUPERSEDED_BY_FINAL_DAY_RECONCILIATION"
+    assert out["historical_16_24_ping_snapshot"]["status"] == "NOT_RECONSTRUCTABLE"
 
 
-def test_funnel_closes_from_the_comingled_counter_when_present(tmp_path, monkeypatch):
+def test_residual_is_not_defined_as_throttle_by_arithmetic(tmp_path, monkeypatch):
     day = "2026-09-10"
     fake = {
         "present": True, "lane_attributable": False,
@@ -85,12 +88,19 @@ def test_funnel_closes_from_the_comingled_counter_when_present(tmp_path, monkeyp
     c.commit(); c.close()
 
     out = la.build_lane_accounting(now=NOW, v2_db=_mk_v2(tmp_path))
-    fc = out["funnel_closure"]
-    assert fc["status"] == "CLOSED"
+    fc = out["final_day_funnel_closure"]
+    assert fc["status"] == "COUNTER_RESIDUAL"
     assert fc["evaluated"] == 158 and fc["terminal_with_counter_sum"] == 154
-    assert fc["residual"] == 4                                # THROTTLE/COOLDOWN/reval
-    assert fc["published_all_experimental"] is True
-    assert out["historical_94_candidate_gap"]["status"] == "RESOLVED_WITH_EVIDENCE"
+    assert fc["residual"] == 4
+    # Task 117 §4: there are NO throttle/cooldown/revalidation records, so the
+    # residual is NOT explained by records and is NOT defined as that class by
+    # arithmetic remainder.
+    assert fc["residual_explained_by_records"] is False
+    assert "UNEXPLAINED_FROM_RECORDS" in fc["residual_attribution"]
+    assert out["off_counter_dispositions_from_records"]["throttle"] == 0
+    assert fc["published_is_comingled"] is True
+    assert fc["original_official_publications"] == 0          # dispatch_audit.alerts
+    assert out["historical_94_candidate_gap"]["status"] == "SUPERSEDED_BY_FINAL_DAY_RECONCILIATION"
 
 
 def test_in_flight_is_reported(tmp_path, monkeypatch):

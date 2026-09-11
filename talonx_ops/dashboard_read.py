@@ -37,7 +37,12 @@ from typing import Any
 from talonx_ops.authoritative_read_model import AuthoritativeReadModel
 from talonx_ops.market_health import MarketHealth
 
-_HOME = Path.home() / ".talonx"
+import os as _os
+
+#: data root. ``TALONX_HOME`` overrides it -- for isolated-fixture renders /
+#: acceptance runs the SPA can be pointed at a copy of the databases without
+#: touching ``~/.talonx``.
+_HOME = Path(_os.environ["TALONX_HOME"]) if _os.environ.get("TALONX_HOME") else (Path.home() / ".talonx")
 
 # canonical Original rejection reasons, in funnel order (Phase 5). The UI shows
 # whatever reasons actually appear; this list only fixes display order + ensures
@@ -737,6 +742,44 @@ class DashboardReadModel:
                         "band": d.get(bcol) if bcol else None,
                         "score": d.get(scol) if scol else None,
                     })
+            # Task 117 Section 4: intelligence-card DELIVERY health -- ingestion,
+            # queued, sending/ambiguous, sent, failed, expired shown SEPARATELY.
+            # A healthy poll loop does not imply anything was delivered.
+            if _has_table(con, "intelligence_delivery"):
+                by_state = {r["state"]: r["c"] for r in _qall(
+                    con, "SELECT state, COUNT(*) c FROM intelligence_delivery GROUP BY state")}
+                today = self._today()
+                sent_today = _q1(
+                    con, "SELECT COUNT(*) FROM intelligence_delivery "
+                    "WHERE state='SENT' AND substr(sent_at_utc,1,10)=?", (today,)) or 0
+                last_sent = _q1(
+                    con, "SELECT MAX(sent_at_utc) FROM intelligence_delivery WHERE state='SENT'")
+                last_digest = None
+                try:
+                    r = con.execute(
+                        "SELECT value FROM schema_meta WHERE key='last_digest_sent_utc'").fetchone()
+                    last_digest = r[0] if r else None
+                except Exception:  # noqa: BLE001
+                    pass
+                pending = int(by_state.get("PENDING", 0))
+                out["card_delivery"] = {
+                    "by_state": {
+                        "PENDING": pending,
+                        "IN_FLIGHT": int(by_state.get("IN_FLIGHT", 0)),
+                        "SENT": int(by_state.get("SENT", 0)),
+                        "AMBIGUOUS": int(by_state.get("AMBIGUOUS", 0)),
+                        "FAILED": int(by_state.get("FAILED", 0)),
+                        "EXPIRED": int(by_state.get("EXPIRED", 0)),
+                        "SUPPRESSED": int(by_state.get("SUPPRESSED", 0)),
+                    },
+                    "sent_today": sent_today,
+                    "last_card_sent_utc": last_sent,
+                    "last_digest_sent_utc": last_digest,
+                    "queued_not_sent": pending + int(by_state.get("IN_FLIGHT", 0)),
+                    "note": ("cards QUEUED is not cards SENT. 0 SENT with a healthy poll "
+                             "loop = delivery disabled or transport not configured -- see "
+                             "the runner's per-cycle delivery summary."),
+                }
             con.close()
         out["latest_events"] = latest
         out["significance_ranked"] = significance
@@ -752,6 +795,34 @@ class DashboardReadModel:
     # ------------------------------------------------------------------ #
     # PAPER / EOD
     # ------------------------------------------------------------------ #
+    def _official_telegram_last_send(self) -> dict[str, Any]:
+        """Last actual send + ack across EVERY official Telegram domain
+        (intraday alerts, long-term alerts, earnings heads-up), unioned from
+        the durable stores -- not just one table."""
+        out: dict[str, Any] = {}
+        con = _ro(self.home / "dispatch_audit.db")
+        if con is not None:
+            try:
+                if _has_table(con, "alerts"):
+                    out["intraday_alert"] = _q1(
+                        con, "SELECT MAX(telegram_sent_at) FROM alerts WHERE telegram_sent=1")
+                if _has_table(con, "long_term_alerts"):
+                    r = con.execute(
+                        "SELECT ticker, telegram_sent_at FROM long_term_alerts "
+                        "WHERE telegram_sent=1 ORDER BY telegram_sent_at DESC LIMIT 1").fetchone()
+                    out["long_term_alert"] = ({"ticker": r[0], "at": r[1]} if r else None)
+                if _has_table(con, "last_telegram_push"):
+                    for hz in ("intraday", "long_term", "earnings_heads_up"):
+                        r = con.execute(
+                            "SELECT MAX(pushed_at) FROM last_telegram_push WHERE horizon=?", (hz,)
+                        ).fetchone()
+                        out[f"last_push_{hz}"] = r[0] if r else None
+            finally:
+                con.close()
+        out["note"] = ("API-confirmed send timestamps only; message ids are stored per row "
+                       "where the transport returns them; human RECEIPT is never asserted here.")
+        return out
+
     def paper_eod(self) -> dict[str, Any]:
         op = self.arm.original_paper()
         ep = self.arm.experimental_paper()
@@ -760,6 +831,7 @@ class DashboardReadModel:
         return {
             "generated_at": self.now.isoformat(),
             "separation_note": "Original / Experimental / PIV paper are SEPARATE ledgers -- never one merged positions count.",
+            "official_telegram_last_send": self._official_telegram_last_send(),
             "original_local_paper": {
                 "attribution": "ORIGINAL / local-only (no broker)",
                 "status": op.status.value,

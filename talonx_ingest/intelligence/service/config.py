@@ -102,6 +102,9 @@ class ServiceConfig:
     deliver_cards_per_cycle: int = 20
     deliver_cards_enforce_age_cutoff: bool = True
     deliver_cards_timeout_seconds: float = 20.0
+    # DIGEST route is AGGREGATED into one message per interval (default 6h),
+    # not sent per-row. Restart-safe via a persisted time-bucket.
+    deliver_digest_interval_seconds: float = 6 * 3600.0
 
     # -- paths ----------------------------------------------------------
     ledger_path: str | None = None
@@ -172,6 +175,9 @@ class ServiceConfig:
             ),
             deliver_cards_timeout_seconds=_env_float(
                 "TALONX_INTEL_DELIVER_TIMEOUT_SECONDS", 20.0
+            ),
+            deliver_digest_interval_seconds=_env_float(
+                "TALONX_INTEL_DELIVER_DIGEST_INTERVAL_SECONDS", 6 * 3600.0
             ),
             ledger_path=os.environ.get("TALONX_LEDGER_PATH") or None,
             state_dir=Path(

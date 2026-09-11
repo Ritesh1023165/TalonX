@@ -37,6 +37,10 @@ from talonx_ingest.intelligence.delivery.config import (
 from talonx_ingest.intelligence.delivery.render_model import TelegramIntelligenceMessage
 
 STATE_PENDING = "PENDING"
+STATE_IN_FLIGHT = "IN_FLIGHT"    # claimed by a drainer, request about to cross /
+                                # crossing the network. A restart / competing
+                                # drainer that finds one recovers it to AMBIGUOUS
+                                # (never blindly re-sends).
 STATE_SENT = "SENT"
 STATE_FAILED = "FAILED"
 STATE_SUPPRESSED = "SUPPRESSED"
@@ -139,6 +143,9 @@ class DeliveryRow:
     sent_at_utc: datetime | None
     next_retry_at_utc: datetime | None
     suppress_reason: str | None
+    attempt_id: str | None = None
+    in_flight_since_utc: datetime | None = None
+    transport_message_id: str | None = None
 
 
 @dataclass
@@ -156,6 +163,15 @@ class DeliveryOutbox:
         self._conn = sqlite3.connect(self.path)
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(_SCHEMA)
+        # additive migration: durable in-flight claim + transport ack id
+        _have = {r[1] for r in self._conn.execute("PRAGMA table_info(intelligence_delivery)")}
+        for col, ddl in (
+            ("attempt_id", "attempt_id TEXT"),
+            ("in_flight_since_utc", "in_flight_since_utc TEXT"),
+            ("transport_message_id", "transport_message_id TEXT"),
+        ):
+            if col not in _have:
+                self._conn.execute(f"ALTER TABLE intelligence_delivery ADD COLUMN {ddl}")
         self._conn.execute(
             "INSERT INTO schema_meta (key, value) VALUES "
             "('intelligence_delivery_schema_version', ?) ON CONFLICT(key) DO NOTHING",
@@ -177,6 +193,58 @@ class DeliveryOutbox:
             "SELECT value FROM schema_meta WHERE key='intelligence_delivery_schema_version'"
         ).fetchone()
         return int(r[0]) if r else 0
+
+    def get_meta(self, key: str) -> str | None:
+        r = self._conn.execute("SELECT value FROM schema_meta WHERE key=?", (key,)).fetchone()
+        return r[0] if r else None
+
+    def set_meta(self, key: str, value: str) -> None:
+        self._conn.execute(
+            "INSERT INTO schema_meta (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (key, str(value)),
+        )
+        self._conn.commit()
+
+    def digest_pending(self, *, now: datetime | None = None,
+                       limit: int | None = None) -> list[DeliveryRow]:
+        """PENDING rows on the DIGEST route (held for aggregation)."""
+        return self.pending(route="DIGEST", now=now, limit=limit)
+
+    def claim_digest_batch(self, delivery_ids: list[str], digest_id: str, *,
+                           now: datetime | None = None) -> list[str]:
+        """Atomically move a batch of PENDING DIGEST rows to IN_FLIGHT under one
+        ``digest_id``. Returns the ids actually claimed (a competing digest run
+        gets fewer / none)."""
+        now = now or datetime.now(timezone.utc)
+        claimed: list[str] = []
+        for did in delivery_ids:
+            cur = self._conn.execute(
+                "UPDATE intelligence_delivery SET state=?, attempt_id=?, in_flight_since_utc=?, "
+                "updated_at_utc=? WHERE delivery_id=? AND state=?",
+                (STATE_IN_FLIGHT, digest_id, _iso(now), _iso(now), did, STATE_PENDING),
+            )
+            if cur.rowcount == 1:
+                claimed.append(did)
+                self._log(did, "IN_FLIGHT", f"digest {digest_id}")
+        self._conn.commit()
+        return claimed
+
+    def mark_digest_sent(self, delivery_ids: list[str], digest_id: str, *,
+                         message_id: str | int | None = None,
+                         now: datetime | None = None) -> None:
+        now = now or datetime.now(timezone.utc)
+        for did in delivery_ids:
+            self._conn.execute(
+                "UPDATE intelligence_delivery SET state=?, sent_at_utc=?, last_error=NULL, "
+                "next_retry_at_utc=NULL, in_flight_since_utc=NULL, "
+                "transport_message_id=?, updated_at_utc=? WHERE delivery_id=? AND state=?",
+                (STATE_SENT, _iso(now),
+                 f"digest:{digest_id}" + (f":{message_id}" if message_id is not None else ""),
+                 _iso(now), did, STATE_IN_FLIGHT),
+            )
+            self._log(did, "SENT", f"in digest {digest_id} (message_id={message_id})")
+        self._conn.commit()
 
     # ------------------------------------------------------------------
     def _log(self, delivery_id: str, kind: str, detail: str | None = None) -> None:
@@ -318,14 +386,84 @@ class DeliveryOutbox:
         self._log(delivery_id, "SUPPRESSED", reason)
         self._conn.commit()
 
-    def mark_sent(self, delivery_id: str, *, now: datetime | None = None) -> None:
+    def claim_for_send(self, delivery_id: str, attempt_id: str, *,
+                       now: datetime | None = None) -> bool:
+        """Atomically move a due PENDING row to IN_FLIGHT and stamp it with this
+        drainer's ``attempt_id``. Returns True iff THIS call won the claim -- a
+        competing drainer (or a re-entrant call) gets False and must not send.
+        Persist-before-network: the claim is committed before the transport is
+        touched, so a crash mid-send leaves a recoverable IN_FLIGHT row.
+        """
+        now = now or datetime.now(timezone.utc)
+        cur = self._conn.execute(
+            "UPDATE intelligence_delivery SET state=?, attempt_id=?, in_flight_since_utc=?, "
+            "updated_at_utc=? WHERE delivery_id=? AND state=? "
+            "AND (next_retry_at_utc IS NULL OR next_retry_at_utc <= ?)",
+            (STATE_IN_FLIGHT, attempt_id, _iso(now), _iso(now), delivery_id,
+             STATE_PENDING, _iso(now)),
+        )
+        self._conn.commit()
+        if cur.rowcount == 1:
+            self._log(delivery_id, "IN_FLIGHT", f"claimed attempt {attempt_id}")
+            return True
+        return False
+
+    def release_claim(self, delivery_id: str, attempt_id: str, *,
+                      now: datetime | None = None) -> None:
+        """A CLEAN transient failure before the request left the process --
+        return the row to PENDING so a later cycle retries. Only our own claim."""
+        now = now or datetime.now(timezone.utc)
+        self._conn.execute(
+            "UPDATE intelligence_delivery SET state=?, attempt_id=NULL, in_flight_since_utc=NULL, "
+            "updated_at_utc=? WHERE delivery_id=? AND state=? AND attempt_id=?",
+            (STATE_PENDING, _iso(now), delivery_id, STATE_IN_FLIGHT, attempt_id),
+        )
+        self._conn.commit()
+
+    def recover_in_flight(self, *, now: datetime | None = None,
+                          stale_after_seconds: float = 90.0) -> list[str]:
+        """Any IN_FLIGHT row older than ``stale_after_seconds`` -> AMBIGUOUS.
+        Called at drain start and on service open: a row stuck IN_FLIGHT means a
+        drainer died / was cancelled / restarted DURING a send -- Telegram may or
+        may not have the message, so it must NOT be blind-retried. Returns the
+        ids recovered."""
+        from datetime import timedelta
+
+        now = now or datetime.now(timezone.utc)
+        cutoff = _iso(now - timedelta(seconds=max(0.0, stale_after_seconds)))
+        rows = self._conn.execute(
+            "SELECT delivery_id FROM intelligence_delivery "
+            "WHERE state=? AND (in_flight_since_utc IS NULL OR in_flight_since_utc <= ?)",
+            (STATE_IN_FLIGHT, cutoff),
+        ).fetchall()
+        ids = [r["delivery_id"] for r in rows]
+        for did in ids:
+            self._conn.execute(
+                "UPDATE intelligence_delivery SET state=?, last_error=?, "
+                "next_retry_at_utc=NULL, updated_at_utc=? WHERE delivery_id=? AND state=?",
+                (STATE_AMBIGUOUS,
+                 "recovered from a stale IN_FLIGHT claim -- outcome unknown, not retried",
+                 _iso(now), did, STATE_IN_FLIGHT),
+            )
+            self._log(did, "AMBIGUOUS", "recovered stale IN_FLIGHT claim")
+        if ids:
+            self._conn.commit()
+        return ids
+
+    def mark_sent(self, delivery_id: str, *, message_id: str | int | None = None,
+                  now: datetime | None = None) -> None:
         now = now or datetime.now(timezone.utc)
         self._conn.execute(
             "UPDATE intelligence_delivery SET state=?, sent_at_utc=?, last_error=NULL, "
-            "next_retry_at_utc=NULL, updated_at_utc=? WHERE delivery_id=? AND state=?",
-            (STATE_SENT, _iso(now), _iso(now), delivery_id, STATE_PENDING),
+            "next_retry_at_utc=NULL, in_flight_since_utc=NULL, "
+            "transport_message_id=COALESCE(?, transport_message_id), updated_at_utc=? "
+            "WHERE delivery_id=? AND state IN (?, ?)",
+            (STATE_SENT, _iso(now),
+             (str(message_id) if message_id is not None else None),
+             _iso(now), delivery_id, STATE_PENDING, STATE_IN_FLIGHT),
         )
-        self._log(delivery_id, "SENT", None)
+        self._log(delivery_id, "SENT",
+                  f"message_id={message_id}" if message_id is not None else None)
         self._conn.commit()
 
     def mark_failed(
@@ -342,7 +480,8 @@ class DeliveryOutbox:
         if permanent or attempts >= MAX_SEND_ATTEMPTS:
             self._conn.execute(
                 "UPDATE intelligence_delivery SET state=?, attempts=?, last_error=?, "
-                "next_retry_at_utc=NULL, updated_at_utc=? WHERE delivery_id=?",
+                "next_retry_at_utc=NULL, attempt_id=NULL, in_flight_since_utc=NULL, "
+                "updated_at_utc=? WHERE delivery_id=?",
                 (STATE_FAILED, attempts, error[:500], _iso(now), delivery_id),
             )
             self._log(delivery_id, "FAILED", error[:200])
@@ -354,9 +493,9 @@ class DeliveryOutbox:
 
             nxt = _iso(now + timedelta(seconds=max(0.0, retry_after_seconds)))
         self._conn.execute(
-            "UPDATE intelligence_delivery SET attempts=?, last_error=?, next_retry_at_utc=?, "
-            "updated_at_utc=? WHERE delivery_id=?",
-            (attempts, error[:500], nxt, _iso(now), delivery_id),
+            "UPDATE intelligence_delivery SET state=?, attempts=?, last_error=?, next_retry_at_utc=?, "
+            "attempt_id=NULL, in_flight_since_utc=NULL, updated_at_utc=? WHERE delivery_id=?",
+            (STATE_PENDING, attempts, error[:500], nxt, _iso(now), delivery_id),
         )
         self._log(delivery_id, "RETRY", f"attempt {attempts}: {error[:150]}")
         self._conn.commit()
@@ -370,8 +509,9 @@ class DeliveryOutbox:
         now = now or datetime.now(timezone.utc)
         self._conn.execute(
             "UPDATE intelligence_delivery SET state=?, last_error=?, next_retry_at_utc=NULL, "
-            "updated_at_utc=? WHERE delivery_id=? AND state=?",
-            (STATE_AMBIGUOUS, detail[:500], _iso(now), delivery_id, STATE_PENDING),
+            "in_flight_since_utc=NULL, updated_at_utc=? WHERE delivery_id=? AND state IN (?, ?)",
+            (STATE_AMBIGUOUS, detail[:500], _iso(now), delivery_id,
+             STATE_PENDING, STATE_IN_FLIGHT),
         )
         self._log(delivery_id, "AMBIGUOUS", detail[:200])
         self._conn.commit()
@@ -527,4 +667,7 @@ class DeliveryOutbox:
             sent_at_utc=_dt(r["sent_at_utc"]),
             next_retry_at_utc=_dt(r["next_retry_at_utc"]),
             suppress_reason=r["suppress_reason"],
+            attempt_id=(r["attempt_id"] if "attempt_id" in r.keys() else None),
+            in_flight_since_utc=(_dt(r["in_flight_since_utc"]) if "in_flight_since_utc" in r.keys() else None),
+            transport_message_id=(r["transport_message_id"] if "transport_message_id" in r.keys() else None),
         )

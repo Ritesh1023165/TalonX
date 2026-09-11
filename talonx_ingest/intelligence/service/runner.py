@@ -184,8 +184,13 @@ class IntelligenceService:
         if self.stores is None:
             return None
         from talonx_ingest.intelligence.delivery.pipeline import (
-            TelegramSenderAdapter, process_pending,
+            TelegramSenderAdapter, process_digest, process_pending,
         )
+
+        # (1D) decision time = NOW, at drain, never the (possibly minutes-old)
+        # poll-cycle timestamp -- the `now` arg is ignored on purpose except in
+        # tests that pin it.
+        now = now or datetime.now(timezone.utc)
 
         enabled = (
             bool(self.config.deliver_intelligence_cards)
@@ -201,35 +206,60 @@ class IntelligenceService:
             except Exception:  # noqa: BLE001
                 return None
 
-        summary: dict = {"mode": mode}
+        summary: dict = {"mode": mode, "at_utc": now.isoformat(), "ok": True}
         try:
-            for route in ("IMMEDIATE", "DIGEST"):
-                res = await asyncio.wait_for(
-                    process_pending(
-                        self.stores.outbox, sender, mode=mode, route=route,
-                        limit=self.config.deliver_cards_per_cycle,
-                        enforce_age_cutoff=(
-                            enabled and self.config.deliver_cards_enforce_age_cutoff
-                        ),
-                        event_time_lookup=_event_time,
-                        now=now,
-                    ),
-                    timeout=self.config.deliver_cards_timeout_seconds,
-                )
+            # IMMEDIATE -> individual sends; DIGEST -> aggregated on a schedule.
+            imm = await asyncio.wait_for(
+                process_pending(
+                    self.stores.outbox, sender, mode=mode, route="IMMEDIATE",
+                    limit=self.config.deliver_cards_per_cycle,
+                    enforce_age_cutoff=(
+                        enabled and self.config.deliver_cards_enforce_age_cutoff),
+                    event_time_lookup=_event_time,
+                ),
+                timeout=self.config.deliver_cards_timeout_seconds,
+            )
+            dig = await asyncio.wait_for(
+                process_digest(
+                    self.stores.outbox, sender, mode=mode,
+                    interval_seconds=self.config.deliver_digest_interval_seconds,
+                    limit=self.config.deliver_cards_per_cycle,
+                    enforce_age_cutoff=(
+                        enabled and self.config.deliver_cards_enforce_age_cutoff),
+                    event_time_lookup=_event_time,
+                ),
+                timeout=self.config.deliver_cards_timeout_seconds,
+            )
+            for route, res in (("IMMEDIATE", imm), ("DIGEST", dig)):
                 summary[route] = {
                     "delivered": res.delivered, "held": res.held,
                     "simulated": res.simulated, "retried": res.retried,
                     "failed": res.failed, "ambiguous": res.ambiguous,
                     "expired": res.expired,
                     "held_reason": res.held_reason,
+                    "message_ids": res.message_ids,
+                    "row_errors": res.errors,
                     "skipped_not_configured": res.skipped_not_configured,
                 }
+                if res.errors:
+                    summary["ok"] = False
+        except asyncio.CancelledError:
+            # shutdown -- propagate. process_pending has already marked any
+            # in-flight row AMBIGUOUS.
+            raise
         except asyncio.TimeoutError:
             logger.warning(
                 "intelligence-card delivery drain timed out (%ss); poll loop continues",
                 self.config.deliver_cards_timeout_seconds,
             )
             summary["timed_out"] = True
+            summary["ok"] = False
+        except Exception as exc:  # noqa: BLE001
+            # (1E) an unexpected delivery error must be VISIBLE and must NOT
+            # terminate source polling or be swallowed into a healthy state.
+            logger.error("intelligence-card delivery cycle failed: %r -- poll loop continues", exc)
+            summary["error"] = repr(exc)
+            summary["ok"] = False
         if any(
             isinstance(v, dict) and (v.get("delivered") or v.get("failed") or v.get("ambiguous") or v.get("expired"))
             for v in summary.values()
@@ -291,7 +321,9 @@ class IntelligenceService:
             now = datetime.now(timezone.utc)
             res = await self.poll_cycle(now=now)
             await self.drain_retries(now=now)
-            delivery = await self.deliver_cycle(now=now)
+            # deliver_cycle computes its OWN drain-time `now`; never blocks the
+            # loop (bounded) and never swallows an error into a healthy state.
+            delivery = await self.deliver_cycle()
 
             summary = {
                 "at_utc": now.isoformat(),
@@ -302,6 +334,7 @@ class IntelligenceService:
                 "new_form4": res.new_form4_filings,
                 "freshness": res.submissions_freshness,
                 "delivery": delivery,
+                "delivery_ok": (delivery or {}).get("ok", True),
                 "errors": res.errors[:10],
             }
             cycle_summaries.append(summary)

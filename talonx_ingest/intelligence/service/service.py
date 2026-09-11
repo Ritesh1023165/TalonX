@@ -48,7 +48,11 @@ def _build_config(args) -> ServiceConfig:
     if getattr(args, "include_paused", False):
         over["include_paused"] = True
     if getattr(args, "send", False):
+        # explicit operator enablement: --send (guarded by
+        # --i-understand-external-send below) flips BOTH gates. Delivery still
+        # only goes ``enabled`` when Telegram is actually configured.
         over["dry_run_delivery"] = False
+        over["deliver_intelligence_cards"] = True
     return cfg.with_overrides(**over) if over else cfg
 
 

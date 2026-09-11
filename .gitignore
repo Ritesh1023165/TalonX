@@ -73,3 +73,4 @@ Thumbs.db
 v2_lane.db.predeploy-*
 v2_lane.db.eod-copy*
 v2_lane.db.*-copy*
+v2_lane.db.startlock

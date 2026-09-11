@@ -334,6 +334,23 @@ function renderIntelligence(d){
      Object.entries(d.counts||{}).map(([k,v])=>kv(k, num(v))).join('')+
      `<details><summary>deep links</summary>`+
      Object.entries(d.deep_links||{}).map(([k,v])=>`<div><a href="${esc(v)}" target="_blank">${k} →</a></div>`).join('')+`</details></div>`;
+  const cd=d.card_delivery;
+  if(cd){
+    const bs=cd.by_state||{};
+    h+=`<div class="card intel"><h3>Card delivery</h3>`+
+       kv('disabled / pending', num(bs.PENDING))+
+       kv('sending (in-flight)', num(bs.IN_FLIGHT))+
+       kv('sent', num(bs.SENT))+
+       kv('sending-ambiguous', num(bs.AMBIGUOUS))+
+       kv('failed', num(bs.FAILED))+
+       kv('expired', num(bs.EXPIRED))+
+       kv('suppressed', num(bs.SUPPRESSED))+
+       kv('sent today', num(cd.sent_today))+
+       kv('last card sent', cd.last_card_sent_utc? esc(String(cd.last_card_sent_utc).slice(0,19)) : '—')+
+       kv('last digest sent', cd.last_digest_sent_utc? esc(String(cd.last_digest_sent_utc).slice(0,19)) : '—')+
+       kv('queued, not sent', num(cd.queued_not_sent))+
+       `<div class="muted small">${esc(cd.note||'')}</div></div>`;
+  }
   h+=`<div class="card intel card-wide"><h3>Latest events</h3>`+
      boundedTable(d.latest_events, [
        {label:'event id', get:r=>r.event_id},{label:'symbol', get:r=>r.symbol},
@@ -364,6 +381,14 @@ function renderPaperEod(d){
      kv('attribution', p.attribution)+kv('status', pill(p.status))+
      kv('positions', pill(p.positions))+kv('orders', pill(p.orders))+
      `<div class="muted small">${esc(p.note||'')}</div></div>`;
+  const ot=d.official_telegram_last_send;
+  if(ot){
+    h+=`<div class="card card-wide"><h3>Official Telegram — last confirmed send</h3>`+
+       kv('intraday alert', ot.last_push_intraday? esc(String(ot.last_push_intraday).slice(0,19)) : '—')+
+       kv('long-term alert', ot.last_push_long_term? esc(String(ot.last_push_long_term).slice(0,19))+(ot.long_term_alert&&ot.long_term_alert.ticker? ' ('+esc(ot.long_term_alert.ticker)+')':'') : '—')+
+       kv('earnings heads-up', ot.last_push_earnings_heads_up? esc(String(ot.last_push_earnings_heads_up).slice(0,19)) : '—')+
+       `<div class="muted small">${esc(ot.note||'')}</div></div>`;
+  }
   h+=`<div class="card card-wide"><h3>EOD reconciliation ${pill(r.status)}</h3>`+
      kv('authoritative source', r.authoritative_source)+kv('last update', r.last_update)+
      `<div class="muted small">${esc(r.note||'')}</div>`+
@@ -551,6 +576,9 @@ function renderBufferWarmup(bw){
 function setStatus(state){ const d=$('status-dot'), t=$('status-text');
   d.className='status-dot'+(state==='connected'?' connected':state==='reconnecting'?' reconnecting':''); t.textContent=state; }
 function connect(){
+  // headless-capture affordance: ?nows disables the live socket so a
+  // virtual-time screenshot can settle (no behaviour change without the param).
+  if(/[?&]nows\b/.test(location.search)){ setStatus('offline'); return; }
   const proto = location.protocol==='https:'?'wss:':'ws:';
   const ws = new WebSocket(`${proto}//${location.host}/ws`); let backoff=1000;
   ws.onopen=()=>{ setStatus('connected'); backoff=1000; };

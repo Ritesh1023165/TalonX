@@ -92,20 +92,28 @@ def cmd_start(args) -> int:
             {"verdict": "REFUSED_ALREADY_RUNNING", "detail": str(exc)}, indent=2))
         return 3
 
-    # D4: bounded readiness wait -> a FIRST-CLASS verdict, from the actual
-    # process/heartbeat state (not a preflight snapshot that races the port).
+    # D4 / Section 3: bounded readiness wait -> a FIRST-CLASS verdict from the
+    # actual process + heartbeat + dashboard state. READY needs EVERY mandatory
+    # component (supervisor, companion, :8787) AND a fresh first tick.
+    # The mechanism that resolves STARTING -> READY within the deadline is THIS
+    # loop: it re-polls verify_running() + the heartbeat file every 3s until all
+    # mandatory signals are up or the 120s grace elapses.
     GRACE_S = 120
     deadline = time.monotonic() + GRACE_S
     heartbeat_fresh = False
+    verify = verify_running(sd, retries=1)
     while time.monotonic() < deadline:
         try:
             s = json.loads(Path(env["TALONX_V2_STATUS_PATH"]).read_text())
             age = (datetime.now(timezone.utc) - datetime.fromisoformat(s["heartbeat_utc"])).total_seconds()
-            if age < 180 and s.get("strategy_version"):
-                heartbeat_fresh = True
-                break
+            heartbeat_fresh = age < 180 and bool(s.get("strategy_version"))
         except Exception:  # noqa: BLE001
-            pass
+            heartbeat_fresh = False
+        verify = verify_running(sd, retries=1)
+        if heartbeat_fresh and all(verify.get(k) for k in ("supervisor_alive",
+                                                           "v2_companion_alive",
+                                                           "dashboard_8787")):
+            break
         time.sleep(3)
 
     within_grace = time.monotonic() < deadline

@@ -167,3 +167,21 @@ def test_digest_not_treated_as_immediate(tmp_path, monkeypatch):
     assert svc.stores.outbox.get(imm).route == "IMMEDIATE"
     assert dig.route == "DIGEST"
     svc.stores.outbox.close()
+
+
+def test_cli_send_flag_flips_both_enablement_gates():
+    """``poll --send --i-understand-external-send`` is the explicit operator
+    enablement: it must flip BOTH ``dry_run_delivery`` -> False AND
+    ``deliver_intelligence_cards`` -> True (env var is the alternative path)."""
+    import argparse
+    from talonx_ingest.intelligence.service.service import _build_config
+
+    base = argparse.Namespace(
+        ledger_path=None, state_dir=None, history_days=None,
+        include_paused=False, send=False)
+    off = _build_config.__wrapped__(base) if hasattr(_build_config, "__wrapped__") else _build_config(base)
+    assert off.deliver_intelligence_cards is False and off.dry_run_delivery is True
+
+    base.send = True
+    on = _build_config(base)
+    assert on.deliver_intelligence_cards is True and on.dry_run_delivery is False
