@@ -78,11 +78,76 @@ CREATE TABLE IF NOT EXISTS portfolio (
     id      INTEGER PRIMARY KEY CHECK (id = 1),
     cash    REAL NOT NULL
 );
+-- Task 117 overnight: a durable, idempotent PRE-OPEN entry intent.  It is
+-- created when a cluster fires and its eligible entry session has NOT started,
+-- so an actionable alert can be sent BEFORE that session's open.  It carries NO
+-- economic weight of its own -- the fill still runs through the unchanged frozen
+-- pipeline at the eligible-entry-session OPEN; the intent only records that the
+-- decision existed earlier and links the later fill to it.
+CREATE TABLE IF NOT EXISTS pending_entry_intents (
+    intent_id             TEXT PRIMARY KEY,
+    episode_id            TEXT NOT NULL UNIQUE,
+    symbol                TEXT NOT NULL,
+    issuer_cik            TEXT,
+    strategy_version      TEXT NOT NULL,
+    activation_filing_date TEXT,
+    target_entry_session  TEXT NOT NULL,
+    planned_exit_session  TEXT,
+    decision_action       TEXT NOT NULL,
+    decision_rationale    TEXT,
+    horizon_trading_days  INTEGER NOT NULL,
+    liquidity_ok          INTEGER,
+    liquidity_median_dv   REAL,
+    liquidity_last_close  REAL,
+    status                TEXT NOT NULL,          -- PENDING | FILLED | EXPIRED_STALE | SUPERSEDED
+    created_at_utc        TEXT NOT NULL,
+    updated_at_utc        TEXT NOT NULL,
+    filled_position_id    INTEGER,
+    fill_entry_session    TEXT,
+    fill_price            REAL,
+    reconciled_at_utc     TEXT,
+    detail                TEXT
+);
+-- Task 117 overnight: durable V2 official-alert outbox.  Written by the service,
+-- drained by a delivery worker that asks OfficialExternalRouter and hands the
+-- payload to an injected transport.  Explicit SENT/HELD/FAILED/PENDING/AMBIGUOUS.
+CREATE TABLE IF NOT EXISTS v2_alert_outbox (
+    event_id              TEXT PRIMARY KEY,
+    episode_id            TEXT NOT NULL,
+    intent_id             TEXT,
+    position_id           INTEGER,
+    kind                  TEXT NOT NULL,          -- ENTRY_INTENT | ENTRY_FILL | EXIT_FILL | ENTRY_STALE
+    action                TEXT NOT NULL,          -- BUY | SELL | INFO
+    symbol                TEXT NOT NULL,
+    strategy_version      TEXT NOT NULL,
+    horizon_trading_days  INTEGER,
+    dedup_key             TEXT NOT NULL,
+    payload_text          TEXT NOT NULL,
+    provenance_json       TEXT NOT NULL,
+    state                 TEXT NOT NULL,          -- PENDING | SENT | HELD | FAILED | AMBIGUOUS | RETRY | EXPIRED
+    attempts              INTEGER NOT NULL DEFAULT 0,
+    next_attempt_utc      TEXT,
+    last_error            TEXT,
+    transport_ref         TEXT,
+    -- Task 117 deployment-readiness: an actionable-instruction alert (PLANNED
+    -- BUY / ENTRY_INTENT) is only deliverable BEFORE this instant; past it the
+    -- worker marks it EXPIRED so a queued instruction never emerges after the
+    -- open as fresh.  NULL for pure notifications (ENTRY_FILL / EXIT_FILL / ...).
+    deliver_by_utc        TEXT,
+    created_at_utc        TEXT NOT NULL,
+    updated_at_utc        TEXT NOT NULL,
+    sent_at_utc           TEXT
+);
 """
 
 
 def _now() -> str:
     return datetime.now().astimezone().isoformat()
+
+
+def _utcnow() -> str:
+    from datetime import timezone
+    return datetime.now(timezone.utc).isoformat()
 
 
 class V2Store:
@@ -107,6 +172,11 @@ class V2Store:
     def _init(self) -> None:
         with self._conn() as c:
             c.executescript(_SCHEMA)
+            # additive, idempotent column migration for an outbox table that was
+            # created by an earlier build (Task 117 deployment-readiness).
+            cols = {r[1] for r in c.execute("PRAGMA table_info(v2_alert_outbox)")}
+            if cols and "deliver_by_utc" not in cols:
+                c.execute("ALTER TABLE v2_alert_outbox ADD COLUMN deliver_by_utc TEXT")
             row = c.execute("SELECT cash FROM portfolio WHERE id=1").fetchone()
             if row is None:
                 c.execute("INSERT INTO portfolio (id, cash) VALUES (1, ?)", (self._starting_cash,))
@@ -273,3 +343,120 @@ class V2Store:
             r = c.execute("SELECT cooldown_until_session FROM cooldowns WHERE issuer_key=?",
                           (symbol.upper(),)).fetchone()
             return date.fromisoformat(r["cooldown_until_session"]) if r else None
+
+    # ---- pre-open entry intents (Task 117 overnight) ----
+    @staticmethod
+    def _intent_id(episode_id: str, target_entry_session: str) -> str:
+        import hashlib
+        return hashlib.sha256(f"{episode_id}|{target_entry_session}".encode()).hexdigest()[:16]
+
+    def upsert_entry_intent(self, ep, decision, liquidity, *, horizon: int,
+                            planned_exit_session: str = "") -> dict:
+        """Create (idempotently) a PENDING pre-open entry intent for ``ep``.
+        Never overwrites a FILLED/EXPIRED/SUPERSEDED terminal state."""
+        tes = ep.eligible_entry_session.isoformat()
+        iid = self._intent_id(ep.episode_id, tes)
+        with self._conn() as c:
+            row = c.execute("SELECT status FROM pending_entry_intents WHERE episode_id=?",
+                            (ep.episode_id,)).fetchone()
+            if row is not None:
+                return self.entry_intent(ep.episode_id)  # already present -- idempotent
+            c.execute(
+                """INSERT INTO pending_entry_intents
+                   (intent_id, episode_id, symbol, issuer_cik, strategy_version,
+                    activation_filing_date, target_entry_session, planned_exit_session,
+                    decision_action, decision_rationale, horizon_trading_days,
+                    liquidity_ok, liquidity_median_dv, liquidity_last_close,
+                    status, created_at_utc, updated_at_utc)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'PENDING', ?, ?)""",
+                (iid, ep.episode_id, ep.symbol.upper(), ep.issuer_cik,
+                 decision.strategy_version, ep.activation_filing_date.isoformat(), tes,
+                 planned_exit_session, decision.action.value, decision.rationale[:400],
+                 int(horizon), 1 if liquidity.ok else 0, liquidity.median_dollar_volume,
+                 liquidity.last_close, _utcnow(), _utcnow()),
+            )
+        return self.entry_intent(ep.episode_id)
+
+    def entry_intent(self, episode_id: str) -> dict | None:
+        with self._conn() as c:
+            r = c.execute("SELECT * FROM pending_entry_intents WHERE episode_id=?",
+                          (episode_id,)).fetchone()
+            return dict(r) if r else None
+
+    def pending_entry_intents(self) -> list[dict]:
+        with self._conn() as c:
+            return [dict(r) for r in c.execute(
+                "SELECT * FROM pending_entry_intents WHERE status='PENDING' "
+                "ORDER BY target_entry_session, symbol")]
+
+    def all_entry_intents(self) -> list[dict]:
+        with self._conn() as c:
+            return [dict(r) for r in c.execute(
+                "SELECT * FROM pending_entry_intents ORDER BY created_at_utc")]
+
+    def mark_entry_intent(self, intent_id: str, status: str, *, position_id: int | None = None,
+                          fill_price: float | None = None, fill_session: str = "",
+                          detail: str = "") -> None:
+        with self._conn() as c:
+            c.execute(
+                """UPDATE pending_entry_intents SET status=?, filled_position_id=?,
+                     fill_price=?, fill_entry_session=?, reconciled_at_utc=?, updated_at_utc=?,
+                     detail=? WHERE intent_id=? AND status='PENDING'""",
+                (status, position_id, fill_price, fill_session, _utcnow(), _utcnow(),
+                 detail[:400], intent_id),
+            )
+
+    # ---- V2 alert outbox (Task 117 overnight) ----
+    def enqueue_alert(self, *, event_id: str, episode_id: str, kind: str, action: str,
+                      symbol: str, strategy_version: str, dedup_key: str, payload_text: str,
+                      provenance: dict, horizon_trading_days: int | None = None,
+                      intent_id: str | None = None, position_id: int | None = None,
+                      deliver_by_utc: str | None = None) -> bool:
+        """Idempotent enqueue.  Returns True if a new row was written.
+
+        ``deliver_by_utc`` -- for an actionable-instruction alert (ENTRY_INTENT):
+        the instant after which the instruction is no longer actionable; the
+        delivery worker EXPIRES it rather than sending it late as fresh.
+        """
+        with self._conn() as c:
+            exists = c.execute("SELECT 1 FROM v2_alert_outbox WHERE event_id=?",
+                               (event_id,)).fetchone() is not None
+            if exists:
+                return False
+            c.execute(
+                """INSERT INTO v2_alert_outbox
+                   (event_id, episode_id, intent_id, position_id, kind, action, symbol,
+                    strategy_version, horizon_trading_days, dedup_key, payload_text,
+                    provenance_json, state, attempts, deliver_by_utc, created_at_utc, updated_at_utc)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'PENDING', 0, ?, ?, ?)""",
+                (event_id, episode_id, intent_id, position_id, kind, action, symbol.upper(),
+                 strategy_version, horizon_trading_days, dedup_key, payload_text,
+                 json.dumps(provenance, default=str), deliver_by_utc, _utcnow(), _utcnow()),
+            )
+            return True
+
+    def outbox_due(self, *, now_iso: str) -> list[dict]:
+        with self._conn() as c:
+            return [dict(r) for r in c.execute(
+                "SELECT * FROM v2_alert_outbox WHERE state IN ('PENDING','RETRY') "
+                "AND (next_attempt_utc IS NULL OR next_attempt_utc <= ?) "
+                "ORDER BY created_at_utc", (now_iso,))]
+
+    def all_outbox(self) -> list[dict]:
+        with self._conn() as c:
+            return [dict(r) for r in c.execute(
+                "SELECT * FROM v2_alert_outbox ORDER BY created_at_utc")]
+
+    def update_outbox(self, event_id: str, *, state: str, attempts: int | None = None,
+                      next_attempt_utc: str | None = None, last_error: str | None = None,
+                      transport_ref: str | None = None, sent: bool = False) -> None:
+        with self._conn() as c:
+            c.execute(
+                """UPDATE v2_alert_outbox SET state=?,
+                     attempts=COALESCE(?, attempts),
+                     next_attempt_utc=?, last_error=?, transport_ref=COALESCE(?, transport_ref),
+                     updated_at_utc=?, sent_at_utc=CASE WHEN ? THEN ? ELSE sent_at_utc END
+                   WHERE event_id=?""",
+                (state, attempts, next_attempt_utc, last_error, transport_ref, _utcnow(),
+                 1 if sent else 0, _utcnow() if sent else None, event_id),
+            )
