@@ -201,6 +201,19 @@ def _start_stack_locked(sd, logs, py, *, env, tick_seconds, heartbeat_seconds,
                         transport, lock: "SingleWriterLock") -> dict[str, Any]:
     lock_path = str(lock.lock_path)
     spawned: list[tuple[str, int]] = []
+    # Task 118A: stop_stack() writes <session_dir>/stop.flag so a running
+    # session_loop checkpoint daemon notices and exits promptly. A same-
+    # session restart (stop, then start again in the SAME session_dir --
+    # exactly the controlled-restart flow this task exercised) previously
+    # never cleared that sentinel: the freshly spawned checkpoint daemon
+    # would see the STALE flag on its very first check
+    # (session_loop.py:70) and exit immediately (clean exit 0, no log
+    # output -- easily mistaken for "still starting" rather than "already
+    # stopped again"). Cleared here, once, before anything is spawned, so
+    # a fresh start always begins from a clean stop-sentinel state.
+    stop_flag = sd / "stop.flag"
+    if stop_flag.exists():
+        stop_flag.unlink()
     try:
         sup_argv = [py, "-m", "talonx_ops.supervisor", "run"]
         if not with_dashboard:
