@@ -1,0 +1,6 @@
+{
+  "n_closed_300k": 57,
+  "n_closed_10m": 57,
+  "capital_constrained": false,
+  "note": "if $300k trade count is lower than $10m's, the campaign-sized run missed entries purely on capital/slot availability, not on signal detection -- reported explicitly, not blended into one number"
+}

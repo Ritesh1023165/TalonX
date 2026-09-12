@@ -1,0 +1,394 @@
+{
+  "label": "b2_overlap_10m",
+  "window": {
+    "start": "2024-09-01",
+    "end": "2026-03-31"
+  },
+  "starting_cash_usd": 10000000.0,
+  "cost_convention": {
+    "total_round_trip_bps": 20,
+    "entry_bps": 10.0,
+    "exit_bps": 10.0,
+    "applied": "once per round trip, verified against realized_pnl_usd_from_ledger below"
+  },
+  "scope_manifest": "docs/research/SCOPE_MANIFEST_39NAME.json (frozen, not re-resolved per-tick)",
+  "price_coverage": {
+    "covered": [
+      "AAPL",
+      "ABCL",
+      "ABT",
+      "ACHR",
+      "ADC",
+      "ADP",
+      "AFL",
+      "AGNC",
+      "AMAT",
+      "AMD",
+      "AVGO",
+      "BAC",
+      "BLK",
+      "C",
+      "CSCO",
+      "CVX",
+      "DELL",
+      "GOOGL",
+      "IBM",
+      "INTC",
+      "JNJ",
+      "JPM",
+      "KO",
+      "MA",
+      "MCD",
+      "MSFT",
+      "MSTR",
+      "NUE",
+      "NVDA",
+      "ORCL",
+      "PG",
+      "PYPL",
+      "STX",
+      "TSLA",
+      "UNH",
+      "V",
+      "VRT",
+      "WMT"
+    ],
+    "uncovered": [
+      "SHOP"
+    ],
+    "per_directory": {
+      "C:\\workspace\\TalonX\\results\\task95g_broad_cross_sectional\\_daily": [
+        "AAPL",
+        "ABT",
+        "ADP",
+        "AFL",
+        "AMAT",
+        "AMD",
+        "AVGO",
+        "BAC",
+        "BLK",
+        "C",
+        "CSCO",
+        "CVX",
+        "DELL",
+        "GOOGL",
+        "IBM",
+        "INTC",
+        "JNJ",
+        "JPM",
+        "KO",
+        "MA",
+        "MCD",
+        "MSFT",
+        "NUE",
+        "NVDA",
+        "ORCL",
+        "PG",
+        "PYPL",
+        "STX",
+        "TSLA",
+        "UNH",
+        "V",
+        "VRT",
+        "WMT"
+      ],
+      "C:\\workspace\\TalonX\\results\\task107a_form4_feasibility\\_prices": [
+        "ABCL",
+        "ACHR",
+        "ADC",
+        "AGNC",
+        "MSTR"
+      ]
+    }
+  },
+  "episode_accounting": {
+    "processed_episode_dispositions": {
+      "ENTERED": 10,
+      "SKIPPED_CLOSE_2.23_LT_5.0": 1,
+      "SKIPPED_CLOSE_3.61_LT_5.0": 1,
+      "SKIPPED_ENTRY_STALE": 5
+    },
+    "buys": 10,
+    "sells": 10,
+    "closed_round_trips": 10,
+    "exit_unresolved": 0,
+    "open_at_end": 0
+  },
+  "trades_table": [
+    {
+      "episode_id": "0009dfdd76e7a9be",
+      "symbol": "ACHR",
+      "entry_price": 7.51,
+      "exit_price": 7.17,
+      "shares": 1331.5579227696405,
+      "entry_time": "2026-09-12T00:58:37.533205+01:00",
+      "exit_time": "2026-09-12T00:58:37.659860+01:00",
+      "gross_return_pct": -4.5273,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -4.7273,
+      "realized_pnl_usd_from_ledger": -452.7296937416777
+    },
+    {
+      "episode_id": "3ea1497b79c8911a",
+      "symbol": "MSTR",
+      "entry_price": 333.21,
+      "exit_price": 237.76,
+      "shares": 30.011104108520154,
+      "entry_time": "2026-09-12T00:58:38.346261+01:00",
+      "exit_time": "2026-09-12T00:58:38.491887+01:00",
+      "gross_return_pct": -28.6456,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -28.8456,
+      "realized_pnl_usd_from_ledger": -2864.559887158249
+    },
+    {
+      "episode_id": "5de3e6757ff8cddb",
+      "symbol": "UNH",
+      "entry_price": 294.73,
+      "exit_price": 291.3,
+      "shares": 33.92935907440708,
+      "entry_time": "2026-09-12T00:58:38.829137+01:00",
+      "exit_time": "2026-09-12T00:58:39.114236+01:00",
+      "gross_return_pct": -1.1638,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -1.3638,
+      "realized_pnl_usd_from_ledger": -116.37770162521701
+    },
+    {
+      "episode_id": "3bbaa44a794190aa",
+      "symbol": "MSTR",
+      "entry_price": 393.24,
+      "exit_price": 388.67,
+      "shares": 25.42976299460889,
+      "entry_time": "2026-09-12T00:58:39.284881+01:00",
+      "exit_time": "2026-09-12T00:58:39.502051+01:00",
+      "gross_return_pct": -1.1621,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -1.3621,
+      "realized_pnl_usd_from_ledger": -116.21401688536207
+    },
+    {
+      "episode_id": "b154c83c2445af2c",
+      "symbol": "MSTR",
+      "entry_price": 396.78,
+      "exit_price": 389.9,
+      "shares": 25.202883209839207,
+      "entry_time": "2026-09-12T00:58:40.022033+01:00",
+      "exit_time": "2026-09-12T00:58:40.225512+01:00",
+      "gross_return_pct": -1.734,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -1.934,
+      "realized_pnl_usd_from_ledger": -173.39583648369444
+    },
+    {
+      "episode_id": "d78e71460b0940d1",
+      "symbol": "ADC",
+      "entry_price": 67.55,
+      "exit_price": 72.15,
+      "shares": 148.03849000740192,
+      "entry_time": "2026-09-12T00:58:41.132213+01:00",
+      "exit_time": "2026-09-12T00:58:41.354718+01:00",
+      "gross_return_pct": 6.8098,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 6.6098,
+      "realized_pnl_usd_from_ledger": 680.9770540340487
+    },
+    {
+      "episode_id": "9b53daa2461b31ce",
+      "symbol": "ADC",
+      "entry_price": 69.43,
+      "exit_price": 69.11,
+      "shares": 144.0299582313121,
+      "entry_time": "2026-09-12T00:58:42.607640+01:00",
+      "exit_time": "2026-09-12T00:58:42.988885+01:00",
+      "gross_return_pct": -0.4609,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -0.6609,
+      "realized_pnl_usd_from_ledger": -46.08958663402154
+    },
+    {
+      "episode_id": "c683447b53fae98a",
+      "symbol": "MSTR",
+      "entry_price": 164.45,
+      "exit_price": 158.45,
+      "shares": 60.808756460930375,
+      "entry_time": "2026-09-12T00:58:42.667841+01:00",
+      "exit_time": "2026-09-12T00:58:43.020895+01:00",
+      "gross_return_pct": -3.6485,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -3.8485,
+      "realized_pnl_usd_from_ledger": -364.8525387655827
+    },
+    {
+      "episode_id": "f2dd3e65b6a1a618",
+      "symbol": "ABT",
+      "entry_price": 108.77,
+      "exit_price": 113.06,
+      "shares": 91.93711501333088,
+      "entry_time": "2026-09-12T00:58:43.272463+01:00",
+      "exit_time": "2026-09-12T00:58:43.613890+01:00",
+      "gross_return_pct": 3.9441,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 3.7441,
+      "realized_pnl_usd_from_ledger": 394.4102234071888
+    },
+    {
+      "episode_id": "d45a4ce35b6f8716",
+      "symbol": "IBM",
+      "entry_price": 236.26,
+      "exit_price": 244.12,
+      "shares": 42.32625074070939,
+      "entry_time": "2026-09-12T00:58:43.750986+01:00",
+      "exit_time": "2026-09-12T00:58:44.109288+01:00",
+      "gross_return_pct": 3.3268,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 3.1268,
+      "realized_pnl_usd_from_ledger": 332.6843308219759
+    }
+  ],
+  "open_positions_at_end": [],
+  "performance": {
+    "n_closed_trades": 10,
+    "distinct_issuers": 6,
+    "net_expectancy_mean_pct_20bps": -2.9261,
+    "profit_factor": 0.31539555755202126,
+    "win_rate": 0.3,
+    "by_issuer_net_return_pct_sum": {
+      "ACHR": -4.7273,
+      "MSTR": -35.9902,
+      "UNH": -1.3638,
+      "ADC": 5.9489,
+      "ABT": 3.7441,
+      "IBM": 3.1268
+    },
+    "by_issuer_n_trades": {
+      "ACHR": 1,
+      "MSTR": 4,
+      "UNH": 1,
+      "ADC": 2,
+      "ABT": 1,
+      "IBM": 1
+    }
+  },
+  "equity_final": {
+    "ending_cash": 9997273.85234697,
+    "open_position_cost_basis": 0,
+    "marked_open_value": 0.0,
+    "equity": 9997273.85234697,
+    "formula": "cash + marked open-position value (NOT portfolio_cash_after, NOT a cumulative-return sum)"
+  },
+  "equity_curve_caveat": "trade-event-granularity cash curve only (cash_events below) -- NOT a true daily mark-to-market of open positions between trade events; that would require pulling daily bars for every holding-period day of every open position across the whole window, not done in this bounded task",
+  "cash_events": [
+    {
+      "at": "2026-09-12T00:58:37.533205+01:00",
+      "cash_after": 9990000.0
+    },
+    {
+      "at": "2026-09-12T00:58:37.659860+01:00",
+      "cash_after": 9999547.270306258
+    },
+    {
+      "at": "2026-09-12T00:58:38.346261+01:00",
+      "cash_after": 9989547.270306258
+    },
+    {
+      "at": "2026-09-12T00:58:38.491887+01:00",
+      "cash_after": 9996682.7104191
+    },
+    {
+      "at": "2026-09-12T00:58:38.829137+01:00",
+      "cash_after": 9986682.7104191
+    },
+    {
+      "at": "2026-09-12T00:58:39.114236+01:00",
+      "cash_after": 9996566.332717475
+    },
+    {
+      "at": "2026-09-12T00:58:39.284881+01:00",
+      "cash_after": 9986566.332717475
+    },
+    {
+      "at": "2026-09-12T00:58:39.502051+01:00",
+      "cash_after": 9996450.11870059
+    },
+    {
+      "at": "2026-09-12T00:58:40.022033+01:00",
+      "cash_after": 9986450.11870059
+    },
+    {
+      "at": "2026-09-12T00:58:40.225512+01:00",
+      "cash_after": 9996276.722864106
+    },
+    {
+      "at": "2026-09-12T00:58:41.132213+01:00",
+      "cash_after": 9986276.722864106
+    },
+    {
+      "at": "2026-09-12T00:58:41.354718+01:00",
+      "cash_after": 9996957.69991814
+    },
+    {
+      "at": "2026-09-12T00:58:42.607640+01:00",
+      "cash_after": 9986957.69991814
+    },
+    {
+      "at": "2026-09-12T00:58:42.667841+01:00",
+      "cash_after": 9976957.69991814
+    },
+    {
+      "at": "2026-09-12T00:58:42.988885+01:00",
+      "cash_after": 9986911.610331506
+    },
+    {
+      "at": "2026-09-12T00:58:43.020895+01:00",
+      "cash_after": 9996546.75779274
+    },
+    {
+      "at": "2026-09-12T00:58:43.272463+01:00",
+      "cash_after": 9986546.75779274
+    },
+    {
+      "at": "2026-09-12T00:58:43.613890+01:00",
+      "cash_after": 9996941.168016147
+    },
+    {
+      "at": "2026-09-12T00:58:43.750986+01:00",
+      "cash_after": 9986941.168016147
+    },
+    {
+      "at": "2026-09-12T00:58:44.109288+01:00",
+      "cash_after": 9997273.85234697
+    }
+  ],
+  "uncertainty": {
+    "method": "issuer-block bootstrap, 5000 reps, seed 118120, 95% percentile CI (predeclared, fixed before this script was run -- same convention as Task 95A-118F)",
+    "ci_pct": [
+      -7.0675,
+      2.6436
+    ],
+    "effective_independent_groups": 6,
+    "caveat": "N=10 trades across only 6 distinct issuers -- N alone is NOT proof of adequate power; the effective independent-group count is the more relevant power measure and is reported explicitly, not implied by N."
+  },
+  "external_sends": 0,
+  "live_ledger_written": false
+}

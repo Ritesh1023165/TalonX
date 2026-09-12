@@ -1,0 +1,1507 @@
+{
+  "label": "b3_full_300k",
+  "window": {
+    "start": "2019-01-01",
+    "end": "2026-03-31"
+  },
+  "starting_cash_usd": 300000.0,
+  "cost_convention": {
+    "total_round_trip_bps": 20,
+    "entry_bps": 10.0,
+    "exit_bps": 10.0,
+    "applied": "once per round trip, verified against realized_pnl_usd_from_ledger below"
+  },
+  "scope_manifest": "docs/research/SCOPE_MANIFEST_39NAME.json (frozen, not re-resolved per-tick)",
+  "price_coverage": {
+    "covered": [
+      "AAPL",
+      "ABCL",
+      "ABT",
+      "ACHR",
+      "ADC",
+      "ADP",
+      "AFL",
+      "AGNC",
+      "AMAT",
+      "AMD",
+      "AVGO",
+      "BAC",
+      "BLK",
+      "C",
+      "CSCO",
+      "CVX",
+      "DELL",
+      "GOOGL",
+      "IBM",
+      "INTC",
+      "JNJ",
+      "JPM",
+      "KO",
+      "MA",
+      "MCD",
+      "MSFT",
+      "MSTR",
+      "NUE",
+      "NVDA",
+      "ORCL",
+      "PG",
+      "PYPL",
+      "STX",
+      "TSLA",
+      "UNH",
+      "V",
+      "VRT",
+      "WMT"
+    ],
+    "uncovered": [
+      "SHOP"
+    ],
+    "per_directory": {
+      "C:\\workspace\\TalonX\\results\\task95g_broad_cross_sectional\\_daily": [
+        "AAPL",
+        "ABT",
+        "ADP",
+        "AFL",
+        "AMAT",
+        "AMD",
+        "AVGO",
+        "BAC",
+        "BLK",
+        "C",
+        "CSCO",
+        "CVX",
+        "DELL",
+        "GOOGL",
+        "IBM",
+        "INTC",
+        "JNJ",
+        "JPM",
+        "KO",
+        "MA",
+        "MCD",
+        "MSFT",
+        "NUE",
+        "NVDA",
+        "ORCL",
+        "PG",
+        "PYPL",
+        "STX",
+        "TSLA",
+        "UNH",
+        "V",
+        "VRT",
+        "WMT"
+      ],
+      "C:\\workspace\\TalonX\\results\\task107a_form4_feasibility\\_prices": [
+        "ABCL",
+        "ACHR",
+        "ADC",
+        "AGNC",
+        "MSTR"
+      ]
+    }
+  },
+  "episode_accounting": {
+    "processed_episode_dispositions": {
+      "ENTERED": 57,
+      "SKIPPED_CLOSE_2.23_LT_5.0": 1,
+      "SKIPPED_CLOSE_2.58_LT_5.0": 1,
+      "SKIPPED_CLOSE_3.61_LT_5.0": 1,
+      "SKIPPED_CLOSE_4.70_LT_5.0": 1,
+      "SKIPPED_ENTRY_STALE": 41,
+      "SKIPPED_INSUFFICIENT_HISTORY_5_OF_20": 1,
+      "SKIPPED_IN_COOLDOWN_UNTIL_2021-10-12": 1,
+      "SKIPPED_IN_COOLDOWN_UNTIL_2023-06-07": 1,
+      "SKIPPED_NO_PRIOR_BARS": 1
+    },
+    "buys": 57,
+    "sells": 57,
+    "closed_round_trips": 57,
+    "exit_unresolved": 0,
+    "open_at_end": 0
+  },
+  "trades_table": [
+    {
+      "episode_id": "26e8c92f512e57fd",
+      "symbol": "ADC",
+      "entry_price": 47.88,
+      "exit_price": 48.27,
+      "shares": 208.85547201336675,
+      "entry_time": "2026-09-12T00:58:47.643487+01:00",
+      "exit_time": "2026-09-12T00:58:47.874480+01:00",
+      "gross_return_pct": 0.8145,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 0.6145,
+      "realized_pnl_usd_from_ledger": 81.45363408521371
+    },
+    {
+      "episode_id": "41d86d489dacb444",
+      "symbol": "MA",
+      "entry_price": 259.09,
+      "exit_price": 267.38,
+      "shares": 38.596626654830374,
+      "entry_time": "2026-09-12T00:58:48.327566+01:00",
+      "exit_time": "2026-09-12T00:58:48.580698+01:00",
+      "gross_return_pct": 3.1997,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 2.9997,
+      "realized_pnl_usd_from_ledger": 319.9660349685455
+    },
+    {
+      "episode_id": "9d82ffd0675cb189",
+      "symbol": "INTC",
+      "entry_price": 41.44,
+      "exit_price": 45.79,
+      "shares": 241.31274131274134,
+      "entry_time": "2026-09-12T00:58:48.731574+01:00",
+      "exit_time": "2026-09-12T00:58:49.063688+01:00",
+      "gross_return_pct": 10.4971,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 10.2971,
+      "realized_pnl_usd_from_ledger": 1049.7104247104253
+    },
+    {
+      "episode_id": "8172546a2294df29",
+      "symbol": "MCD",
+      "entry_price": 165.06,
+      "exit_price": 163.82,
+      "shares": 60.5840300496789,
+      "entry_time": "2026-09-12T00:58:49.847476+01:00",
+      "exit_time": "2026-09-12T00:58:50.065853+01:00",
+      "gross_return_pct": -0.7512,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -0.9512,
+      "realized_pnl_usd_from_ledger": -75.1241972616026
+    },
+    {
+      "episode_id": "37e6a80ee450cb91",
+      "symbol": "ADC",
+      "entry_price": 51.27,
+      "exit_price": 52.42,
+      "shares": 195.04583577140627,
+      "entry_time": "2026-09-12T00:58:50.519484+01:00",
+      "exit_time": "2026-09-12T00:58:50.724153+01:00",
+      "gross_return_pct": 2.243,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 2.043,
+      "realized_pnl_usd_from_ledger": 224.3027111371175
+    },
+    {
+      "episode_id": "2dc40bed3815173c",
+      "symbol": "JPM",
+      "entry_price": 115.38,
+      "exit_price": 113.78,
+      "shares": 86.67013347200555,
+      "entry_time": "2026-09-12T00:58:50.993791+01:00",
+      "exit_time": "2026-09-12T00:58:51.219103+01:00",
+      "gross_return_pct": -1.3867,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -1.5867,
+      "realized_pnl_usd_from_ledger": -138.67221355520815
+    },
+    {
+      "episode_id": "e28eedd755688dcb",
+      "symbol": "TSLA",
+      "entry_price": 60.8,
+      "exit_price": 48.3,
+      "shares": 164.47368421052633,
+      "entry_time": "2026-09-12T00:58:51.534872+01:00",
+      "exit_time": "2026-09-12T00:58:52.023467+01:00",
+      "gross_return_pct": -20.5592,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -20.7592,
+      "realized_pnl_usd_from_ledger": -2055.921052631579
+    },
+    {
+      "episode_id": "cc7a7c647f8dfb55",
+      "symbol": "CVX",
+      "entry_price": 72.58,
+      "exit_price": 41.46,
+      "shares": 137.77900248002206,
+      "entry_time": "2026-09-12T00:58:51.946292+01:00",
+      "exit_time": "2026-09-12T00:58:52.383625+01:00",
+      "gross_return_pct": -42.8768,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -43.0768,
+      "realized_pnl_usd_from_ledger": -4287.682557178286
+    },
+    {
+      "episode_id": "55a5ee0a178903c9",
+      "symbol": "ADC",
+      "entry_price": 50.73,
+      "exit_price": 48.78,
+      "shares": 197.12201852946976,
+      "entry_time": "2026-09-12T00:58:52.250384+01:00",
+      "exit_time": "2026-09-12T00:58:52.671746+01:00",
+      "gross_return_pct": -3.8439,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -4.0439,
+      "realized_pnl_usd_from_ledger": -384.38793613246526
+    },
+    {
+      "episode_id": "df803ed53aaca054",
+      "symbol": "ADC",
+      "entry_price": 47.71,
+      "exit_price": 46.76,
+      "shares": 209.59966464053656,
+      "entry_time": "2026-09-12T00:58:52.937021+01:00",
+      "exit_time": "2026-09-12T00:58:53.233582+01:00",
+      "gross_return_pct": -1.9912,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -2.1912,
+      "realized_pnl_usd_from_ledger": -199.1196814085106
+    },
+    {
+      "episode_id": "bc47a7d82bcf517a",
+      "symbol": "AGNC",
+      "entry_price": 5.617,
+      "exit_price": 5.802,
+      "shares": 1780.3097739006587,
+      "entry_time": "2026-09-12T00:58:53.546416+01:00",
+      "exit_time": "2026-09-12T00:58:53.973768+01:00",
+      "gross_return_pct": 3.2936,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 3.0936,
+      "realized_pnl_usd_from_ledger": 329.3573081716204
+    },
+    {
+      "episode_id": "ac67851728235a3d",
+      "symbol": "VRT",
+      "entry_price": 11.58,
+      "exit_price": 12.38,
+      "shares": 863.5578583765113,
+      "entry_time": "2026-09-12T00:58:53.683807+01:00",
+      "exit_time": "2026-09-12T00:58:54.068077+01:00",
+      "gross_return_pct": 6.9085,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 6.7085,
+      "realized_pnl_usd_from_ledger": 690.8462867012095
+    },
+    {
+      "episode_id": "50deaf945e38b89c",
+      "symbol": "ADC",
+      "entry_price": 47.38,
+      "exit_price": 51.44,
+      "shares": 211.05951878429715,
+      "entry_time": "2026-09-12T00:58:53.854503+01:00",
+      "exit_time": "2026-09-12T00:58:54.205239+01:00",
+      "gross_return_pct": 8.569,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 8.369,
+      "realized_pnl_usd_from_ledger": 856.9016462642448
+    },
+    {
+      "episode_id": "7a3b1401bfc25d89",
+      "symbol": "BAC",
+      "entry_price": 21.91,
+      "exit_price": 22.06,
+      "shares": 456.41259698767686,
+      "entry_time": "2026-09-12T00:58:55.237893+01:00",
+      "exit_time": "2026-09-12T00:58:55.512440+01:00",
+      "gross_return_pct": 0.6846,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 0.4846,
+      "realized_pnl_usd_from_ledger": 68.4618895481508
+    },
+    {
+      "episode_id": "df93ae4066eed45d",
+      "symbol": "AVGO",
+      "entry_price": 31.67,
+      "exit_price": 32.35,
+      "shares": 315.75623618566465,
+      "entry_time": "2026-09-12T00:58:56.107563+01:00",
+      "exit_time": "2026-09-12T00:58:56.346807+01:00",
+      "gross_return_pct": 2.1471,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 1.9471,
+      "realized_pnl_usd_from_ledger": 214.71424060625213
+    },
+    {
+      "episode_id": "f1221b088fdec58a",
+      "symbol": "IBM",
+      "entry_price": 84.75,
+      "exit_price": 93.11,
+      "shares": 117.99410029498524,
+      "entry_time": "2026-09-12T00:58:56.744319+01:00",
+      "exit_time": "2026-09-12T00:58:57.106619+01:00",
+      "gross_return_pct": 9.8643,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 9.6643,
+      "realized_pnl_usd_from_ledger": 986.4306784660766
+    },
+    {
+      "episode_id": "021c5bc5a5b38935",
+      "symbol": "ADC",
+      "entry_price": 49.52,
+      "exit_price": 51.74,
+      "shares": 201.93861066235863,
+      "entry_time": "2026-09-12T00:58:57.013153+01:00",
+      "exit_time": "2026-09-12T00:58:57.286462+01:00",
+      "gross_return_pct": 4.483,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 4.283,
+      "realized_pnl_usd_from_ledger": 448.30371567043585
+    },
+    {
+      "episode_id": "f3db859b8198d271",
+      "symbol": "INTC",
+      "entry_price": 50.61,
+      "exit_price": 56.27,
+      "shares": 197.58940920766648,
+      "entry_time": "2026-09-12T00:58:58.343551+01:00",
+      "exit_time": "2026-09-12T00:58:58.575765+01:00",
+      "gross_return_pct": 11.1836,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 10.9836,
+      "realized_pnl_usd_from_ledger": 1118.3560561153936
+    },
+    {
+      "episode_id": "9582841d547f4fb8",
+      "symbol": "ADC",
+      "entry_price": 51.53,
+      "exit_price": 52.11,
+      "shares": 194.06171162429652,
+      "entry_time": "2026-09-12T00:58:58.828756+01:00",
+      "exit_time": "2026-09-12T00:58:59.105380+01:00",
+      "gross_return_pct": 1.1256,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 0.9256,
+      "realized_pnl_usd_from_ledger": 112.55579274209231
+    },
+    {
+      "episode_id": "26f37cf40e31879e",
+      "symbol": "ADC",
+      "entry_price": 57.29,
+      "exit_price": 53.76,
+      "shares": 174.55053237912375,
+      "entry_time": "2026-09-12T00:59:01.445758+01:00",
+      "exit_time": "2026-09-12T00:59:01.780435+01:00",
+      "gross_return_pct": -6.1616,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -6.3616,
+      "realized_pnl_usd_from_ledger": -616.1633792983066
+    },
+    {
+      "episode_id": "00c6957d5babc468",
+      "symbol": "ACHR",
+      "entry_price": 9.1,
+      "exit_price": 8.0,
+      "shares": 1098.901098901099,
+      "entry_time": "2026-09-12T00:59:01.659799+01:00",
+      "exit_time": "2026-09-12T00:59:02.023948+01:00",
+      "gross_return_pct": -12.0879,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -12.2879,
+      "realized_pnl_usd_from_ledger": -1208.7912087912082
+    },
+    {
+      "episode_id": "a6b7e1b629e0e172",
+      "symbol": "INTC",
+      "entry_price": 44.69,
+      "exit_price": 47.08,
+      "shares": 223.76370552696355,
+      "entry_time": "2026-09-12T00:59:02.348893+01:00",
+      "exit_time": "2026-09-12T00:59:02.628118+01:00",
+      "gross_return_pct": 5.348,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 5.148,
+      "realized_pnl_usd_from_ledger": 534.7952562094433
+    },
+    {
+      "episode_id": "63f826ec7b0eb97d",
+      "symbol": "ABCL",
+      "entry_price": 16.3,
+      "exit_price": 14.58,
+      "shares": 613.4969325153374,
+      "entry_time": "2026-09-12T00:59:02.765824+01:00",
+      "exit_time": "2026-09-12T00:59:03.217246+01:00",
+      "gross_return_pct": -10.5521,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -10.7521,
+      "realized_pnl_usd_from_ledger": -1055.2147239263795
+    },
+    {
+      "episode_id": "daf3b3c30dd76fd4",
+      "symbol": "PYPL",
+      "entry_price": 185.39,
+      "exit_price": 190.1,
+      "shares": 53.94034198176817,
+      "entry_time": "2026-09-12T00:59:03.011010+01:00",
+      "exit_time": "2026-09-12T00:59:03.390856+01:00",
+      "gross_return_pct": 2.5406,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 2.3406,
+      "realized_pnl_usd_from_ledger": 254.0590107341286
+    },
+    {
+      "episode_id": "4149ba77ff102027",
+      "symbol": "PYPL",
+      "entry_price": 121.16,
+      "exit_price": 104.12,
+      "shares": 82.53549026081215,
+      "entry_time": "2026-09-12T00:59:04.317855+01:00",
+      "exit_time": "2026-09-12T00:59:04.673906+01:00",
+      "gross_return_pct": -14.064,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -14.264,
+      "realized_pnl_usd_from_ledger": -1406.4047540442389
+    },
+    {
+      "episode_id": "aeb10861a8bf98d2",
+      "symbol": "INTC",
+      "entry_price": 43.86,
+      "exit_price": 42.83,
+      "shares": 227.99817601459188,
+      "entry_time": "2026-09-12T00:59:04.774012+01:00",
+      "exit_time": "2026-09-12T00:59:05.128834+01:00",
+      "gross_return_pct": -2.3484,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -2.5484,
+      "realized_pnl_usd_from_ledger": -234.83812129502985
+    },
+    {
+      "episode_id": "8f65431a6f8a6a40",
+      "symbol": "ABCL",
+      "entry_price": 8.92,
+      "exit_price": 8.83,
+      "shares": 1121.0762331838564,
+      "entry_time": "2026-09-12T00:59:04.963084+01:00",
+      "exit_time": "2026-09-12T00:59:05.275240+01:00",
+      "gross_return_pct": -1.009,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -1.209,
+      "realized_pnl_usd_from_ledger": -100.89686098654602
+    },
+    {
+      "episode_id": "d6bd6e7804c1379c",
+      "symbol": "VRT",
+      "entry_price": 13.63,
+      "exit_price": 14.43,
+      "shares": 733.6757153338224,
+      "entry_time": "2026-09-12T00:59:05.346166+01:00",
+      "exit_time": "2026-09-12T00:59:05.669198+01:00",
+      "gross_return_pct": 5.8694,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 5.6694,
+      "realized_pnl_usd_from_ledger": 586.9405722670563
+    },
+    {
+      "episode_id": "2bd6e0cc3e6b40b4",
+      "symbol": "INTC",
+      "entry_price": 42.11,
+      "exit_price": 39.89,
+      "shares": 237.47328425552126,
+      "entry_time": "2026-09-12T00:59:06.141642+01:00",
+      "exit_time": "2026-09-12T00:59:06.721713+01:00",
+      "gross_return_pct": -5.2719,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -5.4719,
+      "realized_pnl_usd_from_ledger": -527.1906910472571
+    },
+    {
+      "episode_id": "7c4e72a4fc86f09f",
+      "symbol": "PYPL",
+      "entry_price": 81.01,
+      "exit_price": 77.97,
+      "shares": 123.44155042587334,
+      "entry_time": "2026-09-12T00:59:06.309618+01:00",
+      "exit_time": "2026-09-12T00:59:06.881127+01:00",
+      "gross_return_pct": -3.7526,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -3.9526,
+      "realized_pnl_usd_from_ledger": -375.26231329465554
+    },
+    {
+      "episode_id": "961fa2c8ada33432",
+      "symbol": "MSTR",
+      "entry_price": 19.98,
+      "exit_price": 26.45,
+      "shares": 500.5005005005005,
+      "entry_time": "2026-09-12T00:59:06.572429+01:00",
+      "exit_time": "2026-09-12T00:59:07.079796+01:00",
+      "gross_return_pct": 32.3824,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 32.1824,
+      "realized_pnl_usd_from_ledger": 3238.2382382382384
+    },
+    {
+      "episode_id": "d0b8e982af24e3ee",
+      "symbol": "ABCL",
+      "entry_price": 8.0,
+      "exit_price": 7.8,
+      "shares": 1250.0,
+      "entry_time": "2026-09-12T00:59:06.643311+01:00",
+      "exit_time": "2026-09-12T00:59:07.130870+01:00",
+      "gross_return_pct": -2.5,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -2.7,
+      "realized_pnl_usd_from_ledger": -250.0
+    },
+    {
+      "episode_id": "518679a798c84a6d",
+      "symbol": "INTC",
+      "entry_price": 27.21,
+      "exit_price": 28.61,
+      "shares": 367.5119441381845,
+      "entry_time": "2026-09-12T00:59:09.699070+01:00",
+      "exit_time": "2026-09-12T00:59:09.969743+01:00",
+      "gross_return_pct": 5.1452,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 4.9452,
+      "realized_pnl_usd_from_ledger": 514.5167217934577
+    },
+    {
+      "episode_id": "2c54a6af42e570e9",
+      "symbol": "ADC",
+      "entry_price": 61.23,
+      "exit_price": 62.7,
+      "shares": 163.31863465621427,
+      "entry_time": "2026-09-12T00:59:10.449357+01:00",
+      "exit_time": "2026-09-12T00:59:10.784503+01:00",
+      "gross_return_pct": 2.4008,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 2.2008,
+      "realized_pnl_usd_from_ledger": 240.0783929446352
+    },
+    {
+      "episode_id": "3dde63948259091f",
+      "symbol": "INTC",
+      "entry_price": 28.56,
+      "exit_price": 26.95,
+      "shares": 350.140056022409,
+      "entry_time": "2026-09-12T00:59:11.183123+01:00",
+      "exit_time": "2026-09-12T00:59:11.470707+01:00",
+      "gross_return_pct": -5.6373,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -5.8373,
+      "realized_pnl_usd_from_ledger": -563.7254901960769
+    },
+    {
+      "episode_id": "9dcb7886e13f7b89",
+      "symbol": "ADC",
+      "entry_price": 57.58,
+      "exit_price": 55.81,
+      "shares": 173.6714136853074,
+      "entry_time": "2026-09-12T00:59:12.766086+01:00",
+      "exit_time": "2026-09-12T00:59:13.151521+01:00",
+      "gross_return_pct": -3.074,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -3.274,
+      "realized_pnl_usd_from_ledger": -307.39840222299244
+    },
+    {
+      "episode_id": "f568cef3a7174930",
+      "symbol": "ABCL",
+      "entry_price": 6.92,
+      "exit_price": 7.47,
+      "shares": 1445.0867052023123,
+      "entry_time": "2026-09-12T00:59:13.064138+01:00",
+      "exit_time": "2026-09-12T00:59:13.502367+01:00",
+      "gross_return_pct": 7.948,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 7.748,
+      "realized_pnl_usd_from_ledger": 794.7976878612717
+    },
+    {
+      "episode_id": "89118778ce215411",
+      "symbol": "ADC",
+      "entry_price": 56.71,
+      "exit_price": 53.5,
+      "shares": 176.3357432551578,
+      "entry_time": "2026-09-12T00:59:14.315566+01:00",
+      "exit_time": "2026-09-12T00:59:14.618819+01:00",
+      "gross_return_pct": -5.6604,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -5.8604,
+      "realized_pnl_usd_from_ledger": -566.0377358490568
+    },
+    {
+      "episode_id": "f137ac5c5f29f651",
+      "symbol": "INTC",
+      "entry_price": 33.89,
+      "exit_price": 32.7,
+      "shares": 295.07229271171434,
+      "entry_time": "2026-09-12T00:59:14.490125+01:00",
+      "exit_time": "2026-09-12T00:59:14.800589+01:00",
+      "gross_return_pct": -3.5114,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -3.7114,
+      "realized_pnl_usd_from_ledger": -351.1360283269405
+    },
+    {
+      "episode_id": "9db3cdde73cb85ad",
+      "symbol": "AVGO",
+      "entry_price": 82.43,
+      "exit_price": 79.9,
+      "shares": 121.31505519835011,
+      "entry_time": "2026-09-12T00:59:15.274842+01:00",
+      "exit_time": "2026-09-12T00:59:15.711137+01:00",
+      "gross_return_pct": -3.0693,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -3.2693,
+      "realized_pnl_usd_from_ledger": -306.92708965182646
+    },
+    {
+      "episode_id": "52e0ec4e7cd31312",
+      "symbol": "ADC",
+      "entry_price": 48.55,
+      "exit_price": 47.39,
+      "shares": 205.9732234809475,
+      "entry_time": "2026-09-12T00:59:15.529122+01:00",
+      "exit_time": "2026-09-12T00:59:15.930319+01:00",
+      "gross_return_pct": -2.3893,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -2.5893,
+      "realized_pnl_usd_from_ledger": -238.9289392378978
+    },
+    {
+      "episode_id": "e488a5ed2b9a9dec",
+      "symbol": "INTC",
+      "entry_price": 39.06,
+      "exit_price": 44.11,
+      "shares": 256.0163850486431,
+      "entry_time": "2026-09-12T00:59:16.631648+01:00",
+      "exit_time": "2026-09-12T00:59:16.821505+01:00",
+      "gross_return_pct": 12.9288,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 12.7288,
+      "realized_pnl_usd_from_ledger": 1292.882744495646
+    },
+    {
+      "episode_id": "1105c149c2f82c88",
+      "symbol": "ADC",
+      "entry_price": 54.41,
+      "exit_price": 56.06,
+      "shares": 183.7897445322551,
+      "entry_time": "2026-09-12T00:59:17.163504+01:00",
+      "exit_time": "2026-09-12T00:59:17.407720+01:00",
+      "gross_return_pct": 3.0325,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 2.8325,
+      "realized_pnl_usd_from_ledger": 303.25307847822114
+    },
+    {
+      "episode_id": "06b3344ff3174ece",
+      "symbol": "AFL",
+      "entry_price": 74.16,
+      "exit_price": 76.32,
+      "shares": 134.8435814455232,
+      "entry_time": "2026-09-12T00:59:18.105718+01:00",
+      "exit_time": "2026-09-12T00:59:18.480534+01:00",
+      "gross_return_pct": 2.9126,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 2.7126,
+      "realized_pnl_usd_from_ledger": 291.26213592233034
+    },
+    {
+      "episode_id": "3c9fd11c10ec9090",
+      "symbol": "ADC",
+      "entry_price": 50.6,
+      "exit_price": 51.43,
+      "shares": 197.62845849802372,
+      "entry_time": "2026-09-12T00:59:18.382239+01:00",
+      "exit_time": "2026-09-12T00:59:18.765847+01:00",
+      "gross_return_pct": 1.6403,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 1.4403,
+      "realized_pnl_usd_from_ledger": 164.03162055335997
+    },
+    {
+      "episode_id": "c3f52f16f570ae31",
+      "symbol": "ACHR",
+      "entry_price": 5.11,
+      "exit_price": 4.74,
+      "shares": 1956.9471624266143,
+      "entry_time": "2026-09-12T00:59:18.937006+01:00",
+      "exit_time": "2026-09-12T00:59:19.326829+01:00",
+      "gross_return_pct": -7.2407,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -7.4407,
+      "realized_pnl_usd_from_ledger": -724.0704500978482
+    },
+    {
+      "episode_id": "b45072c408afbbcd",
+      "symbol": "ADC",
+      "entry_price": 53.23,
+      "exit_price": 54.78,
+      "shares": 187.86398647379298,
+      "entry_time": "2026-09-12T00:59:20.468322+01:00",
+      "exit_time": "2026-09-12T00:59:20.826554+01:00",
+      "gross_return_pct": 2.9119,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 2.7119,
+      "realized_pnl_usd_from_ledger": 291.1891790343798
+    },
+    {
+      "episode_id": "0009dfdd76e7a9be",
+      "symbol": "ACHR",
+      "entry_price": 7.51,
+      "exit_price": 7.17,
+      "shares": 1331.5579227696405,
+      "entry_time": "2026-09-12T00:59:23.420012+01:00",
+      "exit_time": "2026-09-12T00:59:23.687523+01:00",
+      "gross_return_pct": -4.5273,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -4.7273,
+      "realized_pnl_usd_from_ledger": -452.7296937416777
+    },
+    {
+      "episode_id": "3ea1497b79c8911a",
+      "symbol": "MSTR",
+      "entry_price": 333.21,
+      "exit_price": 237.76,
+      "shares": 30.011104108520154,
+      "entry_time": "2026-09-12T00:59:25.402784+01:00",
+      "exit_time": "2026-09-12T00:59:25.697735+01:00",
+      "gross_return_pct": -28.6456,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -28.8456,
+      "realized_pnl_usd_from_ledger": -2864.559887158249
+    },
+    {
+      "episode_id": "5de3e6757ff8cddb",
+      "symbol": "UNH",
+      "entry_price": 294.73,
+      "exit_price": 291.3,
+      "shares": 33.92935907440708,
+      "entry_time": "2026-09-12T00:59:26.408620+01:00",
+      "exit_time": "2026-09-12T00:59:26.719262+01:00",
+      "gross_return_pct": -1.1638,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -1.3638,
+      "realized_pnl_usd_from_ledger": -116.37770162521701
+    },
+    {
+      "episode_id": "3bbaa44a794190aa",
+      "symbol": "MSTR",
+      "entry_price": 393.24,
+      "exit_price": 388.67,
+      "shares": 25.42976299460889,
+      "entry_time": "2026-09-12T00:59:26.927147+01:00",
+      "exit_time": "2026-09-12T00:59:27.250040+01:00",
+      "gross_return_pct": -1.1621,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -1.3621,
+      "realized_pnl_usd_from_ledger": -116.21401688536207
+    },
+    {
+      "episode_id": "b154c83c2445af2c",
+      "symbol": "MSTR",
+      "entry_price": 396.78,
+      "exit_price": 389.9,
+      "shares": 25.202883209839207,
+      "entry_time": "2026-09-12T00:59:27.925069+01:00",
+      "exit_time": "2026-09-12T00:59:28.238395+01:00",
+      "gross_return_pct": -1.734,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -1.934,
+      "realized_pnl_usd_from_ledger": -173.39583648369444
+    },
+    {
+      "episode_id": "d78e71460b0940d1",
+      "symbol": "ADC",
+      "entry_price": 67.55,
+      "exit_price": 72.15,
+      "shares": 148.03849000740192,
+      "entry_time": "2026-09-12T00:59:29.178576+01:00",
+      "exit_time": "2026-09-12T00:59:29.479519+01:00",
+      "gross_return_pct": 6.8098,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 6.6098,
+      "realized_pnl_usd_from_ledger": 680.9770540340487
+    },
+    {
+      "episode_id": "9b53daa2461b31ce",
+      "symbol": "ADC",
+      "entry_price": 69.43,
+      "exit_price": 69.11,
+      "shares": 144.0299582313121,
+      "entry_time": "2026-09-12T00:59:30.923627+01:00",
+      "exit_time": "2026-09-12T00:59:31.354161+01:00",
+      "gross_return_pct": -0.4609,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -0.6609,
+      "realized_pnl_usd_from_ledger": -46.08958663402154
+    },
+    {
+      "episode_id": "c683447b53fae98a",
+      "symbol": "MSTR",
+      "entry_price": 164.45,
+      "exit_price": 158.45,
+      "shares": 60.808756460930375,
+      "entry_time": "2026-09-12T00:59:30.990087+01:00",
+      "exit_time": "2026-09-12T00:59:31.385748+01:00",
+      "gross_return_pct": -3.6485,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": -3.8485,
+      "realized_pnl_usd_from_ledger": -364.8525387655827
+    },
+    {
+      "episode_id": "f2dd3e65b6a1a618",
+      "symbol": "ABT",
+      "entry_price": 108.77,
+      "exit_price": 113.06,
+      "shares": 91.93711501333088,
+      "entry_time": "2026-09-12T00:59:31.702131+01:00",
+      "exit_time": "2026-09-12T00:59:32.050540+01:00",
+      "gross_return_pct": 3.9441,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 3.7441,
+      "realized_pnl_usd_from_ledger": 394.4102234071888
+    },
+    {
+      "episode_id": "d45a4ce35b6f8716",
+      "symbol": "IBM",
+      "entry_price": 236.26,
+      "exit_price": 244.12,
+      "shares": 42.32625074070939,
+      "entry_time": "2026-09-12T00:59:32.191121+01:00",
+      "exit_time": "2026-09-12T00:59:32.537375+01:00",
+      "gross_return_pct": 3.3268,
+      "entry_cost_bps": 10.0,
+      "exit_cost_bps": 10.0,
+      "total_cost_bps": 20,
+      "net_return_pct_20bps": 3.1268,
+      "realized_pnl_usd_from_ledger": 332.6843308219759
+    }
+  ],
+  "open_positions_at_end": [],
+  "performance": {
+    "n_closed_trades": 57,
+    "distinct_issuers": 19,
+    "net_expectancy_mean_pct_20bps": -0.8478,
+    "profit_factor": 0.7664054377127731,
+    "win_rate": 0.49122807017543857,
+    "by_issuer_net_return_pct_sum": {
+      "ADC": 7.0491,
+      "MA": 2.9997,
+      "INTC": 26.5337,
+      "MCD": -0.9512,
+      "JPM": -1.5867,
+      "TSLA": -20.7592,
+      "CVX": -43.0768,
+      "AGNC": 3.0936,
+      "VRT": 12.3779,
+      "BAC": 0.4846,
+      "AVGO": -1.3222,
+      "IBM": 12.7911,
+      "ACHR": -24.4559,
+      "ABCL": -6.9131,
+      "PYPL": -15.876,
+      "MSTR": -3.8078,
+      "AFL": 2.7126,
+      "UNH": -1.3638,
+      "ABT": 3.7441
+    },
+    "by_issuer_n_trades": {
+      "ADC": 17,
+      "MA": 1,
+      "INTC": 9,
+      "MCD": 1,
+      "JPM": 1,
+      "TSLA": 1,
+      "CVX": 1,
+      "AGNC": 1,
+      "VRT": 2,
+      "BAC": 1,
+      "AVGO": 2,
+      "IBM": 2,
+      "ACHR": 3,
+      "ABCL": 4,
+      "PYPL": 3,
+      "MSTR": 5,
+      "AFL": 1,
+      "UNH": 1,
+      "ABT": 1
+    }
+  },
+  "equity_final": {
+    "ending_cash": 296307.3635782546,
+    "open_position_cost_basis": 0,
+    "marked_open_value": 0.0,
+    "equity": 296307.3635782546,
+    "formula": "cash + marked open-position value (NOT portfolio_cash_after, NOT a cumulative-return sum)"
+  },
+  "equity_curve_caveat": "trade-event-granularity cash curve only (cash_events below) -- NOT a true daily mark-to-market of open positions between trade events; that would require pulling daily bars for every holding-period day of every open position across the whole window, not done in this bounded task",
+  "cash_events": [
+    {
+      "at": "2026-09-12T00:58:47.643487+01:00",
+      "cash_after": 290000.0
+    },
+    {
+      "at": "2026-09-12T00:58:47.874480+01:00",
+      "cash_after": 300081.4536340852
+    },
+    {
+      "at": "2026-09-12T00:58:48.327566+01:00",
+      "cash_after": 290081.4536340852
+    },
+    {
+      "at": "2026-09-12T00:58:48.580698+01:00",
+      "cash_after": 300401.41966905375
+    },
+    {
+      "at": "2026-09-12T00:58:48.731574+01:00",
+      "cash_after": 290401.41966905375
+    },
+    {
+      "at": "2026-09-12T00:58:49.063688+01:00",
+      "cash_after": 301451.13009376416
+    },
+    {
+      "at": "2026-09-12T00:58:49.847476+01:00",
+      "cash_after": 291451.13009376416
+    },
+    {
+      "at": "2026-09-12T00:58:50.065853+01:00",
+      "cash_after": 301376.0058965026
+    },
+    {
+      "at": "2026-09-12T00:58:50.519484+01:00",
+      "cash_after": 291376.0058965026
+    },
+    {
+      "at": "2026-09-12T00:58:50.724153+01:00",
+      "cash_after": 301600.3086076397
+    },
+    {
+      "at": "2026-09-12T00:58:50.993791+01:00",
+      "cash_after": 291600.3086076397
+    },
+    {
+      "at": "2026-09-12T00:58:51.219103+01:00",
+      "cash_after": 301461.6363940845
+    },
+    {
+      "at": "2026-09-12T00:58:51.534872+01:00",
+      "cash_after": 291461.6363940845
+    },
+    {
+      "at": "2026-09-12T00:58:51.946292+01:00",
+      "cash_after": 281461.6363940845
+    },
+    {
+      "at": "2026-09-12T00:58:52.023467+01:00",
+      "cash_after": 289405.7153414529
+    },
+    {
+      "at": "2026-09-12T00:58:52.250384+01:00",
+      "cash_after": 279405.7153414529
+    },
+    {
+      "at": "2026-09-12T00:58:52.383625+01:00",
+      "cash_after": 285118.0327842746
+    },
+    {
+      "at": "2026-09-12T00:58:52.671746+01:00",
+      "cash_after": 294733.64484814217
+    },
+    {
+      "at": "2026-09-12T00:58:52.937021+01:00",
+      "cash_after": 284733.64484814217
+    },
+    {
+      "at": "2026-09-12T00:58:53.233582+01:00",
+      "cash_after": 294534.52516673366
+    },
+    {
+      "at": "2026-09-12T00:58:53.546416+01:00",
+      "cash_after": 284534.52516673366
+    },
+    {
+      "at": "2026-09-12T00:58:53.683807+01:00",
+      "cash_after": 274534.52516673366
+    },
+    {
+      "at": "2026-09-12T00:58:53.854503+01:00",
+      "cash_after": 264534.52516673366
+    },
+    {
+      "at": "2026-09-12T00:58:53.973768+01:00",
+      "cash_after": 274863.8824749053
+    },
+    {
+      "at": "2026-09-12T00:58:54.068077+01:00",
+      "cash_after": 285554.7287616065
+    },
+    {
+      "at": "2026-09-12T00:58:54.205239+01:00",
+      "cash_after": 296411.63040787075
+    },
+    {
+      "at": "2026-09-12T00:58:55.237893+01:00",
+      "cash_after": 286411.63040787075
+    },
+    {
+      "at": "2026-09-12T00:58:55.512440+01:00",
+      "cash_after": 296480.0922974189
+    },
+    {
+      "at": "2026-09-12T00:58:56.107563+01:00",
+      "cash_after": 286480.0922974189
+    },
+    {
+      "at": "2026-09-12T00:58:56.346807+01:00",
+      "cash_after": 296694.80653802515
+    },
+    {
+      "at": "2026-09-12T00:58:56.744319+01:00",
+      "cash_after": 286694.80653802515
+    },
+    {
+      "at": "2026-09-12T00:58:57.013153+01:00",
+      "cash_after": 276694.80653802515
+    },
+    {
+      "at": "2026-09-12T00:58:57.106619+01:00",
+      "cash_after": 287681.23721649125
+    },
+    {
+      "at": "2026-09-12T00:58:57.286462+01:00",
+      "cash_after": 298129.5409321617
+    },
+    {
+      "at": "2026-09-12T00:58:58.343551+01:00",
+      "cash_after": 288129.5409321617
+    },
+    {
+      "at": "2026-09-12T00:58:58.575765+01:00",
+      "cash_after": 299247.8969882771
+    },
+    {
+      "at": "2026-09-12T00:58:58.828756+01:00",
+      "cash_after": 289247.8969882771
+    },
+    {
+      "at": "2026-09-12T00:58:59.105380+01:00",
+      "cash_after": 299360.4527810192
+    },
+    {
+      "at": "2026-09-12T00:59:01.445758+01:00",
+      "cash_after": 289360.4527810192
+    },
+    {
+      "at": "2026-09-12T00:59:01.659799+01:00",
+      "cash_after": 279360.4527810192
+    },
+    {
+      "at": "2026-09-12T00:59:01.780435+01:00",
+      "cash_after": 288744.2894017209
+    },
+    {
+      "at": "2026-09-12T00:59:02.023948+01:00",
+      "cash_after": 297535.4981929297
+    },
+    {
+      "at": "2026-09-12T00:59:02.348893+01:00",
+      "cash_after": 287535.4981929297
+    },
+    {
+      "at": "2026-09-12T00:59:02.628118+01:00",
+      "cash_after": 298070.29344913916
+    },
+    {
+      "at": "2026-09-12T00:59:02.765824+01:00",
+      "cash_after": 288070.29344913916
+    },
+    {
+      "at": "2026-09-12T00:59:03.011010+01:00",
+      "cash_after": 278070.29344913916
+    },
+    {
+      "at": "2026-09-12T00:59:03.217246+01:00",
+      "cash_after": 287015.0787252128
+    },
+    {
+      "at": "2026-09-12T00:59:03.390856+01:00",
+      "cash_after": 297269.1377359469
+    },
+    {
+      "at": "2026-09-12T00:59:04.317855+01:00",
+      "cash_after": 287269.1377359469
+    },
+    {
+      "at": "2026-09-12T00:59:04.673906+01:00",
+      "cash_after": 295862.73298190266
+    },
+    {
+      "at": "2026-09-12T00:59:04.774012+01:00",
+      "cash_after": 285862.73298190266
+    },
+    {
+      "at": "2026-09-12T00:59:04.963084+01:00",
+      "cash_after": 275862.73298190266
+    },
+    {
+      "at": "2026-09-12T00:59:05.128834+01:00",
+      "cash_after": 285627.89486060763
+    },
+    {
+      "at": "2026-09-12T00:59:05.275240+01:00",
+      "cash_after": 295526.9979996211
+    },
+    {
+      "at": "2026-09-12T00:59:05.346166+01:00",
+      "cash_after": 285526.9979996211
+    },
+    {
+      "at": "2026-09-12T00:59:05.669198+01:00",
+      "cash_after": 296113.93857188814
+    },
+    {
+      "at": "2026-09-12T00:59:06.141642+01:00",
+      "cash_after": 286113.93857188814
+    },
+    {
+      "at": "2026-09-12T00:59:06.309618+01:00",
+      "cash_after": 276113.93857188814
+    },
+    {
+      "at": "2026-09-12T00:59:06.572429+01:00",
+      "cash_after": 266113.93857188814
+    },
+    {
+      "at": "2026-09-12T00:59:06.643311+01:00",
+      "cash_after": 256113.93857188814
+    },
+    {
+      "at": "2026-09-12T00:59:06.721713+01:00",
+      "cash_after": 265586.7478808409
+    },
+    {
+      "at": "2026-09-12T00:59:06.881127+01:00",
+      "cash_after": 275211.4855675463
+    },
+    {
+      "at": "2026-09-12T00:59:07.079796+01:00",
+      "cash_after": 288449.72380578454
+    },
+    {
+      "at": "2026-09-12T00:59:07.130870+01:00",
+      "cash_after": 298199.72380578454
+    },
+    {
+      "at": "2026-09-12T00:59:09.699070+01:00",
+      "cash_after": 288199.72380578454
+    },
+    {
+      "at": "2026-09-12T00:59:09.969743+01:00",
+      "cash_after": 298714.240527578
+    },
+    {
+      "at": "2026-09-12T00:59:10.449357+01:00",
+      "cash_after": 288714.240527578
+    },
+    {
+      "at": "2026-09-12T00:59:10.784503+01:00",
+      "cash_after": 298954.31892052264
+    },
+    {
+      "at": "2026-09-12T00:59:11.183123+01:00",
+      "cash_after": 288954.31892052264
+    },
+    {
+      "at": "2026-09-12T00:59:11.470707+01:00",
+      "cash_after": 298390.59343032655
+    },
+    {
+      "at": "2026-09-12T00:59:12.766086+01:00",
+      "cash_after": 288390.59343032655
+    },
+    {
+      "at": "2026-09-12T00:59:13.064138+01:00",
+      "cash_after": 278390.59343032655
+    },
+    {
+      "at": "2026-09-12T00:59:13.151521+01:00",
+      "cash_after": 288083.19502810354
+    },
+    {
+      "at": "2026-09-12T00:59:13.502367+01:00",
+      "cash_after": 298877.9927159648
+    },
+    {
+      "at": "2026-09-12T00:59:14.315566+01:00",
+      "cash_after": 288877.9927159648
+    },
+    {
+      "at": "2026-09-12T00:59:14.490125+01:00",
+      "cash_after": 278877.9927159648
+    },
+    {
+      "at": "2026-09-12T00:59:14.618819+01:00",
+      "cash_after": 288311.95498011576
+    },
+    {
+      "at": "2026-09-12T00:59:14.800589+01:00",
+      "cash_after": 297960.8189517888
+    },
+    {
+      "at": "2026-09-12T00:59:15.274842+01:00",
+      "cash_after": 287960.8189517888
+    },
+    {
+      "at": "2026-09-12T00:59:15.529122+01:00",
+      "cash_after": 277960.8189517888
+    },
+    {
+      "at": "2026-09-12T00:59:15.711137+01:00",
+      "cash_after": 287653.891862137
+    },
+    {
+      "at": "2026-09-12T00:59:15.930319+01:00",
+      "cash_after": 297414.9629228991
+    },
+    {
+      "at": "2026-09-12T00:59:16.631648+01:00",
+      "cash_after": 287414.9629228991
+    },
+    {
+      "at": "2026-09-12T00:59:16.821505+01:00",
+      "cash_after": 298707.84566739475
+    },
+    {
+      "at": "2026-09-12T00:59:17.163504+01:00",
+      "cash_after": 288707.84566739475
+    },
+    {
+      "at": "2026-09-12T00:59:17.407720+01:00",
+      "cash_after": 299011.09874587297
+    },
+    {
+      "at": "2026-09-12T00:59:18.105718+01:00",
+      "cash_after": 289011.09874587297
+    },
+    {
+      "at": "2026-09-12T00:59:18.382239+01:00",
+      "cash_after": 279011.09874587297
+    },
+    {
+      "at": "2026-09-12T00:59:18.480534+01:00",
+      "cash_after": 289302.3608817953
+    },
+    {
+      "at": "2026-09-12T00:59:18.765847+01:00",
+      "cash_after": 299466.39250234864
+    },
+    {
+      "at": "2026-09-12T00:59:18.937006+01:00",
+      "cash_after": 289466.39250234864
+    },
+    {
+      "at": "2026-09-12T00:59:19.326829+01:00",
+      "cash_after": 298742.3220522508
+    },
+    {
+      "at": "2026-09-12T00:59:20.468322+01:00",
+      "cash_after": 288742.3220522508
+    },
+    {
+      "at": "2026-09-12T00:59:20.826554+01:00",
+      "cash_after": 299033.51123128517
+    },
+    {
+      "at": "2026-09-12T00:59:23.420012+01:00",
+      "cash_after": 289033.51123128517
+    },
+    {
+      "at": "2026-09-12T00:59:23.687523+01:00",
+      "cash_after": 298580.7815375435
+    },
+    {
+      "at": "2026-09-12T00:59:25.402784+01:00",
+      "cash_after": 288580.7815375435
+    },
+    {
+      "at": "2026-09-12T00:59:25.697735+01:00",
+      "cash_after": 295716.22165038524
+    },
+    {
+      "at": "2026-09-12T00:59:26.408620+01:00",
+      "cash_after": 285716.22165038524
+    },
+    {
+      "at": "2026-09-12T00:59:26.719262+01:00",
+      "cash_after": 295599.84394876
+    },
+    {
+      "at": "2026-09-12T00:59:26.927147+01:00",
+      "cash_after": 285599.84394876
+    },
+    {
+      "at": "2026-09-12T00:59:27.250040+01:00",
+      "cash_after": 295483.62993187463
+    },
+    {
+      "at": "2026-09-12T00:59:27.925069+01:00",
+      "cash_after": 285483.62993187463
+    },
+    {
+      "at": "2026-09-12T00:59:28.238395+01:00",
+      "cash_after": 295310.23409539094
+    },
+    {
+      "at": "2026-09-12T00:59:29.178576+01:00",
+      "cash_after": 285310.23409539094
+    },
+    {
+      "at": "2026-09-12T00:59:29.479519+01:00",
+      "cash_after": 295991.211149425
+    },
+    {
+      "at": "2026-09-12T00:59:30.923627+01:00",
+      "cash_after": 285991.211149425
+    },
+    {
+      "at": "2026-09-12T00:59:30.990087+01:00",
+      "cash_after": 275991.211149425
+    },
+    {
+      "at": "2026-09-12T00:59:31.354161+01:00",
+      "cash_after": 285945.121562791
+    },
+    {
+      "at": "2026-09-12T00:59:31.385748+01:00",
+      "cash_after": 295580.2690240254
+    },
+    {
+      "at": "2026-09-12T00:59:31.702131+01:00",
+      "cash_after": 285580.2690240254
+    },
+    {
+      "at": "2026-09-12T00:59:32.050540+01:00",
+      "cash_after": 295974.6792474326
+    },
+    {
+      "at": "2026-09-12T00:59:32.191121+01:00",
+      "cash_after": 285974.6792474326
+    },
+    {
+      "at": "2026-09-12T00:59:32.537375+01:00",
+      "cash_after": 296307.3635782546
+    }
+  ],
+  "uncertainty": {
+    "method": "issuer-block bootstrap, 5000 reps, seed 118120, 95% percentile CI (predeclared, fixed before this script was run -- same convention as Task 95A-118F)",
+    "ci_pct": [
+      -4.5714,
+      1.1092
+    ],
+    "effective_independent_groups": 19,
+    "caveat": "N=57 trades across only 19 distinct issuers -- N alone is NOT proof of adequate power; the effective independent-group count is the more relevant power measure and is reported explicitly, not implied by N."
+  },
+  "external_sends": 0,
+  "live_ledger_written": false
+}

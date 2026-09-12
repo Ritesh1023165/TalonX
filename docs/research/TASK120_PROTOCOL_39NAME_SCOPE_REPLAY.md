@@ -1,5 +1,12 @@
 # Task 120 (B2) — predeclared protocol: 39-name live-scope full-history replay
 
+> **2026-09-12 (Task120A) correction**: this protocol specified an
+> episode-return study (`runtime_episodes`/`build_returns`), not the
+> chronological `V2Service.tick()` replay engine. See
+> `docs/research/TASK120ABC_CORRECTED_BASELINE_AND_DECISION.md` for the
+> corrected protocol and result (B2/B3), which reused the correct engine
+> and also fixed this protocol's 6-name coverage-check bug.
+
 **Written before running the analysis or looking at its results**, per this
 task's own instruction.
 

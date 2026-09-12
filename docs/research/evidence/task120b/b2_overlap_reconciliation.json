@@ -1,0 +1,16 @@
+{
+  "stored_artifact_found": true,
+  "N": {
+    "stored": 10,
+    "fresh": 10
+  },
+  "net_20bps_pct": {
+    "stored": -2.9261,
+    "fresh": -2.9261
+  },
+  "profit_factor": {
+    "stored": 0.31539598833195015,
+    "fresh": 0.31539555755202126
+  },
+  "exact_match": true
+}

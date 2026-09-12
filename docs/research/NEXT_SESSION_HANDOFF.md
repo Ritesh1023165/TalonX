@@ -117,18 +117,24 @@ state. **This decision is made at next-session preflight time, not here.**
 ## One next research/product action
 
 **Option 3 (attributable per-lane reconciliation surface) is DONE** —
-implemented, tested, rendered, and integrated this task (Task 119/119A),
-now live in this candidate's Paper/EOD and Active V2 tabs.
+implemented, tested, rendered, and integrated (Task 119/119A), live in
+this candidate's Paper/EOD and Active V2 tabs.
 
-**Current next action** (Task 120, `TASK120_ECONOMIC_DECISION.md`):
-**NO_SUPPORTED_STRATEGY_CHANGE** — a properly-powered (N=27, vs. the
-live-only N=10) replay of the 39-name live scope's full available history
-is genuinely inconclusive (issuer-block CI [−7.51%, +2.31%], includes
-zero). The smallest concrete evidence-acquisition task identified:
-backfill local daily-bar price coverage for the 6 live-scope names
-currently missing it (**ABCL, ACHR, ADC, AGNC, MSTR, SHOP** — MSTR
-notably, the name that has dominated live activity) using the existing
-`composite-yf` adapter (no new provider), then re-run
-`research/scripts/task120_39name_scope_replay.py` unmodified. Live
-volatility tracking (Task 118E/F protocol) continues in parallel but
-remains explicitly not the sole programme.
+**Superseded 2026-09-12 (Task120A–C)**: Task 120's N=27/6-name-gap
+finding was corrected (wrong replay method, wrong coverage check — see
+`docs/research/TASK120ABC_CORRECTED_BASELINE_AND_DECISION.md`). The
+authoritative 39-name-scope result is now a **properly-powered
+chronological replay** (the real `V2Service.tick()`, N=57, 19 distinct
+issuers, full 2019–2026 available history): net@20bps=−0.85%, 95%
+CI=[−4.57%, +1.11%] — **still inconclusive** (CI includes zero), but on
+a correctly-engineered, tighter-CI basis. Original's economic evidence
+was found to already exist (Task 93, exact frozen contract, 1 trade in
+18.7 months — cited, not rerun). Product decision:
+**`INSUFFICIENT_EVIDENCE_WITH_ONE_SPECIFIC_NEXT_ACTION`** — the one
+named next action is Experimental's exact `EXPERIMENTAL_RELAXED_V1`
+contract, never backtested as a combined whole, reusing Task 93's
+already-built/validated `task93_canonical_v1` dataset and harness (no
+new data collection, no new framework). See
+`docs/research/PRODUCT_STATUS.md` for the one-page authoritative summary.
+Live V2 observation continues in parallel but remains explicitly not the
+sole programme.

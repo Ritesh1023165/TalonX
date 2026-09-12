@@ -1,0 +1,14 @@
+{
+  "manifest_name": "39name_live_execution_scope",
+  "resolved_utc": "2026-09-11",
+  "resolution_method": "talonx_ops.watchlist_coverage.build_coverage_map(), v2_collection_scope == 'POLLED'",
+  "provenance": "docs/research/TASK118_INVENTORY.md (first frozen 2026-09-11); re-verified live and found identical on 2026-09-11 (Task 118H) and again 2026-09-12 (Task 120, before this correction). This exact static list is used by run_baseline_a.py (Task 118 Deliverable A) and by the corrected Task 120A/B scripts -- it is NOT re-resolved dynamically inside any replay, per this task's own instruction to freeze scope and avoid resolving a changing current watchlist inside each run.",
+  "count": 39,
+  "symbols": [
+    "AAPL", "ABCL", "ABT", "ACHR", "ADC", "ADP", "AFL", "AGNC", "AMAT", "AMD",
+    "AVGO", "BAC", "BLK", "C", "CSCO", "CVX", "DELL", "GOOGL", "IBM", "INTC",
+    "JNJ", "JPM", "KO", "MA", "MCD", "MSFT", "MSTR", "NUE", "NVDA", "ORCL",
+    "PG", "PYPL", "SHOP", "STX", "TSLA", "UNH", "V", "VRT", "WMT"
+  ],
+  "limitation": "RETROSPECTIVE_WATCHLIST -- today's 39-name manifest applied to historical episodes is a diagnostic cut, not an out-of-sample backtest; the manifest was not chosen based on backtested insider-cluster performance, but its current composition still reflects hindsight about which names matter now. Unchanged limitation, carried from Task 118 Deliverable A."
+}

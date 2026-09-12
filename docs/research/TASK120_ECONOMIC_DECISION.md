@@ -1,5 +1,21 @@
 # Task 120 (Workstream B) — economic/product decision
 
+> **2026-09-12 (Task120A) correction — do not treat this document's
+> claims below as the final state.** This document (a) mislabelled the
+> N=10, −2.93% figure's origin as "live prospective" (it is a historical
+> chronological replay, 2024-09-01→2026-03-31 — the live ledger's actual
+> Friday state was zero trades); (b) used an episode-return study
+> (`runtime_episodes`/`build_returns`), not the actual chronological
+> `V2Service.tick()` replay engine Task 118 Deliverable A already used —
+> relabelled `EPISODE_RETURN_STUDY_NOT_CHRONOLOGICAL_REPLAY`; (c) wrongly
+> claimed 6 live-scope names (including MSTR) had no price coverage by
+> checking only one of two existing bar directories — corrected to 1
+> name (SHOP), unchanged from Task 118 Deliverable A's own prior finding.
+> See `docs/research/TASK120ABC_CORRECTED_BASELINE_AND_DECISION.md` for
+> the full corrected account and the properly-powered (N=57, chronological
+> replay, CI=[−4.571%, +1.109%]) result that supersedes this document's
+> N=27 figure as the authoritative 39-name-scope diagnostic.
+
 Protocol written and frozen before running: `TASK120_PROTOCOL_39NAME_SCOPE_REPLAY.md`.
 Script: `research/scripts/task120_39name_scope_replay.py`. Raw output:
 `results/task120_39name_scope_replay/{result.json,terminal_summary.txt}` (local).
