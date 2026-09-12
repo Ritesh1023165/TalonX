@@ -4,6 +4,20 @@ Supersedes (does not delete) `TASK120_ECONOMIC_DECISION.md` and
 `TASK120_PROTOCOL_39NAME_SCOPE_REPLAY.md`. Corrections appended as
 blockquotes to those files; the authoritative account is this document.
 
+> **Correction (Task 121, 2026-09-12):** the B3 `equity_final.equity`
+> figure below ($296,307.36) is **gross of the 20bps research cost
+> convention**, not "cost-adjusted equity" — it is V2's own paper ledger's
+> `ending_cash` (V2 models zero cost internally), while `net@20bps` is a
+> SEPARATE per-trade research adjustment that never flows back into that
+> ledger figure. The correct cost-adjusted ending equity is **$295,167.37**
+> (starting $300,000.00 + gross P&L −$3,692.63 − explicit cost adjustment
+> −$1,140.00, verified exactly = 57 trades × $10,000 avg notional × 20bps).
+> Full reconciliation, and the "properly powered" wording withdrawal (the
+> B verdict below is a completed, correctly-engineered computation whose
+> inference strength is separately, and more modestly, described), are in
+> `docs/research/TASK121_TASK120_ACCOUNTING_CORRECTIONS.md`. The headline
+> decision (CI including zero) is unchanged.
+
 ## TASK A — corrections to Task 120
 
 **A1 — historical/live confusion, corrected.** The N=10, −2.93% figure
@@ -31,8 +45,10 @@ step by step). Task 120's N=27 result is **relabelled**:
 `EPISODE_RETURN_STUDY_NOT_CHRONOLOGICAL_REPLAY` — informative as a
 secondary cross-check, but not the authoritative product diagnostic.
 **Withdrawn** from Task 120's claims: "first properly powered" (false —
-Task 118 Deliverable A already used the correct engine at N=10, and this
-task's own B3 result below is both correctly-engineered and better-powered),
+Task 118 Deliverable A already used the correct engine at N=10; and no
+formal power calculation was performed for either N=10 or this task's own
+N=57 result — "properly powered" was never a supported description of
+either, only "correctly engineered" is supported for B3),
 "fully representative" (the coverage claim behind it was itself wrong —
 see A4), and any implied exact-runtime-parity claim (the episode-study
 method does not exercise the runtime's position/cooldown/capital logic at
@@ -164,8 +180,13 @@ change is made from this result. V2 is not promoted; the 39-name scope
 is not expanded.
 
 **Interpretation**: the 39-name live-scope, chronologically-replayed,
-correctly-costed, properly-powered (N=57, 19 issuers) result is
-**negative and statistically inconclusive** (CI includes zero) — a
+correctly-costed result — N=57 closed trades across 19 distinct issuers,
+negative observed net expectancy — is **statistically inconclusive** (95%
+issuer-block-bootstrap CI includes zero). Completion of the computation is
+reported separately from the strength of the underlying inference: N=57 /
+19 issuers is not described as "properly powered" or "adequately powered"
+— no formal power calculation was performed, and 19 independent groups is
+a small basis for such a claim either way. What is supported is only: a
 materially tighter and more decisive CI than the withdrawn N=27
 episode-study's [−7.51%, +2.31%], and computed with the actual runtime
 engine rather than a proxy. It neither confirms nor refutes a real

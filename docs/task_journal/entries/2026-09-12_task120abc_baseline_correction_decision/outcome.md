@@ -1,3 +1,14 @@
+> **Correction (Task 121, 2026-09-12):** the verdict line below described
+> the B result as "properly powered." No formal power calculation was ever
+> performed for N=57/19 issuers; that wording is withdrawn as unsupported.
+> The supported description is: N=57 closed trades, 19 distinct issuers,
+> negative observed net expectancy, 95% CI including zero — a completed,
+> correctly-engineered computation whose *inference strength* is not
+> separately established as "adequate." See
+> `docs/research/TASK121_EXPERIMENTAL_CONTRACT_RESULTS.md` §Task120
+> corrections for the full accounting correction (equity figure) also
+> applied at that date.
+
 1. **Separate verdicts**: A: `TASK120_CORRECTIONS_COMPLETE`. B: `CHRONOLOGICAL_BASELINE_COMPLETE_INCONCLUSIVE` (N=57, properly powered, genuinely inconclusive — not partial). C: `INSUFFICIENT_EVIDENCE_WITH_ONE_SPECIFIC_NEXT_ACTION`.
 
 2. **SHAs**: release verified `f28986999eec5e313cfc89db24e4dbacfb378891` (unchanged — no release-branch work this task, research-only). Research `8bfbaa8` → this commit, pushed.

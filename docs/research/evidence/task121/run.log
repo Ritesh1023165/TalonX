@@ -1,0 +1,96 @@
+fingerprint gate: {'v1_fingerprint': '2ae6216bca70'}
+relaxed thresholds: {'min_atr_pct': 0.1, 'confluence_score_min': 1, 'min_risk_reward_ratio': 1.0}
+frozen (Original) thresholds: {'min_atr_pct': 0.25, 'confluence_score_min': 2, 'min_risk_reward_ratio': 1.5}
+loading task93_canonical_v1 ...
+loaded 116,295 bars, 35 symbols, 2025-01-24 00:00:00+00:00 .. 2025-01-31 23:59:00+00:00, blocking_issues=0
+
+running EXPERIMENTAL_RELAXED_V1 replay (this can take a while)...
+  progress: 3436/116295 bars (3.0%)
+  progress: 6474/116295 bars (5.6%)
+  progress: 8567/116295 bars (7.4%)
+  progress: 10408/116295 bars (8.9%)
+  progress: 11977/116295 bars (10.3%)
+  progress: 13550/116295 bars (11.7%)
+  progress: 15071/116295 bars (13.0%)
+  progress: 16767/116295 bars (14.4%)
+  progress: 18599/116295 bars (16.0%)
+  progress: 20161/116295 bars (17.3%)
+  progress: 21690/116295 bars (18.7%)
+  progress: 23160/116295 bars (19.9%)
+  progress: 24722/116295 bars (21.3%)
+  progress: 26235/116295 bars (22.6%)
+  progress: 27774/116295 bars (23.9%)
+  progress: 29301/116295 bars (25.2%)
+  progress: 30833/116295 bars (26.5%)
+  progress: 32398/116295 bars (27.9%)
+  progress: 33966/116295 bars (29.2%)
+  progress: 35533/116295 bars (30.6%)
+  progress: 37042/116295 bars (31.9%)
+  progress: 38672/116295 bars (33.3%)
+  progress: 40270/116295 bars (34.6%)
+  progress: 41854/116295 bars (36.0%)
+  progress: 43405/116295 bars (37.3%)
+  progress: 44886/116295 bars (38.6%)
+  progress: 46395/116295 bars (39.9%)
+  progress: 47913/116295 bars (41.2%)
+  progress: 49492/116295 bars (42.6%)
+  progress: 51075/116295 bars (43.9%)
+  progress: 52691/116295 bars (45.3%)
+  progress: 54319/116295 bars (46.7%)
+  progress: 55937/116295 bars (48.1%)
+  progress: 57543/116295 bars (49.5%)
+  progress: 59165/116295 bars (50.9%)
+  progress: 60744/116295 bars (52.2%)
+  progress: 62255/116295 bars (53.5%)
+  progress: 63712/116295 bars (54.8%)
+  progress: 65217/116295 bars (56.1%)
+  progress: 66776/116295 bars (57.4%)
+  progress: 68241/116295 bars (58.7%)
+  progress: 69641/116295 bars (59.9%)
+  progress: 71069/116295 bars (61.1%)
+  progress: 72424/116295 bars (62.3%)
+  progress: 73723/116295 bars (63.4%)
+  progress: 75048/116295 bars (64.5%)
+  progress: 76375/116295 bars (65.7%)
+  progress: 77674/116295 bars (66.8%)
+  progress: 79061/116295 bars (68.0%)
+  progress: 80485/116295 bars (69.2%)
+  progress: 81811/116295 bars (70.3%)
+  progress: 83081/116295 bars (71.4%)
+  progress: 84349/116295 bars (72.5%)
+  progress: 85662/116295 bars (73.7%)
+  progress: 87010/116295 bars (74.8%)
+  progress: 88415/116295 bars (76.0%)
+  progress: 89907/116295 bars (77.3%)
+  progress: 91441/116295 bars (78.6%)
+  progress: 92989/116295 bars (80.0%)
+  progress: 94523/116295 bars (81.3%)
+  progress: 95890/116295 bars (82.5%)
+  progress: 97399/116295 bars (83.8%)
+  progress: 98934/116295 bars (85.1%)
+  progress: 100446/116295 bars (86.4%)
+  progress: 101884/116295 bars (87.6%)
+  progress: 103283/116295 bars (88.8%)
+  progress: 104709/116295 bars (90.0%)
+  progress: 106191/116295 bars (91.3%)
+  progress: 107676/116295 bars (92.6%)
+  progress: 109245/116295 bars (93.9%)
+  progress: 110567/116295 bars (95.1%)
+  progress: 111956/116295 bars (96.3%)
+  progress: 113357/116295 bars (97.5%)
+  progress: 114752/116295 bars (98.7%)
+  progress: 116295/116295 bars (100.0%)
+  backtest elapsed: 2267.9s
+
+=== SUMMARY ===
+regular-session closed trades: 0  distinct issuers: 0
+win_rate=None  PF=None
+no trades
+no trades
+equity_final: $100,000.00
+95% CI (usd): None
+95% CI (pct): None
+overnight/weekend holds: 0  max_concurrent=0  capital_never_binding=True
+missing configured symbols: []
+
+DONE. Full artifacts under C:\workspace\TalonX-task118-profitability\results\task121_experimental_replay

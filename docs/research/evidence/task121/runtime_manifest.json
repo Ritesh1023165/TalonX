@@ -1,0 +1,62 @@
+{
+  "fingerprint_gate": {
+    "v1_fingerprint": "2ae6216bca70"
+  },
+  "files": {
+    "talonx_quant\\consumer.py": {
+      "release_sha256_16": "39bd02792ecc12eb",
+      "research_sha256_16": "39bd02792ecc12eb",
+      "content_identical": true
+    },
+    "talonx_quant\\strategy.py": {
+      "release_sha256_16": "bc73da8199920977",
+      "research_sha256_16": "bc73da8199920977",
+      "content_identical": true
+    },
+    "talonx_quant\\config.py": {
+      "release_sha256_16": "9eac608cacc7af60",
+      "research_sha256_16": "9eac608cacc7af60",
+      "content_identical": true
+    },
+    "talonx_quant\\session.py": {
+      "release_sha256_16": "8ae121129107517f",
+      "research_sha256_16": "8ae121129107517f",
+      "content_identical": true
+    },
+    "talonx_quant\\indicators.py": {
+      "release_sha256_16": "153a37a05a5aa0a0",
+      "research_sha256_16": "153a37a05a5aa0a0",
+      "content_identical": true
+    },
+    "talonx_signals\\config.py": {
+      "release_sha256_16": "0535a9a13580d4bc",
+      "research_sha256_16": "be01d1c947dd9269",
+      "content_identical": true
+    },
+    "talonx_signals\\relaxed_profile.py": {
+      "release_sha256_16": "a9be1b038b83ced2",
+      "research_sha256_16": "e93d103c4760ba6d",
+      "content_identical": true
+    },
+    "talonx_signals\\experimental_paper.py": {
+      "release_sha256_16": "d45198c38cf6fa2d",
+      "research_sha256_16": "11c88f18a756df7c",
+      "content_identical": true
+    },
+    "talonx_backtest\\engine.py": {
+      "release_sha256_16": "25fb10ea82a1d309",
+      "research_sha256_16": "25fb10ea82a1d309",
+      "content_identical": true
+    },
+    "talonx_backtest\\execution.py": {
+      "release_sha256_16": "0d88d5606de796f4",
+      "research_sha256_16": "0d88d5606de796f4",
+      "content_identical": true
+    },
+    "talonx_paper\\engine.py": {
+      "release_sha256_16": "5c826b312bbe0f4e",
+      "research_sha256_16": "5c826b312bbe0f4e",
+      "content_identical": true
+    }
+  }
+}

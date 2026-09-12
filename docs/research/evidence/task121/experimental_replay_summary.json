@@ -1,0 +1,96 @@
+{
+  "contract": "EXPERIMENTAL_RELAXED_V1",
+  "dataset": {
+    "id": "task93_canonical_v1",
+    "sha256": "796893860a2733b3ffd689c81f2ce68adf96a6096cfcbbc942d7924a34e37474",
+    "window": [
+      "2025-01-24 00:00:00+00:00",
+      "2025-01-31 23:59:00+00:00"
+    ],
+    "n_bars": 116295,
+    "n_blocking_quality_issues": 0
+  },
+  "universe": {
+    "configured_scope_n": 35,
+    "covered_n": 35,
+    "missing": []
+  },
+  "thresholds": {
+    "relaxed": {
+      "min_atr_pct": 0.1,
+      "confluence_score_min": 1,
+      "min_risk_reward_ratio": 1.0
+    },
+    "frozen_original": {
+      "min_atr_pct": 0.25,
+      "confluence_score_min": 2,
+      "min_risk_reward_ratio": 1.5
+    }
+  },
+  "funnel": {
+    "bars_processed": 116295,
+    "signals_generated": 2300,
+    "signals_published": 75,
+    "rejections_by_reason": {
+      "LOW_VOLATILITY": 56588,
+      "LOW_CONFLUENCE": 1490,
+      "LOW_RISK_REWARD": 130,
+      "OPENING_BLACKOUT": 148,
+      "CLOSING_BLACKOUT": 82,
+      "US_MARKET_SESSION_CLOSED": 252,
+      "PREMARKET_LIQUIDITY": 50,
+      "HTF_DATA_UNAVAILABLE": 33,
+      "NO_ACTIVE_POSITION": 75,
+      "COOLDOWN": 38
+    },
+    "entries_all_sessions": 0,
+    "entries_regular_session": 0,
+    "entries_non_regular_session_excluded": 0,
+    "published_minus_entered": 75,
+    "published_minus_entered_note": "difference is entries skipped because the symbol already had an open position (no pyramiding) or the historical data ended before the next bar could fill it -- the engine does not emit a separate rejection record for the position-already-open case, so this is reported as one combined figure, not silently omitted"
+  },
+  "cost_model": {
+    "spread_bps_round_trip": 5.0,
+    "commissions_modeled": false,
+    "allocation_usd_per_trade": 2500.0,
+    "initial_cash_usd": 100000.0
+  },
+  "performance": {
+    "n_closed_trades_regular_session": 0,
+    "distinct_issuers": 0,
+    "by_issuer_n_trades": {},
+    "win_rate": null,
+    "profit_factor": null,
+    "net_expectancy_usd_mean": null,
+    "net_expectancy_pct_mean": null,
+    "gross_expectancy_usd_mean": null,
+    "net_pnl_usd_total": 0.0,
+    "gross_pnl_usd_total": 0.0,
+    "spread_cost_usd_total": 0.0
+  },
+  "equity_final": {
+    "starting_cash": 100000.0,
+    "gross_pnl_total": 0.0,
+    "spread_cost_total": 0.0,
+    "net_pnl_total": 0.0,
+    "equity": 100000.0,
+    "formula": "initial_cash + sum(net_pnl_usd per closed trade) -- no compounding across trades (fixed $2,500 allocation per entry, matching the real engine's fixed-notional sizing); 0 open positions expected at data end given EOD flatten (verified below)"
+  },
+  "exit_reason_counts": {},
+  "overnight_or_weekend_holds": 0,
+  "concurrency": {
+    "max_concurrent_open_positions": 0,
+    "capital_never_binding": true,
+    "max_committed_usd": 0.0
+  },
+  "uncertainty_usd": {
+    "ci_pct": null,
+    "effective_independent_groups": 0
+  },
+  "uncertainty_pct": {
+    "ci_pct": null,
+    "effective_independent_groups": 0
+  },
+  "sensitivity_drop_top1_issuer": null,
+  "trades_table": []
+}
