@@ -1,5 +1,34 @@
 # Task 121 — Experimental (EXPERIMENTAL_RELAXED_V1) exact-contract results
 
+> **Correction (Task 121A, 2026-09-12):** the claim below that
+> `ExperimentalPaperEngine.check_exits()`/`.flatten_all()` have "no
+> caller anywhere in the live runtime" is **WRONG** for `check_exits()` —
+> it was based on reading `talonx_signals/run.py` from this (then, and
+> now again — the file itself hasn't been touched) STALE research
+> worktree. The pinned RELEASE worktree's `run.py` has `check_exits()`
+> wired into every live market tick (Task 118A P1, commit `72baca2`,
+> never synced into this research branch after the branches diverged at
+> `9bec279`). `flatten_all()` (EOD) genuinely still has no caller
+> (confirmed directly against the release source, not re-asserted from
+> this stale copy). The "Friday's exits were manual" claim is also
+> withdrawn as unsupported, not replaced with a confirmed opposite claim.
+> This task's replay's own computed ECONOMICS (2,300 candidates, 75
+> published, 0 entries) were unaffected — none of the modules that
+> replay imported were stale, only this separate narrative investigation
+> was. Full root-cause, byte-hash evidence, and the corrected contract:
+> `docs/research/TASK121A_PROVENANCE_AND_CONTRACT.md`. The exit lifecycle
+> used in THIS document's replay (labelled `DESIGNED_LIFECYCLE`, with
+> EOD-flatten and bearish-signal-close both simulated) is now known to be
+> a materially different lifecycle from Experimental's real one
+> (stop/target-only, no EOD-flatten, no bearish-close) — superseded by
+> Task 121A's corrected replay, not merely re-labelled. **§4's "consistent
+> with every published candidate being BEARISH" claim was always
+> explicitly disclosed as an inference from aggregate counts (75
+> published = 75 NO_ACTIVE_POSITION), never a per-signal-verified fact —
+> per-signal direction was not retained in this run. Kept UNVERIFIED, not
+> reasserted; Task 121A's own `published_signal_log` DOES retain
+> per-signal direction and supersedes this inference going forward.**
+
 Protocol frozen in `docs/research/TASK121_PROTOCOL.md` before this replay
 was executed against real outcomes. Adapter:
 `research/scripts/task121_experimental_replay.py`. Raw artifacts (full

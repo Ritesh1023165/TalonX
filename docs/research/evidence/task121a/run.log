@@ -1,0 +1,286 @@
+provenance OK: {
+  "_fingerprint_gate": {
+    "v1_fingerprint": "2ae6216bca70",
+    "expected": "2ae6216bca70"
+  }
+}
+run.py provenance: {
+  "release_file": "C:\\workspace\\TalonX\\talonx_signals\\run.py",
+  "release_sha256_16": "c86991fa2ed0f18e",
+  "research_file": "C:\\workspace\\TalonX-task118-profitability\\talonx_signals\\run.py",
+  "research_sha256_16": "f8799bc276df7c1f",
+  "identical": false,
+  "note": "STALE in research worktree -- missing Task 118A P1's check_exits() wiring (commit 72baca2, never synced past the branches' divergence point 9bec279). This adapter reads the RELEASE copy directly for contract facts; it does not import run.py at all."
+}
+universe mapping: {
+  "historical_is_piv_default_universe": true,
+  "configured_live_watchlist": [
+    "AAPL",
+    "ABCL",
+    "ABT",
+    "ACHR",
+    "ADC",
+    "ADP",
+    "AFL",
+    "AGNC",
+    "AMAT",
+    "AMD",
+    "ASML",
+    "AVGO",
+    "BABA",
+    "BAC",
+    "BLK",
+    "BLSH",
+    "C",
+    "CSCO",
+    "CVX",
+    "DELL",
+    "GOOGL",
+    "IBM",
+    "INTC",
+    "JNJ",
+    "JPM",
+    "KO",
+    "MA",
+    "MCD",
+    "MSFT",
+    "MSTR",
+    "NUE",
+    "NVDA",
+    "ORCL",
+    "PATH",
+    "PG",
+    "PLTR",
+    "PYPL",
+    "RIG",
+    "SHOP",
+    "SKHY",
+    "SMCI",
+    "SPCX",
+    "STX",
+    "TSLA",
+    "UNH",
+    "V",
+    "VRT",
+    "WMT"
+  ],
+  "configured_live_watchlist_error": null,
+  "intersection_with_configured_live": [
+    "AAPL",
+    "AMAT",
+    "AMD",
+    "AVGO",
+    "CSCO",
+    "GOOGL",
+    "INTC",
+    "MSFT",
+    "NVDA",
+    "PYPL",
+    "STX",
+    "TSLA"
+  ],
+  "historical_not_in_configured_live": [
+    "ADBE",
+    "ADI",
+    "AMZN",
+    "BKNG",
+    "CMCSA",
+    "COST",
+    "GILD",
+    "HON",
+    "INTU",
+    "ISRG",
+    "KLAC",
+    "LRCX",
+    "MDLZ",
+    "META",
+    "MU",
+    "NFLX",
+    "PANW",
+    "PEP",
+    "QCOM",
+    "REGN",
+    "SBUX",
+    "TXN",
+    "VRTX"
+  ],
+  "note": "Experimental scans CONTROL's published candidates unfiltered -- there is no Experimental-specific symbol allowlist in the runtime. The historical 35-symbol set is Original's OWN validation universe (talonx_piv.DEFAULT_UNIVERSE), not independently proven equal to 'the complete configured product scope'."
+}
+[month1_corrected] loaded 375,628 bars, 35 symbols, 2025-01-24 00:00:00+00:00 .. 2025-02-22 00:59:00+00:00
+[month1_corrected] progress 6538/375628 (1.7%) +30.2s
+[month1_corrected] progress 9870/375628 (2.6%) +30.1s
+[month1_corrected] progress 12380/375628 (3.3%) +30.3s
+[month1_corrected] progress 14629/375628 (3.9%) +30.1s
+[month1_corrected] progress 16988/375628 (4.5%) +30.1s
+[month1_corrected] progress 19274/375628 (5.1%) +30.1s
+[month1_corrected] progress 21514/375628 (5.7%) +30.1s
+[month1_corrected] progress 23759/375628 (6.3%) +30.0s
+[month1_corrected] progress 26032/375628 (6.9%) +30.1s
+[month1_corrected] progress 28322/375628 (7.5%) +30.0s
+[month1_corrected] progress 30696/375628 (8.2%) +30.4s
+[month1_corrected] progress 33080/375628 (8.8%) +30.3s
+[month1_corrected] progress 35498/375628 (9.5%) +30.4s
+[month1_corrected] progress 37792/375628 (10.1%) +30.0s
+[month1_corrected] progress 40179/375628 (10.7%) +30.1s
+[month1_corrected] progress 42505/375628 (11.3%) +30.0s
+[month1_corrected] progress 44716/375628 (11.9%) +30.3s
+[month1_corrected] progress 46942/375628 (12.5%) +30.4s
+[month1_corrected] progress 49024/375628 (13.1%) +30.3s
+[month1_corrected] progress 51311/375628 (13.7%) +30.5s
+[month1_corrected] progress 53577/375628 (14.3%) +30.2s
+[month1_corrected] progress 55867/375628 (14.9%) +30.1s
+[month1_corrected] progress 58112/375628 (15.5%) +30.0s
+[month1_corrected] progress 60385/375628 (16.1%) +30.1s
+[month1_corrected] progress 62493/375628 (16.6%) +30.4s
+[month1_corrected] progress 64554/375628 (17.2%) +30.3s
+[month1_corrected] progress 66776/375628 (17.8%) +30.4s
+[month1_corrected] progress 69011/375628 (18.4%) +30.3s
+[month1_corrected] progress 71236/375628 (19.0%) +30.4s
+[month1_corrected] progress 73243/375628 (19.5%) +30.3s
+[month1_corrected] progress 75293/375628 (20.0%) +30.1s
+[month1_corrected] progress 77300/375628 (20.6%) +30.0s
+[month1_corrected] progress 79452/375628 (21.2%) +30.0s
+[month1_corrected] progress 81568/375628 (21.7%) +30.1s
+[month1_corrected] progress 83529/375628 (22.2%) +30.2s
+[month1_corrected] progress 85561/375628 (22.8%) +30.1s
+[month1_corrected] progress 87681/375628 (23.3%) +30.3s
+[month1_corrected] progress 89840/375628 (23.9%) +30.0s
+[month1_corrected] progress 92040/375628 (24.5%) +30.5s
+[month1_corrected] progress 94281/375628 (25.1%) +30.2s
+[month1_corrected] progress 96305/375628 (25.6%) +30.1s
+[month1_corrected] progress 98475/375628 (26.2%) +30.0s
+[month1_corrected] progress 100679/375628 (26.8%) +30.0s
+[month1_corrected] progress 102633/375628 (27.3%) +30.0s
+[month1_corrected] progress 104640/375628 (27.9%) +30.2s
+[month1_corrected] progress 106762/375628 (28.4%) +30.4s
+[month1_corrected] progress 108938/375628 (29.0%) +30.2s
+[month1_corrected] progress 110875/375628 (29.5%) +30.1s
+[month1_corrected] progress 112877/375628 (30.1%) +30.1s
+[month1_corrected] progress 114841/375628 (30.6%) +30.0s
+[month1_corrected] progress 117080/375628 (31.2%) +30.1s
+[month1_corrected] progress 119190/375628 (31.7%) +30.1s
+[month1_corrected] progress 121148/375628 (32.3%) +30.3s
+[month1_corrected] progress 123004/375628 (32.7%) +30.4s
+[month1_corrected] progress 124844/375628 (33.2%) +30.3s
+[month1_corrected] progress 126786/375628 (33.8%) +30.1s
+[month1_corrected] progress 128743/375628 (34.3%) +30.0s
+[month1_corrected] progress 130870/375628 (34.8%) +30.2s
+[month1_corrected] progress 133106/375628 (35.4%) +30.5s
+[month1_corrected] progress 135220/375628 (36.0%) +30.0s
+[month1_corrected] progress 137380/375628 (36.6%) +30.1s
+[month1_corrected] progress 139478/375628 (37.1%) +30.0s
+[month1_corrected] progress 141403/375628 (37.6%) +30.2s
+[month1_corrected] progress 143288/375628 (38.1%) +30.0s
+[month1_corrected] progress 145305/375628 (38.7%) +30.4s
+[month1_corrected] progress 147344/375628 (39.2%) +30.3s
+[month1_corrected] progress 149520/375628 (39.8%) +30.4s
+[month1_corrected] progress 151746/375628 (40.4%) +30.4s
+[month1_corrected] progress 153892/375628 (41.0%) +30.1s
+[month1_corrected] progress 155874/375628 (41.5%) +30.0s
+[month1_corrected] progress 158051/375628 (42.1%) +30.1s
+[month1_corrected] progress 160116/375628 (42.6%) +30.1s
+[month1_corrected] progress 161907/375628 (43.1%) +30.5s
+[month1_corrected] progress 163681/375628 (43.6%) +30.4s
+[month1_corrected] progress 165740/375628 (44.1%) +30.2s
+[month1_corrected] progress 167881/375628 (44.7%) +30.2s
+[month1_corrected] progress 170048/375628 (45.3%) +30.3s
+[month1_corrected] progress 172250/375628 (45.9%) +30.3s
+[month1_corrected] progress 174350/375628 (46.4%) +30.1s
+[month1_corrected] progress 176550/375628 (47.0%) +30.1s
+[month1_corrected] progress 178707/375628 (47.6%) +30.1s
+[month1_corrected] progress 180568/375628 (48.1%) +30.4s
+[month1_corrected] progress 182405/375628 (48.6%) +30.3s
+[month1_corrected] progress 184392/375628 (49.1%) +30.1s
+[month1_corrected] progress 186532/375628 (49.7%) +30.1s
+[month1_corrected] progress 188740/375628 (50.2%) +30.4s
+[month1_corrected] progress 190872/375628 (50.8%) +30.0s
+[month1_corrected] progress 193004/375628 (51.4%) +30.2s
+[month1_corrected] progress 195127/375628 (51.9%) +30.0s
+[month1_corrected] progress 197332/375628 (52.5%) +30.0s
+[month1_corrected] progress 199192/375628 (53.0%) +30.3s
+[month1_corrected] progress 200918/375628 (53.5%) +30.0s
+[month1_corrected] progress 202806/375628 (54.0%) +30.0s
+[month1_corrected] progress 204733/375628 (54.5%) +30.1s
+[month1_corrected] progress 206907/375628 (55.1%) +30.2s
+[month1_corrected] progress 209105/375628 (55.7%) +30.3s
+[month1_corrected] progress 211370/375628 (56.3%) +30.0s
+[month1_corrected] progress 213603/375628 (56.9%) +30.0s
+[month1_corrected] progress 215766/375628 (57.4%) +30.1s
+[month1_corrected] progress 217701/375628 (58.0%) +30.4s
+[month1_corrected] progress 219575/375628 (58.5%) +30.1s
+[month1_corrected] progress 221693/375628 (59.0%) +30.3s
+[month1_corrected] progress 223852/375628 (59.6%) +30.3s
+[month1_corrected] progress 226067/375628 (60.2%) +30.1s
+[month1_corrected] progress 228330/375628 (60.8%) +30.4s
+[month1_corrected] progress 230568/375628 (61.4%) +30.0s
+[month1_corrected] progress 232756/375628 (62.0%) +30.1s
+[month1_corrected] progress 234677/375628 (62.5%) +30.3s
+[month1_corrected] progress 236569/375628 (63.0%) +30.4s
+[month1_corrected] progress 238699/375628 (63.5%) +30.4s
+[month1_corrected] progress 240841/375628 (64.1%) +30.3s
+[month1_corrected] progress 243044/375628 (64.7%) +30.1s
+[month1_corrected] progress 245254/375628 (65.3%) +30.4s
+[month1_corrected] progress 247406/375628 (65.9%) +30.1s
+[month1_corrected] progress 249614/375628 (66.5%) +30.0s
+[month1_corrected] progress 251555/375628 (67.0%) +30.1s
+[month1_corrected] progress 253308/375628 (67.4%) +30.5s
+[month1_corrected] progress 255267/375628 (68.0%) +30.4s
+[month1_corrected] progress 257243/375628 (68.5%) +30.3s
+[month1_corrected] progress 259074/375628 (69.0%) +30.0s
+[month1_corrected] progress 261250/375628 (69.6%) +30.0s
+[month1_corrected] progress 263460/375628 (70.1%) +30.1s
+[month1_corrected] progress 265622/375628 (70.7%) +30.1s
+[month1_corrected] progress 267810/375628 (71.3%) +30.0s
+[month1_corrected] progress 269951/375628 (71.9%) +30.2s
+[month1_corrected] progress 271738/375628 (72.3%) +30.5s
+[month1_corrected] progress 273708/375628 (72.9%) +30.2s
+[month1_corrected] progress 275788/375628 (73.4%) +30.4s
+[month1_corrected] progress 277949/375628 (74.0%) +30.1s
+[month1_corrected] progress 280031/375628 (74.6%) +30.2s
+[month1_corrected] progress 282183/375628 (75.1%) +30.2s
+[month1_corrected] progress 284315/375628 (75.7%) +30.1s
+[month1_corrected] progress 286499/375628 (76.3%) +30.1s
+[month1_corrected] progress 288627/375628 (76.8%) +30.2s
+[month1_corrected] progress 290419/375628 (77.3%) +30.0s
+[month1_corrected] progress 292355/375628 (77.8%) +30.1s
+[month1_corrected] progress 294447/375628 (78.4%) +30.0s
+[month1_corrected] progress 296566/375628 (79.0%) +30.2s
+[month1_corrected] progress 298767/375628 (79.5%) +30.4s
+[month1_corrected] progress 300927/375628 (80.1%) +30.0s
+[month1_corrected] progress 303087/375628 (80.7%) +30.0s
+[month1_corrected] progress 305274/375628 (81.3%) +30.1s
+[month1_corrected] progress 307325/375628 (81.8%) +30.0s
+[month1_corrected] progress 309079/375628 (82.3%) +30.3s
+[month1_corrected] progress 311001/375628 (82.8%) +30.2s
+[month1_corrected] progress 313063/375628 (83.3%) +30.4s
+[month1_corrected] progress 315209/375628 (83.9%) +30.2s
+[month1_corrected] progress 317360/375628 (84.5%) +30.4s
+[month1_corrected] progress 319570/375628 (85.1%) +30.4s
+[month1_corrected] progress 321708/375628 (85.6%) +30.0s
+[month1_corrected] progress 323929/375628 (86.2%) +30.2s
+[month1_corrected] progress 325936/375628 (86.8%) +30.4s
+[month1_corrected] progress 327795/375628 (87.3%) +30.0s
+[month1_corrected] progress 329787/375628 (87.8%) +30.3s
+[month1_corrected] progress 331922/375628 (88.4%) +30.4s
+[month1_corrected] progress 334029/375628 (88.9%) +30.1s
+[month1_corrected] progress 336234/375628 (89.5%) +30.2s
+[month1_corrected] progress 338348/375628 (90.1%) +30.1s
+[month1_corrected] progress 340571/375628 (90.7%) +30.1s
+[month1_corrected] progress 342783/375628 (91.3%) +30.3s
+[month1_corrected] progress 344558/375628 (91.7%) +30.1s
+[month1_corrected] progress 346507/375628 (92.2%) +30.3s
+[month1_corrected] progress 348553/375628 (92.8%) +30.3s
+[month1_corrected] progress 350702/375628 (93.4%) +30.4s
+[month1_corrected] progress 352921/375628 (94.0%) +30.1s
+[month1_corrected] progress 355142/375628 (94.5%) +30.3s
+[month1_corrected] progress 357334/375628 (95.1%) +30.1s
+[month1_corrected] progress 359579/375628 (95.7%) +30.0s
+[month1_corrected] progress 361464/375628 (96.2%) +30.6s
+[month1_corrected] progress 363330/375628 (96.7%) +30.2s
+[month1_corrected] progress 365375/375628 (97.3%) +30.1s
+[month1_corrected] progress 367487/375628 (97.8%) +30.4s
+[month1_corrected] progress 369454/375628 (98.4%) +30.1s
+[month1_corrected] progress 371504/375628 (98.9%) +30.1s
+[month1_corrected] progress 373475/375628 (99.4%) +30.0s
+[month1_corrected] progress 375628/375628 (100.0%) +29.2s
+[month1_corrected] backtest elapsed: 5312.8s

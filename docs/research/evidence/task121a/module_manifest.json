@@ -1,0 +1,86 @@
+{
+  "talonx_quant.consumer": {
+    "file": "C:\\workspace\\TalonX\\talonx_quant\\consumer.py",
+    "sha256_16": "39bd02792ecc12eb"
+  },
+  "talonx_quant.strategy": {
+    "file": "C:\\workspace\\TalonX\\talonx_quant\\strategy.py",
+    "sha256_16": "bc73da8199920977"
+  },
+  "talonx_quant.config": {
+    "file": "C:\\workspace\\TalonX\\talonx_quant\\config.py",
+    "sha256_16": "9eac608cacc7af60"
+  },
+  "talonx_quant.session": {
+    "file": "C:\\workspace\\TalonX\\talonx_quant\\session.py",
+    "sha256_16": "8ae121129107517f"
+  },
+  "talonx_quant.indicators": {
+    "file": "C:\\workspace\\TalonX\\talonx_quant\\indicators.py",
+    "sha256_16": "153a37a05a5aa0a0"
+  },
+  "talonx_quant.schemas": {
+    "file": "C:\\workspace\\TalonX\\talonx_quant\\schemas.py",
+    "sha256_16": "523ff3831a7c87c1"
+  },
+  "talonx_quant.buffer": {
+    "file": "C:\\workspace\\TalonX\\talonx_quant\\buffer.py",
+    "sha256_16": "9347c9bdb1ec9b17"
+  },
+  "talonx_quant.aggregation": {
+    "file": "C:\\workspace\\TalonX\\talonx_quant\\aggregation.py",
+    "sha256_16": "8fd7745191a0735e"
+  },
+  "talonx_signals.config": {
+    "file": "C:\\workspace\\TalonX\\talonx_signals\\config.py",
+    "sha256_16": "0535a9a13580d4bc"
+  },
+  "talonx_signals.relaxed_profile": {
+    "file": "C:\\workspace\\TalonX\\talonx_signals\\relaxed_profile.py",
+    "sha256_16": "a9be1b038b83ced2"
+  },
+  "talonx_signals.experimental_paper": {
+    "file": "C:\\workspace\\TalonX\\talonx_signals\\experimental_paper.py",
+    "sha256_16": "d45198c38cf6fa2d"
+  },
+  "talonx_paper.engine": {
+    "file": "C:\\workspace\\TalonX\\talonx_paper\\engine.py",
+    "sha256_16": "5c826b312bbe0f4e"
+  },
+  "talonx_paper.store": {
+    "file": "C:\\workspace\\TalonX\\talonx_paper\\store.py",
+    "sha256_16": "5611315b214fa57d"
+  },
+  "talonx_paper.schemas": {
+    "file": "C:\\workspace\\TalonX\\talonx_paper\\schemas.py",
+    "sha256_16": "c0692fd6e2f4f43d"
+  },
+  "talonx_backtest.engine": {
+    "file": "C:\\workspace\\TalonX\\talonx_backtest\\engine.py",
+    "sha256_16": "25fb10ea82a1d309"
+  },
+  "talonx_backtest.execution": {
+    "file": "C:\\workspace\\TalonX\\talonx_backtest\\execution.py",
+    "sha256_16": "0d88d5606de796f4"
+  },
+  "talonx_backtest.data": {
+    "file": "C:\\workspace\\TalonX\\talonx_backtest\\data.py",
+    "sha256_16": "e158a01b3799d2e4"
+  },
+  "talonx_backtest.portfolio": {
+    "file": "C:\\workspace\\TalonX\\talonx_backtest\\portfolio.py",
+    "sha256_16": "a748000a70ee3a0b"
+  },
+  "talonx_signals.run (NOT imported -- contract source only)": {
+    "release_file": "C:\\workspace\\TalonX\\talonx_signals\\run.py",
+    "release_sha256_16": "c86991fa2ed0f18e",
+    "research_file": "C:\\workspace\\TalonX-task118-profitability\\talonx_signals\\run.py",
+    "research_sha256_16": "f8799bc276df7c1f",
+    "identical": false,
+    "note": "STALE in research worktree -- missing Task 118A P1's check_exits() wiring (commit 72baca2, never synced past the branches' divergence point 9bec279). This adapter reads the RELEASE copy directly for contract facts; it does not import run.py at all."
+  },
+  "_fingerprint_gate": {
+    "v1_fingerprint": "2ae6216bca70",
+    "expected": "2ae6216bca70"
+  }
+}

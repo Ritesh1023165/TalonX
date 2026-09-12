@@ -1,5 +1,16 @@
 # Task 121 — Experimental exact-contract evaluation: frozen protocol
 
+> **Correction (Task 121A, 2026-09-12):** §4's execution assumptions
+> (next-bar-open entry, bearish-signal close, 15:50 ET EOD flatten) are
+> now known to NOT match Experimental's real live lifecycle — see
+> `docs/research/TASK121A_PROVENANCE_AND_CONTRACT.md` for the corrected
+> contract (same-bar-close entry, stop/target-only exit, no EOD flatten,
+> no bearish-close) and its root cause (a stale research-worktree copy of
+> `talonx_signals/run.py`, not an import-precedence or search-scope
+> error). This protocol's population/window/universe/cost sections
+> remain otherwise accurate and were reused, corrected only where noted,
+> by Task 121A's own frozen protocol.
+
 Written and committed to the protocol file BEFORE any Experimental-relaxed
 replay was executed against real outcomes. Predeclares the population,
 metrics, uncertainty method, sensitivity checks and interpretation rule so
