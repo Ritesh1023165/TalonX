@@ -6413,3 +6413,58 @@ implementation), with two gates left explicitly PARTIAL/disclosed
 capital-exposure-ratio testing within this task's budget) rather than
 smoothed over. Full detail:
 `docs/research/{TASK130A_REPAIR_PROTOCOL,TASK130A_PROSPECTIVE_REPLAY_ACCEPTANCE,TASK130A_CORRECTED_ECONOMIC_DECISION}.md`.
+
+**Task 130B** (2026-09-13): closes Task 130A's own two remaining
+disclosed gaps -- identity verification and durability -- without
+reopening the frozen contract, and reassesses economics/acceptance on
+the result. Part 2/3: removed the 60-day-grace date-range identity
+heuristic entirely; for each of the 8 traded ambiguous symbols
+re-ran the real, unmodified `detect_episodes_for_issuer` to recover
+the EXACT constituent Form 4 records of the winning episode -- all 8
+(CZR, DOC, LB, MRVL, MTCH, PCG, TPL, WTW) classified
+`VERIFIED_CONSISTENT`. A CIK zero-padding bug in Task 130A's own
+reconciliation script (`"701985"` vs `"0000701985"` counted as
+different issuers) was found and fixed (`_norm_cik`), reducing the
+population-wide unresolved-identity count from 14/35 to 11/35 (0 of
+which correspond to any actual trade); the remaining 16/35 non-traded
+ambiguous symbols are reported honestly as
+`NOT_TRADED_DATE_RANGE_CONSISTENT`, not claimed resolved. Part 4/6/7:
+replaced Task 130A's in-memory-only driver with a new, durable,
+`V2Store`-backed (unmodified import, existing schema, isolated SQLite
+path -- never the live ledger) driver running four EXPLICIT session
+phases (OPEN/CLOSE/POST-CLOSE/MARK) per simulated session, so a
+same-day filing structurally cannot fund that same morning's entries.
+10 failure-path tests using REAL temporary SQLite files and genuine
+close/reopen all pass: reservation survives a real store restart,
+interrupted entry/exit transitions are idempotent, a bounded
+(5-session), idempotent missing-price retry defers rather than
+immediately expiring a timely intent, the 21st competing intent is
+rejected deterministically, insufficient cash produces no partial
+fill, a same-session exit's proceeds cannot fund that morning's
+competing entry (a genuinely open position, seeded directly per this
+task's own instruction to repair Task 130A's weaker fixture), a
+cold-start rejection does not block a later genuinely independent
+episode, and duplicate filing records do not duplicate economic
+effect. Also directly verified and disclosed (not fixed -- out of
+scope) a real characteristic of the frozen, already-deployed
+`cluster_engine`: its greedy window-consumption can silently drop
+later, independent filings that fall within the same 10-trading-day
+window as an already-fired cluster, without forming a second episode.
+Part 8: computed the invested-capital/equity exposure ratio for the
+first time (12.07%, distinct from the existing 89.62% day-occupancy
+measure) and separated study-cutoff (2026-03-31, 2 positions still
+open, equity $330,840.98) from tail-inclusive (20-session settlement
+tail, 0 open/0 unresolved, equity $330,935.40) accounting. Part 9: the
+durable driver's own 153 closed trades are episode-for-episode
+IDENTICAL to Task 130A's 153 -- explained (capacity was never binding
+under either implementation in this window/population; the repairs
+this task adds specifically matter under capacity contention or
+missing-price gaps, neither of which the real dataset triggers), not
+assumed as general equivalence. Verdict: **`PASS_FOR_INTEGRATION_REVIEW`**
+(reaffirmed a third time, now on a durable, accession-level-identity-
+verified, session-phased implementation), closing Task 130A's own
+three disclosed gaps (60-day-grace identity proxy; in-memory-only
+state with no restart testing; missing invested-capital exposure
+metric). Integration remains HOLD, production remains paused,
+unchanged. Full detail:
+`docs/research/{TASK130B_QUALIFICATION_ADDENDUM,TASK130B_DURABLE_LIFECYCLE_ACCEPTANCE,TASK130B_CORRECTED_ECONOMIC_DECISION}.md`.

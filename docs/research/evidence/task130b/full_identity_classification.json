@@ -1,0 +1,3290 @@
+{
+  "n_ambiguous_symbols_total": 35,
+  "n_traded_ambiguous_symbols": 8,
+  "final_classification_counts": {
+    "VERIFIED_CONSISTENT": 8,
+    "VERIFIED_ERROR_REQUIRING_CORRECTION": 0,
+    "UNRESOLVED": 11,
+    "NOT_TRADED_DATE_RANGE_CONSISTENT": 16
+  },
+  "note": "VERIFIED_CONSISTENT/VERIFIED_ERROR_REQUIRING_CORRECTION/UNRESOLVED status for the 8 traded symbols is based on the exact accession-level constituent-record evidence chain (Part 2), not trade profitability. The remaining 16 ambiguous symbols were never traded in this population and are reported as NOT_TRADED_DATE_RANGE_CONSISTENT -- visible, not silently discarded, and explicitly NOT claimed to be accession-level verified. 11 case(s) are UNRESOLVED (overlapping CIK date ranges and/or no exact eligible-entry-session match) -- kept visible in the population; exclusion is diagnostic only, never applied by default.",
+  "cases": [
+    {
+      "symbol": "A",
+      "n_distinct_ciks": 3,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0001090872": {
+          "n_records": 140,
+          "first_filing": "2019-01-31",
+          "last_filing": "2025-12-03",
+          "issuer_names": [
+            "AGILENT TECHNOLOGIES INC",
+            "AGILENT TECHNOLOGIES, INC."
+          ]
+        },
+        "0001132651": {
+          "n_records": 3,
+          "first_filing": "2021-07-22",
+          "last_filing": "2023-08-15",
+          "issuer_names": [
+            "AMES NATIONAL CORP"
+          ]
+        },
+        "0001823406": {
+          "n_records": 1,
+          "first_filing": "2022-03-08",
+          "last_filing": "2022-03-08",
+          "issuer_names": [
+            "Affinity Bancshares, Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_OVERLAP_EVIDENCE_ONLY",
+      "final_classification": "UNRESOLVED"
+    },
+    {
+      "symbol": "AME",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0001037868": {
+          "n_records": 203,
+          "first_filing": "2019-02-12",
+          "last_filing": "2026-03-25",
+          "issuer_names": [
+            "AMETEK INC/"
+          ]
+        },
+        "0001411579": {
+          "n_records": 1,
+          "first_filing": "2021-11-03",
+          "last_filing": "2021-11-03",
+          "issuer_names": [
+            "AMC ENTERTAINMENT HOLDINGS, INC."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_OVERLAP_EVIDENCE_ONLY",
+      "final_classification": "UNRESOLVED"
+    },
+    {
+      "symbol": "APA",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0000006769": {
+          "n_records": 5,
+          "first_filing": "2019-05-07",
+          "last_filing": "2020-04-07",
+          "issuer_names": [
+            "APACHE CORP"
+          ]
+        },
+        "0001841666": {
+          "n_records": 11,
+          "first_filing": "2021-03-12",
+          "last_filing": "2026-03-20",
+          "issuer_names": [
+            "APA Corp"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    },
+    {
+      "symbol": "APO",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001411494": {
+          "n_records": 242,
+          "first_filing": "2019-02-13",
+          "last_filing": "2021-12-13",
+          "issuer_names": [
+            "Apollo Global Management LLC",
+            "Apollo Global Management, Inc."
+          ]
+        },
+        "0001858681": {
+          "n_records": 148,
+          "first_filing": "2022-02-17",
+          "last_filing": "2025-12-12",
+          "issuer_names": [
+            "Apollo Global Management, Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    },
+    {
+      "symbol": "ARNC",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0000004281": {
+          "n_records": 28,
+          "first_filing": "2019-03-07",
+          "last_filing": "2020-03-02",
+          "issuer_names": [
+            "Arconic Inc."
+          ]
+        },
+        "0001790982": {
+          "n_records": 22,
+          "first_filing": "2020-05-22",
+          "last_filing": "2022-11-22",
+          "issuer_names": [
+            "Arconic Corp"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    },
+    {
+      "symbol": "AXON",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001636050": {
+          "n_records": 8,
+          "first_filing": "2019-03-19",
+          "last_filing": "2019-03-19",
+          "issuer_names": [
+            "Axovant Sciences Ltd."
+          ]
+        },
+        "0001069183": {
+          "n_records": 922,
+          "first_filing": "2021-03-04",
+          "last_filing": "2026-03-19",
+          "issuer_names": [
+            "AXON ENTERPRISE, INC."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    },
+    {
+      "symbol": "BEN",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0000038777": {
+          "n_records": 37,
+          "first_filing": "2019-03-04",
+          "last_filing": "2025-11-21",
+          "issuer_names": [
+            "FRANKLIN RESOURCES INC"
+          ]
+        },
+        "38777": {
+          "n_records": 1,
+          "first_filing": "2021-02-16",
+          "last_filing": "2021-02-16",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_OVERLAP_EVIDENCE_ONLY",
+      "final_classification": "UNRESOLVED"
+    },
+    {
+      "symbol": "BG",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001144519": {
+          "n_records": 135,
+          "first_filing": "2019-05-22",
+          "last_filing": "2023-08-17",
+          "issuer_names": [
+            "BUNGELTD",
+            "Bunge LTD"
+          ]
+        },
+        "0001996862": {
+          "n_records": 5,
+          "first_filing": "2024-05-23",
+          "last_filing": "2026-02-13",
+          "issuer_names": [
+            "Bunge Global SA"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    },
+    {
+      "symbol": "BLK",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001364742": {
+          "n_records": 250,
+          "first_filing": "2019-01-22",
+          "last_filing": "2024-08-30",
+          "issuer_names": [
+            "BlackRock Inc."
+          ]
+        },
+        "0002012383": {
+          "n_records": 109,
+          "first_filing": "2024-12-06",
+          "last_filing": "2026-02-26",
+          "issuer_names": [
+            "BlackRock, Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    },
+    {
+      "symbol": "CLX",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0000021076": {
+          "n_records": 76,
+          "first_filing": "2019-02-08",
+          "last_filing": "2025-11-24",
+          "issuer_names": [
+            "CLOROX CO /DE/"
+          ]
+        },
+        "21076": {
+          "n_records": 2,
+          "first_filing": "2021-01-27",
+          "last_filing": "2021-01-27",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_OVERLAP_EVIDENCE_ONLY",
+      "final_classification": "UNRESOLVED"
+    },
+    {
+      "symbol": "COHR",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0000021510": {
+          "n_records": 8,
+          "first_filing": "2019-11-12",
+          "last_filing": "2020-12-03",
+          "issuer_names": [
+            "COHERENT INC"
+          ]
+        },
+        "0000820318": {
+          "n_records": 143,
+          "first_filing": "2022-09-13",
+          "last_filing": "2026-03-18",
+          "issuer_names": [
+            "COHERENT CORP."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    },
+    {
+      "symbol": "COR",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001490892": {
+          "n_records": 252,
+          "first_filing": "2019-02-27",
+          "last_filing": "2021-11-09",
+          "issuer_names": [
+            "CoreSite Realty Corp"
+          ]
+        },
+        "0001140859": {
+          "n_records": 83,
+          "first_filing": "2023-09-07",
+          "last_filing": "2026-02-24",
+          "issuer_names": [
+            "Cencora, Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    },
+    {
+      "symbol": "CTLT",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0001596783": {
+          "n_records": 233,
+          "first_filing": "2019-02-20",
+          "last_filing": "2024-11-14",
+          "issuer_names": [
+            "Catalent, Inc."
+          ]
+        },
+        "1596783": {
+          "n_records": 1,
+          "first_filing": "2021-12-01",
+          "last_filing": "2021-12-01",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_OVERLAP_EVIDENCE_ONLY",
+      "final_classification": "UNRESOLVED"
+    },
+    {
+      "symbol": "CTRA",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001704715": {
+          "n_records": 147,
+          "first_filing": "2019-01-07",
+          "last_filing": "2020-03-27",
+          "issuer_names": [
+            "Contura Energy, Inc."
+          ]
+        },
+        "0000858470": {
+          "n_records": 43,
+          "first_filing": "2021-11-05",
+          "last_filing": "2025-05-22",
+          "issuer_names": [
+            "Coterra Energy Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    },
+    {
+      "symbol": "CZR",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0000858339": {
+          "n_records": 11,
+          "first_filing": "2019-03-08",
+          "last_filing": "2019-11-26",
+          "issuer_names": [
+            "CAESARS ENTERTAINMENT Corp"
+          ]
+        },
+        "0001590895": {
+          "n_records": 63,
+          "first_filing": "2020-12-11",
+          "last_filing": "2025-11-03",
+          "issuer_names": [
+            "Caesars Entertainment, Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2025-03-11"
+      ],
+      "cik_used_by_actual_trades": [
+        "0001590895"
+      ],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "ACCESSION_LEVEL_EXACT_CONSTITUENT_RECORDS",
+      "accession_chain": {
+        "entry_dates": [
+          "2025-03-11"
+        ],
+        "episodes": [
+          {
+            "symbol": "CZR",
+            "target_entry_session": "2025-03-11",
+            "n_episodes_matching": 1,
+            "match_method": "EXACT_ELIGIBLE_ENTRY_SESSION_MATCH",
+            "episode_id": "b8911ad756a4fdcc",
+            "activation_filing_date": "2025-03-10",
+            "distinct_owner_ciks": [
+              "0001158390",
+              "0001023115"
+            ],
+            "constituent_records": [
+              {
+                "accession": "0001590895-25-000086",
+                "issuer_cik_raw": "0001590895",
+                "issuer_cik_norm": "0001590895",
+                "issuer_name": "Caesars Entertainment, Inc.",
+                "owner_cik_raw": "0001158390",
+                "owner_cik_norm": "0001158390",
+                "owner_name": "TOMICK DAVID P",
+                "filing_date": "2025-03-04",
+                "code": "P",
+                "shares": 1850.0,
+                "price": 33.36,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001590895-25-000088",
+                "issuer_cik_raw": "0001590895",
+                "issuer_cik_norm": "0001590895",
+                "issuer_name": "Caesars Entertainment, Inc.",
+                "owner_cik_raw": "0001023115",
+                "owner_cik_norm": "0001023115",
+                "owner_name": "KORNSTEIN DON R",
+                "filing_date": "2025-03-10",
+                "code": "P",
+                "shares": 4000.0,
+                "price": 27.0,
+                "form_type": "4",
+                "is_amendment": false
+              }
+            ],
+            "distinct_issuer_ciks_in_constituents": [
+              "0001590895"
+            ],
+            "single_issuer_cik_confirmed": true
+          }
+        ],
+        "price_series": {
+          "symbol": "CZR",
+          "price_source": "\\task95g_broad_cross_sectional\\_daily\\CZR.csv",
+          "adjustment": "all (SIP, task95g/task107a convention)"
+        }
+      },
+      "final_classification": "VERIFIED_CONSISTENT"
+    },
+    {
+      "symbol": "DIS",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001001039": {
+          "n_records": 6,
+          "first_filing": "2019-01-04",
+          "last_filing": "2019-02-22",
+          "issuer_names": [
+            "WALT DISNEY CO/"
+          ]
+        },
+        "0001744489": {
+          "n_records": 126,
+          "first_filing": "2019-04-12",
+          "last_filing": "2026-02-17",
+          "issuer_names": [
+            "Walt Disney Co"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    },
+    {
+      "symbol": "DLR",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0001297996": {
+          "n_records": 137,
+          "first_filing": "2019-02-12",
+          "last_filing": "2025-12-01",
+          "issuer_names": [
+            "DIGITAL REALTY TRUST, INC.",
+            "Digital Realty Trust, Inc."
+          ]
+        },
+        "0001494877": {
+          "n_records": 2,
+          "first_filing": "2021-03-03",
+          "last_filing": "2023-03-14",
+          "issuer_names": [
+            "DIGITAL REALTY TRUST, L.P."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_OVERLAP_EVIDENCE_ONLY",
+      "final_classification": "UNRESOLVED"
+    },
+    {
+      "symbol": "DOC",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001574540": {
+          "n_records": 40,
+          "first_filing": "2019-06-07",
+          "last_filing": "2023-12-12",
+          "issuer_names": [
+            "Physicians Realty Trust"
+          ]
+        },
+        "0000765880": {
+          "n_records": 15,
+          "first_filing": "2024-03-04",
+          "last_filing": "2025-08-06",
+          "issuer_names": [
+            "HEALTHPEAK PROPERTIES, INC."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2025-04-29",
+        "2025-08-07"
+      ],
+      "cik_used_by_actual_trades": [
+        "0000765880"
+      ],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "ACCESSION_LEVEL_EXACT_CONSTITUENT_RECORDS",
+      "accession_chain": {
+        "entry_dates": [
+          "2025-04-29",
+          "2025-08-07"
+        ],
+        "episodes": [
+          {
+            "symbol": "DOC",
+            "target_entry_session": "2025-04-29",
+            "n_episodes_matching": 1,
+            "match_method": "EXACT_ELIGIBLE_ENTRY_SESSION_MATCH",
+            "episode_id": "65a003761e53c70b",
+            "activation_filing_date": "2025-04-28",
+            "distinct_owner_ciks": [
+              "0001165970",
+              "0001198423",
+              "0001454164",
+              "0001540329",
+              "0001748663"
+            ],
+            "constituent_records": [
+              {
+                "accession": "0001628280-25-020390",
+                "issuer_cik_raw": "0000765880",
+                "issuer_cik_norm": "0000765880",
+                "issuer_name": "HEALTHPEAK PROPERTIES, INC.",
+                "owner_cik_raw": "0001748663",
+                "owner_cik_norm": "0001748663",
+                "owner_name": "Sandstrom Katherine M",
+                "filing_date": "2025-04-28",
+                "code": "P",
+                "shares": 11288.0,
+                "price": 17.65,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001628280-25-020381",
+                "issuer_cik_raw": "0000765880",
+                "issuer_cik_norm": "0000765880",
+                "issuer_name": "HEALTHPEAK PROPERTIES, INC.",
+                "owner_cik_raw": "0001540329",
+                "owner_cik_norm": "0001540329",
+                "owner_name": "Brinker Scott M",
+                "filing_date": "2025-04-28",
+                "code": "P",
+                "shares": 11337.0,
+                "price": 17.68,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001628280-25-020391",
+                "issuer_cik_raw": "0000765880",
+                "issuer_cik_norm": "0000765880",
+                "issuer_name": "HEALTHPEAK PROPERTIES, INC.",
+                "owner_cik_raw": "0001454164",
+                "owner_cik_norm": "0001454164",
+                "owner_name": "Thomas John T",
+                "filing_date": "2025-04-28",
+                "code": "P",
+                "shares": 4200.0,
+                "price": 17.84,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001628280-25-020387",
+                "issuer_cik_raw": "0000765880",
+                "issuer_cik_norm": "0000765880",
+                "issuer_name": "HEALTHPEAK PROPERTIES, INC.",
+                "owner_cik_raw": "0001165970",
+                "owner_cik_norm": "0001165970",
+                "owner_name": "Lewis Sara Grootwassink",
+                "filing_date": "2025-04-28",
+                "code": "P",
+                "shares": 6000.0,
+                "price": 17.66,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001628280-25-020384",
+                "issuer_cik_raw": "0000765880",
+                "issuer_cik_norm": "0000765880",
+                "issuer_name": "HEALTHPEAK PROPERTIES, INC.",
+                "owner_cik_raw": "0001198423",
+                "owner_cik_norm": "0001198423",
+                "owner_name": "SHELLEY-KESSLER PAMELA",
+                "filing_date": "2025-04-28",
+                "code": "P",
+                "shares": 1418.0,
+                "price": 17.63,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001628280-25-020384",
+                "issuer_cik_raw": "0000765880",
+                "issuer_cik_norm": "0000765880",
+                "issuer_name": "HEALTHPEAK PROPERTIES, INC.",
+                "owner_cik_raw": "0001198423",
+                "owner_cik_norm": "0001198423",
+                "owner_name": "SHELLEY-KESSLER PAMELA",
+                "filing_date": "2025-04-28",
+                "code": "P",
+                "shares": 1420.0,
+                "price": 17.61,
+                "form_type": "4",
+                "is_amendment": false
+              }
+            ],
+            "distinct_issuer_ciks_in_constituents": [
+              "0000765880"
+            ],
+            "single_issuer_cik_confirmed": true
+          },
+          {
+            "symbol": "DOC",
+            "target_entry_session": "2025-08-07",
+            "n_episodes_matching": 1,
+            "match_method": "EXACT_ELIGIBLE_ENTRY_SESSION_MATCH",
+            "episode_id": "4f5a79f7f9debbe3",
+            "activation_filing_date": "2025-08-06",
+            "distinct_owner_ciks": [
+              "0001540329",
+              "0001454164"
+            ],
+            "constituent_records": [
+              {
+                "accession": "0001628280-25-036352",
+                "issuer_cik_raw": "0000765880",
+                "issuer_cik_norm": "0000765880",
+                "issuer_name": "HEALTHPEAK PROPERTIES, INC.",
+                "owner_cik_raw": "0001540329",
+                "owner_cik_norm": "0001540329",
+                "owner_name": "Brinker Scott M",
+                "filing_date": "2025-07-29",
+                "code": "P",
+                "shares": 2873.0,
+                "price": 17.4,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001628280-25-036944",
+                "issuer_cik_raw": "0000765880",
+                "issuer_cik_norm": "0000765880",
+                "issuer_name": "HEALTHPEAK PROPERTIES, INC.",
+                "owner_cik_raw": "0001540329",
+                "owner_cik_norm": "0001540329",
+                "owner_name": "Brinker Scott M",
+                "filing_date": "2025-07-31",
+                "code": "P",
+                "shares": 2930.0,
+                "price": 17.06,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001628280-25-037329",
+                "issuer_cik_raw": "0000765880",
+                "issuer_cik_norm": "0000765880",
+                "issuer_name": "HEALTHPEAK PROPERTIES, INC.",
+                "owner_cik_raw": "0001540329",
+                "owner_cik_norm": "0001540329",
+                "owner_name": "Brinker Scott M",
+                "filing_date": "2025-08-04",
+                "code": "P",
+                "shares": 1490.0,
+                "price": 16.83,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0000765880-25-000008",
+                "issuer_cik_raw": "0000765880",
+                "issuer_cik_norm": "0000765880",
+                "issuer_name": "HEALTHPEAK PROPERTIES, INC.",
+                "owner_cik_raw": "0001454164",
+                "owner_cik_norm": "0001454164",
+                "owner_name": "Thomas John T",
+                "filing_date": "2025-08-06",
+                "code": "P",
+                "shares": 1450.0,
+                "price": 17.06,
+                "form_type": "4",
+                "is_amendment": false
+              }
+            ],
+            "distinct_issuer_ciks_in_constituents": [
+              "0000765880"
+            ],
+            "single_issuer_cik_confirmed": true
+          }
+        ],
+        "price_series": {
+          "symbol": "DOC",
+          "price_source": "\\task95g_broad_cross_sectional\\_daily\\DOC.csv",
+          "adjustment": "all (SIP, task95g/task107a convention)"
+        }
+      },
+      "final_classification": "VERIFIED_CONSISTENT"
+    },
+    {
+      "symbol": "EW",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0001099800": {
+          "n_records": 703,
+          "first_filing": "2019-01-03",
+          "last_filing": "2026-03-11",
+          "issuer_names": [
+            "Edwards Lifesciences Corp"
+          ]
+        },
+        "1099800": {
+          "n_records": 2,
+          "first_filing": "2020-12-11",
+          "last_filing": "2020-12-11",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_OVERLAP_EVIDENCE_ONLY",
+      "final_classification": "UNRESOLVED"
+    },
+    {
+      "symbol": "FI",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001575828": {
+          "n_records": 37,
+          "first_filing": "2019-03-04",
+          "last_filing": "2020-06-10",
+          "issuer_names": [
+            "FRANK'S INTERNATIONAL N.V."
+          ]
+        },
+        "0000798354": {
+          "n_records": 43,
+          "first_filing": "2023-08-02",
+          "last_filing": "2025-11-03",
+          "issuer_names": [
+            "FISERV INC"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    },
+    {
+      "symbol": "FOX",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001308161": {
+          "n_records": 3,
+          "first_filing": "2019-02-12",
+          "last_filing": "2019-03-14",
+          "issuer_names": [
+            "TWENTY-FIRST CENTURY FOX, INC."
+          ]
+        },
+        "0001754301": {
+          "n_records": 76,
+          "first_filing": "2019-06-10",
+          "last_filing": "2026-03-13",
+          "issuer_names": [
+            "Fox Corp"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    },
+    {
+      "symbol": "GEN",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001351051": {
+          "n_records": 25,
+          "first_filing": "2019-05-22",
+          "last_filing": "2020-06-04",
+          "issuer_names": [
+            "Genesis Healthcare, Inc."
+          ]
+        },
+        "0000849399": {
+          "n_records": 18,
+          "first_filing": "2023-02-21",
+          "last_filing": "2026-02-19",
+          "issuer_names": [
+            "Gen Digital Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    },
+    {
+      "symbol": "IR",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001466258": {
+          "n_records": 43,
+          "first_filing": "2019-01-03",
+          "last_filing": "2020-02-24",
+          "issuer_names": [
+            "Ingersoll-Rand plc"
+          ]
+        },
+        "0001699150": {
+          "n_records": 103,
+          "first_filing": "2020-05-15",
+          "last_filing": "2026-03-04",
+          "issuer_names": [
+            "Ingersoll Rand Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    },
+    {
+      "symbol": "LB",
+      "n_distinct_ciks": 3,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0000701985": {
+          "n_records": 16,
+          "first_filing": "2020-07-01",
+          "last_filing": "2021-07-20",
+          "issuer_names": [
+            "L Brands, Inc."
+          ]
+        },
+        "701985": {
+          "n_records": 1,
+          "first_filing": "2021-03-02",
+          "last_filing": "2021-03-02",
+          "issuer_names": [
+            ""
+          ]
+        },
+        "0001995807": {
+          "n_records": 14,
+          "first_filing": "2024-07-03",
+          "last_filing": "2026-03-06",
+          "issuer_names": [
+            "LandBridge Co LLC"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2026-01-08"
+      ],
+      "cik_used_by_actual_trades": [
+        "0001995807"
+      ],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "ACCESSION_LEVEL_EXACT_CONSTITUENT_RECORDS",
+      "accession_chain": {
+        "entry_dates": [
+          "2026-01-08"
+        ],
+        "episodes": [
+          {
+            "symbol": "LB",
+            "target_entry_session": "2026-01-08",
+            "n_episodes_matching": 1,
+            "match_method": "EXACT_ELIGIBLE_ENTRY_SESSION_MATCH",
+            "episode_id": "265b4cecd9ba50b6",
+            "activation_filing_date": "2026-01-07",
+            "distinct_owner_ciks": [
+              "0002028379",
+              "0002028425",
+              "0002028434"
+            ],
+            "constituent_records": [
+              {
+                "accession": "0001193125-26-005388",
+                "issuer_cik_raw": "0001995807",
+                "issuer_cik_norm": "0001995807",
+                "issuer_name": "LandBridge Co LLC",
+                "owner_cik_raw": "0002028379",
+                "owner_cik_norm": "0002028379",
+                "owner_name": "Bolling Harrison Fenner",
+                "filing_date": "2026-01-07",
+                "code": "P",
+                "shares": 850.0,
+                "price": 46.84,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001193125-26-005382",
+                "issuer_cik_raw": "0001995807",
+                "issuer_cik_norm": "0001995807",
+                "issuer_name": "LandBridge Co LLC",
+                "owner_cik_raw": "0002028425",
+                "owner_cik_norm": "0002028425",
+                "owner_name": "Long Jason Thomas",
+                "filing_date": "2026-01-07",
+                "code": "P",
+                "shares": 2143.0,
+                "price": 46.59,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001193125-26-005383",
+                "issuer_cik_raw": "0001995807",
+                "issuer_cik_norm": "0001995807",
+                "issuer_name": "LandBridge Co LLC",
+                "owner_cik_raw": "0002028434",
+                "owner_cik_norm": "0002028434",
+                "owner_name": "McNeely Scott Lloyd",
+                "filing_date": "2026-01-07",
+                "code": "P",
+                "shares": 549.0,
+                "price": 45.49,
+                "form_type": "4",
+                "is_amendment": false
+              }
+            ],
+            "distinct_issuer_ciks_in_constituents": [
+              "0001995807"
+            ],
+            "single_issuer_cik_confirmed": true
+          }
+        ],
+        "price_series": {
+          "symbol": "LB",
+          "price_source": "\\task95g_broad_cross_sectional\\_daily\\LB.csv",
+          "adjustment": "all (SIP, task95g/task107a convention)"
+        }
+      },
+      "final_classification": "VERIFIED_CONSISTENT"
+    },
+    {
+      "symbol": "MAA",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0000912595": {
+          "n_records": 157,
+          "first_filing": "2019-01-10",
+          "last_filing": "2026-01-08",
+          "issuer_names": [
+            "MID AMERICA APARTMENT COMMUNITIES INC."
+          ]
+        },
+        "912595": {
+          "n_records": 1,
+          "first_filing": "2021-01-12",
+          "last_filing": "2021-01-12",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_OVERLAP_EVIDENCE_ONLY",
+      "final_classification": "UNRESOLVED"
+    },
+    {
+      "symbol": "MRVL",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001058057": {
+          "n_records": 72,
+          "first_filing": "2019-01-14",
+          "last_filing": "2021-04-19",
+          "issuer_names": [
+            "MARVELL TECHNOLOGY GROUP LTD"
+          ]
+        },
+        "0001835632": {
+          "n_records": 181,
+          "first_filing": "2021-05-18",
+          "last_filing": "2026-03-27",
+          "issuer_names": [
+            "Marvell Technology, Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2025-09-26"
+      ],
+      "cik_used_by_actual_trades": [
+        "0001835632"
+      ],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "ACCESSION_LEVEL_EXACT_CONSTITUENT_RECORDS",
+      "accession_chain": {
+        "entry_dates": [
+          "2025-09-26"
+        ],
+        "episodes": [
+          {
+            "symbol": "MRVL",
+            "target_entry_session": "2025-09-26",
+            "n_episodes_matching": 1,
+            "match_method": "EXACT_ELIGIBLE_ENTRY_SESSION_MATCH",
+            "episode_id": "76946343b45a5b1d",
+            "activation_filing_date": "2025-09-25",
+            "distinct_owner_ciks": [
+              "0001381430",
+              "0001635800",
+              "0001676204",
+              "0001975808"
+            ],
+            "constituent_records": [
+              {
+                "accession": "0001628280-25-042718",
+                "issuer_cik_raw": "0001835632",
+                "issuer_cik_norm": "0001835632",
+                "issuer_name": "Marvell Technology, Inc.",
+                "owner_cik_raw": "0001381430",
+                "owner_cik_norm": "0001381430",
+                "owner_name": "MURPHY MATTHEW J",
+                "filing_date": "2025-09-25",
+                "code": "P",
+                "shares": 13600.0,
+                "price": 77.09,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001628280-25-042725",
+                "issuer_cik_raw": "0001835632",
+                "issuer_cik_norm": "0001835632",
+                "issuer_name": "Marvell Technology, Inc.",
+                "owner_cik_raw": "0001635800",
+                "owner_cik_norm": "0001635800",
+                "owner_name": "Meintjes Willem A",
+                "filing_date": "2025-09-25",
+                "code": "P",
+                "shares": 3400.0,
+                "price": 78.03,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001628280-25-042721",
+                "issuer_cik_raw": "0001835632",
+                "issuer_cik_norm": "0001835632",
+                "issuer_name": "Marvell Technology, Inc.",
+                "owner_cik_raw": "0001676204",
+                "owner_cik_norm": "0001676204",
+                "owner_name": "Koopmans Chris",
+                "filing_date": "2025-09-25",
+                "code": "P",
+                "shares": 6800.0,
+                "price": 78.03,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001628280-25-042723",
+                "issuer_cik_raw": "0001835632",
+                "issuer_cik_norm": "0001835632",
+                "issuer_name": "Marvell Technology, Inc.",
+                "owner_cik_raw": "0001975808",
+                "owner_cik_norm": "0001975808",
+                "owner_name": "Bharathi Sandeep",
+                "filing_date": "2025-09-25",
+                "code": "P",
+                "shares": 3400.0,
+                "price": 78.03,
+                "form_type": "4",
+                "is_amendment": false
+              }
+            ],
+            "distinct_issuer_ciks_in_constituents": [
+              "0001835632"
+            ],
+            "single_issuer_cik_confirmed": true
+          }
+        ],
+        "price_series": {
+          "symbol": "MRVL",
+          "price_source": "\\task95g_broad_cross_sectional\\_daily\\MRVL.csv",
+          "adjustment": "all (SIP, task95g/task107a convention)"
+        }
+      },
+      "final_classification": "VERIFIED_CONSISTENT"
+    },
+    {
+      "symbol": "MTCH",
+      "n_distinct_ciks": 2,
+      "classification": "MULTIPLE_SECURITIES_SAME_ISSUER_NAME",
+      "cik_detail": {
+        "0001575189": {
+          "n_records": 24,
+          "first_filing": "2019-02-12",
+          "last_filing": "2020-05-27",
+          "issuer_names": [
+            "Match Group, Inc."
+          ]
+        },
+        "0000891103": {
+          "n_records": 158,
+          "first_filing": "2020-07-17",
+          "last_filing": "2026-03-06",
+          "issuer_names": [
+            "Match Group, Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2025-02-11"
+      ],
+      "cik_used_by_actual_trades": [
+        "0000891103"
+      ],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "ACCESSION_LEVEL_EXACT_CONSTITUENT_RECORDS",
+      "accession_chain": {
+        "entry_dates": [
+          "2025-02-11"
+        ],
+        "episodes": [
+          {
+            "symbol": "MTCH",
+            "target_entry_session": "2025-02-11",
+            "n_episodes_matching": 1,
+            "match_method": "EXACT_ELIGIBLE_ENTRY_SESSION_MATCH",
+            "episode_id": "10d02906ed204cdd",
+            "activation_filing_date": "2025-02-10",
+            "distinct_owner_ciks": [
+              "0001524273",
+              "0001670982"
+            ],
+            "constituent_records": [
+              {
+                "accession": "0000891103-25-000021",
+                "issuer_cik_raw": "0000891103",
+                "issuer_cik_norm": "0000891103",
+                "issuer_name": "Match Group, Inc.",
+                "owner_cik_raw": "0001524273",
+                "owner_cik_norm": "0001524273",
+                "owner_name": "Rascoff Spencer M",
+                "filing_date": "2025-02-10",
+                "code": "P",
+                "shares": 59560.0,
+                "price": 34.41,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0000891103-25-000022",
+                "issuer_cik_raw": "0000891103",
+                "issuer_cik_norm": "0000891103",
+                "issuer_name": "Match Group, Inc.",
+                "owner_cik_raw": "0001670982",
+                "owner_cik_norm": "0001670982",
+                "owner_name": "Schiffman Glenn",
+                "filing_date": "2025-02-10",
+                "code": "P",
+                "shares": 3000.0,
+                "price": 34.47,
+                "form_type": "4",
+                "is_amendment": false
+              }
+            ],
+            "distinct_issuer_ciks_in_constituents": [
+              "0000891103"
+            ],
+            "single_issuer_cik_confirmed": true
+          }
+        ],
+        "price_series": {
+          "symbol": "MTCH",
+          "price_source": "\\task95g_broad_cross_sectional\\_daily\\MTCH.csv",
+          "adjustment": "all (SIP, task95g/task107a convention)"
+        }
+      },
+      "final_classification": "VERIFIED_CONSISTENT"
+    },
+    {
+      "symbol": "PCG",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0001004980": {
+          "n_records": 34,
+          "first_filing": "2021-09-02",
+          "last_filing": "2026-03-17",
+          "issuer_names": [
+            "PG&E Corp"
+          ]
+        },
+        "0000075488": {
+          "n_records": 149,
+          "first_filing": "2022-03-04",
+          "last_filing": "2023-02-03",
+          "issuer_names": [
+            "PACIFIC GAS & ELECTRIC Co"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2025-02-26"
+      ],
+      "cik_used_by_actual_trades": [
+        "0001004980"
+      ],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "ACCESSION_LEVEL_EXACT_CONSTITUENT_RECORDS",
+      "accession_chain": {
+        "entry_dates": [
+          "2025-02-26"
+        ],
+        "episodes": [
+          {
+            "symbol": "PCG",
+            "target_entry_session": "2025-02-26",
+            "n_episodes_matching": 1,
+            "match_method": "EXACT_ELIGIBLE_ENTRY_SESSION_MATCH",
+            "episode_id": "74c27a2b7796e67f",
+            "activation_filing_date": "2025-02-25",
+            "distinct_owner_ciks": [
+              "0001817034",
+              "0001691046"
+            ],
+            "constituent_records": [
+              {
+                "accession": "0001004980-25-000012",
+                "issuer_cik_raw": "0001004980",
+                "issuer_cik_norm": "0001004980",
+                "issuer_name": "PG&E Corp",
+                "owner_cik_raw": "0001817034",
+                "owner_cik_norm": "0001817034",
+                "owner_name": "Harris Arno Lockheart",
+                "filing_date": "2025-02-21",
+                "code": "P",
+                "shares": 6389.0,
+                "price": 15.66,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001004980-25-000014",
+                "issuer_cik_raw": "0001004980",
+                "issuer_cik_norm": "0001004980",
+                "issuer_name": "PG&E Corp",
+                "owner_cik_raw": "0001691046",
+                "owner_cik_norm": "0001691046",
+                "owner_name": "Denecour Jessica",
+                "filing_date": "2025-02-25",
+                "code": "P",
+                "shares": 1347.0,
+                "price": 15.79,
+                "form_type": "4",
+                "is_amendment": false
+              }
+            ],
+            "distinct_issuer_ciks_in_constituents": [
+              "0001004980"
+            ],
+            "single_issuer_cik_confirmed": true
+          }
+        ],
+        "price_series": {
+          "symbol": "PCG",
+          "price_source": "\\task95g_broad_cross_sectional\\_daily\\PCG.csv",
+          "adjustment": "all (SIP, task95g/task107a convention)"
+        }
+      },
+      "final_classification": "VERIFIED_CONSISTENT"
+    },
+    {
+      "symbol": "PG",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0000080424": {
+          "n_records": 562,
+          "first_filing": "2019-01-28",
+          "last_filing": "2026-03-02",
+          "issuer_names": [
+            "PROCTER & GAMBLE Co"
+          ]
+        },
+        "80424": {
+          "n_records": 4,
+          "first_filing": "2022-08-18",
+          "last_filing": "2022-08-18",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_OVERLAP_EVIDENCE_ONLY",
+      "final_classification": "UNRESOLVED"
+    },
+    {
+      "symbol": "STE",
+      "n_distinct_ciks": 2,
+      "classification": "MULTIPLE_SECURITIES_SAME_ISSUER_NAME",
+      "cik_detail": {
+        "0001624899": {
+          "n_records": 5,
+          "first_filing": "2019-01-14",
+          "last_filing": "2019-03-22",
+          "issuer_names": [
+            "STERIS plc"
+          ]
+        },
+        "0001757898": {
+          "n_records": 178,
+          "first_filing": "2019-05-16",
+          "last_filing": "2026-03-06",
+          "issuer_names": [
+            "STERIS plc"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    },
+    {
+      "symbol": "SWK",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0000093556": {
+          "n_records": 86,
+          "first_filing": "2019-01-28",
+          "last_filing": "2025-11-06",
+          "issuer_names": [
+            "STANLEY BLACK & DECKER, INC."
+          ]
+        },
+        "93556": {
+          "n_records": 1,
+          "first_filing": "2022-09-12",
+          "last_filing": "2022-09-12",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_OVERLAP_EVIDENCE_ONLY",
+      "final_classification": "UNRESOLVED"
+    },
+    {
+      "symbol": "TEL",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0001385157": {
+          "n_records": 203,
+          "first_filing": "2019-02-07",
+          "last_filing": "2026-03-03",
+          "issuer_names": [
+            "TE Connectivity Ltd.",
+            "TE Connectivity plc"
+          ]
+        },
+        "1385157": {
+          "n_records": 2,
+          "first_filing": "2021-12-28",
+          "last_filing": "2021-12-28",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_OVERLAP_EVIDENCE_ONLY",
+      "final_classification": "UNRESOLVED"
+    },
+    {
+      "symbol": "TPL",
+      "n_distinct_ciks": 3,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0000097517": {
+          "n_records": 399,
+          "first_filing": "2019-03-18",
+          "last_filing": "2021-01-12",
+          "issuer_names": [
+            "TEXAS PACIFIC LAND TRUST"
+          ]
+        },
+        "0000919567": {
+          "n_records": 12,
+          "first_filing": "2020-09-29",
+          "last_filing": "2020-11-30",
+          "issuer_names": [
+            "RENN Fund, Inc."
+          ]
+        },
+        "0001811074": {
+          "n_records": 5730,
+          "first_filing": "2021-01-14",
+          "last_filing": "2026-03-31",
+          "issuer_names": [
+            "Texas Pacific Land Corp"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2024-09-12",
+        "2025-02-26",
+        "2025-08-19",
+        "2026-03-02"
+      ],
+      "cik_used_by_actual_trades": [
+        "0001811074"
+      ],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "ACCESSION_LEVEL_EXACT_CONSTITUENT_RECORDS",
+      "accession_chain": {
+        "entry_dates": [
+          "2024-09-12",
+          "2025-02-26",
+          "2025-08-19",
+          "2026-03-02"
+        ],
+        "episodes": [
+          {
+            "symbol": "TPL",
+            "target_entry_session": "2024-09-12",
+            "n_episodes_matching": 1,
+            "match_method": "EXACT_ELIGIBLE_ENTRY_SESSION_MATCH",
+            "episode_id": "5ccea181a25760b5",
+            "activation_filing_date": "2024-09-11",
+            "distinct_owner_ciks": [
+              "0001207097",
+              "0001056823"
+            ],
+            "constituent_records": [
+              {
+                "accession": "0001437749-24-027907",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-08-28",
+                "code": "P",
+                "shares": 3.0,
+                "price": 859.56,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-027907",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-08-28",
+                "code": "P",
+                "shares": 2.0,
+                "price": 857.7,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-027907",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-08-28",
+                "code": "P",
+                "shares": 1.0,
+                "price": 857.7,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-027907",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-08-28",
+                "code": "P",
+                "shares": 2.0,
+                "price": 857.7,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-027907",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-08-28",
+                "code": "P",
+                "shares": 3.0,
+                "price": 857.7,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-027907",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-08-28",
+                "code": "P",
+                "shares": 1.0,
+                "price": 857.7,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028016",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-08-29",
+                "code": "P",
+                "shares": 1.0,
+                "price": 868.03,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028016",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-08-29",
+                "code": "P",
+                "shares": 3.0,
+                "price": 868.03,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028016",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-08-29",
+                "code": "P",
+                "shares": 3.0,
+                "price": 872.21,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028016",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-08-29",
+                "code": "P",
+                "shares": 1.0,
+                "price": 868.03,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028016",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-08-29",
+                "code": "P",
+                "shares": 2.0,
+                "price": 868.03,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028016",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-08-29",
+                "code": "P",
+                "shares": 2.0,
+                "price": 868.03,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028097",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-08-30",
+                "code": "P",
+                "shares": 3.0,
+                "price": 874.19,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028097",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-08-30",
+                "code": "P",
+                "shares": 1.0,
+                "price": 870.78,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028097",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-08-30",
+                "code": "P",
+                "shares": 3.0,
+                "price": 870.78,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028097",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-08-30",
+                "code": "P",
+                "shares": 1.0,
+                "price": 870.78,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028097",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-08-30",
+                "code": "P",
+                "shares": 2.0,
+                "price": 870.78,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028097",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-08-30",
+                "code": "P",
+                "shares": 2.0,
+                "price": 870.78,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028235",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-03",
+                "code": "P",
+                "shares": 3.0,
+                "price": 860.16,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028235",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-03",
+                "code": "P",
+                "shares": 1.0,
+                "price": 866.02,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028235",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-03",
+                "code": "P",
+                "shares": 1.0,
+                "price": 866.03,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028235",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-03",
+                "code": "P",
+                "shares": 2.0,
+                "price": 866.02,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028235",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-03",
+                "code": "P",
+                "shares": 3.0,
+                "price": 866.02,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028235",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-03",
+                "code": "P",
+                "shares": 2.0,
+                "price": 866.02,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028372",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-04",
+                "code": "P",
+                "shares": 2.0,
+                "price": 853.77,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028372",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-04",
+                "code": "P",
+                "shares": 1.0,
+                "price": 853.77,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028372",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-04",
+                "code": "P",
+                "shares": 3.0,
+                "price": 853.77,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028372",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-04",
+                "code": "P",
+                "shares": 1.0,
+                "price": 853.77,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028372",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-04",
+                "code": "P",
+                "shares": 3.0,
+                "price": 833.91,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028372",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-04",
+                "code": "P",
+                "shares": 2.0,
+                "price": 853.77,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028516",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-05",
+                "code": "P",
+                "shares": 2.0,
+                "price": 820.35,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028516",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-05",
+                "code": "P",
+                "shares": 3.0,
+                "price": 820.35,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028516",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-05",
+                "code": "P",
+                "shares": 2.0,
+                "price": 820.35,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028516",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-05",
+                "code": "P",
+                "shares": 1.0,
+                "price": 820.35,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028516",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-05",
+                "code": "P",
+                "shares": 1.0,
+                "price": 820.36,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028516",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-05",
+                "code": "P",
+                "shares": 3.0,
+                "price": 820.03,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028607",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-06",
+                "code": "P",
+                "shares": 1.0,
+                "price": 810.0,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028607",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-06",
+                "code": "P",
+                "shares": 2.0,
+                "price": 810.0,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028607",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-06",
+                "code": "P",
+                "shares": 3.0,
+                "price": 810.0,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028607",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-06",
+                "code": "P",
+                "shares": 2.0,
+                "price": 810.0,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028607",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-06",
+                "code": "P",
+                "shares": 1.0,
+                "price": 810.0,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028607",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-06",
+                "code": "P",
+                "shares": 3.0,
+                "price": 804.84,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028726",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-09",
+                "code": "P",
+                "shares": 3.0,
+                "price": 799.83,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028726",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-09",
+                "code": "P",
+                "shares": 2.0,
+                "price": 799.84,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028726",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-09",
+                "code": "P",
+                "shares": 1.0,
+                "price": 799.83,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028726",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-09",
+                "code": "P",
+                "shares": 2.0,
+                "price": 799.84,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028726",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-09",
+                "code": "P",
+                "shares": 1.0,
+                "price": 799.83,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028726",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-09",
+                "code": "P",
+                "shares": 3.0,
+                "price": 795.94,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028826",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-10",
+                "code": "P",
+                "shares": 1.0,
+                "price": 800.06,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028826",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-10",
+                "code": "P",
+                "shares": 3.0,
+                "price": 792.16,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028826",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-10",
+                "code": "P",
+                "shares": 2.0,
+                "price": 800.06,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028826",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-10",
+                "code": "P",
+                "shares": 3.0,
+                "price": 800.06,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028826",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-10",
+                "code": "P",
+                "shares": 1.0,
+                "price": 800.06,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028826",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2024-09-10",
+                "code": "P",
+                "shares": 2.0,
+                "price": 800.06,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028936",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-09-11",
+                "code": "P",
+                "shares": 1.0,
+                "price": 797.32,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028936",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-09-11",
+                "code": "P",
+                "shares": 2.0,
+                "price": 797.32,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028936",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-09-11",
+                "code": "P",
+                "shares": 3.0,
+                "price": 797.32,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028936",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-09-11",
+                "code": "P",
+                "shares": 2.0,
+                "price": 797.32,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028936",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-09-11",
+                "code": "P",
+                "shares": 1.0,
+                "price": 797.32,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-24-028936",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2024-09-11",
+                "code": "P",
+                "shares": 3.0,
+                "price": 787.22,
+                "form_type": "4",
+                "is_amendment": false
+              }
+            ],
+            "distinct_issuer_ciks_in_constituents": [
+              "0001811074"
+            ],
+            "single_issuer_cik_confirmed": true
+          },
+          {
+            "symbol": "TPL",
+            "target_entry_session": "2025-02-26",
+            "n_episodes_matching": 1,
+            "match_method": "EXACT_ELIGIBLE_ENTRY_SESSION_MATCH",
+            "episode_id": "8a42667affc4dacd",
+            "activation_filing_date": "2025-02-25",
+            "distinct_owner_ciks": [
+              "0001056823",
+              "0001207097"
+            ],
+            "constituent_records": [
+              {
+                "accession": "0001437749-25-003378",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-02-11",
+                "code": "P",
+                "shares": 1.0,
+                "price": 1379.39,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-003511",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-02-12",
+                "code": "P",
+                "shares": 1.0,
+                "price": 1366.97,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-003701",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-02-13",
+                "code": "P",
+                "shares": 1.0,
+                "price": 1356.89,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-003863",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-02-14",
+                "code": "P",
+                "shares": 1.0,
+                "price": 1344.87,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-004154",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-02-18",
+                "code": "P",
+                "shares": 1.0,
+                "price": 1359.0,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-004298",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-02-19",
+                "code": "P",
+                "shares": 1.0,
+                "price": 1402.7,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-004523",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-02-20",
+                "code": "P",
+                "shares": 1.0,
+                "price": 1422.27,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-004673",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-02-21",
+                "code": "P",
+                "shares": 1.0,
+                "price": 1436.25,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-004839",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-02-24",
+                "code": "P",
+                "shares": 1.0,
+                "price": 1377.87,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-005043",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2025-02-25",
+                "code": "P",
+                "shares": 1.0,
+                "price": 1349.2,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-005043",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2025-02-25",
+                "code": "P",
+                "shares": 1.0,
+                "price": 1307.56,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-005043",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2025-02-25",
+                "code": "P",
+                "shares": 2.0,
+                "price": 1349.2,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-005043",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2025-02-25",
+                "code": "P",
+                "shares": 1.0,
+                "price": 1349.2,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-005043",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2025-02-25",
+                "code": "P",
+                "shares": 2.0,
+                "price": 1349.2,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-005043",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001207097",
+                "owner_cik_norm": "0001207097",
+                "owner_name": "STAHL MURRAY",
+                "filing_date": "2025-02-25",
+                "code": "P",
+                "shares": 3.0,
+                "price": 1349.2,
+                "form_type": "4",
+                "is_amendment": false
+              }
+            ],
+            "distinct_issuer_ciks_in_constituents": [
+              "0001811074"
+            ],
+            "single_issuer_cik_confirmed": true
+          },
+          {
+            "symbol": "TPL",
+            "target_entry_session": "2025-08-19",
+            "n_episodes_matching": 1,
+            "match_method": "EXACT_ELIGIBLE_ENTRY_SESSION_MATCH",
+            "episode_id": "3873ec0a1078b00f",
+            "activation_filing_date": "2025-08-18",
+            "distinct_owner_ciks": [
+              "0001056823",
+              "0001168602"
+            ],
+            "constituent_records": [
+              {
+                "accession": "0001437749-25-024520",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-08-04",
+                "code": "P",
+                "shares": 1.0,
+                "price": 943.87,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-024752",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-08-05",
+                "code": "P",
+                "shares": 1.0,
+                "price": 946.12,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-024978",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-08-06",
+                "code": "P",
+                "shares": 1.0,
+                "price": 950.14,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-025278",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-08-07",
+                "code": "P",
+                "shares": 1.0,
+                "price": 955.47,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-025604",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-08-08",
+                "code": "P",
+                "shares": 1.0,
+                "price": 899.77,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-025842",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-08-11",
+                "code": "P",
+                "shares": 1.0,
+                "price": 868.97,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-026094",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-08-12",
+                "code": "P",
+                "shares": 1.0,
+                "price": 876.27,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-026385",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-08-13",
+                "code": "P",
+                "shares": 1.0,
+                "price": 864.54,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-026745",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-08-14",
+                "code": "P",
+                "shares": 1.0,
+                "price": 854.06,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-027102",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-08-15",
+                "code": "P",
+                "shares": 1.0,
+                "price": 889.04,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-25-027202",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2025-08-18",
+                "code": "P",
+                "shares": 1.0,
+                "price": 894.93,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001104659-25-079917",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001168602",
+                "owner_cik_norm": "0001168602",
+                "owner_name": "OLIVER ERIC L",
+                "filing_date": "2025-08-18",
+                "code": "P",
+                "shares": 100.0,
+                "price": 915.0,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001104659-25-079917",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001168602",
+                "owner_cik_norm": "0001168602",
+                "owner_name": "OLIVER ERIC L",
+                "filing_date": "2025-08-18",
+                "code": "P",
+                "shares": 100.0,
+                "price": 895.0,
+                "form_type": "4",
+                "is_amendment": false
+              }
+            ],
+            "distinct_issuer_ciks_in_constituents": [
+              "0001811074"
+            ],
+            "single_issuer_cik_confirmed": true
+          },
+          {
+            "symbol": "TPL",
+            "target_entry_session": "2026-03-02",
+            "n_episodes_matching": 1,
+            "match_method": "EXACT_ELIGIBLE_ENTRY_SESSION_MATCH",
+            "episode_id": "319311f05ef3a6d6",
+            "activation_filing_date": "2026-02-27",
+            "distinct_owner_ciks": [
+              "0001056823",
+              "0001793102"
+            ],
+            "constituent_records": [
+              {
+                "accession": "0001437749-26-004018",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2026-02-13",
+                "code": "P",
+                "shares": 1.0,
+                "price": 413.24,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-26-004273",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2026-02-17",
+                "code": "P",
+                "shares": 1.0,
+                "price": 426.38,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-26-004480",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2026-02-18",
+                "code": "P",
+                "shares": 1.0,
+                "price": 425.55,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-26-004666",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2026-02-19",
+                "code": "P",
+                "shares": 1.0,
+                "price": 435.13,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-26-004817",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2026-02-20",
+                "code": "P",
+                "shares": 1.0,
+                "price": 469.18,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-26-005026",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2026-02-23",
+                "code": "P",
+                "shares": 1.0,
+                "price": 504.28,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-26-005214",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2026-02-24",
+                "code": "P",
+                "shares": 1.0,
+                "price": 519.85,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-26-005485",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2026-02-25",
+                "code": "P",
+                "shares": 1.0,
+                "price": 520.15,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-26-005774",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2026-02-26",
+                "code": "P",
+                "shares": 1.0,
+                "price": 510.65,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001437749-26-006026",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001056823",
+                "owner_cik_norm": "0001056823",
+                "owner_name": "HORIZON KINETICS ASSET MANAGEMENT LLC",
+                "filing_date": "2026-02-27",
+                "code": "P",
+                "shares": 1.0,
+                "price": 507.39,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001104659-26-021089",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001793102",
+                "owner_cik_norm": "0001793102",
+                "owner_name": "EPPS DONNA E",
+                "filing_date": "2026-02-27",
+                "code": "S",
+                "shares": 895.0,
+                "price": 510.08,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001104659-26-021089",
+                "issuer_cik_raw": "0001811074",
+                "issuer_cik_norm": "0001811074",
+                "issuer_name": "Texas Pacific Land Corp",
+                "owner_cik_raw": "0001793102",
+                "owner_cik_norm": "0001793102",
+                "owner_name": "EPPS DONNA E",
+                "filing_date": "2026-02-27",
+                "code": "P",
+                "shares": 895.0,
+                "price": 510.45,
+                "form_type": "4",
+                "is_amendment": false
+              }
+            ],
+            "distinct_issuer_ciks_in_constituents": [
+              "0001811074"
+            ],
+            "single_issuer_cik_confirmed": true
+          }
+        ],
+        "price_series": {
+          "symbol": "TPL",
+          "price_source": "\\task95g_broad_cross_sectional\\_daily\\TPL.csv",
+          "adjustment": "all (SIP, task95g/task107a convention)"
+        }
+      },
+      "final_classification": "VERIFIED_CONSISTENT"
+    },
+    {
+      "symbol": "WTW",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0000105319": {
+          "n_records": 2,
+          "first_filing": "2019-03-04",
+          "last_filing": "2019-03-12",
+          "issuer_names": [
+            "WEIGHT WATCHERS INTERNATIONAL INC"
+          ]
+        },
+        "0001140536": {
+          "n_records": 62,
+          "first_filing": "2022-04-05",
+          "last_filing": "2026-03-05",
+          "issuer_names": [
+            "WILLIS TOWERS WATSON PLC"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2026-02-18"
+      ],
+      "cik_used_by_actual_trades": [
+        "0001140536"
+      ],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "ACCESSION_LEVEL_EXACT_CONSTITUENT_RECORDS",
+      "accession_chain": {
+        "entry_dates": [
+          "2026-02-18"
+        ],
+        "episodes": [
+          {
+            "symbol": "WTW",
+            "target_entry_session": "2026-02-18",
+            "n_episodes_matching": 1,
+            "match_method": "EXACT_ELIGIBLE_ENTRY_SESSION_MATCH",
+            "episode_id": "0585ff7619392fb8",
+            "activation_filing_date": "2026-02-17",
+            "distinct_owner_ciks": [
+              "0001900425",
+              "0002028612"
+            ],
+            "constituent_records": [
+              {
+                "accession": "0001140536-26-000022",
+                "issuer_cik_raw": "0001140536",
+                "issuer_cik_norm": "0001140536",
+                "issuer_name": "WILLIS TOWERS WATSON PLC",
+                "owner_cik_raw": "0001900425",
+                "owner_cik_norm": "0001900425",
+                "owner_name": "Hammond Michael P.",
+                "filing_date": "2026-02-13",
+                "code": "P",
+                "shares": 241.0,
+                "price": 278.86,
+                "form_type": "4",
+                "is_amendment": false
+              },
+              {
+                "accession": "0001140536-26-000024",
+                "issuer_cik_raw": "0001140536",
+                "issuer_cik_norm": "0001140536",
+                "issuer_name": "WILLIS TOWERS WATSON PLC",
+                "owner_cik_raw": "0002028612",
+                "owner_cik_norm": "0002028612",
+                "owner_name": "Clarke Lucy",
+                "filing_date": "2026-02-17",
+                "code": "P",
+                "shares": 3500.0,
+                "price": 284.84,
+                "form_type": "4",
+                "is_amendment": false
+              }
+            ],
+            "distinct_issuer_ciks_in_constituents": [
+              "0001140536"
+            ],
+            "single_issuer_cik_confirmed": true
+          }
+        ],
+        "price_series": {
+          "symbol": "WTW",
+          "price_source": "\\task95g_broad_cross_sectional\\_daily\\WTW.csv",
+          "adjustment": "all (SIP, task95g/task107a convention)"
+        }
+      },
+      "final_classification": "VERIFIED_CONSISTENT"
+    },
+    {
+      "symbol": "XRX",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0000108772": {
+          "n_records": 1,
+          "first_filing": "2019-09-11",
+          "last_filing": "2019-09-11",
+          "issuer_names": [
+            "XEROX CORP"
+          ]
+        },
+        "0001770450": {
+          "n_records": 43,
+          "first_filing": "2020-08-07",
+          "last_filing": "2025-08-05",
+          "issuer_names": [
+            "Xerox Holdings Corp"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false,
+      "evidence_tier": "DATE_RANGE_EVIDENCE_ONLY_NOT_TRADED_NOT_ACCESSION_VERIFIED",
+      "final_classification": "NOT_TRADED_DATE_RANGE_CONSISTENT"
+    }
+  ]
+}

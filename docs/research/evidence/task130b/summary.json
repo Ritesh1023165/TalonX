@@ -1,0 +1,42 @@
+{
+  "window": {
+    "study_start": "2024-09-01",
+    "study_end": "2026-03-31",
+    "settlement_tail_sessions": 20
+  },
+  "universe_n": 626,
+  "starting_cash": 300000.0,
+  "allocation": 10000.0,
+  "max_concurrent": 20,
+  "funnel_counts": {
+    "SKIPPED_ENTRY_STALE": 216,
+    "SKIPPED_NO_PRIOR_INTENT": 7,
+    "INTENT_CREATED": 162,
+    "ENTERED": 153,
+    "EXITED": 153,
+    "SKIPPED_IN_COOLDOWN": 5,
+    "SKIPPED_SYMBOL_ALREADY_OPEN": 4,
+    "SKIPPED_LIQUIDITY_OR_NONBUY": 7
+  },
+  "n_closed_trades": 153,
+  "n_open_at_end_of_tail": 0,
+  "n_exit_unresolved_at_end_of_tail": 0,
+  "open_at_end_of_tail": [],
+  "exit_unresolved_at_end_of_tail": [],
+  "equity_and_drawdown": {
+    "study_window_only": {
+      "n_sessions": 395,
+      "ending_equity_at_study_cutoff": 330840.98,
+      "n_open_at_study_cutoff": 2,
+      "max_drawdown_pct": -2.7478,
+      "capital_utilization_pct_days_with_open_position": 89.62,
+      "mean_invested_capital_over_mean_equity_pct": 12.0731
+    },
+    "tail_inclusive": {
+      "n_sessions": 414,
+      "ending_equity_after_tail": 330935.4,
+      "n_open_after_tail": 0,
+      "max_drawdown_pct": -2.7478
+    }
+  }
+}

@@ -1,0 +1,2311 @@
+{
+  "n_task130a_trades": 153,
+  "n_task130b_trades": 153,
+  "counts": {
+    "UNCHANGED": 153,
+    "IDENTITY_CORRECTED": 0,
+    "NEWLY_ADMITTED": 0,
+    "EXCLUDED": 0,
+    "TIMING_CHANGED": 0,
+    "QUANTITY_COST_CHANGED": 0,
+    "MISSING_DATA_DISPOSITION_CHANGED": 0
+  },
+  "note": "Numerical equality of the aggregate result with Task 130A's own figure is NOT evidence of implementation equivalence and is not a target. Every episode_id present in only one run, or present in both with a material field difference, is retained below with an explicit classification, not collapsed into a single pass/fail summary.",
+  "episodes": [
+    {
+      "episode_id": "0009dfdd76e7a9be",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "ACHR",
+        "b_symbol": "ACHR",
+        "a_entry_session": "2024-11-27",
+        "b_entry_session": "2024-11-27",
+        "a_exit_session": "2024-12-12",
+        "b_exit_session": "2024-12-12",
+        "a_net_return_pct": -4.7273,
+        "b_net_return_pct": -4.7273,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "00513dc26694a2ad",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "KMI",
+        "b_symbol": "KMI",
+        "a_entry_session": "2025-11-04",
+        "b_entry_session": "2025-11-04",
+        "a_exit_session": "2025-11-18",
+        "b_exit_session": "2025-11-18",
+        "a_net_return_pct": 4.1582,
+        "b_net_return_pct": 4.1582,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "00616af9bd0fb905",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "EXE",
+        "b_symbol": "EXE",
+        "a_entry_session": "2025-08-19",
+        "b_entry_session": "2025-08-19",
+        "a_exit_session": "2025-09-03",
+        "b_exit_session": "2025-09-03",
+        "a_net_return_pct": 5.2186,
+        "b_net_return_pct": 5.2186,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "00ecd37efa60fa31",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "PRU",
+        "b_symbol": "PRU",
+        "a_entry_session": "2026-02-13",
+        "b_entry_session": "2026-02-13",
+        "a_exit_session": "2026-03-02",
+        "b_exit_session": "2026-03-02",
+        "a_net_return_pct": -2.681,
+        "b_net_return_pct": -2.681,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "028fecbe7f5e06fd",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "VRSN",
+        "b_symbol": "VRSN",
+        "a_entry_session": "2024-12-27",
+        "b_entry_session": "2024-12-27",
+        "a_exit_session": "2025-01-14",
+        "b_exit_session": "2025-01-14",
+        "a_net_return_pct": 2.077,
+        "b_net_return_pct": 2.077,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "0585ff7619392fb8",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "WTW",
+        "b_symbol": "WTW",
+        "a_entry_session": "2026-02-18",
+        "b_entry_session": "2026-02-18",
+        "a_exit_session": "2026-03-04",
+        "b_exit_session": "2026-03-04",
+        "a_net_return_pct": 2.6871,
+        "b_net_return_pct": 2.6871,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "07b93a525cf7aa40",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CHTR",
+        "b_symbol": "CHTR",
+        "a_entry_session": "2025-08-05",
+        "b_entry_session": "2025-08-05",
+        "a_exit_session": "2025-08-19",
+        "b_exit_session": "2025-08-19",
+        "a_net_return_pct": 1.8096,
+        "b_net_return_pct": 1.8096,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "0826c3473ca87076",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "AMTM",
+        "b_symbol": "AMTM",
+        "a_entry_session": "2025-02-21",
+        "b_entry_session": "2025-02-21",
+        "a_exit_session": "2025-03-07",
+        "b_exit_session": "2025-03-07",
+        "a_net_return_pct": -5.9075,
+        "b_net_return_pct": -5.9075,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "0edb2eacaee735bd",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "DLTR",
+        "b_symbol": "DLTR",
+        "a_entry_session": "2025-04-17",
+        "b_entry_session": "2025-04-17",
+        "a_exit_session": "2025-05-02",
+        "b_exit_session": "2025-05-02",
+        "a_net_return_pct": 14.3712,
+        "b_net_return_pct": 14.3712,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "10d02906ed204cdd",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "MTCH",
+        "b_symbol": "MTCH",
+        "a_entry_session": "2025-02-11",
+        "b_entry_session": "2025-02-11",
+        "a_exit_session": "2025-02-26",
+        "b_exit_session": "2025-02-26",
+        "a_net_return_pct": -4.9504,
+        "b_net_return_pct": -4.9504,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "11ce9fb6f41ff781",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "TKO",
+        "b_symbol": "TKO",
+        "a_entry_session": "2025-06-05",
+        "b_entry_session": "2025-06-05",
+        "a_exit_session": "2025-06-20",
+        "b_exit_session": "2025-06-20",
+        "a_net_return_pct": 4.0289,
+        "b_net_return_pct": 4.0289,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "141e733bc0fcf7a2",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "VRTX",
+        "b_symbol": "VRTX",
+        "a_entry_session": "2025-08-08",
+        "b_entry_session": "2025-08-08",
+        "a_exit_session": "2025-08-22",
+        "b_exit_session": "2025-08-22",
+        "a_net_return_pct": 4.598,
+        "b_net_return_pct": 4.598,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "148450fb0f96a0a9",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "XRAY",
+        "b_symbol": "XRAY",
+        "a_entry_session": "2026-03-04",
+        "b_entry_session": "2026-03-04",
+        "a_exit_session": "2026-03-18",
+        "b_exit_session": "2026-03-18",
+        "a_net_return_pct": -16.2753,
+        "b_net_return_pct": -16.2753,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "152d67654915996a",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CNC",
+        "b_symbol": "CNC",
+        "a_entry_session": "2024-11-14",
+        "b_entry_session": "2024-11-14",
+        "a_exit_session": "2024-11-29",
+        "b_exit_session": "2024-11-29",
+        "a_net_return_pct": 2.7689,
+        "b_net_return_pct": 2.7689,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "16271391935a9f1e",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "KMX",
+        "b_symbol": "KMX",
+        "a_entry_session": "2025-10-07",
+        "b_entry_session": "2025-10-07",
+        "a_exit_session": "2025-10-21",
+        "b_exit_session": "2025-10-21",
+        "a_net_return_pct": -4.6668,
+        "b_net_return_pct": -4.6668,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "17d41b2b4c9e4431",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "MSCI",
+        "b_symbol": "MSCI",
+        "a_entry_session": "2026-02-23",
+        "b_entry_session": "2026-02-23",
+        "a_exit_session": "2026-03-09",
+        "b_exit_session": "2026-03-09",
+        "a_net_return_pct": 3.4647,
+        "b_net_return_pct": 3.4647,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "1e56f8b265547341",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CHD",
+        "b_symbol": "CHD",
+        "a_entry_session": "2025-08-12",
+        "b_entry_session": "2025-08-12",
+        "a_exit_session": "2025-08-26",
+        "b_exit_session": "2025-08-26",
+        "a_net_return_pct": 0.8191,
+        "b_net_return_pct": 0.8191,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "1f0d05ae723e9947",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "SPG",
+        "b_symbol": "SPG",
+        "a_entry_session": "2025-01-03",
+        "b_entry_session": "2025-01-03",
+        "a_exit_session": "2025-01-21",
+        "b_exit_session": "2025-01-21",
+        "a_net_return_pct": 0.8989,
+        "b_net_return_pct": 0.8989,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "20113c14dd7645c4",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "VRSN",
+        "b_symbol": "VRSN",
+        "a_entry_session": "2025-06-02",
+        "b_entry_session": "2025-06-02",
+        "a_exit_session": "2025-06-16",
+        "b_exit_session": "2025-06-16",
+        "a_net_return_pct": 3.5206,
+        "b_net_return_pct": 3.5206,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "20af125169c6a501",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CHRW",
+        "b_symbol": "CHRW",
+        "a_entry_session": "2026-02-17",
+        "b_entry_session": "2026-02-17",
+        "a_exit_session": "2026-03-03",
+        "b_exit_session": "2026-03-03",
+        "a_net_return_pct": 7.6834,
+        "b_net_return_pct": 7.6834,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "243280cb4861eb35",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "SPG",
+        "b_symbol": "SPG",
+        "a_entry_session": "2025-04-03",
+        "b_entry_session": "2025-04-03",
+        "a_exit_session": "2025-04-17",
+        "b_exit_session": "2025-04-17",
+        "a_net_return_pct": -8.3475,
+        "b_net_return_pct": -8.3475,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "254c5c0dec67bb11",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "SPG",
+        "b_symbol": "SPG",
+        "a_entry_session": "2026-01-06",
+        "b_entry_session": "2026-01-06",
+        "a_exit_session": "2026-01-21",
+        "b_exit_session": "2026-01-21",
+        "a_net_return_pct": 1.4562,
+        "b_net_return_pct": 1.4562,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "265b4cecd9ba50b6",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "LB",
+        "b_symbol": "LB",
+        "a_entry_session": "2026-01-08",
+        "b_entry_session": "2026-01-08",
+        "a_exit_session": "2026-01-23",
+        "b_exit_session": "2026-01-23",
+        "a_net_return_pct": 37.1005,
+        "b_net_return_pct": 37.1005,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "282dfb0b8f1ad133",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "NSC",
+        "b_symbol": "NSC",
+        "a_entry_session": "2024-12-16",
+        "b_entry_session": "2024-12-16",
+        "a_exit_session": "2024-12-31",
+        "b_exit_session": "2024-12-31",
+        "a_net_return_pct": -4.8801,
+        "b_net_return_pct": -4.8801,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "28feb3375e0a384a",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "ALGN",
+        "b_symbol": "ALGN",
+        "a_entry_session": "2025-08-04",
+        "b_entry_session": "2025-08-04",
+        "a_exit_session": "2025-08-18",
+        "b_exit_session": "2025-08-18",
+        "a_net_return_pct": 2.8281,
+        "b_net_return_pct": 2.8281,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "2a9fc0a0ac84ccbd",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "IFF",
+        "b_symbol": "IFF",
+        "a_entry_session": "2025-05-16",
+        "b_entry_session": "2025-05-16",
+        "a_exit_session": "2025-06-02",
+        "b_exit_session": "2025-06-02",
+        "a_net_return_pct": -1.0495,
+        "b_net_return_pct": -1.0495,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "2dcf92f3caf381fc",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "XRAY",
+        "b_symbol": "XRAY",
+        "a_entry_session": "2024-11-19",
+        "b_entry_session": "2024-11-19",
+        "a_exit_session": "2024-12-04",
+        "b_exit_session": "2024-12-04",
+        "a_net_return_pct": 5.913,
+        "b_net_return_pct": 5.913,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "2e43c620b008ad49",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "LUV",
+        "b_symbol": "LUV",
+        "a_entry_session": "2025-03-17",
+        "b_entry_session": "2025-03-17",
+        "a_exit_session": "2025-03-31",
+        "b_exit_session": "2025-03-31",
+        "a_net_return_pct": 5.7435,
+        "b_net_return_pct": 5.7435,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "2ec4a235fbf0dc59",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "IFF",
+        "b_symbol": "IFF",
+        "a_entry_session": "2025-03-07",
+        "b_entry_session": "2025-03-07",
+        "a_exit_session": "2025-03-21",
+        "b_exit_session": "2025-03-21",
+        "a_net_return_pct": -4.5159,
+        "b_net_return_pct": -4.5159,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "3081f212527e9cdd",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "ILMN",
+        "b_symbol": "ILMN",
+        "a_entry_session": "2025-05-15",
+        "b_entry_session": "2025-05-15",
+        "a_exit_session": "2025-05-30",
+        "b_exit_session": "2025-05-30",
+        "a_net_return_pct": 2.5743,
+        "b_net_return_pct": 2.5743,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "315711f144f46f68",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "KEY",
+        "b_symbol": "KEY",
+        "a_entry_session": "2025-04-24",
+        "b_entry_session": "2025-04-24",
+        "a_exit_session": "2025-05-08",
+        "b_exit_session": "2025-05-08",
+        "a_net_return_pct": 7.1529,
+        "b_net_return_pct": 7.1529,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "319311f05ef3a6d6",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "TPL",
+        "b_symbol": "TPL",
+        "a_entry_session": "2026-03-02",
+        "b_entry_session": "2026-03-02",
+        "a_exit_session": "2026-03-16",
+        "b_exit_session": "2026-03-16",
+        "a_net_return_pct": -2.2659,
+        "b_net_return_pct": -2.2659,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "3318fa7956e4c9f5",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "BMY",
+        "b_symbol": "BMY",
+        "a_entry_session": "2025-02-24",
+        "b_entry_session": "2025-02-24",
+        "a_exit_session": "2025-03-10",
+        "b_exit_session": "2025-03-10",
+        "a_net_return_pct": 12.5566,
+        "b_net_return_pct": 12.5566,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "36371c739a553360",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "SRE",
+        "b_symbol": "SRE",
+        "a_entry_session": "2026-03-12",
+        "b_entry_session": "2026-03-12",
+        "a_exit_session": "2026-03-26",
+        "b_exit_session": "2026-03-26",
+        "a_net_return_pct": 3.8931,
+        "b_net_return_pct": 3.8931,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "3873ec0a1078b00f",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "TPL",
+        "b_symbol": "TPL",
+        "a_entry_session": "2025-08-19",
+        "b_entry_session": "2025-08-19",
+        "a_exit_session": "2025-09-03",
+        "b_exit_session": "2025-09-03",
+        "a_net_return_pct": 2.1645,
+        "b_net_return_pct": 2.1645,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "3bbaa44a794190aa",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "MSTR",
+        "b_symbol": "MSTR",
+        "a_entry_session": "2025-06-10",
+        "b_entry_session": "2025-06-10",
+        "a_exit_session": "2025-06-25",
+        "b_exit_session": "2025-06-25",
+        "a_net_return_pct": -1.3621,
+        "b_net_return_pct": -1.3621,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "3c3bbf8fc45e6857",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "TYL",
+        "b_symbol": "TYL",
+        "a_entry_session": "2026-02-26",
+        "b_entry_session": "2026-02-26",
+        "a_exit_session": "2026-03-12",
+        "b_exit_session": "2026-03-12",
+        "a_net_return_pct": 0.7849,
+        "b_net_return_pct": 0.7849,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "3d234539d2d4526a",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "RF",
+        "b_symbol": "RF",
+        "a_entry_session": "2025-03-14",
+        "b_entry_session": "2025-03-14",
+        "a_exit_session": "2025-03-28",
+        "b_exit_session": "2025-03-28",
+        "a_net_return_pct": 0.9546,
+        "b_net_return_pct": 0.9546,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "3dc3653fd630cbad",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "PAYX",
+        "b_symbol": "PAYX",
+        "a_entry_session": "2026-02-06",
+        "b_entry_session": "2026-02-06",
+        "a_exit_session": "2026-02-23",
+        "b_exit_session": "2026-02-23",
+        "a_net_return_pct": -11.4647,
+        "b_net_return_pct": -11.4647,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "3ea1497b79c8911a",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "MSTR",
+        "b_symbol": "MSTR",
+        "a_entry_session": "2025-03-25",
+        "b_entry_session": "2025-03-25",
+        "a_exit_session": "2025-04-08",
+        "b_exit_session": "2025-04-08",
+        "a_net_return_pct": -28.8456,
+        "b_net_return_pct": -28.8456,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "3fca6e4d4c415789",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "BLDR",
+        "b_symbol": "BLDR",
+        "a_entry_session": "2025-06-13",
+        "b_entry_session": "2025-06-13",
+        "a_exit_session": "2025-06-30",
+        "b_exit_session": "2025-06-30",
+        "a_net_return_pct": 2.493,
+        "b_net_return_pct": 2.493,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "405c24252403f0f0",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "SEDG",
+        "b_symbol": "SEDG",
+        "a_entry_session": "2024-11-15",
+        "b_entry_session": "2024-11-15",
+        "a_exit_session": "2024-12-02",
+        "b_exit_session": "2024-12-02",
+        "a_net_return_pct": 25.1155,
+        "b_net_return_pct": 25.1155,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "41a4a9efe39bf15f",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "PENN",
+        "b_symbol": "PENN",
+        "a_entry_session": "2025-05-23",
+        "b_entry_session": "2025-05-23",
+        "a_exit_session": "2025-06-09",
+        "b_exit_session": "2025-06-09",
+        "a_net_return_pct": 12.4452,
+        "b_net_return_pct": 12.4452,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "45d20ce0c4a5f246",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "LKQ",
+        "b_symbol": "LKQ",
+        "a_entry_session": "2025-08-28",
+        "b_entry_session": "2025-08-28",
+        "a_exit_session": "2025-09-12",
+        "b_exit_session": "2025-09-12",
+        "a_net_return_pct": 0.2221,
+        "b_net_return_pct": 0.2221,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "45f85643e749aebf",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "PENN",
+        "b_symbol": "PENN",
+        "a_entry_session": "2025-11-19",
+        "b_entry_session": "2025-11-19",
+        "a_exit_session": "2025-12-04",
+        "b_exit_session": "2025-12-04",
+        "a_net_return_pct": 1.7986,
+        "b_net_return_pct": 1.7986,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "48d82cb668395875",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "WRB",
+        "b_symbol": "WRB",
+        "a_entry_session": "2026-02-02",
+        "b_entry_session": "2026-02-02",
+        "a_exit_session": "2026-02-17",
+        "b_exit_session": "2026-02-17",
+        "a_net_return_pct": 3.4557,
+        "b_net_return_pct": 3.4557,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "49a38d6fcc747eff",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "IFF",
+        "b_symbol": "IFF",
+        "a_entry_session": "2026-03-17",
+        "b_entry_session": "2026-03-17",
+        "a_exit_session": "2026-03-31",
+        "b_exit_session": "2026-03-31",
+        "a_net_return_pct": 0.7229,
+        "b_net_return_pct": 0.7229,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "4bd2270d02f9d709",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "VFC",
+        "b_symbol": "VFC",
+        "a_entry_session": "2025-05-28",
+        "b_entry_session": "2025-05-28",
+        "a_exit_session": "2025-06-11",
+        "b_exit_session": "2025-06-11",
+        "a_net_return_pct": -5.4194,
+        "b_net_return_pct": -5.4194,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "4cc2770bbc8570c6",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "AKAM",
+        "b_symbol": "AKAM",
+        "a_entry_session": "2025-08-13",
+        "b_entry_session": "2025-08-13",
+        "a_exit_session": "2025-08-27",
+        "b_exit_session": "2025-08-27",
+        "a_net_return_pct": 7.7586,
+        "b_net_return_pct": 7.7586,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "4f5a79f7f9debbe3",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "DOC",
+        "b_symbol": "DOC",
+        "a_entry_session": "2025-08-07",
+        "b_entry_session": "2025-08-07",
+        "a_exit_session": "2025-08-21",
+        "b_exit_session": "2025-08-21",
+        "a_net_return_pct": 2.2066,
+        "b_net_return_pct": 2.2066,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "5004ab8e44f6ef4d",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "SPG",
+        "b_symbol": "SPG",
+        "a_entry_session": "2024-10-02",
+        "b_entry_session": "2024-10-02",
+        "a_exit_session": "2024-10-16",
+        "b_exit_session": "2024-10-16",
+        "a_net_return_pct": 3.6635,
+        "b_net_return_pct": 3.6635,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "5ba175e00103fb48",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "VRSK",
+        "b_symbol": "VRSK",
+        "a_entry_session": "2025-11-04",
+        "b_entry_session": "2025-11-04",
+        "a_exit_session": "2025-11-18",
+        "b_exit_session": "2025-11-18",
+        "a_net_return_pct": 1.5609,
+        "b_net_return_pct": 1.5609,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "5ccea181a25760b5",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "TPL",
+        "b_symbol": "TPL",
+        "a_entry_session": "2024-09-12",
+        "b_entry_session": "2024-09-12",
+        "a_exit_session": "2024-09-26",
+        "b_exit_session": "2024-09-26",
+        "a_net_return_pct": 10.1406,
+        "b_net_return_pct": 10.1406,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "5de3e6757ff8cddb",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "UNH",
+        "b_symbol": "UNH",
+        "a_entry_session": "2025-05-19",
+        "b_entry_session": "2025-05-19",
+        "a_exit_session": "2025-06-03",
+        "b_exit_session": "2025-06-03",
+        "a_net_return_pct": -1.3638,
+        "b_net_return_pct": -1.3638,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "5e2560cc0dc87101",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "EMN",
+        "b_symbol": "EMN",
+        "a_entry_session": "2025-08-29",
+        "b_entry_session": "2025-08-29",
+        "a_exit_session": "2025-09-15",
+        "b_exit_session": "2025-09-15",
+        "a_net_return_pct": -6.5497,
+        "b_net_return_pct": -6.5497,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "5e86414e070a379f",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CRM",
+        "b_symbol": "CRM",
+        "a_entry_session": "2025-12-19",
+        "b_entry_session": "2025-12-19",
+        "a_exit_session": "2026-01-06",
+        "b_exit_session": "2026-01-06",
+        "a_net_return_pct": 0.6521,
+        "b_net_return_pct": 0.6521,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "5e8a9136c93807a9",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "HOG",
+        "b_symbol": "HOG",
+        "a_entry_session": "2026-03-10",
+        "b_entry_session": "2026-03-10",
+        "a_exit_session": "2026-03-24",
+        "b_exit_session": "2026-03-24",
+        "a_net_return_pct": -3.1937,
+        "b_net_return_pct": -3.1937,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "6011ae4ff435bd3a",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "HII",
+        "b_symbol": "HII",
+        "a_entry_session": "2025-02-28",
+        "b_entry_session": "2025-02-28",
+        "a_exit_session": "2025-03-14",
+        "b_exit_session": "2025-03-14",
+        "a_net_return_pct": 13.0843,
+        "b_net_return_pct": 13.0843,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "656c1311164aa108",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "EL",
+        "b_symbol": "EL",
+        "a_entry_session": "2025-02-10",
+        "b_entry_session": "2025-02-10",
+        "a_exit_session": "2025-02-25",
+        "b_exit_session": "2025-02-25",
+        "a_net_return_pct": 12.9301,
+        "b_net_return_pct": 12.9301,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "65a003761e53c70b",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "DOC",
+        "b_symbol": "DOC",
+        "a_entry_session": "2025-04-29",
+        "b_entry_session": "2025-04-29",
+        "a_exit_session": "2025-05-13",
+        "b_exit_session": "2025-05-13",
+        "a_net_return_pct": -3.4515,
+        "b_net_return_pct": -3.4515,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "65c713fa110d21ca",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "TFX",
+        "b_symbol": "TFX",
+        "a_entry_session": "2025-08-08",
+        "b_entry_session": "2025-08-08",
+        "a_exit_session": "2025-08-22",
+        "b_exit_session": "2025-08-22",
+        "a_net_return_pct": 10.4979,
+        "b_net_return_pct": 10.4979,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "6dcc5a66692369c6",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "PENN",
+        "b_symbol": "PENN",
+        "a_entry_session": "2024-09-10",
+        "b_entry_session": "2024-09-10",
+        "a_exit_session": "2024-09-24",
+        "b_exit_session": "2024-09-24",
+        "a_net_return_pct": 5.2372,
+        "b_net_return_pct": 5.2372,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "7368a01e07a4c12e",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CNC",
+        "b_symbol": "CNC",
+        "a_entry_session": "2025-08-12",
+        "b_entry_session": "2025-08-12",
+        "a_exit_session": "2025-08-26",
+        "b_exit_session": "2025-08-26",
+        "a_net_return_pct": 12.2804,
+        "b_net_return_pct": 12.2804,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "73bc4300e82c0f18",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "AMCR",
+        "b_symbol": "AMCR",
+        "a_entry_session": "2025-02-18",
+        "b_entry_session": "2025-02-18",
+        "a_exit_session": "2025-03-04",
+        "b_exit_session": "2025-03-04",
+        "a_net_return_pct": -0.3512,
+        "b_net_return_pct": -0.3512,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "74c27a2b7796e67f",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "PCG",
+        "b_symbol": "PCG",
+        "a_entry_session": "2025-02-26",
+        "b_entry_session": "2025-02-26",
+        "a_exit_session": "2025-03-12",
+        "b_exit_session": "2025-03-12",
+        "a_net_return_pct": 1.0658,
+        "b_net_return_pct": 1.0658,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "76946343b45a5b1d",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "MRVL",
+        "b_symbol": "MRVL",
+        "a_entry_session": "2025-09-26",
+        "b_entry_session": "2025-09-26",
+        "a_exit_session": "2025-10-10",
+        "b_exit_session": "2025-10-10",
+        "a_net_return_pct": 3.6761,
+        "b_net_return_pct": 3.6761,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "77d68ec59648d427",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CAT",
+        "b_symbol": "CAT",
+        "a_entry_session": "2025-05-09",
+        "b_entry_session": "2025-05-09",
+        "a_exit_session": "2025-05-23",
+        "b_exit_session": "2025-05-23",
+        "a_net_return_pct": 5.2452,
+        "b_net_return_pct": 5.2452,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "78244be64439a214",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "WRB",
+        "b_symbol": "WRB",
+        "a_entry_session": "2025-12-30",
+        "b_entry_session": "2025-12-30",
+        "a_exit_session": "2026-01-14",
+        "b_exit_session": "2026-01-14",
+        "a_net_return_pct": -2.4413,
+        "b_net_return_pct": -2.4413,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "7a15e4218788ae71",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CE",
+        "b_symbol": "CE",
+        "a_entry_session": "2025-12-15",
+        "b_entry_session": "2025-12-15",
+        "a_exit_session": "2025-12-30",
+        "b_exit_session": "2025-12-30",
+        "a_net_return_pct": -3.6132,
+        "b_net_return_pct": -3.6132,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "7d19d2eae47cf107",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "COP",
+        "b_symbol": "COP",
+        "a_entry_session": "2024-12-23",
+        "b_entry_session": "2024-12-23",
+        "a_exit_session": "2025-01-08",
+        "b_exit_session": "2025-01-08",
+        "a_net_return_pct": 6.282,
+        "b_net_return_pct": 6.282,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "7dc5e5e711bbe63d",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "LUV",
+        "b_symbol": "LUV",
+        "a_entry_session": "2025-08-08",
+        "b_entry_session": "2025-08-08",
+        "a_exit_session": "2025-08-22",
+        "b_exit_session": "2025-08-22",
+        "a_net_return_pct": 9.2701,
+        "b_net_return_pct": 9.2701,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "7e7b1811f1cc6dd4",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "TKO",
+        "b_symbol": "TKO",
+        "a_entry_session": "2024-12-16",
+        "b_entry_session": "2024-12-16",
+        "a_exit_session": "2024-12-31",
+        "b_exit_session": "2024-12-31",
+        "a_net_return_pct": -1.1744,
+        "b_net_return_pct": -1.1744,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "7e902c2fd1f57216",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "J",
+        "b_symbol": "J",
+        "a_entry_session": "2025-11-26",
+        "b_entry_session": "2025-11-26",
+        "a_exit_session": "2025-12-11",
+        "b_exit_session": "2025-12-11",
+        "a_net_return_pct": 1.3652,
+        "b_net_return_pct": 1.3652,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "7f03010dae07edab",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "IFF",
+        "b_symbol": "IFF",
+        "a_entry_session": "2025-08-11",
+        "b_entry_session": "2025-08-11",
+        "a_exit_session": "2025-08-25",
+        "b_exit_session": "2025-08-25",
+        "a_net_return_pct": 5.152,
+        "b_net_return_pct": 5.152,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "7fcaa8f45a02a3d0",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CRL",
+        "b_symbol": "CRL",
+        "a_entry_session": "2025-02-24",
+        "b_entry_session": "2025-02-24",
+        "a_exit_session": "2025-03-10",
+        "b_exit_session": "2025-03-10",
+        "a_net_return_pct": 5.0341,
+        "b_net_return_pct": 5.0341,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "81e8aaf3131be40d",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "AAP",
+        "b_symbol": "AAP",
+        "a_entry_session": "2024-11-27",
+        "b_entry_session": "2024-11-27",
+        "a_exit_session": "2024-12-12",
+        "b_exit_session": "2024-12-12",
+        "a_net_return_pct": -0.3177,
+        "b_net_return_pct": -0.3177,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "81ecbdfda7fe5968",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "COO",
+        "b_symbol": "COO",
+        "a_entry_session": "2025-09-03",
+        "b_entry_session": "2025-09-03",
+        "a_exit_session": "2025-09-17",
+        "b_exit_session": "2025-09-17",
+        "a_net_return_pct": -3.1132,
+        "b_net_return_pct": -3.1132,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "8318f04ddd0ec08f",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "VRSK",
+        "b_symbol": "VRSK",
+        "a_entry_session": "2026-02-25",
+        "b_entry_session": "2026-02-25",
+        "a_exit_session": "2026-03-11",
+        "b_exit_session": "2026-03-11",
+        "a_net_return_pct": 4.2074,
+        "b_net_return_pct": 4.2074,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "84e4ef0f42d421c3",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "SRE",
+        "b_symbol": "SRE",
+        "a_entry_session": "2025-03-10",
+        "b_entry_session": "2025-03-10",
+        "a_exit_session": "2025-03-24",
+        "b_exit_session": "2025-03-24",
+        "a_net_return_pct": 2.4069,
+        "b_net_return_pct": 2.4069,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "885f08c0c93adb22",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "PRGO",
+        "b_symbol": "PRGO",
+        "a_entry_session": "2025-09-11",
+        "b_entry_session": "2025-09-11",
+        "a_exit_session": "2025-09-25",
+        "b_exit_session": "2025-09-25",
+        "a_net_return_pct": -6.7929,
+        "b_net_return_pct": -6.7929,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "89fce1e956b1ad21",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "FDX",
+        "b_symbol": "FDX",
+        "a_entry_session": "2025-01-10",
+        "b_entry_session": "2025-01-10",
+        "a_exit_session": "2025-01-27",
+        "b_exit_session": "2025-01-27",
+        "a_net_return_pct": 2.3575,
+        "b_net_return_pct": 2.3575,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "8a42667affc4dacd",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "TPL",
+        "b_symbol": "TPL",
+        "a_entry_session": "2025-02-26",
+        "b_entry_session": "2025-02-26",
+        "a_exit_session": "2025-03-12",
+        "b_exit_session": "2025-03-12",
+        "a_net_return_pct": 3.5113,
+        "b_net_return_pct": 3.5113,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "8b8172ab7deb91e6",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "BBWI",
+        "b_symbol": "BBWI",
+        "a_entry_session": "2025-11-25",
+        "b_entry_session": "2025-11-25",
+        "a_exit_session": "2025-12-10",
+        "b_exit_session": "2025-12-10",
+        "a_net_return_pct": 22.9969,
+        "b_net_return_pct": 22.9969,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "8cef19830b791615",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "WYNN",
+        "b_symbol": "WYNN",
+        "a_entry_session": "2025-04-09",
+        "b_entry_session": "2025-04-09",
+        "a_exit_session": "2025-04-24",
+        "b_exit_session": "2025-04-24",
+        "a_net_return_pct": 23.5385,
+        "b_net_return_pct": 23.5385,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "8e315f09a068d6a4",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "BRO",
+        "b_symbol": "BRO",
+        "a_entry_session": "2025-08-11",
+        "b_entry_session": "2025-08-11",
+        "a_exit_session": "2025-08-25",
+        "b_exit_session": "2025-08-25",
+        "a_net_return_pct": 2.9109,
+        "b_net_return_pct": 2.9109,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "91138bf9a3233cbb",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "OGN",
+        "b_symbol": "OGN",
+        "a_entry_session": "2025-05-07",
+        "b_entry_session": "2025-05-07",
+        "a_exit_session": "2025-05-21",
+        "b_exit_session": "2025-05-21",
+        "a_net_return_pct": -7.7559,
+        "b_net_return_pct": -7.7559,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "94d0004121fab283",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "WU",
+        "b_symbol": "WU",
+        "a_entry_session": "2025-08-26",
+        "b_entry_session": "2025-08-26",
+        "a_exit_session": "2025-09-10",
+        "b_exit_session": "2025-09-10",
+        "a_net_return_pct": -0.7911,
+        "b_net_return_pct": -0.7911,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "957a8758b14b0529",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "DINO",
+        "b_symbol": "DINO",
+        "a_entry_session": "2024-11-08",
+        "b_entry_session": "2024-11-08",
+        "a_exit_session": "2024-11-22",
+        "b_exit_session": "2024-11-22",
+        "a_net_return_pct": 3.2121,
+        "b_net_return_pct": 3.2121,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "9869c2d001b9ee98",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "DINO",
+        "b_symbol": "DINO",
+        "a_entry_session": "2024-12-17",
+        "b_entry_session": "2024-12-17",
+        "a_exit_session": "2025-01-02",
+        "b_exit_session": "2025-01-02",
+        "a_net_return_pct": -2.2683,
+        "b_net_return_pct": -2.2683,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "99ca35ad96c0cd20",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "AZO",
+        "b_symbol": "AZO",
+        "a_entry_session": "2025-12-22",
+        "b_entry_session": "2025-12-22",
+        "a_exit_session": "2026-01-07",
+        "b_exit_session": "2026-01-07",
+        "a_net_return_pct": -2.0836,
+        "b_net_return_pct": -2.0836,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "9b53daa2461b31ce",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "ADC",
+        "b_symbol": "ADC",
+        "a_entry_session": "2026-01-13",
+        "b_entry_session": "2026-01-13",
+        "a_exit_session": "2026-01-28",
+        "b_exit_session": "2026-01-28",
+        "a_net_return_pct": -0.6609,
+        "b_net_return_pct": -0.6609,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "9d328c403b43d962",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CE",
+        "b_symbol": "CE",
+        "a_entry_session": "2025-03-11",
+        "b_entry_session": "2025-03-11",
+        "a_exit_session": "2025-03-25",
+        "b_exit_session": "2025-03-25",
+        "a_net_return_pct": 7.0,
+        "b_net_return_pct": 7.0,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "9e375d1711c85132",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "EPAM",
+        "b_symbol": "EPAM",
+        "a_entry_session": "2025-11-11",
+        "b_entry_session": "2025-11-11",
+        "a_exit_session": "2025-11-25",
+        "b_exit_session": "2025-11-25",
+        "a_net_return_pct": 2.4519,
+        "b_net_return_pct": 2.4519,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "9f4531667f9ff189",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "LW",
+        "b_symbol": "LW",
+        "a_entry_session": "2024-12-24",
+        "b_entry_session": "2024-12-24",
+        "a_exit_session": "2025-01-10",
+        "b_exit_session": "2025-01-10",
+        "a_net_return_pct": -5.8055,
+        "b_net_return_pct": -5.8055,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "a243eb4755bf79f5",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "DAL",
+        "b_symbol": "DAL",
+        "a_entry_session": "2025-04-14",
+        "b_entry_session": "2025-04-14",
+        "a_exit_session": "2025-04-29",
+        "b_exit_session": "2025-04-29",
+        "a_net_return_pct": 0.9989,
+        "b_net_return_pct": 0.9989,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "a2671f89f513ab70",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "NSC",
+        "b_symbol": "NSC",
+        "a_entry_session": "2025-11-07",
+        "b_entry_session": "2025-11-07",
+        "a_exit_session": "2025-11-21",
+        "b_exit_session": "2025-11-21",
+        "a_net_return_pct": 1.674,
+        "b_net_return_pct": 1.674,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "a429e511d2424c7c",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "TAP",
+        "b_symbol": "TAP",
+        "a_entry_session": "2025-11-13",
+        "b_entry_session": "2025-11-13",
+        "a_exit_session": "2025-11-28",
+        "b_exit_session": "2025-11-28",
+        "a_net_return_pct": 0.8904,
+        "b_net_return_pct": 0.8904,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "a6017977667e7e9f",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "ETN",
+        "b_symbol": "ETN",
+        "a_entry_session": "2024-09-06",
+        "b_entry_session": "2024-09-06",
+        "a_exit_session": "2024-09-20",
+        "b_exit_session": "2024-09-20",
+        "a_net_return_pct": 14.3432,
+        "b_net_return_pct": 14.3432,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "a76728501b7d274a",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "DINO",
+        "b_symbol": "DINO",
+        "a_entry_session": "2025-03-06",
+        "b_entry_session": "2025-03-06",
+        "a_exit_session": "2025-03-20",
+        "b_exit_session": "2025-03-20",
+        "a_net_return_pct": 10.861,
+        "b_net_return_pct": 10.861,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "a7ef088dce4cc1f9",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "KKR",
+        "b_symbol": "KKR",
+        "a_entry_session": "2026-02-19",
+        "b_entry_session": "2026-02-19",
+        "a_exit_session": "2026-03-05",
+        "b_exit_session": "2026-03-05",
+        "a_net_return_pct": -7.0662,
+        "b_net_return_pct": -7.0662,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "aac203db9d119be8",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "PRGO",
+        "b_symbol": "PRGO",
+        "a_entry_session": "2025-08-20",
+        "b_entry_session": "2025-08-20",
+        "a_exit_session": "2025-09-04",
+        "b_exit_session": "2025-09-04",
+        "a_net_return_pct": -1.1554,
+        "b_net_return_pct": -1.1554,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "ab0fe252895faaf8",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "MRK",
+        "b_symbol": "MRK",
+        "a_entry_session": "2025-02-10",
+        "b_entry_session": "2025-02-10",
+        "a_exit_session": "2025-02-25",
+        "b_exit_session": "2025-02-25",
+        "a_net_return_pct": 4.6412,
+        "b_net_return_pct": 4.6412,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "ab933853739d86de",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CNC",
+        "b_symbol": "CNC",
+        "a_entry_session": "2024-12-18",
+        "b_entry_session": "2024-12-18",
+        "a_exit_session": "2025-01-03",
+        "b_exit_session": "2025-01-03",
+        "a_net_return_pct": 5.1281,
+        "b_net_return_pct": 5.1281,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "ad3d2de2a98448b4",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "WY",
+        "b_symbol": "WY",
+        "a_entry_session": "2026-02-23",
+        "b_entry_session": "2026-02-23",
+        "a_exit_session": "2026-03-09",
+        "b_exit_session": "2026-03-09",
+        "a_net_return_pct": -4.7292,
+        "b_net_return_pct": -4.7292,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "ae6d675e0fcbb7fa",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "NDAQ",
+        "b_symbol": "NDAQ",
+        "a_entry_session": "2026-02-20",
+        "b_entry_session": "2026-02-20",
+        "a_exit_session": "2026-03-06",
+        "b_exit_session": "2026-03-06",
+        "a_net_return_pct": 7.964,
+        "b_net_return_pct": 7.964,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "b065e045acf037e1",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CRM",
+        "b_symbol": "CRM",
+        "a_entry_session": "2026-03-20",
+        "b_entry_session": "2026-03-20",
+        "a_exit_session": "2026-04-06",
+        "b_exit_session": "2026-04-06",
+        "a_net_return_pct": -4.4345,
+        "b_net_return_pct": -4.4345,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "b154c83c2445af2c",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "MSTR",
+        "b_symbol": "MSTR",
+        "a_entry_session": "2025-07-30",
+        "b_entry_session": "2025-07-30",
+        "a_exit_session": "2025-08-13",
+        "b_exit_session": "2025-08-13",
+        "a_net_return_pct": -1.934,
+        "b_net_return_pct": -1.934,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "b6e504eb42fc5b2f",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "EL",
+        "b_symbol": "EL",
+        "a_entry_session": "2024-11-18",
+        "b_entry_session": "2024-11-18",
+        "a_exit_session": "2024-12-03",
+        "b_exit_session": "2024-12-03",
+        "a_net_return_pct": 19.0624,
+        "b_net_return_pct": 19.0624,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "b88c894cceaad910",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "HP",
+        "b_symbol": "HP",
+        "a_entry_session": "2025-02-12",
+        "b_entry_session": "2025-02-12",
+        "a_exit_session": "2025-02-27",
+        "b_exit_session": "2025-02-27",
+        "a_net_return_pct": -3.6456,
+        "b_net_return_pct": -3.6456,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "b8911ad756a4fdcc",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CZR",
+        "b_symbol": "CZR",
+        "a_entry_session": "2025-03-11",
+        "b_entry_session": "2025-03-11",
+        "a_exit_session": "2025-03-25",
+        "b_exit_session": "2025-03-25",
+        "a_net_return_pct": 0.5684,
+        "b_net_return_pct": 0.5684,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "ba1482b59cafb085",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "AMCR",
+        "b_symbol": "AMCR",
+        "a_entry_session": "2025-11-13",
+        "b_entry_session": "2025-11-13",
+        "a_exit_session": "2025-11-28",
+        "b_exit_session": "2025-11-28",
+        "a_net_return_pct": 0.9742,
+        "b_net_return_pct": 0.9742,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "ba4e25906b617525",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CRH",
+        "b_symbol": "CRH",
+        "a_entry_session": "2026-03-16",
+        "b_entry_session": "2026-03-16",
+        "a_exit_session": "2026-03-30",
+        "b_exit_session": "2026-03-30",
+        "a_net_return_pct": 0.3857,
+        "b_net_return_pct": 0.3857,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "bb296050e181b577",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "FMC",
+        "b_symbol": "FMC",
+        "a_entry_session": "2025-11-17",
+        "b_entry_session": "2025-11-17",
+        "a_exit_session": "2025-12-02",
+        "b_exit_session": "2025-12-02",
+        "a_net_return_pct": -0.1257,
+        "b_net_return_pct": -0.1257,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "bcfa02487784a36e",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "LUV",
+        "b_symbol": "LUV",
+        "a_entry_session": "2024-10-03",
+        "b_entry_session": "2024-10-03",
+        "a_exit_session": "2024-10-17",
+        "b_exit_session": "2024-10-17",
+        "a_net_return_pct": -0.1654,
+        "b_net_return_pct": -0.1654,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "c2672d6adc518bbe",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "EG",
+        "b_symbol": "EG",
+        "a_entry_session": "2025-10-31",
+        "b_entry_session": "2025-10-31",
+        "a_exit_session": "2025-11-14",
+        "b_exit_session": "2025-11-14",
+        "a_net_return_pct": 4.0993,
+        "b_net_return_pct": 4.0993,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "c4a144710b2efdc1",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "FDS",
+        "b_symbol": "FDS",
+        "a_entry_session": "2025-10-09",
+        "b_entry_session": "2025-10-09",
+        "a_exit_session": "2025-10-23",
+        "b_exit_session": "2025-10-23",
+        "a_net_return_pct": 0.285,
+        "b_net_return_pct": 0.285,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "c5407b149fb8d2df",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "AAP",
+        "b_symbol": "AAP",
+        "a_entry_session": "2025-03-11",
+        "b_entry_session": "2025-03-11",
+        "a_exit_session": "2025-03-25",
+        "b_exit_session": "2025-03-25",
+        "a_net_return_pct": 0.242,
+        "b_net_return_pct": 0.242,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "c601128ed34fb3b6",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "MRNA",
+        "b_symbol": "MRNA",
+        "a_entry_session": "2025-03-05",
+        "b_entry_session": "2025-03-05",
+        "a_exit_session": "2025-03-19",
+        "b_exit_session": "2025-03-19",
+        "a_net_return_pct": 2.3231,
+        "b_net_return_pct": 2.3231,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "c683447b53fae98a",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "MSTR",
+        "b_symbol": "MSTR",
+        "a_entry_session": "2026-01-13",
+        "b_entry_session": "2026-01-13",
+        "a_exit_session": "2026-01-28",
+        "b_exit_session": "2026-01-28",
+        "a_net_return_pct": -3.8485,
+        "b_net_return_pct": -3.8485,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "c866e1a9f40a7abf",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "NKE",
+        "b_symbol": "NKE",
+        "a_entry_session": "2025-12-24",
+        "b_entry_session": "2025-12-24",
+        "a_exit_session": "2026-01-09",
+        "b_exit_session": "2026-01-09",
+        "a_net_return_pct": 11.7596,
+        "b_net_return_pct": 11.7596,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "ca6b84ff3af6c55d",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "SPG",
+        "b_symbol": "SPG",
+        "a_entry_session": "2025-10-02",
+        "b_entry_session": "2025-10-02",
+        "a_exit_session": "2025-10-16",
+        "b_exit_session": "2025-10-16",
+        "a_net_return_pct": -5.054,
+        "b_net_return_pct": -5.054,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "cdd63195e4fc1765",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "NSC",
+        "b_symbol": "NSC",
+        "a_entry_session": "2024-10-28",
+        "b_entry_session": "2024-10-28",
+        "a_exit_session": "2024-11-11",
+        "b_exit_session": "2024-11-11",
+        "a_net_return_pct": 7.865,
+        "b_net_return_pct": 7.865,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "d0b6328fe74e6665",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CE",
+        "b_symbol": "CE",
+        "a_entry_session": "2025-08-19",
+        "b_entry_session": "2025-08-19",
+        "a_exit_session": "2025-09-03",
+        "b_exit_session": "2025-09-03",
+        "a_net_return_pct": 1.5131,
+        "b_net_return_pct": 1.5131,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "d0beb8f3797c8548",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "TAP",
+        "b_symbol": "TAP",
+        "a_entry_session": "2026-02-23",
+        "b_entry_session": "2026-02-23",
+        "a_exit_session": "2026-03-09",
+        "b_exit_session": "2026-03-09",
+        "a_net_return_pct": -6.8279,
+        "b_net_return_pct": -6.8279,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "d171ce2655326bc7",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "FMC",
+        "b_symbol": "FMC",
+        "a_entry_session": "2025-03-06",
+        "b_entry_session": "2025-03-06",
+        "a_exit_session": "2025-03-20",
+        "b_exit_session": "2025-03-20",
+        "a_net_return_pct": 7.0393,
+        "b_net_return_pct": 7.0393,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "d1dedc2f5ffd17b5",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "DOW",
+        "b_symbol": "DOW",
+        "a_entry_session": "2024-12-17",
+        "b_entry_session": "2024-12-17",
+        "a_exit_session": "2025-01-02",
+        "b_exit_session": "2025-01-02",
+        "a_net_return_pct": -2.0478,
+        "b_net_return_pct": -2.0478,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "d2edddad6cc99d69",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "HSY",
+        "b_symbol": "HSY",
+        "a_entry_session": "2025-11-26",
+        "b_entry_session": "2025-11-26",
+        "a_exit_session": "2025-12-11",
+        "b_exit_session": "2025-12-11",
+        "a_net_return_pct": -3.8141,
+        "b_net_return_pct": -3.8141,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "d45a4ce35b6f8716",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "IBM",
+        "b_symbol": "IBM",
+        "a_entry_session": "2026-02-26",
+        "b_entry_session": "2026-02-26",
+        "a_exit_session": "2026-03-12",
+        "b_exit_session": "2026-03-12",
+        "a_net_return_pct": 3.1268,
+        "b_net_return_pct": 3.1268,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "d78e71460b0940d1",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "ADC",
+        "b_symbol": "ADC",
+        "a_entry_session": "2025-10-07",
+        "b_entry_session": "2025-10-07",
+        "a_exit_session": "2025-10-21",
+        "b_exit_session": "2025-10-21",
+        "a_net_return_pct": 6.6098,
+        "b_net_return_pct": 6.6098,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "db734f104a0a9038",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "PSX",
+        "b_symbol": "PSX",
+        "a_entry_session": "2025-08-04",
+        "b_entry_session": "2025-08-04",
+        "a_exit_session": "2025-08-18",
+        "b_exit_session": "2025-08-18",
+        "a_net_return_pct": 1.9266,
+        "b_net_return_pct": 1.9266,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "dbd8bb5b974bb8b5",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "WAT",
+        "b_symbol": "WAT",
+        "a_entry_session": "2026-03-19",
+        "b_entry_session": "2026-03-19",
+        "a_exit_session": "2026-04-02",
+        "b_exit_session": "2026-04-02",
+        "a_net_return_pct": 3.364,
+        "b_net_return_pct": 3.364,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "dd3361fe50258b6c",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "TKO",
+        "b_symbol": "TKO",
+        "a_entry_session": "2025-03-19",
+        "b_entry_session": "2025-03-19",
+        "a_exit_session": "2025-04-02",
+        "b_exit_session": "2025-04-02",
+        "a_net_return_pct": 8.3493,
+        "b_net_return_pct": 8.3493,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "dd7a9e9629dbcdb3",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "ROP",
+        "b_symbol": "ROP",
+        "a_entry_session": "2025-11-13",
+        "b_entry_session": "2025-11-13",
+        "a_exit_session": "2025-11-28",
+        "b_exit_session": "2025-11-28",
+        "a_net_return_pct": -1.7991,
+        "b_net_return_pct": -1.7991,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "ded03f3f27cbc53f",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "BX",
+        "b_symbol": "BX",
+        "a_entry_session": "2025-11-14",
+        "b_entry_session": "2025-11-14",
+        "a_exit_session": "2025-12-01",
+        "b_exit_session": "2025-12-01",
+        "a_net_return_pct": 5.5618,
+        "b_net_return_pct": 5.5618,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "e99c1293d5d2bd7f",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "TKO",
+        "b_symbol": "TKO",
+        "a_entry_session": "2025-01-23",
+        "b_entry_session": "2025-01-23",
+        "a_exit_session": "2025-02-06",
+        "b_exit_session": "2025-02-06",
+        "a_net_return_pct": 9.4418,
+        "b_net_return_pct": 9.4418,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "eace75d7e8f339f1",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "POOL",
+        "b_symbol": "POOL",
+        "a_entry_session": "2026-03-02",
+        "b_entry_session": "2026-03-02",
+        "a_exit_session": "2026-03-16",
+        "b_exit_session": "2026-03-16",
+        "a_net_return_pct": -5.764,
+        "b_net_return_pct": -5.764,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "eb4bd84e46cdb603",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CSGP",
+        "b_symbol": "CSGP",
+        "a_entry_session": "2026-03-04",
+        "b_entry_session": "2026-03-04",
+        "a_exit_session": "2026-03-18",
+        "b_exit_session": "2026-03-18",
+        "a_net_return_pct": -8.1043,
+        "b_net_return_pct": -8.1043,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "ebaf09cf6ebb65b2",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "LUV",
+        "b_symbol": "LUV",
+        "a_entry_session": "2025-05-01",
+        "b_entry_session": "2025-05-01",
+        "a_exit_session": "2025-05-15",
+        "b_exit_session": "2025-05-15",
+        "a_net_return_pct": 12.8435,
+        "b_net_return_pct": 12.8435,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "ef26b7bc1e086866",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "NCLH",
+        "b_symbol": "NCLH",
+        "a_entry_session": "2025-11-07",
+        "b_entry_session": "2025-11-07",
+        "a_exit_session": "2025-11-21",
+        "b_exit_session": "2025-11-21",
+        "a_net_return_pct": -1.3944,
+        "b_net_return_pct": -1.3944,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "f1146487671063a4",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "UPS",
+        "b_symbol": "UPS",
+        "a_entry_session": "2025-08-04",
+        "b_entry_session": "2025-08-04",
+        "a_exit_session": "2025-08-18",
+        "b_exit_session": "2025-08-18",
+        "a_net_return_pct": 3.0168,
+        "b_net_return_pct": 3.0168,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "f124e730e74a5e98",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "FAST",
+        "b_symbol": "FAST",
+        "a_entry_session": "2025-11-17",
+        "b_entry_session": "2025-11-17",
+        "a_exit_session": "2025-12-02",
+        "b_exit_session": "2025-12-02",
+        "a_net_return_pct": -0.1246,
+        "b_net_return_pct": -0.1246,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "f244cf87f28a3f52",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "ARES",
+        "b_symbol": "ARES",
+        "a_entry_session": "2026-02-25",
+        "b_entry_session": "2026-02-25",
+        "a_exit_session": "2026-03-11",
+        "b_exit_session": "2026-03-11",
+        "a_net_return_pct": -13.0729,
+        "b_net_return_pct": -13.0729,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "f2c20568cd2986a3",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "HBAN",
+        "b_symbol": "HBAN",
+        "a_entry_session": "2026-03-04",
+        "b_entry_session": "2026-03-04",
+        "a_exit_session": "2026-03-18",
+        "b_exit_session": "2026-03-18",
+        "a_net_return_pct": -9.8014,
+        "b_net_return_pct": -9.8014,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "f2dd3e65b6a1a618",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "ABT",
+        "b_symbol": "ABT",
+        "a_entry_session": "2026-02-09",
+        "b_entry_session": "2026-02-09",
+        "a_exit_session": "2026-02-24",
+        "b_exit_session": "2026-02-24",
+        "a_net_return_pct": 3.7441,
+        "b_net_return_pct": 3.7441,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "f6bd417e3367fd80",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "IP",
+        "b_symbol": "IP",
+        "a_entry_session": "2026-02-03",
+        "b_entry_session": "2026-02-03",
+        "a_exit_session": "2026-02-18",
+        "b_exit_session": "2026-02-18",
+        "a_net_return_pct": 18.0899,
+        "b_net_return_pct": 18.0899,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "f7e4801b7ee18cb7",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "CHD",
+        "b_symbol": "CHD",
+        "a_entry_session": "2025-05-15",
+        "b_entry_session": "2025-05-15",
+        "a_exit_session": "2025-05-30",
+        "b_exit_session": "2025-05-30",
+        "a_net_return_pct": 5.2266,
+        "b_net_return_pct": 5.2266,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "f810b7bcde68c49c",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "NTRS",
+        "b_symbol": "NTRS",
+        "a_entry_session": "2026-02-06",
+        "b_entry_session": "2026-02-06",
+        "a_exit_session": "2026-02-23",
+        "b_exit_session": "2026-02-23",
+        "a_net_return_pct": -6.8133,
+        "b_net_return_pct": -6.8133,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "f8587a7f89fe4a0b",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "WYNN",
+        "b_symbol": "WYNN",
+        "a_entry_session": "2025-02-21",
+        "b_entry_session": "2025-02-21",
+        "a_exit_session": "2025-03-07",
+        "b_exit_session": "2025-03-07",
+        "a_net_return_pct": -5.556,
+        "b_net_return_pct": -5.556,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "f8a413ff6ae8169c",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "PODD",
+        "b_symbol": "PODD",
+        "a_entry_session": "2026-02-27",
+        "b_entry_session": "2026-02-27",
+        "a_exit_session": "2026-03-13",
+        "b_exit_session": "2026-03-13",
+        "a_net_return_pct": -11.7759,
+        "b_net_return_pct": -11.7759,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "fa066e4ad27bb109",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "LLY",
+        "b_symbol": "LLY",
+        "a_entry_session": "2025-08-13",
+        "b_entry_session": "2025-08-13",
+        "a_exit_session": "2025-08-27",
+        "b_exit_session": "2025-08-27",
+        "a_net_return_pct": 12.9274,
+        "b_net_return_pct": 12.9274,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "faf62fb7b2668557",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "COO",
+        "b_symbol": "COO",
+        "a_entry_session": "2025-12-17",
+        "b_entry_session": "2025-12-17",
+        "a_exit_session": "2026-01-02",
+        "b_exit_session": "2026-01-02",
+        "a_net_return_pct": -2.0395,
+        "b_net_return_pct": -2.0395,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "fb89c21bd3a97c27",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "SPG",
+        "b_symbol": "SPG",
+        "a_entry_session": "2025-07-02",
+        "b_entry_session": "2025-07-02",
+        "a_exit_session": "2025-07-17",
+        "b_exit_session": "2025-07-17",
+        "a_net_return_pct": -1.2132,
+        "b_net_return_pct": -1.2132,
+        "all_diffs": []
+      }
+    },
+    {
+      "episode_id": "fbde5c985ae8b95b",
+      "status": "UNCHANGED",
+      "detail": {
+        "a_symbol": "MPC",
+        "b_symbol": "MPC",
+        "a_entry_session": "2025-03-14",
+        "b_entry_session": "2025-03-14",
+        "a_exit_session": "2025-03-28",
+        "b_exit_session": "2025-03-28",
+        "a_net_return_pct": 4.7263,
+        "b_net_return_pct": 4.7263,
+        "all_diffs": []
+      }
+    }
+  ]
+}

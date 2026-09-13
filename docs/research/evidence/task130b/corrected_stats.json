@@ -1,0 +1,105 @@
+{
+  "n_closed_trades": 153,
+  "n_distinct_issuers": 106,
+  "gross_mean_pct": 2.2219,
+  "net_mean_pct": 2.0219,
+  "net_median_pct": 1.674,
+  "win_rate": 0.6275,
+  "profit_factor": 2.1399,
+  "meets_primary_criterion_gt_0_50pct": true,
+  "issuer_block_bootstrap": {
+    "n_issuer_blocks": 106,
+    "ci_pct": [
+      0.7222,
+      3.3989
+    ]
+  },
+  "date_block_bootstrap": {
+    "n_date_blocks": 19,
+    "ci_pct": [
+      0.5723,
+      3.4573
+    ]
+  },
+  "original_sensitivity_trade_count_ranked": {
+    "excl_top1": {
+      "n_remaining": 147,
+      "excluded_issuers": [
+        "SPG"
+      ],
+      "mean_net_pct": 2.1629
+    },
+    "excl_top3": {
+      "n_remaining": 139,
+      "excluded_issuers": [
+        "SPG",
+        "TPL",
+        "LUV"
+      ],
+      "mean_net_pct": 1.9907
+    },
+    "excl_top5": {
+      "n_remaining": 131,
+      "excluded_issuers": [
+        "SPG",
+        "TPL",
+        "LUV",
+        "TKO",
+        "IFF"
+      ],
+      "mean_net_pct": 1.9523
+    }
+  },
+  "supplemental_sensitivity_pnl_contribution_ranked_NOT_PREREGISTERED": {
+    "label": "SUPPLEMENTAL completion test (Task 130A), not part of the original Task 130 preregistration",
+    "n_positive_contributors": 69,
+    "excl_top1": {
+      "n_remaining": 152,
+      "excluded_issuers": [
+        "LB"
+      ],
+      "mean_net_pct": 1.7911,
+      "remaining_total_pnl_usd": 27225.35
+    },
+    "excl_top3": {
+      "n_remaining": 146,
+      "excluded_issuers": [
+        "LB",
+        "EL",
+        "LUV"
+      ],
+      "mean_net_pct": 1.456,
+      "remaining_total_pnl_usd": 21256.94
+    },
+    "excl_top5": {
+      "n_remaining": 144,
+      "excluded_issuers": [
+        "LB",
+        "EL",
+        "LUV",
+        "SEDG",
+        "BBWI"
+      ],
+      "mean_net_pct": 1.1421,
+      "remaining_total_pnl_usd": 16445.7
+    }
+  },
+  "calendar_half_year_stability": {
+    "2024H2": {
+      "n": 21,
+      "mean_net_pct": 4.2582
+    },
+    "2025H1": {
+      "n": 47,
+      "mean_net_pct": 2.716
+    },
+    "2025H2": {
+      "n": 52,
+      "mean_net_pct": 2.0948
+    },
+    "2026H1": {
+      "n": 33,
+      "mean_net_pct": -0.5045
+    }
+  }
+}

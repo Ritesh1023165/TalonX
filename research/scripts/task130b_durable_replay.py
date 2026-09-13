@@ -327,6 +327,21 @@ class ReplayDriver:
         })
 
 
+_FORBIDDEN_LIVE_DB_PATHS = {
+    Path("C:/workspace/TalonX/v2_lane.db").resolve(),
+    (Path.home() / ".talonx" / "v2_lane.db").resolve(),
+}
+
+
+def assert_research_ledger_path(db_path: Path) -> None:
+    """Hard refusal to ever open the live production ledger -- same
+    safety contract `talonx_research.replay_engine` already enforces,
+    reproduced here since this driver does not go through that module."""
+    resolved = Path(db_path).resolve()
+    if resolved in _FORBIDDEN_LIVE_DB_PATHS:
+        raise SystemExit(f"REFUSING to open the live V2 ledger path: {resolved}")
+
+
 def run_replay(universe: list[str], db_path: Path, *, skip_fingerprint_check: bool = False,
                bars_override=None, records_override=None) -> ReplayDriver:
     from talonx_research.versioning import v2_fingerprint
@@ -334,6 +349,7 @@ def run_replay(universe: list[str], db_path: Path, *, skip_fingerprint_check: bo
     from talonx_v2.store import V2Store
     import exchange_calendars as xc
 
+    assert_research_ledger_path(db_path)
     fp = v2_fingerprint()
     if not skip_fingerprint_check and fp != EXPECTED_FINGERPRINT:
         raise SystemExit(f"FINGERPRINT MOVED: {fp} -- ABORT")
@@ -371,3 +387,103 @@ def run_replay(universe: list[str], db_path: Path, *, skip_fingerprint_check: bo
                          n_open=driver.store.n_open())
 
     return driver
+
+
+def _closed_trades_for_stats(driver: ReplayDriver) -> list[dict]:
+    """Shapes CLOSED positions from the durable store into the same
+    record shape task130a_identity_and_stats.compute_stats() already
+    consumes (episode_id/symbol/entry_session/exit_session/entry_price/
+    exit_price/shares/notional/gross_return/net_return/net_pnl_usd) --
+    reusing that unmodified stats function rather than re-deriving it."""
+    out = []
+    for p in driver.store.all_positions():
+        if p["status"] != "CLOSED":
+            continue
+        gross = (p["exit_price"] - p["entry_price"]) / p["entry_price"]
+        out.append({
+            "episode_id": p["episode_id"], "symbol": p["symbol"], "issuer_cik": p["issuer_cik"],
+            "entry_session": p["entry_session"], "exit_session": p["exit_session"],
+            "entry_price": p["entry_price"], "exit_price": p["exit_price"], "shares": p["shares"],
+            "notional": p["position_cost"], "gross_return": gross,
+            "net_return": p["realized_pnl_pct"] / 100.0, "net_pnl_usd": p["realized_pnl_usd"],
+        })
+    return sorted(out, key=lambda t: (t["entry_session"], t["symbol"]))
+
+
+def main() -> int:
+    manifest = json.loads((RESEARCH_ROOT / "results/task118_profitability/reconciliation/population_manifest.json").read_text())
+    universe = sorted(manifest["C_full_panel_A_union_B"])
+    db_path = OUT / "task130b_full_replay.db"
+    if db_path.exists():
+        db_path.unlink()  # fresh run every time -- this is a research artifact db, not the live ledger
+
+    driver = run_replay(universe, db_path)
+    closed = _closed_trades_for_stats(driver)
+
+    (OUT / "closed_trades.json").write_text(json.dumps(closed, indent=2, default=str))
+    (OUT / "daily_marks.json").write_text(json.dumps(driver.daily_marks, indent=2, default=str))
+    (OUT / "funnel_counts.json").write_text(json.dumps(driver.funnel, indent=2, default=str))
+    (OUT / "audit_log.json").write_text(json.dumps(driver.audit_log, indent=2, default=str))
+
+    open_at_end = driver.store.open_positions()
+    unresolved_at_end = [p for p in driver.store.all_positions() if p["status"] == "EXIT_UNRESOLVED"]
+
+    # study cutoff vs tail-inclusive equity/drawdown, both series
+    # including STARTING_CASH as their own first observation (Part 8)
+    marks = driver.daily_marks
+    cutoff_marks = [d for d in marks if d["date"] <= str(driver.study_cutoff)]
+
+    def _drawdown_series(mk: list[dict]) -> pd.Series:
+        eq = pd.Series([m["equity"] for m in mk], index=pd.to_datetime([m["date"] for m in mk]))
+        eq_with_start = pd.concat([pd.Series([STARTING_CASH], index=[eq.index[0] - pd.Timedelta(days=1)]), eq])
+        running_max = eq_with_start.cummax()
+        return (eq_with_start - running_max) / running_max
+
+    dd_study = _drawdown_series(cutoff_marks)
+    dd_tail_inclusive = _drawdown_series(marks)
+
+    n_days_with_open_study = sum(1 for d in cutoff_marks if d["n_open"] > 0)
+    # invested-capital / equity exposure: mean cost-basis-of-open-positions
+    # divided by mean equity, over the STUDY window -- distinct from the
+    # simple "% of days with any open position" occupancy metric.
+    mean_equity_study = float(np.mean([d["equity"] for d in cutoff_marks])) if cutoff_marks else STARTING_CASH
+    mean_cost_basis_study = float(np.mean([d["cost_basis_open"] for d in cutoff_marks])) if cutoff_marks else 0.0
+
+    summary = {
+        "window": {"study_start": STUDY_START, "study_end": STUDY_END,
+                   "settlement_tail_sessions": SETTLEMENT_TAIL_SESSIONS},
+        "universe_n": len(universe), "starting_cash": STARTING_CASH, "allocation": ALLOCATION,
+        "max_concurrent": MAX_CONCURRENT,
+        "funnel_counts": driver.funnel, "n_closed_trades": len(closed),
+        "n_open_at_end_of_tail": len(open_at_end),
+        "n_exit_unresolved_at_end_of_tail": len(unresolved_at_end),
+        "open_at_end_of_tail": [{"episode_id": p["episode_id"], "symbol": p["symbol"],
+                                 "entry_session": p["entry_session"]} for p in open_at_end],
+        "exit_unresolved_at_end_of_tail": [{"episode_id": p["episode_id"], "symbol": p["symbol"],
+                                            "entry_session": p["entry_session"]} for p in unresolved_at_end],
+        "equity_and_drawdown": {
+            "study_window_only": {
+                "n_sessions": len(cutoff_marks),
+                "ending_equity_at_study_cutoff": cutoff_marks[-1]["equity"] if cutoff_marks else STARTING_CASH,
+                "n_open_at_study_cutoff": cutoff_marks[-1]["n_open"] if cutoff_marks else 0,
+                "max_drawdown_pct": round(float(dd_study.min() * 100), 4) if len(dd_study) else 0.0,
+                "capital_utilization_pct_days_with_open_position": round(
+                    100 * n_days_with_open_study / len(cutoff_marks), 2) if cutoff_marks else 0.0,
+                "mean_invested_capital_over_mean_equity_pct": round(
+                    100 * mean_cost_basis_study / mean_equity_study, 4) if mean_equity_study else 0.0,
+            },
+            "tail_inclusive": {
+                "n_sessions": len(marks),
+                "ending_equity_after_tail": marks[-1]["equity"] if marks else STARTING_CASH,
+                "n_open_after_tail": marks[-1]["n_open"] if marks else 0,
+                "max_drawdown_pct": round(float(dd_tail_inclusive.min() * 100), 4) if len(dd_tail_inclusive) else 0.0,
+            },
+        },
+    }
+    (OUT / "summary.json").write_text(json.dumps(summary, indent=2, default=str))
+    print(json.dumps(summary, indent=2, default=str))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
