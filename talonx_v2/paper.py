@@ -106,24 +106,30 @@ def enter_position(
 
     target_exit = v2cal.add_sessions(es, cfg.hold_trading_days)
 
-    pos_id = store.insert_open_position(
-        episode_id=decision.episode_id, symbol=sym, issuer_cik=source_meta.get("issuer_cik", "") if source_meta else "",
-        entry_session=es, target_exit_session=target_exit,
-        entry_price=entry_price, shares=shares, position_cost=cost,
-        source_meta=source_meta or {},
-    )
-    store.set_cash(cash - cost)
-    store.append_trade(
-        episode_id=decision.episode_id, symbol=sym, action="BUY",
-        execution_price=entry_price, shares=shares, position_cost=cost,
-        portfolio_cash_after=cash - cost,
-    )
-    store.record_disposition(
-        episode_id=decision.episode_id, symbol=sym, disposition="ENTERED",
-        issuer_cik=source_meta.get("issuer_cik", "") if source_meta else "",
-        eligible_entry_session=es.isoformat(),
-        detail=f"pos={pos_id} shares={shares:.4f} target_exit={target_exit.isoformat()}",
-    )
+    # Task 131 Remediation Directive 4: the position insert, cash debit,
+    # trade record, and disposition write commit TOGETHER, atomically --
+    # a crash between any two of these can no longer leave a position
+    # without its cash debit, a debit without a trade record, or an
+    # ENTERED episode without a position row.
+    with store.transaction():
+        pos_id = store.insert_open_position(
+            episode_id=decision.episode_id, symbol=sym, issuer_cik=source_meta.get("issuer_cik", "") if source_meta else "",
+            entry_session=es, target_exit_session=target_exit,
+            entry_price=entry_price, shares=shares, position_cost=cost,
+            source_meta=source_meta or {},
+        )
+        store.set_cash(cash - cost)
+        store.append_trade(
+            episode_id=decision.episode_id, symbol=sym, action="BUY",
+            execution_price=entry_price, shares=shares, position_cost=cost,
+            portfolio_cash_after=cash - cost,
+        )
+        store.record_disposition(
+            episode_id=decision.episode_id, symbol=sym, disposition="ENTERED",
+            issuer_cik=source_meta.get("issuer_cik", "") if source_meta else "",
+            eligible_entry_session=es.isoformat(),
+            detail=f"pos={pos_id} shares={shares:.4f} target_exit={target_exit.isoformat()}",
+        )
     return EntryOutcome(True, "ENTERED", pos_id, shares, target_exit)
 
 
@@ -149,21 +155,26 @@ def close_position(
     pnl_usd, pnl_pct = calculate_sell_pnl(shares, entry_price, exit_price)
     held = v2cal.trading_days_elapsed(_as_date(position["entry_session"]), es)
 
-    store.close_position(
-        position_id=position["position_id"], exit_session=es, exit_price=exit_price,
-        realized_pnl_usd=pnl_usd, realized_pnl_pct=pnl_pct, trading_days_held=held,
-    )
-    proceeds = shares * exit_price
-    cash_after = store.cash() + proceeds
-    store.set_cash(cash_after)
-    store.append_trade(
-        episode_id=position["episode_id"], symbol=position["symbol"], action="SELL",
-        execution_price=exit_price, shares=shares, position_cost=float(position["position_cost"]),
-        portfolio_cash_after=cash_after, entry_price=entry_price,
-        realized_pnl_usd=pnl_usd, realized_pnl_pct=pnl_pct, trading_days_held=held,
-    )
-    cooldown_until = v2cal.add_sessions(es, cfg.reentry_cooldown_trading_days)
-    store.set_cooldown(position["symbol"], cooldown_until)
+    # Task 131 Remediation Directive 4: close + cash credit + trade record
+    # + cooldown commit together, atomically -- a crash mid-sequence can
+    # no longer leave a closed position without its cash credit, or
+    # credited cash without a trade record.
+    with store.transaction():
+        store.close_position(
+            position_id=position["position_id"], exit_session=es, exit_price=exit_price,
+            realized_pnl_usd=pnl_usd, realized_pnl_pct=pnl_pct, trading_days_held=held,
+        )
+        proceeds = shares * exit_price
+        cash_after = store.cash() + proceeds
+        store.set_cash(cash_after)
+        store.append_trade(
+            episode_id=position["episode_id"], symbol=position["symbol"], action="SELL",
+            execution_price=exit_price, shares=shares, position_cost=float(position["position_cost"]),
+            portfolio_cash_after=cash_after, entry_price=entry_price,
+            realized_pnl_usd=pnl_usd, realized_pnl_pct=pnl_pct, trading_days_held=held,
+        )
+        cooldown_until = v2cal.add_sessions(es, cfg.reentry_cooldown_trading_days)
+        store.set_cooldown(position["symbol"], cooldown_until)
     return ExitOutcome(position["symbol"], position["episode_id"], es, exit_price,
                        pnl_usd, pnl_pct, held)
 

@@ -23,9 +23,22 @@ from talonx_ingest.intelligence.service.watchlist_source import ResolvedSymbol, 
 from datetime import datetime, timezone
 
 
-def _manifest(tmp_path, symbols):
+def _manifest(tmp_path, symbols, *, cik_map: dict[str, int] | None = None):
+    # Task 131 Remediation Directive 6: resolve_broad_discovery reads a
+    # STATIC, VERSIONED cik_manifest block, not a live CikDirectory --
+    # test fixtures build that block directly, matching the real
+    # discovery_universe_v1_626.json's own shape.
+    cik_map = cik_map or {}
+    resolved = {s: {"cik": str(c).zfill(10), "company_name": f"{s} Inc.",
+                    "source": "sec_company_tickers"} for s, c in cik_map.items()}
+    unresolved = [{"symbol": s, "reason": "no_sec_cik_mapping"}
+                 for s in symbols if s not in cik_map]
     p = tmp_path / "manifest.json"
-    p.write_text(json.dumps({"symbols": symbols, "provenance": {}}))
+    p.write_text(json.dumps({
+        "symbols": symbols, "provenance": {},
+        "cik_manifest": {"manifest_version": "CIK_MANIFEST_V1", "resolved": resolved,
+                         "unresolved": unresolved},
+    }))
     return p
 
 
@@ -69,21 +82,23 @@ def test_enabled_unions_the_broad_universe_additively(tmp_path, monkeypatch):
     assert broad_discovery_enabled() is True
     scope = _empty_scope(symbols=("AAPL",))
     directory = _directory({"AAPL": 1, "MSFT": 2, "GOOG": 3, "NVDA": 4})
-    manifest = _manifest(tmp_path, ["AAPL", "MSFT", "GOOG", "NVDA"])  # AAPL already covered
+    manifest = _manifest(tmp_path, ["AAPL", "MSFT", "GOOG", "NVDA"],  # AAPL already covered
+                         cik_map={"AAPL": 1, "MSFT": 2, "GOOG": 3, "NVDA": 4})
     extended, origin = extend_scope_with_broad_discovery(scope, directory, manifest_path=manifest)
     assert set(extended.symbols) == {"AAPL", "MSFT", "GOOG", "NVDA"}
     assert origin["AAPL"] == ORIGIN_PRODUCT_WATCHLIST
     assert origin["MSFT"] == ORIGIN_BROAD_DISCOVERY
     assert origin["GOOG"] == ORIGIN_BROAD_DISCOVERY
     assert origin["NVDA"] == ORIGIN_BROAD_DISCOVERY
-    # every broad-discovery symbol resolved through the SAME CikDirectory
+    # every broad-discovery symbol resolved from the STATIC CIK_MANIFEST_V1
     resolved_syms = {r.symbol for r in extended.resolved}
     assert resolved_syms == {"AAPL", "MSFT", "GOOG", "NVDA"}
+    assert all("CIK_MANIFEST_V1" in r.source for r in extended.resolved if r.symbol != "AAPL")
 
 
 def test_broad_discovery_symbols_unresolvable_in_directory_are_excluded_not_silently_mapped(tmp_path):
-    directory = _directory({"AAPL": 1, "MSFT": 2})  # GOOG missing from directory entirely
-    manifest = _manifest(tmp_path, ["MSFT", "GOOG"])
+    directory = _directory({"AAPL": 1, "MSFT": 2})  # GOOG missing from the static manifest
+    manifest = _manifest(tmp_path, ["MSFT", "GOOG"], cik_map={"MSFT": 2})
     res = resolve_broad_discovery(directory, manifest_path=manifest)
     assert res.universe_n == 2
     resolved_syms = {r.symbol for r in res.resolved}

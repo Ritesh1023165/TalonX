@@ -20,6 +20,36 @@ here as the authorization basis for every change in this document. Real-
 money trading remained explicitly out of scope throughout and was never
 touched.
 
+## HOLD review findings and remediation (commit `58044a6` → this remediation)
+
+A follow-up review issued a HOLD verdict against commit `58044a6` citing
+6 launch-blocking defects. Each was independently verified against the
+actual diff (not taken on faith — one claim, "a syntax error in
+`routing.py`," named the wrong file, but the underlying defect it
+pointed at was real) before any fix was made. Two of the six literal
+remediation instructions, if followed exactly as worded, would have
+introduced real regressions or violated this program's own frozen-
+contract discipline — both are recorded below with what was implemented
+instead and why.
+
+| # | Reviewed finding | Verified? | Fix | Verification proof |
+|---|---|---|---|---|
+| 1 | "Syntax error in `routing.py`: `RoutingDecision.to_dict()` indented inside `broad_discovery_dispatch_enabled()`" | **Confirmed real** (file is actually `talonx_ops/official_dispatch.py`; not a SyntaxError but a structural bug — `to_dict` was unreachable dead code nested inside the toggle function, never callable as an instance method) | Restored `to_dict()` to `RoutingDecision`'s own class body, immediately after `should_send` | `tests/test_routing.py` (7 tests) — `.to_dict()` exercised across every family/origin/toggle combination |
+| 2 | "Remove synchronous `time.sleep()` in `tick()`; implement async `PENDING_RETRY`" | **Confirmed real** (the Task 131 bounded-retry helper could block one `tick()` call for up to 5 minutes) | Removed the blocking retry entirely; `talonx_v2/price_resilience.py` deleted; replaced with a non-blocking, cross-tick retry (intent stays `PENDING`, naturally retried next tick, no sleep). Literal "async event loop" NOT implemented — this codebase has no asyncio anywhere in `talonx_v2`; see the design doc for why an unscoped asyncio rewrite was declined in favor of the equivalent non-blocking behavior | `tests/test_task131_nonblocking_retry.py` (4 tests) — wall-clock-timed proof a missing-price tick completes in <2s, survives 5 same-session ticks, reconciles on late data, escalates exactly once at the next session |
+| 3 | "Store SEC EDGAR dissemination timestamp; enforce `T_dissemination < T_RTH_Open`" | **Confirmed real, and real design constraint discovered while fixing it**: the natural implementation (extend `cluster_engine.PurchaseRecord`/`ClusterEpisode`) breaks the hash-fingerprinted frozen strategy contract | Implemented entirely in `talonx_v2/service.py`: a per-tick dissemination lookup queried directly from InsiderStore, checked before every entry via `_verify_temporal_boundary` | `tests/test_task131_temporal_boundary.py` (4 tests) — a normally-timed filing passes, an anomalously late one is refused end-to-end, a direct unit sweep across the exact boundary, a date-only source no-ops safely |
+| 4 | "Atomic SQLite transactions in `paper.py`; hard reservation gate (`REJECTED_CAPACITY_EXCEEDED`)" | **Confirmed real** (`enter_position`/`close_position` each made 4 separate, independently-committed store calls; `upsert_entry_intent` had no cash/capacity check at all) | `V2Store.transaction()` (reentrant, WAL-active) wraps both sequences; `V2Service._capacity_rejection_reason()` checked before every `upsert_entry_intent` call | `tests/test_task131_atomic_transactions.py` (8 tests) — real temp SQLite file, monkeypatched mid-sequence crash, a fresh store connection shows nothing partial; 21st-slot and over-reserved-cash rejection proven directly |
+| 5 | "Tag SPCX closure `transaction_type='ADMINISTRATIVE_ADJUSTMENT'`; exclude from performance queries" | **Partially as literally worded**: the migration already tagged the row distinctly via the EXISTING `exit_reason` column (`administrative_force_close_task131`) — a new `transaction_type` column would require an `ALTER TABLE` on a live production database for a distinction the schema already supports. The REAL, verified gap: `talonx_ops/paper_performance.py`'s `closed_trades`/`trade_counts`/`realized_pnl` breakdown scanned `trade_history` directly and would have displayed/counted the row as a real trade | Excluded any `exit_reason` starting with `administrative_` from `closed`/`sells`/`realized_sum_check`; reported separately, in full, under a new `administrative_adjustments` key — never silently dropped | `tests/test_task131_admin_adjustment_isolation.py` (2 tests) — a real SPCX-shaped row is excluded from trade counts/P&L cross-check but fully visible under `administrative_adjustments` |
+| 6a | "Feature-flag V2 durable store changes behind `TALONX_V2_DURABLE_STORE_ENABLED`, default False" | **Real requirement, literal scope corrected**: WAL/SQLite durability itself predates Task 131 (Task 110) — defaulting IT off would revert a live system to non-durable state, a regression, not a rollback | The flag instead gates the Task 131 admission-POLICY changes only (prior-intent requirement, hard capacity gate) — OFF reproduces the exact pre-Task-131 permissive policy | `tests/test_task131_remediation_directive6.py` — both flag states proven end-to-end (cold-start entry allowed when OFF, refused when ON) |
+| 6b | "Replace dynamic CIK lookups with a static `CIK_MANIFEST_V1`" | **Real requirement, scope corrected**: replacing the general-purpose `CikDirectory` (used by the primary product watchlist and the identity guard) would be a live-correctness regression (new tickers/renames would silently stop resolving) | A static, versioned `CIK_MANIFEST_V1` was built and embedded in `discovery_universe_v1_626.json` for ONLY the 626-name Discovery Universe v1 population (569/626 resolved from a snapshot; 57 unresolved and reported, not silently dropped) — the primary watchlist and identity guard continue to use the live, dynamic `CikDirectory`, unchanged | `tests/test_task131_remediation_directive6.py::test_real_manifest_carries_a_valid_static_cik_manifest_v1` — resolves the full population with zero network/CikDirectory calls |
+
+A genuine, unplanned 7th finding surfaced only while fixing #3: reverting
+`cluster_engine.py` via `git checkout --` silently corrupted the frozen
+strategy fingerprint via this machine's `core.autocrlf=true` line-ending
+conversion (LF → CRLF), even though `git diff` showed no differences.
+Caught immediately by the existing fingerprint test suite
+(`test_task114_prospective.py` et al.), root-caused, and fixed by
+restoring the exact blob bytes directly. See the design document.
+
 ## Traceability matrix
 
 | Source finding | Task | Exact gap | Task 131 resolution | File(s) : line(s) |
@@ -116,6 +146,53 @@ touched.
   `tests/test_task131_broad_discovery_dispatch.py` (5),
   `tests/test_task131_dashboard_broad_discovery.py` (5) — 17 new tests,
   all passing.
-- No commit has been made to `feature/task131-option-a-integration` as
-  of this document; the branch has not been pushed or merged toward
-  `main`/`release` at any point in this task.
+- Task 131's original integration work was committed and pushed at
+  `58044a6` (superseding the "no commit yet" statement above, which
+  described the state at the time it was originally written).
+
+## Remediation runtime provenance log (this pass, on top of `58044a6`)
+
+- Baseline verified: `feature/task131-option-a-integration` at `58044a6`
+  (clean, matches `origin`), on top of release `f2898699` (still
+  untouched, still clean).
+- Fixed, in order: (1) `RoutingDecision.to_dict()` restored to the class
+  body; (2) blocking retry removed from `tick()`,
+  `talonx_v2/price_resilience.py` deleted, replaced by the non-blocking
+  `PENDING_RETRY` model; (3) the temporal dissemination boundary
+  implemented entirely in `talonx_v2/service.py` after an initial
+  `cluster_engine.py` attempt was reverted for breaking the frozen
+  strategy fingerprint (and a line-ending self-corruption from that
+  revert was found and fixed); (4) `V2Store.transaction()` (reentrant)
+  + `paper.py` atomic writes + the hard capacity-reservation gate at
+  intent creation; (5) administrative-adjustment exclusion in
+  `talonx_ops/paper_performance.py`; (6) the
+  `TALONX_V2_DURABLE_STORE_ENABLED` flag (default False, gating the
+  admission-policy changes only) and the static `CIK_MANIFEST_V1` for
+  the 626-name Discovery Universe v1 population.
+- New test files: `tests/test_routing.py` (7),
+  `tests/test_task131_nonblocking_retry.py` (4),
+  `tests/test_task131_temporal_boundary.py` (4),
+  `tests/test_task131_atomic_transactions.py` (8),
+  `tests/test_task131_admin_adjustment_isolation.py` (2),
+  `tests/test_task131_remediation_directive6.py` (5) — 30 new tests, all
+  passing.
+- `tests/conftest.py` now sets `TALONX_V2_DURABLE_STORE_ENABLED=true` as
+  the TEST SUITE's own default (`os.environ.setdefault`) — the corrected
+  policy is what the existing V2Service test suite is written to
+  exercise; `V2Service`'s own runtime default (outside pytest, no env
+  override) remains `False`, per the literal remediation requirement.
+- 5 existing test files were updated for the SAME reason as the original
+  integration's own cold-start-gate change (no new behavior beyond what
+  `58044a6` already introduced, just fixture adjustments where a test
+  fixture happened to construct data for the OLD manifest shape or the
+  new field additions): `tests/test_task131_broad_discovery.py` (2
+  tests, `cik_manifest` fixture data added to match the Directive 6
+  static-manifest change).
+- Full repository test suite run after all remediation changes:
+  **4 failed, 4614 passed, 6 skipped** (52m03s) — the SAME 4 pre-existing,
+  verified-unrelated failures as every prior baseline in this task
+  (`test_task102_operational_finalization.py::test_36_original_strategy_unchanged`,
+  `test_task104_p2_cleanup.py::test_32_33_original_strategy_and_thresholds_unchanged`,
+  `test_task117_release_rehearsal.py::test_bounded_release_rehearsal`,
+  `test_task118a_dashboard_message_count.py::test_immediate_and_digest_sends_count_messages_correctly`)
+  — zero new regressions from this remediation.

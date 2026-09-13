@@ -62,6 +62,14 @@ class RoutingDecision:
     def should_send(self) -> bool:
         return self.eligible and not self.already_delivered
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "family": self.family, "eligible": self.eligible,
+            "already_delivered": self.already_delivered, "path": self.path,
+            "reason": self.reason, "should_send": self.should_send,
+            "origin": self.origin,
+        }
+
 
 # Task 131 Directive 5: an explicit, env-driven, OFF-by-default toggle. A
 # BROAD_DISCOVERY-origin alert (Task 131 Directive 4's expanded SEC-
@@ -78,13 +86,6 @@ def broad_discovery_dispatch_enabled() -> bool:
     import os
     return os.environ.get("TALONX_DISPATCH_ENABLE_BROAD_DISCOVERY", "").strip().lower() in (
         "1", "true", "yes", "on")
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "family": self.family, "eligible": self.eligible,
-            "already_delivered": self.already_delivered, "path": self.path,
-            "reason": self.reason, "should_send": self.should_send,
-        }
 
 
 def _ro(path: Path) -> sqlite3.Connection | None:

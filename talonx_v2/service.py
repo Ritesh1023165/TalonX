@@ -40,6 +40,14 @@ HEARTBEAT_TTL_S = 180
 HEARTBEAT_SECONDS_DEFAULT = 30
 
 
+def _env_flag(name: str, *, default: bool) -> bool:
+    import os
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
 class V2SourceError(RuntimeError):
     """The configured live Form-4 source (InsiderStore) could not be read.
 
@@ -60,9 +68,6 @@ class V2Service:
                  pricing_mode: str = "csv",
                  router=None, transport=None, deliver: bool = False,
                  execution_allowlist: list[str] | None = None,
-                 price_retry_max_wait_seconds: float = 300.0,
-                 price_retry_poll_interval_seconds: float = 15.0,
-                 price_retry_sleep_fn=None, price_retry_time_fn=None,
                  broad_discovery_symbols: list[str] | None = None):
         self.cfg = config
         self.cfg.validate_frozen()
@@ -126,14 +131,30 @@ class V2Service:
             "records": 0, "since": None, "causal_cutoff": None,
             "last_ok_utc": None, "error": None,
         }
-        # Task 131 Directive 3: bounded missing-price retry, live ticks only
-        # (a pinned as_of replay/test tick never waits a real wall-clock
-        # second -- see _resilient_price_lookup).
-        self.price_retry_max_wait_seconds = price_retry_max_wait_seconds
-        self.price_retry_poll_interval_seconds = price_retry_poll_interval_seconds
-        self._price_retry_sleep_fn = price_retry_sleep_fn
-        self._price_retry_time_fn = price_retry_time_fn
-        self._price_retry_outcomes: list[dict] = []
+        # Task 131 Remediation Directive 2: missing-price handling is a
+        # non-blocking, cross-tick PENDING_RETRY state -- never a
+        # time.sleep loop inside tick(). See _phase_open.
+        self._pending_retry_episodes: list[dict] = []
+        # Task 131 Remediation Directive 3: (symbol, filing_date_iso) ->
+        # latest real wall-clock dissemination timestamp observed this
+        # tick. Empty for a date-only source (parquet) or before the
+        # first successful "insider" tick -- _verify_temporal_boundary
+        # treats a missing entry as "unknown, skip the check", never a
+        # fabricated pass or fail.
+        self._dissemination_lookup: dict[tuple[str, str], datetime] = {}
+        self._capacity_rejected = 0
+        # Task 131 Remediation Directive 6: the Task 131 durable-lifecycle
+        # RUNTIME BEHAVIOR changes (requiring a durable PENDING intent
+        # before any entry -- no cold-start backfill -- and the hard
+        # capacity-reservation gate at intent-creation time) are gated
+        # behind this explicit, OFF-by-default flag. This does NOT gate
+        # WAL/SQLite durability itself (V2Store has used WAL since Task
+        # 110, predating this integration entirely, and reverting that
+        # would be a real regression, not a safety rollback) -- only the
+        # NEW admission-policy behavior this integration introduces. OFF
+        # (default) reproduces the exact pre-Task-131 permissive entry
+        # policy; ON enables the corrected, gated policy.
+        self.durable_store_gate_enabled = _env_flag("TALONX_V2_DURABLE_STORE_ENABLED", default=False)
         self._no_prior_intent_skipped = 0
         # Task 131 Directive 5: symbols whose alerts should be tagged
         # BROAD_DISCOVERY origin for the dispatcher's own, independent
@@ -177,40 +198,19 @@ class V2Service:
         return None
 
     def _resilient_price_lookup(self, *, live: bool):
-        """Price-lookup callable for this tick's entry/exit resolution
-        (Task 131 Directive 3). In a TRUE live tick (``live=True``, i.e.
-        this ``tick()`` call's own ``as_of`` was None -- the real wall
-        clock), a missing bar is retried in a bounded, idempotent loop
-        (up to ``price_retry_max_wait_seconds``, default 5 minutes) --
-        the market-data feed may simply not have published yet. A pinned
-        replay/dry-run/test tick (``live=False``) NEVER retries: its
-        clock is simulated, its price coverage either exists or it
-        doesn't, and a real ``time.sleep`` inside a deterministic replay
-        would be both meaningless and slow."""
-        if not live:
-            return self._price
+        """Price-lookup callable for this tick's entry/exit resolution.
 
-        from talonx_v2.price_resilience import fetch_price_with_bounded_retry
-
-        def _lookup(sym: str, session: date) -> dict | None:
-            first = self._price(sym, session)
-            if first:
-                return first
-            kwargs = {"max_wait_seconds": self.price_retry_max_wait_seconds,
-                     "poll_interval_seconds": self.price_retry_poll_interval_seconds,
-                     "context": f"{sym}@{session}"}
-            if self._price_retry_sleep_fn is not None:
-                kwargs["sleep_fn"] = self._price_retry_sleep_fn
-            if self._price_retry_time_fn is not None:
-                kwargs["time_fn"] = self._price_retry_time_fn
-            outcome = fetch_price_with_bounded_retry(lambda: self._price(sym, session), **kwargs)
-            self._price_retry_outcomes.append({
-                "symbol": sym, "session": str(session), "attempts": outcome.attempts,
-                "elapsed_seconds": round(outcome.elapsed_seconds, 2), "succeeded": outcome.succeeded,
-            })
-            return outcome.price
-
-        return _lookup
+        Task 131 Remediation Directive 2: this makes EXACTLY ONE, non-
+        blocking attempt per tick -- never a ``time.sleep`` loop inside
+        ``tick()``. A missing price on a live tick is NOT immediately
+        terminal (see ``_phase_open``'s ``PENDING_RETRY`` handling below):
+        the SAME intent is simply re-attempted, at zero extra cost, on
+        the service's own next natural tick (already a non-blocking
+        cadence -- ``run()``'s own inter-tick wait, unchanged). This
+        replaces the earlier bounded in-tick retry loop (which could
+        block the entire service, including due-exit processing for
+        OTHER positions, for up to 5 minutes on one missing price)."""
+        return self._price
 
     # ---- form4 source ----
     def _records(self, *, as_of: date):
@@ -231,6 +231,7 @@ class V2Service:
                 from talonx_ingest.intelligence.insider.store import InsiderStore
                 st = InsiderStore()  # default ingestion_ledger.db (read side)
                 recs = form4_source.from_insider_store(st, since=since, causal_cutoff=cutoff)
+                self._refresh_dissemination_lookup(st, since=since, causal_cutoff=cutoff)
             except Exception as exc:  # noqa: BLE001
                 self._source_state.update(actual="insider", ok=False, records=0, error=repr(exc))
                 logger.error("live Form-4 source (InsiderStore) unavailable: %r -- NOT "
@@ -242,6 +243,9 @@ class V2Service:
             return recs
 
         # form4_kind == "parquet": EXPLICIT offline / replay selection only.
+        # A date-only source has no real wall-clock dissemination timestamp
+        # -- the lookup is explicitly empty (never fabricated).
+        self._dissemination_lookup = {}
         recs = form4_source.from_research_parquet(self.form4_parquet, since=since)
         recs = self._apply_execution_allowlist(recs, stage="records")
         self._source_state.update(
@@ -249,6 +253,39 @@ class V2Service:
             last_ok_utc=datetime.now(timezone.utc).isoformat(),
             note="OFFLINE research parquet -- explicit --form4-source parquet (NOT live)")
         return recs
+
+    def _refresh_dissemination_lookup(self, insider_store, *, since: date,
+                                      causal_cutoff: datetime) -> None:
+        """Task 131 Remediation Directive 3: the REAL SEC EDGAR wall-clock
+        dissemination timestamp for every open-market (code P) transaction
+        currently in this tick's own causal window, keyed by
+        ``(symbol, filing_date_iso)`` -> the LATEST ``accepted_at_utc``
+        observed for that issuer/day (a conservative choice -- using the
+        latest, not earliest, never UNDER-estimates how late information
+        became available). Queried directly against the SAME InsiderStore
+        ``_records()`` already reads from -- a separate, lightweight local
+        SQLite read, not a new network call. Entirely contained in this
+        operational module; the frozen cluster_engine.PurchaseRecord/
+        ClusterEpisode shapes are never touched."""
+        from talonx_ingest.intelligence.insider.domain import TransactionClass
+        lookup: dict[tuple[str, str], datetime] = {}
+        try:
+            txns = insider_store.query_transactions(
+                classification=TransactionClass.OPEN_MARKET_PURCHASE,
+                since=since, causal_cutoff=causal_cutoff, newest_first=False)
+        except Exception:  # noqa: BLE001 -- best-effort; the boundary check simply no-ops without it
+            logger.exception("dissemination_lookup_refresh_failed")
+            self._dissemination_lookup = {}
+            return
+        for t in txns:
+            if not t.symbol or not t.accepted_at_utc:
+                continue
+            fd = t.filing_date or t.accepted_at_utc.date()
+            key = (t.symbol.upper(), fd.isoformat())
+            prev = lookup.get(key)
+            if prev is None or t.accepted_at_utc > prev:
+                lookup[key] = t.accepted_at_utc
+        self._dissemination_lookup = lookup
 
     def _apply_execution_allowlist(self, items, *, stage: str):
         """Drop anything whose issuer symbol is not in the approved execution
@@ -291,7 +328,8 @@ class V2Service:
         self._stale_skipped = 0
         self._allowlist_dropped = 0
         self._no_prior_intent_skipped = 0
-        self._price_retry_outcomes = []
+        self._pending_retry_episodes = []
+        self._capacity_rejected = 0
 
         # Task 117 overnight P3: an unavailable Form-4 SOURCE blocks NEW
         # event-based entries/intents -- but it must NOT block due-exit
@@ -325,7 +363,7 @@ class V2Service:
 
         # --- PHASE OPEN ------------------------------------------------
         self._phase_open(ripe_attemptable, ripe_through, res, price_lookup=price_lookup,
-                         today=today, live=live)
+                         today=today)
 
         # --- PHASE CLOSE -------------------------------------------------
         self._phase_close(ripe_through, res, price_lookup=price_lookup)
@@ -358,7 +396,7 @@ class V2Service:
         return status
 
     def _phase_open(self, episodes: list, ripe_through: date, res, *, price_lookup,
-                    today: date, live: bool) -> None:
+                    today: date) -> None:
         """Resolve entries ONLY for episodes carrying an existing durable
         PENDING intent (necessarily created by an EARLIER tick's own
         POST-CLOSE pass -- intent creation only ever targets a FUTURE
@@ -369,9 +407,10 @@ class V2Service:
         corrected Task 130A/130B research contract) instead of the
         previous permissive cold-start-backfill behaviour."""
         no_prior = 0
+        gate_enabled = self.durable_store_gate_enabled
         for ep in episodes:
             intent = self.store.entry_intent(ep.episode_id)
-            if intent is None or intent["status"] != "PENDING":
+            if gate_enabled and (intent is None or intent["status"] != "PENDING"):
                 # the intent-creation window (PHASE POST-CLOSE, below) stays
                 # open THROUGH the eligible entry session itself (today <=
                 # eligible), so an episode whose entry session is TODAY may
@@ -387,10 +426,35 @@ class V2Service:
                         eligible_entry_session=ep.eligible_entry_session.isoformat(),
                         detail="no durable PENDING intent existed before this tick's OPEN "
                                "phase, and the intent-creation window has closed -- a "
-                               "cold-start entry is never admitted (Task 131 Directive 2)")
+                               "cold-start entry is never admitted (Task 131 Directive 2; "
+                               "TALONX_V2_DURABLE_STORE_ENABLED=true)")
                 no_prior += 1
                 continue
+            # gate_enabled=False (the current default): pre_intent may be
+            # None (a genuine cold-start backfill) -- reproducing the
+            # EXACT pre-Task-131 permissive policy, unchanged, until an
+            # operator explicitly opts into the corrected one.
             pre_intent = intent
+            # Task 131 Remediation Directive 3: an explicit, enforced check
+            # (never merely assumed) that this episode's own activating
+            # filing was disseminated BEFORE its entry session's own RTH
+            # open. Given the frozen entry_offset_sessions=1 contract this
+            # should always hold structurally -- but it is verified here,
+            # not just implied, and a violation refuses the entry outright
+            # rather than silently proceeding on stale timing assumptions.
+            boundary_ok, boundary_detail = self._verify_temporal_boundary(ep)
+            if not boundary_ok:
+                self.store.record_disposition(
+                    episode_id=ep.episode_id, symbol=ep.symbol,
+                    disposition="SKIPPED_TEMPORAL_BOUNDARY_VIOLATION", issuer_cik=ep.issuer_cik,
+                    eligible_entry_session=ep.eligible_entry_session.isoformat(),
+                    detail=boundary_detail)
+                self.store.mark_entry_intent(
+                    pre_intent["intent_id"], "REJECTED_TEMPORAL_BOUNDARY_VIOLATION",
+                    detail=boundary_detail)
+                logger.error("temporal_boundary_violation episode_id=%s symbol=%s detail=%s",
+                            ep.episode_id, ep.symbol, boundary_detail)
+                continue
             n_before = len(res.entries)
             n_skipped_before = len(res.skipped)
             # one noisy symbol must not starve the rest of the tick (Task 117
@@ -406,29 +470,41 @@ class V2Service:
             if len(res.entries) > n_before:
                 self._on_entry_recorded(ep, res.entries[-1], pre_intent, ripe_through)
                 continue
-            # Task 131 Directive 3: the bounded retry already ran INSIDE
-            # price_lookup above, but ONLY for a true LIVE tick. In a
-            # pinned replay/dry-run/test tick (live=False) a missing entry
-            # bar is left exactly as process_episode's own non-terminal
-            # SKIPPED_NO_ENTRY_BAR -- the intent stays PENDING and is
-            # retried naturally on a later tick, unchanged from the
-            # pre-131 behaviour (a replay's own price coverage is a fixed,
-            # known fact, not a transient outage to escalate). Only a true
-            # live tick, where the bounded retry genuinely ran and still
-            # found nothing, releases the intent as FAILED_NO_MARKET_DATA.
             new_skips = res.skipped[n_skipped_before:]
-            if live and any(s.get("reason") == "NO_ENTRY_BAR" for s in new_skips):
-                self.store.record_disposition(
-                    episode_id=ep.episode_id, symbol=ep.symbol,
-                    disposition="FAILED_NO_MARKET_DATA", issuer_cik=ep.issuer_cik,
-                    eligible_entry_session=ep.eligible_entry_session.isoformat(),
-                    detail="no entry bar observed even after the bounded market-data "
-                           "retry window -- intent released, not silently retried forever")
-                self.store.mark_entry_intent(
-                    pre_intent["intent_id"], "FAILED_NO_MARKET_DATA",
-                    detail="market data unavailable for the full bounded retry window")
-                self._enqueue_alert(kind="ENTRY_FAILED_NO_DATA", episode=ep, decision=None,
-                                    intent=pre_intent, extra={"released": True})
+            if not any(s.get("reason") == "NO_ENTRY_BAR" for s in new_skips):
+                continue
+            # Task 131 Remediation Directive 2: a missing entry bar is NOT
+            # immediately escalated -- the durable PENDING intent is left
+            # exactly as is (never touched, never blocked-on with a sleep)
+            # and this episode is surfaced as PENDING_RETRY for this tick's
+            # observability. Because the intent stays 'PENDING' in the
+            # store, phase_open will naturally re-attempt it on the very
+            # next tick -- a non-blocking, zero-extra-cost retry driven by
+            # the service's own existing tick cadence, not an in-call
+            # sleep loop. The intent is retained through the FULL RTH
+            # session window for its own eligible_entry_session (today's
+            # own trading day) -- only once a LATER tick observes that the
+            # target session's own day has fully passed with no price ever
+            # found is the miss escalated to a terminal FAILED_NO_MARKET_DATA
+            # (released exactly once).
+            if ripe_through <= ep.eligible_entry_session:
+                self._pending_retry_episodes.append({
+                    "episode_id": ep.episode_id, "symbol": ep.symbol,
+                    "eligible_entry_session": ep.eligible_entry_session.isoformat(),
+                })
+                continue
+            self.store.record_disposition(
+                episode_id=ep.episode_id, symbol=ep.symbol,
+                disposition="FAILED_NO_MARKET_DATA", issuer_cik=ep.issuer_cik,
+                eligible_entry_session=ep.eligible_entry_session.isoformat(),
+                detail=f"no entry bar observed through the end of the eligible entry "
+                       f"session's own RTH window ({ep.eligible_entry_session.isoformat()}) "
+                       f"-- intent released, not silently retried forever")
+            self.store.mark_entry_intent(
+                pre_intent["intent_id"], "FAILED_NO_MARKET_DATA",
+                detail="market data unavailable through the full RTH session window")
+            self._enqueue_alert(kind="ENTRY_FAILED_NO_DATA", episode=ep, decision=None,
+                                intent=pre_intent, extra={"released": True})
         self._no_prior_intent_skipped = no_prior
 
     def _phase_close(self, ripe_through: date, res, *, price_lookup) -> None:
@@ -502,6 +578,22 @@ class V2Service:
                 continue
             liq, dec = self._eval_causal_decision(e)
             if dec.action is V2Action.BUY:
+                # Task 131 Remediation Directive 4: a HARD admission gate
+                # at intent-creation time, not merely at consumption --
+                # cash/capacity are reserved by a PENDING intent the
+                # instant it is written, so a reservation must never be
+                # created if there is not truly enough unreserved cash/
+                # slots to eventually honour it. Checked BEFORE the
+                # intent row is written -- never rejected after the fact.
+                reject_reason = self._capacity_rejection_reason() if self.durable_store_gate_enabled else None
+                if reject_reason is not None:
+                    self.store.record_disposition(
+                        episode_id=e.episode_id, symbol=e.symbol,
+                        disposition="REJECTED_CAPACITY_EXCEEDED", issuer_cik=e.issuer_cik,
+                        eligible_entry_session=e.eligible_entry_session.isoformat(),
+                        detail=reject_reason)
+                    self._capacity_rejected += 1
+                    continue
                 try:
                     planned_exit = add_sessions(e.eligible_entry_session,
                                                 self.cfg.hold_trading_days).isoformat()
@@ -563,6 +655,61 @@ class V2Service:
         sig = quant_bridge.build_signal(ep, liq, config=self.cfg)
         return liq, brain_bridge.contextualize(sig)
 
+    def _capacity_rejection_reason(self) -> str | None:
+        """Task 131 Remediation Directive 4: the hard admission gate at
+        intent-CREATION time. A PENDING intent reserves $10,000 (the
+        configured per-position allocation) and one slot the instant it
+        exists -- so this checks TRUE unreserved cash/capacity (current
+        cash/open-position-count MINUS every currently-PENDING intent's
+        own reservation), never just the raw store.cash()/n_open() a
+        moment before consumption. Returns None when there IS room,
+        otherwise an explicit, loggable reason."""
+        pending = self.store.pending_entry_intents()
+        reserved_cash = self.cfg.per_position_allocation_usd * len(pending)
+        reserved_slots = len(pending)
+        available_cash = self.store.cash() - reserved_cash
+        available_slots = self.cfg.max_concurrent_positions - self.store.n_open() - reserved_slots
+        if available_cash < self.cfg.per_position_allocation_usd:
+            return (f"unreserved cash ${available_cash:,.2f} < required "
+                   f"${self.cfg.per_position_allocation_usd:,.2f} "
+                   f"(cash=${self.store.cash():,.2f}, {len(pending)} intent(s) already "
+                   f"reserving ${reserved_cash:,.2f})")
+        if available_slots <= 0:
+            return (f"no unreserved capacity slots -- open={self.store.n_open()} + "
+                   f"pending_intents={reserved_slots} >= max={self.cfg.max_concurrent_positions}")
+        return None
+
+    def _verify_temporal_boundary(self, ep) -> tuple[bool, str]:
+        """Task 131 Remediation Directive 3: explicit, enforced check that
+        ``ep``'s own activating filing was disseminated strictly BEFORE its
+        entry session's own RTH open -- never merely assumed from the
+        frozen entry_offset_sessions=1 contract. The real wall-clock
+        timestamp is looked up from ``self._dissemination_lookup``
+        (refreshed each tick directly from InsiderStore -- see
+        ``_refresh_dissemination_lookup``); this method and its lookup
+        table live entirely in this operational module and never touch
+        the frozen cluster_engine.PurchaseRecord/ClusterEpisode shapes.
+        Skips the check (returns ok) when the real wall-clock timestamp is
+        unknown (date-only sources -- research parquet / from_rows, or no
+        matching row this tick) rather than fabricating one; the
+        DATE-level causal_event_ts / eligible_entry_session ordering is
+        itself still enforced structurally by cluster_engine regardless
+        of whether this finer check can run."""
+        ts = self._dissemination_lookup.get((ep.symbol.upper(), ep.activation_filing_date.isoformat()))
+        if ts is None:
+            return True, ""
+        try:
+            import exchange_calendars as _xc
+            rth_open = _xc.get_calendar("XNYS").session_open(
+                ep.eligible_entry_session.isoformat()).to_pydatetime().astimezone(timezone.utc)
+        except Exception as exc:  # noqa: BLE001 -- cannot resolve the session open; fail SAFE (refuse)
+            return False, f"could not resolve RTH open for {ep.eligible_entry_session.isoformat()}: {exc!r}"
+        if ts >= rth_open:
+            return False, (f"activation filing disseminated at {ts.isoformat()}, which is NOT "
+                           f"strictly before the entry session's own RTH open "
+                           f"({rth_open.isoformat()}) -- refusing to prevent look-ahead bias")
+        return True, ""
+
     def _enqueue_alert(self, *, kind: str, episode, decision, intent, extra: dict | None = None):
         import hashlib
         extra = extra or {}
@@ -615,10 +762,10 @@ class V2Service:
         elif kind == "ENTRY_FAILED_NO_DATA":
             headline = f"INSIDER BUY CLUSTER — market data unavailable — {sym}"
             body = (f"The planned {sym} paper entry for {episode.eligible_entry_session.isoformat()} "
-                    f"could not be filled: no entry bar was observed for the full bounded "
-                    f"market-data retry window (up to {self.price_retry_max_wait_seconds:.0f}s). "
-                    "The reservation was released; no position opened. Informational only "
-                    "(Task 131 Directive 3).")
+                    f"could not be filled: no entry bar was ever observed through the end of "
+                    f"that session's own RTH window, despite non-blocking retries on every "
+                    f"intervening tick. The reservation was released; no position opened. "
+                    "Informational only (Task 131 Remediation Directive 2).")
         else:  # ENTRY_STALE
             headline = f"INSIDER BUY CLUSTER — entry expired — {sym}"
             body = (f"The planned {sym} paper entry for {episode.eligible_entry_session.isoformat()} "
@@ -723,11 +870,13 @@ class V2Service:
             "ripe_episodes_this_tick": n_ripe,
             "stale_entry_skipped_this_tick": getattr(self, "_stale_skipped", 0),
             "no_prior_intent_skipped_this_tick": getattr(self, "_no_prior_intent_skipped", 0),
+            "capacity_rejected_this_tick": getattr(self, "_capacity_rejected", 0),
             "entries_this_tick": len(res.entries),
             "exits_this_tick": len(res.exits),
-            # Task 131 Directive 3: bounded missing-price retry observability
-            "price_retry_max_wait_seconds": self.price_retry_max_wait_seconds,
-            "price_retry_outcomes_this_tick": getattr(self, "_price_retry_outcomes", []),
+            # Task 131 Remediation Directive 2: non-blocking, cross-tick
+            # missing-price retry observability -- never a blocking sleep.
+            "pending_retry_episodes_this_tick": getattr(self, "_pending_retry_episodes", []),
+            "pending_retry_count_this_tick": len(getattr(self, "_pending_retry_episodes", [])),
             # Task 131 Directive 2/8: lightweight per-position daily mark
             "open_position_marks": marks or [],
             # execution scope enforcement (Task 117 final activation)

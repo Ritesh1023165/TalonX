@@ -65,6 +65,25 @@ RECOVERY_AFFECTED_EVIDENCE_NOTE = (
 )
 
 # --------------------------------------------------------------------------- #
+# Administrative-adjustment isolation (Task 131 Remediation Directive 5).
+# A one-time, backed-up, idempotent migration
+# (scripts/migrations/task131_close_stranded_spcx.py) administratively
+# closed a stranded SPCX position at its own entry price (zero fabricated
+# P&L, no market outcome invented) -- this is NOT a trading decision or
+# outcome and must never be counted as one. The existing trade_history
+# schema already carries a distinguishing marker for it (`exit_reason`),
+# so no new column/migration is introduced; this prefix convention lets
+# any FUTURE administrative closure be tagged and excluded the same way.
+# `portfolio_state.win_count`/`loss_count`/`total_realized_pnl_usd` were
+# deliberately NOT incremented by that migration, so the PRIMARY
+# get_portfolio_summary()-style win-rate is already unaffected -- this
+# constant closes the SEPARATE, real gap found in THIS module: the
+# per-trade `closed_trades`/`trade_counts` breakdown below scans
+# trade_history directly and would otherwise display/count that row as
+# if it were a real trade.
+ADMINISTRATIVE_ADJUSTMENT_EXIT_REASON_PREFIX = "administrative_"
+
+# --------------------------------------------------------------------------- #
 # Cost treatment (Task 119A A2 correction) -- Task 119 originally labelled
 # every lane's costs "UNMODELED," which was WRONG for Original/Experimental:
 # talonx_paper/engine.py's apply_spread() DOES simulate a bid-ask spread
@@ -374,11 +393,25 @@ def _lane_paper_snapshot(
                 else "open position, exit policy thresholds not recorded on this row")
             open_detail.append(entry)
 
-        closed = _qall(con, "SELECT id, ticker, order_type, execution_price, shares, position_cost, "
-                            "entry_price, realized_pnl_usd, realized_pnl_pct, exit_reason, "
-                            "holding_duration_seconds, portfolio_cash_after, timestamp "
-                            "FROM trade_history WHERE order_type='SELL' ORDER BY id") \
+        all_sell_rows = _qall(con, "SELECT id, ticker, order_type, execution_price, shares, position_cost, "
+                                   "entry_price, realized_pnl_usd, realized_pnl_pct, exit_reason, "
+                                   "holding_duration_seconds, portfolio_cash_after, timestamp "
+                                   "FROM trade_history WHERE order_type='SELL' ORDER BY id") \
             if _has_table(con, "trade_history") else []
+        # Task 131 Remediation Directive 5: an administrative closure (see
+        # ADMINISTRATIVE_ADJUSTMENT_EXIT_REASON_PREFIX above) is not a
+        # trading outcome -- excluded from closed/sells/realized_sum_check
+        # below, but never silently dropped: reported separately, in full.
+        closed = [r for r in all_sell_rows
+                 if not str(r["exit_reason"] or "").startswith(ADMINISTRATIVE_ADJUSTMENT_EXIT_REASON_PREFIX)]
+        administrative_adjustments = [
+            {"symbol": r["ticker"], "trade_history_id": r["id"], "exit_reason": r["exit_reason"],
+             "realized_pnl_usd": r["realized_pnl_usd"], "timestamp": r["timestamp"],
+             "note": "administrative adjustment -- excluded from trading performance metrics "
+                    "(win rate, profit factor, net expectancy, trade counts)"}
+            for r in all_sell_rows
+            if str(r["exit_reason"] or "").startswith(ADMINISTRATIVE_ADJUSTMENT_EXIT_REASON_PREFIX)
+        ]
         closed_detail = []
         realized_sum_check = 0.0
         for r in closed:
@@ -440,6 +473,11 @@ def _lane_paper_snapshot(
                 "detail": open_detail,
             },
             "closed_trades": closed_detail,
+            # Task 131 Remediation Directive 5: administrative closures
+            # (e.g. the SPCX stranded-position cleanup) are NEVER counted
+            # as trading outcomes above -- reported separately here,
+            # never silently discarded.
+            "administrative_adjustments": administrative_adjustments,
             "trade_counts": {
                 "entries_today": entries_today, "exits_today": exits_today,
                 "entries_campaign_to_date": len(buys), "exits_campaign_to_date": len(sells),

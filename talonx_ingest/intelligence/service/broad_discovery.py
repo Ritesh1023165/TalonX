@@ -66,6 +66,14 @@ def load_discovery_universe_v1(path: Path | None = None) -> tuple[str, ...]:
     return tuple(sorted({s.strip().upper() for s in data.get("symbols", []) if s.strip()}))
 
 
+def _load_cik_manifest(path: Path | None = None) -> dict:
+    p = path or DEFAULT_MANIFEST_PATH
+    if not p.is_file():
+        return {}
+    data = json.loads(p.read_text(encoding="utf-8"))
+    return data.get("cik_manifest", {})
+
+
 @dataclass(frozen=True)
 class BroadDiscoveryResolution:
     universe_n: int
@@ -74,27 +82,40 @@ class BroadDiscoveryResolution:
 
 
 def resolve_broad_discovery(
-    directory: CikDirectory, *, manifest_path: Path | None = None,
+    directory: CikDirectory | None = None, *, manifest_path: Path | None = None,
     already_covered: frozenset[str] = frozenset(),
 ) -> BroadDiscoveryResolution:
-    """Resolves the 626-name universe through the SAME CikDirectory every
-    other symbol in this service uses -- never a separate/unaudited
-    mapping. Symbols already covered by the product watchlist are
-    excluded here (the union happens once, in extend_scope_with_broad_discovery)."""
-    universe = load_discovery_universe_v1(manifest_path)
+    """Task 131 Remediation Directive 6: resolves the 626-name universe
+    from the STATIC, VERSIONED ``CIK_MANIFEST_V1`` embedded in the
+    manifest file itself -- NOT a live CikDirectory lookup. This
+    population is a frozen, historical, point-in-time research set (Task
+    130B) that legitimately includes delisted/acquired/renamed names a
+    live lookup against CURRENT SEC company_tickers.json would silently
+    drop -- a static, dated snapshot is the MORE correct choice here, not
+    merely a cautious one. ``directory`` is accepted (unused) only for
+    backward-compatible call-site signatures; it is NOT consulted for
+    symbols covered by the static manifest. Symbols already covered by
+    the product watchlist are excluded here (the union happens once, in
+    extend_scope_with_broad_discovery)."""
+    p = manifest_path or DEFAULT_MANIFEST_PATH
+    universe = load_discovery_universe_v1(p)
+    cik_manifest = _load_cik_manifest(p)
+    resolved_map: dict = cik_manifest.get("resolved", {})
+    unresolved_map = {u["symbol"]: u["reason"] for u in cik_manifest.get("unresolved", [])}
+
     resolved: list[ResolvedSymbol] = []
     unresolved: list[tuple[str, str]] = []
     for sym in universe:
         if sym in already_covered:
             continue
-        if directory.known_non_filer(sym):
-            unresolved.append((sym, f"known_non_filer: {directory.known_non_filer(sym)}"))
-            continue
-        ref = directory.resolve(sym)
-        if ref is None:
-            unresolved.append((sym, "no_sec_cik_mapping"))
-            continue
-        resolved.append(ResolvedSymbol(sym, ref.cik, ref.company_name, ref.source))
+        if sym in resolved_map:
+            r = resolved_map[sym]
+            resolved.append(ResolvedSymbol(sym, r["cik"], r["company_name"],
+                                          f"{r['source']} (CIK_MANIFEST_V1 static snapshot)"))
+        elif sym in unresolved_map:
+            unresolved.append((sym, unresolved_map[sym]))
+        else:
+            unresolved.append((sym, "not_present_in_static_CIK_MANIFEST_V1"))
     resolved.sort(key=lambda r: r.symbol)
     unresolved.sort()
     return BroadDiscoveryResolution(universe_n=len(universe), resolved=tuple(resolved),

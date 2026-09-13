@@ -155,10 +155,25 @@ class V2Store:
         self.path = path
         self._starting_cash = starting_cash
         Path(path).parent.mkdir(parents=True, exist_ok=True) if "/" in path or "\\" in path else None
+        # Task 131 Remediation Directive 4: a reentrant "active transaction"
+        # slot. When None (the default, unchanged for every pre-existing
+        # caller), _conn() opens/commits/closes its OWN connection per
+        # call, exactly as before. When set (only inside the transaction()
+        # context manager below), every nested _conn() call reuses the
+        # SAME connection/transaction instead of opening a new one --
+        # letting a sequence of otherwise-independent store method calls
+        # (insert_open_position + set_cash + append_trade + ...) commit
+        # together, atomically, as one unit.
+        self._active_conn: sqlite3.Connection | None = None
         self._init()
 
     @contextmanager
     def _conn(self):
+        if self._active_conn is not None:
+            # reentrant: already inside an outer transaction() block --
+            # reuse it, and let the OUTER block own commit/close.
+            yield self._active_conn
+            return
         c = sqlite3.connect(self.path, timeout=30)
         c.row_factory = sqlite3.Row
         try:
@@ -167,6 +182,35 @@ class V2Store:
             yield c
             c.commit()
         finally:
+            c.close()
+
+    @contextmanager
+    def transaction(self):
+        """Task 131 Remediation Directive 4: wrap a SEQUENCE of store
+        method calls in one explicit, atomic SQLite transaction (WAL
+        mode active, via the same _conn() every method already uses).
+        Every nested store.<method>(...) call inside this block commits
+        together, as one unit, on exit -- or none of them do, if an
+        exception propagates (the connection is closed WITHOUT a commit,
+        so SQLite's own implicit ROLLBACK-on-close-without-commit applies;
+        nothing partially written survives a crash mid-transaction).
+        Not reentrant across two SEPARATE `with store.transaction():`
+        blocks (only nested store method calls within ONE such block
+        share it); calling transaction() again while one is already
+        active raises, rather than silently nesting incorrectly."""
+        if self._active_conn is not None:
+            raise RuntimeError("V2Store.transaction() is not reentrant -- "
+                              "a transaction is already active on this store")
+        c = sqlite3.connect(self.path, timeout=30)
+        c.row_factory = sqlite3.Row
+        c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA busy_timeout=30000")
+        self._active_conn = c
+        try:
+            yield c
+            c.commit()
+        finally:
+            self._active_conn = None
             c.close()
 
     def _init(self) -> None:
