@@ -1,0 +1,2056 @@
+{
+  "n_trades_in_sensitivity": 227,
+  "n_dropped_invalid_delayed_fill": 0,
+  "dropped_detail": [],
+  "primary_net_pnl_usd_total_matched_population": -896.444788668081,
+  "delayed_net_pnl_usd_total": -927.9076741787092,
+  "delta_usd_total": -31.46288551062821,
+  "primary_mean_usd_per_trade": -3.9490959853219425,
+  "delayed_mean_usd_per_trade": -4.087699005192551,
+  "sign_flips": false,
+  "rows": [
+    {
+      "symbol": "NFLX",
+      "exit_timestamp": "2025-02-07T14:30:00+00:00",
+      "primary_entry_price_net": 1004.61609125,
+      "delayed_entry_price_net": 1003.7008625000001,
+      "primary_net_pnl_usd": 40.570759422424544,
+      "delayed_net_pnl_usd": 42.88738929423798,
+      "delta_usd": 2.316629871813433
+    },
+    {
+      "symbol": "SBUX",
+      "exit_timestamp": "2025-02-07T15:03:00+00:00",
+      "primary_entry_price_net": 111.367835,
+      "delayed_entry_price_net": 111.40284375,
+      "primary_net_pnl_usd": -22.410740834640364,
+      "delayed_net_pnl_usd": -23.189332296555662,
+      "delta_usd": -0.7785914619152976
+    },
+    {
+      "symbol": "AMAT",
+      "exit_timestamp": "2025-02-07T15:53:00+00:00",
+      "primary_entry_price_net": 180.32507,
+      "delayed_entry_price_net": 180.41509250000001,
+      "primary_net_pnl_usd": -18.02075413030525,
+      "delayed_net_pnl_usd": -19.25919806293405,
+      "delta_usd": -1.238443932628801
+    },
+    {
+      "symbol": "SBUX",
+      "exit_timestamp": "2025-02-07T15:53:00+00:00",
+      "primary_entry_price_net": 110.647655,
+      "delayed_entry_price_net": 110.70767000000002,
+      "primary_net_pnl_usd": -7.800379953826905,
+      "delayed_net_pnl_usd": -9.151409744239428,
+      "delta_usd": -1.3510297904125235
+    },
+    {
+      "symbol": "AMAT",
+      "exit_timestamp": "2025-02-07T16:02:00+00:00",
+      "primary_entry_price_net": 179.6148925,
+      "delayed_entry_price_net": 179.5148675,
+      "primary_net_pnl_usd": -9.18134474845965,
+      "delayed_net_pnl_usd": -7.793470086816091,
+      "delta_usd": 1.3878746616435595
+    },
+    {
+      "symbol": "AVGO",
+      "exit_timestamp": "2025-02-07T16:05:00+00:00",
+      "primary_entry_price_net": 230.4275925,
+      "delayed_entry_price_net": 230.56262625000002,
+      "primary_net_pnl_usd": -36.93527392992246,
+      "delayed_net_pnl_usd": -38.377818508215505,
+      "delta_usd": -1.4425445782930453
+    },
+    {
+      "symbol": "MU",
+      "exit_timestamp": "2025-02-07T20:01:00+00:00",
+      "primary_entry_price_net": 92.03300250000001,
+      "delayed_entry_price_net": 91.99799375,
+      "primary_net_pnl_usd": -7.495884424720771,
+      "delayed_net_pnl_usd": -6.547391420696394,
+      "delta_usd": 0.9484930040243764
+    },
+    {
+      "symbol": "AMAT",
+      "exit_timestamp": "2025-02-07T20:11:00+00:00",
+      "primary_entry_price_net": 179.56588025,
+      "delayed_entry_price_net": 179.4748575,
+      "primary_net_pnl_usd": -7.666340192710322,
+      "delayed_net_pnl_usd": -6.402324347855006,
+      "delta_usd": 1.264015844855316
+    },
+    {
+      "symbol": "REGN",
+      "exit_timestamp": "2025-02-07T20:55:00+00:00",
+      "primary_entry_price_net": 722.1805,
+      "delayed_entry_price_net": 722.4405650000001,
+      "primary_net_pnl_usd": -35.35659108076197,
+      "delayed_net_pnl_usd": -36.24381629926925,
+      "delta_usd": -0.8872252185072753
+    },
+    {
+      "symbol": "LRCX",
+      "exit_timestamp": "2025-02-10T14:31:00+00:00",
+      "primary_entry_price_net": 82.3105725,
+      "delayed_entry_price_net": 82.3705875,
+      "primary_net_pnl_usd": 58.873360405796575,
+      "delayed_net_pnl_usd": 57.008971800765536,
+      "delta_usd": -1.8643886050310385
+    },
+    {
+      "symbol": "MU",
+      "exit_timestamp": "2025-02-11T17:03:00+00:00",
+      "primary_entry_price_net": 95.2938175,
+      "delayed_entry_price_net": 95.29881875000001,
+      "primary_net_pnl_usd": -40.329544463889306,
+      "delayed_net_pnl_usd": -40.45862714326675,
+      "delta_usd": -0.1290826793774471
+    },
+    {
+      "symbol": "STX",
+      "exit_timestamp": "2025-02-12T09:00:00+00:00",
+      "primary_entry_price_net": 97.41934875,
+      "delayed_entry_price_net": 97.56438500000002,
+      "primary_net_pnl_usd": 47.62468323316489,
+      "delayed_net_pnl_usd": 43.83746179510008,
+      "delta_usd": -3.7872214380648046
+    },
+    {
+      "symbol": "KLAC",
+      "exit_timestamp": "2025-02-12T14:31:00+00:00",
+      "primary_entry_price_net": 747.446815,
+      "delayed_entry_price_net": 746.94368925,
+      "primary_net_pnl_usd": -30.40835086038851,
+      "delayed_net_pnl_usd": -28.744885235671155,
+      "delta_usd": 1.6634656247173538
+    },
+    {
+      "symbol": "CSCO",
+      "exit_timestamp": "2025-02-12T16:08:00+00:00",
+      "primary_entry_price_net": 62.0655125,
+      "delayed_entry_price_net": 62.10052125000001,
+      "primary_net_pnl_usd": -5.478032184137646,
+      "delayed_net_pnl_usd": -6.884302118478951,
+      "delta_usd": -1.4062699343413048
+    },
+    {
+      "symbol": "NFLX",
+      "exit_timestamp": "2025-02-12T17:54:00+00:00",
+      "primary_entry_price_net": 1004.8111399999999,
+      "delayed_entry_price_net": 1005.53132,
+      "primary_net_pnl_usd": 37.155887821865235,
+      "delayed_net_pnl_usd": 35.33873017500826,
+      "delta_usd": -1.8171576468569768
+    },
+    {
+      "symbol": "INTC",
+      "exit_timestamp": "2025-02-18T10:36:00+00:00",
+      "primary_entry_price_net": 23.405849999999997,
+      "delayed_entry_price_net": 23.43085625,
+      "primary_net_pnl_usd": 179.21561276347575,
+      "delayed_net_pnl_usd": 176.35625778720706,
+      "delta_usd": -2.8593549762686905
+    },
+    {
+      "symbol": "AVGO",
+      "exit_timestamp": "2025-02-18T14:30:00+00:00",
+      "primary_entry_price_net": 232.41308875,
+      "delayed_entry_price_net": 232.7481725,
+      "primary_net_pnl_usd": -45.07231899606177,
+      "delayed_net_pnl_usd": -48.606638361467894,
+      "delta_usd": -3.5343193654061267
+    },
+    {
+      "symbol": "PANW",
+      "exit_timestamp": "2025-02-18T14:53:00+00:00",
+      "primary_entry_price_net": 193.35332625,
+      "delayed_entry_price_net": 193.94847500000003,
+      "primary_net_pnl_usd": 144.62546968984452,
+      "delayed_net_pnl_usd": 136.51019297779936,
+      "delta_usd": -8.115276712045159
+    },
+    {
+      "symbol": "AAPL",
+      "exit_timestamp": "2025-02-20T14:30:00+00:00",
+      "primary_entry_price_net": 243.80593625,
+      "delayed_entry_price_net": 243.63089250000002,
+      "primary_net_pnl_usd": 21.55988572653132,
+      "delayed_net_pnl_usd": 23.371574276032838,
+      "delta_usd": 1.8116885495015183
+    },
+    {
+      "symbol": "PANW",
+      "exit_timestamp": "2025-02-20T14:33:00+00:00",
+      "primary_entry_price_net": 205.3813325,
+      "delayed_entry_price_net": 205.49636125,
+      "primary_net_pnl_usd": -57.59417667620801,
+      "delayed_net_pnl_usd": -58.96133902954953,
+      "delta_usd": -1.36716235334152
+    },
+    {
+      "symbol": "PYPL",
+      "exit_timestamp": "2025-02-20T14:53:00+00:00",
+      "primary_entry_price_net": 77.78944249999999,
+      "delayed_entry_price_net": 77.81945,
+      "primary_net_pnl_usd": -7.675688124387307,
+      "delayed_net_pnl_usd": -8.63673863025263,
+      "delta_usd": -0.9610505058653231
+    },
+    {
+      "symbol": "CMCSA",
+      "exit_timestamp": "2025-02-20T17:52:00+00:00",
+      "primary_entry_price_net": 36.4991225,
+      "delayed_entry_price_net": 36.52412875,
+      "primary_net_pnl_usd": -18.369105997000133,
+      "delayed_net_pnl_usd": -20.06815494537969,
+      "delta_usd": -1.6990489483795557
+    },
+    {
+      "symbol": "MU",
+      "exit_timestamp": "2025-02-21T15:41:00+00:00",
+      "primary_entry_price_net": 101.65040625,
+      "delayed_entry_price_net": 101.605395,
+      "primary_net_pnl_usd": -13.17484282066016,
+      "delayed_net_pnl_usd": -12.073177807142956,
+      "delta_usd": 1.101665013517204
+    },
+    {
+      "symbol": "AMD",
+      "exit_timestamp": "2025-02-21T15:54:00+00:00",
+      "primary_entry_price_net": 113.777537275,
+      "delayed_entry_price_net": 113.69881760000001,
+      "primary_net_pnl_usd": -17.046307944003274,
+      "delayed_net_pnl_usd": -15.32722843372837,
+      "delta_usd": 1.719079510274904
+    },
+    {
+      "symbol": "KLAC",
+      "exit_timestamp": "2025-02-21T15:54:00+00:00",
+      "primary_entry_price_net": 770.2825225,
+      "delayed_entry_price_net": 769.972445,
+      "primary_net_pnl_usd": -16.938058756227292,
+      "delayed_net_pnl_usd": -15.938098765339412,
+      "delta_usd": 0.9999599908878807
+    },
+    {
+      "symbol": "ISRG",
+      "exit_timestamp": "2025-02-21T17:28:00+00:00",
+      "primary_entry_price_net": 603.5958612500001,
+      "delayed_entry_price_net": 602.8406725000001,
+      "primary_net_pnl_usd": -15.215393116647647,
+      "delayed_net_pnl_usd": -12.102661234258804,
+      "delta_usd": 3.112731882388843
+    },
+    {
+      "symbol": "STX",
+      "exit_timestamp": "2025-02-21T18:20:00+00:00",
+      "primary_entry_price_net": 101.965485,
+      "delayed_entry_price_net": 101.99549250000001,
+      "primary_net_pnl_usd": -9.461197825911313,
+      "delayed_net_pnl_usd": -10.193924746233497,
+      "delta_usd": -0.7327269203221842
+    },
+    {
+      "symbol": "ADI",
+      "exit_timestamp": "2025-02-21T18:31:00+00:00",
+      "primary_entry_price_net": 240.55012250000001,
+      "delayed_entry_price_net": 240.26005,
+      "primary_net_pnl_usd": -6.013615468019452,
+      "delayed_net_pnl_usd": -3.0025578014323364,
+      "delta_usd": 3.011057666587116
+    },
+    {
+      "symbol": "LRCX",
+      "exit_timestamp": "2025-02-21T18:31:00+00:00",
+      "primary_entry_price_net": 86.8317025,
+      "delayed_entry_price_net": 86.83670375,
+      "primary_net_pnl_usd": -7.438275496210736,
+      "delayed_net_pnl_usd": -7.581831432656042,
+      "delta_usd": -0.1435559364453063
+    },
+    {
+      "symbol": "STX",
+      "exit_timestamp": "2025-02-21T19:17:00+00:00",
+      "primary_entry_price_net": 101.22029875,
+      "delayed_entry_price_net": 101.2253,
+      "primary_net_pnl_usd": -6.311635441601993,
+      "delayed_net_pnl_usd": -6.434841388467494,
+      "delta_usd": -0.12320594686550113
+    },
+    {
+      "symbol": "INTC",
+      "exit_timestamp": "2025-02-21T19:29:00+00:00",
+      "primary_entry_price_net": 24.9962475,
+      "delayed_entry_price_net": 25.04125875,
+      "primary_net_pnl_usd": -13.74843864063996,
+      "delayed_net_pnl_usd": -18.217434856385136,
+      "delta_usd": -4.468996215745175
+    },
+    {
+      "symbol": "LRCX",
+      "exit_timestamp": "2025-02-21T20:01:00+00:00",
+      "primary_entry_price_net": 85.99149249999999,
+      "delayed_entry_price_net": 85.96148500000001,
+      "primary_net_pnl_usd": -7.06276263317568,
+      "delayed_net_pnl_usd": -6.192526222645542,
+      "delta_usd": 0.8702364105301381
+    },
+    {
+      "symbol": "ADI",
+      "exit_timestamp": "2025-02-21T20:10:00+00:00",
+      "primary_entry_price_net": 238.40458625,
+      "delayed_entry_price_net": 238.64964750000001,
+      "primary_net_pnl_usd": -5.495607889128678,
+      "delayed_net_pnl_usd": -8.057130065528506,
+      "delta_usd": -2.561522176399828
+    },
+    {
+      "symbol": "VRTX",
+      "exit_timestamp": "2025-02-24T16:26:00+00:00",
+      "primary_entry_price_net": 482.220525,
+      "delayed_entry_price_net": 482.1425055,
+      "primary_net_pnl_usd": -11.978609268031505,
+      "delayed_net_pnl_usd": -11.576001776097502,
+      "delta_usd": 0.4026074919340026
+    },
+    {
+      "symbol": "INTC",
+      "exit_timestamp": "2025-02-24T20:29:00+00:00",
+      "primary_entry_price_net": 24.77119125,
+      "delayed_entry_price_net": 24.7361825,
+      "primary_net_pnl_usd": -43.28398518177846,
+      "delayed_net_pnl_usd": -39.807031663030315,
+      "delta_usd": 3.4769535187481466
+    },
+    {
+      "symbol": "VRTX",
+      "exit_timestamp": "2025-02-25T16:40:00+00:00",
+      "primary_entry_price_net": 481.4503325,
+      "delayed_entry_price_net": 482.20052000000004,
+      "primary_net_pnl_usd": -19.87052462467682,
+      "delayed_net_pnl_usd": -23.729006840349385,
+      "delta_usd": -3.8584822156725664
+    },
+    {
+      "symbol": "MDLZ",
+      "exit_timestamp": "2025-02-26T16:07:00+00:00",
+      "primary_entry_price_net": 63.910973750000004,
+      "delayed_entry_price_net": 63.96598750000001,
+      "primary_net_pnl_usd": -8.28897165723447,
+      "delayed_net_pnl_usd": -10.43196003188446,
+      "delta_usd": -2.14298837464999
+    },
+    {
+      "symbol": "PEP",
+      "exit_timestamp": "2025-02-26T16:38:00+00:00",
+      "primary_entry_price_net": 152.09301375,
+      "delayed_entry_price_net": 152.37808500000003,
+      "primary_net_pnl_usd": -11.027441916279258,
+      "delayed_net_pnl_usd": -15.683849813443146,
+      "delta_usd": -4.656407897163888
+    },
+    {
+      "symbol": "INTU",
+      "exit_timestamp": "2025-02-27T15:07:00+00:00",
+      "primary_entry_price_net": 617.6043625000001,
+      "delayed_entry_price_net": 616.9041875,
+      "primary_net_pnl_usd": -14.96863414723748,
+      "delayed_net_pnl_usd": -12.148168875900438,
+      "delta_usd": 2.820465271337042
+    },
+    {
+      "symbol": "INTU",
+      "exit_timestamp": "2025-03-03T20:26:00+00:00",
+      "primary_entry_price_net": 602.1054887500001,
+      "delayed_entry_price_net": 602.0404725000001,
+      "primary_net_pnl_usd": -5.836607024286877,
+      "delayed_net_pnl_usd": -5.567254450654924,
+      "delta_usd": 0.2693525736319531
+    },
+    {
+      "symbol": "SBUX",
+      "exit_timestamp": "2025-03-04T15:59:00+00:00",
+      "primary_entry_price_net": 114.3385775,
+      "delayed_entry_price_net": 114.4386025,
+      "primary_net_pnl_usd": -12.395805890623251,
+      "delayed_net_pnl_usd": -14.570095021039759,
+      "delta_usd": -2.1742891304165077
+    },
+    {
+      "symbol": "INTU",
+      "exit_timestamp": "2025-03-06T17:49:00+00:00",
+      "primary_entry_price_net": 614.613615,
+      "delayed_entry_price_net": 614.27353,
+      "primary_net_pnl_usd": -34.1889798520001,
+      "delayed_net_pnl_usd": -32.82381384722899,
+      "delta_usd": 1.3651660047711118
+    },
+    {
+      "symbol": "REGN",
+      "exit_timestamp": "2025-03-11T15:04:00+00:00",
+      "primary_entry_price_net": 717.25927,
+      "delayed_entry_price_net": 718.2995300000001,
+      "primary_net_pnl_usd": -12.121697639404374,
+      "delayed_net_pnl_usd": -15.72470749075978,
+      "delta_usd": -3.603009851355406
+    },
+    {
+      "symbol": "REGN",
+      "exit_timestamp": "2025-03-11T17:40:00+00:00",
+      "primary_entry_price_net": 715.95394375,
+      "delayed_entry_price_net": 716.93919,
+      "primary_net_pnl_usd": -5.700676573722831,
+      "delayed_net_pnl_usd": -9.128441562805572,
+      "delta_usd": -3.427764989082741
+    },
+    {
+      "symbol": "LRCX",
+      "exit_timestamp": "2025-03-13T15:41:00+00:00",
+      "primary_entry_price_net": 76.456609375,
+      "delayed_entry_price_net": 76.45911000000001,
+      "primary_net_pnl_usd": -39.415391450583684,
+      "delayed_net_pnl_usd": -39.49586582946135,
+      "delta_usd": -0.08047437887766762
+    },
+    {
+      "symbol": "AVGO",
+      "exit_timestamp": "2025-03-13T17:16:00+00:00",
+      "primary_entry_price_net": 191.4778575,
+      "delayed_entry_price_net": 191.53137087500002,
+      "primary_net_pnl_usd": -8.689940819919684,
+      "delayed_net_pnl_usd": -9.386006476575044,
+      "delta_usd": -0.6960656566553602
+    },
+    {
+      "symbol": "QCOM",
+      "exit_timestamp": "2025-03-17T18:26:00+00:00",
+      "primary_entry_price_net": 155.8089425,
+      "delayed_entry_price_net": 155.982986,
+      "primary_net_pnl_usd": 32.19638291942056,
+      "delayed_net_pnl_usd": 29.37099578924538,
+      "delta_usd": -2.8253871301751765
+    },
+    {
+      "symbol": "KLAC",
+      "exit_timestamp": "2025-03-17T18:33:00+00:00",
+      "primary_entry_price_net": 708.2370149999999,
+      "delayed_entry_price_net": 708.9872025,
+      "primary_net_pnl_usd": 45.192074576898904,
+      "delayed_net_pnl_usd": 42.49897761730081,
+      "delta_usd": -2.693096959598094
+    },
+    {
+      "symbol": "AMD",
+      "exit_timestamp": "2025-03-19T13:38:00+00:00",
+      "primary_entry_price_net": 104.29596747500001,
+      "delayed_entry_price_net": 104.34608,
+      "primary_net_pnl_usd": -38.15224148962261,
+      "delayed_net_pnl_usd": -39.334551427327185,
+      "delta_usd": -1.1823099377045736
+    },
+    {
+      "symbol": "VRTX",
+      "exit_timestamp": "2025-03-19T15:44:00+00:00",
+      "primary_entry_price_net": 507.16175875000005,
+      "delayed_entry_price_net": 507.11944817500006,
+      "primary_net_pnl_usd": -11.278496014956545,
+      "delayed_net_pnl_usd": -11.070854130529847,
+      "delta_usd": 0.20764188442669784
+    },
+    {
+      "symbol": "LRCX",
+      "exit_timestamp": "2025-03-19T19:07:00+00:00",
+      "primary_entry_price_net": 76.38409125,
+      "delayed_entry_price_net": 76.3690875,
+      "primary_net_pnl_usd": 93.80524148082986,
+      "delayed_net_pnl_usd": 94.31482993691614,
+      "delta_usd": 0.5095884560862771
+    },
+    {
+      "symbol": "STX",
+      "exit_timestamp": "2025-03-21T09:10:00+00:00",
+      "primary_entry_price_net": 88.602145,
+      "delayed_entry_price_net": 88.522125,
+      "primary_net_pnl_usd": -25.791489020948575,
+      "delayed_net_pnl_usd": -23.554916355657205,
+      "delta_usd": 2.2365726652913693
+    },
+    {
+      "symbol": "KLAC",
+      "exit_timestamp": "2025-03-21T13:27:00+00:00",
+      "primary_entry_price_net": 711.81290875,
+      "delayed_entry_price_net": 711.4228112500001,
+      "primary_net_pnl_usd": -44.06975693948425,
+      "delayed_net_pnl_usd": -42.72308624964695,
+      "delta_usd": 1.3466706898373033
+    },
+    {
+      "symbol": "AMD",
+      "exit_timestamp": "2025-03-21T15:15:00+00:00",
+      "primary_entry_price_net": 105.73642749999999,
+      "delayed_entry_price_net": 105.70642000000002,
+      "primary_net_pnl_usd": -10.113857166206799,
+      "delayed_net_pnl_usd": -9.407038616955221,
+      "delta_usd": 0.7068185492515777
+    },
+    {
+      "symbol": "HON",
+      "exit_timestamp": "2025-03-24T13:36:00+00:00",
+      "primary_entry_price_net": 210.1625275,
+      "delayed_entry_price_net": 210.08250750000002,
+      "primary_net_pnl_usd": 28.957469594573467,
+      "delayed_net_pnl_usd": 29.92074435326288,
+      "delta_usd": 0.9632747586894119
+    },
+    {
+      "symbol": "ADI",
+      "exit_timestamp": "2025-03-26T17:56:00+00:00",
+      "primary_entry_price_net": 210.41259000000002,
+      "delayed_entry_price_net": 210.65265000000002,
+      "primary_net_pnl_usd": -5.407144363367479,
+      "delayed_net_pnl_usd": -8.249985224492006,
+      "delta_usd": -2.842840861124527
+    },
+    {
+      "symbol": "AAPL",
+      "exit_timestamp": "2025-03-26T19:11:00+00:00",
+      "primary_entry_price_net": 221.9054625,
+      "delayed_entry_price_net": 221.83044375000003,
+      "primary_net_pnl_usd": -9.190273425558189,
+      "delayed_net_pnl_usd": -8.347929926547934,
+      "delta_usd": 0.842343499010255
+    },
+    {
+      "symbol": "TXN",
+      "exit_timestamp": "2025-03-26T22:19:00+00:00",
+      "primary_entry_price_net": 184.18603499999998,
+      "delayed_entry_price_net": 184.5161175,
+      "primary_net_pnl_usd": -30.289144885495716,
+      "delayed_net_pnl_usd": -34.70723228283853,
+      "delta_usd": -4.418087397342816
+    },
+    {
+      "symbol": "ADBE",
+      "exit_timestamp": "2025-03-27T12:00:00+00:00",
+      "primary_entry_price_net": 398.4295825,
+      "delayed_entry_price_net": 398.999725,
+      "primary_net_pnl_usd": -15.677738989172667,
+      "delayed_net_pnl_usd": -19.227660495255147,
+      "delta_usd": -3.5499215060824802
+    },
+    {
+      "symbol": "BKNG",
+      "exit_timestamp": "2025-03-27T13:30:00+00:00",
+      "primary_entry_price_net": 4753.848164999999,
+      "delayed_entry_price_net": 4756.828910000001,
+      "primary_net_pnl_usd": -18.420952765116,
+      "delayed_net_pnl_usd": -19.97597071449085,
+      "delta_usd": -1.5550179493748502
+    },
+    {
+      "symbol": "AAPL",
+      "exit_timestamp": "2025-03-27T18:06:00+00:00",
+      "primary_entry_price_net": 221.515365,
+      "delayed_entry_price_net": 221.92546750000002,
+      "primary_net_pnl_usd": 29.214621297262966,
+      "delayed_net_pnl_usd": 24.540812333762187,
+      "delta_usd": -4.673808963500779
+    },
+    {
+      "symbol": "META",
+      "exit_timestamp": "2025-03-27T19:53:00+00:00",
+      "primary_entry_price_net": 608.75215,
+      "delayed_entry_price_net": 608.6321200000001,
+      "primary_net_pnl_usd": -28.388595834939224,
+      "delayed_net_pnl_usd": -27.90116261034711,
+      "delta_usd": 0.48743322459211313
+    },
+    {
+      "symbol": "CMCSA",
+      "exit_timestamp": "2025-03-28T14:12:00+00:00",
+      "primary_entry_price_net": 37.1592875,
+      "delayed_entry_price_net": 37.17429125,
+      "primary_net_pnl_usd": -6.966882101816736,
+      "delayed_net_pnl_usd": -7.973084086707942,
+      "delta_usd": -1.0062019848912058
+    },
+    {
+      "symbol": "COST",
+      "exit_timestamp": "2025-03-28T14:36:00+00:00",
+      "primary_entry_price_net": 929.9424275,
+      "delayed_entry_price_net": 929.5119199000001,
+      "primary_net_pnl_usd": -11.220929856972361,
+      "delayed_net_pnl_usd": -10.06824070745316,
+      "delta_usd": 1.152689149519201
+    },
+    {
+      "symbol": "AAPL",
+      "exit_timestamp": "2025-03-28T15:14:00+00:00",
+      "primary_entry_price_net": 220.5235171,
+      "delayed_entry_price_net": 220.19503500000002,
+      "primary_net_pnl_usd": -6.55845131176693,
+      "delayed_net_pnl_usd": -2.8387901661818273,
+      "delta_usd": 3.719661145585103
+    },
+    {
+      "symbol": "TSLA",
+      "exit_timestamp": "2025-03-28T17:22:00+00:00",
+      "primary_entry_price_net": 265.940568525,
+      "delayed_entry_price_net": 265.806435,
+      "primary_net_pnl_usd": -11.814256395427492,
+      "delayed_net_pnl_usd": -10.55864674608079,
+      "delta_usd": 1.2556096493467024
+    },
+    {
+      "symbol": "GILD",
+      "exit_timestamp": "2025-04-02T13:25:00+00:00",
+      "primary_entry_price_net": 111.42785,
+      "delayed_entry_price_net": 111.42785000000002,
+      "primary_net_pnl_usd": -29.28772968337762,
+      "delayed_net_pnl_usd": -29.287729683378277,
+      "delta_usd": -6.572520305780927e-13
+    },
+    {
+      "symbol": "MDLZ",
+      "exit_timestamp": "2025-04-02T14:40:00+00:00",
+      "primary_entry_price_net": 67.0667625,
+      "delayed_entry_price_net": 67.05676000000001,
+      "primary_net_pnl_usd": -6.467063323654656,
+      "delayed_net_pnl_usd": -6.09511628656143,
+      "delta_usd": 0.37194703709322674
+    },
+    {
+      "symbol": "COST",
+      "exit_timestamp": "2025-04-04T16:20:00+00:00",
+      "primary_entry_price_net": 956.31902,
+      "delayed_entry_price_net": 958.6896125000002,
+      "primary_net_pnl_usd": -53.8238562247775,
+      "delayed_net_pnl_usd": -59.872619812599126,
+      "delta_usd": -6.048763587821625
+    },
+    {
+      "symbol": "AMAT",
+      "exit_timestamp": "2025-04-10T17:20:00+00:00",
+      "primary_entry_price_net": 138.5846375,
+      "delayed_entry_price_net": 137.6644075,
+      "primary_net_pnl_usd": -62.38836357312766,
+      "delayed_net_pnl_usd": -46.09393135985464,
+      "delta_usd": 16.29443221327302
+    },
+    {
+      "symbol": "LRCX",
+      "exit_timestamp": "2025-04-14T08:00:00+00:00",
+      "primary_entry_price_net": 65.78644249999999,
+      "delayed_entry_price_net": 65.42635250000001,
+      "primary_net_pnl_usd": 119.9455913731772,
+      "delayed_net_pnl_usd": 134.36510540611238,
+      "delta_usd": 14.419514032935183
+    },
+    {
+      "symbol": "META",
+      "exit_timestamp": "2025-04-14T16:11:00+00:00",
+      "primary_entry_price_net": 537.2642825,
+      "delayed_entry_price_net": 538.77466,
+      "primary_net_pnl_usd": -29.11540792775486,
+      "delayed_net_pnl_usd": -36.04217856125632,
+      "delta_usd": -6.926770633501462
+    },
+    {
+      "symbol": "AMZN",
+      "exit_timestamp": "2025-04-14T17:03:00+00:00",
+      "primary_entry_price_net": 180.11051637499997,
+      "delayed_entry_price_net": 180.2150425,
+      "primary_net_pnl_usd": -5.072772572577833,
+      "delayed_net_pnl_usd": -6.519849751166361,
+      "delta_usd": -1.4470771785885281
+    },
+    {
+      "symbol": "COST",
+      "exit_timestamp": "2025-04-15T14:05:00+00:00",
+      "primary_entry_price_net": 965.8113925,
+      "delayed_entry_price_net": 965.8730079000002,
+      "primary_net_pnl_usd": 65.43920659954347,
+      "delayed_net_pnl_usd": 65.27555096200304,
+      "delta_usd": -0.16365563754042967
+    },
+    {
+      "symbol": "INTC",
+      "exit_timestamp": "2025-04-15T19:36:00+00:00",
+      "primary_entry_price_net": 20.225054999999998,
+      "delayed_entry_price_net": 20.20505,
+      "primary_net_pnl_usd": -49.44516838149502,
+      "delayed_net_pnl_usd": -47.01887646900173,
+      "delta_usd": 2.4262919124932907
+    },
+    {
+      "symbol": "AVGO",
+      "exit_timestamp": "2025-04-15T21:57:00+00:00",
+      "primary_entry_price_net": 178.6894612,
+      "delayed_entry_price_net": 178.78468500000002,
+      "primary_net_pnl_usd": -70.41386445234912,
+      "delayed_net_pnl_usd": -71.70790383975071,
+      "delta_usd": -1.2940393874015967
+    },
+    {
+      "symbol": "STX",
+      "exit_timestamp": "2025-04-15T23:32:00+00:00",
+      "primary_entry_price_net": 72.4681125,
+      "delayed_entry_price_net": 72.43810500000001,
+      "primary_net_pnl_usd": -51.259183133823626,
+      "delayed_net_pnl_usd": -50.24479174324113,
+      "delta_usd": 1.014391390582496
+    },
+    {
+      "symbol": "PYPL",
+      "exit_timestamp": "2025-04-16T08:00:00+00:00",
+      "primary_entry_price_net": 62.11052375,
+      "delayed_entry_price_net": 62.15553500000001,
+      "primary_net_pnl_usd": -39.27721065143987,
+      "delayed_net_pnl_usd": -41.0591952912966,
+      "delta_usd": -1.7819846398567236
+    },
+    {
+      "symbol": "SBUX",
+      "exit_timestamp": "2025-04-16T08:00:00+00:00",
+      "primary_entry_price_net": 84.09101749999999,
+      "delayed_entry_price_net": 84.10102,
+      "primary_net_pnl_usd": -31.863614327177856,
+      "delayed_net_pnl_usd": -32.157160519574994,
+      "delta_usd": -0.2935461923971374
+    },
+    {
+      "symbol": "AAPL",
+      "exit_timestamp": "2025-04-16T15:46:00+00:00",
+      "primary_entry_price_net": 197.9994875,
+      "delayed_entry_price_net": 198.19653675,
+      "primary_net_pnl_usd": -6.1095959907474935,
+      "delayed_net_pnl_usd": -8.589050181776484,
+      "delta_usd": -2.4794541910289905
+    },
+    {
+      "symbol": "QCOM",
+      "exit_timestamp": "2025-04-16T16:05:00+00:00",
+      "primary_entry_price_net": 135.636400625,
+      "delayed_entry_price_net": 135.33382500000002,
+      "primary_net_pnl_usd": -6.823861870670953,
+      "delayed_net_pnl_usd": -1.249687578105744,
+      "delta_usd": 5.574174292565209
+    },
+    {
+      "symbol": "MU",
+      "exit_timestamp": "2025-04-16T16:27:00+00:00",
+      "primary_entry_price_net": 70.209548,
+      "delayed_entry_price_net": 70.19754500000002,
+      "primary_net_pnl_usd": -5.2367521294968356,
+      "delayed_net_pnl_usd": -4.810175341602962,
+      "delta_usd": 0.42657678789387354
+    },
+    {
+      "symbol": "QCOM",
+      "exit_timestamp": "2025-04-16T17:31:00+00:00",
+      "primary_entry_price_net": 135.55388000000002,
+      "delayed_entry_price_net": 135.70891875,
+      "primary_net_pnl_usd": -7.8874540514816545,
+      "delayed_net_pnl_usd": -10.734533061041413,
+      "delta_usd": -2.8470790095597582
+    },
+    {
+      "symbol": "TSLA",
+      "exit_timestamp": "2025-04-16T17:40:00+00:00",
+      "primary_entry_price_net": 248.09580845000002,
+      "delayed_entry_price_net": 248.09200750000002,
+      "primary_net_pnl_usd": -51.32668536222536,
+      "delayed_net_pnl_usd": -51.289169906048215,
+      "delta_usd": 0.03751545617714669
+    },
+    {
+      "symbol": "BKNG",
+      "exit_timestamp": "2025-04-16T17:41:00+00:00",
+      "primary_entry_price_net": 4600.2797825,
+      "delayed_entry_price_net": 4585.7261450000005,
+      "primary_net_pnl_usd": -27.725152008186797,
+      "delayed_net_pnl_usd": -19.87893729750892,
+      "delta_usd": 7.846214710677877
+    },
+    {
+      "symbol": "INTU",
+      "exit_timestamp": "2025-04-16T17:47:00+00:00",
+      "primary_entry_price_net": 585.1706561,
+      "delayed_entry_price_net": 583.885935,
+      "primary_net_pnl_usd": -6.735603894202086,
+      "delayed_net_pnl_usd": -1.249687578105547,
+      "delta_usd": 5.485916316096539
+    },
+    {
+      "symbol": "STX",
+      "exit_timestamp": "2025-04-16T17:59:00+00:00",
+      "primary_entry_price_net": 71.81795,
+      "delayed_entry_price_net": 71.88796750000002,
+      "primary_net_pnl_usd": -15.344309813911423,
+      "delayed_net_pnl_usd": -17.764316747445214,
+      "delta_usd": -2.4200069335337915
+    },
+    {
+      "symbol": "HON",
+      "exit_timestamp": "2025-04-16T18:18:00+00:00",
+      "primary_entry_price_net": 194.64865,
+      "delayed_entry_price_net": 194.65865250000002,
+      "primary_net_pnl_usd": -6.1932583400912335,
+      "delayed_net_pnl_usd": -6.321402152930364,
+      "delta_usd": -0.1281438128391308
+    },
+    {
+      "symbol": "AVGO",
+      "exit_timestamp": "2025-04-16T18:37:00+00:00",
+      "primary_entry_price_net": 170.61764374999998,
+      "delayed_entry_price_net": 170.2125425,
+      "primary_net_pnl_usd": -12.309669907746411,
+      "delayed_net_pnl_usd": -6.389034168854045,
+      "delta_usd": 5.920635738892366
+    },
+    {
+      "symbol": "KLAC",
+      "exit_timestamp": "2025-04-16T18:58:00+00:00",
+      "primary_entry_price_net": 652.903185,
+      "delayed_entry_price_net": 653.20326,
+      "primary_net_pnl_usd": -103.72777359019938,
+      "delayed_net_pnl_usd": -104.82859692096449,
+      "delta_usd": -1.1008233307651096
+    },
+    {
+      "symbol": "VRTX",
+      "exit_timestamp": "2025-04-16T19:08:00+00:00",
+      "primary_entry_price_net": 488.2320275,
+      "delayed_entry_price_net": 488.18701625000006,
+      "primary_net_pnl_usd": -7.034424323996063,
+      "delayed_net_pnl_usd": -6.804570819021723,
+      "delta_usd": 0.22985350497433998
+    },
+    {
+      "symbol": "AAPL",
+      "exit_timestamp": "2025-04-16T19:24:00+00:00",
+      "primary_entry_price_net": 193.26730475,
+      "delayed_entry_price_net": 193.36833000000001,
+      "primary_net_pnl_usd": -7.314898020794317,
+      "delayed_net_pnl_usd": -8.617200913924556,
+      "delta_usd": -1.3023028931302392
+    },
+    {
+      "symbol": "AVGO",
+      "exit_timestamp": "2025-04-21T08:00:00+00:00",
+      "primary_entry_price_net": 172.8532025,
+      "delayed_entry_price_net": 172.608241275,
+      "primary_net_pnl_usd": -77.16218766614975,
+      "delayed_net_pnl_usd": -73.72375787796815,
+      "delta_usd": 3.438429788181594
+    },
+    {
+      "symbol": "MSFT",
+      "exit_timestamp": "2025-04-21T08:00:00+00:00",
+      "primary_entry_price_net": 377.434335,
+      "delayed_entry_price_net": 376.93421,
+      "primary_net_pnl_usd": -89.25623777709552,
+      "delayed_net_pnl_usd": -86.0576073739763,
+      "delta_usd": 3.1986304031192248
+    },
+    {
+      "symbol": "GOOGL",
+      "exit_timestamp": "2025-04-21T13:30:00+00:00",
+      "primary_entry_price_net": 153.83845000000002,
+      "delayed_entry_price_net": 153.59839000000002,
+      "primary_net_pnl_usd": -94.99344117156716,
+      "delayed_net_pnl_usd": -91.23463956881332,
+      "delta_usd": 3.7588016027538345
+    },
+    {
+      "symbol": "ISRG",
+      "exit_timestamp": "2025-04-21T15:34:00+00:00",
+      "primary_entry_price_net": 495.76391,
+      "delayed_entry_price_net": 494.99371750000006,
+      "primary_net_pnl_usd": -146.11610317701434,
+      "delayed_net_pnl_usd": -142.4535441199821,
+      "delta_usd": 3.66255905703224
+    },
+    {
+      "symbol": "VRTX",
+      "exit_timestamp": "2025-04-21T17:07:00+00:00",
+      "primary_entry_price_net": 486.96171,
+      "delayed_entry_price_net": 487.35180750000006,
+      "primary_net_pnl_usd": -42.57987180860664,
+      "delayed_net_pnl_usd": -44.546897340685604,
+      "delta_usd": -1.9670255320789636
+    },
+    {
+      "symbol": "STX",
+      "exit_timestamp": "2025-04-21T17:37:00+00:00",
+      "primary_entry_price_net": 72.8081975,
+      "delayed_entry_price_net": 72.958235,
+      "primary_net_pnl_usd": -5.3690726239997275,
+      "delayed_net_pnl_usd": -10.499243162886422,
+      "delta_usd": -5.130170538886695
+    },
+    {
+      "symbol": "PANW",
+      "exit_timestamp": "2025-04-21T17:57:00+00:00",
+      "primary_entry_price_net": 167.12177000000003,
+      "delayed_entry_price_net": 167.3518275,
+      "primary_net_pnl_usd": -132.70776302812055,
+      "delayed_net_pnl_usd": -135.96206471064696,
+      "delta_usd": -3.2543016825264033
+    },
+    {
+      "symbol": "GILD",
+      "exit_timestamp": "2025-04-23T19:31:00+00:00",
+      "primary_entry_price_net": 105.3563325,
+      "delayed_entry_price_net": 105.38133875000001,
+      "primary_net_pnl_usd": 22.829222201712582,
+      "delayed_net_pnl_usd": 22.23057258323151,
+      "delta_usd": -0.5986496184810726
+    },
+    {
+      "symbol": "HON",
+      "exit_timestamp": "2025-04-23T22:37:00+00:00",
+      "primary_entry_price_net": 197.8994625,
+      "delayed_entry_price_net": 197.90446375000002,
+      "primary_net_pnl_usd": -35.39106599392562,
+      "delayed_net_pnl_usd": -35.453349204712055,
+      "delta_usd": -0.06228321078643262
+    },
+    {
+      "symbol": "SBUX",
+      "exit_timestamp": "2025-04-28T13:31:00+00:00",
+      "primary_entry_price_net": 83.0707625,
+      "delayed_entry_price_net": 82.88571625,
+      "primary_net_pnl_usd": 51.403088421152006,
+      "delayed_net_pnl_usd": 57.099215511695675,
+      "delta_usd": 5.696127090543669
+    },
+    {
+      "symbol": "ADI",
+      "exit_timestamp": "2025-04-28T15:07:00+00:00",
+      "primary_entry_price_net": 192.8982125,
+      "delayed_entry_price_net": 192.7781825,
+      "primary_net_pnl_usd": -12.91095426817401,
+      "delayed_net_pnl_usd": -11.362411303987034,
+      "delta_usd": 1.548542964186975
+    },
+    {
+      "symbol": "KLAC",
+      "exit_timestamp": "2025-04-28T16:07:00+00:00",
+      "primary_entry_price_net": 681.3703,
+      "delayed_entry_price_net": 680.9201875000001,
+      "primary_net_pnl_usd": -5.651479085601295,
+      "delayed_net_pnl_usd": -4.002625858408956,
+      "delta_usd": 1.6488532271923395
+    },
+    {
+      "symbol": "MU",
+      "exit_timestamp": "2025-04-28T16:09:00+00:00",
+      "primary_entry_price_net": 77.37934,
+      "delayed_entry_price_net": 77.3493325,
+      "primary_net_pnl_usd": -9.486261126031877,
+      "delayed_net_pnl_usd": -8.520071908830081,
+      "delta_usd": 0.9661892172017961
+    },
+    {
+      "symbol": "PYPL",
+      "exit_timestamp": "2025-04-28T16:26:00+00:00",
+      "primary_entry_price_net": 64.46611250000001,
+      "delayed_entry_price_net": 64.43610500000001,
+      "primary_net_pnl_usd": -5.514428219943056,
+      "delayed_net_pnl_usd": -4.352761545720851,
+      "delta_usd": 1.1616666742222055
+    },
+    {
+      "symbol": "TXN",
+      "exit_timestamp": "2025-04-28T17:14:00+00:00",
+      "primary_entry_price_net": 160.1700325,
+      "delayed_entry_price_net": 160.17503375,
+      "primary_net_pnl_usd": -5.931040814391963,
+      "delayed_net_pnl_usd": -6.00891476322247,
+      "delta_usd": -0.07787394883050691
+    },
+    {
+      "symbol": "QCOM",
+      "exit_timestamp": "2025-04-28T17:42:00+00:00",
+      "primary_entry_price_net": 145.9264725,
+      "delayed_entry_price_net": 145.93647500000003,
+      "primary_net_pnl_usd": -5.531595715095591,
+      "delayed_net_pnl_usd": -5.702566818885288,
+      "delta_usd": -0.1709711037896966
+    },
+    {
+      "symbol": "AAPL",
+      "exit_timestamp": "2025-04-28T19:22:00+00:00",
+      "primary_entry_price_net": 208.02179245,
+      "delayed_entry_price_net": 207.82194250000003,
+      "primary_net_pnl_usd": 33.956569125793976,
+      "delayed_net_pnl_usd": 36.39332381853713,
+      "delta_usd": 2.4367546927431505
+    },
+    {
+      "symbol": "HON",
+      "exit_timestamp": "2025-04-29T10:00:00+00:00",
+      "primary_entry_price_net": 198.27955749999998,
+      "delayed_entry_price_net": 198.44459875000004,
+      "primary_net_pnl_usd": 65.81055386912567,
+      "delayed_net_pnl_usd": 63.67663546700566,
+      "delta_usd": -2.1339184021200097
+    },
+    {
+      "symbol": "TXN",
+      "exit_timestamp": "2025-04-29T13:28:00+00:00",
+      "primary_entry_price_net": 160.09501375000002,
+      "delayed_entry_price_net": 160.100015,
+      "primary_net_pnl_usd": -8.977539907923074,
+      "delayed_net_pnl_usd": -9.05535517907392,
+      "delta_usd": -0.07781527115084685
+    },
+    {
+      "symbol": "ISRG",
+      "exit_timestamp": "2025-04-29T14:21:00+00:00",
+      "primary_entry_price_net": 510.467585,
+      "delayed_entry_price_net": 510.40606962500004,
+      "primary_net_pnl_usd": -13.61270936527717,
+      "delayed_net_pnl_usd": -13.313043950461767,
+      "delta_usd": 0.29966541481540254
+    },
+    {
+      "symbol": "TXN",
+      "exit_timestamp": "2025-04-29T15:30:00+00:00",
+      "primary_entry_price_net": 160.45010249999999,
+      "delayed_entry_price_net": 160.31006750000003,
+      "primary_net_pnl_usd": -5.689210295144221,
+      "delayed_net_pnl_usd": -3.5103651553267103,
+      "delta_usd": 2.178845139817511
+    },
+    {
+      "symbol": "STX",
+      "exit_timestamp": "2025-04-29T20:05:00+00:00",
+      "primary_entry_price_net": 82.39059250000001,
+      "delayed_entry_price_net": 82.400595,
+      "primary_net_pnl_usd": 139.20453054151767,
+      "delayed_net_pnl_usd": 138.8841609699544,
+      "delta_usd": -0.32036957156327617
+    },
+    {
+      "symbol": "NVDA",
+      "exit_timestamp": "2025-04-29T20:30:00+00:00",
+      "primary_entry_price_net": 107.71192125,
+      "delayed_entry_price_net": 107.76193375000001,
+      "primary_net_pnl_usd": -20.39319881688607,
+      "delayed_net_pnl_usd": -21.54398862576108,
+      "delta_usd": -1.150789808875011
+    },
+    {
+      "symbol": "AMZN",
+      "exit_timestamp": "2025-04-30T12:19:00+00:00",
+      "primary_entry_price_net": 186.37478205000002,
+      "delayed_entry_price_net": 186.80669,
+      "primary_net_pnl_usd": -21.87768554388549,
+      "delayed_net_pnl_usd": -27.607248701853454,
+      "delta_usd": -5.729563157967963
+    },
+    {
+      "symbol": "LRCX",
+      "exit_timestamp": "2025-04-30T12:36:00+00:00",
+      "primary_entry_price_net": 70.117525,
+      "delayed_entry_price_net": 70.0875175,
+      "primary_net_pnl_usd": -7.665879535822114,
+      "delayed_net_pnl_usd": -6.598803417456203,
+      "delta_usd": 1.067076118365911
+    },
+    {
+      "symbol": "INTC",
+      "exit_timestamp": "2025-04-30T12:49:00+00:00",
+      "primary_entry_price_net": 19.824955,
+      "delayed_entry_price_net": 19.824854975,
+      "primary_net_pnl_usd": -11.33546078667041,
+      "delayed_net_pnl_usd": -11.322904393655241,
+      "delta_usd": 0.012556393015168865
+    },
+    {
+      "symbol": "ADI",
+      "exit_timestamp": "2025-04-30T13:26:00+00:00",
+      "primary_entry_price_net": 192.708165,
+      "delayed_entry_price_net": 192.60814000000002,
+      "primary_net_pnl_usd": -47.681360569231856,
+      "delayed_net_pnl_usd": -46.40782575440483,
+      "delta_usd": 1.2735348148270234
+    },
+    {
+      "symbol": "QCOM",
+      "exit_timestamp": "2025-04-30T14:50:00+00:00",
+      "primary_entry_price_net": 145.9064675,
+      "delayed_entry_price_net": 145.97148375,
+      "primary_net_pnl_usd": -10.49987725869596,
+      "delayed_net_pnl_usd": -11.60871001285513,
+      "delta_usd": -1.1088327541591703
+    },
+    {
+      "symbol": "AMAT",
+      "exit_timestamp": "2025-04-30T15:24:00+00:00",
+      "primary_entry_price_net": 148.0670075,
+      "delayed_entry_price_net": 148.11702000000002,
+      "primary_net_pnl_usd": -4.119292071192831,
+      "delayed_net_pnl_usd": -4.96203947392441,
+      "delta_usd": -0.8427474027315789
+    },
+    {
+      "symbol": "AMD",
+      "exit_timestamp": "2025-04-30T15:25:00+00:00",
+      "primary_entry_price_net": 95.3134224,
+      "delayed_entry_price_net": 95.36383500000001,
+      "primary_net_pnl_usd": -4.779262600478887,
+      "delayed_net_pnl_usd": -6.098322021131016,
+      "delta_usd": -1.3190594206521284
+    },
+    {
+      "symbol": "META",
+      "exit_timestamp": "2025-04-30T15:51:00+00:00",
+      "primary_entry_price_net": 540.9051925,
+      "delayed_entry_price_net": 541.2552800000001,
+      "primary_net_pnl_usd": -7.811119321062961,
+      "delayed_net_pnl_usd": -9.423083595600511,
+      "delta_usd": -1.6119642745375504
+    },
+    {
+      "symbol": "AMZN",
+      "exit_timestamp": "2025-04-30T15:52:00+00:00",
+      "primary_entry_price_net": 182.06050374999998,
+      "delayed_entry_price_net": 182.1155175,
+      "primary_net_pnl_usd": -6.526832978731363,
+      "delayed_net_pnl_usd": -7.2800653848732315,
+      "delta_usd": -0.7532324061418683
+    },
+    {
+      "symbol": "LRCX",
+      "exit_timestamp": "2025-04-30T16:10:00+00:00",
+      "primary_entry_price_net": 70.2875675,
+      "delayed_entry_price_net": 70.3475825,
+      "primary_net_pnl_usd": -5.161207919167282,
+      "delayed_net_pnl_usd": -7.289607286789195,
+      "delta_usd": -2.1283993676219133
+    },
+    {
+      "symbol": "AMZN",
+      "exit_timestamp": "2025-04-30T18:29:00+00:00",
+      "primary_entry_price_net": 182.61554247499998,
+      "delayed_entry_price_net": 182.4556025,
+      "primary_net_pnl_usd": -7.407262104676192,
+      "delayed_net_pnl_usd": -5.222263591494906,
+      "delta_usd": 2.184998513181286
+    },
+    {
+      "symbol": "GOOGL",
+      "exit_timestamp": "2025-04-30T18:29:00+00:00",
+      "primary_entry_price_net": 157.6293975,
+      "delayed_entry_price_net": 157.55938000000003,
+      "primary_net_pnl_usd": -7.116415261309612,
+      "delayed_net_pnl_usd": -6.008607675405408,
+      "delta_usd": 1.1078075859042045
+    },
+    {
+      "symbol": "INTU",
+      "exit_timestamp": "2025-04-30T19:52:00+00:00",
+      "primary_entry_price_net": 610.8826825,
+      "delayed_entry_price_net": 612.7531500000001,
+      "primary_net_pnl_usd": 63.394680532624534,
+      "delayed_net_pnl_usd": 55.56975716893439,
+      "delta_usd": -7.8249233636901465
+    },
+    {
+      "symbol": "LRCX",
+      "exit_timestamp": "2025-04-30T19:55:00+00:00",
+      "primary_entry_price_net": 70.8076975,
+      "delayed_entry_price_net": 70.82770250000002,
+      "primary_net_pnl_usd": 28.930161512454106,
+      "delayed_net_pnl_usd": 28.215875349055104,
+      "delta_usd": -0.7142861633990023
+    },
+    {
+      "symbol": "MSFT",
+      "exit_timestamp": "2025-04-30T19:55:00+00:00",
+      "primary_entry_price_net": 385.316305,
+      "delayed_entry_price_net": 385.24128625000003,
+      "primary_net_pnl_usd": 72.04837205111244,
+      "delayed_net_pnl_usd": 72.54923179978836,
+      "delta_usd": 0.5008597486759214
+    },
+    {
+      "symbol": "TXN",
+      "exit_timestamp": "2025-05-02T13:30:00+00:00",
+      "primary_entry_price_net": 157.2393,
+      "delayed_entry_price_net": 157.06425625000003,
+      "primary_net_pnl_usd": 86.89007376018617,
+      "delayed_net_pnl_usd": 89.7730908778932,
+      "delta_usd": 2.883017117707027
+    },
+    {
+      "symbol": "PYPL",
+      "exit_timestamp": "2025-05-02T18:41:00+00:00",
+      "primary_entry_price_net": 63.99599499999999,
+      "delayed_entry_price_net": 64.1260275,
+      "primary_net_pnl_usd": 144.62530916973856,
+      "delayed_net_pnl_usd": 139.26263111339634,
+      "delta_usd": -5.362678056342219
+    },
+    {
+      "symbol": "NFLX",
+      "exit_timestamp": "2025-05-05T16:13:00+00:00",
+      "primary_entry_price_net": 1139.9111065499999,
+      "delayed_entry_price_net": 1139.5848250000001,
+      "primary_net_pnl_usd": -5.582713940089434,
+      "delayed_net_pnl_usd": -4.868521963689632,
+      "delta_usd": 0.7141919763998015
+    },
+    {
+      "symbol": "AVGO",
+      "exit_timestamp": "2025-05-05T19:54:00+00:00",
+      "primary_entry_price_net": 203.10576375,
+      "delayed_entry_price_net": 202.93362072500003,
+      "primary_net_pnl_usd": -28.876165386518096,
+      "delayed_net_pnl_usd": -26.779978808265493,
+      "delta_usd": 2.0961865782526026
+    },
+    {
+      "symbol": "TSLA",
+      "exit_timestamp": "2025-05-05T19:54:00+00:00",
+      "primary_entry_price_net": 280.750069975,
+      "delayed_entry_price_net": 280.56672415,
+      "primary_net_pnl_usd": -9.350064232339264,
+      "delayed_net_pnl_usd": -7.722464706262905,
+      "delta_usd": 1.6275995260763594
+    },
+    {
+      "symbol": "MU",
+      "exit_timestamp": "2025-05-06T08:24:00+00:00",
+      "primary_entry_price_net": 80.5101225,
+      "delayed_entry_price_net": 80.5701375,
+      "primary_net_pnl_usd": -39.43409414139114,
+      "delayed_net_pnl_usd": -41.26691790739436,
+      "delta_usd": -1.8328237660032158
+    },
+    {
+      "symbol": "META",
+      "exit_timestamp": "2025-05-06T16:24:00+00:00",
+      "primary_entry_price_net": 591.007715,
+      "delayed_entry_price_net": 592.159502875,
+      "primary_net_pnl_usd": -5.795868713828895,
+      "delayed_net_pnl_usd": -10.647254298697238,
+      "delta_usd": -4.851385584868343
+    },
+    {
+      "symbol": "NVDA",
+      "exit_timestamp": "2025-05-06T16:50:00+00:00",
+      "primary_entry_price_net": 113.008245,
+      "delayed_entry_price_net": 113.15328125,
+      "primary_net_pnl_usd": -7.245538256965119,
+      "delayed_net_pnl_usd": -10.440671047707676,
+      "delta_usd": -3.195132790742557
+    },
+    {
+      "symbol": "AMD",
+      "exit_timestamp": "2025-05-06T16:52:00+00:00",
+      "primary_entry_price_net": 99.53487750000001,
+      "delayed_entry_price_net": 99.78894100000001,
+      "primary_net_pnl_usd": -18.45041076179541,
+      "delayed_net_pnl_usd": -24.768457308310335,
+      "delta_usd": -6.318046546514925
+    },
+    {
+      "symbol": "LRCX",
+      "exit_timestamp": "2025-05-06T17:20:00+00:00",
+      "primary_entry_price_net": 73.14328125,
+      "delayed_entry_price_net": 73.118375025,
+      "primary_net_pnl_usd": -5.982363383513075,
+      "delayed_net_pnl_usd": -5.13282912635416,
+      "delta_usd": 0.8495342571589148
+    },
+    {
+      "symbol": "AVGO",
+      "exit_timestamp": "2025-05-06T17:25:00+00:00",
+      "primary_entry_price_net": 199.989985,
+      "delayed_entry_price_net": 200.09001,
+      "primary_net_pnl_usd": -6.236190402234115,
+      "delayed_net_pnl_usd": -7.482822980517596,
+      "delta_usd": -1.2466325782834806
+    },
+    {
+      "symbol": "AVGO",
+      "exit_timestamp": "2025-05-06T20:28:00+00:00",
+      "primary_entry_price_net": 200.149924975,
+      "delayed_entry_price_net": 200.20003750000004,
+      "primary_net_pnl_usd": -14.98470428042674,
+      "delayed_net_pnl_usd": -15.60673408964802,
+      "delta_usd": -0.6220298092212797
+    },
+    {
+      "symbol": "MU",
+      "exit_timestamp": "2025-05-06T22:01:00+00:00",
+      "primary_entry_price_net": 79.7099225,
+      "delayed_entry_price_net": 79.7099225,
+      "primary_net_pnl_usd": 55.50446056449255,
+      "delayed_net_pnl_usd": 55.50446056449226,
+      "delta_usd": -2.8421709430404007e-13
+    },
+    {
+      "symbol": "STX",
+      "exit_timestamp": "2025-05-07T11:35:00+00:00",
+      "primary_entry_price_net": 93.30332,
+      "delayed_entry_price_net": 93.26331,
+      "primary_net_pnl_usd": 36.52087353376055,
+      "delayed_net_pnl_usd": 37.609042076674896,
+      "delta_usd": 1.088168542914346
+    },
+    {
+      "symbol": "AMAT",
+      "exit_timestamp": "2025-05-07T18:08:00+00:00",
+      "primary_entry_price_net": 153.0882625,
+      "delayed_entry_price_net": 153.1682825,
+      "primary_net_pnl_usd": -22.80049066465881,
+      "delayed_net_pnl_usd": -24.094658762006173,
+      "delta_usd": -1.294168097347363
+    },
+    {
+      "symbol": "ADI",
+      "exit_timestamp": "2025-05-07T19:42:00+00:00",
+      "primary_entry_price_net": 194.9187175,
+      "delayed_entry_price_net": 195.03374625000004,
+      "primary_net_pnl_usd": 67.09505078700295,
+      "delayed_net_pnl_usd": 65.58100647159098,
+      "delta_usd": -1.5140443154119652
+    },
+    {
+      "symbol": "PANW",
+      "exit_timestamp": "2025-05-07T20:10:00+00:00",
+      "primary_entry_price_net": 188.06700500000002,
+      "delayed_entry_price_net": 188.307065,
+      "primary_net_pnl_usd": -28.095106315964586,
+      "delayed_net_pnl_usd": -31.24637145186246,
+      "delta_usd": -3.151265135897873
+    },
+    {
+      "symbol": "ISRG",
+      "exit_timestamp": "2025-05-09T14:30:00+00:00",
+      "primary_entry_price_net": 535.49384,
+      "delayed_entry_price_net": 535.1337500000001,
+      "primary_net_pnl_usd": -2.9299590075579545,
+      "delayed_net_pnl_usd": -1.2496875781056647,
+      "delta_usd": 1.6802714294522898
+    },
+    {
+      "symbol": "AMAT",
+      "exit_timestamp": "2025-05-09T15:31:00+00:00",
+      "primary_entry_price_net": 155.9289725,
+      "delayed_entry_price_net": 155.73752465,
+      "primary_net_pnl_usd": -16.958041585247884,
+      "delayed_net_pnl_usd": -13.905642714349,
+      "delta_usd": 3.052398870898884
+    },
+    {
+      "symbol": "AVGO",
+      "exit_timestamp": "2025-05-12T08:00:00+00:00",
+      "primary_entry_price_net": 206.991735,
+      "delayed_entry_price_net": 207.191785,
+      "primary_net_pnl_usd": 129.51993590468737,
+      "delayed_net_pnl_usd": 126.98105405096064,
+      "delta_usd": -2.5388818537267355
+    },
+    {
+      "symbol": "MU",
+      "exit_timestamp": "2025-05-12T08:00:00+00:00",
+      "primary_entry_price_net": 84.881215,
+      "delayed_entry_price_net": 84.86121000000001,
+      "primary_net_pnl_usd": 166.00109930094686,
+      "delayed_net_pnl_usd": 166.62957669352105,
+      "delta_usd": 0.6284773925741831
+    },
+    {
+      "symbol": "NVDA",
+      "exit_timestamp": "2025-05-12T08:00:00+00:00",
+      "primary_entry_price_net": 115.58889,
+      "delayed_entry_price_net": 115.77893750000001,
+      "primary_net_pnl_usd": 136.48862576671536,
+      "delayed_net_pnl_usd": 132.16091225573714,
+      "delta_usd": -4.327713510978214
+    },
+    {
+      "symbol": "GILD",
+      "exit_timestamp": "2025-05-14T14:14:00+00:00",
+      "primary_entry_price_net": 100.70517000000001,
+      "delayed_entry_price_net": 100.64515500000002,
+      "primary_net_pnl_usd": -5.965247365155392,
+      "delayed_net_pnl_usd": -4.478047154878362,
+      "delta_usd": 1.48720021027703
+    },
+    {
+      "symbol": "MU",
+      "exit_timestamp": "2025-05-15T08:13:00+00:00",
+      "primary_entry_price_net": 95.39884375,
+      "delayed_entry_price_net": 95.26381,
+      "primary_net_pnl_usd": -42.51345420525604,
+      "delayed_net_pnl_usd": -39.030036694942346,
+      "delta_usd": 3.483417510313693
+    },
+    {
+      "symbol": "AMD",
+      "exit_timestamp": "2025-05-15T17:54:00+00:00",
+      "primary_entry_price_net": 116.1590325,
+      "delayed_entry_price_net": 115.95898250000002,
+      "primary_net_pnl_usd": -17.81765227770802,
+      "delayed_net_pnl_usd": -13.535443448721658,
+      "delta_usd": 4.282208828986363
+    },
+    {
+      "symbol": "KLAC",
+      "exit_timestamp": "2025-05-16T16:24:00+00:00",
+      "primary_entry_price_net": 789.31728,
+      "delayed_entry_price_net": 789.7923987500001,
+      "primary_net_pnl_usd": -5.17615045751927,
+      "delayed_net_pnl_usd": -6.6769721807228395,
+      "delta_usd": -1.5008217232035692
+    },
+    {
+      "symbol": "ADI",
+      "exit_timestamp": "2025-05-16T22:28:00+00:00",
+      "primary_entry_price_net": 224.81118874999999,
+      "delayed_entry_price_net": 224.85620000000003,
+      "primary_net_pnl_usd": -36.098001761489286,
+      "delayed_net_pnl_usd": -36.59122057786298,
+      "delta_usd": -0.493218816373691
+    },
+    {
+      "symbol": "LRCX",
+      "exit_timestamp": "2025-05-16T22:43:00+00:00",
+      "primary_entry_price_net": 83.440855,
+      "delayed_entry_price_net": 83.53087750000002,
+      "primary_net_pnl_usd": -10.834920135945595,
+      "delayed_net_pnl_usd": -13.517531286559954,
+      "delta_usd": -2.6826111506143597
+    },
+    {
+      "symbol": "AVGO",
+      "exit_timestamp": "2025-05-16T22:45:00+00:00",
+      "primary_entry_price_net": 229.837445,
+      "delayed_entry_price_net": 229.2873075,
+      "primary_net_pnl_usd": -63.56076465260048,
+      "delayed_net_pnl_usd": -57.714926064976304,
+      "delta_usd": 5.845838587624179
+    },
+    {
+      "symbol": "TSLA",
+      "exit_timestamp": "2025-05-16T22:48:00+00:00",
+      "primary_entry_price_net": 345.60698015,
+      "delayed_entry_price_net": 345.13626250000004,
+      "primary_net_pnl_usd": -46.95926676005229,
+      "delayed_net_pnl_usd": -43.61366186492811,
+      "delta_usd": 3.3456048951241755
+    },
+    {
+      "symbol": "TXN",
+      "exit_timestamp": "2025-05-19T08:02:00+00:00",
+      "primary_entry_price_net": 187.6469,
+      "delayed_entry_price_net": 187.60689000000002,
+      "primary_net_pnl_usd": -31.751490432295668,
+      "delayed_net_pnl_usd": -31.225099195450767,
+      "delta_usd": 0.5263912368449013
+    },
+    {
+      "symbol": "ADBE",
+      "exit_timestamp": "2025-05-20T14:00:00+00:00",
+      "primary_entry_price_net": 416.07399250000003,
+      "delayed_entry_price_net": 415.86394,
+      "primary_net_pnl_usd": -5.454618747890436,
+      "delayed_net_pnl_usd": -4.194626131806612,
+      "delta_usd": 1.2599926160838235
+    },
+    {
+      "symbol": "AMD",
+      "exit_timestamp": "2025-05-20T19:00:00+00:00",
+      "primary_entry_price_net": 112.8282,
+      "delayed_entry_price_net": 113.188189975,
+      "primary_net_pnl_usd": -10.553545124356788,
+      "delayed_net_pnl_usd": -18.47111821438061,
+      "delta_usd": -7.917573090023822
+    },
+    {
+      "symbol": "REGN",
+      "exit_timestamp": "2025-05-21T17:57:00+00:00",
+      "primary_entry_price_net": 601.250275,
+      "delayed_entry_price_net": 601.0017128750001,
+      "primary_net_pnl_usd": -5.895093457545499,
+      "delayed_net_pnl_usd": -4.863582228438926,
+      "delta_usd": 1.0315112291065738
+    },
+    {
+      "symbol": "ADBE",
+      "exit_timestamp": "2025-05-21T18:11:00+00:00",
+      "primary_entry_price_net": 416.204025,
+      "delayed_entry_price_net": 415.9739675,
+      "primary_net_pnl_usd": -10.317490922871457,
+      "delayed_net_pnl_usd": -8.94055347345782,
+      "delta_usd": 1.3769374494136368
+    },
+    {
+      "symbol": "AVGO",
+      "exit_timestamp": "2025-05-21T19:25:00+00:00",
+      "primary_entry_price_net": 230.67265375,
+      "delayed_entry_price_net": 230.50761250000002,
+      "primary_net_pnl_usd": -28.60846536300778,
+      "delayed_net_pnl_usd": -26.838972617444536,
+      "delta_usd": 1.7694927455632445
+    },
+    {
+      "symbol": "REGN",
+      "exit_timestamp": "2025-05-22T15:12:00+00:00",
+      "primary_entry_price_net": 594.8986875,
+      "delayed_entry_price_net": 594.8586775000001,
+      "primary_net_pnl_usd": -7.8668069426530565,
+      "delayed_net_pnl_usd": -7.6991868795599405,
+      "delta_usd": 0.16762006309311595
+    },
+    {
+      "symbol": "REGN",
+      "exit_timestamp": "2025-05-28T18:21:00+00:00",
+      "primary_entry_price_net": 598.7996625,
+      "delayed_entry_price_net": 598.5395975,
+      "primary_net_pnl_usd": -26.043100850945848,
+      "delayed_net_pnl_usd": -24.96816845939734,
+      "delta_usd": 1.0749323915485078
+    },
+    {
+      "symbol": "AVGO",
+      "exit_timestamp": "2025-06-02T13:32:00+00:00",
+      "primary_entry_price_net": 235.3688275,
+      "delayed_entry_price_net": 235.53887,
+      "primary_net_pnl_usd": 115.55900494087291,
+      "delayed_net_pnl_usd": 113.67075527703771,
+      "delta_usd": -1.8882496638351967
+    },
+    {
+      "symbol": "STX",
+      "exit_timestamp": "2025-06-02T14:34:00+00:00",
+      "primary_entry_price_net": 117.50937,
+      "delayed_entry_price_net": 117.65440625000001,
+      "primary_net_pnl_usd": 29.69755199096062,
+      "delayed_net_pnl_usd": 26.579115051205076,
+      "delta_usd": -3.1184369397555436
+    },
+    {
+      "symbol": "GILD",
+      "exit_timestamp": "2025-06-02T17:20:00+00:00",
+      "primary_entry_price_net": 108.9972425,
+      "delayed_entry_price_net": 108.90722000000001,
+      "primary_net_pnl_usd": -5.450578256601602,
+      "delayed_net_pnl_usd": -3.388588470076056,
+      "delta_usd": 2.0619897865255465
+    },
+    {
+      "symbol": "BKNG",
+      "exit_timestamp": "2025-06-03T14:50:00+00:00",
+      "primary_entry_price_net": 5496.9438924999995,
+      "delayed_entry_price_net": 5486.721337500001,
+      "primary_net_pnl_usd": -11.045864404372423,
+      "delayed_net_pnl_usd": -6.4085830520827285,
+      "delta_usd": 4.637281352289695
+    },
+    {
+      "symbol": "AMD",
+      "exit_timestamp": "2025-06-05T19:12:00+00:00",
+      "primary_entry_price_net": 116.26815977499999,
+      "delayed_entry_price_net": 116.2390525,
+      "primary_net_pnl_usd": -6.346541382678879,
+      "delayed_net_pnl_usd": -5.722108755144908,
+      "delta_usd": 0.6244326275339711
+    },
+    {
+      "symbol": "QCOM",
+      "exit_timestamp": "2025-06-05T19:16:00+00:00",
+      "primary_entry_price_net": 148.52712250000002,
+      "delayed_entry_price_net": 148.63715000000002,
+      "primary_net_pnl_usd": -18.161560862394253,
+      "delayed_net_pnl_usd": -19.99872256027507,
+      "delta_usd": -1.8371616978808163
+    },
+    {
+      "symbol": "TXN",
+      "exit_timestamp": "2025-06-06T12:30:00+00:00",
+      "primary_entry_price_net": 189.8374475,
+      "delayed_entry_price_net": 190.26255375000002,
+      "primary_net_pnl_usd": 40.88109381053482,
+      "delayed_net_pnl_usd": 35.20396811135495,
+      "delta_usd": -5.677125699179868
+    },
+    {
+      "symbol": "META",
+      "exit_timestamp": "2025-06-06T12:40:00+00:00",
+      "primary_entry_price_net": 684.80615875,
+      "delayed_entry_price_net": 685.071225,
+      "primary_net_pnl_usd": 37.96693457380479,
+      "delayed_net_pnl_usd": 36.98494999552762,
+      "delta_usd": -0.9819845782771708
+    },
+    {
+      "symbol": "GILD",
+      "exit_timestamp": "2025-06-10T14:50:00+00:00",
+      "primary_entry_price_net": 111.03775250000001,
+      "delayed_entry_price_net": 110.99274125000001,
+      "primary_net_pnl_usd": -6.426811907958836,
+      "delayed_net_pnl_usd": -5.415585003402236,
+      "delta_usd": 1.0112269045566
+    },
+    {
+      "symbol": "PANW",
+      "exit_timestamp": "2025-06-10T14:54:00+00:00",
+      "primary_entry_price_net": 195.9589775,
+      "delayed_entry_price_net": 196.16402875000003,
+      "primary_net_pnl_usd": -9.714904169165038,
+      "delayed_net_pnl_usd": -12.318011757291147,
+      "delta_usd": -2.603107588126109
+    },
+    {
+      "symbol": "STX",
+      "exit_timestamp": "2025-06-10T17:27:00+00:00",
+      "primary_entry_price_net": 127.67191,
+      "delayed_entry_price_net": 127.64190250000001,
+      "primary_net_pnl_usd": -7.807830438190649,
+      "delayed_net_pnl_usd": -7.22193775668618,
+      "delta_usd": 0.5858926815044692
+    },
+    {
+      "symbol": "STX",
+      "exit_timestamp": "2025-06-10T18:04:00+00:00",
+      "primary_entry_price_net": 126.77168499999999,
+      "delayed_entry_price_net": 126.75668125,
+      "primary_net_pnl_usd": -5.981422428833412,
+      "delayed_net_pnl_usd": -5.686214074810457,
+      "delta_usd": 0.29520835402295464
+    },
+    {
+      "symbol": "STX",
+      "exit_timestamp": "2025-06-11T18:15:00+00:00",
+      "primary_entry_price_net": 127.9219725,
+      "delayed_entry_price_net": 127.82194750000002,
+      "primary_net_pnl_usd": -38.958563197577405,
+      "delayed_net_pnl_usd": -37.032714980344686,
+      "delta_usd": 1.9258482172327192
+    },
+    {
+      "symbol": "AMAT",
+      "exit_timestamp": "2025-06-12T11:53:00+00:00",
+      "primary_entry_price_net": 171.862955,
+      "delayed_entry_price_net": 171.87295750000004,
+      "primary_net_pnl_usd": -12.738529079754244,
+      "delayed_net_pnl_usd": -12.883280372946874,
+      "delta_usd": -0.14475129319263047
+    },
+    {
+      "symbol": "TXN",
+      "exit_timestamp": "2025-06-12T13:36:00+00:00",
+      "primary_entry_price_net": 198.69966250000002,
+      "delayed_entry_price_net": 198.9597275,
+      "primary_net_pnl_usd": -6.658510303207095,
+      "delayed_net_pnl_usd": -9.917616367865362,
+      "delta_usd": -3.2591060646582672
+    },
+    {
+      "symbol": "AMD",
+      "exit_timestamp": "2025-06-12T18:08:00+00:00",
+      "primary_entry_price_net": 119.5502801,
+      "delayed_entry_price_net": 119.49486625000002,
+      "primary_net_pnl_usd": -9.62064036184529,
+      "delayed_net_pnl_usd": -8.465766411115865,
+      "delta_usd": 1.1548739507294243
+    },
+    {
+      "symbol": "TSLA",
+      "exit_timestamp": "2025-06-12T18:22:00+00:00",
+      "primary_entry_price_net": 327.12176,
+      "delayed_entry_price_net": 327.44184,
+      "primary_net_pnl_usd": -49.76688573086676,
+      "delayed_net_pnl_usd": -52.16203051509864,
+      "delta_usd": -2.3951447842318814
+    },
+    {
+      "symbol": "QCOM",
+      "exit_timestamp": "2025-06-13T08:03:00+00:00",
+      "primary_entry_price_net": 159.03474875,
+      "delayed_entry_price_net": 159.00974250000002,
+      "primary_net_pnl_usd": -48.16166394578613,
+      "delayed_net_pnl_usd": -47.77608202214455,
+      "delta_usd": 0.38558192364158117
+    },
+    {
+      "symbol": "LRCX",
+      "exit_timestamp": "2025-06-13T13:56:00+00:00",
+      "primary_entry_price_net": 90.482615,
+      "delayed_entry_price_net": 90.34758125,
+      "primary_net_pnl_usd": -10.088954657201612,
+      "delayed_net_pnl_usd": -6.367526579468028,
+      "delta_usd": 3.7214280777335835
+    },
+    {
+      "symbol": "NVDA",
+      "exit_timestamp": "2025-06-13T17:16:00+00:00",
+      "primary_entry_price_net": 142.89571500000002,
+      "delayed_entry_price_net": 142.83570000000003,
+      "primary_net_pnl_usd": -7.042674442688167,
+      "delayed_net_pnl_usd": -5.995213381529452,
+      "delta_usd": 1.0474610611587147
+    },
+    {
+      "symbol": "KLAC",
+      "exit_timestamp": "2025-06-13T18:35:00+00:00",
+      "primary_entry_price_net": 868.3070225,
+      "delayed_entry_price_net": 868.1969950000001,
+      "primary_net_pnl_usd": -5.509787869992579,
+      "delayed_net_pnl_usd": -5.1936585544163405,
+      "delta_usd": 0.31612931557623813
+    },
+    {
+      "symbol": "REGN",
+      "exit_timestamp": "2025-06-13T18:59:00+00:00",
+      "primary_entry_price_net": 519.812420625,
+      "delayed_entry_price_net": 520.17001,
+      "primary_net_pnl_usd": 35.85778772867525,
+      "delayed_net_pnl_usd": 34.11451959715989,
+      "delta_usd": -1.7432681315153573
+    },
+    {
+      "symbol": "MU",
+      "exit_timestamp": "2025-06-16T10:57:00+00:00",
+      "primary_entry_price_net": 115.45885750000001,
+      "delayed_entry_price_net": 115.38884000000002,
+      "primary_net_pnl_usd": 41.395535634846965,
+      "delayed_net_pnl_usd": 42.937644576373145,
+      "delta_usd": 1.5421089415261804
+    },
+    {
+      "symbol": "TSLA",
+      "exit_timestamp": "2025-06-17T17:47:00+00:00",
+      "primary_entry_price_net": 319.15977,
+      "delayed_entry_price_net": 319.37482375,
+      "primary_net_pnl_usd": -7.493430915494173,
+      "delayed_net_pnl_usd": -9.171781382470783,
+      "delta_usd": -1.6783504669766103
+    },
+    {
+      "symbol": "AMD",
+      "exit_timestamp": "2025-06-20T13:31:00+00:00",
+      "primary_entry_price_net": 127.24170247500001,
+      "delayed_entry_price_net": 127.17098480000001,
+      "primary_net_pnl_usd": 50.58159638161533,
+      "delayed_net_pnl_usd": 51.99993249560816,
+      "delta_usd": 1.4183361139928294
+    },
+    {
+      "symbol": "NVDA",
+      "exit_timestamp": "2025-06-20T16:23:00+00:00",
+      "primary_entry_price_net": 144.135924975,
+      "delayed_entry_price_net": 144.0660075,
+      "primary_net_pnl_usd": -6.183032180592818,
+      "delayed_net_pnl_usd": -4.972744004167664,
+      "delta_usd": 1.2102881764251538
+    },
+    {
+      "symbol": "MU",
+      "exit_timestamp": "2025-06-20T16:50:00+00:00",
+      "primary_entry_price_net": 121.19028999999999,
+      "delayed_entry_price_net": 121.54037750000002,
+      "primary_net_pnl_usd": 40.203664418989774,
+      "delayed_net_pnl_usd": 32.8868075138235,
+      "delta_usd": -7.316856905166276
+    },
+    {
+      "symbol": "AAPL",
+      "exit_timestamp": "2025-06-24T08:00:00+00:00",
+      "primary_entry_price_net": 199.60989,
+      "delayed_entry_price_net": 199.589885,
+      "primary_net_pnl_usd": 43.70177374477771,
+      "delayed_net_pnl_usd": 43.95673032228041,
+      "delta_usd": 0.2549565775026963
+    },
+    {
+      "symbol": "KLAC",
+      "exit_timestamp": "2025-06-30T13:14:00+00:00",
+      "primary_entry_price_net": 886.481565,
+      "delayed_entry_price_net": 887.4167987500001,
+      "primary_net_pnl_usd": 65.68364171227859,
+      "delayed_net_pnl_usd": 62.97971055283656,
+      "delta_usd": -2.7039311594420283
+    },
+    {
+      "symbol": "NFLX",
+      "exit_timestamp": "2025-07-01T14:55:00+00:00",
+      "primary_entry_price_net": 1313.00316875,
+      "delayed_entry_price_net": 1313.4382775,
+      "primary_net_pnl_usd": -10.224953903029018,
+      "delayed_net_pnl_usd": -11.049753154464275,
+      "delta_usd": -0.8247992514352571
+    },
+    {
+      "symbol": "LRCX",
+      "exit_timestamp": "2025-07-01T15:02:00+00:00",
+      "primary_entry_price_net": 95.62389999999999,
+      "delayed_entry_price_net": 95.6339025,
+      "primary_net_pnl_usd": -9.090954248885282,
+      "delayed_net_pnl_usd": -9.351482336507441,
+      "delta_usd": -0.2605280876221592
+    },
+    {
+      "symbol": "GOOGL",
+      "exit_timestamp": "2025-07-01T15:08:00+00:00",
+      "primary_entry_price_net": 176.624145,
+      "delayed_entry_price_net": 176.744175,
+      "primary_net_pnl_usd": -40.021496282402495,
+      "delayed_net_pnl_usd": -41.692109867270126,
+      "delta_usd": -1.6706135848676311
+    },
+    {
+      "symbol": "NFLX",
+      "exit_timestamp": "2025-07-01T15:49:00+00:00",
+      "primary_entry_price_net": 1289.32225,
+      "delayed_entry_price_net": 1288.5220500000003,
+      "primary_net_pnl_usd": -9.178228134975598,
+      "delayed_net_pnl_usd": -7.63137406146883,
+      "delta_usd": 1.5468540735067675
+    },
+    {
+      "symbol": "STX",
+      "exit_timestamp": "2025-07-01T16:52:00+00:00",
+      "primary_entry_price_net": 142.99574,
+      "delayed_entry_price_net": 143.07576,
+      "primary_net_pnl_usd": 42.971341314083475,
+      "delayed_net_pnl_usd": 41.54909783460189,
+      "delta_usd": -1.4222434794815868
+    },
+    {
+      "symbol": "BKNG",
+      "exit_timestamp": "2025-07-02T14:44:00+00:00",
+      "primary_entry_price_net": 5684.720825,
+      "delayed_entry_price_net": 5692.422750000001,
+      "primary_net_pnl_usd": -3.7381936869346646,
+      "delayed_net_pnl_usd": -7.11566968563637,
+      "delta_usd": -3.377475998701706
+    },
+    {
+      "symbol": "VRTX",
+      "exit_timestamp": "2025-07-07T14:40:00+00:00",
+      "primary_entry_price_net": 458.47459000000003,
+      "delayed_entry_price_net": 458.24453250000005,
+      "primary_net_pnl_usd": -11.553025763107144,
+      "delayed_net_pnl_usd": -10.3037235910722,
+      "delta_usd": 1.2493021720349429
+    },
+    {
+      "symbol": "GOOGL",
+      "exit_timestamp": "2025-07-07T16:25:00+00:00",
+      "primary_entry_price_net": 176.8341975,
+      "delayed_entry_price_net": 176.6937624,
+      "primary_net_pnl_usd": -5.912495022349503,
+      "delayed_net_pnl_usd": -3.9302098334850766,
+      "delta_usd": 1.9822851888644268
+    },
+    {
+      "symbol": "PYPL",
+      "exit_timestamp": "2025-07-07T16:50:00+00:00",
+      "primary_entry_price_net": 76.1290275,
+      "delayed_entry_price_net": 76.0890175,
+      "primary_net_pnl_usd": -4.2044573602365745,
+      "delayed_net_pnl_usd": -2.8920895187011753,
+      "delta_usd": 1.3123678415353992
+    },
+    {
+      "symbol": "TXN",
+      "exit_timestamp": "2025-07-07T17:03:00+00:00",
+      "primary_entry_price_net": 213.4833575,
+      "delayed_entry_price_net": 213.833445,
+      "primary_net_pnl_usd": -6.4595638327450615,
+      "delayed_net_pnl_usd": -10.541981049783852,
+      "delta_usd": -4.08241721703879
+    },
+    {
+      "symbol": "LRCX",
+      "exit_timestamp": "2025-07-07T18:14:00+00:00",
+      "primary_entry_price_net": 98.364585,
+      "delayed_entry_price_net": 98.31457250000001,
+      "primary_net_pnl_usd": -5.823361121281778,
+      "delayed_net_pnl_usd": -4.554576586294377,
+      "delta_usd": 1.2687845349874012
+    },
+    {
+      "symbol": "STX",
+      "exit_timestamp": "2025-07-07T20:57:00+00:00",
+      "primary_entry_price_net": 150.09751500000002,
+      "delayed_entry_price_net": 149.71742000000003,
+      "primary_net_pnl_usd": -52.2038123016232,
+      "delayed_net_pnl_usd": -45.98947136545708,
+      "delta_usd": 6.214340936166124
+    },
+    {
+      "symbol": "AMZN",
+      "exit_timestamp": "2025-07-08T14:55:00+00:00",
+      "primary_entry_price_net": 219.99998625,
+      "delayed_entry_price_net": 220.10501250000004,
+      "primary_net_pnl_usd": -17.211606189361646,
+      "delayed_net_pnl_usd": -18.39630412778584,
+      "delta_usd": -1.1846979384241934
+    },
+    {
+      "symbol": "PYPL",
+      "exit_timestamp": "2025-07-08T16:09:00+00:00",
+      "primary_entry_price_net": 75.04875750000001,
+      "delayed_entry_price_net": 75.09376875000001,
+      "primary_net_pnl_usd": -6.744740244367222,
+      "delayed_net_pnl_usd": -8.23919894152375,
+      "delta_usd": -1.494458697156528
+    },
+    {
+      "symbol": "ADI",
+      "exit_timestamp": "2025-07-09T16:12:00+00:00",
+      "primary_entry_price_net": 241.62039000000001,
+      "delayed_entry_price_net": 241.7504225,
+      "primary_net_pnl_usd": -5.283934232537376,
+      "delayed_net_pnl_usd": -6.625789868061435,
+      "delta_usd": -1.341855635524059
+    },
+    {
+      "symbol": "LRCX",
+      "exit_timestamp": "2025-07-10T08:57:00+00:00",
+      "primary_entry_price_net": 99.05475750000001,
+      "delayed_entry_price_net": 99.05475750000001,
+      "primary_net_pnl_usd": 41.39282507455482,
+      "delayed_net_pnl_usd": 41.39282507455497,
+      "delta_usd": 1.4921397450962104e-13
+    },
+    {
+      "symbol": "VRTX",
+      "exit_timestamp": "2025-07-11T15:57:00+00:00",
+      "primary_entry_price_net": 472.03737985,
+      "delayed_entry_price_net": 471.84293125000005,
+      "primary_net_pnl_usd": -6.964966685572108,
+      "delayed_net_pnl_usd": -5.937575704648549,
+      "delta_usd": 1.0273909809235588
+    },
+    {
+      "symbol": "INTC",
+      "exit_timestamp": "2025-07-11T16:07:00+00:00",
+      "primary_entry_price_net": 23.503574424999996,
+      "delayed_entry_price_net": 23.4758675,
+      "primary_net_pnl_usd": -6.853816555180856,
+      "delayed_net_pnl_usd": -3.911330433262818,
+      "delta_usd": 2.942486121918038
+    },
+    {
+      "symbol": "TSLA",
+      "exit_timestamp": "2025-07-18T13:35:00+00:00",
+      "primary_entry_price_net": 319.53986499999996,
+      "delayed_entry_price_net": 319.139765,
+      "primary_net_pnl_usd": 49.37609193143999,
+      "delayed_net_pnl_usd": 52.57220061561388,
+      "delta_usd": 3.1961086841738933
+    },
+    {
+      "symbol": "SBUX",
+      "exit_timestamp": "2025-07-24T15:20:00+00:00",
+      "primary_entry_price_net": 96.26406,
+      "delayed_entry_price_net": 96.24905625,
+      "primary_net_pnl_usd": -56.16299712478349,
+      "delayed_net_pnl_usd": -55.782040460266856,
+      "delta_usd": 0.38095666451663135
+    },
+    {
+      "symbol": "VRTX",
+      "exit_timestamp": "2025-07-25T14:07:00+00:00",
+      "primary_entry_price_net": 470.497595,
+      "delayed_entry_price_net": 469.91745000000003,
+      "primary_net_pnl_usd": -6.29627288530537,
+      "delayed_net_pnl_usd": -3.217626308621064,
+      "delta_usd": 3.0786465766843065
+    },
+    {
+      "symbol": "INTU",
+      "exit_timestamp": "2025-07-30T16:59:00+00:00",
+      "primary_entry_price_net": 803.7608899999999,
+      "delayed_entry_price_net": 804.50607625,
+      "primary_net_pnl_usd": 24.03136180214051,
+      "delayed_net_pnl_usd": 21.693438545984122,
+      "delta_usd": -2.3379232561563867
+    },
+    {
+      "symbol": "AVGO",
+      "exit_timestamp": "2025-07-31T17:25:00+00:00",
+      "primary_entry_price_net": 295.4838525,
+      "delayed_entry_price_net": 295.42383750000005,
+      "primary_net_pnl_usd": -9.539099941171571,
+      "delayed_net_pnl_usd": -9.033165781688322,
+      "delta_usd": 0.5059341594832496
+    },
+    {
+      "symbol": "AMD",
+      "exit_timestamp": "2025-08-01T18:04:00+00:00",
+      "primary_entry_price_net": 171.2864109,
+      "delayed_entry_price_net": 171.142775,
+      "primary_net_pnl_usd": -9.765455071485576,
+      "delayed_net_pnl_usd": -7.675462782463403,
+      "delta_usd": 2.089992289022173
+    },
+    {
+      "symbol": "KLAC",
+      "exit_timestamp": "2025-08-05T14:12:00+00:00",
+      "primary_entry_price_net": 908.47206125,
+      "delayed_entry_price_net": 907.8976176750001,
+      "primary_net_pnl_usd": -29.641920097078128,
+      "delayed_net_pnl_usd": -28.078878957501733,
+      "delta_usd": 1.563041139576395
+    },
+    {
+      "symbol": "REGN",
+      "exit_timestamp": "2025-08-06T13:36:00+00:00",
+      "primary_entry_price_net": 570.3125425,
+      "delayed_entry_price_net": 570.55760375,
+      "primary_net_pnl_usd": -37.55841363948275,
+      "delayed_net_pnl_usd": -38.61606147247856,
+      "delta_usd": -1.057647832995812
+    },
+    {
+      "symbol": "TXN",
+      "exit_timestamp": "2025-08-11T16:44:00+00:00",
+      "primary_entry_price_net": 186.0765075,
+      "delayed_entry_price_net": 186.31156625,
+      "primary_net_pnl_usd": -10.45059046478491,
+      "delayed_net_pnl_usd": -13.591513940697114,
+      "delta_usd": -3.1409234759122047
+    },
+    {
+      "symbol": "TSLA",
+      "exit_timestamp": "2025-08-14T13:23:00+00:00",
+      "primary_entry_price_net": 340.0801988,
+      "delayed_entry_price_net": 340.34496497500004,
+      "primary_net_pnl_usd": -45.30989195158054,
+      "delayed_net_pnl_usd": -47.21948068537048,
+      "delta_usd": -1.9095887337899384
+    },
+    {
+      "symbol": "GILD",
+      "exit_timestamp": "2025-08-14T13:31:00+00:00",
+      "primary_entry_price_net": 120.0400025,
+      "delayed_entry_price_net": 120.09001500000001,
+      "primary_net_pnl_usd": -27.276167792482283,
+      "delayed_net_pnl_usd": -28.305954495883885,
+      "delta_usd": -1.0297867034016015
+    },
+    {
+      "symbol": "GILD",
+      "exit_timestamp": "2025-08-14T16:30:00+00:00",
+      "primary_entry_price_net": 119.14477875,
+      "delayed_entry_price_net": 119.108869775,
+      "primary_net_pnl_usd": -5.329836474264994,
+      "delayed_net_pnl_usd": -4.577742623450197,
+      "delta_usd": 0.7520938508147967
+    }
+  ]
+}

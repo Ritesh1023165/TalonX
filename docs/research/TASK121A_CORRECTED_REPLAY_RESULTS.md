@@ -6,6 +6,18 @@ Original-shaped exit lifecycle — see
 and parity evidence are in that companion document; this document covers
 Parts 5-7 (the frozen replay, economics, and decision).
 
+> **Correction (Task 121B, 2026-09-13):** this document's guess at the
+> post-backtest hang's cause (unbounded `published_log` growth) was
+> **WRONG** — disproven directly by a controlled reproduction
+> (`published_log` was only 14 rows on a comparable window). The REAL
+> cause was an O(n²) rejection-summarization pattern elsewhere in the
+> same adapter. Root-caused, fixed, and fix-verified in
+> `docs/research/TASK121B_RELIABILITY_FIX.md`. Task 121A's own N=33
+> one-month economic result is unaffected (the hang was in reporting,
+> not in the backtest computation) and is superseded, not invalidated,
+> by Task 121B's full-Segment-A continuous replay
+> (`docs/research/TASK121B_EXTENDED_EXPERIMENTAL_RESULTS.md`).
+
 ## Part 5 — the frozen replay
 
 **Window** (frozen before any outcome was inspected — chosen purely from
