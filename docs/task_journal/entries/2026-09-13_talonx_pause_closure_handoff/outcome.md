@@ -42,3 +42,34 @@
 
 No further task scheduled. Research and application activation remain
 paused pending a concrete resumption decision.
+
+---
+
+> **Correction (2026-09-13, handoff-correction task) — appended, original
+> record above preserved unchanged.**
+>
+> Point 4 above overstated two things, now corrected in
+> `docs/research/NEXT_SESSION_HANDOFF.md`:
+>
+> - **SPCX valuation provenance**: "no mark-to-market price newer than
+>   the entry fill is stored anywhere" overstated what was checked. The
+>   inspected ledger mark table is empty. Earlier September 11 reports
+>   recorded a historical reference mark of $151.21 at 20:08 UTC. Its
+>   provenance has not been reconciled with this ledger inspection. It
+>   is not a current valuation. This is not an assertion that the
+>   historical mark was fabricated, nor that its underlying source has
+>   now been verified — the two observations simply have not been
+>   reconciled. The earlier reports remain preserved, not deleted.
+> - **Monitoring-gap timestamp**: citing "last ledger activity
+>   2026-09-11T08:59:27-04:00" as establishing when the application or
+>   exit evaluation stopped overstated what that timestamp shows.
+>   Earlier EOD evidence places canonical shutdown after 20:09 UTC on
+>   September 11. The stored activity timestamp and that shutdown
+>   timestamp describe different observations. The exact last SPCX
+>   exit evaluation is unresolved. Uninterrupted evaluation before
+>   shutdown is not inferred from either timestamp. Active exit
+>   monitoring remains unavailable while the application stays stopped.
+>
+> No production database, provider, or process was inspected to make
+> this correction — existing reports only. No new investigation was
+> opened.

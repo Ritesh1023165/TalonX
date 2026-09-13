@@ -89,28 +89,33 @@ report:**
   $152.06332906087238** (unchanged since entry — resolves under this
   existing policy on its own next qualifying tick once the application
   is restarted; no manual action taken or implied here).
-  - **Last stored mark**: **there is none beyond the entry fill
-    itself.** The ledger's own mark-to-market table (`latest_prices`)
-    is EMPTY for SPCX (and every other ticker) — no subsequent price
-    update was ever persisted after the 2026-09-10T19:29:45Z entry.
-    The prior handoff text ("$151.2100 @ 2026-09-11T20:09:20Z") is
-    **withdrawn as a current figure** — it is not present in the
-    authoritative ledger as read this task and must not be treated as
-    today's value.
-  - The most recent ledger ACTIVITY of any kind (any ticker) is a
-    2026-09-11T08:59:27-04:00 SELL (BLSH, `confirmed_bearish`); no
-    ledger file has been written since 2026-09-11 21:09 local time
-    (`exp_quant.db`/`forward_outcomes.db` mtimes) — consistent with no
-    process having run since then.
-  - **Exit evaluation for SPCX is currently INACTIVE** because no
-    application process is running (verified this task — see
-    "Application state" below) — this is an observation gap, not a
-    resolved or flattened position. **A future restart must disclose
-    this gap explicitly** (no exit check has run since ~2026-09-11)
-    and follow the existing recovery/stale-check policy on its own
-    next qualifying tick — it must NOT claim uninterrupted monitoring
-    across this gap, and must NOT fabricate or back-fill a closing
-    fill for any time during the gap.
+  - **Last stored mark / valuation provenance (corrected 2026-09-13,
+    handoff-correction task)**: The inspected ledger mark table is
+    empty. Earlier September 11 reports recorded a historical
+    reference mark of $151.21 at 20:08 UTC. Its provenance has not
+    been reconciled with this ledger inspection. It is not a current
+    valuation. The earlier reports are preserved, not deleted — this
+    is not an assertion that the historical mark was fabricated, and
+    it is not an assertion that its underlying source has now been
+    verified; the two observations (empty ledger mark table vs. an
+    earlier-reported $151.21 mark) simply have not been reconciled.
+  - **Monitoring-gap timestamp (corrected 2026-09-13, handoff-correction
+    task)**: Earlier EOD evidence places canonical shutdown after
+    20:09 UTC on September 11. The stored activity timestamp
+    (2026-09-11T08:59:27-04:00, the most recent ledger row of any
+    kind) and that shutdown timestamp describe different observations
+    — the stored-activity timestamp does not by itself establish when
+    the application or exit evaluation actually stopped. The exact
+    last SPCX exit evaluation is unresolved. Uninterrupted evaluation
+    before shutdown is not inferred from either timestamp alone.
+  - **Exit evaluation for SPCX is currently INACTIVE/unavailable**
+    because no application process is running (verified this task —
+    see "Application state" below) — this is an observation gap, not
+    a resolved or flattened position. **A future restart must disclose
+    this gap explicitly** and follow the existing recovery/stale-check
+    policy on its own next qualifying tick — it must NOT claim
+    uninterrupted monitoring across this gap, and must NOT fabricate
+    or back-fill a closing fill for any time during the gap.
 - **V2**: re-verified read-only this task directly against
   `v2_lane.db` (`positions` table: 0 rows; `portfolio` table: cash
   $300,000.00 flat) — **0 open positions, no pending entry/exit
