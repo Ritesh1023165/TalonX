@@ -1,4 +1,4 @@
-# Product status (authoritative, updated 2026-09-13 / Task 123)
+# Product status (authoritative, updated 2026-09-13 / Task 124)
 
 **User objective, unchanged**: configured tickers with intraday and
 short/long-horizon alerts, and attributable local paper portfolios.
@@ -16,7 +16,8 @@ latest, explicit user goal.
 | V2 | medium (10-trading-day hold) | 39-name live scope, full available history (2019–2026), chronological replay (the real `V2Service.tick()`), N=57, 19 distinct issuers, net@20bps=−0.85%, 95% CI=[−4.57%, +1.11%] — includes zero | `INCONCLUSIVE` (not negative, not positive — genuinely underdetermined at current evidence) |
 | V2 | broad 620-name panel (not the live scope) | N=170 (Task 115/116) / N=756 (Task 112R), net@20bps positive, CIs exclude zero | positive, but this is a **different population** than the live 39-name scope and does not transfer automatically |
 | Overnight attention — daily association | non-actionable, research finding only | **Resolved (Task 123)**: 38 active configured tickers, full available history, N=2,557 triggers/1,905 dates, incremental (trigger-minus-control) net **+0.1687%/event**, date-block-bootstrap 95% CI **[+0.0295%,+0.3085%]** — excludes zero, robust to 2 sensitivities | **`ASSOCIATION_SUPPORTED`** (qualified — CI's lower bound does not fully clear the predeclared ±10bps materiality band) — a real, disclosed research finding, **not actionable**: it depends on same-day final volume, only known at/after that day's own close |
-| Overnight attention — actionable pre-close candidate | EOD alert, 15:50 ET decision | **Resolved (Task 123)**: 12 symbols with existing 1-min coverage, common 7-month window, N=31 triggers, incremental net **−0.5504%/event**, 95% CI **[−2.14%,+1.21%]** — includes zero, small-sample-limited | **`NOT_SUPPORTED_UNDER_TESTED_CONTRACT`** — closed as an actionable candidate on currently available data; exact missing input named (broader/longer intraday coverage), not pursued |
+| Overnight attention — actionable pre-close candidate | EOD alert, 15:50 ET decision | **Resolved (Task 123)**: 12 symbols with existing 1-min coverage, common 7-month window, N=31 triggers, incremental net **−0.5504%/event**, 95% CI **[−2.14%,+1.21%]** — includes zero, small-sample-limited. Wording correction (Task 124): the design is causally timed, reference-fill only — execution quality (spread-crossing, slippage, fill probability) was never established | **`NOT_SUPPORTED_UNDER_TESTED_CONTRACT`** — closed as an actionable candidate on currently available data; exact missing input named (broader/longer intraday coverage) |
+| Overnight attention — data-extension feasibility | data question only, no returns computed | **Resolved (Task 124)**: existing free Alpaca SIP access, already used in this program, verified (small probes, not mere documentation) to retain 1-min history to at least 2020-03-02 and to cover 2 of the 5 currently-locally-uncovered active tickers (SHOP, BABA) substantially; SPCX confirmed genuinely thin (not an entitlement gap) | **`DATA_EXTENSION_FEASIBLE`** — one concrete acquisition task specified, not executed; does not authorize deployment or a new backtest |
 
 ## Informational lane
 
@@ -44,7 +45,9 @@ Experimental contract on its now-exhausted historical dataset.
 
 ## Full evidence
 
-`docs/research/TASK123_OVERNIGHT_ATTENTION_RESULTS.md` (this task —
+`docs/research/TASK124_INTRADAY_DATA_FEASIBILITY.md` (this task — data-
+extension feasibility for the overnight-attention actionable candidate,
+no strategy return computed); `docs/research/TASK123_OVERNIGHT_ATTENTION_RESULTS.md` (prior task —
 overnight-attention diagnostic + actionable-candidate closure);
 `docs/research/TASK122_CANDIDATE_DECISION.md` (Experimental
 closure + new-candidate selection); `docs/research/TASK121B_EXTENDED_EXPERIMENTAL_RESULTS.md`

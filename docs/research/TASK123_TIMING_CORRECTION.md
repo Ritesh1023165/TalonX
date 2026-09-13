@@ -37,13 +37,24 @@ alert strategy and **not** an achievable paper fill, because the
 selection criterion (S's final volume) is not known in time to act on
 S's own close.
 
-**Track B — ACTIONABLE PRE-CLOSE CANDIDATE.** A genuinely executable
-version must use only information available at a **fixed pre-close
-cutoff** (e.g., volume accumulated from the session's open through a
-time strictly before the close), enter after a stated decision/delivery
-delay at a **subsequent observed price**, and exit at the next session's
-observed open. This requires intraday (sub-daily) data to construct
-the pre-close cumulative-volume measure and the post-decision entry
+**Track B — ACTIONABLE PRE-CLOSE CANDIDATE.** A **causally timed**
+version — the minimum bar for even being a candidate — must use only
+information available at a **fixed pre-close cutoff** (e.g., volume
+accumulated from the session's open through a time strictly before the
+close), enter after a stated decision/delivery delay at a **subsequent
+observed price**, and exit at the next session's observed open.
+**Correction (Task 124, 2026-09-13): causal timing is not the same
+claim as executability.** Track B (below and in
+`TASK123_OVERNIGHT_ATTENTION_RESULTS.md`) uses causally-timed
+REFERENCE FILLS (observed subsequent 1-minute bar prices) — this
+establishes that no future information leaked into the decision, not
+that those exact prices were actually obtainable through a real order
+(spread-crossing, slippage, fill probability, and route/latency were
+never modeled or verified). "Genuinely executable" is withdrawn as the
+description of this design; "causally timed, reference-fill only,
+execution quality not established" is the accurate one. This requires
+intraday (sub-daily) data to construct the pre-close cumulative-volume
+measure and the post-decision entry
 price — daily bars alone cannot support it. Frozen separately in
 `docs/research/TASK123_FROZEN_PROTOCOL.md` §B and evaluated in
 `docs/research/TASK123_OVERNIGHT_ATTENTION_RESULTS.md`.

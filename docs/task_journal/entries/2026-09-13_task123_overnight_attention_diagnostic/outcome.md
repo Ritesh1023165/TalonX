@@ -1,3 +1,11 @@
+> **Correction (Task 124, 2026-09-13):** point 10's closing line below
+> called Track B "genuinely causal, executable." Track B's timing IS
+> causal (no future information leaked); its prices are causally-timed
+> REFERENCE FILLS only — actual execution quality (spread-crossing,
+> slippage, fill probability) was never established. "Executable" is
+> withdrawn from that description; the results/decision themselves are
+> unaffected. See `docs/research/TASK123_TIMING_CORRECTION.md`.
+
 1. **Diagnostic and actionable verdicts (separate)**: Diagnostic (Track A, daily association) = **`ASSOCIATION_SUPPORTED`** (95% CI on the incremental effect excludes zero, robust to both predefined sensitivities — qualified: the CI's lower bound does not fully clear the predeclared materiality band). Actionable candidate (Track B, pre-close mechanism) = **`NOT_SUPPORTED_UNDER_TESTED_CONTRACT`** (negative point estimate, CI includes zero, N=31 on the one frozen contract tested).
 
 2. **SHAs**: release verified `f28986999eec5e313cfc89db24e4dbacfb378891` unchanged (research-only). Research `36b28ca` → **`<this commit>`**, pushed.

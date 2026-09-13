@@ -1,0 +1,935 @@
+{
+  "summary": {
+    "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+    "note": "current watchlist membership is NOT treated as historical point-in-time membership -- this is a snapshot of TODAY's configured/active/paused status only, used to scope which symbols' historical price series are relevant to check, not a claim about what was configured/tradable at any past date.",
+    "n_configured": 48,
+    "n_active": 43,
+    "n_paused": 5,
+    "n_active_with_daily_coverage": 38,
+    "n_active_with_minute_coverage": 12,
+    "active_missing_daily": [
+      "BABA",
+      "BLSH",
+      "SHOP",
+      "SKHY",
+      "SPCX"
+    ],
+    "active_missing_minute": [
+      "ABCL",
+      "ABT",
+      "ACHR",
+      "ADC",
+      "ADP",
+      "AFL",
+      "AGNC",
+      "BABA",
+      "BAC",
+      "BLK",
+      "BLSH",
+      "C",
+      "CVX",
+      "DELL",
+      "IBM",
+      "JNJ",
+      "JPM",
+      "KO",
+      "MA",
+      "MCD",
+      "MSTR",
+      "NUE",
+      "ORCL",
+      "PG",
+      "SHOP",
+      "SKHY",
+      "SPCX",
+      "UNH",
+      "V",
+      "VRT",
+      "WMT"
+    ],
+    "daily_source_precedence": "task95g_broad_cross_sectional/_daily checked first, task107a_form4_feasibility/_prices fallback",
+    "daily_source_overlap": [],
+    "prior_tasks_using_this_data": {
+      "task95g_broad_cross_sectional/_daily": [
+        "Task 95E",
+        "Task 95G",
+        "Task 121A/B (daily reconciliation only)",
+        "Task 122",
+        "Task 123 Track A"
+      ],
+      "task107a_form4_feasibility/_prices": [
+        "Task 107A/B",
+        "Task 116",
+        "Task 120A-C",
+        "Task 122",
+        "Task 123 Track A"
+      ],
+      "task93_alpha_foundation/_canonical_data": [
+        "Task 93",
+        "Task 121A/B (Experimental replay)",
+        "Task 123 Track B"
+      ]
+    },
+    "outcomes_already_inspected": {
+      "daily_close_to_close_returns": "YES -- Task 93/95E/95G (momentum/cross-sectional), Task 121A/B (Experimental trade returns)",
+      "daily_close_to_next_open_overnight_returns": "YES -- Task 123 Track A (this exact return definition, this exact universe)",
+      "intraday_1min_returns": "YES -- Task 121A/B (Experimental), Task 123 Track B (this exact pre-close mechanism, 12 symbols, 2025-01-24..2025-08-14)",
+      "unexamined_period": "any date range NOT already covered by an existing local file is, by definition, unexamined for THIS specific hypothesis -- see Part 3 probe evidence for what such an extension could look like"
+    }
+  },
+  "tickers": [
+    {
+      "symbol": "AAPL",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "source_dir": "task93_alpha_foundation/_canonical_data",
+        "provider": "Alpaca (unspecified feed in manifest)",
+        "adjustment": "UNADJUSTED (per canonical_dataset_manifest.json)",
+        "first_ts": "2025-01-24 00:01:00+00:00",
+        "last_ts": "2026-08-14 23:59:00+00:00",
+        "n_rows": 299700,
+        "note": "extended-hours bars present; regular-session subset must be filtered by timestamp (09:30-16:00 ET), not assumed equal to all rows"
+      }
+    },
+    {
+      "symbol": "ABCL",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task107a_form4_feasibility/_prices",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2020-12-11",
+        "last_date": "2026-08-31",
+        "n_rows": 1435
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "ABT",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "ACHR",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task107a_form4_feasibility/_prices",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2020-12-18",
+        "last_date": "2026-08-31",
+        "n_rows": 1430
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "ADC",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task107a_form4_feasibility/_prices",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-01-02",
+        "last_date": "2026-08-31",
+        "n_rows": 1926
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "ADP",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "AFL",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "AGNC",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task107a_form4_feasibility/_prices",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-01-02",
+        "last_date": "2026-08-31",
+        "n_rows": 1926
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "AMAT",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "source_dir": "task93_alpha_foundation/_canonical_data",
+        "provider": "Alpaca (unspecified feed in manifest)",
+        "adjustment": "UNADJUSTED (per canonical_dataset_manifest.json)",
+        "first_ts": "2025-01-24 00:34:00+00:00",
+        "last_ts": "2025-08-14 23:59:00+00:00",
+        "n_rows": 63195,
+        "note": "extended-hours bars present; regular-session subset must be filtered by timestamp (09:30-16:00 ET), not assumed equal to all rows"
+      }
+    },
+    {
+      "symbol": "AMD",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "source_dir": "task93_alpha_foundation/_canonical_data",
+        "provider": "Alpaca (unspecified feed in manifest)",
+        "adjustment": "UNADJUSTED (per canonical_dataset_manifest.json)",
+        "first_ts": "2025-01-24 00:01:00+00:00",
+        "last_ts": "2026-08-14 23:59:00+00:00",
+        "n_rows": 321827,
+        "note": "extended-hours bars present; regular-session subset must be filtered by timestamp (09:30-16:00 ET), not assumed equal to all rows"
+      }
+    },
+    {
+      "symbol": "ASML",
+      "status": "paused",
+      "configured_horizon": "INTRADAY",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "AVGO",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "source_dir": "task93_alpha_foundation/_canonical_data",
+        "provider": "Alpaca (unspecified feed in manifest)",
+        "adjustment": "UNADJUSTED (per canonical_dataset_manifest.json)",
+        "first_ts": "2025-01-24 00:01:00+00:00",
+        "last_ts": "2025-08-14 23:59:00+00:00",
+        "n_rows": 93521,
+        "note": "extended-hours bars present; regular-session subset must be filtered by timestamp (09:30-16:00 ET), not assumed equal to all rows"
+      }
+    },
+    {
+      "symbol": "BABA",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "BAC",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "BLK",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "BLSH",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "C",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "CSCO",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "source_dir": "task93_alpha_foundation/_canonical_data",
+        "provider": "Alpaca (unspecified feed in manifest)",
+        "adjustment": "UNADJUSTED (per canonical_dataset_manifest.json)",
+        "first_ts": "2025-01-24 00:44:00+00:00",
+        "last_ts": "2025-08-14 23:59:00+00:00",
+        "n_rows": 66709,
+        "note": "extended-hours bars present; regular-session subset must be filtered by timestamp (09:30-16:00 ET), not assumed equal to all rows"
+      }
+    },
+    {
+      "symbol": "CVX",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "DELL",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "GOOGL",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "source_dir": "task93_alpha_foundation/_canonical_data",
+        "provider": "Alpaca (unspecified feed in manifest)",
+        "adjustment": "UNADJUSTED (per canonical_dataset_manifest.json)",
+        "first_ts": "2025-01-24 00:01:00+00:00",
+        "last_ts": "2026-08-14 23:59:00+00:00",
+        "n_rows": 296128,
+        "note": "extended-hours bars present; regular-session subset must be filtered by timestamp (09:30-16:00 ET), not assumed equal to all rows"
+      }
+    },
+    {
+      "symbol": "IBM",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "INTC",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "source_dir": "task93_alpha_foundation/_canonical_data",
+        "provider": "Alpaca (unspecified feed in manifest)",
+        "adjustment": "UNADJUSTED (per canonical_dataset_manifest.json)",
+        "first_ts": "2025-01-24 00:00:00+00:00",
+        "last_ts": "2025-08-14 23:59:00+00:00",
+        "n_rows": 120249,
+        "note": "extended-hours bars present; regular-session subset must be filtered by timestamp (09:30-16:00 ET), not assumed equal to all rows"
+      }
+    },
+    {
+      "symbol": "JNJ",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "JPM",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "KO",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "MA",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "MCD",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "MSFT",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "source_dir": "task93_alpha_foundation/_canonical_data",
+        "provider": "Alpaca (unspecified feed in manifest)",
+        "adjustment": "UNADJUSTED (per canonical_dataset_manifest.json)",
+        "first_ts": "2025-01-24 00:03:00+00:00",
+        "last_ts": "2026-08-14 23:59:00+00:00",
+        "n_rows": 284554,
+        "note": "extended-hours bars present; regular-session subset must be filtered by timestamp (09:30-16:00 ET), not assumed equal to all rows"
+      }
+    },
+    {
+      "symbol": "MSTR",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task107a_form4_feasibility/_prices",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-01-02",
+        "last_date": "2026-08-31",
+        "n_rows": 1926
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "NUE",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "NVDA",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "source_dir": "task93_alpha_foundation/_canonical_data",
+        "provider": "Alpaca (unspecified feed in manifest)",
+        "adjustment": "UNADJUSTED (per canonical_dataset_manifest.json)",
+        "first_ts": "2025-01-24 00:01:00+00:00",
+        "last_ts": "2026-08-14 23:59:00+00:00",
+        "n_rows": 371748,
+        "note": "extended-hours bars present; regular-session subset must be filtered by timestamp (09:30-16:00 ET), not assumed equal to all rows"
+      }
+    },
+    {
+      "symbol": "ORCL",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "PATH",
+      "status": "paused",
+      "configured_horizon": "INTRADAY",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "PG",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "PLTR",
+      "status": "paused",
+      "configured_horizon": "INTRADAY",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2020-09-30",
+        "last_date": "2026-08-14",
+        "n_rows": 1475
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "PYPL",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "source_dir": "task93_alpha_foundation/_canonical_data",
+        "provider": "Alpaca (unspecified feed in manifest)",
+        "adjustment": "UNADJUSTED (per canonical_dataset_manifest.json)",
+        "first_ts": "2025-01-24 00:56:00+00:00",
+        "last_ts": "2026-08-14 23:59:00+00:00",
+        "n_rows": 215132,
+        "note": "extended-hours bars present; regular-session subset must be filtered by timestamp (09:30-16:00 ET), not assumed equal to all rows"
+      }
+    },
+    {
+      "symbol": "RIG",
+      "status": "paused",
+      "configured_horizon": "INTRADAY",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task107a_form4_feasibility/_prices",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-01-02",
+        "last_date": "2026-08-31",
+        "n_rows": 1926
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "SHOP",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "SKHY",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "SMCI",
+      "status": "paused",
+      "configured_horizon": "INTRADAY",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "SPCX",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "STX",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "source_dir": "task93_alpha_foundation/_canonical_data",
+        "provider": "Alpaca (unspecified feed in manifest)",
+        "adjustment": "UNADJUSTED (per canonical_dataset_manifest.json)",
+        "first_ts": "2025-01-24 12:17:00+00:00",
+        "last_ts": "2026-08-14 23:58:00+00:00",
+        "n_rows": 180681,
+        "note": "extended-hours bars present; regular-session subset must be filtered by timestamp (09:30-16:00 ET), not assumed equal to all rows"
+      }
+    },
+    {
+      "symbol": "TSLA",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "source_dir": "task93_alpha_foundation/_canonical_data",
+        "provider": "Alpaca (unspecified feed in manifest)",
+        "adjustment": "UNADJUSTED (per canonical_dataset_manifest.json)",
+        "first_ts": "2025-01-24 00:00:00+00:00",
+        "last_ts": "2026-08-14 23:59:00+00:00",
+        "n_rows": 367018,
+        "note": "extended-hours bars present; regular-session subset must be filtered by timestamp (09:30-16:00 ET), not assumed equal to all rows"
+      }
+    },
+    {
+      "symbol": "UNH",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "V",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "VRT",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    },
+    {
+      "symbol": "WMT",
+      "status": "active",
+      "configured_horizon": "DUAL_HORIZON",
+      "snapshot_taken_at_utc": "2026-09-13T06:55:39.492958+00:00",
+      "daily_coverage": {
+        "source_dir": "task95g_broad_cross_sectional/_daily",
+        "provider": "Alpaca SIP",
+        "adjustment": "all (split+dividend back-adjusted -- total-return proxy)",
+        "first_date": "2019-06-03",
+        "last_date": "2026-08-14",
+        "n_rows": 1811
+      },
+      "minute_coverage": {
+        "status": "NO_LOCAL_DATA_LOCATED"
+      }
+    }
+  ]
+}
