@@ -51,12 +51,38 @@ def test_transaction_rolls_back_nothing_partial_on_exception(tmp_path):
     assert fresh.cash() == 300_000.0        # the partial cash write never committed
 
 
-def test_transaction_is_not_reentrant_across_two_blocks(tmp_path):
+def test_transaction_is_reentrant_nested_blocks_join_the_outer_one(tmp_path):
+    # Task 131 Final Remediation Directive 2: reentrant so a caller can
+    # wrap an entire sequence (e.g. process_episode + mark_entry_intent
+    # FILLED) around a function that ALSO opens its own transaction()
+    # internally (paper.enter_position) -- without raising, and with the
+    # INNER writes only truly committing once the OUTER block exits.
     store = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
     with store.transaction():
-        with pytest.raises(RuntimeError):
+        store.set_cash(200_000.0)
+        with store.transaction():   # nested -- joins the SAME outer transaction
+            store.set_cooldown("AAA", date(2026, 9, 10))
+        # a fresh connection mid-outer-transaction sees NOTHING yet --
+        # the outer block has not committed.
+        mid = V2Store(str(tmp_path / "v.db"))
+        assert mid.cash() == 300_000.0
+    # only now, after the OUTERMOST block exits, does everything commit together.
+    fresh = V2Store(str(tmp_path / "v.db"))
+    assert fresh.cash() == 200_000.0
+    assert fresh.cooldown_until("AAA") == date(2026, 9, 10)
+
+
+def test_transaction_nested_exception_rolls_back_the_whole_outer_block(tmp_path):
+    store = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
+    with pytest.raises(RuntimeError):
+        with store.transaction():
+            store.set_cash(200_000.0)
             with store.transaction():
-                pass
+                store.set_cooldown("AAA", date(2026, 9, 10))
+                raise RuntimeError("simulated crash in the nested block")
+    fresh = V2Store(str(tmp_path / "v.db"))
+    assert fresh.cash() == 300_000.0             # nothing from the outer block committed either
+    assert fresh.cooldown_until("AAA") is None
 
 
 # --------------------------------------------------------------------- #

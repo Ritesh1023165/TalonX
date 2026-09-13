@@ -142,6 +142,16 @@ class V2Service:
         # treats a missing entry as "unknown, skip the check", never a
         # fabricated pass or fail.
         self._dissemination_lookup: dict[tuple[str, str], datetime] = {}
+        # Final Remediation Directive 1: True only for a tick where
+        # _refresh_dissemination_lookup ACTUALLY ran against the real
+        # InsiderStore this tick -- distinct from ``form4_kind ==
+        # "insider"`` alone, since many tests (and some operational
+        # tooling) override ``_records`` directly, bypassing the real
+        # fetch entirely. The strict "unknown timestamp -> fail" rule
+        # below applies only when a genuine live-data fetch happened and
+        # STILL came up empty for a specific episode -- never to a
+        # bypassed/mocked/replayed records path.
+        self._dissemination_lookup_refreshed_this_tick = False
         self._capacity_rejected = 0
         # Task 131 Remediation Directive 6: the Task 131 durable-lifecycle
         # RUNTIME BEHAVIOR changes (requiring a durable PENDING intent
@@ -286,6 +296,10 @@ class V2Service:
             if prev is None or t.accepted_at_utc > prev:
                 lookup[key] = t.accepted_at_utc
         self._dissemination_lookup = lookup
+        # a genuine, successful query against the real InsiderStore ran --
+        # from here on, "no matching record" for a specific episode means
+        # it genuinely was not found, not merely "we never looked."
+        self._dissemination_lookup_refreshed_this_tick = True
 
     def _apply_execution_allowlist(self, items, *, stage: str):
         """Drop anything whose issuer symbol is not in the approved execution
@@ -330,6 +344,7 @@ class V2Service:
         self._no_prior_intent_skipped = 0
         self._pending_retry_episodes = []
         self._capacity_rejected = 0
+        self._dissemination_lookup_refreshed_this_tick = False
 
         # Task 117 overnight P3: an unavailable Form-4 SOURCE blocks NEW
         # event-based entries/intents -- but it must NOT block due-exit
@@ -363,7 +378,7 @@ class V2Service:
 
         # --- PHASE OPEN ------------------------------------------------
         self._phase_open(ripe_attemptable, ripe_through, res, price_lookup=price_lookup,
-                         today=today)
+                         today=today, live=live)
 
         # --- PHASE CLOSE -------------------------------------------------
         self._phase_close(ripe_through, res, price_lookup=price_lookup)
@@ -396,7 +411,7 @@ class V2Service:
         return status
 
     def _phase_open(self, episodes: list, ripe_through: date, res, *, price_lookup,
-                    today: date) -> None:
+                    today: date, live: bool = False) -> None:
         """Resolve entries ONLY for episodes carrying an existing durable
         PENDING intent (necessarily created by an EARLIER tick's own
         POST-CLOSE pass -- intent creation only ever targets a FUTURE
@@ -406,6 +421,7 @@ class V2Service:
         SKIPPED_NO_PRIOR_INTENT (Task 131 Directive 2, matching the
         corrected Task 130A/130B research contract) instead of the
         previous permissive cold-start-backfill behaviour."""
+        from talonx_v2.calendar import add_sessions
         no_prior = 0
         gate_enabled = self.durable_store_gate_enabled
         for ep in episodes:
@@ -435,40 +451,60 @@ class V2Service:
             # EXACT pre-Task-131 permissive policy, unchanged, until an
             # operator explicitly opts into the corrected one.
             pre_intent = intent
-            # Task 131 Remediation Directive 3: an explicit, enforced check
-            # (never merely assumed) that this episode's own activating
-            # filing was disseminated BEFORE its entry session's own RTH
-            # open. Given the frozen entry_offset_sessions=1 contract this
-            # should always hold structurally -- but it is verified here,
-            # not just implied, and a violation refuses the entry outright
-            # rather than silently proceeding on stale timing assumptions.
-            boundary_ok, boundary_detail = self._verify_temporal_boundary(ep)
+            # Task 131 Remediation Directive 3 / Final Remediation
+            # Directive 1: an explicit, enforced check (never merely
+            # assumed) that this episode's own activating filing -- AND
+            # its own durable intent's creation -- occurred BEFORE its
+            # entry session's own RTH open. Given the frozen entry_offset_
+            # sessions=1 contract this should always hold structurally --
+            # but it is verified here, not just implied, and a violation
+            # refuses the entry outright rather than silently proceeding
+            # on stale timing assumptions.
+            boundary_ok, boundary_detail = self._verify_temporal_boundary(ep, pre_intent, live=live)
             if not boundary_ok:
                 self.store.record_disposition(
                     episode_id=ep.episode_id, symbol=ep.symbol,
                     disposition="SKIPPED_TEMPORAL_BOUNDARY_VIOLATION", issuer_cik=ep.issuer_cik,
                     eligible_entry_session=ep.eligible_entry_session.isoformat(),
                     detail=boundary_detail)
-                self.store.mark_entry_intent(
-                    pre_intent["intent_id"], "REJECTED_TEMPORAL_BOUNDARY_VIOLATION",
-                    detail=boundary_detail)
+                # Final Remediation Directive 3: pre_intent is None in a
+                # genuine legacy-mode (gate disabled) cold start -- guard
+                # before subscripting it, never crash the tick.
+                if pre_intent is not None:
+                    self.store.mark_entry_intent(
+                        pre_intent["intent_id"], "REJECTED_TEMPORAL_BOUNDARY_VIOLATION",
+                        detail=boundary_detail)
                 logger.error("temporal_boundary_violation episode_id=%s symbol=%s detail=%s",
                             ep.episode_id, ep.symbol, boundary_detail)
                 continue
             n_before = len(res.entries)
             n_skipped_before = len(res.skipped)
-            # one noisy symbol must not starve the rest of the tick (Task 117
-            # Phase 0 §2).  Nothing is persisted on a raised error, so the
-            # episode is simply retried next tick -- no duplicate BUY risk.
+            # Final Remediation Directive 2: the entry attempt (capacity
+            # re-check inside enter_position + position insert + cash
+            # debit + trade record + disposition, all already atomic via
+            # paper.enter_position's own store.transaction()) AND the
+            # subsequent PENDING -> FILLED intent-status update now
+            # commit as ONE outer atomic unit -- V2Store.transaction() is
+            # reentrant, so enter_position's own inner transaction() call
+            # joins this outer one rather than opening a second one. A
+            # crash between "position committed" and "intent marked
+            # FILLED" can no longer happen -- both commit together, or
+            # neither does.
+            #
+            # one noisy symbol must not starve the rest of the tick (Task
+            # 117 Phase 0 §2).  Nothing is persisted on a raised error, so
+            # the episode is simply retried next tick -- no duplicate BUY risk.
             try:
-                pipeline.process_episode(ep, store=self.store, bars_lookup=self._bars,
-                                         price_lookup=price_lookup, config=self.cfg, result=res)
+                with self.store.transaction():
+                    pipeline.process_episode(ep, store=self.store, bars_lookup=self._bars,
+                                             price_lookup=price_lookup, config=self.cfg, result=res)
+                    if len(res.entries) > n_before:
+                        self._on_entry_recorded(ep, res.entries[-1], pre_intent, ripe_through)
             except Exception:  # noqa: BLE001
                 logger.exception("episode_processing_failed episode_id=%s symbol=%s",
                                  ep.episode_id, ep.symbol)
                 continue
             if len(res.entries) > n_before:
-                self._on_entry_recorded(ep, res.entries[-1], pre_intent, ripe_through)
                 continue
             new_skips = res.skipped[n_skipped_before:]
             if not any(s.get("reason") == "NO_ENTRY_BAR" for s in new_skips):
@@ -481,28 +517,49 @@ class V2Service:
             # store, phase_open will naturally re-attempt it on the very
             # next tick -- a non-blocking, zero-extra-cost retry driven by
             # the service's own existing tick cadence, not an in-call
-            # sleep loop. The intent is retained through the FULL RTH
-            # session window for its own eligible_entry_session (today's
-            # own trading day) -- only once a LATER tick observes that the
-            # target session's own day has fully passed with no price ever
-            # found is the miss escalated to a terminal FAILED_NO_MARKET_DATA
-            # (released exactly once).
-            if ripe_through <= ep.eligible_entry_session:
+            # sleep loop. Final Remediation Directive 3: retained through
+            # the APPROVED session-based recovery window -- one session
+            # SHORT of max_entry_staleness_sessions (the SAME, already-
+            # frozen operational parameter the pre-existing staleness
+            # guard uses, 3 sessions by default), not just the one
+            # immediate next session. This offset is deliberate, not
+            # arbitrary: the staleness guard EXCLUDES a stale episode from
+            # ripe_attemptable entirely (it never reaches this method
+            # again) the moment ripe_through > eligible + max_entry_
+            # staleness_sessions -- using that SAME threshold here would
+            # make this escalation UNREACHABLE (staleness would always
+            # win the race, one phase earlier in the very same tick).
+            # Ending the retry window one session earlier guarantees this
+            # escalation gets a genuine, reachable chance to release the
+            # intent as FAILED_NO_MARKET_DATA before the coarser,
+            # unrelated staleness guard would ALSO have swept it up as
+            # EXPIRED_STALE. Only once this window has fully elapsed with
+            # no price ever found is the miss escalated (released exactly
+            # once).
+            retry_deadline = add_sessions(ep.eligible_entry_session,
+                                          max(0, self.cfg.max_entry_staleness_sessions - 1))
+            if ripe_through <= retry_deadline:
                 self._pending_retry_episodes.append({
                     "episode_id": ep.episode_id, "symbol": ep.symbol,
                     "eligible_entry_session": ep.eligible_entry_session.isoformat(),
+                    "retry_deadline": retry_deadline.isoformat(),
                 })
                 continue
             self.store.record_disposition(
                 episode_id=ep.episode_id, symbol=ep.symbol,
                 disposition="FAILED_NO_MARKET_DATA", issuer_cik=ep.issuer_cik,
                 eligible_entry_session=ep.eligible_entry_session.isoformat(),
-                detail=f"no entry bar observed through the end of the eligible entry "
-                       f"session's own RTH window ({ep.eligible_entry_session.isoformat()}) "
-                       f"-- intent released, not silently retried forever")
-            self.store.mark_entry_intent(
-                pre_intent["intent_id"], "FAILED_NO_MARKET_DATA",
-                detail="market data unavailable through the full RTH session window")
+                detail=f"no entry bar observed through the approved "
+                       f"{self.cfg.max_entry_staleness_sessions}-session recovery window "
+                       f"(deadline {retry_deadline.isoformat()}) -- intent released, not "
+                       f"silently retried forever")
+            # Final Remediation Directive 3: pre_intent is None in a
+            # genuine legacy-mode (gate disabled) cold start -- guard
+            # before subscripting it, never crash the tick.
+            if pre_intent is not None:
+                self.store.mark_entry_intent(
+                    pre_intent["intent_id"], "FAILED_NO_MARKET_DATA",
+                    detail="market data unavailable through the approved recovery window")
             self._enqueue_alert(kind="ENTRY_FAILED_NO_DATA", episode=ep, decision=None,
                                 intent=pre_intent, extra={"released": True})
         self._no_prior_intent_skipped = no_prior
@@ -532,8 +589,19 @@ class V2Service:
             if not is_stale(e):
                 continue
             # A stale episode is NEVER entered -- skip it on every tick,
-            # whether or not it has been seen before.  Only the disposition
-            # write is guarded so we don't rewrite it each tick.
+            # whether or not it has been seen before.  The disposition
+            # WRITE is guarded so we don't keep rewriting SKIPPED_ENTRY_
+            # STALE every tick -- but the intent-expiry check below is
+            # NOT similarly guarded: a genuine bug was found here where an
+            # episode already dispositioned for an UNRELATED reason
+            # earlier (e.g. process_episode's own SKIPPED_NO_ENTRY_BAR,
+            # written while its PENDING_RETRY was still active) made
+            # episode_seen() True before it ever went stale -- silently
+            # skipping the EXPIRED_STALE transition entirely and leaving
+            # the intent PENDING forever. The intent-liveness check
+            # (``entry_intent(...)["status"] == "PENDING"``) is itself
+            # already idempotent and cheap, so it runs on every tick this
+            # episode is stale, independent of the disposition-write guard.
             if not self.store.episode_seen(e.episode_id):
                 self.store.record_disposition(
                     episode_id=e.episode_id, symbol=e.symbol,
@@ -541,15 +609,15 @@ class V2Service:
                     eligible_entry_session=e.eligible_entry_session.isoformat(),
                     detail=f"eligible {e.eligible_entry_session.isoformat()} > "
                            f"{self.cfg.max_entry_staleness_sessions} sessions before {ripe_through.isoformat()}")
-                intent = self.store.entry_intent(e.episode_id)
-                if intent is not None and intent["status"] == "PENDING":
-                    self.store.mark_entry_intent(
-                        intent["intent_id"], "EXPIRED_STALE",
-                        detail=f"entry session {e.eligible_entry_session.isoformat()} went "
-                               f"stale (> {self.cfg.max_entry_staleness_sessions} sessions) "
-                               "before a FINAL entry bar was observed")
-                    self._enqueue_alert(kind="ENTRY_STALE", episode=e, decision=None,
-                                        intent=intent, extra={"expired": True})
+            intent = self.store.entry_intent(e.episode_id)
+            if intent is not None and intent["status"] == "PENDING":
+                self.store.mark_entry_intent(
+                    intent["intent_id"], "EXPIRED_STALE",
+                    detail=f"entry session {e.eligible_entry_session.isoformat()} went "
+                           f"stale (> {self.cfg.max_entry_staleness_sessions} sessions) "
+                           "before a FINAL entry bar was observed")
+                self._enqueue_alert(kind="ENTRY_STALE", episode=e, decision=None,
+                                    intent=intent, extra={"expired": True})
             stale += 1
         self._stale_skipped = stale
 
@@ -679,24 +747,53 @@ class V2Service:
                    f"pending_intents={reserved_slots} >= max={self.cfg.max_concurrent_positions}")
         return None
 
-    def _verify_temporal_boundary(self, ep) -> tuple[bool, str]:
-        """Task 131 Remediation Directive 3: explicit, enforced check that
-        ``ep``'s own activating filing was disseminated strictly BEFORE its
+    def _verify_temporal_boundary(self, ep, intent: dict | None = None, *,
+                                  live: bool = False) -> tuple[bool, str]:
+        """Task 131 Remediation Directive 3 / Final Remediation Directive 1:
+        explicit, enforced check that BOTH (a) ``ep``'s own activating
+        filing was disseminated, AND (b) on a true LIVE tick, its durable
+        PENDING intent (when one exists) was CREATED, strictly BEFORE the
         entry session's own RTH open -- never merely assumed from the
         frozen entry_offset_sessions=1 contract. The real wall-clock
-        timestamp is looked up from ``self._dissemination_lookup``
-        (refreshed each tick directly from InsiderStore -- see
-        ``_refresh_dissemination_lookup``); this method and its lookup
-        table live entirely in this operational module and never touch
-        the frozen cluster_engine.PurchaseRecord/ClusterEpisode shapes.
-        Skips the check (returns ok) when the real wall-clock timestamp is
-        unknown (date-only sources -- research parquet / from_rows, or no
-        matching row this tick) rather than fabricating one; the
-        DATE-level causal_event_ts / eligible_entry_session ordering is
-        itself still enforced structurally by cluster_engine regardless
-        of whether this finer check can run."""
+        dissemination timestamp is looked up from
+        ``self._dissemination_lookup`` (refreshed each tick directly from
+        InsiderStore -- see ``_refresh_dissemination_lookup``); this
+        method and its lookup table live entirely in this operational
+        module and never touch the frozen cluster_engine.PurchaseRecord/
+        ClusterEpisode shapes.
+
+        An UNKNOWN dissemination timestamp is a STRICT FAILURE only when
+        ``self._dissemination_lookup_refreshed_this_tick`` is True -- i.e.
+        a genuine query against the real InsiderStore ran THIS tick and
+        still found nothing for this specific episode (a real data-
+        quality gap in a feed that IS expected to carry this timestamp
+        must never be silently treated as "safely early"). It remains an
+        explicit, documented, non-fabricating SKIP whenever that fetch
+        never happened at all (a date-only source -- research parquet /
+        from_rows -- or a caller that overrides ``_records`` directly,
+        bypassing the real InsiderStore query entirely, e.g. most of this
+        test suite) -- using ``form4_kind == "insider"`` alone would
+        incorrectly treat every such bypassed/mocked/replayed records
+        path as a violation. The DATE-level causal_event_ts / eligible_
+        entry_session ordering is itself still enforced structurally by
+        cluster_engine regardless of whether this finer check can run.
+
+        The intent-creation-time check (b) is LIVE-TICK-ONLY: a pinned
+        replay/dry-run/test tick's own ``as_of`` bears no relationship to
+        the intent row's REAL wall-clock ``created_at_utc`` (always the
+        actual moment ``upsert_entry_intent`` ran, in the REAL present) --
+        comparing that against a SIMULATED historical RTH open would be
+        comparing two unrelated clocks and would spuriously fail every
+        replayed/backtested entry."""
         ts = self._dissemination_lookup.get((ep.symbol.upper(), ep.activation_filing_date.isoformat()))
         if ts is None:
+            if self._dissemination_lookup_refreshed_this_tick:
+                return False, (
+                    f"no real dissemination timestamp available for the activating filing "
+                    f"(symbol={ep.symbol}, activation_filing_date="
+                    f"{ep.activation_filing_date.isoformat()}) despite a successful InsiderStore "
+                    f"query this tick -- failing STRICT rather than assuming an unobserved "
+                    f"timestamp was safely early")
             return True, ""
         try:
             import exchange_calendars as _xc
@@ -708,6 +805,29 @@ class V2Service:
             return False, (f"activation filing disseminated at {ts.isoformat()}, which is NOT "
                            f"strictly before the entry session's own RTH open "
                            f"({rth_open.isoformat()}) -- refusing to prevent look-ahead bias")
+        # Final Remediation Directive 1: on a true LIVE tick, the durable
+        # intent's own CREATION time must ALSO be strictly before the
+        # entry session's RTH open -- defense in depth against a future
+        # ordering bug (phase methods called out of sequence, a clock
+        # skew) that structural phase ordering alone would not catch.
+        # Live-only: see the docstring for why comparing a replay's own
+        # simulated clock against the intent row's REAL wall-clock
+        # created_at_utc would be meaningless.
+        if live and intent is not None:
+            created_raw = intent.get("created_at_utc")
+            if created_raw:
+                try:
+                    created_ts = datetime.fromisoformat(str(created_raw))
+                    if created_ts.tzinfo is None:
+                        created_ts = created_ts.replace(tzinfo=timezone.utc)
+                except ValueError:
+                    created_ts = None
+                if created_ts is not None and created_ts >= rth_open:
+                    return False, (
+                        f"the durable PENDING intent itself was created at "
+                        f"{created_ts.isoformat()}, which is NOT strictly before the entry "
+                        f"session's own RTH open ({rth_open.isoformat()}) -- refusing to "
+                        f"prevent look-ahead bias")
         return True, ""
 
     def _enqueue_alert(self, *, kind: str, episode, decision, intent, extra: dict | None = None):

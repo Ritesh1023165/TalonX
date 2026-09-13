@@ -210,3 +210,130 @@ continue to use the existing, dynamic `CikDirectory` unchanged — turning
 THAT general-purpose, live-refreshed mechanism static would be a real
 correctness regression for ordinary operation (new tickers, renames)
 and was not attempted.
+
+## Final Remediation pass (on top of `53c3e4a`)
+
+A third pass, closing four remaining production boundaries identified
+after the remediation above. All four stayed inside `talonx_v2/service.py`,
+`talonx_v2/store.py`, and test configuration — no SPA/frontend or
+Supervisor lifecycle change was in scope, and none was made. The frozen
+strategy fingerprint (`11107198c5b81237`) was re-verified unchanged after
+every edit in this pass, same discipline as the two prior passes.
+
+### Directive 1 — strict intent-creation-time deadline
+
+The prior pass's `_verify_temporal_boundary` checked only the filing's
+own dissemination timestamp against the entry session's RTH open. It did
+not also check WHEN the durable `PENDING` intent itself was created —
+so a real, look-ahead-safe dissemination timestamp paired with a bug
+that somehow created the intent AFTER that session's RTH open (e.g. a
+late-arriving backfill tick) would have passed silently.
+
+Two changes:
+
+- **Unknown dissemination timestamp is now a strict failure**, not a
+  pass, but only when this tick's own `_refresh_dissemination_lookup`
+  actually completed a real `InsiderStore` query (tracked via the new
+  `self._dissemination_lookup_refreshed_this_tick` flag, reset every
+  tick). Using `form4_kind == "insider"` alone (the prior pass's
+  condition) was the wrong signal — several existing tests set
+  `form4_kind="insider"` but inject data directly via `svc._records`,
+  bypassing the real InsiderStore fetch the flag is meant to gate on;
+  gating on "a real query ran and still came back with nothing" is the
+  condition the directive actually describes, and is the one that does
+  not spuriously break tests that never touch InsiderStore at all.
+- **The durable intent's own `created_at_utc` is now compared against
+  the entry session's RTH open**, refusing the entry
+  (`REJECTED_TEMPORAL_BOUNDARY_VIOLATION`) if the intent was created at
+  or after it. This check is gated on `live` (`as_of is None` in
+  `tick()`, threaded through `_phase_open`/`_verify_temporal_boundary`)
+  — a pinned historical replay's simulated `as_of` clock has no fixed
+  relationship to `created_at_utc`'s real wall-clock value, so the
+  comparison is only meaningful, and only ever applied, on a genuine
+  live tick.
+
+### Directive 2 — true atomic lifecycle across `process_episode` + intent update
+
+The prior pass's atomic-transaction primitive (`V2Store.transaction()`)
+covered `paper.enter_position`/`close_position` internally, but the
+OUTER call sequence in `_phase_open` — `pipeline.process_episode`
+(which calls `enter_position`) followed by a separate
+`mark_entry_intent(..., "FILLED")` call — still committed as two
+independent transactions. A crash between them left a real, cash-debited
+open position whose intent row was permanently stuck `PENDING`.
+
+`V2Store.transaction()` was made **reentrant**: a nested
+`with store.transaction():` now joins the same outer connection/depth
+counter instead of raising, and only the outermost block commits or
+rolls back. `_phase_open`'s entry-attempt block now wraps
+`pipeline.process_episode(...)` and the subsequent
+`mark_entry_intent(FILLED)` call in one outer `with self.store.
+transaction():` — so a capacity check, reservation, ledger entry, and
+the `PENDING`→`FILLED` transition commit, or roll back, as a single
+unit. Proven in `tests/test_task131_atomic_transactions.py`'s two new
+reentrancy tests (nested blocks join the outer one; a nested exception
+rolls back everything written by the outer block too).
+
+### Directive 3 — retry deadline and the legacy-mode crash
+
+**Legacy-mode crash**: with `TALONX_V2_DURABLE_STORE_ENABLED` at its
+default (`False`), `pre_intent` can legitimately be `None` (a genuine
+cold start, no intent ever created) — two sites in `_phase_open`
+(the temporal-boundary-violation path and the `FAILED_NO_MARKET_DATA`
+path) unconditionally indexed `pre_intent["intent_id"]`, raising
+`TypeError` whenever this legacy path was actually exercised. Both are
+now guarded with `if pre_intent is not None:` before the
+`mark_entry_intent` call.
+
+**Retry deadline**: the prior pass's non-blocking retry model escalated
+to `FAILED_NO_MARKET_DATA` on the very first tick of the NEXT session
+after the eligible entry session — effectively a one-session grace
+window, not the approved multi-session recovery window
+(`max_entry_staleness_sessions`, frozen at 3). Restored the deadline to
+`add_sessions(ep.eligible_entry_session, max_entry_staleness_sessions - 1)`
+— i.e. the approved window, offset by exactly one session short of the
+raw staleness threshold. The `-1` offset is deliberate, not a
+simplification: the pre-existing staleness guard in `_phase_post_close`
+excludes a stale episode from `ripe_attemptable` at the SAME threshold
+(`max_entry_staleness_sessions`), one phase earlier in the very same
+tick. Using the identical threshold for both would make the
+`FAILED_NO_MARKET_DATA` escalation mathematically unreachable — staleness
+would always exclude the episode from `_phase_open` one step before this
+logic could ever run at the boundary tick. Diagnosed via direct SQL
+tracing of `processed_episodes`/entry-intent status across a tick-by-tick
+replay before the off-by-one was found.
+
+A genuine pre-existing bug surfaced during that same debugging, not
+named in the directive but squarely inside "backend ledger integrity":
+the staleness guard's `EXPIRED_STALE` intent-status transition was
+nested inside the SAME `if not self.store.episode_seen(...)` guard as
+the `SKIPPED_ENTRY_STALE` disposition write. If `pipeline.
+process_episode`'s own frozen logic had already written a different
+disposition for that episode earlier (`SKIPPED_NO_ENTRY_BAR`),
+`episode_seen()` was already `True`, and the ENTIRE staleness block —
+including intent expiry — was silently skipped forever, leaving the
+intent `PENDING` indefinitely with no disposition ever attached to it.
+Fixed by decoupling: the disposition write stays guarded by
+`episode_seen()` (a disposition should still only be written once), but
+the intent-liveness check and `EXPIRED_STALE` transition now run
+unconditionally on every tick the episode is stale, regardless of any
+earlier, unrelated disposition.
+
+### Directive 4 — no global durable-store-flag override in tests
+
+`tests/conftest.py`'s `os.environ.setdefault("TALONX_V2_DURABLE_STORE_
+ENABLED", "true")` (added by the prior remediation pass to make the
+corrected policy the suite's default) is removed. `V2Service`'s own
+runtime default (`False`, no env override) is now also the test suite's
+default, with no global override anywhere. Exactly 2 of the ~198 tests
+in the V2-focused battery actually depended on the gate being ON
+(`test_task117_overnight_journey.py::test_p1_same_session_first_tick_
+defers_never_enters_cold` and `::test_p1_late_first_tick_is_a_permanent_
+miss_not_a_stale_backfill`, both specifically testing the gated
+cold-start policy) — each now sets
+`monkeypatch.setenv("TALONX_V2_DURABLE_STORE_ENABLED", "true")` locally,
+so the mode a given test exercises is visible in that test file itself,
+not hidden in a repo-wide default.
+`tests/test_task131_remediation_directive6.py` already carried dedicated,
+explicit-`monkeypatch` coverage of both the OFF (default) and ON states
+from the prior pass and needed no change here.

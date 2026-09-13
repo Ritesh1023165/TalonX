@@ -119,7 +119,11 @@ def test_p1_fill_reconciles_to_intent_at_entry_session_open(tmp_path):
     assert prov["intent_id"] == i["intent_id"] and prov["intent_created_at_utc"]
 
 
-def test_p1_same_session_first_tick_defers_never_enters_cold(tmp_path):
+def test_p1_same_session_first_tick_defers_never_enters_cold(tmp_path, monkeypatch):
+    # Task 131 Final Remediation Directive 4: this test specifically
+    # exercises the GATED (ON) admission policy -- explicit, local
+    # opt-in (V2Service's own runtime default is OFF).
+    monkeypatch.setenv("TALONX_V2_DURABLE_STORE_ENABLED", "true")
     # Task 131 Directive 2: the first tick is ON the entry session itself --
     # no earlier tick ever existed to create a durable PENDING intent, so
     # the cold-start entry that Task 117 previously permitted (labelled
@@ -149,7 +153,11 @@ def test_p1_same_session_first_tick_defers_never_enters_cold(tmp_path):
     assert s.n_open() == 1
 
 
-def test_p1_late_first_tick_is_a_permanent_miss_not_a_stale_backfill(tmp_path):
+def test_p1_late_first_tick_is_a_permanent_miss_not_a_stale_backfill(tmp_path, monkeypatch):
+    # Task 131 Final Remediation Directive 4: this test specifically
+    # exercises the GATED (ON) admission policy -- explicit, local
+    # opt-in (V2Service's own runtime default is OFF).
+    monkeypatch.setenv("TALONX_V2_DURABLE_STORE_ENABLED", "true")
     # the first tick arrives well AFTER the entry session -- the
     # intent-creation window (today <= eligible <= next_sess) has closed
     # too, so this is a genuine, permanent miss: no intent is ever

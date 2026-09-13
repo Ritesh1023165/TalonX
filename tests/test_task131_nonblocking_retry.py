@@ -118,11 +118,37 @@ def test_late_arriving_bar_reconciles_within_the_same_session_one_fill(tmp_path)
 
 
 def test_price_still_missing_next_session_releases_intent_exactly_once(tmp_path):
+    # Task 131 Final Remediation Directive 3: the retry deadline is the
+    # APPROVED session-based recovery window -- ONE SESSION SHORT of
+    # max_entry_staleness_sessions (3, the same frozen operational
+    # parameter the pre-existing staleness guard uses), not just the
+    # single immediate next session. The one-session offset is
+    # deliberate: using the SAME threshold as the staleness guard would
+    # make this escalation unreachable, since staleness excludes a stale
+    # episode from ever reaching this check again one phase earlier in
+    # the very same tick -- see service.py's own comment at the
+    # retry_deadline computation for the full reasoning.
     bars = {"rows": _bars(omit=ELIGIBLE)}
     svc = _svc(tmp_path, bars)
     svc.tick(as_of=ACT)
     svc.tick(as_of=ELIGIBLE)                       # PENDING_RETRY
-    st = svc.tick(as_of=NEXT_SESSION)               # session window has fully passed
+
+    # still well within the approved recovery window -- NOT escalated yet.
+    st_mid = svc.tick(as_of=NEXT_SESSION)           # eligible + 1 session
+    assert st_mid["entries_this_tick"] == 0
+    assert st_mid["pending_retry_count_this_tick"] == 1
+    store_mid = V2Store(str(tmp_path / "v2.db"), starting_cash=BALANCE)
+    assert store_mid.all_entry_intents()[0]["status"] == "PENDING"
+
+    retry_deadline = v2cal.add_sessions(ELIGIBLE, 2)
+    st_at_deadline = svc.tick(as_of=retry_deadline)  # still <= deadline -- one more retry
+    assert st_at_deadline["entries_this_tick"] == 0
+    assert st_at_deadline["pending_retry_count_this_tick"] == 1
+    assert V2Store(str(tmp_path / "v2.db"), starting_cash=BALANCE
+                  ).all_entry_intents()[0]["status"] == "PENDING"
+
+    past_deadline = v2cal.add_sessions(retry_deadline, 1)
+    st = svc.tick(as_of=past_deadline)               # the approved window has fully elapsed
 
     assert st["entries_this_tick"] == 0
     assert st["pending_retry_count_this_tick"] == 0  # no longer pending -- terminal now
@@ -138,7 +164,7 @@ def test_price_still_missing_next_session_releases_intent_exactly_once(tmp_path)
     assert disp == ["FAILED_NO_MARKET_DATA"]
 
     # a further later tick does not re-release it or re-attempt it
-    st2 = svc.tick(as_of=v2cal.next_session_strictly_after(NEXT_SESSION))
+    st2 = svc.tick(as_of=v2cal.next_session_strictly_after(past_deadline))
     assert st2["entries_this_tick"] == 0
     store2 = V2Store(str(tmp_path / "v2.db"), starting_cash=BALANCE)
     assert store2.all_entry_intents()[0]["status"] == "FAILED_NO_MARKET_DATA"

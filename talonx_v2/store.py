@@ -165,6 +165,7 @@ class V2Store:
         # (insert_open_position + set_cash + append_trade + ...) commit
         # together, atomically, as one unit.
         self._active_conn: sqlite3.Connection | None = None
+        self._active_conn_depth: int = 0
         self._init()
 
     @contextmanager
@@ -186,31 +187,46 @@ class V2Store:
 
     @contextmanager
     def transaction(self):
-        """Task 131 Remediation Directive 4: wrap a SEQUENCE of store
-        method calls in one explicit, atomic SQLite transaction (WAL
-        mode active, via the same _conn() every method already uses).
-        Every nested store.<method>(...) call inside this block commits
-        together, as one unit, on exit -- or none of them do, if an
-        exception propagates (the connection is closed WITHOUT a commit,
-        so SQLite's own implicit ROLLBACK-on-close-without-commit applies;
-        nothing partially written survives a crash mid-transaction).
-        Not reentrant across two SEPARATE `with store.transaction():`
-        blocks (only nested store method calls within ONE such block
-        share it); calling transaction() again while one is already
-        active raises, rather than silently nesting incorrectly."""
+        """Task 131 Remediation Directive 2/4: wrap a SEQUENCE of store
+        method calls -- AND/OR further nested ``with store.transaction():``
+        blocks -- in one explicit, atomic SQLite transaction (WAL mode
+        active, via the same ``_conn()`` every method already uses).
+        Every nested ``store.<method>(...)`` call inside this block
+        commits together, as one unit, on exit -- or none of them do, if
+        an exception propagates (the connection is closed WITHOUT a
+        commit, so SQLite's own implicit ROLLBACK-on-close-without-commit
+        applies; nothing partially written survives a crash mid-
+        transaction).
+
+        REENTRANT (depth-counted): a caller may open ``with store.
+        transaction():`` around a SEQUENCE that itself calls a function
+        which ALSO opens ``with store.transaction():`` internally (e.g.
+        ``talonx_v2.paper.enter_position``) -- the inner call transparently
+        joins the SAME outer connection/transaction rather than raising or
+        opening a second one. Only the OUTERMOST block actually commits/
+        closes; an exception at ANY depth propagates up and the entire
+        nested sequence is rolled back together (nothing commits)."""
         if self._active_conn is not None:
-            raise RuntimeError("V2Store.transaction() is not reentrant -- "
-                              "a transaction is already active on this store")
+            # already inside an outer transaction() block -- join it. Only
+            # the OUTERMOST context actually commits/closes/resets state.
+            self._active_conn_depth += 1
+            try:
+                yield self._active_conn
+            finally:
+                self._active_conn_depth -= 1
+            return
         c = sqlite3.connect(self.path, timeout=30)
         c.row_factory = sqlite3.Row
         c.execute("PRAGMA journal_mode=WAL")
         c.execute("PRAGMA busy_timeout=30000")
         self._active_conn = c
+        self._active_conn_depth = 1
         try:
             yield c
             c.commit()
         finally:
             self._active_conn = None
+            self._active_conn_depth = 0
             c.close()
 
     def _init(self) -> None:

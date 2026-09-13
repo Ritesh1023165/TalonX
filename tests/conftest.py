@@ -19,17 +19,15 @@ import pytest
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
-# Task 131 Remediation Directive 6: talonx_v2.service.V2Service's own
-# runtime default for TALONX_V2_DURABLE_STORE_ENABLED is False (a real
-# production deployment starts on the pre-Task-131 permissive entry
-# policy until an operator explicitly opts into the corrected, gated
-# one). The test SUITE's default is the opposite -- the gated, corrected
-# behavior is what nearly every V2Service test in this repo exercises
-# and asserts; a handful of tests that specifically cover the OFF/legacy
-# fallback path unset this locally via monkeypatch. Explicit env
-# overrides from outside pytest (CI, a developer's own shell) still win,
-# per setdefault's own semantics.
-os.environ.setdefault("TALONX_V2_DURABLE_STORE_ENABLED", "true")
+# Task 131 Final Remediation Directive 4: NO global/session-wide default
+# for TALONX_V2_DURABLE_STORE_ENABLED here (removed -- a prior revision
+# of this file set one). talonx_v2.service.V2Service's own runtime
+# default is False; any test that needs the gated (ON) behavior sets it
+# explicitly and locally (a module-scoped autouse fixture in that test
+# file, via monkeypatch) so the mode a given test suite exercises is
+# visible in that file itself, not hidden in a repo-wide default. See
+# tests/test_task131_remediation_directive6.py for the dedicated,
+# parameterized coverage of BOTH the OFF (default) and ON states.
 
 from _network_guard import GuardInitializationError, NetworkGuard
 from talonx_ingest.edgar.models import CompanyRef, FilingMetadata

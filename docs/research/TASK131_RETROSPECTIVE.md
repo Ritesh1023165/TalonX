@@ -196,3 +196,60 @@ restoring the exact blob bytes directly. See the design document.
   `test_task117_release_rehearsal.py::test_bounded_release_rehearsal`,
   `test_task118a_dashboard_message_count.py::test_immediate_and_digest_sends_count_messages_correctly`)
   — zero new regressions from this remediation.
+
+## Final Remediation runtime provenance log (this pass, on top of `53c3e4a`)
+
+A third directive list, closing 4 remaining production boundaries in
+`talonx_v2/service.py` and `talonx_v2/store.py`; no SPA frontend or
+Supervisor lifecycle change was in scope or made. Full design rationale
+in the "Final Remediation pass" section of `TASK131_REMEDIATION_DESIGN.md`.
+
+- Baseline verified: `feature/task131-option-a-integration` at `53c3e4a`
+  (clean, matches `origin`).
+- Fixed, in order: (1) the intent-creation-time deadline check added to
+  `_verify_temporal_boundary` (gated on `live`), and the unknown-
+  dissemination-timestamp strict-failure condition corrected from
+  `form4_kind == "insider"` to a new `self._dissemination_lookup_
+  refreshed_this_tick` flag (a real InsiderStore query actually ran this
+  tick and still found nothing) to avoid spuriously failing tests that
+  inject `svc._records` directly; (2) `V2Store.transaction()` made
+  reentrant so `_phase_open` can wrap `pipeline.process_episode` +
+  `mark_entry_intent(FILLED)` in one outer atomic transaction; (3) both
+  `pre_intent["intent_id"]` legacy-mode crash sites in `_phase_open`
+  guarded with `if pre_intent is not None:`, and the missing-price retry
+  deadline restored to the approved
+  `max_entry_staleness_sessions - 1`-session recovery window (the `-1`
+  is required — see design doc — to avoid a race with the pre-existing
+  staleness guard that would otherwise make the escalation unreachable);
+  a genuine pre-existing bug found via that same debugging (stale-episode
+  intent expiry silently skipped forever whenever the episode already
+  carried an unrelated earlier disposition) was also fixed; (4) the
+  `tests/conftest.py` global `TALONX_V2_DURABLE_STORE_ENABLED=true`
+  default removed, replaced with 2 narrowly-scoped local
+  `monkeypatch.setenv` calls in the 2 of ~198 V2-focused tests that
+  actually needed the gate ON.
+- Fingerprint re-verified unchanged after every edit in this pass:
+  `11107198c5b81237`.
+- Files changed (all uncommitted-in-progress, no new files):
+  `talonx_v2/service.py`, `talonx_v2/store.py`, `tests/conftest.py`,
+  `tests/test_task117_overnight_journey.py`,
+  `tests/test_task131_atomic_transactions.py` (2 tests rewritten for
+  reentrancy, replacing the now-obsolete non-reentrant-`RuntimeError`
+  test),
+  `tests/test_task131_nonblocking_retry.py` (1 test rewritten for the
+  corrected retry-deadline formula).
+- V2-focused battery (19 files covering all V2Service behavior,
+  including every `test_task131_*` and `test_task117_*` file): **198
+  passed**, 0 failed, run with NO global durable-store-flag override —
+  confirming Directive 4's removal causes zero regressions once the 2
+  locally-scoped overrides are in place.
+- Full repository test suite run after all Final Remediation changes:
+  **4 failed, 4615 passed, 6 skipped** (1:54:16) — the SAME 4
+  pre-existing, verified-unrelated failures as every prior baseline in
+  this task (`test_task102_operational_finalization.py::test_36_
+  original_strategy_unchanged`, `test_task104_p2_cleanup.py::test_32_33_
+  original_strategy_and_thresholds_unchanged`,
+  `test_task117_release_rehearsal.py::test_bounded_release_rehearsal`,
+  `test_task118a_dashboard_message_count.py::test_immediate_and_digest_
+  sends_count_messages_correctly`) — zero new regressions from this
+  Final Remediation pass.
