@@ -1187,16 +1187,81 @@ class DashboardReadModel:
         return out
 
     # ------------------------------------------------------------------ #
-    # BROAD DISCOVERY -- Task 131 Directive 4/5. A SEPARATE, ADDITIVE
-    # metric panel for the 626-name Discovery Universe v1 engine. Reads
-    # the SAME v2_lane.db as v2_active_strategy() above, read-only, and
-    # classifies each symbol found there by origin (PRODUCT_WATCHLIST vs
-    # BROAD_DISCOVERY) using the SAME frozen manifest + resolved active
-    # watchlist every other symbol-scope decision in this program uses --
-    # it does NOT read any live process's in-memory state. This method
-    # is entirely NEW; v2_active_strategy() above is UNCHANGED, so the
-    # original 39-name watchlist view is preserved exactly as it was.
+    # BROAD DISCOVERY -- Task 131 Directive 4/5, extended for the SPA
+    # Discovery Dashboard (Concurrent Admission Fix / SPA Acceptance
+    # task). A SEPARATE, ADDITIVE metric panel for the 626-name Discovery
+    # Universe v1 engine. Reads the SAME v2_lane.db as v2_active_
+    # strategy() above, read-only, and classifies each symbol found there
+    # by origin (PRODUCT_WATCHLIST vs BROAD_DISCOVERY) using the SAME
+    # frozen manifest + resolved active watchlist every other symbol-
+    # scope decision in this program uses -- it does NOT read any live
+    # process's in-memory state. v2_active_strategy() above is UNCHANGED,
+    # so the original 39-name watchlist view is preserved exactly as it
+    # was.
+    #
+    # This extension adds, all read-only and additive:
+    #   - universe_coverage: n_resolved/n_unresolved read LIVE from the
+    #     manifest file's own cik_manifest key -- never a hardcoded
+    #     literal in this code, and explicitly labelled as a STATIC,
+    #     versioned research snapshot, never "historical identity
+    #     verification" of a symbol's CURRENT CIK.
+    #   - admission_policy: the REAL, current TALONX_V2_DURABLE_STORE_
+    #     ENABLED state (GATED vs PERMISSIVE), not assumed.
+    #   - source_health: reused directly from v2_active_strategy()'s own
+    #     readiness computation -- the SAME source/process serves both
+    #     views, so this is not a second, independently-observed feed.
+    #   - dashboard_refresh_utc vs upstream_data_as_of_utc: kept
+    #     explicitly distinct (this read's own timestamp vs the
+    #     upstream source's last successful observation).
+    #   - discovery_funnel: real episode dispositions + intent statuses
+    #     for broad-discovery-only symbols, classified into DISCOVERED /
+    #     PENDING / REJECTED / EXPIRED / FILLED (see
+    #     _classify_discovery_candidate below) -- an honest UNCLASSIFIED
+    #     bucket catches anything this mapping does not recognize, so a
+    #     future new disposition string is never silently mis-bucketed.
+    #   - action_queue: PENDING entry intents + recent alert-outbox rows
+    #     for broad-discovery-only symbols, with outbox `state` shown
+    #     as-is (PENDING/RETRY = queued, NOT delivered; only SENT
+    #     confirms delivery).
     # ------------------------------------------------------------------ #
+    @staticmethod
+    def _classify_discovery_candidate(ep: dict, intent: dict | None) -> dict[str, Any]:
+        """Merge one episode's disposition with its (optional) entry
+        intent into ONE discovery-candidate row, bucketed into exactly
+        one of DISCOVERED / PENDING / REJECTED / EXPIRED / FILLED /
+        UNCLASSIFIED. Every real disposition/intent-status string this
+        program's V2 service actually writes (talonx_v2/service.py,
+        talonx_v2/paper.py) is accounted for; anything unrecognized
+        falls into UNCLASSIFIED rather than being silently misfiled into
+        one of the five real buckets."""
+        disposition = ep.get("disposition") or ""
+        intent_status = (intent or {}).get("status")
+        filled = {"ENTERED", "FILLED"}
+        rejected = {"REJECTED_CAPACITY_EXCEEDED", "REJECTED_TEMPORAL_BOUNDARY_VIOLATION",
+                   "SKIPPED_TEMPORAL_BOUNDARY_VIOLATION", "SKIPPED_ADMISSION_DEADLINE_PASSED",
+                   "SKIPPED_NO_PRIOR_INTENT"}
+        expired = {"EXPIRED_STALE", "FAILED_NO_MARKET_DATA", "SKIPPED_ENTRY_STALE"}
+        if disposition in filled or intent_status in filled:
+            bucket = "FILLED"
+        elif intent_status == "PENDING":
+            bucket = "PENDING"
+        elif disposition in rejected or intent_status in rejected:
+            bucket = "REJECTED"
+        elif disposition in expired or intent_status in expired:
+            bucket = "EXPIRED"
+        elif disposition:
+            bucket = "DISCOVERED"
+        else:
+            bucket = "UNCLASSIFIED"
+        reason = ep.get("detail") or (intent or {}).get("detail") or disposition or "no detail recorded"
+        return {
+            "symbol": ep.get("symbol"), "episode_id": ep.get("episode_id"),
+            "event_time": ep.get("updated_at"),
+            "target_entry_session": ep.get("eligible_entry_session"),
+            "disposition": disposition or None, "intent_status": intent_status,
+            "status_bucket": bucket, "reason": reason,
+        }
+
     def v2_broad_discovery(self) -> dict[str, Any]:
         import os as _os
 
@@ -1215,16 +1280,46 @@ class DashboardReadModel:
             "not_a_replacement_for_the_39_name_view": True,
         }
 
+        import json as _json
+
         universe: set[str] = set()
+        manifest_data: dict[str, Any] = {}
         try:
-            import json as _json
             if manifest_path.is_file():
-                universe = {s.strip().upper() for s in
-                           _json.loads(manifest_path.read_text()).get("symbols", []) if s.strip()}
+                manifest_data = _json.loads(manifest_path.read_text())
+                universe = {s.strip().upper() for s in manifest_data.get("symbols", []) if s.strip()}
         except Exception as exc:  # noqa: BLE001
             out["manifest_error"] = f"{type(exc).__name__}: {exc}"
         out["universe_n"] = len(universe)
         out["manifest_path"] = str(manifest_path)
+
+        # universe_coverage: read LIVE from the manifest file's own
+        # cik_manifest key every call -- these are never literals baked
+        # into this code. Explicitly labelled a STATIC, versioned
+        # research-population snapshot (Task 131 Directive 6): a name
+        # counted "unresolved" here can still have a perfectly valid,
+        # CURRENT CIK -- this is NOT a live identity check and must never
+        # be read as one.
+        cm = manifest_data.get("cik_manifest") if manifest_data else None
+        if cm:
+            n_res, n_unres = cm.get("n_resolved"), cm.get("n_unresolved")
+            total = (n_res or 0) + (n_unres or 0)
+            out["universe_coverage"] = {
+                "manifest_version": cm.get("manifest_version"),
+                "n_resolved": n_res, "n_unresolved": n_unres,
+                "resolved_pct": round(100.0 * n_res / total, 1) if total and n_res is not None else None,
+                "unresolved_symbols_sample": (cm.get("unresolved") or [])[:25],
+                "note": "a STATIC, versioned CIK resolution snapshot for this historical "
+                       "research population, resolved once from a point-in-time SEC "
+                       "company_tickers.json -- an 'unresolved' entry here is NOT a claim that "
+                       "symbol's CIK is unknown or invalid TODAY, only that this snapshot did "
+                       "not resolve it; this is never historical identity verification.",
+            }
+        else:
+            out["universe_coverage"] = {
+                "status": "UNKNOWN",
+                "note": "manifest file missing, unreadable, or carries no cik_manifest key",
+            }
 
         watchlist_39: set[str] = set()
         try:
@@ -1248,10 +1343,60 @@ class DashboardReadModel:
         }
         out["toggles"] = toggles
 
+        # admission_policy: the REAL, current admission-policy mode --
+        # the SAME env var + default V2Service.durable_store_gate_enabled
+        # itself reads (talonx_v2/service.py), read directly here rather
+        # than assumed or duplicated with a different default.
+        _admission_raw = _ingest_os.environ.get("TALONX_V2_DURABLE_STORE_ENABLED")
+        _admission_gated = (_admission_raw or "").strip().lower() in ("1", "true", "yes", "on")
+        out["admission_policy"] = {
+            "mode": "GATED" if _admission_gated else "PERMISSIVE",
+            "env_var": "TALONX_V2_DURABLE_STORE_ENABLED",
+            "raw_value": _admission_raw,
+            "note": ("a durable PENDING intent is REQUIRED before any entry, and a hard "
+                    "cash/slot reservation gate applies at intent-creation time"
+                    if _admission_gated else
+                    "the legacy, permissive cold-start policy applies -- an entry does not "
+                    "require a pre-existing durable intent (this is the current production "
+                    "default, TALONX_V2_DURABLE_STORE_ENABLED unset or false)"),
+        }
+
+        # source_health + refresh-vs-upstream-freshness: reused directly
+        # from v2_active_strategy()'s own readiness computation -- the
+        # SAME source/process (the talonx_v2 service + InsiderStore) serves
+        # BOTH the primary watchlist and broad discovery; this is
+        # deliberately NOT a second, independently-observed feed.
+        out["dashboard_refresh_utc"] = out["generated_at"]
+        try:
+            _active = self.v2_active_strategy()
+            _r = _active.get("readiness", {}) or {}
+            out["source_health"] = {
+                "source_ok": _r.get("form4_source_ok"),
+                "source_degraded": _r.get("form4_source_degraded"),
+                "db_read_last_ok_utc": _r.get("source_db_read_last_ok_utc"),
+                "db_read_age_s": _r.get("source_db_read_age_s"),
+                "upstream_poll_last_ok_utc": _r.get("source_poll_last_ok_utc"),
+                "upstream_poll_age_s": _r.get("source_poll_age_s"),
+                "note": "the SAME source/process serves the primary 39-name watchlist AND "
+                       "broad discovery -- not a separately-observed feed",
+            }
+            out["upstream_data_as_of_utc"] = _r.get("source_db_read_last_ok_utc")
+        except Exception as exc:  # noqa: BLE001
+            out["source_health"] = {"status": "UNKNOWN", "note": f"{type(exc).__name__}: {exc}"}
+            out["upstream_data_as_of_utc"] = None
+
+        out["shared_campaign_ledger_note"] = (
+            "Positions/cash below are a SYMBOL-FILTERED VIEW of the SAME shared $300,000 V2 "
+            "campaign ledger shown on the Active V2 tab -- never a separate account or "
+            "portfolio. Realized P&L is computed from ONLY broad-discovery-only symbols; "
+            "campaign-level cash/equity/reconciliation are shown once, on the Active V2 tab, "
+            "and are not meaningfully splittable by symbol subset.")
+
         con = _ro(Path(db))
         if con is None:
             out["ledger"] = {"status": "NO_ACTIVE_PRODUCER", "note": "no v2_lane.db"}
-            con2 = None
+            out["discovery_funnel"] = {"status": "NO_ACTIVE_PRODUCER", "recent": [], "by_status": {}}
+            out["action_queue"] = {"status": "NO_ACTIVE_PRODUCER", "pending_intents": [], "recent_outbox": []}
         else:
             try:
                 if not _has_table(con, "positions"):
@@ -1269,12 +1414,100 @@ class DashboardReadModel:
                         "n_closed": len(bd_closed),
                         "realized_pnl_usd": bd_realized,
                         "open_symbols": sorted({r["symbol"] for r in bd_open}),
+                        "administrative_adjustments_note": (
+                            "the V2 positions table carries no administrative-adjustment "
+                            "marker (unlike the Original/Experimental lanes) -- none have ever "
+                            "been made to this ledger, so none are excluded here"),
                         "note": "counts ONLY symbols in the 626-universe that are NOT already "
                                "in the primary 39-name watchlist -- never double-counted "
                                "with v2_active_strategy's own ledger above",
                     }
+
+                # discovery_funnel: real episode dispositions + intent
+                # statuses for broad-discovery-only symbols, classified.
+                # A genuinely PENDING intent has NO processed_episodes row
+                # yet (V2Service only writes a disposition at ENTERED /
+                # SKIPPED_* / REJECTED_* / EXPIRED_* / FAILED_* time, not
+                # at intent-creation time) -- so the candidate set is the
+                # UNION of both tables' episode_ids, never just the
+                # episodes table alone, or every real PENDING intent
+                # would be invisible here.
+                ep_rows = _qall(con, "SELECT episode_id, symbol, disposition, detail, "
+                                     "eligible_entry_session, updated_at FROM processed_episodes") \
+                    if _has_table(con, "processed_episodes") else []
+                bd_eps = {r["episode_id"]: dict(r) for r in ep_rows
+                         if (r["symbol"] or "").upper() in broad_only}
+                intent_rows = _qall(con, "SELECT intent_id, episode_id, symbol, status, "
+                                         "target_entry_session, planned_exit_session, "
+                                         "created_at_utc, fill_price, fill_entry_session, detail "
+                                         "FROM pending_entry_intents") \
+                    if _has_table(con, "pending_entry_intents") else []
+                intent_by_episode = {r["episode_id"]: dict(r) for r in intent_rows
+                                     if (r["symbol"] or "").upper() in broad_only}
+                candidates = []
+                for episode_id in set(bd_eps) | set(intent_by_episode):
+                    ep = bd_eps.get(episode_id)
+                    intent = intent_by_episode.get(episode_id)
+                    if ep is None:
+                        # intent-only -- no disposition written yet (the
+                        # normal shape of a fresh PENDING reservation).
+                        ep = {"episode_id": episode_id, "symbol": intent["symbol"], "disposition": "",
+                             "detail": "", "eligible_entry_session": intent.get("target_entry_session"),
+                             "updated_at": intent.get("created_at_utc")}
+                    candidates.append(self._classify_discovery_candidate(ep, intent))
+                candidates.sort(key=lambda c: c.get("event_time") or "", reverse=True)
+                by_status: dict[str, int] = {}
+                for c in candidates:
+                    by_status[c["status_bucket"]] = by_status.get(c["status_bucket"], 0) + 1
+                out["discovery_funnel"] = {
+                    "status": "ACTIVE" if candidates else "ZERO_ACTIVITY",
+                    "candidates_n": len(candidates),
+                    "by_status": by_status,
+                    "recent": candidates[:25],
+                    "empty_state_note": (
+                        None if candidates else
+                        "no code-P Form 4 activity has produced a qualifying insider cluster "
+                        "for any broad-discovery-only symbol, through this source's own last "
+                        "successful read above -- a real, current state, not an error or an "
+                        "inferred reason"),
+                }
+
+                # action_queue: pending intents + recent outbox rows for
+                # broad-discovery-only symbols. Reserved cash/slots use
+                # the SAME per-position allocation V2Service itself uses
+                # (a config default, not a live write).
+                bd_pending = [dict(r) for r in intent_rows
+                             if (r["symbol"] or "").upper() in broad_only and r["status"] == "PENDING"]
+                try:
+                    from talonx_v2.config import V2Config
+                    _alloc = V2Config().per_position_allocation_usd
+                except Exception:  # noqa: BLE001
+                    _alloc = None
+                outbox_rows = _qall(con, "SELECT event_id, episode_id, kind, action, symbol, "
+                                         "state, attempts, deliver_by_utc, created_at_utc, "
+                                         "sent_at_utc, last_error FROM v2_alert_outbox") \
+                    if _has_table(con, "v2_alert_outbox") else []
+                bd_outbox = [dict(r) for r in outbox_rows if (r["symbol"] or "").upper() in broad_only]
+                bd_outbox.sort(key=lambda r: r.get("created_at_utc") or "", reverse=True)
+                out["action_queue"] = {
+                    "pending_intents": [
+                        {**p, "reference_price": "PENDING -- resolved at the target session's "
+                                                 "own open, never invented ahead of time"}
+                        for p in bd_pending],
+                    "pending_intents_n": len(bd_pending),
+                    "reserved_cash_usd": (round(_alloc * len(bd_pending), 2)
+                                          if _alloc is not None else None),
+                    "reserved_slots": len(bd_pending),
+                    "recent_outbox": bd_outbox[:25],
+                    "note": "an outbox row's state PENDING or RETRY means QUEUED, NOT "
+                           "delivered -- only SENT confirms delivery. EXPIRED, FAILED, and "
+                           "AMBIGUOUS rows must never be read as a current actionable "
+                           "instruction.",
+                }
             except Exception as exc:  # noqa: BLE001
-                out["ledger"] = {"status": "UNKNOWN", "note": f"{type(exc).__name__}: {exc}"}
+                out["ledger"] = out.get("ledger") or {"status": "UNKNOWN", "note": f"{type(exc).__name__}: {exc}"}
+                out["discovery_funnel"] = {"status": "UNKNOWN", "note": f"{type(exc).__name__}: {exc}", "recent": [], "by_status": {}}
+                out["action_queue"] = {"status": "UNKNOWN", "note": f"{type(exc).__name__}: {exc}", "pending_intents": [], "recent_outbox": []}
             finally:
                 con.close()
 

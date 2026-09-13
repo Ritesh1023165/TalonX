@@ -151,9 +151,17 @@ def _utcnow() -> str:
 
 
 class V2Store:
-    def __init__(self, path: str = "v2_lane.db", starting_cash: float = 100_000.0):
+    def __init__(self, path: str = "v2_lane.db", starting_cash: float = 100_000.0,
+                 busy_timeout_ms: int = 30_000):
         self.path = path
         self._starting_cash = starting_cash
+        # how long a connection waits for a contended SQLite write lock
+        # (PRAGMA busy_timeout, applied to every connection this store
+        # opens) before raising sqlite3.OperationalError -- the "bounded"
+        # in "bounded lock waiting." Overridable only for tests that need
+        # to exercise the lock-TIMEOUT path itself in well under 30s; every
+        # production caller keeps the 30s default unchanged.
+        self._busy_timeout_ms = int(busy_timeout_ms)
         Path(path).parent.mkdir(parents=True, exist_ok=True) if "/" in path or "\\" in path else None
         # Task 131 Remediation Directive 4: a reentrant "active transaction"
         # slot. When None (the default, unchanged for every pre-existing
@@ -175,11 +183,11 @@ class V2Store:
             # reuse it, and let the OUTER block own commit/close.
             yield self._active_conn
             return
-        c = sqlite3.connect(self.path, timeout=30)
+        c = sqlite3.connect(self.path, timeout=self._busy_timeout_ms / 1000.0)
         c.row_factory = sqlite3.Row
         try:
             c.execute("PRAGMA journal_mode=WAL")
-            c.execute("PRAGMA busy_timeout=30000")
+            c.execute(f"PRAGMA busy_timeout={self._busy_timeout_ms}")
             yield c
             c.commit()
         finally:
@@ -193,10 +201,7 @@ class V2Store:
         active, via the same ``_conn()`` every method already uses).
         Every nested ``store.<method>(...)`` call inside this block
         commits together, as one unit, on exit -- or none of them do, if
-        an exception propagates (the connection is closed WITHOUT a
-        commit, so SQLite's own implicit ROLLBACK-on-close-without-commit
-        applies; nothing partially written survives a crash mid-
-        transaction).
+        an exception propagates (explicit ``ROLLBACK`` -- see below).
 
         REENTRANT (depth-counted): a caller may open ``with store.
         transaction():`` around a SEQUENCE that itself calls a function
@@ -205,25 +210,76 @@ class V2Store:
         joins the SAME outer connection/transaction rather than raising or
         opening a second one. Only the OUTERMOST block actually commits/
         closes; an exception at ANY depth propagates up and the entire
-        nested sequence is rolled back together (nothing commits)."""
+        nested sequence is rolled back together (nothing commits).
+
+        CONCURRENT-ADMISSION FIX (Targeted Remediation, on top of the
+        Final Remediation atomic-lifecycle work): the OUTERMOST block now
+        acquires SQLite's RESERVED write lock via an explicit ``BEGIN
+        IMMEDIATE`` the INSTANT the transaction opens -- before this
+        block's own first read, not lazily at its first WRITE statement.
+        Python's ``sqlite3`` module, left to its own default
+        ``isolation_level`` handling, only ever issues an IMPLICIT
+        ``BEGIN`` right before the first INSERT/UPDATE/DELETE -- a bare
+        SELECT (e.g. ``_capacity_rejection_reason()``'s cash/slot reads)
+        never acquires any lock at all. Two concurrent connections could
+        therefore both run their own admission reads, both see the SAME
+        pre-reservation capacity, and both proceed to write -- a classic
+        time-of-check-to-time-of-use race that the Final Remediation
+        pass's atomicity work (single-connection, single-process) never
+        actually exercised. With an explicit ``BEGIN IMMEDIATE`` up
+        front, a SECOND connection's own ``BEGIN IMMEDIATE`` instead
+        BLOCKS (bounded by the same 30s ``busy_timeout`` already set
+        below) until the FIRST connection's transaction commits or rolls
+        back -- so by the time the second connection's own admission
+        reads run, the first writer's reservation is already fully
+        committed and visible. This requires ``isolation_level=None``
+        (autocommit) on this connection so Python's own implicit
+        transaction management never fights with the explicit
+        ``BEGIN``/``COMMIT``/``ROLLBACK`` here. On lock failure (``BEGIN
+        IMMEDIATE`` itself raises after exhausting busy_timeout), the
+        connection is closed and the exception propagates BEFORE
+        ``self._active_conn`` is ever set -- no partial reservation,
+        alert, or economic mutation, and no nested call could have run
+        yet either.
+
+        Nested calls (this store already has an active outer connection)
+        never re-acquire the lock -- it is already held by the outer
+        block, held once, for the sequence's entire duration."""
         if self._active_conn is not None:
             # already inside an outer transaction() block -- join it. Only
-            # the OUTERMOST context actually commits/closes/resets state.
+            # the OUTERMOST context actually commits/closes/resets state,
+            # and it already holds the write lock this whole nested call
+            # runs under.
             self._active_conn_depth += 1
             try:
                 yield self._active_conn
             finally:
                 self._active_conn_depth -= 1
             return
-        c = sqlite3.connect(self.path, timeout=30)
+        c = sqlite3.connect(self.path, timeout=self._busy_timeout_ms / 1000.0, isolation_level=None)
         c.row_factory = sqlite3.Row
-        c.execute("PRAGMA journal_mode=WAL")
-        c.execute("PRAGMA busy_timeout=30000")
+        try:
+            c.execute("PRAGMA journal_mode=WAL")
+            c.execute(f"PRAGMA busy_timeout={self._busy_timeout_ms}")
+            # Acquire the write reservation NOW -- before this block's own
+            # first read -- bounded by busy_timeout above. Raises
+            # sqlite3.OperationalError on a genuine lock timeout; nothing
+            # has been reserved/written/alerted at that point.
+            c.execute("BEGIN IMMEDIATE")
+        except Exception:
+            c.close()
+            raise
         self._active_conn = c
         self._active_conn_depth = 1
         try:
             yield c
-            c.commit()
+            c.execute("COMMIT")
+        except Exception:
+            try:
+                c.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass  # connection may already be unusable -- close() below still runs
+            raise
         finally:
             self._active_conn = None
             self._active_conn_depth = 0

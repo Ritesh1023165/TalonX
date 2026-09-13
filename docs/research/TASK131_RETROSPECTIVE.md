@@ -308,3 +308,74 @@ pass" section of `TASK131_REMEDIATION_DESIGN.md`.
   over the prior baseline (4615 → 4629), matching the 14 new tests in
   `tests/test_task131_targeted_remediation.py` — zero new regressions
   from this Targeted Remediation pass.
+
+## Concurrent Admission Fix + SPA Dashboard Acceptance runtime provenance log (this pass, on top of `26118e4`)
+
+Two workstreams on the same branch, per explicit authorization: (1) a
+real database-boundary concurrency fix, closing a TOCTOU gap the prior
+pass's atomicity tests never actually exercised with two genuine
+writers; (2) a new, additive SPA Discovery Dashboard tab (SPA frontend
+work explicitly authorized for this pass, superseding the earlier
+exclusion). Supervisor/overnight-ingestion lifecycle stayed out of
+scope, as instructed. Full design rationale in the "Concurrent Admission
+Fix + SPA Dashboard Acceptance" section of `TASK131_REMEDIATION_DESIGN.md`.
+
+- Baseline verified: `feature/task131-option-a-integration` at `26118e4`
+  (clean, matches `origin`).
+- **Concurrent admission fix**: `V2Store.transaction()`'s outermost call
+  now opens with `isolation_level=None` and issues an explicit `BEGIN
+  IMMEDIATE` before its own first read (root cause: Python's sqlite3
+  implicit-BEGIN behavior never protects a bare SELECT). `V2Store.
+  __init__` gained an optional `busy_timeout_ms` parameter (default
+  unchanged, 30s) so a test can exercise the bounded-lock-failure path
+  quickly. `paper.enter_position`'s own admission reads (previously
+  unprotected when called standalone) moved inside its own `with store.
+  transaction():` block, closing the same class of gap there too;
+  `paper.close_position` inspected, found to have no analogous gap.
+- **SPA Discovery Dashboard**: `talonx_ops/dashboard_read.py`'s
+  `v2_broad_discovery()` extended (additive, read-only, backward-
+  compatible) with `universe_coverage`, `admission_policy`,
+  `source_health`, `dashboard_refresh_utc`/`upstream_data_as_of_utc`,
+  `discovery_funnel`, `action_queue`, `shared_campaign_ledger_note`, and
+  a new `_classify_discovery_candidate` static helper. New `Broad
+  Discovery` nav tab + `renderV2Discovery()` in `dashboard_web_static/
+  index.html`, registered in `SECTION_RENDER`; 6 new `.pill` CSS states.
+  The existing `v2_active_strategy` / `renderV2` (39-name watchlist) view
+  is byte-for-byte unchanged.
+- Fingerprint re-verified unchanged after every edit in this pass:
+  `11107198c5b81237`.
+- Files changed: `talonx_v2/store.py`, `talonx_v2/paper.py`,
+  `talonx_ops/dashboard_read.py`, `dashboard_web_static/index.html`. New
+  test files: `tests/test_task131_concurrent_admission.py` (4 tests, two
+  genuinely independent `V2Store` connections + real `threading.Event`
+  coordination per test), `tests/test_task131_spa_discovery_backend.py`
+  (8 tests), `tests/test_task131_spa_frontend.py` (8 tests) — 20 new
+  tests, all passing. `tests/test_task131_targeted_remediation.py`'s own
+  reader-isolation/rollback test renamed and its docstring corrected to
+  state accurately what it does and does not prove (see design doc).
+- V2 + dashboard focused battery (26 files: the full 20-file V2-focused
+  set from the prior pass + the 3 new test files above +
+  `test_task131_dashboard_broad_discovery.py` +
+  `test_task100c_unified_dashboard.py` + `test_task119_paper_
+  performance.py`): **301 passed**, 0 failed.
+- SPA rendered acceptance: real headless Chrome screenshots against two
+  isolated fixture scenarios (populated/gated/mixed-candidates,
+  empty/disabled/permissive), every displayed value reconciled against
+  the same run's raw API JSON, existing Active V2/Overview tabs
+  reconfirmed unaffected, narrow-screen characteristic investigated and
+  found pre-existing (not introduced here). Full record, screenshots,
+  and reconciliation tables: `results/task131_concurrent_admission_spa_
+  acceptance/SPA_ACCEPTANCE.md` (gitignored evidence, like every other
+  `results/` acceptance record in this repo).
+- Full repository test suite run after all changes in this pass:
+  **4 failed, 4649 passed, 6 skipped** (0:39:13) — the SAME 4
+  pre-existing, verified-unrelated failures as every prior baseline in
+  this task (`test_task102_operational_finalization.py::test_36_
+  original_strategy_unchanged`, `test_task104_p2_cleanup.py::test_32_33_
+  original_strategy_and_thresholds_unchanged`,
+  `test_task117_release_rehearsal.py::test_bounded_release_rehearsal`,
+  `test_task118a_dashboard_message_count.py::test_immediate_and_digest_
+  sends_count_messages_correctly`); the pass count rose by exactly 20
+  over the prior baseline (4629 → 4649), matching the 20 new tests added
+  in this pass (4 + 8 + 8) — zero new regressions confirmed by name, not
+  assumed.

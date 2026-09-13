@@ -439,3 +439,172 @@ is still open, not just "eventually rolled back" — and one that crashes
 inside `store.upsert_entry_intent` itself. Both leave a fresh connection
 against the same file showing nothing: no intent row, no alert, no
 disposition.
+
+## Concurrent Admission Fix + SPA Dashboard Acceptance (on top of `26118e4`)
+
+A fifth pass, on the same branch: (1) closes a real database-boundary
+concurrency gap the Targeted Remediation pass's atomicity work never
+actually exercised (single-connection, single-process testing only), and
+(2) implements a new, additive SPA dashboard tab surfacing the 626-name
+Discovery Universe v1 engine — explicitly authorized for this pass,
+superseding the earlier SPA exclusion. Supervisor/overnight-ingestion
+lifecycle stays out of scope.
+
+### 1 — the concurrent-admission fix
+
+**Root cause, verified against the actual code before any change**:
+`V2Store.transaction()` opened a connection and set PRAGMAs but never
+issued an explicit `BEGIN`. Python's `sqlite3` module (default
+`isolation_level`) only ever issues an IMPLICIT `BEGIN` right before the
+first INSERT/UPDATE/DELETE — a bare `SELECT` (e.g.
+`_capacity_rejection_reason()`'s cash/slot reads) acquires no lock at
+all. Two genuinely concurrent connections could therefore both run their
+own admission reads, both observe the SAME pre-reservation capacity, and
+both proceed to write — a classic time-of-check-to-time-of-use race the
+prior pass's tests never actually exercised (they used one connection,
+a simulated crash, and a plain reader — see the SCOPE NOTE added to that
+test in this pass).
+
+**Fix**: the OUTERMOST `transaction()` call now opens its connection with
+`isolation_level=None` (autocommit) and issues an explicit
+`BEGIN IMMEDIATE` the instant it opens, before its own first read. A
+second connection's own `BEGIN IMMEDIATE` now genuinely BLOCKS (bounded
+by `busy_timeout`, still 30s in production) until the first connection's
+transaction commits or rolls back — so by the time the second
+connection's own admission reads run, the first writer's reservation is
+already fully committed and visible. Nested `transaction()` calls
+(already inside an active outer connection) are unaffected — they join
+the existing lock, never re-acquiring it. On a lock-timeout failure, the
+connection is closed and the exception propagates BEFORE
+`self._active_conn` is ever set, so no partial reservation/alert/mutation
+survives even that failure mode.
+
+`V2Store.__init__` gained an optional `busy_timeout_ms: int = 30_000`
+parameter (threaded into both `_conn()` and `transaction()`'s PRAGMA
+calls) so a test can exercise the bounded-wait-then-fail path in well
+under 30 real seconds; every production caller keeps the 30s default
+unchanged.
+
+**Other transaction callers inspected for compatibility**: `paper.
+enter_position`'s own capacity/cooldown/cash reads (`position_for_
+symbol`, `cooldown_until`, `n_open`, `cash`) previously ran via separate,
+unprotected `_conn()` calls BEFORE its own `with store.transaction():`
+block. When called from `V2Service._phase_open` (the real production/
+replay path), this was already accidentally protected — `_phase_open`
+wraps `pipeline.process_episode` in its OWN outer `transaction()`, so
+`_conn()`'s reentrant check meant these reads already reused the active
+connection. But `enter_position` called standalone (a test, or any
+future caller) had no such protection. Fixed by moving ALL of
+`enter_position`'s admission reads inside its own `with store.
+transaction():` block, so it is now self-sufficiently safe regardless of
+calling context — nesting is transparent either way. `paper.
+close_position` was inspected and found to have no analogous read-then-
+decide sequence worth protecting (its only pre-transaction reads come
+from the already-fetched `position` dict, not a fresh store read).
+
+**Proof**: `tests/test_task131_concurrent_admission.py` — every test uses
+TWO independent `V2Service`/`V2Store` instances (two real `sqlite3`
+connections) against ONE shared on-disk database file, coordinated with
+`threading.Event` (never an arbitrary sleep as the correctness
+mechanism; a short, bounded `Thread.join()` liveness check confirms a
+writer is genuinely blocked before the test proceeds). Since
+`max_concurrent_positions` is part of the FROZEN strategy contract
+(`validate_frozen()` asserts it `== 20`), "one remaining slot" is
+achieved by pre-seeding 19 real PENDING intents via the store directly,
+never by relaxing the frozen parameter. Covers: one-slot exactly-one-
+admitted, cash-limited admission with plenty of slots, a competing
+writer succeeding after the first writer's simulated crash rolls back
+(the freed slot is genuinely re-evaluated, not assumed free), and a
+bounded lock-timeout that leaves nothing partial. The prior pass's own
+reader-isolation/rollback test (`test_task131_targeted_remediation.py`)
+is retained, with its docstring corrected to state plainly what it does
+and does not prove (visibility + rollback on ONE simulated writer, not
+competing-writer capacity enforcement) — the genuine competing-writer
+proof lives in the new file.
+
+### 2 — the SPA Discovery Dashboard
+
+**Investigated first**: `dashboard_web.py` already registered
+`v2_broad_discovery` as a section (Task 131 Directive 5) and
+`talonx_ops.dashboard_read.DashboardReadModel.v2_broad_discovery()`
+already existed — but `dashboard_web_static/index.html` had NO nav
+button or renderer for it; the panel was reachable only via the raw
+`/api/section/v2_broad_discovery` JSON endpoint, never actually visible
+in the rendered SPA. The existing 39-name "Active V2" tab/renderer
+(`renderV2`) was left completely untouched.
+
+**Backend extension** (`v2_broad_discovery()`, additive, read-only,
+backward-compatible — every existing key unchanged): `universe_coverage`
+reads `n_resolved`/`n_unresolved`/`manifest_version` LIVE from the
+manifest file's own `cik_manifest` key every call (never a hardcoded
+626/569/57 literal), labelled explicitly as a static, versioned research
+snapshot — NOT live identity verification. `admission_policy` reads the
+real, current `TALONX_V2_DURABLE_STORE_ENABLED` state. `source_health` /
+`dashboard_refresh_utc` / `upstream_data_as_of_utc` are reused directly
+from `v2_active_strategy()`'s own readiness computation (the SAME
+source/process serves both views — deliberately not a second,
+independently-observed feed) with the dashboard's own read time kept
+explicitly distinct from the upstream source's last successful
+observation. `discovery_funnel` classifies real episode dispositions +
+intent statuses for broad-discovery-only symbols into DISCOVERED /
+PENDING / REJECTED / EXPIRED / FILLED (`_classify_discovery_candidate`,
+with an honest UNCLASSIFIED fallback for any future disposition string
+this mapping doesn't yet recognize) — built from the UNION of
+`processed_episodes` and `pending_entry_intents` rows, not episodes
+alone, since a genuinely PENDING intent has no disposition row yet in
+the real system (a bug caught while writing the very first version of
+this query, against real V2Store data, before it shipped). `action_queue`
+surfaces PENDING intents (reference price explicitly `"PENDING --
+resolved at the target session's own open, never invented ahead of
+time"`, never a fabricated number) and recent outbox rows with `state`
+shown as-is (PENDING/RETRY = queued, NOT delivered; only SENT confirms
+delivery). `shared_campaign_ledger_note` states explicitly that the
+positions/cash shown are a symbol-filtered VIEW of the SAME shared
+$300,000 V2 campaign ledger the Active V2 tab shows — never implied as a
+separate account or portfolio. V2's own `positions` table carries no
+administrative-adjustment marker at all (unlike Original/Experimental,
+where the Task 131 SPCX closure lives) — this is stated directly rather
+than building unused UI around a column that doesn't exist for this
+lane.
+
+**Frontend**: new `Broad Discovery` nav button + `renderV2Discovery()` in
+`dashboard_web_static/index.html`, registered in `SECTION_RENDER` (the
+existing hash-based deep-link routing, `sectionFromHash()`, picks it up
+automatically — no new routing code needed). 6 new `.pill` CSS states.
+A real bug caught during local verification: the first draft returned
+`pill(...)`'s own HTML markup from inside a `boundedTable()` cell's
+`get()` function — `boundedTable()` pipes every cell through
+`esc(num(...))`, which would have HTML-escaped the pill markup into
+literal broken text. Fixed to return the plain status string in table
+cells (matching every other existing renderer's own convention — none of
+them do this either); now covered by a dedicated regression test.
+
+**Verification, honestly scoped to this environment's actual tools**:
+this environment has no browser-automation tool and no Node.js. The real
+`dashboard_web.py` + `index.html` were served against two isolated
+fixture scenarios (populated/gated/mixed-candidates, and
+empty/disabled/permissive) via real headless Chrome (`--headless=new
+--screenshot`), using the SPA's own pre-existing hash-based deep-linking
+to land directly on the new tab. Every displayed value was reconciled
+against the SAME run's raw `/api/section/v2_broad_discovery` JSON. The
+existing Active V2 and Overview tabs were also screenshotted against the
+same populated fixture to confirm zero regression. A narrow-screen
+(390px) rendering characteristic (long `.kv` row values extending past
+the viewport rather than wrapping) was found and confirmed, via a
+side-by-side screenshot, to be an existing characteristic of the shared
+`.kv` component already present on the UNMODIFIED Active V2 tab — not
+something this task introduced, and not in scope to fix here. Full
+evidence, reconciliation tables, and the tooling-limitation disclosure
+live in `results/task131_concurrent_admission_spa_acceptance/
+SPA_ACCEPTANCE.md` (gitignored, evidence-only, like every other
+`results/` acceptance record in this repo).
+
+Automated (non-browser) coverage: `tests/test_task131_spa_discovery_
+backend.py` (backend fields, real V2Store fixtures, the classifier's
+UNCLASSIFIED fallback) and `tests/test_task131_spa_frontend.py`
+(static-content assertions on `index.html`, matching this repo's own
+established pattern for testing the SPA file — e.g. `test_task100c_
+unified_dashboard.py::test_45_narrow_layout_integrity` — plus an
+aiohttp `TestClient` wiring check; no JS test runner is available in
+this environment, so these are the meaningful automated checks that ARE
+runnable here).

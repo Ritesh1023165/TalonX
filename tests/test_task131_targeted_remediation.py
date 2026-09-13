@@ -256,15 +256,27 @@ def test_admission_sequence_commits_intent_and_notification_together_on_success(
     assert len(fresh.all_outbox()) == 1
 
 
-def test_admission_sequence_is_atomic_under_simulated_contention(tmp_path, monkeypatch):
+def test_admission_sequence_reader_sees_nothing_mid_transaction_then_full_rollback(tmp_path, monkeypatch):
     """Targeted Remediation Directive 3: capacity check + intent creation +
     notification commit, or roll back, as ONE atomic unit. Simulates a
-    concurrent reader (a genuinely SEPARATE store connection, opened WHILE
-    the admission transaction is still active and uncommitted) observing
-    NOTHING mid-sequence -- real SQLite-level isolation, not merely an
-    in-process illusion -- and then a crash during notification
-    generation, proving the ENTIRE sequence rolls back together: never a
-    dangling PENDING intent with no alert ever delivered."""
+    concurrent READER (a genuinely SEPARATE store connection, opened
+    WHILE the admission transaction is still active and uncommitted)
+    observing NOTHING mid-sequence -- real SQLite-level (WAL) read
+    isolation, not merely an in-process illusion -- and then a crash
+    during notification generation, proving the ENTIRE sequence rolls
+    back together: never a dangling PENDING intent with no alert ever
+    delivered.
+
+    SCOPE NOTE (Concurrent Admission Fix follow-up): this proves READ
+    visibility and rollback on a SINGLE (simulated) writer -- it does
+    NOT exercise two independent, genuinely concurrent WRITERS racing
+    for the SAME capacity slot, and it predates the ``BEGIN IMMEDIATE``
+    fix in ``V2Store.transaction()`` (the TOCTOU race that fix closes
+    can only manifest between two REAL writers, never between a writer
+    and a WAL reader, which never blocks on the writer's lock at all).
+    The genuine competing-writer proof -- two real ``V2Store``
+    connections, two real threads, one contended capacity slot -- lives
+    in ``tests/test_task131_concurrent_admission.py``."""
     svc = _svc(tmp_path)
     future_entry = date(2027, 6, 3)
     ep = _ep(entry_session=future_entry, episode_id="e5")

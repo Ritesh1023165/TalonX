@@ -68,13 +68,6 @@ def enter_position(
     if decision.action is not V2Action.BUY:
         return EntryOutcome(False, f"DECISION_NOT_BUY:{decision.action.value}")
 
-    # --- idempotency / restart safety: one logical cluster = one BUY ---
-    if store.position_for_episode(decision.episode_id) is not None:
-        return EntryOutcome(False, "EPISODE_ALREADY_HAS_POSITION")
-    disp = store.episode_disposition(decision.episode_id)
-    if disp == "ENTERED":
-        return EntryOutcome(False, "EPISODE_ALREADY_ENTERED")
-
     sym = decision.symbol.upper()
     es = _as_date(entry_session)
 
@@ -85,33 +78,52 @@ def enter_position(
         )
         return EntryOutcome(False, reason)
 
-    if store.position_for_symbol(sym) is not None:
-        return _skip("SYMBOL_ALREADY_OPEN")
-
-    cd = store.cooldown_until(sym)
-    if cd is not None and es < cd:
-        return _skip(f"IN_COOLDOWN_UNTIL_{cd.isoformat()}")
-
-    if store.n_open() >= cfg.max_concurrent_positions:
-        return _skip(f"MAX_CONCURRENT_{cfg.max_concurrent_positions}")
-
-    if entry_price is None or entry_price <= 0:
-        return _skip("BAD_ENTRY_PRICE")
-
-    cash = store.cash()
-    buy = calculate_buy(cash, cfg.per_position_allocation_usd, entry_price)
-    if buy is None:
-        return _skip("NO_CASH")
-    shares, cost = buy
-
-    target_exit = v2cal.add_sessions(es, cfg.hold_trading_days)
-
-    # Task 131 Remediation Directive 4: the position insert, cash debit,
-    # trade record, and disposition write commit TOGETHER, atomically --
-    # a crash between any two of these can no longer leave a position
-    # without its cash debit, a debit without a trade record, or an
-    # ENTERED episode without a position row.
+    # Targeted Remediation Directive 1 (concurrent admission fix): EVERY
+    # admission read this function makes (idempotency, symbol-flat,
+    # cooldown, capacity, cash) now runs INSIDE the SAME protected
+    # transaction as the eventual write, not as separate, unprotected
+    # reads beforehand. Called from V2Service._phase_open (the real
+    # production/replay path), this nests transparently inside that
+    # method's own OUTER store.transaction() (already holding the write
+    # lock from before pipeline.process_episode even started -- see
+    # service.py); called standalone (e.g. directly in a test), it
+    # acquires its own BEGIN IMMEDIATE here instead. Either way, no
+    # admission decision is ever made on a read taken before the write
+    # lock was held.
     with store.transaction():
+        # --- idempotency / restart safety: one logical cluster = one BUY ---
+        if store.position_for_episode(decision.episode_id) is not None:
+            return EntryOutcome(False, "EPISODE_ALREADY_HAS_POSITION")
+        disp = store.episode_disposition(decision.episode_id)
+        if disp == "ENTERED":
+            return EntryOutcome(False, "EPISODE_ALREADY_ENTERED")
+
+        if store.position_for_symbol(sym) is not None:
+            return _skip("SYMBOL_ALREADY_OPEN")
+
+        cd = store.cooldown_until(sym)
+        if cd is not None and es < cd:
+            return _skip(f"IN_COOLDOWN_UNTIL_{cd.isoformat()}")
+
+        if store.n_open() >= cfg.max_concurrent_positions:
+            return _skip(f"MAX_CONCURRENT_{cfg.max_concurrent_positions}")
+
+        if entry_price is None or entry_price <= 0:
+            return _skip("BAD_ENTRY_PRICE")
+
+        cash = store.cash()
+        buy = calculate_buy(cash, cfg.per_position_allocation_usd, entry_price)
+        if buy is None:
+            return _skip("NO_CASH")
+        shares, cost = buy
+
+        target_exit = v2cal.add_sessions(es, cfg.hold_trading_days)
+
+        # Task 131 Remediation Directive 4: the position insert, cash debit,
+        # trade record, and disposition write commit TOGETHER, atomically --
+        # a crash between any two of these can no longer leave a position
+        # without its cash debit, a debit without a trade record, or an
+        # ENTERED episode without a position row.
         pos_id = store.insert_open_position(
             episode_id=decision.episode_id, symbol=sym, issuer_cik=source_meta.get("issuer_cik", "") if source_meta else "",
             entry_session=es, target_exit_session=target_exit,

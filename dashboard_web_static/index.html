@@ -50,6 +50,10 @@
   .pill.STARTING,.pill.POSITION_OPEN,.pill.ACTIVITY,.pill.PENDING,.pill.RETRY { background:#20262e; color:var(--muted); }
   .pill.INCOMPLETE_COVERAGE,.pill.HELD,.pill.AMBIGUOUS,.pill.DATA_STALE { background:#3a2c07; color:var(--warn); }
   .pill.DATA_UNAVAILABLE,.pill.STARTUP_FAILED { background:#3a1113; color:var(--bad); }
+  .pill.GATED,.pill.FILLED { background:#08351f; color:var(--good); }
+  .pill.PERMISSIVE,.pill.DISCOVERED { background:#20262e; color:var(--muted); }
+  .pill.REJECTED { background:#3a1113; color:var(--bad); }
+  .pill.EXPIRED,.pill.UNCLASSIFIED { background:#3a2c07; color:var(--warn); }
   .banner { border-radius:8px; padding:8px 12px; font-size:12px; margin-bottom:12px; }
   .banner.internal { background:#241a3a; color:#c4b5fd; border:1px solid #3b2d63; }
   .banner.info { background:#12202b; color:#93c5fd; border:1px solid #223a4d; }
@@ -96,6 +100,7 @@
   <button data-sec="premarket">Premarket</button>
   <button data-sec="original_quant">Original Quant</button>
   <button data-sec="v2_active_strategy">Active V2</button>
+  <button data-sec="v2_broad_discovery">Broad Discovery</button>
   <button data-sec="validation">Validation</button>
   <button data-sec="intelligence">Intelligence</button>
   <button data-sec="paper_eod">Paper / EOD</button>
@@ -543,9 +548,85 @@ function renderV2(d){
   return h;
 }
 
+function renderV2Discovery(d){
+  const cov=d.universe_coverage||{}, tg=d.toggles||{}, ap=d.admission_policy||{}, sh=d.source_health||{},
+        led=d.ledger||{}, fn=d.discovery_funnel||{}, aq=d.action_queue||{}, bs=fn.by_status||{};
+  let h=`<h2 class="section-title">Broad Discovery — Discovery Universe v1 <span class="muted small">${esc(d.role||'')}</span></h2>`;
+  h+=`<div class="banner info">${esc(d.shared_campaign_ledger_note||'')}</div>`;
+  h+=`<div class="grid">`;
+  // universe + coverage -- never a hardcoded 626/569/57, always this read's own live numbers
+  h+=`<div class="card"><h3>Discovery universe</h3>`+
+     kv('universe size', num(d.universe_n))+
+     kv('39-name watchlist overlap', num(d.overlap_with_39_name_watchlist_n))+
+     kv('broad-discovery-only', num(d.broad_discovery_only_symbols_n))+
+     kv('manifest version', cov.manifest_version)+
+     kv('CIK resolved / unresolved', (cov.n_resolved==null?'—':cov.n_resolved)+' / '+(cov.n_unresolved==null?'—':cov.n_unresolved)+
+        (cov.resolved_pct!=null? ' ('+cov.resolved_pct+'%)':''))+
+     (d.manifest_error? `<div class="banner warn">manifest error: ${esc(d.manifest_error)}</div>`:'')+
+     `<div class="muted small">${esc(cov.note||'')}</div></div>`;
+  if((cov.unresolved_symbols_sample||[]).length){
+    h+=`<div class="card"><h3>Unresolved CIK sample</h3><details><summary>${cov.unresolved_symbols_sample.length} shown (bounded)</summary>`+
+       boundedTable(cov.unresolved_symbols_sample, [{label:'symbol', get:r=>r.symbol}, {label:'reason', get:r=>r.reason}], 25)+
+       `</details></div>`;
+  }
+  // A. is discovery operating?
+  h+=`<div class="card"><h3>Is discovery operating?</h3>`+
+     kv('SEC ingestion expansion', pill(tg.sec_ingestion_expansion_enabled?'ACTIVE':'ZERO_ACTIVITY'))+
+     kv('broad alert routing', pill(tg.dispatch_send_enabled?'ACTIVE':'ZERO_ACTIVITY'))+
+     kv('admission policy', pill(ap.mode))+
+     `<div class="muted small">${esc(ap.note||'')}</div></div>`;
+  h+=`<div class="card"><h3>Source health</h3>`+
+     kv('source ok', pill(sh.source_ok===false?'FAILED':(sh.source_ok?'READY':'UNKNOWN')))+
+     kv('DB read last ok / age', esc(sh.db_read_last_ok_utc||'—')+' / '+ageStr(sh.db_read_age_s))+
+     kv('upstream poll last ok / age', esc(sh.upstream_poll_last_ok_utc||'—')+' / '+ageStr(sh.upstream_poll_age_s))+
+     kv('degraded', sh.source_degraded||'—')+
+     `<div class="muted small">${esc(sh.note||'')}</div></div>`;
+  h+=`<div class="card"><h3>Freshness</h3>`+
+     kv('dashboard refresh (this read)', esc(String(d.dashboard_refresh_utc||'').slice(0,19)))+
+     kv('upstream data as-of', esc(String(d.upstream_data_as_of_utc||'—').slice(0,19)))+
+     `<div class="muted small">a fresh dashboard read is NOT proof the upstream source itself is current -- shown separately, always.</div></div>`;
+  // D. paper trading (shared ledger, symbol-filtered)
+  h+=`<div class="card card-wide"><h3>Paper trading — broad-discovery-only symbols ${pill(led.status)}</h3><div class="grid">`+
+     `<div>`+kv('open positions', num(led.n_open))+kv('closed positions', num(led.n_closed))+
+       kv('realized P&L (broad-only)', num(led.realized_pnl_usd))+
+       kv('open symbols', esc((led.open_symbols||[]).join(', ')||'none'))+`</div>`+
+     `<div>`+kv('reserved cash (pending)', num(aq.reserved_cash_usd))+
+       kv('reserved slots (pending)', num(aq.reserved_slots))+
+       kv('pending intents', num(aq.pending_intents_n))+`</div></div>`+
+     `<div class="muted small">${esc(led.administrative_adjustments_note||led.note||'')}</div></div>`;
+  // C. what action is being communicated -- pending intents, never an invented price
+  h+=`<div class="card card-wide"><h3>Pre-open entry intents (broad-discovery-only)</h3>`+
+     boundedTable(aq.pending_intents||[], [
+        {label:'symbol', get:i=>i.symbol}, {label:'target entry session', get:i=>i.target_entry_session},
+        {label:'reference price', get:i=>i.reference_price}, {label:'planned exit', get:i=>i.planned_exit_session},
+        {label:'intent created (UTC)', get:i=>i.created_at_utc&&String(i.created_at_utc).slice(0,19)}], 20)+
+     `</div>`;
+  // B. what has been found -- the discovery funnel
+  h+=`<div class="card card-wide"><h3>Discovery funnel — recent candidates ${pill(fn.status)}</h3>`+
+     `<div class="muted small">by status: discovered ${num(bs.DISCOVERED||0)} · pending ${num(bs.PENDING||0)} · `+
+     `rejected ${num(bs.REJECTED||0)} · expired ${num(bs.EXPIRED||0)} · filled ${num(bs.FILLED||0)}`+
+     (bs.UNCLASSIFIED? ` · unclassified ${num(bs.UNCLASSIFIED)}`:'')+`</div>`+
+     (fn.empty_state_note? `<div class="empty">${esc(fn.empty_state_note)}</div>`:
+      boundedTable(fn.recent||[], [
+         {label:'symbol', get:c=>c.symbol}, {label:'event time', get:c=>c.event_time&&String(c.event_time).slice(0,19)},
+         {label:'target entry session', get:c=>c.target_entry_session},
+         {label:'status', get:c=>c.status_bucket}, {label:'reason', get:c=>c.reason}], 25))+
+     `</div>`;
+  // alert delivery -- queued vs delivered kept explicit
+  h+=`<div class="card card-wide"><h3>Alert delivery — broad-discovery-only</h3>`+
+     boundedTable(aq.recent_outbox||[], [
+        {label:'kind', get:x=>x.kind}, {label:'action', get:x=>x.action}, {label:'symbol', get:x=>x.symbol},
+        {label:'state', get:x=>x.state}, {label:'attempts', get:x=>x.attempts},
+        {label:'sent (UTC)', get:x=>x.sent_at_utc&&String(x.sent_at_utc).slice(0,19)},
+        {label:'last error', get:x=>x.last_error}], 20)+
+     `<div class="muted small">${esc(aq.note||'')}</div></div>`;
+  h+=`</div>`;
+  return h;
+}
+
 const SECTION_RENDER = {
   overview: renderOverview, premarket: renderPremarket, original_quant: renderOriginalQuant,
-  v2_active_strategy: renderV2,
+  v2_active_strategy: renderV2, v2_broad_discovery: renderV2Discovery,
   validation: renderValidation, intelligence: renderIntelligence, paper_eod: renderPaperEod,
 };
 
