@@ -1,0 +1,35 @@
+{
+  "window": {
+    "start": "2024-09-01",
+    "end": "2026-03-31"
+  },
+  "universe_n": 626,
+  "starting_cash": 300000.0,
+  "allocation": 10000.0,
+  "max_concurrent": 20,
+  "fingerprint": "11107198c5b81237",
+  "n_episodes_detected": 402,
+  "funnel_counts": {
+    "SKIPPED_ENTRY_STALE": 226,
+    "SKIPPED_NO_PRIOR_INTENT": 7,
+    "INTENT_CREATED": 162,
+    "ENTERED": 153,
+    "EXITED": 153,
+    "SKIPPED_IN_COOLDOWN": 5,
+    "SKIPPED_SYMBOL_ALREADY_OPEN": 4,
+    "SKIPPED_CLOSE_2.23_LT_5.0": 1,
+    "SKIPPED_CLOSE_4.61_LT_5.0": 1,
+    "SKIPPED_CLOSE_3.89_LT_5.0": 1,
+    "SKIPPED_CLOSE_4.76_LT_5.0": 1,
+    "SKIPPED_CLOSE_4.43_LT_5.0": 1,
+    "SKIPPED_CLOSE_3.69_LT_5.0": 1,
+    "SKIPPED_CLOSE_3.61_LT_5.0": 1
+  },
+  "n_closed_trades": 153,
+  "n_open_at_end": 0,
+  "open_at_end": [],
+  "ending_cash": 330935.4,
+  "ending_equity": 330935.4,
+  "max_drawdown_pct_daily_marked": -2.7478,
+  "capital_utilization_pct_days_with_open_position": 85.99
+}

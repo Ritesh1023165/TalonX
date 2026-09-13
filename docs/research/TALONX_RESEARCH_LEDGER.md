@@ -6380,3 +6380,36 @@ drawdown, corrected to a realized-equity -2.25% basis). Verdict:
 specifies a design-only integration handoff for a later, separately-
 authorized task. Full detail:
 `docs/research/{TASK130_OPTION_A_CONTRACT,TASK130_FROZEN_EVALUATION_PROTOCOL,TASK130_OPTION_A_ECONOMIC_DECISION}.md`.
+
+**Task 130A** (2026-09-13): qualification repair of Task 130's own
+review findings -- not a reopening of Task 129's pause, not a new
+hypothesis. Replaced Task 130's permissive-then-post-hoc-filtered
+Track B with a genuinely IN-LINE-gated, session-by-session isolated
+replay (reusing the same production-adjacent primitives, no production
+file modified): a durable intent, created on a strictly earlier
+simulated session, is now required BEFORE any cash/capacity mutation;
+intents reserve $10k cash + 1 slot with deterministic ordering; entries
+resolve before same-session exit proceeds are credited; the phantom-
+exit fallback (`open_notional.pop(episode_id, allocation)`) is removed
+by construction (positions tracked as real dict entries). Computed true
+daily mark-to-market equity/drawdown for the first time (-2.75%, peak
+2026-03-04, trough 2026-03-20, not recovered within window). Added a
+supplemental P&L-contribution-ranked concentration test alongside
+(not replacing) the original trade-count-ranked one -- both stay
+positive through top-5 removal. Reconciled the 35 ambiguous issuer-CIK
+mappings (19 likely legitimate identity changes, 2 multiple-securities-
+same-name, 14 unresolved, disclosed as incomplete coverage) and PROVED
+directly (not assumed) that none of the 8 ambiguous symbols with an
+actual entered trade had its cluster merge two different issuers.
+Corrected Task 130's misstatement that Task 112R's +1.01% belonged to
+the 39-name live scope -- it is the full-panel (N=756) result. Per-
+episode comparison: the corrected replay's 153 closed trades are
+IDENTICAL to Task 130's original 153 (same episode_ids, timing, P&L) --
+explained by this window's capacity never having been binding in
+either implementation, not assumed equivalence. Verdict:
+**`PASS_FOR_INTEGRATION_REVIEW`** (reaffirmed on a corrected, tested
+implementation), with two gates left explicitly PARTIAL/disclosed
+(14/35 unresolved identities; no restart/idempotency or invested-
+capital-exposure-ratio testing within this task's budget) rather than
+smoothed over. Full detail:
+`docs/research/{TASK130A_REPAIR_PROTOCOL,TASK130A_PROSPECTIVE_REPLAY_ACCEPTANCE,TASK130A_CORRECTED_ECONOMIC_DECISION}.md`.

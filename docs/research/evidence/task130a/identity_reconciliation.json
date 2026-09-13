@@ -1,0 +1,1031 @@
+{
+  "n_ambiguous_symbols_total": 35,
+  "n_classified_likely_legitimate_identity_change": 19,
+  "n_classified_multiple_securities_same_name": 2,
+  "n_classified_mapping_defect_or_unresolved": 14,
+  "n_ambiguous_symbols_with_entered_trades": 8,
+  "entered_ambiguous_symbols": [
+    "CZR",
+    "DOC",
+    "LB",
+    "MRVL",
+    "MTCH",
+    "PCG",
+    "TPL",
+    "WTW"
+  ],
+  "n_entered_trades_whose_single_cluster_spans_multiple_ciks": 0,
+  "proof_no_cross_issuer_cluster_merge": "For every ambiguous symbol with an ENTERED trade, the trade's own entry date was matched to exactly ONE issuer_cik's own filing date range (60-day grace). single_cluster_spans_multiple_ciks==False for all confirms no episode/cluster mixed filings from two different issuer_ciks under the shared ticker.",
+  "cases": [
+    {
+      "symbol": "A",
+      "n_distinct_ciks": 3,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0001090872": {
+          "n_records": 140,
+          "first_filing": "2019-01-31",
+          "last_filing": "2025-12-03",
+          "issuer_names": [
+            "AGILENT TECHNOLOGIES INC",
+            "AGILENT TECHNOLOGIES, INC."
+          ]
+        },
+        "0001132651": {
+          "n_records": 3,
+          "first_filing": "2021-07-22",
+          "last_filing": "2023-08-15",
+          "issuer_names": [
+            "AMES NATIONAL CORP"
+          ]
+        },
+        "0001823406": {
+          "n_records": 1,
+          "first_filing": "2022-03-08",
+          "last_filing": "2022-03-08",
+          "issuer_names": [
+            "Affinity Bancshares, Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "AME",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0001037868": {
+          "n_records": 203,
+          "first_filing": "2019-02-12",
+          "last_filing": "2026-03-25",
+          "issuer_names": [
+            "AMETEK INC/"
+          ]
+        },
+        "0001411579": {
+          "n_records": 1,
+          "first_filing": "2021-11-03",
+          "last_filing": "2021-11-03",
+          "issuer_names": [
+            "AMC ENTERTAINMENT HOLDINGS, INC."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "APA",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0000006769": {
+          "n_records": 5,
+          "first_filing": "2019-05-07",
+          "last_filing": "2020-04-07",
+          "issuer_names": [
+            "APACHE CORP"
+          ]
+        },
+        "0001841666": {
+          "n_records": 11,
+          "first_filing": "2021-03-12",
+          "last_filing": "2026-03-20",
+          "issuer_names": [
+            "APA Corp"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "APO",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001411494": {
+          "n_records": 242,
+          "first_filing": "2019-02-13",
+          "last_filing": "2021-12-13",
+          "issuer_names": [
+            "Apollo Global Management LLC",
+            "Apollo Global Management, Inc."
+          ]
+        },
+        "0001858681": {
+          "n_records": 148,
+          "first_filing": "2022-02-17",
+          "last_filing": "2025-12-12",
+          "issuer_names": [
+            "Apollo Global Management, Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "ARNC",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0000004281": {
+          "n_records": 28,
+          "first_filing": "2019-03-07",
+          "last_filing": "2020-03-02",
+          "issuer_names": [
+            "Arconic Inc."
+          ]
+        },
+        "0001790982": {
+          "n_records": 22,
+          "first_filing": "2020-05-22",
+          "last_filing": "2022-11-22",
+          "issuer_names": [
+            "Arconic Corp"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "AXON",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001636050": {
+          "n_records": 8,
+          "first_filing": "2019-03-19",
+          "last_filing": "2019-03-19",
+          "issuer_names": [
+            "Axovant Sciences Ltd."
+          ]
+        },
+        "0001069183": {
+          "n_records": 922,
+          "first_filing": "2021-03-04",
+          "last_filing": "2026-03-19",
+          "issuer_names": [
+            "AXON ENTERPRISE, INC."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "BEN",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0000038777": {
+          "n_records": 37,
+          "first_filing": "2019-03-04",
+          "last_filing": "2025-11-21",
+          "issuer_names": [
+            "FRANKLIN RESOURCES INC"
+          ]
+        },
+        "38777": {
+          "n_records": 1,
+          "first_filing": "2021-02-16",
+          "last_filing": "2021-02-16",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "BG",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001144519": {
+          "n_records": 135,
+          "first_filing": "2019-05-22",
+          "last_filing": "2023-08-17",
+          "issuer_names": [
+            "BUNGELTD",
+            "Bunge LTD"
+          ]
+        },
+        "0001996862": {
+          "n_records": 5,
+          "first_filing": "2024-05-23",
+          "last_filing": "2026-02-13",
+          "issuer_names": [
+            "Bunge Global SA"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "BLK",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001364742": {
+          "n_records": 250,
+          "first_filing": "2019-01-22",
+          "last_filing": "2024-08-30",
+          "issuer_names": [
+            "BlackRock Inc."
+          ]
+        },
+        "0002012383": {
+          "n_records": 109,
+          "first_filing": "2024-12-06",
+          "last_filing": "2026-02-26",
+          "issuer_names": [
+            "BlackRock, Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "CLX",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0000021076": {
+          "n_records": 76,
+          "first_filing": "2019-02-08",
+          "last_filing": "2025-11-24",
+          "issuer_names": [
+            "CLOROX CO /DE/"
+          ]
+        },
+        "21076": {
+          "n_records": 2,
+          "first_filing": "2021-01-27",
+          "last_filing": "2021-01-27",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "COHR",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0000021510": {
+          "n_records": 8,
+          "first_filing": "2019-11-12",
+          "last_filing": "2020-12-03",
+          "issuer_names": [
+            "COHERENT INC"
+          ]
+        },
+        "0000820318": {
+          "n_records": 143,
+          "first_filing": "2022-09-13",
+          "last_filing": "2026-03-18",
+          "issuer_names": [
+            "COHERENT CORP."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "COR",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001490892": {
+          "n_records": 252,
+          "first_filing": "2019-02-27",
+          "last_filing": "2021-11-09",
+          "issuer_names": [
+            "CoreSite Realty Corp"
+          ]
+        },
+        "0001140859": {
+          "n_records": 83,
+          "first_filing": "2023-09-07",
+          "last_filing": "2026-02-24",
+          "issuer_names": [
+            "Cencora, Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "CTLT",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0001596783": {
+          "n_records": 233,
+          "first_filing": "2019-02-20",
+          "last_filing": "2024-11-14",
+          "issuer_names": [
+            "Catalent, Inc."
+          ]
+        },
+        "1596783": {
+          "n_records": 1,
+          "first_filing": "2021-12-01",
+          "last_filing": "2021-12-01",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "CTRA",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001704715": {
+          "n_records": 147,
+          "first_filing": "2019-01-07",
+          "last_filing": "2020-03-27",
+          "issuer_names": [
+            "Contura Energy, Inc."
+          ]
+        },
+        "0000858470": {
+          "n_records": 43,
+          "first_filing": "2021-11-05",
+          "last_filing": "2025-05-22",
+          "issuer_names": [
+            "Coterra Energy Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "CZR",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0000858339": {
+          "n_records": 11,
+          "first_filing": "2019-03-08",
+          "last_filing": "2019-11-26",
+          "issuer_names": [
+            "CAESARS ENTERTAINMENT Corp"
+          ]
+        },
+        "0001590895": {
+          "n_records": 63,
+          "first_filing": "2020-12-11",
+          "last_filing": "2025-11-03",
+          "issuer_names": [
+            "Caesars Entertainment, Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2025-03-11"
+      ],
+      "cik_used_by_actual_trades": [
+        "0001590895"
+      ],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "DIS",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001001039": {
+          "n_records": 6,
+          "first_filing": "2019-01-04",
+          "last_filing": "2019-02-22",
+          "issuer_names": [
+            "WALT DISNEY CO/"
+          ]
+        },
+        "0001744489": {
+          "n_records": 126,
+          "first_filing": "2019-04-12",
+          "last_filing": "2026-02-17",
+          "issuer_names": [
+            "Walt Disney Co"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "DLR",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0001297996": {
+          "n_records": 137,
+          "first_filing": "2019-02-12",
+          "last_filing": "2025-12-01",
+          "issuer_names": [
+            "DIGITAL REALTY TRUST, INC.",
+            "Digital Realty Trust, Inc."
+          ]
+        },
+        "0001494877": {
+          "n_records": 2,
+          "first_filing": "2021-03-03",
+          "last_filing": "2023-03-14",
+          "issuer_names": [
+            "DIGITAL REALTY TRUST, L.P."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "DOC",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001574540": {
+          "n_records": 40,
+          "first_filing": "2019-06-07",
+          "last_filing": "2023-12-12",
+          "issuer_names": [
+            "Physicians Realty Trust"
+          ]
+        },
+        "0000765880": {
+          "n_records": 15,
+          "first_filing": "2024-03-04",
+          "last_filing": "2025-08-06",
+          "issuer_names": [
+            "HEALTHPEAK PROPERTIES, INC."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2025-04-29",
+        "2025-08-07"
+      ],
+      "cik_used_by_actual_trades": [
+        "0000765880"
+      ],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "EW",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0001099800": {
+          "n_records": 703,
+          "first_filing": "2019-01-03",
+          "last_filing": "2026-03-11",
+          "issuer_names": [
+            "Edwards Lifesciences Corp"
+          ]
+        },
+        "1099800": {
+          "n_records": 2,
+          "first_filing": "2020-12-11",
+          "last_filing": "2020-12-11",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "FI",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001575828": {
+          "n_records": 37,
+          "first_filing": "2019-03-04",
+          "last_filing": "2020-06-10",
+          "issuer_names": [
+            "FRANK'S INTERNATIONAL N.V."
+          ]
+        },
+        "0000798354": {
+          "n_records": 43,
+          "first_filing": "2023-08-02",
+          "last_filing": "2025-11-03",
+          "issuer_names": [
+            "FISERV INC"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "FOX",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001308161": {
+          "n_records": 3,
+          "first_filing": "2019-02-12",
+          "last_filing": "2019-03-14",
+          "issuer_names": [
+            "TWENTY-FIRST CENTURY FOX, INC."
+          ]
+        },
+        "0001754301": {
+          "n_records": 76,
+          "first_filing": "2019-06-10",
+          "last_filing": "2026-03-13",
+          "issuer_names": [
+            "Fox Corp"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "GEN",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001351051": {
+          "n_records": 25,
+          "first_filing": "2019-05-22",
+          "last_filing": "2020-06-04",
+          "issuer_names": [
+            "Genesis Healthcare, Inc."
+          ]
+        },
+        "0000849399": {
+          "n_records": 18,
+          "first_filing": "2023-02-21",
+          "last_filing": "2026-02-19",
+          "issuer_names": [
+            "Gen Digital Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "IR",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001466258": {
+          "n_records": 43,
+          "first_filing": "2019-01-03",
+          "last_filing": "2020-02-24",
+          "issuer_names": [
+            "Ingersoll-Rand plc"
+          ]
+        },
+        "0001699150": {
+          "n_records": 103,
+          "first_filing": "2020-05-15",
+          "last_filing": "2026-03-04",
+          "issuer_names": [
+            "Ingersoll Rand Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "LB",
+      "n_distinct_ciks": 3,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0000701985": {
+          "n_records": 16,
+          "first_filing": "2020-07-01",
+          "last_filing": "2021-07-20",
+          "issuer_names": [
+            "L Brands, Inc."
+          ]
+        },
+        "701985": {
+          "n_records": 1,
+          "first_filing": "2021-03-02",
+          "last_filing": "2021-03-02",
+          "issuer_names": [
+            ""
+          ]
+        },
+        "0001995807": {
+          "n_records": 14,
+          "first_filing": "2024-07-03",
+          "last_filing": "2026-03-06",
+          "issuer_names": [
+            "LandBridge Co LLC"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2026-01-08"
+      ],
+      "cik_used_by_actual_trades": [
+        "0001995807"
+      ],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "MAA",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0000912595": {
+          "n_records": 157,
+          "first_filing": "2019-01-10",
+          "last_filing": "2026-01-08",
+          "issuer_names": [
+            "MID AMERICA APARTMENT COMMUNITIES INC."
+          ]
+        },
+        "912595": {
+          "n_records": 1,
+          "first_filing": "2021-01-12",
+          "last_filing": "2021-01-12",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "MRVL",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0001058057": {
+          "n_records": 72,
+          "first_filing": "2019-01-14",
+          "last_filing": "2021-04-19",
+          "issuer_names": [
+            "MARVELL TECHNOLOGY GROUP LTD"
+          ]
+        },
+        "0001835632": {
+          "n_records": 181,
+          "first_filing": "2021-05-18",
+          "last_filing": "2026-03-27",
+          "issuer_names": [
+            "Marvell Technology, Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2025-09-26"
+      ],
+      "cik_used_by_actual_trades": [
+        "0001835632"
+      ],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "MTCH",
+      "n_distinct_ciks": 2,
+      "classification": "MULTIPLE_SECURITIES_SAME_ISSUER_NAME",
+      "cik_detail": {
+        "0001575189": {
+          "n_records": 24,
+          "first_filing": "2019-02-12",
+          "last_filing": "2020-05-27",
+          "issuer_names": [
+            "Match Group, Inc."
+          ]
+        },
+        "0000891103": {
+          "n_records": 158,
+          "first_filing": "2020-07-17",
+          "last_filing": "2026-03-06",
+          "issuer_names": [
+            "Match Group, Inc."
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2025-02-11"
+      ],
+      "cik_used_by_actual_trades": [
+        "0000891103"
+      ],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "PCG",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0001004980": {
+          "n_records": 34,
+          "first_filing": "2021-09-02",
+          "last_filing": "2026-03-17",
+          "issuer_names": [
+            "PG&E Corp"
+          ]
+        },
+        "0000075488": {
+          "n_records": 149,
+          "first_filing": "2022-03-04",
+          "last_filing": "2023-02-03",
+          "issuer_names": [
+            "PACIFIC GAS & ELECTRIC Co"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2025-02-26"
+      ],
+      "cik_used_by_actual_trades": [
+        "0001004980"
+      ],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "PG",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0000080424": {
+          "n_records": 562,
+          "first_filing": "2019-01-28",
+          "last_filing": "2026-03-02",
+          "issuer_names": [
+            "PROCTER & GAMBLE Co"
+          ]
+        },
+        "80424": {
+          "n_records": 4,
+          "first_filing": "2022-08-18",
+          "last_filing": "2022-08-18",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "STE",
+      "n_distinct_ciks": 2,
+      "classification": "MULTIPLE_SECURITIES_SAME_ISSUER_NAME",
+      "cik_detail": {
+        "0001624899": {
+          "n_records": 5,
+          "first_filing": "2019-01-14",
+          "last_filing": "2019-03-22",
+          "issuer_names": [
+            "STERIS plc"
+          ]
+        },
+        "0001757898": {
+          "n_records": 178,
+          "first_filing": "2019-05-16",
+          "last_filing": "2026-03-06",
+          "issuer_names": [
+            "STERIS plc"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "SWK",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0000093556": {
+          "n_records": 86,
+          "first_filing": "2019-01-28",
+          "last_filing": "2025-11-06",
+          "issuer_names": [
+            "STANLEY BLACK & DECKER, INC."
+          ]
+        },
+        "93556": {
+          "n_records": 1,
+          "first_filing": "2022-09-12",
+          "last_filing": "2022-09-12",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "TEL",
+      "n_distinct_ciks": 2,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0001385157": {
+          "n_records": 203,
+          "first_filing": "2019-02-07",
+          "last_filing": "2026-03-03",
+          "issuer_names": [
+            "TE Connectivity Ltd.",
+            "TE Connectivity plc"
+          ]
+        },
+        "1385157": {
+          "n_records": 2,
+          "first_filing": "2021-12-28",
+          "last_filing": "2021-12-28",
+          "issuer_names": [
+            ""
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "TPL",
+      "n_distinct_ciks": 3,
+      "classification": "MAPPING_DEFECT_OR_UNRESOLVED_OVERLAPPING_DATES",
+      "cik_detail": {
+        "0000097517": {
+          "n_records": 399,
+          "first_filing": "2019-03-18",
+          "last_filing": "2021-01-12",
+          "issuer_names": [
+            "TEXAS PACIFIC LAND TRUST"
+          ]
+        },
+        "0000919567": {
+          "n_records": 12,
+          "first_filing": "2020-09-29",
+          "last_filing": "2020-11-30",
+          "issuer_names": [
+            "RENN Fund, Inc."
+          ]
+        },
+        "0001811074": {
+          "n_records": 5730,
+          "first_filing": "2021-01-14",
+          "last_filing": "2026-03-31",
+          "issuer_names": [
+            "Texas Pacific Land Corp"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2024-09-12",
+        "2025-02-26",
+        "2025-08-19",
+        "2026-03-02"
+      ],
+      "cik_used_by_actual_trades": [
+        "0001811074"
+      ],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "WTW",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0000105319": {
+          "n_records": 2,
+          "first_filing": "2019-03-04",
+          "last_filing": "2019-03-12",
+          "issuer_names": [
+            "WEIGHT WATCHERS INTERNATIONAL INC"
+          ]
+        },
+        "0001140536": {
+          "n_records": 62,
+          "first_filing": "2022-04-05",
+          "last_filing": "2026-03-05",
+          "issuer_names": [
+            "WILLIS TOWERS WATSON PLC"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": true,
+      "entered_trade_dates": [
+        "2026-02-18"
+      ],
+      "cik_used_by_actual_trades": [
+        "0001140536"
+      ],
+      "single_cluster_spans_multiple_ciks": false
+    },
+    {
+      "symbol": "XRX",
+      "n_distinct_ciks": 2,
+      "classification": "LIKELY_LEGITIMATE_HISTORICAL_IDENTITY_CHANGE",
+      "cik_detail": {
+        "0000108772": {
+          "n_records": 1,
+          "first_filing": "2019-09-11",
+          "last_filing": "2019-09-11",
+          "issuer_names": [
+            "XEROX CORP"
+          ]
+        },
+        "0001770450": {
+          "n_records": 43,
+          "first_filing": "2020-08-07",
+          "last_filing": "2025-08-05",
+          "issuer_names": [
+            "Xerox Holdings Corp"
+          ]
+        }
+      },
+      "symbol_has_entered_trades": false,
+      "entered_trade_dates": [],
+      "cik_used_by_actual_trades": [],
+      "single_cluster_spans_multiple_ciks": false
+    }
+  ]
+}
