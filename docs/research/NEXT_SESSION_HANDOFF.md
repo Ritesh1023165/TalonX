@@ -1,8 +1,26 @@
-# Next-session handoff (finalized 2026-09-11, updated 2026-09-12 / Task119A+120)
+# Next-session handoff (finalized 2026-09-11, updated 2026-09-13 / Task129 pause + TalonX closure)
+
+> **2026-09-13 update (Task 129 + this closure task): RESEARCH AND
+> APPLICATION ACTIVATION ARE PAUSED.** Programme decision
+> `PAUSE_ALPHA_RESEARCH_UNDER_CURRENT_CONSTRAINTS` —
+> `docs/research/TASK129_RESEARCH_PROGRAM_DECISION.md` +
+> `TASK129_EVIDENCE_MATRIX.csv`. No supported profitable-alert
+> candidate exists on the live-configured population; V2's
+> configured-scope evidence remains genuinely `INCONCLUSIVE` (not
+> rejected). **No production process is currently running** (verified
+> read-only this task, timestamp below) — the "Startup / warmup
+> recovery procedure" and "Candidate release" sections below describe
+> HOW to restart if and when a resumption decision is made; they are
+> reference material, not a scheduled or implied next action. **Do not
+> restart the application from this document alone** — restart
+> requires the same explicit resumption decision Task 129 and this
+> closure task both describe below, not merely reading this handoff.
 
 **Do not launch the next session automatically — this is a handoff
 document, not a scheduler. No GO is declared here; GO/NO-GO is a
-preflight-time decision at next start.**
+preflight-time decision made only after an explicit resumption
+decision (see "Resumption conditions" below), not at arbitrary read
+time.**
 
 > **2026-09-12 update (Task119A/120)**: the candidate SHA changed from
 > `5c0b3f3` to `f289869` — a dashboard-only integration (Task 119 +
@@ -59,16 +77,48 @@ preflight-time decision at next start.**
 
 ## Open-position and pending-notification obligations
 
-- **Experimental: SPCX carries over**, 16.865960 sh, entry $148.2276,
-  stop $144.6133, target $152.0633 — resolves under its existing policy
-  on its own next qualifying tick; no manual action. **Re-verified
-  read-only 2026-09-12 (Task119A/120)**: unchanged since Task 118H's
-  close — same entry/stop/target, position still open, last stored mark
-  $151.2100 @ 2026-09-11T20:09:20Z (POST_CLOSE, +$50.30 unrealized on
-  that stale mark — will refresh on the next live tick, not before).
-- **V2**: 0 open positions, no pending entry/exit obligations, ABCL
-  episode `07242bc857569f60` remains terminal (`SKIPPED_ENTRY_STALE`).
-- **Intelligence**: 0 pending cards at last check.
+**Re-verified read-only 2026-09-13T09:40Z (this closure task), directly
+against the authoritative SQLite ledgers — not copied from any prior
+report:**
+
+- **Experimental: SPCX remains open**, position identifier `SPCX`
+  (`~/.talonx/experimental/experimental_paper.db`, table `positions`):
+  **16.865960067130683 shares**, entry price **$148.22755360794068**,
+  entry timestamp **2026-09-10T19:29:45.777729+00:00**, cost basis
+  $2,500.00, existing exit policy **stop $144.6133321126302 / target
+  $152.06332906087238** (unchanged since entry — resolves under this
+  existing policy on its own next qualifying tick once the application
+  is restarted; no manual action taken or implied here).
+  - **Last stored mark**: **there is none beyond the entry fill
+    itself.** The ledger's own mark-to-market table (`latest_prices`)
+    is EMPTY for SPCX (and every other ticker) — no subsequent price
+    update was ever persisted after the 2026-09-10T19:29:45Z entry.
+    The prior handoff text ("$151.2100 @ 2026-09-11T20:09:20Z") is
+    **withdrawn as a current figure** — it is not present in the
+    authoritative ledger as read this task and must not be treated as
+    today's value.
+  - The most recent ledger ACTIVITY of any kind (any ticker) is a
+    2026-09-11T08:59:27-04:00 SELL (BLSH, `confirmed_bearish`); no
+    ledger file has been written since 2026-09-11 21:09 local time
+    (`exp_quant.db`/`forward_outcomes.db` mtimes) — consistent with no
+    process having run since then.
+  - **Exit evaluation for SPCX is currently INACTIVE** because no
+    application process is running (verified this task — see
+    "Application state" below) — this is an observation gap, not a
+    resolved or flattened position. **A future restart must disclose
+    this gap explicitly** (no exit check has run since ~2026-09-11)
+    and follow the existing recovery/stale-check policy on its own
+    next qualifying tick — it must NOT claim uninterrupted monitoring
+    across this gap, and must NOT fabricate or back-fill a closing
+    fill for any time during the gap.
+- **V2**: re-verified read-only this task directly against
+  `v2_lane.db` (`positions` table: 0 rows; `portfolio` table: cash
+  $300,000.00 flat) — **0 open positions, no pending entry/exit
+  obligations**, confirmed accurate and unchanged. ABCL episode
+  `07242bc857569f60` remains terminal (`SKIPPED_ENTRY_STALE`).
+- **Intelligence**: not re-queried this task (no open position/ledger
+  obligation of this kind exists for the informational lane); 0
+  pending cards at last check, carried forward unverified.
 - **No other obligation carries over.**
 
 ## Feed / exit-evaluation / delivery verification (next session)
@@ -104,37 +154,81 @@ check + port check + `redis.ping()`), exactly as done today.
 ## Explicit go/no-go conditions for next start
 
 **GO** if: preflight all-`[OK]`, no live prior stack detected, V2 ledger
-continuity confirmed, Redis reachable. **NO-GO / investigate first** if:
-any preflight gate fails, a competing writer is detected, or the V2
-ledger fingerprint/md5 differs unexpectedly from this session's final
-state. **This decision is made at next-session preflight time, not here.**
+continuity confirmed, Redis reachable, **AND an explicit resumption
+decision has been made** (see below — a passing preflight alone is
+never sufficient while the programme is paused). **NO-GO / investigate
+first** if: any preflight gate fails, a competing writer is detected,
+the V2 ledger fingerprint/md5 differs unexpectedly from this session's
+final state, **or no resumption decision has been made yet.** **This
+decision is made at next-session preflight time, not here — and is
+gated on the resumption decision below, not on this document alone.**
 
 ## Next market session
 
-**Monday 2026-09-14**, re-verified via `talonx_v2.calendar.is_session`
-(2026-09-12/13 correctly read as non-sessions).
+Not scheduled. The prior text ("Monday 2026-09-14") described a launch
+that did not proceed — **application activation is paused** (Task 129)
+and no next session is currently planned. When a resumption decision
+is made, `talonx_v2.calendar.is_session` remains the correct way to
+identify the next actual trading session at that time.
+
+## Application state as of this closure task (2026-09-13T09:40:01Z, read-only)
+
+- Release `f28986999eec5e313cfc89db24e4dbacfb378891` and research
+  `e0d26bde41d6691bee30c73576b999c3aa9b4713` — both verified exactly as
+  expected, both worktrees clean.
+- **No TalonX process is running**: 0 Python processes of any kind, 0
+  listening ports on 8787/8770/8760/8501. Four stale `.run/task99c_*.pid`
+  files exist (from an unrelated, much earlier task) — all four PIDs
+  checked individually and confirmed NOT running; not a live session.
+- Redis reachable (`PING` → True), 0 `talonx:*` keys — read-only,
+  nothing modified.
+- No ongoing monitoring is implied by this snapshot — it is a
+  point-in-time check, not a standing watch.
+
+## Programme decision and resumption conditions (Task 129)
+
+**`PAUSE_ALPHA_RESEARCH_UNDER_CURRENT_CONSTRAINTS`** —
+`docs/research/TASK129_RESEARCH_PROGRAM_DECISION.md` +
+`docs/research/TASK129_EVIDENCE_MATRIX.csv` (authoritative). No
+supported profitable-alert candidate exists on the live-configured
+population; this is not a claim that all possible strategies fail, and
+paid data is not asserted as a guaranteed fix. Implemented application
+capabilities (alerts, paper portfolios, dashboard, long/short-horizon
+support) are validated as WORKING SOFTWARE; none of them currently
+carry a validated profitable TRADING STRATEGY on the live-configured
+scope — V2's own evidence remains genuinely `INCONCLUSIVE`, not
+rejected.
+
+**Named resumption conditions (exact, from Task 129 §5)**:
+1. An explicit user product decision authorizing a genuine long-hold
+   alert type, or accepting non-differentiating calendar-wide alerts —
+   would unblock an already-scoped candidate without new data.
+2. Authorization for a materially new, paid, or non-price data/feature
+   class (e.g. consensus estimates, options) — the specific bar this
+   programme's own closure clause already sets.
+3. V2's paper ledger accumulating a materially larger sample on its
+   already-frozen contract, observed as part of normal, periodic
+   product review — **not** a dedicated research task, and **not**
+   grounds to resume research on its own without a fresh bounded
+   proposal.
+
+**A future resumption proposal must specify** (Task 129 §6, restated):
+what new information or capability has become available; which
+documented limitation (named in the evidence matrix) it addresses; one
+bounded experiment and the specific product decision it would change;
+data provenance, cost, acceptance criteria, and an explicit stop
+condition; any required authorization. This closure task does **not**
+recommend paid data, scope expansion, filter relaxation, or another
+candidate — none of those is supported by evidence named here.
 
 ## One next research/product action
 
-**Option 3 (attributable per-lane reconciliation surface) is DONE** —
-implemented, tested, rendered, and integrated (Task 119/119A), live in
-this candidate's Paper/EOD and Active V2 tabs.
-
-**Superseded 2026-09-12 (Task120A–C)**: Task 120's N=27/6-name-gap
-finding was corrected (wrong replay method, wrong coverage check — see
-`docs/research/TASK120ABC_CORRECTED_BASELINE_AND_DECISION.md`). The
-authoritative 39-name-scope result is now a **properly-powered
-chronological replay** (the real `V2Service.tick()`, N=57, 19 distinct
-issuers, full 2019–2026 available history): net@20bps=−0.85%, 95%
-CI=[−4.57%, +1.11%] — **still inconclusive** (CI includes zero), but on
-a correctly-engineered, tighter-CI basis. Original's economic evidence
-was found to already exist (Task 93, exact frozen contract, 1 trade in
-18.7 months — cited, not rerun). Product decision:
-**`INSUFFICIENT_EVIDENCE_WITH_ONE_SPECIFIC_NEXT_ACTION`** — the one
-named next action is Experimental's exact `EXPERIMENTAL_RELAXED_V1`
-contract, never backtested as a combined whole, reusing Task 93's
-already-built/validated `task93_canonical_v1` dataset and harness (no
-new data collection, no new framework). See
-`docs/research/PRODUCT_STATUS.md` for the one-page authoritative summary.
-Live V2 observation continues in parallel but remains explicitly not the
-sole programme.
+**None scheduled.** Research and application activation remain paused
+pending a concrete resumption decision per the conditions above. The
+prior Task 119/119A/120A–C history (dashboard reconciliation delivered;
+V2 39-name-scope replay corrected to N=57, net@20bps=−0.85%, 95%
+CI=[−4.57%,+1.11%]) remains accurate and is superseded only in the
+sense that the whole alpha-research programme it fed into is now
+paused — see `docs/research/PRODUCT_STATUS.md` and
+`docs/research/TASK129_RESEARCH_PROGRAM_DECISION.md` for the full,
+current, authoritative picture.
