@@ -1,5 +1,25 @@
 # Task 128 Part 7/8 — user-visible product specification and bounded decision
 
+> **Correction (Task 129, 2026-09-13)** — dated notes only; no Task 128
+> calculation is reopened or rerun.
+>
+> - `USEFUL_AS_TRACKING_BENCHMARK_ONLY` stands unchanged.
+> - Reporting the baseline's lower return (+12.77% ann.) alongside its
+>   lower max drawdown (−19.58%) than SPY (+17.44% ann., −33.79%
+>   drawdown) does **not**, by itself, establish that SPY dominates the
+>   baseline — no risk-adjusted (e.g. Sharpe-type) metric was computed;
+>   these remain two separate, uncombined facts.
+> - "No delistings possible in this panel by construction" describes
+>   this HISTORICAL panel only (today's survivors, by definition,
+>   cannot show a past delisting) — it does **not** mean future
+>   delisting risk for the currently-active names is impossible; that
+>   risk is real and unmeasured here.
+> - The distinction between Task 127's cohort-return average
+>   (+13.70%/6mo) and Task 128's chronological portfolio result
+>   (+151.13% total / +12.77% annualized) stands exactly as reported.
+>
+> See `docs/research/TASK129_RESEARCH_PROGRAM_DECISION.md` §8.
+
 ## Part 7 — the smallest faithful paper-alert journey (specification only, nothing implemented)
 
 Described AS THE ACTUAL TESTED CONTRACT (monthly formation, up to 6

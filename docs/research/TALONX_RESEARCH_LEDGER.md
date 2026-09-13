@@ -6335,3 +6335,19 @@ now-trustworthy research control for future long-term candidates, not
 productized as a standalone alert (no ticker differentiation,
 underperforms the simplest passive alternative). Full detail:
 `docs/research/{TASK128_BASELINE_CONTRACT_AND_ACCOUNTING,TASK128_BASELINE_PRODUCT_DECISION}.md`.
+
+**Task 129** (2026-09-13): consolidated all ten distinct mechanisms
+examined across this programme (task-by-task detail above) into one
+evidence matrix and reached a programme-level decision:
+**`PAUSE_ALPHA_RESEARCH_UNDER_CURRENT_CONSTRAINTS`** — no candidate
+(turn-of-month, 52-week-high at a longer horizon, further V2 live
+accumulation, a new free price/volume hypothesis) clears the six-point
+next-experiment gate; each remaining option is blocked by a product
+decision, a data ceiling, or would be an indefinite-live-observation
+substitute this task explicitly excludes. Named five concrete causes
+of programme iteration (stale-worktree parity, late accounting
+corrections, unsupported product-restriction inferences, delayed
+data-extension checks, unverified provenance assumptions) each with a
+lightweight, already-existing-mechanism prevention rule. Roadmap start
+date retained at 2026-09-11 (Task 118H), not reset. Full detail:
+`docs/research/{TASK129_RESEARCH_PROGRAM_DECISION,TASK129_EVIDENCE_MATRIX.csv}`.

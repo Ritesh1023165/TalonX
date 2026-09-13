@@ -1,4 +1,11 @@
-# Product status (authoritative, updated 2026-09-13 / Task 128)
+# Product status (authoritative, updated 2026-09-13 / Task 129)
+
+**Programme decision (Task 129): `PAUSE_ALPHA_RESEARCH_UNDER_CURRENT_CONSTRAINTS`**
+— see `docs/research/TASK129_RESEARCH_PROGRAM_DECISION.md` and
+`TASK129_EVIDENCE_MATRIX.csv` for the full, authoritative synthesis of
+every mechanism below and why no further alpha-research task is
+currently justified. This page's per-mechanism rows are unchanged and
+remain the underlying evidence; Task 129 does not alter any of them.
 
 **User objective, unchanged**: configured tickers with intraday and
 short/long-horizon alerts, and attributable local paper portfolios.
@@ -61,7 +68,9 @@ Experimental contract on its now-exhausted historical dataset.
 
 ## Full evidence
 
-`docs/research/TASK128_BASELINE_CONTRACT_AND_ACCOUNTING.md` +
+`docs/research/TASK129_RESEARCH_PROGRAM_DECISION.md` +
+`TASK129_EVIDENCE_MATRIX.csv` (authoritative programme-level synthesis
+and pause decision); `docs/research/TASK128_BASELINE_CONTRACT_AND_ACCOUNTING.md` +
 `TASK128_BASELINE_PRODUCT_DECISION.md` (this task — corrects Task 127's
 overclaimed language, builds the first real chronological portfolio
 for the no-selection baseline, fair same-capital SPY comparison,
