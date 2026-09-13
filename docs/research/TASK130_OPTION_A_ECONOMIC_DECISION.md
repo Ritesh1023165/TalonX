@@ -1,5 +1,31 @@
 # Task 130 Part 7/8 — Option A offline evaluation, results, decision, and integration handoff
 
+> **Correction (Task 130A, 2026-09-13) — REVIEW HOLD, original artifacts
+> below preserved unchanged.**
+>
+> - The historical subset statistics below (Track A N=157, Track B
+>   N=153, and all reported figures) remain reported as computed — not
+>   deleted or altered.
+> - **`PASS_FOR_INTEGRATION_REVIEW` is UNDER REVIEW**, superseded
+>   pending Task 130A's repair — see
+>   `docs/research/TASK130A_CORRECTED_ECONOMIC_DECISION.md` for the
+>   current verdict.
+> - **Track B (below) was an intent-ASSOCIATED subset, not a proven
+>   prospective-policy replay.** It was built by running the
+>   PERMISSIVE policy (cold-start entries allowed) to completion, then
+>   filtering completed trades post-hoc by intent presence — the
+>   excluded cold-start entries still consumed real capacity/cooldown
+>   state during the underlying replay, so other episodes were never
+>   re-evaluated under a genuinely gated capacity timeline.
+> - **The −2.25% figure reported below was a "realized-equity"
+>   drawdown** (cash + open positions marked at unchanging entry cost),
+>   **not a daily mark-to-market equity drawdown** — it could not show
+>   an unrealized loss on any still-open position by construction.
+>
+> See `docs/research/TASK130A_REPAIR_PROTOCOL.md` for the full repair
+> addendum and `TASK130A_CORRECTED_ECONOMIC_DECISION.md` for the
+> corrected result and final gate.
+
 Runs `research/scripts/task130_discovery_evaluation.py` exactly ONCE,
 implementing the contract frozen in
 `docs/research/TASK130_FROZEN_EVALUATION_PROTOCOL.md` before any return
