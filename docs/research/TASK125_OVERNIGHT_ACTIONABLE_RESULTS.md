@@ -1,5 +1,52 @@
 # Task 125 Part 5/6 — overnight-attention actionable candidate, extended evaluation and decision
 
+> **Correction (Task 126, 2026-09-13)** — applied to stored artifacts
+> only; Task 125 was NOT rerun.
+>
+> - The statistical verdict remains **`INCONCLUSIVE`** and the product
+>   verdict remains **`DO_NOT_ADVANCE`**, unchanged.
+> - This document's closing description of the result as
+>   "stress-tested and **confirmed**" (also echoed in the journal
+>   outcome) is corrected: **a "confirmed negative edge" is not what
+>   was established.** The expanded, feed-verified test retained the
+>   SAME negative-leaning point estimates Task 123 first found across a
+>   materially larger sample (3,201 vs. 579 observations, 542 vs. 100
+>   distinct dates) — but every cohort's 95% CI still includes zero.
+>   That is evidence AGAINST a positive effect existing at the tested
+>   materiality, not proof of a statistically negative underlying
+>   expectancy. The correct, precise description is: *repeated,
+>   larger-sample testing failed to find supporting evidence, and the
+>   point estimate stayed negative* — not *the strategy was shown to
+>   lose money*.
+> - The `EXTREME_RETURN_EXCLUSION_ABS=0.50` guard is **not** complete
+>   corporate-action handling. It correctly caught the one AVGO/NVDA
+>   split-driven overnight-return discontinuity in-sample (§ below),
+>   but two related limitations remain undisclosed-by-omission in the
+>   original text: (1) a stock split also distorts the **same-time-of-
+>   day cumulative-volume trigger** for the ~20 sessions surrounding
+>   it (already noted in the frozen protocol's §3, but not repeated
+>   here where a reader would look first), and (2) **dividends are not
+>   adjusted for at all** under the raw-price convention this task
+>   uses — an ex-dividend overnight return is reported as a real
+>   economic loss/gain of that magnitude, not corrected, which the
+>   guard does nothing to address (a dividend-sized move is far too
+>   small to trip a ±50% threshold).
+> - **Eligible dates, trigger dates, and bootstrap resampling blocks
+>   are three different counts and must not be conflated.** For Cohort
+>   A: 3,201 **eligible observations** span **542 distinct calendar
+>   dates** (this is the bootstrap's resampling-block count — it
+>   resamples ALL eligible dates, trigger or not, since the control
+>   population is drawn from the same dates); of those 542 dates, only
+>   **117 are trigger dates** (at least one of the 12 symbols fired
+>   that day). The bootstrap's `n_dates=542` in the machine-readable
+>   output is the ELIGIBLE-date count, not the trigger-date count —
+>   reading it as "117 independent blocks" would understate the
+>   resampling population, and reading it as "542 independent trigger
+>   events" would overstate the trigger evidence base.
+>
+> See `docs/research/TASK126_CANDIDATE_SELECTION.md` Part 1 for the
+> full correction record.
+
 Runs `research/scripts/task125_overnight_evaluation.py` exactly ONCE,
 reusing Task 123 Track B's transformation and uncertainty method
 unchanged (only the input directory/window differ per cohort — see

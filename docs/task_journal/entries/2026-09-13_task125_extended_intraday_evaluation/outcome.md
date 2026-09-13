@@ -1,3 +1,16 @@
+> **Correction (Task 126, 2026-09-13):** the closing line below
+> ("stress-tested and confirmed") is corrected — statistical
+> `INCONCLUSIVE` / product `DO_NOT_ADVANCE` both stand unchanged, but
+> "confirmed negative edge" is NOT what this task established: every
+> cohort's CI still includes zero. The correct description is that a
+> materially larger, feed-verified retest failed to find supporting
+> evidence while the point estimate stayed negative — not that a
+> negative expectancy was statistically proven. The ±50% extreme-return
+> guard is also not complete corporate-action handling (split-driven
+> volume distortion and unadjusted dividends remain limitations). See
+> `docs/research/TASK126_CANDIDATE_SELECTION.md` Part 1 and the
+> corresponding correction in `TASK125_OVERNIGHT_ACTIONABLE_RESULTS.md`.
+
 1. **Statistical and product verdicts**: Statistical (Cohort A,
    primary) = **`INCONCLUSIVE`** (95% CI [−0.7946%,+0.3458%] includes
    zero). Product = **`DO_NOT_ADVANCE`** — negative on both the

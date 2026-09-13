@@ -1,0 +1,45 @@
+{
+  "task": "126",
+  "generated_at_utc": "2026-09-13",
+  "selection_decision": "NO_CANDIDATE_PASSES_PRODUCT_AND_DATA_GATES",
+  "statistical_verdict": "NOT_APPLICABLE_NO_EVALUATION_RUN",
+  "candidates": {
+    "A_52_week_high_proximity": {
+      "source": "George & Hwang (2004), Journal of Finance 59(5), 2145-2176",
+      "product_verdict": "BLOCKED_BY_SPECIFIC_PRODUCT_OR_DATA_REQUIREMENT",
+      "gate_failures": [
+        "published mechanism is cross-sectional long-short decile rank across thousands of stocks, not a per-ticker absolute threshold",
+        "published holding period is 6-12 months; no existing TalonX product horizon authorizes that; compressing it would be an unvalidated, invented adaptation"
+      ],
+      "gate_passes": [
+        "ticker-specific, differentiating signal",
+        "full existing daily-bar coverage (35/48 configured tickers)",
+        "no direct mechanism overlap with rejected work, though adjacent to Task 95B's rejected short-horizon zone"
+      ],
+      "smallest_unblocking_requirement": "an explicit product decision authorizing a long-hold (multi-month) alert type, or explicit acceptance that a short-horizon version is a novel, unvalidated hypothesis rather than a literature-grounded one",
+      "return_computed": false
+    },
+    "B_turn_of_month": {
+      "source": "McConnell & Xu (2008), Financial Analysts Journal 64(2), 49-64",
+      "product_verdict": "DO_NOT_ADVANCE",
+      "gate_failures": [
+        "structurally produces a common calendar-wide exposure identical across all 48 configured tickers -- zero ticker-specific differentiation"
+      ],
+      "gate_passes": [
+        "no shorting or cross-sectional ranking required",
+        "holding period (~4 trading days) matches existing TalonX short-horizon product shape",
+        "zero overlap with any previously rejected TalonX contract",
+        "trivial, full existing-data coverage",
+        "mechanically exact, no design choice to invent"
+      ],
+      "smallest_unblocking_requirement": "a product decision to accept a non-differentiating, scheduled full-book exposure toggle as a valid alert type for this product",
+      "return_computed": false
+    }
+  },
+  "prior_task_reference": "docs/research/TASK122_CANDIDATE_DECISION.md Part 3 (Hypotheses 2 and 3)",
+  "task125_corrections_applied": [
+    "confirmed_negative_edge_withdrawn",
+    "extreme_return_guard_not_complete_corporate_action_handling",
+    "eligible_vs_trigger_vs_bootstrap_date_counts_distinguished"
+  ]
+}

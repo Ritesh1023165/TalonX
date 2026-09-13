@@ -6261,3 +6261,23 @@ data reproduced Task 123's exact original numbers bit-for-bit
 `DO_NOT_ADVANCE` — closed on a materially larger, multi-year,
 feed-verified dataset; not scheduled for further reruns of this exact
 contract. Full detail: `docs/research/TASK125_OVERNIGHT_ACTIONABLE_RESULTS.md`.
+
+**Task 126** (2026-09-13): applied a product-fit gate to Task 122's two
+remaining shortlisted candidates (52-week-high proximity — George &
+Hwang 2004 JF; turn-of-month — McConnell & Xu 2008 FAJ), selecting
+before inspecting any return. Also appended corrections to Task 125's
+stored artifacts (no rerun): "confirmed negative edge" withdrawn (every
+cohort's CI still includes zero — repeated, larger-sample testing
+failed to find supporting evidence, it did not prove a negative
+expectancy); the ±50% guard is not complete corporate-action handling
+(split-driven volume distortion, unadjusted dividends remain
+limitations); eligible/trigger/bootstrap-block date counts
+distinguished. Decision: **`NO_CANDIDATE_PASSES_PRODUCT_AND_DATA_GATES`**
+— 52-week-high `BLOCKED_BY_SPECIFIC_PRODUCT_OR_DATA_REQUIREMENT` (the
+published 6-12 month hold has no authorized TalonX horizon; inventing
+a shorter one would be an unvalidated adaptation, explicitly disallowed
+this task); turn-of-month `DO_NOT_ADVANCE` (structurally a common
+calendar exposure identical across all 48 configured tickers, zero
+ticker-specific differentiation — a product-fit failure, not a data or
+statistical one). No evaluation code was run against either candidate.
+Full detail: `docs/research/{TASK126_CANDIDATE_SELECTION,TASK126_ECONOMIC_DECISION}.md`.
