@@ -347,6 +347,20 @@ outcome (the overnight return itself) was computed or inspected in this
 task**, per Part 4's explicit instruction to rank/check feasibility
 BEFORE looking at candidate returns.
 
+> **Correction (Task 123, 2026-09-13):** the trigger-frequency counts
+> above (2,447 events, etc.) remain accurate. What is withdrawn is the
+> IMPLICIT assumption, carried into Part 5's fixed evaluation protocol
+> below, that this daily-final-volume trigger could be acted on at
+> session S's OWN closing price — final daily volume is only known at
+> or after the close itself, making that a non-causal execution claim.
+> Corrected into two explicit tracks (a non-actionable daily-data
+> ASSOCIATION diagnostic, and a separately-specified, intraday-data-
+> dependent ACTIONABLE pre-close candidate) in
+> `docs/research/TASK123_TIMING_CORRECTION.md` and evaluated in
+> `docs/research/TASK123_OVERNIGHT_ATTENTION_RESULTS.md`. Part 5's
+> protocol below (same-day close entry) is superseded by that
+> correction, not deleted.
+
 ---
 
 ## Part 5 — decision

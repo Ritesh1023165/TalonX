@@ -1,0 +1,5412 @@
+{
+  "track": "B_actionable_preclose_candidate",
+  "label": "Feasibility + bounded reference-fill test. Entry/exit prices are REFERENCE FILLS (observed subsequent prices), NOT claimed executable quotes.",
+  "contract": {
+    "universe": [
+      "AAPL",
+      "AMAT",
+      "AMD",
+      "AVGO",
+      "CSCO",
+      "GOOGL",
+      "INTC",
+      "MSFT",
+      "NVDA",
+      "PYPL",
+      "STX",
+      "TSLA"
+    ],
+    "window": [
+      "2025-01-24",
+      "2025-08-14"
+    ],
+    "regular_session_open_utc": "14:30:00",
+    "decision_cutoff_utc": "20:50:00",
+    "reference_volume_measure": "cumulative volume from regular-session open through the decision cutoff (same-time-of-day normalization), vs. trailing 20-session average of the SAME same-time-of-day cumulative metric",
+    "alert_delay_minutes": 2,
+    "entry_observation_utc": "20:52:00",
+    "exit": "next XNYS session's regular-open 1-min bar (reference fill)",
+    "cost_bps_round_trip": 5.0
+  },
+  "exclusion_counts_by_symbol": {
+    "AAPL": {
+      "symbol": "AAPL",
+      "no_data": false,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 17,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 50,
+      "missing_next_session": 0,
+      "extreme_return_excluded": 0,
+      "eligible": 73,
+      "triggers": 5
+    },
+    "AMAT": {
+      "symbol": "AMAT",
+      "no_data": false,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 78,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 50,
+      "missing_next_session": 1,
+      "extreme_return_excluded": 0,
+      "eligible": 11,
+      "triggers": 1
+    },
+    "AMD": {
+      "symbol": "AMD",
+      "no_data": false,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 20,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 50,
+      "missing_next_session": 1,
+      "extreme_return_excluded": 0,
+      "eligible": 69,
+      "triggers": 5
+    },
+    "AVGO": {
+      "symbol": "AVGO",
+      "no_data": false,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 49,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 50,
+      "missing_next_session": 1,
+      "extreme_return_excluded": 0,
+      "eligible": 40,
+      "triggers": 1
+    },
+    "CSCO": {
+      "symbol": "CSCO",
+      "no_data": false,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 77,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 45,
+      "missing_next_session": 1,
+      "extreme_return_excluded": 0,
+      "eligible": 17,
+      "triggers": 2
+    },
+    "GOOGL": {
+      "symbol": "GOOGL",
+      "no_data": false,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 32,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 50,
+      "missing_next_session": 0,
+      "extreme_return_excluded": 0,
+      "eligible": 58,
+      "triggers": 4
+    },
+    "INTC": {
+      "symbol": "INTC",
+      "no_data": false,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 16,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 50,
+      "missing_next_session": 1,
+      "extreme_return_excluded": 0,
+      "eligible": 73,
+      "triggers": 4
+    },
+    "MSFT": {
+      "symbol": "MSFT",
+      "no_data": false,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 63,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 50,
+      "missing_next_session": 0,
+      "extreme_return_excluded": 0,
+      "eligible": 27,
+      "triggers": 3
+    },
+    "NVDA": {
+      "symbol": "NVDA",
+      "no_data": false,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 0,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 50,
+      "missing_next_session": 1,
+      "extreme_return_excluded": 0,
+      "eligible": 89,
+      "triggers": 1
+    },
+    "PYPL": {
+      "symbol": "PYPL",
+      "no_data": false,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 66,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 50,
+      "missing_next_session": 0,
+      "extreme_return_excluded": 0,
+      "eligible": 24,
+      "triggers": 1
+    },
+    "STX": {
+      "symbol": "STX",
+      "no_data": false,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 109,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 21,
+      "missing_next_session": 0,
+      "extreme_return_excluded": 0,
+      "eligible": 10,
+      "triggers": 3
+    },
+    "TSLA": {
+      "symbol": "TSLA",
+      "no_data": false,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 1,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 50,
+      "missing_next_session": 1,
+      "extreme_return_excluded": 0,
+      "eligible": 88,
+      "triggers": 1
+    }
+  },
+  "n_eligible_observations": 579,
+  "n_triggers": 31,
+  "trigger_net_return_mean_pct": -0.2688,
+  "control_net_return_mean_pct": 0.2816,
+  "incremental_diff_pct": -0.5504,
+  "uncertainty": {
+    "n_dates": 100,
+    "n_reps_used": 5000,
+    "trigger_mean_ci_pct": [
+      -2.0298,
+      1.5912
+    ],
+    "control_mean_ci_pct": [
+      -0.0705,
+      0.6207
+    ],
+    "incremental_diff_ci_pct": [
+      -2.1445,
+      1.209
+    ],
+    "method": "date-block bootstrap, joint resampling of trigger+control from the SAME resampled date multiset, 5000 reps, seed 123123, 95% percentile CI"
+  },
+  "trade_table": [
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-07",
+      "is_trigger": true,
+      "gross_return": 0.04429367312041488,
+      "net_return": 0.04379367312041488,
+      "entry_price_reference_fill": 181.29,
+      "exit_price_reference_fill": 189.32
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-08",
+      "is_trigger": true,
+      "gross_return": 0.033649947874435426,
+      "net_return": 0.033149947874435426,
+      "entry_price_reference_fill": 172.66,
+      "exit_price_reference_fill": 178.47
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-09",
+      "is_trigger": true,
+      "gross_return": -0.0321248741188318,
+      "net_return": -0.032624874118831804,
+      "entry_price_reference_fill": 198.6,
+      "exit_price_reference_fill": 192.22
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-10",
+      "is_trigger": false,
+      "gross_return": -0.0025207436193676047,
+      "net_return": -0.0030207436193676047,
+      "entry_price_reference_fill": 190.42,
+      "exit_price_reference_fill": 189.94
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-11",
+      "is_trigger": false,
+      "gross_return": 0.03434343434343434,
+      "net_return": 0.03384343434343434,
+      "entry_price_reference_fill": 198.0,
+      "exit_price_reference_fill": 204.8
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-14",
+      "is_trigger": false,
+      "gross_return": -0.004758364312267727,
+      "net_return": -0.005258364312267727,
+      "entry_price_reference_fill": 201.75,
+      "exit_price_reference_fill": 200.79
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-15",
+      "is_trigger": false,
+      "gross_return": -0.025564950798595554,
+      "net_return": -0.026064950798595554,
+      "entry_price_reference_fill": 202.23,
+      "exit_price_reference_fill": 197.06
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-16",
+      "is_trigger": false,
+      "gross_return": 0.008349654674775664,
+      "net_return": 0.007849654674775663,
+      "entry_price_reference_fill": 194.02,
+      "exit_price_reference_fill": 195.64
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-17",
+      "is_trigger": false,
+      "gross_return": -0.02778340080971653,
+      "net_return": -0.02828340080971653,
+      "entry_price_reference_fill": 197.6,
+      "exit_price_reference_fill": 192.11
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-21",
+      "is_trigger": false,
+      "gross_return": 0.02785992217898836,
+      "net_return": 0.02735992217898836,
+      "entry_price_reference_fill": 192.75,
+      "exit_price_reference_fill": 198.12
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-22",
+      "is_trigger": false,
+      "gross_return": 0.03508508508508501,
+      "net_return": 0.03458508508508501,
+      "entry_price_reference_fill": 199.8,
+      "exit_price_reference_fill": 206.81
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-23",
+      "is_trigger": false,
+      "gross_return": 0.008753056234718892,
+      "net_return": 0.008253056234718892,
+      "entry_price_reference_fill": 204.5,
+      "exit_price_reference_fill": 206.29
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-25",
+      "is_trigger": false,
+      "gross_return": 0.0001197031362221157,
+      "net_return": -0.0003802968637778843,
+      "entry_price_reference_fill": 208.85,
+      "exit_price_reference_fill": 208.875
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-28",
+      "is_trigger": false,
+      "gross_return": 0.004571428571428671,
+      "net_return": 0.00407142857142867,
+      "entry_price_reference_fill": 210.0,
+      "exit_price_reference_fill": 210.96
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-29",
+      "is_trigger": false,
+      "gross_return": -0.006880929791271417,
+      "net_return": -0.007380929791271418,
+      "entry_price_reference_fill": 210.8,
+      "exit_price_reference_fill": 209.3495
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-04-30",
+      "is_trigger": false,
+      "gross_return": -0.0036231884057971175,
+      "net_return": -0.004123188405797118,
+      "entry_price_reference_fill": 212.52,
+      "exit_price_reference_fill": 211.75
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-01",
+      "is_trigger": false,
+      "gross_return": -0.00758521363418152,
+      "net_return": -0.00808521363418152,
+      "entry_price_reference_fill": 208.3,
+      "exit_price_reference_fill": 206.72
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-02",
+      "is_trigger": false,
+      "gross_return": -0.030449202555723476,
+      "net_return": -0.030949202555723476,
+      "entry_price_reference_fill": 205.03,
+      "exit_price_reference_fill": 198.787
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-07",
+      "is_trigger": false,
+      "gross_return": -0.0018858307849132228,
+      "net_return": -0.0023858307849132228,
+      "entry_price_reference_fill": 196.2,
+      "exit_price_reference_fill": 195.83
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-08",
+      "is_trigger": false,
+      "gross_return": 0.004837157473534859,
+      "net_return": 0.004337157473534858,
+      "entry_price_reference_fill": 197.43,
+      "exit_price_reference_fill": 198.385
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-12",
+      "is_trigger": false,
+      "gross_return": 0.003012191072529813,
+      "net_return": 0.002512191072529813,
+      "entry_price_reference_fill": 210.81,
+      "exit_price_reference_fill": 211.445
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-13",
+      "is_trigger": false,
+      "gross_return": 0.006464703661759108,
+      "net_return": 0.005964703661759108,
+      "entry_price_reference_fill": 211.92,
+      "exit_price_reference_fill": 213.29
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-14",
+      "is_trigger": false,
+      "gross_return": -0.007784120394395466,
+      "net_return": -0.008284120394395467,
+      "entry_price_reference_fill": 211.97,
+      "exit_price_reference_fill": 210.32
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-15",
+      "is_trigger": false,
+      "gross_return": -0.0024173343192785968,
+      "net_return": -0.0029173343192785968,
+      "entry_price_reference_fill": 211.1003,
+      "exit_price_reference_fill": 210.59
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-16",
+      "is_trigger": false,
+      "gross_return": -0.017919954368285862,
+      "net_return": -0.018419954368285862,
+      "entry_price_reference_fill": 210.38,
+      "exit_price_reference_fill": 206.61
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-19",
+      "is_trigger": false,
+      "gross_return": -0.0017771373679154046,
+      "net_return": -0.0022771373679154046,
+      "entry_price_reference_fill": 208.2,
+      "exit_price_reference_fill": 207.83
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-20",
+      "is_trigger": false,
+      "gross_return": -0.0031080825160308967,
+      "net_return": -0.0036080825160308967,
+      "entry_price_reference_fill": 206.4617,
+      "exit_price_reference_fill": 205.82
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-22",
+      "is_trigger": false,
+      "gross_return": -0.022702488351343364,
+      "net_return": -0.023202488351343364,
+      "entry_price_reference_fill": 201.74,
+      "exit_price_reference_fill": 197.16
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-23",
+      "is_trigger": false,
+      "gross_return": 0.015928297055057605,
+      "net_return": 0.015428297055057605,
+      "entry_price_reference_fill": 195.25,
+      "exit_price_reference_fill": 198.36
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-27",
+      "is_trigger": false,
+      "gross_return": 0.002446941323345886,
+      "net_return": 0.0019469413233458859,
+      "entry_price_reference_fill": 200.25,
+      "exit_price_reference_fill": 200.74
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-28",
+      "is_trigger": false,
+      "gross_return": 0.004525935478199905,
+      "net_return": 0.004025935478199905,
+      "entry_price_reference_fill": 200.2238,
+      "exit_price_reference_fill": 201.13
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-29",
+      "is_trigger": false,
+      "gross_return": -0.003551065319595925,
+      "net_return": -0.004051065319595926,
+      "entry_price_reference_fill": 199.94,
+      "exit_price_reference_fill": 199.23
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-05-30",
+      "is_trigger": false,
+      "gross_return": 9.975062344147467e-05,
+      "net_return": -0.00040024937655852534,
+      "entry_price_reference_fill": 200.5,
+      "exit_price_reference_fill": 200.52
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-02",
+      "is_trigger": false,
+      "gross_return": -0.0012871287128712883,
+      "net_return": -0.0017871287128712883,
+      "entry_price_reference_fill": 202.0,
+      "exit_price_reference_fill": 201.74
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-03",
+      "is_trigger": false,
+      "gross_return": 0.01133605514352598,
+      "net_return": 0.01083605514352598,
+      "entry_price_reference_fill": 202.8307,
+      "exit_price_reference_fill": 205.13
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-05",
+      "is_trigger": false,
+      "gross_return": 0.015457491897282516,
+      "net_return": 0.014957491897282515,
+      "entry_price_reference_fill": 200.55,
+      "exit_price_reference_fill": 203.65
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-06",
+      "is_trigger": false,
+      "gross_return": 0.005879470847623747,
+      "net_return": 0.005379470847623746,
+      "entry_price_reference_fill": 204.1,
+      "exit_price_reference_fill": 205.3
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-09",
+      "is_trigger": false,
+      "gross_return": 0.006699419383653593,
+      "net_return": 0.006199419383653593,
+      "entry_price_reference_fill": 201.51,
+      "exit_price_reference_fill": 202.86
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-10",
+      "is_trigger": false,
+      "gross_return": 0.0010367810417180046,
+      "net_return": 0.0005367810417180045,
+      "entry_price_reference_fill": 202.55,
+      "exit_price_reference_fill": 202.76
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-11",
+      "is_trigger": false,
+      "gross_return": -0.005065086665019147,
+      "net_return": -0.005565086665019148,
+      "entry_price_reference_fill": 199.0884,
+      "exit_price_reference_fill": 198.08
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-12",
+      "is_trigger": false,
+      "gross_return": -0.013924496053888347,
+      "net_return": -0.014424496053888347,
+      "entry_price_reference_fill": 198.93,
+      "exit_price_reference_fill": 196.16
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-13",
+      "is_trigger": false,
+      "gross_return": 0.010361507128309633,
+      "net_return": 0.009861507128309632,
+      "entry_price_reference_fill": 196.4,
+      "exit_price_reference_fill": 198.435
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-17",
+      "is_trigger": false,
+      "gross_return": 0.007308596545027024,
+      "net_return": 0.006808596545027024,
+      "entry_price_reference_fill": 195.66,
+      "exit_price_reference_fill": 197.09
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-20",
+      "is_trigger": false,
+      "gross_return": 0.003288162614587531,
+      "net_return": 0.002788162614587531,
+      "entry_price_reference_fill": 200.72,
+      "exit_price_reference_fill": 201.38
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-23",
+      "is_trigger": false,
+      "gross_return": -0.0024815127301602846,
+      "net_return": -0.0029815127301602846,
+      "entry_price_reference_fill": 201.49,
+      "exit_price_reference_fill": 200.99
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-24",
+      "is_trigger": false,
+      "gross_return": 0.008669656203288634,
+      "net_return": 0.008169656203288633,
+      "entry_price_reference_fill": 200.7,
+      "exit_price_reference_fill": 202.44
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-25",
+      "is_trigger": false,
+      "gross_return": -0.008193058245195783,
+      "net_return": -0.008693058245195784,
+      "entry_price_reference_fill": 201.39,
+      "exit_price_reference_fill": 199.74
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-26",
+      "is_trigger": false,
+      "gross_return": 0.003484494001692484,
+      "net_return": 0.002984494001692484,
+      "entry_price_reference_fill": 200.89,
+      "exit_price_reference_fill": 201.59
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-27",
+      "is_trigger": false,
+      "gross_return": -0.0011181235402275558,
+      "net_return": -0.0016181235402275558,
+      "entry_price_reference_fill": 201.23,
+      "exit_price_reference_fill": 201.005
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-06-30",
+      "is_trigger": false,
+      "gross_return": 0.02085107419496257,
+      "net_return": 0.02035107419496257,
+      "entry_price_reference_fill": 205.27,
+      "exit_price_reference_fill": 209.5501
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-07-01",
+      "is_trigger": false,
+      "gross_return": 0.014480286738351333,
+      "net_return": 0.013980286738351333,
+      "entry_price_reference_fill": 209.25,
+      "exit_price_reference_fill": 212.28
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-07-02",
+      "is_trigger": false,
+      "gross_return": 0.008152859632614362,
+      "net_return": 0.007652859632614362,
+      "entry_price_reference_fill": 212.0115,
+      "exit_price_reference_fill": 213.74
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-07-07",
+      "is_trigger": false,
+      "gross_return": -0.0010262529832936185,
+      "net_return": -0.0015262529832936185,
+      "entry_price_reference_fill": 209.5,
+      "exit_price_reference_fill": 209.285
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-07-09",
+      "is_trigger": false,
+      "gross_return": 0.0061693242217160105,
+      "net_return": 0.00566932422171601,
+      "entry_price_reference_fill": 210.72,
+      "exit_price_reference_fill": 212.02
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-07-11",
+      "is_trigger": false,
+      "gross_return": -0.01140575990875381,
+      "net_return": -0.01190575990875381,
+      "entry_price_reference_fill": 210.42,
+      "exit_price_reference_fill": 208.02
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-07-14",
+      "is_trigger": false,
+      "gross_return": 0.007817370869502627,
+      "net_return": 0.007317370869502626,
+      "entry_price_reference_fill": 208.51,
+      "exit_price_reference_fill": 210.14
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-07-15",
+      "is_trigger": false,
+      "gross_return": 0.015512783682849696,
+      "net_return": 0.015012783682849695,
+      "entry_price_reference_fill": 208.86,
+      "exit_price_reference_fill": 212.1
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-07-16",
+      "is_trigger": false,
+      "gross_return": -0.0009351064665110709,
+      "net_return": -0.0014351064665110709,
+      "entry_price_reference_fill": 210.1365,
+      "exit_price_reference_fill": 209.94
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-07-21",
+      "is_trigger": false,
+      "gross_return": 0.004001883239171278,
+      "net_return": 0.0035018832391712777,
+      "entry_price_reference_fill": 212.4,
+      "exit_price_reference_fill": 213.25
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-07-23",
+      "is_trigger": false,
+      "gross_return": 0.0014013548453675195,
+      "net_return": 0.0009013548453675195,
+      "entry_price_reference_fill": 214.1499,
+      "exit_price_reference_fill": 214.45
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-07-24",
+      "is_trigger": false,
+      "gross_return": 0.002991353119887963,
+      "net_return": 0.002491353119887963,
+      "entry_price_reference_fill": 213.95,
+      "exit_price_reference_fill": 214.59
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-07-28",
+      "is_trigger": false,
+      "gross_return": -0.003789565041730225,
+      "net_return": -0.004289565041730226,
+      "entry_price_reference_fill": 213.8504,
+      "exit_price_reference_fill": 213.04
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-07-29",
+      "is_trigger": false,
+      "gross_return": -0.003218173213440645,
+      "net_return": -0.003718173213440645,
+      "entry_price_reference_fill": 211.3,
+      "exit_price_reference_fill": 210.62
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-07-30",
+      "is_trigger": false,
+      "gross_return": 0.005101058710298423,
+      "net_return": 0.004601058710298422,
+      "entry_price_reference_fill": 207.8,
+      "exit_price_reference_fill": 208.86
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-07-31",
+      "is_trigger": false,
+      "gross_return": -0.03150794773831411,
+      "net_return": -0.03200794773831411,
+      "entry_price_reference_fill": 212.01,
+      "exit_price_reference_fill": 205.33
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-08-01",
+      "is_trigger": false,
+      "gross_return": 0.02078499136015788,
+      "net_return": 0.020284991360157878,
+      "entry_price_reference_fill": 202.55,
+      "exit_price_reference_fill": 206.76
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-08-04",
+      "is_trigger": false,
+      "gross_return": 0.005185278742519506,
+      "net_return": 0.004685278742519505,
+      "entry_price_reference_fill": 203.4799,
+      "exit_price_reference_fill": 204.535
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-08-06",
+      "is_trigger": true,
+      "gross_return": 0.029700929289117495,
+      "net_return": 0.029200929289117494,
+      "entry_price_reference_fill": 211.99,
+      "exit_price_reference_fill": 218.2863
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-08-07",
+      "is_trigger": false,
+      "gross_return": 0.012406271301976801,
+      "net_return": 0.0119062713019768,
+      "entry_price_reference_fill": 220.05,
+      "exit_price_reference_fill": 222.78
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-08-08",
+      "is_trigger": true,
+      "gross_return": -0.013570527597755677,
+      "net_return": -0.014070527597755678,
+      "entry_price_reference_fill": 229.91,
+      "exit_price_reference_fill": 226.79
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-08-11",
+      "is_trigger": false,
+      "gross_return": 0.008737478487268913,
+      "net_return": 0.008237478487268912,
+      "entry_price_reference_fill": 226.61,
+      "exit_price_reference_fill": 228.59
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-08-12",
+      "is_trigger": false,
+      "gross_return": 0.010289868336754493,
+      "net_return": 0.009789868336754493,
+      "entry_price_reference_fill": 229.449,
+      "exit_price_reference_fill": 231.81
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2025-08-13",
+      "is_trigger": false,
+      "gross_return": -0.004608622852956601,
+      "net_return": -0.005108622852956601,
+      "entry_price_reference_fill": 233.2801,
+      "exit_price_reference_fill": 232.205
+    },
+    {
+      "symbol": "AMAT",
+      "date": "2025-04-08",
+      "is_trigger": true,
+      "gross_return": 0.015818858560793903,
+      "net_return": 0.015318858560793902,
+      "entry_price_reference_fill": 128.96,
+      "exit_price_reference_fill": 131.0
+    },
+    {
+      "symbol": "AMAT",
+      "date": "2025-04-11",
+      "is_trigger": false,
+      "gross_return": 0.009520274914089244,
+      "net_return": 0.009020274914089244,
+      "entry_price_reference_fill": 145.5,
+      "exit_price_reference_fill": 146.8852
+    },
+    {
+      "symbol": "AMAT",
+      "date": "2025-04-23",
+      "is_trigger": false,
+      "gross_return": 0.024600880814753756,
+      "net_return": 0.024100880814753756,
+      "entry_price_reference_fill": 145.32,
+      "exit_price_reference_fill": 148.895
+    },
+    {
+      "symbol": "AMAT",
+      "date": "2025-05-14",
+      "is_trigger": false,
+      "gross_return": -0.006868742840885345,
+      "net_return": -0.007368742840885345,
+      "entry_price_reference_fill": 174.6899,
+      "exit_price_reference_fill": 173.49
+    },
+    {
+      "symbol": "AMAT",
+      "date": "2025-05-15",
+      "is_trigger": false,
+      "gross_return": -0.02328232823282328,
+      "net_return": -0.02378232823282328,
+      "entry_price_reference_fill": 166.65,
+      "exit_price_reference_fill": 162.77
+    },
+    {
+      "symbol": "AMAT",
+      "date": "2025-05-28",
+      "is_trigger": false,
+      "gross_return": -0.01676304133858264,
+      "net_return": -0.01726304133858264,
+      "entry_price_reference_fill": 162.56,
+      "exit_price_reference_fill": 159.835
+    },
+    {
+      "symbol": "AMAT",
+      "date": "2025-06-05",
+      "is_trigger": false,
+      "gross_return": 0.019557823129251917,
+      "net_return": 0.019057823129251916,
+      "entry_price_reference_fill": 164.64,
+      "exit_price_reference_fill": 167.86
+    },
+    {
+      "symbol": "AMAT",
+      "date": "2025-06-16",
+      "is_trigger": false,
+      "gross_return": 0.005607476635513864,
+      "net_return": 0.0051074766355138634,
+      "entry_price_reference_fill": 176.55,
+      "exit_price_reference_fill": 177.54
+    },
+    {
+      "symbol": "AMAT",
+      "date": "2025-07-22",
+      "is_trigger": false,
+      "gross_return": 0.005460970125281239,
+      "net_return": 0.004960970125281239,
+      "entry_price_reference_fill": 186.78,
+      "exit_price_reference_fill": 187.8
+    },
+    {
+      "symbol": "AMAT",
+      "date": "2025-07-23",
+      "is_trigger": false,
+      "gross_return": 0.0031897926634767426,
+      "net_return": 0.0026897926634767426,
+      "entry_price_reference_fill": 188.1,
+      "exit_price_reference_fill": 188.7
+    },
+    {
+      "symbol": "AMAT",
+      "date": "2025-08-08",
+      "is_trigger": false,
+      "gross_return": 0.016437795647932907,
+      "net_return": 0.015937795647932906,
+      "entry_price_reference_fill": 185.2499,
+      "exit_price_reference_fill": 188.295
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-04-07",
+      "is_trigger": false,
+      "gross_return": 0.06460336538461542,
+      "net_return": 0.06410336538461542,
+      "entry_price_reference_fill": 83.2,
+      "exit_price_reference_fill": 88.575
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-04-08",
+      "is_trigger": true,
+      "gross_return": 0.06653796653796662,
+      "net_return": 0.06603796653796662,
+      "entry_price_reference_fill": 77.7,
+      "exit_price_reference_fill": 82.87
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-04-09",
+      "is_trigger": true,
+      "gross_return": -0.06671085747428818,
+      "net_return": -0.06721085747428818,
+      "entry_price_reference_fill": 96.551,
+      "exit_price_reference_fill": 90.11
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-04-10",
+      "is_trigger": false,
+      "gross_return": 0.025969645868465507,
+      "net_return": 0.025469645868465507,
+      "entry_price_reference_fill": 88.95,
+      "exit_price_reference_fill": 91.26
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-04-11",
+      "is_trigger": false,
+      "gross_return": 0.024272882805816964,
+      "net_return": 0.023772882805816964,
+      "entry_price_reference_fill": 93.52,
+      "exit_price_reference_fill": 95.79
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-04-14",
+      "is_trigger": false,
+      "gross_return": 0.010636489214748801,
+      "net_return": 0.0101364892147488,
+      "entry_price_reference_fill": 94.11,
+      "exit_price_reference_fill": 95.111
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-04-15",
+      "is_trigger": false,
+      "gross_return": -0.059184724894594476,
+      "net_return": -0.059684724894594476,
+      "entry_price_reference_fill": 95.109,
+      "exit_price_reference_fill": 89.48
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-04-16",
+      "is_trigger": false,
+      "gross_return": -0.005824577432617661,
+      "net_return": -0.006324577432617662,
+      "entry_price_reference_fill": 87.56,
+      "exit_price_reference_fill": 87.05
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-04-21",
+      "is_trigger": false,
+      "gross_return": 0.0026906878802057665,
+      "net_return": 0.0021906878802057665,
+      "entry_price_reference_fill": 85.48,
+      "exit_price_reference_fill": 85.71
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-04-22",
+      "is_trigger": false,
+      "gross_return": 0.07821747708019022,
+      "net_return": 0.07771747708019022,
+      "entry_price_reference_fill": 86.17,
+      "exit_price_reference_fill": 92.91
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-04-24",
+      "is_trigger": false,
+      "gross_return": 0.0026612731530764044,
+      "net_return": 0.0021612731530764044,
+      "entry_price_reference_fill": 93.94,
+      "exit_price_reference_fill": 94.19
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-04-25",
+      "is_trigger": false,
+      "gross_return": -0.003526970954356834,
+      "net_return": -0.004026970954356834,
+      "entry_price_reference_fill": 96.4,
+      "exit_price_reference_fill": 96.06
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-04-29",
+      "is_trigger": false,
+      "gross_return": -0.0054416250072431005,
+      "net_return": -0.005941625007243101,
+      "entry_price_reference_fill": 94.9165,
+      "exit_price_reference_fill": 94.4
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-04-30",
+      "is_trigger": false,
+      "gross_return": -0.0032212603180995503,
+      "net_return": -0.0037212603180995503,
+      "entry_price_reference_fill": 99.34,
+      "exit_price_reference_fill": 99.02
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-01",
+      "is_trigger": false,
+      "gross_return": 0.029274369355341,
+      "net_return": 0.028774369355341,
+      "entry_price_reference_fill": 96.33,
+      "exit_price_reference_fill": 99.15
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-02",
+      "is_trigger": false,
+      "gross_return": 0.02064777327935219,
+      "net_return": 0.020147773279352188,
+      "entry_price_reference_fill": 98.8,
+      "exit_price_reference_fill": 100.84
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-05",
+      "is_trigger": false,
+      "gross_return": -0.019137332672285456,
+      "net_return": -0.019637332672285457,
+      "entry_price_reference_fill": 100.85,
+      "exit_price_reference_fill": 98.92
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-06",
+      "is_trigger": false,
+      "gross_return": -0.03639996101744469,
+      "net_return": -0.036899961017444693,
+      "entry_price_reference_fill": 102.61,
+      "exit_price_reference_fill": 98.875
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-07",
+      "is_trigger": false,
+      "gross_return": 0.03764140554610074,
+      "net_return": 0.037141405546100736,
+      "entry_price_reference_fill": 99.89,
+      "exit_price_reference_fill": 103.65
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-08",
+      "is_trigger": false,
+      "gross_return": 0.0005882930661953445,
+      "net_return": 8.829306619534448e-05,
+      "entry_price_reference_fill": 101.82,
+      "exit_price_reference_fill": 101.8799
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-13",
+      "is_trigger": false,
+      "gross_return": 0.06221628838451276,
+      "net_return": 0.06171628838451276,
+      "entry_price_reference_fill": 112.35,
+      "exit_price_reference_fill": 119.34
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-14",
+      "is_trigger": false,
+      "gross_return": -0.022338805212387847,
+      "net_return": -0.022838805212387847,
+      "entry_price_reference_fill": 118.18,
+      "exit_price_reference_fill": 115.54
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-16",
+      "is_trigger": false,
+      "gross_return": -0.014820526000171363,
+      "net_return": -0.015320526000171364,
+      "entry_price_reference_fill": 116.73,
+      "exit_price_reference_fill": 115.0
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-19",
+      "is_trigger": false,
+      "gross_return": -0.012480363065107247,
+      "net_return": -0.012980363065107248,
+      "entry_price_reference_fill": 114.58,
+      "exit_price_reference_fill": 113.15
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-20",
+      "is_trigger": false,
+      "gross_return": 0.0001751773670841672,
+      "net_return": -0.0003248226329158328,
+      "entry_price_reference_fill": 114.17,
+      "exit_price_reference_fill": 114.19
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-21",
+      "is_trigger": false,
+      "gross_return": -0.001965145696920745,
+      "net_return": -0.002465145696920745,
+      "entry_price_reference_fill": 111.9001,
+      "exit_price_reference_fill": 111.6802
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-22",
+      "is_trigger": false,
+      "gross_return": -0.021219205178924616,
+      "net_return": -0.021719205178924617,
+      "entry_price_reference_fill": 111.22,
+      "exit_price_reference_fill": 108.86
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-23",
+      "is_trigger": false,
+      "gross_return": 0.040433674395637276,
+      "net_return": 0.039933674395637275,
+      "entry_price_reference_fill": 110.1656,
+      "exit_price_reference_fill": 114.62
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-27",
+      "is_trigger": false,
+      "gross_return": -0.003933222620400301,
+      "net_return": -0.004433222620400301,
+      "entry_price_reference_fill": 114.41,
+      "exit_price_reference_fill": 113.96
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-28",
+      "is_trigger": false,
+      "gross_return": -0.0045379177938739135,
+      "net_return": -0.005037917793873914,
+      "entry_price_reference_fill": 114.59,
+      "exit_price_reference_fill": 114.07
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-05-30",
+      "is_trigger": false,
+      "gross_return": 0.0246835443037976,
+      "net_return": 0.0241835443037976,
+      "entry_price_reference_fill": 110.6,
+      "exit_price_reference_fill": 113.33
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-06-04",
+      "is_trigger": false,
+      "gross_return": -0.009452274453540355,
+      "net_return": -0.009952274453540355,
+      "entry_price_reference_fill": 118.49,
+      "exit_price_reference_fill": 117.37
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-06-05",
+      "is_trigger": false,
+      "gross_return": 0.01930434782608703,
+      "net_return": 0.01880434782608703,
+      "entry_price_reference_fill": 115.0,
+      "exit_price_reference_fill": 117.22
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-06-09",
+      "is_trigger": false,
+      "gross_return": 0.01430380787893748,
+      "net_return": 0.01380380787893748,
+      "entry_price_reference_fill": 121.59,
+      "exit_price_reference_fill": 123.3292
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-06-10",
+      "is_trigger": false,
+      "gross_return": -0.0025749573413503812,
+      "net_return": -0.0030749573413503812,
+      "entry_price_reference_fill": 123.07,
+      "exit_price_reference_fill": 122.7531
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-06-11",
+      "is_trigger": false,
+      "gross_return": -0.006307339449541205,
+      "net_return": -0.006807339449541205,
+      "entry_price_reference_fill": 122.08,
+      "exit_price_reference_fill": 121.31
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-06-12",
+      "is_trigger": false,
+      "gross_return": -0.02763670064874879,
+      "net_return": -0.02813670064874879,
+      "entry_price_reference_fill": 118.69,
+      "exit_price_reference_fill": 115.4098
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-06-16",
+      "is_trigger": true,
+      "gross_return": 0.02741782553729455,
+      "net_return": 0.02691782553729455,
+      "entry_price_reference_fill": 126.56,
+      "exit_price_reference_fill": 130.03
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-06-17",
+      "is_trigger": false,
+      "gross_return": 0.01569509734369423,
+      "net_return": 0.01519509734369423,
+      "entry_price_reference_fill": 126.7211,
+      "exit_price_reference_fill": 128.71
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-06-23",
+      "is_trigger": false,
+      "gross_return": 0.047982131854590104,
+      "net_return": 0.047482131854590104,
+      "entry_price_reference_fill": 129.84,
+      "exit_price_reference_fill": 136.07
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-06-24",
+      "is_trigger": false,
+      "gross_return": 0.02173285198555952,
+      "net_return": 0.02123285198555952,
+      "entry_price_reference_fill": 138.5,
+      "exit_price_reference_fill": 141.51
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-06-25",
+      "is_trigger": false,
+      "gross_return": -0.008266759291420622,
+      "net_return": -0.008766759291420623,
+      "entry_price_reference_fill": 143.95,
+      "exit_price_reference_fill": 142.76
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-06-26",
+      "is_trigger": false,
+      "gross_return": 0.014357726403615434,
+      "net_return": 0.013857726403615434,
+      "entry_price_reference_fill": 143.825,
+      "exit_price_reference_fill": 145.89
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-06-27",
+      "is_trigger": false,
+      "gross_return": -0.004108635097493041,
+      "net_return": -0.004608635097493041,
+      "entry_price_reference_fill": 143.6,
+      "exit_price_reference_fill": 143.01
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-06-30",
+      "is_trigger": false,
+      "gross_return": -0.030047975165796603,
+      "net_return": -0.030547975165796604,
+      "entry_price_reference_fill": 141.74,
+      "exit_price_reference_fill": 137.481
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-01",
+      "is_trigger": false,
+      "gross_return": 0.005743430698508467,
+      "net_return": 0.005243430698508467,
+      "entry_price_reference_fill": 136.0685,
+      "exit_price_reference_fill": 136.85
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-02",
+      "is_trigger": false,
+      "gross_return": 0.0030386340616408436,
+      "net_return": 0.0025386340616408436,
+      "entry_price_reference_fill": 138.22,
+      "exit_price_reference_fill": 138.64
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-07",
+      "is_trigger": false,
+      "gross_return": 0.022963733650416263,
+      "net_return": 0.022463733650416262,
+      "entry_price_reference_fill": 134.56,
+      "exit_price_reference_fill": 137.65
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-08",
+      "is_trigger": false,
+      "gross_return": 0.012762871646120333,
+      "net_return": 0.012262871646120332,
+      "entry_price_reference_fill": 137.9,
+      "exit_price_reference_fill": 139.66
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-10",
+      "is_trigger": false,
+      "gross_return": -0.0013905390661068662,
+      "net_return": -0.0018905390661068662,
+      "entry_price_reference_fill": 144.2606,
+      "exit_price_reference_fill": 144.06
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-11",
+      "is_trigger": false,
+      "gross_return": -0.01572314796403984,
+      "net_return": -0.01622314796403984,
+      "entry_price_reference_fill": 146.3511,
+      "exit_price_reference_fill": 144.05
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-14",
+      "is_trigger": false,
+      "gross_return": 0.0716875299268076,
+      "net_return": 0.0711875299268076,
+      "entry_price_reference_fill": 146.19,
+      "exit_price_reference_fill": 156.67
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-15",
+      "is_trigger": false,
+      "gross_return": 0.0002581311306142364,
+      "net_return": -0.00024186886938576358,
+      "entry_price_reference_fill": 154.96,
+      "exit_price_reference_fill": 155.0
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-16",
+      "is_trigger": false,
+      "gross_return": 0.002438855045439947,
+      "net_return": 0.0019388550454399471,
+      "entry_price_reference_fill": 159.8701,
+      "exit_price_reference_fill": 160.26
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-17",
+      "is_trigger": false,
+      "gross_return": -0.019141751451220212,
+      "net_return": -0.019641751451220213,
+      "entry_price_reference_fill": 160.21,
+      "exit_price_reference_fill": 157.1433
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-18",
+      "is_trigger": false,
+      "gross_return": 0.014663691424928293,
+      "net_return": 0.014163691424928293,
+      "entry_price_reference_fill": 156.85,
+      "exit_price_reference_fill": 159.15
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-21",
+      "is_trigger": false,
+      "gross_return": -0.03503801655423788,
+      "net_return": -0.03553801655423788,
+      "entry_price_reference_fill": 156.7212,
+      "exit_price_reference_fill": 151.23
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-23",
+      "is_trigger": false,
+      "gross_return": 0.0003758221108676185,
+      "net_return": -0.0001241778891323815,
+      "entry_price_reference_fill": 159.65,
+      "exit_price_reference_fill": 159.71
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-28",
+      "is_trigger": false,
+      "gross_return": 0.036487961845658834,
+      "net_return": 0.035987961845658833,
+      "entry_price_reference_fill": 174.03,
+      "exit_price_reference_fill": 180.38
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-29",
+      "is_trigger": true,
+      "gross_return": 0.003173978989944315,
+      "net_return": 0.002673978989944315,
+      "entry_price_reference_fill": 178.01,
+      "exit_price_reference_fill": 178.575
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-30",
+      "is_trigger": false,
+      "gross_return": -0.007260726072607415,
+      "net_return": -0.007760726072607416,
+      "entry_price_reference_fill": 181.8,
+      "exit_price_reference_fill": 180.48
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-07-31",
+      "is_trigger": false,
+      "gross_return": -0.027736812251843546,
+      "net_return": -0.028236812251843546,
+      "entry_price_reference_fill": 176.3,
+      "exit_price_reference_fill": 171.41
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-08-04",
+      "is_trigger": false,
+      "gross_return": -0.014929149797570873,
+      "net_return": -0.015429149797570874,
+      "entry_price_reference_fill": 177.84,
+      "exit_price_reference_fill": 175.185
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-08-05",
+      "is_trigger": false,
+      "gross_return": -0.046427228404189114,
+      "net_return": -0.046927228404189114,
+      "entry_price_reference_fill": 168.3301,
+      "exit_price_reference_fill": 160.515
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-08-06",
+      "is_trigger": true,
+      "gross_return": 0.048383160463697505,
+      "net_return": 0.047883160463697505,
+      "entry_price_reference_fill": 163.9,
+      "exit_price_reference_fill": 171.83
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-08-07",
+      "is_trigger": false,
+      "gross_return": 0.00353169524266006,
+      "net_return": 0.00303169524266006,
+      "entry_price_reference_fill": 172.7499,
+      "exit_price_reference_fill": 173.36
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-08-11",
+      "is_trigger": false,
+      "gross_return": 0.003493856635416126,
+      "net_return": 0.002993856635416126,
+      "entry_price_reference_fill": 171.73,
+      "exit_price_reference_fill": 172.33
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-08-12",
+      "is_trigger": false,
+      "gross_return": 0.059206003666361084,
+      "net_return": 0.058706003666361084,
+      "entry_price_reference_fill": 174.56,
+      "exit_price_reference_fill": 184.895
+    },
+    {
+      "symbol": "AMD",
+      "date": "2025-08-13",
+      "is_trigger": false,
+      "gross_return": -0.012676364258878858,
+      "net_return": -0.013176364258878859,
+      "entry_price_reference_fill": 183.4201,
+      "exit_price_reference_fill": 181.095
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-04-07",
+      "is_trigger": false,
+      "gross_return": 0.06021008669240002,
+      "net_return": 0.05971008669240002,
+      "entry_price_reference_fill": 158.03,
+      "exit_price_reference_fill": 167.545
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-04-10",
+      "is_trigger": false,
+      "gross_return": 0.010398512838387441,
+      "net_return": 0.009898512838387441,
+      "entry_price_reference_fill": 172.14,
+      "exit_price_reference_fill": 173.93
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-04-11",
+      "is_trigger": false,
+      "gross_return": -0.0036873968079250696,
+      "net_return": -0.00418739680792507,
+      "entry_price_reference_fill": 181.7,
+      "exit_price_reference_fill": 181.03
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-04-14",
+      "is_trigger": false,
+      "gross_return": 0.008260747400955282,
+      "net_return": 0.007760747400955281,
+      "entry_price_reference_fill": 177.95,
+      "exit_price_reference_fill": 179.42
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-04-15",
+      "is_trigger": false,
+      "gross_return": -0.019708846584546413,
+      "net_return": -0.020208846584546414,
+      "entry_price_reference_fill": 178.6,
+      "exit_price_reference_fill": 175.08
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-04-22",
+      "is_trigger": false,
+      "gross_return": 0.06249260967246073,
+      "net_return": 0.06199260967246073,
+      "entry_price_reference_fill": 169.14,
+      "exit_price_reference_fill": 179.71
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-04-29",
+      "is_trigger": false,
+      "gross_return": -0.008344335885925425,
+      "net_return": -0.008844335885925425,
+      "entry_price_reference_fill": 189.35,
+      "exit_price_reference_fill": 187.77
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-04-30",
+      "is_trigger": false,
+      "gross_return": 0.006757782839787341,
+      "net_return": 0.00625778283978734,
+      "entry_price_reference_fill": 197.55,
+      "exit_price_reference_fill": 198.885
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-05-01",
+      "is_trigger": false,
+      "gross_return": 0.03391857506361329,
+      "net_return": 0.03341857506361329,
+      "entry_price_reference_fill": 196.5,
+      "exit_price_reference_fill": 203.165
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-05-06",
+      "is_trigger": false,
+      "gross_return": 0.012998441192739074,
+      "net_return": 0.012498441192739074,
+      "entry_price_reference_fill": 198.87,
+      "exit_price_reference_fill": 201.455
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-05-08",
+      "is_trigger": false,
+      "gross_return": -0.0017822736030829178,
+      "net_return": -0.002282273603082918,
+      "entry_price_reference_fill": 207.6,
+      "exit_price_reference_fill": 207.23
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-05-09",
+      "is_trigger": false,
+      "gross_return": 0.044119059049447795,
+      "net_return": 0.043619059049447795,
+      "entry_price_reference_fill": 208.3,
+      "exit_price_reference_fill": 217.49
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-05-12",
+      "is_trigger": false,
+      "gross_return": 0.0326792963464142,
+      "net_return": 0.0321792963464142,
+      "entry_price_reference_fill": 221.7,
+      "exit_price_reference_fill": 228.945
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-05-14",
+      "is_trigger": false,
+      "gross_return": -0.008552950491906852,
+      "net_return": -0.009052950491906853,
+      "entry_price_reference_fill": 231.8732,
+      "exit_price_reference_fill": 229.89
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-05-16",
+      "is_trigger": false,
+      "gross_return": 0.0044175824175825,
+      "net_return": 0.003917582417582499,
+      "entry_price_reference_fill": 227.5,
+      "exit_price_reference_fill": 228.505
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-05-19",
+      "is_trigger": false,
+      "gross_return": -0.0058517555266579535,
+      "net_return": -0.006351755526657954,
+      "entry_price_reference_fill": 230.7,
+      "exit_price_reference_fill": 229.35
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-05-20",
+      "is_trigger": false,
+      "gross_return": 0.0022925858638289665,
+      "net_return": 0.0017925858638289664,
+      "entry_price_reference_fill": 231.18,
+      "exit_price_reference_fill": 231.71
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-05-22",
+      "is_trigger": false,
+      "gross_return": -0.0029501084598698712,
+      "net_return": -0.0034501084598698713,
+      "entry_price_reference_fill": 230.5,
+      "exit_price_reference_fill": 229.82
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-05-28",
+      "is_trigger": false,
+      "gross_return": -0.017816091954023006,
+      "net_return": -0.018316091954023006,
+      "entry_price_reference_fill": 243.6,
+      "exit_price_reference_fill": 239.26
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-05-30",
+      "is_trigger": false,
+      "gross_return": 0.029644921552436143,
+      "net_return": 0.029144921552436143,
+      "entry_price_reference_fill": 242.2,
+      "exit_price_reference_fill": 249.38
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-06-03",
+      "is_trigger": false,
+      "gross_return": 0.016068099044781903,
+      "net_return": 0.015568099044781902,
+      "entry_price_reference_fill": 256.2033,
+      "exit_price_reference_fill": 260.32
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-06-04",
+      "is_trigger": false,
+      "gross_return": 0.004137931034482678,
+      "net_return": 0.003637931034482678,
+      "entry_price_reference_fill": 261.0,
+      "exit_price_reference_fill": 262.08
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-06-05",
+      "is_trigger": true,
+      "gross_return": -0.010470842503133349,
+      "net_return": -0.010970842503133349,
+      "entry_price_reference_fill": 253.3225,
+      "exit_price_reference_fill": 250.67
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-06-06",
+      "is_trigger": false,
+      "gross_return": 0.0007285384708788367,
+      "net_return": 0.0002285384708788367,
+      "entry_price_reference_fill": 247.07,
+      "exit_price_reference_fill": 247.25
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-06-09",
+      "is_trigger": false,
+      "gross_return": -0.002501228886016338,
+      "net_return": -0.003001228886016338,
+      "entry_price_reference_fill": 243.9201,
+      "exit_price_reference_fill": 243.31
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-06-10",
+      "is_trigger": false,
+      "gross_return": 0.02721674876847291,
+      "net_return": 0.02671674876847291,
+      "entry_price_reference_fill": 243.6,
+      "exit_price_reference_fill": 250.23
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-06-11",
+      "is_trigger": false,
+      "gross_return": 0.01592290966594212,
+      "net_return": 0.01542290966594212,
+      "entry_price_reference_fill": 252.95,
+      "exit_price_reference_fill": 256.9777
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-06-24",
+      "is_trigger": false,
+      "gross_return": 0.013593044006530608,
+      "net_return": 0.013093044006530608,
+      "entry_price_reference_fill": 263.37,
+      "exit_price_reference_fill": 266.95
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-06-25",
+      "is_trigger": false,
+      "gross_return": 0.014586006491055903,
+      "net_return": 0.014086006491055902,
+      "entry_price_reference_fill": 264.98,
+      "exit_price_reference_fill": 268.845
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-06-27",
+      "is_trigger": false,
+      "gross_return": 0.003963302752293618,
+      "net_return": 0.003463302752293618,
+      "entry_price_reference_fill": 272.5,
+      "exit_price_reference_fill": 273.58
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-07-01",
+      "is_trigger": false,
+      "gross_return": 0.006338160616889299,
+      "net_return": 0.0058381606168892985,
+      "entry_price_reference_fill": 265.85,
+      "exit_price_reference_fill": 267.535
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-07-07",
+      "is_trigger": false,
+      "gross_return": 0.001408863029238372,
+      "net_return": 0.0009088630292383719,
+      "entry_price_reference_fill": 273.27,
+      "exit_price_reference_fill": 273.655
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-07-10",
+      "is_trigger": false,
+      "gross_return": -0.0054829339143064315,
+      "net_return": -0.005982933914306432,
+      "entry_price_reference_fill": 275.4,
+      "exit_price_reference_fill": 273.89
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-07-22",
+      "is_trigger": false,
+      "gross_return": -0.00754337440281605,
+      "net_return": -0.00804337440281605,
+      "entry_price_reference_fill": 278.39,
+      "exit_price_reference_fill": 276.29
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-07-23",
+      "is_trigger": false,
+      "gross_return": -0.027376880984952057,
+      "net_return": -0.027876880984952057,
+      "entry_price_reference_fill": 292.4,
+      "exit_price_reference_fill": 284.395
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-07-30",
+      "is_trigger": false,
+      "gross_return": -0.0075945187386495805,
+      "net_return": -0.008094518738649581,
+      "entry_price_reference_fill": 302.85,
+      "exit_price_reference_fill": 300.55
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-07-31",
+      "is_trigger": false,
+      "gross_return": -0.009047765372665384,
+      "net_return": -0.009547765372665384,
+      "entry_price_reference_fill": 292.89,
+      "exit_price_reference_fill": 290.24
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-08-01",
+      "is_trigger": false,
+      "gross_return": 0.02880208333333334,
+      "net_return": 0.02830208333333334,
+      "entry_price_reference_fill": 288.0,
+      "exit_price_reference_fill": 296.295
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-08-05",
+      "is_trigger": false,
+      "gross_return": 0.0056122448979591955,
+      "net_return": 0.005112244897959195,
+      "entry_price_reference_fill": 294.0,
+      "exit_price_reference_fill": 295.65
+    },
+    {
+      "symbol": "AVGO",
+      "date": "2025-08-06",
+      "is_trigger": false,
+      "gross_return": 0.018354995535271312,
+      "net_return": 0.017854995535271312,
+      "entry_price_reference_fill": 302.37,
+      "exit_price_reference_fill": 307.92
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-04-02",
+      "is_trigger": false,
+      "gross_return": -0.03794238683127571,
+      "net_return": -0.03844238683127571,
+      "entry_price_reference_fill": 60.75,
+      "exit_price_reference_fill": 58.445
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-04-07",
+      "is_trigger": false,
+      "gross_return": 0.01424917793204239,
+      "net_return": 0.013749177932042389,
+      "entry_price_reference_fill": 54.74,
+      "exit_price_reference_fill": 55.52
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-04-14",
+      "is_trigger": false,
+      "gross_return": 0.0008225461288051683,
+      "net_return": 0.0003225461288051683,
+      "entry_price_reference_fill": 57.3828,
+      "exit_price_reference_fill": 57.43
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-04-22",
+      "is_trigger": false,
+      "gross_return": 0.03486613082545076,
+      "net_return": 0.03436613082545076,
+      "entry_price_reference_fill": 54.867,
+      "exit_price_reference_fill": 56.78
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-05-08",
+      "is_trigger": false,
+      "gross_return": 0.0029283801874164794,
+      "net_return": 0.0024283801874164794,
+      "entry_price_reference_fill": 59.76,
+      "exit_price_reference_fill": 59.935
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-05-14",
+      "is_trigger": false,
+      "gross_return": 0.020456333595594067,
+      "net_return": 0.019956333595594067,
+      "entry_price_reference_fill": 63.55,
+      "exit_price_reference_fill": 64.85
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-05-23",
+      "is_trigger": false,
+      "gross_return": 0.01088684043229482,
+      "net_return": 0.01038684043229482,
+      "entry_price_reference_fill": 62.92,
+      "exit_price_reference_fill": 63.605
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-05-28",
+      "is_trigger": false,
+      "gross_return": -0.004582082477484595,
+      "net_return": -0.005082082477484595,
+      "entry_price_reference_fill": 63.29,
+      "exit_price_reference_fill": 63.0
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-06-03",
+      "is_trigger": false,
+      "gross_return": 0.0,
+      "net_return": -0.0005,
+      "entry_price_reference_fill": 64.45,
+      "exit_price_reference_fill": 64.45
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-07-02",
+      "is_trigger": false,
+      "gross_return": 0.003347886410373535,
+      "net_return": 0.002847886410373535,
+      "entry_price_reference_fill": 68.7598,
+      "exit_price_reference_fill": 68.99
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-07-03",
+      "is_trigger": false,
+      "gross_return": -0.010301902990413447,
+      "net_return": -0.010801902990413448,
+      "entry_price_reference_fill": 69.89,
+      "exit_price_reference_fill": 69.17
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-07-24",
+      "is_trigger": false,
+      "gross_return": 0.0005118455688799539,
+      "net_return": 1.1845568879953906e-05,
+      "entry_price_reference_fill": 68.38,
+      "exit_price_reference_fill": 68.415
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-07-30",
+      "is_trigger": false,
+      "gross_return": 0.017612380250552784,
+      "net_return": 0.017112380250552783,
+      "entry_price_reference_fill": 67.85,
+      "exit_price_reference_fill": 69.045
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-08-06",
+      "is_trigger": false,
+      "gross_return": 0.004841740135857808,
+      "net_return": 0.004341740135857808,
+      "entry_price_reference_fill": 69.19,
+      "exit_price_reference_fill": 69.525
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-08-07",
+      "is_trigger": false,
+      "gross_return": 0.015513297111810154,
+      "net_return": 0.015013297111810153,
+      "entry_price_reference_fill": 69.94,
+      "exit_price_reference_fill": 71.025
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-08-08",
+      "is_trigger": true,
+      "gross_return": -0.007344208188229562,
+      "net_return": -0.007844208188229562,
+      "entry_price_reference_fill": 71.9887,
+      "exit_price_reference_fill": 71.46
+    },
+    {
+      "symbol": "CSCO",
+      "date": "2025-08-13",
+      "is_trigger": true,
+      "gross_return": 0.022041056213349064,
+      "net_return": 0.021541056213349064,
+      "entry_price_reference_fill": 68.7399,
+      "exit_price_reference_fill": 70.255
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-04-07",
+      "is_trigger": false,
+      "gross_return": 0.025981055480378767,
+      "net_return": 0.025481055480378767,
+      "entry_price_reference_fill": 147.8,
+      "exit_price_reference_fill": 151.64
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-04-08",
+      "is_trigger": false,
+      "gross_return": 0.0014770133344350622,
+      "net_return": 0.0009770133344350622,
+      "entry_price_reference_fill": 145.2255,
+      "exit_price_reference_fill": 145.44
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-04-09",
+      "is_trigger": true,
+      "gross_return": -0.023536815607300254,
+      "net_return": -0.024036815607300255,
+      "entry_price_reference_fill": 158.9,
+      "exit_price_reference_fill": 155.16
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-04-10",
+      "is_trigger": false,
+      "gross_return": 0.008576104746317537,
+      "net_return": 0.008076104746317536,
+      "entry_price_reference_fill": 152.75,
+      "exit_price_reference_fill": 154.06
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-04-16",
+      "is_trigger": false,
+      "gross_return": -0.004109857133537731,
+      "net_return": -0.004609857133537731,
+      "entry_price_reference_fill": 153.29,
+      "exit_price_reference_fill": 152.66
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-04-22",
+      "is_trigger": false,
+      "gross_return": 0.03589757120806336,
+      "net_return": 0.03539757120806336,
+      "entry_price_reference_fill": 151.598,
+      "exit_price_reference_fill": 157.04
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-04-23",
+      "is_trigger": false,
+      "gross_return": 0.01159513132607315,
+      "net_return": 0.011095131326073149,
+      "entry_price_reference_fill": 156.1,
+      "exit_price_reference_fill": 157.91
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-04-24",
+      "is_trigger": false,
+      "gross_return": -0.019277384498498584,
+      "net_return": -0.019777384498498585,
+      "entry_price_reference_fill": 165.842,
+      "exit_price_reference_fill": 162.645
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-04-28",
+      "is_trigger": false,
+      "gross_return": -0.0037235569422776615,
+      "net_return": -0.004223556942277662,
+      "entry_price_reference_fill": 160.25,
+      "exit_price_reference_fill": 159.6533
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-04-29",
+      "is_trigger": false,
+      "gross_return": -0.015266457680250811,
+      "net_return": -0.01576645768025081,
+      "entry_price_reference_fill": 159.5,
+      "exit_price_reference_fill": 157.065
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-04-30",
+      "is_trigger": false,
+      "gross_return": -0.004220291653738828,
+      "net_return": -0.004720291653738828,
+      "entry_price_reference_fill": 161.15,
+      "exit_price_reference_fill": 160.4699
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-01",
+      "is_trigger": false,
+      "gross_return": 0.020132977070776104,
+      "net_return": 0.019632977070776103,
+      "entry_price_reference_fill": 160.93,
+      "exit_price_reference_fill": 164.17
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-05",
+      "is_trigger": false,
+      "gross_return": -0.003165905631659083,
+      "net_return": -0.003665905631659083,
+      "entry_price_reference_fill": 164.25,
+      "exit_price_reference_fill": 163.73
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-07",
+      "is_trigger": true,
+      "gross_return": 0.014507944858338506,
+      "net_return": 0.014007944858338506,
+      "entry_price_reference_fill": 151.6893,
+      "exit_price_reference_fill": 153.89
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-08",
+      "is_trigger": false,
+      "gross_return": -0.007672301690507144,
+      "net_return": -0.008172301690507144,
+      "entry_price_reference_fill": 153.8,
+      "exit_price_reference_fill": 152.62
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-09",
+      "is_trigger": false,
+      "gross_return": 0.028369258992334556,
+      "net_return": 0.027869258992334556,
+      "entry_price_reference_fill": 152.63,
+      "exit_price_reference_fill": 156.96
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-12",
+      "is_trigger": false,
+      "gross_return": 0.007391661402400551,
+      "net_return": 0.006891661402400551,
+      "entry_price_reference_fill": 158.3,
+      "exit_price_reference_fill": 159.4701
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-14",
+      "is_trigger": false,
+      "gross_return": -0.006230341156544861,
+      "net_return": -0.006730341156544861,
+      "entry_price_reference_fill": 165.32,
+      "exit_price_reference_fill": 164.29
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-15",
+      "is_trigger": false,
+      "gross_return": 0.01835866261398178,
+      "net_return": 0.01785866261398178,
+      "entry_price_reference_fill": 164.5,
+      "exit_price_reference_fill": 167.52
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-16",
+      "is_trigger": false,
+      "gross_return": -0.009679552696446936,
+      "net_return": -0.010179552696446936,
+      "entry_price_reference_fill": 166.33,
+      "exit_price_reference_fill": 164.72
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-20",
+      "is_trigger": false,
+      "gross_return": 0.03205948680441284,
+      "net_return": 0.03155948680441284,
+      "entry_price_reference_fill": 164.07,
+      "exit_price_reference_fill": 169.33
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-21",
+      "is_trigger": false,
+      "gross_return": 0.041152019002375306,
+      "net_return": 0.040652019002375306,
+      "entry_price_reference_fill": 168.4,
+      "exit_price_reference_fill": 175.33
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-22",
+      "is_trigger": false,
+      "gross_return": -0.014810495626822129,
+      "net_return": -0.01531049562682213,
+      "entry_price_reference_fill": 171.5,
+      "exit_price_reference_fill": 168.96
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-23",
+      "is_trigger": false,
+      "gross_return": 0.02458943356504606,
+      "net_return": 0.02408943356504606,
+      "entry_price_reference_fill": 168.3406,
+      "exit_price_reference_fill": 172.48
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-27",
+      "is_trigger": false,
+      "gross_return": 0.0025465910406297088,
+      "net_return": 0.0020465910406297087,
+      "entry_price_reference_fill": 172.78,
+      "exit_price_reference_fill": 173.22
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-28",
+      "is_trigger": false,
+      "gross_return": -0.003470414714558334,
+      "net_return": -0.003970414714558335,
+      "entry_price_reference_fill": 172.89,
+      "exit_price_reference_fill": 172.29
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-05-29",
+      "is_trigger": false,
+      "gross_return": -0.007507420124541864,
+      "net_return": -0.008007420124541864,
+      "entry_price_reference_fill": 171.83,
+      "exit_price_reference_fill": 170.54
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-06-02",
+      "is_trigger": false,
+      "gross_return": -0.01005738626279351,
+      "net_return": -0.010557386262793511,
+      "entry_price_reference_fill": 169.03,
+      "exit_price_reference_fill": 167.33
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-06-05",
+      "is_trigger": false,
+      "gross_return": 0.029937977099236512,
+      "net_return": 0.029437977099236512,
+      "entry_price_reference_fill": 167.68,
+      "exit_price_reference_fill": 172.7
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-06-06",
+      "is_trigger": false,
+      "gross_return": 0.011870462141293059,
+      "net_return": 0.011370462141293058,
+      "entry_price_reference_fill": 173.54,
+      "exit_price_reference_fill": 175.6
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-06-09",
+      "is_trigger": false,
+      "gross_return": 0.020391934109627696,
+      "net_return": 0.019891934109627696,
+      "entry_price_reference_fill": 176.05,
+      "exit_price_reference_fill": 179.64
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-06-10",
+      "is_trigger": false,
+      "gross_return": 0.003867496216579669,
+      "net_return": 0.003367496216579669,
+      "entry_price_reference_fill": 178.41,
+      "exit_price_reference_fill": 179.1
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-06-11",
+      "is_trigger": false,
+      "gross_return": -0.00629232505643329,
+      "net_return": -0.00679232505643329,
+      "entry_price_reference_fill": 177.2,
+      "exit_price_reference_fill": 176.085
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-06-12",
+      "is_trigger": false,
+      "gross_return": -0.00947927479874977,
+      "net_return": -0.009979274798749771,
+      "entry_price_reference_fill": 175.6147,
+      "exit_price_reference_fill": 173.95
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-06-17",
+      "is_trigger": false,
+      "gross_return": -0.0030046280138645853,
+      "net_return": -0.0035046280138645853,
+      "entry_price_reference_fill": 175.9286,
+      "exit_price_reference_fill": 175.4
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-06-18",
+      "is_trigger": false,
+      "gross_return": -0.010461005035928617,
+      "net_return": -0.010961005035928617,
+      "entry_price_reference_fill": 173.9699,
+      "exit_price_reference_fill": 172.15
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-06-20",
+      "is_trigger": true,
+      "gross_return": -0.0060975609756098725,
+      "net_return": -0.006597560975609873,
+      "entry_price_reference_fill": 167.28,
+      "exit_price_reference_fill": 166.26
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-06-23",
+      "is_trigger": false,
+      "gross_return": 0.013096465167040439,
+      "net_return": 0.012596465167040438,
+      "entry_price_reference_fill": 164.93,
+      "exit_price_reference_fill": 167.09
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-06-24",
+      "is_trigger": false,
+      "gross_return": 0.025424236973076608,
+      "net_return": 0.024924236973076608,
+      "entry_price_reference_fill": 166.77,
+      "exit_price_reference_fill": 171.01
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-06-26",
+      "is_trigger": false,
+      "gross_return": 0.006718017026698497,
+      "net_return": 0.006218017026698497,
+      "entry_price_reference_fill": 172.67,
+      "exit_price_reference_fill": 173.83
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-06-27",
+      "is_trigger": true,
+      "gross_return": -0.003088743601667443,
+      "net_return": -0.003588743601667443,
+      "entry_price_reference_fill": 177.8393,
+      "exit_price_reference_fill": 177.29
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-06-30",
+      "is_trigger": false,
+      "gross_return": -0.006856689522298454,
+      "net_return": -0.007356689522298454,
+      "entry_price_reference_fill": 176.47,
+      "exit_price_reference_fill": 175.26
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-07-02",
+      "is_trigger": false,
+      "gross_return": -0.0013441612993559948,
+      "net_return": -0.0018441612993559948,
+      "entry_price_reference_fill": 178.55,
+      "exit_price_reference_fill": 178.31
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-07-07",
+      "is_trigger": false,
+      "gross_return": -0.007564625850340234,
+      "net_return": -0.008064625850340235,
+      "entry_price_reference_fill": 176.4,
+      "exit_price_reference_fill": 175.0656
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-07-08",
+      "is_trigger": false,
+      "gross_return": 0.023884430176565052,
+      "net_return": 0.023384430176565052,
+      "entry_price_reference_fill": 174.44,
+      "exit_price_reference_fill": 178.6064
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-07-09",
+      "is_trigger": false,
+      "gross_return": -0.006522972206466249,
+      "net_return": -0.007022972206466249,
+      "entry_price_reference_fill": 176.3,
+      "exit_price_reference_fill": 175.15
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-07-11",
+      "is_trigger": false,
+      "gross_return": 0.0004442470013326094,
+      "net_return": -5.5752998667390596e-05,
+      "entry_price_reference_fill": 180.08,
+      "exit_price_reference_fill": 180.16
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-07-17",
+      "is_trigger": false,
+      "gross_return": 0.0023849769858703684,
+      "net_return": 0.0018849769858703684,
+      "entry_price_reference_fill": 183.6915,
+      "exit_price_reference_fill": 184.1296
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-07-23",
+      "is_trigger": false,
+      "gross_return": 0.002646875648743885,
+      "net_return": 0.002146875648743885,
+      "entry_price_reference_fill": 192.68,
+      "exit_price_reference_fill": 193.19
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-07-25",
+      "is_trigger": false,
+      "gross_return": -0.007248252653378251,
+      "net_return": -0.007748252653378251,
+      "entry_price_reference_fill": 193.15,
+      "exit_price_reference_fill": 191.75
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-07-29",
+      "is_trigger": false,
+      "gross_return": 0.0012214512642994002,
+      "net_return": 0.0007214512642994002,
+      "entry_price_reference_fill": 195.3414,
+      "exit_price_reference_fill": 195.58
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-07-30",
+      "is_trigger": false,
+      "gross_return": -0.007835251982604152,
+      "net_return": -0.008335251982604153,
+      "entry_price_reference_fill": 195.45,
+      "exit_price_reference_fill": 193.9186
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-07-31",
+      "is_trigger": false,
+      "gross_return": -0.010553814002089879,
+      "net_return": -0.011053814002089879,
+      "entry_price_reference_fill": 191.4,
+      "exit_price_reference_fill": 189.38
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-08-01",
+      "is_trigger": false,
+      "gross_return": 0.029813598813810627,
+      "net_return": 0.029313598813810626,
+      "entry_price_reference_fill": 188.84,
+      "exit_price_reference_fill": 194.47
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-08-05",
+      "is_trigger": false,
+      "gross_return": -0.002976404889866835,
+      "net_return": -0.003476404889866835,
+      "entry_price_reference_fill": 194.3284,
+      "exit_price_reference_fill": 193.75
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-08-06",
+      "is_trigger": false,
+      "gross_return": 0.004334523202447649,
+      "net_return": 0.0038345232024476488,
+      "entry_price_reference_fill": 196.1,
+      "exit_price_reference_fill": 196.95
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-08-07",
+      "is_trigger": false,
+      "gross_return": 0.023042229421276428,
+      "net_return": 0.022542229421276427,
+      "entry_price_reference_fill": 196.5999,
+      "exit_price_reference_fill": 201.13
+    },
+    {
+      "symbol": "GOOGL",
+      "date": "2025-08-13",
+      "is_trigger": false,
+      "gross_return": 0.0039190395872605865,
+      "net_return": 0.0034190395872605865,
+      "entry_price_reference_fill": 201.58,
+      "exit_price_reference_fill": 202.37
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-07",
+      "is_trigger": false,
+      "gross_return": 0.03392857142857131,
+      "net_return": 0.03342857142857131,
+      "entry_price_reference_fill": 19.6,
+      "exit_price_reference_fill": 20.265
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-08",
+      "is_trigger": false,
+      "gross_return": 0.020787746170678245,
+      "net_return": 0.020287746170678245,
+      "entry_price_reference_fill": 18.28,
+      "exit_price_reference_fill": 18.66
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-09",
+      "is_trigger": true,
+      "gross_return": -0.05228758169934644,
+      "net_return": -0.05278758169934644,
+      "entry_price_reference_fill": 21.42,
+      "exit_price_reference_fill": 20.3
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-10",
+      "is_trigger": false,
+      "gross_return": -0.0699598796389167,
+      "net_return": -0.0704598796389167,
+      "entry_price_reference_fill": 19.94,
+      "exit_price_reference_fill": 18.545
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-11",
+      "is_trigger": false,
+      "gross_return": 0.06512977099236661,
+      "net_return": 0.06462977099236661,
+      "entry_price_reference_fill": 19.65,
+      "exit_price_reference_fill": 20.9298
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-14",
+      "is_trigger": false,
+      "gross_return": -0.005185393897152224,
+      "net_return": -0.005685393897152224,
+      "entry_price_reference_fill": 20.2299,
+      "exit_price_reference_fill": 20.125
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-15",
+      "is_trigger": false,
+      "gross_return": -0.030196275792652272,
+      "net_return": -0.030696275792652272,
+      "entry_price_reference_fill": 19.87,
+      "exit_price_reference_fill": 19.27
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-16",
+      "is_trigger": false,
+      "gross_return": -0.02324973876698011,
+      "net_return": -0.02374973876698011,
+      "entry_price_reference_fill": 19.14,
+      "exit_price_reference_fill": 18.695
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-17",
+      "is_trigger": false,
+      "gross_return": -0.0218997361477572,
+      "net_return": -0.0223997361477572,
+      "entry_price_reference_fill": 18.95,
+      "exit_price_reference_fill": 18.535
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-21",
+      "is_trigger": false,
+      "gross_return": 0.03149814716781352,
+      "net_return": 0.030998147167813517,
+      "entry_price_reference_fill": 18.89,
+      "exit_price_reference_fill": 19.485
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-22",
+      "is_trigger": false,
+      "gross_return": 0.07106339468302658,
+      "net_return": 0.07056339468302658,
+      "entry_price_reference_fill": 19.56,
+      "exit_price_reference_fill": 20.95
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-23",
+      "is_trigger": false,
+      "gross_return": 0.027890532931779344,
+      "net_return": 0.027390532931779343,
+      "entry_price_reference_fill": 20.6199,
+      "exit_price_reference_fill": 21.195
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-24",
+      "is_trigger": false,
+      "gross_return": -0.019811788013868403,
+      "net_return": -0.020311788013868404,
+      "entry_price_reference_fill": 20.19,
+      "exit_price_reference_fill": 19.79
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-25",
+      "is_trigger": false,
+      "gross_return": 0.040750000000000064,
+      "net_return": 0.040250000000000064,
+      "entry_price_reference_fill": 20.0,
+      "exit_price_reference_fill": 20.815
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-29",
+      "is_trigger": false,
+      "gross_return": -0.021706956092747975,
+      "net_return": -0.022206956092747976,
+      "entry_price_reference_fill": 20.27,
+      "exit_price_reference_fill": 19.83
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-04-30",
+      "is_trigger": false,
+      "gross_return": 0.005978098556495892,
+      "net_return": 0.005478098556495892,
+      "entry_price_reference_fill": 20.09,
+      "exit_price_reference_fill": 20.2101
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-01",
+      "is_trigger": false,
+      "gross_return": 0.030325814536340978,
+      "net_return": 0.029825814536340978,
+      "entry_price_reference_fill": 19.95,
+      "exit_price_reference_fill": 20.555
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-02",
+      "is_trigger": false,
+      "gross_return": -0.00753390743779192,
+      "net_return": -0.00803390743779192,
+      "entry_price_reference_fill": 20.6002,
+      "exit_price_reference_fill": 20.445
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-05",
+      "is_trigger": false,
+      "gross_return": -0.01911373707533226,
+      "net_return": -0.01961373707533226,
+      "entry_price_reference_fill": 20.31,
+      "exit_price_reference_fill": 19.9218
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-06",
+      "is_trigger": false,
+      "gross_return": 0.002827053498478671,
+      "net_return": 0.002327053498478671,
+      "entry_price_reference_fill": 19.9501,
+      "exit_price_reference_fill": 20.0065
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-09",
+      "is_trigger": false,
+      "gross_return": 0.027153558052434468,
+      "net_return": 0.026653558052434467,
+      "entry_price_reference_fill": 21.36,
+      "exit_price_reference_fill": 21.94
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-12",
+      "is_trigger": false,
+      "gross_return": 0.01688126409209767,
+      "net_return": 0.01638126409209767,
+      "entry_price_reference_fill": 22.2199,
+      "exit_price_reference_fill": 22.595
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-13",
+      "is_trigger": false,
+      "gross_return": -0.0401865008880995,
+      "net_return": -0.0406865008880995,
+      "entry_price_reference_fill": 22.52,
+      "exit_price_reference_fill": 21.615
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-14",
+      "is_trigger": false,
+      "gross_return": -0.010658725962207516,
+      "net_return": -0.011158725962207516,
+      "entry_price_reference_fill": 21.5598,
+      "exit_price_reference_fill": 21.33
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-15",
+      "is_trigger": false,
+      "gross_return": 0.0027906976744185297,
+      "net_return": 0.0022906976744185297,
+      "entry_price_reference_fill": 21.5,
+      "exit_price_reference_fill": 21.56
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-16",
+      "is_trigger": false,
+      "gross_return": -0.01358486034061468,
+      "net_return": -0.01408486034061468,
+      "entry_price_reference_fill": 21.6491,
+      "exit_price_reference_fill": 21.355
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-21",
+      "is_trigger": false,
+      "gross_return": -0.0019295706705257931,
+      "net_return": -0.002429570670525793,
+      "entry_price_reference_fill": 20.73,
+      "exit_price_reference_fill": 20.69
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-22",
+      "is_trigger": false,
+      "gross_return": -0.025736973572949018,
+      "net_return": -0.02623697357294902,
+      "entry_price_reference_fill": 20.5774,
+      "exit_price_reference_fill": 20.0478
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-23",
+      "is_trigger": false,
+      "gross_return": 0.018703241895261735,
+      "net_return": 0.018203241895261735,
+      "entry_price_reference_fill": 20.05,
+      "exit_price_reference_fill": 20.425
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-28",
+      "is_trigger": false,
+      "gross_return": -0.006121449559255643,
+      "net_return": -0.006621449559255643,
+      "entry_price_reference_fill": 20.42,
+      "exit_price_reference_fill": 20.295
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-29",
+      "is_trigger": false,
+      "gross_return": -0.01805143422354094,
+      "net_return": -0.01855143422354094,
+      "entry_price_reference_fill": 20.22,
+      "exit_price_reference_fill": 19.855
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-05-30",
+      "is_trigger": false,
+      "gross_return": 0.004358974358974477,
+      "net_return": 0.0038589743589744767,
+      "entry_price_reference_fill": 19.5,
+      "exit_price_reference_fill": 19.585
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-06-02",
+      "is_trigger": false,
+      "gross_return": 0.008109477952356725,
+      "net_return": 0.007609477952356725,
+      "entry_price_reference_fill": 19.73,
+      "exit_price_reference_fill": 19.89
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-06-03",
+      "is_trigger": false,
+      "gross_return": -0.004189255791030133,
+      "net_return": -0.004689255791030134,
+      "entry_price_reference_fill": 20.29,
+      "exit_price_reference_fill": 20.205
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-06-04",
+      "is_trigger": false,
+      "gross_return": -0.005434782608695676,
+      "net_return": -0.005934782608695677,
+      "entry_price_reference_fill": 20.24,
+      "exit_price_reference_fill": 20.13
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-06-05",
+      "is_trigger": false,
+      "gross_return": 0.017103413654618427,
+      "net_return": 0.016603413654618426,
+      "entry_price_reference_fill": 19.92,
+      "exit_price_reference_fill": 20.2607
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-06-09",
+      "is_trigger": false,
+      "gross_return": 0.016144814090019555,
+      "net_return": 0.015644814090019554,
+      "entry_price_reference_fill": 20.44,
+      "exit_price_reference_fill": 20.77
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-06-10",
+      "is_trigger": true,
+      "gross_return": -0.04784650112866817,
+      "net_return": -0.04834650112866817,
+      "entry_price_reference_fill": 22.15,
+      "exit_price_reference_fill": 21.0902
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-06-11",
+      "is_trigger": false,
+      "gross_return": -0.0077182826821032835,
+      "net_return": -0.008218282682103284,
+      "entry_price_reference_fill": 20.73,
+      "exit_price_reference_fill": 20.57
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-06-16",
+      "is_trigger": false,
+      "gross_return": 0.010361445783132472,
+      "net_return": 0.009861445783132472,
+      "entry_price_reference_fill": 20.75,
+      "exit_price_reference_fill": 20.965
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-06-18",
+      "is_trigger": false,
+      "gross_return": -0.0046533271288971,
+      "net_return": -0.0051533271288971005,
+      "entry_price_reference_fill": 21.49,
+      "exit_price_reference_fill": 21.39
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-06-23",
+      "is_trigger": false,
+      "gross_return": 0.037535410764872656,
+      "net_return": 0.037035410764872656,
+      "entry_price_reference_fill": 21.18,
+      "exit_price_reference_fill": 21.975
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-06-24",
+      "is_trigger": false,
+      "gross_return": -0.00421286031042134,
+      "net_return": -0.004712860310421341,
+      "entry_price_reference_fill": 22.55,
+      "exit_price_reference_fill": 22.455
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-06-25",
+      "is_trigger": false,
+      "gross_return": 0.002473021582733992,
+      "net_return": 0.001973021582733992,
+      "entry_price_reference_fill": 22.24,
+      "exit_price_reference_fill": 22.295
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-06-27",
+      "is_trigger": false,
+      "gross_return": -0.010159010600706786,
+      "net_return": -0.010659010600706786,
+      "entry_price_reference_fill": 22.64,
+      "exit_price_reference_fill": 22.41
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-06-30",
+      "is_trigger": false,
+      "gross_return": 0.00412684234033045,
+      "net_return": 0.00362684234033045,
+      "entry_price_reference_fill": 22.39,
+      "exit_price_reference_fill": 22.4824
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-01",
+      "is_trigger": false,
+      "gross_return": -0.05215162138475027,
+      "net_return": -0.05265162138475027,
+      "entry_price_reference_fill": 22.82,
+      "exit_price_reference_fill": 21.6299
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-02",
+      "is_trigger": false,
+      "gross_return": 0.02263374485596703,
+      "net_return": 0.02213374485596703,
+      "entry_price_reference_fill": 21.87,
+      "exit_price_reference_fill": 22.365
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-07",
+      "is_trigger": false,
+      "gross_return": 0.051252847380409916,
+      "net_return": 0.050752847380409916,
+      "entry_price_reference_fill": 21.95,
+      "exit_price_reference_fill": 23.075
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-08",
+      "is_trigger": false,
+      "gross_return": -0.013169073916737384,
+      "net_return": -0.013669073916737384,
+      "entry_price_reference_fill": 23.54,
+      "exit_price_reference_fill": 23.23
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-09",
+      "is_trigger": false,
+      "gross_return": 0.013865187713310467,
+      "net_return": 0.013365187713310467,
+      "entry_price_reference_fill": 23.44,
+      "exit_price_reference_fill": 23.765
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-10",
+      "is_trigger": false,
+      "gross_return": -0.01554795843798018,
+      "net_return": -0.01604795843798018,
+      "entry_price_reference_fill": 23.8102,
+      "exit_price_reference_fill": 23.44
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-11",
+      "is_trigger": false,
+      "gross_return": -0.017064846416382395,
+      "net_return": -0.017564846416382396,
+      "entry_price_reference_fill": 23.44,
+      "exit_price_reference_fill": 23.04
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-15",
+      "is_trigger": false,
+      "gross_return": -0.0054724170060498345,
+      "net_return": -0.005972417006049835,
+      "entry_price_reference_fill": 22.8601,
+      "exit_price_reference_fill": 22.735
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-16",
+      "is_trigger": false,
+      "gross_return": 0.0019929385459060978,
+      "net_return": 0.0014929385459060977,
+      "entry_price_reference_fill": 22.6299,
+      "exit_price_reference_fill": 22.675
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-17",
+      "is_trigger": false,
+      "gross_return": 0.010736196319018454,
+      "net_return": 0.010236196319018454,
+      "entry_price_reference_fill": 22.82,
+      "exit_price_reference_fill": 23.065
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-21",
+      "is_trigger": false,
+      "gross_return": 0.00021431633090451818,
+      "net_return": -0.00028568366909548183,
+      "entry_price_reference_fill": 23.33,
+      "exit_price_reference_fill": 23.335
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-22",
+      "is_trigger": false,
+      "gross_return": 0.0019313304721029212,
+      "net_return": 0.0014313304721029212,
+      "entry_price_reference_fill": 23.3,
+      "exit_price_reference_fill": 23.345
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-23",
+      "is_trigger": false,
+      "gross_return": -0.023221133361738366,
+      "net_return": -0.023721133361738367,
+      "entry_price_reference_fill": 23.47,
+      "exit_price_reference_fill": 22.925
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-24",
+      "is_trigger": false,
+      "gross_return": -0.08377777777777784,
+      "net_return": -0.08427777777777784,
+      "entry_price_reference_fill": 22.5,
+      "exit_price_reference_fill": 20.615
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-25",
+      "is_trigger": true,
+      "gross_return": 0.012330754352030793,
+      "net_return": 0.011830754352030792,
+      "entry_price_reference_fill": 20.68,
+      "exit_price_reference_fill": 20.935
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-28",
+      "is_trigger": false,
+      "gross_return": -0.003848438171484947,
+      "net_return": -0.004348438171484947,
+      "entry_price_reference_fill": 20.7097,
+      "exit_price_reference_fill": 20.63
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-29",
+      "is_trigger": false,
+      "gross_return": 0.000255277368679252,
+      "net_return": -0.000244722631320748,
+      "entry_price_reference_fill": 20.37,
+      "exit_price_reference_fill": 20.3752
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-30",
+      "is_trigger": false,
+      "gross_return": -0.011116600790513687,
+      "net_return": -0.011616600790513687,
+      "entry_price_reference_fill": 20.24,
+      "exit_price_reference_fill": 20.015
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-07-31",
+      "is_trigger": false,
+      "gross_return": -0.029322548028311468,
+      "net_return": -0.02982254802831147,
+      "entry_price_reference_fill": 19.78,
+      "exit_price_reference_fill": 19.2
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-08-01",
+      "is_trigger": false,
+      "gross_return": 0.007246376811594235,
+      "net_return": 0.006746376811594235,
+      "entry_price_reference_fill": 19.32,
+      "exit_price_reference_fill": 19.46
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-08-05",
+      "is_trigger": false,
+      "gross_return": 0.003727634194830909,
+      "net_return": 0.003227634194830909,
+      "entry_price_reference_fill": 20.12,
+      "exit_price_reference_fill": 20.195
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-08-06",
+      "is_trigger": false,
+      "gross_return": -0.030147058823529305,
+      "net_return": -0.030647058823529305,
+      "entry_price_reference_fill": 20.4,
+      "exit_price_reference_fill": 19.785
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-08-07",
+      "is_trigger": false,
+      "gross_return": -0.003022670025189078,
+      "net_return": -0.003522670025189078,
+      "entry_price_reference_fill": 19.85,
+      "exit_price_reference_fill": 19.79
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-08-08",
+      "is_trigger": false,
+      "gross_return": 0.04254754754754764,
+      "net_return": 0.04204754754754764,
+      "entry_price_reference_fill": 19.98,
+      "exit_price_reference_fill": 20.8301
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-08-11",
+      "is_trigger": true,
+      "gross_return": 0.016355083941974824,
+      "net_return": 0.015855083941974824,
+      "entry_price_reference_fill": 20.7703,
+      "exit_price_reference_fill": 21.11
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-08-12",
+      "is_trigger": false,
+      "gross_return": 0.00022999080036800734,
+      "net_return": -0.00027000919963199267,
+      "entry_price_reference_fill": 21.74,
+      "exit_price_reference_fill": 21.745
+    },
+    {
+      "symbol": "INTC",
+      "date": "2025-08-13",
+      "is_trigger": false,
+      "gross_return": 0.0019142212189615648,
+      "net_return": 0.0014142212189615648,
+      "entry_price_reference_fill": 22.15,
+      "exit_price_reference_fill": 22.1924
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-04-07",
+      "is_trigger": false,
+      "gross_return": 0.03438498957609459,
+      "net_return": 0.03388498957609459,
+      "entry_price_reference_fill": 359.75,
+      "exit_price_reference_fill": 372.12
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-04-08",
+      "is_trigger": false,
+      "gross_return": 0.01815567646810079,
+      "net_return": 0.01765567646810079,
+      "entry_price_reference_fill": 354.71,
+      "exit_price_reference_fill": 361.15
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-04-09",
+      "is_trigger": true,
+      "gross_return": -0.03457705085612073,
+      "net_return": -0.03507705085612073,
+      "entry_price_reference_fill": 391.3,
+      "exit_price_reference_fill": 377.77
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-04-10",
+      "is_trigger": false,
+      "gross_return": -0.00633507853403148,
+      "net_return": -0.00683507853403148,
+      "entry_price_reference_fill": 382.0,
+      "exit_price_reference_fill": 379.58
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-04-14",
+      "is_trigger": false,
+      "gross_return": -0.0009809489390262272,
+      "net_return": -0.0014809489390262272,
+      "entry_price_reference_fill": 387.38,
+      "exit_price_reference_fill": 387.0
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-04-17",
+      "is_trigger": false,
+      "gross_return": -0.023105711341324442,
+      "net_return": -0.023605711341324442,
+      "entry_price_reference_fill": 368.74,
+      "exit_price_reference_fill": 360.22
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-04-22",
+      "is_trigger": false,
+      "gross_return": 0.03262913997546679,
+      "net_return": 0.03212913997546679,
+      "entry_price_reference_fill": 366.85,
+      "exit_price_reference_fill": 378.82
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-04-29",
+      "is_trigger": false,
+      "gross_return": -0.014696931270606228,
+      "net_return": -0.015196931270606229,
+      "entry_price_reference_fill": 394.3,
+      "exit_price_reference_fill": 388.505
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-04-30",
+      "is_trigger": false,
+      "gross_return": 0.02711525173342233,
+      "net_return": 0.02661525173342233,
+      "entry_price_reference_fill": 419.69,
+      "exit_price_reference_fill": 431.07
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-05-01",
+      "is_trigger": false,
+      "gross_return": 0.032004902076312014,
+      "net_return": 0.031504902076312014,
+      "entry_price_reference_fill": 424.31,
+      "exit_price_reference_fill": 437.89
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-05-05",
+      "is_trigger": false,
+      "gross_return": 0.0007593888070691612,
+      "net_return": 0.0002593888070691612,
+      "entry_price_reference_fill": 434.56,
+      "exit_price_reference_fill": 434.89
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-05-13",
+      "is_trigger": false,
+      "gross_return": 0.009654618832080963,
+      "net_return": 0.009154618832080963,
+      "entry_price_reference_fill": 448.49,
+      "exit_price_reference_fill": 452.82
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-05-14",
+      "is_trigger": false,
+      "gross_return": 0.0008162004764846742,
+      "net_return": 0.0003162004764846742,
+      "entry_price_reference_fill": 453.32,
+      "exit_price_reference_fill": 453.69
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-05-16",
+      "is_trigger": false,
+      "gross_return": 0.005205116894574369,
+      "net_return": 0.004705116894574368,
+      "entry_price_reference_fill": 453.4,
+      "exit_price_reference_fill": 455.76
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-05-19",
+      "is_trigger": false,
+      "gross_return": -0.007301815645502363,
+      "net_return": -0.0078018156455023635,
+      "entry_price_reference_fill": 458.79,
+      "exit_price_reference_fill": 455.44
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-05-28",
+      "is_trigger": false,
+      "gross_return": -0.0014582970572871723,
+      "net_return": -0.0019582970572871723,
+      "entry_price_reference_fill": 459.44,
+      "exit_price_reference_fill": 458.77
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-05-30",
+      "is_trigger": true,
+      "gross_return": 0.0007604067089597155,
+      "net_return": 0.0002604067089597155,
+      "entry_price_reference_fill": 460.28,
+      "exit_price_reference_fill": 460.63
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-06-02",
+      "is_trigger": false,
+      "gross_return": -0.0006708069158029017,
+      "net_return": -0.0011708069158029018,
+      "entry_price_reference_fill": 462.13,
+      "exit_price_reference_fill": 461.82
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-06-16",
+      "is_trigger": false,
+      "gross_return": -0.0025725358751440552,
+      "net_return": -0.0030725358751440553,
+      "entry_price_reference_fill": 477.35,
+      "exit_price_reference_fill": 476.122
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-06-24",
+      "is_trigger": false,
+      "gross_return": 0.007161657587072323,
+      "net_return": 0.006661657587072323,
+      "entry_price_reference_fill": 490.11,
+      "exit_price_reference_fill": 493.62
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-06-26",
+      "is_trigger": false,
+      "gross_return": 0.0029014124236868,
+      "net_return": 0.0024014124236868,
+      "entry_price_reference_fill": 496.31,
+      "exit_price_reference_fill": 497.75
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-07-16",
+      "is_trigger": false,
+      "gross_return": 0.009880405512434631,
+      "net_return": 0.00938040551243463,
+      "entry_price_reference_fill": 505.04,
+      "exit_price_reference_fill": 510.03
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-07-30",
+      "is_trigger": false,
+      "gross_return": -0.02583239737690657,
+      "net_return": -0.02633239737690657,
+      "entry_price_reference_fill": 552.02,
+      "exit_price_reference_fill": 537.76
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-07-31",
+      "is_trigger": true,
+      "gross_return": -0.015881216862875247,
+      "net_return": -0.016381216862875247,
+      "entry_price_reference_fill": 536.5206,
+      "exit_price_reference_fill": 528.0
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-08-01",
+      "is_trigger": false,
+      "gross_return": 0.0215083532219571,
+      "net_return": 0.0210083532219571,
+      "entry_price_reference_fill": 523.75,
+      "exit_price_reference_fill": 535.015
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-08-08",
+      "is_trigger": false,
+      "gross_return": 0.000956937799043045,
+      "net_return": 0.000456937799043045,
+      "entry_price_reference_fill": 522.5,
+      "exit_price_reference_fill": 523.0
+    },
+    {
+      "symbol": "MSFT",
+      "date": "2025-08-12",
+      "is_trigger": false,
+      "gross_return": 0.0009825224374113706,
+      "net_return": 0.00048252243741137056,
+      "entry_price_reference_fill": 529.25,
+      "exit_price_reference_fill": 529.77
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-07",
+      "is_trigger": false,
+      "gross_return": 0.06531027466937944,
+      "net_return": 0.06481027466937944,
+      "entry_price_reference_fill": 98.3,
+      "exit_price_reference_fill": 104.72
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-08",
+      "is_trigger": false,
+      "gross_return": 0.036089536708267866,
+      "net_return": 0.035589536708267866,
+      "entry_price_reference_fill": 96.4878,
+      "exit_price_reference_fill": 99.97
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-09",
+      "is_trigger": true,
+      "gross_return": -0.03910878352898883,
+      "net_return": -0.039608783528988833,
+      "entry_price_reference_fill": 113.4988,
+      "exit_price_reference_fill": 109.06
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-10",
+      "is_trigger": false,
+      "gross_return": 0.0038210624417520656,
+      "net_return": 0.0033210624417520655,
+      "entry_price_reference_fill": 107.3,
+      "exit_price_reference_fill": 107.71
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-11",
+      "is_trigger": false,
+      "gross_return": 0.015929602888086647,
+      "net_return": 0.015429602888086646,
+      "entry_price_reference_fill": 110.8,
+      "exit_price_reference_fill": 112.565
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-14",
+      "is_trigger": false,
+      "gross_return": 0.006298713068696671,
+      "net_return": 0.00579871306869667,
+      "entry_price_reference_fill": 110.34,
+      "exit_price_reference_fill": 111.035
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-15",
+      "is_trigger": false,
+      "gross_return": -0.05705477615941379,
+      "net_return": -0.05755477615941379,
+      "entry_price_reference_fill": 111.91,
+      "exit_price_reference_fill": 105.525
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-16",
+      "is_trigger": false,
+      "gross_return": -0.026958752904725047,
+      "net_return": -0.027458752904725048,
+      "entry_price_reference_fill": 103.28,
+      "exit_price_reference_fill": 100.4957
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-17",
+      "is_trigger": false,
+      "gross_return": -0.053576824853200034,
+      "net_return": -0.054076824853200034,
+      "entry_price_reference_fill": 101.2602,
+      "exit_price_reference_fill": 95.835
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-21",
+      "is_trigger": false,
+      "gross_return": 0.028510594100540132,
+      "net_return": 0.02801059410054013,
+      "entry_price_reference_fill": 96.28,
+      "exit_price_reference_fill": 99.025
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-22",
+      "is_trigger": false,
+      "gross_return": 0.05152402099313691,
+      "net_return": 0.05102402099313691,
+      "entry_price_reference_fill": 99.08,
+      "exit_price_reference_fill": 104.185
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-23",
+      "is_trigger": false,
+      "gross_return": 0.025350330868041837,
+      "net_return": 0.024850330868041837,
+      "entry_price_reference_fill": 102.76,
+      "exit_price_reference_fill": 105.365
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-24",
+      "is_trigger": false,
+      "gross_return": 0.011473713909526895,
+      "net_return": 0.010973713909526894,
+      "entry_price_reference_fill": 106.33,
+      "exit_price_reference_fill": 107.55
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-25",
+      "is_trigger": false,
+      "gross_return": -0.022076049738691705,
+      "net_return": -0.022576049738691706,
+      "entry_price_reference_fill": 110.98,
+      "exit_price_reference_fill": 108.53
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-28",
+      "is_trigger": false,
+      "gross_return": 0.00028756078408243013,
+      "net_return": -0.00021243921591756988,
+      "entry_price_reference_fill": 108.4988,
+      "exit_price_reference_fill": 108.53
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-29",
+      "is_trigger": false,
+      "gross_return": -0.005816135084427687,
+      "net_return": -0.0063161350844276876,
+      "entry_price_reference_fill": 106.6,
+      "exit_price_reference_fill": 105.98
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-04-30",
+      "is_trigger": false,
+      "gross_return": 0.00908281389136234,
+      "net_return": 0.00858281389136234,
+      "entry_price_reference_fill": 112.3,
+      "exit_price_reference_fill": 113.32
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-01",
+      "is_trigger": false,
+      "gross_return": 0.019239373601789733,
+      "net_return": 0.018739373601789733,
+      "entry_price_reference_fill": 111.75,
+      "exit_price_reference_fill": 113.9
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-02",
+      "is_trigger": false,
+      "gross_return": -0.008691359148598754,
+      "net_return": -0.009191359148598754,
+      "entry_price_reference_fill": 114.2399,
+      "exit_price_reference_fill": 113.247
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-05",
+      "is_trigger": false,
+      "gross_return": -0.008275376353552244,
+      "net_return": -0.008775376353552244,
+      "entry_price_reference_fill": 113.59,
+      "exit_price_reference_fill": 112.65
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-06",
+      "is_trigger": false,
+      "gross_return": 0.0010585744530700048,
+      "net_return": 0.0005585744530700047,
+      "entry_price_reference_fill": 113.36,
+      "exit_price_reference_fill": 113.48
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-07",
+      "is_trigger": false,
+      "gross_return": 0.0054893215541642615,
+      "net_return": 0.004989321554164261,
+      "entry_price_reference_fill": 116.59,
+      "exit_price_reference_fill": 117.23
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-08",
+      "is_trigger": false,
+      "gross_return": -0.010143198090692085,
+      "net_return": -0.010643198090692085,
+      "entry_price_reference_fill": 117.32,
+      "exit_price_reference_fill": 116.13
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-09",
+      "is_trigger": false,
+      "gross_return": 0.03822695644704055,
+      "net_return": 0.03772695644704055,
+      "entry_price_reference_fill": 116.41,
+      "exit_price_reference_fill": 120.86
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-12",
+      "is_trigger": false,
+      "gross_return": 0.052365827836142964,
+      "net_return": 0.051865827836142964,
+      "entry_price_reference_fill": 122.79,
+      "exit_price_reference_fill": 129.22
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-13",
+      "is_trigger": false,
+      "gross_return": 0.02408894379246429,
+      "net_return": 0.02358894379246429,
+      "entry_price_reference_fill": 129.52,
+      "exit_price_reference_fill": 132.64
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-14",
+      "is_trigger": false,
+      "gross_return": -0.02273060566065399,
+      "net_return": -0.02323060566065399,
+      "entry_price_reference_fill": 136.38,
+      "exit_price_reference_fill": 133.28
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-15",
+      "is_trigger": false,
+      "gross_return": 0.004412219526648942,
+      "net_return": 0.003912219526648941,
+      "entry_price_reference_fill": 134.8301,
+      "exit_price_reference_fill": 135.425
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-16",
+      "is_trigger": false,
+      "gross_return": 0.003218128295059408,
+      "net_return": 0.002718128295059408,
+      "entry_price_reference_fill": 134.861,
+      "exit_price_reference_fill": 135.295
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-19",
+      "is_trigger": false,
+      "gross_return": -0.017587939698492483,
+      "net_return": -0.018087939698492483,
+      "entry_price_reference_fill": 135.32,
+      "exit_price_reference_fill": 132.94
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-20",
+      "is_trigger": false,
+      "gross_return": -0.0034225067911304308,
+      "net_return": -0.003922506791130431,
+      "entry_price_reference_fill": 134.5505,
+      "exit_price_reference_fill": 134.09
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-21",
+      "is_trigger": false,
+      "gross_return": 0.013043004832970384,
+      "net_return": 0.012543004832970384,
+      "entry_price_reference_fill": 131.3271,
+      "exit_price_reference_fill": 133.04
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-22",
+      "is_trigger": false,
+      "gross_return": -0.018494850011277153,
+      "net_return": -0.018994850011277153,
+      "entry_price_reference_fill": 133.01,
+      "exit_price_reference_fill": 130.55
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-23",
+      "is_trigger": false,
+      "gross_return": 0.031683696812566664,
+      "net_return": 0.031183696812566664,
+      "entry_price_reference_fill": 131.14,
+      "exit_price_reference_fill": 135.295
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-27",
+      "is_trigger": false,
+      "gross_return": 7.393715341952323e-05,
+      "net_return": -0.0004260628465804768,
+      "entry_price_reference_fill": 135.25,
+      "exit_price_reference_fill": 135.26
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-28",
+      "is_trigger": false,
+      "gross_return": -0.0019518773511247867,
+      "net_return": -0.0024518773511247867,
+      "entry_price_reference_fill": 140.89,
+      "exit_price_reference_fill": 140.615
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-29",
+      "is_trigger": false,
+      "gross_return": -0.010233496684923571,
+      "net_return": -0.010733496684923571,
+      "entry_price_reference_fill": 138.76,
+      "exit_price_reference_fill": 137.34
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-05-30",
+      "is_trigger": false,
+      "gross_return": 0.01244628833901329,
+      "net_return": 0.011946288339013289,
+      "entry_price_reference_fill": 134.98,
+      "exit_price_reference_fill": 136.66
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-02",
+      "is_trigger": false,
+      "gross_return": 0.026232568274259016,
+      "net_return": 0.025732568274259016,
+      "entry_price_reference_fill": 137.68,
+      "exit_price_reference_fill": 141.2917
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-03",
+      "is_trigger": false,
+      "gross_return": -0.0016994759949016114,
+      "net_return": -0.0021994759949016114,
+      "entry_price_reference_fill": 141.22,
+      "exit_price_reference_fill": 140.98
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-04",
+      "is_trigger": false,
+      "gross_return": 0.0022534288546198766,
+      "net_return": 0.0017534288546198766,
+      "entry_price_reference_fill": 141.6508,
+      "exit_price_reference_fill": 141.97
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-05",
+      "is_trigger": false,
+      "gross_return": 0.018113858539390293,
+      "net_return": 0.017613858539390292,
+      "entry_price_reference_fill": 139.12,
+      "exit_price_reference_fill": 141.64
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-06",
+      "is_trigger": false,
+      "gross_return": 0.01708348009862637,
+      "net_return": 0.01658348009862637,
+      "entry_price_reference_fill": 141.95,
+      "exit_price_reference_fill": 144.375
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-09",
+      "is_trigger": false,
+      "gross_return": 0.0008831631258365835,
+      "net_return": 0.0003831631258365835,
+      "entry_price_reference_fill": 142.669,
+      "exit_price_reference_fill": 142.795
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-10",
+      "is_trigger": false,
+      "gross_return": 0.0041351032038363655,
+      "net_return": 0.0036351032038363655,
+      "entry_price_reference_fill": 143.89,
+      "exit_price_reference_fill": 144.485
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-11",
+      "is_trigger": false,
+      "gross_return": 0.006636379770290857,
+      "net_return": 0.006136379770290856,
+      "entry_price_reference_fill": 143.1202,
+      "exit_price_reference_fill": 144.07
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-12",
+      "is_trigger": false,
+      "gross_return": -0.02526577385061457,
+      "net_return": -0.02576577385061457,
+      "entry_price_reference_fill": 144.86,
+      "exit_price_reference_fill": 141.2
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-13",
+      "is_trigger": false,
+      "gross_return": 0.018649086935063064,
+      "net_return": 0.018149086935063063,
+      "entry_price_reference_fill": 141.83,
+      "exit_price_reference_fill": 144.475
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-16",
+      "is_trigger": false,
+      "gross_return": -0.0012450715916165755,
+      "net_return": -0.0017450715916165756,
+      "entry_price_reference_fill": 144.57,
+      "exit_price_reference_fill": 144.39
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-17",
+      "is_trigger": false,
+      "gross_return": 0.008747526234590408,
+      "net_return": 0.008247526234590408,
+      "entry_price_reference_fill": 143.9607,
+      "exit_price_reference_fill": 145.22
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-18",
+      "is_trigger": false,
+      "gross_return": -0.00378840060614416,
+      "net_return": -0.00428840060614416,
+      "entry_price_reference_fill": 145.18,
+      "exit_price_reference_fill": 144.63
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-20",
+      "is_trigger": false,
+      "gross_return": -0.0007638271496726023,
+      "net_return": -0.0012638271496726024,
+      "entry_price_reference_fill": 143.7498,
+      "exit_price_reference_fill": 143.64
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-23",
+      "is_trigger": false,
+      "gross_return": 0.020759563979726448,
+      "net_return": 0.020259563979726447,
+      "entry_price_reference_fill": 144.03,
+      "exit_price_reference_fill": 147.02
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-24",
+      "is_trigger": false,
+      "gross_return": 0.030501015572105716,
+      "net_return": 0.030001015572105716,
+      "entry_price_reference_fill": 147.7,
+      "exit_price_reference_fill": 152.205
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-25",
+      "is_trigger": false,
+      "gross_return": 0.011805093400129474,
+      "net_return": 0.011305093400129473,
+      "entry_price_reference_fill": 154.6197,
+      "exit_price_reference_fill": 156.445
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-26",
+      "is_trigger": false,
+      "gross_return": 0.01675900438028255,
+      "net_return": 0.01625900438028255,
+      "entry_price_reference_fill": 154.8302,
+      "exit_price_reference_fill": 157.425
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-27",
+      "is_trigger": false,
+      "gross_return": -0.0019058509624546582,
+      "net_return": -0.0024058509624546582,
+      "entry_price_reference_fill": 157.41,
+      "exit_price_reference_fill": 157.11
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-06-30",
+      "is_trigger": false,
+      "gross_return": -0.020181219110378956,
+      "net_return": -0.020681219110378957,
+      "entry_price_reference_fill": 157.82,
+      "exit_price_reference_fill": 154.635
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-01",
+      "is_trigger": false,
+      "gross_return": 0.01914155215362867,
+      "net_return": 0.01864155215362867,
+      "entry_price_reference_fill": 153.1485,
+      "exit_price_reference_fill": 156.08
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-02",
+      "is_trigger": false,
+      "gross_return": 0.022925555626313487,
+      "net_return": 0.022425555626313487,
+      "entry_price_reference_fill": 157.03,
+      "exit_price_reference_fill": 160.63
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-03",
+      "is_trigger": false,
+      "gross_return": -0.006151914626491006,
+      "net_return": -0.006651914626491007,
+      "entry_price_reference_fill": 159.3,
+      "exit_price_reference_fill": 158.32
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-07",
+      "is_trigger": false,
+      "gross_return": 0.006240511133603022,
+      "net_return": 0.005740511133603021,
+      "entry_price_reference_fill": 158.08,
+      "exit_price_reference_fill": 159.0665
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-08",
+      "is_trigger": false,
+      "gross_return": 0.019092556715205378,
+      "net_return": 0.018592556715205377,
+      "entry_price_reference_fill": 160.01,
+      "exit_price_reference_fill": 163.065
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-09",
+      "is_trigger": false,
+      "gross_return": -0.002916869525497523,
+      "net_return": -0.003416869525497523,
+      "entry_price_reference_fill": 162.8801,
+      "exit_price_reference_fill": 162.405
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-10",
+      "is_trigger": false,
+      "gross_return": 0.020297442230895912,
+      "net_return": 0.019797442230895912,
+      "entry_price_reference_fill": 164.0453,
+      "exit_price_reference_fill": 167.375
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-11",
+      "is_trigger": false,
+      "gross_return": -0.007787406823828835,
+      "net_return": -0.008287406823828836,
+      "entry_price_reference_fill": 165.01,
+      "exit_price_reference_fill": 163.725
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-14",
+      "is_trigger": false,
+      "gross_return": 0.04570941004388107,
+      "net_return": 0.04520941004388107,
+      "entry_price_reference_fill": 164.08,
+      "exit_price_reference_fill": 171.58
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-15",
+      "is_trigger": false,
+      "gross_return": 0.000259532523662509,
+      "net_return": -0.000240467476337491,
+      "entry_price_reference_fill": 169.9209,
+      "exit_price_reference_fill": 169.965
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-16",
+      "is_trigger": false,
+      "gross_return": 0.00975125540114452,
+      "net_return": 0.00925125540114452,
+      "entry_price_reference_fill": 171.26,
+      "exit_price_reference_fill": 172.93
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-17",
+      "is_trigger": false,
+      "gross_return": -0.006121859659255047,
+      "net_return": -0.006621859659255047,
+      "entry_price_reference_fill": 173.15,
+      "exit_price_reference_fill": 172.09
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-18",
+      "is_trigger": false,
+      "gross_return": 0.004177303318635417,
+      "net_return": 0.003677303318635417,
+      "entry_price_reference_fill": 172.36,
+      "exit_price_reference_fill": 173.08
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-21",
+      "is_trigger": false,
+      "gross_return": -0.030235083908488947,
+      "net_return": -0.030735083908488947,
+      "entry_price_reference_fill": 171.258,
+      "exit_price_reference_fill": 166.08
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-22",
+      "is_trigger": false,
+      "gross_return": 0.015917827967323328,
+      "net_return": 0.015417827967323328,
+      "entry_price_reference_fill": 166.48,
+      "exit_price_reference_fill": 169.13
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-23",
+      "is_trigger": false,
+      "gross_return": -0.0014506208657305564,
+      "net_return": -0.0019506208657305564,
+      "entry_price_reference_fill": 172.34,
+      "exit_price_reference_fill": 172.09
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-24",
+      "is_trigger": false,
+      "gross_return": 0.00538811732841582,
+      "net_return": 0.00488811732841582,
+      "entry_price_reference_fill": 173.53,
+      "exit_price_reference_fill": 174.465
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-25",
+      "is_trigger": false,
+      "gross_return": 0.008183856954549151,
+      "net_return": 0.007683856954549151,
+      "entry_price_reference_fill": 173.5001,
+      "exit_price_reference_fill": 174.92
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-28",
+      "is_trigger": false,
+      "gross_return": 0.006781576716586635,
+      "net_return": 0.006281576716586634,
+      "entry_price_reference_fill": 176.95,
+      "exit_price_reference_fill": 178.15
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-29",
+      "is_trigger": false,
+      "gross_return": 0.014842763719078889,
+      "net_return": 0.014342763719078888,
+      "entry_price_reference_fill": 175.85,
+      "exit_price_reference_fill": 178.4601
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-30",
+      "is_trigger": false,
+      "gross_return": 0.004085379340853734,
+      "net_return": 0.003585379340853734,
+      "entry_price_reference_fill": 180.84,
+      "exit_price_reference_fill": 181.5788
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-07-31",
+      "is_trigger": false,
+      "gross_return": -0.016137194264829957,
+      "net_return": -0.016637194264829958,
+      "entry_price_reference_fill": 177.85,
+      "exit_price_reference_fill": 174.98
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-08-01",
+      "is_trigger": false,
+      "gross_return": 0.026299094526789357,
+      "net_return": 0.025799094526789357,
+      "entry_price_reference_fill": 173.39,
+      "exit_price_reference_fill": 177.95
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-08-04",
+      "is_trigger": false,
+      "gross_return": -0.013558384061981177,
+      "net_return": -0.014058384061981177,
+      "entry_price_reference_fill": 180.7,
+      "exit_price_reference_fill": 178.25
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-08-05",
+      "is_trigger": false,
+      "gross_return": 0.004570590226836702,
+      "net_return": 0.004070590226836701,
+      "entry_price_reference_fill": 177.22,
+      "exit_price_reference_fill": 178.03
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-08-06",
+      "is_trigger": false,
+      "gross_return": 0.01787806102526912,
+      "net_return": 0.01737806102526912,
+      "entry_price_reference_fill": 179.27,
+      "exit_price_reference_fill": 182.475
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-08-07",
+      "is_trigger": false,
+      "gross_return": 0.005186206896551804,
+      "net_return": 0.004686206896551803,
+      "entry_price_reference_fill": 181.25,
+      "exit_price_reference_fill": 182.19
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-08-08",
+      "is_trigger": false,
+      "gross_return": 0.003832466465918394,
+      "net_return": 0.003332466465918394,
+      "entry_price_reference_fill": 182.65,
+      "exit_price_reference_fill": 183.35
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-08-11",
+      "is_trigger": false,
+      "gross_return": -0.0054787818821459,
+      "net_return": -0.0059787818821459005,
+      "entry_price_reference_fill": 181.92,
+      "exit_price_reference_fill": 180.9233
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-08-12",
+      "is_trigger": false,
+      "gross_return": -0.007594939479022678,
+      "net_return": -0.008094939479022678,
+      "entry_price_reference_fill": 182.7796,
+      "exit_price_reference_fill": 181.3914
+    },
+    {
+      "symbol": "NVDA",
+      "date": "2025-08-13",
+      "is_trigger": false,
+      "gross_return": 0.007329655172413796,
+      "net_return": 0.0068296551724137955,
+      "entry_price_reference_fill": 181.25,
+      "exit_price_reference_fill": 182.5785
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-04-08",
+      "is_trigger": false,
+      "gross_return": -0.0011314186248913005,
+      "net_return": -0.0016314186248913005,
+      "entry_price_reference_fill": 57.45,
+      "exit_price_reference_fill": 57.385
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-04-30",
+      "is_trigger": false,
+      "gross_return": -0.008298066676815208,
+      "net_return": -0.008798066676815208,
+      "entry_price_reference_fill": 65.69,
+      "exit_price_reference_fill": 65.1449
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-05-01",
+      "is_trigger": false,
+      "gross_return": 0.02957486136783727,
+      "net_return": 0.029074861367837268,
+      "entry_price_reference_fill": 64.92,
+      "exit_price_reference_fill": 66.84
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-05-02",
+      "is_trigger": false,
+      "gross_return": 0.017544955323486544,
+      "net_return": 0.017044955323486544,
+      "entry_price_reference_fill": 67.2501,
+      "exit_price_reference_fill": 68.43
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-05-05",
+      "is_trigger": false,
+      "gross_return": 0.005110235070813429,
+      "net_return": 0.004610235070813429,
+      "entry_price_reference_fill": 68.49,
+      "exit_price_reference_fill": 68.84
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-05-06",
+      "is_trigger": false,
+      "gross_return": 0.004689138400273185,
+      "net_return": 0.004189138400273185,
+      "entry_price_reference_fill": 67.9016,
+      "exit_price_reference_fill": 68.22
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-05-12",
+      "is_trigger": false,
+      "gross_return": -0.0031945788964182764,
+      "net_return": -0.0036945788964182764,
+      "entry_price_reference_fill": 72.31,
+      "exit_price_reference_fill": 72.079
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-05-21",
+      "is_trigger": false,
+      "gross_return": -0.0018169112508734653,
+      "net_return": -0.0023169112508734653,
+      "entry_price_reference_fill": 71.55,
+      "exit_price_reference_fill": 71.42
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-06-03",
+      "is_trigger": false,
+      "gross_return": 0.014699822949611585,
+      "net_return": 0.014199822949611585,
+      "entry_price_reference_fill": 71.1097,
+      "exit_price_reference_fill": 72.155
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-06-24",
+      "is_trigger": false,
+      "gross_return": -0.0036684782608694677,
+      "net_return": -0.004168478260869468,
+      "entry_price_reference_fill": 73.6,
+      "exit_price_reference_fill": 73.33
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-06-25",
+      "is_trigger": false,
+      "gross_return": -0.0060183285460264635,
+      "net_return": -0.006518328546026464,
+      "entry_price_reference_fill": 73.11,
+      "exit_price_reference_fill": 72.67
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-07-03",
+      "is_trigger": false,
+      "gross_return": 0.0030098152984536775,
+      "net_return": 0.0025098152984536774,
+      "entry_price_reference_fill": 76.3502,
+      "exit_price_reference_fill": 76.58
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-07-14",
+      "is_trigger": false,
+      "gross_return": -0.0028482300284824458,
+      "net_return": -0.003348230028482446,
+      "entry_price_reference_fill": 73.73,
+      "exit_price_reference_fill": 73.52
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-07-21",
+      "is_trigger": false,
+      "gross_return": 0.0069154038750844915,
+      "net_return": 0.006415403875084491,
+      "entry_price_reference_fill": 74.8474,
+      "exit_price_reference_fill": 75.365
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-07-22",
+      "is_trigger": false,
+      "gross_return": 0.013618421052631557,
+      "net_return": 0.013118421052631557,
+      "entry_price_reference_fill": 76.0,
+      "exit_price_reference_fill": 77.035
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-07-23",
+      "is_trigger": false,
+      "gross_return": 0.014951456310679623,
+      "net_return": 0.014451456310679622,
+      "entry_price_reference_fill": 77.25,
+      "exit_price_reference_fill": 78.405
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-07-24",
+      "is_trigger": false,
+      "gross_return": 0.0016677357280308058,
+      "net_return": 0.0011677357280308058,
+      "entry_price_reference_fill": 77.95,
+      "exit_price_reference_fill": 78.08
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-07-25",
+      "is_trigger": false,
+      "gross_return": 0.005641025641025532,
+      "net_return": 0.005141025641025532,
+      "entry_price_reference_fill": 78.0,
+      "exit_price_reference_fill": 78.44
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-07-28",
+      "is_trigger": false,
+      "gross_return": -0.08994776404637517,
+      "net_return": -0.09044776404637517,
+      "entry_price_reference_fill": 78.49,
+      "exit_price_reference_fill": 71.43
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-07-29",
+      "is_trigger": true,
+      "gross_return": -0.011621433542101545,
+      "net_return": -0.012121433542101545,
+      "entry_price_reference_fill": 71.85,
+      "exit_price_reference_fill": 71.015
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-07-30",
+      "is_trigger": false,
+      "gross_return": -0.002305469701698315,
+      "net_return": -0.002805469701698315,
+      "entry_price_reference_fill": 69.5303,
+      "exit_price_reference_fill": 69.37
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-07-31",
+      "is_trigger": false,
+      "gross_return": -0.015797903319743845,
+      "net_return": -0.016297903319743845,
+      "entry_price_reference_fill": 68.68,
+      "exit_price_reference_fill": 67.595
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-08-07",
+      "is_trigger": false,
+      "gross_return": -0.0026311942698434843,
+      "net_return": -0.0031311942698434843,
+      "entry_price_reference_fill": 68.41,
+      "exit_price_reference_fill": 68.23
+    },
+    {
+      "symbol": "PYPL",
+      "date": "2025-08-11",
+      "is_trigger": false,
+      "gross_return": 0.02238805970149249,
+      "net_return": 0.02188805970149249,
+      "entry_price_reference_fill": 67.0,
+      "exit_price_reference_fill": 68.5
+    },
+    {
+      "symbol": "STX",
+      "date": "2025-02-25",
+      "is_trigger": false,
+      "gross_return": 0.005663876497418618,
+      "net_return": 0.005163876497418618,
+      "entry_price_reference_fill": 99.755,
+      "exit_price_reference_fill": 100.32
+    },
+    {
+      "symbol": "STX",
+      "date": "2025-02-26",
+      "is_trigger": false,
+      "gross_return": 0.021715310289869505,
+      "net_return": 0.021215310289869505,
+      "entry_price_reference_fill": 100.39,
+      "exit_price_reference_fill": 102.57
+    },
+    {
+      "symbol": "STX",
+      "date": "2025-02-27",
+      "is_trigger": true,
+      "gross_return": -0.011146182679029337,
+      "net_return": -0.011646182679029338,
+      "entry_price_reference_fill": 101.38,
+      "exit_price_reference_fill": 100.25
+    },
+    {
+      "symbol": "STX",
+      "date": "2025-02-28",
+      "is_trigger": false,
+      "gross_return": 0.011495382196895276,
+      "net_return": 0.010995382196895276,
+      "entry_price_reference_fill": 101.78,
+      "exit_price_reference_fill": 102.95
+    },
+    {
+      "symbol": "STX",
+      "date": "2025-03-03",
+      "is_trigger": false,
+      "gross_return": -0.011290967226219029,
+      "net_return": -0.011790967226219029,
+      "entry_price_reference_fill": 100.08,
+      "exit_price_reference_fill": 98.95
+    },
+    {
+      "symbol": "STX",
+      "date": "2025-03-04",
+      "is_trigger": true,
+      "gross_return": -0.006332971196905013,
+      "net_return": -0.006832971196905013,
+      "entry_price_reference_fill": 94.3475,
+      "exit_price_reference_fill": 93.75
+    },
+    {
+      "symbol": "STX",
+      "date": "2025-03-05",
+      "is_trigger": false,
+      "gross_return": -0.020657581656932655,
+      "net_return": -0.021157581656932656,
+      "entry_price_reference_fill": 92.46,
+      "exit_price_reference_fill": 90.55
+    },
+    {
+      "symbol": "STX",
+      "date": "2025-03-06",
+      "is_trigger": false,
+      "gross_return": 0.0013796275005746317,
+      "net_return": 0.0008796275005746317,
+      "entry_price_reference_fill": 86.98,
+      "exit_price_reference_fill": 87.1
+    },
+    {
+      "symbol": "STX",
+      "date": "2025-03-07",
+      "is_trigger": false,
+      "gross_return": -0.01770062606715983,
+      "net_return": -0.01820062606715983,
+      "entry_price_reference_fill": 87.85,
+      "exit_price_reference_fill": 86.295
+    },
+    {
+      "symbol": "STX",
+      "date": "2025-04-03",
+      "is_trigger": true,
+      "gross_return": -0.07042253521126762,
+      "net_return": -0.07092253521126762,
+      "entry_price_reference_fill": 71.0,
+      "exit_price_reference_fill": 66.0
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-07",
+      "is_trigger": false,
+      "gross_return": 0.05752910571879388,
+      "net_return": 0.05702910571879388,
+      "entry_price_reference_fill": 234.49,
+      "exit_price_reference_fill": 247.98
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-08",
+      "is_trigger": false,
+      "gross_return": 0.03687460843103896,
+      "net_return": 0.03637460843103896,
+      "entry_price_reference_fill": 223.46,
+      "exit_price_reference_fill": 231.7
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-09",
+      "is_trigger": false,
+      "gross_return": -0.0683873329672341,
+      "net_return": -0.0688873329672341,
+      "entry_price_reference_fill": 273.15,
+      "exit_price_reference_fill": 254.47
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-10",
+      "is_trigger": false,
+      "gross_return": -0.030076173645653292,
+      "net_return": -0.030576173645653293,
+      "entry_price_reference_fill": 252.4889,
+      "exit_price_reference_fill": 244.895
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-11",
+      "is_trigger": false,
+      "gross_return": 0.01887451524598882,
+      "net_return": 0.01837451524598882,
+      "entry_price_reference_fill": 252.4992,
+      "exit_price_reference_fill": 257.265
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-14",
+      "is_trigger": false,
+      "gross_return": 0.010493419744741717,
+      "net_return": 0.009993419744741716,
+      "entry_price_reference_fill": 251.51,
+      "exit_price_reference_fill": 254.1492
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-15",
+      "is_trigger": false,
+      "gross_return": -0.014156151419558394,
+      "net_return": -0.014656151419558394,
+      "entry_price_reference_fill": 253.6,
+      "exit_price_reference_fill": 250.01
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-16",
+      "is_trigger": false,
+      "gross_return": -0.007025858485075198,
+      "net_return": -0.007525858485075199,
+      "entry_price_reference_fill": 240.54,
+      "exit_price_reference_fill": 238.85
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-17",
+      "is_trigger": false,
+      "gross_return": -0.06723873481739417,
+      "net_return": -0.06773873481739418,
+      "entry_price_reference_fill": 241.23,
+      "exit_price_reference_fill": 225.01
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-21",
+      "is_trigger": false,
+      "gross_return": 0.036826772241727035,
+      "net_return": 0.036326772241727034,
+      "entry_price_reference_fill": 227.579,
+      "exit_price_reference_fill": 235.96
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-22",
+      "is_trigger": false,
+      "gross_return": 0.06603299556151088,
+      "net_return": 0.06553299556151088,
+      "entry_price_reference_fill": 238.82,
+      "exit_price_reference_fill": 254.59
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-23",
+      "is_trigger": false,
+      "gross_return": 0.013525270900893505,
+      "net_return": 0.013025270900893504,
+      "entry_price_reference_fill": 252.86,
+      "exit_price_reference_fill": 256.28
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-24",
+      "is_trigger": false,
+      "gross_return": 0.04236472174080497,
+      "net_return": 0.04186472174080497,
+      "entry_price_reference_fill": 259.65,
+      "exit_price_reference_fill": 270.65
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-25",
+      "is_trigger": false,
+      "gross_return": 0.005087532073343004,
+      "net_return": 0.004587532073343004,
+      "entry_price_reference_fill": 285.0498,
+      "exit_price_reference_fill": 286.5
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-28",
+      "is_trigger": false,
+      "gross_return": -0.011467313029121518,
+      "net_return": -0.011967313029121518,
+      "entry_price_reference_fill": 284.67,
+      "exit_price_reference_fill": 281.4056
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-29",
+      "is_trigger": false,
+      "gross_return": -0.04270905321354512,
+      "net_return": -0.04320905321354512,
+      "entry_price_reference_fill": 289.4,
+      "exit_price_reference_fill": 277.04
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-04-30",
+      "is_trigger": false,
+      "gross_return": 0.010590602605288213,
+      "net_return": 0.010090602605288213,
+      "entry_price_reference_fill": 283.27,
+      "exit_price_reference_fill": 286.27
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-01",
+      "is_trigger": false,
+      "gross_return": 0.014940881404514439,
+      "net_return": 0.014440881404514438,
+      "entry_price_reference_fill": 279.1,
+      "exit_price_reference_fill": 283.27
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-02",
+      "is_trigger": false,
+      "gross_return": -0.038773450280185084,
+      "net_return": -0.039273450280185085,
+      "entry_price_reference_fill": 287.31,
+      "exit_price_reference_fill": 276.17
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-05",
+      "is_trigger": false,
+      "gross_return": -0.016283401389784347,
+      "net_return": -0.016783401389784347,
+      "entry_price_reference_fill": 279.18,
+      "exit_price_reference_fill": 274.634
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-06",
+      "is_trigger": false,
+      "gross_return": 0.00811107464537053,
+      "net_return": 0.00761107464537053,
+      "entry_price_reference_fill": 274.23,
+      "exit_price_reference_fill": 276.4543
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-07",
+      "is_trigger": false,
+      "gross_return": 0.023228803716608626,
+      "net_return": 0.022728803716608625,
+      "entry_price_reference_fill": 275.52,
+      "exit_price_reference_fill": 281.92
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-08",
+      "is_trigger": false,
+      "gross_return": 0.062045334739061486,
+      "net_return": 0.061545334739061486,
+      "entry_price_reference_fill": 284.55,
+      "exit_price_reference_fill": 302.205
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-09",
+      "is_trigger": false,
+      "gross_return": 0.056046901172529306,
+      "net_return": 0.055546901172529306,
+      "entry_price_reference_fill": 298.5,
+      "exit_price_reference_fill": 315.23
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-12",
+      "is_trigger": false,
+      "gross_return": 0.014695091252360015,
+      "net_return": 0.014195091252360015,
+      "entry_price_reference_fill": 317.8,
+      "exit_price_reference_fill": 322.4701
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-13",
+      "is_trigger": false,
+      "gross_return": 0.024499623777276103,
+      "net_return": 0.023999623777276102,
+      "entry_price_reference_fill": 332.25,
+      "exit_price_reference_fill": 340.39
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-14",
+      "is_trigger": false,
+      "gross_return": -0.028355849382006193,
+      "net_return": -0.028855849382006193,
+      "entry_price_reference_fill": 347.9,
+      "exit_price_reference_fill": 338.035
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-15",
+      "is_trigger": false,
+      "gross_return": 0.010773722627737126,
+      "net_return": 0.010273722627737125,
+      "entry_price_reference_fill": 342.5,
+      "exit_price_reference_fill": 346.19
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-16",
+      "is_trigger": false,
+      "gross_return": -0.026798763028289985,
+      "net_return": -0.027298763028289985,
+      "entry_price_reference_fill": 349.24,
+      "exit_price_reference_fill": 339.8808
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-19",
+      "is_trigger": false,
+      "gross_return": 0.00993803343855948,
+      "net_return": 0.009438033438559479,
+      "entry_price_reference_fill": 342.12,
+      "exit_price_reference_fill": 345.52
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-20",
+      "is_trigger": false,
+      "gross_return": -0.004474532934305775,
+      "net_return": -0.004974532934305775,
+      "entry_price_reference_fill": 344.17,
+      "exit_price_reference_fill": 342.63
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-21",
+      "is_trigger": false,
+      "gross_return": 0.024909747292418905,
+      "net_return": 0.024409747292418904,
+      "entry_price_reference_fill": 332.4,
+      "exit_price_reference_fill": 340.68
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-22",
+      "is_trigger": false,
+      "gross_return": -0.018796772684752105,
+      "net_return": -0.019296772684752106,
+      "entry_price_reference_fill": 342.08,
+      "exit_price_reference_fill": 335.65
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-23",
+      "is_trigger": false,
+      "gross_return": 0.04803698954080726,
+      "net_return": 0.04753698954080726,
+      "entry_price_reference_fill": 339.988,
+      "exit_price_reference_fill": 356.32
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-27",
+      "is_trigger": false,
+      "gross_return": -0.003578787878787959,
+      "net_return": -0.0040787878787879595,
+      "entry_price_reference_fill": 363.0,
+      "exit_price_reference_fill": 361.7009
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-28",
+      "is_trigger": false,
+      "gross_return": 0.0009955752212387203,
+      "net_return": 0.0004955752212387203,
+      "entry_price_reference_fill": 361.6,
+      "exit_price_reference_fill": 361.96
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-29",
+      "is_trigger": false,
+      "gross_return": 0.013019010555197719,
+      "net_return": 0.012519010555197718,
+      "entry_price_reference_fill": 357.17,
+      "exit_price_reference_fill": 361.82
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-05-30",
+      "is_trigger": false,
+      "gross_return": -0.020995373048004584,
+      "net_return": -0.021495373048004585,
+      "entry_price_reference_fill": 345.8,
+      "exit_price_reference_fill": 338.5398
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-02",
+      "is_trigger": false,
+      "gross_return": 0.00927489885521382,
+      "net_return": 0.00877489885521382,
+      "entry_price_reference_fill": 342.8501,
+      "exit_price_reference_fill": 346.03
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-03",
+      "is_trigger": false,
+      "gross_return": -0.03238866396761131,
+      "net_return": -0.03288866396761131,
+      "entry_price_reference_fill": 343.33,
+      "exit_price_reference_fill": 332.21
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-04",
+      "is_trigger": false,
+      "gross_return": -0.03924238298387328,
+      "net_return": -0.03974238298387328,
+      "entry_price_reference_fill": 330.51,
+      "exit_price_reference_fill": 317.54
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-05",
+      "is_trigger": true,
+      "gross_return": 0.049372185675242486,
+      "net_return": 0.048872185675242485,
+      "entry_price_reference_fill": 281.373,
+      "exit_price_reference_fill": 295.265
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-06",
+      "is_trigger": false,
+      "gross_return": -0.013289518520642862,
+      "net_return": -0.013789518520642863,
+      "entry_price_reference_fill": 296.399,
+      "exit_price_reference_fill": 292.46
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-09",
+      "is_trigger": false,
+      "gross_return": 0.014480106015061889,
+      "net_return": 0.013980106015061888,
+      "entry_price_reference_fill": 309.39,
+      "exit_price_reference_fill": 313.87
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-10",
+      "is_trigger": false,
+      "gross_return": 0.016160335518998536,
+      "net_return": 0.015660335518998536,
+      "entry_price_reference_fill": 327.8026,
+      "exit_price_reference_fill": 333.1
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-11",
+      "is_trigger": false,
+      "gross_return": -0.0020476772616137007,
+      "net_return": -0.0025476772616137007,
+      "entry_price_reference_fill": 327.2,
+      "exit_price_reference_fill": 326.53
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-12",
+      "is_trigger": false,
+      "gross_return": -0.014601742182114297,
+      "net_return": -0.015101742182114297,
+      "entry_price_reference_fill": 319.14,
+      "exit_price_reference_fill": 314.48
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-13",
+      "is_trigger": false,
+      "gross_return": 0.01361780158585102,
+      "net_return": 0.013117801585851019,
+      "entry_price_reference_fill": 325.5665,
+      "exit_price_reference_fill": 330.0
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-16",
+      "is_trigger": false,
+      "gross_return": -0.01833216793846726,
+      "net_return": -0.01883216793846726,
+      "entry_price_reference_fill": 328.93,
+      "exit_price_reference_fill": 322.9
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-17",
+      "is_trigger": false,
+      "gross_return": 0.02594848369496261,
+      "net_return": 0.02544848369496261,
+      "entry_price_reference_fill": 315.24,
+      "exit_price_reference_fill": 323.42
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-18",
+      "is_trigger": false,
+      "gross_return": -0.007689830386066188,
+      "net_return": -0.008189830386066188,
+      "entry_price_reference_fill": 322.6209,
+      "exit_price_reference_fill": 320.14
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-20",
+      "is_trigger": false,
+      "gross_return": 0.0944387264779738,
+      "net_return": 0.0939387264779738,
+      "entry_price_reference_fill": 322.57,
+      "exit_price_reference_fill": 353.0331
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-23",
+      "is_trigger": false,
+      "gross_return": -0.024864401941193326,
+      "net_return": -0.025364401941193326,
+      "entry_price_reference_fill": 350.3,
+      "exit_price_reference_fill": 341.59
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-24",
+      "is_trigger": false,
+      "gross_return": -0.054434772379720164,
+      "net_return": -0.054934772379720165,
+      "entry_price_reference_fill": 340.04,
+      "exit_price_reference_fill": 321.53
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-25",
+      "is_trigger": false,
+      "gross_return": -0.0006463680127556382,
+      "net_return": -0.0011463680127556382,
+      "entry_price_reference_fill": 326.13,
+      "exit_price_reference_fill": 325.9192
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-26",
+      "is_trigger": false,
+      "gross_return": 0.00357987892941658,
+      "net_return": 0.00307987892941658,
+      "entry_price_reference_fill": 325.43,
+      "exit_price_reference_fill": 326.595
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-27",
+      "is_trigger": false,
+      "gross_return": -0.010300495662949105,
+      "net_return": -0.010800495662949106,
+      "entry_price_reference_fill": 322.8,
+      "exit_price_reference_fill": 319.475
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-06-30",
+      "is_trigger": false,
+      "gross_return": -0.04116586538461553,
+      "net_return": -0.04166586538461553,
+      "entry_price_reference_fill": 316.16,
+      "exit_price_reference_fill": 303.145
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-01",
+      "is_trigger": false,
+      "gross_return": 0.03521407235313645,
+      "net_return": 0.03471407235313645,
+      "entry_price_reference_fill": 301.3,
+      "exit_price_reference_fill": 311.91
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-02",
+      "is_trigger": false,
+      "gross_return": -0.008403361344537896,
+      "net_return": -0.008903361344537897,
+      "entry_price_reference_fill": 316.54,
+      "exit_price_reference_fill": 313.88
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-03",
+      "is_trigger": false,
+      "gross_return": -0.06337443301603518,
+      "net_return": -0.06387443301603518,
+      "entry_price_reference_fill": 313.06,
+      "exit_price_reference_fill": 293.22
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-07",
+      "is_trigger": false,
+      "gross_return": 0.015075888764388257,
+      "net_return": 0.014575888764388256,
+      "entry_price_reference_fill": 294.51,
+      "exit_price_reference_fill": 298.95
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-08",
+      "is_trigger": false,
+      "gross_return": -0.006322515554060826,
+      "net_return": -0.006822515554060826,
+      "entry_price_reference_fill": 297.35,
+      "exit_price_reference_fill": 295.47
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-09",
+      "is_trigger": false,
+      "gross_return": 0.02994923857868037,
+      "net_return": 0.02944923857868037,
+      "entry_price_reference_fill": 295.5,
+      "exit_price_reference_fill": 304.35
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-10",
+      "is_trigger": false,
+      "gross_return": 0.0026765559496935154,
+      "net_return": 0.0021765559496935154,
+      "entry_price_reference_fill": 310.1,
+      "exit_price_reference_fill": 310.93
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-11",
+      "is_trigger": false,
+      "gross_return": 0.005147614861674699,
+      "net_return": 0.004647614861674698,
+      "entry_price_reference_fill": 312.6108,
+      "exit_price_reference_fill": 314.22
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-14",
+      "is_trigger": false,
+      "gross_return": 0.002114698734337006,
+      "net_return": 0.001614698734337006,
+      "entry_price_reference_fill": 316.83,
+      "exit_price_reference_fill": 317.5
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-15",
+      "is_trigger": false,
+      "gross_return": 0.02942737081321445,
+      "net_return": 0.028927370813214448,
+      "entry_price_reference_fill": 309.0796,
+      "exit_price_reference_fill": 318.175
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-16",
+      "is_trigger": false,
+      "gross_return": 0.001431238332296303,
+      "net_return": 0.0009312383322963029,
+      "entry_price_reference_fill": 321.4,
+      "exit_price_reference_fill": 321.86
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-17",
+      "is_trigger": false,
+      "gross_return": 0.02340498764041432,
+      "net_return": 0.02290498764041432,
+      "entry_price_reference_fill": 319.59,
+      "exit_price_reference_fill": 327.07
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-18",
+      "is_trigger": false,
+      "gross_return": 0.0020338159851864823,
+      "net_return": 0.0015338159851864823,
+      "entry_price_reference_fill": 329.43,
+      "exit_price_reference_fill": 330.1
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-22",
+      "is_trigger": false,
+      "gross_return": 0.006003922160205288,
+      "net_return": 0.005503922160205288,
+      "entry_price_reference_fill": 331.45,
+      "exit_price_reference_fill": 333.44
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-23",
+      "is_trigger": false,
+      "gross_return": -0.08745418494261858,
+      "net_return": -0.08795418494261859,
+      "entry_price_reference_fill": 332.86,
+      "exit_price_reference_fill": 303.75
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-24",
+      "is_trigger": false,
+      "gross_return": 0.027078353688484214,
+      "net_return": 0.026578353688484213,
+      "entry_price_reference_fill": 305.41,
+      "exit_price_reference_fill": 313.68
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-25",
+      "is_trigger": false,
+      "gross_return": 0.02684351807989893,
+      "net_return": 0.02634351807989893,
+      "entry_price_reference_fill": 316.65,
+      "exit_price_reference_fill": 325.15
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-28",
+      "is_trigger": false,
+      "gross_return": -0.018986175115207393,
+      "net_return": -0.019486175115207394,
+      "entry_price_reference_fill": 325.5,
+      "exit_price_reference_fill": 319.32
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-29",
+      "is_trigger": false,
+      "gross_return": 0.0044887780548628076,
+      "net_return": 0.003988778054862807,
+      "entry_price_reference_fill": 320.8,
+      "exit_price_reference_fill": 322.24
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-30",
+      "is_trigger": false,
+      "gross_return": -0.005064485687322873,
+      "net_return": -0.005564485687322873,
+      "entry_price_reference_fill": 317.9,
+      "exit_price_reference_fill": 316.29
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-07-31",
+      "is_trigger": false,
+      "gross_return": -0.010879449207586434,
+      "net_return": -0.011379449207586434,
+      "entry_price_reference_fill": 307.92,
+      "exit_price_reference_fill": 304.57
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-08-01",
+      "is_trigger": false,
+      "gross_return": 0.021047084090533685,
+      "net_return": 0.020547084090533685,
+      "entry_price_reference_fill": 302.65,
+      "exit_price_reference_fill": 309.0199
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-08-04",
+      "is_trigger": false,
+      "gross_return": -0.004717185422394077,
+      "net_return": -0.005217185422394077,
+      "entry_price_reference_fill": 309.4006,
+      "exit_price_reference_fill": 307.9411
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-08-05",
+      "is_trigger": false,
+      "gross_return": 0.025132996429663157,
+      "net_return": 0.024632996429663157,
+      "entry_price_reference_fill": 307.1699,
+      "exit_price_reference_fill": 314.89
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-08-06",
+      "is_trigger": false,
+      "gross_return": -0.0035112359550562022,
+      "net_return": -0.004011235955056203,
+      "entry_price_reference_fill": 320.4,
+      "exit_price_reference_fill": 319.275
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-08-07",
+      "is_trigger": false,
+      "gross_return": 0.03142679515076163,
+      "net_return": 0.030926795150761632,
+      "entry_price_reference_fill": 321.7,
+      "exit_price_reference_fill": 331.81
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-08-08",
+      "is_trigger": false,
+      "gross_return": 0.034972561622654164,
+      "net_return": 0.03447256162265416,
+      "entry_price_reference_fill": 329.83,
+      "exit_price_reference_fill": 341.365
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-08-11",
+      "is_trigger": false,
+      "gross_return": -0.01045997045790259,
+      "net_return": -0.01095997045790259,
+      "entry_price_reference_fill": 338.5,
+      "exit_price_reference_fill": 334.9593
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-08-12",
+      "is_trigger": false,
+      "gross_return": 0.014568681641773606,
+      "net_return": 0.014068681641773606,
+      "entry_price_reference_fill": 340.12,
+      "exit_price_reference_fill": 345.0751
+    },
+    {
+      "symbol": "TSLA",
+      "date": "2025-08-13",
+      "is_trigger": false,
+      "gross_return": -0.005182180262575664,
+      "net_return": -0.0056821802625756646,
+      "entry_price_reference_fill": 338.95,
+      "exit_price_reference_fill": 337.1935
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-# Product status (authoritative, updated 2026-09-13 / Task 122)
+# Product status (authoritative, updated 2026-09-13 / Task 123)
 
 **User objective, unchanged**: configured tickers with intraday and
 short/long-horizon alerts, and attributable local paper portfolios.
@@ -15,7 +15,8 @@ latest, explicit user goal.
 | Experimental | intraday (relaxed gates) | **Resolved (Task 121A/121B, 2026-09-12/13)**: the exact `EXPERIMENTAL_RELAXED_V1` contract, corrected exit lifecycle (no EOD flatten, no bearish-close — verified against the release source), full available history (2019-06→2025-08, N=227, 35 issuers): gross P&L **−$612.92** (negative before cost), net **−$896.44**, PF 0.764, win rate 19.4%, 95% CI **[−$8.94,+$1.06]/trade** (does not clear the predeclared ±$1.25 materiality band either way) | `INSUFFICIENT_EVIDENCE` (statistical) / **`DO_NOT_ADVANCE_CURRENT_EXPERIMENTAL_CONTRACT`** (product, Task 122) — archived as an internal research baseline; same-population historical data exhausted; not scheduled for further backtesting |
 | V2 | medium (10-trading-day hold) | 39-name live scope, full available history (2019–2026), chronological replay (the real `V2Service.tick()`), N=57, 19 distinct issuers, net@20bps=−0.85%, 95% CI=[−4.57%, +1.11%] — includes zero | `INCONCLUSIVE` (not negative, not positive — genuinely underdetermined at current evidence) |
 | V2 | broad 620-name panel (not the live scope) | N=170 (Task 115/116) / N=756 (Task 112R), net@20bps positive, CIs exclude zero | positive, but this is a **different population** than the live 39-name scope and does not transfer automatically |
-| **New candidate** (unevaluated) | overnight (close-to-open), EOD alert | Feasibility only (Task 122): 35/48 configured tickers have existing free daily-bar coverage; 2,447 volume-attention trigger events over 86 months, 0 zero-trigger months, 0 data-quality issues — no economic outcome computed yet | **`ONE_CANDIDATE_READY_FOR_FIXED_EVALUATION`** — fixed protocol frozen in `TASK122_CANDIDATE_DECISION.md`, not yet run |
+| Overnight attention — daily association | non-actionable, research finding only | **Resolved (Task 123)**: 38 active configured tickers, full available history, N=2,557 triggers/1,905 dates, incremental (trigger-minus-control) net **+0.1687%/event**, date-block-bootstrap 95% CI **[+0.0295%,+0.3085%]** — excludes zero, robust to 2 sensitivities | **`ASSOCIATION_SUPPORTED`** (qualified — CI's lower bound does not fully clear the predeclared ±10bps materiality band) — a real, disclosed research finding, **not actionable**: it depends on same-day final volume, only known at/after that day's own close |
+| Overnight attention — actionable pre-close candidate | EOD alert, 15:50 ET decision | **Resolved (Task 123)**: 12 symbols with existing 1-min coverage, common 7-month window, N=31 triggers, incremental net **−0.5504%/event**, 95% CI **[−2.14%,+1.21%]** — includes zero, small-sample-limited | **`NOT_SUPPORTED_UNDER_TESTED_CONTRACT`** — closed as an actionable candidate on currently available data; exact missing input named (broader/longer intraday coverage), not pursued |
 
 ## Informational lane
 
@@ -26,9 +27,12 @@ recommendation anywhere in this product.
 ## What this page is not
 
 Not a claim that every possible free-data strategy has been exhausted —
-one new candidate (overnight/attention, Task 122) is specifically named
-above with a frozen next-evaluation protocol, not exhausted. Not a claim
-that N=57 (V2, live scope) or N=227 (Experimental, full history) is
+Task 122's shortlist still names two untouched hypotheses (52-week-high
+proximity; turn-of-month), and the overnight-attention DAILY association
+itself (Task 123) is a genuine, positive, disclosed research finding —
+what closed is only the ONE specific pre-close actionable mechanism
+tested, not the whole space. Not a claim that N=57 (V2, live scope) or
+N=227 (Experimental, full history) is
 "properly powered" in a formal statistical-power sense — neither figure
 carries that description anywhere in this research program as of Task
 121/122's own wording corrections; both are reported as completed,
@@ -40,7 +44,9 @@ Experimental contract on its now-exhausted historical dataset.
 
 ## Full evidence
 
-`docs/research/TASK122_CANDIDATE_DECISION.md` (this task — Experimental
+`docs/research/TASK123_OVERNIGHT_ATTENTION_RESULTS.md` (this task —
+overnight-attention diagnostic + actionable-candidate closure);
+`docs/research/TASK122_CANDIDATE_DECISION.md` (Experimental
 closure + new-candidate selection); `docs/research/TASK121B_EXTENDED_EXPERIMENTAL_RESULTS.md`
 (Experimental's full-history result); `docs/research/TASK120ABC_CORRECTED_BASELINE_AND_DECISION.md`
 (V2's 39-name-scope result); `docs/research/PRODUCT_REQUIREMENTS_AND_NEXT_DECISION.md`
