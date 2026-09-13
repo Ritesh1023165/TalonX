@@ -337,3 +337,105 @@ not hidden in a repo-wide default.
 `tests/test_task131_remediation_directive6.py` already carried dedicated,
 explicit-`monkeypatch` coverage of both the OFF (default) and ON states
 from the prior pass and needed no change here.
+
+## Targeted Remediation pass (on top of `9a81e5c`)
+
+A fourth pass, closing 3 further production boundaries -- again entirely
+within `talonx_v2/service.py` (no SPA frontend or Supervisor lifecycle
+change). All 3 directives converge on the same function,
+`_verify_temporal_boundary`, now called from TWO places with two
+different meanings of "the moment this admission decision is being
+evaluated."
+
+### Directive 1 — strict intent deadline validation
+
+Two real gaps in the prior pass's version of `_verify_temporal_boundary`:
+
+- **Unknown dissemination timestamp on a live tick.** The strict-failure
+  condition was `self._dissemination_lookup_refreshed_this_tick` --
+  True only when a real InsiderStore query ran THIS tick and still found
+  nothing. That was the right condition for a NON-live (replay/test)
+  tick (see the Final Remediation section above for why: most of this
+  test suite bypasses `_records` entirely, so the flag correctly stays
+  False and the check correctly no-ops). But on a genuine LIVE tick, an
+  unknown timestamp was ALSO silently passing whenever the flag happened
+  to be False for any other reason -- e.g. `_refresh_dissemination_
+  lookup`'s own query raising an exception, or a live run misconfigured
+  with `form4_kind="parquet"`. Fixed: the strict-failure condition is now
+  `live or self._dissemination_lookup_refreshed_this_tick` -- a live
+  decision never silently proceeds on an unobserved timestamp, for any
+  reason, while the non-live/replay skip is preserved exactly as before.
+- **Missing/malformed intent `created_at_utc` on a live tick.** The prior
+  pass's intent-creation-time check (`if live and intent is not None:`)
+  only ever produced a FAILURE when `created_at_utc` was present AND
+  parsed AND `>= rth_open`. If it was missing (`created_raw` falsy) or
+  malformed (`ValueError`), the code silently fell through to `return
+  True, ""` at the end of the function -- the exact opposite of "strict
+  failure for unknown timing" the durable-intent contract requires.
+  Fixed: `created_ts is None` (missing OR malformed) is now itself an
+  explicit `return False, ...` — never silently treated as "assume it
+  was early enough."
+
+### Directive 2 — pre-admission deadline check
+
+`_verify_temporal_boundary` previously only ran at CONSUMPTION time
+(`_phase_open`, called with the episode's own pre-existing intent). It
+never ran at ADMISSION time (`_phase_post_close`, BEFORE the intent is
+created) — so on a live tick running late in the day, an episode whose
+`eligible_entry_session` is TODAY but whose RTH open has already passed
+could still receive a brand-new `PENDING` intent and an "ACTIONABLE"
+alert, even though that intent is structurally guaranteed to fail
+Directive 1's own consumption-time check on the very next tick (its
+`created_at_utc` would necessarily be `>= rth_open`). A real user-facing
+defect: an operator would be alerted to "act now" on an instruction that
+was already, provably, too late to honour causally.
+
+Rather than duplicate the temporal-boundary logic, `_verify_temporal_
+boundary` is now called from `_phase_post_close` too, with `intent=None`
+— the function's existing `intent is not None` branch (consumption-time:
+compare the intent's own `created_at_utc`) and a new `else` branch
+(admission-time: compare `datetime.now(timezone.utc)`, i.e. "the instant
+a fresh intent would be created right now") share one coherent
+definition: *the moment this admission decision is evaluated must be
+strictly before the entry session's own RTH open*, whether that moment
+is a past intent's recorded creation time or the present instant. A
+violation writes `SKIPPED_ADMISSION_DEADLINE_PASSED` and creates no
+intent, no alert, at all. Like every other wall-clock comparison in this
+function, gated strictly on `live` — a replay/backtest tick must still be
+able to admit any historical `eligible_entry_session` (the entire point
+of replay), so the deadline check never applies when `live=False`.
+
+`_phase_post_close` gained a `live: bool = False` parameter, threaded
+from `tick()`'s own `live = as_of is None`, matching the existing pattern
+already used for `_phase_open`.
+
+### Directive 3 — atomic admission lifecycle under contention
+
+`_phase_post_close`'s admission sequence — `_capacity_rejection_reason()`
+(read), `upsert_entry_intent()` (write), `_enqueue_alert()` → `store.
+enqueue_alert()` (write) — previously ran as three independent,
+separately-committed operations. A crash between the second and third
+(a real possibility: `enqueue_alert` builds a fairly involved provenance
+payload and resolves `deliver_by` via `exchange_calendars`, either of
+which can raise) would leave a real, cash/slot-reserving `PENDING` intent
+with NO alert ever recorded — a reservation nobody was ever told about.
+
+The whole decision — capacity check through to notification, both the
+success path (intent + alert) and the rejection path (a single
+`REJECTED_CAPACITY_EXCEEDED` disposition write) — is now wrapped in one
+`with self.store.transaction():` block, reusing the reentrant primitive
+built for the Final Remediation pass. `continue` inside the `with` block
+exits it normally (no exception), so the single-write rejection path
+still commits correctly; an exception anywhere in the success path rolls
+back the ENTIRE sequence, leaving nothing partial.
+
+Proven in `tests/test_task131_targeted_remediation.py` with a real
+temporary SQLite file and two failure-injection tests: one that crashes
+inside `store.enqueue_alert` (after the intent write would have
+succeeded) — which, before raising, ALSO opens a genuinely separate
+`V2Store` connection to prove real SQLite-level isolation: the reserving
+intent is invisible to that contending reader while the outer transaction
+is still open, not just "eventually rolled back" — and one that crashes
+inside `store.upsert_entry_intent` itself. Both leave a fresh connection
+against the same file showing nothing: no intent row, no alert, no
+disposition.

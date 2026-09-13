@@ -153,6 +153,12 @@ class V2Service:
         # bypassed/mocked/replayed records path.
         self._dissemination_lookup_refreshed_this_tick = False
         self._capacity_rejected = 0
+        # Targeted Remediation Directive 2: episodes refused a NEW
+        # PENDING intent at admission time because the target session's
+        # own RTH open had already passed the moment admission was
+        # evaluated (live ticks only) -- distinct from _capacity_rejected
+        # (which refuses for lack of cash/slots, not timing).
+        self._admission_deadline_rejected = 0
         # Task 131 Remediation Directive 6: the Task 131 durable-lifecycle
         # RUNTIME BEHAVIOR changes (requiring a durable PENDING intent
         # before any entry -- no cold-start backfill -- and the hard
@@ -344,6 +350,7 @@ class V2Service:
         self._no_prior_intent_skipped = 0
         self._pending_retry_episodes = []
         self._capacity_rejected = 0
+        self._admission_deadline_rejected = 0
         self._dissemination_lookup_refreshed_this_tick = False
 
         # Task 117 overnight P3: an unavailable Form-4 SOURCE blocks NEW
@@ -384,7 +391,7 @@ class V2Service:
         self._phase_close(ripe_through, res, price_lookup=price_lookup)
 
         # --- PHASE POST-CLOSE --------------------------------------------
-        self._phase_post_close(all_eps, all_ripe, today, ripe_through, _is_stale)
+        self._phase_post_close(all_eps, all_ripe, today, ripe_through, _is_stale, live=live)
 
         # --- PHASE MARK ----------------------------------------------------
         marks = self._phase_mark(today)
@@ -575,7 +582,7 @@ class V2Service:
             logger.exception("settle_due_exits_failed as_of=%s", ripe_through)
 
     def _phase_post_close(self, all_eps: list, all_ripe: list, today: date,
-                          ripe_through: date, is_stale) -> None:
+                          ripe_through: date, is_stale, *, live: bool = False) -> None:
         """Record staleness terminal dispositions/intent-expiry, THEN
         create NEW durable PENDING intents (reservations) for episodes
         eligible at a FUTURE session -- using THIS tick's own
@@ -646,36 +653,75 @@ class V2Service:
                 continue
             liq, dec = self._eval_causal_decision(e)
             if dec.action is V2Action.BUY:
-                # Task 131 Remediation Directive 4: a HARD admission gate
-                # at intent-creation time, not merely at consumption --
-                # cash/capacity are reserved by a PENDING intent the
-                # instant it is written, so a reservation must never be
-                # created if there is not truly enough unreserved cash/
-                # slots to eventually honour it. Checked BEFORE the
-                # intent row is written -- never rejected after the fact.
-                reject_reason = self._capacity_rejection_reason() if self.durable_store_gate_enabled else None
-                if reject_reason is not None:
+                # Targeted Remediation Directive 2: the SAME temporal
+                # deadline check used at consumption time (_phase_open)
+                # is now also applied here, BEFORE a reservation or its
+                # actionable alert is ever created -- called with
+                # intent=None, so on a live tick it compares "right now"
+                # (the instant a fresh intent would be created) against
+                # the target session's own RTH open. A session whose
+                # causal admission window has already closed never gets
+                # a new BUY intent, no matter how the episode itself was
+                # detected.
+                boundary_ok, boundary_detail = self._verify_temporal_boundary(e, None, live=live)
+                if not boundary_ok:
                     self.store.record_disposition(
                         episode_id=e.episode_id, symbol=e.symbol,
-                        disposition="REJECTED_CAPACITY_EXCEEDED", issuer_cik=e.issuer_cik,
+                        disposition="SKIPPED_ADMISSION_DEADLINE_PASSED", issuer_cik=e.issuer_cik,
                         eligible_entry_session=e.eligible_entry_session.isoformat(),
-                        detail=reject_reason)
-                    self._capacity_rejected += 1
+                        detail=boundary_detail)
+                    self._admission_deadline_rejected += 1
+                    logger.error("admission_deadline_passed episode_id=%s symbol=%s detail=%s",
+                                e.episode_id, e.symbol, boundary_detail)
                     continue
                 try:
                     planned_exit = add_sessions(e.eligible_entry_session,
                                                 self.cfg.hold_trading_days).isoformat()
                 except Exception:  # noqa: BLE001
                     planned_exit = ""
-                intent = self.store.upsert_entry_intent(
-                    e, dec, liq, horizon=self.cfg.hold_trading_days,
-                    planned_exit_session=planned_exit)
-                intents_created += 1
-                self._enqueue_alert(kind="ENTRY_INTENT", episode=e, decision=dec,
-                                    intent=intent, extra={
-                                        "target_entry_session": e.eligible_entry_session.isoformat(),
-                                        "planned_exit_session": planned_exit,
-                                        "actionable": True})
+                # Targeted Remediation Directive 3: the capacity check,
+                # the intent-creation reservation, and its notification
+                # now commit -- or roll back -- as ONE atomic unit. A
+                # crash/exception at ANY point in this sequence (a
+                # capacity re-check racing a concurrent writer, a
+                # notification write that fails) must never leave a
+                # reservation with no alert, nor an alert for an
+                # admission that was never actually reserved. A rejection
+                # (capacity exceeded) is itself still a single, complete,
+                # committed outcome -- `continue` inside `with` exits the
+                # block normally (no exception), so that single
+                # disposition write still commits on its own.
+                with self.store.transaction():
+                    # Task 131 Remediation Directive 4: a HARD admission
+                    # gate at intent-creation time, not merely at
+                    # consumption -- cash/capacity are reserved by a
+                    # PENDING intent the instant it is written, so a
+                    # reservation must never be created if there is not
+                    # truly enough unreserved cash/slots to eventually
+                    # honour it. Checked BEFORE the intent row is
+                    # written -- never rejected after the fact -- and now
+                    # read on the SAME connection/transaction as the
+                    # write that follows it, so nothing can invalidate
+                    # this read between the check and the write it gates.
+                    reject_reason = (self._capacity_rejection_reason()
+                                     if self.durable_store_gate_enabled else None)
+                    if reject_reason is not None:
+                        self.store.record_disposition(
+                            episode_id=e.episode_id, symbol=e.symbol,
+                            disposition="REJECTED_CAPACITY_EXCEEDED", issuer_cik=e.issuer_cik,
+                            eligible_entry_session=e.eligible_entry_session.isoformat(),
+                            detail=reject_reason)
+                        self._capacity_rejected += 1
+                        continue
+                    intent = self.store.upsert_entry_intent(
+                        e, dec, liq, horizon=self.cfg.hold_trading_days,
+                        planned_exit_session=planned_exit)
+                    intents_created += 1
+                    self._enqueue_alert(kind="ENTRY_INTENT", episode=e, decision=dec,
+                                        intent=intent, extra={
+                                            "target_entry_session": e.eligible_entry_session.isoformat(),
+                                            "planned_exit_session": planned_exit,
+                                            "actionable": True})
         self._intents_created = intents_created
 
     def _phase_mark(self, today: date) -> list[dict]:
@@ -749,12 +795,14 @@ class V2Service:
 
     def _verify_temporal_boundary(self, ep, intent: dict | None = None, *,
                                   live: bool = False) -> tuple[bool, str]:
-        """Task 131 Remediation Directive 3 / Final Remediation Directive 1:
-        explicit, enforced check that BOTH (a) ``ep``'s own activating
-        filing was disseminated, AND (b) on a true LIVE tick, its durable
-        PENDING intent (when one exists) was CREATED, strictly BEFORE the
-        entry session's own RTH open -- never merely assumed from the
-        frozen entry_offset_sessions=1 contract. The real wall-clock
+        """Task 131 Remediation Directive 3 / Final Remediation Directive 1
+        / Targeted Remediation Directives 1-2: explicit, enforced check
+        that BOTH (a) ``ep``'s own activating filing was disseminated,
+        AND (b) the moment this admission decision is evaluated (an
+        existing durable PENDING intent's own creation time, or "right
+        now" if none exists yet) occurred strictly BEFORE the entry
+        session's own RTH open -- never merely assumed from the frozen
+        entry_offset_sessions=1 contract. The real wall-clock
         dissemination timestamp is looked up from
         ``self._dissemination_lookup`` (refreshed each tick directly from
         InsiderStore -- see ``_refresh_dissemination_lookup``); this
@@ -762,38 +810,65 @@ class V2Service:
         module and never touch the frozen cluster_engine.PurchaseRecord/
         ClusterEpisode shapes.
 
-        An UNKNOWN dissemination timestamp is a STRICT FAILURE only when
-        ``self._dissemination_lookup_refreshed_this_tick`` is True -- i.e.
-        a genuine query against the real InsiderStore ran THIS tick and
-        still found nothing for this specific episode (a real data-
-        quality gap in a feed that IS expected to carry this timestamp
-        must never be silently treated as "safely early"). It remains an
-        explicit, documented, non-fabricating SKIP whenever that fetch
-        never happened at all (a date-only source -- research parquet /
-        from_rows -- or a caller that overrides ``_records`` directly,
-        bypassing the real InsiderStore query entirely, e.g. most of this
-        test suite) -- using ``form4_kind == "insider"`` alone would
-        incorrectly treat every such bypassed/mocked/replayed records
-        path as a violation. The DATE-level causal_event_ts / eligible_
-        entry_session ordering is itself still enforced structurally by
-        cluster_engine regardless of whether this finer check can run.
+        An UNKNOWN dissemination timestamp is a STRICT FAILURE whenever
+        EITHER this is a true LIVE tick (``live=True``, regardless of
+        whether this tick's own InsiderStore query happened to find
+        anything at all -- a live decision must never silently proceed
+        on an unobserved timestamp) OR
+        ``self._dissemination_lookup_refreshed_this_tick`` is True (a
+        genuine query against the real InsiderStore ran THIS tick, even
+        on a pinned replay, and still found nothing for this specific
+        episode -- a real data-quality gap in a feed that IS expected to
+        carry this timestamp must never be silently treated as "safely
+        early"). It remains an explicit, documented, non-fabricating SKIP
+        only on a NON-live tick whose fetch never happened at all (a
+        date-only source -- research parquet / from_rows -- or a caller
+        that overrides ``_records`` directly, bypassing the real
+        InsiderStore query entirely, e.g. most of this test suite, which
+        always pins ``as_of`` and is therefore never ``live``) -- using
+        ``form4_kind == "insider"`` alone would incorrectly treat every
+        such bypassed/mocked/replayed records path as a violation. The
+        DATE-level causal_event_ts / eligible_entry_session ordering is
+        itself still enforced structurally by cluster_engine regardless
+        of whether this finer check can run.
 
-        The intent-creation-time check (b) is LIVE-TICK-ONLY: a pinned
-        replay/dry-run/test tick's own ``as_of`` bears no relationship to
-        the intent row's REAL wall-clock ``created_at_utc`` (always the
-        actual moment ``upsert_entry_intent`` ran, in the REAL present) --
-        comparing that against a SIMULATED historical RTH open would be
-        comparing two unrelated clocks and would spuriously fail every
-        replayed/backtested entry."""
+        The intent-creation-time / admission-time check (b) is
+        LIVE-TICK-ONLY: a pinned replay/dry-run/test tick's own ``as_of``
+        bears no relationship to either the intent row's REAL wall-clock
+        ``created_at_utc`` or to ``datetime.now()`` (always the actual,
+        real present) -- comparing either against a SIMULATED historical
+        RTH open would be comparing two unrelated clocks and would
+        spuriously fail every replayed/backtested entry.
+
+        Targeted Remediation Directive 1/2: on a true LIVE tick, an
+        UNKNOWN dissemination timestamp is now ALWAYS a strict failure
+        (never a silent pass), and check (b) is now called from TWO
+        places with two different meanings of "the moment being
+        evaluated":
+
+          - called with a real ``intent`` (from ``_phase_open``, at
+            CONSUMPTION time): the intent's own ``created_at_utc`` MUST
+            be present, parsable, and strictly before the RTH open --
+            missing or malformed timing data is now itself a strict
+            failure, never silently treated as "assume it was early
+            enough."
+          - called with ``intent=None`` (from ``_phase_post_close``, at
+            ADMISSION time, BEFORE any intent row exists): the real
+            wall-clock ``datetime.now(timezone.utc)`` -- i.e. "if a
+            PENDING intent were created right now" -- MUST itself be
+            strictly before the RTH open, so a reservation (and its
+            actionable alert) is never created for a session whose
+            causal admission window has already closed."""
         ts = self._dissemination_lookup.get((ep.symbol.upper(), ep.activation_filing_date.isoformat()))
         if ts is None:
-            if self._dissemination_lookup_refreshed_this_tick:
+            if live or self._dissemination_lookup_refreshed_this_tick:
                 return False, (
                     f"no real dissemination timestamp available for the activating filing "
                     f"(symbol={ep.symbol}, activation_filing_date="
-                    f"{ep.activation_filing_date.isoformat()}) despite a successful InsiderStore "
-                    f"query this tick -- failing STRICT rather than assuming an unobserved "
-                    f"timestamp was safely early")
+                    f"{ep.activation_filing_date.isoformat()}) -- failing STRICT rather than "
+                    f"assuming an unobserved timestamp was safely early"
+                    + ("" if self._dissemination_lookup_refreshed_this_tick else
+                       " (live tick, no successful InsiderStore query this tick either)"))
             return True, ""
         try:
             import exchange_calendars as _xc
@@ -805,29 +880,45 @@ class V2Service:
             return False, (f"activation filing disseminated at {ts.isoformat()}, which is NOT "
                            f"strictly before the entry session's own RTH open "
                            f"({rth_open.isoformat()}) -- refusing to prevent look-ahead bias")
-        # Final Remediation Directive 1: on a true LIVE tick, the durable
-        # intent's own CREATION time must ALSO be strictly before the
-        # entry session's RTH open -- defense in depth against a future
-        # ordering bug (phase methods called out of sequence, a clock
-        # skew) that structural phase ordering alone would not catch.
-        # Live-only: see the docstring for why comparing a replay's own
-        # simulated clock against the intent row's REAL wall-clock
-        # created_at_utc would be meaningless.
-        if live and intent is not None:
-            created_raw = intent.get("created_at_utc")
-            if created_raw:
-                try:
-                    created_ts = datetime.fromisoformat(str(created_raw))
-                    if created_ts.tzinfo is None:
-                        created_ts = created_ts.replace(tzinfo=timezone.utc)
-                except ValueError:
-                    created_ts = None
-                if created_ts is not None and created_ts >= rth_open:
+        # Targeted Remediation Directive 1/2: on a true LIVE tick, the
+        # moment THIS admission decision is being evaluated -- the
+        # existing intent's own creation time if one already exists,
+        # otherwise "right now" (the instant a fresh intent would be
+        # created) -- must ALSO be strictly before the entry session's
+        # RTH open. Live-only: see the docstring above for why comparing
+        # a replay's own simulated clock against either real wall-clock
+        # value would be meaningless.
+        if live:
+            if intent is not None:
+                created_ts = None
+                created_raw = intent.get("created_at_utc")
+                if created_raw:
+                    try:
+                        created_ts = datetime.fromisoformat(str(created_raw))
+                        if created_ts.tzinfo is None:
+                            created_ts = created_ts.replace(tzinfo=timezone.utc)
+                    except ValueError:
+                        created_ts = None
+                if created_ts is None:
+                    return False, (
+                        f"the durable PENDING intent carries no valid, parsable "
+                        f"created_at_utc timestamp (raw={created_raw!r}) -- refusing to "
+                        f"assume it was created strictly before the entry session's own "
+                        f"RTH open ({rth_open.isoformat()})")
+                if created_ts >= rth_open:
                     return False, (
                         f"the durable PENDING intent itself was created at "
                         f"{created_ts.isoformat()}, which is NOT strictly before the entry "
                         f"session's own RTH open ({rth_open.isoformat()}) -- refusing to "
                         f"prevent look-ahead bias")
+            else:
+                now = datetime.now(timezone.utc)
+                if now >= rth_open:
+                    return False, (
+                        f"admission is being evaluated at {now.isoformat()}, which is NOT "
+                        f"strictly before the entry session's own RTH open "
+                        f"({rth_open.isoformat()}) -- refusing to create a BUY intent for a "
+                        f"session whose causal admission window has already closed")
         return True, ""
 
     def _enqueue_alert(self, *, kind: str, episode, decision, intent, extra: dict | None = None):
@@ -991,6 +1082,7 @@ class V2Service:
             "stale_entry_skipped_this_tick": getattr(self, "_stale_skipped", 0),
             "no_prior_intent_skipped_this_tick": getattr(self, "_no_prior_intent_skipped", 0),
             "capacity_rejected_this_tick": getattr(self, "_capacity_rejected", 0),
+            "admission_deadline_rejected_this_tick": getattr(self, "_admission_deadline_rejected", 0),
             "entries_this_tick": len(res.entries),
             "exits_this_tick": len(res.exits),
             # Task 131 Remediation Directive 2: non-blocking, cross-tick

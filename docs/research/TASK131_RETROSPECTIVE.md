@@ -253,3 +253,58 @@ in the "Final Remediation pass" section of `TASK131_REMEDIATION_DESIGN.md`.
   `test_task118a_dashboard_message_count.py::test_immediate_and_digest_
   sends_count_messages_correctly`) — zero new regressions from this
   Final Remediation pass.
+
+## Targeted Remediation runtime provenance log (this pass, on top of `9a81e5c`)
+
+A fourth directive list, closing 3 further production boundaries, all
+inside `talonx_v2/service.py`'s `_verify_temporal_boundary` and
+`_phase_post_close`. Full design rationale in the "Targeted Remediation
+pass" section of `TASK131_REMEDIATION_DESIGN.md`.
+
+- Baseline verified: `feature/task131-option-a-integration` at `9a81e5c`
+  (clean, matches `origin`).
+- Fixed, in order: (1) an unknown dissemination timestamp is now a
+  strict failure on ANY live tick (`live or self._dissemination_lookup_
+  refreshed_this_tick`), not only when a real InsiderStore query happened
+  to run this tick; a missing or malformed intent `created_at_utc` on a
+  live tick is now itself a strict failure rather than silently falling
+  through to a pass; (2) `_verify_temporal_boundary` is now also called
+  from `_phase_post_close`, BEFORE a reservation exists, with
+  `intent=None` — comparing the real "right now" against the target
+  session's RTH open so a `BUY` intent (and its actionable alert) is
+  never created for a session whose admission window has already closed
+  (new disposition `SKIPPED_ADMISSION_DEADLINE_PASSED`, new counter
+  `_admission_deadline_rejected` / `admission_deadline_rejected_this_
+  tick`); `_phase_post_close` gained a `live: bool = False` parameter,
+  threaded from `tick()`; (3) the capacity check, intent creation, and
+  notification generation in `_phase_post_close` now run inside one
+  `with self.store.transaction():` block (reusing the reentrant
+  primitive from the Final Remediation pass) — the success path (intent
+  + alert) and the rejection path (a single disposition write) both
+  commit atomically, and a crash anywhere in the success path rolls back
+  the whole sequence.
+- Fingerprint re-verified unchanged after every edit in this pass:
+  `11107198c5b81237`.
+- Files changed: `talonx_v2/service.py` only. New test file:
+  `tests/test_task131_targeted_remediation.py` (14 tests) — direct
+  unit-level coverage of both live and non-live behavior for all 3
+  directives (matching this codebase's own established pattern for
+  wall-clock-dependent logic, per `test_task131_temporal_boundary.py`),
+  plus end-to-end wiring proofs through real `_phase_post_close()` calls
+  and two failure-injection atomicity tests (one of which opens a
+  genuinely separate `V2Store` connection mid-transaction to prove real
+  SQLite-level isolation under contention, not merely eventual rollback).
+- V2-focused battery (19 prior files + the new one, 20 files covering all
+  V2Service behavior): **212 passed**, 0 failed.
+- Full repository test suite run after all Targeted Remediation changes:
+  **4 failed, 4629 passed, 6 skipped** (0:44:12) — the SAME 4
+  pre-existing, verified-unrelated failures as every prior baseline in
+  this task (`test_task102_operational_finalization.py::test_36_
+  original_strategy_unchanged`, `test_task104_p2_cleanup.py::test_32_33_
+  original_strategy_and_thresholds_unchanged`,
+  `test_task117_release_rehearsal.py::test_bounded_release_rehearsal`,
+  `test_task118a_dashboard_message_count.py::test_immediate_and_digest_
+  sends_count_messages_correctly`); the pass count rose by exactly 14
+  over the prior baseline (4615 → 4629), matching the 14 new tests in
+  `tests/test_task131_targeted_remediation.py` — zero new regressions
+  from this Targeted Remediation pass.
