@@ -1,11 +1,18 @@
-# Product status (authoritative, updated 2026-09-13 / Task 129)
+# Product status (authoritative, updated 2026-09-13 / Task 130)
 
 **Programme decision (Task 129): `PAUSE_ALPHA_RESEARCH_UNDER_CURRENT_CONSTRAINTS`**
 — see `docs/research/TASK129_RESEARCH_PROGRAM_DECISION.md` and
-`TASK129_EVIDENCE_MATRIX.csv` for the full, authoritative synthesis of
-every mechanism below and why no further alpha-research task is
-currently justified. This page's per-mechanism rows are unchanged and
-remain the underlying evidence; Task 129 does not alter any of them.
+`TASK129_EVIDENCE_MATRIX.csv`. **Task 130 is the user's own explicit,
+bounded exception to that pause (Option A: broader V2 discovery)** —
+it does not reopen the paused free price/volume alpha space; it
+extends the ALREADY-`INCONCLUSIVE`-not-rejected V2/insider-cluster
+mechanism to a larger, evidence-anchored universe. Result:
+**`PASS_FOR_INTEGRATION_REVIEW`** (Track B, timestamp-proven
+prospective policy, N=153, net +2.02%/round trip, both uncertainty
+methods exclude zero) — see
+`docs/research/{TASK130_OPTION_A_CONTRACT,TASK130_FROZEN_EVALUATION_PROTOCOL,TASK130_OPTION_A_ECONOMIC_DECISION}.md`.
+Not a deployment recommendation; the alpha-research pause otherwise
+remains in effect for every other mechanism on this page.
 
 **User objective, unchanged**: configured tickers with intraday and
 short/long-horizon alerts, and attributable local paper portfolios.
@@ -28,6 +35,7 @@ never authorizes live deployment or promises profitability.
 | Experimental | intraday (relaxed gates) | **Resolved (Task 121A/121B, 2026-09-12/13)**: the exact `EXPERIMENTAL_RELAXED_V1` contract, corrected exit lifecycle (no EOD flatten, no bearish-close — verified against the release source), full available history (2019-06→2025-08, N=227, 35 issuers): gross P&L **−$612.92** (negative before cost), net **−$896.44**, PF 0.764, win rate 19.4%, 95% CI **[−$8.94,+$1.06]/trade** (does not clear the predeclared ±$1.25 materiality band either way) | `INSUFFICIENT_EVIDENCE` (statistical) / **`DO_NOT_ADVANCE_CURRENT_EXPERIMENTAL_CONTRACT`** (product, Task 122) — archived as an internal research baseline; same-population historical data exhausted; not scheduled for further backtesting |
 | V2 | medium (10-trading-day hold) | 39-name live scope, full available history (2019–2026), chronological replay (the real `V2Service.tick()`), N=57, 19 distinct issuers, net@20bps=−0.85%, 95% CI=[−4.57%, +1.11%] — includes zero | `INCONCLUSIVE` (not negative, not positive — genuinely underdetermined at current evidence) |
 | V2 | broad 620-name panel (not the live scope) | N=170 (Task 115/116) / N=756 (Task 112R), net@20bps positive, CIs exclude zero | positive, but this is a **different population** than the live 39-name scope and does not transfer automatically |
+| V2 | **Discovery Universe v1, 626 names (Task 130, Option A)** | isolated $300k/20-slot capacity-constrained offline replay, timestamp-proven-prospective Track B: N=153, 106 issuers, net@20bps=**+2.02%**/round trip, issuer-block 95% CI **[+0.72%,+3.40%]** and date-block 95% CI **[+0.57%,+3.46%]** — both exclude zero; top-1/3/5-issuer-removal sensitivity never reverses sign; 3 of 4 calendar half-years independently positive (most recent, 2026H1, negative); $300k capacity never binding in this run; SPY (+20.28%) exceeds Track B's own realized return (+10.31%) — reported as context, not a gating criterion | **`PASS_FOR_INTEGRATION_REVIEW`** — a candidate for a LATER, separately-authorized activation-review task; NOT a deployment recommendation; the broader alpha-research pause (Task 129) is otherwise unaffected |
 | Overnight attention — daily association | non-actionable, research finding only | **Resolved (Task 123)**: 38 active configured tickers, full available history, N=2,557 triggers/1,905 dates, incremental (trigger-minus-control) net **+0.1687%/event**, date-block-bootstrap 95% CI **[+0.0295%,+0.3085%]** — excludes zero, robust to 2 sensitivities | **`ASSOCIATION_SUPPORTED`** (qualified — CI's lower bound does not fully clear the predeclared ±10bps materiality band) — a real, disclosed research finding, **not actionable**: it depends on same-day final volume, only known at/after that day's own close |
 | Overnight attention — actionable pre-close candidate | EOD alert, 15:50 ET decision | **CLOSED (Task 125, extended)**: same frozen contract, 12-symbol primary cohort extended from 7 months/N=31/100 dates to **2.5 years/N=3,201 eligible/158 triggers/542 distinct dates** on independently re-acquired, feed-verified SIP data (feed identity resolved: `task93_canonical_v1` confirmed SIP, not IEX). Incremental net **−0.2284%/event**, 95% CI **[−0.79%,+0.35%]** — includes zero; absolute trigger net return also negative (−0.1196%); negative in all 3 calendar years tested. A +3-symbol added cohort (BABA/SHOP/SPCX) showed a small positive but 58%-single-issuer-concentrated, non-year-stable reading (n=31) that does not change the primary verdict. Correctness check: the original 2025 sub-window re-evaluated on the new data reproduces Task 123's exact original numbers bit-for-bit | Statistical **`INCONCLUSIVE`** / Product **`DO_NOT_ADVANCE`** — closed on a materially larger, multi-year, feed-verified dataset; not scheduled for further reruns of this contract |
 | Overnight attention — data-extension feasibility | data question only, no returns computed | **Resolved (Task 124), executed (Task 125)**: existing free Alpaca SIP access, already used in this program, verified (small probes, not mere documentation) to retain 1-min history to at least 2020-03-02; the concrete extension it specified (12 symbols back to 2023-01-01 + BABA/SHOP/SPCX) was acquired and evaluated in Task 125 (60/60 partitions, 0 failures) | **`DATA_EXTENSION_FEASIBLE`** (Task 124) → **executed** (Task 125) — see row above for the resulting economic decision |
@@ -68,6 +76,11 @@ Experimental contract on its now-exhausted historical dataset.
 
 ## Full evidence
 
+`docs/research/TASK130_OPTION_A_CONTRACT.md` +
+`TASK130_FROZEN_EVALUATION_PROTOCOL.md` + `TASK130_OPTION_A_ECONOMIC_DECISION.md`
+(this task — the user's explicit Option A resumption: Discovery
+Universe v1 four-tier contract, frozen evaluation protocol, and one
+offline $300k-capacity-constrained evaluation, `PASS_FOR_INTEGRATION_REVIEW`);
 `docs/research/TASK129_RESEARCH_PROGRAM_DECISION.md` +
 `TASK129_EVIDENCE_MATRIX.csv` (authoritative programme-level synthesis
 and pause decision); `docs/research/TASK128_BASELINE_CONTRACT_AND_ACCOUNTING.md` +

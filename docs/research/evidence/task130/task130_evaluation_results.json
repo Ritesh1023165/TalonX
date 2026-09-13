@@ -1,0 +1,182 @@
+{
+  "window": {
+    "start": "2024-09-01",
+    "end": "2026-03-31"
+  },
+  "universe_n": 626,
+  "starting_cash": 300000.0,
+  "per_position_allocation": 10000.0,
+  "max_concurrent_positions": 20,
+  "cost_bps_round_trip": 20.0,
+  "fingerprint": "11107198c5b81237",
+  "funnel": {
+    "n_processed_episode_records": 402,
+    "episode_dispositions": {
+      "ENTERED": 157,
+      "SKIPPED_CLOSE_2.23_LT_5.0": 1,
+      "SKIPPED_CLOSE_3.61_LT_5.0": 1,
+      "SKIPPED_CLOSE_3.69_LT_5.0": 1,
+      "SKIPPED_CLOSE_3.89_LT_5.0": 1,
+      "SKIPPED_CLOSE_4.43_LT_5.0": 1,
+      "SKIPPED_CLOSE_4.61_LT_5.0": 1,
+      "SKIPPED_CLOSE_4.76_LT_5.0": 1,
+      "SKIPPED_ENTRY_STALE": 226,
+      "SKIPPED_IN_COOLDOWN_UNTIL_2025-02-13": 1,
+      "SKIPPED_IN_COOLDOWN_UNTIL_2025-03-11": 1,
+      "SKIPPED_IN_COOLDOWN_UNTIL_2025-03-19": 1,
+      "SKIPPED_IN_COOLDOWN_UNTIL_2026-01-22": 1,
+      "SKIPPED_IN_COOLDOWN_UNTIL_2026-02-24": 3,
+      "SKIPPED_IN_COOLDOWN_UNTIL_2026-03-12": 1,
+      "SKIPPED_SYMBOL_ALREADY_OPEN": 4
+    },
+    "n_entries_native_replay": 157,
+    "n_exits_native_replay": 157,
+    "n_closed_trades_track_A": 157,
+    "n_closed_trades_track_B_timestamp_proven": 153,
+    "n_cold_start_excluded_from_track_B": 4,
+    "n_pending_entry_intents_total": 162,
+    "n_open_at_end": 0,
+    "n_exit_unresolved": 0
+  },
+  "track_A_historical": {
+    "track": "A_historical_ideal_timing",
+    "n_closed_trades": 157,
+    "n_distinct_issuers": 107,
+    "gross_mean_pct": 2.0305,
+    "net_mean_pct": 1.8305,
+    "net_median_pct": 1.5131,
+    "win_rate": 0.6178,
+    "profit_factor": 1.9761,
+    "meets_primary_criterion_gt_0_50pct": true,
+    "issuer_block_bootstrap": {
+      "n_issuer_blocks": 107,
+      "ci_pct": [
+        0.5993,
+        3.1245
+      ],
+      "method": "issuer-block bootstrap, 5000 reps, seed 130130, 95% percentile CI"
+    },
+    "date_block_bootstrap": {
+      "n_date_blocks": 19,
+      "ci_pct": [
+        0.3668,
+        3.2799
+      ],
+      "method": "date-block (monthly) bootstrap, 5000 reps, seed 130130, 95% percentile CI"
+    },
+    "top1_issuer": "TPL",
+    "top1_issuer_trade_count": 6,
+    "top1_issuer_share_of_trades": 0.0382,
+    "top1_issuer_share_of_net_pnl": -0.0177,
+    "sensitivity_excl_top1": {
+      "n_remaining": 151,
+      "mean_net_pct": 1.9371
+    },
+    "sensitivity_excl_top3": {
+      "n_remaining": 141,
+      "mean_net_pct": 1.939
+    },
+    "sensitivity_excl_top5": {
+      "n_remaining": 133,
+      "mean_net_pct": 1.8981
+    },
+    "calendar_half_year_stability": {
+      "2024H2": {
+        "n": 22,
+        "mean_net_pct": 4.1138
+      },
+      "2025H1": {
+        "n": 48,
+        "mean_net_pct": 2.4102
+      },
+      "2025H2": {
+        "n": 53,
+        "mean_net_pct": 1.929
+      },
+      "2026H1": {
+        "n": 34,
+        "mean_net_pct": -0.6188
+      }
+    }
+  },
+  "track_A_native_portfolio": {
+    "starting_cash": 300000.0,
+    "ending_cash": 331879.408860508,
+    "n_open_end": 0,
+    "n_closed": 157,
+    "n_exit_unresolved": 0
+  },
+  "track_B_prospective": {
+    "track": "B_timestamp_proven_prospective",
+    "n_closed_trades": 153,
+    "n_distinct_issuers": 106,
+    "gross_mean_pct": 2.2219,
+    "net_mean_pct": 2.0219,
+    "net_median_pct": 1.674,
+    "win_rate": 0.6275,
+    "profit_factor": 2.1399,
+    "meets_primary_criterion_gt_0_50pct": true,
+    "issuer_block_bootstrap": {
+      "n_issuer_blocks": 106,
+      "ci_pct": [
+        0.7222,
+        3.3989
+      ],
+      "method": "issuer-block bootstrap, 5000 reps, seed 130130, 95% percentile CI"
+    },
+    "date_block_bootstrap": {
+      "n_date_blocks": 19,
+      "ci_pct": [
+        0.5723,
+        3.4573
+      ],
+      "method": "date-block (monthly) bootstrap, 5000 reps, seed 130130, 95% percentile CI"
+    },
+    "top1_issuer": "SPG",
+    "top1_issuer_trade_count": 6,
+    "top1_issuer_share_of_trades": 0.0392,
+    "top1_issuer_share_of_net_pnl": -0.0278,
+    "sensitivity_excl_top1": {
+      "n_remaining": 147,
+      "mean_net_pct": 2.1629
+    },
+    "sensitivity_excl_top3": {
+      "n_remaining": 139,
+      "mean_net_pct": 1.9907
+    },
+    "sensitivity_excl_top5": {
+      "n_remaining": 131,
+      "mean_net_pct": 1.9523
+    },
+    "calendar_half_year_stability": {
+      "2024H2": {
+        "n": 21,
+        "mean_net_pct": 4.2582
+      },
+      "2025H1": {
+        "n": 47,
+        "mean_net_pct": 2.716
+      },
+      "2025H2": {
+        "n": 52,
+        "mean_net_pct": 2.0948
+      },
+      "2026H1": {
+        "n": 33,
+        "mean_net_pct": -0.5045
+      }
+    }
+  },
+  "track_B_reconstructed_equity": {
+    "starting_cash": 300000.0,
+    "ending_cash": 330935.4,
+    "ending_realized_equity": 330935.4,
+    "min_cash_observed": 181392.76,
+    "total_return_pct": 10.3118,
+    "max_drawdown_pct_realized_equity_basis": -2.2526,
+    "drawdown_note": "computed on cash + open-positions-marked-at-entry-cost ('realized equity'); does NOT include intra-holding unrealized mark-to-market fluctuation of open positions (no daily bar marks wired into this reconstruction) -- a disclosed limitation, not a claim of daily-marked precision.",
+    "n_events": 306
+  },
+  "track_C_operational_latency": "UNAVAILABLE_REQUIRES_LIVE_OBSERVATION",
+  "spy_benchmark_total_return_pct": 20.2822
+}

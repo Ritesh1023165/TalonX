@@ -6351,3 +6351,32 @@ data-extension checks, unverified provenance assumptions) each with a
 lightweight, already-existing-mechanism prevention rule. Roadmap start
 date retained at 2026-09-11 (Task 118H), not reset. Full detail:
 `docs/research/{TASK129_RESEARCH_PROGRAM_DECISION,TASK129_EVIDENCE_MATRIX.csv}`.
+
+**Task 130** (2026-09-13): the user's explicit, bounded Option A
+resumption (broader V2 discovery, watchlist preserved) -- not a
+reopening of Task 129's paused free price/volume alpha space. Froze a
+four-tier contract (configured watchlist 48/43/39, re-verified live;
+Discovery Universe v1 = Task 118D's own matched-post-117-runtime
+626-name population, reused directly; alert-subscription vs. paper-
+execution kept independent). Resolved from actual code (not the
+documented label) that V2's eligibility rule is LIQUIDITY-ONLY in
+every executed run -- the documented membership-OR-liquidity branch is
+unimplemented. Documented a genuine policy change: the current runtime
+permits labelled cold-start entries without a prior durable intent;
+this task's isolated Track B (timestamp-proven prospective) excludes
+them, with its own independently reconstructed campaign cash/equity.
+Ran one offline evaluation ($300k isolated capacity-constrained
+campaign, $10k/position, max 20 concurrent, reusing the real
+V2Service via talonx_research.replay_engine, unmodified): Track B
+N=153/106 issuers, net@20bps=+2.02%/round trip, issuer-block 95% CI
+[+0.72%,+3.40%] and date-block 95% CI [+0.57%,+3.46%] both exclude
+zero, top-1/3/5-issuer-removal sensitivity never reverses sign, 3 of 4
+calendar half-years independently positive (2026H1 negative,
+disclosed). Found and fixed two implementation-correctness issues in
+its own analysis code before reporting (wall-clock vs. simulated
+session dates; a capital-deployment artifact mislabeled as -44%
+drawdown, corrected to a realized-equity -2.25% basis). Verdict:
+**`PASS_FOR_INTEGRATION_REVIEW`** -- not a deployment recommendation;
+specifies a design-only integration handoff for a later, separately-
+authorized task. Full detail:
+`docs/research/{TASK130_OPTION_A_CONTRACT,TASK130_FROZEN_EVALUATION_PROTOCOL,TASK130_OPTION_A_ECONOMIC_DECISION}.md`.
