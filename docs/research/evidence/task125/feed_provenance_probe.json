@@ -1,0 +1,134 @@
+{
+  "task": "125",
+  "diagnostic_only": true,
+  "strategy_returns_inspected": false,
+  "code_based_finding": "task63_download_alpaca.py, task61r_download_alpaca.py, and task7b's own download_summary.json format all route through scripts/download_historical_1m.py::fetch_alpaca, whose Alpaca request params never include a 'feed' key -- confirmed by direct source read, not inferred from output.",
+  "feed_identity_confirmation": {
+    "probe": "feed_identity_confirmation",
+    "symbol": "AAPL",
+    "date": "2025-02-05",
+    "omitted_feed_param": {
+      "symbol": "AAPL",
+      "start": "2025-02-05",
+      "end": "2025-02-05",
+      "feed_parameter": "OMITTED",
+      "adjustment": "raw",
+      "http_status": 200,
+      "n_bars": 841,
+      "classification": "DATA_PRESENT",
+      "first_ts": "2025-02-05T00:04:00+00:00",
+      "last_ts": "2025-02-05T23:59:00+00:00",
+      "bar_fingerprint_sha256": "a8cff5350f1da77481bbc1f98f6d4aa730363ad7d97f4b813275b292ce0c7441"
+    },
+    "explicit_sip": {
+      "symbol": "AAPL",
+      "start": "2025-02-05",
+      "end": "2025-02-05",
+      "feed_parameter": "sip",
+      "adjustment": "raw",
+      "http_status": 200,
+      "n_bars": 841,
+      "classification": "DATA_PRESENT",
+      "first_ts": "2025-02-05T00:04:00+00:00",
+      "last_ts": "2025-02-05T23:59:00+00:00",
+      "bar_fingerprint_sha256": "a8cff5350f1da77481bbc1f98f6d4aa730363ad7d97f4b813275b292ce0c7441"
+    },
+    "explicit_iex": {
+      "symbol": "AAPL",
+      "start": "2025-02-05",
+      "end": "2025-02-05",
+      "feed_parameter": "iex",
+      "adjustment": "raw",
+      "http_status": 200,
+      "n_bars": 388,
+      "classification": "DATA_PRESENT",
+      "first_ts": "2025-02-05T14:30:00+00:00",
+      "last_ts": "2025-02-05T20:59:00+00:00",
+      "bar_fingerprint_sha256": "55020df8e3cd8159571469e43a921ea2fbd5d31f888da0f7175fa5b31b1851ca"
+    },
+    "omitted_matches_sip_bar_for_bar": true,
+    "omitted_matches_iex_bar_for_bar": false,
+    "conclusion": "OMITTED_FEED_IS_SIP"
+  },
+  "new_symbol_availability": {
+    "probe": "new_symbol_availability",
+    "date": "2023-06-01",
+    "by_symbol": {
+      "BABA": {
+        "symbol": "BABA",
+        "start": "2023-06-01",
+        "end": "2023-06-01",
+        "feed_parameter": "sip",
+        "adjustment": "raw",
+        "http_status": 200,
+        "n_bars": 667,
+        "classification": "DATA_PRESENT",
+        "first_ts": "2023-06-01T08:00:00+00:00",
+        "last_ts": "2023-06-01T23:59:00+00:00",
+        "bar_fingerprint_sha256": "6f5b0e3ce5f5a9f2851eec91a2923eb8e776b822ae153ab24a05a9460d3afbe2"
+      },
+      "BLSH": {
+        "symbol": "BLSH",
+        "start": "2023-06-01",
+        "end": "2023-06-01",
+        "feed_parameter": "sip",
+        "adjustment": "raw",
+        "http_status": 200,
+        "classification": "NO_ENTITLEMENT_OR_UNKNOWN_SYMBOL",
+        "n_bars": 0
+      },
+      "SHOP": {
+        "symbol": "SHOP",
+        "start": "2023-06-01",
+        "end": "2023-06-01",
+        "feed_parameter": "sip",
+        "adjustment": "raw",
+        "http_status": 200,
+        "n_bars": 502,
+        "classification": "DATA_PRESENT",
+        "first_ts": "2023-06-01T08:47:00+00:00",
+        "last_ts": "2023-06-01T23:59:00+00:00",
+        "bar_fingerprint_sha256": "a76c3b1a8dfa7416dd09e9b94c8a9ede0d8bce91d83e3a99a7201cd6d82158f5"
+      },
+      "SKHY": {
+        "symbol": "SKHY",
+        "start": "2023-06-01",
+        "end": "2023-06-01",
+        "feed_parameter": "sip",
+        "adjustment": "raw",
+        "http_status": 200,
+        "classification": "NO_ENTITLEMENT_OR_UNKNOWN_SYMBOL",
+        "n_bars": 0
+      },
+      "SPCX": {
+        "symbol": "SPCX",
+        "start": "2023-06-01",
+        "end": "2023-06-01",
+        "feed_parameter": "sip",
+        "adjustment": "raw",
+        "http_status": 200,
+        "n_bars": 7,
+        "classification": "DATA_PRESENT",
+        "first_ts": "2023-06-01T14:54:00+00:00",
+        "last_ts": "2023-06-01T18:52:00+00:00",
+        "bar_fingerprint_sha256": "303fefd70578f7904e121f8ad058bef8c75e35ca57695ac6e84cec490d721da5"
+      }
+    }
+  },
+  "blsh_listing_window": {
+    "probe": "blsh_listing_window",
+    "result": {
+      "symbol": "BLSH",
+      "start": "2023-01-01",
+      "end": "2026-09-01",
+      "feed_parameter": "sip",
+      "adjustment": "raw",
+      "http_status": 200,
+      "n_bars": 265,
+      "classification": "DATA_PRESENT",
+      "first_ts": "2025-08-13T04:00:00+00:00",
+      "last_ts": "2026-09-01T04:00:00+00:00",
+      "bar_fingerprint_sha256": "8a9b4459c47cf2bb9cc2881cce5cfa89607807790ff26a8cc10e086a4cab0b2e"
+    }
+  }
+}
