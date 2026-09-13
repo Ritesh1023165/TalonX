@@ -1,0 +1,1847 @@
+{
+  "universe": [
+    "AAPL",
+    "ABCL",
+    "ABT",
+    "ACHR",
+    "ADC",
+    "ADP",
+    "AFL",
+    "AGNC",
+    "AMAT",
+    "AMD",
+    "AVGO",
+    "BAC",
+    "BLK",
+    "C",
+    "CSCO",
+    "CVX",
+    "DELL",
+    "GOOGL",
+    "IBM",
+    "INTC",
+    "JNJ",
+    "JPM",
+    "KO",
+    "MA",
+    "MCD",
+    "MSFT",
+    "MSTR",
+    "NUE",
+    "NVDA",
+    "ORCL",
+    "PG",
+    "PYPL",
+    "STX",
+    "TSLA",
+    "UNH",
+    "V",
+    "VRT",
+    "WMT"
+  ],
+  "n_universe": 38,
+  "data_window": {
+    "first_date": "2019-01-02",
+    "last_date": "2026-08-31"
+  },
+  "strategy_A_tercile": {
+    "label": "A_tercile_selection",
+    "n_formation_months": 92,
+    "n_realized_cohorts": 68,
+    "n_pending_incomplete_forward_window": 6,
+    "n_skipped_insufficient_eligible": 18,
+    "n_skipped_no_entry_data": 0,
+    "n_distinct_issuers_selected": 37,
+    "gross_mean_pct": 10.9039,
+    "net_mean_pct": 10.8539,
+    "net_median_pct": 9.3975,
+    "net_win_rate": 0.8382,
+    "net_worst_5pct_mean_pct": -11.264,
+    "net_mean_pct_adverse_cost_15bps": 10.7539,
+    "by_issuer_selection_counts": {
+      "MSFT": 15,
+      "PYPL": 5,
+      "TSLA": 5,
+      "AVGO": 28,
+      "NVDA": 19,
+      "AAPL": 24,
+      "BLK": 24,
+      "DELL": 18,
+      "UNH": 26,
+      "PG": 33,
+      "ORCL": 16,
+      "AMD": 8,
+      "ABT": 14,
+      "VRT": 22,
+      "WMT": 32,
+      "JNJ": 28,
+      "MCD": 37,
+      "GOOGL": 26,
+      "MSTR": 5,
+      "AMAT": 12,
+      "ADP": 31,
+      "V": 26,
+      "MA": 29,
+      "CSCO": 21,
+      "STX": 12,
+      "AGNC": 17,
+      "CVX": 27,
+      "INTC": 4,
+      "NUE": 12,
+      "BAC": 16,
+      "AFL": 34,
+      "IBM": 25,
+      "KO": 34,
+      "ADC": 18,
+      "C": 16,
+      "JPM": 26,
+      "ACHR": 2
+    }
+  },
+  "benchmark_B1_eligible_universe": {
+    "label": "B1_eligible_universe_equal_weight",
+    "n_formation_months": 92,
+    "n_realized_cohorts": 68,
+    "n_pending_incomplete_forward_window": 6,
+    "n_skipped_insufficient_eligible": 18,
+    "n_skipped_no_entry_data": 0,
+    "n_distinct_issuers_selected": 38,
+    "gross_mean_pct": 13.75,
+    "net_mean_pct": 13.7,
+    "net_median_pct": 13.0113,
+    "net_win_rate": 0.8529,
+    "net_worst_5pct_mean_pct": -18.4103,
+    "net_mean_pct_adverse_cost_15bps": 13.6
+  },
+  "incremental_A_vs_B1": {
+    "mean_pct": -2.846,
+    "uncertainty": {
+      "n_blocks": 12,
+      "block_means_pct": [
+        -7.0906,
+        -4.0301,
+        1.4151,
+        8.1675,
+        -6.2953,
+        -3.9089,
+        -3.0219,
+        -3.0257,
+        -0.1158,
+        -14.7756,
+        4.7082,
+        -12.8455
+      ],
+      "mean_ci_pct": [
+        -6.9582,
+        0.232
+      ],
+      "method": "non-overlapping 6-month block bootstrap, 5000 reps, seed 127127, 95% percentile CI"
+    }
+  },
+  "strategy_A_absolute_uncertainty": {
+    "n_blocks": 12,
+    "block_means_pct": [
+      27.9679,
+      12.1745,
+      1.4466,
+      -3.1938,
+      1.8712,
+      13.2436,
+      19.5279,
+      13.106,
+      6.3507,
+      5.4514,
+      20.5061,
+      13.6775
+    ],
+    "mean_ci_pct": [
+      6.2455,
+      15.9948
+    ],
+    "method": "non-overlapping 6-month block bootstrap, 5000 reps, seed 127127, 95% percentile CI"
+  },
+  "portfolio_chronological_base_cost": {
+    "cost_bps": 5.0,
+    "ending_cash": 222980.46,
+    "ending_marked_equity": 222980.46,
+    "n_realized_cohorts": 68,
+    "n_open_at_end": 0,
+    "equity_curve": [
+      {
+        "date": "2019-01-31",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-02-28",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-03-29",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-04-30",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-05-31",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-06-28",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-07-31",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-08-30",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-09-30",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-10-31",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-11-29",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-12-31",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2020-01-31",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2020-02-28",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2020-03-31",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2020-04-30",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2020-05-29",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2020-06-30",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2020-07-31",
+        "cash": 83329.17,
+        "marked_positions": 18220.71,
+        "equity": 101549.88,
+        "n_open_cohorts": 1
+      },
+      {
+        "date": "2020-08-31",
+        "cash": 66658.33,
+        "marked_positions": 39643.59,
+        "equity": 106301.92,
+        "n_open_cohorts": 2
+      },
+      {
+        "date": "2020-09-30",
+        "cash": 49987.5,
+        "marked_positions": 54709.09,
+        "equity": 104696.59,
+        "n_open_cohorts": 3
+      },
+      {
+        "date": "2020-10-30",
+        "cash": 33316.67,
+        "marked_positions": 68271.64,
+        "equity": 101588.31,
+        "n_open_cohorts": 4
+      },
+      {
+        "date": "2020-11-30",
+        "cash": 16645.83,
+        "marked_positions": 95246.19,
+        "equity": 111892.02,
+        "n_open_cohorts": 5
+      },
+      {
+        "date": "2020-12-31",
+        "cash": -25.0,
+        "marked_positions": 117504.82,
+        "equity": 117479.82,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-01-29",
+        "cash": 8023.41,
+        "marked_positions": 113401.12,
+        "equity": 121424.53,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-02-26",
+        "cash": 11481.7,
+        "marked_positions": 115206.36,
+        "equity": 126688.06,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-03-31",
+        "cash": 13621.38,
+        "marked_positions": 115791.09,
+        "equity": 129412.47,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-04-30",
+        "cash": 15582.69,
+        "marked_positions": 119227.02,
+        "equity": 134809.71,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-05-28",
+        "cash": 23617.91,
+        "marked_positions": 112554.75,
+        "equity": 136172.66,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-06-30",
+        "cash": 27935.93,
+        "marked_positions": 109347.15,
+        "equity": 137283.08,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-07-30",
+        "cash": 30703.08,
+        "marked_positions": 108651.62,
+        "equity": 139354.71,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-08-31",
+        "cash": 34317.85,
+        "marked_positions": 107141.78,
+        "equity": 141459.63,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-09-30",
+        "cash": 36419.73,
+        "marked_positions": 98638.08,
+        "equity": 135057.81,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-10-29",
+        "cash": 37605.62,
+        "marked_positions": 105120.76,
+        "equity": 142726.38,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-11-30",
+        "cash": 38712.29,
+        "marked_positions": 105531.56,
+        "equity": 144243.85,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-12-31",
+        "cash": 40107.35,
+        "marked_positions": 109837.84,
+        "equity": 149945.19,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-01-31",
+        "cash": 42954.83,
+        "marked_positions": 100106.23,
+        "equity": 143061.06,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-02-28",
+        "cash": 43367.75,
+        "marked_positions": 97560.99,
+        "equity": 140928.74,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-03-31",
+        "cash": 42432.9,
+        "marked_positions": 103035.93,
+        "equity": 145468.83,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-04-29",
+        "cash": 43913.77,
+        "marked_positions": 96100.03,
+        "equity": 140013.79,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-05-31",
+        "cash": 42324.3,
+        "marked_positions": 97620.6,
+        "equity": 139944.9,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-06-30",
+        "cash": 41553.56,
+        "marked_positions": 92885.26,
+        "equity": 134438.82,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-07-29",
+        "cash": 40036.58,
+        "marked_positions": 100168.16,
+        "equity": 140204.74,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-08-31",
+        "cash": 39541.12,
+        "marked_positions": 97455.92,
+        "equity": 136997.03,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-09-30",
+        "cash": 39259.31,
+        "marked_positions": 90553.68,
+        "equity": 129812.98,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-10-31",
+        "cash": 36735.17,
+        "marked_positions": 103914.78,
+        "equity": 140649.95,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-11-30",
+        "cash": 37047.05,
+        "marked_positions": 108814.56,
+        "equity": 145861.61,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-12-30",
+        "cash": 38360.57,
+        "marked_positions": 104434.71,
+        "equity": 142795.29,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-01-31",
+        "cash": 39984.45,
+        "marked_positions": 101555.08,
+        "equity": 141539.53,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-02-28",
+        "cash": 39962.2,
+        "marked_positions": 97750.43,
+        "equity": 137712.63,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-03-31",
+        "cash": 39912.78,
+        "marked_positions": 99168.23,
+        "equity": 139081.01,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-04-28",
+        "cash": 41416.09,
+        "marked_positions": 100253.37,
+        "equity": 141669.46,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-05-31",
+        "cash": 41523.97,
+        "marked_positions": 101209.16,
+        "equity": 142733.13,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-06-30",
+        "cash": 40231.34,
+        "marked_positions": 110805.68,
+        "equity": 151037.02,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-07-31",
+        "cash": 40693.49,
+        "marked_positions": 112939.19,
+        "equity": 153632.68,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-08-31",
+        "cash": 42201.32,
+        "marked_positions": 115592.24,
+        "equity": 157793.56,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-09-29",
+        "cash": 46712.45,
+        "marked_positions": 103954.89,
+        "equity": 150667.34,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-10-31",
+        "cash": 48765.06,
+        "marked_positions": 101443.05,
+        "equity": 150208.11,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-11-30",
+        "cash": 50183.75,
+        "marked_positions": 107966.92,
+        "equity": 158150.68,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-12-29",
+        "cash": 53471.66,
+        "marked_positions": 109264.36,
+        "equity": 162736.02,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-01-31",
+        "cash": 56575.77,
+        "marked_positions": 110544.62,
+        "equity": 167120.38,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-02-29",
+        "cash": 57787.86,
+        "marked_positions": 115855.92,
+        "equity": 173643.78,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-03-28",
+        "cash": 62363.34,
+        "marked_positions": 118676.54,
+        "equity": 181039.88,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-04-30",
+        "cash": 67106.45,
+        "marked_positions": 108730.15,
+        "equity": 175836.6,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-05-31",
+        "cash": 70610.54,
+        "marked_positions": 111228.5,
+        "equity": 181839.04,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-06-28",
+        "cash": 72994.65,
+        "marked_positions": 109116.41,
+        "equity": 182111.07,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-07-31",
+        "cash": 75116.16,
+        "marked_positions": 107471.37,
+        "equity": 182587.53,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-08-30",
+        "cash": 78554.8,
+        "marked_positions": 107523.54,
+        "equity": 186078.34,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-09-30",
+        "cash": 80248.73,
+        "marked_positions": 107380.28,
+        "equity": 187629.01,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-10-31",
+        "cash": 81623.07,
+        "marked_positions": 104331.73,
+        "equity": 185954.8,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-11-29",
+        "cash": 83933.09,
+        "marked_positions": 109909.19,
+        "equity": 193842.28,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-12-31",
+        "cash": 86097.33,
+        "marked_positions": 104068.81,
+        "equity": 190166.14,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-01-31",
+        "cash": 87395.27,
+        "marked_positions": 108620.97,
+        "equity": 196016.24,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-02-28",
+        "cash": 89439.03,
+        "marked_positions": 106914.13,
+        "equity": 196353.16,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-03-31",
+        "cash": 90779.57,
+        "marked_positions": 99949.31,
+        "equity": 190728.88,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-04-30",
+        "cash": 91093.41,
+        "marked_positions": 98147.33,
+        "equity": 189240.75,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-05-30",
+        "cash": 91927.2,
+        "marked_positions": 101628.99,
+        "equity": 193556.19,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-06-30",
+        "cash": 92446.43,
+        "marked_positions": 102207.62,
+        "equity": 194654.05,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-07-31",
+        "cash": 93859.51,
+        "marked_positions": 101532.07,
+        "equity": 195391.58,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-08-29",
+        "cash": 94500.61,
+        "marked_positions": 103101.69,
+        "equity": 197602.3,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-09-30",
+        "cash": 94597.91,
+        "marked_positions": 108436.14,
+        "equity": 203034.05,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-10-31",
+        "cash": 94602.35,
+        "marked_positions": 111998.88,
+        "equity": 206601.22,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-11-28",
+        "cash": 94561.25,
+        "marked_positions": 112760.96,
+        "equity": 207322.21,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-12-31",
+        "cash": 97896.49,
+        "marked_positions": 109918.9,
+        "equity": 207815.39,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2026-01-30",
+        "cash": 101283.37,
+        "marked_positions": 113025.86,
+        "equity": 214309.23,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2026-02-27",
+        "cash": 105335.7,
+        "marked_positions": 110624.39,
+        "equity": 215960.1,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2026-03-31",
+        "cash": 126100.86,
+        "marked_positions": 86667.46,
+        "equity": 212768.33,
+        "n_open_cohorts": 5
+      },
+      {
+        "date": "2026-04-30",
+        "cash": 145635.63,
+        "marked_positions": 75137.23,
+        "equity": 220772.86,
+        "n_open_cohorts": 4
+      },
+      {
+        "date": "2026-05-29",
+        "cash": 165000.29,
+        "marked_positions": 57441.34,
+        "equity": 222441.63,
+        "n_open_cohorts": 3
+      },
+      {
+        "date": "2026-06-30",
+        "cash": 185080.78,
+        "marked_positions": 37340.79,
+        "equity": 222421.57,
+        "n_open_cohorts": 2
+      },
+      {
+        "date": "2026-07-31",
+        "cash": 204422.02,
+        "marked_positions": 18479.31,
+        "equity": 222901.33,
+        "n_open_cohorts": 1
+      },
+      {
+        "date": "2026-08-31",
+        "cash": 222980.46,
+        "marked_positions": 0.0,
+        "equity": 222980.46,
+        "n_open_cohorts": 0
+      }
+    ],
+    "max_drawdown_pct": -13.426379332341376
+  },
+  "portfolio_chronological_adverse_cost": {
+    "cost_bps": 15.0,
+    "ending_cash": 221785.34,
+    "ending_marked_equity": 221785.34,
+    "n_realized_cohorts": 68,
+    "n_open_at_end": 0,
+    "equity_curve": [
+      {
+        "date": "2019-01-31",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-02-28",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-03-29",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-04-30",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-05-31",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-06-28",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-07-31",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-08-30",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-09-30",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-10-31",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-11-29",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2019-12-31",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2020-01-31",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2020-02-28",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2020-03-31",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2020-04-30",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2020-05-29",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2020-06-30",
+        "cash": 100000.0,
+        "marked_positions": 0.0,
+        "equity": 100000.0,
+        "n_open_cohorts": 0
+      },
+      {
+        "date": "2020-07-31",
+        "cash": 83320.83,
+        "marked_positions": 18220.71,
+        "equity": 101541.55,
+        "n_open_cohorts": 1
+      },
+      {
+        "date": "2020-08-31",
+        "cash": 66641.67,
+        "marked_positions": 39643.59,
+        "equity": 106285.26,
+        "n_open_cohorts": 2
+      },
+      {
+        "date": "2020-09-30",
+        "cash": 49962.5,
+        "marked_positions": 54709.09,
+        "equity": 104671.59,
+        "n_open_cohorts": 3
+      },
+      {
+        "date": "2020-10-30",
+        "cash": 33283.33,
+        "marked_positions": 68271.64,
+        "equity": 101554.98,
+        "n_open_cohorts": 4
+      },
+      {
+        "date": "2020-11-30",
+        "cash": 16604.17,
+        "marked_positions": 95246.19,
+        "equity": 111850.36,
+        "n_open_cohorts": 5
+      },
+      {
+        "date": "2020-12-31",
+        "cash": -75.0,
+        "marked_positions": 117504.82,
+        "equity": 117429.82,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-01-29",
+        "cash": 7952.71,
+        "marked_positions": 113401.12,
+        "equity": 121353.83,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-02-26",
+        "cash": 11392.6,
+        "marked_positions": 115206.36,
+        "equity": 126598.96,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-03-31",
+        "cash": 13514.54,
+        "marked_positions": 115791.09,
+        "equity": 129305.63,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-04-30",
+        "cash": 15458.2,
+        "marked_positions": 119227.02,
+        "equity": 134685.22,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-05-28",
+        "cash": 23472.73,
+        "marked_positions": 112554.75,
+        "equity": 136027.48,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-06-30",
+        "cash": 27771.92,
+        "marked_positions": 109347.15,
+        "equity": 137119.07,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-07-30",
+        "cash": 30521.02,
+        "marked_positions": 108651.62,
+        "equity": 139172.65,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-08-31",
+        "cash": 34117.3,
+        "marked_positions": 107141.78,
+        "equity": 141259.08,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-09-30",
+        "cash": 36201.47,
+        "marked_positions": 98638.08,
+        "equity": 134839.55,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-10-29",
+        "cash": 37370.09,
+        "marked_positions": 105120.76,
+        "equity": 142490.85,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-11-30",
+        "cash": 38459.53,
+        "marked_positions": 105531.56,
+        "equity": 143991.1,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2021-12-31",
+        "cash": 39837.23,
+        "marked_positions": 109837.84,
+        "equity": 149675.06,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-01-31",
+        "cash": 42666.61,
+        "marked_positions": 100106.23,
+        "equity": 142772.84,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-02-28",
+        "cash": 43062.66,
+        "marked_positions": 97560.99,
+        "equity": 140623.65,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-03-31",
+        "cash": 42111.6,
+        "marked_positions": 103035.93,
+        "equity": 145147.53,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-04-29",
+        "cash": 43575.06,
+        "marked_positions": 96100.03,
+        "equity": 139675.09,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-05-31",
+        "cash": 41969.71,
+        "marked_positions": 97620.6,
+        "equity": 139590.31,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-06-30",
+        "cash": 41182.69,
+        "marked_positions": 92885.26,
+        "equity": 134067.95,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-07-29",
+        "cash": 39649.8,
+        "marked_positions": 100168.16,
+        "equity": 139817.96,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-08-31",
+        "cash": 39137.91,
+        "marked_positions": 97455.92,
+        "equity": 136593.83,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-09-30",
+        "cash": 38839.57,
+        "marked_positions": 90553.68,
+        "equity": 129393.25,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-10-31",
+        "cash": 36300.03,
+        "marked_positions": 103914.78,
+        "equity": 140214.81,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-11-30",
+        "cash": 36595.08,
+        "marked_positions": 108814.56,
+        "equity": 145409.64,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2022-12-30",
+        "cash": 37891.28,
+        "marked_positions": 104434.71,
+        "equity": 142325.99,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-01-31",
+        "cash": 39497.67,
+        "marked_positions": 101555.08,
+        "equity": 141052.75,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-02-28",
+        "cash": 39458.76,
+        "marked_positions": 97750.43,
+        "equity": 137209.19,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-03-31",
+        "cash": 39392.69,
+        "marked_positions": 99168.23,
+        "equity": 138560.92,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-04-28",
+        "cash": 40878.58,
+        "marked_positions": 100253.37,
+        "equity": 141131.95,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-05-31",
+        "cash": 40969.74,
+        "marked_positions": 101209.16,
+        "equity": 142178.9,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-06-30",
+        "cash": 39661.09,
+        "marked_positions": 110805.68,
+        "equity": 150466.76,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-07-31",
+        "cash": 40106.33,
+        "marked_positions": 112939.19,
+        "equity": 153045.51,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-08-31",
+        "cash": 41596.73,
+        "marked_positions": 115592.24,
+        "equity": 157188.98,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-09-29",
+        "cash": 46088.94,
+        "marked_positions": 103954.89,
+        "equity": 150043.83,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-10-31",
+        "cash": 48123.85,
+        "marked_positions": 101443.05,
+        "equity": 149566.9,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-11-30",
+        "cash": 49525.17,
+        "marked_positions": 107966.92,
+        "equity": 157492.09,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2023-12-29",
+        "cash": 52794.76,
+        "marked_positions": 109264.36,
+        "equity": 162059.11,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-01-31",
+        "cash": 55880.64,
+        "marked_positions": 110544.62,
+        "equity": 166425.25,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-02-29",
+        "cash": 57075.45,
+        "marked_positions": 115855.92,
+        "equity": 172931.37,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-03-28",
+        "cash": 61631.98,
+        "marked_positions": 118676.54,
+        "equity": 180308.52,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-04-30",
+        "cash": 66356.04,
+        "marked_positions": 108730.15,
+        "equity": 175086.2,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-05-31",
+        "cash": 69841.71,
+        "marked_positions": 111228.5,
+        "equity": 181070.21,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-06-28",
+        "cash": 72207.96,
+        "marked_positions": 109116.41,
+        "equity": 181324.37,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-07-31",
+        "cash": 74311.73,
+        "marked_positions": 107471.37,
+        "equity": 181783.1,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-08-30",
+        "cash": 77731.98,
+        "marked_positions": 107523.54,
+        "equity": 185255.52,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-09-30",
+        "cash": 79408.4,
+        "marked_positions": 107380.28,
+        "equity": 186788.67,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-10-31",
+        "cash": 80765.38,
+        "marked_positions": 104331.73,
+        "equity": 185097.1,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-11-29",
+        "cash": 83057.58,
+        "marked_positions": 109909.19,
+        "equity": 192966.76,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2024-12-31",
+        "cash": 85204.05,
+        "marked_positions": 104068.81,
+        "equity": 189272.87,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-01-31",
+        "cash": 86484.68,
+        "marked_positions": 108620.97,
+        "equity": 195105.65,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-02-28",
+        "cash": 88510.74,
+        "marked_positions": 106914.13,
+        "equity": 195424.88,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-03-31",
+        "cash": 89833.94,
+        "marked_positions": 99949.31,
+        "equity": 189783.26,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-04-30",
+        "cash": 90130.96,
+        "marked_positions": 98147.33,
+        "equity": 188278.29,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-05-30",
+        "cash": 90947.66,
+        "marked_positions": 101628.99,
+        "equity": 192576.65,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-06-30",
+        "cash": 91449.95,
+        "marked_positions": 102207.62,
+        "equity": 193657.57,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-07-31",
+        "cash": 92845.66,
+        "marked_positions": 101532.07,
+        "equity": 194377.73,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-08-29",
+        "cash": 93469.77,
+        "marked_positions": 103101.69,
+        "equity": 196571.46,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-09-30",
+        "cash": 93550.35,
+        "marked_positions": 108436.14,
+        "equity": 201986.49,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-10-31",
+        "cash": 93538.11,
+        "marked_positions": 111998.88,
+        "equity": 205536.99,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-11-28",
+        "cash": 93480.37,
+        "marked_positions": 112760.96,
+        "equity": 206241.32,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2025-12-31",
+        "cash": 96797.27,
+        "marked_positions": 109918.9,
+        "equity": 206716.16,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2026-01-30",
+        "cash": 100165.78,
+        "marked_positions": 113025.86,
+        "equity": 213191.64,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2026-02-27",
+        "cash": 104199.42,
+        "marked_positions": 110624.39,
+        "equity": 214823.81,
+        "n_open_cohorts": 6
+      },
+      {
+        "date": "2026-03-31",
+        "cash": 124954.19,
+        "marked_positions": 86667.46,
+        "equity": 211621.65,
+        "n_open_cohorts": 5
+      },
+      {
+        "date": "2026-04-30",
+        "cash": 144479.19,
+        "marked_positions": 75137.23,
+        "equity": 219616.42,
+        "n_open_cohorts": 4
+      },
+      {
+        "date": "2026-05-29",
+        "cash": 163834.17,
+        "marked_positions": 57441.34,
+        "equity": 221275.51,
+        "n_open_cohorts": 3
+      },
+      {
+        "date": "2026-06-30",
+        "cash": 183904.61,
+        "marked_positions": 37340.79,
+        "equity": 221245.4,
+        "n_open_cohorts": 2
+      },
+      {
+        "date": "2026-07-31",
+        "cash": 203236.18,
+        "marked_positions": 18479.31,
+        "equity": 221715.49,
+        "n_open_cohorts": 1
+      },
+      {
+        "date": "2026-08-31",
+        "cash": 221785.34,
+        "marked_positions": 0.0,
+        "equity": 221785.34,
+        "n_open_cohorts": 0
+      }
+    ],
+    "max_drawdown_pct": -13.55056079483115
+  },
+  "spy_benchmark": {
+    "start_date": "2019-01-02",
+    "end_date": "2026-08-31",
+    "total_return_pct": 242.6778,
+    "max_drawdown_pct": -23.928124558586198,
+    "equity_curve": [
+      {
+        "date": "2019-01-31",
+        "equity": 107822.55
+      },
+      {
+        "date": "2019-02-28",
+        "equity": 111356.33
+      },
+      {
+        "date": "2019-03-29",
+        "equity": 113371.16
+      },
+      {
+        "date": "2019-04-30",
+        "equity": 117954.79
+      },
+      {
+        "date": "2019-05-31",
+        "equity": 110529.84
+      },
+      {
+        "date": "2019-06-28",
+        "equity": 118218.37
+      },
+      {
+        "date": "2019-07-31",
+        "equity": 119956.22
+      },
+      {
+        "date": "2019-08-30",
+        "equity": 117959.26
+      },
+      {
+        "date": "2019-09-30",
+        "equity": 120260.01
+      },
+      {
+        "date": "2019-10-31",
+        "equity": 122909.22
+      },
+      {
+        "date": "2019-11-29",
+        "equity": 127367.76
+      },
+      {
+        "date": "2019-12-31",
+        "equity": 131057.9
+      },
+      {
+        "date": "2020-01-31",
+        "equity": 131017.69
+      },
+      {
+        "date": "2020-02-28",
+        "equity": 120626.34
+      },
+      {
+        "date": "2020-03-31",
+        "equity": 105410.11
+      },
+      {
+        "date": "2020-04-30",
+        "equity": 119040.39
+      },
+      {
+        "date": "2020-05-29",
+        "equity": 124714.08
+      },
+      {
+        "date": "2020-06-30",
+        "equity": 127095.25
+      },
+      {
+        "date": "2020-07-31",
+        "equity": 134278.95
+      },
+      {
+        "date": "2020-08-31",
+        "equity": 143915.3
+      },
+      {
+        "date": "2020-09-30",
+        "equity": 138089.71
+      },
+      {
+        "date": "2020-10-30",
+        "equity": 134935.67
+      },
+      {
+        "date": "2020-11-30",
+        "equity": 149606.86
+      },
+      {
+        "date": "2020-12-31",
+        "equity": 155240.35
+      },
+      {
+        "date": "2021-01-29",
+        "equity": 153533.77
+      },
+      {
+        "date": "2021-02-26",
+        "equity": 157630.45
+      },
+      {
+        "date": "2021-03-31",
+        "equity": 164934.77
+      },
+      {
+        "date": "2021-04-30",
+        "equity": 173664.22
+      },
+      {
+        "date": "2021-05-28",
+        "equity": 174865.98
+      },
+      {
+        "date": "2021-06-30",
+        "equity": 178725.88
+      },
+      {
+        "date": "2021-07-30",
+        "equity": 183086.13
+      },
+      {
+        "date": "2021-08-31",
+        "equity": 188536.45
+      },
+      {
+        "date": "2021-09-30",
+        "equity": 179748.93
+      },
+      {
+        "date": "2021-10-29",
+        "equity": 192360.61
+      },
+      {
+        "date": "2021-11-30",
+        "equity": 190814.87
+      },
+      {
+        "date": "2021-12-31",
+        "equity": 199642.6
+      },
+      {
+        "date": "2022-01-31",
+        "equity": 189112.76
+      },
+      {
+        "date": "2022-02-28",
+        "equity": 183528.41
+      },
+      {
+        "date": "2022-03-31",
+        "equity": 190430.66
+      },
+      {
+        "date": "2022-04-29",
+        "equity": 173713.37
+      },
+      {
+        "date": "2022-05-31",
+        "equity": 174106.5
+      },
+      {
+        "date": "2022-06-30",
+        "equity": 159752.5
+      },
+      {
+        "date": "2022-07-29",
+        "equity": 174459.44
+      },
+      {
+        "date": "2022-08-31",
+        "equity": 167342.74
+      },
+      {
+        "date": "2022-09-30",
+        "equity": 151871.87
+      },
+      {
+        "date": "2022-10-31",
+        "equity": 164215.51
+      },
+      {
+        "date": "2022-11-30",
+        "equity": 173347.03
+      },
+      {
+        "date": "2022-12-30",
+        "equity": 163357.76
+      },
+      {
+        "date": "2023-01-31",
+        "equity": 173628.48
+      },
+      {
+        "date": "2023-02-28",
+        "equity": 169263.76
+      },
+      {
+        "date": "2023-03-31",
+        "equity": 175540.56
+      },
+      {
+        "date": "2023-04-28",
+        "equity": 178341.67
+      },
+      {
+        "date": "2023-05-31",
+        "equity": 179168.16
+      },
+      {
+        "date": "2023-06-30",
+        "equity": 190779.13
+      },
+      {
+        "date": "2023-07-31",
+        "equity": 197020.19
+      },
+      {
+        "date": "2023-08-31",
+        "equity": 193821.48
+      },
+      {
+        "date": "2023-09-29",
+        "equity": 184627.41
+      },
+      {
+        "date": "2023-10-31",
+        "equity": 180620.09
+      },
+      {
+        "date": "2023-11-30",
+        "equity": 197118.48
+      },
+      {
+        "date": "2023-12-29",
+        "equity": 206115.98
+      },
+      {
+        "date": "2024-01-31",
+        "equity": 209399.57
+      },
+      {
+        "date": "2024-02-29",
+        "equity": 220327.02
+      },
+      {
+        "date": "2024-03-28",
+        "equity": 227533.06
+      },
+      {
+        "date": "2024-04-30",
+        "equity": 218356.86
+      },
+      {
+        "date": "2024-05-31",
+        "equity": 229400.46
+      },
+      {
+        "date": "2024-06-28",
+        "equity": 237495.53
+      },
+      {
+        "date": "2024-07-31",
+        "equity": 240372.59
+      },
+      {
+        "date": "2024-08-30",
+        "equity": 245988.21
+      },
+      {
+        "date": "2024-09-30",
+        "equity": 251152.61
+      },
+      {
+        "date": "2024-10-31",
+        "equity": 248914.4
+      },
+      {
+        "date": "2024-11-29",
+        "equity": 263755.36
+      },
+      {
+        "date": "2024-12-31",
+        "equity": 257411.54
+      },
+      {
+        "date": "2025-01-31",
+        "equity": 264322.73
+      },
+      {
+        "date": "2025-02-28",
+        "equity": 260967.66
+      },
+      {
+        "date": "2025-03-31",
+        "equity": 246426.02
+      },
+      {
+        "date": "2025-04-30",
+        "equity": 244290.56
+      },
+      {
+        "date": "2025-05-30",
+        "equity": 259645.28
+      },
+      {
+        "date": "2025-06-30",
+        "equity": 272985.17
+      },
+      {
+        "date": "2025-07-31",
+        "equity": 279270.91
+      },
+      {
+        "date": "2025-08-29",
+        "equity": 285002.68
+      },
+      {
+        "date": "2025-09-30",
+        "equity": 295152.79
+      },
+      {
+        "date": "2025-10-31",
+        "equity": 302189.06
+      },
+      {
+        "date": "2025-11-28",
+        "equity": 302778.77
+      },
+      {
+        "date": "2025-12-31",
+        "equity": 303020.01
+      },
+      {
+        "date": "2026-01-30",
+        "equity": 307487.49
+      },
+      {
+        "date": "2026-02-27",
+        "equity": 304829.34
+      },
+      {
+        "date": "2026-03-31",
+        "equity": 289791.82
+      },
+      {
+        "date": "2026-04-30",
+        "equity": 320233.2
+      },
+      {
+        "date": "2026-05-29",
+        "equity": 337088.99
+      },
+      {
+        "date": "2026-06-30",
+        "equity": 333617.76
+      },
+      {
+        "date": "2026-07-31",
+        "equity": 333733.92
+      },
+      {
+        "date": "2026-08-31",
+        "equity": 342677.81
+      }
+    ]
+  }
+}

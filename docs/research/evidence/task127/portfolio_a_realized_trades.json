@@ -1,0 +1,1361 @@
+[
+  {
+    "cohort_formation": "2020-06-30",
+    "entry": "2020-07-01",
+    "exit": "2021-01-04",
+    "symbols": [
+      "MSFT",
+      "PYPL",
+      "TSLA",
+      "AVGO",
+      "NVDA",
+      "AAPL",
+      "BLK",
+      "DELL",
+      "UNH",
+      "PG",
+      "ORCL"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 24719.242678230865
+  },
+  {
+    "cohort_formation": "2020-07-31",
+    "entry": "2020-08-03",
+    "exit": "2021-02-01",
+    "symbols": [
+      "AAPL",
+      "NVDA",
+      "PYPL",
+      "PG",
+      "AMD",
+      "AVGO",
+      "ABT",
+      "BLK",
+      "VRT",
+      "WMT",
+      "UNH"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 20129.1197243668
+  },
+  {
+    "cohort_formation": "2020-08-31",
+    "entry": "2020-09-01",
+    "exit": "2021-03-01",
+    "symbols": [
+      "AAPL",
+      "AMD",
+      "AVGO",
+      "NVDA",
+      "TSLA",
+      "JNJ",
+      "PYPL",
+      "DELL",
+      "MCD",
+      "PG",
+      "GOOGL"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18810.51717067638
+  },
+  {
+    "cohort_formation": "2020-09-30",
+    "entry": "2020-10-01",
+    "exit": "2021-04-01",
+    "symbols": [
+      "PG",
+      "DELL",
+      "VRT",
+      "AVGO",
+      "ORCL",
+      "ABT",
+      "MCD",
+      "JNJ",
+      "UNH",
+      "WMT",
+      "NVDA"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18632.147652249434
+  },
+  {
+    "cohort_formation": "2020-10-30",
+    "entry": "2020-11-02",
+    "exit": "2021-05-03",
+    "symbols": [
+      "PG",
+      "ABT",
+      "GOOGL",
+      "WMT",
+      "MCD",
+      "VRT",
+      "UNH",
+      "AVGO",
+      "ORCL",
+      "BLK",
+      "MSTR"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 24706.046770122564
+  },
+  {
+    "cohort_formation": "2020-11-30",
+    "entry": "2020-12-01",
+    "exit": "2021-06-01",
+    "symbols": [
+      "AMD",
+      "AVGO",
+      "MSTR",
+      "WMT",
+      "PYPL",
+      "AMAT",
+      "VRT",
+      "GOOGL",
+      "ADP",
+      "DELL",
+      "BLK"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 20988.852364883365
+  },
+  {
+    "cohort_formation": "2020-12-31",
+    "entry": "2021-01-04",
+    "exit": "2021-07-01",
+    "symbols": [
+      "AVGO",
+      "BLK",
+      "JNJ",
+      "TSLA",
+      "V",
+      "MSTR",
+      "ORCL",
+      "UNH",
+      "ADP",
+      "DELL",
+      "MA"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 19437.991884814066
+  },
+  {
+    "cohort_formation": "2021-01-29",
+    "entry": "2021-02-01",
+    "exit": "2021-08-02",
+    "symbols": [
+      "ABT",
+      "MSTR",
+      "MSFT",
+      "VRT",
+      "AVGO",
+      "GOOGL",
+      "JNJ",
+      "DELL",
+      "PYPL",
+      "ORCL",
+      "CSCO"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 20285.59488118045
+  },
+  {
+    "cohort_formation": "2021-02-26",
+    "entry": "2021-03-01",
+    "exit": "2021-09-01",
+    "symbols": [
+      "DELL",
+      "ORCL",
+      "STX",
+      "AGNC",
+      "ADP",
+      "CVX",
+      "V",
+      "VRT",
+      "MA",
+      "AMAT",
+      "INTC"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18772.71915705352
+  },
+  {
+    "cohort_formation": "2021-03-31",
+    "entry": "2021-04-01",
+    "exit": "2021-10-01",
+    "symbols": [
+      "AMAT",
+      "NUE",
+      "STX",
+      "BAC",
+      "AGNC",
+      "MCD",
+      "CSCO",
+      "UNH",
+      "AFL",
+      "ADP",
+      "IBM"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 17856.724235542766
+  },
+  {
+    "cohort_formation": "2021-04-30",
+    "entry": "2021-05-03",
+    "exit": "2021-11-01",
+    "symbols": [
+      "MCD",
+      "AGNC",
+      "NUE",
+      "UNH",
+      "AFL",
+      "BLK",
+      "KO",
+      "ADC",
+      "V",
+      "BAC",
+      "IBM"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 17777.49703800557
+  },
+  {
+    "cohort_formation": "2021-05-28",
+    "entry": "2021-06-01",
+    "exit": "2021-12-01",
+    "symbols": [
+      "AGNC",
+      "BLK",
+      "NVDA",
+      "VRT",
+      "C",
+      "AFL",
+      "JPM",
+      "KO",
+      "ADP",
+      "JNJ",
+      "MCD"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18065.892721430806
+  },
+  {
+    "cohort_formation": "2021-06-30",
+    "entry": "2021-07-01",
+    "exit": "2022-01-03",
+    "symbols": [
+      "VRT",
+      "NVDA",
+      "MSFT",
+      "AMAT",
+      "GOOGL",
+      "ADP",
+      "BLK",
+      "V",
+      "AVGO",
+      "MCD",
+      "KO"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 19518.315187808526
+  },
+  {
+    "cohort_formation": "2021-07-30",
+    "entry": "2021-08-02",
+    "exit": "2022-02-01",
+    "symbols": [
+      "ADP",
+      "AMD",
+      "PG",
+      "AVGO",
+      "ADC",
+      "CSCO",
+      "JNJ",
+      "VRT",
+      "KO",
+      "GOOGL",
+      "MCD"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 17083.755897440085
+  },
+  {
+    "cohort_formation": "2021-08-31",
+    "entry": "2021-09-01",
+    "exit": "2022-03-01",
+    "symbols": [
+      "GOOGL",
+      "AVGO",
+      "CSCO",
+      "ABT",
+      "ADC",
+      "AAPL",
+      "AFL",
+      "MSFT",
+      "BLK",
+      "VRT",
+      "NVDA"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 15735.979800943178
+  },
+  {
+    "cohort_formation": "2021-09-30",
+    "entry": "2021-10-01",
+    "exit": "2022-04-01",
+    "symbols": [
+      "DELL",
+      "BAC",
+      "JPM",
+      "MCD",
+      "PG",
+      "AVGO",
+      "ORCL",
+      "CVX",
+      "IBM",
+      "ADP",
+      "MSFT"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18151.701236008612
+  },
+  {
+    "cohort_formation": "2021-10-29",
+    "entry": "2021-11-01",
+    "exit": "2022-05-02",
+    "symbols": [
+      "ABT",
+      "ADP",
+      "CVX",
+      "GOOGL",
+      "MSFT",
+      "NVDA",
+      "TSLA",
+      "UNH",
+      "BAC",
+      "AVGO",
+      "BLK"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 15081.363949783754
+  },
+  {
+    "cohort_formation": "2021-11-30",
+    "entry": "2021-12-01",
+    "exit": "2022-06-01",
+    "symbols": [
+      "AAPL",
+      "NVDA",
+      "AMD",
+      "DELL",
+      "ADP",
+      "PG",
+      "MSFT",
+      "AVGO",
+      "CVX",
+      "ABT",
+      "UNH"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 15900.100331021129
+  },
+  {
+    "cohort_formation": "2021-12-31",
+    "entry": "2022-01-03",
+    "exit": "2022-07-01",
+    "symbols": [
+      "KO",
+      "MCD",
+      "PG",
+      "ABT",
+      "ADP",
+      "AFL",
+      "UNH",
+      "CSCO",
+      "CVX",
+      "AVGO",
+      "AAPL"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 15153.852748454561
+  },
+  {
+    "cohort_formation": "2022-01-31",
+    "entry": "2022-02-01",
+    "exit": "2022-08-01",
+    "symbols": [
+      "KO",
+      "PG",
+      "AFL",
+      "MA",
+      "JNJ",
+      "CVX",
+      "MCD",
+      "AAPL",
+      "DELL",
+      "BAC",
+      "UNH"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 16175.368281256538
+  },
+  {
+    "cohort_formation": "2022-02-28",
+    "entry": "2022-03-01",
+    "exit": "2022-09-01",
+    "symbols": [
+      "CVX",
+      "NUE",
+      "KO",
+      "PG",
+      "UNH",
+      "JNJ",
+      "AFL",
+      "MCD",
+      "MA",
+      "AAPL",
+      "GOOGL"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 16389.022050810632
+  },
+  {
+    "cohort_formation": "2022-03-31",
+    "entry": "2022-04-01",
+    "exit": "2022-10-03",
+    "symbols": [
+      "KO",
+      "WMT",
+      "JNJ",
+      "AFL",
+      "UNH",
+      "AAPL",
+      "CVX",
+      "NUE",
+      "AVGO",
+      "PG",
+      "GOOGL"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 14146.696896132893
+  },
+  {
+    "cohort_formation": "2022-04-29",
+    "entry": "2022-05-02",
+    "exit": "2022-11-01",
+    "symbols": [
+      "PG",
+      "KO",
+      "JNJ",
+      "WMT",
+      "UNH",
+      "MCD",
+      "ADC",
+      "MA",
+      "IBM",
+      "CVX",
+      "ADP"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 16982.711123136596
+  },
+  {
+    "cohort_formation": "2022-05-31",
+    "entry": "2022-06-01",
+    "exit": "2022-12-01",
+    "symbols": [
+      "CVX",
+      "JNJ",
+      "IBM",
+      "KO",
+      "ADC",
+      "MCD",
+      "AFL",
+      "UNH",
+      "PG",
+      "ADP",
+      "MA"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 17984.361213658474
+  },
+  {
+    "cohort_formation": "2022-06-30",
+    "entry": "2022-07-01",
+    "exit": "2023-01-03",
+    "symbols": [
+      "IBM",
+      "ADC",
+      "JNJ",
+      "KO",
+      "UNH",
+      "MCD",
+      "PG",
+      "ADP",
+      "AFL",
+      "CVX",
+      "MA"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18294.710882622177
+  },
+  {
+    "cohort_formation": "2022-07-29",
+    "entry": "2022-08-01",
+    "exit": "2023-02-01",
+    "symbols": [
+      "ADC",
+      "UNH",
+      "MCD",
+      "ADP",
+      "KO",
+      "JNJ",
+      "IBM",
+      "CVX",
+      "AAPL",
+      "MA",
+      "V"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 16648.584657375693
+  },
+  {
+    "cohort_formation": "2022-08-31",
+    "entry": "2022-09-01",
+    "exit": "2023-03-01",
+    "symbols": [
+      "MCD",
+      "UNH",
+      "ADC",
+      "KO",
+      "ADP",
+      "IBM",
+      "AFL",
+      "CVX",
+      "JNJ",
+      "AAPL",
+      "PG"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 16621.407201493526
+  },
+  {
+    "cohort_formation": "2022-09-30",
+    "entry": "2022-10-03",
+    "exit": "2023-04-03",
+    "symbols": [
+      "UNH",
+      "JNJ",
+      "ADP",
+      "MCD",
+      "KO",
+      "AFL",
+      "ADC",
+      "IBM",
+      "WMT",
+      "CVX",
+      "PG"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18174.1453773257
+  },
+  {
+    "cohort_formation": "2022-10-31",
+    "entry": "2022-11-01",
+    "exit": "2023-05-01",
+    "symbols": [
+      "CVX",
+      "UNH",
+      "MCD",
+      "AFL",
+      "IBM",
+      "JNJ",
+      "ADP",
+      "KO",
+      "WMT",
+      "V",
+      "ADC"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 16778.715973815917
+  },
+  {
+    "cohort_formation": "2022-11-30",
+    "entry": "2022-12-01",
+    "exit": "2023-06-01",
+    "symbols": [
+      "ADP",
+      "IBM",
+      "AFL",
+      "UNH",
+      "MCD",
+      "CVX",
+      "KO",
+      "JNJ",
+      "WMT",
+      "V",
+      "PG"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 15378.20541285827
+  },
+  {
+    "cohort_formation": "2022-12-30",
+    "entry": "2023-01-03",
+    "exit": "2023-07-03",
+    "symbols": [
+      "AFL",
+      "KO",
+      "JNJ",
+      "CVX",
+      "UNH",
+      "MCD",
+      "PG",
+      "IBM",
+      "ORCL",
+      "ADC",
+      "WMT"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 17132.97550093224
+  },
+  {
+    "cohort_formation": "2023-01-31",
+    "entry": "2023-02-01",
+    "exit": "2023-08-01",
+    "symbols": [
+      "AFL",
+      "V",
+      "ORCL",
+      "NUE",
+      "MCD",
+      "ADC",
+      "KO",
+      "BLK",
+      "MA",
+      "AVGO",
+      "CVX"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18178.66489837773
+  },
+  {
+    "cohort_formation": "2023-02-28",
+    "entry": "2023-03-01",
+    "exit": "2023-09-01",
+    "symbols": [
+      "JPM",
+      "VRT",
+      "ORCL",
+      "MCD",
+      "V",
+      "AVGO",
+      "NUE",
+      "MA",
+      "AFL",
+      "KO",
+      "AGNC"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 21181.968195414967
+  },
+  {
+    "cohort_formation": "2023-03-31",
+    "entry": "2023-04-03",
+    "exit": "2023-10-02",
+    "symbols": [
+      "AVGO",
+      "MCD",
+      "NVDA",
+      "ORCL",
+      "V",
+      "CSCO",
+      "KO",
+      "MA",
+      "AMAT",
+      "WMT",
+      "AAPL"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18723.44037006942
+  },
+  {
+    "cohort_formation": "2023-04-28",
+    "entry": "2023-05-01",
+    "exit": "2023-11-01",
+    "symbols": [
+      "MCD",
+      "MSFT",
+      "KO",
+      "MA",
+      "NVDA",
+      "V",
+      "PG",
+      "WMT",
+      "ORCL",
+      "AVGO",
+      "AAPL"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18089.528091253665
+  },
+  {
+    "cohort_formation": "2023-05-31",
+    "entry": "2023-06-01",
+    "exit": "2023-12-01",
+    "symbols": [
+      "ORCL",
+      "AAPL",
+      "AVGO",
+      "MSFT",
+      "GOOGL",
+      "AMAT",
+      "WMT",
+      "VRT",
+      "CSCO",
+      "MCD",
+      "JPM"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 19958.74002748667
+  },
+  {
+    "cohort_formation": "2023-06-30",
+    "entry": "2023-07-03",
+    "exit": "2024-01-02",
+    "symbols": [
+      "AAPL",
+      "DELL",
+      "JPM",
+      "MA",
+      "MCD",
+      "V",
+      "VRT",
+      "WMT",
+      "CSCO",
+      "AMAT",
+      "AVGO"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 19774.939552858395
+  },
+  {
+    "cohort_formation": "2023-07-31",
+    "entry": "2023-08-01",
+    "exit": "2024-02-01",
+    "symbols": [
+      "AAPL",
+      "ACHR",
+      "GOOGL",
+      "JPM",
+      "WMT",
+      "PG",
+      "AMAT",
+      "AFL",
+      "NVDA",
+      "MCD",
+      "IBM"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 17882.923268125385
+  },
+  {
+    "cohort_formation": "2023-08-31",
+    "entry": "2023-09-01",
+    "exit": "2024-03-01",
+    "symbols": [
+      "AMAT",
+      "AVGO",
+      "CSCO",
+      "GOOGL",
+      "NVDA",
+      "VRT",
+      "WMT",
+      "IBM",
+      "V",
+      "MA",
+      "STX"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 21246.31855599047
+  },
+  {
+    "cohort_formation": "2023-09-29",
+    "entry": "2023-10-02",
+    "exit": "2024-04-01",
+    "symbols": [
+      "AFL",
+      "WMT",
+      "DELL",
+      "MA",
+      "GOOGL",
+      "IBM",
+      "VRT",
+      "CSCO",
+      "PG",
+      "V",
+      "CVX"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 21413.940758403474
+  },
+  {
+    "cohort_formation": "2023-10-31",
+    "entry": "2023-11-01",
+    "exit": "2024-05-01",
+    "symbols": [
+      "WMT",
+      "UNH",
+      "IBM",
+      "PG",
+      "AFL",
+      "V",
+      "MSFT",
+      "INTC",
+      "VRT",
+      "STX"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 20174.923755408414
+  },
+  {
+    "cohort_formation": "2023-11-30",
+    "entry": "2023-12-01",
+    "exit": "2024-06-03",
+    "symbols": [
+      "DELL",
+      "IBM",
+      "STX",
+      "UNH",
+      "V",
+      "AFL",
+      "BLK",
+      "JPM",
+      "INTC",
+      "MA",
+      "MSFT"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 19054.945148762254
+  },
+  {
+    "cohort_formation": "2023-12-29",
+    "entry": "2024-01-02",
+    "exit": "2024-07-01",
+    "symbols": [
+      "MA",
+      "MCD",
+      "JPM",
+      "C",
+      "IBM",
+      "V",
+      "BLK",
+      "AMD",
+      "DELL",
+      "INTC",
+      "GOOGL"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18792.340631110183
+  },
+  {
+    "cohort_formation": "2024-01-31",
+    "entry": "2024-02-01",
+    "exit": "2024-08-01",
+    "symbols": [
+      "MA",
+      "PG",
+      "VRT",
+      "NUE",
+      "JPM",
+      "ABT",
+      "V",
+      "C",
+      "AFL",
+      "NVDA",
+      "DELL"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 20109.47430965151
+  },
+  {
+    "cohort_formation": "2024-02-29",
+    "entry": "2024-03-01",
+    "exit": "2024-09-03",
+    "symbols": [
+      "AMD",
+      "DELL",
+      "JPM",
+      "MSTR",
+      "NVDA",
+      "STX",
+      "VRT",
+      "BAC",
+      "NUE",
+      "AVGO",
+      "MA"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18364.763852811997
+  },
+  {
+    "cohort_formation": "2024-03-28",
+    "entry": "2024-04-01",
+    "exit": "2024-10-01",
+    "symbols": [
+      "AFL",
+      "AGNC",
+      "BAC",
+      "C",
+      "JPM",
+      "PG",
+      "NUE",
+      "BLK",
+      "VRT",
+      "MA",
+      "GOOGL"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18045.171072164256
+  },
+  {
+    "cohort_formation": "2024-04-30",
+    "entry": "2024-05-01",
+    "exit": "2024-11-01",
+    "symbols": [
+      "PG",
+      "KO",
+      "VRT",
+      "AFL",
+      "C",
+      "WMT",
+      "BAC",
+      "CVX",
+      "JPM",
+      "ADP",
+      "GOOGL"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18980.858858454
+  },
+  {
+    "cohort_formation": "2024-05-31",
+    "entry": "2024-06-03",
+    "exit": "2024-12-02",
+    "symbols": [
+      "AFL",
+      "BAC",
+      "WMT",
+      "KO",
+      "JPM",
+      "AGNC",
+      "CVX",
+      "PG",
+      "AAPL",
+      "AMAT",
+      "GOOGL"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18835.064537434664
+  },
+  {
+    "cohort_formation": "2024-06-28",
+    "entry": "2024-07-01",
+    "exit": "2025-01-02",
+    "symbols": [
+      "BAC",
+      "KO",
+      "JPM",
+      "AFL",
+      "MSFT",
+      "WMT",
+      "GOOGL",
+      "STX",
+      "C",
+      "AGNC",
+      "PG"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 17968.779347459382
+  },
+  {
+    "cohort_formation": "2024-07-31",
+    "entry": "2024-08-01",
+    "exit": "2025-02-03",
+    "symbols": [
+      "ADP",
+      "AFL",
+      "BLK",
+      "UNH",
+      "ADC",
+      "KO",
+      "JPM",
+      "IBM",
+      "CVX",
+      "WMT",
+      "AGNC"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18714.590826392367
+  },
+  {
+    "cohort_formation": "2024-08-30",
+    "entry": "2024-09-03",
+    "exit": "2025-03-03",
+    "symbols": [
+      "ADP",
+      "AFL",
+      "BLK",
+      "IBM",
+      "JNJ",
+      "JPM",
+      "KO",
+      "PG",
+      "WMT",
+      "ADC",
+      "UNH"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18011.370832335797
+  },
+  {
+    "cohort_formation": "2024-09-30",
+    "entry": "2024-10-01",
+    "exit": "2025-04-01",
+    "symbols": [
+      "AFL",
+      "BLK",
+      "CSCO",
+      "MCD",
+      "ORCL",
+      "AAPL",
+      "AGNC",
+      "TSLA",
+      "WMT",
+      "KO",
+      "ADP"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 16984.677505598625
+  },
+  {
+    "cohort_formation": "2024-10-31",
+    "entry": "2024-11-01",
+    "exit": "2025-05-01",
+    "symbols": [
+      "V",
+      "ADP",
+      "JPM",
+      "WMT",
+      "ADC",
+      "MA",
+      "BLK",
+      "CSCO",
+      "C",
+      "VRT",
+      "AAPL"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 17504.626820985613
+  },
+  {
+    "cohort_formation": "2024-11-29",
+    "entry": "2024-12-02",
+    "exit": "2025-06-02",
+    "symbols": [
+      "AAPL",
+      "ACHR",
+      "C",
+      "MA",
+      "V",
+      "WMT",
+      "PG",
+      "JPM",
+      "ADP",
+      "CVX",
+      "ABT"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 17190.054064371136
+  },
+  {
+    "cohort_formation": "2024-12-31",
+    "entry": "2025-01-02",
+    "exit": "2025-07-01",
+    "symbols": [
+      "CSCO",
+      "V",
+      "MA",
+      "C",
+      "AAPL",
+      "GOOGL",
+      "BLK",
+      "JPM",
+      "ADP",
+      "ABT",
+      "WMT"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18083.92171494048
+  },
+  {
+    "cohort_formation": "2025-01-31",
+    "entry": "2025-02-03",
+    "exit": "2025-08-01",
+    "symbols": [
+      "BLK",
+      "GOOGL",
+      "JPM",
+      "V",
+      "WMT",
+      "C",
+      "IBM",
+      "ADP",
+      "AGNC",
+      "ABT",
+      "MA"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 17311.932441143636
+  },
+  {
+    "cohort_formation": "2025-02-28",
+    "entry": "2025-03-03",
+    "exit": "2025-09-02",
+    "symbols": [
+      "ABT",
+      "ADP",
+      "AGNC",
+      "MA",
+      "V",
+      "JNJ",
+      "KO",
+      "CSCO",
+      "CVX",
+      "MCD",
+      "PG"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 16768.132376318787
+  },
+  {
+    "cohort_formation": "2025-03-31",
+    "entry": "2025-04-01",
+    "exit": "2025-10-01",
+    "symbols": [
+      "ADC",
+      "KO",
+      "CVX",
+      "JNJ",
+      "AFL",
+      "MCD",
+      "V",
+      "ADP",
+      "PG",
+      "CSCO",
+      "MA"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 16675.269387924254
+  },
+  {
+    "cohort_formation": "2025-04-30",
+    "entry": "2025-05-01",
+    "exit": "2025-11-03",
+    "symbols": [
+      "MCD",
+      "ADC",
+      "KO",
+      "V",
+      "AFL",
+      "MA",
+      "ADP",
+      "ABT",
+      "JNJ",
+      "WMT",
+      "PG"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 16629.735435708077
+  },
+  {
+    "cohort_formation": "2025-05-30",
+    "entry": "2025-06-02",
+    "exit": "2025-12-01",
+    "symbols": [
+      "ADP",
+      "MA",
+      "STX",
+      "V",
+      "MSFT",
+      "CSCO",
+      "MCD",
+      "KO",
+      "AVGO",
+      "IBM",
+      "ADC"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 20006.073139435666
+  },
+  {
+    "cohort_formation": "2025-06-30",
+    "entry": "2025-07-01",
+    "exit": "2026-01-02",
+    "symbols": [
+      "AVGO",
+      "C",
+      "CSCO",
+      "IBM",
+      "JPM",
+      "NVDA",
+      "ORCL",
+      "STX",
+      "MSFT",
+      "BAC",
+      "BLK"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 20057.714946969874
+  },
+  {
+    "cohort_formation": "2025-07-31",
+    "entry": "2025-08-01",
+    "exit": "2026-02-02",
+    "symbols": [
+      "MSFT",
+      "ORCL",
+      "STX",
+      "NVDA",
+      "JPM",
+      "BLK",
+      "AMD",
+      "CSCO",
+      "C",
+      "JNJ",
+      "AVGO"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 20723.166377866833
+  },
+  {
+    "cohort_formation": "2025-08-29",
+    "entry": "2025-09-02",
+    "exit": "2026-03-02",
+    "symbols": [
+      "AGNC",
+      "BAC",
+      "GOOGL",
+      "JPM",
+      "C",
+      "JNJ",
+      "MA",
+      "MCD",
+      "CVX",
+      "BLK",
+      "STX"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 20765.157536571925
+  },
+  {
+    "cohort_formation": "2025-09-30",
+    "entry": "2025-10-01",
+    "exit": "2026-04-01",
+    "symbols": [
+      "JNJ",
+      "NVDA",
+      "STX",
+      "JPM",
+      "DELL",
+      "BLK",
+      "AFL",
+      "WMT",
+      "AAPL",
+      "BAC",
+      "VRT"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 19534.768383339117
+  },
+  {
+    "cohort_formation": "2025-10-31",
+    "entry": "2025-11-03",
+    "exit": "2026-05-01",
+    "symbols": [
+      "BAC",
+      "CSCO",
+      "GOOGL",
+      "AAPL",
+      "JPM",
+      "AMAT",
+      "AGNC",
+      "DELL",
+      "IBM",
+      "C",
+      "NVDA"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 19364.66077869208
+  },
+  {
+    "cohort_formation": "2025-11-28",
+    "entry": "2025-12-01",
+    "exit": "2026-06-01",
+    "symbols": [
+      "AAPL",
+      "AGNC",
+      "AMAT",
+      "AVGO",
+      "C",
+      "KO",
+      "NUE",
+      "WMT",
+      "JNJ",
+      "BAC",
+      "GOOGL"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 20080.48579729551
+  },
+  {
+    "cohort_formation": "2025-12-31",
+    "entry": "2026-01-02",
+    "exit": "2026-07-01",
+    "symbols": [
+      "AGNC",
+      "NUE",
+      "JPM",
+      "BAC",
+      "GOOGL",
+      "JNJ",
+      "AFL",
+      "KO",
+      "C",
+      "CSCO",
+      "MCD"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 19341.242032684622
+  },
+  {
+    "cohort_formation": "2026-01-30",
+    "entry": "2026-02-02",
+    "exit": "2026-08-03",
+    "symbols": [
+      "CVX",
+      "KO",
+      "GOOGL",
+      "JNJ",
+      "WMT",
+      "MCD",
+      "CSCO",
+      "NUE",
+      "IBM",
+      "AFL",
+      "AGNC"
+    ],
+    "notional": 16666.666666666668,
+    "proceeds_net": 18558.443054236697
+  }
+]

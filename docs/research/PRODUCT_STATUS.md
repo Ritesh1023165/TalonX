@@ -1,11 +1,17 @@
-# Product status (authoritative, updated 2026-09-13 / Task 126)
+# Product status (authoritative, updated 2026-09-13 / Task 127)
 
 **User objective, unchanged**: configured tickers with intraday and
 short/long-horizon alerts, and attributable local paper portfolios.
 **Positive aggregate economics is the goal — informational delivery
 alone is not success**, and earlier descriptive-product decisions
 (Task 96H's "Risk & Event Intelligence" framing) do not override this
-latest, explicit user goal.
+latest, explicit user goal. **Long-term opportunities may use a
+multi-month research horizon** (Task 127) — the absence of a currently
+PASSING multi-month strategy is not a prohibition on testing one; every
+BUY/SELL alert contract, short or long horizon, states an explicit
+decision/entry/holding-review/exit policy, and SELL only closes an
+existing long (no shorting anywhere in this product). An evaluation
+never authorizes live deployment or promises profitability.
 
 ## Current strategy support by horizon
 
@@ -18,8 +24,8 @@ latest, explicit user goal.
 | Overnight attention — daily association | non-actionable, research finding only | **Resolved (Task 123)**: 38 active configured tickers, full available history, N=2,557 triggers/1,905 dates, incremental (trigger-minus-control) net **+0.1687%/event**, date-block-bootstrap 95% CI **[+0.0295%,+0.3085%]** — excludes zero, robust to 2 sensitivities | **`ASSOCIATION_SUPPORTED`** (qualified — CI's lower bound does not fully clear the predeclared ±10bps materiality band) — a real, disclosed research finding, **not actionable**: it depends on same-day final volume, only known at/after that day's own close |
 | Overnight attention — actionable pre-close candidate | EOD alert, 15:50 ET decision | **CLOSED (Task 125, extended)**: same frozen contract, 12-symbol primary cohort extended from 7 months/N=31/100 dates to **2.5 years/N=3,201 eligible/158 triggers/542 distinct dates** on independently re-acquired, feed-verified SIP data (feed identity resolved: `task93_canonical_v1` confirmed SIP, not IEX). Incremental net **−0.2284%/event**, 95% CI **[−0.79%,+0.35%]** — includes zero; absolute trigger net return also negative (−0.1196%); negative in all 3 calendar years tested. A +3-symbol added cohort (BABA/SHOP/SPCX) showed a small positive but 58%-single-issuer-concentrated, non-year-stable reading (n=31) that does not change the primary verdict. Correctness check: the original 2025 sub-window re-evaluated on the new data reproduces Task 123's exact original numbers bit-for-bit | Statistical **`INCONCLUSIVE`** / Product **`DO_NOT_ADVANCE`** — closed on a materially larger, multi-year, feed-verified dataset; not scheduled for further reruns of this contract |
 | Overnight attention — data-extension feasibility | data question only, no returns computed | **Resolved (Task 124), executed (Task 125)**: existing free Alpaca SIP access, already used in this program, verified (small probes, not mere documentation) to retain 1-min history to at least 2020-03-02; the concrete extension it specified (12 symbols back to 2023-01-01 + BABA/SHOP/SPCX) was acquired and evaluated in Task 125 (60/60 partitions, 0 failures) | **`DATA_EXTENSION_FEASIBLE`** (Task 124) → **executed** (Task 125) — see row above for the resulting economic decision |
-| 52-week-high proximity | published 6–12 months, no TalonX-authorized short-horizon version | **Assessed, not run (Task 126)**: product-fit gate applied before any return was inspected — published mechanism is a cross-sectional long-short decile rank with a 6–12-month hold; no existing TalonX horizon authorizes that, and compressing it would be an unvalidated, invented adaptation, not a literature-grounded test | **`BLOCKED_BY_SPECIFIC_PRODUCT_OR_DATA_REQUIREMENT`** — blocked on an explicit product decision (long-hold alert support), not on data or mechanism |
-| Turn-of-month calendar effect | ~4-day calendar window | **Assessed, not run (Task 126)**: product-fit gate applied before any return was inspected — the mechanism structurally produces a common calendar-wide exposure identical across all 48 configured tickers, zero ticker-specific differentiation | **`DO_NOT_ADVANCE`** — rejected on structural product-fit grounds, not on statistical or economic evidence |
+| 52-week-high proximity, long-only 6-month hold | multi-month research horizon, authorized (Task 127) | **RUN AND CLOSED (Task 127)**: tercile selection (top 30% by close/252-day-high) on the 38 active-covered configured tickers, monthly formation, Jegadeesh-Titman-style overlapping 6-month holds, source-grounded (George & Hwang 2004, verified from the primary record — tercile, not decile as previously described). Absolute net return strongly positive (+10.85%/6mo, CI [+6.25%,+15.99%]) but **attributable to broad market beta**: the passive eligible-universe benchmark (no selection at all) returned MORE (+13.70%/6mo). Incremental (selection vs. no-selection) net **−2.846%/6mo**, 95% CI **[−6.96%,+0.23%]** — includes zero, negative in 9/12 non-overlapping 6-month blocks | Statistical **`INCONCLUSIVE`** / Product **`DO_NOT_ADVANCE`** — the added selection complexity is not justified; simply holding the eligible universe outperformed it |
+| Turn-of-month calendar effect | ~4-day calendar window | **Assessed, not run (Task 126)**: product-fit gate applied before any return was inspected — the mechanism structurally produces a common calendar-wide exposure identical across all 48 configured tickers, zero ticker-specific differentiation. Remains un-re-evaluated (Task 127 did not touch it, per explicit instruction) | **`DO_NOT_ADVANCE`** — rejected on structural product-fit grounds, not on statistical or economic evidence |
 
 ## Informational lane
 
@@ -31,10 +37,14 @@ recommendation anywhere in this product.
 
 Not a claim that every possible free-data strategy has been exhausted —
 Task 122's shortlist's other two hypotheses (52-week-high proximity;
-turn-of-month) were assessed on product-fit/mechanism grounds in Task
-126 and both blocked/rejected WITHOUT any return ever being computed
-for either — neither was economically tested or disproven, and both
-remain re-visitable if the named product decisions are made. The
+turn-of-month) were both assessed on product-fit/mechanism grounds in
+Task 126; 52-week-high was then corrected, source-verified, and
+actually RUN in Task 127 (closed `DO_NOT_ADVANCE` on genuine
+incremental-vs-benchmark evidence, not a product-fit block). Turn-of-
+month remains un-re-evaluated — its `DO_NOT_ADVANCE` is a product-fit
+judgment only, and it was never economically tested or disproven; it
+remains re-visitable if the named product decision (accepting a
+non-differentiating, calendar-wide alert type) is made. The
 overnight-attention DAILY association itself (Task 123) is a genuine,
 positive, disclosed research finding — what closed is only the ONE
 specific pre-close actionable mechanism tested, not the whole space.
@@ -50,7 +60,11 @@ Experimental contract on its now-exhausted historical dataset.
 
 ## Full evidence
 
-`docs/research/TASK126_CANDIDATE_SELECTION.md` + `TASK126_ECONOMIC_DECISION.md`
+`docs/research/TASK127_PRODUCT_CONTRACT_CORRECTIONS.md` +
+`TASK127_FROZEN_LONG_TERM_PROTOCOL.md` + `TASK127_LONG_TERM_ECONOMIC_DECISION.md`
+(this task — corrects Task 126's product restrictions, source-verifies
+George & Hwang 2004, freezes and runs one long-only 52-week-high
+contract, closed `DO_NOT_ADVANCE`); `docs/research/TASK126_CANDIDATE_SELECTION.md` + `TASK126_ECONOMIC_DECISION.md`
 (this task — product-fit gate applied to the two remaining Task 122
 candidates, both blocked/rejected before any return was computed;
 Task 125 correction record); `docs/research/TASK125_OVERNIGHT_ACTIONABLE_RESULTS.md` (prior task —

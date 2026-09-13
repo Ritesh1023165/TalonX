@@ -6281,3 +6281,30 @@ calendar exposure identical across all 48 configured tickers, zero
 ticker-specific differentiation — a product-fit failure, not a data or
 statistical one). No evaluation code was run against either candidate.
 Full detail: `docs/research/{TASK126_CANDIDATE_SELECTION,TASK126_ECONOMIC_DECISION}.md`.
+
+**Task 127** (2026-09-13): corrected Task 126's unsupported product
+restrictions (absence of a current multi-month strategy is not a
+prohibition on long-term alerts; ticker-specific differentiation was
+never a stated user requirement; "full coverage" now names an exact
+38-ticker population; corporate-action handling verified, not asserted
+trivial) and authorized a research-only multi-month holding contract.
+Source-verified George & Hwang (2004) from the primary/publisher
+record: TERCILE (not decile, correcting Task 122/126's inherited
+description) sort on close/252-day-high, monthly formation,
+Jegadeesh-Titman-style overlapping 6-month holds, $5 price filter —
+compared against Task 95B's closest prior finding (20-day-high
+proximity, 3-5 day hold, negative) and confirmed genuinely distinct
+(different anchor window and horizon). Froze and ran ONE long-only
+adaptation on the 38 active-covered configured tickers: chronological
+$100k portfolio, 1/6 capital per concurrent cohort slot, 5bps cost.
+Absolute net return strongly positive (+10.85%/6mo, 95% CI
+[+6.25%,+15.99%]) but attributable to broad market beta — the passive
+eligible-universe benchmark (identical eligibility, no selection)
+returned MORE (+13.70%/6mo). Incremental (selection vs. no selection)
+net −2.846%/6mo, 95% CI [−6.96%,+0.23%] (non-overlapping 6-month block
+bootstrap, 12 blocks) — includes zero, negative in 9/12 blocks.
+Statistical `INCONCLUSIVE` / product `DO_NOT_ADVANCE` — the added
+selection complexity is not justified; simply holding the eligible
+universe outperformed it. Turn-of-month remains un-re-evaluated,
+untouched by this task. Full detail:
+`docs/research/{TASK127_PRODUCT_CONTRACT_CORRECTIONS,TASK127_FROZEN_LONG_TERM_PROTOCOL,TASK127_LONG_TERM_ECONOMIC_DECISION}.md`.
