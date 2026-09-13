@@ -1,0 +1,962 @@
+{
+  "A_original12_expanded": {
+    "cohort": "A_original12_expanded",
+    "symbols": [
+      "AAPL",
+      "AMAT",
+      "AMD",
+      "AVGO",
+      "CSCO",
+      "GOOGL",
+      "INTC",
+      "MSFT",
+      "NVDA",
+      "PYPL",
+      "STX",
+      "TSLA"
+    ],
+    "window": [
+      "2022-12-01",
+      "2025-08-14"
+    ],
+    "data_dir": "C:\\workspace\\TalonX-task118-profitability\\results\\task125_intraday_extension\\_merged",
+    "exclusion_counts_by_symbol": {
+      "AAPL": {
+        "symbol": "AAPL",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 84,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 374,
+        "triggers": 12
+      },
+      "AMAT": {
+        "symbol": "AMAT",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 356,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 101,
+        "triggers": 5
+      },
+      "AMD": {
+        "symbol": "AMD",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 82,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 375,
+        "triggers": 15
+      },
+      "AVGO": {
+        "symbol": "AVGO",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 305,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 152,
+        "triggers": 16
+      },
+      "CSCO": {
+        "symbol": "CSCO",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 337,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 214,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 125,
+        "triggers": 5
+      },
+      "GOOGL": {
+        "symbol": "GOOGL",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 185,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 273,
+        "triggers": 18
+      },
+      "INTC": {
+        "symbol": "INTC",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 122,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 335,
+        "triggers": 21
+      },
+      "MSFT": {
+        "symbol": "MSFT",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 201,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 257,
+        "triggers": 15
+      },
+      "NVDA": {
+        "symbol": "NVDA",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 34,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 1,
+        "eligible": 422,
+        "triggers": 20
+      },
+      "PYPL": {
+        "symbol": "PYPL",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 267,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 191,
+        "triggers": 11
+      },
+      "STX": {
+        "symbol": "STX",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 420,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 110,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 147,
+        "triggers": 12
+      },
+      "TSLA": {
+        "symbol": "TSLA",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 8,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 449,
+        "triggers": 8
+      }
+    },
+    "n_eligible_observations": 3201,
+    "n_triggers": 158,
+    "n_distinct_issuers_triggered": 12,
+    "n_distinct_dates_triggered": 117,
+    "trigger_gross_return": {
+      "n": 158,
+      "mean_pct": -0.0696,
+      "median_pct": -0.0367,
+      "win_rate": 0.4873,
+      "worst_5pct_mean_pct": -7.584
+    },
+    "trigger_net_return": {
+      "n": 158,
+      "mean_pct": -0.1196,
+      "median_pct": -0.0867,
+      "win_rate": 0.4684,
+      "worst_5pct_mean_pct": -7.634
+    },
+    "control_unconditional_gross_return": {
+      "n": 3201,
+      "mean_pct": 0.1588,
+      "median_pct": 0.0823,
+      "win_rate": 0.5251,
+      "worst_5pct_mean_pct": -4.4806
+    },
+    "control_unconditional_net_return": {
+      "n": 3201,
+      "mean_pct": 0.1088,
+      "median_pct": 0.0323,
+      "win_rate": 0.5089,
+      "worst_5pct_mean_pct": -4.5306
+    },
+    "incremental_diff_net_pct_mean": -0.2284,
+    "by_issuer_trigger_counts": {
+      "INTC": 21,
+      "NVDA": 20,
+      "GOOGL": 18,
+      "AVGO": 16,
+      "AMD": 15,
+      "MSFT": 15,
+      "AAPL": 12,
+      "STX": 12,
+      "PYPL": 11,
+      "TSLA": 8,
+      "AMAT": 5,
+      "CSCO": 5
+    },
+    "concentration_top1_issuer": {
+      "issuer": "INTC",
+      "issuer_trigger_n": 21,
+      "share_of_triggers": 0.1329,
+      "mean_net_pct_excl_top1": 0.1598
+    },
+    "trigger_by_year": {
+      "2023": {
+        "n": 56,
+        "mean_net_pct": -0.1144
+      },
+      "2024": {
+        "n": 71,
+        "mean_net_pct": -0.0586
+      },
+      "2025": {
+        "n": 31,
+        "mean_net_pct": -0.2688
+      }
+    },
+    "uncertainty": {
+      "n_dates": 542,
+      "n_reps_used": 5000,
+      "trigger_mean_ci_pct": [
+        -0.725,
+        0.4929
+      ],
+      "control_mean_ci_pct": [
+        -0.0149,
+        0.2351
+      ],
+      "incremental_diff_ci_pct": [
+        -0.7946,
+        0.3458
+      ],
+      "method": "date-block bootstrap, joint resampling of trigger+control from the SAME resampled date multiset, 5000 reps, seed 123123, 95% percentile CI"
+    },
+    "exclusion_counts_total": {
+      "no_data": 0,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 2401,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 2514,
+      "missing_next_session": 7,
+      "extreme_return_excluded": 1,
+      "eligible": 3201,
+      "triggers": 158
+    }
+  },
+  "B_added_cohort": {
+    "cohort": "B_added_cohort",
+    "symbols": [
+      "BABA",
+      "SHOP",
+      "SPCX"
+    ],
+    "window": [
+      "2022-12-01",
+      "2025-08-14"
+    ],
+    "data_dir": "C:\\workspace\\TalonX-task118-profitability\\results\\task125_intraday_extension\\_merged",
+    "exclusion_counts_by_symbol": {
+      "BABA": {
+        "symbol": "BABA",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 222,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 235,
+        "triggers": 18
+      },
+      "SHOP": {
+        "symbol": "SHOP",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 303,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 155,
+        "triggers": 12
+      },
+      "SPCX": {
+        "symbol": "SPCX",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 213,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 353,
+        "missing_next_session": 2,
+        "extreme_return_excluded": 0,
+        "eligible": 5,
+        "triggers": 1
+      }
+    },
+    "n_eligible_observations": 395,
+    "n_triggers": 31,
+    "n_distinct_issuers_triggered": 3,
+    "n_distinct_dates_triggered": 31,
+    "trigger_gross_return": {
+      "n": 31,
+      "mean_pct": 0.3088,
+      "median_pct": -0.1699,
+      "win_rate": 0.4839,
+      "worst_5pct_mean_pct": -4.3944
+    },
+    "trigger_net_return": {
+      "n": 31,
+      "mean_pct": 0.2588,
+      "median_pct": -0.2199,
+      "win_rate": 0.4839,
+      "worst_5pct_mean_pct": -4.4444
+    },
+    "control_unconditional_gross_return": {
+      "n": 395,
+      "mean_pct": 0.0342,
+      "median_pct": -0.0477,
+      "win_rate": 0.4785,
+      "worst_5pct_mean_pct": -5.5492
+    },
+    "control_unconditional_net_return": {
+      "n": 395,
+      "mean_pct": -0.0158,
+      "median_pct": -0.0977,
+      "win_rate": 0.4608,
+      "worst_5pct_mean_pct": -5.5992
+    },
+    "incremental_diff_net_pct_mean": 0.2746,
+    "by_issuer_trigger_counts": {
+      "BABA": 18,
+      "SHOP": 12,
+      "SPCX": 1
+    },
+    "concentration_top1_issuer": {
+      "issuer": "BABA",
+      "issuer_trigger_n": 18,
+      "share_of_triggers": 0.5806,
+      "mean_net_pct_excl_top1": 0.4884
+    },
+    "trigger_by_year": {
+      "2023": {
+        "n": 12,
+        "mean_net_pct": -0.0574
+      },
+      "2024": {
+        "n": 13,
+        "mean_net_pct": 1.1424
+      },
+      "2025": {
+        "n": 6,
+        "mean_net_pct": -1.023
+      }
+    },
+    "uncertainty": {
+      "n_dates": 294,
+      "n_reps_used": 5000,
+      "trigger_mean_ci_pct": [
+        -0.5349,
+        1.0844
+      ],
+      "control_mean_ci_pct": [
+        -0.306,
+        0.2923
+      ],
+      "incremental_diff_ci_pct": [
+        -0.497,
+        1.0535
+      ],
+      "method": "date-block bootstrap, joint resampling of trigger+control from the SAME resampled date multiset, 5000 reps, seed 123123, 95% percentile CI"
+    },
+    "exclusion_counts_total": {
+      "no_data": 0,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 738,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 791,
+      "missing_next_session": 3,
+      "extreme_return_excluded": 0,
+      "eligible": 395,
+      "triggers": 31
+    }
+  },
+  "C_combined_secondary": {
+    "cohort": "C_combined_secondary",
+    "symbols": [
+      "AAPL",
+      "AMAT",
+      "AMD",
+      "AVGO",
+      "CSCO",
+      "GOOGL",
+      "INTC",
+      "MSFT",
+      "NVDA",
+      "PYPL",
+      "STX",
+      "TSLA",
+      "BABA",
+      "SHOP",
+      "SPCX"
+    ],
+    "window": [
+      "2022-12-01",
+      "2025-08-14"
+    ],
+    "data_dir": "C:\\workspace\\TalonX-task118-profitability\\results\\task125_intraday_extension\\_merged",
+    "exclusion_counts_by_symbol": {
+      "AAPL": {
+        "symbol": "AAPL",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 84,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 374,
+        "triggers": 12
+      },
+      "AMAT": {
+        "symbol": "AMAT",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 356,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 101,
+        "triggers": 5
+      },
+      "AMD": {
+        "symbol": "AMD",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 82,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 375,
+        "triggers": 15
+      },
+      "AVGO": {
+        "symbol": "AVGO",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 305,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 152,
+        "triggers": 16
+      },
+      "CSCO": {
+        "symbol": "CSCO",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 337,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 214,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 125,
+        "triggers": 5
+      },
+      "GOOGL": {
+        "symbol": "GOOGL",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 185,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 273,
+        "triggers": 18
+      },
+      "INTC": {
+        "symbol": "INTC",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 122,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 335,
+        "triggers": 21
+      },
+      "MSFT": {
+        "symbol": "MSFT",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 201,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 257,
+        "triggers": 15
+      },
+      "NVDA": {
+        "symbol": "NVDA",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 34,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 1,
+        "eligible": 422,
+        "triggers": 20
+      },
+      "PYPL": {
+        "symbol": "PYPL",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 267,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 191,
+        "triggers": 11
+      },
+      "STX": {
+        "symbol": "STX",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 420,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 110,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 147,
+        "triggers": 12
+      },
+      "TSLA": {
+        "symbol": "TSLA",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 8,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 449,
+        "triggers": 8
+      },
+      "BABA": {
+        "symbol": "BABA",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 222,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 235,
+        "triggers": 18
+      },
+      "SHOP": {
+        "symbol": "SHOP",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 303,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 219,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 155,
+        "triggers": 12
+      },
+      "SPCX": {
+        "symbol": "SPCX",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 213,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 353,
+        "missing_next_session": 2,
+        "extreme_return_excluded": 0,
+        "eligible": 5,
+        "triggers": 1
+      }
+    },
+    "n_eligible_observations": 3596,
+    "n_triggers": 189,
+    "n_distinct_issuers_triggered": 15,
+    "n_distinct_dates_triggered": 136,
+    "trigger_gross_return": {
+      "n": 189,
+      "mean_pct": -0.0075,
+      "median_pct": -0.0376,
+      "win_rate": 0.4868,
+      "worst_5pct_mean_pct": -7.0049
+    },
+    "trigger_net_return": {
+      "n": 189,
+      "mean_pct": -0.0575,
+      "median_pct": -0.0876,
+      "win_rate": 0.4709,
+      "worst_5pct_mean_pct": -7.0549
+    },
+    "control_unconditional_gross_return": {
+      "n": 3596,
+      "mean_pct": 0.1452,
+      "median_pct": 0.0722,
+      "win_rate": 0.52,
+      "worst_5pct_mean_pct": -4.6234
+    },
+    "control_unconditional_net_return": {
+      "n": 3596,
+      "mean_pct": 0.0952,
+      "median_pct": 0.0222,
+      "win_rate": 0.5036,
+      "worst_5pct_mean_pct": -4.6734
+    },
+    "incremental_diff_net_pct_mean": -0.1527,
+    "by_issuer_trigger_counts": {
+      "INTC": 21,
+      "NVDA": 20,
+      "GOOGL": 18,
+      "BABA": 18,
+      "AVGO": 16,
+      "AMD": 15,
+      "MSFT": 15,
+      "AAPL": 12,
+      "STX": 12,
+      "SHOP": 12,
+      "PYPL": 11,
+      "TSLA": 8,
+      "AMAT": 5,
+      "CSCO": 5,
+      "SPCX": 1
+    },
+    "concentration_top1_issuer": {
+      "issuer": "INTC",
+      "issuer_trigger_n": 21,
+      "share_of_triggers": 0.1111,
+      "mean_net_pct_excl_top1": 0.1781
+    },
+    "trigger_by_year": {
+      "2023": {
+        "n": 68,
+        "mean_net_pct": -0.1043
+      },
+      "2024": {
+        "n": 84,
+        "mean_net_pct": 0.1272
+      },
+      "2025": {
+        "n": 37,
+        "mean_net_pct": -0.3911
+      }
+    },
+    "uncertainty": {
+      "n_dates": 543,
+      "n_reps_used": 5000,
+      "trigger_mean_ci_pct": [
+        -0.5885,
+        0.4949
+      ],
+      "control_mean_ci_pct": [
+        -0.033,
+        0.2241
+      ],
+      "incremental_diff_ci_pct": [
+        -0.6333,
+        0.3531
+      ],
+      "method": "date-block bootstrap, joint resampling of trigger+control from the SAME resampled date multiset, 5000 reps, seed 123123, 95% percentile CI"
+    },
+    "exclusion_counts_total": {
+      "no_data": 0,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 3139,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 3305,
+      "missing_next_session": 10,
+      "extreme_return_excluded": 1,
+      "eligible": 3596,
+      "triggers": 189
+    }
+  },
+  "D_original_subwindow_verified_sip": {
+    "cohort": "D_original_subwindow_verified_sip",
+    "symbols": [
+      "AAPL",
+      "AMAT",
+      "AMD",
+      "AVGO",
+      "CSCO",
+      "GOOGL",
+      "INTC",
+      "MSFT",
+      "NVDA",
+      "PYPL",
+      "STX",
+      "TSLA"
+    ],
+    "window": [
+      "2025-01-24",
+      "2025-08-14"
+    ],
+    "data_dir": "C:\\workspace\\TalonX-task118-profitability\\results\\task125_intraday_extension\\_merged",
+    "exclusion_counts_by_symbol": {
+      "AAPL": {
+        "symbol": "AAPL",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 17,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 50,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 73,
+        "triggers": 5
+      },
+      "AMAT": {
+        "symbol": "AMAT",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 78,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 50,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 11,
+        "triggers": 1
+      },
+      "AMD": {
+        "symbol": "AMD",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 20,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 50,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 69,
+        "triggers": 5
+      },
+      "AVGO": {
+        "symbol": "AVGO",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 49,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 50,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 40,
+        "triggers": 1
+      },
+      "CSCO": {
+        "symbol": "CSCO",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 77,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 45,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 17,
+        "triggers": 2
+      },
+      "GOOGL": {
+        "symbol": "GOOGL",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 32,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 50,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 58,
+        "triggers": 4
+      },
+      "INTC": {
+        "symbol": "INTC",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 16,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 50,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 73,
+        "triggers": 4
+      },
+      "MSFT": {
+        "symbol": "MSFT",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 63,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 50,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 27,
+        "triggers": 3
+      },
+      "NVDA": {
+        "symbol": "NVDA",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 0,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 50,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 89,
+        "triggers": 1
+      },
+      "PYPL": {
+        "symbol": "PYPL",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 66,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 50,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 24,
+        "triggers": 1
+      },
+      "STX": {
+        "symbol": "STX",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 109,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 21,
+        "missing_next_session": 0,
+        "extreme_return_excluded": 0,
+        "eligible": 10,
+        "triggers": 3
+      },
+      "TSLA": {
+        "symbol": "TSLA",
+        "no_data": false,
+        "missing_cutoff_bar": 0,
+        "missing_entry_bar": 1,
+        "missing_next_open_bar": 0,
+        "insufficient_trailing_history": 50,
+        "missing_next_session": 1,
+        "extreme_return_excluded": 0,
+        "eligible": 88,
+        "triggers": 1
+      }
+    },
+    "n_eligible_observations": 579,
+    "n_triggers": 31,
+    "n_distinct_issuers_triggered": 12,
+    "n_distinct_dates_triggered": 20,
+    "trigger_gross_return": {
+      "n": 31,
+      "mean_pct": -0.2188,
+      "median_pct": -0.6098,
+      "win_rate": 0.4516,
+      "worst_5pct_mean_pct": -7.0423
+    },
+    "trigger_net_return": {
+      "n": 31,
+      "mean_pct": -0.2688,
+      "median_pct": -0.6598,
+      "win_rate": 0.4516,
+      "worst_5pct_mean_pct": -7.0923
+    },
+    "control_unconditional_gross_return": {
+      "n": 579,
+      "mean_pct": 0.3316,
+      "median_pct": 0.2447,
+      "win_rate": 0.5717,
+      "worst_5pct_mean_pct": -5.3849
+    },
+    "control_unconditional_net_return": {
+      "n": 579,
+      "mean_pct": 0.2816,
+      "median_pct": 0.1947,
+      "win_rate": 0.5509,
+      "worst_5pct_mean_pct": -5.4349
+    },
+    "incremental_diff_net_pct_mean": -0.5504,
+    "by_issuer_trigger_counts": {
+      "AAPL": 5,
+      "AMD": 5,
+      "GOOGL": 4,
+      "INTC": 4,
+      "MSFT": 3,
+      "STX": 3,
+      "CSCO": 2,
+      "AMAT": 1,
+      "AVGO": 1,
+      "NVDA": 1,
+      "PYPL": 1,
+      "TSLA": 1
+    },
+    "concentration_top1_issuer": {
+      "issuer": "AAPL",
+      "issuer_trigger_n": 5,
+      "share_of_triggers": 0.1613,
+      "mean_net_pct_excl_top1": -0.5491
+    },
+    "trigger_by_year": {
+      "2025": {
+        "n": 31,
+        "mean_net_pct": -0.2688
+      }
+    },
+    "uncertainty": {
+      "n_dates": 100,
+      "n_reps_used": 5000,
+      "trigger_mean_ci_pct": [
+        -2.0298,
+        1.5912
+      ],
+      "control_mean_ci_pct": [
+        -0.0705,
+        0.6207
+      ],
+      "incremental_diff_ci_pct": [
+        -2.1445,
+        1.209
+      ],
+      "method": "date-block bootstrap, joint resampling of trigger+control from the SAME resampled date multiset, 5000 reps, seed 123123, 95% percentile CI"
+    },
+    "exclusion_counts_total": {
+      "no_data": 0,
+      "missing_cutoff_bar": 0,
+      "missing_entry_bar": 528,
+      "missing_next_open_bar": 0,
+      "insufficient_trailing_history": 566,
+      "missing_next_session": 7,
+      "extreme_return_excluded": 0,
+      "eligible": 579,
+      "triggers": 31
+    }
+  }
+}

@@ -6220,3 +6220,44 @@ outcome return computed): 35/48 configured tickers covered by existing
 free daily bars, 2,447 trigger events over 86 months, 0 data-quality
 issues, 0 zero-trigger months. Fixed next-evaluation protocol frozen,
 not yet run. Full detail: `docs/research/TASK122_CANDIDATE_DECISION.md`.
+
+**Task 123** (2026-09-13): corrected Task 122's causal-timing defect (a
+same-close trigger built from session S's own final volume cannot be
+acted on at S's own close). Split into Track A — DAILY-DATA ASSOCIATION
+DIAGNOSTIC, non-actionable, `ASSOCIATION_SUPPORTED` (qualified): N=2,557
+triggers/1,905 dates, incremental net +0.1687%/event, date-block-
+bootstrap 95% CI [+0.0295%,+0.3085%] excludes zero — and Track B —
+ACTIONABLE PRE-CLOSE CANDIDATE (15:50 ET cutoff, 2-min delay,
+next-open reference exit), `NOT_SUPPORTED_UNDER_TESTED_CONTRACT`: 12
+symbols/7-month common coverage, N=31 triggers, incremental net
+−0.5504%/event, 95% CI [−2.14%,+1.21%] includes zero. Closed as an
+actionable candidate on the data available at the time; exact missing
+input named (broader/longer intraday coverage), not pursued that task.
+
+**Task 124** (2026-09-13): bounded data-feasibility check (no return
+computed) for extending Track B's intraday coverage. Verdict
+`DATA_EXTENSION_FEASIBLE` — small Alpaca SIP/IEX probes confirmed 1-min
+retention to at least 2020-03-02 and real coverage for 2 of 5
+Task-124-identified candidate tickers (SHOP, BABA); specified one
+concrete acquisition task (extend the 12 Track-B symbols to 2023-01-01,
+add the 5 candidates), not executed that task.
+
+**Task 125** (2026-09-13): executed Task 124's acquisition spec and ran
+ONE extended evaluation of Track B's frozen contract. Resolved
+`task93_canonical_v1`'s feed identity from acquisition code + a
+confirmatory live probe (bar-for-bar match to explicit `feed=sip`,
+differs from `feed=iex`) — it is SIP, not IEX as previously suspected.
+Acquired 60/60 partitions (12 original + BABA/SHOP/SPCX, 2022-12→
+2025-08-14, 0 failures) via a resumable per-symbol/date-partition
+downloader; SKHY/BLSH excluded from the added cohort on coverage
+grounds (post-window listing / near-zero prior history), decided
+before any return. Evaluated 4 cohorts on the SAME frozen contract: the
+primary cohort (original 12, expanded window) reached N=3,201
+eligible/158 triggers/542 distinct dates, incremental net −0.2284%,
+95% CI [−0.79%,+0.35%] — includes zero, negative in all 3 calendar
+years tested; the original 2025 sub-window re-evaluated on the new
+data reproduced Task 123's exact original numbers bit-for-bit
+(correctness check). Statistical `INCONCLUSIVE` / product
+`DO_NOT_ADVANCE` — closed on a materially larger, multi-year,
+feed-verified dataset; not scheduled for further reruns of this exact
+contract. Full detail: `docs/research/TASK125_OVERNIGHT_ACTIONABLE_RESULTS.md`.
