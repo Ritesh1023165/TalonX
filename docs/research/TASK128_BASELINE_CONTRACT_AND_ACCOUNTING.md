@@ -143,3 +143,141 @@ composition is optimized anywhere in this task. The purpose is solely
 to establish what Benchmark B1 actually delivers as a chronological
 portfolio and whether that is a useful long-term paper-alert product —
 not to improve its backtest.
+
+## Part 4 — reconciled chronological portfolio (real results)
+
+Run via `research/scripts/task128_baseline_chronological_reconciliation.py`
+after 4 passing fixture tests (`tests/test_task128_chronological_reconciliation.py`
+— no negative cash/implicit leverage, cash+marked=equity reconciliation,
+insufficient-cash guard behavior, drawdown/recovery-duration on a known
+synthetic path). Full output:
+`results/task128_baseline_reconciliation/chronological_reconciliation.json`
+(compact form copied to `docs/research/evidence/task128/`; the full
+daily equity curve, 351KB, stays local-only per this program's
+evidence-size convention).
+
+| | Benchmark B1 (no selection) | Strategy A (tercile) | SPY (same $100k, same dates) |
+|---|---:|---:|---:|
+| Starting capital | $100,000 | $100,000 | $100,000 |
+| Ending equity | **$251,128.98** | $218,662.44 | $342,677.81 |
+| Total return | **+151.13%** | +118.66% | +242.68% |
+| **Annualized return** (7.66 yrs elapsed) | **+12.77%** | +10.75% | +17.44% |
+| Max drawdown (daily marked equity) | **−19.58%** | −14.54% | −33.79% |
+| Drawdown peak → trough → recovery | 2022-01-03 → 2022-10-12 → 2023-06-15 | 2021-12-27 → 2022-09-30 → 2023-07-12 | 2020-02-19 → 2020-03-23 → 2020-08-10 |
+| Recovery duration | 528 days | 562 days | 173 days |
+| Recovery status | RECOVERED | RECOVERED | RECOVERED |
+| Capital utilization (% days with ≥1 open position) | 79.3% | 79.3% | 100% (fully invested day 1) |
+| Realized round trips | 67 | 67 | n/a (buy-and-hold) |
+| Insufficient-cash skips | 1 (2020-12-01 entry) | 1 | n/a |
+| Under 15bps adverse cost | ending equity $249,936.45 (+149.94%, +12.70% ann.) | — | n/a |
+
+- **This is the first genuinely chronological, portfolio-level result
+  for Benchmark B1** — Task 127 never computed one (§ Part 2 above).
+  It confirms Task 127's ORIGINAL directional finding (Strategy A
+  underperforms Benchmark B1) in a materially more rigorous form: a
+  real $100k portfolio with capital constraints, realistic cost timing,
+  and a genuine compounding path — not an unweighted average of 68
+  independent point returns.
+- **The one insufficient-cash skip (2020-12-01) is a real, disclosed
+  instance of the "no implicit leverage" rule actually binding** — not
+  a bug. With exactly 6 slots at `starting_capital/6` each, cumulative
+  small entry costs (2.5bps per slot) leave slightly less than
+  `6 × slot_capital` in cash once all 6 slots are ever filled
+  simultaneously; on this one occasion the arithmetic came up ~$12
+  short and the entry was correctly SKIPPED rather than funded via
+  leverage. Effect: 67 of 68 possible entries realized, one entry
+  forgone — economically negligible, structurally reassuring (the
+  guard works).
+- **Realized vs. unrealized P&L**: by the end of the tracked window
+  (2026-08-31) both Benchmark B1 and Strategy A have **0 open
+  positions** — the portfolio naturally winds down because no further
+  cohort can be FORMED within the final ~6 months of available data
+  (not a forced liquidation; no position was closed early solely to
+  make the report flat — every closure above is a normal, scheduled
+  6-month exit at its own predetermined date).
+- **Contribution by issuer** (net $ P&L across all 67 realized round
+  trips, Benchmark B1): top contributors MSTR (+$16,533), VRT
+  (+$12,220), STX (+$11,374); only 3 of 38 issuers show a net loss
+  (ACHR −$1,751, ABCL −$2,021, PYPL −$2,446) — broad-based, not
+  concentrated in one or two names.
+- **Gross vs. cost-adjusted**: the 15bps adverse-cost sensitivity
+  moves ending equity from $251,128.98 to $249,936.45 — a ~$1,193
+  (0.47%) difference over the full 7.66-year run. Costs are a minor
+  factor relative to either the market-exposure return or the
+  selection-vs-no-selection gap; this baseline's economics are NOT
+  cost-sensitive at these cost levels.
+
+## Part 5 — fair comparison (same capital, same dates, both marked daily)
+
+SPY and Benchmark B1 use the **identical** $100,000 starting capital
+and the **identical** 2019-01-02→2026-08-31 date range, both marked
+DAILY (not the mismatched "full-period total return vs. per-6-month-
+cohort average" comparison Task 127 originally made — corrected Part 1
+above). **One deployment-timing difference remains and is disclosed,
+not hidden**: SPY is conventionally fully invested from day 1, while
+Benchmark B1 ramps up over its first ~13 months (252-day eligibility
+warm-up) and averages 79.3% utilization thereafter (never negative
+cash, per Part 4's own guard). This means part of the gap between
+Benchmark B1's +12.77% and SPY's +17.44% annualized return reflects
+**allocation/deployment timing**, not solely stock selection — the two
+effects are NOT separated by this comparison alone (doing so would
+require a fully-invested-from-day-1 variant of Benchmark B1's own
+universe, which was not built — disclosed as a residual limitation,
+not resolved by inventing a new contract in this task).
+
+**No alpha is claimed from Benchmark B1's positive absolute return.**
+Both Benchmark B1 and SPY were strongly positive over this specific
+secular bull-market window; underperforming SPY by ~4.7 points of
+annualized return is a real, material gap, not a rounding difference.
+Whether the ADDED COMPLEXITY of running 38 individual, overlapping,
+6-month-cohort positions is worth it FOR A USER, relative to just
+holding SPY (or nothing, or a simpler tracker), is assessed on its own
+terms in `TASK128_BASELINE_PRODUCT_DECISION.md` Part 7 — not inferred
+from the return gap alone.
+
+## Part 6 — retrospective watchlist-bias audit
+
+- **Verified historical membership**: **NONE available.** No dated,
+  point-in-time watchlist snapshot exists anywhere in this repository
+  for any date before today (2026-09-13). This is stated directly, not
+  worked around.
+- **Today's watchlist projected backward**: **ALL 38** symbols used in
+  this evaluation — the entire study population is today's active
+  configured tickers, applied to historical prices. This is the SAME
+  limitation already disclosed in Task 127 (Part 3, "Universe, snapshot,
+  and historical-membership limitation") — restated here per this
+  task's own explicit audit requirement, not newly discovered.
+- **Pre-listing exclusions**: ABCL (first bar 2020-12-11) and ACHR
+  (2020-12-18) are naturally excluded from every cohort's eligible pool
+  until each individually accumulates 252 trading days of its OWN
+  history (≈ late 2021/early 2022) — handled mechanically by the
+  existing eligibility filter, not by any special-case code.
+- **Missing or delisted names**: **NONE in this panel, by
+  construction** — today's active watchlist cannot contain a name that
+  was delisted, since a delisted name would not still be "active"
+  today. This is the survivorship gap itself, not a separate mechanism
+  needing separate handling.
+- **Data-availability-driven exclusions**: **5 of the 43 currently-
+  active configured tickers** (BABA, BLSH, SHOP, SKHY, SPCX) have no
+  located daily-bar coverage in either of the two directories used and
+  are excluded from BOTH Strategy A and Benchmark B1 identically — a
+  coverage gap, not a performance-based exclusion (already established
+  in Task 123/124/125/127).
+- **Contribution table cross-check**: Part 4's issuer-contribution
+  table shows 35 of 38 issuers net-positive and only 3 net-negative
+  (ACHR, ABCL, PYPL) — no name was removed after seeing this outcome;
+  all 38 remain in the reported universe regardless of their individual
+  contribution sign, per this task's own explicit "do not remove
+  successful or unsuccessful names after seeing outcomes" instruction.
+- **Can survivorship bias be quantified here? No.** There is no
+  point-in-time comparison universe available to measure the bias
+  against — stated directly, not approximated with an invented
+  substitute. Qualitatively: survivorship bias plausibly inflates BOTH
+  Benchmark B1's and Strategy A's absolute returns similarly (both use
+  the IDENTICAL 38-name universe), so it should not by itself explain
+  the negative Strategy-A-vs-Benchmark-B1 gap (a within-universe
+  comparison), but it does mean NEITHER absolute return figure — nor
+  the SPY-relative gap — should be read as a historically achievable,
+  unbiased return for a strategy that would have used a true
+  historical point-in-time universe. No broader historical-membership
+  reconstruction project is undertaken in this task.

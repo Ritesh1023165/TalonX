@@ -6308,3 +6308,30 @@ selection complexity is not justified; simply holding the eligible
 universe outperformed it. Turn-of-month remains un-re-evaluated,
 untouched by this task. Full detail:
 `docs/research/{TASK127_PRODUCT_CONTRACT_CORRECTIONS,TASK127_FROZEN_LONG_TERM_PROTOCOL,TASK127_LONG_TERM_ECONOMIC_DECISION}.md`.
+
+**Task 128** (2026-09-13): corrected Task 127's overclaimed language
+(no rerun of the selection strategy): "adds no value" -> "did not
+demonstrate added value in this evaluation"; non-overlapping bootstrap
+blocks are not proven statistically independent; "attributable to
+broad market beta" softened to "consistent with" (no factor regression
+was run); flagged SPY's full-period total return and per-6-month-
+cohort averages as non-directly-comparable metric types. Identified
+that Task 127's reported Benchmark B1 (no-selection) +13.70% was an
+ARITHMETIC MEAN of 68 individual cohort returns, not a portfolio
+return -- `run_chronological_portfolio` was only ever called for
+Strategy A. Reused that same, already-generic function (extended only
+to mark every trading day, not just month-ends) to build the FIRST
+real chronological $100k portfolio for Benchmark B1: total return
++151.13%, annualized +12.77%, max drawdown -19.58% (recovered in 528
+days), 79.3% average capital utilization, 67/68 round trips realized
+(1 correctly skipped by the no-implicit-leverage guard on real data).
+Same-capital, same-dates, both-marked-daily SPY comparison: +242.68%
+total / +17.44% annualized -- the baseline underperforms simple SPY
+buy-and-hold by ~4.7 points annualized. Survivorship-bias audit: no
+point-in-time watchlist snapshot exists anywhere in the repo to
+quantify the bias against; stated directly rather than approximated.
+Product decision: `USEFUL_AS_TRACKING_BENCHMARK_ONLY` -- genuine,
+now-trustworthy research control for future long-term candidates, not
+productized as a standalone alert (no ticker differentiation,
+underperforms the simplest passive alternative). Full detail:
+`docs/research/{TASK128_BASELINE_CONTRACT_AND_ACCOUNTING,TASK128_BASELINE_PRODUCT_DECISION}.md`.

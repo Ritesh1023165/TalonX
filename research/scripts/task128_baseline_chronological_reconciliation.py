@@ -50,6 +50,15 @@ def run_chronological_portfolio_daily(cohorts: list, data: dict, all_dates: pd.D
     realized = [c for c in cohorts if c.status == "REALIZED"]
     slot_capital = starting_capital / t127.HOLD_MONTHS
 
+    # Precomputed, forward-filled close-price lookup per symbol -- O(1)
+    # per (symbol, date) instead of re-filtering the whole DataFrame on
+    # every call (the naive per-date boolean mask was the bottleneck on
+    # ~1,900 trading days x up to 38 concurrently-marked symbols).
+    close_lookup: dict[str, pd.Series] = {}
+    for sym, df in data.items():
+        s = df.set_index("date")["close"].reindex(all_dates).ffill()
+        close_lookup[sym] = s
+
     cash = starting_capital
     open_positions: list[dict] = []
     equity_curve = []
@@ -104,15 +113,11 @@ def run_chronological_portfolio_daily(cohorts: list, data: dict, all_dates: pd.D
         unresolved = []
         for pos in open_positions:
             for sym, n in pos["shares"].items():
-                px = t127._price_on_or_none(data[sym], d, "close")
-                if px is not None:
-                    marked += n * px
+                px = close_lookup[sym].get(d)
+                if pd.notna(px):
+                    marked += n * float(px)
                 else:
-                    df = data[sym]
-                    prior = df[df["date"] <= d]
-                    if len(prior):
-                        marked += n * float(prior.iloc[-1]["close"])
-                        unresolved.append(sym)
+                    unresolved.append(sym)
         equity = cash + marked
         equity_curve.append({"date": str(d.date()), "cash": round(cash, 2),
                             "marked_positions": round(marked, 2), "equity": round(equity, 2),
@@ -122,7 +127,14 @@ def run_chronological_portfolio_daily(cohorts: list, data: dict, all_dates: pd.D
     eq = pd.Series([e["equity"] for e in equity_curve],
                    index=pd.to_datetime([e["date"] for e in equity_curve]))
     running_max = eq.cummax()
-    drawdown = (eq - running_max) / running_max
+    # guard against a degenerate all-zero equity path (e.g. starting_capital=0,
+    # every entry skipped) -- running_max is 0 throughout, division is undefined;
+    # treat as a flat/no drawdown series rather than raising on all-NaN.
+    if (running_max == 0).all():
+        drawdown = pd.Series(0.0, index=eq.index)
+    else:
+        drawdown = (eq - running_max) / running_max.replace(0, pd.NA)
+        drawdown = drawdown.fillna(0.0)
     trough_idx = drawdown.idxmin()
     max_drawdown_pct = float(drawdown.min() * 100)
     peak_idx = eq[:trough_idx].idxmax()
@@ -138,9 +150,10 @@ def run_chronological_portfolio_daily(cohorts: list, data: dict, all_dates: pd.D
     end_equity = equity_curve[-1]["equity"] if equity_curve else None
     first_date, last_date = all_dates.min(), all_dates.max()
     elapsed_years = (last_date - first_date).days / 365.25
-    total_return_pct = round(100 * (end_equity / start_capital - 1.0), 4) if end_equity else None
+    total_return_pct = (round(100 * (end_equity / start_capital - 1.0), 4)
+                        if end_equity is not None and start_capital > 0 else None)
     annualized_pct = (round(100 * ((end_equity / start_capital) ** (1 / elapsed_years) - 1.0), 4)
-                      if end_equity and end_equity > 0 else None)
+                      if end_equity and start_capital > 0 else None)
 
     n_util_days = sum(1 for e in equity_curve if e["n_open_cohorts"] > 0)
     turnover_events = len([r for r in realized_log if "proceeds_net" in r])
