@@ -1,0 +1,865 @@
+{
+  "summary": {
+    "universe_version": "discovery_universe_v1",
+    "source": "results/task118_profitability/reconciliation/population_manifest.json (Task 118D, matched post-Task-117 runtime, NOT Task 116's raw 620-name figure)",
+    "n_total_symbols": 626,
+    "n_tier1_sec_resolved_subset": 39,
+    "n_broad_discovery_only": 587,
+    "n_symbols_with_cik_mapping_ambiguity": 35,
+    "n_symbols_with_zero_form4_coverage": 12,
+    "n_symbols_with_zero_price_coverage": 1,
+    "known_mapping_ambiguity_note": "35 symbols resolve to more than one distinct issuer_cik in the research parquet (e.g. ticker reuse after a name change/spin-off/share-class filing quirk) -- the primary_issuer_cik field here is the MOST-FREQUENT CIK for that symbol in the data, not a verified single true mapping; flagged, not silently resolved.",
+    "zero_filing_coverage_note": "12 symbols (including SHOP, one of Tier 1's own 39 SEC-resolved names) have ZERO Form 4 open-market code-P records in the research parquet used by this replay -- these symbols cannot produce any episode/trade in this evaluation regardless of liquidity or contract, purely a data-coverage gap, not a filtering decision. Not silently dropped from the manifest.",
+    "generated_at_utc": "2026-09-13T11:16:43.204784+00:00"
+  },
+  "n_full_entries": 626,
+  "flagged_entries_only": [
+    {
+      "symbol": "A",
+      "primary_issuer_cik": "1090872",
+      "issuer_name": "AGILENT TECHNOLOGIES INC",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 144,
+      "distinct_ciks_seen": 3,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-01-31",
+      "last_filing_date": "2025-12-03",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_3_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "AME",
+      "primary_issuer_cik": "1037868",
+      "issuer_name": "AMETEK INC/",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 204,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-02-12",
+      "last_filing_date": "2026-03-25",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "APA",
+      "primary_issuer_cik": "1841666",
+      "issuer_name": "APA Corp",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 16,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-05-07",
+      "last_filing_date": "2026-03-20",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "APO",
+      "primary_issuer_cik": "1411494",
+      "issuer_name": "Apollo Global Management LLC",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 390,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-02-13",
+      "last_filing_date": "2025-12-12",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "ARNC",
+      "primary_issuer_cik": "4281",
+      "issuer_name": "Arconic Inc.",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 50,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-03-07",
+      "last_filing_date": "2022-11-22",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "AXON",
+      "primary_issuer_cik": "1069183",
+      "issuer_name": "AXON ENTERPRISE, INC.",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 930,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-03-19",
+      "last_filing_date": "2026-03-19",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "BEN",
+      "primary_issuer_cik": "38777",
+      "issuer_name": "FRANKLIN RESOURCES INC",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 38,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-03-04",
+      "last_filing_date": "2025-11-21",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "BF.B",
+      "primary_issuer_cik": null,
+      "issuer_name": null,
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 0,
+      "distinct_ciks_seen": 0,
+      "cik_mapping_ambiguous": false,
+      "first_filing_date": null,
+      "last_filing_date": null,
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "NO_FORM4_RECORDS_IN_RESEARCH_PARQUET"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "BG",
+      "primary_issuer_cik": "1144519",
+      "issuer_name": "Bunge LTD",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 140,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-05-22",
+      "last_filing_date": "2026-02-13",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "BIO",
+      "primary_issuer_cik": null,
+      "issuer_name": null,
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 0,
+      "distinct_ciks_seen": 0,
+      "cik_mapping_ambiguous": false,
+      "first_filing_date": null,
+      "last_filing_date": null,
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "NO_FORM4_RECORDS_IN_RESEARCH_PARQUET"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "BLK",
+      "primary_issuer_cik": "1364742",
+      "issuer_name": "BlackRock Inc.",
+      "in_tier1_sec_resolved_39": true,
+      "n_form4_open_market_records": 359,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-01-22",
+      "last_filing_date": "2026-02-26",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "BRK.B",
+      "primary_issuer_cik": null,
+      "issuer_name": null,
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 0,
+      "distinct_ciks_seen": 0,
+      "cik_mapping_ambiguous": false,
+      "first_filing_date": null,
+      "last_filing_date": null,
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "NO_FORM4_RECORDS_IN_RESEARCH_PARQUET"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "CLX",
+      "primary_issuer_cik": "21076",
+      "issuer_name": "CLOROX CO /DE/",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 78,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-02-08",
+      "last_filing_date": "2025-11-24",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "COHR",
+      "primary_issuer_cik": "820318",
+      "issuer_name": "COHERENT CORP.",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 151,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-11-12",
+      "last_filing_date": "2026-03-18",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "COR",
+      "primary_issuer_cik": "1490892",
+      "issuer_name": "CoreSite Realty Corp",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 335,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-02-27",
+      "last_filing_date": "2026-02-24",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "CTLT",
+      "primary_issuer_cik": "1596783",
+      "issuer_name": "Catalent, Inc.",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 234,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-02-20",
+      "last_filing_date": "2024-11-14",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "CTRA",
+      "primary_issuer_cik": "1704715",
+      "issuer_name": "Contura Energy, Inc.",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 190,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-01-07",
+      "last_filing_date": "2025-05-22",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "CZR",
+      "primary_issuer_cik": "1590895",
+      "issuer_name": "Caesars Entertainment, Inc.",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 74,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-03-08",
+      "last_filing_date": "2025-11-03",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "DIS",
+      "primary_issuer_cik": "1744489",
+      "issuer_name": "Walt Disney Co",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 132,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-01-04",
+      "last_filing_date": "2026-02-17",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "DLR",
+      "primary_issuer_cik": "1297996",
+      "issuer_name": "Digital Realty Trust, Inc.",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 139,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-02-12",
+      "last_filing_date": "2025-12-01",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "DOC",
+      "primary_issuer_cik": "1574540",
+      "issuer_name": "Physicians Realty Trust",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 55,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-06-07",
+      "last_filing_date": "2025-08-06",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "EW",
+      "primary_issuer_cik": "1099800",
+      "issuer_name": "Edwards Lifesciences Corp",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 705,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-01-03",
+      "last_filing_date": "2026-03-11",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "FDXF",
+      "primary_issuer_cik": null,
+      "issuer_name": null,
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 0,
+      "distinct_ciks_seen": 0,
+      "cik_mapping_ambiguous": false,
+      "first_filing_date": null,
+      "last_filing_date": null,
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "NO_FORM4_RECORDS_IN_RESEARCH_PARQUET"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "FI",
+      "primary_issuer_cik": "798354",
+      "issuer_name": "FISERV INC",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 80,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-03-04",
+      "last_filing_date": "2025-11-03",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "FOX",
+      "primary_issuer_cik": "1754301",
+      "issuer_name": "Fox Corp",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 79,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-02-12",
+      "last_filing_date": "2026-03-13",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "FOXA",
+      "primary_issuer_cik": null,
+      "issuer_name": null,
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 0,
+      "distinct_ciks_seen": 0,
+      "cik_mapping_ambiguous": false,
+      "first_filing_date": null,
+      "last_filing_date": null,
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "NO_FORM4_RECORDS_IN_RESEARCH_PARQUET"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "FRC",
+      "primary_issuer_cik": null,
+      "issuer_name": null,
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 0,
+      "distinct_ciks_seen": 0,
+      "cik_mapping_ambiguous": false,
+      "first_filing_date": null,
+      "last_filing_date": null,
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "NO_FORM4_RECORDS_IN_RESEARCH_PARQUET"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "GEN",
+      "primary_issuer_cik": "1351051",
+      "issuer_name": "Genesis Healthcare, Inc.",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 43,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-05-22",
+      "last_filing_date": "2026-02-19",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "HONA",
+      "primary_issuer_cik": null,
+      "issuer_name": null,
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 0,
+      "distinct_ciks_seen": 0,
+      "cik_mapping_ambiguous": false,
+      "first_filing_date": null,
+      "last_filing_date": null,
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "NO_FORM4_RECORDS_IN_RESEARCH_PARQUET"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "IR",
+      "primary_issuer_cik": "1699150",
+      "issuer_name": "Ingersoll Rand Inc.",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 146,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-01-03",
+      "last_filing_date": "2026-03-04",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "LB",
+      "primary_issuer_cik": "701985",
+      "issuer_name": "L Brands, Inc.",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 31,
+      "distinct_ciks_seen": 3,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2020-07-01",
+      "last_filing_date": "2026-03-06",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_3_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "LEN",
+      "primary_issuer_cik": null,
+      "issuer_name": null,
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 0,
+      "distinct_ciks_seen": 0,
+      "cik_mapping_ambiguous": false,
+      "first_filing_date": null,
+      "last_filing_date": null,
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "NO_FORM4_RECORDS_IN_RESEARCH_PARQUET"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "MAA",
+      "primary_issuer_cik": "912595",
+      "issuer_name": "MID AMERICA APARTMENT COMMUNITIES INC.",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 158,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-01-10",
+      "last_filing_date": "2026-01-08",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "MRVL",
+      "primary_issuer_cik": "1835632",
+      "issuer_name": "Marvell Technology, Inc.",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 253,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-01-14",
+      "last_filing_date": "2026-03-27",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "MTCH",
+      "primary_issuer_cik": "891103",
+      "issuer_name": "Match Group, Inc.",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 182,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-02-12",
+      "last_filing_date": "2026-03-06",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "NWSA",
+      "primary_issuer_cik": null,
+      "issuer_name": null,
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 0,
+      "distinct_ciks_seen": 0,
+      "cik_mapping_ambiguous": false,
+      "first_filing_date": null,
+      "last_filing_date": null,
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "NO_FORM4_RECORDS_IN_RESEARCH_PARQUET"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "PCG",
+      "primary_issuer_cik": "75488",
+      "issuer_name": "PACIFIC GAS & ELECTRIC Co",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 183,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2021-09-02",
+      "last_filing_date": "2026-03-17",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "PG",
+      "primary_issuer_cik": "80424",
+      "issuer_name": "PROCTER & GAMBLE Co",
+      "in_tier1_sec_resolved_39": true,
+      "n_form4_open_market_records": 566,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-01-28",
+      "last_filing_date": "2026-03-02",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "SBNY",
+      "primary_issuer_cik": null,
+      "issuer_name": null,
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 0,
+      "distinct_ciks_seen": 0,
+      "cik_mapping_ambiguous": false,
+      "first_filing_date": null,
+      "last_filing_date": null,
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "NO_FORM4_RECORDS_IN_RESEARCH_PARQUET"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "SHOP",
+      "primary_issuer_cik": null,
+      "issuer_name": null,
+      "in_tier1_sec_resolved_39": true,
+      "n_form4_open_market_records": 0,
+      "distinct_ciks_seen": 0,
+      "cik_mapping_ambiguous": false,
+      "first_filing_date": null,
+      "last_filing_date": null,
+      "has_daily_price_coverage": false,
+      "price_source": null,
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "NO_FORM4_RECORDS_IN_RESEARCH_PARQUET",
+        "NO_DAILY_PRICE_COVERAGE"
+      ],
+      "confidence": "LOW"
+    },
+    {
+      "symbol": "SOLS",
+      "primary_issuer_cik": null,
+      "issuer_name": null,
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 0,
+      "distinct_ciks_seen": 0,
+      "cik_mapping_ambiguous": false,
+      "first_filing_date": null,
+      "last_filing_date": null,
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "NO_FORM4_RECORDS_IN_RESEARCH_PARQUET"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "STE",
+      "primary_issuer_cik": "1757898",
+      "issuer_name": "STERIS plc",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 183,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-01-14",
+      "last_filing_date": "2026-03-06",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "SWK",
+      "primary_issuer_cik": "93556",
+      "issuer_name": "STANLEY BLACK & DECKER, INC.",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 87,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-01-28",
+      "last_filing_date": "2025-11-06",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "TEL",
+      "primary_issuer_cik": "1385157",
+      "issuer_name": "TE Connectivity Ltd.",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 205,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-02-07",
+      "last_filing_date": "2026-03-03",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "TPL",
+      "primary_issuer_cik": "1811074",
+      "issuer_name": "Texas Pacific Land Corp",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 6141,
+      "distinct_ciks_seen": 3,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-03-18",
+      "last_filing_date": "2026-03-31",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_3_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "WTW",
+      "primary_issuer_cik": "1140536",
+      "issuer_name": "WILLIS TOWERS WATSON PLC",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 64,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-03-04",
+      "last_filing_date": "2026-03-05",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "symbol": "XRX",
+      "primary_issuer_cik": "1770450",
+      "issuer_name": "Xerox Holdings Corp",
+      "in_tier1_sec_resolved_39": false,
+      "n_form4_open_market_records": 44,
+      "distinct_ciks_seen": 2,
+      "cik_mapping_ambiguous": true,
+      "first_filing_date": "2019-09-11",
+      "last_filing_date": "2025-08-05",
+      "has_daily_price_coverage": true,
+      "price_source": "task95g_broad_cross_sectional/_daily",
+      "membership_eligibility_source": "task118d_matched_runtime_population_C (task116_620_panel UNION tier1_39_sec_resolved), re-run under post-task117 runtime",
+      "exclusion_reasons": [
+        "AMBIGUOUS_CIK_MAPPING_2_DISTINCT_CIKS"
+      ],
+      "confidence": "MEDIUM"
+    }
+  ]
+}
