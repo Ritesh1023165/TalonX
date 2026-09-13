@@ -85,20 +85,26 @@ reported explicitly, never implied equal to N.
 
 ## 7. Predeclared sensitivities
 
-1. **Execution-realism (Part 5)** — one predefined alternative fill
-   model: entry at the **NEXT available bar's own close** (roughly a
-   1-minute order-submission-latency proxy) instead of the signal's own
-   bar close, holding the SAME stop_price/target_price (both are
-   ATR/pivot-derived from the signal's own geometry, independent of the
-   realized entry price) and the SAME subsequent-bar exit-trigger
-   mechanism. Computed post-hoc from the SAME already-loaded bar-close
-   lookup (no second ~10-hour backtest) — a full chronological
-   propagation of the delayed fill (recomputed shares from the delayed
-   price, and the trade DROPPED from this sensitivity's population,
-   flagged not silently kept, if the delayed fill would fall outside
-   the signal's own stop/target bracket — `fill_geometry_is_valid`'s own
-   real production check) — not a constant subtracted from the primary
-   number.
+1. **Execution-realism REPRICING sensitivity (Part 5)** — one predefined
+   alternative fill model: entry at the **NEXT available bar's own
+   close** (roughly a 1-minute order-submission-latency proxy) instead
+   of the signal's own bar close, holding the SAME stop_price/
+   target_price (both are ATR/pivot-derived from the signal's own
+   geometry, independent of the realized entry price) and the SAME
+   recorded exit price/reason — i.e. the exit trigger is NOT
+   re-evaluated against the delayed entry timing. Computed post-hoc from
+   the SAME already-loaded bar-close lookup (no second ~10-hour
+   backtest) — shares/dollar P&L are genuinely recomputed from the
+   delayed price (not a constant subtracted from the primary number),
+   and a trade is DROPPED from this sensitivity's population (flagged,
+   not silently kept) if the delayed fill would fall outside the
+   signal's own stop/target bracket. **Precision, added after this
+   protocol's own results were reported (Task 122 correction): this is
+   a per-trade REPRICING sensitivity, not a fully chronologically-
+   propagated alternative portfolio simulation** — it does not
+   re-derive whether a delayed fill would have changed occupancy/
+   cooldown state for later candidates. Label it accordingly in any
+   summary of these results.
 2. **Drop-top-1-issuer** (by trade count) — both means published,
    neither silently substituted.
 3. **Time/period concentration** — trades-per-month table and a

@@ -6178,3 +6178,45 @@ occurred in Task69Q; all three remain exactly as before. Real capital remains st
 Next action: Task70 — accelerated frozen-alpha validation / historical holdout assessment is the
 immediate priority; the next live PAPER session (plan recorded, not started) can run in parallel on
 market days.
+
+## Tasks 93–122 — pointer note (2026-09-13)
+
+This append-only ledger's own entries stop at Task 69Q above. Tasks
+70–92 and 93–119's detailed history is NOT backfilled here (out of this
+task's bound) — the authoritative consolidated record for that period is
+`docs/RESEARCH_STATUS.md` (release worktree; task-by-task table,
+"What is preserved" / "What is NOT reopened") and, for the
+profitability-research thread specifically (Tasks 118–122, this research
+branch), `docs/research/PRODUCT_STATUS.md`.
+
+**Task 120A–C** (2026-09-12): corrected V2 39-name-live-scope
+chronological replay, N=57/19 issuers, net@20bps=−0.85%, 95% CI
+[−4.57%,+1.11%] — includes zero, genuinely inconclusive (not "properly
+powered" — that wording was later withdrawn, Task 121/122).
+
+**Task 121/121A/121B** (2026-09-12/13): the `EXPERIMENTAL_RELAXED_V1`
+exact-contract question — closed. Root-caused two of Task 121's own
+defects (a stale research-worktree copy of `talonx_signals/run.py`
+gave a false "no exit caller" finding; an O(n²) bug caused a
+multi-hour reporting hang, unrelated to the backtest itself), proved
+harness parity against the corrected, verified-wired contract (no EOD
+flatten, no bearish-close, signal-bar-close entry), then ran the full
+available history (`task93_canonical_v1`, 2019-06→2025-08, 2,565,682
+bars, N=227 closed trades, 35/35 issuers): gross P&L −$612.92 (negative
+before cost), net −$896.44, PF 0.764, 95% CI [−$8.94,+$1.06]/trade —
+does not clear the predeclared ±$1.25 materiality band either way.
+
+**Task 122** (2026-09-13): `DO_NOT_ADVANCE_CURRENT_EXPERIMENTAL_CONTRACT`
+(product decision, separate from the `INSUFFICIENT_EVIDENCE` statistical
+one) — `EXPERIMENTAL_RELAXED_V1` archived as an internal research
+baseline, same-population historical data exhausted, not scheduled for
+further backtesting. Selected ONE new candidate for the configured-
+ticker product: overnight (close-to-open) return conditioned on
+same-day abnormal volume as a free retail-attention proxy (Berkman,
+Koch, Tuttle & Zhang 2012 JFQA; Lou, Polk & Skouras 2019 JFE) — a
+session-decomposition mechanism never isolated by this program's prior
+(closed) price/volume studies. Bounded feasibility check only (no
+outcome return computed): 35/48 configured tickers covered by existing
+free daily bars, 2,447 trigger events over 86 months, 0 data-quality
+issues, 0 zero-trigger months. Fixed next-evaluation protocol frozen,
+not yet run. Full detail: `docs/research/TASK122_CANDIDATE_DECISION.md`.

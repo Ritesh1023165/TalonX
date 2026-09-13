@@ -1,3 +1,16 @@
+> **Corrections (Task 122, 2026-09-13):** (a) point 7 below calls the
+> execution sensitivity "full chronological repricing" — this overstates
+> what was computed. It genuinely recomputed shares/P&L from the delayed
+> fill price (not a constant subtraction), but held the exit price/reason
+> fixed and did not re-derive downstream occupancy/cooldown effects on
+> later candidates. Correct label: a **per-trade repricing sensitivity**,
+> not a fully chronologically-propagated portfolio simulation. (b) no
+> point below reports daily marked drawdown — none was computed. Ending
+> equity ($99,155.10, point 6) is a single balance at the window's end,
+> **not** a drawdown figure, and must not be read as one. Full detail:
+> `docs/research/TASK121B_EXTENDED_EXPERIMENTAL_RESULTS.md`. The
+> underlying trade-level numbers and the decision are unchanged.
+
 1. **Verdict and SHAs**: Part 1 `RECONCILIATION_VERIFIED_COMPLETE`; Part 2 `ROOT_CAUSE_CONFIRMED_FIX_VERIFIED`; Part 3-6 `RUN_COMPLETE_AS_PREDECLARED`; Part 7 **`INSUFFICIENT_EVIDENCE_WITH_SPECIFIC_BLOCKER`**. Release verified `f28986999eec5e313cfc89db24e4dbacfb378891` — unchanged, research-only. Research `2239b21` → **`<this commit>`**, pushed.
 
 2. **First-month reconciliation**: 33 entries = 33 closed trades = **0 open positions** — verified, not assumed, that Task 121A's +$61.92 net figure IS the complete portfolio profit for that month (equity = ending_cash exactly). Decomposed: gross +$103.19, spread cost −$41.27 (matches 33×$1.25 exactly), net +$61.93. 7 wins (avg +$75.66) / 26 losses (avg −$17.99), max hold 6.98 days, 42% overnight-crossing.

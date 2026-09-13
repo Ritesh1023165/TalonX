@@ -129,23 +129,55 @@ obligations — their eventual real outcome is unknown.
 **95% CI on net $/trade: [−$8.94, +$1.06].** Effective independent-group
 count: **35 issuers** (not 227 trades).
 
-### Execution-realism sensitivity (predeclared: next-available-bar-close
-   fill, chronologically propagated)
+### Execution-realism REPRICING sensitivity (predeclared: next-available-
+   bar-close fill)
+
+**Correction (Task 122, 2026-09-13):** the original text below called
+this sensitivity "chronologically propagated." That overstates what was
+actually computed. It IS more than a constant subtraction — each of the
+227 trades' SHARE COUNT and dollar P&L were genuinely recomputed from
+the delayed fill price (`research/scripts/task121b_execution_sensitivity.py`).
+It is NOT a full chronological re-simulation: the exit price/reason for
+every trade was kept IDENTICAL to the primary run (the stop/target
+trigger and its outcome were not re-evaluated against the delayed entry
+timing), and no downstream effects on occupancy, cooldown arming, or
+which LATER candidates would have been eligible were re-derived — a
+genuinely delayed fill could in principle change whether a slot was
+still open for a subsequent signal, and this sensitivity does not
+capture that. Correctly labelled: a **per-trade repricing sensitivity**,
+not a fully chronologically-propagated alternative portfolio simulation.
+The numbers themselves are unchanged and were not the source of the
+error — only the "chronologically propagated" characterization is
+withdrawn.
 
 All 227 trades re-priced at the next available bar's own close after the
-primary entry bar (shares/P&L fully recomputed from the delayed price,
-not a constant subtraction — 0 trades dropped for landing outside a
-valid fill-geometry bracket):
+primary entry bar (shares/P&L recomputed from the delayed price, not a
+constant subtraction — 0 trades dropped for landing outside a valid
+fill-geometry bracket; exit price/reason held fixed, per the correction
+above):
 
-| | primary (signal-bar-close) | sensitivity (next-bar-close) |
+| | primary (signal-bar-close) | repricing sensitivity (next-bar-close) |
 |---|---:|---:|
 | Net P&L total | −$896.44 | **−$927.91** |
 | Mean $/trade | −$3.95 | **−$4.09** |
 
 **Delta: −$31.46 total, sign unchanged.** The 1-bar execution-latency
-sensitivity makes the result marginally MORE negative, not less —
-confirms the primary finding is not an artifact of the zero-latency
-fill assumption.
+repricing sensitivity makes the result marginally MORE negative, not
+less — consistent with (not proof beyond the scope described above)
+the primary finding not being an artifact of the zero-latency fill
+assumption.
+
+### Daily marked drawdown
+
+**Not supplied.** This replay's equity/P&L accounting is at
+trade-event granularity (entries/exits/end-of-window marks) only — a
+true daily mark-to-market of concurrently open positions between
+trade events was not computed (the same disclosed limitation pattern as
+Task 120B/121A). **Ending equity ($99,155.10) is not a drawdown figure**
+and must not be read as one — it is the balance at ONE point in time
+(the window's end), not the running peak-to-trough series needed to
+compute maximum drawdown. No drawdown number is reported anywhere in
+this document, and none should be inferred from the equity figure.
 
 ### First month vs. extension vs. continuous-campaign total
 
