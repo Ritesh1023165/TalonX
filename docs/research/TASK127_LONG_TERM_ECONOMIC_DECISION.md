@@ -1,5 +1,58 @@
 # Task 127 Part 6/7 — 52-week-high long-term evaluation, results and decision
 
+> **Correction (Task 128, 2026-09-13)** — applied to stored artifacts
+> only; Task 127's selection-strategy computation was NOT rerun.
+>
+> - The 52-week-high tercile contract's **`DO_NOT_ADVANCE`** verdict
+>   stands unchanged.
+> - **"The added selection complexity is not justified; simply holding
+>   the eligible universe outperformed it"** overstated what this
+>   evaluation showed. Corrected: the tercile selection strategy **did
+>   not demonstrate added value in this evaluation** relative to
+>   Benchmark B1 — the incremental 95% CI includes zero, so this is an
+>   absence of supporting evidence, not a proof that selection has zero
+>   or negative value.
+> - **"12 genuinely non-overlapping 6-month macro-blocks... 12 blocks
+>   is a small number of truly independent periods"** overstated the
+>   bootstrap's guarantee. Non-overlapping IN TIME is not the same as
+>   statistically independent — adjacent blocks can still share broad
+>   market-regime persistence, correlated issuer composition (the same
+>   38-name universe), and macro autocorrelation the block construction
+>   does not remove. The block bootstrap reduces, but does not prove
+>   away, dependence; "12 non-overlapping blocks" is the accurate
+>   description, not "12 independent observations."
+> - **"Attributable to broad market beta"** overstated a correlational
+>   observation as a proven causal decomposition. No factor regression
+>   or beta estimation was performed. Corrected: both Strategy A's and
+>   Benchmark B1's strongly positive absolute returns are **consistent
+>   with** broad market exposure during a strong secular bull run (SPY
+>   +242.68% over the same span) — this is circumstantial, not a
+>   quantified beta attribution.
+> - **SPY's full-period (2019-01-02→2026-08-31) total return of
+>   +242.68% and the strategy/benchmark's PER-6-MONTH-COHORT average
+>   returns are not directly comparable metrics** — one is a single
+>   compounded figure over ~7.5 years, the others are uncompounded
+>   arithmetic means across 68 individual 6-month windows. The original
+>   text's juxtaposition of these two numbers in one paragraph, even
+>   with the utilization caveat noted, risked reading as a
+>   like-for-like magnitude comparison. See
+>   `docs/research/TASK128_BASELINE_CONTRACT_AND_ACCOUNTING.md` for the
+>   corrected, genuinely comparable chronological-portfolio comparison
+>   (same starting capital, same dates, both marked daily).
+> - **The reported +13.70% (Benchmark B1) is an ARITHMETIC MEAN OF 68
+>   INDIVIDUAL 6-MONTH COHORT RETURNS** (`np.mean(net)` over
+>   `cohort_gross_net_return` outputs) — it is explicitly NOT a
+>   chronological portfolio return. `run_chronological_portfolio` was
+>   only ever invoked for Strategy A in the original script; Benchmark
+>   B1's own chronological portfolio was never built. Task 128
+>   addresses this gap directly by reusing the existing (generic,
+>   already-parameterized) `run_chronological_portfolio` function for
+>   Benchmark B1 as well — see `TASK128_BASELINE_CONTRACT_AND_ACCOUNTING.md`.
+>
+> None of the above changes the 52-week-high tercile contract's
+> `DO_NOT_ADVANCE` product verdict or its `INCONCLUSIVE` statistical
+> verdict — both stand as originally reported.
+
 Runs `research/scripts/task127_52wk_high_evaluation.py` exactly ONCE,
 implementing the contract frozen in
 `docs/research/TASK127_FROZEN_LONG_TERM_PROTOCOL.md` before any return
