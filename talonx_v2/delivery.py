@@ -168,11 +168,17 @@ def _backoff_s(attempts: int) -> int:
 
 def deliver_outbox(store, *, router, transport: Transport | None = None,
                    now: datetime | None = None,
-                   max_attempts: int = _DEFAULT_MAX_ATTEMPTS) -> dict[str, Any]:
+                   max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
+                   broad_discovery_symbols: frozenset[str] = frozenset()) -> dict[str, Any]:
     """Drain v2_alert_outbox once.  Returns a per-run summary.
 
     ``router`` = talonx_ops.official_dispatch.OfficialExternalRouter (or a
-    compatible object with ``.decide(family, dedup_key)``).
+    compatible object with ``.decide(family, dedup_key, origin=...)``).
+
+    ``broad_discovery_symbols`` (Task 131 Directive 5): symbols whose alert
+    should be tagged ``origin="BROAD_DISCOVERY"`` for the router's own,
+    independent dispatch toggle -- empty by default, byte-identical to
+    pre-Task-131 routing for every symbol.
     """
     transport = transport or DryRunTransport()
     now = now or datetime.now(timezone.utc)
@@ -200,7 +206,11 @@ def deliver_outbox(store, *, router, transport: Transport | None = None,
             summary["events"].append({"event_id": eid, "state": "EXPIRED", "reason": "deadline"})
             continue
 
-        rd = router.decide(FAMILY, dedup)
+        origin = "BROAD_DISCOVERY" if row["symbol"] in broad_discovery_symbols else "PRODUCT_WATCHLIST"
+        try:
+            rd = router.decide(FAMILY, dedup, origin=origin)
+        except TypeError:
+            rd = router.decide(FAMILY, dedup)  # a minimal test double without ``origin`` support
         if not getattr(rd, "eligible", False):
             store.update_outbox(eid, state="HELD", last_error=f"router: {rd.reason}")
             summary["held"] += 1

@@ -56,10 +56,28 @@ class RoutingDecision:
     already_delivered: bool
     path: str                     # "official_telegram" | "none"
     reason: str
+    origin: str = "PRODUCT_WATCHLIST"   # Task 131 Directive 5
 
     @property
     def should_send(self) -> bool:
         return self.eligible and not self.already_delivered
+
+
+# Task 131 Directive 5: an explicit, env-driven, OFF-by-default toggle. A
+# BROAD_DISCOVERY-origin alert (Task 131 Directive 4's expanded SEC-
+# ingestion scope) is a SEPARATE, independent gate from V2Service's own
+# execution_allowlist -- both must be explicitly enabled before a
+# broad-discovery alert ever reaches a real Telegram send. Unset/false
+# preserves EXACTLY the pre-Task-131 routing behaviour for every existing
+# caller (none of which ever pass ``origin``).
+ORIGIN_PRODUCT_WATCHLIST = "PRODUCT_WATCHLIST"
+ORIGIN_BROAD_DISCOVERY = "BROAD_DISCOVERY"
+
+
+def broad_discovery_dispatch_enabled() -> bool:
+    import os
+    return os.environ.get("TALONX_DISPATCH_ENABLE_BROAD_DISCOVERY", "").strip().lower() in (
+        "1", "true", "yes", "on")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -132,23 +150,38 @@ class OfficialExternalRouter:
             con.close()
 
     # -- the decision ----------------------------------------------------
-    def decide(self, family: str, dedup_key: str = "") -> RoutingDecision:
+    def decide(self, family: str, dedup_key: str = "", *,
+              origin: str = ORIGIN_PRODUCT_WATCHLIST) -> RoutingDecision:
         fam = (family or "").strip().lower()
         if not is_external_eligible(fam):
             return RoutingDecision(
                 family=fam, eligible=False, already_delivered=False, path=self.NO_PATH,
                 reason=("experimental family -- structurally internal-only (Phase 6)"
                         if fam else "unknown family -- fail-closed (not eligible)"),
+                origin=origin,
+            )
+        # Task 131 Directive 5: a BROAD_DISCOVERY-origin alert needs its OWN
+        # explicit toggle, independent of the ingestion-side one (Directive
+        # 4) and independent of V2Service's own execution_allowlist -- a
+        # defense-in-depth gate specifically at the external-send boundary.
+        if origin == ORIGIN_BROAD_DISCOVERY and not broad_discovery_dispatch_enabled():
+            return RoutingDecision(
+                family=fam, eligible=False, already_delivered=False, path=self.NO_PATH,
+                reason="BROAD_DISCOVERY-origin alert -- dispatch toggle "
+                       "(TALONX_DISPATCH_ENABLE_BROAD_DISCOVERY) is not enabled",
+                origin=origin,
             )
         delivered = self.already_delivered(fam, dedup_key)
         if delivered:
             return RoutingDecision(
                 family=fam, eligible=True, already_delivered=True, path=self.NO_PATH,
                 reason="already delivered per this family's own store -- no duplicate send",
+                origin=origin,
             )
         return RoutingDecision(
             family=fam, eligible=True, already_delivered=False, path=self.OFFICIAL_PATH,
             reason="eligible; not yet delivered; route via the one official Telegram path",
+            origin=origin,
         )
 
     # -- observability -------------------------------------------------

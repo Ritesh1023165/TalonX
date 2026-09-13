@@ -137,7 +137,9 @@ def test_process_episode_treats_prior_stale_skip_as_terminal(tmp_path):
 
 def test_fresh_episode_still_enters(tmp_path):
     """The fix must not over-block: a non-stale episode (eligible entry
-    within max_entry_staleness_sessions of the tick) still enters."""
+    within max_entry_staleness_sessions of the tick) still enters --
+    given a durable PENDING intent was created on the strictly-earlier
+    tick (Task 131 Directive 2: an entry is never admitted cold)."""
     cfg = _cfg(tmp_path)
     # filings on the two sessions immediately before the tick -> eligible
     # entry is the tick session itself (0 sessions stale).
@@ -146,9 +148,16 @@ def test_fresh_episode_still_enters(tmp_path):
     svc = _svc(cfg, tmp_path, rows, bars)
     store = V2Store(cfg.db_path)
 
+    # a tick on the session strictly before TUESDAY creates the durable
+    # PENDING intent (activation 09-04, eligible entry 09-08 == TUESDAY).
+    st0 = svc.tick(as_of=date(2026, 9, 4))
+    assert st0["entry_intents_created_this_tick"] == 1
+    assert st0["entries_this_tick"] == 0
+
     st = svc.tick(as_of=TUESDAY)
     assert st["ripe_episodes_this_tick"] == 1
     assert st["stale_entry_skipped_this_tick"] == 0
+    assert st["no_prior_intent_skipped_this_tick"] == 0
     assert st["entries_this_tick"] == 1
     assert store.n_open() == 1
     assert store.cash() == BALANCE - 10_000.0

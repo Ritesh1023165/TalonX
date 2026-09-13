@@ -1186,6 +1186,102 @@ class DashboardReadModel:
                                 else "READY")
         return out
 
+    # ------------------------------------------------------------------ #
+    # BROAD DISCOVERY -- Task 131 Directive 4/5. A SEPARATE, ADDITIVE
+    # metric panel for the 626-name Discovery Universe v1 engine. Reads
+    # the SAME v2_lane.db as v2_active_strategy() above, read-only, and
+    # classifies each symbol found there by origin (PRODUCT_WATCHLIST vs
+    # BROAD_DISCOVERY) using the SAME frozen manifest + resolved active
+    # watchlist every other symbol-scope decision in this program uses --
+    # it does NOT read any live process's in-memory state. This method
+    # is entirely NEW; v2_active_strategy() above is UNCHANGED, so the
+    # original 39-name watchlist view is preserved exactly as it was.
+    # ------------------------------------------------------------------ #
+    def v2_broad_discovery(self) -> dict[str, Any]:
+        import os as _os
+
+        _repo_root = Path(__file__).resolve().parents[1]
+        db = (_os.environ.get("TALONX_V2_DB_PATH")
+              or (str(_repo_root / "v2_lane.db") if (_repo_root / "v2_lane.db").exists()
+                  else str(self.home / "v2_lane.db")))
+        manifest_path = (_repo_root / "talonx_ingest" / "intelligence" / "service" / "data"
+                        / "discovery_universe_v1_626.json")
+
+        out: dict[str, Any] = {
+            "generated_at": self.now.isoformat(),
+            "panel": "Broad Discovery -- Discovery Universe v1 (626 names)",
+            "role": "ADDITIVE research-validated coverage panel, separate from the "
+                   "primary 39-name watchlist view above",
+            "not_a_replacement_for_the_39_name_view": True,
+        }
+
+        universe: set[str] = set()
+        try:
+            import json as _json
+            if manifest_path.is_file():
+                universe = {s.strip().upper() for s in
+                           _json.loads(manifest_path.read_text()).get("symbols", []) if s.strip()}
+        except Exception as exc:  # noqa: BLE001
+            out["manifest_error"] = f"{type(exc).__name__}: {exc}"
+        out["universe_n"] = len(universe)
+        out["manifest_path"] = str(manifest_path)
+
+        watchlist_39: set[str] = set()
+        try:
+            from talonx_ops.watchlist_coverage import build_coverage_map
+            watchlist_39 = {c["symbol"].upper() for c in build_coverage_map()["tickers"]
+                            if c.get("v2_collection_scope") == "POLLED"}
+        except Exception as exc:  # noqa: BLE001
+            out["watchlist_39_error"] = f"{type(exc).__name__}: {exc}"
+        out["watchlist_39_n"] = len(watchlist_39)
+
+        # broad-discovery-only = in the 626-universe but NOT already in the
+        # 39-name product watchlist -- never double-counted.
+        broad_only = universe - watchlist_39
+
+        import os as _ingest_os
+        toggles = {
+            "sec_ingestion_expansion_enabled": _ingest_os.environ.get(
+                "TALONX_INTEL_ENABLE_BROAD_DISCOVERY", "").strip().lower() in ("1", "true", "yes", "on"),
+            "dispatch_send_enabled": _ingest_os.environ.get(
+                "TALONX_DISPATCH_ENABLE_BROAD_DISCOVERY", "").strip().lower() in ("1", "true", "yes", "on"),
+        }
+        out["toggles"] = toggles
+
+        con = _ro(Path(db))
+        if con is None:
+            out["ledger"] = {"status": "NO_ACTIVE_PRODUCER", "note": "no v2_lane.db"}
+            con2 = None
+        else:
+            try:
+                if not _has_table(con, "positions"):
+                    out["ledger"] = {"status": "ZERO_ACTIVITY", "note": "no positions table"}
+                else:
+                    all_pos = _qall(con, "SELECT symbol, status, realized_pnl_usd, position_cost "
+                                         "FROM positions")
+                    bd_pos = [dict(r) for r in all_pos if (r["symbol"] or "").upper() in broad_only]
+                    bd_open = [r for r in bd_pos if r["status"] == "OPEN"]
+                    bd_closed = [r for r in bd_pos if r["status"] == "CLOSED"]
+                    bd_realized = round(sum((r["realized_pnl_usd"] or 0.0) for r in bd_closed), 2)
+                    out["ledger"] = {
+                        "status": "ACTIVE" if bd_pos else "ZERO_ACTIVITY",
+                        "n_open": len(bd_open),
+                        "n_closed": len(bd_closed),
+                        "realized_pnl_usd": bd_realized,
+                        "open_symbols": sorted({r["symbol"] for r in bd_open}),
+                        "note": "counts ONLY symbols in the 626-universe that are NOT already "
+                               "in the primary 39-name watchlist -- never double-counted "
+                               "with v2_active_strategy's own ledger above",
+                    }
+            except Exception as exc:  # noqa: BLE001
+                out["ledger"] = {"status": "UNKNOWN", "note": f"{type(exc).__name__}: {exc}"}
+            finally:
+                con.close()
+
+        out["broad_discovery_only_symbols_n"] = len(broad_only)
+        out["overlap_with_39_name_watchlist_n"] = len(universe & watchlist_39)
+        return out
+
     @staticmethod
     def _v2_position_lifecycle(row: dict[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
         row = dict(row)
@@ -1270,7 +1366,9 @@ class DashboardReadModel:
             "overview": self.overview(),
             "premarket": self.premarket(),
             "original_quant": self.original_quant(),
-            "v2_active_strategy": self.v2_active_strategy(),   # Task 112
+            "v2_active_strategy": self.v2_active_strategy(),   # Task 112 -- UNCHANGED, the
+                                                                # original 39-name watchlist view
+            "v2_broad_discovery": self.v2_broad_discovery(),   # Task 131 -- NEW, additive
             "validation": self.validation(),
             "intelligence": self.intelligence(),
             "paper_eod": self.paper_eod(),                     # includes folded-in Task 119 performance data

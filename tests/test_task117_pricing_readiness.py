@@ -136,16 +136,29 @@ def test_today_bar_is_provisional_never_used(tmp_path):
 
 # ----- 4. provider errors retry without consuming eligible episodes -----
 def test_provider_error_does_not_consume_the_episode(tmp_path):
-    today = ENTRY
-    # yf raises for AAA on this pass
+    # Task 131 Directive 2: an entry requires a durable PENDING intent
+    # created on a strictly earlier tick -- so the intent must be created
+    # FIRST, using genuinely good liquidity history (available throughout,
+    # unlike the ORIGINAL version of this test which had no valid data
+    # until a late "recovery" step -- that scenario is now, correctly, a
+    # permanent miss under the new contract: recovering data well after
+    # the causal entry window closed can never justify an entry at a
+    # since-stale price). The transient provider error here is instead
+    # isolated to the ENTRY-SESSION tick's own price/liquidity read --
+    # exactly the kind of momentary gap the intent (reservation) is
+    # designed to survive.
+    good_rows = _yf_rows("AAA", through=date(2026, 9, 10))
+    svc, holder = _svc(tmp_path, today=ACT, yf_rows_by_sym={"AAA": good_rows})
+    svc._records = lambda *, as_of: from_rows(_rows())
+    svc.tick(as_of=ACT)                                       # creates the durable PENDING intent
+
+    # NOW inject a transient provider error for the entry-session tick only
     class _Raiser:
         def __init__(self, s): pass
         def history(self, **k): raise RuntimeError("yf 503")
-    svc, holder = _svc(tmp_path, today=today, yf_rows_by_sym={})
     svc._resolver.adapter.live._tf = lambda s: _Raiser(s)
     svc._resolver.adapter.live._cache.clear()
-    svc._records = lambda *, as_of: from_rows(_rows())
-    st = svc.tick(as_of=date(2026, 9, 8))                    # S+1: would enter, but yf raises
+    st = svc.tick(as_of=ENTRY)                                # entry session itself: yf raises
     assert st["entries_this_tick"] == 0
     import sqlite3
     from talonx_v2.store import V2Store
@@ -153,10 +166,13 @@ def test_provider_error_does_not_consume_the_episode(tmp_path):
         "select disposition from processed_episodes")]
     assert len(disp) == 1 and disp[0].startswith("SKIPPED_")   # a provider error -> a skip
     assert disp[0] not in ("ENTERED", "SKIPPED_ENTRY_STALE")   # NON-terminal -> retried next tick
-    # recover: yf now returns data -> the SAME episode enters, single BUY
-    svc._resolver.adapter.live._tf = lambda s: _StubTicker(s, _yf_rows("AAA", through=date(2026, 9, 8)))
+    s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
+    assert s.all_entry_intents()[0]["status"] == "PENDING"     # the reservation survives the error
+
+    # recover: yf now returns data again -> the SAME episode enters, single BUY
+    svc._resolver.adapter.live._tf = lambda s: _StubTicker(s, good_rows)
     svc._resolver.adapter.live._cache.clear()
-    st2 = svc.tick(as_of=date(2026, 9, 9))
+    st2 = svc.tick(as_of=date(2026, 9, 8))                    # still well within staleness bounds
     assert st2["entries_this_tick"] == 1
     assert [t["action"] for t in V2Store(str(tmp_path / 'v.db'), 300_000.0).trades()] == ["BUY"]
 

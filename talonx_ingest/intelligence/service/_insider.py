@@ -27,6 +27,10 @@ from talonx_ingest.intelligence.insider.pipeline import ingest_form4_xml
 
 logger = logging.getLogger("talonx_ingest.intelligence.service._insider")
 
+# Task 131 Directive 4: CIK/accession-level identity validation. Reused
+# lazily (deferred import) to keep this module's import graph unchanged
+# for every existing caller that does not pass a ``directory``.
+
 
 def _cache_dir() -> Path:
     return Path(settings.raw_cache_dir).parent / "form_ownership_xml_cache"
@@ -66,6 +70,7 @@ class OwnershipIngestOutcome:
     from_cache: bool = False
     error: str | None = None
     xml_url: str | None = None
+    identity_check: str | None = None  # Task 131 Directive 4 -- outcome, when enforced
 
 
 def _candidate_xml_names(primary_document: str | None) -> list[str]:
@@ -100,7 +105,18 @@ async def ingest_form_ownership(
     accepted_at_utc: datetime | None,
     primary_document: str | None = None,
     cache_dir: Path | None = None,
+    enforce_issuer_identity: bool = True,
 ) -> OwnershipIngestOutcome:
+    """``enforce_issuer_identity`` (Task 131 Directive 4, default ON): once
+    the ownership XML is retrieved, its OWN declared ``issuerCik`` is
+    compared against ``cik`` (the caller's authoritative, currently-
+    resolved CIK for ``symbol`` -- the same identity this call's own SEC
+    Archives URL was already built from). A mismatch means this specific
+    filing's own declared issuer does not match the entity currently,
+    authoritatively associated with ``symbol`` -- it is DROPPED (never
+    persisted), not silently force-mapped. Every check outcome (pass or
+    drop) is returned explicitly in ``OwnershipIngestOutcome.identity_check``,
+    never silently swallowed."""
     acc_nd = accession.replace("-", "")
     cik_int = int(str(cik).lstrip("CIK"))
     base_url = f"https://www.sec.gov/Archives/edgar/data/{cik_int}/{acc_nd}"
@@ -150,6 +166,30 @@ async def ingest_form_ownership(
         except OSError:
             pass
 
+    identity_check_result = "NOT_ENFORCED"
+    if enforce_issuer_identity:
+        from talonx_ingest.intelligence.insider.ownership_xml import parse_ownership_xml
+        from talonx_ingest.intelligence.service.identity_guard import (
+            check_filing_issuer_identity, log_identity_check)
+        try:
+            probe_filing, _probe_txns = parse_ownership_xml(
+                xml, accession=accession, accepted_at_utc=accepted_at_utc,
+                symbol_hint=symbol, form_type_hint=form_type, source_reference=xml_url)
+        except Exception as exc:  # noqa: BLE001
+            return OwnershipIngestOutcome(accession, symbol, False, from_cache=from_cache,
+                                         error=f"identity pre-parse: {exc}", xml_url=xml_url,
+                                         identity_check="PARSE_FAILED")
+        check = check_filing_issuer_identity(
+            symbol=symbol, accession=accession,
+            filing_issuer_cik=probe_filing.issuer_cik or "", expected_cik=cik)
+        log_identity_check(check)
+        if not check.ok:
+            return OwnershipIngestOutcome(accession, symbol, False, from_cache=from_cache,
+                                         error=check.reason, xml_url=xml_url,
+                                         identity_check="DROPPED_" + (
+                                             "NO_CIK" if not check.filing_issuer_cik else "MISMATCH"))
+        identity_check_result = "MATCHED"
+
     try:
         r1 = ingest_form4_xml(
             insider_store, xml, accession=accession, accepted_at_utc=accepted_at_utc,
@@ -158,12 +198,14 @@ async def ingest_form_ownership(
         )
     except Exception as exc:  # noqa: BLE001
         return OwnershipIngestOutcome(accession, symbol, False, from_cache=from_cache,
-                                     error=f"parse/ingest: {exc}", xml_url=xml_url)
+                                     error=f"parse/ingest: {exc}", xml_url=xml_url,
+                                     identity_check=identity_check_result)
 
     return OwnershipIngestOutcome(
         accession=accession,
         symbol=symbol,
         ok=True,
+        identity_check=identity_check_result,
         transactions_new=r1.transactions_new,
         transactions_total=r1.transactions_built,
         parent_event_created=bool(r1.parent_events_created),

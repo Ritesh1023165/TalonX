@@ -59,7 +59,11 @@ class V2Service:
                  live_lookback_days: int = 45,
                  pricing_mode: str = "csv",
                  router=None, transport=None, deliver: bool = False,
-                 execution_allowlist: list[str] | None = None):
+                 execution_allowlist: list[str] | None = None,
+                 price_retry_max_wait_seconds: float = 300.0,
+                 price_retry_poll_interval_seconds: float = 15.0,
+                 price_retry_sleep_fn=None, price_retry_time_fn=None,
+                 broad_discovery_symbols: list[str] | None = None):
         self.cfg = config
         self.cfg.validate_frozen()
         self.store = V2Store(config.db_path, starting_cash=config.starting_cash_usd)
@@ -122,6 +126,22 @@ class V2Service:
             "records": 0, "since": None, "causal_cutoff": None,
             "last_ok_utc": None, "error": None,
         }
+        # Task 131 Directive 3: bounded missing-price retry, live ticks only
+        # (a pinned as_of replay/test tick never waits a real wall-clock
+        # second -- see _resilient_price_lookup).
+        self.price_retry_max_wait_seconds = price_retry_max_wait_seconds
+        self.price_retry_poll_interval_seconds = price_retry_poll_interval_seconds
+        self._price_retry_sleep_fn = price_retry_sleep_fn
+        self._price_retry_time_fn = price_retry_time_fn
+        self._price_retry_outcomes: list[dict] = []
+        self._no_prior_intent_skipped = 0
+        # Task 131 Directive 5: symbols whose alerts should be tagged
+        # BROAD_DISCOVERY origin for the dispatcher's own, independent
+        # toggle -- empty by default (byte-identical routing for every
+        # symbol unless explicitly populated by the caller, e.g. run.py's
+        # --enable-broad-discovery wiring).
+        self.broad_discovery_symbols = frozenset(
+            s.upper() for s in (broad_discovery_symbols or ()))
 
     # ---- bar access ----
     def _bars(self, sym: str) -> list[dict]:
@@ -155,6 +175,42 @@ class V2Service:
             if row["date"] == s:
                 return row
         return None
+
+    def _resilient_price_lookup(self, *, live: bool):
+        """Price-lookup callable for this tick's entry/exit resolution
+        (Task 131 Directive 3). In a TRUE live tick (``live=True``, i.e.
+        this ``tick()`` call's own ``as_of`` was None -- the real wall
+        clock), a missing bar is retried in a bounded, idempotent loop
+        (up to ``price_retry_max_wait_seconds``, default 5 minutes) --
+        the market-data feed may simply not have published yet. A pinned
+        replay/dry-run/test tick (``live=False``) NEVER retries: its
+        clock is simulated, its price coverage either exists or it
+        doesn't, and a real ``time.sleep`` inside a deterministic replay
+        would be both meaningless and slow."""
+        if not live:
+            return self._price
+
+        from talonx_v2.price_resilience import fetch_price_with_bounded_retry
+
+        def _lookup(sym: str, session: date) -> dict | None:
+            first = self._price(sym, session)
+            if first:
+                return first
+            kwargs = {"max_wait_seconds": self.price_retry_max_wait_seconds,
+                     "poll_interval_seconds": self.price_retry_poll_interval_seconds,
+                     "context": f"{sym}@{session}"}
+            if self._price_retry_sleep_fn is not None:
+                kwargs["sleep_fn"] = self._price_retry_sleep_fn
+            if self._price_retry_time_fn is not None:
+                kwargs["time_fn"] = self._price_retry_time_fn
+            outcome = fetch_price_with_bounded_retry(lambda: self._price(sym, session), **kwargs)
+            self._price_retry_outcomes.append({
+                "symbol": sym, "session": str(session), "attempts": outcome.attempts,
+                "elapsed_seconds": round(outcome.elapsed_seconds, 2), "succeeded": outcome.succeeded,
+            })
+            return outcome.price
+
+        return _lookup
 
     # ---- form4 source ----
     def _records(self, *, as_of: date):
@@ -211,12 +267,21 @@ class V2Service:
                         sorted({getattr(d, "symbol", "?") for d in dropped})[:8], len(kept))
         return kept
 
-    # ---- one tick ----
+    # ---- one tick -- four explicit phases (Task 131 Directive 2/7) ----
+    # OPEN        -- resolve entries ONLY for episodes with a durable PENDING
+    #                intent that already existed before this tick began.
+    # CLOSE       -- settle due exits at this tick's prices (after OPEN, so a
+    #                same-tick exit's proceeds can never fund a same-tick entry).
+    # POST-CLOSE  -- NOW record staleness terminal dispositions and create NEW
+    #                PENDING intents (reservations) for future sessions, using
+    #                this tick's own freshly-detected episodes.
+    # MARK        -- mark every still-open position for observability.
     def tick(self, *, as_of: date | None = None) -> dict:
         self._tick += 1
         today = as_of or datetime.now(timezone.utc).date()
         self._as_of_holder["d"] = today          # pricing resolver's causal "today"
         ripe_through = today if is_session(today) else next_session_on_or_after(today)
+        live = as_of is None                     # true live wall-clock tick vs. pinned replay/dry-run
 
         from talonx_v2.calendar import add_sessions
 
@@ -225,6 +290,8 @@ class V2Service:
         self._intents_created = 0
         self._stale_skipped = 0
         self._allowlist_dropped = 0
+        self._no_prior_intent_skipped = 0
+        self._price_retry_outcomes = []
 
         # Task 117 overnight P3: an unavailable Form-4 SOURCE blocks NEW
         # event-based entries/intents -- but it must NOT block due-exit
@@ -240,7 +307,6 @@ class V2Service:
                          "get due-exit evaluation)", self._tick, exc)
 
         res = pipeline.ProcessResult()
-        episodes: list = []
 
         all_eps = pipeline.detect_episodes(records, config=self.cfg) if records is not None else []
         # defense-in-depth: even if a record slipped through, no episode outside
@@ -248,16 +314,187 @@ class V2Service:
         all_eps = self._apply_execution_allowlist(all_eps, stage="episodes")
         all_ripe = [e for e in all_eps if e.eligible_entry_session <= ripe_through]
 
+        stale_cut = add_sessions(ripe_through, -self.cfg.max_entry_staleness_sessions) \
+            if self.cfg.max_entry_staleness_sessions > 0 else date.min
+
+        def _is_stale(e) -> bool:
+            return self.cfg.max_entry_staleness_sessions > 0 and e.eligible_entry_session < stale_cut
+
+        ripe_attemptable = [e for e in all_ripe if not _is_stale(e)]
+        price_lookup = self._resilient_price_lookup(live=live)
+
+        # --- PHASE OPEN ------------------------------------------------
+        self._phase_open(ripe_attemptable, ripe_through, res, price_lookup=price_lookup,
+                         today=today, live=live)
+
+        # --- PHASE CLOSE -------------------------------------------------
+        self._phase_close(ripe_through, res, price_lookup=price_lookup)
+
+        # --- PHASE POST-CLOSE --------------------------------------------
+        self._phase_post_close(all_eps, all_ripe, today, ripe_through, _is_stale)
+
+        # --- PHASE MARK ----------------------------------------------------
+        marks = self._phase_mark(today)
+
+        # drain the durable alert outbox (only when an operator wired a transport).
+        # For a PINNED as-of tick (replay / dry-run) the delivery clock is that
+        # session ~close, so notification deadlines are evaluated on the modelled
+        # timeline; a live tick (as_of is None) uses the real wall clock.
+        if self._deliver and self._router is not None:
+            try:
+                from datetime import time as _time
+
+                from talonx_v2.delivery import deliver_outbox
+                deliver_now = (None if as_of is None else
+                               datetime.combine(today, _time(20, 0), tzinfo=timezone.utc))
+                self._last_delivery = deliver_outbox(
+                    self.store, router=self._router, transport=self._transport,
+                    now=deliver_now, broad_discovery_symbols=self.broad_discovery_symbols)
+            except Exception:  # noqa: BLE001
+                logger.exception("deliver_outbox failed")
+
+        status = self._write_status(today, len(records or []), len(ripe_attemptable), res,
+                                    source_degraded=source_degraded, marks=marks)
+        return status
+
+    def _phase_open(self, episodes: list, ripe_through: date, res, *, price_lookup,
+                    today: date, live: bool) -> None:
+        """Resolve entries ONLY for episodes carrying an existing durable
+        PENDING intent (necessarily created by an EARLIER tick's own
+        POST-CLOSE pass -- intent creation only ever targets a FUTURE
+        session, so a PENDING intent visible here was structurally
+        impossible to have been created this same tick). An episode with
+        no valid prior intent is never entered cold -- it is recorded
+        SKIPPED_NO_PRIOR_INTENT (Task 131 Directive 2, matching the
+        corrected Task 130A/130B research contract) instead of the
+        previous permissive cold-start-backfill behaviour."""
+        no_prior = 0
+        for ep in episodes:
+            intent = self.store.entry_intent(ep.episode_id)
+            if intent is None or intent["status"] != "PENDING":
+                # the intent-creation window (PHASE POST-CLOSE, below) stays
+                # open THROUGH the eligible entry session itself (today <=
+                # eligible), so an episode whose entry session is TODAY may
+                # still legitimately receive its first PENDING intent this
+                # very tick's own post-close -- fillable on a LATER tick.
+                # Only once that window has definitively closed (today has
+                # moved PAST the eligible session with no intent ever
+                # created) is the miss permanent and worth a terminal write.
+                if ep.eligible_entry_session < today and not self.store.episode_seen(ep.episode_id):
+                    self.store.record_disposition(
+                        episode_id=ep.episode_id, symbol=ep.symbol,
+                        disposition="SKIPPED_NO_PRIOR_INTENT", issuer_cik=ep.issuer_cik,
+                        eligible_entry_session=ep.eligible_entry_session.isoformat(),
+                        detail="no durable PENDING intent existed before this tick's OPEN "
+                               "phase, and the intent-creation window has closed -- a "
+                               "cold-start entry is never admitted (Task 131 Directive 2)")
+                no_prior += 1
+                continue
+            pre_intent = intent
+            n_before = len(res.entries)
+            n_skipped_before = len(res.skipped)
+            # one noisy symbol must not starve the rest of the tick (Task 117
+            # Phase 0 §2).  Nothing is persisted on a raised error, so the
+            # episode is simply retried next tick -- no duplicate BUY risk.
+            try:
+                pipeline.process_episode(ep, store=self.store, bars_lookup=self._bars,
+                                         price_lookup=price_lookup, config=self.cfg, result=res)
+            except Exception:  # noqa: BLE001
+                logger.exception("episode_processing_failed episode_id=%s symbol=%s",
+                                 ep.episode_id, ep.symbol)
+                continue
+            if len(res.entries) > n_before:
+                self._on_entry_recorded(ep, res.entries[-1], pre_intent, ripe_through)
+                continue
+            # Task 131 Directive 3: the bounded retry already ran INSIDE
+            # price_lookup above, but ONLY for a true LIVE tick. In a
+            # pinned replay/dry-run/test tick (live=False) a missing entry
+            # bar is left exactly as process_episode's own non-terminal
+            # SKIPPED_NO_ENTRY_BAR -- the intent stays PENDING and is
+            # retried naturally on a later tick, unchanged from the
+            # pre-131 behaviour (a replay's own price coverage is a fixed,
+            # known fact, not a transient outage to escalate). Only a true
+            # live tick, where the bounded retry genuinely ran and still
+            # found nothing, releases the intent as FAILED_NO_MARKET_DATA.
+            new_skips = res.skipped[n_skipped_before:]
+            if live and any(s.get("reason") == "NO_ENTRY_BAR" for s in new_skips):
+                self.store.record_disposition(
+                    episode_id=ep.episode_id, symbol=ep.symbol,
+                    disposition="FAILED_NO_MARKET_DATA", issuer_cik=ep.issuer_cik,
+                    eligible_entry_session=ep.eligible_entry_session.isoformat(),
+                    detail="no entry bar observed even after the bounded market-data "
+                           "retry window -- intent released, not silently retried forever")
+                self.store.mark_entry_intent(
+                    pre_intent["intent_id"], "FAILED_NO_MARKET_DATA",
+                    detail="market data unavailable for the full bounded retry window")
+                self._enqueue_alert(kind="ENTRY_FAILED_NO_DATA", episode=ep, decision=None,
+                                    intent=pre_intent, extra={"released": True})
+        self._no_prior_intent_skipped = no_prior
+
+    def _phase_close(self, ripe_through: date, res, *, price_lookup) -> None:
+        try:
+            n_exits_before = len(res.exits)
+            pipeline.settle_due_exits(store=self.store, as_of_session=ripe_through,
+                                      price_lookup=price_lookup, config=self.cfg, result=res)
+            for x in res.exits[n_exits_before:]:
+                self._on_exit_recorded(x)
+        except Exception:  # noqa: BLE001
+            logger.exception("settle_due_exits_failed as_of=%s", ripe_through)
+
+    def _phase_post_close(self, all_eps: list, all_ripe: list, today: date,
+                          ripe_through: date, is_stale) -> None:
+        """Record staleness terminal dispositions/intent-expiry, THEN
+        create NEW durable PENDING intents (reservations) for episodes
+        eligible at a FUTURE session -- using THIS tick's own
+        freshly-detected episodes. Runs strictly after PHASE OPEN/CLOSE
+        above, so nothing created here could possibly have funded this
+        same tick's own entries (Task 131 Directive 2/7)."""
+        from talonx_v2.calendar import add_sessions
+
+        stale = 0
+        for e in all_ripe:
+            if not is_stale(e):
+                continue
+            # A stale episode is NEVER entered -- skip it on every tick,
+            # whether or not it has been seen before.  Only the disposition
+            # write is guarded so we don't rewrite it each tick.
+            if not self.store.episode_seen(e.episode_id):
+                self.store.record_disposition(
+                    episode_id=e.episode_id, symbol=e.symbol,
+                    disposition="SKIPPED_ENTRY_STALE", issuer_cik=e.issuer_cik,
+                    eligible_entry_session=e.eligible_entry_session.isoformat(),
+                    detail=f"eligible {e.eligible_entry_session.isoformat()} > "
+                           f"{self.cfg.max_entry_staleness_sessions} sessions before {ripe_through.isoformat()}")
+                intent = self.store.entry_intent(e.episode_id)
+                if intent is not None and intent["status"] == "PENDING":
+                    self.store.mark_entry_intent(
+                        intent["intent_id"], "EXPIRED_STALE",
+                        detail=f"entry session {e.eligible_entry_session.isoformat()} went "
+                               f"stale (> {self.cfg.max_entry_staleness_sessions} sessions) "
+                               "before a FINAL entry bar was observed")
+                    self._enqueue_alert(kind="ENTRY_STALE", episode=e, decision=None,
+                                        intent=intent, extra={"expired": True})
+            stale += 1
+        self._stale_skipped = stale
+
         # --- PRE-OPEN ENTRY INTENT PASS (Task 117 overnight) ---------------
-        # An episode whose eligible entry session has NOT started gets a
-        # durable PENDING intent + an ACTIONABLE alert now (before that
-        # session's open).  It carries no economic weight -- the fill still
-        # runs the unchanged frozen pipeline at the eligible-entry-session
-        # OPEN and is then LINKED to this intent (delayed fill notification).
+        # An episode whose eligible entry session has NOT started, OR IS
+        # TODAY, gets a durable PENDING intent + an ACTIONABLE alert now.
+        # It carries no economic weight -- the fill still runs the
+        # unchanged frozen pipeline at the eligible-entry-session OPEN
+        # (PHASE OPEN, on a LATER tick -- THIS tick's own PHASE OPEN
+        # already ran before this method, so an intent created here can
+        # never be consumed before the NEXT tick) and is then LINKED to
+        # this intent (delayed fill notification). Including "today" in
+        # the window (not just strictly future sessions) lets a
+        # composite/live pricing source whose liquidity read was only
+        # PROVISIONAL at the moment of an earlier tick get a further,
+        # still-causal chance once data stabilises -- without ever
+        # letting a same-tick decision fund a same-tick entry.
         next_sess = next_session_strictly_after(ripe_through)
         intents_created = 0
         for e in all_eps:
-            if not (today < e.eligible_entry_session <= next_sess):
+            if not (today <= e.eligible_entry_session <= next_sess):
                 continue                                   # started/past, or too far ahead
             if self.store.episode_disposition(e.episode_id) in ("ENTERED", "SKIPPED_ENTRY_STALE"):
                 continue
@@ -281,80 +518,38 @@ class V2Service:
                                         "actionable": True})
         self._intents_created = intents_created
 
-        # live guard: do NOT chase a stale entry at a historical price
-        stale_cut = add_sessions(ripe_through, -self.cfg.max_entry_staleness_sessions) \
-            if self.cfg.max_entry_staleness_sessions > 0 else date.min
-        episodes, stale = [], 0
-        for e in all_ripe:
-            if self.cfg.max_entry_staleness_sessions > 0 and e.eligible_entry_session < stale_cut:
-                # A stale episode is NEVER entered -- skip it on every tick,
-                # whether or not it has been seen before.  Only the disposition
-                # write is guarded so we don't rewrite it each tick.
-                if not self.store.episode_seen(e.episode_id):
-                    self.store.record_disposition(
-                        episode_id=e.episode_id, symbol=e.symbol,
-                        disposition="SKIPPED_ENTRY_STALE", issuer_cik=e.issuer_cik,
-                        eligible_entry_session=e.eligible_entry_session.isoformat(),
-                        detail=f"eligible {e.eligible_entry_session.isoformat()} > "
-                               f"{self.cfg.max_entry_staleness_sessions} sessions before {ripe_through.isoformat()}")
-                    intent = self.store.entry_intent(e.episode_id)
-                    if intent is not None and intent["status"] == "PENDING":
-                        self.store.mark_entry_intent(
-                            intent["intent_id"], "EXPIRED_STALE",
-                            detail=f"entry session {e.eligible_entry_session.isoformat()} went "
-                                   f"stale (> {self.cfg.max_entry_staleness_sessions} sessions) "
-                                   "before a FINAL entry bar was observed")
-                        self._enqueue_alert(kind="ENTRY_STALE", episode=e, decision=None,
-                                            intent=intent, extra={"expired": True})
-                stale += 1
-                continue
-            episodes.append(e)
-        self._stale_skipped = stale
-
-        for ep in episodes:
-            # one noisy symbol must not starve the rest of the tick (Task 117
-            # Phase 0 §2).  Nothing is persisted on a raised error, so the
-            # episode is simply retried next tick -- no duplicate BUY risk.
-            pre_intent = self.store.entry_intent(ep.episode_id)
-            n_before = len(res.entries)
-            try:
-                pipeline.process_episode(ep, store=self.store, bars_lookup=self._bars,
-                                         price_lookup=self._price, config=self.cfg, result=res)
-            except Exception:  # noqa: BLE001
-                logger.exception("episode_processing_failed episode_id=%s symbol=%s",
-                                 ep.episode_id, ep.symbol)
-                continue
-            if len(res.entries) > n_before:
-                self._on_entry_recorded(ep, res.entries[-1], pre_intent, ripe_through)
-        try:
-            n_exits_before = len(res.exits)
-            pipeline.settle_due_exits(store=self.store, as_of_session=ripe_through,
-                                      price_lookup=self._price, config=self.cfg, result=res)
-            for x in res.exits[n_exits_before:]:
-                self._on_exit_recorded(x)
-        except Exception:  # noqa: BLE001
-            logger.exception("settle_due_exits_failed as_of=%s", ripe_through)
-
-        # drain the durable alert outbox (only when an operator wired a transport).
-        # For a PINNED as-of tick (replay / dry-run) the delivery clock is that
-        # session ~close, so notification deadlines are evaluated on the modelled
-        # timeline; a live tick (as_of is None) uses the real wall clock.
-        if self._deliver and self._router is not None:
-            try:
-                from datetime import time as _time
-
-                from talonx_v2.delivery import deliver_outbox
-                deliver_now = (None if as_of is None else
-                               datetime.combine(today, _time(20, 0), tzinfo=timezone.utc))
-                self._last_delivery = deliver_outbox(
-                    self.store, router=self._router, transport=self._transport,
-                    now=deliver_now)
-            except Exception:  # noqa: BLE001
-                logger.exception("deliver_outbox failed")
-
-        status = self._write_status(today, len(records or []), len(episodes), res,
-                                    source_degraded=source_degraded)
-        return status
+    def _phase_mark(self, today: date) -> list[dict]:
+        """Lightweight daily mark-to-market of every still-open position
+        (Task 131 Directive 2/8): requested date, actual mark date/price,
+        freshness, and unrealized P&L -- never presents an unavailable
+        mark as a fresh valuation."""
+        marks = []
+        for p in self.store.open_positions():
+            px = self._price(p["symbol"], today)
+            mark_date, mark_price, stale = None, None, True
+            if px and px.get("close"):
+                mark_date, mark_price, stale = today.isoformat(), float(px["close"]), False
+            else:
+                # fall back to the frozen bar directory's own last available
+                # close on/before today -- flagged STALE, never presented as fresh.
+                for row in sorted(self._bars(p["symbol"]), key=lambda r: r["date"], reverse=True):
+                    if row["date"] <= today.isoformat() and row.get("close"):
+                        mark_date, mark_price, stale = row["date"], float(row["close"]), True
+                        break
+            entry_price = p["entry_price"]
+            unrealized_pct = (100.0 * (mark_price - entry_price) / entry_price
+                              if mark_price is not None else None)
+            marks.append({
+                "symbol": p["symbol"], "position_id": p["position_id"],
+                "requested_date": today.isoformat(), "mark_date": mark_date,
+                "mark_price": mark_price, "mark_available": mark_price is not None,
+                "mark_stale": stale if mark_price is not None else None,
+                "entry_price": entry_price, "shares": p["shares"], "cost_basis": p["position_cost"],
+                "unrealized_pnl_pct": (round(unrealized_pct, 4) if unrealized_pct is not None else None),
+                "unrealized_pnl_usd": (round(p["shares"] * (mark_price - entry_price), 2)
+                                      if mark_price is not None else None),
+            })
+        return marks
 
     # ---- causal decision + alert helpers (Task 117 overnight) ----
     def _eval_causal_decision(self, ep):
@@ -373,7 +568,8 @@ class V2Service:
         extra = extra or {}
         sym = episode.symbol.upper()
         action = {"ENTRY_INTENT": "BUY", "ENTRY_FILL": "BUY",
-                  "EXIT_FILL": "SELL", "ENTRY_STALE": "INFO"}[kind]
+                  "EXIT_FILL": "SELL", "ENTRY_STALE": "INFO",
+                  "ENTRY_FAILED_NO_DATA": "INFO"}[kind]
         ref = (extra.get("position_id") or extra.get("target_entry_session")
                or extra.get("exit_session") or episode.eligible_entry_session.isoformat())
         event_id = hashlib.sha256(f"{episode.episode_id}|{kind}|{ref}".encode()).hexdigest()[:24]
@@ -416,6 +612,13 @@ class V2Service:
             body = (f"Closed the {sym} paper long at the {extra.get('exit_session')} CLOSE "
                     f"{extra.get('exit_price')} ({extra.get('realized_pnl_pct', 0.0):+.2f}%, held "
                     f"{extra.get('trading_days_held')} sessions). Paper only.")
+        elif kind == "ENTRY_FAILED_NO_DATA":
+            headline = f"INSIDER BUY CLUSTER — market data unavailable — {sym}"
+            body = (f"The planned {sym} paper entry for {episode.eligible_entry_session.isoformat()} "
+                    f"could not be filled: no entry bar was observed for the full bounded "
+                    f"market-data retry window (up to {self.price_retry_max_wait_seconds:.0f}s). "
+                    "The reservation was released; no position opened. Informational only "
+                    "(Task 131 Directive 3).")
         else:  # ENTRY_STALE
             headline = f"INSIDER BUY CLUSTER — entry expired — {sym}"
             body = (f"The planned {sym} paper entry for {episode.eligible_entry_session.isoformat()} "
@@ -488,7 +691,7 @@ class V2Service:
                            for r in rows[-8:]]}
 
     def _write_status(self, today: date, n_records: int, n_ripe: int, res,
-                      *, source_degraded: str | None = None) -> dict:
+                      *, source_degraded: str | None = None, marks: list[dict] | None = None) -> dict:
         opens = paper.open_position_report(self.store, today)
         unresolved = self.store.unresolved_positions()
         status = {
@@ -519,8 +722,14 @@ class V2Service:
             "form4_records_seen": n_records,
             "ripe_episodes_this_tick": n_ripe,
             "stale_entry_skipped_this_tick": getattr(self, "_stale_skipped", 0),
+            "no_prior_intent_skipped_this_tick": getattr(self, "_no_prior_intent_skipped", 0),
             "entries_this_tick": len(res.entries),
             "exits_this_tick": len(res.exits),
+            # Task 131 Directive 3: bounded missing-price retry observability
+            "price_retry_max_wait_seconds": self.price_retry_max_wait_seconds,
+            "price_retry_outcomes_this_tick": getattr(self, "_price_retry_outcomes", []),
+            # Task 131 Directive 2/8: lightweight per-position daily mark
+            "open_position_marks": marks or [],
             # execution scope enforcement (Task 117 final activation)
             "execution_scope_enforced": self.execution_allowlist is not None,
             "execution_scope_count": (len(self.execution_allowlist)

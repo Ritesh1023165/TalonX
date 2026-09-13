@@ -203,6 +203,9 @@ def test_interrupted_tick_leaves_a_consistent_recoverable_ledger(tmp_path, monke
                     status_path=str(tmp_path / "s.json"))
     svc._records = lambda *, as_of: rows
 
+    # Task 131 Directive 2: a durable PENDING intent must exist BEFORE the
+    # entry session -- a tick on the activation date creates it.
+    svc.tick(as_of=date(2026, 8, 14))
     # first tick opens the position normally
     svc.tick(as_of=date(2026, 8, 17))
     svc.tick(as_of=date(2026, 8, 18))

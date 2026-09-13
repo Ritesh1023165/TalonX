@@ -119,17 +119,79 @@ def test_p1_fill_reconciles_to_intent_at_entry_session_open(tmp_path):
     assert prov["intent_id"] == i["intent_id"] and prov["intent_created_at_utc"]
 
 
-def test_p1_cold_start_backfill_labels_the_late_fill(tmp_path):
-    # first tick is ON the entry session -> no earlier intent -> honest label
+def test_p1_same_session_first_tick_defers_never_enters_cold(tmp_path):
+    # Task 131 Directive 2: the first tick is ON the entry session itself --
+    # no earlier tick ever existed to create a durable PENDING intent, so
+    # the cold-start entry that Task 117 previously permitted (labelled
+    # "cold-start backfill") is REFUSED this same tick: cash/capacity are
+    # never touched without a reservation written to disk beforehand.
+    # PHASE OPEN already ran (and refused) before PHASE POST-CLOSE gets a
+    # chance to create a fresh intent for the NEXT tick -- so a durable
+    # intent DOES appear by the end of this tick (never usable THIS tick,
+    # by construction), and the entry actually resolves one tick later.
     svc = _svc(tmp_path, _bars(tmp_path))
     svc._records = lambda *, as_of: from_rows(_rows())
     st = svc.tick(as_of=ENTRY_MON)
-    assert st["entries_this_tick"] == 1
+    assert st["entries_this_tick"] == 0
+    assert st["no_prior_intent_skipped_this_tick"] == 1
+    s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
+    assert s.all_positions() == []
+    assert s.cash() == 300_000.0
+    intents = s.all_entry_intents()
+    assert len(intents) == 1 and intents[0]["status"] == "PENDING"
+    disp = [r[0] for r in __import__("sqlite3").connect(str(tmp_path / "v.db")).execute(
+        "SELECT disposition FROM processed_episodes")]
+    assert disp == []                       # not yet terminal -- the window is still open
+
+    st2 = svc.tick(as_of=vc.add_sessions(ENTRY_MON, 1))
+    assert st2["entries_this_tick"] == 1
+    s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
+    assert s.n_open() == 1
+
+
+def test_p1_late_first_tick_is_a_permanent_miss_not_a_stale_backfill(tmp_path):
+    # the first tick arrives well AFTER the entry session -- the
+    # intent-creation window (today <= eligible <= next_sess) has closed
+    # too, so this is a genuine, permanent miss: no intent is ever
+    # created, and NO later tick can resurrect it into a backfilled entry
+    # at a since-stale price (Task 131 Directive 2).
+    svc = _svc(tmp_path, _bars(tmp_path))
+    svc._records = lambda *, as_of: from_rows(_rows())
+    # 1 session late (well within max_entry_staleness_sessions=3, so this
+    # exercises the "window closed, no intent ever existed" path
+    # specifically -- not the separate, pre-existing staleness guard).
+    late = vc.add_sessions(ENTRY_MON, 1)
+    st = svc.tick(as_of=late)
+    assert st["entries_this_tick"] == 0
+    assert st["no_prior_intent_skipped_this_tick"] == 1
     s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
     assert s.all_entry_intents() == []
+    assert s.all_positions() == []
+    assert s.cash() == 300_000.0
+    disp = [r[0] for r in __import__("sqlite3").connect(str(tmp_path / "v.db")).execute(
+        "SELECT disposition FROM processed_episodes")]
+    assert disp == ["SKIPPED_NO_PRIOR_INTENT"]
+
+    # a further later tick does not resurrect it
+    st2 = svc.tick(as_of=vc.add_sessions(late, 1))
+    assert st2["entries_this_tick"] == 0
+    s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
+    assert s.all_positions() == [] and s.all_entry_intents() == []
+
+
+def test_p1_a_timely_intent_still_fills_and_labels_delayed_notification(tmp_path):
+    # the SAME episode, given a genuinely earlier tick to create its
+    # durable PENDING intent first, fills normally -- confirming the new
+    # gate only refuses the COLD-START case, not a legitimately admitted one.
+    svc = _svc(tmp_path, _bars(tmp_path))
+    svc._records = lambda *, as_of: from_rows(_rows())
+    svc.tick(as_of=ACT_FRI)                     # creates the intent
+    st = svc.tick(as_of=ENTRY_MON)               # resolves the entry
+    assert st["entries_this_tick"] == 1
+    s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
+    assert s.all_entry_intents()[0]["status"] == "FILLED"
     fill = [r for r in s.all_outbox() if r["kind"] == "ENTRY_FILL"][0]
-    assert "cold-start backfill" in fill["payload_text"]
-    assert "not prospectively actionable" in fill["payload_text"]
+    assert "delayed notification of a previously-recorded paper intent" in fill["payload_text"]
 
 
 def test_p1_intent_expires_stale_without_a_fill(tmp_path):

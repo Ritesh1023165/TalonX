@@ -21,6 +21,14 @@ from talonx_v2.store import V2Store
 
 ENTRY = date(2026, 8, 17)
 ACT = date(2026, 8, 14)
+# Task 131 Directive 2: an entry is never admitted without a durable PENDING
+# intent created on a strictly earlier tick. A tick on the activation date
+# itself creates that intent (today=ACT < eligible=ENTRY <= next_sess=ENTRY);
+# the tests below then tick again at the ORIGINAL single-tick date to
+# resolve the actual entry -- preserving each test's own real assertion
+# (scope enforcement, restart, exit-not-blocked) while respecting the new
+# two-step admission flow.
+PRIOR = ACT
 
 
 def _bars(tmp, syms):
@@ -58,6 +66,7 @@ def test_no_allowlist_considers_every_issuer(tmp_path):
     svc = _svc(tmp_path, allowlist=None)
     svc._records = lambda *, as_of: from_rows(
         _cluster_rows("INSCOPE") + _cluster_rows("OUTSCOPE") + _cluster_rows("MUNI1"))
+    svc.tick(as_of=PRIOR)
     st = svc.tick(as_of=date(2026, 8, 18))
     s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
     assert st["execution_scope_enforced"] is False
@@ -68,6 +77,7 @@ def test_allowlist_drops_out_of_scope_issuers(tmp_path):
     svc = _svc(tmp_path, allowlist=["INSCOPE"])
     svc._records = lambda *, as_of: from_rows(
         _cluster_rows("INSCOPE") + _cluster_rows("OUTSCOPE") + _cluster_rows("MUNI1"))
+    svc.tick(as_of=PRIOR)
     st = svc.tick(as_of=date(2026, 8, 18))
     s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
     assert st["execution_scope_enforced"] is True and st["execution_scope_count"] == 1
@@ -87,6 +97,7 @@ def test_allowlist_defense_in_depth_at_episode_stage(tmp_path):
     svc = _svc(tmp_path, allowlist=["INSCOPE"])
     svc._records = lambda *, as_of: from_rows(
         _cluster_rows("INSCOPE") + _cluster_rows("OUTSCOPE"))
+    svc.tick(as_of=PRIOR)
     st = svc.tick(as_of=date(2026, 8, 18))
     s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
     assert [p["symbol"] for p in s.all_positions()] == ["INSCOPE"]
@@ -158,6 +169,7 @@ def test_scope_does_not_block_exiting_an_existing_position(tmp_path):
     svc1 = V2Service(config=cfg, bar_dirs=[bd], form4_kind="parquet",
                      status_path=str(tmp_path / "s.json"), execution_allowlist=["INSCOPE"])
     svc1._records = lambda *, as_of: from_rows(_cluster_rows("INSCOPE"))
+    svc1.tick(as_of=PRIOR)
     svc1.tick(as_of=date(2026, 8, 18))
     s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
     assert s.n_open() == 1
@@ -176,11 +188,14 @@ def test_scope_does_not_block_exiting_an_existing_position(tmp_path):
 def test_restart_preserves_the_enforced_scope(tmp_path):
     bd = _bars(tmp_path, ["INSCOPE", "OUTSCOPE"])
     cfg = V2Config(db_path=str(tmp_path / "v.db"), starting_cash_usd=300_000.0)
-    for _ in range(2):                                       # two fresh instances, same allowlist
+    # same underlying db across "restarts" -- a durable PENDING intent created
+    # by the first fresh instance survives into the second (Task 131
+    # Directive 2/4: the reservation is a real, committed row, not in-memory).
+    for as_of in [PRIOR, date(2026, 8, 18)]:
         svc = V2Service(config=cfg, bar_dirs=[bd], form4_kind="parquet",
                         status_path=str(tmp_path / "s.json"), execution_allowlist=["INSCOPE"])
         svc._records = lambda *, as_of: from_rows(_cluster_rows("INSCOPE") + _cluster_rows("OUTSCOPE"))
-        svc.tick(as_of=date(2026, 8, 18))
+        svc.tick(as_of=as_of)
     s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
     assert [p["symbol"] for p in s.all_positions()] == ["INSCOPE"]
     import sqlite3

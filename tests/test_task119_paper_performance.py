@@ -520,7 +520,7 @@ def test_dashboard_read_model_exposes_paper_performance(tmp_path, monkeypatch):
     all_sec = dr.all_sections()
     assert "paper_performance" not in all_sec
     assert set(all_sec) == {"overview", "premarket", "original_quant", "v2_active_strategy",
-                            "validation", "intelligence", "paper_eod"}
+                            "v2_broad_discovery", "validation", "intelligence", "paper_eod"}
     eod = dr.paper_eod()
     assert eod["original_local_paper"]["performance"]["lane"] == "ORIGINAL"
     assert eod["experimental_validation_paper"]["performance"]["lane"] == "EXPERIMENTAL"

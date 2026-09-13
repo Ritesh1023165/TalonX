@@ -68,6 +68,10 @@ class IntelligenceService:
         self._watchlist: TickerWatchlistStore | None = None
         self._owns_watchlist = False
         self._stop = asyncio.Event()
+        # Task 131 Directive 4/5: per-symbol origin, for the dashboard's
+        # broad-discovery panel to distinguish PRODUCT_WATCHLIST from
+        # BROAD_DISCOVERY without a second scope/process/rate-limiter.
+        self.scope_origin_by_symbol: dict[str, str] = {}
 
     # ------------------------------------------------------------------
     def request_stop(self) -> None:
@@ -96,6 +100,7 @@ class IntelligenceService:
             directory=self.directory,
         )
         logger.info("scope: %s", self.scope.watchlist.summary_line())
+        self._apply_broad_discovery()
 
         self.enrichment = EnrichmentEngine(
             self.stores, self.client, config=self.config, metrics=self.metrics,
@@ -148,10 +153,24 @@ class IntelligenceService:
         self.scope = resolve_scope(
             config=self.config, watchlist_store=self._watchlist, directory=self.directory
         )
+        self._apply_broad_discovery()
         if self.poller is not None:
             self.poller.scope = self.scope
         if self.backfill is not None:
             self.backfill.scope = self.scope
+
+    def _apply_broad_discovery(self) -> None:
+        """Task 131 Directive 4: additive, opt-in (TALONX_INTEL_ENABLE_
+        BROAD_DISCOVERY). Unions the 626-name Discovery Universe v1 into
+        THIS SAME scope/process (so the shared SEC rate-limit budget is
+        genuinely shared, not doubled by a second poller). A no-op,
+        byte-identical to pre-Task-131 behaviour, unless explicitly
+        enabled."""
+        from talonx_ingest.intelligence.service.broad_discovery import (
+            extend_scope_with_broad_discovery)
+        assert self.scope is not None and self.directory is not None
+        self.scope, self.scope_origin_by_symbol = extend_scope_with_broad_discovery(
+            self.scope, self.directory)
 
     # ------------------------------------------------------------------
     async def poll_cycle(

@@ -92,6 +92,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--execution-scope-file", default="",
                     help="live mode: a text file of allowed issuer symbols (one per line); "
                          "overrides --execution-scope when given.")
+    ap.add_argument("--enable-broad-discovery", action="store_true",
+                    help="Task 131 Directive 4/5: additively union the frozen 626-name "
+                         "Discovery Universe v1 into the execution scope (a no-op when "
+                         "--execution-scope is 'none' -- already unrestricted) and tag "
+                         "those symbols' alerts BROAD_DISCOVERY origin for the dispatcher's "
+                         "own, separately-toggled (TALONX_DISPATCH_ENABLE_BROAD_DISCOVERY) "
+                         "external-send gate. OFF by default -- the original watchlist "
+                         "execution scope is completely unaffected unless explicitly set.")
+    ap.add_argument("--broad-discovery-manifest",
+                    default="talonx_ingest/intelligence/service/data/discovery_universe_v1_626.json",
+                    help="path to the frozen Discovery Universe v1 symbol manifest")
     ap.add_argument("--deliver", action="store_true",
                     help="live mode: drain the durable V2 alert outbox each tick "
                          "through OfficialExternalRouter + the selected --transport")
@@ -178,6 +189,30 @@ def main(argv: list[str] | None = None) -> int:
             logging.getLogger("talonx_v2.run").info(
                 "V2 execution scope ENFORCED -- %d allowed issuers: %s",
                 len(allowlist), ", ".join(allowlist))
+
+        # Task 131 Directive 4/5: additive, opt-in broad-discovery union.
+        broad_discovery_symbols: list[str] = []
+        if args.enable_broad_discovery:
+            mp = Path(args.broad_discovery_manifest)
+            if not mp.is_file():
+                raise SystemExit(
+                    f"FATAL: --enable-broad-discovery requested but manifest not found "
+                    f"at {mp} -- refusing to start (fail closed).")
+            universe = sorted({s.strip().upper() for s in
+                               json.loads(mp.read_text()).get("symbols", []) if s.strip()})
+            if allowlist is not None:
+                # union additively -- never SHRINKS the existing scope
+                broad_discovery_symbols = sorted(set(universe) - set(allowlist))
+                allowlist = sorted(set(allowlist) | set(universe))
+            else:
+                broad_discovery_symbols = universe  # allowlist already unrestricted (None)
+            import os as _os
+            logging.getLogger("talonx_v2.run").info(
+                "V2 broad discovery ENABLED -- %d symbols added (manifest=%s); dispatch "
+                "toggle TALONX_DISPATCH_ENABLE_BROAD_DISCOVERY=%s",
+                len(broad_discovery_symbols), mp,
+                "on" if _os.environ.get("TALONX_DISPATCH_ENABLE_BROAD_DISCOVERY") else "off")
+
         svc = V2Service(
             config=cfg, bar_dirs=[Path(p) for p in args.bar_dir],
             form4_kind=args.form4_source, form4_parquet=args.form4_parquet,
@@ -186,6 +221,7 @@ def main(argv: list[str] | None = None) -> int:
             execution_allowlist=allowlist,
             pricing_mode=args.pricing_mode,
             router=router, transport=transport, deliver=args.deliver,
+            broad_discovery_symbols=broad_discovery_symbols,
         )
         if args.once and args.as_of:
             st = svc.tick(as_of=date.fromisoformat(args.as_of))

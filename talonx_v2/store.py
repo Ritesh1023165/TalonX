@@ -180,6 +180,19 @@ class V2Store:
             row = c.execute("SELECT cash FROM portfolio WHERE id=1").fetchone()
             if row is None:
                 c.execute("INSERT INTO portfolio (id, cash) VALUES (1, ?)", (self._starting_cash,))
+            # Task 131 Directive 2: WAL is already requested on every connection
+            # (``_conn`` above); this is a one-time, loud verification that the
+            # filesystem/driver actually honoured it, rather than silently
+            # falling back to a lock-prone rollback-journal mode (a real risk on
+            # some network filesystems). ":memory:" databases (used by a few
+            # unit tests) cannot use WAL at all -- exempted explicitly, not
+            # silently ignored.
+            if self.path != ":memory:":
+                mode = c.execute("PRAGMA journal_mode").fetchone()[0]
+                if str(mode).lower() != "wal":
+                    raise RuntimeError(
+                        f"V2Store REFUSING to proceed: journal_mode={mode!r} at {self.path!r}, "
+                        "expected 'wal' -- durable crash-resilience requires WAL")
 
     # ---- portfolio ----
     def cash(self) -> float:
