@@ -24,7 +24,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from talonx_ingest.edgar.client import EdgarClient
 from talonx_ingest.intelligence.domain import FreshnessStatus, SourceType
@@ -36,7 +36,8 @@ from talonx_ingest.intelligence.service.enrichment import EnrichmentEngine
 from talonx_ingest.intelligence.service.observability import ServiceMetrics
 from talonx_ingest.intelligence.service.poller import EdgarPoller, PollCycleResult
 from talonx_ingest.intelligence.service.scope import IngestionScope, resolve_scope
-from talonx_ingest.intelligence.service.singleton import write_heartbeat
+from talonx_ingest.intelligence.service.state_machine import ProcessingStage
+from talonx_ingest.intelligence.service.singleton import read_heartbeat, write_heartbeat
 from talonx_ingest.intelligence.service.stores import StoreBundle
 from talonx_watchlist.config import WatchlistConfig
 from talonx_watchlist.store import TickerWatchlistStore
@@ -330,6 +331,100 @@ class IntelligenceService:
             logger.info("intelligence-card delivery: %s", summary)
         return summary
 
+    async def reconcile_and_enrich(self, *, now: datetime | None = None) -> dict:
+        """Task 133: the bounded, backward-compatible recovery pass --
+        called every poll-loop iteration, BETWEEN poll_cycle() and
+        deliver_cycle(), so a large enrichment backlog can never again
+        starve deliver_cycle() of a turn the way the old unbounded
+        post-fetch loop inside poll_once() could.
+
+        (1) RECONCILE: registers any ``text_events`` row with no
+            ``intel_event_processing`` row yet -- a cheap, local, indexed
+            anti-join (``find_undiscovered_events``), bounded by
+            ``reconcile_max_events_per_cycle``. This is what makes an
+            event persisted by an OLDER process version (or deferred by
+            ``poll_once``'s own bounded enrichment via ``_defer_to_
+            recovery``) discoverable again, independent of ingestion
+            deduplication -- deduplication only ever prevents a SECOND
+            ``text_events`` row for the same accession, it says nothing
+            about whether that row has been enriched.
+        (2) ENRICH: pulls a bounded batch (count and/or time budget --
+            ``enrich_max_events_per_cycle`` / ``enrich_time_budget_
+            seconds``, the SAME knobs ``poll_once``'s own inline
+            enrichment bound uses) of ``next_for_processing`` -- every
+            OPEN stage, honouring retry backoff -- and runs
+            ``process_event`` on each, wall-clock-capped per event
+            (``enrich_per_event_timeout_seconds``) so one bad/slow event
+            cannot block the whole batch; a timeout is recorded as a
+            bounded, backed-off retryable failure via ``record_error``,
+            never a silent indefinite hang.
+
+        Idempotent and duplicate-safe by construction: ``process_event``
+        already re-derives its own stage from the row's current
+        sub-states (Task 96C/E/F) rather than assuming a fresh start, so
+        replaying a PARTIAL/interrupted row resumes rather than redoing
+        completed steps, and card enqueue (``_enqueue_delivery``) itself
+        is dedup-keyed on ``event_id`` -- neither reconciliation nor a
+        retried enrichment pass can create a second card for one event.
+        """
+        assert self.stores is not None and self.enrichment is not None
+        now = now or datetime.now(timezone.utc)
+        ps = self.stores.processing
+
+        # (1) reconcile -- make orphaned persisted events discoverable
+        reconciled = 0
+        for eid in ps.find_undiscovered_events(limit=self.config.reconcile_max_events_per_cycle):
+            ev = self.stores.events.get_event(eid)
+            if ev is None:
+                continue
+            ps.ensure(
+                eid, symbol=ev.symbol, event_type=ev.event_type.value,
+                form_type=ev.form_type, accession=ev.accession, origin="recovery",
+                stage=ProcessingStage.STORED,
+            )
+            reconciled += 1
+
+        # (2) bounded enrichment batch
+        max_events = self.config.enrich_max_events_per_cycle or None
+        time_budget = self.config.enrich_time_budget_seconds or None
+        per_event_timeout = self.config.enrich_per_event_timeout_seconds or None
+        rows = ps.next_for_processing(now=now, limit=max_events)
+        enriched = timed_out = failed = 0
+        t0 = time.monotonic()
+        for row in rows:
+            if time_budget and (time.monotonic() - t0) > time_budget:
+                break
+            try:
+                coro = self.enrichment.process_event(row.event_id, origin=row.origin, now=now)
+                if per_event_timeout:
+                    await asyncio.wait_for(coro, timeout=per_event_timeout)
+                else:
+                    await coro
+                enriched += 1
+            except asyncio.TimeoutError:
+                timed_out += 1
+                logger.warning(
+                    "recovery enrichment timed out for %s (>%ss)",
+                    row.event_id, per_event_timeout,
+                )
+                ps.record_error(
+                    row.event_id, error=f"enrichment timed out after {per_event_timeout}s",
+                    retryable=True,
+                    retry_after_utc=now + timedelta(seconds=self.config.poll_recovery_seconds),
+                )
+            except Exception as exc:  # noqa: BLE001 -- one bad event must not stop the batch
+                failed += 1
+                logger.warning("recovery enrichment failed for %s: %s", row.event_id, exc)
+
+        summary = {
+            "reconciled": reconciled, "enriched": enriched,
+            "timed_out": timed_out, "failed": failed,
+            "elapsed_seconds": round(time.monotonic() - t0, 2),
+        }
+        if reconciled or enriched or timed_out or failed:
+            logger.info("recovery pass: %s", summary)
+        return summary
+
     async def drain_retries(self, *, now: datetime | None = None, limit: int = 50) -> int:
         assert self.stores is not None and self.enrichment is not None
         now = now or datetime.now(timezone.utc)
@@ -383,9 +478,32 @@ class IntelligenceService:
         while not self._stop.is_set():
             now = datetime.now(timezone.utc)
             res = await self.poll_cycle(now=now)
-            await self.drain_retries(now=now)
+            # Task 133: reconcile_and_enrich REPLACES the old drain_retries()
+            # call here -- it is bounded (count and/or time budget) and also
+            # covers due_for_retry's 3 stages PLUS every other open stage
+            # (including a brand-new STORED row, e.g. from poll_cycle's own
+            # bounded enrichment deferring work here, or a row recovered from
+            # an event a prior process persisted but never enriched) -- so it
+            # is a strict superset, not a narrower replacement. drain_retries
+            # itself is kept, unchanged, for run_once()/other callers.
+            recovery = await self.reconcile_and_enrich(now=now)
+            # merge (not overwrite) into the progress file poll_cycle just
+            # wrote, so an observer sees BOTH the fetch-phase snapshot and
+            # this cycle's recovery-pass result together -- plus a cheap
+            # (already-computed, no extra scan) remaining-backlog count.
+            try:
+                merged = read_heartbeat(self.config.progress_path()) or {}
+                merged["recovery"] = recovery
+                if self.stores is not None:
+                    merged["backlog_by_stage"] = self.stores.processing.counts_by_stage()
+                write_heartbeat(self.config.progress_path(), merged)
+            except Exception:  # noqa: BLE001 -- progress reporting must never break the loop
+                logger.debug("progress-file recovery merge failed", exc_info=True)
             # deliver_cycle computes its OWN drain-time `now`; never blocks the
             # loop (bounded) and never swallows an error into a healthy state.
+            # Because reconcile_and_enrich is bounded (unlike the old
+            # unbounded post-fetch enrichment loop), delivery gets a real,
+            # regular turn on EVERY iteration, even with a large backlog.
             delivery = await self.deliver_cycle()
 
             summary = {
@@ -396,6 +514,7 @@ class IntelligenceService:
                 "new_events": len(res.new_event_ids),
                 "new_form4": res.new_form4_filings,
                 "freshness": res.submissions_freshness,
+                "recovery": recovery,
                 "delivery": delivery,
                 "delivery_ok": (delivery or {}).get("ok", True),
                 "errors": res.errors[:10],

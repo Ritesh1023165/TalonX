@@ -41,6 +41,7 @@ from talonx_ingest.intelligence.service._insider import ingest_form_ownership
 from talonx_ingest.intelligence.service.config import ServiceConfig
 from talonx_ingest.intelligence.service.observability import ServiceMetrics
 from talonx_ingest.intelligence.service.retry import classify_error
+from talonx_ingest.intelligence.service.state_machine import ProcessingStage
 from talonx_ingest.intelligence.service.scope import IngestionScope
 from talonx_ingest.intelligence.service.stores import StoreBundle
 
@@ -232,11 +233,30 @@ class EdgarPoller:
             )
 
         # -- downstream enrichment for new events -------------------
+        # Task 133: bounded by count (enrich_max_events_per_cycle) and/or
+        # wall-clock (enrich_time_budget_seconds) -- 0 means unbounded on
+        # either axis, preserving the exact pre-Task-133 behaviour by
+        # default. An event beyond the bound is NOT silently dropped: it
+        # is durably registered (ps.ensure, cheap/local/no network) at
+        # STORED so the SEPARATE, unbounded-scope recovery pass
+        # (IntelligenceService.reconcile_and_enrich, which reuses the
+        # SAME intel_event_processing table) picks it up on a later,
+        # regular cadence instead of blocking THIS cycle's own delivery
+        # opportunity. This is the fix for whole-cycle delivery
+        # starvation on a large first pass -- not just progress logging.
         if self.enrichment is not None and result.new_event_ids:
             self.enrichment.source_status = snap.status.value
             unique_ids = list(dict.fromkeys(result.new_event_ids))
             enrich_total = len(unique_ids)
+            max_events = self.config.enrich_max_events_per_cycle
+            time_budget = self.config.enrich_time_budget_seconds
+            enrich_t0 = time.monotonic()
             for enrich_done, eid in enumerate(unique_ids, start=1):
+                over_count_budget = max_events and enrich_done > max_events
+                over_time_budget = time_budget and (time.monotonic() - enrich_t0) > time_budget
+                if over_count_budget or over_time_budget:
+                    self._defer_to_recovery(eid)
+                    continue
                 try:
                     await self.enrichment.process_event(eid, origin="poll", now=now)
                 except Exception as exc:  # noqa: BLE001 - never let one event kill the cycle
@@ -246,3 +266,23 @@ class EdgarPoller:
 
         result.duration_seconds = round(time.monotonic() - t0, 3)
         return result
+
+    def _defer_to_recovery(self, event_id: str) -> None:
+        """Task 133: durably register a discovered-but-not-yet-enriched
+        event at STORED (cheap, local, no network -- see ProcessingState
+        Store.ensure's ON CONFLICT DO NOTHING) so it is picked up by the
+        bounded recovery pass instead of being lost when this poll_once()
+        call's own in-memory new_event_ids list goes out of scope."""
+        try:
+            ev = self.stores.events.get_event(event_id)
+        except Exception:  # noqa: BLE001 -- deferral must never break the cycle
+            logger.warning("_defer_to_recovery: could not load %s", event_id, exc_info=True)
+            return
+        if ev is None:
+            return
+        self.stores.processing.ensure(
+            event_id,
+            symbol=ev.symbol, event_type=ev.event_type.value,
+            form_type=ev.form_type, accession=ev.accession,
+            origin="poll", stage=ProcessingStage.STORED,
+        )

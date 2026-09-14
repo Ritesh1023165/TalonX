@@ -308,6 +308,69 @@ class ProcessingStateStore:
         ).fetchall()
         return [self._row(r) for r in rows]
 
+    # ------------------------------------------------------------------
+    # Task 133: recoverable-processing support. Both queries below are
+    # additive reads against tables that already exist -- no new queue,
+    # no new table.
+    # ------------------------------------------------------------------
+    def find_undiscovered_events(self, *, limit: int = 200) -> list[str]:
+        """Bounded, indexed anti-join: ``text_events`` rows (this same
+        SQLite file -- see module docstring) with NO ``intel_event_
+        processing`` row at all. This is the backward-compatible recovery
+        path for events a prior process persisted but never handed to
+        ``process_event`` (which is what actually creates the row, via
+        ``ensure`` below) -- e.g. because it only ever enriched from an
+        in-memory ``new_event_ids`` list that a restart discards, or
+        because the whole enrichment pass for a large cycle simply hasn't
+        reached them yet. ``LIMIT``-bounded so a caller can safely call
+        this every cycle without an unbounded scan; ordered oldest-first
+        so recovery is fair, not last-in-first-out."""
+        rows = self._conn.execute(
+            """
+            SELECT te.event_id FROM text_events te
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM intel_event_processing p WHERE p.event_id = te.event_id
+             )
+             ORDER BY te.ingested_at_utc
+             LIMIT ?
+            """,
+            (int(limit),),
+        ).fetchall()
+        return [r[0] for r in rows]
+
+    def next_for_processing(
+        self, *, now: datetime | None = None, limit: int | None = None
+    ) -> list[ProcessingRow]:
+        """Unified "what should a recovery/backlog pass work on next"
+        query -- generalises ``due_for_retry`` to EVERY open stage
+        (including a brand-new ``STORED`` row from ``find_undiscovered_
+        events`` + ``ensure``, or one left at ``DISCOVERED``/
+        ``NORMALIZED``/``ENRICHMENT_PENDING``/``SIGNIFICANCE_EVALUATED``
+        by an interrupted prior run -- see OPEN_STAGES), while still
+        honouring ``retry_after_utc`` backoff so a FAILED_RETRYABLE row
+        is not hammered before its window. Distinct from ``open_rows``
+        (which ignores backoff entirely -- kept as-is for its existing
+        callers/tests) and from ``due_for_retry`` (which only covers 3 of
+        the 7 open stages -- kept as-is too). Oldest-``discovered_at_utc``
+        first, so one very recent flood of events cannot starve older
+        (possibly backward-compat-recovered) work indefinitely."""
+        from talonx_ingest.intelligence.service.state_machine import OPEN_STAGES
+
+        now = now or datetime.now(timezone.utc)
+        placeholders = ",".join("?" for _ in OPEN_STAGES)
+        sql = (
+            f"SELECT * FROM intel_event_processing WHERE stage IN ({placeholders}) "
+            "AND (retry_after_utc IS NULL OR retry_after_utc <= ?) "
+            "ORDER BY discovered_at_utc"
+        )
+        params: list = [s.value for s in OPEN_STAGES]
+        params.append(_iso(now))
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(int(limit))
+        rows = self._conn.execute(sql, params).fetchall()
+        return [self._row(r) for r in rows]
+
     def counts_by_stage(self) -> dict[str, int]:
         rows = self._conn.execute(
             "SELECT stage, COUNT(*) c FROM intel_event_processing GROUP BY stage"

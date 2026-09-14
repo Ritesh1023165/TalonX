@@ -88,6 +88,35 @@ class ServiceConfig:
     # -- enrichment ---------------------------------------------------
     enable_xbrl: bool = True
     enrichment_max_retries: int = 4
+    # Task 133: bounds on the poll_once() post-fetch enrichment pass, so a
+    # scope expansion that surfaces tens of thousands of new events cannot
+    # block deliver_cycle()/heartbeat/shutdown for the whole first cycle.
+    # UNLIKE poll_max_symbols_per_cycle's pre-existing "0 == unbounded"
+    # convention, these two are BRAND NEW fields with no prior behaviour
+    # to preserve, so they default to a real, always-on bound rather than
+    # an opt-in one -- whole-cycle delivery starvation is a bug to fix by
+    # default, not a footgun to leave loaded unless an operator remembers
+    # to set an env var. 25 events / 60s mirrors the existing
+    # deliver_cards_per_cycle=20 scale; any leftover work is durably
+    # deferred to the SEPARATE, also-bounded reconcile_and_enrich pass
+    # (runner.py) on the next cycle, never lost. 0 still means unbounded,
+    # for a one-shot `once`/`backfill` CLI invocation that explicitly
+    # wants to run a cycle to completion.
+    enrich_max_events_per_cycle: int = 25
+    enrich_time_budget_seconds: float = 60.0
+    # Bounded per-event wall-clock cap around process_event() itself (each
+    # underlying HTTP call already has EdgarClient's own request_timeout_
+    # seconds; this is a belt-and-suspenders cap on the WHOLE per-event
+    # unit of work -- comparison + XBRL + significance + delivery-enqueue
+    # -- so one event's aggregate cost cannot indefinitely stall a batch).
+    # 0 == no additional cap beyond the per-request one.
+    enrich_per_event_timeout_seconds: float = 90.0
+    # Task 133: bounded batch size for the backward-compatible recovery
+    # sweep (persisted events with no processing row yet -- see
+    # ProcessingStateStore.find_undiscovered_events). Always-on with a
+    # modest default since it is a cheap, local, indexed anti-join, not a
+    # new behaviour that needs an opt-in default.
+    reconcile_max_events_per_cycle: int = 200
 
     # -- delivery ---------------------------------------------------------
     # 96B qualification never sends externally unless this is explicitly
@@ -171,6 +200,14 @@ class ServiceConfig:
             ),
             live_priority=_env_bool("TALONX_INTEL_LIVE_PRIORITY", True),
             enable_xbrl=_env_bool("TALONX_INTEL_ENABLE_XBRL", True),
+            enrich_max_events_per_cycle=_env_int("TALONX_INTEL_ENRICH_MAX_EVENTS", 0),
+            enrich_time_budget_seconds=_env_float("TALONX_INTEL_ENRICH_TIME_BUDGET_SECONDS", 0.0),
+            enrich_per_event_timeout_seconds=_env_float(
+                "TALONX_INTEL_ENRICH_PER_EVENT_TIMEOUT_SECONDS", 90.0
+            ),
+            reconcile_max_events_per_cycle=_env_int(
+                "TALONX_INTEL_RECONCILE_MAX_EVENTS", 200
+            ),
             dry_run_delivery=_env_bool("TALONX_INTEL_DRY_RUN_DELIVERY", True),
             deliver_intelligence_cards=_env_bool("TALONX_INTEL_DELIVER_CARDS", False),
             deliver_cards_per_cycle=_env_int("TALONX_INTEL_DELIVER_PER_CYCLE", 20),
