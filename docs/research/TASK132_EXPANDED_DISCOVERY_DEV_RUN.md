@@ -603,7 +603,10 @@ RECONCILIATION_REPORT.md`. Summary:
 ## Addendum 8 — Task 137: Overnight Continuity, Scope Accuracy and Delivery Fairness
 
 Full detail: `results/task132_development_run/TASK137_OVERNIGHT_
-CONTINUITY_REPORT.md`. Summary:
+CONTINUITY_REPORT.md` (local, gitignored). Sanitized, directly-reviewable
+copy of this evidence, committed and pushed for GitHub review without a
+ZIP download: [`docs/research/evidence/task137/README.md`](evidence/task137/README.md).
+Summary:
 
 - **EOD `eod_reconciled_today=false` despite a successful close**: a
   real, persistent reporting defect, not a timing artifact -- this
