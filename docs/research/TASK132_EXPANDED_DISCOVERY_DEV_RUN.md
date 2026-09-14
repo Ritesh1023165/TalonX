@@ -353,3 +353,55 @@ DELIVERY_REPORT.md`. Summary:
   `11107198c5b81237` unchanged. Full-suite gate: **4,680 passed, 8
   failed, 6 skipped** (49m06s) at HEAD `309b845` -- the same 8 failures
   by exact name as Task 132's own baseline, zero new failures.
+
+## Addendum 3 — Task 134: Fresh-Event Latency, Backlog Drainage and EOD Reconciliation
+
+Full detail: `results/task132_development_run/TASK134_FRESH_LATENCY_
+REPORT.md`. Summary:
+
+- **No fresh SEC-published event existed in this observation window**
+  (max `accepted_at_utc` across the whole ledger predates this run's own
+  launch) -- reported as the limitation it is, not glossed over. Real
+  LOCAL pipeline latency measured instead (25-sample, true wall-clock
+  `intel_processing_log` timestamps, NOT the per-cycle-batch-fixed
+  `ingested_at_utc`/`enqueued_at_utc` fields, which understated one
+  sample's true latency by ~3.5 minutes -- itself a documented finding):
+  enrichment ~0.2-0.3s once selected; queue-to-send 65-76s for this
+  cycle's own inline work, up to ~17 minutes (bounded, never indefinite)
+  for low-priority backfill-origin cards.
+- **A second, genuine starvation defect found and fixed**: 296
+  `intel_event_processing` rows (oldest discovered 10 days before this
+  dev run started) were fully processed (`significance_state=DONE,
+  delivery_state=DONE`) yet stuck at `stage=PARTIAL` (an `OPEN_STAGES`
+  member) forever, because `EnrichmentEngine._rollup_stage` never
+  special-cased `delivery_state==DONE` when the comparison sub-state was
+  a PERMANENT data-quality PARTIAL flag -- re-selected and re-run (a
+  real SEC comparison fetch) every single cycle with no progress and no
+  backoff. Fixed (delivery_state==DONE now always closes the row;
+  comparison_state itself stays observable); verified live after a
+  third managed Intelligence-only restart -- the specifically tracked
+  row resolved to COMPLETE, 20/296 affected rows resolved in the first
+  post-restart cycle, the rest draining gradually at the same bounded
+  per-cycle rate as everything else in this pipeline.
+- Cards-to-Telegram-message mapping confirmed by CODE inspection (claim-
+  before-send, mark-SENT-only-on-success, for both IMMEDIATE and DIGEST)
+  as well as live data (2 DIGEST messages aggregating 26 cards; 9
+  IMMEDIATE cards = 9 messages); both AMBIGUOUS rows re-checked still
+  correctly un-retried.
+- V2: zero entries this session, evidence-based (the insider-transaction
+  candidate pool, `form4_records_seen`, has been static all session --
+  not a pipeline defect, not loosened).
+- Discovered (not previously documented): the live long-polling dispatch
+  process has never actually loaded the Task 132 `/ping` extension --
+  every `/ping` demonstration so far used a standalone script for
+  exactly this reason; Original is healthy and was correctly NOT
+  restarted just to pick it up.
+- EOD mechanism inspected (not invoked -- still NOT_DUE_YET): `close`
+  defaults to a full stack shutdown; `--no-shutdown` is the existing,
+  correct option to preserve overnight ingestion given a real backlog
+  remains.
+- Cash $300,000.00 / 0 positions / 0 intents preserved throughout; one
+  managed Intelligence-only restart; 3 new tests, 131 passed across
+  every directly-affected file (full suite not repeated -- already run
+  once for Task 133's larger change-set); frozen fingerprint
+  `11107198c5b81237` unchanged.
