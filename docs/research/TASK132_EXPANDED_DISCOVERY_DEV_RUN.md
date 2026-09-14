@@ -448,3 +448,43 @@ HANDOFF_REPORT.md`. Summary:
   passed, zero regressions, frozen fingerprint `11107198c5b81237`
   unchanged. EOD still PENDING at report time (~2h before close);
   `--no-shutdown` remains the correct existing option.
+
+## Addendum 5 — Task 136A: Stop Historical-Alert Noise and Reconcile Alert Content
+
+Full detail: `results/task132_development_run/TASK136A_HISTORICAL_
+ALERT_NOISE_REPORT.md`. Summary:
+
+- User-reported incident: 4 real ACN Form 4s from May/July 2024
+  (accessions ...175/176/205/206) delivered as live Telegram alerts on
+  2026-09-14 (message IDs 934-937). Full scope, traced: 183 pre-2026
+  cards sent today across ~150 messages -- happened during Task 133/134's
+  delivery-fix verification, when the newly-unblocked queue drained
+  without a send-time age gate catching them. SENT history left
+  unchanged (not authorized to alter it).
+- **Root cause 1 (why historical cards were sent)**: `outbox.pending()`
+  orders by BAND PRIORITY first, `expire_stale()`'s bounded sweep orders
+  by enqueue time only -- a HIGH-band historical card enqueued late
+  (beyond the sweep's bound) can be selected for sending before the
+  sweep ever reaches it. Fixed with a new `expire_one_if_stale()` gate
+  applied immediately before every send (both IMMEDIATE and DIGEST),
+  using the identical freshness-basis logic as the bulk sweep so the two
+  paths cannot disagree. Reproduced the exact race in isolation, then
+  shown fixed.
+- **Root cause 2 (the $2,244,878 vs $12k / "4 sellers" vs "1 sale"
+  reconciliation)**: `build_insider_activity()` always computed rolling
+  windows "as of the most recent known activity" (effectively today),
+  never the historical filing's OWN date -- blending current issuer-wide
+  aggregates into a 2024 card's "why surfaced" without disclosure. Fixed
+  by passing `as_of_date` derived from the event's own `accepted_at_utc`.
+  Every figure on the ACN cards was individually correct for its own
+  (undisclosed) window; the fix makes all windows consistently anchored
+  to the filing's own date instead of today.
+- 6 new tests (band-priority race reproduced/fixed; as_of_date verified
+  against a real 2024 event), 184 passed, zero regressions, frozen
+  fingerprint unchanged. Intelligence restarted (only component needing
+  the fix); live post-cutover: the entire 206-row PENDING backlog at
+  restart time correctly resolved to EXPIRED (0 sent) -- containment
+  confirmed, though no natural fresh-card delivery example fell in this
+  exact window (reported as that limitation, not manufactured).
+- Cash/positions/intents unchanged; SEC ingestion/recovery and V2
+  actionable delivery untouched. EOD still PENDING at report time.
