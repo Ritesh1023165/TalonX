@@ -437,3 +437,75 @@ def test_v2_actionable_delivery_module_is_structurally_independent():
             if sub in text:
                 offenders.append((str(py), sub))
     assert offenders == [], offenders
+
+
+# ---------------------------------------------------------------------
+# Task 136 EOD follow-up, verification point B: a lookup that keeps
+# failing for ONE row must not starve an eligible row sitting alongside
+# it -- neither within a single bounded drain cycle nor across repeated
+# cycles.
+# ---------------------------------------------------------------------
+
+def test_repeated_lookup_failure_does_not_starve_an_eligible_row_same_cycle(ledger_path):
+    """A permanently-flaky lookup for row A (always raises -> DEFER every
+    time) sits AHEAD of eligible row B in band/enqueue order. Row B must
+    still be sent in the SAME drain cycle -- the per-row loop `continue`s
+    past a DEFER'd row rather than stopping the batch."""
+    ob = DeliveryOutbox(ledger_path)
+    now = datetime(2026, 9, 14, 16, 0, 0, tzinfo=UTC)
+    did_a, eid_a, _ = _enq(ob, symbol="AAA", accession="0000000020-26-000020",
+                           enqueued_at=now - timedelta(minutes=10))
+    did_b, eid_b, _ = _enq(ob, symbol="BBB", accession="0000000021-26-000021",
+                           enqueued_at=now - timedelta(minutes=9))
+
+    def _lookup(event_id):
+        if event_id == eid_a:
+            raise RuntimeError("permanently flaky lookup for A")
+        return now - timedelta(minutes=9)          # B: valid, fresh
+
+    snd = RecordingSender()
+    res = _drain(ob, snd, now=now, event_time_lookup=_lookup, route="IMMEDIATE")
+
+    assert ob.get(did_a).state == STATE_PENDING     # untouched, not starved-out either way
+    assert ob.get(did_b).state == STATE_SENT
+    assert did_b in [r.delivery_id for r in snd.sent]
+    ob.close()
+
+
+def test_repeated_lookup_failure_does_not_starve_eligible_rows_across_cycles(ledger_path):
+    """The SAME permanently-flaky row is re-drained across several
+    consecutive cycles (simulating repeated poll-loop iterations). Each
+    cycle it DEFERs again (never blocks), and a batch of otherwise-
+    eligible rows enqueued around it are delivered normally across those
+    cycles -- the flaky row consumes at most its own slot each time, never
+    exhausting the bounded per-cycle budget for everyone else."""
+    ob = DeliveryOutbox(ledger_path)
+    now = datetime(2026, 9, 14, 16, 0, 0, tzinfo=UTC)
+    did_flaky, eid_flaky, _ = _enq(ob, symbol="FLK", accession="0000000030-26-000030",
+                                   enqueued_at=now - timedelta(minutes=30))
+    good_ids = []
+    good_eids = {}
+    for i in range(5):
+        did, eid, _ = _enq(ob, symbol=f"GD{i}", accession=f"000000003{i+1}-26-00003{i+1}",
+                           enqueued_at=now - timedelta(minutes=20 - i))
+        good_ids.append(did)
+        good_eids[eid] = now - timedelta(minutes=20 - i)
+
+    calls = {"n": 0}
+
+    def _lookup(event_id):
+        if event_id == eid_flaky:
+            calls["n"] += 1
+            raise RuntimeError("permanently flaky lookup")
+        return good_eids.get(event_id)
+
+    snd = RecordingSender()
+    for cycle in range(3):
+        _drain(ob, snd, now=now + timedelta(seconds=cycle), event_time_lookup=_lookup,
+              route="IMMEDIATE")
+
+    assert ob.get(did_flaky).state == STATE_PENDING       # still recoverable, never stuck terminal
+    assert calls["n"] >= 3                                 # re-attempted every cycle, not given up on
+    assert all(ob.get(d).state == STATE_SENT for d in good_ids)
+    assert set(good_ids) == {r.delivery_id for r in snd.sent}
+    ob.close()

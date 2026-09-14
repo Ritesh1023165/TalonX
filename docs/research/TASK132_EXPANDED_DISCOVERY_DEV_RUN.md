@@ -547,3 +547,55 @@ CASES_REPORT.md` + `TASK136A_CORRECTIONS_ADDENDUM.md`. Summary:
   companion untouched. EOD still PENDING at report time (before 20:00 UTC
   close); `close --no-shutdown` remains the correct mechanism, owned by
   the running checkpoint daemon.
+
+## Addendum 7 — Task 136: EOD Reconciliation and Overnight Continuity
+
+Full detail: `results/task132_development_run/TASK136_EOD_
+RECONCILIATION_REPORT.md`. Summary:
+
+- Executed `python -m talonx_ops.prospective close --no-shutdown` at
+  2026-09-14T20:13:30Z (past the verified 20:00 UTC XNYS close). Exit
+  code 0, verdict `PASS_WITH_FINDINGS` (the one finding is the expected,
+  documented "no PIV reader injected" PARTIAL, `mismatches=[]` -- not a
+  real reconciliation failure). `--no-shutdown` confirmed to retain the
+  ENTIRE stack literally unchanged (identical PIDs before/after,
+  `stop_stack()` never called).
+- Established precisely: the checkpoint daemon's `--every 1800` loop
+  only calls the lightweight `capture()` checkpoint, never the actual
+  `close`/reconciliation -- no automatic EOD had run before this task.
+  Base reconciliation is explicitly idempotent (upsert-per-session-date).
+  `prospective status`'s own `"eod"` field is a pure calendar/clock check
+  independent of whether `close` was invoked -- it correctly still read
+  `PENDING` immediately after a successful close.
+- Cash $300,000.00 unchanged, 0 positions, 0 pending intents, 0 buys/0
+  sells -- a real, reconciled zero-activity day (not proof every trading
+  path executed, stated explicitly). Informational outbox: 124 PENDING /
+  237 SENT / 19,460 EXPIRED / 2 AMBIGUOUS (untouched, never blind-
+  retried) / 0 SUPPRESSED. Enrichment backlog: 8,454 rows still awaiting
+  enrichment (STORED/PENDING) -- explicitly reported as NOT zero despite
+  the low delivery-PENDING count.
+- Task 136B verification points closed: (A) confirmed by source read --
+  the only production caller of process_pending/process_digest always
+  passes a real event_time_lookup, no compatibility fallback in the live
+  path; (B) a real gap -- no existing test demonstrated a permanently-
+  failing lookup doesn't starve eligible rows -- closed with 2 new
+  isolated tests (same-cycle and cross-cycle), both pass; (C) Intelligence
+  confirmed running commit a1d0fd4 (0222c30 is docs-only), launched
+  19:49:27/28 UTC, with the appearance of the new 'unqualified' summary
+  key as strong-but-not-cryptographic functional attribution evidence.
+- Bounded post-close observation caught a REAL natural delivery: LULU
+  8-K (accession 0001397187-26-000129), SEC-accepted 16:15:47 UTC same
+  day, sent 20:18:39/40 UTC -- genuinely fresh, verified against the
+  ledger, not manufactured. No stale historical card escaped the gate in
+  this window.
+- One out-of-scope, pre-existing observation surfaced (not fixed, not
+  this task's authorized scope): the Original/V1 strategy fingerprint
+  (`get_strategy_version()`, unrelated to the V2 fingerprint this task's
+  baseline names as frozen) currently reads `2dea67a6f6d2` against an
+  expected `2ae6216bca70` -- likely a CRLF-vs-LF line-ending artifact on
+  this Windows checkout (confirmed `strategy.py` has CRLF terminators;
+  the hash function does not normalize them, unlike the CRLF-safe
+  ORPB/FPRC fingerprint test), not a real strategy change; flagged as the
+  exact blocker for a future, separately-scoped task.
+- 16/16 focused tests pass (14 prior + 2 new). No code change beyond the
+  2 new tests; HEAD unchanged by the reconciliation itself.
