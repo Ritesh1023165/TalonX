@@ -20,7 +20,33 @@ from __future__ import annotations
 
 RELEASE_SHA_EXPECTED = "0d52e7c"  # Task 117 final activation release
 V2_FINGERPRINT_EXPECTED = "11107198c5b81237"
-V1_FINGERPRINT_EXPECTED = "2ae6216bca70"
+# Task 137: updated from the stale "2ae6216bca70". Investigated a reported
+# mismatch (get_strategy_version() read "2dea67a6f6d2" against this
+# constant) with a full per-file comparison across the baseline commit
+# (18e93d9, where this constant was first set), the current committed git
+# blobs, and the working-tree bytes. Two DISTINCT, separately-confirmed
+# causes, not one:
+#   1. Line-ending representation -- the working tree materialises these
+#      files with CRLF (Windows `core.autocrlf`); the committed git blobs
+#      are pure LF. Fixed at the source: get_strategy_version() (talonx_
+#      backtest/reproducibility.py) now LF-normalizes before hashing, the
+#      same technique tests/test_task65b_protected_fingerprints.py already
+#      uses for the other two frozen-candidate fingerprints in this repo.
+#   2. A REAL, substantive, already-authorized change: commit 66a49f9
+#      ("Task 135 -- surface Redis PUBLISH subscriber count for Quant
+#      signals", 2026-09-14) modified talonx_quant/consumer.py -- one of
+#      the 5 files this fingerprint covers -- after this constant was
+#      frozen. That commit's own message incorrectly claimed no
+#      fingerprinted file was touched; it was, but the change is confined
+#      to Pub/Sub delivery-observability logging/metrics AROUND an
+#      already-decided signal publish (QuantScanner._publish_signal),
+#      not any gating/entry/opportunity-scoring logic. Not reverted here
+#      (it was a legitimate, tested, already-pushed fix) -- this constant
+#      is corrected to the new, current, LF-normalized baseline instead:
+#      "ed8272fe568d" (== git show HEAD:talonx_quant/{strategy,
+#      indicators,config,session,consumer}.py concatenated, LF-normalized
+#      sha256, first 12 hex chars -- reproducible from git alone).
+V1_FINGERPRINT_EXPECTED = "ed8272fe568d"
 V2_STRATEGY_VERSION = "INSIDER_BUY_CLUSTER_V2@1"
 
 CAMPAIGN_START_DATE = "2026-09-08"          # Day 1 = Task 113

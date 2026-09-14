@@ -245,7 +245,7 @@ def enqueue_card(
         metrics.record_render(message.band.value if message.band else None, truncated=message.truncated)
 
     try:
-        assert_clean(message.text)
+        assert_clean(message.text, company_name=getattr(card, "company_name", None))
     except PredictiveLanguageError:
         if metrics is not None:
             metrics.record_claim_safety_rejection()

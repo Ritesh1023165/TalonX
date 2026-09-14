@@ -68,3 +68,67 @@ def test_bare_buy_sell_without_context_flagged():
 def test_empty_text_is_clean():
     assert scan_rendered("") == []
     assert scan_rendered(None) == []
+
+
+# ---------------------------------------------------------------------
+# Task 137: a company's own factual, SEC-sourced name that happens to
+# contain "buy"/"sell" (e.g. "Best Buy") must not be misclassified as
+# predictive/advice language -- the exact, confirmed, deterministic
+# false positive behind all 35 real FAILED_RETRYABLE BBY rows.
+# ---------------------------------------------------------------------
+
+def test_company_name_containing_bare_buy_is_not_flagged_when_given():
+    text = "BEST BUY CO INC filed a Form 8-K today."
+    assert scan_rendered(text) == ["token:buy"]           # without context: the real prior bug
+    assert scan_rendered(text, company_name="BEST BUY CO INC") == []
+    assert_clean(text, company_name="BEST BUY CO INC")    # does not raise
+
+
+def test_company_name_exemption_does_not_weaken_real_predictive_detection():
+    # a genuine predictive PHRASE touching the same word is still caught,
+    # even with the company name present.
+    text = "BEST BUY CO INC is a strong buy right now."
+    v = scan_rendered(text, company_name="BEST BUY CO INC")
+    assert "phrase:strong buy" in v
+
+
+def test_company_name_exemption_does_not_hide_an_unrelated_bare_buy():
+    # a bare "buy" that is NOT part of the company name's own text is
+    # still flagged -- the exemption is scoped to the exact name string,
+    # not a blanket "buy is fine somewhere in this card" relaxation.
+    text = "insiders should buy more shares of XYZ based on this filing."
+    v = scan_rendered(text, company_name="BEST BUY CO INC")
+    assert "token:buy" in v
+
+
+def test_short_or_missing_company_name_is_ignored():
+    # a too-short/degenerate company_name (e.g. a data-quality gap) must
+    # not accidentally exempt unrelated text via a coincidental overlap.
+    assert scan_rendered("time to buy", company_name="") == ["token:buy"]
+    assert scan_rendered("time to buy", company_name="A") == ["token:buy"]
+    assert scan_rendered("time to buy", company_name=None) == ["token:buy"]
+
+
+def test_enqueue_card_passes_the_events_company_name_through(monkeypatch):
+    """End-to-end through the real call site: enqueue_card must pass the
+    card's own company_name into assert_clean, not just scan_rendered
+    directly -- the actual path that produced the real BBY rejections."""
+    import talonx_ingest.intelligence.delivery.pipeline as dp
+
+    captured = {}
+    real_assert_clean = dp.assert_clean
+
+    def _spy(text, *, company_name=None):
+        captured["company_name"] = company_name
+        return real_assert_clean(text, company_name=company_name)
+
+    monkeypatch.setattr(dp, "assert_clean", _spy)
+
+    from _delivery_helpers import make_card
+    from talonx_ingest.intelligence.delivery.outbox import DeliveryOutbox
+
+    card, _ = make_card(symbol="BBY", company="BEST BUY CO INC")
+    ob = DeliveryOutbox(":memory:")
+    dp.enqueue_card(card, outbox=ob)
+    assert captured["company_name"] == "BEST BUY CO INC"
+    ob.close()

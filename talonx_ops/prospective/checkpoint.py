@@ -274,12 +274,34 @@ def campaign_day(now: datetime | None = None) -> int:
         return 0
 
 
+def _live_companion_uses_broad_discovery(status: dict[str, Any]) -> bool:
+    """Task 137: determine whether the ACTUAL running V2 companion has
+    broad discovery unioned into its execution scope, from its own live-
+    reported ``execution_scope_count`` (``V2Service.checkpoint()``,
+    written to ``v2_service_status.json`` every tick) -- never assumed,
+    never a hardcoded flag independent of the running process. A live
+    count strictly larger than the funnel's own from-scratch watchlist-
+    only resolution is direct, observable proof broad discovery is
+    active; a missing/stale status file (companion not running) or an
+    equal/smaller count means "no" -- the funnel then keeps its prior,
+    narrower (but not misleadingly labelled) behaviour."""
+    live_count = status.get("execution_scope_count")
+    if not isinstance(live_count, int):
+        return False
+    from talonx_ops.prospective.funnel import _resolved_execution_scope
+
+    watchlist_only = _resolved_execution_scope(include_broad_discovery=False)
+    watchlist_only_count = len(watchlist_only) if watchlist_only is not None else 0
+    return live_count > watchlist_only_count
+
+
 def capture(now: datetime | None = None) -> dict[str, Any]:
     now = now or datetime.now(timezone.utc)
     s = _v2_status()
     v1fp, v2fp = _v1_fp(), _v2_fp()
     ledger = check_ledger_continuity(V2_DB_PATH)
-    funnel = build_funnel(db_path=V2_DB_PATH, as_of=now.date())
+    funnel = build_funnel(db_path=V2_DB_PATH, as_of=now.date(),
+                          include_broad_discovery=_live_companion_uses_broad_discovery(s))
     poller = logical_poller_report()
     market = _market()
     intel = _intel()

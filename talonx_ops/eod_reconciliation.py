@@ -44,6 +44,37 @@ STATUS_MISMATCH = "RECONCILED_WITH_MISMATCH"
 STATUS_PARTIAL = "PARTIAL"
 STATUS_UNKNOWN = "UNKNOWN"
 
+
+def reconciled_to_available_scope(rec: "EodReconciliation | dict") -> bool:
+    """Task 137: a `PARTIAL` status has exactly one structural cause in
+    this deployment -- ``piv_paper`` is permanently ``NOT_CHECKED`` (PIV/
+    Alpaca is a read-only, opt-in-only component that is never injected
+    here; this V2 campaign does not use it at all). That makes ``status
+    == PARTIAL`` for THIS deployment a standing, permanent condition, not
+    a signal of something actually missing/broken -- `eod_reconciled_
+    today`/`today_reconciled` (which both require `RECONCILED`/
+    `RECONCILED_WITH_MISMATCH`) can therefore never become true here, a
+    reporting defect distinct from the genuine "reconciled too early,
+    before session close" case Task 118A P3 already guards against.
+
+    Returns True only for the NARROW case this fix actually addresses:
+    ``status == PARTIAL``, no mismatches, every component OTHER than
+    ``piv_paper`` is ``CHECKED``, and ``piv_paper`` itself is
+    ``NOT_CHECKED`` (not e.g. ``UNKNOWN`` from a broker-read error, which
+    is a genuinely different, real problem). Deliberately a SEPARATE,
+    explicitly-named signal -- it does not change `status`, does not
+    change `today_reconciled`'s existing strict meaning, and does not
+    retroactively rewrite any persisted record; a caller that wants "did
+    this deployment reconcile everything it actually checks" reads this
+    in addition to, not instead of, the existing field."""
+    d = rec.to_dict() if hasattr(rec, "to_dict") else rec
+    if d.get("status") != STATUS_PARTIAL or d.get("mismatches"):
+        return False
+    comps = {c["name"]: c["outcome"] for c in d.get("component_status", [])}
+    if comps.get("piv_paper") != NOT_CHECKED:
+        return False
+    return all(outcome == CHECKED for name, outcome in comps.items() if name != "piv_paper")
+
 _DDL = """
 CREATE TABLE IF NOT EXISTS eod_sessions (
     session_date       TEXT PRIMARY KEY,

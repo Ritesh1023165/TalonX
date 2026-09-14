@@ -17,6 +17,7 @@ frozen rules the lane applies (stale vs fresh-eligible vs pending).
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -27,31 +28,74 @@ def _today_utc() -> date:
     return datetime.now(timezone.utc).date()
 
 
-def _resolved_execution_scope() -> list[str] | None:
+_BROAD_DISCOVERY_MANIFEST = (
+    Path(__file__).resolve().parents[2]
+    / "talonx_ingest" / "intelligence" / "service" / "data"
+    / "discovery_universe_v1_626.json"
+)
+
+
+def _resolved_execution_scope(*, include_broad_discovery: bool = False) -> list[str] | None:
     """The enforced V2 execution allowlist (POLLED SEC-covered issuers), or
     ``None`` if it cannot be resolved offline. Same source the live companion
-    uses via ``run.py --execution-scope resolved-active-watchlist`` (D1)."""
+    uses via ``run.py --execution-scope resolved-active-watchlist`` (D1).
+
+    Task 137: ``include_broad_discovery`` additively unions in the SAME
+    frozen Discovery Universe v1 manifest ``run.py --enable-broad-
+    discovery`` unions into the LIVE companion's own ``execution_
+    allowlist`` (talonx_v2/run.py) -- without this, a live companion
+    actually running with broad discovery enabled evaluates Form 4/code-P
+    admission against ~626 issuers while this observational funnel kept
+    silently recomputing a narrower ~39-issuer (watchlist-only) scope,
+    understating "how much is actually being evaluated" and any code-P/
+    cluster counts derived from it. Default ``False`` preserves the exact
+    prior behaviour for any caller that does not know (or does not want)
+    the live companion's actual flag state -- see ``build_funnel``'s own
+    caller in ``checkpoint.py`` for how that state is actually determined
+    from the running companion, not assumed."""
     try:
         from talonx_ops.watchlist_coverage import build_coverage_map
         allow = sorted(c["symbol"] for c in build_coverage_map()["tickers"]
                        if c.get("v2_collection_scope") == "POLLED")
-        return allow or None
     except Exception:  # noqa: BLE001
         return None
+    if include_broad_discovery:
+        try:
+            manifest = json.loads(_BROAD_DISCOVERY_MANIFEST.read_text())
+            universe = {s.strip().upper() for s in manifest.get("symbols", []) if s.strip()}
+            allow = sorted(set(allow) | universe)
+        except Exception:  # noqa: BLE001
+            pass  # never fail the observational funnel over a manifest read problem
+    return allow or None
 
 
 def build_funnel(*, db_path: str | Path, as_of: date | None = None,
                  lookback_days: int = 45,
-                 execution_allowlist: list[str] | None | str = "auto") -> dict[str, Any]:
+                 execution_allowlist: list[str] | None | str = "auto",
+                 include_broad_discovery: bool = False) -> dict[str, Any]:
     """``execution_allowlist``:
       * ``"auto"`` (default) -> resolve the enforced V2 scope and filter to it,
         matching what the live companion actually evaluates (D1 fix);
       * an explicit ``list[str]`` -> filter to exactly those symbols;
       * ``None`` -> unrestricted (the pre-D1 behaviour; historical replay only).
+
+    ``include_broad_discovery`` (Task 137, only used with ``execution_
+    allowlist="auto"``): additionally union in the frozen Discovery
+    Universe v1 manifest, matching a live companion actually running with
+    ``--enable-broad-discovery`` -- see ``_resolved_execution_scope``.
+    Reports BOTH the watchlist-only count and the resolved (possibly
+    wider) one, explicitly labelled, never silently substituting one for
+    the other -- see ``scope`` below.
     """
     as_of = as_of or _today_utc()
+    watchlist_only_count: int | None = None
     if execution_allowlist == "auto":
-        execution_allowlist = _resolved_execution_scope()
+        watchlist_scope = _resolved_execution_scope(include_broad_discovery=False)
+        watchlist_only_count = len(watchlist_scope) if watchlist_scope is not None else None
+        execution_allowlist = (
+            _resolved_execution_scope(include_broad_discovery=True) if include_broad_discovery
+            else watchlist_scope
+        )
     allow_set = ({s.upper() for s in execution_allowlist}
                  if execution_allowlist is not None else None)
     out: dict[str, Any] = {
@@ -59,7 +103,14 @@ def build_funnel(*, db_path: str | Path, as_of: date | None = None,
         "scope": {
             "today_utc": as_of.isoformat(), "window_days": lookback_days,
             "execution_scope_enforced": allow_set is not None,
+            # Task 137: this is the scope ACTUALLY used to filter Form 4/
+            # code-P records and episodes below -- when include_broad_
+            # discovery is True and differs from watchlist_only_count,
+            # that difference IS the broad-discovery union, not a
+            # separate/unrelated figure.
             "execution_scope_count": (len(allow_set) if allow_set is not None else None),
+            "watchlist_only_count": watchlist_only_count,
+            "broad_discovery_included": bool(include_broad_discovery),
         },
         "available": False,
     }

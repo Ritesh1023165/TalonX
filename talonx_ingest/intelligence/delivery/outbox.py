@@ -63,6 +63,21 @@ _FRESH_EXPIRED = "EXPIRED"        # valid basis, over cutoff -- terminal
 _FRESH_UNQUALIFIED = "UNQUALIFIED"  # no usable source-time evidence -- terminal
 _FRESH_DEFER = "DEFER"            # lookup itself failed -- transient, retry later
 
+# Task 137: a bounded, fixed backoff applied to a DEFER'd row's own
+# next_retry_at_utc -- see _expire_row_if_stale's DEFER branch. Without
+# this, a row whose lookup keeps failing sorts in the EXACT SAME position
+# every cycle (band, then enqueue_time ASC) and a bounded per-cycle
+# `pending()` selection (`LIMIT`) can be filled ENTIRELY by such rows,
+# never reaching a genuinely eligible row sitting behind them -- a
+# starvation gap distinct from (and not covered by) "a DEFER'd row does
+# not stop the REST of an already-selected batch", which was already
+# correctly handled. A short, fixed delay (not exponential -- no
+# meaningful "attempts" counter exists for this transient, non-terminal
+# case, and one is deliberately not added) is enough to let the SAME
+# bounded query reach past it on a later cycle, while still retrying it
+# promptly once the underlying lookup problem clears.
+_DEFER_BACKOFF_SECONDS = 30.0
+
 
 @dataclass
 class _FreshnessOutcome:
@@ -649,7 +664,21 @@ class DeliveryOutbox:
             default_max = CARD_MAX_AGE_DEFAULT_SECONDS
 
         expired: list[str] = []
-        mutated = False   # Task 136B: EXPIRED *or* UNQUALIFIED both mutate the row
+        mutated = False   # Task 136B/137: EXPIRED, UNQUALIFIED or DEFER all mutate the row
+        # Task 137: this sweep deliberately does NOT filter on next_retry_
+        # at_utc the way pending() does. That column is shared with the
+        # UNRELATED send-attempt backoff mark_failed() sets (a row simply
+        # waiting for its NEXT SEND try, nothing to do with a lookup
+        # failure) -- filtering the AGE sweep on it here would let a row
+        # that is merely awaiting a send retry silently escape an
+        # age-based expiry it genuinely still needs, conflating two
+        # different backoffs that happen to share one column. The
+        # per-row inline gate (expire_one_if_stale, used against
+        # pending()'s own already-next_retry_at_utc-filtered selection)
+        # is what actually protects the bounded SEND-selection path from
+        # starvation; this bulk sweep still benefits indirectly, since it
+        # writes the SAME DEFER backoff (see _expire_row_if_stale) if it
+        # happens to reach a failing row first.
         sql = (
             "SELECT delivery_id, route, event_id, enqueued_at_utc FROM intelligence_delivery "
             "WHERE state = ? ORDER BY enqueued_at_utc ASC"
@@ -675,8 +704,9 @@ class DeliveryOutbox:
             # age", not "suppressed for missing evidence" (the per-row
             # inline gate in process_pending/process_digest is what
             # surfaces DrainResult.unqualified/.unqualified_ids). A DEFER
-            # outcome mutates nothing -- the row is left exactly as it
-            # was, to be retried on this or a later call.
+            # outcome (Task 137: now writes a bounded next_retry_at_utc
+            # backoff, see _expire_row_if_stale) never changes `state` and
+            # is not counted in either list -- it is neither verdict.
             if outcome.disposition == _FRESH_EXPIRED:
                 expired.append(r["delivery_id"])
                 mutated = True
@@ -684,6 +714,8 @@ class DeliveryOutbox:
                 mutated = True
                 if unqualified_ids_out is not None:
                     unqualified_ids_out.append(r["delivery_id"])
+            elif outcome.disposition == _FRESH_DEFER:
+                mutated = True
         if mutated:
             self._conn.commit()
         return expired
@@ -718,11 +750,20 @@ class DeliveryOutbox:
                             "proven old").
           * DEFER         -- the lookup itself raised (a transient failure,
                             e.g. a DB error) -- NOT a verdict on the event;
-                            the row is left completely untouched (still
-                            PENDING) so a later pass can retry it. Bounded
-                            naturally: this same row is reconsidered on the
-                            very next call, never blocks other rows in the
-                            current batch/sweep.
+                            ``state`` stays PENDING (never terminal) so a
+                            later pass can retry it. Task 137: a bounded,
+                            fixed backoff (`_DEFER_BACKOFF_SECONDS`) is
+                            written to ``next_retry_at_utc`` -- without it
+                            the row sorts in the EXACT SAME position on
+                            every subsequent call (band, then enqueue_time
+                            ASC), and a bounded per-cycle `pending()`
+                            selection can be filled ENTIRELY by rows stuck
+                            this way, never reaching a genuinely eligible
+                            row behind them. The backoff excludes it from
+                            selection for a short, bounded window, not
+                            forever -- a later successful lookup recovers
+                            it exactly as before, no different terminal
+                            state, no lost row.
         Task 136B, additionally: ``event_time_lookup`` being ``None``
         (no lookup CAPABILITY offered by this caller at all) is a
         different situation from a provided lookup finding nothing for
@@ -734,8 +775,11 @@ class DeliveryOutbox:
         UNQUALIFIED.
 
         Mutates the row for EXPIRED/UNQUALIFIED (does NOT commit -- callers
-        commit); OK/DEFER never mutate. `enqueued_at_utc` may be a string
-        (raw column) or a ``DeliveryRow``'s own datetime attribute."""
+        commit) and, as of Task 137, also for DEFER (only ``next_retry_at_
+        utc``/``updated_at_utc``, never ``state`` -- callers must commit
+        this case too now). OK never mutates. `enqueued_at_utc` may be a
+        string (raw column) or a ``DeliveryRow``'s own datetime
+        attribute."""
         enq = enqueued_at_utc if isinstance(enqueued_at_utc, datetime) else _dt(enqueued_at_utc)
         evt: datetime | None = None
         evt_invalid_reason: str | None = None
@@ -743,7 +787,16 @@ class DeliveryOutbox:
             try:
                 raw_evt = event_time_lookup(event_id)
             except Exception as exc:  # noqa: BLE001 -- a lookup FAILURE is transient
-                return _FreshnessOutcome(_FRESH_DEFER, f"event_time_lookup failed: {exc}")
+                reason = f"event_time_lookup failed: {exc}"
+                next_retry = now + timedelta(seconds=_DEFER_BACKOFF_SECONDS)
+                self._conn.execute(
+                    "UPDATE intelligence_delivery SET next_retry_at_utc=?, updated_at_utc=? "
+                    "WHERE delivery_id=?",
+                    (_iso(next_retry), _iso(now), delivery_id),
+                )
+                self._log(delivery_id, "DEFERRED",
+                          f"{reason} -- retry not before {next_retry.isoformat()}")
+                return _FreshnessOutcome(_FRESH_DEFER, reason)
             if raw_evt is not None:
                 evt, evt_invalid_reason = _validate_source_time(raw_evt, now)
 
@@ -797,15 +850,18 @@ class DeliveryOutbox:
         max_age_seconds: "dict[str, int] | int | None" = None,
         event_time_lookup=None,
     ) -> "_FreshnessOutcome":
-        """Task 136A/136B: the per-row freshness gate applied immediately
-        before a send (see ``process_pending``/``process_digest`` in
-        pipeline.py) -- the actual enforcement point queue creation time
-        cannot bypass, independent of whether a prior bulk ``expire_
-        stale`` pass reached this specific row. ``row`` is a
+        """Task 136A/136B/137: the per-row freshness gate applied
+        immediately before a send (see ``process_pending``/``process_
+        digest`` in pipeline.py) -- the actual enforcement point queue
+        creation time cannot bypass, independent of whether a prior bulk
+        ``expire_stale`` pass reached this specific row. ``row`` is a
         ``DeliveryRow`` (has ``.delivery_id``/``.route``/``.event_id``/
         ``.enqueued_at_utc``). Commits immediately for EXPIRED/UNQUALIFIED
         (unlike the bulk sweep, called one row at a time inline in the
-        send loop); a DEFER outcome never mutates or commits anything.
+        send loop) and, as of Task 137, for DEFER too (a bounded ``next_
+        retry_at_utc`` backoff is written -- see ``_expire_row_if_stale``
+        -- so a permanently-failing lookup cannot monopolize a bounded
+        selection ``limit`` forever; ``state`` itself is never touched).
         Returns a ``_FreshnessOutcome`` -- callers must only send when
         ``.disposition == _FRESH_OK``."""
         from talonx_ingest.intelligence.delivery.config import (
@@ -825,7 +881,7 @@ class DeliveryOutbox:
             route_max=route_max, default_max=default_max,
             event_time_lookup=event_time_lookup,
         )
-        if outcome.disposition in (_FRESH_EXPIRED, _FRESH_UNQUALIFIED):
+        if outcome.disposition in (_FRESH_EXPIRED, _FRESH_UNQUALIFIED, _FRESH_DEFER):
             self._conn.commit()
         return outcome
 

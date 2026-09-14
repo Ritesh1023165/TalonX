@@ -633,7 +633,7 @@ class AuthoritativeReadModel:
         (``~/.talonx/eod_reconciliation.db``, owned by
         ``talonx_ops.eod_reconciliation``)."""
         try:
-            from talonx_ops.eod_reconciliation import EodReconciliationStore
+            from talonx_ops.eod_reconciliation import EodReconciliationStore, reconciled_to_available_scope
 
             store = EodReconciliationStore(self.home / "eod_reconciliation.db", read_only=True)
             latest = store.latest()
@@ -659,11 +659,20 @@ class AuthoritativeReadModel:
         # differently named) meaning; `today_reconciled` now means what it
         # says -- a genuinely completed reconciliation for today.
         _today_status = rec["status"] if today is not None else None
+        # Task 137: `piv_paper` is permanently NOT_CHECKED in this deployment
+        # (PIV/Alpaca is opt-in-only and never wired up here) -- a PARTIAL
+        # status caused solely by that is a standing condition, not evidence
+        # anything is actually missing/broken. `today_reconciled` above keeps
+        # its existing strict meaning (Task 118A P3); this is a SEPARATE,
+        # explicitly narrower-scope signal, not a silent reclassification.
+        _today_reconciled_available_scope = bool(
+            today is not None and reconciled_to_available_scope(today))
         vals = {
             "latest_session": latest.session_date,
             "today_has_a_record": today is not None,
             "today_record_status": _today_status,
             "today_reconciled": _today_status in ("RECONCILED", "RECONCILED_WITH_MISMATCH"),
+            "today_reconciled_available_scope": _today_reconciled_available_scope,
             "status": rec["status"],
             "original_paper": rec["original_paper"],
             "experimental_paper": rec["experimental_paper"],

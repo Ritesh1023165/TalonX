@@ -68,10 +68,29 @@ _ALLOWED_CONTEXT_RE = re.compile(
 )
 
 
-def _bare_buy_sell_violations(text: str) -> list[str]:
+def _company_name_spans(text: str, company_name: str | None) -> list[tuple[int, int]]:
+    """Task 137: every occurrence of the filer's own, SEC-sourced company
+    name in ``text`` -- e.g. "BEST BUY CO INC" -- so a bare "buy"/"sell"
+    token that is part of THAT name (not renderer- or reason-string-
+    authored free text) is never treated as predictive/advice language.
+    Confirmed real, deterministic false-positive: every BBY (Best Buy)
+    card was rejected on every attempt, regardless of filing type/
+    content, purely because the company's own proper name contains the
+    literal word "Buy". A short (<=2 char) or empty ``company_name`` is
+    ignored -- too easy to coincidentally overlap unrelated text."""
+    if not company_name or len(company_name.strip()) <= 2:
+        return []
+    pat = re.compile(re.escape(company_name.strip()), re.IGNORECASE)
+    return [(m.start(), m.end()) for m in pat.finditer(text)]
+
+
+def _bare_buy_sell_violations(text: str, *, company_name: str | None = None) -> list[str]:
+    name_spans = _company_name_spans(text, company_name)
     out: list[str] = []
     for m in _BUY_SELL_RE.finditer(text):
         s, e = m.start(), m.end()
+        if any(ns <= s and e <= ne for ns, ne in name_spans):
+            continue   # part of the filer's own factual company name
         window = text[max(0, s - 40): min(len(text), e + 40)]
         if _ALLOWED_CONTEXT_RE.search(window):
             continue
@@ -79,9 +98,14 @@ def _bare_buy_sell_violations(text: str) -> list[str]:
     return sorted(set(out))
 
 
-def scan_rendered(text: str | None) -> list[str]:
+def scan_rendered(text: str | None, *, company_name: str | None = None) -> list[str]:
     """Return every ``(kind:term)`` claim-safety violation in the rendered
-    message. Empty list == clean."""
+    message. Empty list == clean. ``company_name`` (Task 137, optional):
+    the event's own SEC-sourced filer name, so a bare "buy"/"sell" that is
+    part of it (e.g. "Best Buy") is not misclassified as advice language
+    -- see ``_company_name_spans``. Every OTHER rule is completely
+    unaffected; this narrowly extends only the existing bare-token allow-
+    list, it does not relax phrase-level detection at all."""
     if not text:
         return []
     violations: list[str] = []
@@ -94,13 +118,13 @@ def scan_rendered(text: str | None) -> list[str]:
     for pat, phrase in zip(_PHRASE_RE, _PROHIBITED_PHRASES):
         if pat.search(text):
             violations.append(f"phrase:{phrase}")
-    for t in _bare_buy_sell_violations(text):
+    for t in _bare_buy_sell_violations(text, company_name=company_name):
         violations.append(f"token:{t}")
     return sorted(set(violations))
 
 
-def assert_clean(text: str | None) -> None:
-    v = scan_rendered(text)
+def assert_clean(text: str | None, *, company_name: str | None = None) -> None:
+    v = scan_rendered(text, company_name=company_name)
     if v:
         raise PredictiveLanguageError(
             f"rendered Telegram text contains prohibited claim language: {v}"

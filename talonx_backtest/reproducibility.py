@@ -89,11 +89,25 @@ def get_strategy_version() -> str:
     """sha256 (first 12 hex chars) of the frozen strategy's own source
     files. A missing file contributes a distinct, deterministic marker
     to the hash rather than silently being skipped, so a broken
-    checkout doesn't masquerade as a valid fingerprint."""
+    checkout doesn't masquerade as a valid fingerprint.
+
+    Task 137: hashes the CANONICAL LF form of each file, so a working
+    tree that materialises these files with CRLF (e.g. a Windows
+    checkout under `core.autocrlf`) produces the SAME fingerprint as the
+    LF blobs actually committed to git -- a no-op on an LF checkout,
+    where this was already true. Same rationale, same technique
+    `tests/test_task65b_protected_fingerprints.py` already established
+    for the other two frozen-candidate fingerprints in this repo (see its
+    own comment) -- a genuine content change is still fully detected;
+    only the line-ending REPRESENTATION stops being significant. Applied
+    retroactively when this defect was confirmed: the mismatch reported
+    against the previous ``V1_FINGERPRINT_EXPECTED`` (talonx_ops/
+    prospective/__init__.py) was NOT solely this -- see that constant's
+    own comment for the real, substantive change also found."""
     digest = hashlib.sha256()
     for path in _STRATEGY_FILES:
         try:
-            digest.update(path.read_bytes())
+            digest.update(path.read_bytes().replace(b"\r\n", b"\n"))
         except OSError:
             digest.update(b"MISSING:" + str(path).encode())
     return digest.hexdigest()[:12]

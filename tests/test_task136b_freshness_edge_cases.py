@@ -163,20 +163,25 @@ def test_lookup_failure_defers_and_remains_recoverable(ledger_path):
     snd = RecordingSender()
     res = _drain(ob, snd, now=now, event_time_lookup=_flaky_lookup, route="IMMEDIATE")
     row = ob.get(did)
-    assert row.state == STATE_PENDING            # left completely untouched -- not terminal
+    assert row.state == STATE_PENDING            # `state` itself untouched -- not terminal
     assert snd.sent == []
     assert res.expired == 0 and res.unqualified == 0   # neither verdict was reached
-    # the lookup is consulted twice per drain pass by design -- once by the
-    # bulk expire_stale() sweep, once more by the per-row inline gate
-    # immediately before send (the two independent checks Task 136A/136B
-    # deliberately keep in agreement) -- a DEFER from either leaves the row
-    # untouched, so both see the same still-PENDING row.
-    assert calls["n"] == 2
+    # Task 137: a DEFER now writes a bounded next_retry_at_utc backoff (see
+    # outbox._DEFER_BACKOFF_SECONDS) -- whichever of the bulk expire_stale()
+    # sweep or the per-row inline send-path gate reaches this row FIRST
+    # within one drain cycle sets that backoff, which then correctly
+    # excludes the row from pending()'s own already-next_retry_at_utc-
+    # filtered send-selection for the REST of this same cycle -- so the
+    # lookup is consulted once per cycle now, not twice (a deliberate,
+    # beneficial side effect of closing the starvation gap, not a
+    # regression: see test_task137_overnight_continuity.py for the
+    # starvation fix itself).
+    assert calls["n"] == 1
 
     def _recovered_lookup(event_id):
         return now - timedelta(seconds=5)          # a genuinely fresh, valid time
 
-    res2 = _drain(ob, snd, now=now + timedelta(seconds=1),
+    res2 = _drain(ob, snd, now=now + timedelta(seconds=31),
                   event_time_lookup=_recovered_lookup, route="IMMEDIATE")
     assert ob.get(did).state == STATE_SENT
     assert did in [r.delivery_id for r in snd.sent]

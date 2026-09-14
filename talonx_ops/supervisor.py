@@ -885,20 +885,28 @@ def _status_snapshot() -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         out["market_error"] = repr(exc)
     try:
-        from talonx_ops.eod_reconciliation import EodReconciliationStore
+        from talonx_ops.eod_reconciliation import EodReconciliationStore, reconciled_to_available_scope
 
         st = EodReconciliationStore(read_only=True)
         latest = st.latest()
         st.close()
         out["eod_latest"] = latest.to_dict() if latest else None
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        _today_rec = latest if (latest and latest.session_date == today) else None
         # Task 118A P3: a same-day record whose own status is not a
         # completed reconciliation (e.g. PARTIAL, from an intraday/pre-open
         # shutdown snapshot) must never read as "today already reconciled"
         # -- matches the same fix in authoritative_read_model.py.
         out["eod_reconciled_today"] = bool(
-            latest and latest.session_date == today
-            and latest.status in ("RECONCILED", "RECONCILED_WITH_MISMATCH"))
+            _today_rec and _today_rec.status in ("RECONCILED", "RECONCILED_WITH_MISMATCH"))
+        # Task 137: `eod_reconciled_today` above stays strict on purpose --
+        # this deployment's `piv_paper` component is permanently NOT_CHECKED
+        # (PIV/Alpaca is opt-in-only and never injected here), so a PARTIAL
+        # status caused SOLELY by that is a standing condition, not a sign
+        # anything is actually missing/broken. This is a SEPARATE, narrower-
+        # scope signal, not a silent reclassification of the strict one.
+        out["eod_reconciled_today_available_scope"] = bool(
+            _today_rec and reconciled_to_available_scope(_today_rec))
     except Exception as exc:  # noqa: BLE001
         out["eod_error"] = repr(exc)
 
@@ -925,6 +933,8 @@ def _status_snapshot() -> dict[str, Any]:
             "original_open_positions": op.get("open_positions"),
             "experimental_open_positions": ep.get("open_positions"),
             "eod_reconciled_today": out.get("eod_reconciled_today", False),
+            "eod_reconciled_today_available_scope": out.get(
+                "eod_reconciled_today_available_scope", False),
             "dashboard_url": "http://localhost:8787",
             "intelligence_deep_viewer": "http://localhost:8760",
         }

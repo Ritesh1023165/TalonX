@@ -403,8 +403,16 @@ def test_a2_overview_healthy_zero_is_not_an_attention_item(_dash, monkeypatch):
 # ======================================================================
 
 def test_task114_does_not_change_fingerprints():
+    # Task 137: asserts against the live V1_FINGERPRINT_EXPECTED constant
+    # (not a hardcoded literal duplicated here) -- that constant is the
+    # single source of truth for what the CURRENT baseline is, and is
+    # itself updated (with full per-file/commit evidence in its own
+    # comment) only when a real, already-authorized change to one of the
+    # 5 fingerprinted files is confirmed, distinct from a stale value
+    # silently drifting out of sync with a second hardcoded copy here.
     from talonx_backtest.reproducibility import get_strategy_version
-    assert get_strategy_version() == "2ae6216bca70"
+    from talonx_ops.prospective import V1_FINGERPRINT_EXPECTED
+    assert get_strategy_version() == V1_FINGERPRINT_EXPECTED
     import importlib
     fp = importlib.import_module("research.scripts.task112_v2_release_fingerprint").v2_release_fingerprint()
     assert fp["fingerprint"] == "11107198c5b81237"
