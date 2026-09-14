@@ -282,6 +282,13 @@ upstream (the enrichment bottleneck above).
   execution-scope membership cannot reach a paper entry — verified by
   inspection, no code change required (no enforcement gap found).
 
+### Full-suite gate (completed after commit `bb8478f`)
+
+**4665 passed, 8 failed, 6 skipped** (53m47s) — the 8 failures are, by
+exact name, the IDENTICAL set already documented above from the original
+turn's own full-suite run against `aca1a4c` (4 pre-existing/unrelated; 4
+environmental, the live stack's own real PIDs). Zero new failures.
+
 ### `/ping` extended (Directive section 5)
 
 `talonx_dispatch/telegram_listener.py`: existing market/Quant sections
