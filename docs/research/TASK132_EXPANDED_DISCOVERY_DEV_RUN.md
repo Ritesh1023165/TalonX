@@ -350,4 +350,6 @@ DELIVERY_REPORT.md`. Summary:
   poller ownership verified after each; cash $300,000.00 / 0 positions /
   0 intents preserved throughout. 15 new focused tests, 204 passed
   across every directly-affected file, frozen fingerprint
-  `11107198c5b81237` unchanged.
+  `11107198c5b81237` unchanged. Full-suite gate: **4,680 passed, 8
+  failed, 6 skipped** (49m06s) at HEAD `309b845` -- the same 8 failures
+  by exact name as Task 132's own baseline, zero new failures.
