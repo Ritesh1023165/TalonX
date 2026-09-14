@@ -51,6 +51,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 from datetime import datetime, time, timedelta, timezone
 from typing import Any, AsyncContextManager, Callable
@@ -132,6 +133,43 @@ async def _sum_metrics(client, stage: str, counters: list[str]) -> int | None:
 
 def _fmt_metric(value: int | None) -> str:
     return "unknown" if value is None else f"{value:,}"
+
+
+def _fmt_seconds(value: float | None) -> str:
+    """Task 132: renders an elapsed/age seconds figure as e.g. '2h14m' or
+    '37s' -- "unknown" (never "0s") if the value itself is unavailable."""
+    if value is None:
+        return "unknown"
+    value = int(value)
+    if value < 60:
+        return f"{value}s"
+    minutes, seconds = divmod(value, 60)
+    if minutes < 60:
+        return f"{minutes}m{seconds:02d}s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h{minutes:02d}m"
+
+
+def _cap_message(text: str, budget: int) -> str:
+    """Task 132: deterministic last-resort truncation to a hard size
+    budget -- used only as a safety net once a message has already been
+    split in two; under normal conditions neither half comes close to
+    this. A truncated message is labelled as such, never silently cut."""
+    if len(text) <= budget:
+        return text
+    marker = "\n… (truncated to fit Telegram's message-size limit)"
+    return text[: budget - len(marker)] + marker
+
+
+def _env_truthy(name: str) -> bool:
+    """Task 132: each module in this project re-declares its own tiny env
+    helper rather than sharing one (see the module docstring's note on
+    _incr_metric) -- this one matches talonx_ingest.intelligence.service.
+    config's own ``_env_bool`` truthy set exactly (also mirrored by
+    talonx_ops/dashboard_read.py's own admission_policy block), so a
+    value this process itself loaded via python-dotenv reads the same
+    way the Intelligence/V2 processes that actually consume it do."""
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
 
 logger = logging.getLogger("talonx_dispatch.telegram_listener")
 
@@ -431,7 +469,30 @@ class TelegramReplyListener:
             "",
             *self._session_section(),
         ]
-        await self._reply("\n".join(lines), plain=True)
+        discovery_lines = self._discovery_v2_section()
+        await self._send_ping_reply(lines, discovery_lines)
+
+    async def _send_ping_reply(self, lines: list[str], discovery_lines: list[str]) -> None:
+        """Task 132 section 5: appends the new DISCOVERY/V2/DELIVERY block
+        to the existing /ping reply, splitting into a second message only
+        if needed to respect Telegram's size limit -- reusing the delivery
+        pipeline's OWN existing size-budget constant (Task 96F,
+        talonx_ingest.intelligence.delivery.config) rather than inventing a
+        second, competing size policy. Each half is ALSO independently
+        capped at that same budget (deterministic truncation, never a
+        silently-oversized message that Telegram's API would reject
+        outright with a 400) -- the combined-length check alone is not
+        sufficient once split, since either half could still exceed the
+        budget on its own."""
+        from talonx_ingest.intelligence.delivery.config import MESSAGE_BUDGET
+
+        combined = "\n".join([*lines, "", *discovery_lines])
+        if len(combined) <= MESSAGE_BUDGET:
+            await self._reply(combined, plain=True)
+            return
+        await self._reply(_cap_message("\n".join(lines), MESSAGE_BUDGET), plain=True)
+        part2 = "\n".join(["\U0001F3D3 Pong! (2/2)", "─" * 30, *discovery_lines])
+        await self._reply(_cap_message(part2, MESSAGE_BUDGET), plain=True)
 
     def _piv_section(self) -> list[str]:
         """Additive, opt-in block for a PAPER PIV-context caller only
@@ -834,6 +895,213 @@ class TelegramReplyListener:
             f"  UK time: {uk_now.strftime('%H:%M:%S %Z')}",
             f"  Regular session: {'yes' if us_session == 'regular' else 'no'}",
         ]
+
+    def _discovery_v2_section(self) -> list[str]:
+        """Task 132 section 5: DISCOVERY / V2 / DELIVERY -- additive, reads
+        ONLY already-existing files/snapshots the Intelligence service and
+        V2 companion write themselves (their own heartbeat/progress/status
+        JSON, plus bounded COUNT/MAX queries against the shared, read-only-
+        opened ``ingestion_ledger.db``). Never opens a second writer, never
+        scans filing content, never touches a live trading decision. Every
+        field follows this file's own convention: unavailable/never-yet-
+        measured is the literal string "unknown" (or an explicit "not yet"
+        phrase), NEVER a fabricated 0 -- an old event/filing time alone must
+        not read as "unhealthy poller", and process uptime must not stand
+        in for ingestion progress (see TASK132_EXPANDED_DISCOVERY_DEV_RUN.md
+        for why: a still-running FIRST cycle over a 9x-expanded scope can
+        look silent from any per-cycle-only signal for hours)."""
+        lines: list[str] = []
+
+        # -- DISCOVERY: heartbeat (scope, last completed upstream poll) +
+        #    progress (in-flight cycle state, added this task) -----------
+        lines.append("\U0001F50E DISCOVERY")
+        heartbeat, hb_age_s = self._read_json_with_age(self._intel_heartbeat_path())
+        progress, prog_age_s = self._read_json_with_age(self._intel_progress_path())
+        if heartbeat is None:
+            lines.append("  scope/poll status: unknown (heartbeat file unavailable)")
+        else:
+            scope = heartbeat.get("scope") or {}
+            effective_n = len(heartbeat.get("effective_symbols") or [])
+            lines.append(
+                f"  Collection scope: {scope.get('effective', 'unknown')} watchlist"
+                f" -> {effective_n or 'unknown'} effective (broad-discovery-inclusive)"
+            )
+            last_poll = (heartbeat.get("metrics") or {}).get("source", {}).get("last_successful_poll_utc")
+            lines.append(
+                "  Last completed upstream poll: "
+                + (last_poll if last_poll else "none yet (first cycle still in progress)")
+            )
+        if progress is None:
+            lines.append("  Current cycle: unknown (no progress snapshot written yet)")
+        else:
+            phase = progress.get("phase", "unknown")
+            complete = progress.get("cycle_complete")
+            elapsed = progress.get("elapsed_seconds")
+            state_label = "COMPLETE" if complete else f"IN PROGRESS ({phase})"
+            lines.append(f"  Current cycle: {state_label}, elapsed {_fmt_seconds(elapsed)}")
+            sd, st = progress.get("symbols_done"), progress.get("symbols_total")
+            if sd is not None and st is not None:
+                lines.append(f"  Issuers polled: {sd}/{st} (as of {_fmt_seconds(prog_age_s)} ago)")
+            ed, et = progress.get("events_done"), progress.get("events_total")
+            if ed is not None and et is not None:
+                lines.append(f"  New filings enriched: {ed:,}/{et:,} (same snapshot)")
+        events_today = self._intel_bounded_counts()
+        lines.append(
+            "  New filing events persisted (today, UTC): "
+            + (f"{events_today:,}" if events_today is not None else "unknown")
+        )
+        if events_today is None:
+            lines.append("  (ledger DB unavailable for this reading -- not a claim of zero activity)")
+
+        # -- V2: the companion's own status file (Task 112/113/114) -------
+        lines.append("")
+        lines.append("\U0001F4C8 V2")
+        v2, v2_age_s = self._read_json_with_age(self._v2_status_path())
+        if v2 is None:
+            lines.append("  status: unknown (v2_service_status.json unavailable)")
+        else:
+            exec_scope = v2.get("execution_scope_count", "unknown")
+            lines.append(f"  Execution-eligible scope: {exec_scope}")
+            last_tick = v2.get("last_tick_utc", "unknown")
+            lines.append(f"  Last successful tick: {last_tick} (snapshot read {_fmt_seconds(v2_age_s)} ago)")
+            rejects = {
+                "out_of_scope": v2.get("execution_scope_out_of_scope_dropped_this_tick"),
+                "stale_entry": v2.get("stale_entry_skipped_this_tick"),
+                "no_prior_intent": v2.get("no_prior_intent_skipped_this_tick"),
+                "capacity": v2.get("capacity_rejected_this_tick"),
+                "admission_deadline": v2.get("admission_deadline_rejected_this_tick"),
+            }
+            leading = sorted(
+                ((k, n) for k, n in rejects.items() if isinstance(n, int) and n > 0),
+                key=lambda kv: kv[1], reverse=True,
+            )
+            ripe = v2.get("ripe_episodes_this_tick", "unknown")
+            lines.append(f"  Candidates evaluated (last tick): {ripe}")
+            if leading:
+                lines.append("  Leading rejection reasons (last tick): " + ", ".join(f"{k}={n}" for k, n in leading))
+            pending_intents = v2.get("pending_entry_intents")
+            lines.append(f"  Pending intents: {len(pending_intents) if pending_intents is not None else 'unknown'}")
+            open_pos = v2.get("open_positions")
+            lines.append(f"  Open positions: {open_pos if open_pos is not None else 'unknown'}")
+            lines.append(
+                f"  Entries/exits (last tick): {v2.get('entries_this_tick', 'unknown')}"
+                f"/{v2.get('exits_this_tick', 'unknown')}"
+            )
+            # Same env var + truthy check as talonx_ops/dashboard_read.py's
+            # own admission_policy block -- one established reading, not a
+            # second competing derivation.
+            admission_mode = "GATED" if _env_truthy("TALONX_V2_DURABLE_STORE_ENABLED") else "PERMISSIVE"
+            lines.append(f"  Admission mode: {admission_mode}")
+
+        # -- DELIVERY: discovery informational outbox (ingestion_ledger.db)
+        #    + V2 actionable outbox (already in v2_service_status.json) ---
+        lines.append("")
+        lines.append("\U0001F4EC DELIVERY")
+        counts, last_sent = self._intel_delivery_counts()
+        if counts is None:
+            lines.append("  Discovery informational queue: unknown (ledger DB unavailable)")
+        else:
+            lines.append(
+                "  Discovery informational queue -- pending: {p}, sent: {s}, "
+                "expired/held: {e}, failed: {f}".format(
+                    p=counts.get("PENDING", 0), s=counts.get("SENT", 0),
+                    e=counts.get("EXPIRED", 0), f=counts.get("FAILED", 0),
+                )
+            )
+            lines.append(
+                "  Last successful discovery delivery: " + (last_sent if last_sent else "none in retained history")
+            )
+        if v2 is not None:
+            ao = v2.get("alert_outbox") or {}
+            lines.append(
+                f"  V2 actionable outbox -- total: {ao.get('total', 'unknown')}, "
+                f"by state: {ao.get('by_state') if ao.get('by_state') else '{}'}"
+            )
+        return lines
+
+    @staticmethod
+    def _intel_heartbeat_path():
+        from talonx_ingest.intelligence.service.config import ServiceConfig
+        return ServiceConfig().heartbeat_path()
+
+    @staticmethod
+    def _intel_progress_path():
+        from talonx_ingest.intelligence.service.config import ServiceConfig
+        return ServiceConfig().progress_path()
+
+    @staticmethod
+    def _v2_status_path():
+        from talonx_ops.prospective.paths import V2_STATUS_PATH
+        return V2_STATUS_PATH
+
+    @staticmethod
+    def _read_json_with_age(path) -> tuple[dict | None, float | None]:
+        """Bounded, best-effort read of a small local JSON snapshot file.
+        Never raises -- (None, None) means "unavailable", never a fabricated
+        empty/zero reading."""
+        try:
+            if not path.is_file():
+                return None, None
+            raw = path.read_text(encoding="utf-8")
+            data = json.loads(raw)
+            age_s = max(0.0, datetime.now(timezone.utc).timestamp() - path.stat().st_mtime)
+            return data, age_s
+        except Exception as exc:  # noqa: BLE001 -- a status-check read must never raise
+            logger.warning("Discovery/V2 snapshot read failed for %s: %s", path, exc)
+            return None, None
+
+    @staticmethod
+    def _intel_ledger_path():
+        from talonx_ingest.config import settings
+        return settings.ledger.path
+
+    def _intel_bounded_counts(self) -> int | None:
+        """Single bounded COUNT query against the shared, read-only-opened
+        ingestion ledger -- new filing-text events persisted today (UTC),
+        the SAME per-UTC-day windowing convention every other /ping counter
+        in this file already uses (see _quant_section's "today"). A cheap
+        indexed-enough scan of a table in the tens of thousands of rows,
+        not a bulk content scan. None on any failure -- never a fabricated
+        0 (a query failure is not evidence of zero activity)."""
+        try:
+            import sqlite3
+            path = self._intel_ledger_path()
+            start_of_day = datetime.now(timezone.utc).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            ).isoformat()
+            con = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=2.0)
+            try:
+                row = con.execute(
+                    "SELECT COUNT(*) FROM text_events WHERE ingested_at_utc >= ?", (start_of_day,)
+                ).fetchone()
+                return row[0] if row else None
+            finally:
+                con.close()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Discovery bounded-count query failed: %s", exc)
+            return None
+
+    def _intel_delivery_counts(self) -> tuple[dict | None, str | None]:
+        """Two single bounded queries (GROUP BY state; MAX(sent_at_utc)) --
+        no per-row scan, no filing content read. (None, None) on failure."""
+        try:
+            import sqlite3
+            path = self._intel_ledger_path()
+            con = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=2.0)
+            try:
+                rows = con.execute(
+                    "SELECT state, COUNT(*) FROM intelligence_delivery GROUP BY state"
+                ).fetchall()
+                counts = {state: n for state, n in rows}
+                last = con.execute(
+                    "SELECT MAX(sent_at_utc) FROM intelligence_delivery WHERE state='SENT'"
+                ).fetchone()
+                return counts, (last[0] if last else None)
+            finally:
+                con.close()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Discovery delivery-count query failed: %s", exc)
+            return None, None
 
     async def _ws_status(self) -> str:
         client = getattr(self.dispatch_agent, "_client", None)

@@ -121,6 +121,30 @@ def test_poll_loop_runs_bounded_and_writes_heartbeat(tmp_path, monkeypatch):
     assert cfg.metrics_path().is_file()
 
 
+def test_poll_cycle_writes_a_progress_file(tmp_path, monkeypatch):
+    """Task 132 section 2/5: ``poll_cycle`` must expose in-progress state
+    via a small, cheap progress file -- distinct from the full heartbeat,
+    which is only written after the whole cycle (poll_cycle + drain_retries
+    + deliver_cycle) completes."""
+    svc, cfg = _service(tmp_path, monkeypatch)
+
+    async def _go():
+        await svc.open()
+        try:
+            return await svc.poll_cycle()
+        finally:
+            await svc.close()
+
+    asyncio.run(_go())
+    progress = read_heartbeat(cfg.progress_path())
+    assert progress is not None
+    assert progress["symbols_total"] == 1
+    assert progress["symbols_done"] == 1
+    assert progress["cycle_complete"] is True
+    assert progress["last_symbol"] == "FAKE"
+    assert "elapsed_seconds" in progress and "cycle_started_at_utc" in progress
+
+
 def test_status_is_offline_safe(tmp_path, monkeypatch):
     svc, cfg = _service(tmp_path, monkeypatch)
 

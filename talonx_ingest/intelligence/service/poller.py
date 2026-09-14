@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -84,6 +85,21 @@ class EdgarPoller:
         self._rotation_cursor = 0
 
     # ------------------------------------------------------------------
+    @staticmethod
+    def _report_progress(
+        progress_cb: "Callable[[int, int, str], None] | None",
+        symbols_done: int,
+        symbols_total: int,
+        last_symbol: str,
+    ) -> None:
+        if progress_cb is None:
+            return
+        try:
+            progress_cb(symbols_done, symbols_total, last_symbol)
+        except Exception:  # noqa: BLE001 - a progress observer must never break polling
+            logger.debug("progress_cb raised; ignored", exc_info=True)
+
+    # ------------------------------------------------------------------
     def _cycle_symbols(self, only: set[str] | None = None):
         resolved = [r for r in self.scope.resolved if only is None or r.symbol in only]
         n = self.config.poll_max_symbols_per_cycle
@@ -96,8 +112,28 @@ class EdgarPoller:
 
     # ------------------------------------------------------------------
     async def poll_once(
-        self, *, now: datetime | None = None, symbols: list[str] | None = None
+        self,
+        *,
+        now: datetime | None = None,
+        symbols: list[str] | None = None,
+        progress_cb: "Callable[[int, int, str], None] | None" = None,
+        enrich_progress_cb: "Callable[[int, int, str], None] | None" = None,
     ) -> PollCycleResult:
+        """``progress_cb(symbols_done, symbols_total, last_symbol)`` is invoked
+        after every symbol is attempted (success or failure) -- a bounded,
+        in-memory-only hook so a full first pass over a large scope (e.g. a
+        broad-discovery expansion) can expose live progress without waiting
+        for the whole cycle to finish.
+
+        ``enrich_progress_cb(events_done, events_total, last_event_id)`` is
+        invoked the same way, but for the SEPARATE downstream per-event
+        significance/comparison enrichment pass below -- confirmed (Task 132
+        section 2) to be the dominant cost of a large first cycle, not the
+        per-symbol fetch loop: enrichment awaits ``process_event`` for every
+        newly discovered event ONE AT A TIME, so a scope expansion that
+        surfaces tens of thousands of new events can spend far longer here
+        than fetching them. Both callbacks are optional; ``None`` for either
+        is a byte-identical no-op for every existing caller/test."""
         now = now or datetime.now(timezone.utc)
         result = PollCycleResult(started_at_utc=now)
         t0 = time.monotonic()
@@ -108,7 +144,9 @@ class EdgarPoller:
         form4_budget = self.config.poll_max_form4_per_cycle
         only = {s.upper() for s in symbols} if symbols else None
 
-        for rs in self._cycle_symbols(only):
+        cycle_symbols = self._cycle_symbols(only)
+        symbols_total = len(cycle_symbols)
+        for idx, rs in enumerate(cycle_symbols, start=1):
             call_t0 = time.monotonic()
             try:
                 subs = await self.client.get_submissions(rs.cik)
@@ -118,6 +156,7 @@ class EdgarPoller:
                 dec = classify_error(exc)
                 self.metrics.record_poll(success=False, got_429=("429" in str(exc)))
                 logger.warning("poll %s failed (%s): %s", rs.symbol, dec.cls.value, exc)
+                self._report_progress(progress_cb, idx, symbols_total, rs.symbol)
                 continue
             latency_ms = (time.monotonic() - call_t0) * 1000.0
             self.metrics.record_poll(success=True, latency_ms=latency_ms)
@@ -178,6 +217,8 @@ class EdgarPoller:
                     self.metrics.insider_parse_failures += 1
                     result.errors.append(f"{rs.symbol} form4 {nf.accession}: {outcome.error}")
 
+            self._report_progress(progress_cb, idx, symbols_total, rs.symbol)
+
         # -- freshness bookkeeping (quiet != failure) -----------------
         snap = self.freshness.record_attempt(
             SourceType.SEC_EDGAR_SUBMISSIONS,
@@ -193,12 +234,15 @@ class EdgarPoller:
         # -- downstream enrichment for new events -------------------
         if self.enrichment is not None and result.new_event_ids:
             self.enrichment.source_status = snap.status.value
-            for eid in list(dict.fromkeys(result.new_event_ids)):
+            unique_ids = list(dict.fromkeys(result.new_event_ids))
+            enrich_total = len(unique_ids)
+            for enrich_done, eid in enumerate(unique_ids, start=1):
                 try:
                     await self.enrichment.process_event(eid, origin="poll", now=now)
                 except Exception as exc:  # noqa: BLE001 - never let one event kill the cycle
                     result.errors.append(f"enrich {eid}: {exc}")
                     logger.exception("enrichment failed for %s", eid)
+                self._report_progress(enrich_progress_cb, enrich_done, enrich_total, eid)
 
         result.duration_seconds = round(time.monotonic() - t0, 3)
         return result

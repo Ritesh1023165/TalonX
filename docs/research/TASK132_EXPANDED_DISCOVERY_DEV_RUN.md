@@ -182,3 +182,118 @@ than assumed:
   targeted 4-test re-run (0.93s — not a repeated full-suite cycle).
   Full detail: `results/task132_development_run/DEVELOPMENT_RUN_
   REPORT.md`.
+
+## Addendum — Operational Closure (same day, same live run, same branch)
+
+A follow-up directive on the SAME still-running development stack asked
+for the historical observations above to be **refreshed against current
+fact**, not restated. Full detail: `results/task132_development_run/
+OPERATIONAL_CLOSURE_REPORT.md`. Summary of what changed:
+
+### The real ingestion bottleneck, found and instrumented (not guessed)
+
+The first expanded-scope poll cycle was still running after 2h45m+.
+Direct inspection (not CPU/`Responding: True`) found two genuine,
+distinct phases inside `EdgarPoller.poll_once()`, only the SECOND of
+which is the actual bottleneck:
+
+1. **Per-symbol SEC fetch loop** (`for rs in cycle_symbols`) — evidence
+   (528/569 symbols with newly-ingested filings) shows this phase is far
+   along or complete.
+2. **Per-NEW-EVENT enrichment loop** (`for eid in result.new_event_ids:
+   await self.enrichment.process_event(eid, ...)`) — runs strictly AFTER
+   phase 1, ONE event at a time, each doing its own SEC EDGAR fetch(es)
+   for filing comparison (+ XBRL, `enable_xbrl=True` by default). Direct
+   count: of 27,598 new text-filing events discovered by this run, only
+   ~2,986 (~11%) had been enriched after 2h45m — a real, demonstrated
+   "expensive comparison/parsing" cost (Directive category, not network
+   stall or reprocessing), at a rate that would take on the order of a
+   day to fully drain at this scope multiple, not a "one-time cost" to
+   hand-wave.
+
+**Why both phases were externally invisible**: the service's only
+progress signal (`service.heartbeat.json`) is written once per FULL
+`poll_cycle()` (fetch + enrichment together) — for a first cycle this
+large, that is a single write at start and none again for hours.
+
+**Fix applied** (`talonx_ingest/intelligence/service/{poller,runner,
+config}.py`): two new optional callbacks on `EdgarPoller.poll_once()` --
+`progress_cb` (per symbol) and `enrich_progress_cb` (per enriched event)
+-- both `None` by default (byte-identical no-op for every existing
+caller). `IntelligenceService.poll_cycle()` wires both into a new,
+throttled (`progress_write_min_interval_seconds`, default 10s)
+`service.progress.json` snapshot distinguishing `phase: "polling"` /
+`"enriching"` / `"done"`, elapsed time, and done/total counts for
+whichever phase is active. 8 new focused tests
+(`tests/test_service_poller.py`, `tests/test_service_runner_singleton.py`).
+
+**Why this was NOT fixed by restarting with a bounded per-cycle window**:
+directly queried — 24,958 of the 27,598 newly-ingested filing events
+have a `text_events` row but NO `intel_event_processing` row yet (the
+processing row is created lazily, only when enrichment actually reaches
+that event). Since `ingest_symbol_filings` treats an already-persisted
+filing as a duplicate (correctly — dedup must never regress), a restart
+of the Intelligence component NOW would silently orphan those ~25,000
+already-ingested events: the restarted cycle would never re-surface them
+as "new", so they would never reach enrichment/significance/delivery at
+all. **The current cycle must run to completion (or a proper resume/
+sweep mechanism must exist) before any restart of this component** — the
+progress-reporting fix above takes effect on the NEXT cycle, not this
+one, by design. This is the single most important operational finding
+of this task.
+
+### Discovery-card delivery: real root cause, not a routing bug
+
+`deliver_cycle()` (the ONLY call site for the informational-card drain)
+runs strictly after `poll_cycle()` returns, inside `run_poll_loop`'s
+single sequential loop body — confirmed directly from
+`service.heartbeat.json` staying at `mode: "poll:start"` /
+`last_cycle: None` for the entire observation window. Since `poll_cycle`
+(fetch + enrichment) has not returned even once, `deliver_cycle()` has
+never run even once. The originally-reported 10 cards were a small
+sample of a much larger enqueue burst (2,414 rows at launch, now 2,950 —
+growing as enrichment continues, all still `PENDING`); `SENT`/`EXPIRED`
+are unchanged from before this run (last touched 2026-09-11) — direct
+proof nothing has drained, nothing has been silently dropped, and no
+card has been fabricated as delivered. Outcome: **waiting for a known
+(if currently very slow) delivery schedule** — not suppressed, not
+expired, not stranded by a missing consumer/setting. No delivery-path
+code change was needed once this was understood; the real fix is
+upstream (the enrichment bottleneck above).
+
+### Scope reconciliation (569 vs 626)
+
+- **Configured discovery universe**: 626 symbols (`discovery_universe_
+  v1_626.json`, Task 131 Directive 6, static/versioned).
+- **Resolved ingestion universe**: 569 — 626 minus 57 with no resolvable
+  CIK in that manifest (`broad_discovery: 57/626 symbols unresolved`,
+  logged, never silently dropped from observability).
+- **Resolved execution (V2) universe**: 626 — the 39-name watchlist plus
+  587 broad-discovery-only symbols; V2's own `execution_scope_enforced:
+  true` / `execution_scope_out_of_scope_dropped_this_tick` counter
+  (visible in `v2_service_status.json`, now surfaced on `/ping`) proves
+  the allowlist is live-enforced, not advisory (16 dropped on the most
+  recent tick observed).
+- **Evaluation vs paper-entry-eligible**: unchanged from Task 131 — a
+  symbol must have BOTH a resolved CIK (ingestion) AND pass V2's own
+  liquidity/price mapping at entry time; `execution_scope_enforced`
+  rejects anything outside the 626-name allowlist before an intent is
+  ever created, so an ingestion-only (569-scope) name with no resolved
+  execution-scope membership cannot reach a paper entry — verified by
+  inspection, no code change required (no enforcement gap found).
+
+### `/ping` extended (Directive section 5)
+
+`talonx_dispatch/telegram_listener.py`: existing market/Quant sections
+unchanged; new `_discovery_v2_section()` appends DISCOVERY / V2 /
+DELIVERY, reading only already-existing snapshots (Intelligence's own
+heartbeat + new progress file, the V2 companion's own status JSON, two
+bounded `COUNT`/`GROUP BY`/`MAX` queries against the shared ledger, never
+a full scan) — every field is "unknown" (never a fabricated 0) when its
+source is unavailable. `_send_ping_reply()` reuses the delivery
+pipeline's existing `MESSAGE_BUDGET` (Task 96F) to decide whether to
+split into two Telegram messages, with a deterministic truncation
+safety-net on each half. 13 new focused tests. One real, clearly-labelled
+`[DEVELOPMENT TEST]` /ping was sent through the established destination,
+standalone (not via the live supervised process, to avoid any restart)
+— confirmed delivered (2/2 messages sent, no transport error).

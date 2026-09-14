@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import datetime, timezone
 
 from talonx_ingest.edgar.client import EdgarClient
@@ -177,7 +178,48 @@ class IntelligenceService:
         self, *, now: datetime | None = None, symbols: list[str] | None = None
     ) -> PollCycleResult:
         assert self.poller is not None
-        res = await self.poller.poll_once(now=now, symbols=symbols)
+        cycle_started_at_utc = (now or datetime.now(timezone.utc)).isoformat()
+        cycle_started_monotonic = time.monotonic()
+        last_write_monotonic = 0.0
+        known: dict = {}  # fields carried forward across writes (e.g. the
+                           # symbol-phase totals still matter once enrichment starts)
+
+        def _write(payload: dict, *, force: bool = False) -> None:
+            nonlocal last_write_monotonic
+            now_m = time.monotonic()
+            if not force and (now_m - last_write_monotonic) < self.config.progress_write_min_interval_seconds:
+                return
+            last_write_monotonic = now_m
+            known.update(payload)
+            base = {
+                "cycle_started_at_utc": cycle_started_at_utc,
+                "elapsed_seconds": round(now_m - cycle_started_monotonic, 1),
+                "cycle_complete": False,
+            }
+            base.update(known)
+            write_heartbeat(self.config.progress_path(), base)
+
+        def _on_symbol_progress(done: int, total: int, last_symbol: str) -> None:
+            _write({
+                "phase": "polling",
+                "symbols_done": done, "symbols_total": total, "last_symbol": last_symbol,
+            }, force=(done >= total))
+
+        def _on_enrich_progress(done: int, total: int, last_event_id: str) -> None:
+            _write({
+                "phase": "enriching",
+                "events_done": done, "events_total": total, "last_event_id": last_event_id,
+            }, force=(done >= total))
+
+        res = await self.poller.poll_once(
+            now=now, symbols=symbols,
+            progress_cb=_on_symbol_progress, enrich_progress_cb=_on_enrich_progress,
+        )
+        # one final, unthrottled write marking the whole poll_cycle() (fetch +
+        # enrichment) truly complete -- distinct from either phase's own last
+        # write, since enrichment can finish an instant after its own last
+        # throttled/forced write above.
+        _write({"phase": "done", "cycle_complete": True}, force=True)
         logger.info(
             "poll cycle: polled=%d failed=%d filings=%d new_events=%d form4=%d fresh=%s %.2fs",
             res.symbols_polled, res.symbols_failed, res.filings_seen,

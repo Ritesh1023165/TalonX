@@ -77,6 +77,7 @@ class ServiceConfig:
     poll_recovery_seconds: float = 300.0
     poll_max_symbols_per_cycle: int = 0        # 0 == every effective symbol
     poll_max_form4_per_cycle: int = 40         # bound ownership fetches per cycle
+    progress_write_min_interval_seconds: float = 10.0  # throttle for the mid-cycle progress file
 
     # -- backfill -------------------------------------------------------
     backfill_concurrency: int = 1
@@ -136,6 +137,9 @@ class ServiceConfig:
 
     def heartbeat_path(self) -> Path:
         return self.state_dir / "service.heartbeat.json"
+
+    def progress_path(self) -> Path:
+        return self.state_dir / "service.progress.json"
 
     def metrics_path(self) -> Path:
         return self.state_dir / "service.metrics.json"

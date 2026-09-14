@@ -25,6 +25,7 @@ from talonx_ingest.intelligence.comparison.retrieval import FilingArchiveCache
 from tests._service_helpers import (
     FakeEdgarClient,
     FakeWatchlistStore,
+    default_rows,
     make_submissions,
     wl_row,
 )
@@ -104,4 +105,102 @@ def test_transient_source_failure_then_recovery(tmp_path):
     assert len(r2.new_event_ids) >= 3
     snap = SourceFreshnessTracker(stores.events).snapshot(SourceType.SEC_EDGAR_SUBMISSIONS)
     assert snap.status.value == "FRESH"
+    stores.close()
+
+
+def _setup_two_symbols(tmp_path, fail_second=False):
+    """Task 132: a 2-symbol scope, for exercising ``poll_once``'s
+    ``progress_cb`` across more than one symbol."""
+    cfg = ServiceConfig(ledger_path=str(tmp_path / "l.db"), state_dir=tmp_path / "state",
+                        history_days=3650)
+    stores = StoreBundle.open(cfg.ledger())
+    client = FakeEdgarClient(
+        submissions={
+            "0000012345": make_submissions(cik=12345, ticker="FAKE", rows=default_rows()),
+            "0000067890": make_submissions(cik=67890, ticker="OTHR", rows=default_rows()),
+        },
+        fail_submissions_for={67890} if fail_second else set(),
+    )
+    directory = CikDirectory.from_company_tickers({
+        "0": {"cik_str": 12345, "ticker": "FAKE", "title": "Fake Industries Inc."},
+        "1": {"cik_str": 67890, "ticker": "OTHR", "title": "Other Corp."},
+    })
+    wl = FakeWatchlistStore([wl_row("FAKE"), wl_row("OTHR")])
+    scope = resolve_scope(config=cfg, watchlist_store=wl, directory=directory)
+    enrich = EnrichmentEngine(
+        stores, client, config=cfg,
+        cache=FilingArchiveCache(client, cache_dir=tmp_path / "cache"),
+    )
+    poller = EdgarPoller(stores, client, config=cfg, scope=scope, enrichment=enrich)
+    return cfg, stores, client, poller
+
+
+def test_progress_cb_reports_every_symbol_in_order(tmp_path):
+    """Task 132 section 2: ``poll_once`` must expose bounded, per-symbol
+    progress so a large first-cycle scope isn't externally silent for the
+    whole cycle duration."""
+    cfg, stores, client, poller = _setup_two_symbols(tmp_path)
+    calls = []
+    res = asyncio.run(poller.poll_once(progress_cb=lambda done, total, sym: calls.append((done, total, sym))))
+    assert res.symbols_polled == 2
+    assert [c[:2] for c in calls] == [(1, 2), (2, 2)]
+    assert {c[2] for c in calls} == {"FAKE", "OTHR"}
+    stores.close()
+
+
+def test_progress_cb_reports_failed_symbols_too(tmp_path):
+    cfg, stores, client, poller = _setup_two_symbols(tmp_path, fail_second=True)
+    calls = []
+    res = asyncio.run(poller.poll_once(progress_cb=lambda done, total, sym: calls.append((done, total, sym))))
+    assert res.symbols_polled == 1 and res.symbols_failed == 1
+    # a failed symbol still advances the externally-observed progress count
+    assert len(calls) == 2
+    stores.close()
+
+
+def test_progress_cb_exception_never_breaks_the_poll(tmp_path):
+    cfg, stores, client, poller = _setup_two_symbols(tmp_path)
+
+    def _boom(done, total, sym):
+        raise RuntimeError("observer bug")
+
+    res = asyncio.run(poller.poll_once(progress_cb=_boom))
+    assert res.symbols_polled == 2 and res.symbols_failed == 0
+    stores.close()
+
+
+def test_poll_once_without_progress_cb_is_unaffected(tmp_path):
+    """Default ``progress_cb=None`` stays a byte-identical no-op."""
+    cfg, stores, client, poller = _setup_two_symbols(tmp_path)
+    res = asyncio.run(poller.poll_once())
+    assert res.symbols_polled == 2
+    stores.close()
+
+
+def test_enrich_progress_cb_reports_every_new_event(tmp_path):
+    """Task 132 section 2: the confirmed dominant bottleneck of a large
+    first cycle is the SEPARATE per-event enrichment pass (significance +
+    comparison), not the per-symbol fetch loop -- it must expose its own
+    progress independently."""
+    cfg, stores, client, poller = _setup(tmp_path)  # single symbol, default_rows() -> 3 text events
+    calls = []
+    res = asyncio.run(poller.poll_once(
+        enrich_progress_cb=lambda done, total, eid: calls.append((done, total, eid))
+    ))
+    assert len(res.new_event_ids) >= 3
+    assert len(calls) == len(set(res.new_event_ids))
+    assert calls[-1][0] == calls[-1][1]        # final call: done == total
+    dones = [c[0] for c in calls]
+    assert dones == sorted(dones)              # strictly increasing / in order
+    stores.close()
+
+
+def test_enrich_progress_cb_exception_never_breaks_the_poll(tmp_path):
+    cfg, stores, client, poller = _setup(tmp_path)
+
+    def _boom(done, total, eid):
+        raise RuntimeError("observer bug")
+
+    res = asyncio.run(poller.poll_once(enrich_progress_cb=_boom))
+    assert len(res.new_event_ids) >= 3
     stores.close()
