@@ -235,3 +235,69 @@ async def test_process_pending_and_process_digest_thread_the_expire_scan_limit(l
                          now=now, enforce_age_cutoff=True, expire_scan_limit=7)
     assert seen["limit"] == 7
     ob.close()
+
+
+# ---------------------------------------------------------------------
+# Task 136A: reproduces the ACN incident precisely -- a HIGH-band stale
+# card, enqueued AFTER a pile of other PENDING rows, was sent (4 real
+# Telegram messages, 2024-vintage ACN Form 4s delivered 2026-09-14) even
+# though it was over two years past the 6h IMMEDIATE cutoff. Root cause:
+# outbox.pending() orders by BAND PRIORITY first, then enqueue time --
+# completely independent of expire_stale()'s own enqueue-time-ordered,
+# BOUNDED sweep. A HIGH-band row enqueued late (beyond the bound) can be
+# selected for sending before the bounded sweep ever reaches it.
+# ---------------------------------------------------------------------
+
+def _enq_with_band(ob, *, symbol, accession, enqueued_at, band):
+    did = _enq(ob, symbol=symbol, accession=accession, enqueued_at=enqueued_at)
+    ob._conn.execute("UPDATE intelligence_delivery SET band=? WHERE delivery_id=?", (band, did))
+    ob._conn.commit()
+    return did
+
+
+def test_high_band_stale_card_cannot_jump_the_bounded_expire_sweep(ledger_path):
+    """The exact discovered defect, reproduced then fixed: with a small
+    expire_scan_limit, a stale HIGH-band row enqueued AFTER many older-
+    enqueued LOW-band filler rows is NOT reached by the bounded sweep
+    (limit smaller than the filler count) -- yet outbox.pending()'s
+    band-first ordering would select it to send FIRST. The per-row gate
+    (outbox.expire_one_if_stale, called inline in process_pending's send
+    loop) must catch it anyway."""
+    ob = DeliveryOutbox(ledger_path)
+    now = datetime(2026, 9, 14, 16, 0, 0, tzinfo=UTC)
+
+    # 5 older-enqueued, LOW-band, genuinely FRESH filler rows -- these are
+    # what a bounded (limit=2) expire_stale() sweep actually reaches first.
+    fillers = [
+        _enq_with_band(ob, symbol="DELL", accession=f"0001193125-26-{386800 + i}",
+                       enqueued_at=now - timedelta(minutes=30 - i), band="LOW")
+        for i in range(5)
+    ]
+    # the ACN-shaped card: enqueued LAST (so the bounded-by-enqueue-order
+    # sweep never reaches it), HIGH band (so pending() selects it FIRST
+    # despite that), and genuinely stale (a 2024 event_time).
+    stale_high = _enq_with_band(ob, symbol="ACN", accession="0001467373-24-000206",
+                                enqueued_at=now - timedelta(seconds=1), band="HIGH")
+
+    def _event_time(event_id):
+        # only the ACN card resolves to a real (stale) event time -- the
+        # fillers have no known event_time, matching real behaviour where
+        # get_event() returns None for an id it doesn't recognise.
+        if "0001467373-24-000206" in event_id:
+            return datetime(2024, 7, 15, 20, 14, 1, tzinfo=UTC)
+        return None
+
+    snd = RecordingSender()
+    res = _drain(
+        ob, snd, now=now, enforce_age_cutoff=True,
+        event_time_lookup=_event_time, expire_scan_limit=2,  # deliberately too small to reach stale_high
+    )
+
+    assert ob.get(stale_high).state == STATE_EXPIRED
+    assert "stale_card" in (ob.get(stale_high).suppress_reason or "")
+    assert stale_high not in [r.delivery_id for r in snd.sent]
+    # the genuinely fresh filler rows still deliver -- this is NOT a
+    # blanket pause, only the specific stale row is blocked
+    assert all(ob.get(d).state == STATE_SENT for d in fillers)
+    assert res.expired >= 1
+    ob.close()

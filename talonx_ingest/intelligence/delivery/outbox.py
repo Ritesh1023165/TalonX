@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from talonx_ingest.config import settings
@@ -606,34 +606,94 @@ class DeliveryOutbox:
             params.append(int(limit))
         rows = self._conn.execute(sql, params).fetchall()
         for r in rows:
-            enq = _dt(r["enqueued_at_utc"])
-            evt = None
-            if event_time_lookup is not None:
-                try:
-                    evt = event_time_lookup(r["event_id"])
-                except Exception:  # noqa: BLE001
-                    evt = None
-            candidates = [t for t in (enq, evt) if t is not None]
-            if not candidates:
-                continue
-            basis = min(candidates)
-            which = "event_time" if (evt is not None and basis == evt) else "enqueue_time"
-            cutoff_s = route_max.get(r["route"], default_max)
-            if now - basis <= timedelta(seconds=cutoff_s):
-                continue
-            age_h = (now - basis).total_seconds() / 3600.0
-            reason = (f"stale_card: {age_h:.1f}h old by {which} "
-                      f"> {cutoff_s / 3600:.0f}h {r['route']} cutoff")
-            self._conn.execute(
-                "UPDATE intelligence_delivery SET state=?, next_retry_at_utc=NULL, "
-                "updated_at_utc=?, suppress_reason=? WHERE delivery_id=?",
-                (STATE_EXPIRED, _iso(now), reason, r["delivery_id"]),
+            reason = self._expire_row_if_stale(
+                delivery_id=r["delivery_id"], route=r["route"], event_id=r["event_id"],
+                enqueued_at_utc=r["enqueued_at_utc"], now=now,
+                route_max=route_max, default_max=default_max,
+                event_time_lookup=event_time_lookup,
             )
-            self._log(r["delivery_id"], "EXPIRED", reason)
-            expired.append(r["delivery_id"])
+            if reason is not None:
+                expired.append(r["delivery_id"])
         if expired:
             self._conn.commit()
         return expired
+
+    def _expire_row_if_stale(
+        self, *, delivery_id: str, route: str, event_id: str, enqueued_at_utc,
+        now: datetime, route_max: dict, default_max: int, event_time_lookup,
+    ) -> str | None:
+        """Shared freshness-basis logic for exactly ONE row -- used by both
+        the bulk ``expire_stale`` sweep above AND (Task 136A) the per-row
+        check immediately before a send, so the two can never disagree and
+        a row cannot be sent just because the bulk sweep (bounded, enqueue-
+        time-ordered) had not yet reached it while ``pending()`` (BAND-
+        priority-ordered -- a HIGH-band historical card sorts ahead of
+        hundreds of older-enqueued, lower-band rows) had already selected
+        it for sending. Mutates the row to EXPIRED (does NOT commit --
+        callers commit) and returns the reason string if it expired it,
+        else ``None``. `enqueued_at_utc` may be a string (raw column) or a
+        ``DeliveryRow``'s own datetime attribute."""
+        enq = enqueued_at_utc if isinstance(enqueued_at_utc, datetime) else _dt(enqueued_at_utc)
+        evt = None
+        if event_time_lookup is not None:
+            try:
+                evt = event_time_lookup(event_id)
+            except Exception:  # noqa: BLE001
+                evt = None
+        candidates = [t for t in (enq, evt) if t is not None]
+        if not candidates:
+            return None
+        basis = min(candidates)
+        which = "event_time" if (evt is not None and basis == evt) else "enqueue_time"
+        cutoff_s = route_max.get(route, default_max)
+        if now - basis <= timedelta(seconds=cutoff_s):
+            return None
+        age_h = (now - basis).total_seconds() / 3600.0
+        reason = (f"stale_card: {age_h:.1f}h old by {which} "
+                  f"> {cutoff_s / 3600:.0f}h {route} cutoff")
+        self._conn.execute(
+            "UPDATE intelligence_delivery SET state=?, next_retry_at_utc=NULL, "
+            "updated_at_utc=?, suppress_reason=? WHERE delivery_id=?",
+            (STATE_EXPIRED, _iso(now), reason, delivery_id),
+        )
+        self._log(delivery_id, "EXPIRED", reason)
+        return reason
+
+    def expire_one_if_stale(
+        self, row, *, now: datetime | None = None,
+        max_age_seconds: "dict[str, int] | int | None" = None,
+        event_time_lookup=None,
+    ) -> str | None:
+        """Task 136A: the per-row freshness gate applied immediately before
+        a send (see ``process_pending``/``process_digest`` in pipeline.py)
+        -- the actual enforcement point queue creation time cannot bypass,
+        independent of whether a prior bulk ``expire_stale`` pass reached
+        this specific row. ``row`` is a ``DeliveryRow`` (has
+        ``.delivery_id``/``.route``/``.event_id``/``.enqueued_at_utc``).
+        Commits immediately (unlike the bulk sweep) since this is called
+        one row at a time, inline in the send loop. Returns the expiry
+        reason if it expired the row (the caller must not send it), else
+        ``None`` (still eligible)."""
+        from talonx_ingest.intelligence.delivery.config import (
+            CARD_MAX_AGE_DEFAULT_SECONDS, CARD_MAX_AGE_SECONDS,
+        )
+
+        now = now or datetime.now(timezone.utc)
+        if max_age_seconds is None:
+            route_max, default_max = dict(CARD_MAX_AGE_SECONDS), CARD_MAX_AGE_DEFAULT_SECONDS
+        elif isinstance(max_age_seconds, int):
+            route_max, default_max = {}, max_age_seconds
+        else:
+            route_max, default_max = dict(max_age_seconds), CARD_MAX_AGE_DEFAULT_SECONDS
+        reason = self._expire_row_if_stale(
+            delivery_id=row.delivery_id, route=row.route, event_id=row.event_id,
+            enqueued_at_utc=row.enqueued_at_utc, now=now,
+            route_max=route_max, default_max=default_max,
+            event_time_lookup=event_time_lookup,
+        )
+        if reason is not None:
+            self._conn.commit()
+        return reason
 
     def counts_by_state(self) -> dict[str, int]:
         rows = self._conn.execute(

@@ -221,3 +221,64 @@ def test_partial_comparison_flag_reaches_complete_and_stops_reprocessing(tmp_pat
     due = stores.processing.next_for_processing(limit=100)
     assert tenq not in [r.event_id for r in due]
     stores.close()
+
+
+# ---------------------------------------------------------------------
+# Task 136A: the card-content root cause. build_insider_activity was
+# always called with as_of_date=None (-> "as of the most recent known
+# transaction/filing date for this symbol", effectively "today"),
+# regardless of how old the EVENT actually being enriched is. For a
+# historical filing enriched long after publication (a broad-discovery
+# backfill), that silently blends CURRENT issuer-wide rolling-window
+# activity into a historical filing's card -- the confirmed cause of the
+# ACN incident (a 2024 filing's "why surfaced" cited a $2,244,878
+# "largest transaction" / "4 distinct insiders" cluster belonging to a
+# different, much more recent window than the SAME card's "what changed"
+# 30-day-as-of-the-filing's-own-date section).
+# ---------------------------------------------------------------------
+
+def test_enqueue_delivery_passes_the_events_own_date_as_the_activity_cutoff(tmp_path, monkeypatch):
+    from datetime import date, datetime, timezone
+
+    from talonx_ingest.intelligence.domain import EventType
+    from talonx_ingest.intelligence.service.config import ServiceConfig
+    from talonx_ingest.intelligence.service.enrichment import EnrichmentEngine
+    from talonx_ingest.intelligence.service.stores import StoreBundle
+    from talonx_ingest.intelligence.comparison.retrieval import FilingArchiveCache
+    from tests._service_helpers import FakeEdgarClient
+    from _significance_helpers import mk_event
+    import talonx_ingest.intelligence.insider.pipeline as insider_pipeline_mod
+
+    cfg = ServiceConfig(ledger_path=str(tmp_path / "l.db"), state_dir=tmp_path / "s",
+                        history_days=3650, enable_xbrl=False)
+    stores = StoreBundle.open(cfg.ledger())
+    client = FakeEdgarClient()
+    engine = EnrichmentEngine(
+        stores, client, config=cfg,
+        cache=FilingArchiveCache(client, cache_dir=tmp_path / "c"),
+    )
+
+    # a 2024 Form 4, enriched "today" (2026) -- exactly the ACN shape.
+    old_accepted = datetime(2024, 7, 15, 20, 14, 1, tzinfo=timezone.utc)
+    ev = mk_event(
+        event_type=EventType.INSIDER_TRANSACTION, symbol="ACN",
+        accession="0001467373-24-000206", form_type="4",
+        accepted_at=old_accepted, now=datetime(2026, 9, 14, 16, 0, 0, tzinfo=timezone.utc),
+    )
+    stores.events.upsert_event(ev)
+
+    captured = {}
+    real_build = insider_pipeline_mod.build_insider_activity
+
+    def _spy(store, symbol, **kw):
+        captured["as_of_date"] = kw.get("as_of_date")
+        return real_build(store, symbol, **kw)
+
+    monkeypatch.setattr(insider_pipeline_mod, "build_insider_activity", _spy)
+
+    asyncio.run(engine.process_event(ev.event_id))
+
+    # the activity cutoff must be the FILING's own date (2024-07-15), not
+    # today's date (2026-09-14) -- the exact bug being fixed.
+    assert captured["as_of_date"] == date(2024, 7, 15)
+    stores.close()

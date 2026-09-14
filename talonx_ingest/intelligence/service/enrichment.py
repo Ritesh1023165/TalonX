@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from talonx_ingest.intelligence.comparison.engine import run_comparison_for_event
 from talonx_ingest.intelligence.comparison.retrieval import FilingArchiveCache
@@ -55,6 +55,36 @@ _COMPARISON_RETRY_FLAGS = {"current_document_unavailable", "prior_document_unava
 # data_quality_flags for the evidence trace and do NOT make the enrichment
 # PARTIAL — the comparison is valid and persisted.
 _COMPARISON_PARTIAL_FLAGS = {"low_quality_comparison"}
+
+
+def _event_as_of_date(ev) -> date:
+    """Task 136A: the causal point-in-time to compute an issuer's insider-
+    activity rolling aggregates/clusters AS OF, for the card describing
+    ``ev``. Previously every ``build_insider_activity`` call in this file
+    passed no ``as_of_date`` at all, which defaults to "the most recent
+    transaction/filing date known for this symbol" -- for a filing
+    enriched the same day it was published that is a harmless proxy for
+    "today", but for a HISTORICAL filing enriched long after publication
+    (a broad-discovery backfill) it silently means "as of whatever is
+    freshest in the DB right now", years after the filing's own date --
+    blending CURRENT issuer-wide activity into a historical filing's "why
+    surfaced"/"what changed" without disclosure (confirmed root cause of
+    the Task 136A ACN incident: a 2024 filing's card cited a $2,244,878
+    "largest transaction" and a "4 distinct insiders" cluster that belong
+    to a DIFFERENT, much more recent window than the 30-day-as-of-2024
+    window the SAME card's "what changed" section drew from).
+
+    Uses the filing's own SEC acceptance time when available (the
+    authoritative causal timestamp for everything else in this system);
+    falls back to ``filing_date`` (also a real source field, just less
+    precise), then to today only when NEITHER exists -- explicitly not a
+    silent fabrication, since a symbol/event with no publication evidence
+    at all has no better basis available."""
+    if getattr(ev, "accepted_at_utc", None) is not None:
+        return ev.accepted_at_utc.date()
+    if getattr(ev, "filing_date", None) is not None:
+        return ev.filing_date
+    return datetime.now(timezone.utc).date()
 
 
 @dataclass
@@ -272,7 +302,9 @@ class EnrichmentEngine:
             self.metrics.insider_open_market_ps += sum(
                 1 for t in this_filing if t.is_open_market_discretionary
             )
-            act = build_insider_activity(self.stores.insider, ev.symbol)
+            act = build_insider_activity(
+                self.stores.insider, ev.symbol, as_of_date=_event_as_of_date(ev),
+            )
             if not act.transactions and not act.latest_filings:
                 return False, "insider activity empty for symbol"
             return True, None
@@ -318,7 +350,9 @@ class EnrichmentEngine:
             try:
                 from talonx_ingest.intelligence.insider.pipeline import build_insider_activity
 
-                insider_activity = build_insider_activity(self.stores.insider, ev.symbol)
+                insider_activity = build_insider_activity(
+                    self.stores.insider, ev.symbol, as_of_date=_event_as_of_date(ev),
+                )
             except Exception:  # noqa: BLE001
                 insider_activity = None
 

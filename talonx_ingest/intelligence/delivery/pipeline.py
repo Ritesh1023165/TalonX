@@ -385,6 +385,28 @@ async def process_pending(
 
     for row in rows:
         send_now = datetime.now(timezone.utc)          # (1D) per-row decision time
+        # Task 136A: the LAST-MOMENT freshness gate, independent of whether
+        # the bulk expire_stale() pass above (bounded, enqueued_at_utc-
+        # ordered) had already reached THIS row -- outbox.pending() above
+        # orders by BAND priority first, so a HIGH-band historical card
+        # can be selected for sending well ahead of older-enqueued, lower-
+        # band rows the bounded sweep processes first. Without this, queue
+        # creation time (today) stands in for source freshness (possibly
+        # years old) purely because the two scans disagree on order.
+        if enforce_age_cutoff:
+            # uses the cycle's own `now` (the same clock expire_stale() used
+            # above), NOT send_now -- freshness must be judged on one
+            # consistent clock per drain cycle, matching the injected/test
+            # clock a caller may have passed rather than a fresh wall-clock
+            # read per row.
+            reason = outbox.expire_one_if_stale(
+                row, now=now, max_age_seconds=max_age_seconds,
+                event_time_lookup=event_time_lookup,
+            )
+            if reason is not None:
+                result.expired += 1
+                result.expired_ids.append(row.delivery_id)
+                continue
         attempt_id = _uuid.uuid4().hex[:16]
         # (1B) persist-before-network: claim PENDING -> IN_FLIGHT, committed,
         # BEFORE the transport is touched. A competing drainer that lost the
@@ -550,6 +572,26 @@ async def process_digest(
         result.expired = len(result.expired_ids)
 
     rows = outbox.digest_pending(now=now, limit=limit)
+    # Task 136A: the same last-moment freshness gate as process_pending --
+    # digest_pending() orders/selects independently of the bulk expire_
+    # stale() sweep above, so a stale row can otherwise reach the digest
+    # batch before the sweep (bounded, enqueue-time-ordered) reaches it.
+    # Filtered out BEFORE the due/disabled/simulate checks below so a
+    # stale row is never counted as "held" either -- it is independently
+    # stale regardless of whether this digest bucket is due.
+    if enforce_age_cutoff and rows:
+        fresh_rows = []
+        for r in rows:
+            reason = outbox.expire_one_if_stale(
+                r, now=now, max_age_seconds=max_age_seconds,
+                event_time_lookup=event_time_lookup,
+            )
+            if reason is not None:
+                result.expired += 1
+                result.expired_ids.append(r.delivery_id)
+            else:
+                fresh_rows.append(r)
+        rows = fresh_rows
     if not due:
         result.held = len(rows)
         result.held_reason = "digest_not_due"
