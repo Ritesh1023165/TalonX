@@ -360,7 +360,20 @@ class EnrichmentEngine:
             base = ProcessingStage.COMPLETE
         if allow_delivery and delivery_state == ProcessingStateStore.FAILED:
             return ProcessingStage.PARTIAL
-        if allow_delivery and delivery_state == ProcessingStateStore.DONE and base == ProcessingStage.COMPLETE:
+        if allow_delivery and delivery_state == ProcessingStateStore.DONE:
+            # Task 134: once delivery has genuinely completed, this row is
+            # DONE -- even when `base` is PARTIAL because comparison_state
+            # is a permanently-partial data-quality flag (e.g. missing
+            # XBRL on an old filing), which a re-run can never change.
+            # Previously this fell through to `return base` (PARTIAL, an
+            # OPEN_STAGES member), so next_for_processing/due_for_retry
+            # re-selected it every cycle forever with no backoff
+            # (attempts stayed 0 -- see record_error's guard) -- a real,
+            # demonstrated no-progress reprocessing loop, spending a real
+            # SEC comparison-fetch on the SAME already-delivered event on
+            # every cycle. comparison_state itself is untouched here and
+            # still records the caveat for anyone querying it directly;
+            # only the scheduling-facing `stage` rolls up to COMPLETE.
             return ProcessingStage.COMPLETE
         if not allow_delivery and base == ProcessingStage.COMPLETE:
             return ProcessingStage.SIGNIFICANCE_EVALUATED

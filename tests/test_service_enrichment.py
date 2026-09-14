@@ -126,3 +126,98 @@ def test_no_duplicate_delivery_on_reprocess(tmp_path):
     rows = [r for r in stores.outbox.query(limit=100) if r.event_id == eid]
     assert len(rows) == 1                     # one durable row, not three
     stores.close()
+
+
+# ---------------------------------------------------------------------
+# Task 134: a PERMANENTLY-partial comparison sub-state (a real, observed
+# data-quality flag on old filings -- not a transient failure) must not
+# keep a row open forever once delivery has genuinely completed.
+# Confirmed live: 296 rows discovered 2026-09-04, still being re-selected
+# and re-run (a real SEC comparison-fetch each time) on 2026-09-14, with
+# significance_state/delivery_state already DONE and attempts always 0
+# (record_error is never reached for this path, so no backoff ever
+# applies) -- a genuine, demonstrated no-progress reprocessing loop.
+# ---------------------------------------------------------------------
+
+def test_rollup_stage_partial_comparison_with_delivery_done_is_complete():
+    """Direct unit test of the fixed rollup rule, isolated from the async
+    pipeline: base=PARTIAL (from comparison_state) + delivery_state=DONE
+    -> COMPLETE, not PARTIAL. Regression guard for the exact bug found in
+    Task 134 -- a PARTIAL stage is an OPEN_STAGES member, so leaving this
+    at PARTIAL after delivery is genuinely done means next_for_processing
+    re-selects it on every future cycle, forever, with no way to ever
+    change comparison_state (a re-run cannot fix a permanent data-quality
+    flag on an old filing)."""
+    from dataclasses import dataclass
+
+    from talonx_ingest.intelligence.service.enrichment import EnrichmentEngine
+    from talonx_ingest.intelligence.service.state_store import ProcessingStateStore
+
+    @dataclass
+    class _Row:
+        comparison_state: str
+        attempts: int = 0
+
+    row = _Row(comparison_state=ProcessingStateStore.PARTIAL)
+    stage = EnrichmentEngine._rollup_stage(
+        row, comparison_ok=True, sig_err=None,
+        delivery_state=ProcessingStateStore.DONE, allow_delivery=True,
+    )
+    assert stage == ProcessingStage.COMPLETE
+
+
+def test_rollup_stage_partial_comparison_without_delivery_done_stays_open():
+    """The fix is scoped to `delivery_state == DONE` only -- a PARTIAL
+    comparison whose delivery has NOT yet resolved must still stay open
+    (PENDING delivery is a real reason to keep re-selecting the row)."""
+    from dataclasses import dataclass
+
+    from talonx_ingest.intelligence.service.enrichment import EnrichmentEngine
+    from talonx_ingest.intelligence.service.state_store import ProcessingStateStore
+
+    @dataclass
+    class _Row:
+        comparison_state: str
+        attempts: int = 0
+
+    row = _Row(comparison_state=ProcessingStateStore.PARTIAL)
+    stage = EnrichmentEngine._rollup_stage(
+        row, comparison_ok=True, sig_err=None,
+        delivery_state=ProcessingStateStore.PENDING, allow_delivery=True,
+    )
+    assert stage == ProcessingStage.PARTIAL
+
+
+def test_partial_comparison_flag_reaches_complete_and_stops_reprocessing(tmp_path, monkeypatch):
+    """End-to-end through the real async pipeline: a comparison that
+    returns the real `low_quality_comparison` data-quality flag
+    (comparison_ok=True, comparison_state=PARTIAL) still reaches an
+    overall CLOSED stage once delivery completes -- so the SCHEDULER
+    (next_for_processing, which is what run_poll_loop's recovery pass
+    actually calls every cycle -- see ProcessingStateStore.OPEN_STAGES)
+    never re-selects it again. This is the actual guarantee that stops
+    the reprocessing loop (not that a direct process_event() call would
+    itself be a no-op -- it isn't; the fix is that nothing schedules
+    that call anymore)."""
+    from tests._significance_helpers import mk_comparison
+
+    cfg, stores, client, engine, ids = _prep(tmp_path)
+    tenq = _tenq_event_id(stores)
+    ev = stores.events.get_event(tenq)
+
+    async def _partial_flagged(*a, **k):
+        return mk_comparison(event=ev, quality_flags=("low_quality_comparison",))
+
+    monkeypatch.setattr(enr_mod, "run_comparison_for_event", _partial_flagged)
+    asyncio.run(engine.process_event(tenq))
+
+    row = stores.processing.get(tenq)
+    assert row.comparison_state == "PARTIAL"       # caveat still observable
+    assert row.delivery_state == "DONE"
+    assert row.stage == ProcessingStage.COMPLETE   # closed, not stuck at PARTIAL
+
+    # the scheduler that drives repeated recovery passes must no longer
+    # pick this row up at all
+    due = stores.processing.next_for_processing(limit=100)
+    assert tenq not in [r.event_id for r in due]
+    stores.close()
