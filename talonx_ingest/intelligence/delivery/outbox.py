@@ -63,20 +63,44 @@ _FRESH_EXPIRED = "EXPIRED"        # valid basis, over cutoff -- terminal
 _FRESH_UNQUALIFIED = "UNQUALIFIED"  # no usable source-time evidence -- terminal
 _FRESH_DEFER = "DEFER"            # lookup itself failed -- transient, retry later
 
-# Task 137: a bounded, fixed backoff applied to a DEFER'd row's own
-# next_retry_at_utc -- see _expire_row_if_stale's DEFER branch. Without
-# this, a row whose lookup keeps failing sorts in the EXACT SAME position
-# every cycle (band, then enqueue_time ASC) and a bounded per-cycle
-# `pending()` selection (`LIMIT`) can be filled ENTIRELY by such rows,
-# never reaching a genuinely eligible row sitting behind them -- a
+# Task 137 (revised, Task 138): a bounded backoff applied to a DEFER'd
+# row's own next_retry_at_utc -- see _expire_row_if_stale's DEFER branch.
+# Without this, a row whose lookup keeps failing sorts in the EXACT SAME
+# position every cycle (band, then enqueue_time ASC) and a bounded
+# per-cycle `pending()` selection (`LIMIT`) can be filled ENTIRELY by such
+# rows, never reaching a genuinely eligible row sitting behind them -- a
 # starvation gap distinct from (and not covered by) "a DEFER'd row does
 # not stop the REST of an already-selected batch", which was already
-# correctly handled. A short, fixed delay (not exponential -- no
-# meaningful "attempts" counter exists for this transient, non-terminal
-# case, and one is deliberately not added) is enough to let the SAME
-# bounded query reach past it on a later cycle, while still retrying it
-# promptly once the underlying lookup problem clears.
-_DEFER_BACKOFF_SECONDS = 30.0
+# correctly handled.
+#
+# Task 138 correction: a FIXED 30s backoff (the original Task 137 fix)
+# is NOT sufficient at the real production cycle interval (~3-4 minutes,
+# confirmed via poll-cycle logs) whenever the bulk expire_stale() sweep
+# cannot reach the failing row within its own bound (e.g. permanently
+# consumed by other still-fresh, still-PENDING rows ahead of it in
+# enqueue order -- the same structural gap Task 136A closed for the
+# EXPIRED case, now shown to recur for DEFER). Reproduced directly: a
+# fixed 30s backoff against a 210s cycle gap, with a bounded sweep that
+# never reaches the failing rows, starves a valid row behind them across
+# 20 consecutive realistic cycles (~66 minutes) with zero progress. Fixed
+# with a genuine per-row, EXPONENTIALLY GROWING, CAPPED backoff (the same
+# principle already used for send-attempt retries in `mark_failed`/
+# `backoff_seconds()` elsewhere in this codebase, not a new or arbitrary
+# mechanism) keyed to a dedicated `defer_count` column (NOT the unrelated
+# `attempts` send-counter) -- so a row that keeps failing is excluded for
+# a growing window that eventually exceeds any realistic cycle interval,
+# guaranteeing eventual progress without an unbounded scan and without
+# picking one arbitrary long sleep value. `defer_count` resets to 0 the
+# moment the row reaches any non-DEFER outcome (OK/EXPIRED/UNQUALIFIED).
+_DEFER_BACKOFF_BASE_SECONDS = 30.0
+_DEFER_BACKOFF_CAP_SECONDS = 3600.0
+
+
+def _defer_backoff_seconds(defer_count: int) -> float:
+    """Exponential, capped -- ``defer_count`` is 1-based (this DEFER is
+    the Nth consecutive one for this row)."""
+    return min(_DEFER_BACKOFF_CAP_SECONDS,
+              _DEFER_BACKOFF_BASE_SECONDS * (2 ** max(0, defer_count - 1)))
 
 
 @dataclass
@@ -228,6 +252,11 @@ class DeliveryOutbox:
             ("attempt_id", "attempt_id TEXT"),
             ("in_flight_since_utc", "in_flight_since_utc TEXT"),
             ("transport_message_id", "transport_message_id TEXT"),
+            # Task 138: consecutive-DEFER counter, distinct from the
+            # send-attempt `attempts` column -- drives the exponential
+            # backoff in _defer_backoff_seconds(). Default 0 for every
+            # existing/new row (never deferred yet).
+            ("defer_count", "defer_count INTEGER NOT NULL DEFAULT 0"),
         ):
             if col not in _have:
                 self._conn.execute(f"ALTER TABLE intelligence_delivery ADD COLUMN {ddl}")
@@ -399,7 +428,7 @@ class DeliveryOutbox:
                 "UPDATE intelligence_delivery SET state=?, disposition='UPDATE', text=?, "
                 "content_hash=?, prev_content_hash=?, truncated=?, dropped_sections=?, "
                 "evidence_urls=?, band=?, tier=?, route=?, attempts=0, last_error=NULL, "
-                "next_retry_at_utc=NULL, updated_at_utc=? WHERE delivery_id=?",
+                "next_retry_at_utc=NULL, defer_count=0, updated_at_utc=? WHERE delivery_id=?",
                 (
                     STATE_PENDING, message.text, message.content_hash, existing.content_hash,
                     1 if message.truncated else 0,
@@ -418,8 +447,8 @@ class DeliveryOutbox:
             self._conn.execute(
                 "UPDATE intelligence_delivery SET state=?, text=?, content_hash=?, truncated=?, "
                 "dropped_sections=?, evidence_urls=?, band=?, tier=?, route=?, attempts=0, "
-                "last_error=NULL, next_retry_at_utc=NULL, suppress_reason=NULL, updated_at_utc=? "
-                "WHERE delivery_id=?",
+                "last_error=NULL, next_retry_at_utc=NULL, defer_count=0, suppress_reason=NULL, "
+                "updated_at_utc=? WHERE delivery_id=?",
                 (
                     STATE_PENDING, message.text, message.content_hash,
                     1 if message.truncated else 0,
@@ -788,14 +817,22 @@ class DeliveryOutbox:
                 raw_evt = event_time_lookup(event_id)
             except Exception as exc:  # noqa: BLE001 -- a lookup FAILURE is transient
                 reason = f"event_time_lookup failed: {exc}"
-                next_retry = now + timedelta(seconds=_DEFER_BACKOFF_SECONDS)
+                row_now = self._conn.execute(
+                    "SELECT defer_count FROM intelligence_delivery WHERE delivery_id=?",
+                    (delivery_id,),
+                ).fetchone()
+                prior_defers = int(row_now["defer_count"]) if row_now is not None else 0
+                new_defer_count = prior_defers + 1
+                backoff = _defer_backoff_seconds(new_defer_count)
+                next_retry = now + timedelta(seconds=backoff)
                 self._conn.execute(
-                    "UPDATE intelligence_delivery SET next_retry_at_utc=?, updated_at_utc=? "
-                    "WHERE delivery_id=?",
-                    (_iso(next_retry), _iso(now), delivery_id),
+                    "UPDATE intelligence_delivery SET next_retry_at_utc=?, updated_at_utc=?, "
+                    "defer_count=? WHERE delivery_id=?",
+                    (_iso(next_retry), _iso(now), new_defer_count, delivery_id),
                 )
                 self._log(delivery_id, "DEFERRED",
-                          f"{reason} -- retry not before {next_retry.isoformat()}")
+                          f"{reason} -- consecutive defer #{new_defer_count}, "
+                          f"retry not before {next_retry.isoformat()} ({backoff:.0f}s backoff)")
                 return _FreshnessOutcome(_FRESH_DEFER, reason)
             if raw_evt is not None:
                 evt, evt_invalid_reason = _validate_source_time(raw_evt, now)
@@ -826,7 +863,7 @@ class DeliveryOutbox:
                   f"> {cutoff_s / 3600:.0f}h {route} cutoff")
         self._conn.execute(
             "UPDATE intelligence_delivery SET state=?, next_retry_at_utc=NULL, "
-            "updated_at_utc=?, suppress_reason=? WHERE delivery_id=?",
+            "updated_at_utc=?, suppress_reason=?, defer_count=0 WHERE delivery_id=?",
             (STATE_EXPIRED, _iso(now), reason, delivery_id),
         )
         self._log(delivery_id, "EXPIRED", reason)
@@ -839,7 +876,7 @@ class DeliveryOutbox:
         evidence of age" is not the same claim as "proven old")."""
         self._conn.execute(
             "UPDATE intelligence_delivery SET state=?, next_retry_at_utc=NULL, "
-            "updated_at_utc=?, suppress_reason=? WHERE delivery_id=?",
+            "updated_at_utc=?, suppress_reason=?, defer_count=0 WHERE delivery_id=?",
             (STATE_SUPPRESSED, _iso(now), f"unqualified: {reason}", delivery_id),
         )
         self._log(delivery_id, "SUPPRESSED", f"unqualified: {reason}")

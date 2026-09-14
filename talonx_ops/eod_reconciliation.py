@@ -45,6 +45,17 @@ STATUS_PARTIAL = "PARTIAL"
 STATUS_UNKNOWN = "UNKNOWN"
 
 
+# Task 138: the fixed, expected component set `build_reconciliation`
+# always produces (see its own body below) -- required EXACTLY, not
+# "whatever happens to be present". Without this, a record silently
+# missing a component (a future refactor that drops one, a truncated/
+# hand-edited payload, or any bug upstream) would still read as
+# available-scope-reconciled as long as the FEWER components it DOES
+# carry are all CHECKED -- an incomplete record must never read as PASS.
+_EOD_EXPECTED_COMPONENTS = frozenset(
+    {"original_paper", "experimental_paper", "piv_paper", "alert_stores"})
+
+
 def reconciled_to_available_scope(rec: "EodReconciliation | dict") -> bool:
     """Task 137: a `PARTIAL` status has exactly one structural cause in
     this deployment -- ``piv_paper`` is permanently ``NOT_CHECKED`` (PIV/
@@ -70,7 +81,16 @@ def reconciled_to_available_scope(rec: "EodReconciliation | dict") -> bool:
     d = rec.to_dict() if hasattr(rec, "to_dict") else rec
     if d.get("status") != STATUS_PARTIAL or d.get("mismatches"):
         return False
-    comps = {c["name"]: c["outcome"] for c in d.get("component_status", [])}
+    comp_list = d.get("component_status", [])
+    names = [c["name"] for c in comp_list]
+    # Task 138: require the EXACT expected component set -- a MISSING
+    # required component, an unexpected/unknown extra one, or a
+    # duplicate/conflicting entry for the same name (names list has
+    # repeats, so the dict below would silently collapse to whichever
+    # one happened to be last) must never be treated as complete evidence.
+    if len(names) != len(set(names)) or set(names) != _EOD_EXPECTED_COMPONENTS:
+        return False
+    comps = {c["name"]: c["outcome"] for c in comp_list}
     if comps.get("piv_paper") != NOT_CHECKED:
         return False
     return all(outcome == CHECKED for name, outcome in comps.items() if name != "piv_paper")

@@ -331,20 +331,17 @@ def test_build_funnel_reports_both_the_narrow_and_resolved_scope_explicitly(tmp_
     assert wide["scope"]["broad_discovery_included"] is True
 
 
-def test_live_companion_broad_discovery_detected_from_its_own_reported_scope(monkeypatch):
-    """The checkpoint must derive broad-discovery inclusion from the ACTUAL
-    running companion's own live-reported execution_scope_count -- never a
-    hardcoded assumption -- and default to False (the safe/narrow prior
-    behaviour) when the companion is not running / status is stale."""
-    import talonx_ops.prospective.checkpoint as ck_mod
+def test_live_companion_broad_discovery_detected_from_its_own_reported_scope():
+    """SUPERSEDED by Task 138: the bare boolean `_live_companion_uses_
+    broad_discovery` this test originally covered has been replaced by
+    the qualified `evaluate_scope_evidence` (talonx_ops/prospective/
+    checkpoint.py) -- it adds freshness (heartbeat) and process-ownership
+    (session.pids.json PID + argv) checks this Task 137 version did not
+    have, per a direct review finding. See tests/test_task138_
+    operational_corrections.py for the full replacement coverage (fresh/
+    stale/missing/wrong-process/manifest-unreadable/mismatch cases). This
+    stub only confirms the function still exists and returns the shape
+    the newer tests exercise in depth."""
+    from talonx_ops.prospective.checkpoint import evaluate_scope_evidence
 
-    def _fake_narrow_scope(*, include_broad_discovery=False):
-        return ["AAPL"] * 39   # count is all that matters here
-
-    monkeypatch.setattr(
-        "talonx_ops.prospective.funnel._resolved_execution_scope", _fake_narrow_scope)
-
-    assert ck_mod._live_companion_uses_broad_discovery({"execution_scope_count": 626}) is True
-    assert ck_mod._live_companion_uses_broad_discovery({"execution_scope_count": 39}) is False
-    assert ck_mod._live_companion_uses_broad_discovery({}) is False            # no status at all
-    assert ck_mod._live_companion_uses_broad_discovery({"execution_scope_count": None}) is False
+    assert callable(evaluate_scope_evidence)

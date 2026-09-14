@@ -274,25 +274,135 @@ def campaign_day(now: datetime | None = None) -> int:
         return 0
 
 
-def _live_companion_uses_broad_discovery(status: dict[str, Any]) -> bool:
-    """Task 137: determine whether the ACTUAL running V2 companion has
-    broad discovery unioned into its execution scope, from its own live-
-    reported ``execution_scope_count`` (``V2Service.checkpoint()``,
-    written to ``v2_service_status.json`` every tick) -- never assumed,
-    never a hardcoded flag independent of the running process. A live
-    count strictly larger than the funnel's own from-scratch watchlist-
-    only resolution is direct, observable proof broad discovery is
-    active; a missing/stale status file (companion not running) or an
-    equal/smaller count means "no" -- the funnel then keeps its prior,
-    narrower (but not misleadingly labelled) behaviour."""
-    live_count = status.get("execution_scope_count")
-    if not isinstance(live_count, int):
-        return False
-    from talonx_ops.prospective.funnel import _resolved_execution_scope
+# Task 138: qualified outcomes for scope evidence -- Task 137's own
+# `_live_companion_uses_broad_discovery` compared a bare count with NO
+# check that the status snapshot was actually fresh, or that it belonged
+# to the process currently running (a stale file left by a since-dead or
+# since-replaced companion would be read exactly the same way). Every
+# outcome below is a distinct, explicit, reported qualification -- a
+# stale/unowned/malformed snapshot is NEVER silently treated as "verified
+# live scope", and a genuine narrow (watchlist-only) result is never
+# reported as if it were successful broad coverage.
+SCOPE_FRESH_VALID = "FRESH_VALID"
+SCOPE_STALE = "STALE"
+SCOPE_MISSING_MALFORMED = "MISSING_MALFORMED"
+SCOPE_WRONG_PROCESS = "WRONG_PROCESS"
+SCOPE_MANIFEST_UNREADABLE = "MANIFEST_UNREADABLE"
+SCOPE_MISMATCH = "SCOPE_MISMATCH"
 
-    watchlist_only = _resolved_execution_scope(include_broad_discovery=False)
+
+def _session_pids_info(now: datetime) -> dict[str, Any]:
+    """The most recent prospective session's full session.pids.json
+    (today, then yesterday) -- run identity/argv evidence, same file
+    `_session_started_utc` already reads a single field from."""
+    try:
+        from talonx_ops.prospective.paths import session_dir
+
+        for d in (now.date(), (now - timedelta(days=1)).date()):
+            p = session_dir(d) / "session.pids.json"
+            if p.exists():
+                return json.loads(p.read_text())
+    except Exception:  # noqa: BLE001
+        pass
+    return {}
+
+
+def evaluate_scope_evidence(status: dict[str, Any], now: datetime) -> dict[str, Any]:
+    """Task 138: qualify the live V2 companion's reported execution scope
+    before treating it as evidence for anything -- reuses EXISTING runtime
+    metadata (the same `heartbeat_utc`/`heartbeat_ttl_s` freshness fields
+    `_service_health` already reads; `session.pids.json`'s own recorded
+    PID + argv; `psutil`-backed liveness via `talonx_ops.prospective.
+    proc._alive`), never a new, independent liveness mechanism.
+
+    Returns a dict with at least ``qualification`` (one of the
+    ``SCOPE_*`` constants above) and ``broad_discovery_active`` (bool --
+    only ever True for ``FRESH_VALID``) plus a human ``reason`` and the
+    raw counts involved, so a caller can report UNKNOWN/DEGRADED with a
+    reason rather than silently falling back to a narrow scope and
+    calling it successful broad coverage.
+    """
+    reported = status.get("execution_scope_count")
+    if not status or not isinstance(reported, int):
+        return {"qualification": SCOPE_MISSING_MALFORMED, "broad_discovery_active": False,
+                "reason": "no status file, or execution_scope_count missing/non-integer",
+                "reported_scope_count": reported}
+
+    hb_age = _age_s(status.get("heartbeat_utc"), now)
+    ttl = float(status.get("heartbeat_ttl_s", 180))
+    if hb_age is None:
+        return {"qualification": SCOPE_MISSING_MALFORMED, "broad_discovery_active": False,
+                "reason": "status has no parseable heartbeat_utc",
+                "reported_scope_count": reported}
+    if hb_age > ttl:
+        return {"qualification": SCOPE_STALE, "broad_discovery_active": False,
+                "reason": f"heartbeat {hb_age:.0f}s old > ttl {ttl:.0f}s -- "
+                          "snapshot not treated as live evidence",
+                "reported_scope_count": reported, "heartbeat_age_s": round(hb_age, 1)}
+
+    # process/run identity, where existing metadata supports it: the
+    # recorded companion PID must still be the one actually running.
+    pids = _session_pids_info(now)
+    companion_pid = pids.get("v2_companion_pid")
+    if companion_pid is not None:
+        try:
+            from talonx_ops.prospective.proc import _alive
+        except Exception:  # noqa: BLE001
+            _alive = None
+        if _alive is not None and not _alive(companion_pid):
+            return {"qualification": SCOPE_WRONG_PROCESS, "broad_discovery_active": False,
+                    "reason": f"session.pids.json names companion PID {companion_pid}, "
+                              "which is not currently alive -- snapshot may belong to a "
+                              "dead/replaced process",
+                    "reported_scope_count": reported}
+    argv = pids.get("v2_argv") or []
+    argv_says_broad = "--enable-broad-discovery" in argv
+
+    from talonx_ops.prospective.funnel import _BROAD_DISCOVERY_MANIFEST, _resolved_execution_scope
+
+    try:
+        watchlist_only = _resolved_execution_scope(include_broad_discovery=False)
+    except Exception as exc:  # noqa: BLE001
+        return {"qualification": SCOPE_MISSING_MALFORMED, "broad_discovery_active": False,
+                "reason": f"could not resolve the watchlist-only scope: {exc!r}",
+                "reported_scope_count": reported}
     watchlist_only_count = len(watchlist_only) if watchlist_only is not None else 0
-    return live_count > watchlist_only_count
+
+    # _resolved_execution_scope() deliberately never raises on a manifest
+    # problem (it must not crash the observational funnel) -- checked
+    # explicitly and separately here instead, so a missing/unreadable
+    # manifest is its own distinct, reported qualification rather than
+    # silently degrading to "narrow scope confirmed".
+    try:
+        _BROAD_DISCOVERY_MANIFEST.read_text()
+    except Exception as exc:  # noqa: BLE001
+        return {"qualification": SCOPE_MANIFEST_UNREADABLE, "broad_discovery_active": False,
+                "reason": f"discovery manifest unreadable at {_BROAD_DISCOVERY_MANIFEST}: {exc!r}",
+                "reported_scope_count": reported, "watchlist_only_count": watchlist_only_count}
+    reconstructed = _resolved_execution_scope(include_broad_discovery=True)
+    reconstructed_count = len(reconstructed) if reconstructed is not None else 0
+
+    active = argv_says_broad or reported > watchlist_only_count
+    if not active:
+        return {"qualification": SCOPE_FRESH_VALID, "broad_discovery_active": False,
+                "reason": "fresh, owned snapshot; narrow (watchlist-only) scope confirmed "
+                          "-- reported as narrow, not as successful broad coverage",
+                "reported_scope_count": reported, "watchlist_only_count": watchlist_only_count,
+                "reconstructed_scope_count": watchlist_only_count}
+
+    if reported != reconstructed_count:
+        return {"qualification": SCOPE_MISMATCH, "broad_discovery_active": False,
+                "reason": f"reported scope ({reported}) differs from the reconstructed "
+                          f"watchlist-union-manifest scope ({reconstructed_count}) -- "
+                          "not treated as confirmed until reconciled",
+                "reported_scope_count": reported, "watchlist_only_count": watchlist_only_count,
+                "reconstructed_scope_count": reconstructed_count}
+
+    return {"qualification": SCOPE_FRESH_VALID, "broad_discovery_active": True,
+            "reason": "fresh, owned snapshot; argv confirms --enable-broad-discovery; "
+                      "reported scope matches the reconstructed watchlist-union-manifest scope",
+            "reported_scope_count": reported, "watchlist_only_count": watchlist_only_count,
+            "reconstructed_scope_count": reconstructed_count}
 
 
 def capture(now: datetime | None = None) -> dict[str, Any]:
@@ -300,8 +410,10 @@ def capture(now: datetime | None = None) -> dict[str, Any]:
     s = _v2_status()
     v1fp, v2fp = _v1_fp(), _v2_fp()
     ledger = check_ledger_continuity(V2_DB_PATH)
+    scope_evidence = evaluate_scope_evidence(s, now)
     funnel = build_funnel(db_path=V2_DB_PATH, as_of=now.date(),
-                          include_broad_discovery=_live_companion_uses_broad_discovery(s))
+                          include_broad_discovery=scope_evidence["broad_discovery_active"])
+    funnel.setdefault("scope", {})["evidence"] = scope_evidence
     poller = logical_poller_report()
     market = _market()
     intel = _intel()
