@@ -2276,10 +2276,34 @@ class QuantScanner:
             )
             return
         try:
-            await self._client.publish(self.config.signals_channel, signal.to_redis_payload())
+            # Task 135: Redis PUBLISH returns the number of subscribers that
+            # actually received this message -- fire-and-forget Pub/Sub has
+            # no queue, no ACK and no redelivery, so a live-but-momentarily-
+            # unsubscribed consumer silently loses it, and "published"
+            # (incremented unconditionally below, right after this call
+            # returns without raising) only ever means "Redis accepted the
+            # command", never "a consumer got it". Capturing this return
+            # value is the smallest available correction: it turns an
+            # otherwise-silent gap into an explicit, logged, counted fact
+            # instead of requiring a consumer-side counter mismatch to be
+            # the only evidence something was missed.
+            n_subscribers = await self._client.publish(
+                self.config.signals_channel, signal.to_redis_payload()
+            )
             self._signals_published += 1
             await _incr_metric(self._client, "quant", "published", 1)
-            logger.info("Signal: %s %s -- %s", signal.ticker, signal.signal_type.value, signal.message)
+            if not n_subscribers:
+                await _incr_metric(self._client, "quant", "published_no_subscriber", 1)
+                logger.warning(
+                    "Signal PUBLISHED with ZERO subscribers on %s: %s %s -- %s "
+                    "(fire-and-forget Redis Pub/Sub -- likely lost, not delivered)",
+                    self.config.signals_channel, signal.ticker, signal.signal_type.value, signal.message,
+                )
+            else:
+                logger.info(
+                    "Signal: %s %s -- %s (%d subscriber(s))",
+                    signal.ticker, signal.signal_type.value, signal.message, n_subscribers,
+                )
         except Exception as exc:  # noqa: BLE001 -- a publish failure shouldn't crash the scanner
             logger.warning("Failed to publish signal to Redis: %s", exc)
             return

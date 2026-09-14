@@ -563,6 +563,54 @@ async def test_cooldown_set_failure_after_publish_degrades_and_blocks_subsequent
     assert len(_signal_publishes(scanner)) == 1  # second publish blocked
 
 
+# --- Task 135: PUBLISH subscriber-count visibility -----------------------
+# Redis PUBLISH returns the number of subscribers that actually received
+# the message -- fire-and-forget Pub/Sub has no queue/ACK/redelivery, so
+# "published" (Redis accepted the command) has never meant "a consumer
+# got it". These pin the new, explicit evidence for the gap a bare
+# published-vs-Brain-received counter mismatch otherwise leaves silent.
+
+def _incrby_keys(scanner) -> list[str]:
+    return [c.args[0] for c in scanner._client.incrby.await_args_list]
+
+
+@pytest.mark.asyncio
+async def test_publish_with_a_live_subscriber_does_not_warn_or_flag(scanner):
+    scanner._client.publish.return_value = 1  # a real subscriber count
+    await scanner._publish_signal(_signal("AAPL", 3.0))
+
+    assert len(_signal_publishes(scanner)) == 1
+    # only the ordinary "published" counter increments -- no extra flag
+    keys = _incrby_keys(scanner)
+    assert any(k.endswith(":quant:published") for k in keys)
+    assert not any(k.endswith(":quant:published_no_subscriber") for k in keys)
+
+
+@pytest.mark.asyncio
+async def test_publish_with_zero_subscribers_is_flagged_explicitly(scanner, caplog):
+    scanner._client.publish.return_value = 0  # Redis accepted it, nobody was listening
+    await scanner._publish_signal(_signal("AAPL", 3.0))
+
+    assert len(_signal_publishes(scanner)) == 1  # the publish itself still happened
+    keys = _incrby_keys(scanner)
+    assert any(k.endswith(":quant:published") for k in keys)
+    assert any(k.endswith(":quant:published_no_subscriber") for k in keys)  # the new evidence
+    assert any(
+        "ZERO subscribers" in r.message for r in caplog.records if r.name == "talonx_quant.consumer"
+    )
+
+
+@pytest.mark.asyncio
+async def test_publish_zero_subscribers_still_arms_cooldown(scanner):
+    """The publish itself genuinely happened (Redis accepted it, cooldown
+    still correctly guards this ticker) -- the new visibility is
+    additional evidence, not a different accept/reject decision."""
+    scanner._client.publish.return_value = 0
+    await scanner._publish_signal(_signal("AAPL", 3.0))
+
+    assert len(_cooldown_set_calls(scanner)) == 1
+
+
 @pytest.mark.asyncio
 async def test_handle_market_tick_suppresses_every_ticker_when_risk_degraded(scanner, monkeypatch):
     scanner._risk_degraded = True

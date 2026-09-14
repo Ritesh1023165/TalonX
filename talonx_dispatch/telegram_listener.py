@@ -758,6 +758,15 @@ class TelegramReplyListener:
     async def _quant_section(self, client) -> list[str]:
         evaluated = await _get_metric(client, "quant", "evaluated")
         published = await _get_metric(client, "quant", "published")
+        # Task 135: "published" only ever meant "Redis accepted the PUBLISH
+        # command" -- never "a subscriber received it" (fire-and-forget
+        # Pub/Sub has no queue/ACK/redelivery). published_no_subscriber
+        # (talonx_quant/consumer.py::_publish_signal) is the new, explicit
+        # counter for the exact gap a published-vs-Brain-received mismatch
+        # otherwise leaves silent -- shown only when there's a real,
+        # measured count to report (never fabricated if the key is simply
+        # absent because no signal has published yet today).
+        published_no_sub = await _get_metric(client, "quant", "published_no_subscriber")
         bar_level, candidate_breakdown = self._quant_rejection_breakdown_today()
 
         lines = [
@@ -780,6 +789,11 @@ class TelegramReplyListener:
             for reason in extra_reasons:
                 lines.append(f"    {reason}: {candidate_breakdown[reason]:,}")
         lines.append(f"  Signals published today: {_fmt_metric(published)}")
+        if published_no_sub is not None and published_no_sub > 0:
+            lines.append(
+                f"    WARNING: {published_no_sub} of those had ZERO Redis subscribers "
+                f"at publish time -- likely never reached Brain"
+            )
         return lines
 
     def _quant_rejection_breakdown_today(self) -> tuple[int | None, dict[str, int] | None]:
