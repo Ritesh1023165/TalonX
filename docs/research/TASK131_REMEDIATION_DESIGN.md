@@ -608,3 +608,123 @@ unified_dashboard.py::test_45_narrow_layout_integrity` — plus an
 aiohttp `TestClient` wiring check; no JS test runner is available in
 this environment, so these are the meaningful automated checks that ARE
 runnable here).
+
+## Complete SPA Dashboard Acceptance (on top of `b642b3d`)
+
+A sixth pass, closing 4 real findings from a review of `b642b3d`'s own
+Broad Discovery tab — entirely inside `talonx_ops/dashboard_read.py`
+and `dashboard_web_static/index.html`; `talonx_v2/` untouched, so the
+prior pass's concurrent-admission fix and temporal protections are
+unmodified. Full requirement-by-requirement verdicts, screenshots, and
+reconciliation evidence: `results/task131_spa_final_acceptance/
+SPA_ACCEPTANCE.md` (gitignored evidence bundle, also packaged as
+`task131_spa_final_acceptance.zip` at the same path).
+
+### 1 — upstream freshness no longer conflated with a cache read
+
+Verified the defect against the actual code first: `upstream_data_as_
+of_utc` was literally assigned from `source_db_read_last_ok_utc` — a
+successful LOCAL SQLite read was being presented as evidence the
+UPSTREAM SEC source was current, which a cache hit can never prove.
+`source_health` now exposes four genuinely distinct timestamps
+(dashboard-read time, DB-read time, upstream-poll-cycle time, and a NEW
+`latest_source_event_utc` — a direct `MAX(accepted_at_utc)` query
+against `insider_transactions`, the real per-filing SEC dissemination
+timestamp, scoped to `classification='OPEN_MARKET_PURCHASE'` to match
+the frozen strategy's own transaction filter). `upstream_data_as_of_utc`
+is set ONLY from that fourth field, or explicitly `None` with a stated
+`upstream_data_as_of_basis` when unavailable — never backfilled from
+the other three. Proven with a real fixture where the DB read is fresh
+(~4 minutes) while the upstream poll and latest event are both
+genuinely stale (~13 days) — the exact scenario the defect would have
+misrepresented as fresh.
+
+### 2 — empty states are evidence-based, not inferred
+
+The discovery funnel's empty-state text previously asserted a REASON
+("no code-P Form 4 activity has produced a qualifying insider cluster")
+that a mere zero-row count cannot establish — the source could be
+disabled, stale, or unreachable, and the text would say the same thing
+regardless. Replaced with a purely factual statement plus a new
+`discovery_operating_evidence` block (the SAME `toggles`/`source_health`
+signals already computed elsewhere in the response) so a viewer forms
+their own conclusion from independent evidence — this method never
+infers one. A genuine gap beyond the literally-named defect was found
+while implementing this: the `con is None` (database-unavailable) branch
+carried NO explanatory text at all, silently rendering as an empty
+table indistinguishable from "zero candidates recorded" — given its own
+distinct note and evidence block, so "database unavailable" and
+"available database, zero rows" are now visibly different states, never
+conflated.
+
+### 3 — position-level paper detail, reused not invented
+
+`v2_broad_discovery()`'s ledger previously exposed only aggregate
+counts (`n_open`, `n_closed`, `realized_pnl_usd`). Extended with
+`open_positions_detail`/`closed_trades_detail`, filtered to
+broad-discovery-only symbols from the SAME `build_v2_paper_performance`
+call `v2_active_strategy()`'s own campaign-ledger card already makes
+(computed once per request, reused, never a second/duplicate
+valuation) — real entry/fill data, a real quote-based mark (or
+explicit `None`/`UNAVAILABLE`, never fabricated, when no usable mark
+exists), and real realized P&L for closed trades. A `symbol_membership_
+note` states plainly that a symbol's presence here reflects CURRENT
+universe/watchlist membership, not a historical claim about how a given
+position was actually discovered. Reconciled two ways: an automated
+test asserts the panel's own detail rows are `==` (full dict equality)
+to a DIRECT, independent call to `build_v2_paper_performance` against
+the same fixture; a manual reconciliation script in the evidence bundle
+confirms the same across two real, separately-timed process calls
+(excluding only the naturally time-varying `mark_age_seconds` field).
+
+### 4 — narrow-screen overflow, root-caused and fixed
+
+Two distinct, real bugs, found by iterating screenshot → diagnose →
+fix → re-screenshot (not guessed at):
+
+1. CSS Grid/Flex items default to `min-width:auto` — refusing to
+   shrink below their content's intrinsic minimum. A wide table inside
+   a `.card` (a grid item) forced the WHOLE GRID TRACK, and therefore
+   the whole page, wider than the 390px test viewport — bypassing
+   `.tblwrap`'s own `overflow-x:auto` containment entirely, since by
+   the time that container computed its available width, the ancestor
+   track was already oversized. Fixed: `.grid`/`.card` gained
+   `min-width:0`.
+2. Even after that fix, individual `.kv` row VALUES were present in the
+   DOM (confirmed via `--dump-dom`) but not visually rendering at
+   390px — a flexbox `flex-grow`/`justify-content:space-between`/
+   `flex-wrap:wrap` interaction edge case. Rather than chase that
+   interaction further, switched to a simpler, more robust, well-known
+   pattern inside the EXISTING `@media (max-width:640px)` block: `.kv`
+   becomes `flex-direction:column` on narrow screens (key on its own
+   line, value below, both full-width) — block-level stacking has no
+   equivalent edge case. Also hardened `table.tbl td` with `overflow-
+   wrap:anywhere`/`word-break:break-word` (a single long unbroken ISO
+   timestamp in one cell was independently capable of forcing a table
+   wider than its wrapper's min-content allowance) and added
+   `html,body{overflow-x:hidden}` as a page-level safety net.
+
+This CSS lives in the SHARED stylesheet, so it fixed the pre-existing
+narrow-screen characteristic on the Active V2 and Overview tabs too —
+confirmed via matching before/after screenshots of those UNMODIFIED
+tabs at the same 390px viewport, with zero desktop-width regression
+(also screenshotted, pixel-consistent with the prior pass). Wide tables
+still scroll within their own container when content genuinely doesn't
+fit even after wrapping — the intended, requested behaviour, not a
+remaining bug.
+
+### 5 — real rendered verification, limitations disclosed plainly
+
+Same headless-Chrome-CLI approach as the prior pass (no browser-
+automation tool or Node.js available in this environment — disclosed,
+not treated as license to skip rendering). All 7 required scenarios
+were captured as real screenshots against two isolated fixtures — see
+the evidence bundle's requirement table for the full mapping. Two
+dashboard server processes were found LEFT RUNNING from an entirely
+separate, earlier session partway through this pass (on the same
+ports this pass needed), discovered via `Get-CimInstance Win32_Process`
+after `ps aux`-based `taskkill` attempts silently failed to actually
+stop them (Git Bash's `ps aux` PIDs do not reliably map to real Windows
+process IDs) — every screenshot in the final evidence bundle was
+re-captured after that cleanup was confirmed complete via a fresh
+`Get-CimInstance` check showing zero matching processes.

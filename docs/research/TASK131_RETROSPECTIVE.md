@@ -379,3 +379,83 @@ Fix + SPA Dashboard Acceptance" section of `TASK131_REMEDIATION_DESIGN.md`.
   over the prior baseline (4629 → 4649), matching the 20 new tests added
   in this pass (4 + 8 + 8) — zero new regressions confirmed by name, not
   assumed.
+
+## Complete SPA Dashboard Acceptance runtime provenance log (this pass, on top of `b642b3d`)
+
+A sixth directive list, closing 4 real dashboard-correctness findings
+from a review of `b642b3d`'s own Broad Discovery tab. Confined entirely
+to `talonx_ops/dashboard_read.py` and `dashboard_web_static/index.html`
+plus their tests — `talonx_v2/` untouched, so the concurrent-admission
+fix and temporal protections from the immediately prior pass are
+preserved unmodified. Full design rationale in the "Complete SPA
+Dashboard Acceptance" section of `TASK131_REMEDIATION_DESIGN.md`; full
+requirement-by-requirement verdicts and evidence in `results/
+task131_spa_final_acceptance/SPA_ACCEPTANCE.md`
+(gitignored, also packaged as `task131_spa_final_acceptance.zip` at the
+same local path).
+
+- Baseline verified: `feature/task131-option-a-integration` at `b642b3d`
+  (clean, matches `origin`).
+- Fixed, in order: (1) `upstream_data_as_of_utc` no longer set from
+  `source_db_read_last_ok_utc` — now set only from a new, directly
+  queried `latest_source_event_utc` (`MAX(accepted_at_utc)` from
+  `insider_transactions`), or explicitly `None`/`UNKNOWN`; `source_
+  health` exposes all four distinct timestamps; (2) the discovery
+  funnel's empty-state text rewritten to a purely factual statement
+  plus a new `discovery_operating_evidence` block (independent
+  toggle/source-health signals, never an inferred reason); the
+  database-unavailable branch (found to have no explanatory text at
+  all) given its own distinct note + evidence block; (3)
+  `ledger.open_positions_detail`/`closed_trades_detail` added, reused
+  directly from the SAME `build_v2_paper_performance` call `v2_active_
+  strategy()` already makes (computed once, `_active`, never a second
+  valuation), with `symbol_membership_note` and `position_detail_note`
+  guarding against over-claiming; (4) two real narrow-screen overflow
+  bugs found and fixed (`.grid`/`.card` `min-width:0`; `.kv` switched to
+  `flex-direction:column` under `@media (max-width:640px)`; `table.tbl
+  td` hardened with `overflow-wrap`/`word-break`; `html,body{overflow-
+  x:hidden}` safety net) — a shared-CSS fix, confirmed via before/after
+  screenshots to also fix the pre-existing characteristic on the
+  UNMODIFIED Active V2 and Overview tabs, with zero desktop regression.
+- Fingerprint re-verified unchanged throughout this pass:
+  `11107198c5b81237`.
+- Files changed: `talonx_ops/dashboard_read.py`,
+  `dashboard_web_static/index.html`,
+  `tests/test_task131_spa_discovery_backend.py` (6 new tests: 3
+  freshness-distinction, 2 position-detail-reconciliation, 1
+  db-unavailable-distinction — 19 tests total in that file, up from 13).
+- Real rendered verification: real headless-Chrome screenshots against
+  two isolated fixtures (populated — 5 broad-discovery-only symbols
+  covering PENDING/FILLED-open/FILLED-closed/REJECTED/EXPIRED plus a
+  6th symbol demonstrating missing valuation; empty/disabled), at both
+  desktop (1600px) and narrow (390px) widths, for Broad Discovery,
+  Active V2, and Overview. Every displayed value reconciled against the
+  same run's raw API JSON; position-level detail additionally reconciled
+  against a direct, independent call to `build_v2_paper_performance`
+  (dict-equality, excluding only the naturally time-varying
+  `mark_age_seconds` field across two separately-timed calls — the
+  automated pytest test asserts full equality including that field,
+  using one fixed `now` for both sides). Two stray dashboard server
+  processes from an unrelated earlier session were found still running
+  on the needed ports partway through this pass (`ps aux`-based
+  `taskkill` had silently failed to stop them under Git Bash on
+  Windows) — found via `Get-CimInstance Win32_Process`, killed, and
+  every screenshot in the final bundle re-captured after confirming a
+  clean process state.
+- V2 + dashboard focused battery (24 files: the 21-file set from the
+  prior pass minus the 2 already-covered concurrent-admission-only
+  files, plus the 3 dashboard-specific files re-run standalone):
+  **91 passed** (dashboard-focused subset) and **243 passed**
+  (full V2 + dashboard battery), 0 failed.
+- Full repository test suite run after all changes in this pass:
+  **4 failed, 4655 passed, 6 skipped** (0:38:23) — compared by exact
+  test identity and failure reason (not merely count) against the
+  documented baseline: `test_task102_operational_finalization.py::
+  test_36_original_strategy_unchanged`, `test_task104_p2_cleanup.py::
+  test_32_33_original_strategy_and_thresholds_unchanged`,
+  `test_task117_release_rehearsal.py::test_bounded_release_rehearsal`,
+  `test_task118a_dashboard_message_count.py::test_immediate_and_digest_
+  sends_count_messages_correctly` — identical set, identical names, same
+  4 pre-existing failures carried from every prior baseline in this
+  task; pass count rose by exactly 6 (4649 → 4655), matching the 6 new
+  tests added in this pass. Zero new regressions.

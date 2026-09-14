@@ -11,6 +11,7 @@
     --accent:#6b7280; --orig:#22d3ee; --exp:#a78bfa; --intel:#60a5fa;
   }
   * { box-sizing: border-box; }
+  html, body { max-width:100%; overflow-x:hidden; }
   body { margin: 0; background: var(--bg); color: var(--text);
     font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size:14px; }
   header { display:flex; align-items:center; gap:20px; padding:12px 20px;
@@ -30,16 +31,18 @@
     border-radius:6px; padding:4px 10px; cursor:pointer; font-size:11px; }
   nav#legacy button.active { color:#fff; border-color:var(--muted); }
   main { padding:16px 20px 48px; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px; min-width:0; }
   .card { background:var(--panel); border:1px solid var(--panel-border); border-left:3px solid var(--accent);
-    border-radius:10px; padding:14px 16px; }
+    border-radius:10px; padding:14px 16px; min-width:0; }
   .card.orig { border-left-color:var(--orig); } .card.exp { border-left-color:var(--exp); }
   .card.intel { border-left-color:var(--intel); }
   .card h3 { margin:0 0 8px; font-size:13px; font-weight:600; letter-spacing:.02em; }
   .card-wide { grid-column:1/-1; }
-  .kv { display:flex; justify-content:space-between; gap:12px; padding:3px 0; border-bottom:1px solid #1a212c; font-size:13px; }
+  .kv { display:flex; flex-wrap:wrap; justify-content:space-between; gap:2px 12px; padding:3px 0; border-bottom:1px solid #1a212c; font-size:13px; }
   .kv:last-child { border-bottom:none; }
-  .kv .k { color:var(--muted); } .kv .v { font-family:ui-monospace,Consolas,monospace; text-align:right; }
+  .kv .k { color:var(--muted); flex-shrink:0; }
+  .kv .v { font-family:ui-monospace,Consolas,monospace; text-align:right; flex:1 1 auto; min-width:0;
+    word-break:break-word; overflow-wrap:anywhere; }
   .pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11px; font-weight:600; }
   .pill.ACTIVE,.pill.READY,.pill.HEALTHY,.pill.RECONCILED { background:#08351f; color:var(--good); }
   .pill.ZERO_ACTIVITY,.pill.NOT_DUE,.pill.UNKNOWN,.pill.NOT_CHECKED,.pill.NOT_PERSISTED { background:#20262e; color:var(--muted); }
@@ -60,7 +63,8 @@
   .banner.warn { background:#2c2207; color:var(--warn); border:1px solid #4d3c12; }
   table.tbl { width:100%; border-collapse:collapse; font-size:12px; margin-top:6px; }
   table.tbl th { text-align:left; color:var(--muted); font-weight:500; padding:4px 8px 6px 0; border-bottom:1px solid var(--panel-border); }
-  table.tbl td { padding:4px 8px 4px 0; border-bottom:1px solid #1a212c; font-family:ui-monospace,Consolas,monospace; }
+  table.tbl td { padding:4px 8px 4px 0; border-bottom:1px solid #1a212c; font-family:ui-monospace,Consolas,monospace;
+    overflow-wrap:anywhere; word-break:break-word; }
   .tblwrap { overflow-x:auto; }
   details { margin-top:8px; } summary { cursor:pointer; color:var(--muted); font-size:12px; }
   .muted { color:var(--muted); } .small { font-size:11px; }
@@ -82,7 +86,18 @@
   .card-channel { font-size:11px; color:var(--muted); font-family:ui-monospace,Consolas,monospace; }
   pre.json { white-space:pre-wrap; font-size:11px; background:var(--panel-2); border:1px solid var(--panel-border);
     border-radius:6px; padding:8px; overflow:auto; max-height:340px; }
-  @media (max-width:640px) { .grid { grid-template-columns:1fr; } header { gap:10px; } }
+  @media (max-width:640px) {
+    .grid { grid-template-columns:1fr; }
+    header { gap:10px; }
+    /* stack key/value vertically -- sidesteps flex-wrap+space-between
+       edge cases with long values/identifiers entirely; guaranteed to
+       never force horizontal overflow since both lines are full-width
+       block-level content. */
+    .kv { flex-direction:column; align-items:flex-start; gap:1px; }
+    .kv .v { text-align:left; }
+    nav#primary, nav#legacy { gap:6px; }
+    nav#primary button, nav#legacy button { flex:0 0 auto; }
+  }
 </style>
 </head>
 <body>
@@ -579,12 +594,20 @@ function renderV2Discovery(d){
      kv('source ok', pill(sh.source_ok===false?'FAILED':(sh.source_ok?'READY':'UNKNOWN')))+
      kv('DB read last ok / age', esc(sh.db_read_last_ok_utc||'—')+' / '+ageStr(sh.db_read_age_s))+
      kv('upstream poll last ok / age', esc(sh.upstream_poll_last_ok_utc||'—')+' / '+ageStr(sh.upstream_poll_age_s))+
+     kv('latest source event / age', esc(sh.latest_source_event_utc||'—')+' / '+ageStr(sh.latest_source_event_age_s))+
+     (sh.latest_source_event_unavailable_reason? kv('event timestamp unavailable because', esc(sh.latest_source_event_unavailable_reason)):'')+
      kv('degraded', sh.source_degraded||'—')+
      `<div class="muted small">${esc(sh.note||'')}</div></div>`;
-  h+=`<div class="card"><h3>Freshness</h3>`+
-     kv('dashboard refresh (this read)', esc(String(d.dashboard_refresh_utc||'').slice(0,19)))+
-     kv('upstream data as-of', esc(String(d.upstream_data_as_of_utc||'—').slice(0,19)))+
-     `<div class="muted small">a fresh dashboard read is NOT proof the upstream source itself is current -- shown separately, always.</div></div>`;
+  // freshness -- FOUR distinct timestamps, deliberately never substituted
+  // for one another (SPA Final Acceptance correction).
+  h+=`<div class="card card-wide"><h3>Freshness — four distinct timestamps</h3><div class="tblwrap"><table class="tbl"><tbody>`+
+     `<tr><td>0. dashboard refresh (this read)</td><td>${esc(String(d.dashboard_refresh_utc||'—').slice(0,19))}</td></tr>`+
+     `<tr><td>1. database read last ok <span class="muted">(proves the local cache was reachable -- NOT upstream freshness)</span></td><td>${esc(String(sh.db_read_last_ok_utc||'—').slice(0,19))} <span class="muted">(${ageStr(sh.db_read_age_s)} ago)</span></td></tr>`+
+     `<tr><td>2. upstream poll cycle last ok <span class="muted">(proves polling ran -- NOT that anything new was found)</span></td><td>${esc(String(sh.upstream_poll_last_ok_utc||'—').slice(0,19))} <span class="muted">(${ageStr(sh.upstream_poll_age_s)} ago)</span></td></tr>`+
+     `<tr><td>3. latest source event observed <span class="muted">(the real freshness signal, when known)</span></td><td>${esc(String(sh.latest_source_event_utc||'—').slice(0,19))} <span class="muted">(${ageStr(sh.latest_source_event_age_s)} ago)</span></td></tr>`+
+     `<tr><td><b>upstream data as-of</b> (basis: ${esc(d.upstream_data_as_of_basis||'—')})</td><td><b>${esc(String(d.upstream_data_as_of_utc||'UNKNOWN').slice(0,19))}</b></td></tr>`+
+     `</tbody></table></div>`+
+     `<div class="muted small">A fresh dashboard read is NOT proof of upstream freshness, and neither is a successful cache read. "upstream data as-of" is set ONLY from the actual latest observed source event -- never backfilled from row 0 or row 1 above.</div></div>`;
   // D. paper trading (shared ledger, symbol-filtered)
   h+=`<div class="card card-wide"><h3>Paper trading — broad-discovery-only symbols ${pill(led.status)}</h3><div class="grid">`+
      `<div>`+kv('open positions', num(led.n_open))+kv('closed positions', num(led.n_closed))+
@@ -593,7 +616,33 @@ function renderV2Discovery(d){
      `<div>`+kv('reserved cash (pending)', num(aq.reserved_cash_usd))+
        kv('reserved slots (pending)', num(aq.reserved_slots))+
        kv('pending intents', num(aq.pending_intents_n))+`</div></div>`+
-     `<div class="muted small">${esc(led.administrative_adjustments_note||led.note||'')}</div></div>`;
+     `<div class="muted small">${esc(led.administrative_adjustments_note||led.note||'')}</div>`+
+     `<div class="muted small">${esc(led.symbol_membership_note||'')}</div></div>`;
+  // position-level detail -- reused directly from the same paper engine
+  // v2_active_strategy's own campaign ledger uses (build_v2_paper_performance);
+  // never a second/invented valuation.
+  if(led.position_detail_unavailable_reason){
+    h+=`<div class="card card-wide"><h3>Open position detail</h3><div class="empty">${esc(led.position_detail_unavailable_reason)}</div></div>`;
+  } else {
+    h+=`<div class="card card-wide"><h3>Open position detail (broad-discovery-only)</h3>`+
+       boundedTable(led.open_positions_detail||[], [
+          {label:'symbol', get:p=>p.symbol}, {label:'entry session', get:p=>p.entry_session},
+          {label:'entry price', get:p=>p.entry_price}, {label:'quantity', get:p=>p.quantity},
+          {label:'cost basis', get:p=>p.cost_basis}, {label:'planned exit', get:p=>p.planned_exit_session},
+          {label:'mark', get:p=>p.mark==null?'UNAVAILABLE':p.mark},
+          {label:'mark as-of', get:p=>p.mark_timestamp&&String(p.mark_timestamp).slice(0,19)},
+          {label:'mark session', get:p=>p.mark_session_classification},
+          {label:'unrealized $', get:p=>p.unrealized_pnl_usd==null?'UNAVAILABLE':p.unrealized_pnl_usd}], 20)+
+       `<div class="muted small">${esc(led.position_detail_note||'')}</div></div>`;
+    h+=`<div class="card card-wide"><h3>Closed trade detail (broad-discovery-only)</h3>`+
+       boundedTable(led.closed_trades_detail||[], [
+          {label:'symbol', get:t=>t.symbol}, {label:'entry session', get:t=>t.entry_session},
+          {label:'exit session', get:t=>t.exit_session}, {label:'entry price', get:t=>t.entry_price},
+          {label:'exit price', get:t=>t.exit_price}, {label:'quantity', get:t=>t.quantity},
+          {label:'realized $', get:t=>t.realized_pnl_usd}, {label:'realized %', get:t=>t.realized_pnl_pct},
+          {label:'days held', get:t=>t.trading_days_held}, {label:'exit reason', get:t=>t.exit_reason}], 20)+
+       `</div>`;
+  }
   // C. what action is being communicated -- pending intents, never an invented price
   h+=`<div class="card card-wide"><h3>Pre-open entry intents (broad-discovery-only)</h3>`+
      boundedTable(aq.pending_intents||[], [
@@ -601,12 +650,24 @@ function renderV2Discovery(d){
         {label:'reference price', get:i=>i.reference_price}, {label:'planned exit', get:i=>i.planned_exit_session},
         {label:'intent created (UTC)', get:i=>i.created_at_utc&&String(i.created_at_utc).slice(0,19)}], 20)+
      `</div>`;
-  // B. what has been found -- the discovery funnel
+  // B. what has been found -- the discovery funnel. An empty candidate
+  // list states ONLY that fact -- it never claims a reason (healthy
+  // operation, no qualifying filings); the INDEPENDENT evidence below
+  // lets the viewer determine why, for themselves.
+  const ev=fn.discovery_operating_evidence||{};
   h+=`<div class="card card-wide"><h3>Discovery funnel — recent candidates ${pill(fn.status)}</h3>`+
      `<div class="muted small">by status: discovered ${num(bs.DISCOVERED||0)} · pending ${num(bs.PENDING||0)} · `+
      `rejected ${num(bs.REJECTED||0)} · expired ${num(bs.EXPIRED||0)} · filled ${num(bs.FILLED||0)}`+
      (bs.UNCLASSIFIED? ` · unclassified ${num(bs.UNCLASSIFIED)}`:'')+`</div>`+
-     (fn.empty_state_note? `<div class="empty">${esc(fn.empty_state_note)}</div>`:
+     (fn.empty_state_note? `<div class="empty">${esc(fn.empty_state_note)}</div>`+
+        (fn.discovery_operating_evidence? `<div class="tblwrap"><table class="tbl"><tbody>`+
+           `<tr><td>SEC ingestion expansion enabled</td><td>${pill(ev.sec_ingestion_expansion_enabled?'ACTIVE':'ZERO_ACTIVITY')}</td></tr>`+
+           `<tr><td>broad alert routing enabled</td><td>${pill(ev.dispatch_send_enabled?'ACTIVE':'ZERO_ACTIVITY')}</td></tr>`+
+           `<tr><td>source ok</td><td>${pill(ev.source_ok===false?'FAILED':(ev.source_ok?'READY':'UNKNOWN'))}</td></tr>`+
+           `<tr><td>DB read age</td><td>${ageStr(ev.db_read_age_s)}</td></tr>`+
+           `<tr><td>upstream poll age</td><td>${ageStr(ev.upstream_poll_age_s)}</td></tr>`+
+           `<tr><td>latest source event</td><td>${esc(String(ev.latest_source_event_utc||'UNKNOWN').slice(0,19))}</td></tr>`+
+           `</tbody></table></div><div class="muted small">${esc(ev.note||'')}</div>`:'') :
       boundedTable(fn.recent||[], [
          {label:'symbol', get:c=>c.symbol}, {label:'event time', get:c=>c.event_time&&String(c.event_time).slice(0,19)},
          {label:'target entry session', get:c=>c.target_entry_session},

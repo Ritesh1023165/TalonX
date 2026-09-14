@@ -1361,15 +1361,61 @@ class DashboardReadModel:
                     "default, TALONX_V2_DURABLE_STORE_ENABLED unset or false)"),
         }
 
-        # source_health + refresh-vs-upstream-freshness: reused directly
-        # from v2_active_strategy()'s own readiness computation -- the
-        # SAME source/process (the talonx_v2 service + InsiderStore) serves
-        # BOTH the primary watchlist and broad discovery; this is
-        # deliberately NOT a second, independently-observed feed.
+        # source_health + freshness: reused directly from v2_active_
+        # strategy()'s own readiness computation -- the SAME source/
+        # process (the talonx_v2 service + InsiderStore) serves BOTH the
+        # primary watchlist and broad discovery; this is deliberately NOT
+        # a second, independently-observed feed. `_active`'s own ledger.
+        # performance (build_v2_paper_performance) is ALSO reused below
+        # for position-level detail -- computed once here, not twice.
+        #
+        # SPA Final Acceptance correction: FOUR genuinely different
+        # timestamps, never substituted for one another --
+        #   (0) dashboard_refresh_utc     -- when THIS read ran
+        #   (1) db_read_last_ok_utc       -- the local SQLite read
+        #                                    succeeded (proves the DB was
+        #                                    reachable, NOT that upstream
+        #                                    data is current)
+        #   (2) upstream_poll_last_ok_utc -- the upstream SEC poll CYCLE
+        #                                    itself last completed
+        #                                    (proves polling is running,
+        #                                    NOT that it found anything
+        #                                    new)
+        #   (3) latest_source_event_utc   -- the newest individual filing
+        #                                    event actually observed in
+        #                                    the source data (queried
+        #                                    directly from
+        #                                    insider_transactions;
+        #                                    UNKNOWN when unavailable,
+        #                                    never backfilled from (1) or
+        #                                    (2))
+        # The PRIOR version of this method set the top-level
+        # ``upstream_data_as_of_utc`` from (1) -- a real defect (a
+        # successful CACHE read is not evidence of upstream freshness).
+        # It is now set from (3) only, or left explicitly None/UNKNOWN.
         out["dashboard_refresh_utc"] = out["generated_at"]
+        _active: dict[str, Any] = {}
         try:
             _active = self.v2_active_strategy()
             _r = _active.get("readiness", {}) or {}
+            latest_event_utc, latest_event_age_s, latest_event_note = None, None, None
+            try:
+                _ic = _ro(Path(self.intel_ledger))
+                if _ic is not None:
+                    try:
+                        if _has_table(_ic, "insider_transactions"):
+                            latest_event_utc = _q1(
+                                _ic, "SELECT MAX(accepted_at_utc) FROM insider_transactions "
+                                    "WHERE classification='OPEN_MARKET_PURCHASE'")
+                            latest_event_age_s = _age_seconds(latest_event_utc, self.now)
+                        else:
+                            latest_event_note = "insider_transactions table not found"
+                    finally:
+                        _ic.close()
+                else:
+                    latest_event_note = "ingestion_ledger.db unavailable"
+            except Exception as exc:  # noqa: BLE001
+                latest_event_note = f"{type(exc).__name__}: {exc}"
             out["source_health"] = {
                 "source_ok": _r.get("form4_source_ok"),
                 "source_degraded": _r.get("form4_source_degraded"),
@@ -1377,13 +1423,31 @@ class DashboardReadModel:
                 "db_read_age_s": _r.get("source_db_read_age_s"),
                 "upstream_poll_last_ok_utc": _r.get("source_poll_last_ok_utc"),
                 "upstream_poll_age_s": _r.get("source_poll_age_s"),
+                "latest_source_event_utc": latest_event_utc,
+                "latest_source_event_age_s": (round(latest_event_age_s, 1)
+                                              if latest_event_age_s is not None else None),
+                "latest_source_event_unavailable_reason": (
+                    None if latest_event_utc is not None else (latest_event_note or "no rows yet")),
                 "note": "the SAME source/process serves the primary 39-name watchlist AND "
-                       "broad discovery -- not a separately-observed feed",
+                       "broad discovery -- not a separately-observed feed. FOUR distinct "
+                       "timestamps are exposed here and must never be substituted for one "
+                       "another: dashboard_refresh_utc (this read), db_read_last_ok_utc (the "
+                       "local cache was reachable -- NOT proof of upstream freshness), "
+                       "upstream_poll_last_ok_utc (the poll cycle ran -- NOT proof it found "
+                       "anything new), latest_source_event_utc (the newest individual filing "
+                       "event actually observed -- the real freshness signal, UNKNOWN when "
+                       "unavailable rather than backfilled from either of the other two).",
             }
-            out["upstream_data_as_of_utc"] = _r.get("source_db_read_last_ok_utc")
+            out["upstream_data_as_of_utc"] = latest_event_utc
+            out["upstream_data_as_of_basis"] = (
+                "latest_source_event_utc" if latest_event_utc is not None else
+                "UNKNOWN -- no event-level upstream timestamp available; this is deliberately "
+                "left unset rather than substituted from a database-read or poll-cycle "
+                "timestamp, neither of which proves upstream freshness")
         except Exception as exc:  # noqa: BLE001
             out["source_health"] = {"status": "UNKNOWN", "note": f"{type(exc).__name__}: {exc}"}
             out["upstream_data_as_of_utc"] = None
+            out["upstream_data_as_of_basis"] = "UNKNOWN -- source_health computation itself failed"
 
         out["shared_campaign_ledger_note"] = (
             "Positions/cash below are a SYMBOL-FILTERED VIEW of the SAME shared $300,000 V2 "
@@ -1395,7 +1459,25 @@ class DashboardReadModel:
         con = _ro(Path(db))
         if con is None:
             out["ledger"] = {"status": "NO_ACTIVE_PRODUCER", "note": "no v2_lane.db"}
-            out["discovery_funnel"] = {"status": "NO_ACTIVE_PRODUCER", "recent": [], "by_status": {}}
+            out["discovery_funnel"] = {
+                "status": "NO_ACTIVE_PRODUCER", "recent": [], "by_status": {},
+                "empty_state_note": (
+                    "The V2 campaign ledger database itself is unavailable -- this is NOT "
+                    "the same as \"zero candidates were recorded\"; no query could even run. "
+                    "See discovery_operating_evidence below."),
+                "discovery_operating_evidence": {
+                    "sec_ingestion_expansion_enabled": toggles["sec_ingestion_expansion_enabled"],
+                    "dispatch_send_enabled": toggles["dispatch_send_enabled"],
+                    "source_ok": out.get("source_health", {}).get("source_ok"),
+                    "source_degraded": out.get("source_health", {}).get("source_degraded"),
+                    "db_read_age_s": out.get("source_health", {}).get("db_read_age_s"),
+                    "upstream_poll_age_s": out.get("source_health", {}).get("upstream_poll_age_s"),
+                    "latest_source_event_utc": out.get("source_health", {}).get("latest_source_event_utc"),
+                    "note": "these signals are INDEPENDENT of the ledger's own availability -- "
+                           "the upstream source can be perfectly healthy even while THIS "
+                           "specific campaign ledger file is missing/unreachable.",
+                },
+            }
             out["action_queue"] = {"status": "NO_ACTIVE_PRODUCER", "pending_intents": [], "recent_outbox": []}
         else:
             try:
@@ -1421,7 +1503,45 @@ class DashboardReadModel:
                         "note": "counts ONLY symbols in the 626-universe that are NOT already "
                                "in the primary 39-name watchlist -- never double-counted "
                                "with v2_active_strategy's own ledger above",
+                        "symbol_membership_note": (
+                            "a symbol appears here because it is CURRENTLY in the 626-name "
+                            "universe and NOT in the 39-name watchlist -- this does NOT prove "
+                            "the position was originated via broad-discovery ingestion "
+                            "specifically (TALONX_INTEL_ENABLE_BROAD_DISCOVERY may not have "
+                            "been active when this episode was actually detected); it is a "
+                            "present-tense symbol-membership filter, not a claim of historical "
+                            "discovery origin"),
                     }
+
+                    # SPA Final Acceptance section 3: position-level detail,
+                    # reused DIRECTLY from build_v2_paper_performance (the
+                    # SAME real paper engine + valuation evidence
+                    # v2_active_strategy's own campaign-ledger card uses,
+                    # already computed once above as `_active`) -- never a
+                    # second/invented valuation. Filtered to broad-
+                    # discovery-only symbols; the campaign-level totals
+                    # (cash/equity/reconciliation) stay on the Active V2
+                    # tab only, per shared_campaign_ledger_note above.
+                    _perf = (_active.get("ledger") or {}).get("performance") or {}
+                    if _perf.get("status") in (None, "UNAVAILABLE") and "open_positions" not in _perf:
+                        out["ledger"]["position_detail_unavailable_reason"] = (
+                            _perf.get("note") or "campaign performance snapshot unavailable")
+                        out["ledger"]["open_positions_detail"] = []
+                        out["ledger"]["closed_trades_detail"] = []
+                    else:
+                        _open_detail_all = ((_perf.get("open_positions") or {}).get("detail")) or []
+                        _closed_detail_all = _perf.get("closed_trades") or []
+                        out["ledger"]["open_positions_detail"] = [
+                            r for r in _open_detail_all if (r.get("symbol") or "").upper() in broad_only]
+                        out["ledger"]["closed_trades_detail"] = [
+                            r for r in _closed_detail_all if (r.get("symbol") or "").upper() in broad_only]
+                        out["ledger"]["position_detail_note"] = (
+                            "mark/unrealized-P&L fields are exactly as computed by "
+                            "build_v2_paper_performance (talonx_ops/paper_performance.py) -- "
+                            "'mark'=None and 'unrealized_pnl_usd'=None mean NO usable mark was "
+                            "available for that symbol (never a fabricated fresh valuation); "
+                            "'mark' when present is a real quote, distinct from 'entry_price' "
+                            "(the original fill), and is never presented as the fill price.")
 
                 # discovery_funnel: real episode dispositions + intent
                 # statuses for broad-discovery-only symbols, classified.
@@ -1459,6 +1579,17 @@ class DashboardReadModel:
                 by_status: dict[str, int] = {}
                 for c in candidates:
                     by_status[c["status_bucket"]] = by_status.get(c["status_bucket"], 0) + 1
+                # SPA Final Acceptance correction: an empty candidate list
+                # means ONLY "zero rows recorded in this ledger view" --
+                # it does NOT, by itself, establish that no qualifying
+                # filing activity occurred, that discovery is healthy, or
+                # that the source is current. The prior text asserted a
+                # REASON ("no code-P Form 4 activity has produced a
+                # qualifying cluster") the ledger alone cannot prove.
+                # Replaced with a purely factual statement, plus the
+                # INDEPENDENT evidence (source health, toggles, admission
+                # policy) a reader needs to form their OWN conclusion --
+                # never inferred or asserted here.
                 out["discovery_funnel"] = {
                     "status": "ACTIVE" if candidates else "ZERO_ACTIVITY",
                     "candidates_n": len(candidates),
@@ -1466,10 +1597,27 @@ class DashboardReadModel:
                     "recent": candidates[:25],
                     "empty_state_note": (
                         None if candidates else
-                        "no code-P Form 4 activity has produced a qualifying insider cluster "
-                        "for any broad-discovery-only symbol, through this source's own last "
-                        "successful read above -- a real, current state, not an error or an "
-                        "inferred reason"),
+                        "No recorded broad-discovery candidates in this ledger. This states "
+                        "ONLY that zero rows are recorded here -- see "
+                        "discovery_operating_evidence (and source_health / toggles / "
+                        "admission_policy above) to determine independently whether that is "
+                        "because discovery is disabled, the source is stale/unavailable, or "
+                        "the source is healthy and genuinely observed no qualifying activity."),
+                    "discovery_operating_evidence": {
+                        "sec_ingestion_expansion_enabled": toggles["sec_ingestion_expansion_enabled"],
+                        "dispatch_send_enabled": toggles["dispatch_send_enabled"],
+                        "source_ok": out.get("source_health", {}).get("source_ok"),
+                        "source_degraded": out.get("source_health", {}).get("source_degraded"),
+                        "db_read_age_s": out.get("source_health", {}).get("db_read_age_s"),
+                        "upstream_poll_age_s": out.get("source_health", {}).get("upstream_poll_age_s"),
+                        "latest_source_event_utc": out.get("source_health", {}).get("latest_source_event_utc"),
+                        "note": "these signals are INDEPENDENT of the candidate count above -- "
+                               "a healthy, actively-polling source can legitimately show zero "
+                               "candidates (no qualifying cluster has formed YET), and a "
+                               "disabled or unhealthy source can also show zero candidates for "
+                               "an entirely different reason. Read them together; never infer "
+                               "one from the other.",
+                    },
                 }
 
                 # action_queue: pending intents + recent outbox rows for
