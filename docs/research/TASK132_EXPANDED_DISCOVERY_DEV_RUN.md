@@ -488,3 +488,62 @@ ALERT_NOISE_REPORT.md`. Summary:
   exact window (reported as that limitation, not manufactured).
 - Cash/positions/intents unchanged; SEC ingestion/recovery and V2
   actionable delivery untouched. EOD still PENDING at report time.
+
+## Addendum 6 — Task 136B: Close Freshness Edge Cases and Correct Acceptance Evidence
+
+Full detail: `results/task132_development_run/TASK136B_FRESHNESS_EDGE_
+CASES_REPORT.md` + `TASK136A_CORRECTIONS_ADDENDUM.md`. Summary:
+
+- Two remaining Task 136A gaps, confirmed by the user's own review and
+  closed: (1) an event whose publication time could not be established
+  still qualified via a silent fallback to enqueue time; (2)
+  `process_pending`'s per-row freshness check reused the single
+  drain-level `now`, not a fresh clock read at each row's own send
+  decision, so a card could cross its cutoff mid-batch and still pass.
+- **Fix 1**: `_expire_row_if_stale` now returns a 4-way `_FreshnessOutcome`
+  (OK / EXPIRED / UNQUALIFIED / DEFER) instead of `str | None`.
+  UNQUALIFIED (a lookup ran and found nothing, or found an invalid
+  timestamp) moves the row to SUPPRESSED with a truthful reason, never
+  EXPIRED (no age was ever established) and never silently OK. DEFER (the
+  lookup itself raised) leaves the row completely untouched for a bounded
+  retry. Naive/future source timestamps explicitly rejected
+  (`_validate_source_time`).
+- **Fix 2**: `process_pending`/`process_digest`/`deliver_cycle` gain an
+  injectable `clock` parameter, read fresh at each row's (or, for a
+  digest, the whole batch's) final send decision -- defaults to reusing
+  `now` when a caller pins it (test determinism preserved) or a real
+  `datetime.now(timezone.utc)` read in production. A DIGEST batch is
+  re-validated as one unit immediately before it is actually sent;
+  ineligible cards are excluded and never marked SENT; an empty-eligible
+  digest sends nothing at all.
+- **Content correction**: traced the ACN incident's four disclosed
+  figures precisely -- the "Why surfaced" reasons (significance engine)
+  were ALREADY event-relative before Task 136A; only the "What changed"
+  section's insider facts (a separate enrichment-engine build) used the
+  wrong as-of basis. Task 136A's report and its own code docstring both
+  overstated this as affecting every figure; both corrected.
+- **BST/UTC correction**: `Get-CimInstance`'s `CreationDate` and raw log
+  prefixes are host-local time (BST, UTC+1 in September), not UTC, as
+  treated throughout Tasks 132-136A -- proven by direct comparison against
+  each event's own embedded `_utc` field. Task 136A's "19:39:38 UTC"
+  restart timestamp corrected to 18:39:38 UTC.
+- **206 vs 229 reconciled**: 206 = a PENDING snapshot total; 229 = the
+  interval count the first live cycle's route-UNFILTERED bulk
+  `expire_stale()` sweep actually transitioned (verified in source: no
+  `route` filter on that query) -- structurally can, and likely does,
+  include some DIGEST-route rows the IMMEDIATE-labelled snapshot did not
+  count, not a discrepancy in the underlying fix.
+- 12 new regression tests (isolated queues + an injected `_StepClock`,
+  never real wall time) plus 3 existing test files updated for the
+  corrected semantics (a "no evidence" lookup result is UNQUALIFIED, not
+  a silent enqueue-time pass). 558 tests passed; 3 pre-existing,
+  unrelated failures reconfirmed present on unmodified HEAD via
+  `git stash` (environmental/date-dependent, not caused by this change).
+  Frozen fingerprint `11107198c5b81237` unchanged.
+- Intelligence restarted (only component touched) via the supervisor's
+  own dead-child detection; clean startup, unchanged 569-symbol scope,
+  continued backfill with no gap, single supervisor ownership preserved.
+  Cash $300,000.00 / 0 positions / 0 intents unchanged throughout. V2
+  companion untouched. EOD still PENDING at report time (before 20:00 UTC
+  close); `close --no-shutdown` remains the correct mechanism, owned by
+  the running checkpoint daemon.
