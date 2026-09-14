@@ -50,9 +50,29 @@ def _svc(tmp_path, **cfg_over):
     return svc, cfg
 
 
-def _enqueue(svc, *, symbol, accession, enqueued_at):
+def _enqueue(svc, *, symbol, accession, enqueued_at, event_accepted_at=None):
+    """Enqueue a delivery row AND (Task 136B) a matching, real backing
+    ``TextEvent`` in the EventStore -- the real ``deliver_cycle`` freshness
+    gate now looks up publication evidence via ``EventStore.get_event``,
+    and a row whose event genuinely does not exist there is correctly
+    UNQUALIFIED (no fallback to enqueue time), matching how a row can only
+    ever be enqueued in production as a result of processing a real
+    ingested event. Defaults the event's own ``accepted_at_utc`` to
+    ``enqueued_at`` (a "fresh" backing event) -- pass ``event_accepted_at``
+    to simulate a historical source time distinct from the enqueue time."""
+    from talonx_ingest.intelligence.domain import EventType, SourceType, TextEvent
+
     card, wc = make_card(symbol=symbol, accession=accession, on_watchlist=True, now=enqueued_at)
-    return enqueue_card(card, outbox=svc.stores.outbox, now=enqueued_at).row.delivery_id
+    row = enqueue_card(card, outbox=svc.stores.outbox, now=enqueued_at).row
+    svc.stores.events.upsert_event(TextEvent(
+        event_id=row.event_id, symbol=symbol, company_name=symbol,
+        source_type=SourceType.SEC_EDGAR_SUBMISSIONS, source_record_id=accession,
+        event_type=EventType.EARNINGS_RESULTS, form_type="8-K",
+        accession=accession,
+        accepted_at_utc=event_accepted_at or enqueued_at,
+        ingested_at_utc=enqueued_at,
+    ))
+    return row.delivery_id
 
 
 def test_disabled_by_default_holds_then_enable_sends_after_restart(tmp_path, monkeypatch):
@@ -105,21 +125,14 @@ def test_enabled_cycle_expires_stale_backlog_and_delivers_only_fresh(tmp_path, m
 
 def test_old_event_enqueued_today_is_not_fresh(tmp_path, monkeypatch):
     """Freshness is measured from the older of (event time, enqueue time)."""
-    from talonx_ingest.intelligence.domain import TextEvent, EventType, SourceType
-
     svc, cfg = _svc(tmp_path, deliver_intelligence_cards=True, dry_run_delivery=False)
+    # enqueued just now, but the underlying event was accepted 5 days ago --
+    # EventStore.upsert_event is insert-or-ignore (not a real overwrite), so
+    # the historical accepted_at_utc must be given to _enqueue() directly
+    # rather than upserted again afterward.
     did = _enqueue(svc, symbol="ORCL", accession="0001193125-26-387905",
-                   enqueued_at=NOW - timedelta(minutes=5))          # enqueued just now
-    row = svc.stores.outbox.get(did)
-    # ...but the underlying event was accepted 5 days ago
-    svc.stores.events.upsert_event(TextEvent(
-        event_id=row.event_id, symbol="ORCL", company_name="ORACLE CORP",
-        source_type=SourceType.SEC_EDGAR_SUBMISSIONS, source_record_id="x",
-        event_type=EventType.EARNINGS_RESULTS, form_type="8-K",
-        accession="0001193125-26-387905",
-        accepted_at_utc=NOW - timedelta(days=5),
-        ingested_at_utc=NOW - timedelta(days=5),
-    ))
+                   enqueued_at=NOW - timedelta(minutes=5),
+                   event_accepted_at=NOW - timedelta(days=5))
     inter = _Intercept()
     monkeypatch.setattr(dp, "TelegramSenderAdapter", lambda *a, **k: inter)
 

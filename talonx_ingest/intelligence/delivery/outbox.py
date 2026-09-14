@@ -49,6 +49,50 @@ STATE_EXPIRED = "EXPIRED"        # D5: a PENDING row older than its route cutoff
 STATE_AMBIGUOUS = "AMBIGUOUS"    # a send whose outcome could not be confirmed --
                                 # durable, NOT auto-retried, needs a human decision
 
+# Task 136B: the per-row freshness-decision outcome -- see
+# DeliveryOutbox._expire_row_if_stale's own docstring for the full
+# rationale. Deliberately NOT reusing the delivery `state` vocabulary
+# above as the disposition constants (OK/EXPIRED/UNQUALIFIED/DEFER):
+# UNQUALIFIED and EXPIRED both land the row in an existing `state`
+# (SUPPRESSED / EXPIRED respectively), but the CALLER-facing distinction
+# ("was there evidence this was actually old, or just no evidence at
+# all") matters even though the two share no meaningfully different
+# downstream handling today.
+_FRESH_OK = "OK"                  # valid basis, within cutoff -- may send
+_FRESH_EXPIRED = "EXPIRED"        # valid basis, over cutoff -- terminal
+_FRESH_UNQUALIFIED = "UNQUALIFIED"  # no usable source-time evidence -- terminal
+_FRESH_DEFER = "DEFER"            # lookup itself failed -- transient, retry later
+
+
+@dataclass
+class _FreshnessOutcome:
+    disposition: str          # one of _FRESH_OK / _FRESH_EXPIRED / _FRESH_UNQUALIFIED / _FRESH_DEFER
+    reason: str | None = None  # populated for every disposition except _FRESH_OK
+
+
+def _validate_source_time(evt: datetime, now: datetime) -> tuple[datetime | None, str | None]:
+    """Task 136B: explicit validation for a source ``accepted_at_utc``
+    returned by an ``event_time_lookup`` -- a timestamp is not
+    automatically usable just because a value came back. Returns
+    ``(evt, None)`` when usable, or ``(None, reason)`` when not -- never
+    raises (a malformed/future timestamp is a data-quality fact to
+    report, not a program error).
+
+    - Timezone-naive: cannot be safely compared against a UTC ``now``
+      (silently assuming a timezone here is exactly the kind of implicit
+      behaviour Task 136B closes) -- rejected.
+    - More than a small clock-skew tolerance (5 minutes) in the future:
+      a source cannot publish something before it happens; treated as
+      invalid rather than granting it "very fresh" status by trusting
+      the number at face value.
+    """
+    if evt.tzinfo is None:
+        return None, "source timestamp is timezone-naive (cannot be safely compared)"
+    if evt > now + timedelta(minutes=5):
+        return None, f"source timestamp {evt.isoformat()} is in the future relative to now"
+    return evt, None
+
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_meta (
     key TEXT PRIMARY KEY, value TEXT NOT NULL
@@ -546,8 +590,17 @@ class DeliveryOutbox:
         max_age_seconds: "dict[str, int] | int | None" = None,
         event_time_lookup=None,
         limit: int | None = None,
+        unqualified_ids_out: "list[str] | None" = None,
     ) -> list[str]:
         """Move PENDING rows older than their per-route cutoff to EXPIRED.
+
+        Task 136B: ``unqualified_ids_out``, if given, is extended in place
+        with the delivery_ids this same sweep found UNQUALIFIED (moved to
+        SUPPRESSED) -- an opt-in, backward-compatible way for a caller
+        (``process_pending``/``process_digest``) to observe both
+        dispositions from this ONE call without changing the return
+        contract every existing caller/test already depends on (a bare
+        ``list[str]`` of EXPIRED ids).
 
         Audit-preserving: a state transition with an ``EXPIRED`` log entry, not
         a delete. Idempotent. Returns the delivery_ids expired. ``max_age_seconds``
@@ -596,6 +649,7 @@ class DeliveryOutbox:
             default_max = CARD_MAX_AGE_DEFAULT_SECONDS
 
         expired: list[str] = []
+        mutated = False   # Task 136B: EXPIRED *or* UNQUALIFIED both mutate the row
         sql = (
             "SELECT delivery_id, route, event_id, enqueued_at_utc FROM intelligence_delivery "
             "WHERE state = ? ORDER BY enqueued_at_utc ASC"
@@ -606,48 +660,114 @@ class DeliveryOutbox:
             params.append(int(limit))
         rows = self._conn.execute(sql, params).fetchall()
         for r in rows:
-            reason = self._expire_row_if_stale(
+            outcome = self._expire_row_if_stale(
                 delivery_id=r["delivery_id"], route=r["route"], event_id=r["event_id"],
                 enqueued_at_utc=r["enqueued_at_utc"], now=now,
                 route_max=route_max, default_max=default_max,
                 event_time_lookup=event_time_lookup,
             )
-            if reason is not None:
+            # Task 136B: the bulk sweep's own return contract (list of
+            # EXPIRED ids) is unchanged for backward compatibility -- an
+            # UNQUALIFIED row is also mutated (to SUPPRESSED, a genuinely
+            # different terminal disposition, see _expire_row_if_stale) but
+            # is not counted in this list, since callers of the ORIGINAL
+            # expire_stale() specifically track "expired by established
+            # age", not "suppressed for missing evidence" (the per-row
+            # inline gate in process_pending/process_digest is what
+            # surfaces DrainResult.unqualified/.unqualified_ids). A DEFER
+            # outcome mutates nothing -- the row is left exactly as it
+            # was, to be retried on this or a later call.
+            if outcome.disposition == _FRESH_EXPIRED:
                 expired.append(r["delivery_id"])
-        if expired:
+                mutated = True
+            elif outcome.disposition == _FRESH_UNQUALIFIED:
+                mutated = True
+                if unqualified_ids_out is not None:
+                    unqualified_ids_out.append(r["delivery_id"])
+        if mutated:
             self._conn.commit()
         return expired
 
     def _expire_row_if_stale(
         self, *, delivery_id: str, route: str, event_id: str, enqueued_at_utc,
         now: datetime, route_max: dict, default_max: int, event_time_lookup,
-    ) -> str | None:
+    ) -> "_FreshnessOutcome":
         """Shared freshness-basis logic for exactly ONE row -- used by both
-        the bulk ``expire_stale`` sweep above AND (Task 136A) the per-row
-        check immediately before a send, so the two can never disagree and
-        a row cannot be sent just because the bulk sweep (bounded, enqueue-
-        time-ordered) had not yet reached it while ``pending()`` (BAND-
-        priority-ordered -- a HIGH-band historical card sorts ahead of
-        hundreds of older-enqueued, lower-band rows) had already selected
-        it for sending. Mutates the row to EXPIRED (does NOT commit --
-        callers commit) and returns the reason string if it expired it,
-        else ``None``. `enqueued_at_utc` may be a string (raw column) or a
-        ``DeliveryRow``'s own datetime attribute."""
+        the bulk ``expire_stale`` sweep above AND the per-row check
+        immediately before a send (``expire_one_if_stale`` below), so the
+        two can never disagree and a row cannot be sent just because the
+        bulk sweep (bounded, enqueue-time-ordered) had not yet reached it
+        while ``pending()`` (BAND-priority-ordered -- a HIGH-band
+        historical card sorts ahead of hundreds of older-enqueued, lower-
+        band rows) had already selected it for sending (Task 136A).
+
+        Task 136B: distinguishes FOUR outcomes, not two --
+          * OK           -- a valid source/enqueue basis, within cutoff.
+          * EXPIRED       -- a valid basis, over cutoff (existing older-of-
+                            source/enqueue policy, unchanged for this case).
+          * UNQUALIFIED   -- no usable source-time evidence at all (the
+                            lookup ran cleanly and found none, or found a
+                            malformed/future timestamp) -- Task 136A's own
+                            fix still silently fell back to enqueue time
+                            alone here, which is exactly the gap this
+                            closes: queue creation time is NEVER, on its
+                            own, evidence of freshness for informational
+                            delivery. Terminal -- moved to SUPPRESSED (an
+                            existing state, distinct from EXPIRED, since
+                            "no evidence of age" is not the same claim as
+                            "proven old").
+          * DEFER         -- the lookup itself raised (a transient failure,
+                            e.g. a DB error) -- NOT a verdict on the event;
+                            the row is left completely untouched (still
+                            PENDING) so a later pass can retry it. Bounded
+                            naturally: this same row is reconsidered on the
+                            very next call, never blocks other rows in the
+                            current batch/sweep.
+        Task 136B, additionally: ``event_time_lookup`` being ``None``
+        (no lookup CAPABILITY offered by this caller at all) is a
+        different situation from a provided lookup finding nothing for
+        THIS event -- the former is a caller-level choice to use
+        enqueue-time-only cutoff semantics (the pre-event-time Task 117
+        behaviour, still exercised directly by callers/tests that never
+        pass ``event_time_lookup``), not a per-event "no publication
+        evidence" verdict, so it is judged on ``enq`` alone rather than
+        UNQUALIFIED.
+
+        Mutates the row for EXPIRED/UNQUALIFIED (does NOT commit -- callers
+        commit); OK/DEFER never mutate. `enqueued_at_utc` may be a string
+        (raw column) or a ``DeliveryRow``'s own datetime attribute."""
         enq = enqueued_at_utc if isinstance(enqueued_at_utc, datetime) else _dt(enqueued_at_utc)
-        evt = None
+        evt: datetime | None = None
+        evt_invalid_reason: str | None = None
         if event_time_lookup is not None:
             try:
-                evt = event_time_lookup(event_id)
-            except Exception:  # noqa: BLE001
-                evt = None
-        candidates = [t for t in (enq, evt) if t is not None]
-        if not candidates:
-            return None
-        basis = min(candidates)
-        which = "event_time" if (evt is not None and basis == evt) else "enqueue_time"
+                raw_evt = event_time_lookup(event_id)
+            except Exception as exc:  # noqa: BLE001 -- a lookup FAILURE is transient
+                return _FreshnessOutcome(_FRESH_DEFER, f"event_time_lookup failed: {exc}")
+            if raw_evt is not None:
+                evt, evt_invalid_reason = _validate_source_time(raw_evt, now)
+
+        if evt is None and event_time_lookup is not None:
+            # A lookup capability WAS offered and ran cleanly, but found
+            # nothing usable for this specific event (never returned, or
+            # returned a malformed/future timestamp -- see
+            # _validate_source_time). Queue-creation time (enq) is
+            # deliberately NOT used as a substitute here -- that is the
+            # exact defect this task closes.
+            reason = evt_invalid_reason or "no publication/acceptance evidence available"
+            return self._terminal_unqualified(delivery_id, now, reason)
+
+        if evt is None and enq is None:
+            # No lookup capability AND no enqueue time either -- truly
+            # nothing to judge freshness by.
+            return self._terminal_unqualified(
+                delivery_id, now, "no enqueue time and no event_time_lookup provided")
+
+        basis = min(enq, evt) if (enq is not None and evt is not None) else (evt or enq)
+        which = "event_time" if basis == evt else "enqueue_time"
         cutoff_s = route_max.get(route, default_max)
         if now - basis <= timedelta(seconds=cutoff_s):
-            return None
+            return _FreshnessOutcome(_FRESH_OK, None)
         age_h = (now - basis).total_seconds() / 3600.0
         reason = (f"stale_card: {age_h:.1f}h old by {which} "
                   f"> {cutoff_s / 3600:.0f}h {route} cutoff")
@@ -657,23 +777,37 @@ class DeliveryOutbox:
             (STATE_EXPIRED, _iso(now), reason, delivery_id),
         )
         self._log(delivery_id, "EXPIRED", reason)
-        return reason
+        return _FreshnessOutcome(_FRESH_EXPIRED, reason)
+
+    def _terminal_unqualified(self, delivery_id: str, now: datetime, reason: str) -> "_FreshnessOutcome":
+        """Task 136B: shared terminal-state write for the UNQUALIFIED
+        disposition -- no usable source-time evidence at all. Moves the row
+        to SUPPRESSED (an existing state, distinct from EXPIRED: "no
+        evidence of age" is not the same claim as "proven old")."""
+        self._conn.execute(
+            "UPDATE intelligence_delivery SET state=?, next_retry_at_utc=NULL, "
+            "updated_at_utc=?, suppress_reason=? WHERE delivery_id=?",
+            (STATE_SUPPRESSED, _iso(now), f"unqualified: {reason}", delivery_id),
+        )
+        self._log(delivery_id, "SUPPRESSED", f"unqualified: {reason}")
+        return _FreshnessOutcome(_FRESH_UNQUALIFIED, reason)
 
     def expire_one_if_stale(
         self, row, *, now: datetime | None = None,
         max_age_seconds: "dict[str, int] | int | None" = None,
         event_time_lookup=None,
-    ) -> str | None:
-        """Task 136A: the per-row freshness gate applied immediately before
-        a send (see ``process_pending``/``process_digest`` in pipeline.py)
-        -- the actual enforcement point queue creation time cannot bypass,
-        independent of whether a prior bulk ``expire_stale`` pass reached
-        this specific row. ``row`` is a ``DeliveryRow`` (has
-        ``.delivery_id``/``.route``/``.event_id``/``.enqueued_at_utc``).
-        Commits immediately (unlike the bulk sweep) since this is called
-        one row at a time, inline in the send loop. Returns the expiry
-        reason if it expired the row (the caller must not send it), else
-        ``None`` (still eligible)."""
+    ) -> "_FreshnessOutcome":
+        """Task 136A/136B: the per-row freshness gate applied immediately
+        before a send (see ``process_pending``/``process_digest`` in
+        pipeline.py) -- the actual enforcement point queue creation time
+        cannot bypass, independent of whether a prior bulk ``expire_
+        stale`` pass reached this specific row. ``row`` is a
+        ``DeliveryRow`` (has ``.delivery_id``/``.route``/``.event_id``/
+        ``.enqueued_at_utc``). Commits immediately for EXPIRED/UNQUALIFIED
+        (unlike the bulk sweep, called one row at a time inline in the
+        send loop); a DEFER outcome never mutates or commits anything.
+        Returns a ``_FreshnessOutcome`` -- callers must only send when
+        ``.disposition == _FRESH_OK``."""
         from talonx_ingest.intelligence.delivery.config import (
             CARD_MAX_AGE_DEFAULT_SECONDS, CARD_MAX_AGE_SECONDS,
         )
@@ -685,15 +819,15 @@ class DeliveryOutbox:
             route_max, default_max = {}, max_age_seconds
         else:
             route_max, default_max = dict(max_age_seconds), CARD_MAX_AGE_DEFAULT_SECONDS
-        reason = self._expire_row_if_stale(
+        outcome = self._expire_row_if_stale(
             delivery_id=row.delivery_id, route=row.route, event_id=row.event_id,
             enqueued_at_utc=row.enqueued_at_utc, now=now,
             route_max=route_max, default_max=default_max,
             event_time_lookup=event_time_lookup,
         )
-        if reason is not None:
+        if outcome.disposition in (_FRESH_EXPIRED, _FRESH_UNQUALIFIED):
             self._conn.commit()
-        return reason
+        return outcome
 
     def counts_by_state(self) -> dict[str, int]:
         rows = self._conn.execute(

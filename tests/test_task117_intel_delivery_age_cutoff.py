@@ -19,6 +19,7 @@ from talonx_ingest.intelligence.delivery.outbox import (
     STATE_EXPIRED,
     STATE_PENDING,
     STATE_SENT,
+    STATE_SUPPRESSED,
     DeliveryOutbox,
 )
 from talonx_ingest.intelligence.delivery.pipeline import (
@@ -132,6 +133,11 @@ def test_default_drain_unchanged_without_opt_in(ledger_path):
 # ---------------------------------------------------------------------
 
 def test_expire_stale_default_is_unbounded_scans_every_pending_row(ledger_path):
+    """Task 136B: a lookup that ran cleanly and found NOTHING for every one
+    of these rows makes them UNQUALIFIED (SUPPRESSED), not EXPIRED -- there
+    is no established age to report, only an absence of evidence. The scan
+    coverage/boundedness behaviour under test is unchanged; only the
+    resulting disposition is corrected."""
     ob = DeliveryOutbox(ledger_path)
     now = datetime(2026, 9, 10, 20, 0, 0, tzinfo=UTC)
     dids = [
@@ -146,8 +152,10 @@ def test_expire_stale_default_is_unbounded_scans_every_pending_row(ledger_path):
         return None
 
     expired = ob.expire_stale(now=now, event_time_lookup=_lookup)
-    assert len(expired) == 12 and set(expired) == set(dids)
+    assert expired == []                             # none PROVEN old -- no evidence at all
     assert len(lookups) == 12          # every row scanned -- unchanged default behaviour
+    assert all(ob.get(d).state == STATE_SUPPRESSED for d in dids)
+    assert all("unqualified" in (ob.get(d).suppress_reason or "") for d in dids)
     ob.close()
 
 
@@ -156,7 +164,11 @@ def test_expire_stale_limit_bounds_the_scan_oldest_first(ledger_path):
     inspected (and at most `limit` calls made to event_time_lookup) no
     matter how many PENDING rows exist -- oldest enqueued_at_utc first,
     so the rows most likely to be genuinely stale are the ones handled
-    each bounded pass."""
+    each bounded pass.
+
+    Task 136B: with no event-time evidence at all for any of them, the
+    inspected rows become UNQUALIFIED (SUPPRESSED), not EXPIRED -- see
+    ``test_expire_stale_default_is_unbounded_scans_every_pending_row``."""
     ob = DeliveryOutbox(ledger_path)
     now = datetime(2026, 9, 10, 20, 0, 0, tzinfo=UTC)
     older = [
@@ -177,8 +189,10 @@ def test_expire_stale_limit_bounds_the_scan_oldest_first(ledger_path):
 
     expired = ob.expire_stale(now=now, event_time_lookup=_lookup, limit=5)
     assert len(lookups) == 5                       # bounded -- NOT all 40 PENDING rows
-    assert len(expired) == 5                        # the 5 oldest, all genuinely stale
-    assert set(expired).issubset(set(older))        # oldest-first, not last-in-first-out
+    assert expired == []                            # none PROVEN old -- no evidence at all
+    touched = [d for d in older if ob.get(d).state == STATE_SUPPRESSED]
+    assert len(touched) == 5
+    assert set(touched).issubset(set(older))        # oldest-first, not last-in-first-out
     # nothing from the fresh batch was even inspected, let alone touched
     assert all(ob.get(d).state == STATE_PENDING for d in newer)
     ob.close()
@@ -266,13 +280,21 @@ def test_high_band_stale_card_cannot_jump_the_bounded_expire_sweep(ledger_path):
     ob = DeliveryOutbox(ledger_path)
     now = datetime(2026, 9, 14, 16, 0, 0, tzinfo=UTC)
 
-    # 5 older-enqueued, LOW-band, genuinely FRESH filler rows -- these are
-    # what a bounded (limit=2) expire_stale() sweep actually reaches first.
+    # 5 older-enqueued, LOW-band, genuinely FRESH filler rows (a REAL,
+    # verified-fresh event_time each, matching their enqueue time -- Task
+    # 136B: unknown event-time evidence is no longer treated as "fresh via
+    # enqueue time", so these must carry real, positively-fresh evidence to
+    # exercise "fresh rows still deliver" meaningfully) -- these are what a
+    # bounded (limit=2) expire_stale() sweep actually reaches first.
+    filler_accessions = [f"0001193125-26-{386800 + i}" for i in range(5)]
     fillers = [
-        _enq_with_band(ob, symbol="DELL", accession=f"0001193125-26-{386800 + i}",
+        _enq_with_band(ob, symbol="DELL", accession=filler_accessions[i],
                        enqueued_at=now - timedelta(minutes=30 - i), band="LOW")
         for i in range(5)
     ]
+    filler_event_times = {
+        filler_accessions[i]: now - timedelta(minutes=30 - i) for i in range(5)
+    }
     # the ACN-shaped card: enqueued LAST (so the bounded-by-enqueue-order
     # sweep never reaches it), HIGH band (so pending() selects it FIRST
     # despite that), and genuinely stale (a 2024 event_time).
@@ -280,11 +302,11 @@ def test_high_band_stale_card_cannot_jump_the_bounded_expire_sweep(ledger_path):
                                 enqueued_at=now - timedelta(seconds=1), band="HIGH")
 
     def _event_time(event_id):
-        # only the ACN card resolves to a real (stale) event time -- the
-        # fillers have no known event_time, matching real behaviour where
-        # get_event() returns None for an id it doesn't recognise.
         if "0001467373-24-000206" in event_id:
             return datetime(2024, 7, 15, 20, 14, 1, tzinfo=UTC)
+        for acc, evt in filler_event_times.items():
+            if acc in event_id:
+                return evt
         return None
 
     snd = RecordingSender()

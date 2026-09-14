@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
 from talonx_ingest.edgar.client import EdgarClient
@@ -229,7 +230,10 @@ class IntelligenceService:
         )
         return res
 
-    async def deliver_cycle(self, *, now: datetime | None = None) -> dict | None:
+    async def deliver_cycle(
+        self, *, now: datetime | None = None,
+        clock: "Callable[[], datetime] | None" = None,
+    ) -> dict | None:
         """One bounded intelligence-card delivery pass, inside the poll loop.
 
         Uses the EXISTING official transport (``talonx_dispatch.telegram_client``
@@ -242,6 +246,17 @@ class IntelligenceService:
           a DIGEST card is not sent as if it were IMMEDIATE.
         * a hard ``asyncio.wait_for`` timeout means a slow/backing-off transport
           never blocks source polling.
+
+        Task 136B: ``clock`` is the per-row FINAL send-decision clock threaded
+        through to ``process_pending``/``process_digest`` (see their own
+        docstrings) -- it is intentionally a SEPARATE parameter from ``now``.
+        Real production callers pass neither: ``now`` resolves to a fresh
+        real read below, and ``clock`` defaults to a real fresh read at each
+        row's own decision too. A caller that explicitly pins ``now`` (every
+        existing test) gets that SAME pinned value reused as the default
+        clock as well, so a historical ``now=...`` is never silently mixed
+        with real wall-clock time -- pass ``clock`` explicitly to test the
+        clock-advances-mid-batch behaviour itself.
         """
         if self.stores is None:
             return None
@@ -249,10 +264,13 @@ class IntelligenceService:
             TelegramSenderAdapter, process_digest, process_pending,
         )
 
+        _now_was_given = now is not None
         # (1D) decision time = NOW, at drain, never the (possibly minutes-old)
         # poll-cycle timestamp -- the `now` arg is ignored on purpose except in
         # tests that pin it.
         now = now or datetime.now(timezone.utc)
+        if clock is None:
+            clock = (lambda: now) if _now_was_given else (lambda: datetime.now(timezone.utc))
 
         enabled = (
             bool(self.config.deliver_intelligence_cards)
@@ -262,11 +280,20 @@ class IntelligenceService:
         sender = TelegramSenderAdapter() if enabled else _InertSender()
 
         def _event_time(event_id: str):
-            try:
-                ev = self.stores.events.get_event(event_id)
-                return getattr(ev, "accepted_at_utc", None) if ev is not None else None
-            except Exception:  # noqa: BLE001
-                return None
+            # Task 136B: a clean `None` return means "looked it up, there is
+            # genuinely no publication evidence for this event" (event not
+            # found, or found with accepted_at_utc unset) -- a PERMANENT,
+            # not transient, unavailability. A real lookup FAILURE (e.g. a
+            # DB error) is deliberately NOT caught here and left to
+            # propagate, so outbox._expire_row_if_stale can tell the two
+            # apart: it treats a raised exception as a transient, retryable
+            # DEFER, and a clean None as UNQUALIFIED (no fallback to
+            # enqueue time as evidence of freshness). Previously this
+            # caught every exception and returned None either way, which
+            # silently collapsed both cases into "fall back to enqueue
+            # time" -- the exact gap Task 136B closes.
+            ev = self.stores.events.get_event(event_id)
+            return getattr(ev, "accepted_at_utc", None) if ev is not None else None
 
         summary: dict = {"mode": mode, "at_utc": now.isoformat(), "ok": True}
         try:
@@ -280,6 +307,13 @@ class IntelligenceService:
                         enabled and self.config.deliver_cards_enforce_age_cutoff),
                     event_time_lookup=_event_time,
                     expire_scan_limit=self.config.expire_scan_max_rows_per_cycle,
+                    # Task 136B: a genuinely fresh read at EACH row's own send
+                    # decision, not the single `now` resolved once above for
+                    # this whole cycle -- a card can cross its expiry
+                    # boundary while it waits its turn in a real batch. See
+                    # this method's own docstring for why `clock` (not
+                    # `now`) is what varies between production and a test.
+                    clock=clock,
                 ),
                 timeout=self.config.deliver_cards_timeout_seconds,
             )
@@ -293,6 +327,7 @@ class IntelligenceService:
                         enabled and self.config.deliver_cards_enforce_age_cutoff),
                     event_time_lookup=_event_time,
                     expire_scan_limit=self.config.expire_scan_max_rows_per_cycle,
+                    clock=clock,
                 ),
                 timeout=self.config.deliver_cards_timeout_seconds,
             )
@@ -302,6 +337,7 @@ class IntelligenceService:
                     "simulated": res.simulated, "retried": res.retried,
                     "failed": res.failed, "ambiguous": res.ambiguous,
                     "expired": res.expired,
+                    "unqualified": res.unqualified,
                     "held_reason": res.held_reason,
                     "message_ids": res.message_ids,
                     "row_errors": res.errors,

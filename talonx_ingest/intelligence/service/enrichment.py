@@ -58,21 +58,47 @@ _COMPARISON_PARTIAL_FLAGS = {"low_quality_comparison"}
 
 
 def _event_as_of_date(ev) -> date:
-    """Task 136A: the causal point-in-time to compute an issuer's insider-
-    activity rolling aggregates/clusters AS OF, for the card describing
-    ``ev``. Previously every ``build_insider_activity`` call in this file
-    passed no ``as_of_date`` at all, which defaults to "the most recent
-    transaction/filing date known for this symbol" -- for a filing
-    enriched the same day it was published that is a harmless proxy for
-    "today", but for a HISTORICAL filing enriched long after publication
-    (a broad-discovery backfill) it silently means "as of whatever is
-    freshest in the DB right now", years after the filing's own date --
-    blending CURRENT issuer-wide activity into a historical filing's "why
-    surfaced"/"what changed" without disclosure (confirmed root cause of
-    the Task 136A ACN incident: a 2024 filing's card cited a $2,244,878
-    "largest transaction" and a "4 distinct insiders" cluster that belong
-    to a DIFFERENT, much more recent window than the 30-day-as-of-2024
-    window the SAME card's "what changed" section drew from).
+    """Task 136A (scope corrected by Task 136B): the causal point-in-time
+    to compute an issuer's insider-activity rolling aggregates/clusters AS
+    OF, for THIS function's two callers only (``_confirm_insider`` and
+    ``_enqueue_delivery`` below) -- the ``InsiderActivity`` object that
+    feeds the rendered card's **"What changed:"** section
+    (``renderer._insider_facts``: the "Insiders (30d): N reported
+    open-market sale(s)" / "Largest single open-market transaction: $X"
+    lines). Previously both call sites passed no ``as_of_date`` at all,
+    which defaults to "the most recent transaction/filing date known for
+    this symbol" -- for a filing enriched the same day it was published
+    that is a harmless proxy for "today", but for a HISTORICAL filing
+    enriched long after publication (a broad-discovery backfill) it
+    silently means "as of whatever is freshest in the DB right now",
+    years after the filing's own date. Confirmed root cause of the actual
+    Task 136A ACN "What changed" defect: a 2024 filing's card showed a
+    "Largest single open-market transaction: $12k" / "Insiders (30d): 1
+    reported open-market sale(s)" pair computed as-of the DAY THE
+    BACKFILL RAN (2026-09), not the filing's own 2024 date.
+
+    Task 136B correction -- this does NOT cover the card's separate
+    **"Why surfaced:"** section (``renderer._reason_lines`` /
+    ``card.significance_reasons``, including that same card's own
+    "$2,244,878 was reported" / "N distinct insiders ... within 30 days"
+    / "N distinct disclosure types ... within 7 days" lines): those are
+    produced by ``significance/rules.py``'s ``insider_activity()`` and
+    ``simultaneous_events()`` from a SEPARATE ``InsiderActivity`` object
+    built inside ``significance/pipeline.py``'s own
+    ``_insider_activity_for_filing`` (``as_of = event.accepted_at_utc``,
+    already the event's own date) -- that path was event-relative and
+    correct BEFORE this fix and is untouched by it. The two sections can
+    therefore cite different-looking but individually correct figures for
+    the same filing (one as-of the filing's own date, one previously
+    as-of-today) -- see Task 136B's addendum to the Task 136A report for
+    the corrected per-line provenance.
+
+    Note this is DATE granularity (``event.accepted_at_utc.date()``), not
+    an intraday cutoff -- the rolling-window boundaries this feeds
+    (10/30/90 CALENDAR days) are computed against a calendar day, not a
+    time-of-day, unlike the full-datetime ``as_of`` used elsewhere in
+    ``significance/pipeline.py`` (event rarity, simultaneous-event
+    counting) for finer-grained causal ordering.
 
     Uses the filing's own SEC acceptance time when available (the
     authoritative causal timestamp for everything else in this system);

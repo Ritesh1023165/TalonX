@@ -14,6 +14,7 @@ state (``EXECUTION_INDEPENDENCE_AUDIT.md``).
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Protocol
@@ -36,6 +37,10 @@ from talonx_ingest.intelligence.delivery.outbox import (
     DeliveryOutbox,
     DeliveryRow,
     EnqueueResult,
+    _FRESH_DEFER,
+    _FRESH_EXPIRED,
+    _FRESH_OK,
+    _FRESH_UNQUALIFIED,
 )
 from talonx_ingest.intelligence.delivery.render_model import TelegramIntelligenceMessage
 from talonx_ingest.intelligence.delivery.renderer import (
@@ -185,6 +190,7 @@ class DrainResult:
     retried: int = 0
     failed: int = 0
     expired: int = 0
+    unqualified: int = 0      # Task 136B: no usable source-time evidence -- SUPPRESSED, distinct from EXPIRED
     held: int = 0             # left PENDING because delivery is disabled
     held_reason: str | None = None
     simulated: int = 0        # would-send count, outbox NOT mutated
@@ -192,6 +198,7 @@ class DrainResult:
     skipped_not_configured: bool = False
     delivery_ids: list[str] = field(default_factory=list)
     expired_ids: list[str] = field(default_factory=list)
+    unqualified_ids: list[str] = field(default_factory=list)
     simulated_ids: list[str] = field(default_factory=list)
     ambiguous_ids: list[str] = field(default_factory=list)
     message_ids: dict = field(default_factory=dict)     # delivery_id -> transport message id
@@ -311,9 +318,22 @@ async def process_pending(
     event_time_lookup=None,
     stale_in_flight_seconds: float = 90.0,
     expire_scan_limit: int | None = None,
+    clock: "Callable[[], datetime] | None" = None,
 ) -> DrainResult:
     """Process due PENDING rows, CRITICAL first. Persist-before-send is
     guaranteed by ``enqueue``. Safe to call repeatedly and after a restart.
+
+    Task 136B: ``clock`` is the injectable UTC clock used for the FINAL,
+    per-row freshness decision immediately before each send -- distinct
+    from ``now`` (used for row SELECTION / the bulk expire_stale sweep /
+    claim timestamps elsewhere). Production leaves it ``None`` and gets a
+    fresh ``datetime.now(timezone.utc)`` read at each row's decision
+    point (a row selected while fresh can still cross its cutoff while
+    waiting in a large batch -- using a single stale ``now`` for the
+    whole batch, as an earlier fix did to satisfy test determinism,
+    reintroduced exactly that gap). Tests pass a small stateful callable
+    (e.g. one that advances a controlled starting time) to deterministically
+    prove that behaviour without depending on real wall-clock timing.
 
     ``mode``:
       * ``"enabled"``  -- the ONLY mode that can produce ``SENT``. A row is
@@ -355,9 +375,10 @@ async def process_pending(
     if enforce_age_cutoff:
         result.expired_ids = outbox.expire_stale(
             now=now, max_age_seconds=max_age_seconds, event_time_lookup=event_time_lookup,
-            limit=expire_scan_limit,
+            limit=expire_scan_limit, unqualified_ids_out=result.unqualified_ids,
         )
         result.expired = len(result.expired_ids)
+        result.unqualified = len(result.unqualified_ids)
 
     rows = outbox.pending(route=route, now=now, limit=limit)
 
@@ -383,6 +404,17 @@ async def process_pending(
 
     import uuid as _uuid
 
+    # Task 136B: `clock` defaults to REUSING the drain's own resolved
+    # `now` (not a fresh real-time read) when the caller does not pass
+    # one explicitly -- this preserves exact backward compatibility for
+    # every existing caller/test that pins `now` for determinism and
+    # never mixes it with real wall time. Production (runner.py's
+    # deliver_cycle) explicitly passes clock=lambda: datetime.now(...)
+    # so it gets a genuinely fresh per-row read; a test that wants to
+    # prove the boundary-crossing behaviour passes its own controlled/
+    # advancing callable.
+    _clock = clock if clock is not None else (lambda: now)
+
     for row in rows:
         send_now = datetime.now(timezone.utc)          # (1D) per-row decision time
         # Task 136A: the LAST-MOMENT freshness gate, independent of whether
@@ -393,19 +425,30 @@ async def process_pending(
         # band rows the bounded sweep processes first. Without this, queue
         # creation time (today) stands in for source freshness (possibly
         # years old) purely because the two scans disagree on order.
+        #
+        # Task 136B: this decision MUST use a freshly-read clock, not the
+        # single drain-level `now` captured once at the top of the call --
+        # a card can cross its expiry boundary while it waits its turn in a
+        # large batch, and a stale reused `now` would let it pass anyway.
+        # `clock()` defaults to a real fresh `datetime.now(timezone.utc)`
+        # read in production; tests inject a controlled/advancing callable.
         if enforce_age_cutoff:
-            # uses the cycle's own `now` (the same clock expire_stale() used
-            # above), NOT send_now -- freshness must be judged on one
-            # consistent clock per drain cycle, matching the injected/test
-            # clock a caller may have passed rather than a fresh wall-clock
-            # read per row.
-            reason = outbox.expire_one_if_stale(
-                row, now=now, max_age_seconds=max_age_seconds,
+            outcome = outbox.expire_one_if_stale(
+                row, now=_clock(), max_age_seconds=max_age_seconds,
                 event_time_lookup=event_time_lookup,
             )
-            if reason is not None:
-                result.expired += 1
-                result.expired_ids.append(row.delivery_id)
+            if outcome.disposition == _FRESH_DEFER:
+                # transient lookup failure -- row left untouched, PENDING,
+                # naturally retried on a later drain. Not counted as
+                # expired/unqualified; it is neither.
+                continue
+            if outcome.disposition in (_FRESH_EXPIRED, _FRESH_UNQUALIFIED):
+                if outcome.disposition == _FRESH_EXPIRED:
+                    result.expired += 1
+                    result.expired_ids.append(row.delivery_id)
+                else:
+                    result.unqualified += 1
+                    result.unqualified_ids.append(row.delivery_id)
                 continue
         attempt_id = _uuid.uuid4().hex[:16]
         # (1B) persist-before-network: claim PENDING -> IN_FLIGHT, committed,
@@ -542,6 +585,7 @@ async def process_digest(
     event_time_lookup=None,
     stale_in_flight_seconds: float = 90.0,
     expire_scan_limit: int | None = None,
+    clock: "Callable[[], datetime] | None" = None,
 ) -> DrainResult:
     """Aggregate + deliver the DIGEST route on a schedule.
 
@@ -551,6 +595,13 @@ async def process_digest(
     sent once, and all marked SENT referencing the digest id. Restart-safe:
     the last-sent time-bucket is persisted, so a restart in the same window
     does not re-send.
+
+    Task 136B: ``clock`` (see ``process_pending``) is read fresh a SECOND
+    time immediately before the claimed batch is actually rendered/sent --
+    a card can be fresh when first selected for this digest and still cross
+    its cutoff while the batch is being assembled. Any card that falls out
+    of eligibility at that final check is excluded from the digest and
+    never marked SENT; if none remain, nothing is sent at all.
     """
     if mode not in _VALID_MODES:
         raise InvalidDeliveryMode(f"delivery mode {mode!r} invalid")
@@ -567,30 +618,51 @@ async def process_digest(
     if enforce_age_cutoff:
         result.expired_ids = outbox.expire_stale(
             now=now, max_age_seconds=max_age_seconds, event_time_lookup=event_time_lookup,
-            limit=expire_scan_limit,
+            limit=expire_scan_limit, unqualified_ids_out=result.unqualified_ids,
         )
         result.expired = len(result.expired_ids)
+        result.unqualified = len(result.unqualified_ids)
+
+    # Task 136B: `clock` defaults to REUSING the drain's own resolved
+    # `now` (not a fresh real-time read) when the caller does not pass
+    # one explicitly -- this preserves exact backward compatibility for
+    # every existing caller/test that pins `now` for determinism and
+    # never mixes it with real wall time. Production (runner.py's
+    # deliver_cycle) explicitly passes clock=lambda: datetime.now(...)
+    # so it gets a genuinely fresh per-row read; a test that wants to
+    # prove the boundary-crossing behaviour passes its own controlled/
+    # advancing callable.
+    _clock = clock if clock is not None else (lambda: now)
 
     rows = outbox.digest_pending(now=now, limit=limit)
-    # Task 136A: the same last-moment freshness gate as process_pending --
-    # digest_pending() orders/selects independently of the bulk expire_
+    # Task 136A/136B: the same last-moment freshness gate as process_pending
+    # -- digest_pending() orders/selects independently of the bulk expire_
     # stale() sweep above, so a stale row can otherwise reach the digest
     # batch before the sweep (bounded, enqueue-time-ordered) reaches it.
     # Filtered out BEFORE the due/disabled/simulate checks below so a
     # stale row is never counted as "held" either -- it is independently
-    # stale regardless of whether this digest bucket is due.
+    # stale regardless of whether this digest bucket is due. This is an
+    # early elimination pass only -- see the SECOND, final-decision-time
+    # check right before the claimed batch is actually sent, below.
     if enforce_age_cutoff and rows:
         fresh_rows = []
         for r in rows:
-            reason = outbox.expire_one_if_stale(
-                r, now=now, max_age_seconds=max_age_seconds,
+            outcome = outbox.expire_one_if_stale(
+                r, now=_clock(), max_age_seconds=max_age_seconds,
                 event_time_lookup=event_time_lookup,
             )
-            if reason is not None:
+            if outcome.disposition == _FRESH_OK:
+                fresh_rows.append(r)
+            elif outcome.disposition == _FRESH_DEFER:
+                # transient lookup failure -- leave this row PENDING,
+                # untouched, out of THIS digest attempt, retried later.
+                continue
+            elif outcome.disposition == _FRESH_EXPIRED:
                 result.expired += 1
                 result.expired_ids.append(r.delivery_id)
-            else:
-                fresh_rows.append(r)
+            else:  # _FRESH_UNQUALIFIED
+                result.unqualified += 1
+                result.unqualified_ids.append(r.delivery_id)
         rows = fresh_rows
     if not due:
         result.held = len(rows)
@@ -625,7 +697,46 @@ async def process_digest(
     claimed = outbox.claim_digest_batch([r.delivery_id for r in rows], digest_id, now=now)
     if not claimed:
         return result
-    text = _digest_text_from_rows([r for r in rows if r.delivery_id in claimed], now)
+
+    # Task 136B: FINAL-decision-time re-validation. A row can be fresh at
+    # the early filter above and still cross its cutoff while this batch
+    # was being claimed/assembled (rendering + the checks above take real
+    # time in production; a test can simulate the same gap by advancing
+    # its injected clock between digest_pending() and here). Re-check each
+    # CLAIMED row against a freshly read clock and rebuild the digest from
+    # only the still-eligible survivors -- an excluded row is never part
+    # of the sent digest and never marked SENT alongside it.
+    rows_by_id = {r.delivery_id: r for r in rows}
+    send_time = _clock()
+    still_eligible: list[str] = []
+    for did in claimed:
+        outcome = outbox.expire_one_if_stale(
+            rows_by_id[did], now=send_time, max_age_seconds=max_age_seconds,
+            event_time_lookup=event_time_lookup,
+        )
+        if outcome.disposition == _FRESH_OK:
+            still_eligible.append(did)
+        elif outcome.disposition == _FRESH_DEFER:
+            # transient -- release our claim so the row returns to PENDING
+            # and a later cycle can retry it; not a verdict either way.
+            outbox.release_claim(did, digest_id, now=send_time)
+        elif outcome.disposition == _FRESH_EXPIRED:
+            result.expired += 1
+            result.expired_ids.append(did)
+        else:  # _FRESH_UNQUALIFIED
+            result.unqualified += 1
+            result.unqualified_ids.append(did)
+    claimed = still_eligible
+    if not claimed:
+        # Every claimed card fell out of eligibility before the digest
+        # could actually be sent -- send nothing (no transport call). The
+        # excluded rows above are already in their correct terminal
+        # (EXPIRED/SUPPRESSED) or recoverable (released to PENDING) state.
+        # The bucket is deliberately NOT advanced here, so a still-fresh
+        # set of rows can still produce a real digest send within the same
+        # window on a subsequent call.
+        return result
+    text = _digest_text_from_rows([rows_by_id[did] for did in claimed], now)
     synthetic = types.SimpleNamespace(
         delivery_id=digest_id, text=text, parse_mode=None, disposition="NEW",
         band=None, route="DIGEST", symbol="DIGEST", event_id=digest_id)
