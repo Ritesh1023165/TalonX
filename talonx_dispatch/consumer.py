@@ -221,6 +221,7 @@ class DispatchAgent:
         telegram_client: TelegramClient | None = None,
         watchlist_store: TickerWatchlistStore | None = None,
         extra_resolvers=None,
+        message_resolvers=None,
     ):
         self.config = config or DispatchConfig()
         self.store = store or AuditStore(self.config.audit_db_path)
@@ -236,7 +237,7 @@ class DispatchAgent:
         # Original app passing None keeps behaviour byte-identical.
         self.reply_listener = TelegramReplyListener(
             self.store, self.config, self.telegram_client, dispatch_agent=self,
-            extra_resolvers=extra_resolvers,
+            extra_resolvers=extra_resolvers, message_resolvers=message_resolvers,
         )
         self._client = None
         self._stop_event = asyncio.Event()

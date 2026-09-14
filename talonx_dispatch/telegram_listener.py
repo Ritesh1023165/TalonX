@@ -202,6 +202,7 @@ class TelegramReplyListener:
         poll_telemetry=None,
         bot_factory: BotFactory | None = None,
         extra_resolvers=None,
+        message_resolvers=None,
     ):
         self.store = store
         self.config = config or DispatchConfig()
@@ -211,6 +212,13 @@ class TelegramReplyListener:
         # replied and handling stops. The Original application passes none, so
         # this list is empty and the existing behaviour is byte-identical.
         self.extra_resolvers = list(extra_resolvers or [])
+        # Task 138 Workstream 3: ordered list of callables `Message -> str |
+        # None`, tried BEFORE `extra_resolvers` -- receives the FULL inbound
+        # `python-telegram-bot` ``Message`` object (not just its text), so a
+        # resolver can read ``message.reply_to_message.message_id`` for true
+        # message-ID correlation (a plain text-only resolver cannot). Same
+        # additive posture: empty by default, byte-identical when unused.
+        self.message_resolvers = list(message_resolvers or [])
         self.telegram_client = telegram_client or TelegramClient(self.config)
         # Optional -- see module docstring. Gives /ping access to
         # DispatchAgent.started_at (uptime) and its live Redis client (WS
@@ -339,6 +347,25 @@ class TelegramReplyListener:
         if message.text.strip().lower() in ("/ping", "ping"):
             await self._handle_ping()
             return
+
+        for resolver in self.message_resolvers:
+            try:
+                reply = resolver(message)
+            except Exception:  # noqa: BLE001 -- a broken resolver must never kill the poller
+                logger.exception("message reply resolver raised; ignoring")
+                continue
+            if reply is not None:
+                # plain=True (parse_mode=None): a message_resolvers reply can
+                # carry arbitrary, uncontrolled SEC-sourced text (company
+                # names, filing text, URLs) that is NOT guaranteed
+                # Markdown-safe -- sending it under MARKDOWN parse mode risks
+                # a Telegram "can't parse entities" send failure on a stray
+                # unescaped _ / * / ` / [ character. See
+                # talonx_ingest.intelligence.delivery.reply_correlation's own
+                # module docstring for the matching rationale on its side
+                # (it already strips HTML for the same reason).
+                await self._reply(reply, plain=True)
+                return
 
         for resolver in self.extra_resolvers:
             try:

@@ -1276,6 +1276,24 @@ async def main() -> None:
         on_error=lambda exc: logger.warning("Experimental D/X/R/E reply resolver: %s", exc)
     )
     exp_resolvers = [_dxre_resolver] if _dxre_resolver is not None else None
+
+    # Task 138 Workstream 3: the Intelligence informational "reply details"
+    # resolver -- SAME read-only (file:...?mode=ro) pattern as the
+    # Experimental one directly above, against ingestion_ledger.db
+    # (Intelligence's own store, owned/written only by the Intelligence
+    # process). This is a message_resolvers entry (receives the full
+    # inbound Message, not just its text) so it can read
+    # reply_to_message.message_id for true message-ID correlation.
+    from talonx_ingest.intelligence.delivery.reply_correlation import (
+        build_intelligence_details_resolver,
+    )
+
+    intel_reply_reader, _intel_details_resolver = build_intelligence_details_resolver(
+        on_error=lambda exc: logger.warning("Intelligence details reply resolver: %s", exc)
+    )
+    intel_message_resolvers = (
+        [_intel_details_resolver] if _intel_details_resolver is not None else None
+    )
     if not args.skip_dispatch:
         try:
             # Shares the SAME watchlist_store instance already created
@@ -1283,7 +1301,8 @@ async def main() -> None:
             # file) -- same one-connection-per-process convention
             # paper_trading_engine's construction already follows.
             dispatch_agent = DispatchAgent(
-                watchlist_store=watchlist_store, extra_resolvers=exp_resolvers
+                watchlist_store=watchlist_store, extra_resolvers=exp_resolvers,
+                message_resolvers=intel_message_resolvers,
             )
         except Exception as exc:  # noqa: BLE001 -- audit DB init failure shouldn't crash the whole run
             logger.warning(
@@ -1625,6 +1644,8 @@ async def main() -> None:
             dispatch_agent.store.close()
         if exp_reply_store is not None:  # Task 100B: D/X/R/E read-only bridge handle
             exp_reply_store.close()
+        if intel_reply_reader is not None:  # Task 138: Intelligence details read-only bridge handle
+            intel_reply_reader.close()
         if paper_store is not None:
             paper_store.close()
         watchlist_store.close()
