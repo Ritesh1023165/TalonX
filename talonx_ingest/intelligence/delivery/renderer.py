@@ -31,6 +31,7 @@ from talonx_ingest.intelligence.delivery.config import (
     ROUTE_IMMEDIATE,
     SECTION_PRIORITY,
     TIER_COMPACT,
+    TIER_CONCISE,
     TIER_DIGEST,
     TIER_EXPANDED,
     is_immediate,
@@ -305,6 +306,7 @@ def _render(
     tier: str,
     what_changed: dict | None,
     insider_activity,
+    route_override: str | None = None,
 ) -> TelegramIntelligenceMessage:
     expanded = tier == TIER_EXPANDED
     reason_limit = MAX_REASONS_EXPANDED if expanded else MAX_REASONS_COMPACT
@@ -325,7 +327,14 @@ def _render(
     text, truncated, dropped = _assemble(sections, budget=budget)
 
     band = card.significance
+    # Task 138: `route_override` (from notification_policy.classify_
+    # disposition) is a NARROWING/re-routing of the band-derived route
+    # only -- e.g. a HIGH-band card without a substantive trigger routes
+    # DIGEST instead of the band-implied IMMEDIATE. Never widens a route
+    # the band itself would not have allowed.
     route = ROUTE_IMMEDIATE if (band is not None and is_immediate(band)) else ROUTE_DIGEST
+    if route_override in (ROUTE_IMMEDIATE, ROUTE_DIGEST):
+        route = route_override
     return TelegramIntelligenceMessage(
         card_id=card.alert_id,
         event_id=card.event_id,
@@ -343,18 +352,92 @@ def _render(
     )
 
 
-def render_compact(card, *, what_changed: dict | None = None, insider_activity=None):
-    return _render(card, tier=TIER_COMPACT, what_changed=what_changed, insider_activity=insider_activity)
+def render_concise(card, *, disposition_reason: str | None = None, now: datetime | None = None):
+    """Task 138 Workstream 2: the compact IMMEDIATE-disposition shape --
+    see docs/research/NOTIFICATION_POLICY.md §7. Target 3-5 short lines;
+    always route=IMMEDIATE (this shape is only ever used for a card the
+    notification policy already decided warrants interruption -- it does
+    not itself re-derive eligibility). Full facts, aggregation windows,
+    and the filing link move to the reply-for-details response (Workstream
+    3), not this initial push. ``disposition_reason`` (the specific
+    substantive trigger notification_policy.classify_disposition found)
+    is preferred over the generic first significance reason when given,
+    so the line always names the CONCRETE thing that qualified, never a
+    vague "significant filing" placeholder.
+
+    "Source" shows the event's own accepted_at_utc and its age computed
+    at RENDER time (a real wall-clock read here, not a DB-read timestamp
+    presented as fresh) -- kept explicitly labelled as source age only;
+    it does not claim anything about the SEPARATE send-time freshness
+    check (Task 136B), which runs independently right before delivery."""
+    now = now or datetime.now(timezone.utc)
+    reasons = list(card.significance_reasons)
+    summary = (disposition_reason or (reasons[0] if reasons else None)
+              or EVENT_TYPE_LABEL.get(card.event_type, card.event_type.value))
+    summary = _trim(summary, 180)
+
+    ts = card.timestamp_utc
+    if ts is not None:
+        ts = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+        age_s = (now - ts).total_seconds()
+        age_h = age_s / 3600.0
+        age_txt = f"{age_h:.1f}h" if age_h >= 1 else f"{max(0, age_s) / 60:.0f}m"
+        source_line = f"Source: {_iso_min(ts)} (source age: {age_txt})"
+    else:
+        source_line = "Source: time unknown"
+
+    event_label = EVENT_TYPE_LABEL.get(card.event_type, card.event_type.value)
+    disclaimer = card.disclaimer or DISCLAIMER_SHORT
+    lines = [
+        f"[INFO] {bold(esc(card.symbol))} — {esc(event_label)}",
+        esc(summary),
+        esc(source_line),
+        italic('Reply "details" for facts and filing link.'),
+        italic("ℹ️ " + esc(disclaimer)),
+    ]
+    text = "\n".join(lines)
+    ev_urls = [card.source_url] if card.source_url else []
+    return TelegramIntelligenceMessage(
+        card_id=card.alert_id,
+        event_id=card.event_id,
+        symbol=card.symbol,
+        band=card.significance,
+        tier=TIER_CONCISE,
+        route=ROUTE_IMMEDIATE,
+        text=text,
+        content_hash=content_hash(text),
+        char_len=len(text),
+        truncated=False,
+        dropped_sections=(),
+        evidence_urls=tuple(ev_urls),
+        disclaimer_present=True,   # policy doc §7: boilerplate FACTS move
+                                    # to the details reply; the standing
+                                    # "information, not advice" safety
+                                    # disclaimer itself is never dropped,
+                                    # matching this module's own existing
+                                    # invariant -- 5 lines total, still
+                                    # within the compact target.
+    )
 
 
-def render_expanded(card, *, what_changed: dict | None = None, insider_activity=None):
-    return _render(card, tier=TIER_EXPANDED, what_changed=what_changed, insider_activity=insider_activity)
+def render_compact(card, *, what_changed: dict | None = None, insider_activity=None,
+                   route_override: str | None = None):
+    return _render(card, tier=TIER_COMPACT, what_changed=what_changed,
+                   insider_activity=insider_activity, route_override=route_override)
 
 
-def render_for_card(card, *, what_changed: dict | None = None, insider_activity=None):
+def render_expanded(card, *, what_changed: dict | None = None, insider_activity=None,
+                    route_override: str | None = None):
+    return _render(card, tier=TIER_EXPANDED, what_changed=what_changed,
+                   insider_activity=insider_activity, route_override=route_override)
+
+
+def render_for_card(card, *, what_changed: dict | None = None, insider_activity=None,
+                    route_override: str | None = None):
     """Pick the tier by band: HIGH / CRITICAL → expanded, else compact."""
     tier = TIER_EXPANDED if card.significance in EXPANDED_BANDS else TIER_COMPACT
-    return _render(card, tier=tier, what_changed=what_changed, insider_activity=insider_activity)
+    return _render(card, tier=tier, what_changed=what_changed,
+                   insider_activity=insider_activity, route_override=route_override)
 
 
 # ---------------------------------------------------------------------------

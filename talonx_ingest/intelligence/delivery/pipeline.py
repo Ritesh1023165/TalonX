@@ -45,6 +45,7 @@ from talonx_ingest.intelligence.delivery.outbox import (
 from talonx_ingest.intelligence.delivery.render_model import TelegramIntelligenceMessage
 from talonx_ingest.intelligence.delivery.renderer import (
     render_compact,
+    render_concise,
     render_expanded,
     render_for_card,
 )
@@ -214,12 +215,19 @@ def render_card(
     what_changed: dict | None = None,
     insider_activity=None,
     tier: str | None = None,
+    route_override: str | None = None,
+    disposition_reason: str | None = None,
 ) -> TelegramIntelligenceMessage:
+    if tier == "CONCISE":
+        return render_concise(card, disposition_reason=disposition_reason)
     if tier == TIER_COMPACT:
-        return render_compact(card, what_changed=what_changed, insider_activity=insider_activity)
+        return render_compact(card, what_changed=what_changed, insider_activity=insider_activity,
+                              route_override=route_override)
     if tier == TIER_EXPANDED:
-        return render_expanded(card, what_changed=what_changed, insider_activity=insider_activity)
-    return render_for_card(card, what_changed=what_changed, insider_activity=insider_activity)
+        return render_expanded(card, what_changed=what_changed, insider_activity=insider_activity,
+                               route_override=route_override)
+    return render_for_card(card, what_changed=what_changed, insider_activity=insider_activity,
+                           route_override=route_override)
 
 
 def enqueue_card(
@@ -233,13 +241,25 @@ def enqueue_card(
     metrics: DeliveryMetrics | None = None,
     render_version: str = RENDER_VERSION,
     now: datetime | None = None,
+    route_override: str | None = None,
+    disposition_reason: str | None = None,
 ) -> EnqueueResult:
     """Render + claim-safety + update-policy + durable persist. Raises
     ``PredictiveLanguageError`` (fail closed) if the rendered text carries
-    prohibited claim language — a bad message never reaches the outbox."""
+    prohibited claim language — a bad message never reaches the outbox.
+
+    Task 138: ``route_override`` (``"IMMEDIATE"``/``"DIGEST"``/``None``)
+    optionally narrows the band-derived route -- see notification_policy.
+    py's ``classify_disposition``; a ``DASHBOARD_ONLY`` decision from that
+    policy is handled by the CALLER not calling this function at all, not
+    by a value passed here. ``disposition_reason`` (used only when
+    ``tier="CONCISE"``) is the specific substantive trigger that
+    qualified this card for IMMEDIATE, shown verbatim instead of a
+    generic reason line."""
     now = now or datetime.now(timezone.utc)
     message = render_card(
-        card, what_changed=what_changed, insider_activity=insider_activity, tier=tier
+        card, what_changed=what_changed, insider_activity=insider_activity, tier=tier,
+        route_override=route_override, disposition_reason=disposition_reason,
     )
     if metrics is not None:
         metrics.record_render(message.band.value if message.band else None, truncated=message.truncated)

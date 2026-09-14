@@ -35,6 +35,12 @@ DELIVERY_CHANNEL = "telegram"            # the channel component of delivery_id
 TIER_COMPACT = "COMPACT"
 TIER_EXPANDED = "EXPANDED"
 TIER_DIGEST = "DIGEST"
+# Task 138 Workstream 2: the compact, 3-5-line IMMEDIATE-disposition
+# shape -- see docs/research/NOTIFICATION_POLICY.md §7. Distinct from
+# TIER_COMPACT (still the full multi-section layout, just with tighter
+# per-section limits) -- CONCISE drops straight to one sentence + source
+# + a reply-for-details pointer.
+TIER_CONCISE = "CONCISE"
 
 #: bands rendered EXPANDED by default (HIGH/CRITICAL); others render COMPACT.
 EXPANDED_BANDS: frozenset[SignificanceBand] = frozenset(

@@ -382,7 +382,37 @@ class EnrichmentEngine:
             except Exception:  # noqa: BLE001
                 insider_activity = None
 
+        # Task 138 Workstream 2: notification-policy disposition -- see
+        # docs/research/NOTIFICATION_POLICY.md. Computed from the SAME
+        # already-persisted significance reasons and insider_activity
+        # object used for the card itself; never re-derives materiality,
+        # only decides whether this HIGH/MEDIUM-band card actually
+        # interrupts the operator (IMMEDIATE), waits for the digest
+        # (DIGEST), or never enters the Telegram outbox at all
+        # (DASHBOARD_ONLY -- the event/enrichment/significance record
+        # itself is entirely unaffected and remains dashboard-queryable).
+        from talonx_ingest.intelligence.delivery.notification_policy import (
+            DISPOSITION_DASHBOARD_ONLY,
+            classify_disposition,
+        )
+
+        decision = classify_disposition(
+            band=sig.band if sig is not None else None,
+            reason_codes=[r.code for r in sig.reasons] if sig is not None else (),
+            insider_activity=insider_activity,
+        )
+        if decision.disposition == DISPOSITION_DASHBOARD_ONLY:
+            self.stores.processing.set_substate(
+                ev.event_id, delivery_state=ProcessingStateStore.DONE,
+                detail=f"96F DASHBOARD_ONLY: {decision.reason}")
+            self.metrics.delivery_suppressed += 1
+            return ProcessingStateStore.DONE, None
+
         allow_update = prior_row.delivery_state == ProcessingStateStore.DONE
+        # Task 138 Workstream 2 §7: an IMMEDIATE card uses the compact
+        # 3-5-line CONCISE shape -- DIGEST keeps the existing renderer
+        # (an aggregated digest message is already compact per-row).
+        tier = "CONCISE" if decision.disposition == "IMMEDIATE" else None
         try:
             result = enqueue_card(
                 card,
@@ -391,6 +421,9 @@ class EnrichmentEngine:
                 insider_activity=insider_activity,
                 allow_update=allow_update,
                 now=now,
+                route_override=decision.disposition,
+                tier=tier,
+                disposition_reason=decision.reason,
             )
         except PredictiveLanguageError as exc:
             self.metrics.claim_safety_rejections += 1
