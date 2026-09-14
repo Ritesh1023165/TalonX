@@ -304,3 +304,50 @@ safety-net on each half. 13 new focused tests. One real, clearly-labelled
 `[DEVELOPMENT TEST]` /ping was sent through the established destination,
 standalone (not via the live supervised process, to avoid any restart)
 — confirmed delivered (2/2 messages sent, no transport error).
+
+## Addendum 2 — Task 133: Recoverable Ingestion and Timely Discovery Delivery
+
+Full detail: `results/task132_development_run/TASK133_RECOVERABLE_
+DELIVERY_REPORT.md`. Summary:
+
+- **Recovery**: persisted-but-never-enriched events (the exact shape the
+  addendum above found -- 24,958 orphans at the time) are now
+  independently discoverable via two new, additive `ProcessingStateStore`
+  queries (`find_undiscovered_events`, `next_for_processing`) and a new
+  bounded `IntelligenceService.reconcile_and_enrich()` pass, reusing the
+  existing state machine -- no new queue, no schema change. Proven with a
+  genuine cross-process crash test (subprocess hard `os._exit` after
+  persist, before enrich; a cold reopen of the same ledger file recovers
+  and completes it).
+- **Scheduling**: `poll_once()`'s inline enrichment and the new recovery
+  pass are both bounded (count + time budget, per-event timeout);
+  `deliver_cycle()` now gets a real turn every poll-loop iteration
+  instead of waiting behind a potentially unbounded enrichment pass.
+- **A genuine P0 found live, during the managed cutover, not staged**:
+  `outbox.expire_stale()` (Task 96F/117, pre-existing) scanned every
+  PENDING row with no LIMIT, doing one synchronous DB read per row when
+  `deliver_cycle`'s `event_time_lookup` was given -- at ~4,000 PENDING
+  rows that unbounded, `await`-free loop defeated `asyncio.wait_for`'s
+  own timeout (a synchronous loop cannot yield for the timeout to
+  preempt it), hanging the whole Intelligence process for several
+  minutes. Fixed with a bounded, oldest-first `limit` (default unbounded
+  preserved for every other caller/test).
+- **Real result, not a transport test message**: after the fix and a
+  second managed restart, one delivery cycle sent 20 real IMMEDIATE
+  cards + 1 aggregated DIGEST message (21 real Telegram messages, IDs
+  732-752) and correctly expired 600 genuinely stale backlog rows.
+  `intelligence_delivery`: SENT 6 -> 46, EXPIRED 9,850 -> 10,450.
+- **Scope/eligibility**, addressing the explicit "a counter is not
+  identity proof" objection: traced the real entry path and found THREE
+  independent guards, not just the execution allowlist -- (1) a sourcing
+  gate (V2's Form4 feed is 100% derived from the CIK-driven ingestion
+  pipeline, so an unresolved-CIK symbol can never produce a candidate at
+  all), (2) the execution allowlist (symbol membership), (3) a real
+  price-lookup guard at entry (`SKIPPED_NO_ENTRY_BAR` when no CSV bar
+  exists for that symbol/session). No enforcement gap found.
+- Two managed restarts of ONLY the Intelligence component (Original/
+  Experimental/V2/Dashboard/checkpoint-daemon never touched); single-
+  poller ownership verified after each; cash $300,000.00 / 0 positions /
+  0 intents preserved throughout. 15 new focused tests, 204 passed
+  across every directly-affected file, frozen fingerprint
+  `11107198c5b81237` unchanged.
