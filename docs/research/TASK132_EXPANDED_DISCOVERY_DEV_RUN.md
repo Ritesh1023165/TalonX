@@ -599,3 +599,72 @@ RECONCILIATION_REPORT.md`. Summary:
   exact blocker for a future, separately-scoped task.
 - 16/16 focused tests pass (14 prior + 2 new). No code change beyond the
   2 new tests; HEAD unchanged by the reconciliation itself.
+
+## Addendum 8 — Task 137: Overnight Continuity, Scope Accuracy and Delivery Fairness
+
+Full detail: `results/task132_development_run/TASK137_OVERNIGHT_
+CONTINUITY_REPORT.md`. Summary:
+
+- **EOD `eod_reconciled_today=false` despite a successful close**: a
+  real, persistent reporting defect, not a timing artifact -- this
+  deployment's `piv_paper` component is permanently `NOT_CHECKED` (PIV/
+  Alpaca opt-in-only, never wired up), so `status` can only ever be
+  `PARTIAL`, never `RECONCILED`, here. New `reconciled_to_available_
+  scope()` (talonx_ops/eod_reconciliation.py) distinguishes that specific
+  pattern from a genuinely broken reconciliation, exposed as a SEPARATE,
+  explicitly-named field (`eod_reconciled_today_available_scope` /
+  `today_reconciled_available_scope`) -- the existing strict field is
+  unchanged.
+- **39 vs 626 scope**: traced precisely -- the live V2 companion
+  genuinely evaluates the union of the 39-symbol watchlist and the frozen
+  626-name Discovery Universe v1 manifest (`--enable-broad-discovery`,
+  confirmed against the actual admission-gating code, not just startup
+  logs); only the OBSERVATIONAL funnel's own independent recomputation
+  stayed narrow. `build_funnel(include_broad_discovery=...)` now unions
+  the same manifest when the LIVE companion's own reported scope proves
+  it is active -- never a hardcoded assumption. Real, substantive effect:
+  reported code-P records window went from 8 to 26, distinct issuers to
+  11, real >=2-insider clusters now visible (ABCL, APTV).
+- **Deferred-lookup SATURATION** (distinct from, and not covered by, the
+  already-fixed "one failing row doesn't stop the rest of a batch"):
+  reproduced -- a bounded selection limit filled entirely by permanently-
+  failing lookups can starve a valid row behind them FOREVER, across
+  every cycle. Fixed with a bounded, fixed backoff written to the row's
+  own `next_retry_at_utc` on DEFER (the same column `pending()` already
+  filters send-selection on); `state` never touched, fully recoverable,
+  exactly-once on success. The bulk sweep deliberately does NOT gain the
+  same filter (would conflate with the unrelated send-retry backoff on
+  the same column -- confirmed by reproducing that exact regression,
+  then reverting it).
+- **Original/V1 fingerprint mismatch, fully resolved**: two distinct
+  causes. CRLF-vs-LF representation (working tree has CRLF, committed
+  blobs are LF) -- fixed by LF-normalizing `get_strategy_version()`,
+  matching an existing precedent elsewhere in the repo. AND a real,
+  substantive, already-authorized change: commit 66a49f9 (Task 135, same
+  session) modified `talonx_quant/consumer.py` -- one of the 5
+  fingerprinted files -- after the constant was frozen, confined to
+  Pub/Sub delivery-observability logging around an already-decided
+  signal publish, not gating/scoring logic. Not reverted; the constant
+  corrected to the new, current, git-reproducible baseline
+  (`ed8272fe568d`).
+- **LULU latency**: enrichment (sub-second) and delivery (~8-9s) stages
+  precisely measured, no defect. The source-to-local-discovery interval
+  (SEC accepted 16:15:47 UTC -> our poller) is an explicit evidence gap
+  -- `ingested_at_utc` confirmed BATCH-fixed (shared across unrelated
+  records), not a true per-record marker; the best circumstantial
+  evidence (poll-cycle `filings=` counter) points to ~20:18 UTC, ~4h
+  later, but the true cause cannot be determined from available
+  evidence and was not invented.
+- **35 `FAILED_RETRYABLE` rows, root-caused and fixed**: 100% one issuer
+  (BBY / Best Buy Co Inc), one error, deterministic -- the company's own
+  factual name contains the word "Buy", misclassified by the bare-token
+  claim-safety scanner. `claim_safety.scan_rendered`/`assert_clean` gain
+  a narrow, company-name-scoped exemption; every other rule (phrase-level
+  predictive language, unrelated bare tokens) remains fully enforced.
+  Not manually replayed -- will self-heal via the existing retry
+  mechanism against the now-fixed, restarted code.
+- 19 new/updated focused tests, 575 passed; 11 pre-existing, unrelated
+  failures reconfirmed present on unmodified `32f8bc5`. Frozen V2
+  fingerprint `11107198c5b81237` unchanged. Intelligence restarted
+  (only component whose long-running process imports the changed code);
+  cash $300,000.00 / 0 positions / 0 intents unchanged throughout.
