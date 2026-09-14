@@ -405,3 +405,46 @@ REPORT.md`. Summary:
   every directly-affected file (full suite not repeated -- already run
   once for Task 133's larger change-set); frozen fingerprint
   `11107198c5b81237` unchanged.
+
+## Addendum 4 — Task 135: Quant -> Brain Handoff Discrepancy
+
+Full detail: `results/task132_development_run/TASK135_QUANT_BRAIN_
+HANDOFF_REPORT.md`. Summary:
+
+- Investigated /ping's Quant candidates=68 / published=1 / Brain
+  received=0. Original (Quant/Brain/Core/Dispatch, all asyncio tasks in
+  one `run_talonx.py` process) had never been restarted all session --
+  confirmed via `git diff aca1a4c HEAD` that nothing in this whole
+  Task131-135 arc touched that pipeline's code, so the discrepancy
+  predates this work.
+- **Root cause: a genuine, one-shot fire-and-forget Redis Pub/Sub
+  delivery gap, not a config mismatch, crash, or counter bug.** Brain's
+  subscription was proven alive and stable all day (no reconnects,
+  actively processed a message on a sibling channel at 16:55) yet has
+  zero log activity for `signals_channel`; Quant's publish genuinely
+  succeeded (real same-day counter increment, fresh TTL). "published"
+  has only ever meant "Redis accepted the command", never "a consumer
+  received it" -- an evidence gap (the expected post-publish log line is
+  itself absent from the whole multi-day log) is reported as such, not
+  reconstructed.
+- **Fix (bounded, no rewrite)**: capture Redis PUBLISH's own return
+  value (subscriber count) instead of discarding it --
+  `talonx_quant/consumer.py::_publish_signal` now logs a WARNING and
+  increments a new `quant:published_no_subscriber` metric whenever a
+  signal is accepted with zero live subscribers; `/ping`'s existing
+  Quant section surfaces it when nonzero. 3 new tests reproduce the
+  exact discovered gap (silent before, visible after) without changing
+  the underlying accept/reject decision.
+- Original restarted (first time all session) to load the fix -- the
+  smallest component set able to (Quant/Brain/Core/Dispatch/the real
+  Telegram listener are all inside it); Intelligence untouched. Verified
+  by commit-vs-restart-time correlation that the loaded code is the
+  fixed version, and that the real (not standalone-script) `/ping`
+  listener is alive and polling -- explicitly NOT claiming a literal
+  `/ping` round-trip was proven, since simulating an inbound Telegram
+  message from outside the user's own account isn't possible here.
+- Cash $300,000.00 / 0 positions / 0 intents preserved; SEC discovery/V2
+  lane (Intelligence, PID unchanged since Task 134) untouched. 313 tests
+  passed, zero regressions, frozen fingerprint `11107198c5b81237`
+  unchanged. EOD still PENDING at report time (~2h before close);
+  `--no-shutdown` remains the correct existing option.
