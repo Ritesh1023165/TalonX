@@ -419,3 +419,50 @@ def test_task114_v2config_frozen_unchanged():
     assert c.max_concurrent_positions == 20
     assert c.hold_trading_days == 10
     assert c.stop_loss_enabled is False
+
+
+# ======================================================================
+# Task 132 -- prospective start_stack() gains --enable-broad-discovery
+# pass-through to the V2 companion (previously only reachable via a raw,
+# unsupervised `python -m talonx_v2.run` invocation, never through the
+# real, established launcher). Argv construction tested directly, with
+# _spawn() monkeypatched (no real process ever launched) and V2_DB_PATH/
+# V2_STATUS_PATH redirected to tmp_path (never the real repo-root ledger).
+# ======================================================================
+
+def _patched_proc(monkeypatch, tmp_path):
+    from talonx_ops.prospective import proc
+    v2_db = tmp_path / "v2_lane.db"
+    v2_status = tmp_path / "v2_service_status.json"
+    monkeypatch.setattr(proc, "V2_DB_PATH", v2_db)
+    monkeypatch.setattr(proc, "V2_STATUS_PATH", v2_status)
+    spawned: list[dict] = []
+    _next_pid = iter(range(9001, 9999))
+
+    def _fake_spawn(argv, *, log_path, env=None):
+        spawned.append({"argv": argv, "log_path": log_path, "env": env})
+        return next(_next_pid)
+    monkeypatch.setattr(proc, "_spawn", _fake_spawn)
+    return proc, spawned, v2_db
+
+
+def test_start_stack_omits_enable_broad_discovery_by_default(tmp_path, monkeypatch):
+    proc, spawned, v2_db = _patched_proc(monkeypatch, tmp_path)
+    proc.start_stack(tmp_path / "session", env={}, with_dashboard=False,
+                     with_checkpoint_daemon=False)
+    v2_call = next(c for c in spawned if "talonx_v2.run" in c["argv"])
+    assert "--enable-broad-discovery" not in v2_call["argv"]
+    assert "--form4-source" in v2_call["argv"]
+    assert v2_call["argv"][v2_call["argv"].index("--form4-source") + 1] == "insider"
+
+
+def test_start_stack_passes_enable_broad_discovery_through_to_the_v2_companion(tmp_path, monkeypatch):
+    proc, spawned, v2_db = _patched_proc(monkeypatch, tmp_path)
+    proc.start_stack(tmp_path / "session", env={}, with_dashboard=False,
+                     with_checkpoint_daemon=False, enable_broad_discovery=True)
+    v2_call = next(c for c in spawned if "talonx_v2.run" in c["argv"])
+    assert "--enable-broad-discovery" in v2_call["argv"]
+    # never supervisor include_v2 -- still the ONE, separately-spawned companion
+    sup_call = next(c for c in spawned if "talonx_ops.supervisor" in c["argv"])
+    assert "--include-v2" not in sup_call["argv"]
+    assert not any("talonx_v2" in a for a in sup_call["argv"] if a != sup_call["argv"][1])

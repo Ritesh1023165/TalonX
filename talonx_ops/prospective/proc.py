@@ -147,6 +147,7 @@ def start_stack(session_dir: str | Path, *, env: dict[str, str],
                 checkpoint_every_s: int = 1800,
                 pricing_mode: str = "csv", execution_scope: str = "none",
                 deliver: bool = False, transport: str = "dryrun",
+                enable_broad_discovery: bool = False,
                 allow_when_running: bool = False) -> dict[str, Any]:
     sd = Path(session_dir)
     sd.mkdir(parents=True, exist_ok=True)
@@ -191,6 +192,7 @@ def start_stack(session_dir: str | Path, *, env: dict[str, str],
         with_dashboard=with_dashboard, with_checkpoint_daemon=with_checkpoint_daemon,
         checkpoint_every_s=checkpoint_every_s, pricing_mode=pricing_mode,
         execution_scope=execution_scope, deliver=deliver, transport=transport,
+        enable_broad_discovery=enable_broad_discovery,
         lock=_lock,
     )
 
@@ -198,7 +200,8 @@ def start_stack(session_dir: str | Path, *, env: dict[str, str],
 def _start_stack_locked(sd, logs, py, *, env, tick_seconds, heartbeat_seconds,
                         live_lookback_days, with_dashboard, with_checkpoint_daemon,
                         checkpoint_every_s, pricing_mode, execution_scope, deliver,
-                        transport, lock: "SingleWriterLock") -> dict[str, Any]:
+                        transport, enable_broad_discovery=False,
+                        lock: "SingleWriterLock") -> dict[str, Any]:
     lock_path = str(lock.lock_path)
     spawned: list[tuple[str, int]] = []
     # Task 118A: stop_stack() writes <session_dir>/stop.flag so a running
@@ -234,6 +237,14 @@ def _start_stack_locked(sd, logs, py, *, env, tick_seconds, heartbeat_seconds,
                    "--pricing-mode", pricing_mode, "--execution-scope", execution_scope]
         if deliver:
             v2_argv += ["--deliver", "--transport", transport]
+        if enable_broad_discovery:
+            # Task 132: additively union the frozen 626-name Discovery
+            # Universe v1 into the companion's own execution scope and tag
+            # those symbols' trading-lane alerts BROAD_DISCOVERY origin
+            # (talonx_v2.run's own flag -- see its help text). OFF by
+            # default; the original watchlist scope is unaffected unless
+            # explicitly requested here.
+            v2_argv += ["--enable-broad-discovery"]
         v2_pid = _spawn(v2_argv, log_path=logs / "v2_companion.log", env=env)
         spawned.append(("v2_companion", v2_pid))
 

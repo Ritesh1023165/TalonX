@@ -16,6 +16,25 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Task 132: load the shared .env into THIS process's os.environ before
+# anything spawns -- same resolution approach as dashboard.py /
+# talonx_ops/supervisor.py. proc._spawn() merges {**os.environ, **env} for
+# EVERY child (supervisor, V2 companion, checkpoint daemon), so whatever is
+# in THIS process's environment at spawn time is what reaches all three;
+# resolve_env() below only resolves its own 4 named vars from .env as a
+# fallback, it does not load secrets (TELEGRAM_*) or the broader TALONX_*
+# toggles into this process's own os.environ. Without this, those settings
+# were only ever visible if the invoking shell happened to export them
+# first -- a real, silent gap this closes. override=False: a real env var
+# already set in the shell always wins.
+try:
+    from dotenv import load_dotenv
+    _shared_env = Path(__file__).resolve().parents[2] / ".env"
+    if _shared_env.is_file():
+        load_dotenv(_shared_env, override=False)
+except ImportError:  # pragma: no cover
+    pass
+
 from talonx_ops.prospective import RELEASE_SHA_EXPECTED
 from talonx_ops.prospective.paths import (atomic_write, ensure_session_dir, now_pair,
                                           resolve_env, session_dir)
@@ -81,6 +100,7 @@ def cmd_start(args) -> int:
                            pricing_mode=args.pricing_mode,
                            execution_scope=args.execution_scope,
                            deliver=args.deliver, transport=args.transport,
+                           enable_broad_discovery=args.enable_broad_discovery,
                            allow_when_running=getattr(args, "force", False))
     except ConcurrentStartError as exc:
         print("=" * 66)
@@ -254,6 +274,12 @@ def main(argv=None) -> int:
                    choices=["none", "resolved-active-watchlist"])
     s.add_argument("--deliver", action="store_true")
     s.add_argument("--transport", default="dryrun", choices=["dryrun", "telegram"])
+    # Task 132: additively union the frozen 626-name Discovery Universe v1
+    # into the V2 companion's execution scope + tag those symbols'
+    # trading-lane alerts BROAD_DISCOVERY origin (talonx_v2.run's own
+    # --enable-broad-discovery flag -- see its help text). OFF by default;
+    # the original watchlist scope is unaffected unless explicitly set.
+    s.add_argument("--enable-broad-discovery", action="store_true")
 
     c = sub.add_parser("close"); c.set_defaults(fn=cmd_close)
     c.add_argument("--session-dir", default="")

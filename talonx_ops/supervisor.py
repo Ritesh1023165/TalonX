@@ -44,6 +44,23 @@ logger = logging.getLogger("talonx_ops.supervisor")
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# Task 132: load the shared .env (same resolution approach as dashboard.py /
+# talonx_ops/cli.py) BEFORE any component is spawned -- SubprocessRunner
+# inherits `dict(os.environ)` for every child, so a setting only visible in
+# the invoking shell (e.g. TELEGRAM_BOT_TOKEN, TALONX_INTEL_ENABLE_BROAD_
+# DISCOVERY) previously never reached a supervised process unless the
+# operator manually exported it first -- a real, silent gap this closes.
+# override=False: a real env var already set in the shell always wins.
+try:
+    from dotenv import load_dotenv
+    _shared_env = _REPO_ROOT / ".env"
+    if _shared_env.is_file():
+        load_dotenv(_shared_env, override=False)
+except ImportError:  # pragma: no cover -- python-dotenv is a real dependency
+    # elsewhere in this repo; degrade to "no .env loaded" rather than crash
+    # the supervisor entrypoint itself.
+    pass
+
 # component argv markers -- a supervised child (and its .venv-shim grandchild)
 # always carries one of these in its command line.  Used to make the recursive
 # stop OWNERSHIP-SAFE: an unrelated process that happens to be a descendant, or a
@@ -721,6 +738,15 @@ def default_talonx_components(
     intel_argv = [py, "-m", "talonx_ingest.intelligence.service", "poll"]
     if with_backfill:
         intel_argv.append("--with-backfill")
+    # Task 132: real external delivery of the informational intelligence
+    # cards (Task 96F) is intentionally NOT a CLI flag baked into this
+    # always-running spec's argv (see tests/test_task117_supervised_
+    # intelligence.py::test_intelligence_argv_never_includes_a_second_
+    # send_flag and its own reasoning) -- it is config-driven via
+    # TALONX_INTEL_DELIVER_CARDS / TALONX_INTEL_DRY_RUN_DELIVERY, which
+    # reach this child through the SAME ordinary env-var inheritance
+    # (SubprocessRunner.spawn()'s dict(os.environ)) every other setting
+    # here already uses -- set them in the launching shell / .env, not here.
     specs = [
         ComponentSpec(
             name="original",

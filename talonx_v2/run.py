@@ -28,6 +28,20 @@ import sys
 from datetime import date
 from pathlib import Path
 
+# Task 132: load the shared .env (same resolution approach as dashboard.py /
+# talonx_ops/supervisor.py) BEFORE anything reads an env var -- this is the
+# V2 companion's own standalone entrypoint (not a supervisor child), so
+# without this, TELEGRAM_BOT_TOKEN/CHAT_ID and the TALONX_* toggles are only
+# visible if the invoking shell happened to export them first. override=False:
+# a real env var already set in the shell always wins.
+try:
+    from dotenv import load_dotenv
+    _shared_env = Path(__file__).resolve().parent.parent / ".env"
+    if _shared_env.is_file():
+        load_dotenv(_shared_env, override=False)
+except ImportError:  # pragma: no cover
+    pass
+
 from talonx_v2 import form4_source, pipeline
 from talonx_v2.config import V2Config
 from talonx_v2.store import V2Store
