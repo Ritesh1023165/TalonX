@@ -118,3 +118,120 @@ def test_default_drain_unchanged_without_opt_in(ledger_path):
     assert res.expired == 0
     assert ob.get(did).state == STATE_SENT
     ob.close()
+
+
+# ---------------------------------------------------------------------
+# Task 133 P0: expire_stale must be boundable. A large PENDING backlog +
+# an event_time_lookup (what deliver_cycle always passes) makes the
+# unbounded scan do ONE SYNCHRONOUS DB read per PENDING row -- confirmed
+# live to make the whole Intelligence process unresponsive for minutes
+# (asyncio.wait_for's timeout around the caller cannot preempt a
+# synchronous loop with no `await` inside it). limit=None preserves the
+# exact old behaviour for every existing caller above; a real caller with
+# a large volume MUST pass a bound.
+# ---------------------------------------------------------------------
+
+def test_expire_stale_default_is_unbounded_scans_every_pending_row(ledger_path):
+    ob = DeliveryOutbox(ledger_path)
+    now = datetime(2026, 9, 10, 20, 0, 0, tzinfo=UTC)
+    dids = [
+        _enq(ob, symbol="DELL", accession=f"0001193125-26-{386800 + i}",
+             enqueued_at=now - timedelta(days=3))
+        for i in range(12)
+    ]
+    lookups = []
+
+    def _lookup(event_id):
+        lookups.append(event_id)
+        return None
+
+    expired = ob.expire_stale(now=now, event_time_lookup=_lookup)
+    assert len(expired) == 12 and set(expired) == set(dids)
+    assert len(lookups) == 12          # every row scanned -- unchanged default behaviour
+    ob.close()
+
+
+def test_expire_stale_limit_bounds_the_scan_oldest_first(ledger_path):
+    """The actual Task 133 fix: with a limit, at most `limit` rows are
+    inspected (and at most `limit` calls made to event_time_lookup) no
+    matter how many PENDING rows exist -- oldest enqueued_at_utc first,
+    so the rows most likely to be genuinely stale are the ones handled
+    each bounded pass."""
+    ob = DeliveryOutbox(ledger_path)
+    now = datetime(2026, 9, 10, 20, 0, 0, tzinfo=UTC)
+    older = [
+        _enq(ob, symbol="DELL", accession=f"0001193125-26-{386800 + i}",
+             enqueued_at=now - timedelta(days=3, hours=i))
+        for i in range(20)
+    ]
+    newer = [
+        _enq(ob, symbol="ORCL", accession=f"0001193125-26-{387900 + i}",
+             enqueued_at=now - timedelta(minutes=i))
+        for i in range(20)
+    ]
+    lookups = []
+
+    def _lookup(event_id):
+        lookups.append(event_id)
+        return None
+
+    expired = ob.expire_stale(now=now, event_time_lookup=_lookup, limit=5)
+    assert len(lookups) == 5                       # bounded -- NOT all 40 PENDING rows
+    assert len(expired) == 5                        # the 5 oldest, all genuinely stale
+    assert set(expired).issubset(set(older))        # oldest-first, not last-in-first-out
+    # nothing from the fresh batch was even inspected, let alone touched
+    assert all(ob.get(d).state == STATE_PENDING for d in newer)
+    ob.close()
+
+
+def test_expire_stale_limit_makes_full_backlog_progress_over_several_calls(ledger_path):
+    """A bounded scan still eventually covers the WHOLE backlog -- calling
+    it repeatedly (as deliver_cycle does, once per poll-loop iteration)
+    drains a large stale backlog completely, just spread over multiple
+    calls instead of one unbounded one."""
+    ob = DeliveryOutbox(ledger_path)
+    now = datetime(2026, 9, 10, 20, 0, 0, tzinfo=UTC)
+    dids = [
+        _enq(ob, symbol="DELL", accession=f"0001193125-26-{386800 + i}",
+             enqueued_at=now - timedelta(days=3, minutes=i))
+        for i in range(23)
+    ]
+    total_expired: list[str] = []
+    for _ in range(6):  # 6 * 5 = 30 >= 23 -- enough passes to cover everything
+        total_expired.extend(ob.expire_stale(now=now, limit=5))
+    assert set(total_expired) == set(dids)
+    assert all(ob.get(d).state == STATE_EXPIRED for d in dids)
+    ob.close()
+
+
+@pytest.mark.asyncio
+async def test_process_pending_and_process_digest_thread_the_expire_scan_limit(ledger_path, monkeypatch):
+    """Confirms deliver_cycle's actual fix end-to-end: process_pending's
+    (and process_digest's) expire_scan_limit reaches outbox.expire_stale,
+    not just a plumbing no-op."""
+    from talonx_ingest.intelligence.delivery.pipeline import process_digest, process_pending
+
+    ob = DeliveryOutbox(ledger_path)
+    now = datetime(2026, 9, 10, 20, 0, 0, tzinfo=UTC)
+    for i in range(10):
+        _enq(ob, symbol="DELL", accession=f"0001193125-26-{386800 + i}",
+             enqueued_at=now - timedelta(days=3, minutes=i))
+
+    seen = {"count": 0}
+    real_expire = ob.expire_stale
+
+    def _spy(*a, **kw):
+        seen["count"] += 1
+        seen["limit"] = kw.get("limit")
+        return real_expire(*a, **kw)
+
+    monkeypatch.setattr(ob, "expire_stale", _spy)
+
+    await process_pending(ob, RecordingSender(), mode="enabled", route="IMMEDIATE",
+                          now=now, enforce_age_cutoff=True, expire_scan_limit=3)
+    assert seen["limit"] == 3
+
+    await process_digest(ob, RecordingSender(), mode="enabled", interval_seconds=21600,
+                         now=now, enforce_age_cutoff=True, expire_scan_limit=7)
+    assert seen["limit"] == 7
+    ob.close()

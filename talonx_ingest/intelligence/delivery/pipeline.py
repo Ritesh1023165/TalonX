@@ -310,6 +310,7 @@ async def process_pending(
     max_age_seconds: "dict[str, int] | int | None" = None,
     event_time_lookup=None,
     stale_in_flight_seconds: float = 90.0,
+    expire_scan_limit: int | None = None,
 ) -> DrainResult:
     """Process due PENDING rows, CRITICAL first. Persist-before-send is
     guaranteed by ``enqueue``. Safe to call repeatedly and after a restart.
@@ -354,6 +355,7 @@ async def process_pending(
     if enforce_age_cutoff:
         result.expired_ids = outbox.expire_stale(
             now=now, max_age_seconds=max_age_seconds, event_time_lookup=event_time_lookup,
+            limit=expire_scan_limit,
         )
         result.expired = len(result.expired_ids)
 
@@ -517,6 +519,7 @@ async def process_digest(
     max_age_seconds: "dict[str, int] | int | None" = None,
     event_time_lookup=None,
     stale_in_flight_seconds: float = 90.0,
+    expire_scan_limit: int | None = None,
 ) -> DrainResult:
     """Aggregate + deliver the DIGEST route on a schedule.
 
@@ -541,7 +544,9 @@ async def process_digest(
 
     if enforce_age_cutoff:
         result.expired_ids = outbox.expire_stale(
-            now=now, max_age_seconds=max_age_seconds, event_time_lookup=event_time_lookup)
+            now=now, max_age_seconds=max_age_seconds, event_time_lookup=event_time_lookup,
+            limit=expire_scan_limit,
+        )
         result.expired = len(result.expired_ids)
 
     rows = outbox.digest_pending(now=now, limit=limit)

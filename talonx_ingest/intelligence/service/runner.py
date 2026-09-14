@@ -279,6 +279,7 @@ class IntelligenceService:
                     enforce_age_cutoff=(
                         enabled and self.config.deliver_cards_enforce_age_cutoff),
                     event_time_lookup=_event_time,
+                    expire_scan_limit=self.config.expire_scan_max_rows_per_cycle,
                 ),
                 timeout=self.config.deliver_cards_timeout_seconds,
             )
@@ -291,6 +292,7 @@ class IntelligenceService:
                     enforce_age_cutoff=(
                         enabled and self.config.deliver_cards_enforce_age_cutoff),
                     event_time_lookup=_event_time,
+                    expire_scan_limit=self.config.expire_scan_max_rows_per_cycle,
                 ),
                 timeout=self.config.deliver_cards_timeout_seconds,
             )

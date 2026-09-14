@@ -545,6 +545,7 @@ class DeliveryOutbox:
         self, *, now: datetime | None = None,
         max_age_seconds: "dict[str, int] | int | None" = None,
         event_time_lookup=None,
+        limit: int | None = None,
     ) -> list[str]:
         """Move PENDING rows older than their per-route cutoff to EXPIRED.
 
@@ -557,7 +558,27 @@ class DeliveryOutbox:
         ``event_time_lookup(event_id)`` returns one) and the enqueue time -- so
         an old filing enqueued today does NOT count as fresh. The transition
         reason records which basis triggered it.
-        """
+
+        Task 133: ``limit`` bounds how many PENDING rows this ONE call
+        inspects (oldest ``enqueued_at_utc`` first -- the rows most likely
+        to actually be stale). Without it, a large PENDING backlog makes
+        this call scan EVERY pending row and -- when ``event_time_lookup``
+        is given -- do one SEPARATE, SYNCHRONOUS database read per row
+        (``deliver_cycle`` passes a lookup that queries the events store).
+        That synchronous, unbounded loop runs inside an ``async def``
+        caller with no ``await`` in it anywhere, so it cannot yield to the
+        event loop -- ``asyncio.wait_for``'s timeout around the caller
+        can never fire while it is running (confirmed live at ~4,000
+        PENDING rows: the whole Intelligence process became unresponsive,
+        holding its own write lock, for minutes). ``None`` preserves the
+        exact prior unbounded behaviour for any existing caller/test that
+        doesn't pass it -- callers with a large PENDING volume (see
+        ``deliver_cycle``) MUST pass a bound. Full coverage is preserved
+        across cycles, oldest-first, not silently narrowed: a row that
+        isn't reached this cycle is reached on a later one, well within
+        any real cutoff (default 24h; a several-hundred-row bound sweeps
+        thousands of rows within tens of minutes at a several-minute
+        cycle cadence)."""
         from datetime import timedelta
 
         from talonx_ingest.intelligence.delivery.config import (
@@ -575,10 +596,15 @@ class DeliveryOutbox:
             default_max = CARD_MAX_AGE_DEFAULT_SECONDS
 
         expired: list[str] = []
-        rows = self._conn.execute(
+        sql = (
             "SELECT delivery_id, route, event_id, enqueued_at_utc FROM intelligence_delivery "
-            "WHERE state = ?", (STATE_PENDING,),
-        ).fetchall()
+            "WHERE state = ? ORDER BY enqueued_at_utc ASC"
+        )
+        params: list = [STATE_PENDING]
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(int(limit))
+        rows = self._conn.execute(sql, params).fetchall()
         for r in rows:
             enq = _dt(r["enqueued_at_utc"])
             evt = None

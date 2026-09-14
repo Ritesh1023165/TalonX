@@ -132,6 +132,17 @@ class ServiceConfig:
     deliver_cards_per_cycle: int = 20
     deliver_cards_enforce_age_cutoff: bool = True
     deliver_cards_timeout_seconds: float = 20.0
+    # Task 133 P0 fix: outbox.expire_stale() (called by BOTH process_pending
+    # and process_digest) scans EVERY PENDING row, and -- when an
+    # event_time_lookup is given, as deliver_cycle always does -- runs one
+    # SYNCHRONOUS database read per row. At a large PENDING volume that
+    # blocking loop can run for minutes with no `await` inside it, so
+    # asyncio.wait_for's timeout above CANNOT preempt it (confirmed live:
+    # the whole Intelligence process became unresponsive, holding its own
+    # write lock). Bounding the scan (oldest-enqueued-first) is the fix --
+    # None/unbounded is kept as expire_stale's own DEFAULT for any other
+    # caller/test, but deliver_cycle always passes this bound.
+    expire_scan_max_rows_per_cycle: int = 300
     # DIGEST route is AGGREGATED into one message per interval (default 6h),
     # not sent per-row. Restart-safe via a persisted time-bucket.
     deliver_digest_interval_seconds: float = 6 * 3600.0
@@ -200,8 +211,8 @@ class ServiceConfig:
             ),
             live_priority=_env_bool("TALONX_INTEL_LIVE_PRIORITY", True),
             enable_xbrl=_env_bool("TALONX_INTEL_ENABLE_XBRL", True),
-            enrich_max_events_per_cycle=_env_int("TALONX_INTEL_ENRICH_MAX_EVENTS", 0),
-            enrich_time_budget_seconds=_env_float("TALONX_INTEL_ENRICH_TIME_BUDGET_SECONDS", 0.0),
+            enrich_max_events_per_cycle=_env_int("TALONX_INTEL_ENRICH_MAX_EVENTS", 25),
+            enrich_time_budget_seconds=_env_float("TALONX_INTEL_ENRICH_TIME_BUDGET_SECONDS", 60.0),
             enrich_per_event_timeout_seconds=_env_float(
                 "TALONX_INTEL_ENRICH_PER_EVENT_TIMEOUT_SECONDS", 90.0
             ),
@@ -219,6 +230,9 @@ class ServiceConfig:
             ),
             deliver_digest_interval_seconds=_env_float(
                 "TALONX_INTEL_DELIVER_DIGEST_INTERVAL_SECONDS", 6 * 3600.0
+            ),
+            expire_scan_max_rows_per_cycle=_env_int(
+                "TALONX_INTEL_EXPIRE_SCAN_MAX_ROWS", 300
             ),
             ledger_path=os.environ.get("TALONX_LEDGER_PATH") or None,
             state_dir=Path(
