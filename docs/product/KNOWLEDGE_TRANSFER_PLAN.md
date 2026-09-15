@@ -42,8 +42,8 @@ today" specifies which one it means.
 | # | Title | Status |
 |---|---|---|
 | 1 | Purpose and user value | **Done — recorded in `DECISION_LOG.md`** |
-| 2 | Investment basics through a paper-trade example | Next — not yet conducted |
-| 3 | Application overview: Original, Intelligence and V2 | Not yet conducted |
+| 2 | Paper execution, accounting, risk and evaluation | **Decisions recorded; implementation assessment/authorization separate.** Recorded in `DECISION_LOG.md` (title updated from the originally-planned "Investment basics through a paper-trade example"; the plan is owner-adjustable — see below) |
+| 3 | Application overview: Original, Intelligence and V2 | Not yet conducted. Discussion items added to its agenda from Session 2's findings (see `DECISION_LOG.md` Session 3 agenda note). |
 | 4 | End-to-end user journey | Not yet conducted |
 | 5 | Data sources, discovery and coverage | Not yet conducted |
 | 6 | Original intraday strategy and filters | Not yet conducted |

@@ -147,6 +147,50 @@ documentation layer.
   the dashboard's Active V2 tab; no broker-order code path exists for
   V2 at all).
 
+## 6a. Paper execution, accounting, risk and evaluation — `AGREED` (Session 2), implementation `PARTIALLY ASSESSED`
+
+Recorded in full in `DECISION_LOG.md` Session 2 and tracked as `S2-01`
+through `S2-15` in `REQUIREMENTS_TRACKER.md`. Summary only — see those
+two documents for the authoritative detail:
+
+- Alert-to-action mapping (BUY/SELL act, BULLISH/BEARISH inform only,
+  no automatic shorting) — `Implemented` (V2), confirmed by code
+  inspection this session.
+- Capacity boundaries (visible skip records, no cash inflation,
+  qualification vs. admission distinction) — `Partially implemented`;
+  the skip mechanism exists under different naming than the suggested
+  operator-facing wording.
+- Live/replay parity and a desired-but-unverified 2-year replay window
+  — `Partially implemented`, existing bounded research-grade replay
+  infrastructure only (`talonx_research/`).
+- EOD daily/realized/open-P&L separation, exit-follows-strategy-rules,
+  unresolved-exit disclosure — `Implemented`.
+- Dashboard presentation (equal-prominence equity/open-P&L,
+  entry-equity-denominated contribution labelling, missing/stale
+  valuation wording) — `Partially implemented`; the underlying data
+  fields and a never-zero/flagged-incomplete equity mechanism exist,
+  but the requirement's specific labels and layout do not yet.
+- Exit-rule and stop-loss disclosure to the operator (the V2-specific
+  "10th trading session, no stop-loss" wording) — the rule is real and
+  frozen in code; **no operator-facing disclosure surface was found**
+  this session.
+- Experimental isolation (separate versioned experiments, isolated
+  accounts, no stop-loss-necessarily-helps claim) — `Implemented`,
+  matches this project's existing `talonx_research/` governance.
+
+**This session's discussion of both intraday and multi-day accounting
+does not resolve §7's open intraday-vs-multi-day scope question below,
+and its accounting examples do not finalize the $10,000 cross-lane
+allocation figure** — both remain exactly as open as before this
+session; see `DECISION_LOG.md` Session 2's own "Open questions" for the
+explicit statement.
+
+A specific operational (not product-requirement) finding from this same
+period — V2's current-price freshness telemetry being structurally
+incomplete in its running `"csv"` pricing mode — is tracked separately
+in `OPERATIONAL_FINDINGS.md` (`OPS-002`), since it is a runtime data
+gap, not a product decision.
+
 ## 7. Open / proposed — see `REQUIREMENTS_TRACKER.md` for tracked status
 
 - **Intraday-vs-multi-day scope** ("swing intelligence assistant"): does

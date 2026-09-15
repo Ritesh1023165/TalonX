@@ -45,6 +45,21 @@ without naming which of these applies.
 | S1-11 | Separate market-session label from opportunity-status label | Proposed | Not authorized | Not implemented | Not assessed in this documentation pass |
 | S1-12 | "High conviction" = desired quality, not profitability/confidence-score claim | Agreed | Not authorized | Implemented (no conflicting feature exists) | Code inspection |
 | S1-13 | Example/alert wording accuracy guardrail (roles, fund source) | Agreed | Not authorized | Implemented (partial evidence) | Code inspection (not exhaustive) |
+| S2-01 | Alert-to-action mapping (BUY/SELL/EXIT act, BULLISH/BEARISH inform only) | Agreed | Not authorized by this documentation task | Implemented | Code inspection (this session) |
+| S2-02 | No automatic shorting; SELL without a position gets an explicit, non-fabricating disposition | Agreed | Not authorized by this documentation task | Implemented | Code inspection (this session) |
+| S2-03 | Capacity-skip records visible; cash never inflated/reset to force entry | Agreed | Not authorized by this documentation task | Partially implemented | Code inspection (this session) |
+| S2-04 | Signal qualification distinct from paper-portfolio admission; skipped opportunities never counted as executed returns | Agreed | Not authorized by this documentation task | Partially implemented | Code inspection (this session) |
+| S2-05 | Same execution/accounting rules for live and replay, separate campaign state/clocks | Agreed | Not authorized by this documentation task | Partially implemented | Code inspection (this session) |
+| S2-06 | Replay respects information availability (no look-ahead); 2-year window desired, feasibility unverified | Agreed | Not authorized by this documentation task | Partially implemented (bounded window only) | Code inspection (this session) |
+| S2-07 | EOD separates daily equity movement, realized, open/unrealized P&L; no auto-close of multi-day positions | Agreed | Not authorized by this documentation task | Implemented | Code inspection (this session) |
+| S2-08 | Exit follows strategy's own rules; unresolved/delayed outcome disclosed when data unavailable | Agreed | Not authorized by this documentation task | Implemented | Code inspection (established this project's history + this session) |
+| S2-09 | Directional accuracy and profitability reported as separate measurements | Agreed | Not authorized by this documentation task | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S2-10 | Equal-prominence Account Equity / Aggregate Open-Position P&L; per-position "contribution relative to entry equity" labelling; no cross-denominator summing | Agreed | Not authorized by this documentation task | Partially implemented (fields exist; prescribed labelling/layout does not) | Code inspection (this session) |
+| S2-11 | Consistent gross/net and realized/unrealized disclosure; deposit/withdrawal methodology deferred | Agreed | Not authorized by this documentation task | Partially implemented | Code inspection (this session) |
+| S2-12 | "Awaiting price"/"Valuation stale" with timestamp; unresolved P&L never shown as zero; incomplete equity flagged | Agreed | Not authorized by this documentation task | Partially implemented (status/None-vs-zero mechanism exists; prescribed wording does not) | Code inspection (this session) |
+| S2-13 | Actual strategy exit rule + stop-loss status disclosed to the operator; V2-specific wording; allocation ≠ max/expected loss | Agreed | Not authorized by this documentation task | Partially implemented (rule exists and is frozen in code; operator-facing disclosure not found) | Code inspection (this session) |
+| S2-14 | Strategy/stop-loss variants use separate versioned experiments and isolated accounts; baseline preserved | Agreed | Not authorized by this documentation task | Implemented | Code inspection (established, `talonx_research/`, this project's history) |
+| S2-15 | No claim that a stop-loss necessarily helps/hurts; prior +2.0219% result is conditional evidence, not a live promise; no new experiment authorized here | Agreed | Explicitly not authorized (no new research experiment) | Not implemented (correctly — nothing to build) | Code inspection (this session) |
 
 ---
 
@@ -500,3 +515,582 @@ rendered_samples_post_fix.txt` (real "CEO reported..." examples).
 **Open questions/dependencies**: a full audit of every message-
 generating path (not just the ones exercised this session) is a
 candidate for Session 7 (Intelligence and useful company developments).
+
+---
+
+## S2-01 — Alert-to-action mapping
+
+**Plain-language requirement**: BUY opens a long position (subject to
+entry/portfolio rules); SELL/EXIT closes an existing position; BULLISH
+and BEARISH are informational observations that execute nothing.
+
+**Source/session**: Session 2.
+
+**Decision status**: `Agreed`.
+
+**Implementation authorization**: `Not authorized by this documentation
+task` (this documents already-built behavior).
+
+**Current implementation status**: `Implemented`. V2's episode pipeline
+only ever opens a position via the `BUY` path in `talonx_v2/paper.py`
+(`open_position`, triggered by an insider-buy-cluster episode reaching
+`ENTERED`); exit is a separate, dedicated close path
+(`talonx_v2/pipeline.py`'s 10th-trading-session close). No code path
+was found this session that executes anything from a BULLISH/BEARISH-
+labelled signal — those originate from Original/Intelligence's
+descriptive layers, not V2's paper-execution layer.
+
+**Validation status**: `Verified` — **Code inspection** (`talonx_v2/
+paper.py`, `talonx_v2/pipeline.py`, this session).
+
+**Evidence references**: `talonx_v2/paper.py:93-139`; `talonx_v2/
+pipeline.py:148`.
+
+**Open questions/dependencies**: none for V2; Original's own
+intraday BUY/SELL signal-to-action mapping was not re-inspected this
+session (established in this project's prior history, not re-verified
+here).
+
+---
+
+## S2-02 — No automatic shorting; explicit disposition for a SELL without a position
+
+**Plain-language requirement**: the system must never automatically
+short a name, and a SELL/EXIT signal with no applicable existing
+position must not fabricate a short or invented proceeds — it needs an
+explicit, honest disposition.
+
+**Source/session**: Session 2.
+
+**Decision status**: `Agreed`.
+
+**Implementation authorization**: `Not authorized by this documentation
+task`.
+
+**Current implementation status**: `Implemented`. V2's own service
+status explicitly reports `"shorts": False` (`talonx_v2/service.py:1130`)
+as a structural, always-true field, not a runtime toggle — no
+short-selling code path exists to disable. An exit without a matching
+open position cannot occur in V2's own flow because exits are only
+evaluated against the strategy's own tracked open positions (there is
+no independent "SELL signal" input to V2 at all — V2's only decision
+input is the insider-buy-cluster episode pipeline).
+
+**Validation status**: `Verified` — **Code inspection** (`talonx_v2/
+service.py:1130`, this session).
+
+**Evidence references**: `talonx_v2/service.py:1130`.
+
+**Open questions/dependencies**: Original's intraday SELL-without-
+position handling was not re-inspected this session — a candidate for
+Session 6 (Original intraday strategy and filters).
+
+---
+
+## S2-03 — Capacity-skip records visible; cash never inflated to force an entry
+
+**Plain-language requirement**: a qualified opportunity the virtual
+account cannot currently take must remain visible, with an appropriate
+skip record — and cash must never be inflated or reset to force an
+entry.
+
+**Source/session**: Session 2.
+
+**Decision status**: `Agreed`.
+
+**Implementation authorization**: `Not authorized by this documentation
+task`.
+
+**Current implementation status**: `Partially implemented`. V2's entry
+path (`talonx_v2/paper.py::open_position`) already returns distinct,
+named, non-fabricating skip outcomes — `NO_CASH`, `SYMBOL_ALREADY_OPEN`,
+`IN_COOLDOWN_UNTIL_*`, `MAX_CONCURRENT_*`, `BAD_ENTRY_PRICE` — and cash
+is only ever debited by a real committed BUY inside one atomic
+transaction (`store.transaction()`); no code path was found this
+session that inflates or resets cash. **Gap**: none of these skip codes
+reads as the specific operator-facing wording "Paper entry skipped:
+insufficient cash/capacity" suggested in the discussion — the mechanism
+exists under different, more granular naming; whether these codes are
+currently surfaced anywhere the operator actually sees (Telegram/
+dashboard) was **not traced end-to-end this session**.
+
+**Validation status**: `Verified (mechanism)` / `Not assessed
+(operator-facing surfacing)` — **Code inspection** (`talonx_v2/
+paper.py:93-139`, this session).
+
+**Evidence references**: `talonx_v2/paper.py:93-139`.
+
+**Open questions/dependencies**: whether the near-miss funnel already
+referenced in `docs/research/evidence/eod_closure_2026-09-15/
+EOD_CLOSURE_REPORT.md` §3 ("V2 near-miss funnel: 4 historical
+clusters, all stale") is the same mechanism the operator would see for
+a live capacity skip — not confirmed this session; candidate for
+Session 8 (V2 multi-day strategy and lifecycle) or Session 9 (Telegram
+and dashboard experience).
+
+---
+
+## S2-04 — Signal qualification distinct from paper-portfolio admission
+
+**Plain-language requirement**: "this is a qualified opportunity" and
+"this was admitted into the paper portfolio" must be distinguishable,
+and a skipped opportunity's hypothetical outcome must never be counted
+as an executed portfolio return.
+
+**Source/session**: Session 2.
+
+**Decision status**: `Agreed`.
+
+**Implementation authorization**: `Not authorized by this documentation
+task`.
+
+**Current implementation status**: `Partially implemented`. The
+underlying mechanism supports the distinction — a cluster episode can
+reach eligibility (a qualifying insider-buy pattern) without ever
+reaching `ENTERED` (blocked by `NO_CASH`/`MAX_CONCURRENT_*`/etc, S2-03)
+— and V2's realized/unrealized P&L accounting
+(`talonx_ops/paper_performance.py`) only ever sums real
+`trade_history` rows, never a hypothetical skipped entry. Whether the
+dashboard and any Telegram messaging **consistently label** the
+qualification/admission distinction for the operator (as opposed to
+the accounting layer correctly excluding skipped entries, which is
+confirmed) was **not traced end-to-end this session**.
+
+**Validation status**: `Verified (accounting exclusion)` / `Not
+assessed (operator-facing labelling consistency)` — **Code inspection**
+(`talonx_ops/paper_performance.py`, `talonx_v2/paper.py`, this
+session).
+
+**Evidence references**: `talonx_ops/paper_performance.py:436-454`;
+`talonx_v2/paper.py:93-139`.
+
+**Open questions/dependencies**: candidate for Session 8/Session 9,
+same as S2-03.
+
+---
+
+## S2-05 — Same execution/accounting rules for live and replay
+
+**Plain-language requirement**: live paper evaluation and historical
+replay should reuse the same execution/accounting rules, with separate
+campaign/account state and appropriate real/simulated clocks.
+
+**Source/session**: Session 2.
+
+**Decision status**: `Agreed`.
+
+**Implementation authorization**: `Not authorized by this documentation
+task`.
+
+**Current implementation status**: `Partially implemented`. Task
+115/116 (this project's history, `docs/research/
+TALONX_RESEARCH_LEDGER.md`) built `talonx_research/replay_engine.py`,
+which drives the **real** `V2Service.tick()` chronologically against a
+**physically separate** ledger file (the replay engine "physically
+refuses `v2_lane.db`" — the live campaign database is structurally
+unreachable from replay) — a genuine, verified shared-rules
+architecture, not a reimplementation. This was built and exercised as
+a **research validation tool**, not yet confirmed as the product's own
+standing "live vs. replay" feature with its own operator-facing
+identity — that framing is `NOT ASSESSED IN THIS DOCUMENTATION PASS`.
+
+**Validation status**: `Verified (mechanism, as research infrastructure)`
+— **Code inspection** (`talonx_research/replay_engine.py`'s existence
+and its own prior task documentation, this session); not re-executed
+this session (no application tests run, per this task's own
+restriction).
+
+**Evidence references**: `talonx_research/replay_engine.py`;
+`docs/research/TALONX_RESEARCH_LEDGER.md` (Task 115/116 entries).
+
+**Open questions/dependencies**: whether this research-grade replay
+engine should become a product-facing feature (vs. remaining an
+internal validation tool) — not decided; candidate for Session 12
+(Technical validation, usefulness and economic evidence).
+
+---
+
+## S2-06 — Replay respects information availability; 2-year window desired, feasibility unverified
+
+**Plain-language requirement**: replay must never access future data
+relative to its simulated clock; a two-year replay window is desired,
+but its data feasibility is explicitly not established by this
+decision.
+
+**Source/session**: Session 2.
+
+**Decision status**: `Agreed` (need + no-look-ahead constraint) /
+`Proposed` (the specific 2-year figure, feasibility unverified).
+
+**Implementation authorization**: `Not authorized by this documentation
+task`.
+
+**Current implementation status**: `Partially implemented`. Task
+115/116's replay engine drives the tick loop chronologically
+(session-by-session, forward only) — consistent with no-look-ahead by
+construction — over a window from 2024-09-01 to 2026-03-31, **bounded
+by the available parquet data, not a full two years up to the present
+session date**. Whether a genuine, current two-year-to-today window is
+data-feasible was **not re-verified this session** — this documentation
+pass explicitly does not claim it is.
+
+**Validation status**: `Verified (existing window, no-look-ahead
+mechanism)` / `Not assessed (2-year-to-today feasibility)` — **Code
+inspection** + prior task evidence (`docs/research/
+TALONX_RESEARCH_LEDGER.md`, Task 115/116).
+
+**Evidence references**: `talonx_research/replay_engine.py`;
+`docs/research/TALONX_RESEARCH_LEDGER.md` (Task 115/116).
+
+**Open questions/dependencies**: a data-coverage audit for a genuine
+rolling two-year window is future work, not performed here.
+
+---
+
+## S2-07 — EOD separates daily/realized/open P&L; no auto-close of multi-day positions
+
+**Plain-language requirement**: EOD reporting shows daily equity
+movement, realized results, and open/unrealized P&L as distinct
+figures, and never automatically closes a multi-day position.
+
+**Source/session**: Session 2.
+
+**Decision status**: `Agreed`.
+
+**Implementation authorization**: `Not authorized by this documentation
+task`.
+
+**Current implementation status**: `Implemented`. `talonx_ops/
+paper_performance.py` computes `realized_pnl`, `unrealized_pnl`, and
+`equity` as separate fields (each with its own status), surfaced
+separately in the dashboard (`dashboard_web_static/index.html`'s
+`renderV2`, lines ~446-458). Today's own EOD closure
+(`docs/research/evidence/eod_closure_2026-09-15/EOD_CLOSURE_REPORT.md`)
+independently confirms V2's EOD reconciliation (`talonx_ops/
+prospective/close.py`) never force-closes an open multi-day position —
+it reconciles and reports, and the current campaign had 0 open
+positions at that specific EOD to exercise the distinction against
+directly.
+
+**Validation status**: `Verified` — **Code inspection** (`talonx_ops/
+paper_performance.py`, `dashboard_web_static/index.html`, this
+session) + **Natural live behavior** (today's real EOD closure, no
+force-close code path present or exercised).
+
+**Evidence references**: `talonx_ops/paper_performance.py:436-458`;
+`dashboard_web_static/index.html:446-458`; `docs/research/evidence/
+eod_closure_2026-09-15/EOD_CLOSURE_REPORT.md` §3.
+
+**Open questions/dependencies**: none.
+
+---
+
+## S2-08 — Exit follows strategy's own rules; unresolved outcome disclosed when data unavailable
+
+**Plain-language requirement**: final trade evaluation follows the
+strategy's existing exit rules; if the planned exit can't complete
+because data is unavailable, the system shows an unresolved/delayed
+outcome rather than fabricating a close.
+
+**Source/session**: Session 2.
+
+**Decision status**: `Agreed`.
+
+**Implementation authorization**: `Not authorized by this documentation
+task`.
+
+**Current implementation status**: `Implemented`. V2's frozen exit rule
+(close of the 10th trading session after entry, `talonx_v2/
+config.py:33`, `pipeline.py:148`) is the only exit path; when a
+required exit price/date isn't available, the position surfaces as
+`EXIT_UNRESOLVED` (this project's established terminal-state handling,
+independently confirmed as `0` — meaning present and queryable, not
+absent — in today's EOD obligations inspection).
+
+**Validation status**: `Verified` — **Code inspection**
+(`talonx_v2/config.py:33-36`, `pipeline.py:148`, this session) +
+**Natural live behavior** (`EXIT_UNRESOLVED: 0` queried directly
+against the live `v2_lane.db` during today's EOD closure).
+
+**Evidence references**: `talonx_v2/config.py:33-36`; `talonx_v2/
+pipeline.py:148`; `docs/research/evidence/eod_closure_2026-09-15/
+EOD_CLOSURE_REPORT.md` §2.
+
+**Open questions/dependencies**: none for the mechanism; whether
+`EXIT_UNRESOLVED` is disclosed to the operator (not just internally
+queryable) is folded into S1-06's open Telegram-surfacing question.
+
+---
+
+## S2-09 — Directional accuracy and profitability reported separately
+
+**Plain-language requirement**: "was the direction called correctly"
+and "was the trade profitable" are separate measurements and must not
+be conflated in reporting.
+
+**Source/session**: Session 2.
+
+**Decision status**: `Agreed`.
+
+**Implementation authorization**: `Not authorized by this documentation
+task`.
+
+**Current implementation status**: `Not assessed in this documentation
+pass` — no existing dashboard/report field explicitly labelled
+"directional accuracy" as distinct from P&L was located or ruled out
+in the time available this session; this requires a dedicated
+inspection of every performance-reporting surface, not performed here.
+
+**Validation status**: `Not assessed in this documentation pass`.
+
+**Evidence references**: none yet.
+
+**Open questions/dependencies**: candidate for Session 10 (Paper
+accounting, costs and risk) or Session 12 (Technical validation,
+usefulness and economic evidence).
+
+---
+
+## S2-10 — Equal-prominence equity/open-P&L; per-position contribution labelling; no cross-denominator summing
+
+**Plain-language requirement**: Account Equity and Aggregate
+Open-Position P&L get equal visual prominence; each position shows its
+monetary P&L, trade return, and a "Contribution relative to account
+equity at entry" figure (denominator = equity immediately before that
+position's entry); the overall account return is reported separately
+and position percentages with different denominators are never summed
+as if they were total account return.
+
+**Source/session**: Session 2.
+
+**Decision status**: `Agreed`.
+
+**Implementation authorization**: `Not authorized by this documentation
+task`.
+
+**Current implementation status**: `Partially implemented`. The
+underlying data — per-position `unrealized_pnl_usd`, `realized_pnl_usd`,
+`realized_pnl_pct`, and a separately-tracked account `equity` value —
+already exists and is rendered (`dashboard_web_static/
+index.html:446-478`). **Gaps found by direct inspection**: no
+"Contribution relative to account equity at entry" label or
+entry-equity-denominated contribution figure exists; no code enforces
+or documents equal visual prominence between the equity figure and an
+aggregate open-position-P&L figure (they are both present but not
+verified as equally prominent by any explicit design rule); no
+evidence either way of any place actually summing mismatched-
+denominator percentages (not found, but not exhaustively ruled out
+either).
+
+**Validation status**: `Verified (data fields)` / `Verified (gap:
+contribution labelling absent)` — **Code inspection**
+(`dashboard_web_static/index.html:446-478`, this session).
+
+**Evidence references**: `dashboard_web_static/index.html:446-478`;
+`talonx_ops/paper_performance.py`.
+
+**Open questions/dependencies**: candidate for Session 9 (Telegram and
+dashboard experience) — this is a concrete, scoped presentation gap,
+not a data-availability gap.
+
+---
+
+## S2-11 — Consistent gross/net, realized/unrealized disclosure; deposits/withdrawals deferred
+
+**Plain-language requirement**: gross/net treatment and realized/
+unrealized status are stated consistently; formal deposit/withdrawal
+handling and a detailed portfolio-return methodology may come later and
+must not be invented now.
+
+**Source/session**: Session 2.
+
+**Decision status**: `Agreed`.
+
+**Implementation authorization**: `Not authorized by this documentation
+task`.
+
+**Current implementation status**: `Partially implemented`. Realized
+and unrealized figures are already structurally separate fields
+(S2-07/S2-10 evidence); whether "gross" vs. "net" (of costs) is
+consistently labelled everywhere was **not exhaustively checked** this
+session — `talonx_ops/paper_performance.py` does carry a
+`_TALONX_PAPER_COST_BREAKDOWN` structure attached to closed-trade
+detail rows, suggesting cost/net figures exist for at least Original's
+lane, but full-surface consistency was not verified. No deposit/
+withdrawal feature exists anywhere in the codebase inspected this
+session or across this project's history — correctly untouched, not a
+gap, per this requirement's own explicit deferral.
+
+**Validation status**: `Partially verified` — **Code inspection**
+(`talonx_ops/paper_performance.py:433`, this session); gross/net
+labelling consistency `NOT ASSESSED IN THIS DOCUMENTATION PASS` in
+full.
+
+**Evidence references**: `talonx_ops/paper_performance.py:420-433`.
+
+**Open questions/dependencies**: deposit/withdrawal methodology and
+full gross/net consistency audit — both explicitly deferred, candidates
+for Session 10 (Paper accounting, costs and risk).
+
+---
+
+## S2-12 — Missing/stale valuation disclosure; unresolved P&L never shown as zero
+
+**Plain-language requirement**: a missing current price shows
+"Awaiting price" or "Valuation stale" with its timestamp; unknown/
+unresolved P&L is never displayed as zero; a carried-forward mark is
+labelled with its real freshness; incomplete equity is flagged as such.
+
+**Source/session**: Session 2.
+
+**Decision status**: `Agreed`.
+
+**Implementation authorization**: `Not authorized by this documentation
+task`.
+
+**Current implementation status**: `Partially implemented`. **Verified
+by direct code inspection**: `talonx_ops/paper_performance.py`
+computes `equity_status = "COMPLETE" if marked_value_complete else
+("PARTIAL" if opens else "COMPLETE")` and, critically,
+`equity_value = ... if marked_value_complete or not opens else None` —
+equity is explicitly set to `None` (not zero, not silently estimated)
+when a mark is incomplete, and flagged `PARTIAL` rather than presented
+as fully current. This is a real, working match for this requirement's
+**intent**. **Gap**: no literal "Awaiting price" / "Valuation stale"
+string, and no explicit carried-forward-mark date label, was found in
+`dashboard_web_static/index.html` — a grep for both exact phrases
+returned no matches. The mechanism (never-zero, flagged-incomplete)
+exists; the prescribed operator-facing wording does not.
+
+**Validation status**: `Verified (mechanism)` / `Verified (gap:
+prescribed wording absent)` — **Code inspection**
+(`talonx_ops/paper_performance.py:451-452`, plus a direct grep of
+`dashboard_web_static/index.html` for the requirement's literal
+phrases, this session).
+
+**Evidence references**: `talonx_ops/paper_performance.py:451-452`;
+`docs/research/evidence/eod_closure_2026-09-15/
+EOD_CLOSURE_REPORT.md` §4 (the related V2 pricing-freshness finding —
+see also `OPERATIONAL_FINDINGS.md` `OPS-002`, which is about upstream
+price-source freshness specifically, a related but distinct concern
+from this dashboard-presentation requirement).
+
+**Open questions/dependencies**: candidate for Session 9 (Telegram and
+dashboard experience); directly related to, but not the same issue as,
+`OPS-002`'s upstream pricing-resolver gap.
+
+---
+
+## S2-13 — Actual exit rule and stop-loss status disclosed; V2-specific wording; allocation ≠ loss
+
+**Plain-language requirement**: the operator sees the real strategy
+exit rule and stop-loss status; for the current V2 baseline
+specifically, "Close of the 10th trading session after entry." / "No
+price-based stop-loss."; this wording must not be applied to every
+strategy; wording must avoid implying losses will recover before exit;
+allocation is capital assigned, not a loss estimate.
+
+**Source/session**: Session 2.
+
+**Decision status**: `Agreed`.
+
+**Implementation authorization**: `Not authorized by this documentation
+task`.
+
+**Current implementation status**: `Partially implemented`. **Verified
+by direct code inspection**: the rule is real and frozen —
+`talonx_v2/config.py:33` ("SELL at the CLOSE of the +10th trading
+session after entry"), `stop_loss_enabled: bool = False` with an
+explicit assertion (`config.py:94`, `assert self.stop_loss_enabled is
+False`) guarding the frozen baseline, and `pipeline.py:148`'s own
+comment confirms "FROZEN exit = close of the +10th trading session ...
+the ONLY [exit rule]". **Gap**: no operator-facing surface (Telegram
+message text, dashboard exit-rule display) presenting this rule in the
+plain-language wording given in this requirement was found this
+session — the rule is enforced in code, not explained to the operator
+anywhere located.
+
+**Validation status**: `Verified (rule exists, frozen)` / `Verified
+(gap: operator-facing disclosure not found)` — **Code inspection**
+(`talonx_v2/config.py:33-36,94`; `talonx_v2/pipeline.py:148`, this
+session).
+
+**Evidence references**: `talonx_v2/config.py:33-36,94`; `talonx_v2/
+pipeline.py:148`.
+
+**Open questions/dependencies**: candidate for Session 8 (V2 multi-day
+strategy and lifecycle) or Session 9 (Telegram and dashboard
+experience) — a concrete, scoped disclosure gap.
+
+---
+
+## S2-14 — Strategy/stop-loss variants use separate versioned, isolated experiments
+
+**Plain-language requirement**: any strategy change, including a
+stop-loss variant, runs as a separately versioned experiment with its
+own isolated virtual account, comparable only under consistent
+starting capital/data/cost assumptions — the baseline campaign is
+preserved.
+
+**Source/session**: Session 2.
+
+**Decision status**: `Agreed`.
+
+**Implementation authorization**: `Not authorized by this documentation
+task`.
+
+**Current implementation status**: `Implemented`. This is the
+established governance model built in Task 115/116
+(`talonx_research/` — immutable `StrategyVersion`/`StrategyRegistry`,
+the replay engine's own physical refusal to touch `v2_lane.db`, and
+`docs/STRATEGY_LIFECYCLE.md`'s R1-R7 governance rules) — the exact
+mechanism this requirement describes already exists as this project's
+standing validation infrastructure, confirmed by this session's own
+`git log` review and the prior task's evidence, not re-executed here.
+
+**Validation status**: `Verified` — **Code inspection** (established,
+this project's history — `talonx_research/`, `docs/
+STRATEGY_LIFECYCLE.md`; re-confirmed present by directory/doc
+inspection this session, not re-run).
+
+**Evidence references**: `talonx_research/`; `docs/
+STRATEGY_LIFECYCLE.md`; `docs/research/TALONX_RESEARCH_LEDGER.md`
+(Task 115/116).
+
+**Open questions/dependencies**: none.
+
+---
+
+## S2-15 — No stop-loss-necessarily-helps claim; prior result is conditional evidence; no new experiment authorized
+
+**Plain-language requirement**: the product must not claim a stop-loss
+necessarily improves or destroys returns; the prior +2.0219% net@20
+result (Task 115/116) is conditional historical evidence, not a
+validated promise for current live execution; this session authorizes
+no new research experiment.
+
+**Source/session**: Session 2.
+
+**Decision status**: `Agreed`.
+
+**Implementation authorization**: `Explicitly not authorized` — no new
+research experiment is authorized by this or Session 2's own
+discussion.
+
+**Current implementation status**: `Not implemented` — correctly so;
+nothing is meant to be built from this item. No stop-loss-variant
+experiment, promotion, or fingerprint change was made this session
+(confirmed: V2 fingerprint `11107198c5b81237` unchanged per today's own
+EOD closure report).
+
+**Validation status**: `Verified` — **Code inspection** / **Natural
+live behavior** (V2 fingerprint unchanged, no new `talonx_research/`
+experiment artifact created this session).
+
+**Evidence references**: `docs/research/evidence/eod_closure_2026-09-15/
+EOD_CLOSURE_REPORT.md` §4 (`v2_fingerprint_ok: true`, `11107198c5b81237`
+unchanged); `docs/research/TALONX_RESEARCH_LEDGER.md` (Task 115/116,
+the +2.0219%/+2.196% figures' own origin and stated conditionality).
+
+**Open questions/dependencies**: whether/when a new stop-loss
+experiment should be authorized is a future decision, not made here.

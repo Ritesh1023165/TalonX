@@ -112,3 +112,54 @@ Direct inspection of the actual default bar directory (`results/task95g_broad_cr
 - This document (sanitized, committed).
 - `results/prospective_2026-09-15/` (local, gitignored, raw): `eod_final_checkpoint.json`, `v2_service_status.eod.json`, `v2_lane.db.eod-copy`, `lane_accounting_eod.json`, `session.pids.json` (the day's original launch record), `preflight.json`/`preflight_poststart.json`, `events.jsonl`, `checkpoints/`.
 - Prior, unrelated evidence in this repository (`docs/research/evidence/task140/...`) is unaffected and unreferenced-as-modified by this closure.
+
+## 8. Review note (appended 2026-09-15, Session 2 documentation pass — not a re-litigation of §1-7 above)
+
+This section is appended, not edited into, the original report above —
+same append-only discipline as `docs/product/DECISION_LOG.md`. Full
+detail and the linked open issue live in `docs/product/
+OPERATIONAL_FINDINGS.md` (`OPS-001`, `OPS-002`); this is a short pointer
+plus the two qualifications the original report did not itself state.
+
+**Scope qualification**: EOD accounting and controlled shutdown were
+supported by this report — the reconciliation was genuinely clean
+(zero mismatches among checked components) and the shutdown was
+genuinely graceful (zero residual processes). **This does not
+establish readiness for current-session V2 paper execution.** See
+`OPERATIONAL_FINDINGS.md` `OPS-002` for the specific gap this refers
+to: V2's `"csv"` pricing mode never constructs its own freshness-
+tracking resolver, so its price-staleness telemetry is structurally
+always empty, and the actual default bar directory's latest usable
+price (`2026-08-14`) is materially stale relative to this closure's
+session date. This does not mean price lookups don't happen (the real
+lookup, `CsvBarAdapter.session()`, is separate from the missing
+diagnostic resolver and fails safely — returns `None`, never a wrong
+price) — see `OPS-002` for the full, careful distinction.
+
+**Next-start qualification** (appends to §6 above, does not replace
+it):
+
+- No persisted obligation was reported to require an earlier-than-
+  preferred start — that finding in §6 stands.
+- This is **not proof of complete trading readiness** — see the scope
+  qualification above.
+- Monitoring-only operation and execution-capable V2 acceptance are
+  **distinct** claims; §6's clean next-start procedure is a claim about
+  the former (the process/accounting lifecycle can safely restart on
+  the existing schedule), not the latter.
+- The `csv` launch command recorded in §6 step 5 must **not** be
+  presented as fully execution-ready until `OPS-002` is resolved, or
+  is explicitly shown as running in a degraded/monitoring-only mode.
+- Starting at 08:00 UK, as §6 concludes is safe relative to obligations,
+  leaves an **intentional monitoring gap overnight** — this was true
+  of §6's own conclusion and is restated here for visibility, not newly
+  discovered.
+- **No launch is scheduled or authorized by this documentation task**,
+  same as §6's own closing statement.
+- No supported monitoring-only switch is prescribed here — none was
+  confirmed to exist in the code/runbooks inspected during this
+  documentation pass; inventing one is out of scope.
+
+**Evidence reference**: `docs/product/OPERATIONAL_FINDINGS.md`
+(`OPS-001`, `OPS-002`); `docs/product/DECISION_LOG.md` (Session 2);
+`docs/product/REQUIREMENTS_TRACKER.md` (`S2-12`).

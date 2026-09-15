@@ -16,6 +16,10 @@ Start with the root [`../README.md`](../README.md) for the one-page overview, th
   verified implementation.
 - [product/KNOWLEDGE_TRANSFER_PLAN.md](product/KNOWLEDGE_TRANSFER_PLAN.md)
   — the 13-session plan and the workflow for tracking future decisions.
+- [product/OPERATIONAL_FINDINGS.md](product/OPERATIONAL_FINDINGS.md) —
+  operational/runtime findings (e.g. price-freshness gaps) discovered
+  outside the strategy-tuning and product-requirement tracks, tracked
+  through to a future corrective task.
 
 This is a **separate layer** from `research/TALONX_PRODUCT_STRATEGY_
 SPEC.md`/`research/TALONX_OWNER_DECISIONS.md` below, which govern
