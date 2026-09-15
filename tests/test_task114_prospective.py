@@ -557,6 +557,51 @@ def test_start_stack_deliver_telegram_never_overrides_an_explicit_shell_value(tm
     assert "TALONX_INTEL_DELIVER_CARDS" not in (sup_call["env"] or {})
 
 
+def test_start_stack_full_authorized_configuration_together(tmp_path, monkeypatch):
+    """Task 140 (live /ping follow-up): one integrated scenario proving the
+    launcher can deliver every authorized configuration dimension
+    CONSISTENTLY in a single start_stack() call -- broad collection
+    (Intelligence), expanded execution scope (V2), GATED admission (an
+    operator-supplied env override -- NOT flipped by --enable-broad-
+    discovery/--deliver, since PERMISSIVE remains this deployment's own
+    documented, unchanged default; see docs/research/TASK131_
+    RETROSPECTIVE.md and docs/research/evidence/task139/
+    ping_discrepancy_investigation.md), Intelligence delivery enabled, and
+    routine digest left OFF (never implied by --deliver -- a separate,
+    still-default-off opt-in)."""
+    from talonx_ops.prospective import proc
+    monkeypatch.setattr(proc, "_live_prior_stack", lambda: [])
+    proc, spawned, v2_db = _patched_proc(monkeypatch, tmp_path)
+
+    proc.start_stack(
+        tmp_path / "session", env={"TALONX_V2_DURABLE_STORE_ENABLED": "1"},
+        with_dashboard=False, with_checkpoint_daemon=False,
+        execution_scope="resolved-active-watchlist", deliver=True,
+        transport="telegram", enable_broad_discovery=True,
+    )
+    sup_call = next(c for c in spawned if "talonx_ops.supervisor" in c["argv"])
+    v2_call = next(c for c in spawned if "talonx_v2.run" in c["argv"])
+    env = sup_call["env"] or {}
+
+    # broad collection (Intelligence) + expanded execution (V2)
+    assert env.get("TALONX_INTEL_ENABLE_BROAD_DISCOVERY") == "1"
+    assert "--enable-broad-discovery" in v2_call["argv"]
+    assert "--execution-scope" in v2_call["argv"]
+    assert v2_call["argv"][v2_call["argv"].index("--execution-scope") + 1] == "resolved-active-watchlist"
+    # GATED admission -- the operator-supplied override, carried through
+    # UNCHANGED (never overwritten by any of the other flags above)
+    assert env.get("TALONX_V2_DURABLE_STORE_ENABLED") == "1"
+    # Intelligence delivery enabled
+    assert env.get("TALONX_INTEL_DELIVER_CARDS") == "1"
+    assert env.get("TALONX_INTEL_DRY_RUN_DELIVERY") == "0"
+    # routine digest stays OFF -- never implied by --deliver
+    assert "TALONX_INTEL_DELIVER_DIGEST_ENABLED" not in env
+    # the SAME merged env reaches the V2 companion too (proc._spawn's
+    # {**os.environ, **env} pattern; env is one shared dict object across
+    # every spawn in _start_stack_locked)
+    assert sup_call["env"] is v2_call["env"]
+
+
 def test_start_stack_enable_broad_discovery_never_overrides_an_explicit_shell_value(tmp_path, monkeypatch):
     """A real, explicitly-set env var (shell export or an already-resolved
     `env` dict entry) always wins -- --enable-broad-discovery only ADDS

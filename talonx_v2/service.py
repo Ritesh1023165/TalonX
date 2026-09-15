@@ -1091,6 +1091,17 @@ class V2Service:
             "pending_retry_count_this_tick": len(getattr(self, "_pending_retry_episodes", [])),
             # Task 131 Directive 2/8: lightweight per-position daily mark
             "open_position_marks": marks or [],
+            # Task 140: expose the REAL, same-process admission-gate value
+            # this running companion actually reads at __init__ (line
+            # ~173) -- so /ping and the dashboard can read the authoritative
+            # source instead of each independently re-deriving
+            # TALONX_V2_DURABLE_STORE_ENABLED from THEIR OWN process's
+            # environment (a genuine divergence risk: Original and the V2
+            # companion are separately-spawned processes, and this exact
+            # class of cross-process env-propagation gap has already
+            # surfaced twice tonight for broad-discovery and delivery-
+            # enablement -- see docs/research/evidence/task140/).
+            "durable_store_gate_enabled": self.durable_store_gate_enabled,
             # execution scope enforcement (Task 117 final activation)
             "execution_scope_enforced": self.execution_allowlist is not None,
             "execution_scope_count": (len(self.execution_allowlist)

@@ -1343,16 +1343,36 @@ class DashboardReadModel:
         }
         out["toggles"] = toggles
 
-        # admission_policy: the REAL, current admission-policy mode --
-        # the SAME env var + default V2Service.durable_store_gate_enabled
-        # itself reads (talonx_v2/service.py), read directly here rather
-        # than assumed or duplicated with a different default.
+        # admission_policy: Task 140 -- prefer the REAL companion's own
+        # same-process value (v2_service_status.json's
+        # "durable_store_gate_enabled", written by the actual V2Service
+        # instance at the moment IT read TALONX_V2_DURABLE_STORE_ENABLED)
+        # over re-deriving the env var HERE, in the dashboard's own
+        # separate process. This dashboard and the V2 companion are
+        # spawned independently and can, in principle, see different
+        # merged environments -- the exact class of gap already found
+        # twice tonight for broad-discovery and delivery-enablement (see
+        # docs/research/evidence/task140/). Falls back to the old env-
+        # derived reading only for a status file predating this field.
         _admission_raw = _ingest_os.environ.get("TALONX_V2_DURABLE_STORE_ENABLED")
+        _status_path = (_ingest_os.environ.get("TALONX_V2_STATUS_PATH")
+                        or (str(_repo_root / "v2_service_status.json")
+                            if (_repo_root / "v2_service_status.json").exists()
+                            else str(self.home / "v2_service_status.json")))
+        _source = "this process's own env (status file unavailable/predates this field -- unverified against the actual companion)"
         _admission_gated = (_admission_raw or "").strip().lower() in ("1", "true", "yes", "on")
+        try:
+            _status_raw = _json.loads(Path(_status_path).read_text())
+            if "durable_store_gate_enabled" in _status_raw:
+                _admission_gated = bool(_status_raw["durable_store_gate_enabled"])
+                _source = "live companion (v2_service_status.json)"
+        except Exception:  # noqa: BLE001 -- fall back to the env-derived reading above
+            pass
         out["admission_policy"] = {
             "mode": "GATED" if _admission_gated else "PERMISSIVE",
             "env_var": "TALONX_V2_DURABLE_STORE_ENABLED",
             "raw_value": _admission_raw,
+            "source": _source,
             "note": ("a durable PENDING intent is REQUIRED before any entry, and a hard "
                     "cash/slot reservation gate applies at intent-creation time"
                     if _admission_gated else

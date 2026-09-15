@@ -1028,11 +1028,25 @@ class TelegramReplyListener:
                 f"  Entries/exits (last tick): {v2.get('entries_this_tick', 'unknown')}"
                 f"/{v2.get('exits_this_tick', 'unknown')}"
             )
-            # Same env var + truthy check as talonx_ops/dashboard_read.py's
-            # own admission_policy block -- one established reading, not a
-            # second competing derivation.
-            admission_mode = "GATED" if _env_truthy("TALONX_V2_DURABLE_STORE_ENABLED") else "PERMISSIVE"
-            lines.append(f"  Admission mode: {admission_mode}")
+            # Task 140: prefer the REAL companion's own same-process value
+            # (v2_service_status.json's "durable_store_gate_enabled",
+            # written by the actual V2Service instance at the moment it
+            # read TALONX_V2_DURABLE_STORE_ENABLED) over re-deriving the
+            # env var HERE, in Original's own separate process -- Original
+            # and the V2 companion are spawned independently and can, in
+            # principle, see different merged environments (the exact
+            # class of gap already found twice tonight for broad-discovery
+            # and delivery-enablement). Falls back to the old env-derived
+            # reading only for a status file predating this field.
+            if "durable_store_gate_enabled" in v2:
+                gated = bool(v2["durable_store_gate_enabled"])
+                admission_mode = "GATED" if gated else "PERMISSIVE"
+                lines.append(f"  Admission mode: {admission_mode} (source: live companion)")
+            else:
+                admission_mode = "GATED" if _env_truthy("TALONX_V2_DURABLE_STORE_ENABLED") else "PERMISSIVE"
+                lines.append(f"  Admission mode: {admission_mode} (source: this process's own env -- "
+                             f"status file predates durable_store_gate_enabled, unverified against the "
+                             f"actual companion)")
 
         # -- DELIVERY: discovery informational outbox (ingestion_ledger.db)
         #    + V2 actionable outbox (already in v2_service_status.json) ---
