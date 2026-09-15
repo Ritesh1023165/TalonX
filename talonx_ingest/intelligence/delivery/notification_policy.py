@@ -80,7 +80,11 @@ def _has_buy_cluster(insider_activity):
     """Returns the matching InsiderCluster object (not just a bool) so
     its own real fields (distinct_owners, window_calendar_days,
     transaction_count, total_value) can build genuine evidence text --
-    never a bare presence check alone."""
+    never a bare presence check alone. BUY-side only -- this is the
+    ELIGIBILITY path (a buy cluster alone, with no other substantive
+    reason, still qualifies for IMMEDIATE); kept exactly as before, never
+    widened to sell clusters, which do NOT independently earn eligibility
+    here."""
     if insider_activity is None:
         return None
     clusters = getattr(insider_activity, "clusters", None) or ()
@@ -90,12 +94,28 @@ def _has_buy_cluster(insider_activity):
     return None
 
 
+def _has_any_cluster(insider_activity):
+    """Any insider cluster (buy OR sell) -- Task 140c: used ONLY to pick
+    a richer evidence TEXT for an event that is ALREADY eligible via
+    LARGE_OPEN_MARKET_TRANSACTION, never to grant eligibility on its own
+    (that remains _has_buy_cluster's job, unchanged). See
+    classify_disposition's own comment for why this exists."""
+    if insider_activity is None:
+        return None
+    clusters = getattr(insider_activity, "clusters", None) or ()
+    return clusters[0] if clusters else None
+
+
 def _cluster_evidence_text(cluster) -> str:
     n = cluster.distinct_owners
     window = cluster.window_calendar_days
     txns = getattr(cluster, "transaction_count", 0) or 0
     total = getattr(cluster, "total_value", None)
-    detail = f"{n} distinct insiders bought in the open market within {window} days"
+    # Task 140c: state the real transaction direction -- mirrors
+    # rules.py's own insider_activity() side-derivation exactly (never a
+    # second, independently-maintained direction check).
+    verb = "bought" if getattr(cluster, "kind", None) == _BUY_CLUSTER_KIND else "sold"
+    detail = f"{n} distinct insiders {verb} in the open market within {window} days"
     extra = []
     if txns:
         extra.append(f"{txns} transaction{'s' if txns != 1 else ''}")
@@ -172,6 +192,26 @@ def classify_disposition(
     # LOOSER content bar.
     hits, evidence = _substantive_evidence(reasons)
     if hits and evidence:
+        # Task 140c (bounded acceptance-review finding): LARGE_OPEN_MARKET_
+        # TRANSACTION's own description never states purchase/sale
+        # direction ("an open-market insider transaction of about $X was
+        # reported"). When it is the ONLY reason this event qualifies AND
+        # a real insider cluster (buy or sell) is ALSO present for the
+        # same event, the cluster's own description is strictly more
+        # informative -- it states direction, distinct-owner count and
+        # window, plus the same dollar total. Demonstrated live: two real
+        # PENDING DD cards (each a genuine 2-distinct-seller/30-day
+        # cluster) would have sent as a bare, direction-less dollar
+        # figure despite the richer, already-computed cluster fact
+        # sitting right next to it in the same reasons list. This never
+        # overrides a genuinely different substantive code (a filing-
+        # change code never co-occurs with an insider cluster for the
+        # same event in practice) -- it only improves WHICH already-
+        # qualifying fact is shown, never widens eligibility.
+        if hits == {"LARGE_OPEN_MARKET_TRANSACTION"}:
+            richer_cluster = _has_any_cluster(insider_activity)
+            if richer_cluster is not None:
+                evidence = _cluster_evidence_text(richer_cluster)
         return DispositionDecision(
             DISPOSITION_IMMEDIATE,
             f"{band_val} band with a substantive, evidenced trigger present: {sorted(hits)}.",
@@ -210,29 +250,50 @@ class ReclassifyResult:
     scanned: int = 0
     downgraded: int = 0
     downgraded_ids: list = None       # type: ignore[assignment]
+    # Task 140c: a row that STAYS IMMEDIATE but whose evidence_text
+    # selection improved (e.g. a direction-less dollar figure correctly
+    # replaced by a richer, already-computed cluster fact) -- content
+    # corrected in place, route/state/attempts untouched. Kept separate
+    # from `downgraded` -- a genuinely different outcome (eligibility
+    # unchanged, only which already-qualifying fact is shown).
+    content_refreshed: int = 0
+    content_refreshed_ids: list = None  # type: ignore[assignment]
     errors: list = None               # type: ignore[assignment]
 
     def __post_init__(self):
         if self.downgraded_ids is None:
             self.downgraded_ids = []
+        if self.content_refreshed_ids is None:
+            self.content_refreshed_ids = []
         if self.errors is None:
             self.errors = []
 
 
 def reclassify_pending_rows(
-    outbox, *, significance_store, insider_store=None, route: str = "IMMEDIATE",
-    limit: int = 500, now=None,
+    outbox, *, significance_store, insider_store=None, events_store=None,
+    route: str = "IMMEDIATE", limit: int = 500, now=None,
 ) -> ReclassifyResult:
     """Bounded: inspects at most ``limit`` PENDING rows on ``route``
     (default IMMEDIATE), oldest-enqueued first, reusing ``outbox.pending``
     (the SAME selection query the send path uses -- no separate/unbounded
     scan). For each, re-fetches its already-persisted significance record
-    and re-classifies; a row whose new verdict is DIGEST has its `route`
-    column updated in place (logged). SENT/AMBIGUOUS rows are never
-    touched (``outbox.pending`` only ever returns PENDING rows); nothing
-    is deleted or replayed. Safe to call repeatedly -- a row already
-    reclassified to DIGEST is simply skipped on a later call (its route
-    is no longer IMMEDIATE)."""
+    and re-classifies:
+
+    - A row whose new verdict is DIGEST has its `route` column updated in
+      place (logged) -- unchanged from Task 140/140b.
+    - Task 140c: a row whose verdict is STILL IMMEDIATE, tier CONCISE, but
+      whose evidence_text would now differ (a content-quality correction,
+      not an eligibility one -- e.g. this same turn's LARGE_OPEN_MARKET_
+      TRANSACTION-vs-cluster preference fix) is RE-RENDERED via the real
+      render_concise and its `text`/`content_hash` updated in place, only
+      when ``events_store`` is supplied (optional -- omitting it preserves
+      the exact prior route-only behavior for any existing caller/test).
+      Never touches `state`/`route`/`attempts`/`enqueued_at_utc`.
+
+    SENT/AMBIGUOUS rows are never touched (``outbox.pending`` only ever
+    returns PENDING rows); nothing is deleted or replayed. Safe to call
+    repeatedly -- idempotent (a row already reclassified/refreshed simply
+    produces no further change on a later call)."""
     from talonx_ingest.intelligence.insider.pipeline import build_insider_activity
 
     res = ReclassifyResult()
@@ -263,6 +324,34 @@ def reclassify_pending_rows(
                             f"IMMEDIATE -> DIGEST: {decision.reason}")
                 res.downgraded += 1
                 res.downgraded_ids.append(row.delivery_id)
+            elif (decision.disposition == DISPOSITION_IMMEDIATE and events_store is not None
+                  and row.tier == "CONCISE"):
+                try:
+                    ev = events_store.get_event(row.event_id)
+                    if ev is not None:
+                        from talonx_ingest.intelligence.delivery.identity import content_hash as _content_hash
+                        from talonx_ingest.intelligence.delivery.renderer import render_concise
+                        from talonx_ingest.intelligence.pipeline import build_alert_card
+                        from talonx_ingest.intelligence.significance.alert_integration import (
+                            apply_significance,
+                        )
+
+                        card = apply_significance(build_alert_card(ev), sig)
+                        msg = render_concise(card, disposition_reason=decision.evidence_text, now=now)
+                        if msg.text != row.text:
+                            outbox._conn.execute(
+                                "UPDATE intelligence_delivery SET text=?, content_hash=? "
+                                "WHERE delivery_id=? AND state='PENDING'",
+                                (msg.text, _content_hash(msg.text), row.delivery_id),
+                            )
+                            outbox._conn.commit()
+                            outbox._log(row.delivery_id, "CONTENT_RECLASSIFIED",
+                                        "evidence text refreshed by a content-quality "
+                                        "policy correction (eligibility unchanged)")
+                            res.content_refreshed += 1
+                            res.content_refreshed_ids.append(row.delivery_id)
+                except Exception as exc:  # noqa: BLE001
+                    res.errors.append(f"{row.delivery_id}: content refresh: {exc!r}")
         except Exception as exc:  # noqa: BLE001
             res.errors.append(f"{row.delivery_id}: {exc!r}")
     return res
