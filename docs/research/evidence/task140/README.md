@@ -24,6 +24,26 @@ touched, no restart performed or required. See that document for the
 full root cause, fix, real-browser test evidence (10/10 real headless-
 Chrome behavioural tests), and before/after screenshots.
 
+## Later correction (Task 140b): live generic alerts bypassing the content requirement
+
+A real operator-received pair of AXON informational pushes (CRITICAL
+band) restated their own filing category as "evidence" and explained
+nothing else. Root cause, fix, and full closure evidence in
+`axon_live_defect/root_cause_and_fix.md` — `notification_policy.
+classify_disposition`'s CRITICAL branch had a separate, looser
+evidence fallback that silently accepted `EVENT_TYPE_BASE`'s own bare
+category description; removed so CRITICAL now shares the IDENTICAL
+evidence gate as MEDIUM/HIGH, "regardless of significance band". Also
+corrected the "Source freshness unknown at emit time" wording (verified
+that field is `UNKNOWN` for 100% of persisted events today — a separate,
+never-wired-up signal, not doubt about the event's own known timing).
+Commits `d296c60` (fix) + `12be1bd`/`f6bd1d3`/`d05c885` (this same
+Task 140 evidence lineage, unrelated prior corrections). 11 new tests,
+529-test broader regression (0 failed), live bounded
+`reclassify_pending_rows` pass (0 PENDING CRITICAL rows existed; 49
+currently-due HIGH/MEDIUM rows re-confirmed correctly classified, 0
+downgraded), minimal single-component (Intelligence-only) restart.
+
 ## Exact new default
 
 - `ServiceConfig.deliver_digest_enabled` (env

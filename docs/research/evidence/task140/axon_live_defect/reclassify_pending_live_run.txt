@@ -1,0 +1,11 @@
+Bounded, idempotent reclassify_pending_rows pass against the REAL
+production ~/.talonx/ingestion_ledger.db, run once at cutover after
+committing d296c60 (the CRITICAL-branch fix).
+
+db: C:\Users\rites\.talonx\ingestion_ledger.db exists: True
+PENDING IMMEDIATE rows before: 49
+scanned: 49
+downgraded: 0
+downgraded_ids: []
+errors: []
+PENDING IMMEDIATE rows after: 49
