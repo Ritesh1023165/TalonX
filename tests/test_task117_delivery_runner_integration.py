@@ -182,6 +182,88 @@ def test_digest_not_treated_as_immediate(tmp_path, monkeypatch):
     svc.stores.outbox.close()
 
 
+def _enqueue_digest(svc, *, symbol, accession, enqueued_at):
+    """Same real-backing-TextEvent contract as _enqueue (see its own
+    docstring for why -- the freshness gate needs it or the row is
+    UNQUALIFIED before it ever reaches the digest-mode check at all),
+    but on_watchlist=False so the card naturally routes DIGEST."""
+    from talonx_ingest.intelligence.domain import EventType, SourceType, TextEvent
+
+    card, _ = make_card(symbol=symbol, accession=accession, on_watchlist=False,
+                        now=enqueued_at)
+    row = enqueue_card(card, outbox=svc.stores.outbox, now=enqueued_at).row
+    assert row.route == "DIGEST"
+    svc.stores.events.upsert_event(TextEvent(
+        event_id=row.event_id, symbol=symbol, company_name=symbol,
+        source_type=SourceType.SEC_EDGAR_SUBMISSIONS, source_record_id=accession,
+        event_type=EventType.EARNINGS_RESULTS, form_type="8-K",
+        accession=accession, accepted_at_utc=enqueued_at, ingested_at_utc=enqueued_at,
+    ))
+    return row.delivery_id
+
+
+def test_digest_delivery_defaults_off_even_when_immediate_delivery_is_enabled(tmp_path, monkeypatch):
+    """Task 140 B1/B4: deliver_digest_enabled defaults False -- a DIGEST-
+    route row is HELD (not sent, not lost, not dropped) even with overall
+    delivery fully enabled and past its digest interval, distinct from
+    IMMEDIATE which is unaffected by this flag."""
+    svc, cfg = _svc(tmp_path, deliver_intelligence_cards=True, dry_run_delivery=False)
+    assert cfg.deliver_digest_enabled is False
+    imm = _enqueue(svc, symbol="ORCL", accession="0001193125-26-387905",
+                   enqueued_at=NOW - timedelta(minutes=5))
+    dig_id = _enqueue_digest(svc, symbol="TSLA", accession="0001104659-26-106432",
+                             enqueued_at=NOW - timedelta(minutes=5))
+    inter = _Intercept()
+    monkeypatch.setattr(dp, "TelegramSenderAdapter", lambda *a, **k: inter)
+
+    s = asyncio.run(svc.deliver_cycle(now=NOW))
+    assert s["IMMEDIATE"]["delivered"] == 1                       # unaffected
+    assert svc.stores.outbox.get(imm).state == STATE_SENT
+    assert s["DIGEST"]["held"] >= 1 and s["DIGEST"]["delivered"] == 0
+    dig_after = svc.stores.outbox.get(dig_id)
+    assert dig_after.state == STATE_PENDING                        # never lost
+    logs = svc.stores.outbox.logs(dig_id)
+    assert any(l["kind"] == "HELD" and "delivery disabled" in (l["detail"] or "") for l in logs)
+    svc.stores.outbox.close()
+
+
+def test_digest_delivery_explicit_opt_in_sends_the_aggregated_digest(tmp_path, monkeypatch):
+    """The same row/config, but with deliver_digest_enabled=True -- the
+    digest is sent, exactly the pre-Task-140 behaviour, as an explicit
+    choice rather than the new default."""
+    svc, cfg = _svc(tmp_path, deliver_intelligence_cards=True, dry_run_delivery=False,
+                    deliver_digest_enabled=True)
+    assert cfg.deliver_digest_enabled is True
+    dig_id = _enqueue_digest(svc, symbol="TSLA", accession="0001104659-26-106432",
+                             enqueued_at=NOW - timedelta(minutes=5))
+    inter = _Intercept()
+    monkeypatch.setattr(dp, "TelegramSenderAdapter", lambda *a, **k: inter)
+
+    s = asyncio.run(svc.deliver_cycle(now=NOW))
+    assert s["DIGEST"]["delivered"] == 1
+    assert svc.stores.outbox.get(dig_id).state == STATE_SENT
+    svc.stores.outbox.close()
+
+
+def test_digest_default_off_is_durable_across_the_existing_pending_backlog(tmp_path, monkeypatch):
+    """Task 140 B5: the digest-off default is a per-cycle GATE (re-
+    evaluated every deliver_cycle call), not a one-time batch -- pending
+    DIGEST rows from BEFORE this config existed are held on every single
+    cycle they're checked, not just the first, and never escape by
+    outliving some one-shot reclassification pass."""
+    svc, cfg = _svc(tmp_path, deliver_intelligence_cards=True, dry_run_delivery=False)
+    dig_id = _enqueue_digest(svc, symbol="TSLA", accession="0001104659-26-106432",
+                             enqueued_at=NOW - timedelta(minutes=5))
+    inter = _Intercept()
+    monkeypatch.setattr(dp, "TelegramSenderAdapter", lambda *a, **k: inter)
+
+    for i in range(3):
+        s = asyncio.run(svc.deliver_cycle(now=NOW + timedelta(minutes=10 * i)))
+        assert s["DIGEST"]["delivered"] == 0
+        assert svc.stores.outbox.get(dig_id).state == STATE_PENDING
+    svc.stores.outbox.close()
+
+
 def test_cli_send_flag_flips_both_enablement_gates():
     """``poll --send --i-understand-external-send`` is the explicit operator
     enablement: it must flip BOTH ``dry_run_delivery`` -> False AND

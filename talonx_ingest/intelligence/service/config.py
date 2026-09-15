@@ -129,6 +129,18 @@ class ServiceConfig:
     # AND ``dry_run_delivery=False`` AND have Telegram configured to actually
     # deliver. Per-cycle cap + a hard timeout keep it off the poll path.
     deliver_intelligence_cards: bool = False
+    # Task 140: routine filing-inventory DIGEST delivery is a SEPARATE,
+    # explicit opt-in from ``deliver_intelligence_cards`` -- default off.
+    # IMMEDIATE (a qualified, substantive alert -- see notification_
+    # policy.classify_disposition) is governed by ``deliver_intelligence_
+    # cards`` alone, unaffected by this flag. When this is False, DIGEST-
+    # route rows are drained in the EXISTING "disabled" mode (reuses
+    # process_digest's own mode=MODE_DISABLED branch -- rows stay PENDING,
+    # logged HELD/"delivery disabled", nothing sent, nothing lost); the
+    # underlying event/enrichment/significance data stays fully persisted
+    # and dashboard-queryable exactly as it always has been. Set True to
+    # resume the periodic filing-activity digest as an explicit choice.
+    deliver_digest_enabled: bool = False
     deliver_cards_per_cycle: int = 20
     deliver_cards_enforce_age_cutoff: bool = True
     deliver_cards_timeout_seconds: float = 20.0
@@ -221,6 +233,7 @@ class ServiceConfig:
             ),
             dry_run_delivery=_env_bool("TALONX_INTEL_DRY_RUN_DELIVERY", True),
             deliver_intelligence_cards=_env_bool("TALONX_INTEL_DELIVER_CARDS", False),
+            deliver_digest_enabled=_env_bool("TALONX_INTEL_DELIVER_DIGEST_ENABLED", False),
             deliver_cards_per_cycle=_env_int("TALONX_INTEL_DELIVER_PER_CYCLE", 20),
             deliver_cards_enforce_age_cutoff=_env_bool(
                 "TALONX_INTEL_DELIVER_AGE_CUTOFF", True

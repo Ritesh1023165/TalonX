@@ -278,6 +278,11 @@ class IntelligenceService:
         )
         mode = "enabled" if enabled else "disabled"
         sender = TelegramSenderAdapter() if enabled else _InertSender()
+        # Task 140: DIGEST is a separate, explicit opt-in (default OFF) from
+        # IMMEDIATE -- reuses process_digest's own existing "disabled" mode
+        # (rows stay PENDING, HELD/"delivery disabled", nothing lost) rather
+        # than a new delivery engine. IMMEDIATE's own `mode` is unaffected.
+        digest_mode = mode if self.config.deliver_digest_enabled else "disabled"
 
         def _event_time(event_id: str):
             # Task 136B: a clean `None` return means "looked it up, there is
@@ -319,7 +324,7 @@ class IntelligenceService:
             )
             dig = await asyncio.wait_for(
                 process_digest(
-                    self.stores.outbox, sender, mode=mode,
+                    self.stores.outbox, sender, mode=digest_mode,
                     interval_seconds=self.config.deliver_digest_interval_seconds,
                     limit=self.config.deliver_cards_per_cycle,
                     now=now,

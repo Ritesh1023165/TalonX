@@ -1,4 +1,4 @@
-# TalonX Informational Notification Delivery Policy (Task 138)
+# TalonX Informational Notification Delivery Policy (Task 138, revised Task 140)
 
 Status: active configurable delivery policy, not an economically-validated
 trading threshold. Governs which already-enriched, already-scored
@@ -7,6 +7,14 @@ held for the periodic digest or dashboard-only. It changes **nothing**
 about ingestion, enrichment, significance scoring, the freeze fingerprint,
 or V2's own paper entry/exit delivery (a completely separate route/
 meaning, untouched — see §5).
+
+**Task 140 update**: the periodic filing-activity DIGEST route itself is
+now OFF by default (§2.1) — a routine, non-substantive event no longer
+produces ANY Telegram message by default (previously it still reached the
+operator, just bundled into one larger periodic message rather than sent
+individually). This closes the gap the original Task 138 policy left:
+replacing a large filing-inventory digest with a smaller one is still
+noise if the digest itself was never explicitly requested.
 
 ## 1. Objective
 
@@ -28,6 +36,35 @@ form/item number, or watchlist membership.
 No new delivery engine, no new outbox table, no new route. `DASHBOARD_
 ONLY` is the only genuinely new behaviour, and it is a *subtraction*
 (skip the existing enqueue call), not an addition.
+
+## 2.1 DIGEST delivery itself: OFF by default (Task 140)
+
+Distinct from which individual cards route to `DIGEST` (§3) is whether the
+periodic DIGEST message is sent to Telegram **at all**. New config field
+`ServiceConfig.deliver_digest_enabled` (env `TALONX_INTEL_DELIVER_DIGEST_
+ENABLED`), **default `False`** — independent of, and does not require
+touching, the existing `deliver_intelligence_cards`/`TALONX_INTEL_DELIVER_
+CARDS` master switch that still governs `IMMEDIATE`.
+
+- **Off (default)**: `IntelligenceService.deliver_cycle` drains
+  `process_digest` in the SAME `mode="disabled"` the whole delivery path
+  already uses for a fully-disabled deployment — DIGEST-route rows stay
+  `PENDING`, logged `HELD` / `"digest due but delivery disabled"`, never
+  sent, never dropped, never mutated otherwise. They remain visible via
+  the dashboard/detail surfaces and age out through the SAME existing
+  freshness/expiry mechanism as any other backlog row (no special-cased
+  deletion). This check runs **every** `deliver_cycle`, not a one-time
+  migration — a backlog row enqueued before this config existed is held
+  on every cycle it is evaluated, not just the first.
+- **On (`TALONX_INTEL_DELIVER_DIGEST_ENABLED=1`)**: exact pre-Task-140
+  behaviour — the periodic aggregated digest is sent as before.
+- `IMMEDIATE` delivery is completely unaffected by this flag either way.
+
+**Effective default for this deployment**: OFF (not currently set in
+`.env` or the environment). Verified reaching the running process via
+`ServiceConfig.from_env().deliver_digest_enabled is False` and a live
+`deliver_cycle` observation (`DIGEST.held >= 1`, `DIGEST.delivered == 0`)
+— see `docs/research/evidence/task140/`.
 
 ## 3. Deterministic rule (implemented in
 `talonx_ingest/intelligence/delivery/notification_policy.py::classify_disposition`)
