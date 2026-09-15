@@ -569,15 +569,51 @@ def _digest_row_summary(r) -> str:
     except ValueError:
         desc = etype_raw or "event"
     when = r.enqueued_at_utc.strftime("%Y-%m-%dT%H:%MZ") if r.enqueued_at_utc else "time unknown"
-    link = f" {r.evidence_urls[0]}" if getattr(r, "evidence_urls", None) else ""
+    # Task 140 fix: `r` here may be a real DeliveryRow (evidence_urls
+    # already json.loads'd into a tuple by DeliveryOutbox._row) OR the
+    # lightweight read-only row wrapper ReadOnlyIntelligenceReader uses
+    # for the production reply-correlation path (raw, un-decoded sqlite
+    # column). Indexing a raw JSON string like "[...]" at [0] silently
+    # returns "[" instead of a URL -- confirmed live against real
+    # production message 958's own delivery rows. Decode defensively so
+    # this function's output is correct for BOTH callers.
+    ev_urls = getattr(r, "evidence_urls", None)
+    if isinstance(ev_urls, str):
+        import json as _json
+        try:
+            ev_urls = _json.loads(ev_urls or "[]")
+        except (ValueError, TypeError):
+            ev_urls = []
+    link = f" {ev_urls[0]}" if ev_urls else ""
     return f"{desc} (enqueued {when}){link}"
 
 
-def _digest_text_from_rows(rows: list, now: datetime) -> str:
+_DIGEST_BAND_RANK = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, None: 4}
+
+
+def digest_display_order(rows: list) -> list:
+    """THE single sort TalonX ever uses to decide what order a digest's
+    constituent rows appear in -- band priority, then symbol, then
+    event_id (a stable final tiebreak). Task 140: this used to be
+    duplicated inline inside ``_digest_text_from_rows`` with no way for
+    a caller to learn the order it produced; extracted so
+    ``process_digest`` can persist the SAME order (``DeliveryOutbox.
+    mark_digest_sent``'s ``digest_item_ordinal``) it renders -- one
+    shared source of truth, never two independently-derived orders that
+    can (and, in production, did) disagree."""
+    return sorted(rows, key=lambda r: (_DIGEST_BAND_RANK.get(r.band, 4), r.symbol, r.event_id))
+
+
+def _digest_text_from_rows(rows: list, now: datetime, *, ordered: list | None = None) -> str:
+    """``ordered``, when given, is the EXACT display order to render in
+    (already computed once by the caller via ``digest_display_order`` --
+    avoids re-sorting and guarantees the text matches whatever ordinals
+    were persisted alongside it). Falls back to sorting internally so
+    every existing/test caller that only cares about the text is
+    unaffected."""
     from talonx_ingest.intelligence.delivery.config import MAX_DIGEST_ROWS
 
-    rank = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, None: 4}
-    srt = sorted(rows, key=lambda r: (rank.get(r.band, 4), r.symbol, r.event_id))
+    srt = ordered if ordered is not None else digest_display_order(rows)
     shown = srt[:MAX_DIGEST_ROWS]
     # Task 118A P3: this batch is being sent right now (the caller only
     # reaches this function once `due` is True) -- "held" described rows
@@ -756,7 +792,13 @@ async def process_digest(
         # set of rows can still produce a real digest send within the same
         # window on a subsequent call.
         return result
-    text = _digest_text_from_rows([rows_by_id[did] for did in claimed], now)
+    # Task 140: ONE shared order, computed once -- both the rendered text
+    # and the ordinals persisted below (on success) come from this SAME
+    # list, so a later "details N" reply can never disagree with what the
+    # operator actually read.
+    ordered_rows = digest_display_order([rows_by_id[did] for did in claimed])
+    ordered_ids = [r.delivery_id for r in ordered_rows]
+    text = _digest_text_from_rows(ordered_rows, now, ordered=ordered_rows)
     synthetic = types.SimpleNamespace(
         delivery_id=digest_id, text=text, parse_mode=None, disposition="NEW",
         band=None, route="DIGEST", symbol="DIGEST", event_id=digest_id)
@@ -781,7 +823,7 @@ async def process_digest(
         return result
 
     if res.ok:
-        outbox.mark_digest_sent(claimed, digest_id, message_id=res.message_id, now=now)
+        outbox.mark_digest_sent(ordered_ids, digest_id, message_id=res.message_id, now=now)
         outbox.set_meta(_DIGEST_META_KEY, str(bucket))
         outbox.set_meta(_DIGEST_SENT_AT_KEY, now.isoformat())
         result.delivered += len(claimed)

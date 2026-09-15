@@ -1,0 +1,36 @@
+Full repository suite run, Task 140 reply-details correction (this segment).
+Started: 2026-09-15T~09:00Z (approx), immediately before commit.
+Properly captured this time -- no truncating pipe.
+
+tests/test_task83_browser_dashboard.py::test_compare_view_not_run_when_no_evidence
+  C:\workspace\TalonX\tests\test_task83_browser_dashboard.py:216: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["compare_config"] = cfg
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_task100a_authoritative_read_model.py::test_2_no_producer_yields_no_active_producer
+FAILED tests/test_task102_operational_finalization.py::test_36_original_strategy_unchanged
+FAILED tests/test_task104_p2_cleanup.py::test_32_33_original_strategy_and_thresholds_unchanged
+FAILED tests/test_task111_v2_e2e.py::test_item3_original_strategy_fingerprint_unchanged
+FAILED tests/test_task112_tuesday_release.py::test_03_v1_fingerprint_intact
+FAILED tests/test_task114_prospective.py::test_start_stack_omits_enable_broad_discovery_by_default
+FAILED tests/test_task114_prospective.py::test_start_stack_passes_enable_broad_discovery_through_to_the_v2_companion
+FAILED tests/test_task117_deployment_rehearsal.py::test_bounded_controlled_deployment_rehearsal
+FAILED tests/test_task117_execution_scope.py::test_prospective_start_stack_passes_the_deployment_flags
+FAILED tests/test_task117_migration.py::test_migration_preserves_all_existing_state
+FAILED tests/test_task117_migration.py::test_migration_is_idempotent_across_restarts
+FAILED tests/test_task117_migration.py::test_alter_migration_on_a_preexisting_outbox_without_the_new_column
+FAILED tests/test_task117_migration.py::test_historical_episode_in_store_makes_no_fresh_actionable_alert
+FAILED tests/test_task117_migration.py::test_interrupted_tick_leaves_a_consistent_recoverable_ledger
+FAILED tests/test_task117_release_rehearsal.py::test_bounded_release_rehearsal
+FAILED tests/test_task118a_dashboard_message_count.py::test_immediate_and_digest_sends_count_messages_correctly
+FAILED tests/test_task131_dashboard_broad_discovery.py::test_original_watchlist_view_untouched_shape
+17 failed, 4851 passed, 6 skipped, 420 warnings in 4862.37s (1:21:02)
+
+======================================================================
+BASELINE COMPARISON -- exact name-for-name diff against the Task 138
+worktree-verified pre-existing/environmental 17-failure set
+(docs/research/evidence/task138/full_suite_run_output.txt)
+======================================================================
+EXACT MATCH -- all 17 failure names identical, zero difference.

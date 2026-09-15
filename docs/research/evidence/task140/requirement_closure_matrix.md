@@ -135,3 +135,47 @@ not manufactured, not claimed from calling the resolver directly.
 substantive-content work. Frozen fingerprint `11107198c5b81237`
 re-verified unchanged post-cutover (`research.scripts.task112_v2_
 release_fingerprint`).
+
+## 7. CORRECTION (same-day follow-up) — Reply-for-details ordering/index/source-link/wording
+
+**Supersedes item 5's "unchanged from Task 138/139 — not reopened"
+status.** The operator's live reply against message 958 subsequently
+occurred and exposed real defects; this is now closed with real
+evidence rather than deferred.
+
+- **Status: NOT correct (5 confirmed real defects) → IMPLEMENTED_AND_VERIFIED
+  this turn**, both in isolated tests AND directly re-checked against
+  the real historical production message the operator actually replied
+  to.
+- Root cause + fix: `reply_details_correction_root_cause.md`.
+- Code: `talonx_ingest/intelligence/delivery/outbox.py` (new
+  `digest_item_ordinal` column + `mark_digest_sent` order contract),
+  `pipeline.py` (`digest_display_order` extracted/shared, `process_digest`
+  persists the same order it renders, `_digest_row_summary` evidence_urls
+  decoding fix), `reply_correlation.py` (order verification, pagination,
+  validated source-link resolution, facts/selection-reason separation,
+  digest-item wording fix).
+- Tests: `tests/test_task140_reply_details_acceptance.py` (14 new,
+  real digest renderer + real persisted correlation + real resolver
+  against an isolated on-disk store, including an enqueue-order-vs-
+  display-order fixture shaped exactly like the real historical digest);
+  2 pre-existing wording assertions in `tests/test_task138_reply_
+  correlation.py` updated to match the new, more precise fact/reason
+  split (not reverted — a deliberate improvement).
+- Live diagnostic re-verification (NOT a live Telegram round trip — see
+  `reply_details_live_verification_message_958.txt`'s own header):
+  directly against the real `~/.talonx/ingestion_ledger.db`, message
+  958. `"details"` index and `"details 1"`/`"details 2"` now match the
+  operator's own reported real order exactly (`AKAM` then `AMZN` —
+  not the confirmed-wrong `PH...`/`APO` order).
+- A genuine NEW bug was found and fixed by this same live-verification
+  step (evidence_urls raw-JSON-string indexing bug in the digest-line
+  reconstruction, production read-only-reader path only) — see the root
+  cause doc's own section on it.
+- **Isolated-test verdict and live-diagnostic verdict are reported
+  SEPARATELY, per instruction**: isolated = PASS (14/14 new + 136/136
+  combined focused regression). Live diagnostic = matches real operator
+  evidence exactly, both before-fix (reproduced the bug) and after-fix
+  (correct). **A corrected LIVE TELEGRAM ROUND TRIP remains separately
+  pending** — no inbound reply has been manufactured; the operator must
+  naturally reply again to confirm end-to-end over the real transport.

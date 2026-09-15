@@ -229,6 +229,7 @@ class DeliveryRow:
     attempt_id: str | None = None
     in_flight_since_utc: datetime | None = None
     transport_message_id: str | None = None
+    digest_item_ordinal: int | None = None
 
 
 @dataclass
@@ -257,6 +258,17 @@ class DeliveryOutbox:
             # backoff in _defer_backoff_seconds(). Default 0 for every
             # existing/new row (never deferred yet).
             ("defer_count", "defer_count INTEGER NOT NULL DEFAULT 0"),
+            # Task 140: the row's own 1-based position in the ACTUAL
+            # digest message as rendered/sent (the same sort key
+            # _digest_text_from_rows used to build the text an operator
+            # actually read) -- persisted at mark_digest_sent time so a
+            # later "details N" reply resolves against a stored fact, not
+            # a re-derived guess. NULL for every row not sent as part of a
+            # digest (a single-card send, or any row predating this
+            # column) -- reply_correlation.py falls back to a verified
+            # deterministic re-sort (band/symbol/event_id, all immutable
+            # post-enqueue) for those, labelled as reconstructed.
+            ("digest_item_ordinal", "digest_item_ordinal INTEGER"),
         ):
             if col not in _have:
                 self._conn.execute(f"ALTER TABLE intelligence_delivery ADD COLUMN {ddl}")
@@ -321,17 +333,26 @@ class DeliveryOutbox:
     def mark_digest_sent(self, delivery_ids: list[str], digest_id: str, *,
                          message_id: str | int | None = None,
                          now: datetime | None = None) -> None:
+        """``delivery_ids`` MUST already be in the exact order the digest
+        was actually rendered/sent in (Task 140) -- this is what gets
+        persisted as each row's 1-based ``digest_item_ordinal``, the
+        durable fact a later "details N" reply resolves against. The
+        caller (``process_digest``) derives this order from the SAME sort
+        key ``_digest_text_from_rows`` uses to build the message text --
+        one shared source of order, never two independently-derived
+        ones."""
         now = now or datetime.now(timezone.utc)
-        for did in delivery_ids:
+        for ordinal, did in enumerate(delivery_ids, start=1):
             self._conn.execute(
                 "UPDATE intelligence_delivery SET state=?, sent_at_utc=?, last_error=NULL, "
                 "next_retry_at_utc=NULL, in_flight_since_utc=NULL, "
-                "transport_message_id=?, updated_at_utc=? WHERE delivery_id=? AND state=?",
+                "transport_message_id=?, digest_item_ordinal=?, updated_at_utc=? "
+                "WHERE delivery_id=? AND state=?",
                 (STATE_SENT, _iso(now),
                  f"digest:{digest_id}" + (f":{message_id}" if message_id is not None else ""),
-                 _iso(now), did, STATE_IN_FLIGHT),
+                 ordinal, _iso(now), did, STATE_IN_FLIGHT),
             )
-            self._log(did, "SENT", f"in digest {digest_id} (message_id={message_id})")
+            self._log(did, "SENT", f"in digest {digest_id} (message_id={message_id}, item {ordinal})")
         self._conn.commit()
 
     # ------------------------------------------------------------------
@@ -983,4 +1004,5 @@ class DeliveryOutbox:
             attempt_id=(r["attempt_id"] if "attempt_id" in r.keys() else None),
             in_flight_since_utc=(_dt(r["in_flight_since_utc"]) if "in_flight_since_utc" in r.keys() else None),
             transport_message_id=(r["transport_message_id"] if "transport_message_id" in r.keys() else None),
+            digest_item_ordinal=(r["digest_item_ordinal"] if "digest_item_ordinal" in r.keys() else None),
         )

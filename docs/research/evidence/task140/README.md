@@ -56,7 +56,11 @@ migration.
 | `commit_2c96c8f_{message,stat}.txt` | the substantive-content-requirement fix + reservation-expiry tests (personal email redacted) |
 | `post_task140_v2_service_status.json` | live V2 status snapshot showing `execution_scope_count: 626`, `durable_store_gate_enabled: true` |
 | `execution_scope_membership_log_excerpt.txt` | the real companion's OWN startup log lines proving 39 (watchlist) + 587 (broad discovery manifest) = 626 by genuine membership, not just count |
-| `full_suite_run_output_task140.txt` | the one full-repository-suite run for this final completion pass |
+| `full_suite_run_output_task140.txt` | the one full-repository-suite run for this final completion pass (see its own CAPTURE LIMITATION note; superseded for current-state comparison by `full_suite_run_output_task140_v2.txt`, below) |
+| `reply_details_correction_root_cause.md` | same-day correction: reply-for-details ordering/index/source-link/wording root cause + fix, against real message-958 evidence |
+| `reply_details_live_verification_message_958.txt` | diagnostic resolver invocation (not a live round trip) against the real production ledger for message 958, before/after the ordering + evidence_urls fixes |
+| `reply_details_focused_regression_output.txt` | 136/136 pass — all Task 138/140 delivery-module tests including the new Task 140 acceptance suite |
+| `full_suite_run_output_task140_v2.txt` | complete, properly-captured (no truncation) full-repository-suite run for this correction, superseding the incomplete 4/17-name capture above |
 
 ## Before/after example
 
@@ -93,6 +97,25 @@ existing `digest:<id>:<message_id>` correlation format and multi-item
 new to verify here beyond what Task 138 already proved. Live inbound
 Telegram reply verification remains PENDING (unchanged from Task
 138/139 — no natural operator reply has occurred yet); not manufactured.
+
+### CORRECTION (same-day follow-up, after this section was written)
+
+The paragraph above is now **superseded** — kept for the historical
+record, not deleted. The operator's live reply DID subsequently occur
+(a real round trip against message 958) and it exposed five real,
+confirmed defects in `reply_correlation.py` (wrong item order, wrong
+"details 2" resolution, a hard 6-item cap with no path to the rest,
+a missing source link, and a mislabeled supporting card). All five are
+fixed; see `reply_details_correction_root_cause.md` for the full root
+cause and fix, `reply_details_live_verification_message_958.txt` for
+the diagnostic re-verification against the real production message
+(NOT a live Telegram round trip — see that file's own header), and
+`reply_details_focused_regression_output.txt` /
+`test_task140_reply_details_acceptance.py` (14 new tests) for the
+regression coverage. `reply_correlation.py`, `pipeline.py`, and
+`outbox.py` are all modified by this correction — the "not modified by
+this task" claim above applies only to the digest-off-default work this
+README originally documented.
 
 ## Limitations
 

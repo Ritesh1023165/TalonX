@@ -188,7 +188,7 @@ def test_build_details_response_missing_event_is_reported_not_guessed():
     ctx = DetailsContext(row=row, event=None, significance=None)
     text = build_details_response([ctx])
     assert "Source event record unavailable" in text
-    assert "no persisted significance reasons found" in text
+    assert "no persisted filing-level facts found" in text
 
 
 def test_build_details_response_multi_event_gives_indexed_summary_by_default():
@@ -344,7 +344,7 @@ def test_resolve_details_reply_survives_store_lookup_failures(ledger_path):
         significance_store=_FakeSignificanceStore({}, raise_on_get=True),
     )
     assert "Source event record unavailable" in text
-    assert "no persisted significance reasons found" in text
+    assert "no persisted filing-level facts found" in text
     ob.close()
 
 
