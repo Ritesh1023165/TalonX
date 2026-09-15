@@ -1,0 +1,32 @@
+[Item 1 of 14]
+
+PH -- DIGEST disposition (delivery telegram...)
+Accession: 0001193125-26-390561
+Filing link: https://www.sec.gov/Archives/edgar/data/76334/000119312526390561/0001193125-26-390561-index.htm
+Source accepted: 2026-09-14 16:05 UTC
+Delivery enqueued: 2026-09-14 20:05 UTC
+Delivery sent: 2026-09-15 00:07 UTC
+
+Source facts (from the significance engine, not interpretation):
+  - other-events 8-K (Item 8.01)  [EVENT_TYPE_BASE]
+  - this company is on your watchlist (user priority, not market significance)  [ON_WATCHLIST]
+
+Original notification text sent to you (HTML markup stripped for this plain-text reply -- wording/facts unchanged):
+🟡 MEDIUM INFORMATION SIGNIFICANCE
+PH (Parker-Hannifin Corp) · regular hours
+
+Other material event (8-K Item 8.01)
+PH filed an 8-K under Item 8.01 (other events)
+Accepted: 2026-09-14 16:05 UTC
+
+Why surfaced:
+• other-events 8-K (Item 8.01)
+• this company is on your watchlist (user priority, not market significance)
+
+⚠️ Source freshness unknown at emit time
+
+🔗 SEC filing · ref 0001193125-26-390561
+
+ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.
+
+Data limitations: aggregation windows/insider-activity detail beyond what the original card showed are not separately re-derived here -- the significance reasons above are the SAME ones already used to decide this card's routing.

@@ -1,0 +1,73 @@
+5734b8cd03022f59082fed4a942ed783f6412257
+Ritesh Talwadekar <[REDACTED-EMAIL]>
+Tue Sep 15 00:31:08 2026 +0100
+feat(ingest): Task 138 Workstream 2 -- quieter, concise informational alerts
+
+New notification-DELIVERY policy (not a strategy/economic change): see
+docs/research/NOTIFICATION_POLICY.md for the full deterministic rule set
+and representative examples. Reuses existing routes (ROUTE_IMMEDIATE/
+ROUTE_DIGEST) and existing, already-frozen significance/comparison/
+insider thresholds -- no new materiality threshold invented, no strategy
+logic touched.
+
+talonx_ingest/intelligence/delivery/notification_policy.py (new):
+`classify_disposition(band, reason_codes, insider_activity)` deterministically
+decides IMMEDIATE / DIGEST / DASHBOARD_ONLY:
+  - CRITICAL band -> IMMEDIATE always (the engine's own structural floor
+    already requires >=2 substantive families to reach CRITICAL).
+  - LOW band / no band -> DASHBOARD_ONLY (never even a digest slot).
+  - MEDIUM/HIGH band -> IMMEDIATE only with an explicit substantive
+    trigger: a filing-comparison reason code that already crossed a
+    frozen decile/tercile/keyword/XBRL threshold, a single open-market
+    transaction >= the existing frozen $1M threshold, or a >=2-distinct-
+    insider OPEN-MARKET BUY cluster (checked directly against the raw
+    cluster kind, not the generic reason code, so a routine SELL cluster
+    does not qualify) -- otherwise DIGEST, never suppressed. Watchlist
+    membership, a bare form/item-number base score, and "multiple
+    disclosure types" (MULTI_ITEM_8K) are explicitly excluded as
+    sufficient triggers on their own, per the reviewed over-triggering
+    cases (DXCM/PSA generic Reg FD, routine AXON sell summaries).
+
+DASHBOARD_ONLY is implemented as a subtraction, not a new engine: `_enqueue_
+delivery` (enrichment.py) skips the existing `enqueue_card` call entirely
+-- the event/enrichment/significance record remains fully persisted and
+dashboard-queryable, it simply never enters the Telegram outbox.
+IMMEDIATE/DIGEST use `enqueue_card`'s new `route_override` parameter
+(threaded through render_card/render_compact/render_expanded/render_
+for_card in renderer.py) to narrow (never widen) the band-derived route.
+
+New compact IMMEDIATE message shape (renderer.render_concise, tier
+CONCISE): "[INFO] SYMBOL -- event / one sentence naming the specific
+verified change (the actual disposition_reason, not a generic
+placeholder) / Source: timestamp (source age: Xh) / Reply "details" for
+facts and filing link. / standing disclaimer" -- 5 lines, ~280 chars,
+down from the existing ~18-line/~685-char full render. The disclaimer is
+kept (this module's own existing "never dropped" invariant); "source
+age" is explicitly labelled as such, never presented as a bare "fresh"
+claim, distinct from the separate Task 136B send-time freshness check.
+DIGEST-route cards keep the existing renderer unchanged (already compact
+per aggregated row).
+
+Bounded, idempotent backlog reclassification (`reclassify_pending_rows`):
+re-evaluates existing PENDING IMMEDIATE rows (via the same bounded
+`outbox.pending()` selection the send path uses, not a new/unbounded
+scan) against their already-persisted significance record and downgrades
+route to DIGEST where the new policy says so -- logged per row; SENT/
+AMBIGUOUS rows are never selected or touched; a row already reclassified
+is simply skipped on a later call.
+
+23 new focused tests (tests/test_task138_notification_policy.py): every
+band/trigger combination, the buy-vs-sell cluster distinction, the
+render_card override contract (narrows only, never widens), an end-to-
+end EnrichmentEngine DASHBOARD_ONLY skip, backlog reclassification
+(downgrade / leave-alone / never-touches-SENT), and the concise-shape
+renderer (line count, disclaimer retained, source-age labelling, no bare
+"fresh" claim). 136 passed across every directly affected delivery/
+enrichment module with the routing changes applied, no regressions.
+
+V2's own paper entry/exit delivery (talonx_v2/, a structurally separate
+route) is untouched by this task. Frozen V2 fingerprint 11107198c5b81237
+unaffected.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+

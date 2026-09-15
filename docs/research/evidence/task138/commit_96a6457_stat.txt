@@ -1,0 +1,71 @@
+commit 96a6457851956fee7285cf759258b694d7eeae57
+Author: Ritesh Talwadekar <ritesh160290@gmail.com>
+Date:   Tue Sep 15 00:19:44 2026 +0100
+
+    fix(ops,ingest): Task 138 Workstream 1 -- close the three Task 137 review gaps
+    
+    A. Delivery fairness at REAL scheduling intervals. Task 137's fixed 30s
+       DEFER backoff was verified against 1-second test gaps, which masked
+       the real gap: at the actual ~210s production poll-cycle interval, a
+       fixed 30s backoff always fully expires before the next cycle, so a
+       permanently-failing row (whenever the bulk expire_stale() sweep can't
+       reach it -- e.g. permanently behind other still-fresh PENDING rows)
+       re-occupies a bounded pending() selection FOREVER. Reproduced directly
+       with a deterministic fixture (more rows than the scan limit,
+       persistently-failing high-priority rows outside that scan, a valid
+       row behind them, 210s-spaced cycles): zero progress across 20 cycles
+       (~66 minutes). Fixed with a genuine, exponential, capped, per-row
+       backoff (same principle as the existing send-retry `backoff_seconds`,
+       not a new/arbitrary mechanism) keyed to a new `defer_count` column
+       (added via the existing additive-migration pattern, distinct from the
+       unrelated `attempts` send-counter, reset on any non-DEFER outcome and
+       on enqueue()'s existing re-open paths). Same fixture now resolves
+       within a bounded number of cycles; persistently-failing rows remain
+       PENDING (recoverable); state survives close/reopen (durable columns).
+    
+    B. Runtime scope evidence. The Task 137 broad-discovery inference
+       compared a bare `execution_scope_count` with no check that the status
+       snapshot was fresh or belonged to the currently-running process.
+       Replaced with `evaluate_scope_evidence()` (talonx_ops/prospective/
+       checkpoint.py), reusing EXISTING runtime metadata only: the same
+       heartbeat/ttl freshness fields `_service_health` already reads,
+       `session.pids.json`'s recorded companion PID + full argv (direct,
+       authoritative evidence of --enable-broad-discovery, not inferred from
+       a count), and psutil-backed liveness via the existing `proc._alive`.
+       Returns one of six explicit qualifications (FRESH_VALID / STALE /
+       MISSING_MALFORMED / WRONG_PROCESS / MANIFEST_UNREADABLE / SCOPE_
+       MISMATCH) plus reported-vs-reconstructed counts -- a stale/unowned/
+       malformed snapshot is never silently treated as verified live scope,
+       and a genuinely narrow result is reported as narrow, never as
+       successful broad coverage. Exposed under funnel.scope.evidence in the
+       checkpoint output.
+    
+    C. Available-scope EOD completeness. `reconciled_to_available_scope`
+       previously accepted whatever components happened to be present in a
+       record, as long as those were all CHECKED -- a record silently missing
+       a required component (or carrying a duplicate/conflicting entry) could
+       still read as complete evidence. Now requires the EXACT expected
+       4-component set (no more, no fewer, no duplicates) before evaluating
+       outcomes. The strict `today_reconciled`/`eod_reconciled_today` field's
+       own meaning is untouched; the read-model boundary already correctly
+       scopes evaluation to same-session records only (confirmed with a
+       dedicated wrong-session test), so no change was needed there.
+    
+    21 new focused tests (tests/test_task138_operational_corrections.py) +
+    1 test in test_task137_overnight_continuity.py updated to reflect the
+    superseded scope-evidence function (full replacement coverage lives in
+    the new file). 95 passed across every directly affected module, no
+    regressions.
+    
+    Frozen V2 fingerprint 11107198c5b81237 and Original strategy decision
+    logic untouched -- these are operational/reporting corrections only, no
+    strategy or filter change.
+    
+    Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+
+ talonx_ingest/intelligence/delivery/outbox.py |  81 +++--
+ talonx_ops/eod_reconciliation.py              |  22 +-
+ talonx_ops/prospective/checkpoint.py          | 148 +++++++-
+ tests/test_task137_overnight_continuity.py    |  31 +-
+ tests/test_task138_operational_corrections.py | 477 ++++++++++++++++++++++++++
+ 5 files changed, 701 insertions(+), 58 deletions(-)

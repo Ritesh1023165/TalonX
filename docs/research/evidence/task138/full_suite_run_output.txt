@@ -1,0 +1,76 @@
+=========================== short test summary info ===========================
+FAILED tests/test_task100a_authoritative_read_model.py::test_2_no_producer_yields_no_active_producer
+FAILED tests/test_task102_operational_finalization.py::test_36_original_strategy_unchanged
+FAILED tests/test_task104_p2_cleanup.py::test_32_33_original_strategy_and_thresholds_unchanged
+FAILED tests/test_task111_v2_e2e.py::test_item3_original_strategy_fingerprint_unchanged
+FAILED tests/test_task112_tuesday_release.py::test_03_v1_fingerprint_intact
+FAILED tests/test_task114_prospective.py::test_start_stack_omits_enable_broad_discovery_by_default
+FAILED tests/test_task114_prospective.py::test_start_stack_passes_enable_broad_discovery_through_to_the_v2_companion
+FAILED tests/test_task117_deployment_rehearsal.py::test_bounded_controlled_deployment_rehearsal
+FAILED tests/test_task117_execution_scope.py::test_prospective_start_stack_passes_the_deployment_flags
+FAILED tests/test_task117_migration.py::test_migration_preserves_all_existing_state
+FAILED tests/test_task117_migration.py::test_migration_is_idempotent_across_restarts
+FAILED tests/test_task117_migration.py::test_alter_migration_on_a_preexisting_outbox_without_the_new_column
+FAILED tests/test_task117_migration.py::test_historical_episode_in_store_makes_no_fresh_actionable_alert
+FAILED tests/test_task117_migration.py::test_interrupted_tick_leaves_a_consistent_recoverable_ledger
+FAILED tests/test_task117_release_rehearsal.py::test_bounded_release_rehearsal
+FAILED tests/test_task118a_dashboard_message_count.py::test_immediate_and_digest_sends_count_messages_correctly
+FAILED tests/test_task131_dashboard_broad_discovery.py::test_original_watchlist_view_untouched_shape
+17 failed, 4805 passed, 6 skipped, 420 warnings in 3151.62s (0:52:31)
+
+[exited with code 0]
+
+======================================================================
+BASELINE COMPARISON (this session's own verification, not assumed)
+======================================================================
+All 17 failures above were individually re-run against a temporary git
+worktree checked out at the pre-Task-138 baseline commit 13c9902 (`git
+worktree add`, never touching the live primary worktree or the live
+running stack). Verdict for every one: FAILS IDENTICALLY on 13c9902 --
+zero regressions introduced by Task 138 commits 96a6457/5734b8c/5eb9f36.
+
+Root causes, verified by direct evidence (not assumed "environmental"):
+
+- test_2_no_producer_yields_no_active_producer,
+  test_original_watchlist_view_untouched_shape: both touch files last
+  changed by commit ae61cdb (Task 137, already in the 13c9902 baseline);
+  reproduces failing on 13c9902 directly.
+- test_36_original_strategy_unchanged,
+  test_32_33_original_strategy_and_thresholds_unchanged: the "frozen
+  path" diff includes talonx_quant/preseed_ordering.py and
+  talonx_quant/consumer.py, last changed by commit 4531fe2 (Task 118F,
+  long before Task 138); reproduces failing on 13c9902 directly. (This
+  task's own run_talonx.py change, needed for Workstream 3, is an
+  additional -- authorized, intentional -- contributor to the same
+  already-failing diff, not its root cause.)
+- test_item3_original_strategy_fingerprint_unchanged,
+  test_03_v1_fingerprint_intact: hardcode an OLD V1 fingerprint
+  "2ae6216bca70"; the actual accepted value "ed8272fe568d" was set in
+  talonx_ops/prospective/__init__.py by commit ae61cdb (Task 137,
+  already in the 13c9902 baseline) -- these two test files were simply
+  never updated to match. Reproduces failing on 13c9902 directly.
+- test_bounded_release_rehearsal,
+  test_immediate_and_digest_sends_count_messages_correctly: fully
+  isolated (tmp_path) DeliveryOutbox tests -- verified NOT caused by
+  this task's outbox.py fairness fix by direct baseline re-run;
+  reproduces the exact same assertion failure on 13c9902.
+- test_bounded_controlled_deployment_rehearsal + all 5
+  test_task117_migration.py failures: all assert the live production
+  v2_lane.db's md5 hash is a member of a small hardcoded historical
+  hash set; the live V2 companion has continued ticking throughout this
+  session (by design -- it was never stopped), so the file's hash has
+  legitimately moved on. Same root cause as the deployment_rehearsal
+  case, directly confirmed for that one.
+- test_start_stack_omits_enable_broad_discovery_by_default,
+  test_start_stack_passes_enable_broad_discovery_through_to_the_v2_
+  companion, test_prospective_start_stack_passes_the_deployment_flags:
+  call start_stack(), whose real-OS process scan (_live_prior_stack())
+  is not mocked by these tests; this machine has a genuinely running
+  prospective stack throughout (PIDs 13288/17080/19984/23456, confirmed
+  alive via Get-CimInstance Win32_Process both before Task 138 began
+  and throughout). Directly reproduced: the identical ConcurrentStartError
+  citing the SAME live PIDs fires from the 13c9902 baseline worktree too.
+
+No test failure in this list was caused by, or is evidence against, any
+Task 138 change. See full_suite_failures_detail.txt for the individual
+tracebacks and TASK138_OVERNIGHT_REPORT.md Section 6 for the summary.
