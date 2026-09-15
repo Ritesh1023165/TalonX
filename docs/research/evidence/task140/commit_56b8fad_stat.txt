@@ -1,0 +1,57 @@
+commit 56b8fadc9bb4616bd38e75c1015150c9ceab52ca
+Author: Ritesh Talwadekar <ritesh160290@gmail.com>
+Date:   Tue Sep 15 04:49:45 2026 +0100
+
+    fix(v2,ops,dispatch): Task 140 -- admission-mode reporting provenance + integrated launch test
+    
+    Investigated the live /ping report of admission=PERMISSIVE (previously
+    GATED per the operator's own observation) before declaring configuration
+    restoration complete.
+    
+    Finding 1 (behavior): PERMISSIVE is genuine, correct, UNCHANGED
+    V2Service behavior -- talonx_v2/service.py reads
+    TALONX_V2_DURABLE_STORE_ENABLED once at __init__ (default False), and
+    docs/research/TASK131_RETROSPECTIVE.md states explicitly: "V2Service's
+    own runtime default (outside pytest, no env override) remains False, per
+    the literal remediation requirement." No evidence anywhere in this
+    campaign's audit trail (unlike broad-discovery and delivery-enablement,
+    both directly evidenced as previously-active) shows GATED was ever the
+    deliberately-authorized live setting. Per the explicit preservation
+    requirement ("V2 admission... rules" unchanged) and the prohibition on
+    strategy/admission tuning, this was NOT flipped to GATED without
+    concrete evidence it was ever the authorized state.
+    
+    Finding 2 (reporting provenance -- the real, demonstrated defect):
+    /ping (talonx_dispatch/telegram_listener.py) and the dashboard
+    (talonx_ops/dashboard_read.py) each independently RE-DERIVE
+    admission_mode from TALONX_V2_DURABLE_STORE_ENABLED in THEIR OWN
+    process's environment -- Original/Dashboard and the V2 companion are
+    spawned as separate processes and can, in principle, see divergent
+    merged environments (the exact class of cross-process env-propagation
+    gap already demonstrated twice tonight for broad-discovery and
+    delivery-enablement). Neither reading was ever sourced from the actual
+    companion's own same-process state.
+    
+    Fix: talonx_v2/service.py now exposes the REAL
+    `durable_store_gate_enabled` value (the exact attribute the running
+    companion's own admission logic reads) in v2_service_status.json.
+    telegram_listener.py and dashboard_read.py now both prefer this
+    authoritative, same-process value when the status file has it, falling
+    back to their old env-derived reading (labelled "unverified against the
+    actual companion") only for a status file predating this field.
+    
+    New integrated test
+    (test_start_stack_full_authorized_configuration_together): proves the
+    launcher can deliver broad collection (Intelligence),
+    expanded execution scope (V2), an operator-supplied GATED-admission
+    override, Intelligence delivery enabled, and routine digest correctly
+    left OFF -- all together, consistently, in one start_stack() call,
+    without any one flag silently implying or overriding another.
+    
+    Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+
+ talonx_dispatch/telegram_listener.py | 24 +++++++++++++++----
+ talonx_ops/dashboard_read.py         | 28 ++++++++++++++++++----
+ talonx_v2/service.py                 | 11 +++++++++
+ tests/test_task114_prospective.py    | 45 ++++++++++++++++++++++++++++++++++++
+ 4 files changed, 99 insertions(+), 9 deletions(-)

@@ -47,6 +47,8 @@ migration.
 | `focused_test_run_output.txt` | 46/49 pass — 3 known-environmental failures (live-process-scan / live-session-timing, unrelated to this task's code, documented) |
 | `post_cutover_heartbeat.json` | live Intelligence heartbeat post-cutover — 569 effective_symbols confirmed |
 | `delivery_mode_confirmation.txt` | live proof `delivery.mode: "enabled"` after the urgent fix — before/after SENT-log evidence |
+| `admission_provenance_investigation.md` | resolves the follow-up admission=PERMISSIVE report: genuine unchanged behavior (not a regression) + a real reporting-provenance defect found and fixed regardless |
+| `commit_56b8fad_{message,stat}.txt` | the admission-provenance fix + integrated launch test (personal email redacted) |
 
 ## Before/after example
 
