@@ -65,9 +65,11 @@ class DispositionDecision:
     # Populated ONLY from an already-persisted, already-evidenced source
     # (a SignificanceReason.description the engine already computed with
     # real numbers baked in, or the InsiderCluster's own structured
-    # fields) -- never invented here. `None` when no such text exists (a
-    # DIGEST/DASHBOARD_ONLY verdict, or -- defensively -- a CRITICAL card
-    # whose reasons somehow carried no description at all). This is what
+    # fields) -- never invented here. `None` whenever ``disposition`` is
+    # not IMMEDIATE (a DIGEST/DASHBOARD_ONLY verdict never needs one).
+    # Task 140b: CRITICAL is NOT special-cased to accept a lesser bar --
+    # every IMMEDIATE verdict, at any band, carries a real evidence_text.
+    # This is what
     # the renderer and reply-details response must show; `reason` above
     # is deliberately NOT reused for that (see the Task 140 fix note in
     # enrichment.py: reason used to leak into the message as a generic
@@ -140,39 +142,34 @@ def classify_disposition(
     band_val = band.value if isinstance(band, SignificanceBand) else band
     reasons = list(reasons or ())
 
-    if band_val == SignificanceBand.CRITICAL.value:
-        # The engine's own structural floor (>=2 substantive families,
-        # >=5 substantive points) already gates CRITICAL strictly -- this
-        # policy does not re-derive that. But the MESSAGE must still show
-        # real evidence, not a bare band label: prefer the highest-point
-        # reason with a genuine description among the ones that already
-        # crossed a substantive threshold in this event's own scoring.
-        _, ev = _substantive_evidence(reasons)
-        if ev is None and reasons:
-            # CRITICAL's floor can also be reached by insider-cluster/
-            # dollar-magnitude reasons outside SUBSTANTIVE_REASON_CODES's
-            # filing-change subset -- fall back to the highest-point
-            # reason with ANY real description, still never inventing text.
-            with_desc = [r for r in reasons if (r.description or "").strip()]
-            if with_desc:
-                ev = max(with_desc, key=lambda r: r.points).description
-        return DispositionDecision(
-            DISPOSITION_IMMEDIATE,
-            "CRITICAL band -- the engine's own structural floor already "
-            "requires >=2 substantive scoring families before reaching "
-            "CRITICAL, so this policy does not re-derive substantiveness.",
-            evidence_text=ev,
-        )
     if band_val == SignificanceBand.LOW.value or band_val is None:
         return DispositionDecision(
             DISPOSITION_DASHBOARD_ONLY,
             f"{band_val or 'no'} band -- no scoring signal worth a digest slot.",
         )
 
-    # MEDIUM / HIGH: require an explicit substantive trigger AND its own
-    # genuine, already-computed supporting fact text -- Task 140: a
-    # recognized code with no real description behind it does NOT
-    # qualify (falls through to DIGEST, content-gated, not suppressed).
+    # MEDIUM / HIGH / CRITICAL all require the SAME explicit substantive
+    # trigger AND its own genuine, already-computed supporting fact text.
+    #
+    # Task 140b (live defect fix): CRITICAL used to get a SEPARATE, looser
+    # fallback here -- "no SUBSTANTIVE_REASON_CODES hit? then just use the
+    # highest-point reason with ANY non-empty description" -- reasoning
+    # that CRITICAL's own structural floor (>=2 scoring families, >=5
+    # points) already proved substantiveness. That reasoning was wrong in
+    # practice: EVENT_TYPE_BASE (a bare category/item-number label,
+    # deliberately excluded from SUBSTANTIVE_REASON_CODES) ALWAYS carries
+    # a non-empty description and typically ties for the highest point
+    # value, so `max()` (which returns the FIRST max on a tie) silently
+    # selected it as "evidence" almost every time -- proven live: two real
+    # AXON CRITICAL cards (DEBT_FINANCING, REGULATION_FD, accession
+    # 0001193125-26-391320) whose ONLY reasons were EVENT_TYPE_BASE,
+    # MULTI_ITEM_8K, EVENT_RARE_FOR_FILER, EVENT_CLUSTER and ON_WATCHLIST
+    # -- none of them a specific disclosed development -- were sent as
+    # immediate pushes whose entire "evidence" line was just the category
+    # label restated. CRITICAL now goes through the IDENTICAL gate as
+    # MEDIUM/HIGH: "regardless of significance band" per this fix's own
+    # requirement, a higher band earns a MORE prominent send, never a
+    # LOOSER content bar.
     hits, evidence = _substantive_evidence(reasons)
     if hits and evidence:
         return DispositionDecision(
@@ -198,8 +195,9 @@ def classify_disposition(
     return DispositionDecision(
         DISPOSITION_DIGEST,
         f"{band_val} band but no substantive trigger present (routed to DIGEST, "
-        "not suppressed -- band/watchlist/item-number/multi-item/sell-cluster "
-        "alone do not justify an immediate interruption).",
+        "not suppressed -- band/watchlist/item-number/multi-item-count/rarity/"
+        "clustering-count/sell-cluster alone do not justify an immediate "
+        "interruption, regardless of significance band).",
     )
 
 

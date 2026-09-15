@@ -220,7 +220,24 @@ def _quality_lines(card, *, expanded: bool) -> list[str]:
     if fresh in (FreshnessStatus.STALE, FreshnessStatus.DOWN):
         out.append(f"⚠️ Source feed was {esc(fresh.value.lower())} at emit time")
     elif fresh == FreshnessStatus.UNKNOWN:
-        out.append("⚠️ Source freshness unknown at emit time")
+        # Task 140b: this is a SEPARATE freshness dimension from the
+        # "Source: <accepted-at> (source age: ...)" line already shown
+        # above -- that timestamp/age IS known precisely (it's the SEC
+        # filing's own accepted_at_utc). What's unknown here is only
+        # whether talonx_ingest.intelligence.freshness's own EDGAR-poll
+        # currency tracker (freshness.py -- FRESH/STALE/DOWN based on how
+        # recently a poll last succeeded) had a confirmed-current reading
+        # for THIS source at build time; `card.freshness` defaults to
+        # UNKNOWN and, verified directly against production data, is
+        # UNKNOWN for every persisted event today (this tracker is not yet
+        # wired into card construction) -- a genuine, always-present gap,
+        # not something to hide, but it must not read as doubt about the
+        # event's own timing, which is already shown and exact. Never
+        # inferred from enqueue time, a DB read, or a heartbeat -- if this
+        # were ever wired up, it would report the SAME tracker's real
+        # FRESH/STALE/DOWN verdict, not a proxy.
+        out.append("⚠️ Ingestion feed-poll currency not tracked for this source "
+                   "(the filing date/age above is exact and unaffected)")
     if flags:
         shown = ", ".join(flags[:6])
         out.append(f"⚠️ Data limitations: {esc(shown)}")
@@ -367,12 +384,13 @@ def render_concise(card, *, disposition_reason: str | None = None, now: datetime
     evidenced fact sentence (a real percentage/dollar figure/owner count
     already computed by the significance/insider engines), never the
     internal policy-audit string ("HIGH band with a substantive trigger
-    present: [CODE]") that string used to be Task 138 era. Falls back to
-    the raw first significance-reason description only when no
-    evidence_text exists at all (the rare CRITICAL-with-no-real-
-    description edge case) -- never to a generic "significant filing"
-    placeholder; if truly nothing qualifies as a concrete fact, the event
-    type label appears, at least specific to what KIND of event this is.
+    present: [CODE]") that string used to be Task 138 era. Task 140b: every
+    band (including CRITICAL) now only reaches this CONCISE/IMMEDIATE
+    render path with a real, non-category evidence_text already validated
+    by the policy -- this function does not re-validate it. The `reasons[0]`
+    fallback below is defensive-only (should be unreachable in practice
+    now that no disposition ever returns IMMEDIATE without evidence_text);
+    it is never a silent substitute for a missing evidence_text.
 
     "Source" shows the event's own accepted_at_utc and its age computed
     at RENDER time (a real wall-clock read here, not a DB-read timestamp

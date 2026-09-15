@@ -65,9 +65,21 @@ def _reasons(*codes_and_descriptions):
 # classify_disposition -- deterministic band/reason-code decisions
 # ---------------------------------------------------------------------
 
-def test_critical_band_is_always_immediate_no_extra_signal_needed():
+def test_critical_band_with_no_reasons_at_all_is_not_immediate_task140b():
+    """Task 140b correction: CRITICAL band used to be a free pass to
+    IMMEDIATE regardless of any evidence -- this is the exact assumption
+    that let two real AXON informational pushes (CRITICAL band,
+    category-only "evidence") reach the operator explaining nothing
+    beyond "this filing type exists". CRITICAL now requires the SAME
+    genuine, evidenced substantive trigger as every other band; a
+    CRITICAL card with no reasons at all (nothing to even attempt a
+    content-gate check against) correctly falls through to DIGEST, not a
+    bare band label standing in for evidence. See
+    tests/test_task140b_critical_content_gate.py for the full regression
+    coverage of this fix, traced against the real AXON production data."""
     d = classify_disposition(band=SignificanceBand.CRITICAL, reasons=[])
-    assert d.disposition == DISPOSITION_IMMEDIATE
+    assert d.disposition == DISPOSITION_DIGEST
+    assert d.evidence_text is None
 
 
 def test_low_band_is_dashboard_only():
