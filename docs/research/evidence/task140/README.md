@@ -49,6 +49,9 @@ migration.
 | `delivery_mode_confirmation.txt` | live proof `delivery.mode: "enabled"` after the urgent fix — before/after SENT-log evidence |
 | `admission_provenance_investigation.md` | resolves the follow-up admission=PERMISSIVE report: genuine unchanged behavior (not a regression) + a real reporting-provenance defect found and fixed regardless |
 | `commit_56b8fad_{message,stat}.txt` | the admission-provenance fix + integrated launch test (personal email redacted) |
+| `gated_admission_activation.md` | the explicit operator authorization to switch to GATED admission, applied via `.env` + one managed restart, verified live in the real companion/dashboard |
+| `commit_c9fb63d_{message,stat}.txt` | the exit-eligibility-after-scope-change isolated tests (A4 closure; personal email redacted) |
+| `post_gated_admission_cutover_heartbeat.json` | live Intelligence heartbeat after the GATED-admission cutover — 569 symbols, delivery enabled, digest still off, all confirmed together |
 
 ## Before/after example
 
