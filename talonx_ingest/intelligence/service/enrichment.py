@@ -398,7 +398,7 @@ class EnrichmentEngine:
 
         decision = classify_disposition(
             band=sig.band if sig is not None else None,
-            reason_codes=[r.code for r in sig.reasons] if sig is not None else (),
+            reasons=sig.reasons if sig is not None else (),
             insider_activity=insider_activity,
         )
         if decision.disposition == DISPOSITION_DASHBOARD_ONLY:
@@ -423,7 +423,18 @@ class EnrichmentEngine:
                 now=now,
                 route_override=decision.disposition,
                 tier=tier,
-                disposition_reason=decision.reason,
+                # Task 140: the user-facing card text must show the
+                # SPECIFIC evidenced fact (decision.evidence_text), never
+                # decision.reason -- that string is the internal policy-
+                # level audit explanation ("HIGH band with a substantive
+                # trigger present: [CODE]"), a generic placeholder if it
+                # ever reached a message. evidence_text is None for
+                # DIGEST/DASHBOARD_ONLY (this tier isn't CONCISE there
+                # anyway) and, defensively, for the rare case a CRITICAL
+                # card's own reasons carried no real description at all --
+                # render_concise falls back to the raw first significance
+                # reason string in that case, never this audit text.
+                disposition_reason=decision.evidence_text,
             )
         except PredictiveLanguageError as exc:
             self.metrics.claim_safety_rejections += 1

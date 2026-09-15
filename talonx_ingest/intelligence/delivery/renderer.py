@@ -353,23 +353,37 @@ def _render(
 
 
 def render_concise(card, *, disposition_reason: str | None = None, now: datetime | None = None):
-    """Task 138 Workstream 2: the compact IMMEDIATE-disposition shape --
-    see docs/research/NOTIFICATION_POLICY.md §7. Target 3-5 short lines;
+    """Task 138 Workstream 2, evidence contract tightened Task 140: the
+    compact IMMEDIATE-disposition shape -- see
+    docs/research/NOTIFICATION_POLICY.md §7. Target 3-5 short lines;
     always route=IMMEDIATE (this shape is only ever used for a card the
     notification policy already decided warrants interruption -- it does
     not itself re-derive eligibility). Full facts, aggregation windows,
     and the filing link move to the reply-for-details response (Workstream
-    3), not this initial push. ``disposition_reason`` (the specific
-    substantive trigger notification_policy.classify_disposition found)
-    is preferred over the generic first significance reason when given,
-    so the line always names the CONCRETE thing that qualified, never a
-    vague "significant filing" placeholder.
+    3), not this initial push.
+
+    ``disposition_reason`` MUST be ``notification_policy.classify_
+    disposition``'s own ``evidence_text`` -- the SPECIFIC, already-
+    evidenced fact sentence (a real percentage/dollar figure/owner count
+    already computed by the significance/insider engines), never the
+    internal policy-audit string ("HIGH band with a substantive trigger
+    present: [CODE]") that string used to be Task 138 era. Falls back to
+    the raw first significance-reason description only when no
+    evidence_text exists at all (the rare CRITICAL-with-no-real-
+    description edge case) -- never to a generic "significant filing"
+    placeholder; if truly nothing qualifies as a concrete fact, the event
+    type label appears, at least specific to what KIND of event this is.
 
     "Source" shows the event's own accepted_at_utc and its age computed
     at RENDER time (a real wall-clock read here, not a DB-read timestamp
     presented as fresh) -- kept explicitly labelled as source age only;
     it does not claim anything about the SEPARATE send-time freshness
-    check (Task 136B), which runs independently right before delivery."""
+    check (Task 136B), which runs independently right before delivery.
+
+    A material data-quality/freshness caveat (``_quality_lines``, the
+    SAME helper the EXPANDED renderer already uses) is appended when one
+    genuinely exists -- Task 140: essential uncertainty is preserved even
+    though it costs a line, never hidden purely to stay at 5 lines."""
     now = now or datetime.now(timezone.utc)
     reasons = list(card.significance_reasons)
     summary = (disposition_reason or (reasons[0] if reasons else None)
@@ -392,9 +406,11 @@ def render_concise(card, *, disposition_reason: str | None = None, now: datetime
         f"[INFO] {bold(esc(card.symbol))} — {esc(event_label)}",
         esc(summary),
         esc(source_line),
-        italic('Reply "details" for facts and filing link.'),
-        italic("ℹ️ " + esc(disclaimer)),
     ]
+    for ql in _quality_lines(card, expanded=False):
+        lines.append(esc(ql))
+    lines.append(italic('Reply "details" for facts and filing link.'))
+    lines.append(italic("ℹ️ " + esc(disclaimer)))
     text = "\n".join(lines)
     ev_urls = [card.source_url] if card.source_url else []
     return TelegramIntelligenceMessage(

@@ -11,6 +11,7 @@ import ast
 import asyncio
 import importlib
 import pkgutil
+from datetime import datetime, timezone
 
 import pytest
 
@@ -290,3 +291,87 @@ def test_only_pipeline_may_touch_telegram_transport():
         )
         if touches_transport:
             assert mod.name.endswith(".pipeline"), mod.name
+
+
+# ---------------------------------------------------------------------
+# Task 140 -- explicit, isolated proof of the digest-disable gate at the
+# process_digest() level itself (not just through IntelligenceService.
+# deliver_cycle, already covered in
+# tests/test_task117_delivery_runner_integration.py). A prior report
+# incorrectly cited held_reason="digest_not_due" as evidence of the
+# disable switch -- that reason means something else entirely (the
+# interval simply hasn't elapsed). This proves the DISABLE reason
+# specifically, with the schedule genuinely due, fresh rows genuinely
+# present, and transport genuinely configured.
+# ---------------------------------------------------------------------
+
+def test_digest_disabled_with_a_genuinely_due_schedule_sends_nothing(ledger_path):
+    from talonx_ingest.intelligence.delivery.pipeline import process_digest
+
+    ob = DeliveryOutbox(ledger_path)
+    now = datetime(2026, 9, 15, 16, 0, 0, tzinfo=timezone.utc)
+    card, _ = make_card(symbol="DXCM", event_type=EventType.REGULATION_FD,
+                        on_watchlist=False, now=now)
+    row = enqueue_card(card, outbox=ob, now=now).row
+    assert row.route == "DIGEST"
+
+    sender = RecordingSender(configured=True)   # transport genuinely configured
+    # first-ever call on a fresh outbox -> last_digest_bucket is None ->
+    # due=True by construction (pipeline.py: `due = last_bucket is None or
+    # int(last_bucket) < bucket`) -- the schedule genuinely IS due, not
+    # "not yet".
+    res = asyncio.run(process_digest(ob, sender, mode="disabled",
+                                     interval_seconds=6 * 3600.0, now=now))
+
+    assert sender.sent == []                                   # no sender call
+    assert res.held >= 1 and res.delivered == 0
+    assert res.held_reason == "delivery_disabled"                # truthful reason
+    assert res.held_reason != "digest_not_due"                   # NOT the weaker signal
+    after = ob.get(row.delivery_id)
+    assert after.state == STATE_PENDING                          # no row marked SENT
+    # no digest scheduling state falsely advanced as a successful delivery
+    assert ob.get_meta("last_digest_bucket") is None
+    assert ob.get_meta("last_digest_sent_utc") is None
+    logs = ob.logs(row.delivery_id)
+    assert any(l["kind"] == "HELD" and "delivery disabled" in (l["detail"] or "") for l in logs)
+
+    # IMMEDIATE remains fully independent of the digest toggle
+    imm_card, _ = make_card(symbol="ORCL", on_watchlist=True, now=now)
+    imm_row = enqueue_card(imm_card, outbox=ob, now=now).row
+    imm_res = asyncio.run(process_pending(ob, sender, mode="enabled", route="IMMEDIATE", now=now))
+    assert imm_res.delivered == 1
+    assert ob.get(imm_row.delivery_id).state == STATE_SENT
+    ob.close()
+
+
+def test_digest_enabled_in_the_isolated_fixture_sends_normally_no_duplicates(ledger_path):
+    from talonx_ingest.intelligence.delivery.pipeline import process_digest
+
+    ob = DeliveryOutbox(ledger_path)
+    now = datetime(2026, 9, 15, 16, 0, 0, tzinfo=timezone.utc)
+    ids = []
+    for i, sym in enumerate(("DXCM", "PSA", "AXON")):
+        card, _ = make_card(symbol=sym, event_type=EventType.REGULATION_FD,
+                            on_watchlist=False, now=now,
+                            accession=f"0000{i}00000-26-000100")
+        ids.append(enqueue_card(card, outbox=ob, now=now).row.delivery_id)
+
+    sender = RecordingSender(configured=True)
+    res = asyncio.run(process_digest(ob, sender, mode="enabled",
+                                     interval_seconds=6 * 3600.0, now=now))
+    assert res.delivered == 3
+    assert len(sender.sent) == 1                                 # one aggregated message
+    for did in ids:
+        row = ob.get(did)
+        assert row.state == STATE_SENT
+        assert row.transport_message_id and row.transport_message_id.startswith("digest:")
+    # scheduling state correctly advanced for a REAL send
+    assert ob.get_meta("last_digest_bucket") is not None
+
+    # a second call within the SAME bucket must not re-send (no duplicates)
+    calls_before = len(sender.sent)
+    res2 = asyncio.run(process_digest(ob, sender, mode="enabled",
+                                      interval_seconds=6 * 3600.0, now=now))
+    assert len(sender.sent) == calls_before
+    assert res2.delivered == 0
+    ob.close()

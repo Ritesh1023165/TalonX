@@ -54,36 +54,114 @@ _BUY_CLUSTER_KIND = "MULTIPLE_OPEN_MARKET_BUYERS"
 @dataclass(frozen=True)
 class DispositionDecision:
     disposition: str          # IMMEDIATE | DIGEST | DASHBOARD_ONLY
-    reason: str                # human-readable, logged verbatim
+    reason: str                # internal, policy-level explanation (audit log) --
+                                # NOT the user-facing message text
+    evidence_text: str | None = None
+    # Task 140 (post-Task-138 stricter requirement): the SPECIFIC,
+    # supported fact sentence that justified an IMMEDIATE decision --
+    # e.g. "Risk Factors rewrite in the top decile of this filing type's
+    # history (change magnitude 34%)" or "3 distinct insiders bought in
+    # the open market within 7 days (4 transactions, ~$1,250,000 total)".
+    # Populated ONLY from an already-persisted, already-evidenced source
+    # (a SignificanceReason.description the engine already computed with
+    # real numbers baked in, or the InsiderCluster's own structured
+    # fields) -- never invented here. `None` when no such text exists (a
+    # DIGEST/DASHBOARD_ONLY verdict, or -- defensively -- a CRITICAL card
+    # whose reasons somehow carried no description at all). This is what
+    # the renderer and reply-details response must show; `reason` above
+    # is deliberately NOT reused for that (see the Task 140 fix note in
+    # enrichment.py: reason used to leak into the message as a generic
+    # "band with a substantive trigger present: [CODE]" placeholder).
 
 
-def _has_buy_cluster(insider_activity) -> bool:
+def _has_buy_cluster(insider_activity):
+    """Returns the matching InsiderCluster object (not just a bool) so
+    its own real fields (distinct_owners, window_calendar_days,
+    transaction_count, total_value) can build genuine evidence text --
+    never a bare presence check alone."""
     if insider_activity is None:
-        return False
+        return None
     clusters = getattr(insider_activity, "clusters", None) or ()
-    return any(getattr(c, "kind", None) == _BUY_CLUSTER_KIND for c in clusters)
+    for c in clusters:
+        if getattr(c, "kind", None) == _BUY_CLUSTER_KIND:
+            return c
+    return None
 
 
-def _substantive_codes_present(reason_codes) -> set[str]:
-    return set(reason_codes) & SUBSTANTIVE_REASON_CODES
+def _cluster_evidence_text(cluster) -> str:
+    n = cluster.distinct_owners
+    window = cluster.window_calendar_days
+    txns = getattr(cluster, "transaction_count", 0) or 0
+    total = getattr(cluster, "total_value", None)
+    detail = f"{n} distinct insiders bought in the open market within {window} days"
+    extra = []
+    if txns:
+        extra.append(f"{txns} transaction{'s' if txns != 1 else ''}")
+    if total:
+        extra.append(f"~${total:,.0f} total")
+    if extra:
+        detail += f" ({', '.join(extra)})"
+    return detail
+
+
+def _substantive_evidence(reasons) -> tuple[set, str | None]:
+    """``reasons`` is an iterable of the significance engine's own
+    ``SignificanceReason`` objects (NOT bare code strings -- Task 140:
+    checking the code alone, without validating its own supporting
+    description field is genuinely populated, is exactly the
+    reason-code-only bypass this closes). Returns (hit_codes,
+    evidence_text) -- evidence_text is the FIRST substantive reason's own
+    ``description`` (already a real, specific, already-computed fact
+    sentence -- see rules.py's ``filing_change``/``insider_activity``),
+    or ``None`` if a substantive code is present but its own description
+    is empty/whitespace (a genuine content-gate failure, not assumed
+    impossible)."""
+    reasons = list(reasons or ())
+    hits = {r.code for r in reasons if getattr(r, "code", None) in SUBSTANTIVE_REASON_CODES}
+    if not hits:
+        return hits, None
+    for r in reasons:
+        if r.code in hits and (r.description or "").strip():
+            return hits, r.description
+    return hits, None    # codes present but no genuine supporting text -- fails the content gate
 
 
 def classify_disposition(
-    *, band: "SignificanceBand | str | None", reason_codes, insider_activity=None,
+    *, band: "SignificanceBand | str | None", reasons=(), insider_activity=None,
 ) -> DispositionDecision:
-    """Pure, deterministic. ``reason_codes`` is any iterable of the
-    significance engine's own ``SignificanceReason.code`` strings for this
-    event (e.g. ``[r.code for r in sig.reasons]``). ``insider_activity``
-    is the same object already built for card rendering/significance
-    (may be ``None`` for a non-insider event)."""
+    """Pure, deterministic. ``reasons`` is an iterable of the
+    significance engine's own ``SignificanceReason`` objects for this
+    event (e.g. ``sig.reasons``) -- Task 140: the FULL objects, not bare
+    code strings, because eligibility now requires validating each
+    reason's own supporting ``description`` text is genuinely populated,
+    not merely that its code is a recognized substantive one.
+    ``insider_activity`` is the same object already built for card
+    rendering/significance (may be ``None`` for a non-insider event)."""
     band_val = band.value if isinstance(band, SignificanceBand) else band
+    reasons = list(reasons or ())
 
     if band_val == SignificanceBand.CRITICAL.value:
+        # The engine's own structural floor (>=2 substantive families,
+        # >=5 substantive points) already gates CRITICAL strictly -- this
+        # policy does not re-derive that. But the MESSAGE must still show
+        # real evidence, not a bare band label: prefer the highest-point
+        # reason with a genuine description among the ones that already
+        # crossed a substantive threshold in this event's own scoring.
+        _, ev = _substantive_evidence(reasons)
+        if ev is None and reasons:
+            # CRITICAL's floor can also be reached by insider-cluster/
+            # dollar-magnitude reasons outside SUBSTANTIVE_REASON_CODES's
+            # filing-change subset -- fall back to the highest-point
+            # reason with ANY real description, still never inventing text.
+            with_desc = [r for r in reasons if (r.description or "").strip()]
+            if with_desc:
+                ev = max(with_desc, key=lambda r: r.points).description
         return DispositionDecision(
             DISPOSITION_IMMEDIATE,
             "CRITICAL band -- the engine's own structural floor already "
             "requires >=2 substantive scoring families before reaching "
             "CRITICAL, so this policy does not re-derive substantiveness.",
+            evidence_text=ev,
         )
     if band_val == SignificanceBand.LOW.value or band_val is None:
         return DispositionDecision(
@@ -91,18 +169,31 @@ def classify_disposition(
             f"{band_val or 'no'} band -- no scoring signal worth a digest slot.",
         )
 
-    # MEDIUM / HIGH: require an explicit substantive trigger.
-    hits = _substantive_codes_present(reason_codes or ())
-    if hits:
+    # MEDIUM / HIGH: require an explicit substantive trigger AND its own
+    # genuine, already-computed supporting fact text -- Task 140: a
+    # recognized code with no real description behind it does NOT
+    # qualify (falls through to DIGEST, content-gated, not suppressed).
+    hits, evidence = _substantive_evidence(reasons)
+    if hits and evidence:
         return DispositionDecision(
             DISPOSITION_IMMEDIATE,
-            f"{band_val} band with a substantive trigger present: {sorted(hits)}.",
+            f"{band_val} band with a substantive, evidenced trigger present: {sorted(hits)}.",
+            evidence_text=evidence,
         )
-    if _has_buy_cluster(insider_activity):
+    cluster = _has_buy_cluster(insider_activity)
+    if cluster is not None:
         return DispositionDecision(
             DISPOSITION_IMMEDIATE,
             f"{band_val} band with a >=2-distinct-insider open-market BUY "
             "cluster present.",
+            evidence_text=_cluster_evidence_text(cluster),
+        )
+    if hits and not evidence:
+        return DispositionDecision(
+            DISPOSITION_DIGEST,
+            f"{band_val} band: substantive code(s) {sorted(hits)} present but no "
+            "genuine supporting description found on the reason itself -- content "
+            "gate not satisfied, routed to DIGEST rather than trusting the code alone.",
         )
     return DispositionDecision(
         DISPOSITION_DIGEST,
@@ -161,7 +252,7 @@ def reclassify_pending_rows(
                 except Exception:  # noqa: BLE001
                     insider_activity = None
             decision = classify_disposition(
-                band=sig.band, reason_codes=[r.code for r in sig.reasons],
+                band=sig.band, reasons=sig.reasons,
                 insider_activity=insider_activity,
             )
             if decision.disposition == DISPOSITION_DIGEST:
