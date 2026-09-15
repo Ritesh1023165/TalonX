@@ -1,0 +1,59 @@
+Full repository suite run, this session's final completion pass.
+Started: 2026-09-15T04:14Z (approx, immediately after committing 2c96c8f)
+Finished: exit code 0, "17 failed, 4837 passed, 6 skipped, 420 warnings in 3549.15s (0:59:09)"
+
+CAPTURE LIMITATION, stated honestly: this run's raw output was piped
+through `| tail -5` when launched (the same output-truncation mistake
+made once already in the Task 138 segment of this session), so only the
+final summary line and the LAST 4 individual FAILED test names survived
+capture:
+
+  FAILED tests/test_task117_migration.py::test_interrupted_tick_leaves_a_consistent_recoverable_ledger
+  FAILED tests/test_task117_release_rehearsal.py::test_bounded_release_rehearsal
+  FAILED tests/test_task118a_dashboard_message_count.py::test_immediate_and_digest_sends_count_messages_correctly
+  FAILED tests/test_task131_dashboard_broad_discovery.py::test_original_watchlist_view_untouched_shape
+  17 failed, 4837 passed, 6 skipped, 420 warnings in 3549.15s (0:59:09)
+
+The remaining 13 of 17 failure names were not captured verbatim from
+this specific run and are NOT re-asserted here as directly re-verified
+against this exact run. What IS directly supported:
+
+1. The TOTAL count (17) is identical to the count independently,
+   name-by-name verified as pre-existing/environmental against the
+   `13c9902` baseline earlier this session
+   (docs/research/evidence/task138/full_suite_run_output.txt) -- via a
+   temporary git worktree, each of those 17 individually confirmed to
+   fail identically on the pre-Task-138 commit.
+2. All 4 names actually captured from THIS run are an exact subset of
+   that same previously-verified 17-name set.
+3. None of this session's code changes (notification_policy.py,
+   renderer.py, enrichment.py, talonx_v2/service.py, dashboard_read.py,
+   telegram_listener.py, prospective/proc.py) touch any file the
+   previously-verified 17 failures were traced to (live-process-scan
+   fixtures, a live-session-timing fixture, a superseded hardcoded
+   fingerprint constant, and a live production ledger's md5 hash moving
+   past a historical allowlist while its owning companion kept ticking)
+   -- none of those root causes are affected by anything changed this
+   session.
+4. Positive control: every one of this session's own new/modified test
+   files was run repeatedly in FOCUSED batteries throughout this
+   session (176 tests in one combined run alone, plus multiple smaller
+   targeted runs) and passed 100% every time, including the rewritten
+   tests/test_task138_notification_policy.py (26/26) and the 6 new
+   Task 140 test files -- so no full-suite failure is attributable to
+   this session's own changes with any observed counter-evidence.
+
+`pytest`'s own `.pytest_cache/v/cache/lastfailed` was checked as a
+possible source for the missing 13 names, but is STALE/accumulated
+across multiple earlier partial runs this session (it still names
+`tests/test_task138_notification_policy.py::test_buy_side_cluster_is_
+immediate`, a test renamed to `test_buy_side_cluster_is_immediate_
+with_real_evidence_text` earlier this session -- proving that cache
+entry predates this session's own edit and is not reliable for
+reconstructing this specific run's exact failure set).
+
+Per explicit instruction, the full suite was NOT re-run a second time
+merely to recover the missing names -- this capture gap is reported
+honestly as a limitation of this evidence bundle, not glossed over, and
+not used to claim more verification than actually exists for the other
+13 names individually.
