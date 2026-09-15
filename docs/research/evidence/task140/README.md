@@ -44,6 +44,29 @@ Task 140 evidence lineage, unrelated prior corrections). 11 new tests,
 currently-due HIGH/MEDIUM rows re-confirmed correctly classified, 0
 downgraded), minimal single-component (Intelligence-only) restart.
 
+## Later correction (Task 140c): bounded alert-usefulness acceptance review
+
+A follow-up, non-reopening review of currently-eligible informational
+alerts (12-sample, deterministic selection: insider purchases/sales,
+buy/sell clusters, filing comparisons, same-accession pairs) — full
+evidence in `alert_usefulness_review/README.md`. Found and fixed ONE
+real, demonstrated defect distinct from the AXON case:
+`LARGE_OPEN_MARKET_TRANSACTION`'s direction-less dollar figure ("an
+open-market insider transaction of about $X was reported") was shown
+even when a richer, already-computed insider-cluster fact (which states
+purchase/sale direction, distinct-owner count and window) existed for
+the SAME event — two real PENDING DD cards would have sent with no
+indication of direction. Fixed narrowly (evidence-TEXT selection only;
+eligibility untouched, verified by a dedicated non-widening test) —
+commit `4a4657a`. Checked all 787 same-accession multi-event groups for
+actual redundant `IMMEDIATE` pairs: zero found; no consolidation
+subsystem built. 9 new tests, 529+145-test regression (0 failed),
+`reclassify_pending_rows` gained an optional content-refresh path for
+old `PENDING` rows, minimal single-component (Intelligence-only)
+restart. The review's own corrected scope-of-acceptance section states
+plainly this is a 12-of-18,321-row bounded sample, not a universal
+acceptance result.
+
 ## Exact new default
 
 - `ServiceConfig.deliver_digest_enabled` (env

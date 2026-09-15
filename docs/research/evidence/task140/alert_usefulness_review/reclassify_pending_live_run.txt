@@ -1,0 +1,17 @@
+Bounded reclassify_pending_rows cutover run against the REAL
+production ~/.talonx/ingestion_ledger.db, after committing 4a4657a
+(the cluster-evidence-preference fix).
+
+db: C:\Users\rites\.talonx\ingestion_ledger.db exists: True
+PENDING IMMEDIATE rows before: 0
+BEFORE telegram:card:SEC:0001628280-25-054484:INSIDER_TRANSACTION:telegram-intel-v1: an open-market insider transaction of about $3,026,466 was reported
+BEFORE telegram:card:SEC:0001062993-24-009906:INSIDER_TRANSACTION:telegram-intel-v1: an open-market insider transaction of about $1,450,400 was reported
+scanned: 0
+downgraded: 0 []
+content_refreshed: 0 []
+errors: []
+AFTER telegram:card:SEC:0001628280-25-054484:INSIDER_TRANSACTION:telegram-intel-v1: an open-market insider transaction of about $3,026,466 was reported
+  state=EXPIRED route=IMMEDIATE
+AFTER telegram:card:SEC:0001062993-24-009906:INSIDER_TRANSACTION:telegram-intel-v1: an open-market insider transaction of about $1,450,400 was reported
+  state=EXPIRED route=IMMEDIATE
+PENDING IMMEDIATE rows after: 0
