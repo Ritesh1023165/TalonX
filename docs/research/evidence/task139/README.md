@@ -30,7 +30,7 @@ see the commit this README ships with.
 - [x] Stack restored via the existing `prospective start` lifecycle command, with the actual verified HEAD, existing DB paths, and the previously authorized broad-discovery/durable-admission/Task 138 notification-policy/Telegram configuration
 - [x] Current market-session boundary respected: no retrospective/backdated entries (positive evidence: V2's first tick correctly skipped 3 stale episodes); EOD confirmed `NOT_DUE_YET` and not run
 - [x] Real post-launch progress verified (fresh enrichment rows, a successful V2 tick, dashboard 200 OK, Telegram send/receive ownership) — not just heartbeat/CPU
-- [x] Accounting/reservation reconciliation: byte-identical before/after on both ledgers
+- [x] Accounting/reservation reconciliation: matching on every specifically-compared value (cash, position/intent/row counts, outbox state totals -- not a full database byte-for-byte comparison) before/after on both ledgers
 - [x] Session/checkpoint continuity verified: fresh checkpoint daemon for the new session, campaign day counter correctly continued (not reset)
 - [x] Historical Intelligence/Original "unexpected exit" pattern fully classified — separated cleanly from tonight's confirmed OS restart by exit-code signature and commit-timestamp correlation; zero remaining unexplained entries
 - [x] Bounded diagnostic added (`talonx_ops/supervisor.py::_exit_code_hint`) — log-only, no control-flow change — so a future reviewer doesn't have to redo this classification by hand

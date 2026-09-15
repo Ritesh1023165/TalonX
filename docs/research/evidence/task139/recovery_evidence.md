@@ -96,7 +96,7 @@ limitation, not claimed as direct.
 
 ## 5. Post-launch progress and reconciliation
 
-**Accounting — byte-identical before and after, both databases:**
+**Accounting — matching on every specifically-compared value (cash, position/intent/row counts, outbox state totals -- not a full database byte-for-byte comparison) before and after, both databases:**
 
 | | Original `current_cash` | Original `open_positions` | V2 `cash` | V2 `open_positions` | V2 intents/cooldowns/trades |
 |---|---|---|---|---|---|

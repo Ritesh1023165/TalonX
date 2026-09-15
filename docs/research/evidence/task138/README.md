@@ -87,6 +87,13 @@ necessary for verifiability.
   task.
 - `5eb9f360a183ce6a310b1725aaf119cc7bc52744` — this task's own final git
   commit SHA (code identity, not a strategy fingerprint).
-- `2ae6216bca70` — the separate, also-frozen, Original V1 strategy
-  fingerprint, not touched or re-verified by this task (no V1 strategy
-  code was in this task's authorized surface).
+- `ed8272fe568d` — the separate, also-frozen, Original V1 strategy
+  fingerprint (`talonx_ops.prospective.V1_FINGERPRINT_EXPECTED`), not
+  touched or re-verified by this task (no V1 strategy code was in this
+  task's authorized surface). **Correction (added 2026-09-15, under
+  Task 139/140)**: this line originally named the SUPERSEDED value
+  `2ae6216bca70` — corrected by Task 137 (commit `ae61cdb8`) to the
+  current, git-reproducible baseline `ed8272fe568d` well before this
+  report was written; the old value was carried over here by mistake,
+  not a re-drift. See `docs/research/TASK132_EXPANDED_DISCOVERY_DEV_RUN.md`
+  Addendum 8 for the original correction record.

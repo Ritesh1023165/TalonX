@@ -81,7 +81,7 @@ session boundary, confirmed by reading its source before acting):
   `startup verdict: READY`.
 - **`effective_symbols` in the fresh heartbeat: 569 entries** (was 39) —
   the actual live collection list, verified by direct query.
-- Post-restart accounting: byte-identical to the pre-restart snapshot
+- Post-restart accounting: matching on every specifically-compared value (cash, position/intent/row counts, outbox state totals -- not a full database byte-for-byte comparison) to the pre-restart snapshot
   above (same cash, same 0/0/0/2/171/264/24313 figures) — no drift, no
   duplicate effect.
 - V2 fingerprint unchanged: `11107198c5b81237`.

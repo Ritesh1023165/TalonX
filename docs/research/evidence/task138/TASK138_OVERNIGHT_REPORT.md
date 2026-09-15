@@ -2,10 +2,17 @@
 
 Branch `feature/task131-option-a-integration`. Actual UTC start time verified
 at execution: **2026-09-14T23:06:52Z** (`date -u`). Report generated
-**2026-09-15T00:0X:XXZ** (UTC; never inferred from unlabelled Windows-local
-log prefixes — this repo's supervisor log is in Europe/London local time,
-UTC+1 during this period, confirmed by direct comparison against every
-event's own `_utc` field, e.g. supervisor log `00:52:33` local = `23:52:33Z`).
+**2026-09-15T00:56:59Z** (UTC; matches the committing commit `0fe57f4`'s own
+`2026-09-15T01:56:59+01:00` timestamp; never inferred from unlabelled
+Windows-local log prefixes — this repo's supervisor log is in Europe/London
+local time, UTC+1 during this period, confirmed by direct comparison against
+every event's own `_utc` field, e.g. supervisor log `00:52:33` local = `23:52:33Z`).
+
+**Correction (added 2026-09-15, under Task 139/140)**: this report
+originally read "Report generated 2026-09-15T00:0X:XXZ" — an unfilled
+placeholder left in by mistake. Filled in above from the committing
+commit's own timestamp, the actual best available evidence for when this
+file's content was finalized.
 
 ## 1. Starting/final SHA, push result, running component versions
 
@@ -15,8 +22,13 @@ event's own `_utc` field, e.g. supervisor log `00:52:33` local = `23:52:33Z`).
   - `5734b8c` — Workstream 2 (notification policy)
   - `5eb9f36` — Workstream 3 (reply "details")
 - **Final HEAD: `5eb9f360a183ce6a310b1725aaf119cc7bc52744` (`5eb9f36`).**
-- Push: pending as the last step of this report (see the commit log for
-  push confirmation immediately after this file is committed).
+- Push: **completed**. Pushed as part of commit `0fe57f4`
+  (`13c9902..0fe57f4` on `origin/feature/task131-option-a-integration`).
+  **Correction (added 2026-09-15, under Task 139/140)**: this line
+  originally read "pending as the last step of this report" — stale by
+  the time of final commit/push; corrected here rather than left
+  misleading. See §9 of the Task 139 evidence bundle for everything
+  pushed since.
 - Running component versions, verified after the managed restarts (§7):
   - **Original** (`run_talonx.py`, PID 23600→14332): `commit_sha` =
     `5eb9f360a183ce6a310b1725aaf119cc7bc52744`, read directly from
@@ -299,7 +311,7 @@ respawn it" procedure (documented precedent: Task 132/134 addenda in
 `docs/research/TALONX_RESEARCH_LEDGER.md`) — never a second supervisor
 instance, never `talonx_ops.prospective start`. Full before/after PIDs,
 supervisor-log evidence, and post-restart verification (single owner per
-component, no duplicate stack, accounting byte-identical, 0 IN_FLIGHT rows,
+component, no duplicate stack, accounting matching on every specifically-compared value (cash, position/intent/row counts, outbox state totals -- not a full database byte-for-byte comparison), 0 IN_FLIGHT rows,
 no forced resend) are in `before_after_cutover_snapshots.json`.
 
 ## 8. Accounting, strategy and freshness preservation
