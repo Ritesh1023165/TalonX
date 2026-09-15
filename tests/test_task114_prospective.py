@@ -474,3 +474,61 @@ def test_start_stack_passes_enable_broad_discovery_through_to_the_v2_companion(t
     sup_call = next(c for c in spawned if "talonx_ops.supervisor" in c["argv"])
     assert "--include-v2" not in sup_call["argv"]
     assert not any("talonx_v2" in a for a in sup_call["argv"] if a != sup_call["argv"][1])
+
+
+# ======================================================================
+# Task 140 -- found during a live /ping investigation: --enable-broad-
+# discovery reached the V2 companion's own argv (tested above) but was
+# NEVER wired to Intelligence's OWN broad-discovery mode
+# (TALONX_INTEL_ENABLE_BROAD_DISCOVERY, the only control surface
+# talonx_ingest/intelligence/service/broad_discovery.py reads -- no CLI
+# flag exists on `poll` for it). The only way it was ever active in this
+# deployment was an ad-hoc interactive shell export before the FIRST
+# `prospective start` of a campaign, invisible to and not restored by any
+# subsequent restart -- including this task's own host-reboot recovery,
+# which is exactly how this was caught (a live /ping showed Intelligence
+# collecting 39 symbols, watchlist-only, instead of the 569 a genuinely
+# broad-collecting deployment resolves). Fixed by setting the env var
+# supervisor's own spawn merges into every child it launches (Original/
+# Experimental/Intelligence/Dashboard) whenever --enable-broad-discovery
+# is requested -- one flag now consistently governs both V2's execution
+# scope and Intelligence's actual collection scope.
+# ======================================================================
+
+def test_start_stack_does_not_set_intel_broad_discovery_env_by_default(tmp_path, monkeypatch):
+    from talonx_ops.prospective import proc
+    monkeypatch.setattr(proc, "_live_prior_stack", lambda: [])
+    proc, spawned, v2_db = _patched_proc(monkeypatch, tmp_path)
+    proc.start_stack(tmp_path / "session", env={}, with_dashboard=False,
+                     with_checkpoint_daemon=False)
+    sup_call = next(c for c in spawned if "talonx_ops.supervisor" in c["argv"])
+    assert "TALONX_INTEL_ENABLE_BROAD_DISCOVERY" not in (sup_call["env"] or {})
+
+
+def test_start_stack_enable_broad_discovery_also_sets_the_intelligence_env_var(tmp_path, monkeypatch):
+    from talonx_ops.prospective import proc
+    monkeypatch.setattr(proc, "_live_prior_stack", lambda: [])
+    proc, spawned, v2_db = _patched_proc(monkeypatch, tmp_path)
+    proc.start_stack(tmp_path / "session", env={}, with_dashboard=False,
+                     with_checkpoint_daemon=False, enable_broad_discovery=True)
+    sup_call = next(c for c in spawned if "talonx_ops.supervisor" in c["argv"])
+    assert sup_call["env"]["TALONX_INTEL_ENABLE_BROAD_DISCOVERY"] == "1"
+    # every child supervisor itself spawns inherits this same merged env
+    # (proc._spawn's {**os.environ, **env} pattern -- verified once here at
+    # the level THIS launcher actually controls, not re-testing supervisor's
+    # own internal spawn mechanics, which belong to test_task78i_supervisor.py)
+
+
+def test_start_stack_enable_broad_discovery_never_overrides_an_explicit_shell_value(tmp_path, monkeypatch):
+    """A real, explicitly-set env var (shell export or an already-resolved
+    `env` dict entry) always wins -- --enable-broad-discovery only ADDS
+    the key when genuinely absent, mirroring the load_dotenv(override=
+    False) precedent Task 132 already established for .env resolution."""
+    from talonx_ops.prospective import proc
+    monkeypatch.setattr(proc, "_live_prior_stack", lambda: [])
+    proc, spawned, v2_db = _patched_proc(monkeypatch, tmp_path)
+    monkeypatch.setenv("TALONX_INTEL_ENABLE_BROAD_DISCOVERY", "0")
+    proc.start_stack(tmp_path / "session", env={}, with_dashboard=False,
+                     with_checkpoint_daemon=False, enable_broad_discovery=True)
+    sup_call = next(c for c in spawned if "talonx_ops.supervisor" in c["argv"])
+    assert "TALONX_INTEL_ENABLE_BROAD_DISCOVERY" not in (sup_call["env"] or {})

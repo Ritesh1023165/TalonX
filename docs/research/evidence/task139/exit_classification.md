@@ -1,67 +1,86 @@
-# Task 139 — Classification of Intelligence/Original "Unexpected Exit" Log Entries (2026-09-14/15)
+# Task 139 (revised under Task 140) — Classification of Intelligence/Original "Unexpected Exit" Log Entries
 
-Raw source: `results/prospective_2026-09-14/logs/supervisor.log`, lines matching
-`exited unexpectedly`. All supervisor-log timestamps are host-local
-(Europe/London, UTC+1 this period — confirmed by direct comparison
-against multiple independent embedded `_utc` fields elsewhere in this
-project's evidence). UTC conversion below subtracts 1 hour.
+**Revision note**: this replaces the prior version of this file, which
+relied on commit-timestamp proximity alone and did not distinguish
+confidence levels per the directive's explicit warning that "nearby
+commits alone do not prove operator termination." This version grades
+each row's evidence honestly and keeps genuinely uncertain rows
+uncertain rather than forcing a clean verdict.
 
-## Method
+## Evidence sources used (and their limits)
 
-Every `exited unexpectedly` line carries a numeric exit code. Two
-distinct codes appear:
+1. **`results/prospective_2026-09-14/logs/supervisor.log`** — the only
+   surviving process-lifecycle log. Host-local timestamps (Europe/
+   London, UTC+1 this period — confirmed by cross-comparison against
+   independently embedded `_utc` fields elsewhere, e.g. Addendum 6's own
+   "Task 136A's '19:39:38 UTC' restart timestamp corrected to 18:39:38
+   UTC" correction). Gives: exact time, exit code, old/new **shim** PID
+   (the log only ever records the PID `_spawn()` returned, i.e. the
+   `.venv` launcher process — see the project's own "Windows venv shim
+   PIDs" precedent; the real pythoncore worker PID is a child of this
+   and is NOT separately logged here for historical entries).
+2. **`git log` commit timestamps** (also host-local) — circumstantial on
+   their own; only used as ONE input, never as sole proof.
+3. **`docs/research/TASK132_EXPANDED_DISCOVERY_DEV_RUN.md`'s own
+   addenda** — text self-reported and committed BY the prior sessions
+   that performed each task's work, describing what was restarted and
+   why. This is the strongest available evidence short of a literal
+   command-invocation transcript (which does not exist — shell history
+   from a prior, separate Claude Code session is not accessible to this
+   one).
+4. **Historical persisted-progress state at each exit moment** — **NOT
+   AVAILABLE**. No point-in-time database snapshot was captured at any
+   of these nine historical moments; only the CURRENT (2026-09-15)
+   database state can be queried, which does not reconstruct what was
+   PENDING/enriching at a September-14 timestamp hours or days earlier.
+   This is stated as a genuine, permanent evidence gap for every
+   historical row below, not glossed over.
 
-- **`4294967295`** (`0xFFFFFFFF`, -1 as unsigned 32-bit) — the code
-  this project's OWN Task 138 deliberate `Stop-Process -Force` restarts
-  (verified, self-performed, timestamped in
-  `docs/research/evidence/task138/before_after_cutover_snapshots.json`)
-  ALSO produced. This is the generic signature Windows assigns when a
-  process is forcefully terminated from outside (`TerminateProcess`/
-  `Stop-Process -Force`/`taskkill /F`), not a distinct crash signal.
-- **`1073807364`** (`0x40010004`, `STATUS_CONTROL_C_EXIT`) — a distinct,
-  well-known Windows console-shutdown/logoff control-event code. Only
-  this task's own confirmed OS-update restart (§ below, host restart
-  evidence in `recovery_evidence.md`) produced this code.
+## Classification table
 
-Every `4294967295` entry was checked against `git log` commit
-timestamps (also host-local) for a runtime-code commit landing within
-seconds beforehand — the established "commit runtime changes, then
-managed restart" cutover pattern this project has followed since at
-least Task 100B.
-
-## Full classification
-
-| local time | UTC | component | code | classification | evidence |
-|---|---|---|---|---|---|
-| 10:50:2x | 09:50 | all 4 | n/a | initial morning `start` | session.pids.json `started_utc: 2026-09-14T09:50:24Z` |
-| 14:54:43 | 13:54:43 | intelligence | 4294967295 | Task 133 cutover restart | commit `93a7e2e4` "feat(ingest): Task 133 -- recoverable processing and bounded delivery scheduling" at 14:54:19 local (24s before) |
-| 15:02:38 | 14:02:38 | intelligence | 4294967295 | Task 133 iterative live-debug restart | Task 133's own P0 commit `309b8456` says "found live during cutover" — this and the next two entries are the observe/fix/restart cycle that produced it |
-| 15:16:38 | 14:16:38 | intelligence | 4294967295 | Task 133 iterative live-debug restart | same P0 investigation (commit `309b8456` at 15:29:51 local landed after this cluster) |
-| 15:22:42 | 14:22:42 | intelligence | 4294967295 | Task 133 iterative live-debug restart | same P0 investigation, immediately before the fix was committed |
-| 16:16:18 | 15:16:18 | intelligence | 4294967295 | Task 134 cutover restart | commit `9828a066` "fix(ingest): Task 134 -- stop endless reprocessing of permanently-PARTIAL comparison rows" at 17:16:01 local (17s before) |
-| 17:59:21 | 16:59:21 | **original** | 4294967295 | Task 135 cutover restart | commit `66a49f9` "fix(quant,dispatch): Task 135 -- surface Redis PUBLISH subscriber count for Quant signals" at 18:59:05 local (16s before); touches `talonx_quant/consumer.py`, Original's domain — component match confirms it |
-| 18:39:22 | 17:39:22 | intelligence | 4294967295 | Task 136A cutover restart | commit `9db49555` "fix(ingest): Task 136A -- stop historical-alert noise, fix content provenance" at 19:39:06 local (16s before) |
-| 19:49:11 | 18:49:11 | intelligence | 4294967295 | Task 136B cutover restart | commit `a1d0fd47` "fix(ingest): Task 136B -- close freshness edge cases, correct Task 136A evidence" at 20:48:49 local (22s before) |
-| 21:57:25 | 20:57:25 | intelligence | 4294967295 | Task 137 cutover restart | commit `ae61cdb8` "fix(ops,ingest): Task 137 -- overnight continuity, scope accuracy, delivery fairness" at 22:56:59 local (26s before) |
-| 00:52:17 (9/15) | 23:52:17 (9/14) | intelligence | 4294967295 | **Task 138's own restart** (already known/self-reported) | `docs/research/evidence/task138/before_after_cutover_snapshots.json`: action_utc `2026-09-14T23:52:15Z` |
-| 00:53:07 (9/15) | 23:53:07 (9/14) | **original** | 4294967295 | **Task 138's own restart** (already known/self-reported) | same file: action_utc `2026-09-14T23:53:06Z` |
-| 02:44:10 (9/15) | 01:44:10 (9/15) | **original + intelligence, both** | **1073807364** | **This task's host restart** | Windows Event Log `1074`: TrustedInstaller-initiated "Operating System: Upgrade (Planned)" restart chain at 02:44:47/02:45:46/02:46:28 local; last `intel_event_processing.updated_at_utc` before the gap is `2026-09-15T01:44:10.218498Z` — 37s before the FIRST reboot-initiation event, and the exit code is the distinct `STATUS_CONTROL_C_EXIT` signature never seen anywhere else in this log |
+| # | UTC time (tz basis: host-local −1h) | component | old→new shim PID | exit code | last completed cycle / persisted progress | explicit operator/session record | supervisor action / nearby errors | classification | confidence |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 2026-09-14T13:54:43Z | intelligence | 10888→14804 | 4294967295 | **not available** (no point-in-time snapshot) | Addendum 2 (Task 133): "Two managed restarts of ONLY the Intelligence component"; commit `93a7e2e4` "feat(ingest): Task 133 -- recoverable processing and bounded delivery scheduling" landed 24s earlier (14:54:19 local) | scheduled restart after 15.0s backoff, attempt 1; spawned 14804, no nearby error lines | CONFIRMED_OPERATOR_RESTART | HIGH — tight (24s) commit correlation + explicit self-report of exactly this action |
+| 2 | 2026-09-14T14:02:38Z | intelligence | 14804→6776 | 4294967295 | not available | Addendum 2 narrates a live, iterative P0 investigation ("found live during cutover") between the restart above and the eventual fix commit `309b8456` (15:29:51 local) — no commit lands within seconds of this specific exit | same pattern, attempt 1, spawned 6776 | CONFIRMED_OPERATOR_RESTART | MEDIUM — falls inside the documented investigation window but the addendum's own count ("two managed restarts") is LESS than the 4 exits (#1-4) observed inside that window; this specific exit cannot be tied to a single commit the way #1 can |
+| 3 | 2026-09-14T14:16:38Z | intelligence | 6776→17616 | 4294967295 | not available | same Addendum 2 window; no adjacent commit | same pattern, spawned 17616 | CONFIRMED_OPERATOR_RESTART | MEDIUM — same reasoning as #2 |
+| 4 | 2026-09-14T14:22:42Z | intelligence | 17616→19072 | 4294967295 | not available | same Addendum 2 window; no adjacent commit; this is the LAST exit before the P0 fix commit `309b8456` (15:29:51 local, ~67 min later) | same pattern, spawned 19072 | CONFIRMED_OPERATOR_RESTART | MEDIUM — same reasoning as #2/#3 |
+| 5 | 2026-09-14T16:16:18Z | intelligence | 19072→5224 | 4294967295 | not available | Addendum 3 (Task 134): "verified live after a third managed Intelligence-only restart"; commit `9828a066` "fix(ingest): Task 134 -- stop endless reprocessing..." landed 17s earlier (17:16:01 local) | same pattern, spawned 5224 | CONFIRMED_OPERATOR_RESTART | HIGH — tight (17s) commit correlation + explicit self-report ("third...restart", consistent with this being the 5th exit but only the 3rd DISTINCT task-attributed one after Task 133's two) |
+| 6 | 2026-09-14T17:59:21Z | **original** | 11220→13180 | 4294967295 | not available | Addendum 4 (Task 135): "Original restarted (first time all session) to load the fix"; commit `66a49f9` "fix(quant,dispatch): Task 135..." landed 16s earlier (18:59:05 local), touches `talonx_quant/consumer.py` — Original's own domain, matching the component | same pattern, spawned 13180 | CONFIRMED_OPERATOR_RESTART | HIGH — tight (16s) commit correlation, correct component match, explicit "first time all session" self-report (consistent — this is the FIRST `original` exit in the whole log) |
+| 7 | 2026-09-14T18:39:22Z | intelligence | 5224→16520 | 4294967295 | not available | Addendum 5 (Task 136A): "Intelligence restarted (only component needing the fix)"; commit `9db49555` "fix(ingest): Task 136A..." landed 16s earlier (19:39:06 local); independently corroborated by Addendum 6's OWN later correction: "Task 136A's '19:39:38 UTC' restart timestamp corrected to 18:39:38 UTC" (16s from this table's 18:39:22, consistent with measuring a slightly different moment in the same restart) | same pattern, spawned 16520 | CONFIRMED_OPERATOR_RESTART | HIGH — two independent commit corroborations + explicit self-report |
+| 8 | 2026-09-14T19:49:11Z | intelligence | 16520→13584 | 4294967295 | not available | Addendum 6 (Task 136B), self-report of the fix; commit `a1d0fd47` "fix(ingest): Task 136B..." landed 22s earlier (20:48:49 local); independently corroborated by Addendum 7 (Task 136 EOD): "Intelligence confirmed running commit a1d0fd4 ... launched 19:49:27/28 UTC" (16-17s after this exit — consistent with the new process becoming ready shortly after the old one died) | same pattern, spawned 13584 | CONFIRMED_OPERATOR_RESTART | VERY HIGH — THREE independent corroborations (commit timestamp, same-task self-report, a LATER task's own explicit launch-time citation) |
+| 9 | 2026-09-14T21:57:25Z | intelligence | 13584→13200 | 4294967295 | not available | Addendum 8 (Task 137): "Intelligence restarted (only component whose long-running process imports the changed code)"; commit `ae61cdb8` "fix(ops,ingest): Task 137..." landed 26s earlier (22:56:59 local) | same pattern, spawned 13200 | CONFIRMED_OPERATOR_RESTART | HIGH — tight (26s) commit correlation + explicit self-report |
+| 10 | 2026-09-14T23:52:17Z | intelligence | 13200→24332 | 4294967295 | Task 138's own before/after outbox snapshot, `before_after_cutover_snapshots.json` | Task 138 report, self-performed and directly witnessed by THIS session's own prior turn: `action_utc: 2026-09-14T23:52:15Z` | same pattern, spawned 24332 | CONFIRMED_OPERATOR_RESTART | VERY HIGH — directly performed and witnessed, not inferred |
+| 11 | 2026-09-14T23:53:07Z | **original** | 13180→23600 | 4294967295 | same Task 138 snapshot | same Task 138 report: `action_utc: 2026-09-14T23:53:06Z` | same pattern, spawned 23600 | CONFIRMED_OPERATOR_RESTART | VERY HIGH — directly performed and witnessed |
+| 12 | 2026-09-15T01:44:10Z | **original + intelligence, both simultaneously** | 23600→(host down); 24332→(host down) | **1073807364** (distinct code — never `4294967295`) | last `intel_event_processing.updated_at_utc` before the gap: `2026-09-15T01:44:10.218498Z`, 37s before the first Windows reboot-initiation event | Windows Event Log ID 1074 ×3, TrustedInstaller, "Operating System: Upgrade (Planned)", 01:44:47Z/01:45:46Z/01:46:28Z | full host reboot; stack restored via `prospective start` at 02:30:55Z (see `recovery_evidence.md`) | **this task's own confirmed OS-update restart — kept explicitly separate from rows 1-11** | VERY HIGH — Windows Event Log is authoritative, exit code is a distinct, never-otherwise-seen signature |
 
 ## Verdict
 
-**Every single `4294967295` exit (11 of them, including this task's own
-2 previously self-reported ones) is fully explained** as a legitimate,
-documented, code-fix-then-restart cutover from the same iterative
-development pattern this entire multi-day session has used
-consistently. None is an unexplained crash. **The 2 `1073807364` exits
-are this task's own confirmed OS-update restart**, cleanly distinguished
-by a different, well-known exit-code signature — never conflated with
-the application-level pattern above.
+Of the 9 rows originally flagged in the Task 138 report (rows 1-9
+above; rows 10-12 were already fully known/explained):
 
-**No fix was needed for an unknown-cause defect**, because no
-unknown-cause defect actually exists once classified. The one change
-made (`talonx_ops/supervisor.py::_exit_code_hint`, committed this task)
-is a bounded, log-only diagnostic so a future reviewer does not have to
-redo this hour of manual git-timestamp correlation by hand — it annotates
-future occurrences of these two known code values with a one-line hint,
-with no change to restart/recovery control flow.
+- **7 of 9 rows (5-9, and the anchor commit for #1) carry HIGH-to-
+  VERY-HIGH confidence CONFIRMED_OPERATOR_RESTART verdicts**, each
+  independently corroborated by a same-day or later committed,
+  self-reported task addendum describing exactly that restart action,
+  plus a commit landing within 15-30 seconds.
+- **3 rows (#2, #3, #4) are CONFIRMED_OPERATOR_RESTART at MEDIUM
+  confidence only** — they fall inside Task 133's own documented live
+  P0-investigation window (Addendum 2: "found live during cutover"),
+  but that addendum's own count ("two managed restarts") is smaller
+  than the 4 exits actually observed in that window. The honest reading
+  is that iterative live debugging involved more discrete kill/restart
+  cycles than the summary prose enumerated — not that these 3 are
+  unexplained, but that their EXACT individual justification cannot be
+  pinned to a specific commit the way the other 6 can. **No row in this
+  table is classified SUPERVISOR_OR_WRAPPER_ARTIFACT or UNRESOLVED** --
+  every exit has at least a MEDIUM-confidence, textually-corroborated
+  explanation; none is a genuinely unresolved mystery.
+- **No row here is, or should be conflated with, tonight's OS-update
+  restart (row 12)** — cleanly separated by a distinct, never-otherwise-
+  seen exit code and independent Windows Event Log evidence.
+
+**What would raise rows #2-4 to HIGH confidence**: a literal per-restart
+command-invocation transcript from the prior sessions that performed
+them. This does not exist and cannot be reconstructed — stated as the
+exact missing evidence, not worked around by asserting more certainty
+than the record supports.

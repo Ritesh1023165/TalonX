@@ -217,6 +217,27 @@ def _start_stack_locked(sd, logs, py, *, env, tick_seconds, heartbeat_seconds,
     stop_flag = sd / "stop.flag"
     if stop_flag.exists():
         stop_flag.unlink()
+    # Task 140 (found during a live /ping investigation): --enable-broad-
+    # discovery already threaded correctly into the V2 companion's own
+    # argv below, but Intelligence's broad-discovery mode
+    # (talonx_ingest/intelligence/service/broad_discovery.py) is
+    # controlled ONLY by TALONX_INTEL_ENABLE_BROAD_DISCOVERY -- there is
+    # no CLI flag for it (poll has none) and it was never in the .env
+    # Task 132 already wired load_dotenv() for. The only way it was ever
+    # active was an ad-hoc interactive shell export before the FIRST
+    # `prospective start` of a campaign -- invisible to, and NOT restored
+    # by, a subsequent restart/reboot recovery. Setting it in `env` here
+    # (merged into supervisor's own os.environ, which every child
+    # supervisor spawns -- Original/Experimental/Intelligence/Dashboard --
+    # inherits via the SAME {**os.environ, **env} pattern _spawn() already
+    # uses everywhere) makes ONE flag govern both V2's execution scope AND
+    # Intelligence's actual collection scope consistently, through the
+    # real launcher, matching what "broad discovery" means to an operator.
+    # A real shell-exported value still wins (env only ADDS the key when
+    # requested, never overwrites one already present).
+    if (enable_broad_discovery and "TALONX_INTEL_ENABLE_BROAD_DISCOVERY" not in env
+            and "TALONX_INTEL_ENABLE_BROAD_DISCOVERY" not in os.environ):
+        env = {**env, "TALONX_INTEL_ENABLE_BROAD_DISCOVERY": "1"}
     try:
         sup_argv = [py, "-m", "talonx_ops.supervisor", "run"]
         if not with_dashboard:
