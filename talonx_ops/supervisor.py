@@ -44,6 +44,38 @@ logger = logging.getLogger("talonx_ops.supervisor")
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# Task 139: bounded diagnostic only -- no behavior change. A monitored
+# child's exit code alone does not say WHY it exited; this repo's own
+# history shows the two most common causes are indistinguishable by code
+# value alone unless you know what to look for. Annotate the two known
+# Windows-console signatures so a future reviewer doesn't have to redo the
+# forensic commit-timestamp correlation this task performed by hand:
+#   0xFFFFFFFF (-1 as unsigned, "4294967295" in this log's %s formatting)
+#     -- TerminateProcess()/"Stop-Process -Force" style external kill.
+#        Seen throughout 2026-09-14 correlating (within ~15-30s) to a
+#        runtime-code commit immediately before each restart -- i.e. the
+#        established "commit runtime changes, then managed restart"
+#        cutover pattern from prior tasks, not a crash.
+#   0x40010004 (STATUS_CONTROL_C_EXIT, "1073807364") -- a console
+#        shutdown/logoff control event, e.g. an OS-triggered host restart.
+_EXIT_CODE_HINTS = {
+    -1: "external forceful kill (e.g. Stop-Process -Force/taskkill) -- "
+        "check for a runtime-code commit immediately before this timestamp",
+    0xFFFFFFFF: "external forceful kill (e.g. Stop-Process -Force/taskkill) -- "
+                "check for a runtime-code commit immediately before this timestamp",
+    0x40010004: "console shutdown/logoff signal (STATUS_CONTROL_C_EXIT) -- "
+                "consistent with an OS-triggered host restart, not an app crash",
+    1073807364: "console shutdown/logoff signal (STATUS_CONTROL_C_EXIT) -- "
+                "consistent with an OS-triggered host restart, not an app crash",
+}
+
+
+def _exit_code_hint(code: int | None) -> str:
+    if code is None:
+        return ""
+    hint = _EXIT_CODE_HINTS.get(code)
+    return f" ({hint})" if hint else ""
+
 # Task 132: load the shared .env (same resolution approach as dashboard.py /
 # talonx_ops/cli.py) BEFORE any component is spawned -- SubprocessRunner
 # inherits `dict(os.environ)` for every child, so a setting only visible in
@@ -405,7 +437,8 @@ class Supervisor:
                     continue
                 # unexpected exit
                 c.last_error = f"unexpected exit (code {code})"
-                logger.warning("%s exited unexpectedly code=%s", c.name, code)
+                logger.warning("%s exited unexpectedly code=%s%s", c.name, code,
+                              _exit_code_hint(code))
                 self._schedule_restart(c)
                 continue
             # alive -- refresh health

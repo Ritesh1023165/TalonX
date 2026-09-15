@@ -333,11 +333,21 @@ no forced resend) are in `before_after_cutover_snapshots.json`.
   dedicated unit/integration tests. Absence of a qualifying IMMEDIATE
   event in a bounded window is treated as a valid outcome per the task's
   own instruction, not a reason to loosen any rule.
-- Intelligence has restarted many times over the course of 2026-09-14
+- ~~Intelligence has restarted many times over the course of 2026-09-14
   (9 unexpected exits, code `4294967295`, before this task's own two
   deliberate restarts) — a pre-existing operational pattern, not
   introduced by this task, and out of this task's authorized scope to
-  root-cause tonight; flagged here for the operator's attention.
+  root-cause tonight; flagged here for the operator's attention.~~
+  **CORRECTED by Task 139** (2026-09-15, during host-restart recovery):
+  this was investigated and fully explained, not left open. All 9
+  `code=4294967295` exits individually correlate (within 15-30 seconds)
+  to a runtime-code commit message for Tasks 133/134/135/136A/136B/137 —
+  i.e. every one is the SAME documented "commit runtime changes, then
+  managed restart" cutover pattern this project has used throughout,
+  not an unexplained crash. Full timestamp-by-timestamp correlation:
+  `docs/research/evidence/task139/exit_classification.md`. This was an
+  overcautious mischaracterization in the original report, not a
+  discovered defect.
 - Full-repository-suite tally: 17 failed / 4,805 passed / 6 skipped,
   every failure independently confirmed pre-existing against the
   `13c9902` baseline (§6) — no open, unexplained full-suite failure
