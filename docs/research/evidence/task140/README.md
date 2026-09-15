@@ -13,6 +13,17 @@ requested.
 `--deliver --transport telegram` had never reached Intelligence's own
 delivery enablement at all, only V2's).
 
+## Later correction (separate defect, same Task 140 label): dashboard refresh interrupting reading
+
+A follow-up user report -- the `:8787` cockpit dashboard's 6-second auto-
+refresh was returning the operator to the top of the page while reading
+-- is fully documented, fixed, and evidenced in its own subfolder:
+`dashboard_refresh_fix/root_cause_and_fix.md`. Frontend-only
+(`dashboard_web_static/index.html`), no backend/strategy/accounting file
+touched, no restart performed or required. See that document for the
+full root cause, fix, real-browser test evidence (10/10 real headless-
+Chrome behavioural tests), and before/after screenshots.
+
 ## Exact new default
 
 - `ServiceConfig.deliver_digest_enabled` (env

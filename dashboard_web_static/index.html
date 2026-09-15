@@ -86,6 +86,28 @@
   .card-channel { font-size:11px; color:var(--muted); font-family:ui-monospace,Consolas,monospace; }
   pre.json { white-space:pre-wrap; font-size:11px; background:var(--panel-2); border:1px solid var(--panel-border);
     border-radius:6px; padding:8px; overflow:auto; max-height:340px; }
+  #refresh-controls { display:flex; align-items:center; gap:6px; min-width:0; }
+  #refresh-controls button { background:var(--panel); color:var(--text); border:1px solid var(--panel-border);
+    border-radius:6px; padding:3px 10px; cursor:pointer; font-size:11px; flex-shrink:0; }
+  #refresh-controls button.paused { border-color:var(--warn); color:var(--warn); }
+  #refresh-controls button:disabled { opacity:.5; cursor:default; }
+  /* A longer status message (e.g. an error) must NEVER wrap onto a
+     second line -- that would grow the header's own height and shift
+     every scroll position on the page below it, exactly the kind of
+     refresh-triggered jump this task eliminates elsewhere. Ellipsis
+     instead of reflow. */
+  /* a FIXED width (not max-width) -- the element must occupy the same
+     footprint whether its text is empty or long, otherwise the header's
+     own flex-wrap layout can drop to a second row purely because the
+     status text got longer, growing header height and shifting the
+     whole page's scroll position exactly like the bug this fixes. */
+  #refresh-status { display:inline-block; width:190px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #refresh-status.error { color:var(--bad); }
+  #refresh-status.updating { color:var(--muted); }
+  .new-items-pill { position:sticky; top:6px; z-index:5; display:inline-block; margin:0 0 10px;
+    background:#16202b; color:#93c5fd; border:1px solid #223a4d; border-radius:14px;
+    padding:4px 12px; font-size:12px; cursor:pointer; }
+  .new-items-pill:hover { background:#1a2733; }
   @media (max-width:640px) {
     .grid { grid-template-columns:1fr; }
     header { gap:10px; }
@@ -108,6 +130,11 @@
   <div class="stat">msgs <b id="grand-total">0</b></div>
   <div class="stat">tickers <b id="distinct-tickers">0</b></div>
   <div class="stat" id="overall-health-wrap" style="display:none">system <b id="overall-health">—</b></div>
+  <div class="stat" id="refresh-controls">
+    <button id="refresh-pause-btn" type="button" title="Pause automatic refresh">Pause</button>
+    <button id="refresh-manual-btn" type="button" title="Refresh now">Refresh</button>
+    <span id="refresh-status" class="muted small">updated <span id="refresh-updated-ago">just now</span></span>
+  </div>
 </header>
 
 <nav id="primary">
@@ -167,11 +194,22 @@ function ageStr(sec){ if(sec==null) return '—'; if(sec<90) return Math.round(s
 function srcLine(s){ return s? `<div class="src">source: ${esc(s)}</div>` : ''; }
 
 /* ---------- primary section renderers ---------- */
-function boundedTable(rows, cols, cap){
+// Task 140 (dashboard refresh): `keyFn`, when given, stamps each <tr> with a
+// stable data-key (row identity, e.g. event_id/symbol) so the refresh morph
+// (see applyRefresh/morphChildren below) can reuse/reorder existing row DOM
+// nodes across an auto-refresh instead of destroying and recreating them --
+// this is what lets a row the operator is mid-reading survive a refresh even
+// when other rows above/below it changed. Falls back to the row's own index
+// when no natural key is given (matches the PRE-fix behaviour exactly: no
+// worse than before, just not reorder-safe for tables that don't pass one).
+function boundedTable(rows, cols, cap, keyFn){
   cap = cap || 12;
   if(!rows || !rows.length) return `<div class="empty">none</div>`;
   const head = cols.map(c=>`<th>${c.label}</th>`).join('');
-  const body = rows.slice(0,cap).map(r=>`<tr>${cols.map(c=>`<td>${esc(num(c.get(r)))}</td>`).join('')}</tr>`).join('');
+  const body = rows.slice(0,cap).map((r,i)=>{
+    const k = esc(String((keyFn? keyFn(r,i) : i)));
+    return `<tr data-key="${k}">${cols.map(c=>`<td>${esc(num(c.get(r)))}</td>`).join('')}</tr>`;
+  }).join('');
   const more = rows.length>cap ? `<div class="small muted">+${rows.length-cap} more (bounded view)</div>` : '';
   return `<div class="tblwrap"><table class="tbl"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${more}`;
 }
@@ -229,7 +267,7 @@ function renderOverview(d){
      `<div class="small muted">legacy dry-run bookkeeping rows: ${num(a.experimental_legacy_bookkeeping_rows)} (not live sends)</div></div>`;
   h+=`<div class="card card-wide"><h3>Source status (false-zero guard)</h3><div class="tblwrap"><table class="tbl">`+
      `<thead><tr><th>domain</th><th>status</th><th>authoritative source</th><th>note</th></tr></thead><tbody>`+
-     (d.source_status||[]).map(s=>`<tr><td>${esc(s.domain)}</td><td>${pill(s.status)}</td>`+
+     (d.source_status||[]).map(s=>`<tr data-key="${esc(s.domain)}"><td>${esc(s.domain)}</td><td>${pill(s.status)}</td>`+
        `<td class="muted">${esc(s.authoritative_source)}</td><td class="muted">${esc((s.note||'').slice(0,140))}</td></tr>`).join('')+
      `</tbody></table></div></div>`;
   h+=`</div>`;
@@ -245,7 +283,7 @@ function renderPremarket(d){
        {label:'symbol', get:r=>r.symbol},{label:'earnings date', get:r=>r.earnings_date},
        {label:'window', get:r=>r.window},{label:'session', get:r=>r.session},
        {label:'heads-up sent', get:r=>String(r.heads_up_sent)},
-     ], 20)+srcLine(er.source)+`</div>`;
+     ], 20, r=>r.symbol+'|'+r.earnings_date)+srcLine(er.source)+`</div>`;
   {
     const cov=pw.coverage||{}, fam=pw.events_by_family||{}, cnt=pw.counts_by_family||{};
     let pwh=`<div class="card card-wide"><h3>Premarket watch ${pill(pw.status)}</h3>`;
@@ -263,7 +301,7 @@ function renderPremarket(d){
         {label:'symbol', get:r=>r.symbol},{label:'bias', get:r=>r.bias},
         {label:'gap %', get:r=>r.gap_pct},{label:'rel vol', get:r=>r.relative_volume},
         {label:'ref', get:r=>r.reference_price},{label:'detail', get:r=>r.detail},
-      ], 10);
+      ], 10, r=>r.symbol);
     });
     pwh+=srcLine(pw.source)+`</div>`;
     h+=pwh;
@@ -272,7 +310,7 @@ function renderPremarket(d){
      boundedTable(ec.items, [
        {label:'symbol', get:r=>r.symbol},{label:'event type', get:r=>r.event_type},
        {label:'accepted at', get:r=>r.accepted_at},
-     ], 15)+srcLine(ec.source)+`</div>`;
+     ], 15, r=>r.symbol+'|'+r.event_type+'|'+r.accepted_at)+srcLine(ec.source)+`</div>`;
   h+=`</div>`;
   return h;
 }
@@ -298,7 +336,7 @@ function renderOriginalQuant(d){
   h+=`<div class="card orig card-wide"><h3>Rejection reasons (today)</h3>`+
      boundedTable(f.by_reason, [
        {label:'reason', get:r=>r.reason},{label:'count', get:r=>r.count},{label:'%', get:r=>r.pct},
-     ], 20)+`</div>`;
+     ], 20, r=>r.reason)+`</div>`;
   h+=`<div class="card card-wide"><h3>Source status</h3><pre class="json">${esc(JSON.stringify(d.source_status||{},null,1))}</pre></div>`;
   h+=`</div>`;
   return h;
@@ -318,14 +356,14 @@ function renderValidation(d){
      kv('BULLISH', num(dir.BULLISH))+kv('BEARISH', num(dir.BEARISH))+
      kv('WOULD_PASS', num(g.WOULD_PASS))+kv('WOULD_REJECT', num(g.WOULD_REJECT))+kv('other', num(g.OTHER))+`</div>`;
   h+=`<div class="card exp"><h3>Reject reasons</h3>`+
-     boundedTable(d.reject_reasons, [{label:'reason', get:r=>r.reason},{label:'count', get:r=>r.count}], 12)+`</div>`;
+     boundedTable(d.reject_reasons, [{label:'reason', get:r=>r.reason},{label:'count', get:r=>r.count}], 12, r=>r.reason)+`</div>`;
   h+=`<div class="card exp card-wide"><h3>Recent directional alerts (internal)</h3>`+
      boundedTable(d.directional_recent, [
        {label:'id', get:r=>r.alert_id},{label:'symbol', get:r=>r.symbol},{label:'dir', get:r=>r.direction},
        {label:'setup', get:r=>r.setup_type},{label:'score', get:r=>r.setup_score},
        {label:'gate', get:r=>r.trade_gate_status},{label:'reject', get:r=>r.trade_gate_reject_reason},
        {label:'ts', get:r=>r.bar_timestamp},
-     ], 15)+`</div>`;
+     ], 15, r=>r.alert_id)+`</div>`;
   h+=`<div class="card exp card-wide"><h3>Forward outcomes ${pill(fo.status)} — Task 99G</h3>`+
      `<div style="display:flex;gap:20px;flex-wrap:wrap;margin:6px 0" class="small muted">`+
      Object.entries(fo.summary||{}).map(([k,v])=>`<span><b style="color:var(--text);font-size:16px;display:block">${v}</b>${k}</span>`).join('')+`</div>`+
@@ -334,7 +372,7 @@ function renderValidation(d){
        {label:'MFE', get:r=>r.mfe},{label:'MAE', get:r=>r.mae},
        {label:'+30m', get:r=>r.r_30m},{label:'+60m', get:r=>r.r_60m},{label:'EOD', get:r=>r.r_eod},{label:'+1D', get:r=>r.r_1d},
        {label:'status', get:r=>r.status},
-     ], 15)+srcLine(fo.source)+`</div>`;
+     ], 15, r=>r.obs_id)+srcLine(fo.source)+`</div>`;
   h+=`<div class="card exp card-wide"><h3>Original vs Experimental (informational)</h3>`+
      `<div class="muted small">${esc(cmp.note||'')}</div><pre class="json">${esc(JSON.stringify({original:cmp.original,experimental:cmp.experimental},null,1))}</pre></div>`;
   h+=`</div>`;
@@ -375,11 +413,11 @@ function renderIntelligence(d){
      boundedTable(d.latest_events, [
        {label:'event id', get:r=>r.event_id},{label:'symbol', get:r=>r.symbol},
        {label:'type', get:r=>r.event_type},{label:'accepted at', get:r=>r.accepted_at},
-     ], 15)+`</div>`;
+     ], 15, r=>r.event_id)+`</div>`;
   h+=`<div class="card intel card-wide"><h3>Significance-ranked</h3>`+
      boundedTable(d.significance_ranked, [
        {label:'event id', get:r=>r.event_id},{label:'band', get:r=>r.band},{label:'score', get:r=>r.score},
-     ], 15)+`</div>`;
+     ], 15, r=>r.event_id)+`</div>`;
   h+=`</div>`;
   return h;
 }
@@ -430,14 +468,16 @@ function lanePaperCard(cls, title, base, perf, extraBanner){
      {label:'qty', get:p=>p.quantity}, {label:'cost basis', get:p=>p.cost_basis},
      {label:'mark', get:p=>p.mark}, {label:'mark session', get:p=>p.mark_session_classification},
      {label:'mark age', get:p=>ageStr(p.mark_age_seconds)},
-     {label:'unrealized $', get:p=>p.unrealized_pnl_usd}, {label:'obligation', get:p=>p.pending_exit_obligation}], 20);
+     {label:'unrealized $', get:p=>p.unrealized_pnl_usd}, {label:'obligation', get:p=>p.pending_exit_obligation}], 20,
+     p=>p.symbol+'|'+p.entry_time);
   if((op.detail||[]).some(p=>p.mark_note)) h+=`<div class="muted small">${(op.detail||[]).filter(p=>p.mark_note).map(p=>esc(p.symbol)+': '+esc(p.mark_note)).join(' · ')}</div>`;
   h+=`<details><summary>closed trades (${(perf.closed_trades||[]).length})</summary>`+
      boundedTable(perf.closed_trades||[], [
         {label:'symbol', get:t=>t.symbol}, {label:'exit time', get:t=>t.exit_event_time&&String(t.exit_event_time).slice(0,19)},
         {label:'qty', get:t=>t.quantity}, {label:'entry px', get:t=>t.entry_price}, {label:'exit px', get:t=>t.exit_price},
         {label:'realized $', get:t=>t.realized_pnl_usd}, {label:'exit reason', get:t=>t.exit_reason},
-        {label:'recovery-affected', get:t=>t.recovery_affected?'YES':'no'}, {label:'provenance', get:t=>t.provenance&&String(t.provenance).slice(0,9)}], 20)+
+        {label:'recovery-affected', get:t=>t.recovery_affected?'YES':'no'}, {label:'provenance', get:t=>t.provenance&&String(t.provenance).slice(0,9)}], 20,
+        t=>t.symbol+'|'+t.exit_event_time)+
      `</details>`;
   const flagged=(perf.closed_trades||[]).filter(t=>t.recovery_affected);
   if(flagged.length) h+=`<div class="banner warn">${flagged.length} recovery-affected closed trade(s): ${esc(flagged[0].recovery_affected_reason||'')}</div>`;
@@ -532,13 +572,15 @@ function renderV2(d){
      boundedTable(l.open_positions||[], [
         {label:'symbol', get:p=>p.symbol}, {label:'entry session', get:p=>p.entry_session},
         {label:'entry px', get:p=>p.entry_price}, {label:'planned exit', get:p=>p.target_exit_session},
-        {label:'days held', get:p=>p.days_held}, {label:'shares', get:p=>p.shares}], 20)+
+        {label:'days held', get:p=>p.days_held}, {label:'shares', get:p=>p.shares}], 20,
+        p=>p.symbol+'|'+p.entry_session)+
      `</div>`;
   // PENDING pre-open intents (actionable, not yet filled)
   h+=`<div class="card card-wide"><h3>Pre-open entry intents (actionable — filled at the session OPEN)</h3>`+
      boundedTable((intt.pending && intt.pending.length? intt.pending : (sv.pending_entry_intents||[])), [
         {label:'symbol', get:i=>i.symbol}, {label:'target entry session', get:i=>i.target_entry_session},
-        {label:'intent created (UTC)', get:i=>i.created_at_utc}], 20)+
+        {label:'intent created (UTC)', get:i=>i.created_at_utc}], 20,
+        i=>i.symbol+'|'+i.created_at_utc)+
      `<div class="muted small">by status: ${esc(JSON.stringify(intt.by_status||{}))}</div></div>`;
   // FUNNEL: Form4 -> purchases -> distinct owners -> clusters -> eligibility/staleness -> decisions -> paper -> delivery
   h+=`<div class="card card-wide"><h3>Funnel — Form 4 → clusters → decisions → paper → delivery</h3><div class="tblwrap"><table class="tbl"><tbody>`+
@@ -557,7 +599,8 @@ function renderV2(d){
      boundedTable(del.recent||(sv.alert_outbox&&sv.alert_outbox.recent)||[], [
         {label:'kind', get:x=>x.kind}, {label:'action', get:x=>x.action}, {label:'symbol', get:x=>x.symbol},
         {label:'state', get:x=>x.state}, {label:'attempts', get:x=>x.attempts},
-        {label:'transport ref', get:x=>x.transport_ref}, {label:'last error', get:x=>x.last_error}], 12)+
+        {label:'transport ref', get:x=>x.transport_ref}, {label:'last error', get:x=>x.last_error}], 12,
+        x=>x.kind+'|'+x.action+'|'+x.symbol+'|'+x.transport_ref)+
      `<div class="muted small">Experimental external delivery is structurally blocked; Intelligence alerts are informational and rendered under the Intelligence tab.</div></div>`;
   h+=`</div>`;
   return h;
@@ -579,10 +622,21 @@ function renderV2Discovery(d){
         (cov.resolved_pct!=null? ' ('+cov.resolved_pct+'%)':''))+
      (d.manifest_error? `<div class="banner warn">manifest error: ${esc(d.manifest_error)}</div>`:'')+
      `<div class="muted small">${esc(cov.note||'')}</div></div>`;
-  if((cov.unresolved_symbols_sample||[]).length){
-    h+=`<div class="card"><h3>Unresolved CIK sample</h3><details><summary>${cov.unresolved_symbols_sample.length} shown (bounded)</summary>`+
-       boundedTable(cov.unresolved_symbols_sample, [{label:'symbol', get:r=>r.symbol}, {label:'reason', get:r=>r.reason}], 25)+
-       `</details></div>`;
+  // Task 140 (dashboard refresh): always render this card (never add/remove
+  // the whole sibling) so a refresh morph never has to reflow every card
+  // after it in the grid just because this count crossed zero -- the SAME
+  // stability principle _bw-unavailable/_bw-content already use elsewhere
+  // in this file, applied here since this one is string-templated per
+  // refresh rather than a fixed element with a toggled id.
+  {
+    const uSamp = cov.unresolved_symbols_sample||[];
+    h+=`<div class="card"><h3>Unresolved CIK sample</h3>`+
+       (uSamp.length
+         ? `<details><summary>${uSamp.length} shown (bounded)</summary>`+
+           boundedTable(uSamp, [{label:'symbol', get:r=>r.symbol}, {label:'reason', get:r=>r.reason}], 25, r=>r.symbol)+
+           `</details>`
+         : `<div class="empty">none — all CIKs resolved</div>`)+
+       `</div>`;
   }
   // A. is discovery operating?
   h+=`<div class="card"><h3>Is discovery operating?</h3>`+
@@ -632,7 +686,8 @@ function renderV2Discovery(d){
           {label:'mark', get:p=>p.mark==null?'UNAVAILABLE':p.mark},
           {label:'mark as-of', get:p=>p.mark_timestamp&&String(p.mark_timestamp).slice(0,19)},
           {label:'mark session', get:p=>p.mark_session_classification},
-          {label:'unrealized $', get:p=>p.unrealized_pnl_usd==null?'UNAVAILABLE':p.unrealized_pnl_usd}], 20)+
+          {label:'unrealized $', get:p=>p.unrealized_pnl_usd==null?'UNAVAILABLE':p.unrealized_pnl_usd}], 20,
+          p=>p.symbol+'|'+p.entry_session)+
        `<div class="muted small">${esc(led.position_detail_note||'')}</div></div>`;
     h+=`<div class="card card-wide"><h3>Closed trade detail (broad-discovery-only)</h3>`+
        boundedTable(led.closed_trades_detail||[], [
@@ -640,7 +695,8 @@ function renderV2Discovery(d){
           {label:'exit session', get:t=>t.exit_session}, {label:'entry price', get:t=>t.entry_price},
           {label:'exit price', get:t=>t.exit_price}, {label:'quantity', get:t=>t.quantity},
           {label:'realized $', get:t=>t.realized_pnl_usd}, {label:'realized %', get:t=>t.realized_pnl_pct},
-          {label:'days held', get:t=>t.trading_days_held}, {label:'exit reason', get:t=>t.exit_reason}], 20)+
+          {label:'days held', get:t=>t.trading_days_held}, {label:'exit reason', get:t=>t.exit_reason}], 20,
+          t=>t.symbol+'|'+t.exit_session)+
        `</div>`;
   }
   // C. what action is being communicated -- pending intents, never an invented price
@@ -648,7 +704,8 @@ function renderV2Discovery(d){
      boundedTable(aq.pending_intents||[], [
         {label:'symbol', get:i=>i.symbol}, {label:'target entry session', get:i=>i.target_entry_session},
         {label:'reference price', get:i=>i.reference_price}, {label:'planned exit', get:i=>i.planned_exit_session},
-        {label:'intent created (UTC)', get:i=>i.created_at_utc&&String(i.created_at_utc).slice(0,19)}], 20)+
+        {label:'intent created (UTC)', get:i=>i.created_at_utc&&String(i.created_at_utc).slice(0,19)}], 20,
+        i=>i.symbol+'|'+i.created_at_utc)+
      `</div>`;
   // B. what has been found -- the discovery funnel. An empty candidate
   // list states ONLY that fact -- it never claims a reason (healthy
@@ -671,7 +728,8 @@ function renderV2Discovery(d){
       boundedTable(fn.recent||[], [
          {label:'symbol', get:c=>c.symbol}, {label:'event time', get:c=>c.event_time&&String(c.event_time).slice(0,19)},
          {label:'target entry session', get:c=>c.target_entry_session},
-         {label:'status', get:c=>c.status_bucket}, {label:'reason', get:c=>c.reason}], 25))+
+         {label:'status', get:c=>c.status_bucket}, {label:'reason', get:c=>c.reason}], 25,
+         c=>c.symbol+'|'+c.event_time))+
      `</div>`;
   // alert delivery -- queued vs delivered kept explicit
   h+=`<div class="card card-wide"><h3>Alert delivery — broad-discovery-only</h3>`+
@@ -679,7 +737,8 @@ function renderV2Discovery(d){
         {label:'kind', get:x=>x.kind}, {label:'action', get:x=>x.action}, {label:'symbol', get:x=>x.symbol},
         {label:'state', get:x=>x.state}, {label:'attempts', get:x=>x.attempts},
         {label:'sent (UTC)', get:x=>x.sent_at_utc&&String(x.sent_at_utc).slice(0,19)},
-        {label:'last error', get:x=>x.last_error}], 20)+
+        {label:'last error', get:x=>x.last_error}], 20,
+        x=>x.kind+'|'+x.action+'|'+x.symbol+'|'+x.sent_at_utc)+
      `<div class="muted small">${esc(aq.note||'')}</div></div>`;
   h+=`</div>`;
   return h;
@@ -691,23 +750,277 @@ const SECTION_RENDER = {
   validation: renderValidation, intelligence: renderIntelligence, paper_eod: renderPaperEod,
 };
 
+/* =====================================================================
+   Task 140 -- dashboard refresh no longer interrupts reading.
+   =====================================================================
+   ROOT CAUSE (reproduced before this fix): every periodic refresh --
+   auto (every 6s) AND the initial load -- ran through the SAME code
+   path, which (1) immediately replaced the section container's entire
+   innerHTML with a one-line "loading..." placeholder BEFORE the fetch
+   even started, collapsing total document height far below the
+   reader's current scroll offset (the browser clamps window.scrollY to
+   the new, much shorter, max scroll -- landing the reader back near the
+   top), and (2) on response, replaced the ENTIRE container's innerHTML
+   again wholesale, destroying every existing DOM node (and with it any
+   user-toggled <details open> state) and recreating everything fresh.
+   No explicit scrollTo/focus call was ever made -- the jump was a pure
+   side effect of full-replace-driven document height collapse-then-
+   regrow. Confirmed via direct DOM inspection (data-key-based
+   before/after element identity checks; see docs/research/evidence/
+   task140/dashboard_refresh_fix.md) and reproduced live in headless
+   Chrome (docs/research/evidence/task140/dashboard_refresh/).
+
+   FIX: a small, dependency-free keyed DOM morph (morphChildren below --
+   the same technique morphdom/idiomorph use, hand-written here rather
+   than adding a new frontend dependency) patches the EXISTING DOM in
+   place on every refresh -- unchanged nodes are never removed/recreated,
+   so their scroll position, focus and <details> open/closed state
+   survive automatically. Only the FIRST load of a newly-selected tab
+   still does a full replace (nothing to preserve yet, and the "loading"
+   placeholder is legitimate there). A scroll-anchor correction handles
+   the case where content ABOVE the reader's visible position genuinely
+   changes height (see applyRefresh).
+   ===================================================================== */
+
+// ---- keyed DOM morph -------------------------------------------------
+function _dataKey(node){
+  return (node && node.nodeType===Node.ELEMENT_NODE) ? node.getAttribute('data-key') : null;
+}
+
+function morphAttrs(oldEl, newEl){
+  // <details open> is USER-OWNED once rendered: a refresh must never
+  // silently open or close a section the operator toggled themselves.
+  const skipOpen = oldEl.tagName === 'DETAILS';
+  for (const a of Array.from(oldEl.attributes)) {
+    if (skipOpen && a.name === 'open') continue;
+    if (!newEl.hasAttribute(a.name)) oldEl.removeAttribute(a.name);
+  }
+  for (const a of Array.from(newEl.attributes)) {
+    if (skipOpen && a.name === 'open') continue;
+    if (oldEl.getAttribute(a.name) !== a.value) oldEl.setAttribute(a.name, a.value);
+  }
+}
+
+function morphNode(oldNode, newNode){
+  if (newNode.nodeType === Node.TEXT_NODE || newNode.nodeType === Node.COMMENT_NODE){
+    if (oldNode.nodeType !== newNode.nodeType) return newNode.cloneNode(true);
+    if (oldNode.data !== newNode.data) oldNode.data = newNode.data;
+    return oldNode;
+  }
+  if (oldNode.nodeType !== Node.ELEMENT_NODE || oldNode.tagName !== newNode.tagName){
+    return newNode.cloneNode(true);
+  }
+  morphAttrs(oldNode, newNode);
+  morphChildren(oldNode, Array.from(newNode.childNodes));
+  return oldNode;
+}
+
+// Patches `oldParent`'s children in place to match `newKids`. When ANY of
+// newKids carries data-key, reconciliation is KEYED (existing nodes are
+// matched, reused and reordered by key -- this is what keeps a table row
+// the operator is reading identified correctly even if OTHER rows above
+// it were added/removed/reordered this refresh). Otherwise it is plain
+// POSITIONAL matching (safe here: cards/kv rows render in a fixed order
+// every call, driven by the same code path, so index+tag matching is
+// exact -- not a guess).
+function morphChildren(oldParent, newKids){
+  const oldKids = Array.from(oldParent.childNodes);
+  const anyKeyed = newKids.some(k => _dataKey(k) != null);
+  if (!anyKeyed){
+    const max = Math.max(oldKids.length, newKids.length);
+    for (let i=0;i<max;i++){
+      const ok = oldParent.childNodes[i];
+      const nk = newKids[i];
+      if (nk === undefined){ if (ok) oldParent.removeChild(ok); continue; }
+      if (ok === undefined){ oldParent.appendChild(nk.cloneNode(true)); continue; }
+      const result = morphNode(ok, nk);
+      if (result !== ok) oldParent.replaceChild(result, ok);
+    }
+    return;
+  }
+  const oldByKey = new Map();
+  oldKids.forEach(k => { const key = _dataKey(k); if (key != null) oldByKey.set(key, k); });
+  const used = new Set();
+  let cursor = oldParent.firstChild;
+  newKids.forEach(nk => {
+    const key = _dataKey(nk);
+    const match = key != null ? oldByKey.get(key) : null;
+    let node;
+    if (match){ node = morphNode(match, nk); used.add(match); }
+    else { node = nk.cloneNode(true); }
+    if (cursor === node){ cursor = cursor.nextSibling; }
+    else { oldParent.insertBefore(node, cursor); }
+  });
+  oldKids.forEach(k => { if (!used.has(k) && k.parentNode === oldParent) oldParent.removeChild(k); });
+}
+
+// ---- scroll-anchored refresh apply ------------------------------------
+// Finds the topmost element (bearing data-key, so it is meaningfully
+// re-identifiable) that is not entirely scrolled above the viewport --
+// "the thing the operator is currently looking at". Restoring only a raw
+// pixel offset is insufficient when content ABOVE it changes height (a
+// table gaining/losing rows shifts everything below) -- so instead this
+// anchors on that specific element's own viewport position and corrects
+// for whatever shifted above it.
+function findAnchor(container){
+  const candidates = container.querySelectorAll('[data-key]');
+  for (const el of candidates){
+    if (el.getBoundingClientRect().bottom > 0) return el;
+  }
+  return null;
+}
+
+function applyRefresh(container, newHtml){
+  const anchor = findAnchor(container);
+  const anchorTopBefore = anchor ? anchor.getBoundingClientRect().top : null;
+  // The anchor's position among EVERY keyed element in this container
+  // (not scoped to its immediate parent -- a table row evicted by a cap
+  // change has no useful "same parent, same index" candidate at all,
+  // since its whole neighbourhood may have been evicted together).
+  const allKeyedBefore = anchor ? Array.from(container.querySelectorAll('[data-key]')) : [];
+  const anchorPos = anchor ? allKeyedBefore.indexOf(anchor) : -1;
+  const prevTopKey = _dataKey(container.querySelector('[data-key]'));
+
+  const tmp = document.createElement('div');
+  tmp.innerHTML = newHtml;
+  morphChildren(container, Array.from(tmp.childNodes));
+
+  if (anchor && anchorTopBefore != null){
+    let target = anchor.isConnected ? anchor : null;
+    if (!target && anchorPos >= 0){
+      // Sensible nearby fallback: the anchored element itself is gone
+      // (its row/card genuinely left this refresh) -- walk outward
+      // through where it USED to sit among all keyed elements and
+      // anchor on the nearest one that is still in the document (these
+      // are the SAME element references captured before the morph, so
+      // `.isConnected` directly tells us whether the keyed morph above
+      // reused -- vs removed -- each one). Checking one step further
+      // "after" before "before" at each distance mildly favours content
+      // the reader had not reached yet over content already read.
+      for (let off = 1; off < allKeyedBefore.length && !target; off++){
+        const after = allKeyedBefore[anchorPos + off];
+        if (after && after.isConnected) { target = after; break; }
+        const before = allKeyedBefore[anchorPos - off];
+        if (before && before.isConnected) { target = before; break; }
+      }
+    }
+    if (target){
+      const delta = target.getBoundingClientRect().top - anchorTopBefore;
+      if (Math.abs(delta) > 0.5) window.scrollBy(0, delta);
+    }
+  }
+
+  // "new items above" -- never auto-jump to them; just let the operator
+  // know they exist and choose when to look. Heuristic: the section's
+  // own first keyed item changed identity AND the reader has scrolled
+  // down enough that new content prepended above would otherwise go
+  // unnoticed.
+  const newTopKey = _dataKey(container.querySelector('[data-key]'));
+  maybeShowNewItemsPill(container, prevTopKey, newTopKey);
+}
+
+function maybeShowNewItemsPill(container, prevTopKey, newTopKey){
+  const existing = container.querySelector('.new-items-pill');
+  if (prevTopKey == null || newTopKey == null || prevTopKey === newTopKey
+      || window.scrollY <= 40){
+    return; // nothing prepended above what the reader can already see, or n/a
+  }
+  if (existing) return; // don't stack multiple pills across consecutive refreshes
+  const pill = document.createElement('div');
+  pill.className = 'new-items-pill';
+  pill.textContent = 'New updates above — click to view';
+  pill.addEventListener('click', () => {
+    window.scrollTo({top:0, behavior:'smooth'});
+    pill.remove();
+  });
+  container.insertBefore(pill, container.firstChild);
+}
+
+// ---- refresh scheduling: pause/resume, manual refresh, request ordering
 let activeSection = "overview";
 let activeLegacy = null;
+let paused = false;
+let refreshTimer = null;
+let lastSuccessAt = null;      // Date -- ONLY advances on a real, applied success
+const _sectionState = new Map(); // name -> {generation, inFlight}
+
+function _stateFor(name){
+  let s = _sectionState.get(name);
+  if (!s){ s = {generation:0, inFlight:false, controller:null}; _sectionState.set(name, s); }
+  return s;
+}
+
+function setRefreshStatus(text, cls){
+  const el = $('refresh-status');
+  el.className = 'muted small' + (cls? ' '+cls : '');
+  el.innerHTML = text;
+}
+
+function _agoText(){
+  if (!lastSuccessAt) return 'never';
+  const s = Math.max(0, Math.round((Date.now()-lastSuccessAt.getTime())/1000));
+  return (s<90? s+'s' : Math.round(s/60)+'m') + ' ago';
+}
+function _tickAgoDisplay(){
+  const el = $('refresh-updated-ago');
+  if (el) el.textContent = _agoText();
+}
+setInterval(_tickAgoDisplay, 1000);
 
 async function loadSection(name){
+  // A genuinely NEW tab selection is intentional navigation, distinct
+  // from a background refresh of the SAME tab -- it is allowed (expected)
+  // to reset scroll/expanded-state, exactly like following a link. Only
+  // this path shows the loading skeleton / does a full replace.
   activeSection = name; activeLegacy = null;
   document.querySelectorAll('#primary button').forEach(b=>b.classList.toggle('active', b.dataset.sec===name));
   document.querySelectorAll('#legacy button').forEach(b=>b.classList.remove('active'));
   $('live-view').style.display='none'; $('fetch-view').style.display='none';
   const host=$('section-view'); host.style.display='';
   host.innerHTML = `<div class="muted small">loading ${name}…</div>`;
+  await fetchAndApplySection(name, {auto:false, initial:true});
+}
+
+async function fetchAndApplySection(name, {auto}){
+  const st = _stateFor('section:'+name);
+  if (auto && paused) return;                 // pause stops scheduling new auto refreshes
+  if (auto && st.inFlight) return;             // never overlap two auto requests for the same target
+  if (st.controller) st.controller.abort();    // manual refresh supersedes/cancels any in-flight one
+  const controller = new AbortController();
+  st.controller = controller;
+  const myGen = ++st.generation;
+  st.inFlight = true;
+  if (!auto) setRefreshStatus('updating…', 'updating');
   try{
-    const resp = await fetch('/api/section/'+name);
+    const resp = await fetch('/api/section/'+name, {signal: controller.signal});
     const data = await resp.json();
-    if(!resp.ok){ host.innerHTML = `<div class="banner warn">read failed</div><pre class="json">${esc(JSON.stringify(data,null,1))}</pre>`; return; }
-    host.innerHTML = (SECTION_RENDER[name]||((d)=>`<pre class="json">${esc(JSON.stringify(d,null,1))}</pre>`))(data);
-    if(data.runtime && data.runtime.overall){ $('overall-health-wrap').style.display=''; $('overall-health').textContent = data.runtime.overall; }
-  }catch(err){ host.innerHTML = `<div class="banner warn">fetch error: ${esc(err)}</div>`; }
+    // Discard if superseded: a newer request for this same section started
+    // since (generation moved on), OR the operator switched away from this
+    // section/tab entirely, OR (auto only) pause was engaged while this
+    // request was in flight -- an in-flight request must never silently
+    // apply after pause.
+    if (myGen !== st.generation || activeSection !== name || activeLegacy !== null) return;
+    if (auto && paused) return;
+    const host = $('section-view');
+    if (!resp.ok){
+      setRefreshStatus('read failed — showing last known data', 'error');
+      if (!auto) host.innerHTML = `<div class="banner warn">read failed</div><pre class="json">${esc(JSON.stringify(data,null,1))}</pre>`;
+      return;
+    }
+    const html = (SECTION_RENDER[name]||((d)=>`<pre class="json">${esc(JSON.stringify(d,null,1))}</pre>`))(data);
+    applyRefresh(host, html);
+    if (data.runtime && data.runtime.overall){ $('overall-health-wrap').style.display=''; $('overall-health').textContent = data.runtime.overall; }
+    lastSuccessAt = new Date();
+    clearTransientStatus();
+    _tickAgoDisplay();
+  }catch(err){
+    if (err && err.name === 'AbortError') return;   // superseded by a newer request -- not a real failure
+    if (myGen !== st.generation || activeSection !== name || activeLegacy !== null) return;
+    setRefreshStatus('fetch error — showing last known data', 'error');
+  }finally{
+    st.inFlight = false;
+    if (st.controller === controller) st.controller = null;
+  }
 }
 document.querySelectorAll('#primary button').forEach(b=>b.addEventListener('click', ()=>loadSection(b.dataset.sec)));
 
@@ -717,34 +1030,74 @@ function jsonBlock(o){ return `<pre class="json">${esc(JSON.stringify(o,null,2))
 function kv2(l,v){ return `<div style="margin:2px 0"><span class="muted">${l}:</span> <b>${v}</b></div>`; }
 
 async function loadLegacy(view){
-  activeLegacy = view;
+  // Same intentional-navigation distinction as loadSection: selecting a
+  // NEW legacy view is a full replace (nothing to preserve yet); a
+  // background refresh of the SAME view goes through the morph path.
+  activeLegacy = view; activeSection = null;
   document.querySelectorAll('#legacy button').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
   document.querySelectorAll('#primary button').forEach(b=>b.classList.remove('active'));
   $('section-view').style.display='none';
   if(view==='live'){ $('live-view').style.display=''; $('fetch-view').style.display='none'; return; }
   $('live-view').style.display='none'; $('fetch-view').style.display='';
+  $('fetch-meta').textContent = 'loading '+view+' …';
+  $('fetch-body').innerHTML = '';
+  await fetchAndApplyLegacy(view, {auto:false, initial:true});
+}
+
+async function fetchAndApplyLegacy(view, {auto}){
+  const st = _stateFor('legacy:'+view);
+  if (auto && paused) return;
+  if (auto && st.inFlight) return;
+  if (st.controller) st.controller.abort();
+  const controller = new AbortController();
+  st.controller = controller;
+  const myGen = ++st.generation;
+  st.inFlight = true;
+  if (!auto) setRefreshStatus('updating…', 'updating');
   const meta=$('fetch-meta'), body=$('fetch-body');
-  meta.textContent = 'loading '+view+' …';
   try{
-    if(view==='authority'){
-      const resp=await fetch('/api/section/overview'); const d=await resp.json();
-      meta.textContent='GET /api/section/overview · read-only';
-      body.innerHTML = `<div class="tblwrap"><table class="tbl"><thead><tr><th>domain</th><th>status</th><th>source</th><th>note</th></tr></thead><tbody>`+
-        (d.source_status||[]).map(s=>`<tr><td>${esc(s.domain)}</td><td>${pill(s.status)}</td><td class="muted">${esc(s.authoritative_source)}</td><td class="muted">${esc((s.note||'').slice(0,180))}</td></tr>`).join('')+
+    let metaText, html;
+    if (view==='authority'){
+      const resp=await fetch('/api/section/overview', {signal: controller.signal}); const d=await resp.json();
+      if (!resp.ok) throw new Error('read failed');
+      metaText = 'GET /api/section/overview · read-only';
+      html = `<div class="tblwrap"><table class="tbl"><thead><tr><th>domain</th><th>status</th><th>source</th><th>note</th></tr></thead><tbody>`+
+        (d.source_status||[]).map(s=>`<tr data-key="${esc(s.domain)}"><td>${esc(s.domain)}</td><td>${pill(s.status)}</td><td class="muted">${esc(s.authoritative_source)}</td><td class="muted">${esc((s.note||'').slice(0,180))}</td></tr>`).join('')+
         `</tbody></table></div>`;
-      return;
+    } else {
+      const resp = await fetch("/views/" + view, {signal: controller.signal}); const data = await resp.json();
+      if (myGen !== st.generation || activeLegacy !== view || activeSection !== null) return;
+      if (auto && paused) return;
+      if (!resp.ok){
+        setRefreshStatus('read failed — showing last known data', 'error');
+        if (!auto){ body.innerHTML = jsonBlock(data); meta.textContent='read failed'; }
+        return;
+      }
+      metaText = "GET /views/" + view + " · read-only · " + (data.as_of||data.trading_date||'');
+      html = renderLegacyView(view, data);
     }
-    const resp = await fetch("/views/" + view); const data = await resp.json();
-    if(!resp.ok){ body.innerHTML = jsonBlock(data); meta.textContent='read failed'; return; }
-    meta.textContent = "GET /views/" + view + " · read-only · " + (data.as_of||data.trading_date||'');
-    body.innerHTML = renderLegacyView(view, data);
-  }catch(e){ body.innerHTML = `<div class="banner warn">fetch error: ${esc(e)}</div>`; }
+    if (myGen !== st.generation || activeLegacy !== view || activeSection !== null) return;
+    if (auto && paused) return;
+    meta.textContent = metaText;
+    applyRefresh(body, html);
+    lastSuccessAt = new Date();
+    clearTransientStatus();
+    _tickAgoDisplay();
+  }catch(e){
+    if (e && e.name === 'AbortError') return;
+    if (myGen !== st.generation || activeLegacy !== view || activeSection !== null) return;
+    setRefreshStatus('fetch error — showing last known data', 'error');
+    if (!auto) body.innerHTML = `<div class="banner warn">fetch error: ${esc(e)}</div>`;
+  }finally{
+    st.inFlight = false;
+    if (st.controller === controller) st.controller = null;
+  }
 }
 function renderLegacyView(view, d){
   if(view==='original'){
     let h=`<h3>Original (raw pipeline view)</h3>`+kv2('run', healthBadge(d.run_health))+kv2('redis', healthBadge(d.redis_health))+kv2('metrics', healthBadge(d.metrics_health));
     h+=`<div class="tblwrap"><table class="tbl"><thead><tr><th>Stage</th><th>Total</th><th>Health</th></tr></thead><tbody>`+
-      (d.lifecycle_stages||[]).map(s=>`<tr><td>${esc(s.stage)}</td><td>${s.total}</td><td>${healthBadge(s.health)}</td></tr>`).join('')+`</tbody></table></div>`;
+      (d.lifecycle_stages||[]).map(s=>`<tr data-key="${esc(s.stage)}"><td>${esc(s.stage)}</td><td>${s.total}</td><td>${healthBadge(s.health)}</td></tr>`).join('')+`</tbody></table></div>`;
     h+=`<h3>Telegram (owner: ${esc(d.telegram&&d.telegram.owner)})</h3>`+jsonBlock(d.telegram)+
        `<h3>Local simulated-paper</h3>`+jsonBlock(d.simulated_paper);
     return h;
@@ -801,8 +1154,52 @@ function sectionFromHash(){
   return SECTION_RENDER[h] ? h : null;
 }
 window.addEventListener('hashchange', ()=>{ const s=sectionFromHash(); if(s) loadSection(s); });
+
+// ---- pause/resume/manual refresh controls ------------------------------
+const REFRESH_INTERVAL_MS = 6000; // unchanged cadence -- this task does not alter it
+
+function refreshActive(auto){
+  if (activeSection && !activeLegacy) return fetchAndApplySection(activeSection, {auto});
+  if (activeLegacy && activeLegacy!=='live') return fetchAndApplyLegacy(activeLegacy, {auto});
+  return Promise.resolve();
+}
+
+function armRefreshTimer(){
+  if (refreshTimer) return; // never create a second timer -- resume must not duplicate
+  refreshTimer = setInterval(()=>refreshActive(true), REFRESH_INTERVAL_MS);
+}
+function disarmRefreshTimer(){
+  if (refreshTimer){ clearInterval(refreshTimer); refreshTimer = null; }
+}
+
+function updatePauseButtonUI(){
+  const btn = $('refresh-pause-btn');
+  btn.textContent = paused ? 'Resume' : 'Pause';
+  btn.classList.toggle('paused', paused);
+  clearTransientStatus();
+}
+// Clears an "updating…"/error status back to a resting state -- "paused"
+// while paused, blank otherwise. Called after every successful applied
+// refresh (auto or manual) and after every pause/resume toggle, so the
+// status line never gets stuck on a stale transient message.
+function clearTransientStatus(){
+  setRefreshStatus(paused ? 'paused' : '', undefined);
+}
+
+$('refresh-pause-btn').addEventListener('click', ()=>{
+  paused = !paused;
+  if (paused) disarmRefreshTimer();     // pause stops SCHEDULING new automatic refreshes...
+  else armRefreshTimer();               // ...resume re-arms exactly one timer, no catch-up burst
+  updatePauseButtonUI();
+});
+$('refresh-manual-btn').addEventListener('click', ()=>{
+  // Manual refresh works regardless of paused state, and leaves that
+  // state exactly as it was -- it never arms/disarms the timer itself.
+  refreshActive(false);
+});
+
 loadSection(sectionFromHash() || 'overview');
-setInterval(()=>{ if(activeSection && !activeLegacy) loadSection(activeSection); else if(activeLegacy && activeLegacy!=='live') loadLegacy(activeLegacy); }, 6000);
+armRefreshTimer();
 </script>
 </body>
 </html>
