@@ -1,0 +1,86 @@
+2c96c8f0e9976e88f79a2838219d79b709286d45
+Ritesh Talwadekar <[REDACTED-EMAIL]>
+Tue Sep 15 05:17:16 2026 +0100
+fix(ingest): Task 140 -- require genuine supported evidence before an immediate push
+
+Closes the stricter content requirement introduced after Task 138's own
+tests were written: classify_disposition previously trusted a
+recognized substantive REASON CODE's mere presence
+(SUBSTANTIVE_REASON_CODES membership, or a buy-cluster's bare kind
+check) as sufficient justification for IMMEDIATE -- exactly the
+"document-change score/reason code" and "count of insiders" bypass the
+newer requirement explicitly forbids as a SOLE justification.
+
+talonx_ingest/intelligence/delivery/notification_policy.py:
+- classify_disposition's signature changes from `reason_codes` (bare
+  code strings) to `reasons` (the significance engine's own full
+  SignificanceReason objects) -- eligibility now validates that a
+  qualifying code's OWN `description` field is genuinely populated
+  (rules.py already bakes real facts into every description at
+  generation time -- a percentage, a dollar figure, an owner count --
+  never invented here, only read and validated). A code present with no
+  genuine supporting text falls through to DIGEST, content-gated, never
+  trusted on the code alone, never suppressed either.
+- New `DispositionDecision.evidence_text` field carries the SPECIFIC
+  qualifying fact sentence (the reason's real description, or -- for a
+  buy cluster -- built directly from the InsiderCluster's own
+  distinct_owners/window_calendar_days/transaction_count/total_value
+  fields, never a bare presence/count claim).
+- CRITICAL band (still always IMMEDIATE per the engine's own structural
+  floor) now also carries real evidence_text drawn from its own highest-
+  point reason, so a CRITICAL card's message shows a genuine fact too,
+  not just a band label.
+
+talonx_ingest/intelligence/service/enrichment.py: FIXES A CONFIRMED BUG
+found while implementing this -- `disposition_reason=decision.reason`
+was passing the INTERNAL POLICY-AUDIT string ("HIGH band with a
+substantive trigger present: [CODE]") into the renderer, which
+render_concise's own docstring claimed (incorrectly) was already the
+"specific substantive trigger" text. Fixed to
+`disposition_reason=decision.evidence_text` -- the message now shows
+the actual verified fact, not a generic policy-internal placeholder.
+
+talonx_ingest/intelligence/delivery/renderer.py: render_concise's
+docstring corrected to describe the real evidence_text contract; now
+also appends `_quality_lines` (the SAME helper the EXPANDED renderer
+already uses) when a genuine data-quality/freshness caveat exists --
+essential uncertainty is preserved even at the cost of a line, never
+hidden purely to stay at 5 lines.
+
+Tests: 6 new + rewrote all 12 pre-existing classify_disposition unit
+tests in tests/test_task138_notification_policy.py to use real
+SignificanceReason objects with genuine descriptions (the bare
+`reason_codes=[...]` calls no longer compile against the new
+signature -- this was a deliberate, not accidental, breaking change).
+New: content-gate-failure (code present, no description -> DIGEST, not
+IMMEDIATE), evidence_text validated against real percentages/dollar
+figures for filing-change/insider-transaction/buy-cluster/XBRL cases,
+evidence_text is None for DIGEST/DASHBOARD_ONLY, and an explicit
+old-policy-backlog-row-cannot-escape-the-content-gate test through
+reclassify_pending_rows.
+
+tests/test_task140_substantive_content_e2e.py (4 new): full pipeline,
+REAL evaluate_significance + a real FilingComparison (not mocked) --
+a HIGH-band event with no comparison data, and one whose risk-factors
+diff_ratio is genuinely below the frozen decile/tercile thresholds,
+both correctly fail to reach IMMEDIATE; a genuine decile-crossing
+change reaches IMMEDIATE with the real percentage present directly in
+render_concise's OWN OUTPUT TEXT (not merely in evidence_text) and
+persisted into the real enqueue_card/outbox row.
+
+tests/test_task140_reservation_expiry_exactly_once.py (2 new): the
+real V2Service/V2Store path, isolated on-disk database, controlled
+clock -- a PENDING entry intent's reservation (verified: cash is never
+debited at creation, per Task 131 Remediation Directive 4's own
+COMPUTED reservation model) survives a store close/reopen, and is
+released exactly once (terminal EXPIRED_STALE status, never re-fired on
+a later tick, `updated_at_utc` unchanged on repeat) when the staleness
+boundary is crossed -- with cash proven unchanged throughout (never
+inventing a credit-on-release the implementation does not use) and no
+phantom position/trade appearing.
+
+No admission/strategy/pricing/expiry logic touched. Frozen V2
+fingerprint unaffected (talonx_v2/ untouched by this commit).
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+

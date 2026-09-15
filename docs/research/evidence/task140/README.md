@@ -52,6 +52,11 @@ migration.
 | `gated_admission_activation.md` | the explicit operator authorization to switch to GATED admission, applied via `.env` + one managed restart, verified live in the real companion/dashboard |
 | `commit_c9fb63d_{message,stat}.txt` | the exit-eligibility-after-scope-change isolated tests (A4 closure; personal email redacted) |
 | `post_gated_admission_cutover_heartbeat.json` | live Intelligence heartbeat after the GATED-admission cutover — 569 symbols, delivery enabled, digest still off, all confirmed together |
+| `requirement_closure_matrix.md` | the FINAL, authoritative requirement-to-code/test matrix for the 2026-09-15 follow-up directive (substantive content, digest-off proof, scope reconciliation, reservation expiry) |
+| `commit_2c96c8f_{message,stat}.txt` | the substantive-content-requirement fix + reservation-expiry tests (personal email redacted) |
+| `post_task140_v2_service_status.json` | live V2 status snapshot showing `execution_scope_count: 626`, `durable_store_gate_enabled: true` |
+| `execution_scope_membership_log_excerpt.txt` | the real companion's OWN startup log lines proving 39 (watchlist) + 587 (broad discovery manifest) = 626 by genuine membership, not just count |
+| `full_suite_run_output_task140.txt` | the one full-repository-suite run for this final completion pass |
 
 ## Before/after example
 
