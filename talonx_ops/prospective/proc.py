@@ -238,6 +238,30 @@ def _start_stack_locked(sd, logs, py, *, env, tick_seconds, heartbeat_seconds,
     if (enable_broad_discovery and "TALONX_INTEL_ENABLE_BROAD_DISCOVERY" not in env
             and "TALONX_INTEL_ENABLE_BROAD_DISCOVERY" not in os.environ):
         env = {**env, "TALONX_INTEL_ENABLE_BROAD_DISCOVERY": "1"}
+    # Task 140 (found live, same investigation as the broad-discovery fix
+    # above -- this ledger.md's own EXACT sibling gap): `--deliver
+    # --transport telegram` on `prospective start` is ALSO wired ONLY into
+    # the V2 companion's own argv below, never into Intelligence's card-
+    # delivery enablement (talonx_ingest/intelligence/service/config.py's
+    # deliver_intelligence_cards/dry_run_delivery, read from
+    # TALONX_INTEL_DELIVER_CARDS / TALONX_INTEL_DRY_RUN_DELIVERY -- Task
+    # 132's own investigation deliberately chose env-var inheritance over
+    # a CLI flag on `poll` for this, per
+    # tests/test_task117_supervised_intelligence.py::test_intelligence_
+    # argv_never_includes_a_second_send_flag). Same root cause, same fix
+    # shape: only ever set via an ad-hoc interactive shell export, never
+    # in .env, invisible to and not restored by any restart including a
+    # reboot. Reusing the SAME `--deliver`/`--transport` flags an operator
+    # already passes for V2 (not inventing a third), since "deliver to the
+    # established Telegram destination" is a single operator intent that
+    # should govern both lanes together, not two separately-remembered
+    # switches. `--transport dryrun` intentionally does NOT flip these
+    # (dry-run stays dry-run for Intelligence too).
+    if transport == "telegram" and deliver:
+        if "TALONX_INTEL_DELIVER_CARDS" not in env and "TALONX_INTEL_DELIVER_CARDS" not in os.environ:
+            env = {**env, "TALONX_INTEL_DELIVER_CARDS": "1"}
+        if "TALONX_INTEL_DRY_RUN_DELIVERY" not in env and "TALONX_INTEL_DRY_RUN_DELIVERY" not in os.environ:
+            env = {**env, "TALONX_INTEL_DRY_RUN_DELIVERY": "0"}
     try:
         sup_argv = [py, "-m", "talonx_ops.supervisor", "run"]
         if not with_dashboard:

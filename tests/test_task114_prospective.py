@@ -519,6 +519,44 @@ def test_start_stack_enable_broad_discovery_also_sets_the_intelligence_env_var(t
     # own internal spawn mechanics, which belong to test_task78i_supervisor.py)
 
 
+def test_start_stack_deliver_telegram_also_enables_intelligence_delivery(tmp_path, monkeypatch):
+    """Sibling gap to the broad-discovery one above, found in the SAME live
+    investigation: --deliver --transport telegram was wired only into the
+    V2 companion's own argv, never into Intelligence's own delivery-
+    enablement env vars (no CLI flag exists for it on `poll` by design --
+    see test_task117_supervised_intelligence.py)."""
+    from talonx_ops.prospective import proc
+    monkeypatch.setattr(proc, "_live_prior_stack", lambda: [])
+    proc, spawned, v2_db = _patched_proc(monkeypatch, tmp_path)
+    proc.start_stack(tmp_path / "session", env={}, with_dashboard=False,
+                     with_checkpoint_daemon=False, deliver=True, transport="telegram")
+    sup_call = next(c for c in spawned if "talonx_ops.supervisor" in c["argv"])
+    assert sup_call["env"]["TALONX_INTEL_DELIVER_CARDS"] == "1"
+    assert sup_call["env"]["TALONX_INTEL_DRY_RUN_DELIVERY"] == "0"
+
+
+def test_start_stack_dryrun_transport_does_not_enable_intelligence_delivery(tmp_path, monkeypatch):
+    from talonx_ops.prospective import proc
+    monkeypatch.setattr(proc, "_live_prior_stack", lambda: [])
+    proc, spawned, v2_db = _patched_proc(monkeypatch, tmp_path)
+    proc.start_stack(tmp_path / "session", env={}, with_dashboard=False,
+                     with_checkpoint_daemon=False, deliver=True, transport="dryrun")
+    sup_call = next(c for c in spawned if "talonx_ops.supervisor" in c["argv"])
+    assert "TALONX_INTEL_DELIVER_CARDS" not in (sup_call["env"] or {})
+    assert "TALONX_INTEL_DRY_RUN_DELIVERY" not in (sup_call["env"] or {})
+
+
+def test_start_stack_deliver_telegram_never_overrides_an_explicit_shell_value(tmp_path, monkeypatch):
+    from talonx_ops.prospective import proc
+    monkeypatch.setattr(proc, "_live_prior_stack", lambda: [])
+    proc, spawned, v2_db = _patched_proc(monkeypatch, tmp_path)
+    monkeypatch.setenv("TALONX_INTEL_DELIVER_CARDS", "0")
+    proc.start_stack(tmp_path / "session", env={}, with_dashboard=False,
+                     with_checkpoint_daemon=False, deliver=True, transport="telegram")
+    sup_call = next(c for c in spawned if "talonx_ops.supervisor" in c["argv"])
+    assert "TALONX_INTEL_DELIVER_CARDS" not in (sup_call["env"] or {})
+
+
 def test_start_stack_enable_broad_discovery_never_overrides_an_explicit_shell_value(tmp_path, monkeypatch):
     """A real, explicitly-set env var (shell export or an already-resolved
     `env` dict entry) always wins -- --enable-broad-discovery only ADDS
