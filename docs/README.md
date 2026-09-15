@@ -2,6 +2,27 @@
 
 Start with the root [`../README.md`](../README.md) for the one-page overview, then use this index.
 
+## Product-experience knowledge transfer (started Session 1, 2026-09-15)
+
+- [product/PRODUCT_DEFINITION.md](product/PRODUCT_DEFINITION.md) — what
+  the product is, who it's for, and how it communicates (Telegram-first
+  opportunities, optional major-development alerts, dashboard as the
+  general-monitoring surface).
+- [product/DECISION_LOG.md](product/DECISION_LOG.md) — the append-only,
+  session-by-session record of product-owner knowledge-transfer
+  discussions.
+- [product/REQUIREMENTS_TRACKER.md](product/REQUIREMENTS_TRACKER.md) —
+  stable-ID tracking (`S<session>-<sequence>`) from proposal through
+  verified implementation.
+- [product/KNOWLEDGE_TRANSFER_PLAN.md](product/KNOWLEDGE_TRANSFER_PLAN.md)
+  — the 13-session plan and the workflow for tracking future decisions.
+
+This is a **separate layer** from `research/TALONX_PRODUCT_STRATEGY_
+SPEC.md`/`research/TALONX_OWNER_DECISIONS.md` below, which govern
+Original's intraday strategy-tuning parameters specifically (confluence,
+ATR semantics, signal-family independence) — not the full product
+experience across Original, Intelligence and V2.
+
 ## Current product docs (authoritative — post-Task 104)
 
 | doc | covers |

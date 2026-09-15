@@ -7,6 +7,14 @@ it explicitly rather than silently assumed to match. Full traceability of the im
 consequences of each answer lives in `results/task33_owner_spec_finalization/` (built on
 `results/task31_owner_specification/` and `results/task32_owner_decision_capture/`, neither redone).
 
+**Scope note (added 2026-09-15, not a revision of any item below)**: this
+document tracks Original's intraday **strategy-tuning** decisions only
+(frequency, confluence, signal-family independence, ATR semantics, cost
+tolerance). Product-experience decisions spanning the full product
+(Original + Intelligence + V2, Telegram/dashboard UX, notification
+philosophy) are tracked separately in `docs/product/DECISION_LOG.md`
+onward, starting with Knowledge-Transfer Session 1.
+
 ---
 
 ## FREQ-001 — Opportunity-Frequency Objective

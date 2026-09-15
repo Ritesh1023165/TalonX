@@ -26,6 +26,19 @@ COST-001) have now been answered explicitly by the product owner** — see
 `docs/research/TALONX_OWNER_DECISIONS.md` for the verbatim answers and their implementation-alignment
 consequences.
 
+**Scope note (added 2026-09-15, not a revision of any section below)**:
+this document's own title predates Intelligence (Task 96) and V2 (Task
+107 onward) — its actual content is Original's intraday
+**strategy-tuning** specification only (trade direction, signal
+families, confluence, ATR, cost model). The full current-product
+definition — spanning Original, Intelligence and V2, and the
+Telegram/dashboard user experience — is tracked separately starting
+with `docs/product/PRODUCT_DEFINITION.md` (Knowledge-Transfer Session 1
+onward). Where the two overlap (e.g. product identity, user-facing
+cadence), `docs/product/` is the newer, broader authority; this
+document remains authoritative for Original's own strategy-internals
+questions.
+
 ---
 
 ## 1. Product identity — **CONFIRMED**
