@@ -61,6 +61,10 @@ migration.
 | `reply_details_live_verification_message_958.txt` | diagnostic resolver invocation (not a live round trip) against the real production ledger for message 958, before/after the ordering + evidence_urls fixes |
 | `reply_details_focused_regression_output.txt` | 136/136 pass — all Task 138/140 delivery-module tests including the new Task 140 acceptance suite |
 | `full_suite_run_output_task140_v2.txt` | complete, properly-captured (no truncation) full-repository-suite run for this correction, superseding the incomplete 4/17-name capture above |
+| `cutover_before_status.json` | `talonx_ops.supervisor status` immediately before this correction's restart — Original pid 13132/commit `229c607` (pre-fix), Intelligence heartbeat fresh |
+| `cutover_after_intelligence_restart.json` | status after the Intelligence-only restart — new pid, fresh heartbeat, Original untouched (same pid 13132) |
+| `cutover_after_original_restart.json` | status shortly after the Original restart — new pid, live, `telegram_get_updates_owners: 1` (single ownership) |
+| `cutover_after_full_verification.json` | final status once Original's own startup completed — pid 13616, `commit_sha: 12be1bd` (this correction's own commit), single Telegram owner, Intelligence still live |
 
 ## Before/after example
 
