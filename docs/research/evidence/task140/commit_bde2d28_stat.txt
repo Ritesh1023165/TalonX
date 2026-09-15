@@ -1,0 +1,47 @@
+commit bde2d2877489076c2e3affc45a9953f6a460e337
+Author: Ritesh Talwadekar <ritesh160290@gmail.com>
+Date:   Tue Sep 15 04:24:59 2026 +0100
+
+    fix(ops): Task 140 URGENT -- --deliver --transport telegram never reached Intelligence
+    
+    Found immediately after the digest-toggle cutover, while verifying the
+    running process's actual effective config: Intelligence delivery
+    (deliver_intelligence_cards / dry_run_delivery, TALONX_INTEL_DELIVER_
+    CARDS / TALONX_INTEL_DRY_RUN_DELIVERY) was False/True (fully disabled)
+    in every restart performed tonight, including the two prior Task 139/140
+    recovery restarts -- the EXACT SAME missing-wiring pattern as the broad-
+    discovery gap fixed earlier this session, just for a different config
+    dimension, and missed in that first pass. `--deliver --transport
+    telegram` on `prospective start` was, and remains, wired only into the
+    V2 companion's own argv (talonx_v2.run --deliver --transport telegram);
+    Intelligence's own delivery enablement has no CLI flag by design (Task
+    132's own investigation deliberately chose env-var inheritance --
+    test_task117_supervised_intelligence.py::test_intelligence_argv_never_
+    includes_a_second_send_flag) and was never added to .env -- the only way
+    it was ever active was, again, an ad-hoc interactive shell export before
+    the campaign's first `prospective start`, invisible to and not restored
+    by any subsequent restart including tonight's reboot.
+    
+    Verified via direct evidence, not assumed: the most recent Telegram SENT
+    log entry across all of tonight's restarts is still message_id=958 at
+    2026-09-15T00:07:55Z -- BEFORE the 01:44Z reboot. Zero real sends have
+    occurred since, across three restarts, until this fix.
+    
+    talonx_ops/prospective/proc.py: `start_stack()` now also sets
+    TALONX_INTEL_DELIVER_CARDS=1 and TALONX_INTEL_DRY_RUN_DELIVERY=0 in the
+    env merged into supervisor's spawn whenever `deliver=True` AND
+    `transport == "telegram"` are both requested (the SAME flags an operator
+    already passes for V2 -- reused, not a third switch). `--transport
+    dryrun` correctly does NOT flip these. Never overrides an explicit
+    shell/env value, same override=False-style precedent as the broad-
+    discovery fix.
+    
+    3 new tests in tests/test_task114_prospective.py: telegram transport
+    enables both Intelligence env vars; dryrun transport enables neither; an
+    explicit shell value is never overridden.
+    
+    Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+
+ talonx_ops/prospective/proc.py    | 24 ++++++++++++++++++++++++
+ tests/test_task114_prospective.py | 38 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 62 insertions(+)

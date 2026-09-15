@@ -1,0 +1,34 @@
+Live confirmation, captured 2026-09-15T03:29:41Z from the RUNNING
+Intelligence process's own service.progress.json (poll cycle log entry),
+after the "Task 140 URGENT" delivery-enablement fix (commit bde2d28) was
+cut over via stop_stack()/start_stack():
+
+  'delivery': {
+    'mode': 'enabled',
+    'at_utc': '2026-09-15T03:29:41.312677+00:00',
+    'ok': True,
+    'IMMEDIATE': {'delivered': 0, 'held': 0, 'expired': 320, ...},
+    'DIGEST': {'delivered': 0, 'held': 0, 'expired': 70,
+               'held_reason': 'digest_not_due', ...}
+  }
+
+Interpretation:
+- mode: 'enabled' -- confirms TALONX_INTEL_DELIVER_CARDS / TALONX_INTEL_
+  DRY_RUN_DELIVERY reached this process correctly. Before this fix, every
+  restart tonight (including the two prior Task 139/140 recovery
+  restarts) produced mode: 'disabled' -- verified by the fact that the
+  most recent real Telegram SENT log entry, checked immediately before
+  this fix, was still message_id=958 at 2026-09-15T00:07:55Z, BEFORE the
+  01:44Z reboot. Zero real sends had occurred across three restarts
+  until this one.
+- IMMEDIATE.held: 0, delivered: 0, expired: 320 -- delivery is genuinely
+  live and evaluating rows (not stuck disabled); this specific cycle had
+  no fresh, qualifying row to send (320 genuinely stale backlog rows
+  correctly expired instead) -- absence of a qualifying event, a valid
+  outcome, not evidence the fix failed.
+- DIGEST.held_reason: 'digest_not_due' -- the digest interval (default
+  6h) had not yet elapsed since the last digest attempt at the time of
+  this cycle; the Task 140 digest-off-by-default gate (held_reason
+  'delivery_disabled') will show once the interval next becomes due,
+  independently confirmed already via 9 isolated unit tests (see
+  focused_test_run_output.txt).
