@@ -198,6 +198,184 @@ today.
 
 ---
 
+## OPS-003 — Entry-session deadline-consistency finding (recorded for re-verification)
+
+**Status**: `OPEN` — recorded for future re-verification against
+current code; **not corrected by this documentation pass**.
+
+**Found**: originally, Task 112R (this project's history, before this
+documentation track existed); re-surfaced and formally tracked during
+the Session 5 documentation pass (2026-09-16).
+
+**Finding**: Task 112R's own "G1" review found that the research
+`build_episodes` methodology (used to compute the historical
+`+2.0219%`/`+2.196%` evidence figures cited in `S2-15`) determines
+entry eligibility after the **last** insider filing in a cluster
+window, while the actual Task 109 contract and V2's live runtime
+(`talonx_v2/service.py`/`pipeline.py`) fire entry eligibility at the
+**second distinct insider** filing — a difference that produced 326
+entry-session differences in an offline, like-for-like comparison.
+Task 112R's own conclusion at the time was that the **runtime is
+contract-correct** (matches the frozen Task 109 specification) and the
+research methodology is the one that differs — no code change was
+made, because the runtime was judged correct against its own frozen
+spec.
+
+**Why this is tracked again now**: Session 5's discussion of exact
+three-session-recovery deadline semantics (`S5-13`, `S5-19`,
+`S5-20`) raised this as a specific, named example of a
+previously-inspected deadline-related inconsistency that should be
+**re-verified against current code** before it is relied on further —
+the original Task 112R review predates this documentation track, used
+an offline comparison, and has not been re-run against the code as it
+exists today (multiple V2/Task 131+ changes have landed since).
+
+**Explicitly not done in this pass**: no code was re-read line-by-line
+to re-confirm Task 112R's original conclusion still holds; no fix,
+adjustment, or reclassification was made. This is a disclosed,
+tracked re-verification item, not a live defect claim.
+
+**Future corrective work — NOT IMPLEMENTED here**: re-run or replicate
+Task 112R's own offline entry-session comparison against the current
+codebase; confirm whether the 326-difference finding and its
+"runtime is contract-correct" conclusion still hold; if the runtime
+has since changed, re-assess whether that conclusion needs updating.
+
+**Evidence references**: this project's Task 112R history (`docs/
+research/TALONX_RESEARCH_LEDGER.md`); `talonx_v2/service.py`,
+`talonx_v2/pipeline.py` (current code, not re-diffed against Task
+112R's version this session).
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S5-13`, `S5-19`, `S5-20`.
+
+---
+
+## OPS-004 — Corporate-action and fractional-share handling gap
+
+**Status**: `OPEN` — no such code exists today; Session 5 §D is
+entirely future policy, not implemented behavior.
+
+**Found**: Session 5 documentation pass (2026-09-16), via targeted
+code search.
+
+**Finding**: a search across the codebase for stock-split, reverse-
+split, merger, cash-in-lieu, and fractional-share handling found **no
+production code implementing any of this** — the only matches were in
+an unrelated research script (`research/scripts/task101a_event_first.py`,
+a different "event-first" methodology study, not corporate-action
+handling). V2's frozen strategy and Original's own accounting operate
+on the assumption that a symbol's identity and share count remain
+stable between entry and exit; nothing currently detects, blocks on,
+or reconciles a corporate action occurring during that window.
+
+**Explicit implications**: any of Session 5 §D's agreed policies
+(verified-rename mapping, before/after-entry split handling,
+merger/replacement-security treatment, proportional cost-basis
+allocation, `CORP_ACTION_CASH` accounting) describe a **target**, not
+a gap being closed — there is no partial implementation to point to.
+A corporate action occurring today during a live V2 holding period
+would not be specially handled by any code found this session (though
+this was not exercised live — V2's campaign has had 0 trades to date
+per the 2026-09-15 EOD closure, so this gap has not yet been tested
+against a real event).
+
+**Future corrective work — NOT IMPLEMENTED here**: build the
+verification/blocking gate for unresolved corporate actions; build
+split/merger-adjusted entry-basis and chronological-reconstruction
+logic; build proportional cost-basis allocation and `CORP_ACTION_CASH`
+accounting; decide and implement the exact rounding mode and residual-
+reconciliation policy (`S5-27`).
+
+**Evidence references**: targeted repository-wide search, this
+session (no matches in `talonx_v2/`, `talonx_paper/`, `talonx_ops/`).
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S5-15`, `S5-16`, `S5-21`
+through `S5-27`.
+
+---
+
+## OPS-005 — Price-provider qualification gap
+
+**Status**: `OPEN` — extends `OPS-002`'s pricing-freshness finding
+with the broader, unresolved provider-selection question.
+
+**Found**: Session 5 documentation pass (2026-09-16).
+
+**Finding**: Session 5 §B agreed that each strategy/data-contract
+version should define **one primary provider, feed, opening-reference
+definition, and adjustment basis**, explicitly distinguishing an
+official auction price from a provider's own daily-bar open. Today,
+V2's `"csv"` pricing mode is a real, working, version-scoped price
+source (`talonx_v2/config.py`/`service.py`) — but it is not formalized
+as an explicit, documented data-contract object, its relationship to
+an "official auction price" was not verified this session, and (per
+`OPS-002`) its own freshness-tracking resolver is not constructed in
+this mode at all. **Actual provider selection and free-tier
+feasibility for a more complete/current pricing source remain
+genuinely undecided** (`S5-10`) — this is not a defect in the current
+`"csv"` mode's own behavior (it fails safely, `OPS-002`), but a gap in
+having any **qualified, validated alternative or fallback** ready.
+
+**Future corrective work — NOT IMPLEMENTED here**: research and select
+an authorized, free-tier-feasible primary provider per strategy;
+define its opening-reference/adjustment basis explicitly; build a
+**qualified** fallback path (not an unvalidated substitution) with
+equivalent live/replay rules (`S5-11`); resolve `OPS-002`'s freshness-
+telemetry gap for whichever provider is ultimately used.
+
+**Evidence references**: `talonx_v2/config.py`, `talonx_v2/service.py`
+(this session); `OPERATIONAL_FINDINGS.md` `OPS-002` (the related,
+narrower freshness-telemetry finding).
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S5-08` through `S5-12`.
+
+---
+
+## OPS-006 — Registry/coverage-scope fragmentation
+
+**Status**: `OPEN` — three separate, non-unified symbol scopes
+confirmed with dated evidence; extends `S3-08`'s finding.
+
+**Found**: Session 3 (`S3-08`, initial finding); confirmed with dated
+evidence during the Session 5 documentation pass (2026-09-16).
+
+**Finding**: no single master security registry exists. Three
+separate, independently-maintained scopes were confirmed this session,
+each with its own dated evidence:
+
+- **Original**: 48 configured tickers, 43 active/selected, 39
+  SEC-covered (`docs/OPERATIONS.md:69`; `docs/audits/2026-09-10/
+  README.md:86`; corroborated by `selected_symbols: 43` in multiple
+  Task 138-140 checkpoint files, dated 2026-09-14/15).
+- **Intelligence**: 569-symbol effective collection scope
+  (`docs/research/evidence/task140/gated_admission_activation.md:52`,
+  `effective_symbols: 569`; corroborated by `docs/research/evidence/
+  task137/TASK137_OVERNIGHT_CONTINUITY_REPORT.md:160`, dated
+  2026-09-14).
+- **V2**: 626-symbol execution scope (`execution_scope_count: 626`,
+  `docs/research/evidence/eod_closure_2026-09-15/
+  EOD_CLOSURE_REPORT.md` §4, dated 2026-09-15).
+
+None of these is a superset or subset of the others by construction —
+they were built independently for each system's own purpose. **No
+evidence was found this session for a "27-unresolved / 599-resolved"
+count pair** referenced in the Session 5 discussion prompt; that
+figure is explicitly not adopted anywhere in this documentation.
+
+**Future corrective work — NOT IMPLEMENTED here**: build the master
+security registry (`S5-01`-`S5-06`); reconcile/cross-map the three
+existing scopes into it; decide and disclose how per-strategy/per-
+horizon eligibility derives from the unified registry going forward.
+
+**Evidence references**: see the dated citations above (also
+duplicated in `DECISION_LOG.md` Session 5 §A and
+`REQUIREMENTS_TRACKER.md` `S5-07`).
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S3-08`, `S5-01` through
+`S5-07`.
+
+---
+
 *See `REQUIREMENTS_TRACKER.md` for product-requirement tracking,
 `DECISION_LOG.md` for the session-by-session product-owner record, and
 `docs/research/TALONX_RESEARCH_LEDGER.md` for the research/validation

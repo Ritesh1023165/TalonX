@@ -714,25 +714,387 @@ decisions do not fix it.
 
 ## Session 4 — End-to-End User Journey
 
-**Not yet conducted.** Per `KNOWLEDGE_TRANSFER_PLAN.md`, carries
-forward the following scenarios (must refine the existing requirement
-IDs above or add linked requirements — not a disconnected
-specification):
+**Recorded**: 2026-09-16, approximately 13:46 UTC / 14:46 BST (Python
+`zoneinfo`, this project's established recording-time discipline).
+**Source**: the product-owner discussion supplied directly in this
+session's prompt (same pattern as Sessions 1–3; the discussion's own
+internal timestamp is unavailable and is not invented here).
 
-1. Start application and inspect configuration/data readiness.
-2. Automatic discovery and manual stock addition.
-3. Intraday opportunity → alert → paper entry or explicit skip → exit.
-4. Multi-day opportunity → timely intent → entry → EOD open exposure →
-   scheduled exit.
-5. Same stock qualifies under two strategies.
-6. Pause/exclude a stock with existing obligations.
-7. Stale data, expired opportunities, and missed monitoring during
-   downtime.
-8. Research candidate displayed internally; optional research-bot
-   routing.
-9. Promotion affects new opportunities while existing positions retain
-   their original rules.
+### Context
 
-Directly resolves `S3-28`'s deferred lifecycle-semantics question
-(scenarios 6, 7) and exercises `S3-06`/`S3-07` (scenarios 3, 4, 5),
-`S3-15`-`S3-20` (scenario 8), and `S3-18` (scenario 9) concretely.
+This session answers the 9 scenarios Session 3's documentation pass
+queued for Session 4 (start/inspect, discovery+manual addition,
+intraday full cycle, multi-day full cycle, dual-strategy same-stock,
+pause/exclude with obligations, stale-data/downtime, research-candidate
+routing, promotion vs. existing-position rules). It refines existing
+requirement IDs (`S3-06`/`S3-07`, `S3-11`, `S3-15`-`S3-20`, `S3-28`)
+rather than introducing a disconnected specification.
+
+### Agreed product direction
+
+- **One "Start monitoring" action** using previously saved settings —
+  a single operator action, not a multi-step manual reconfiguration
+  each time.
+- **Resume previously-enabled paper strategies only when their
+  prerequisites pass**; per-strategy readiness and any **shared**
+  dependency failure (e.g. a data feed both Original and V2 rely on)
+  are both exposed to the operator, not collapsed into one undiffer-
+  entiated "not ready" state.
+- **Recover existing obligations and pending intents before new
+  discovery** starts — chronological accounting must not change, and
+  a later exit's proceeds must never fund an earlier entry (recovery
+  order matters for accounting correctness, not just convenience).
+- **Preserve campaign balances, positions, reservations and exit
+  rules** across a start/stop cycle — a restart is not a reset.
+- **Catch-up ingestion must not create late prospective entries or
+  stale "act now" alerts** — backfilled data must be evaluated as
+  historical context, never presented as a fresh, actionable-right-now
+  opportunity.
+- **Primary Telegram bot**: qualified intraday and multi-day
+  opportunities, lifecycle updates (entry/exit/expiry), and optional
+  substantive major corporate developments.
+- **Separate Operations bot**: meaningful incidents and recovery
+  notifications (distinct audience/purpose from trading opportunities).
+- **Optional Research bot remains isolated and OFF by default**
+  (reaffirms `S3-21`, now positioned alongside the Primary/Operations
+  distinction as a third, clearly separate channel).
+- **Bot creation, destinations and credentials require separate
+  implementation authorization** — proposed flags/channels must not be
+  described as existing features anywhere in product copy or
+  documentation.
+- **Paper execution is automatic and independent of notification
+  success** — a failed/delayed Telegram send must never block or skip
+  an actual paper entry/exit.
+- **Explicit lifecycle states**, with **separate** missing-price and
+  valuation-staleness modifiers (an opportunity's lifecycle state and
+  its current pricing confidence are two independent axes, not
+  conflated into one status).
+- **Pausing new entries cancels unfilled intents atomically**, while
+  preserving existing position management (a pause stops new
+  commitments; it does not touch positions already entered).
+- **EOD reports daily performance, open risk, and unresolved
+  obligations** (extends `S2-07` to the multi-strategy/multi-account
+  picture Session 3 introduced).
+- **Independent outage detection and operational alert deduplication
+  remain implementation work, not proven capabilities** — neither is
+  claimed as already solved by this session.
+
+### Implementation authorization
+
+**None.** Every decision above is an agreed product direction; all new
+implementation authorization is explicitly **"Not authorized by this
+documentation task."** See `REQUIREMENTS_TRACKER.md` (`S4-01` through
+`S4-14`).
+
+### Differences from current behavior (see `REQUIREMENTS_TRACKER.md` for full detail)
+
+- `talonx_ops.prospective start` is already a single operator command
+  (`S4-01`'s intent partially met), but does not itself gate on
+  **per-strategy readiness** in the way described — it starts the
+  supervised stack as a whole.
+- V2's own retry/staleness machinery already has a **distinct**
+  "missing market data" disposition (`FAILED_NO_MARKET_DATA`,
+  `talonx_v2/service.py:555-571`) separate from the staleness-terminal
+  `SKIPPED_ENTRY_STALE` — a real, working precedent for `S4-11`'s
+  "separate missing-price/valuation modifier" intent, under different
+  naming than what a future Telegram/dashboard surface would show.
+- No unified "recover obligations before new discovery" ordering
+  guarantee was traced end-to-end across Original/Intelligence/V2 this
+  session (each currently runs its own independent startup sequence) —
+  `S4-03` is `Not assessed in this documentation pass` at that
+  cross-system level.
+- No second ("Operations") Telegram bot or research-bot mode-switch
+  exists in the codebase inspected this session — targeted search
+  found no second bot configuration anywhere (`S4-07`/`S4-08`).
+- `pending_entry_intents` rows only have a `PENDING`→(other) status
+  transition path driven by fill/expiry logic
+  (`talonx_v2/store.py:515-533`) — no explicit, atomic
+  "cancel-on-pause" operation was found (`S4-12`).
+
+### Open questions
+
+- Exact UI/copy for per-strategy readiness and shared-dependency-
+  failure surfacing — not specified, a future design detail.
+- Exact Operations-bot incident taxonomy (what counts as "meaningful")
+  — not defined this session.
+
+### Proposed enhancements (not agreed as requirements)
+
+- None beyond the agreed items above.
+
+### Any separately authorized implementation work
+
+**None.**
+
+---
+
+## Session 5 — Data Sources, Discovery and Coverage
+
+**Recorded**: 2026-09-16, approximately 13:46 UTC / 14:46 BST (same
+recording pass as Session 4 above; both sessions were supplied
+together in this task's prompt). **Source**: the product-owner
+discussion supplied directly in this session's prompt.
+
+### Context
+
+This session closes the requirements-level discussion for data
+sources, discovery and coverage, carrying forward `S3-27`'s deferred
+2-year-replay-feasibility question and `S3-08`/`S3-09`/`S3-10`'s
+master-stock-coverage gaps into concrete technical detail across five
+areas: master registry/identity, price reference/timestamps,
+three-session recovery semantics, corporate actions/fractional shares,
+and catch-up/priorities/historical data. **This session is closed at
+the requirements level, with explicitly listed technical decisions and
+implementation gates still outstanding — it does not establish
+execution readiness or universal validation of any of these areas.**
+
+### A. Master registry and identity — agreed
+
+- **One master security registry** with per-strategy/horizon
+  eligibility (the concrete data model behind `S3-08`'s master stock
+  list).
+- **SEC CIK identifies the issuer, not necessarily the specific share
+  class/security** — a single CIK can cover multiple share classes or
+  security types; the registry tracks **security identity**, **symbol
+  history**, and **price-series identity** as related but distinct
+  concepts.
+- **Refresh bulk mappings daily**, with **bounded event-triggered
+  checks** for out-of-cycle changes (not purely a fixed daily batch).
+- **Retain the last verified snapshot on refresh failure**, and
+  **disclose freshness** — a failed refresh must not silently serve
+  stale data as if current, nor crash/block on a transient failure.
+- **Preserve immutable historical versions**, **observed timestamps**,
+  and **verified effective dates** — without inventing historical
+  validity for a mapping that was never actually verified at that
+  point in time.
+- **Unknown/ambiguous identity blocks only the affected admission(s)**
+  — not unrelated securities, and not existing obligations (an
+  ambiguous NEW symbol must never retroactively freeze an existing
+  position in a different, unambiguous symbol).
+- **Registry refresh does not automatically expand approved
+  universes** — discovering more identity mappings is not the same as
+  authorizing more symbols for trading.
+- **Coverage-count accuracy**: this session's discussion referenced
+  **27-unresolved / 599-resolved** counts; **no evidence for these
+  specific figures was found** in this repository's code, tests, or
+  evidence documents during this documentation pass, and they are
+  **not adopted**. The actual, evidence-dated counts found this
+  session are three **different, non-unified** scopes (consistent with
+  `S3-08`'s "three separate lists" finding, not one master registry):
+  - **Original**: 48 configured tickers, **43 active/selected**, of
+    which **39 are SEC-covered** (`docs/OPERATIONS.md:69`; `docs/
+    audits/2026-09-10/README.md:86`; corroborated by multiple Task
+    138–140 checkpoint JSON files reading `selected_symbols: 43`, most
+    recently `docs/research/evidence/task140/
+    cutover_after_full_verification.json`, dated within this project's
+    Task 140 work, 2026-09-14/15).
+  - **Intelligence**: **569**-symbol effective collection scope
+    (`docs/research/evidence/task140/gated_admission_activation.md:52`,
+    `effective_symbols: 569`; corroborated by `docs/research/evidence/
+    task137/TASK137_OVERNIGHT_CONTINUITY_REPORT.md:160`, "569 symbols
+    (39 [SEC-covered from Original's own set]"), dated 2026-09-14).
+  - **V2**: **626**-symbol execution scope
+    (`execution_scope_count: 626`, `docs/research/evidence/
+    eod_closure_2026-09-15/EOD_CLOSURE_REPORT.md` §4, dated
+    2026-09-15). None of these three counts is "the" master registry
+    count — `S3-08`'s finding that no unified master list exists yet
+    stands.
+
+### B. Price reference and timestamps — agreed
+
+- Each strategy/data-contract **version** defines **one primary
+  provider, feed, opening-reference definition, and adjustment
+  basis** — not an implicit, undocumented default.
+- **Official auction price and a provider's daily-bar open are not
+  interchangeable** — they can differ, and a system must not treat
+  them as the same number without saying so.
+- **Actual provider selection and free-tier feasibility remain OPEN**
+  — not decided by this session; see the deferrals below.
+- **No midday-price substitution or unvalidated provider fallback** —
+  if the primary price is unavailable, the system does not silently
+  substitute a different provider or a different time-of-day price
+  without that being an explicit, validated fallback path.
+- **Qualified fallback is future work**, requiring explicit validation
+  and **equivalent live/replay rules** (a fallback used live must
+  behave the same way a replay of that fallback would).
+- **Preserve source time, actual first receipt, processing, and
+  notification timestamps separately** — four distinct timestamps, not
+  collapsed into one. **Batch timestamps are not observation
+  evidence** — a bulk-refresh's own run time must not be presented as
+  when a specific fact was actually first true or first observed.
+
+### C. Three-session recovery — agreed
+
+- For `max_entry_staleness_sessions = 3` (V2's existing frozen
+  parameter, `talonx_v2/config.py:72`), the **target entry session is
+  Session 1** (the session the opportunity first became eligible).
+- **Recovery ends at the exchange-calendar official close of Session
+  3**, including early-close days and excluding non-trading days —
+  calendar-aware, not a naive 3-calendar-day window.
+- **Only timely, durably admitted intents may reconcile** — an intent
+  that was never durably recorded, or recorded too late, does not get
+  a delayed fill.
+- **Check expiry before attempting a fill** — the order matters; a
+  fill attempt must not proceed on an already-expired intent.
+- **Downtime and identity/corporate-action delays do not extend the
+  deadline** — the 3-session window is fixed relative to the target
+  entry session, not relative to when the system happened to be
+  running.
+- **Missing-price expiry is `EXPIRED_NO_MARKET_DATA` at the product
+  level** — distinct from unresolved-identity or corporate-action
+  delay reasons, which must be preserved as their own distinct
+  reasons, not collapsed into one generic "expired."
+- **Release reservations exactly once**, without inventing a cash
+  credit — a reservation release is a bookkeeping unlock, never a
+  fabricated gain.
+- **Delayed reconciliation preserves the original entry-reference
+  session and exit schedule** (the position's own timeline is anchored
+  to when it was *supposed* to enter, not when the system happened to
+  catch up) — the actual **recorded-at** time is disclosed separately.
+- **Exact equality-at-deadline semantics** (is Session 3's own close
+  itself still eligible, or only sessions strictly before it?) and
+  **receive-versus-commit boundary semantics** (does "received before
+  deadline" mean data received, or transaction committed?) are
+  recorded as **explicit implementation-acceptance details still
+  requiring definition** — not resolved by this session.
+- **Finding recorded, not corrected**: a previously-inspected
+  deadline-related inconsistency in this area — most directly, Task
+  112R's own G1 finding (this project's history: the research
+  `build_episodes` methodology enters after the *last* window filing,
+  while the Task 109 contract/runtime fires at the *second* distinct
+  insider filing, producing 326 entry-session differences in an
+  offline comparison; that review concluded the runtime is
+  contract-correct, not the research methodology, and made no code
+  change) — is logged here as a finding to **re-verify against
+  current code** in a future implementation task. **This documentation
+  pass does not re-verify or silently correct it** — see
+  `OPERATIONAL_FINDINGS.md` `OPS-003`.
+
+### D. Corporate actions and fractional shares — agreed (all future policy; none implemented today)
+
+- **Verified renames** preserve identity and intent via **effective-
+  dated mappings**.
+- **Before-entry splits** use the corresponding **post-split entry
+  basis**.
+- **After-target-entry splits during delayed reconciliation** require
+  **chronological reconstruction**, applied **transactionally and
+  exactly once**.
+- **Unverified changes block execution without discarding
+  obligations** — an unresolved corporate action pauses that specific
+  position's progress, it does not cancel it.
+- **Mergers/replacement securities require explicitly supported
+  treatment** — no implicit "just use the new ticker" substitution.
+- **Whole-share truncate-and-cash-in-lieu is a modeled policy, not a
+  guarantee of broker settlement terms** — the model's own rounding
+  choice must not be presented as what a real broker would actually
+  do.
+- **Cost basis is allocated proportionally** to retained and
+  liquidated quantities in a partial corporate action.
+- **`CORP_ACTION_CASH` is recorded separately**, but its associated
+  gain/loss is **included in position and account returns** — it must
+  **never be counted as a new deposit**.
+- **A missing settlement reference preserves an unresolved
+  entitlement**, not fabricated spendable cash.
+- **High-precision `Decimal` arithmetic internally.**
+- **Posted USD amounts use cents; fractional-share display uses four
+  decimal places.**
+- **Intermediate entitlements are never truncated to display
+  precision** before the final calculation is complete.
+- **Exact rounding mode and residual reconciliation** remain
+  **explicit technical details to settle before implementation** — not
+  decided by this session.
+- **Avoid double-adjustment** of prices and quantities (a split-
+  adjusted price must not also be applied to an already-split-adjusted
+  quantity, or vice versa).
+
+### E. Catch-up, priorities and historical data — agreed
+
+- **Durable source checkpoints**, plus **overlap/deduplication** and
+  **recoverable enrichment state** — **no fixed 16-hour completeness
+  assumption** (no code or documentation matching a "16-hour" figure
+  was found this session; this requirement explicitly rules such an
+  assumption out going forward, it does not describe removing an
+  existing one).
+- **Prioritize obligations and timely intents over bulk historical
+  work** — a backlog of historical backfill must never delay servicing
+  an active, time-sensitive obligation.
+- **A specific pre-market lockout window is PROPOSED/UNDEFINED, not
+  agreed** — recorded explicitly as not decided, not defaulted to any
+  specific window.
+- **Two-year replay feasibility remains OPEN** (extends `S3-27`):
+  data availability, granularity, point-in-time universe/identity,
+  corporate actions, and licensing **all need evidence** — none of
+  these five sub-questions is resolved by this session.
+
+### Implementation authorization
+
+**None.** All new implementation authorization is explicitly **"Not
+authorized by this documentation task."** See `REQUIREMENTS_TRACKER.md`
+(`S5-01` through `S5-31`).
+
+### Findings tracked in `OPERATIONAL_FINDINGS.md`
+
+Per this session's own instruction to add distinct findings without
+duplicating `OPS-002`:
+- **`OPS-003`** — the deadline-consistency finding (§C above).
+- **`OPS-004`** — corporate-action/fractional-share handling gap (no
+  such code exists today; §D above is entirely future policy).
+- **`OPS-005`** — price-provider qualification gap (no authoritative
+  primary-provider/opening-reference definition confirmed per
+  strategy; extends `OPS-002`'s pricing-freshness finding with the
+  broader provider-selection question).
+- **`OPS-006`** — registry/coverage-scope fragmentation (three
+  separate, non-unified symbol scopes — Original 43/48, Intelligence
+  569, V2 626 — confirmed this session, extending `S3-08`'s finding
+  with dated evidence).
+
+### Explicit deferrals (carried and new)
+
+- **`S3-27`** (2-year replay data feasibility) — **not resolved**,
+  restated and detailed as `S5-31`'s five sub-questions; still
+  destined for Session 5's own slot... this **is** Session 5, so this
+  specific deferral now moves to whichever session performs the actual
+  data-coverage audit (not decided; a candidate for Session 12's
+  technical-validation work, or a dedicated data-engineering task, not
+  a knowledge-transfer session).
+- Provider selection and free-tier feasibility (§B) — deferred; no
+  destination session assigned yet, candidate for Session 6 or a
+  dedicated technical session once V2's own strategy-mechanics
+  discussion (Session 6) clarifies which strategies would need which
+  providers.
+- Pre-market lockout window (§E) — deferred; candidate for Session 9
+  (Telegram and dashboard experience) or Session 11 (Operation,
+  stop/start and recovery).
+- Exact equality-at-deadline / receive-vs-commit semantics (§C) —
+  deferred to a future implementation-acceptance task specifically,
+  not a knowledge-transfer session (these are technical acceptance
+  criteria, not product decisions).
+- Exact rounding mode / residual reconciliation for fractional shares
+  (§D) — deferred, same destination as above.
+
+`OPS-002` **remains `OPEN`**, unaffected by this session, per this
+task's own instruction.
+
+### Any separately authorized implementation work
+
+**None.**
+
+---
+
+## Session 6 — Signal Discovery and Strategy Mechanics
+
+**Not yet conducted.** Carries forward from Sessions 1–5:
+
+- Both intraday and multi-day remain product scope (`S3-01`) — a V2
+  deep-dive in Session 6 does not retire the intraday strategy.
+- Distinguish signal qualification, portfolio admission, paper
+  execution, and Telegram delivery as four separate concepts
+  (`S2-04`/`S3-06`) — Session 6 should ground this distinction in
+  Original's and V2's actual current rule sets.
+- Explain current **frozen** rules (V2's `INSIDER_BUY_CLUSTER_V2@1`,
+  Original's existing intraday confluence rules) **separately** from
+  any **proposed** change — no tuning or implementation is authorized
+  by the discussion itself.
+- Preserve `S3-24`'s unresolved deferral: Original's long-term/
+  fundamentals path still needs its own role review before Session 6
+  or a later session decides to retain, adapt, or retire it.

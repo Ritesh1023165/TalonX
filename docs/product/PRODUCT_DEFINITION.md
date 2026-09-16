@@ -235,6 +235,77 @@ explicit deferrals, not decisions). Summary only:
 `OPS-002` (V2 pricing-freshness gap, `OPERATIONAL_FINDINGS.md`)
 **remains open** — none of Session 3's product decisions touch it.
 
+## 6c. End-to-end user journey — `AGREED` (Session 4), implementation `MOSTLY NOT BUILT`
+
+Recorded in full in `DECISION_LOG.md` Session 4, tracked as `S4-01`
+through `S4-14` in `REQUIREMENTS_TRACKER.md`. Summary:
+
+- One "Start monitoring" action, per-strategy readiness gating, and
+  ordered obligation-recovery-before-discovery — `Partially
+  implemented`/`Not assessed`; a single start command already exists,
+  but per-strategy readiness gating and cross-system recovery
+  ordering were not found or traced this session.
+- Campaign preservation across restart — `Implemented`, directly
+  evidenced by the 2026-09-15 EOD closure.
+- A three-bot model (Primary opportunities/lifecycle, separate
+  Operations incidents, optional isolated Research) — `Not
+  implemented` beyond the single existing bot; **no Operations or
+  Research bot exists**, and none is authorized by this documentation.
+- Paper execution independent of notification success — `Implemented`,
+  confirmed by code inspection (execution and delivery are
+  architecturally separate paths).
+- Explicit lifecycle states with a separate missing-price/valuation
+  axis — `Partially implemented`; V2 already has distinct internal
+  dispositions for this, not yet operator-facing.
+- Atomic intent-cancellation on pause — `Not implemented`.
+- EOD daily performance/open risk/unresolved obligations —
+  `Implemented` (extends `S2-07`).
+- Outage detection and alert deduplication — `Partially implemented`;
+  a real single-owner Telegram-poller dedup exists, a broader outage-
+  detection capability was not confirmed.
+
+## 6d. Data sources, discovery and coverage — `AGREED` (Session 5), implementation `LARGELY NOT BUILT`
+
+Recorded in full in `DECISION_LOG.md` Session 5, tracked as `S5-01`
+through `S5-31` in `REQUIREMENTS_TRACKER.md` (`S5-10`, `S5-19`,
+`S5-20`, `S5-30`, `S5-31` are open/deferred, not decisions). **This
+session is closed at the requirements level only — it does not
+establish execution readiness or universal validation of any of the
+five areas below.** Summary:
+
+- **Master registry/identity**: one master security registry with
+  per-strategy/horizon eligibility, CIK-vs-security-identity
+  distinction — `Not implemented`; today's three separate scopes
+  (Original 43/48 active, Intelligence 569, V2 626 — each with dated
+  evidence, see `OPERATIONAL_FINDINGS.md` `OPS-006`) remain unmerged.
+  **A "27-unresolved/599-resolved" count pair referenced in this
+  session's own prompt was checked for and not found anywhere in this
+  repository — not adopted.**
+- **Price reference/timestamps**: one primary provider per strategy
+  version, official-auction-vs-daily-bar-open distinction, no
+  unvalidated fallback — `Partially implemented`; provider selection
+  itself remains explicitly `OPEN` (`S5-10`) — see
+  `OPERATIONAL_FINDINGS.md` `OPS-005`.
+- **Three-session recovery**: target-entry-session and exchange-
+  calendar-close semantics for `max_entry_staleness_sessions=3` —
+  `Implemented`, directly matching existing frozen code
+  (`talonx_v2/config.py:72`, `talonx_v2/calendar.py:88`). Exact
+  equality-at-deadline/receive-vs-commit semantics remain an explicit
+  open implementation-acceptance detail (`S5-19`). A previously-
+  inspected deadline-consistency finding (Task 112R's G1 entry-session
+  comparison) is recorded for future re-verification, not corrected —
+  `OPERATIONAL_FINDINGS.md` `OPS-003`.
+- **Corporate actions/fractional shares**: entirely future policy — no
+  such code exists today (confirmed by targeted search) —
+  `OPERATIONAL_FINDINGS.md` `OPS-004`.
+- **Catch-up/priorities/historical data**: durable checkpoints already
+  exist for Intelligence (Task 96B); no fixed 16-hour completeness
+  assumption was found to remove; a pre-market lockout window remains
+  explicitly undefined (`S5-30`); 2-year replay feasibility remains
+  open across five distinct sub-questions (`S5-31`, extends `S3-27`).
+
+`OPS-002` **remains open**, unaffected by Session 4 or 5.
+
 ## 7. Open / proposed — see `REQUIREMENTS_TRACKER.md` for tracked status
 
 - **Intraday-vs-multi-day scope** ("swing intelligence assistant"):

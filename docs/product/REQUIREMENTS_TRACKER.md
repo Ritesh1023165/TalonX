@@ -88,6 +88,51 @@ without naming which of these applies.
 | S3-26 | Deferred: detailed experiment evaluation criteria/evidence sufficiency | Open — deferred | N/A | N/A | N/A |
 | S3-27 | Deferred: exact 2-year historical data feasibility | Open — deferred | N/A | N/A | N/A |
 | S3-28 | Deferred: remaining lifecycle semantics (mute controls, pending intents on pause) | Open — deferred | N/A | N/A | N/A |
+| S4-01 | One "Start monitoring" action using saved settings | Agreed | Not authorized | Partially implemented (single-command start exists; no per-strategy readiness gate) | Code inspection (this session) |
+| S4-02 | Resume enabled strategies only when prerequisites pass; per-strategy + shared-dependency readiness exposed | Agreed | Not authorized | Not implemented | Code inspection (this session) |
+| S4-03 | Recover obligations/pending intents before new discovery; no chronological-accounting change; no later-funds-earlier | Agreed | Not authorized | Not assessed in this documentation pass (cross-system ordering not traced) | Not assessed in this documentation pass |
+| S4-04 | Preserve campaign balances/positions/reservations/exit rules across start/stop | Agreed | Not authorized | Implemented (established, EOD closure evidence) | Natural live behavior (established) |
+| S4-05 | Catch-up ingestion must not create late prospective entries or stale "act now" alerts | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S4-06 | Primary Telegram bot: opportunities, lifecycle updates, optional major-dev | Agreed | Not authorized (pre-existing, partial) | Implemented (opportunities/major-dev); lifecycle-update coverage not assessed | Code inspection (established + this session) |
+| S4-07 | Separate Operations bot for incidents/recovery notifications | Agreed | Explicitly not authorized (no bot creation) | Not implemented | Code inspection (this session) |
+| S4-08 | Optional Research bot isolated, OFF by default | Agreed (reaffirms S3-21) | Explicitly not authorized | Not implemented | Code inspection (this session) |
+| S4-09 | Bot creation/destinations/credentials require separate authorization; proposed flags not described as existing | Agreed | Explicitly not authorized | Implemented (this documentation itself follows the rule) | Code inspection (this session) |
+| S4-10 | Paper execution automatic, independent of notification success | Agreed | Not authorized (pre-existing) | Implemented | Code inspection (this session, delivery/execution code paths separate) |
+| S4-11 | Explicit lifecycle states with separate missing-price/valuation modifiers | Agreed | Not authorized | Partially implemented (V2 has distinct FAILED_NO_MARKET_DATA vs. SKIPPED_ENTRY_STALE internally; not operator-facing) | Code inspection (this session) |
+| S4-12 | Pausing new entries atomically cancels unfilled intents; preserves existing positions | Agreed | Not authorized | Not implemented (no atomic cancel-on-pause found) | Code inspection (this session) |
+| S4-13 | EOD reports daily performance, open risk, unresolved obligations | Agreed (extends S2-07) | Not authorized (pre-existing) | Implemented | Code inspection (established, S2-07 evidence) |
+| S4-14 | Independent outage detection + alert dedup are future work, not proven capabilities | Agreed | Not authorized | Partially implemented (single-owner Telegram-poller dedup exists; broader outage-detection/alert-dedup not confirmed) | Code inspection (this session) |
+| S5-01 | One master security registry with per-strategy/horizon eligibility | Agreed | Not authorized | Not implemented (extends S3-08's finding) | Code inspection (this session) |
+| S5-02 | CIK identifies issuer not security/class; track identity/symbol-history/price-series separately | Agreed | Not authorized | Not implemented | Code inspection (this session) |
+| S5-03 | Daily bulk refresh + bounded event-triggered checks; retain last verified snapshot on failure, disclose freshness | Agreed | Not authorized | Not implemented | Code inspection (this session) |
+| S5-04 | Preserve immutable historical versions/observed timestamps/verified effective dates | Agreed | Not authorized | Not implemented | Code inspection (this session) |
+| S5-05 | Unknown/ambiguous identity blocks only affected admissions | Agreed | Not authorized | Not implemented (no registry to test against) | Code inspection (this session) |
+| S5-06 | Registry refresh does not auto-expand approved universes | Agreed | Not authorized | N/A (no registry exists yet) | Code inspection (this session) |
+| S5-07 | Coverage-count accuracy: 27/599 not adopted; actual 43/569/626 counts labelled with scope+date | Agreed | Not authorized | Implemented (in this documentation itself) | Code inspection (this session, dated citations) |
+| S5-08 | Each strategy/data-contract version defines one primary provider/feed/opening-reference/adjustment basis | Agreed | Not authorized | Partially implemented (V2's csv mode is one such definition; not formalized as a versioned contract) | Code inspection (this session) |
+| S5-09 | Official auction price ≠ provider daily-bar open | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S5-10 | Provider selection + free-tier feasibility remain OPEN | Open — deferred | N/A | N/A | N/A |
+| S5-11 | No midday-price substitution/unvalidated fallback; qualified fallback is future work | Agreed | Not authorized | Implemented (CsvBarAdapter returns None, never substitutes — see OPS-002) | Code inspection (established, OPS-002) |
+| S5-12 | Preserve source/first-receipt/processing/notification timestamps separately; batch timestamps ≠ observation evidence | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S5-13 | 3-session recovery: target entry = Session 1; recovery ends at exchange-calendar close of Session 3 | Agreed | Not authorized | Implemented (max_entry_staleness_sessions=3, calendar-aware add_sessions) | Code inspection (this session) |
+| S5-14 | Only timely, durably admitted intents reconcile; check expiry before fill | Agreed | Not authorized | Implemented | Code inspection (this session, service.py retry/expiry ordering) |
+| S5-15 | Downtime/identity/corp-action delays do not extend the deadline | Agreed | Not authorized | Partially implemented (deadline is calendar-fixed; corp-action-delay interaction not assessed, no corp-action code exists) | Code inspection (this session) |
+| S5-16 | Missing-price expiry = EXPIRED_NO_MARKET_DATA at product level; distinct identity/corp-action reasons preserved | Agreed | Not authorized | Partially implemented (internal code uses FAILED_NO_MARKET_DATA; product-level label not surfaced; no corp-action reason exists) | Code inspection (this session) |
+| S5-17 | Release reservations exactly once, no invented cash credit | Agreed | Not authorized (pre-existing) | Implemented | Code inspection (established, this project's history) |
+| S5-18 | Delayed reconciliation preserves original entry-reference session/exit schedule; recorded-at disclosed separately | Agreed | Not authorized | Partially implemented (entry-session preservation confirmed; separate recorded-at disclosure not assessed) | Code inspection (this session) |
+| S5-19 | Exact equality-at-deadline / receive-vs-commit semantics — explicit open acceptance detail | Open — deferred | N/A | N/A | N/A |
+| S5-20 | Deadline-consistency finding recorded for re-verification, not corrected here | Open — tracked (OPS-003) | N/A | N/A | N/A |
+| S5-21 | Verified renames preserve identity/intent via effective-dated mappings | Agreed | Not authorized | Not implemented | Code inspection (this session — OPS-004) |
+| S5-22 | Before-entry splits use post-split entry basis | Agreed | Not authorized | Not implemented | Code inspection (this session — OPS-004) |
+| S5-23 | After-target-entry splits require chronological reconstruction, transactional, exactly once | Agreed | Not authorized | Not implemented | Code inspection (this session — OPS-004) |
+| S5-24 | Unverified changes block execution without discarding obligations | Agreed | Not authorized | Not implemented | Code inspection (this session — OPS-004) |
+| S5-25 | Mergers/replacement securities require explicitly supported treatment | Agreed | Not authorized | Not implemented | Code inspection (this session — OPS-004) |
+| S5-26 | Truncate+cash-in-lieu modeled policy; proportional cost basis; CORP_ACTION_CASH separate but counted in returns; unresolved entitlement not fabricated cash | Agreed | Not authorized | Not implemented | Code inspection (this session — OPS-004) |
+| S5-27 | Decimal arithmetic internally; cents/4-decimal display; no intermediate truncation; rounding mode open | Agreed | Not authorized | Not assessed in this documentation pass (existing accounting precision not audited) | Not assessed in this documentation pass |
+| S5-28 | Durable checkpoints + overlap/dedup + recoverable enrichment state; no fixed 16-hour assumption | Agreed | Not authorized | Partially implemented (Intelligence's own checkpoint/backfill/poller exists, Task 96B; 16h-assumption search found none to remove) | Code inspection (established + this session) |
+| S5-29 | Prioritize obligations/timely intents over bulk historical work | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S5-30 | Pre-market lockout window PROPOSED/UNDEFINED | Open — deferred | N/A | N/A | N/A |
+| S5-31 | 2-year replay feasibility remains OPEN (5 sub-questions) | Open — deferred (extends S3-27) | N/A | N/A | N/A |
 
 ---
 
@@ -1590,6 +1635,14 @@ window is actually data-feasible (as opposed to the existing bounded
 Session 5 (Data sources, discovery and coverage). **Dependency**:
 none blocking.
 
+**Session 5 update (2026-09-16)**: Session 5 detailed this deferral
+into five explicit sub-questions (data availability, granularity,
+point-in-time universe/identity, corporate actions, licensing — see
+`S5-31`) rather than resolving it. **Decision status unchanged**: still
+`Open — deferred`; no destination session has been assigned for the
+actual audit itself yet (Session 5 was the discussion *about* the
+question, not the audit).
+
 ## S3-28 — Deferred: remaining lifecycle semantics (mute, pending intents on pause)
 
 **Requirement**: exact mute controls and the handling of already-
@@ -1601,3 +1654,450 @@ discussion. **Planned session**: Session 4 (End-to-end user journey)
 and/or Session 11 (Operation, stop/start and recovery). **Dependency**:
 `S3-11`'s Pause/Exclude/Mute definitions (agreed this session) as the
 starting point.
+
+---
+
+# Session 4 requirements (S4-01 through S4-14)
+
+Compact format (same five fields per entry), per `DECISION_LOG.md`
+Session 4.
+
+## S4-01 — One "Start monitoring" action using saved settings
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — `python -m
+talonx_ops.prospective start` is already a single operator command
+using persisted `.env` configuration, but it starts the stack as a
+whole rather than gating on per-strategy readiness (`S4-02`).
+**Validation**: Code inspection (`talonx_ops/prospective/`, this
+session). **Dependency**: `S4-02`.
+
+## S4-02 — Resume strategies only when prerequisites pass; readiness exposed
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no per-strategy readiness gate
+or shared-dependency-failure surface was found; today's start either
+brings the whole stack up or it doesn't. **Validation**: Code
+inspection (this session). **Dependency**: `S3-05`'s independent-
+strategy target architecture.
+
+## S4-03 — Recover obligations before new discovery; no chronological-accounting change
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — this
+requires tracing each of Original/Intelligence/V2's own startup
+sequences end-to-end and comparing their obligation-recovery-vs-
+discovery ordering, not performed this session. **Validation**: Not
+assessed in this documentation pass. **Dependency**: none blocking to
+design.
+
+## S4-04 — Preserve campaign balances/positions/reservations/exit rules across restart
+
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing).
+**Implementation**: Implemented — directly confirmed by this project's
+own EOD closure evidence (`docs/research/evidence/
+eod_closure_2026-09-15/EOD_CLOSURE_REPORT.md`): V2's cash/positions
+and Original's lane balances were unchanged across the graceful
+shutdown, and no reset occurred. **Validation**: Natural live behavior
+(2026-09-15 EOD closure). **Dependency**: none.
+
+## S4-05 — Catch-up ingestion must not create late prospective entries or stale alerts
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — requires
+tracing Intelligence's backfill/poller code against its own alert-
+emission path specifically for this guarantee, not performed this
+session. **Validation**: Not assessed in this documentation pass.
+**Dependency**: `S5-28` (durable checkpoints, no fixed completeness
+assumption) is the closest related, already-partially-implemented
+mechanism.
+
+## S4-06 — Primary Telegram bot scope
+
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing,
+partial). **Implementation**: Implemented for opportunities and
+optional major-development alerts (established, `S1-01`/`S1-02`'s
+evidence); explicit "lifecycle update" messages (entry/exit/expiry
+notifications specifically, as their own message type) were **not**
+separately confirmed this session. **Validation**: Code inspection
+(established + this session). **Dependency**: `S4-11` (explicit
+lifecycle states) as the underlying state model such updates would
+draw from.
+
+## S4-07 — Separate Operations bot
+
+**Decision**: Agreed. **Authorization**: Explicitly not authorized (no
+bot creation). **Implementation**: Not implemented — a targeted search
+for a second, operations-specific Telegram bot configuration found
+none. **Validation**: Code inspection (this session). **Dependency**:
+none blocking to design.
+
+## S4-08 — Optional Research bot isolated, OFF by default
+
+**Decision**: Agreed (reaffirms `S3-21`). **Authorization**:
+Explicitly not authorized. **Implementation**: Not implemented — same
+finding as `S3-21`, now positioned as the third of three distinct bot
+channels. **Validation**: Code inspection (this session).
+**Dependency**: `S3-21`.
+
+## S4-09 — Bot infrastructure requires separate authorization; no premature "existing" claims
+
+**Decision**: Agreed. **Authorization**: Explicitly not authorized.
+**Implementation**: Implemented, in the narrow sense that this
+documentation itself complies — nowhere in `PRODUCT_DEFINITION.md`,
+`DECISION_LOG.md`, or this tracker is the Operations/Research bot
+described as an existing, working feature. **Validation**: Code
+inspection (self-check of this session's own output). **Dependency**:
+none.
+
+## S4-10 — Paper execution automatic, independent of notification success
+
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing).
+**Implementation**: Implemented — V2's entry/exit code path
+(`talonx_v2/paper.py`) commits the position/cash/trade atomically
+inside `store.transaction()` with no dependency on delivery; delivery
+is a separate outbox mechanism (`DeliveryOutbox`, this project's
+established Task 96F/138/140 work) that can independently succeed,
+fail, or stay `PENDING`/`AMBIGUOUS` without touching the execution
+record. **Validation**: Code inspection (`talonx_v2/paper.py`, this
+session, confirming execution and delivery are architecturally
+separate). **Dependency**: none.
+
+## S4-11 — Explicit lifecycle states with separate missing-price/valuation modifiers
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — V2 already distinguishes
+`FAILED_NO_MARKET_DATA` (missing price) from `SKIPPED_ENTRY_STALE`
+(staleness) as separate internal dispositions
+(`talonx_v2/service.py:555-571,612-618`), a real precedent for keeping
+these two axes separate; none of this is yet surfaced to the operator
+as an explicit lifecycle-state display. **Validation**: Code
+inspection (this session). **Dependency**: `S5-16` (the product-level
+`EXPIRED_NO_MARKET_DATA` naming this internal code would need to
+adopt or map to).
+
+## S4-12 — Pausing new entries atomically cancels unfilled intents
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — `pending_entry_intents` rows
+transition status only via fill/expiry logic
+(`talonx_v2/store.py:515-533`); no atomic "cancel all unfilled intents
+for this symbol/strategy on pause" operation was found. **Validation**:
+Code inspection (this session). **Dependency**: `S3-11` (Pause
+definition) and `S3-28` (deferred pending-intent-on-pause semantics) —
+this requirement sharpens that deferral into a specific atomicity
+guarantee, still not implemented.
+
+## S4-13 — EOD reports daily performance, open risk, unresolved obligations
+
+**Decision**: Agreed (extends `S2-07`). **Authorization**: Not
+authorized (pre-existing). **Implementation**: Implemented — see
+`S2-07`'s evidence (`talonx_ops/paper_performance.py`,
+`docs/research/evidence/eod_closure_2026-09-15/
+EOD_CLOSURE_REPORT.md`); this entry additionally confirms EOD already
+surfaces "open risk" (unrealized P&L, open positions) and unresolved
+obligations (`EXIT_UNRESOLVED`, `AMBIGUOUS` outbox rows) as part of the
+same reconciliation. **Validation**: Code inspection + natural live
+behavior (established, 2026-09-15 EOD closure). **Dependency**: none.
+
+## S4-14 — Outage detection and alert dedup are future work
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — a real, working
+single-owner Telegram-poller dedup mechanism exists and was directly
+observed this project's history (`telegram_get_updates_owners: 1`,
+`docs/research/evidence/eod_closure_2026-09-15/
+EOD_CLOSURE_REPORT.md` §4) and `talonx_ops/official_dispatch.py`/
+`dashboard_read.py` contain dedup-related logic; a broader,
+**independent outage-detection** capability (detecting a silent
+failure, not just deduplicating a known message stream) was **not**
+confirmed to exist as its own feature this session. **Validation**:
+Code inspection (this session, targeted search). **Dependency**: none
+blocking; this entry's own point is that the claim must stay honest,
+not that a specific fix is owed.
+
+---
+
+# Session 5 requirements (S5-01 through S5-31)
+
+Compact format, per `DECISION_LOG.md` Session 5, grouped A–E as
+discussed.
+
+## S5-01 — One master security registry with per-strategy/horizon eligibility
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — extends `S3-08`'s finding
+(three separate, unmerged lists exist: Original's watchlist,
+Intelligence's collection scope, V2's execution scope). **Validation**:
+Code inspection (this session). **Dependency**: `S5-02`-`S5-06` define
+the registry's data model.
+
+## S5-02 — CIK identifies issuer, not security/class; distinct identity/symbol-history/price-series tracking
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no code found this session
+tracking security identity, symbol history, and price-series identity
+as three distinct, linked concepts; Intelligence's own scope/watchlist
+code (`talonx_ingest/intelligence/service/scope.py`,
+`watchlist_source.py`) operates on CIK/symbol pairs without this finer
+distinction. **Validation**: Code inspection (this session).
+**Dependency**: `S5-01`.
+
+## S5-03 — Daily bulk refresh + bounded event-triggered checks; retain last-verified snapshot on failure
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented as described — Intelligence's
+existing scope refresh (Task 96B's `scope`/`backfill`/`poller`
+modules, this project's history) refreshes on its own cadence, but
+whether it specifically retains a "last verified snapshot" with
+explicit freshness disclosure on failure was **not confirmed** this
+session. **Validation**: Not assessed in this documentation pass (full
+implementation) / Code inspection (existence of a refresh mechanism at
+all, established). **Dependency**: `S5-01`.
+
+## S5-04 — Preserve immutable historical versions/observed timestamps/verified effective dates
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no registry exists yet to
+version (`S5-01`). **Validation**: Code inspection (this session — N/A
+finding). **Dependency**: `S5-01`, `S5-03`.
+
+## S5-05 — Unknown/ambiguous identity blocks only affected admissions
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no registry to test this
+isolation property against yet. **Validation**: Code inspection (this
+session). **Dependency**: `S5-01`.
+
+## S5-06 — Registry refresh does not auto-expand approved universes
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: N/A — no registry exists yet; this is a constraint
+recorded in advance of building one. **Validation**: Code inspection
+(this session). **Dependency**: `S5-01`.
+
+## S5-07 — Coverage-count accuracy (27/599 not adopted; actual counts dated)
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Implemented in this documentation itself — see
+`DECISION_LOG.md` Session 5 §A for the three dated, cited counts
+(Original 43/48 active, 39 SEC-covered; Intelligence 569; V2 626) and
+the explicit statement that no evidence for 27/599 was found.
+**Validation**: Code inspection (`docs/OPERATIONS.md:69`, `docs/
+research/evidence/task140/gated_admission_activation.md:52`,
+`docs/research/evidence/eod_closure_2026-09-15/
+EOD_CLOSURE_REPORT.md` §4, all read this session). **Dependency**:
+none.
+
+## S5-08 — One primary provider/feed/opening-reference/adjustment basis per strategy version
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — V2's `"csv"` pricing mode
+is a real, single, version-scoped provider definition
+(`talonx_v2/config.py`/`service.py`), but it is not yet formalized as
+an explicit, documented "data-contract version" object as this
+requirement describes, and (per `OPS-002`) its own freshness telemetry
+is incomplete. **Validation**: Code inspection (established, `OPS-002`
++ this session). **Dependency**: `OPS-005`.
+
+## S5-09 — Official auction price ≠ provider daily-bar open
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — requires
+comparing V2's actual entry-price source against a genuine official-
+auction reference, not performed this session. **Validation**: Not
+assessed in this documentation pass. **Dependency**: `S5-08`.
+
+## S5-10 — Provider selection + free-tier feasibility remain OPEN
+
+**Decision**: Open — deferred. **Authorization**: N/A.
+**Implementation**: N/A. **Validation**: N/A. **Reason**: needs
+dedicated data-provider research. **Planned session**: not assigned;
+candidate is a dedicated technical task once Session 6 clarifies
+strategy-specific needs. **Dependency**: `OPS-005`.
+
+## S5-11 — No midday-price substitution/unvalidated fallback
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Implemented — `CsvBarAdapter.session()` returns
+`None` (never substitutes a different time-of-day or provider's price)
+for a missing date, confirmed during the 2026-09-15 EOD closure and
+`OPS-002`. **Validation**: Code inspection (established, `OPS-002`).
+**Dependency**: none.
+
+## S5-12 — Preserve source/receipt/processing/notification timestamps separately
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — requires
+tracing a specific event's full timestamp lineage through ingestion,
+processing and delivery, not performed this session. **Validation**:
+Not assessed in this documentation pass. **Dependency**: none
+blocking.
+
+## S5-13 — 3-session recovery: target entry = Session 1, ends at exchange-calendar close of Session 3
+
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing).
+**Implementation**: Implemented — `max_entry_staleness_sessions = 3`
+(`talonx_v2/config.py:72`) combined with the calendar-aware
+`add_sessions()` (`talonx_v2/calendar.py:88`, driving the staleness
+cutoff in `service.py:377-381`) matches this semantics exactly.
+**Validation**: Code inspection (this session, direct read of the
+cited lines). **Dependency**: `S5-19` (exact equality-at-deadline
+detail still open).
+
+## S5-14 — Only timely, durably admitted intents reconcile; check expiry before fill
+
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing).
+**Implementation**: Implemented — `service.py`'s retry-then-expire
+ordering (`retry_deadline` checked before any fill attempt,
+`service.py:546-571`) matches this. **Validation**: Code inspection
+(this session). **Dependency**: none.
+
+## S5-15 — Downtime/identity/corp-action delays do not extend the deadline
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — the deadline itself is a
+fixed calendar computation independent of process uptime (confirmed);
+the corporate-action-delay interaction specifically is **not
+assessed**, since no corporate-action code exists at all (`OPS-004`).
+**Validation**: Code inspection (this session, deadline computation
+only). **Dependency**: `OPS-004`.
+
+## S5-16 — Missing-price expiry = EXPIRED_NO_MARKET_DATA at product level
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — the internal code's actual
+disposition name is `FAILED_NO_MARKET_DATA` (`service.py:555-571`),
+not `EXPIRED_NO_MARKET_DATA` — functionally equivalent, differently
+named; no distinct identity/corporate-action expiry reason exists
+since no corporate-action code exists (`OPS-004`). **Validation**:
+Code inspection (this session). **Dependency**: `OPS-004`.
+
+## S5-17 — Release reservations exactly once, no invented cash credit
+
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing).
+**Implementation**: Implemented — established reservation-lifecycle
+work from this project's Task 140 history (reservation-expiry-exactly-
+once). **Validation**: Code inspection (established). **Dependency**:
+none.
+
+## S5-18 — Delayed reconciliation preserves original entry-reference session; recorded-at disclosed separately
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — `eligible_entry_session`
+is preserved and used as the position's own timeline anchor
+(`service.py`'s `target_exit = add_sessions(es, cfg.hold_trading_days)`
+uses the entry session, not a later processing time); whether a
+**separate, disclosed** "recorded-at" time is surfaced anywhere
+operator-facing was not confirmed this session. **Validation**: Code
+inspection (this session, entry-session preservation only).
+**Dependency**: none blocking.
+
+## S5-19 — Exact equality-at-deadline / receive-vs-commit semantics
+
+**Decision**: Open — deferred (explicit implementation-acceptance
+detail). **Authorization**: N/A. **Implementation**: N/A.
+**Validation**: N/A. **Reason**: technical acceptance criteria, not a
+product decision — needs definition before any implementation task
+touching this window. **Planned session**: none (a future
+implementation-acceptance task, not a knowledge-transfer session).
+**Dependency**: `S5-13`.
+
+## S5-20 — Deadline-consistency finding, recorded not corrected
+
+**Decision**: Open — tracked as `OPS-003`. **Authorization**: N/A.
+**Implementation**: N/A (no correction made). **Validation**: N/A.
+**Dependency**: see `OPERATIONAL_FINDINGS.md` `OPS-003` for the full
+finding (Task 112R's G1 entry-session-semantics comparison,
+re-verification against current code not performed this session).
+
+## S5-21 — Verified renames preserve identity/intent via effective-dated mappings
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no rename-handling code exists.
+**Validation**: Code inspection (this session — see `OPS-004`).
+**Dependency**: `S5-01` (a registry to attach effective-dated mappings
+to).
+
+## S5-22 — Before-entry splits use post-split entry basis
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no split-handling code exists.
+**Validation**: Code inspection (this session — `OPS-004`).
+**Dependency**: `OPS-004`.
+
+## S5-23 — After-target-entry splits require chronological reconstruction, exactly once
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented. **Validation**: Code inspection
+(this session — `OPS-004`). **Dependency**: `S5-18` (delayed-
+reconciliation timeline preservation), `OPS-004`.
+
+## S5-24 — Unverified changes block execution without discarding obligations
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no corporate-action verification
+gate exists to block on. **Validation**: Code inspection (this session
+— `OPS-004`). **Dependency**: `OPS-004`.
+
+## S5-25 — Mergers/replacement securities require explicitly supported treatment
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented. **Validation**: Code inspection
+(this session — `OPS-004`). **Dependency**: `OPS-004`.
+
+## S5-26 — Truncate+cash-in-lieu policy; proportional cost basis; CORP_ACTION_CASH treatment
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — none of this accounting
+treatment exists in code today. **Validation**: Code inspection (this
+session — targeted search for split/merger/cash-in-lieu handling,
+`OPS-004`). **Dependency**: `OPS-004`.
+
+## S5-27 — Decimal arithmetic; cents/4-decimal display; no intermediate truncation
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — auditing
+V2's/Original's actual numeric types (whether `Decimal` or `float` is
+used internally today) was not performed this session. **Validation**:
+Not assessed in this documentation pass. **Dependency**: none
+blocking to state the policy; blocking to verify compliance.
+
+## S5-28 — Durable checkpoints + overlap/dedup + recoverable enrichment state; no fixed 16-hour assumption
+
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing,
+partial). **Implementation**: Partially implemented — Intelligence's
+established `scope`/`backfill`/`poller`/enrichment modules (Task 96B,
+this project's history) already implement durable checkpointing and
+recoverable state; a targeted search this session for a "16-hour"
+completeness assumption anywhere in the codebase or docs found none —
+there is nothing matching that figure to remove. **Validation**: Code
+inspection (this session, targeted search + established Task 96B
+evidence). **Dependency**: none.
+
+## S5-29 — Prioritize obligations/timely intents over bulk historical work
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — requires
+tracing actual scheduling/priority logic across ingestion and
+execution, not performed this session. **Validation**: Not assessed in
+this documentation pass. **Dependency**: none blocking.
+
+## S5-30 — Pre-market lockout window PROPOSED/UNDEFINED
+
+**Decision**: Open — deferred (explicitly not agreed).
+**Authorization**: N/A. **Implementation**: N/A. **Validation**: N/A.
+**Reason**: no specific window was agreed; recorded as undefined, not
+defaulted. **Planned session**: Session 9 (Telegram and dashboard
+experience) or Session 11 (Operation, stop/start and recovery) —
+candidate, not decided. **Dependency**: none blocking.
+
+## S5-31 — 2-year replay feasibility remains OPEN (5 sub-questions)
+
+**Decision**: Open — deferred (extends `S3-27`). **Authorization**:
+N/A. **Implementation**: N/A. **Validation**: N/A. **Reason**: data
+availability, granularity, point-in-time universe/identity, corporate
+actions, and licensing all need independent evidence — none resolved
+this session. **Planned session**: not assigned (candidate: Session 12
+or a dedicated data-engineering task). **Dependency**: `OPS-004`
+(corporate-action question specifically overlaps).

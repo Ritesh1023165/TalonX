@@ -44,24 +44,25 @@ today" specifies which one it means.
 | 1 | Purpose and user value | **Done — recorded in `DECISION_LOG.md`** |
 | 2 | Paper execution, accounting, risk and evaluation | **Decisions recorded; implementation assessment/authorization separate.** Recorded in `DECISION_LOG.md` (title updated from the originally-planned "Investment basics through a paper-trade example"; the plan is owner-adjustable — see below) |
 | 3 | Application structure and configuration: Original, Intelligence and V2 | **Agreed decisions recorded (S3-01..S3-23); named deferrals remain (S3-24..S3-28).** Recorded in `DECISION_LOG.md` (title extended from "Application overview" to reflect its actual scope — master stock coverage, capital defaults, research-lab workflow, naming, and a conditional reset policy, in addition to the three flows' responsibilities). |
-| 4 | End-to-end user journey | Not yet conducted. Carries forward 9 scenarios from Session 3 (see `DECISION_LOG.md` Session 4 agenda) — must refine Session 1-3's existing requirement IDs or add linked requirements, not a disconnected specification. |
-| 5 | Data sources, discovery and coverage | Not yet conducted. Receives `S3-27` (2-year historical data feasibility, deferred from Session 3). |
-| 6 | Original intraday strategy and filters | Not yet conducted. Candidate for extension to also cover `S3-24` (Original's long-term/fundamentals path review) — not decided; may instead become its own session. |
+| 4 | End-to-end user journey | **Agreed decisions recorded (S4-01..S4-14).** Recorded in `DECISION_LOG.md`. |
+| 5 | Data sources, discovery and coverage | **Closed at the requirements level (S5-01..S5-31); explicit technical decisions and implementation gates remain outstanding — not execution readiness or universal validation.** Recorded in `DECISION_LOG.md`. |
+| 6 | Signal discovery and strategy mechanics | Not yet conducted. Title updated (from "Original intraday strategy and filters") to reflect its actual planned scope: signal qualification vs. portfolio admission vs. paper execution vs. Telegram delivery, across **both** Original and V2, with frozen-vs-proposed rules kept separate — see `DECISION_LOG.md` Session 6 agenda. May absorb some of Session 8's originally-planned V2-specific content; reconciled when Session 8 is actually conducted, not decided now. Candidate for also covering `S3-24` (Original's long-term/fundamentals path review) — not decided; may instead become its own session. |
 | 7 | Intelligence and useful company developments | Not yet conducted |
-| 8 | V2 multi-day strategy and lifecycle | Not yet conducted |
-| 9 | Telegram and dashboard experience | Not yet conducted |
+| 8 | V2 multi-day strategy and lifecycle | Not yet conducted. Scope may overlap with Session 6's now-broader "strategy mechanics" framing — to be reconciled (not merged or cancelled) when this session is actually conducted. |
+| 9 | Telegram and dashboard experience | Not yet conducted. Candidate destination for `S5-30` (pre-market lockout window, undefined). |
 | 10 | Paper accounting, costs and risk | Not yet conducted. Receives `S3-25` (cross-strategy exposure enforcement policy, deferred from Session 3). |
-| 11 | Operation, stop/start and recovery | Not yet conducted. Shares `S3-28` (mute controls, pending-intent handling) with Session 4. |
-| 12 | Technical validation, usefulness and economic evidence | Not yet conducted. Receives `S3-26` (experiment evaluation criteria/evidence sufficiency, deferred from Session 3) — a prerequisite for authorizing any future experiment. |
+| 11 | Operation, stop/start and recovery | Not yet conducted. Shares `S3-28` (mute controls, pending-intent handling) with Session 4; candidate destination for `S5-30` alongside Session 9. |
+| 12 | Technical validation, usefulness and economic evidence | Not yet conducted. Receives `S3-26` (experiment evaluation criteria/evidence sufficiency, deferred from Session 3) and is a candidate destination for `S5-31`'s 2-year-replay-feasibility audit — a prerequisite for authorizing any future experiment. |
 | 13 | Architecture, effective configuration and prioritized roadmap | Not yet conducted |
 
 **Closure discipline** (applies from Session 3 onward): before closing
 each session, every question raised in it is recorded as **agreed**,
 **rejected**, or **explicitly deferred with a reason and a named
 destination session** — never silently dropped. Session 3's own
-deferrals (`S3-24` through `S3-28`) are the first application of this
-discipline; see `DECISION_LOG.md` Session 3's "Explicit deferrals" for
-the pattern each future session should follow.
+deferrals (`S3-24` through `S3-28`) were the first application of this
+discipline; Session 5's own deferrals (`S5-10`, `S5-19`, `S5-20`,
+`S5-30`, `S5-31`) follow the same pattern — see `DECISION_LOG.md`
+Session 3/5's "Explicit deferrals" sections.
 
 **This plan is adjustable by the owner** — the order, content, or
 existence of any future session may change; nothing here is fixed in
