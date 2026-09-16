@@ -643,6 +643,131 @@ matches for the three cited status/tag strings).
 
 **Related**: `REQUIREMENTS_TRACKER.md` `S6-19`, `S6-20`, `S6-23`.
 
+**Session 7 correction (2026-09-16, ~20:55 UTC) — string-search
+findings separated from control-flow evidence**: the original finding
+above is accurate as a **string search** (no code matches those three
+exact label strings) but was read too broadly — it does **not** mean
+"no related exit protection exists at all." Direct reading of
+`talonx_paper/engine.py`'s actual control flow this session found a
+real, working `check_stop_take()` function (`engine.py:96-135`) that:
+runs on every market tick for an open position; uses ATR-anchored
+stop/target dollar levels persisted at signal time (falling back to
+percentage bands only when those levels are missing); and **already
+applies a stop-first conservative tiebreak** — its own docstring
+states "on the (rare) tick where both thresholds are somehow crossed
+at once, protecting capital wins the tiebreak over locking in a gain."
+Exit fills also already go through `apply_spread(..., "SELL")`
+(`talonx_paper/consumer.py`, multiple call sites; `simulated_spread_bps`
+default 5bps, `talonx_paper/config.py:99`) — a real, working friction/
+cost model on exits, not merely on entries.
+
+**Corrected characterization**: the specific **explicit tagging**
+(`AMBIGUOUS_INTRABAR_ORDER`), the **gap-below-stop vs. ordinary-
+crossing** distinct fill models, the **stop-market-vs-stop-limit**
+distinction, and true **sub-bar/intrabar** (rather than per-tick)
+ordering resolution remain genuinely **not implemented** — that part
+of the original finding stands. But the *conservative stop-first
+tiebreak itself*, and *a real exit-side friction/slippage model*, are
+**already implemented**, under different naming and at tick
+granularity rather than the target's bar/intrabar granularity. This
+finding's `Status` remains `OPEN` for the genuinely-missing pieces;
+this correction narrows, rather than closes, the gap.
+
+**Related requirement corrections**: see `REQUIREMENTS_TRACKER.md`
+`S6-19`/`S6-20`'s own dated correction notes.
+
+---
+
+## OPS-010 — Development-centric grouping and CORRECTION-linkage gap
+
+**Status**: `OPEN` — agreed target design exists (Session 7 §E); no
+implementation.
+
+**Found**: Session 7 documentation pass (2026-09-16), via direct
+reading of `talonx_ingest/intelligence/delivery/update_policy.py` and
+`outbox.py`.
+
+**Finding**: `update_policy.py`'s `classify_update()` is real, working,
+deterministic infrastructure — it decides `NEW` / `UPDATE` /
+`SUPPRESS_DUPLICATE` / `SUPPRESS_NOOP` for a re-rendered card, keyed on
+`content_hash` and significance band, with a defined set of
+"material marker" line prefixes that count as a real content change.
+This is genuine precedent for part of Session 7 §E's requirement.
+**Two distinct gaps remain**: (1) `DeliveryOutbox` operates on one
+`delivery_id` per `event_id` (`outbox.py:204,774`) — there is no
+`development_id`/group/topic field to link multiple filings, press
+releases, agreements, or amendments into one development record, so
+today's dedup/update mechanism cannot group across sources the way
+§E describes; (2) `classify_update()` has no `CORRECTION` decision
+type — a materially-wrong repair of previously-delivered information
+and a genuine new material change are not currently distinguished
+from each other, so §E's and §G's `CORRECTION`-specific rules (link to
+original, eligible despite mutes, never broadcast to new recipients,
+etc.) have no existing decision type to attach to.
+
+**Future corrective work — NOT IMPLEMENTED here**: design and
+implement a development-record grouping key (verified entity +
+transaction/topic + relevant dates, per `S7-12`); add a `CORRECTION`
+decision type to `update_policy.py`, distinct from `UPDATE`; implement
+the correction-specific delivery rules (§G) on top of that new type.
+
+**Evidence references**: `talonx_ingest/intelligence/delivery/
+update_policy.py` (full file read this session); `talonx_ingest/
+intelligence/delivery/outbox.py:204,774`.
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S7-12`, `S7-13`, `S7-14`,
+`S7-21`.
+
+---
+
+## OPS-011 — Per-stock company-event mute and materiality-catalogue gap
+
+**Status**: `OPEN` — agreed target design exists (Session 7 §B/§C/§G);
+no implementation.
+
+**Found**: Session 7 documentation pass (2026-09-16), via targeted
+search of `talonx_ingest/intelligence/dashboard/render.py` and
+`talonx_ingest/intelligence/significance/`.
+
+**Finding**: no per-stock company-event mute feature exists — a search
+for "mute" in the Intelligence dashboard's render code found only a
+CSS class name (`.muted`, a text-styling convention unrelated to
+notification suppression). Separately, Intelligence's existing
+significance engine (frozen ruleset `information-significance-v1`,
+`talonx_ingest/intelligence/significance/`) computes a band score
+(LOW/MEDIUM/HIGH/CRITICAL) — a real, working mechanism, but a
+**different** one from Session 7 §C's agreed versioned, route-specific
+materiality-rules catalogue (Route 1 verified-status-change vs. Route
+2 measured-quantitative-development, each with its own evidence
+rules). The existing content gate (`notification_policy.py`'s
+`_substantive_evidence`) is likewise a single-axis check, not
+Session 7 §B's six-question rubric evaluated individually.
+
+**Explicit implication**: a `HIGH`/`CRITICAL` significance band today
+does **not** by itself imply the six-question rubric or either
+materiality route would be satisfied — the existing scorer and the
+newly agreed qualification requirements are related but distinct, and
+must not be conflated when this gap is eventually closed.
+
+**Future corrective work — NOT IMPLEMENTED here**: build a per-stock
+company-event mute (distinct from Original's own ticker-pause, which
+is a structurally separate system per `S3-08`/`OPS-006`); build the
+versioned materiality-rules catalogue with its two routes; build the
+six-question rubric as an explicit, individually-evaluated gate ahead
+of (not replacing) the existing significance engine. Numerical
+thresholds for Route 2 and freshness windows are separately deferred
+(`S7-25`, `S7-26`) and are explicitly **not** part of this finding's
+corrective scope.
+
+**Evidence references**: `talonx_ingest/intelligence/dashboard/
+render.py` (targeted search, this session); `talonx_ingest/
+intelligence/significance/` (established, this project's Task 96E
+history); `talonx_ingest/intelligence/delivery/notification_policy.py`
+(established, this project's Task 138-140c history).
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S7-05` through `S7-10`,
+`S7-20`, `S7-23`.
+
 ---
 
 *See `REQUIREMENTS_TRACKER.md` for product-requirement tracking,

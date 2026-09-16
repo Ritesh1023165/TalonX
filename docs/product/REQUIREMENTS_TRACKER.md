@@ -151,14 +151,40 @@ without naming which of these applies.
 | S6-16 | Preserve corrected baseline: revalidation + bracket-check + no-post-spread-RRR-recheck + not-a-scheduler; reject "no revalidation" claim | Agreed (inspected baseline) | Not authorized | Implemented (accurately describes current code) | Code inspection (this session, talonx_quant/consumer.py:2017, talonx_paper/engine.py:156-186) |
 | S6-17 | Approved target: approve-then-freeze, next-eligible-bar-open entry, RRR recheck at execution price, T-10 cutoff | Agreed | Not authorized | Not implemented (OPS-008) | Code inspection (this session) |
 | S6-18 | Spread-adjusted entry ≠ full net-of-fees/exit-cost RRR; exact cost treatment TBD | Open — deferred (S6-25) | N/A | N/A | N/A |
-| S6-19 | Market-time exit precedence; both-touched-unknown ⇒ stop-first + AMBIGUOUS_INTRABAR_ORDER (conservative, not proof) | Agreed | Not authorized | Not implemented (OPS-009; no matching status code found) | Code inspection (this session, repo-wide search) |
-| S6-20 | Stop/gap fill models; no extreme-low auto-fill; stop-market≠stop-limit; pre-entry ranges can't trigger post-entry exits; exactly-once closure | Agreed | Not authorized | Not implemented (OPS-009) | Code inspection (this session) |
+| S6-19 | Market-time exit precedence; both-touched-unknown ⇒ stop-first + AMBIGUOUS_INTRABAR_ORDER (conservative, not proof) | Agreed | Not authorized | **Partially implemented** (corrected 2026-09-16 — `check_stop_take()` already applies a stop-first tiebreak at tick granularity; explicit tag/sub-bar resolution absent, OPS-009) | Code inspection (this session, `talonx_paper/engine.py:96-135`) |
+| S6-20 | Stop/gap fill models; no extreme-low auto-fill; stop-market≠stop-limit; pre-entry ranges can't trigger post-entry exits; exactly-once closure | Agreed | Not authorized | **Partially implemented** (corrected 2026-09-16 — exit fills already spread-adjusted via `apply_spread`; gap/crossing distinction and exactly-once guarantee unconfirmed, OPS-009) | Code inspection (this session, `talonx_paper/consumer.py`, `config.py:99`) |
 | S6-21 | Intraday EOD-flatten inspected baseline: 15:50 ET default, DST-aware not calendar-aware, no price-age check, no durable recovery state | Agreed (inspected baseline) | Not authorized | Implemented (accurately describes current code) | Code inspection (this session, talonx_paper/config.py, consumer.py) |
 | S6-22 | Approved EOD-flatten target: close-10min cutoff, durable cross-restart recovery, account block, EXIT_UNRESOLVED, Operations notify-once | Agreed | Not authorized | Not implemented (OPS-007) | Code inspection (this session) |
 | S6-23 | Shared recovery per-exit-type own evidence; explicit uncertainty; not applied to V2/fundamentals | Agreed | Not authorized | Not implemented (OPS-007/OPS-009) | Code inspection (this session) |
 | S6-24 | Deadline equality/receipt-vs-processing semantics resolved at requirements level (resolves S5-19) | Agreed (requirements-level only) | Not authorized | Not implemented; implementation/validation tracked under OPS-003 | Code inspection (this session) |
 | S6-25 | Deferred: numerical spread/slippage/fee assumptions for entry-geometry target | Open — deferred | N/A | N/A | N/A |
 | S6-26 | Deferred: missing intraday entry-bar recovery duration (extends OPS-005) | Open — deferred | N/A | N/A | N/A |
+| S7-01 | Primary Telegram = trading opportunities + opted-in major developments; informational, no auto-trade; routine filings dashboard-only | Agreed | Not authorized (pre-existing, partial) | Implemented | Code inspection (established) |
+| S7-02 | Operations incidents + Research Lab notifications keep separate routing | Agreed (reaffirms S4-06/07/08) | Not authorized | Not implemented (no Operations/Research bot exists) | Code inspection (established) |
+| S7-03 | Intraday + Insider Buying remain primary scope; no demotion revival | Agreed (reaffirms S3-01/S6-04) | Not authorized (pre-existing) | Implemented | Code inspection (established) |
+| S7-04 | No proposed bot/flag described as already deployed | Agreed | Not authorized | Implemented (this documentation's own framing) | Code inspection (this session, self-check) |
+| S7-05 | Six-question qualification rubric; category/label alone insufficient; recognized-but-unsubstantive stays dashboard-pending | Agreed | Not authorized | Not implemented (existing gate is single-axis, not 6 distinct checks) | Code inspection (this session) |
+| S7-06 | Versioned materiality-rules catalogue | Agreed | Not authorized | Not implemented (existing significance engine is a band scorer, not a routes catalogue) | Code inspection (this session) |
+| S7-07 | Route 1: verified significant status change, no universal numerical threshold | Agreed | Not authorized | Not implemented | Code inspection (this session) |
+| S7-08 | Route 2: measured quantitative development; comparable metrics; revision/financing context rules; debt ratios not universal thresholds | Agreed | Not authorized | Not implemented | Code inspection (this session) |
+| S7-09 | Routine earnings dashboard-only unless qualifying; no forced structural catalyst; no unsupported "beat expectations"; no universal SEC-item claim | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S7-10 | Missing-reason handling; never infer misconduct/distress/price direction; "material" = policy-relevance not legal/market-impact guarantee | Agreed | Not authorized | Partially implemented (price-direction guarded via claim_safety; misconduct/distress not separately guarded) | Code inspection (this session, claim_safety.py:42) |
+| S7-11 | Concise-alert content list; avoid jargon/generic labels/unsupported confidence/invented context | Agreed | Not authorized (pre-existing, partial) | Partially implemented (S1-05's jargon gap still open) | Code inspection (established, S1-05) |
+| S7-12 | Development record links multiple filings/PRs/agreements; grouped by entity+transaction/topic+dates, not ticker/accession alone | Agreed | Not authorized | Not implemented (OPS-010) | Code inspection (this session, outbox.py delivery_id keying) |
+| S7-13 | Duplicates/amendments enrich without new notification; distinct developments stay separate; uncertain relationships never fabricated | Agreed | Not authorized | Not implemented (OPS-010) | Code inspection (this session) |
+| S7-14 | UPDATE vs CORRECTION distinction; update explains delta + links to prior; later development ≠ correction; history preserved | Agreed | Not authorized | Partially implemented (UPDATE decision type exists; CORRECTION does not) | Code inspection (this session, update_policy.py) |
+| S7-15 | Four distinct timestamps kept separate; batch/DB-read/enrichment times never impersonate receipt/publication | Agreed | Not authorized | Partially implemented (mechanism exists; freshness_status UNKNOWN for 100% of persisted events per established Task140 finding) | Code inspection (established, this session) |
+| S7-16 | UTC storage; explicit DST-aware display zones; no hardcoded BST; unknown times stay unknown | Agreed | Not authorized (pre-existing, partial) | Partially implemented (established UK-time discipline this session's own reporting; dashboard-wide audit not performed) | Code inspection (established) |
+| S7-17 | Freshness follows source-publication time; no restart/reprocess refresh; stale-backlog-flood prevention; delayed summaries OFF by default | Agreed | Not authorized (pre-existing, partial) | Partially implemented | Code inspection (established, Task140c reclassify_pending_rows evidence) |
+| S7-18 | Numerical freshness windows deferred; existing values recorded as current implementation only | Open — deferred (S7-25) | N/A | N/A | N/A |
+| S7-19 | Major-dev Telegram opt-in explicit, persisted across restarts | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S7-20 | Per-stock company-event mute; doesn't suppress trades/exits/Operations; trading pause doesn't auto-pause monitoring; delayed summaries separate opt-in | Agreed | Not authorized | Not implemented (mute); Implemented (pause/monitoring separation, structural side-effect) | Code inspection (this session, render.py + S3-08/OPS-006 evidence) |
+| S7-21 | Material corrections: eligible despite mutes, may repair past freshness window, must link+identify, never bypass shutdown/revocation/broadcast | Agreed | Not authorized | Not implemented (OPS-010, no CORRECTION type) | Code inspection (this session) |
+| S7-22 | Distinguish qualification / delivery eligibility / delivery attempts / confirmed delivery | Agreed | Not authorized (pre-existing, partial) | Partially implemented (outbox states distinguish attempts/sent/ambiguous; full 4-way operator-facing distinction not confirmed) | Code inspection (established, this session) |
+| S7-23 | 5 distinct coverage dimensions, may co-occur, none conceals another | Agreed | Not authorized | Not implemented (no unified 5-dimension surface found) | Code inspection (this session) |
+| S7-24 | Empty feed ≠ nothing happened; disclose limitations; no exhaustive-coverage claim | Agreed | Not authorized | Implemented (this documentation's own framing; dashboard's own wording not audited) | Code inspection (this session, self-check) |
+| S7-25 | Deferred: numerical freshness windows, requires bounded historical-filing review | Open — deferred | N/A | N/A | N/A |
+| S7-26 | Deferred: event-specific quantitative materiality thresholds, requires bounded historical-filing review | Open — deferred | N/A | N/A | N/A |
 
 ---
 
@@ -225,6 +251,15 @@ notification_policy.py`; `docs/research/evidence/task140/README.md`
 ("digest off by default").
 
 **Open questions/dependencies**: none.
+
+**Session 7 update (2026-09-16, ~20:55 UTC) — refined**: Session 7 §A
+refined this into the full agreed scope — the primary Telegram channel
+carries both qualified trading opportunities AND explicitly opted-in
+major developments, with company-development messages remaining
+purely informational (never auto-creating a paper trade,
+`S7-01`/`S7-19`). The plain-language presentation requirements are now
+also fully specified (`S7-11`). Verdict unchanged: `Implemented` for
+the optionality itself.
 
 ---
 
@@ -334,6 +369,15 @@ item-number citation is itself a requirement the owner wants
 prioritized, or an acceptable technical-audience detail — not decided;
 a candidate topic for Session 7 (Intelligence and useful company
 developments).
+
+**Session 7 update (2026-09-16, ~20:55 UTC) — linked, not resolved**:
+Session 7 §D's full plain-language presentation requirement (`S7-11`)
+directly incorporates "avoid unexplained SEC jargon" as one of its
+explicit rules. **This gap is not fixed by Session 7** — the raw
+"Item 2.03/2.04" citation was not re-checked or re-rendered this
+session; `S7-11`'s own verdict is `Partially implemented`, citing this
+same open gap. Whether prioritizing the fix is itself authorized
+remains undecided.
 
 ---
 
@@ -1282,6 +1326,14 @@ index.html`). **Dependencies**: `S3-08` (master stock list, per-
 horizon eligibility) is a natural prerequisite for a horizon label to
 be meaningful.
 
+**Session 7 update (2026-09-16, ~20:55 UTC) — reaffirmed, boundary
+clarified**: Session 7 confirms notification/routing policy (§A) never
+changes which securities are members of the master universe —
+Intelligence's own content-gating and routing decisions (`S7-01`
+through `S7-24`) are downstream of, and do not modify, `S3-08`'s
+master-list/coverage membership. No demotion of Intraday occurred
+(`S7-03`).
+
 ## S3-02 — Original not retired or disconnected
 
 **Requirement**: keeping intraday does not retire/disconnect Original,
@@ -1793,6 +1845,16 @@ separately confirmed this session. **Validation**: Code inspection
 lifecycle states) as the underlying state model such updates would
 draw from.
 
+**Session 7 update (2026-09-16, ~20:55 UTC) — refined**: Session 7 §A
+refines this entry's "Primary Telegram bot" framing into "Trade &
+Event" routing specifically — trading opportunities and opted-in
+major-company-developments share the primary channel, distinct from
+Operations (`S4-07`) and Research (`S4-08`) routing. Independent
+per-domain controls are now specified: event mute, trading pause, and
+global delivery shutdown (`S7-20`/`S7-21`) — none of which were
+tracked before this session. Verdict unchanged for the core routing
+claim: `Implemented`.
+
 ## S4-07 — Separate Operations bot
 
 **Decision**: Agreed. **Authorization**: Explicitly not authorized (no
@@ -1831,6 +1893,14 @@ fail, or stay `PENDING`/`AMBIGUOUS` without touching the execution
 record. **Validation**: Code inspection (`talonx_v2/paper.py`, this
 session, confirming execution and delivery are architecturally
 separate). **Dependency**: none.
+
+**Session 7 update (2026-09-16, ~20:55 UTC) — reaffirmed, not
+downgraded**: Session 7 §G explicitly distinguishes event
+qualification, delivery eligibility, delivery attempts, and confirmed
+delivery as four separate concepts (`S7-22`) — none of which is
+"notification success," reinforcing (not contradicting) this entry's
+own claim that notification success never controls paper execution.
+Verdict unchanged: `Implemented`.
 
 ## S4-11 — Explicit lifecycle states with separate missing-price/valuation modifiers
 
@@ -1923,6 +1993,14 @@ code (`talonx_ingest/intelligence/service/scope.py`,
 `watchlist_source.py`) operates on CIK/symbol pairs without this finer
 distinction. **Validation**: Code inspection (this session).
 **Dependency**: `S5-01`.
+
+**Session 7 update (2026-09-16, ~20:55 UTC) — reaffirmed for
+Intelligence specifically**: Session 7's development-centric grouping
+requirement (`S7-12`) explicitly reaffirms this entry's own point —
+grouping developments by "verified entities, transaction/topic, and
+relevant dates" (not ticker or accession alone) directly depends on
+the same security-identity distinction this entry describes as not
+yet implemented. Verdict unchanged: `Not implemented`.
 
 ## S5-03 — Daily bulk refresh + bounded event-triggered checks; retain last-verified snapshot on failure
 
@@ -2021,6 +2099,17 @@ tracing a specific event's full timestamp lineage through ingestion,
 processing and delivery, not performed this session. **Validation**:
 Not assessed in this documentation pass. **Dependency**: none
 blocking.
+
+**Session 7 update (2026-09-16, ~20:55 UTC) — sharpened, still not
+assessed end-to-end**: Session 7 §F names the same four timestamps
+explicitly (occurred/effective, source publication, first local
+detection/receipt, notification-sent) and adds UTC-storage/DST-aware-
+display conventions (`S7-15`/`S7-16`). This session's own targeted
+check re-confirmed the established finding that `freshness_status` is
+`UNKNOWN` for 100% of persisted Intelligence events (this project's
+Task 140 evidence) — consistent with, not contradicting, this entry's
+`Not assessed` verdict for full lineage tracing; the freshness-field
+gap specifically is real and disclosed, not newly discovered.
 
 ## S5-13 — 3-session recovery: target entry = Session 1, ends at exchange-calendar close of Session 3
 
@@ -2334,6 +2423,15 @@ Code inspection (this session — no matching account/workflow found).
 candidate would eventually go through); `S3-24` (resolved by this
 entry at the product-positioning level only).
 
+**Session 7 update (2026-09-16, ~20:55 UTC) — scope of "resolved"
+clarified**: Session 7 confirms this entry's own caveat explicitly —
+"Fundamental Opportunities" was **partially inspected** (a product-
+positioning decision only); **full technical qualification of
+Original's underlying long-term/fundamentals path remains incomplete**
+(`S3-24`'s original technical-review deferral is unaffected by this
+entry). No new inspection of that path was performed this session
+either.
+
 ## S6-04 — Both intraday and multi-day remain primary scope; no demotion
 
 **Decision**: Agreed (reaffirms `S3-01`). **Authorization**: Not
@@ -2436,6 +2534,15 @@ under Session 4/5, not re-verified here for Original). **Validation**:
 Code inspection (this session, targeted search, no match found).
 **Dependency**: none blocking to design.
 
+**Session 7 update (2026-09-16, ~20:55 UTC) — boundary clarified**:
+Session 7 §F's company-development freshness rules (`S7-17`) are
+**not** automatically applied to trade alerts — this entry's own
+capacity-independent trade-alert requirement and Session 6 §D's
+expired-opportunity handling remain governed by their own rules,
+separate from Intelligence's company-event freshness policy. This
+clarification prevents conflating the two domains; no implementation
+status changed.
+
 ## S6-14 — Expiry-update discipline and duplicate-flood prevention
 
 **Decision**: Agreed. **Authorization**: Not authorized.
@@ -2488,26 +2595,57 @@ detail), `S6-26` (missing-bar recovery duration).
 ## S6-19 — Market-time exit precedence and stop-first ambiguity assumption
 
 **Decision**: Agreed. **Authorization**: Not authorized.
-**Implementation**: Not implemented — a repository-wide search for
+**Implementation**: ~~Not implemented — a repository-wide search for
 `AMBIGUOUS_INTRABAR_ORDER` found no matches anywhere in `talonx_paper/`
 or elsewhere in the codebase; no code implements market-time exit-
 precedence resolution or the stop-first conservative-ambiguity
-assumption. **Validation**: Code inspection (this session, repo-wide
-search, no match). **Dependency**: `OPS-009`.
+assumption.~~ **Corrected, see note below.** **Validation**: Code
+inspection (this session, repo-wide search, no match). **Dependency**:
+`OPS-009`.
+
+**Correction (2026-09-16, ~20:55 UTC) — string-search finding
+separated from control-flow evidence**: the repository-wide search for
+the exact `AMBIGUOUS_INTRABAR_ORDER` string genuinely found no match —
+that part is accurate. But direct reading of `talonx_paper/engine.py`'s
+`check_stop_take()` (`engine.py:96-135`) found a real, working
+stop-first tiebreak: its own docstring states stop-loss is checked
+first "on the (rare) tick where both thresholds are somehow crossed at
+once, protecting capital wins the tiebreak over locking in a gain."
+**Corrected classification: `Partially implemented`** — the
+conservative stop-first *behavior* exists (at per-tick, not
+sub-bar/intrabar, granularity, and without the explicit
+`AMBIGUOUS_INTRABAR_ORDER` tag or market-time-sequenced multi-source
+resolution the target describes). See `OPERATIONAL_FINDINGS.md`
+`OPS-009`'s own correction note for the full evidence.
 
 ## S6-20 — Stop/gap fill models, exactly-once closure
 
 **Decision**: Agreed. **Authorization**: Not authorized.
-**Implementation**: Not implemented — no code matching the declared
+**Implementation**: ~~Not implemented — no code matching the declared
 stop-crossing/gap-below-stop fill models, extreme-low-fill
 prohibition, or stop-market-vs-stop-limit distinction was found; a
 repository-wide search for `EXIT_UNRESOLVED`/`EXIT_PENDING` (target
 status labels used elsewhere in this design) found no matches in
-`talonx_paper/` either. Exactly-once closure at the *position* level
-(distinct from V2's own exactly-once *reservation-release*, `S5-17`)
-was not separately traced this session. **Validation**: Code
-inspection (this session, repo-wide search, no match). **Dependency**:
-`OPS-009`.
+`talonx_paper/` either.~~ **Corrected, see note below.** Exactly-once
+closure at the *position* level (distinct from V2's own exactly-once
+*reservation-release*, `S5-17`) was not separately traced this
+session. **Validation**: Code inspection (this session, repo-wide
+search, no match). **Dependency**: `OPS-009`.
+
+**Correction (2026-09-16, ~20:55 UTC) — string-search finding
+separated from control-flow evidence**: the string searches for
+`EXIT_UNRESOLVED`/`EXIT_PENDING` genuinely found no match — that part
+is accurate, and the gap-below-stop-vs-ordinary-crossing distinct fill
+models, the extreme-low-fill prohibition as an explicit rule, and the
+stop-market-vs-stop-limit distinction remain genuinely not found.
+**However**, exit fills already go through a real, working friction
+model: `apply_spread(fill_price, simulated_spread_bps, "SELL")`
+(`talonx_paper/consumer.py`, multiple call sites; default 5bps,
+`talonx_paper/config.py:99`) — a declared adverse-cost adjustment on
+every exit fill, not merely on entries. **Corrected classification:
+`Partially implemented`** — a real exit-side cost model exists; the
+target's more specific crossing-vs-gap fill-price distinction and
+exactly-once position-closure guarantee remain unconfirmed/not found.
 
 ## S6-21 — Intraday EOD-flatten inspected baseline
 
@@ -2574,3 +2712,259 @@ one-minute interval (`S6-17`). **Decision**: Open — deferred.
 extends `OPS-005`'s open provider-qualification question, not a
 knowledge-transfer-session topic. **Planned session**: none (a
 data-provider qualification task). **Dependency**: `OPS-005`.
+
+---
+
+# Session 7 requirements (S7-01 through S7-26)
+
+Compact format, per `DECISION_LOG.md` Session 7, grouped A–H as
+discussed. `S7-18`, `S7-25`, `S7-26` are explicit deferrals, not
+decisions.
+
+## S7-01 — Primary Telegram = trading opportunities + opted-in major developments
+
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing,
+partial). **Implementation**: Implemented — reaffirms `S1-01`/`S1-02`.
+**Validation**: Code inspection (established). **Dependency**: none.
+
+## S7-02 — Operations/Research Lab notifications keep separate routing
+
+**Decision**: Agreed (reaffirms `S4-06`/`S4-07`/`S4-08`).
+**Authorization**: Not authorized. **Implementation**: Not implemented
+— no Operations or Research bot exists. **Validation**: Code
+inspection (established). **Dependency**: `S4-07`, `S4-08`.
+
+## S7-03 — Intraday + Insider Buying remain primary scope; no demotion revival
+
+**Decision**: Agreed (reaffirms `S3-01`/`S6-04`). **Authorization**:
+Not authorized (pre-existing). **Implementation**: Implemented.
+**Validation**: Code inspection (established). **Dependency**: none.
+
+## S7-04 — No proposed bot/flag described as already deployed
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Implemented — this documentation's own framing
+complies (self-checked, same discipline as `S4-09`). **Validation**:
+Code inspection (this session, self-check). **Dependency**: `S4-09`.
+
+## S7-05 — Six-question qualification rubric
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — the existing content gate
+(`notification_policy.py`'s `_substantive_evidence`/
+`SUBSTANTIVE_REASON_CODES`) is a coarser, single-axis check (does
+non-generic evidence text exist), not six individually-evaluated
+rubric questions. **Validation**: Code inspection (this session).
+**Dependency**: `S7-06`.
+
+## S7-06 — Versioned materiality-rules catalogue
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — Intelligence's existing
+significance engine (`talonx_ingest/intelligence/significance/`,
+frozen ruleset `information-significance-v1`) is a band scorer
+(LOW/MEDIUM/HIGH/CRITICAL), not a versioned, route-specific
+materiality catalogue; the two are related but distinct. **Validation**:
+Code inspection (this session, `talonx_ingest/intelligence/
+significance/`). **Dependency**: `S7-07`, `S7-08`.
+
+## S7-07 — Route 1: verified significant status change
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no distinct "Route 1" evidence
+path was found separate from the general significance/content-gate
+mechanism. **Validation**: Code inspection (this session).
+**Dependency**: `S7-06`.
+
+## S7-08 — Route 2: measured quantitative development
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no distinct "Route 2" comparable-
+metrics/approved-threshold mechanism was found; existing XBRL-magnitude
+evidence (`SUBSTANTIVE_REASON_CODES`'s `XBRL_MAGNITUDE`) is the closest
+existing precedent but is not itself the versioned, event-specific
+threshold catalogue this route describes. **Validation**: Code
+inspection (this session). **Dependency**: `S7-06`, `S7-26`.
+
+## S7-09 — Routine earnings dashboard-only unless qualifying
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — requires
+tracing a real earnings-release event through the current pipeline to
+confirm whether it is ever dashboard-only vs. always routed the same
+way; not performed this session. **Validation**: Not assessed in this
+documentation pass. **Dependency**: `S7-06`.
+
+## S7-10 — Missing-reason handling; never infer misconduct/distress/price direction
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — `claim_safety.py`'s
+predictive-language block (`talonx_ingest/intelligence/delivery/
+claim_safety.py:42`) rejects price-target/expected-return language,
+matching the "never infer future price direction" half; it does
+**not** separately guard against inferring misconduct or distress —
+that half is not confirmed to exist. **Validation**: Code inspection
+(this session, exact line cited). **Dependency**: none blocking.
+
+## S7-11 — Plain-language presentation content list
+
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing,
+partial). **Implementation**: Partially implemented — most elements
+have established precedent (one-sentence evidence lead, reply-for-
+details, informational/no-trade framing); the "avoid unexplained SEC
+jargon" element has a known, open gap (`S1-05`'s real-message
+citation-syntax finding, unresolved). **Validation**: Code inspection
+(established + this session). **Dependency**: `S1-05`.
+
+## S7-12 — Development record links multiple filings/sources
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — `DeliveryOutbox`
+(`talonx_ingest/intelligence/delivery/outbox.py`) operates on a single
+`delivery_id` per `event_id`; no `development_id`/group/topic field
+was found. **Validation**: Code inspection (this session,
+`outbox.py:204,774`). **Dependency**: `S5-02` (security-identity
+distinction), `OPS-010`.
+
+## S7-13 — Grouping rules: duplicates enrich, distinct developments separate, no fabrication
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — depends on `S7-12`'s grouping
+mechanism, which does not exist. **Validation**: Code inspection (this
+session). **Dependency**: `S7-12`, `OPS-010`.
+
+## S7-14 — UPDATE vs. CORRECTION distinction
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — `update_policy.py`'s
+`classify_update()` (`talonx_ingest/intelligence/delivery/
+update_policy.py`) implements a real, deterministic `NEW`/`UPDATE`/
+`SUPPRESS_DUPLICATE`/`SUPPRESS_NOOP` decision keyed on `content_hash`
+and significance band — genuine precedent for the `UPDATE` half. **No
+`CORRECTION` decision type exists** — a materially-wrong repair and a
+genuine new material change are not currently distinguished.
+**Validation**: Code inspection (this session, full file read).
+**Dependency**: `OPS-010`.
+
+## S7-15 — Four distinct timestamps kept separate
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — see `S5-12`'s dated
+update: the mechanism for tracking distinct timestamps exists in
+concept, but `freshness_status` is `UNKNOWN` for 100% of persisted
+events (established Task 140 finding, re-confirmed relevant, not
+re-run this session). **Validation**: Code inspection (established).
+**Dependency**: `S5-12`.
+
+## S7-16 — UTC storage; DST-aware display; no hardcoded BST
+
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing,
+partial). **Implementation**: Partially implemented — this project's
+own established UK-time discipline (Python `zoneinfo`, used
+consistently in every documentation session including this one)
+demonstrates the DST-aware display convention works correctly when
+used; a dashboard/renderer-wide audit for any hardcoded BST was **not**
+performed this session. **Validation**: Code inspection (established;
+this session's own reporting practice). **Dependency**: none blocking.
+
+## S7-17 — Freshness follows source-publication time; no restart-refresh; flood prevention
+
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing,
+partial). **Implementation**: Partially implemented — `reclassify_
+pending_rows`'s established content-refresh behavior (Task 140c, this
+project's history) demonstrates freshness-aware re-evaluation exists
+in some form; a full audit against every sub-clause (restart-doesn't-
+refresh-age, stale-backlog-flood-prevention specifically) was not
+performed this session. **Validation**: Code inspection (established).
+**Dependency**: `S7-18`.
+
+## S7-18 — Deferred: numerical freshness windows
+
+**Decision**: Open — deferred (`S7-25`). **Authorization**: N/A.
+**Implementation**: N/A. **Validation**: N/A. **Dependency**: `S7-25`.
+
+## S7-19 — Major-dev opt-in explicit, persisted across restarts
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — requires
+tracing the actual opt-in flag's persistence mechanism, not performed
+this session. **Validation**: Not assessed in this documentation pass.
+**Dependency**: none blocking.
+
+## S7-20 — Per-stock company-event mute; independent of trading pause
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented (mute) / Implemented (pause-
+monitoring independence) — a search of `talonx_ingest/intelligence/
+dashboard/render.py` for "mute" found only a CSS class name (`.muted`,
+text styling), confirming no per-stock company-event mute feature
+exists. Separately, Original's ticker-pause (`talonx_watchlist/
+store.py`, `S3-11`) and Intelligence's own collection scope
+(`talonx_ingest/intelligence/service/scope.py`) are structurally
+separate systems (`S3-08`/`OPS-006`) — so "trading pause does not
+auto-pause company monitoring" is true today, as a side effect of the
+systems being unmerged rather than a deliberately designed control.
+**Validation**: Code inspection (this session, exact files cited).
+**Dependency**: `OPS-011`.
+
+## S7-21 — Material corrections: eligible despite mutes, must link/identify, never bypass shutdown
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — depends on a `CORRECTION`
+decision type (`S7-14`) that does not exist yet; a global-delivery-
+shutdown/destination-revocation bypass guard specific to corrections
+was not found (nor searched for independently of the missing
+`CORRECTION` type itself). **Validation**: Code inspection (this
+session). **Dependency**: `S7-14`, `OPS-010`.
+
+## S7-22 — Distinguish qualification / eligibility / attempts / confirmed delivery
+
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing,
+partial). **Implementation**: Partially implemented — `DeliveryOutbox`
+already has distinct states for attempts and outcomes (`SENT`,
+`PENDING`, `AMBIGUOUS`, established this project's history); whether
+"event qualification" and "delivery eligibility" are equally
+distinctly tracked as their own separate concepts (not just
+attempt/outcome) was not separately confirmed this session.
+**Validation**: Code inspection (established + this session).
+**Dependency**: none blocking.
+
+## S7-23 — Five distinct coverage dimensions, may co-occur
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no unified surface presenting
+all five dimensions (no-qualifying-development / collection-delayed /
+extraction-incomplete / identity-unresolved / qualified-but-muted) as
+distinct, co-occurring states was found. **Validation**: Code
+inspection (this session). **Dependency**: `S7-20` (mute is one of the
+five dimensions).
+
+## S7-24 — Empty feed ≠ nothing happened; no exhaustive-coverage claim
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Implemented — this documentation's own framing
+complies (no exhaustive-coverage claim made anywhere in this product-
+documentation layer); the dashboard's own actual wording for this
+specific disclosure was not separately audited this session.
+**Validation**: Code inspection (this session, self-check).
+**Dependency**: none.
+
+## S7-25 — Deferred: numerical freshness windows
+
+**Requirement**: exact freshness-window numbers for §F. **Decision**:
+Open — deferred. **Authorization**: N/A. **Implementation**: N/A.
+**Validation**: N/A. **Reason**: requires a bounded review of
+representative historical filings (selection method, examples, false
+positives/misses, coverage limitations, proposed acceptance criteria)
+before any number is chosen — not performed here; no number is
+invented. **Planned session**: none assigned (a future bounded-review
+task). **Dependency**: none blocking.
+
+## S7-26 — Deferred: event-specific quantitative materiality thresholds
+
+**Requirement**: exact Route 2 threshold numbers (§C). **Decision**:
+Open — deferred. **Authorization**: N/A. **Implementation**: N/A.
+**Validation**: N/A. **Reason**: same bounded-review requirement as
+`S7-25`; this documentation task does not authorize a new extraction/
+LLM project by implication. **Planned session**: none assigned.
+**Dependency**: `S7-08`.

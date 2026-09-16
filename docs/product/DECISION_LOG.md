@@ -1598,23 +1598,302 @@ of closure found for either).
 
 ## Session 7 — Intelligence and Useful Company Developments
 
+**Recorded**: 2026-09-16, approximately 20:55 UTC / 21:55 BST (Python
+`zoneinfo`, this project's established recording-time discipline).
+**Source**: the product-owner discussion supplied directly in this
+session's prompt (same pattern as Sessions 1–6; the discussion's own
+internal timestamp is unavailable and is not invented here). **Status:
+discussion closed; agreed requirements documented, with numerical
+policy choices deferred and implementation/validation separately
+tracked.**
+
+### Context
+
+This session answers the pointers Session 6's documentation pass
+queued here: `S1-05`'s unresolved SEC-jargon gap, `S1-13`'s non-
+exhaustive wording-accuracy guardrail, Session 6 §B's identity-
+grouping caveat, and `S5-01`-`S5-07`'s master-registry background. It
+covers eight areas: purpose/routing, a six-question qualification
+rubric, materiality routes, plain-language presentation, development-
+centric grouping, timestamps/freshness, user controls/corrections, and
+coverage/dashboard visibility.
+
+### A. Purpose and routing — agreed
+
+- Primary Telegram supports **both** qualified trading opportunities
+  **and** explicitly opted-in major company developments.
+- Company-development notifications are **informational** — they do
+  **not** automatically create paper trades.
+- Routine filings remain **dashboard-only**.
+- Operations incidents and optional Research Lab notifications retain
+  their **separate routing** (reaffirms `S4-06`/`S4-07`/`S4-08`).
+- **Intraday and Insider Buying remain primary trading product scope**
+  — this session does **not** revive the earlier, already-superseded
+  proposal to demote Intraday (reaffirms `S3-01`/`S6-04`).
+- **No proposed bot or flag is described as already deployed** — the
+  Operations bot, Research bot, and any new opt-in flag discussed
+  remain proposed/target, not existing features (reaffirms `S4-09`).
+
+### B. Six-question qualification rubric — agreed
+
+A major-development candidate must establish all six:
+1. What specifically changed?
+2. Which verified company/security is affected?
+3. Why might it matter, using concrete context?
+4. Is it new and timely?
+5. Has this development already been reported?
+6. What remains uncertain?
+
+**A filing category, watchlist membership, or a `HIGH`/`CRITICAL`
+label alone does not establish qualification.** If the system
+recognizes a category but cannot extract substantive facts, the
+candidate is **retained on the dashboard pending qualification** — a
+generic "something important happened" message is never sent.
+
+### C. Materiality routes — agreed
+
+- Maintain a **versioned catalogue** of event-specific evidence and
+  materiality rules.
+- **Route 1 — verified significant status change** (e.g. a deal
+  termination, an explicit dividend suspension): no universal numerical
+  threshold is required, but identity, status, and necessary context
+  must be established.
+- **Route 2 — measured quantitative development**: uses comparable
+  metrics and **approved, event-specific** thresholds. For revisions,
+  matching periods, units, currency, and accounting basis must be
+  verified. For financing, purpose, terms, and suitable company-scale
+  context must be assessed — an old/new pair is not always the
+  appropriate comparison. **Debt-to-cash or debt-to-market-cap are
+  possible measures, not approved universal thresholds.**
+- **Routine earnings releases remain dashboard-only** unless their
+  content establishes a qualifying material development. A structural
+  catalyst is **not required in every case** — a sufficiently material,
+  verified financial change may qualify on its own. **Never** claim
+  "beat expectations" without a reliable comparison dataset. **Never**
+  assert all quarterly releases universally use the same SEC item.
+- **Missing reasons**: a verified development may still qualify when
+  its reason is undisclosed, **if** that reason is not necessary to
+  establish materiality — state "reason not disclosed in the reviewed
+  source" where supported. **Never infer misconduct, distress, or
+  future price direction.** Missing context that *prevents*
+  qualification results in dashboard-only status.
+- **"Material" means relevant under this product's own policy** — not
+  a legal materiality determination, and not a guarantee of market
+  impact.
+
+### D. Plain-language presentation — agreed
+
+A concise alert contains: company and development type; one sentence
+explaining the verified development; "why it matters," clearly
+distinguishing interpretation from source facts; relevant status,
+terms, and limitations; source publication time and detection delay;
+an informational/no-paper-trade indication; and reply-for-details
+access to sources and supporting evidence. **Avoid**: unexplained SEC
+jargon, generic repeated category labels, unsupported confidence
+claims, and invented financial context.
+
+### E. Development-centric grouping — agreed
+
+- One **development record** may link multiple filings, press
+  releases, agreements, and amendments.
+- Grouping uses **verified entities, transaction/topic, and relevant
+  dates** — ticker alone or accession alone is insufficient.
+- Duplicate sources and administrative amendments **enrich the record
+  without another Telegram notification**.
+- Distinct, unrelated developments within one filing remain **separate
+  candidates**.
+- Related financing may be **supporting context** for an acquisition
+  rather than a redundant second alert.
+- **Uncertain relationships remain explicit — grouping is never
+  fabricated.**
+- **Subsequent notifications require**: a qualifying material change →
+  `UPDATE`; repair of materially wrong previously-delivered information
+  → `CORRECTION`. An update explains what changed since the prior
+  message and links to it. **A genuine later development is not a
+  correction of formerly accurate reporting.** Source and notification
+  history are preserved.
+
+### F. Timestamps and freshness — agreed
+
+Keep **four** timestamps distinct: occurred/effective time (if known —
+occurrence and effective dates may differ; never forced into one
+misleading value); source publication time; actual first local
+detection/receipt time; successful notification-sent time. Previously
+agreed processing timestamps are retained separately. **Batch labels,
+DB-read times, and enrichment times must never impersonate first
+receipt or source publication.**
+
+- **Store authoritative timestamps in UTC.** Use explicit display
+  zones: America/New_York follows its own DST rules; UK display uses
+  Europe/London, correctly showing GMT or BST — **never hardcode BST
+  year-round.** Unknown times remain unknown, never invented.
+- **Freshness follows the relevant source publication time**: restart,
+  reprocessing, or a duplicate document does **not** refresh event age.
+  A material update to an old development has its **own** evidence/
+  publication time. An unknown publication time results in dashboard-
+  only status pending verification. A fresh, qualified catch-up event
+  may still alert if all routing conditions pass. A genuinely stale
+  startup backlog must **not** generate an immediate-alert flood.
+  Delayed-development summaries are optional and **OFF by default**.
+- **Numerical freshness windows remain deferred** (see below) —
+  existing policy values are inspected and recorded as **current
+  implementation only**, not silently replaced or newly approved.
+
+### G. User controls and corrections — agreed
+
+- Major-development Telegram notifications require **explicit opt-in**,
+  persisted across restarts.
+- **Per-stock company-event mute** suppresses those pushes only, **not
+  collection**.
+- Company-event mute does **not** suppress trade opportunities, exits,
+  or Operations incidents.
+- **Trading pause does not automatically pause company monitoring.**
+- Delayed summaries have their own **separate** opt-in, **OFF by
+  default**.
+- **Material corrections** to previously delivered alerts: remain
+  eligible despite ordinary stock/category event mutes; may repair an
+  old alert even after its original freshness window has expired; must
+  link to the original message and clearly identify itself as a
+  correction; must **not** bypass a global delivery shutdown or a
+  revoked destination; must **not** be broadcast to new recipients;
+  preserve pending correction/audit state when delivery is unavailable;
+  a minor formatting change does **not** warrant a corrective
+  notification.
+- **Distinguish four separate concepts**: event qualification, delivery
+  eligibility, delivery attempts, and confirmed delivery.
+
+### H. Coverage and dashboard visibility — agreed
+
+Distinguish five states/dimensions: (1) no qualifying development
+found; (2) collection delayed/unavailable; (3) document collected,
+extraction incomplete; (4) identity unresolved; (5) development
+qualified, notification disabled/muted. **These may be separate
+dimensions rather than mutually exclusive states** — one label must
+never conceal another, different problem. **An empty Telegram feed is
+not evidence that nothing important occurred.** Source, identity,
+extraction, and timing limitations are disclosed; **exhaustive
+company-news coverage is never claimed.**
+
+### Implementation authorization
+
+**None.** Every decision above is an agreed product direction; all new
+implementation authorization is explicitly **"Not authorized by this
+documentation task."** See `REQUIREMENTS_TRACKER.md` (`S7-01` through
+`S7-26`).
+
+### Validation performed this session
+
+Targeted, read-only code inspection (not an exhaustive audit) directly
+found:
+- `talonx_ingest/intelligence/delivery/update_policy.py`'s
+  `classify_update()` — a real, deterministic `NEW` / `UPDATE` /
+  `SUPPRESS_DUPLICATE` / `SUPPRESS_NOOP` decision keyed on rendered
+  `content_hash` and significance band. This is genuine, working
+  precedent for §E's `UPDATE` concept — **but there is no
+  `CORRECTION` decision type**; a materially-wrong repair and a
+  genuine new material change are not currently distinguished from
+  each other in this code.
+- `DeliveryOutbox` (`talonx_ingest/intelligence/delivery/outbox.py`)
+  operates on a single `delivery_id` per `event_id` — **no
+  `development_id`/group/topic field was found** — confirming §E's
+  multi-filing "development record" grouping is **not implemented**;
+  today's update/dedup mechanism works within one event's own delivery
+  history, not across a merged group of filings.
+- A search of `talonx_ingest/intelligence/dashboard/render.py` for
+  "mute" found only a CSS class name (`.muted`, a text-styling
+  convention) — **no per-stock company-event mute feature exists**.
+- `claim_safety.py`'s predictive-language block
+  (`talonx_ingest/intelligence/delivery/claim_safety.py:42`) rejects
+  price-target/expected-return language — it does **not** separately
+  guard against inferring misconduct or distress; §C's "never infer
+  misconduct, distress, or future price direction" is **partially**
+  matched (price-direction only) by existing code, not fully.
+- Original's ticker-pause (`talonx_watchlist/store.py`, `S3-11`'s
+  evidence) and Intelligence's own collection scope
+  (`talonx_ingest/intelligence/service/scope.py`) are **structurally
+  separate systems** (confirmed, `S3-08`/`OPS-006`) — meaning "trading
+  pause does not automatically pause company monitoring" is **true
+  today**, though as a side effect of the systems being unmerged, not
+  by deliberate designed control.
+- Intelligence's existing significance engine
+  (`talonx_ingest/intelligence/significance/`, frozen ruleset
+  `information-significance-v1`) is a **band scorer**
+  (LOW/MEDIUM/HIGH/CRITICAL) — it is **not** the same thing as §C's
+  versioned, route-specific materiality catalogue; the two are
+  related but distinct, and this session does not claim the existing
+  scorer already implements the new catalogue.
+- The existing content gate (`notification_policy.py`'s
+  `_substantive_evidence`/`SUBSTANTIVE_REASON_CODES`, this project's
+  Task 140/140b/140c hardening) is a **coarser, single-axis** check
+  (does non-generic evidence text exist at all) — it does **not**
+  implement §B's six distinct rubric questions individually.
+
+None of these findings were inferred from a function name, a generic
+significance score, a passing unrelated test, or a prior narrative
+claim alone — each is grounded in a specific, cited code read this
+session. **Not assessed this session** (targeted inspection was
+insufficient, marked honestly rather than guessed): the exact reply-
+correlation-vs-update/correction-linkage relationship beyond what
+`update_policy.py` shows; per-domain bot-routing enforcement details;
+extraction-coverage completeness; and full timestamp-provenance tracing
+end-to-end for a real event.
+
+### Explicit deferrals
+
+- **`S7-25`** — numerical freshness windows. **Reason**: requires a
+  bounded review of representative historical filings (selection
+  method, examples, false positives/misses, coverage limitations, and
+  proposed acceptance criteria must all be recorded when that review
+  occurs) before any specific number is chosen. **No numerical
+  threshold is invented in this documentation task.**
+- **`S7-26`** — event-specific quantitative materiality thresholds
+  (§C Route 2). **Reason**: same bounded-review requirement as
+  `S7-25`. **This documentation task does not authorize a new
+  extraction/LLM project by implication** — reviewing representative
+  filings is a future, separately authorized task.
+
+`OPS-002` and `OPS-003` **remain `OPEN`**, unaffected by this session —
+re-confirmed by this session's own targeted code reads (no evidence of
+closure found for either).
+
+### Findings tracked in `OPERATIONAL_FINDINGS.md`
+
+- **`OPS-010`** — development-centric grouping not implemented (§E);
+  today's update/dedup mechanism operates per single event, not across
+  a merged multi-filing development record; no `CORRECTION` decision
+  type distinct from `UPDATE` exists.
+- **`OPS-011`** — per-stock company-event mute and materiality-
+  catalogue gap (§B/§C/§G); no versioned materiality-routes catalogue
+  and no per-stock mute feature exist; the existing significance
+  engine and content gate are related but distinct, narrower
+  mechanisms.
+
+### Any separately authorized implementation work
+
+**None.**
+
+---
+
+## Session 8 — V2 Multi-Day Strategy and Lifecycle
+
 **Not yet conducted.** Scope preserved exactly as already established
 in `KNOWLEDGE_TRANSFER_PLAN.md` — not expanded or narrowed by this
 task. Carries forward, by requirement ID, relevant unfinished details
-from Sessions 1-6:
+from Sessions 1-7:
 
-- `S1-05`'s unresolved gap: raw SEC item-number jargon still appears in
-  a real production message header (not addressed by Session 6).
-- `S1-13`'s "not exhaustive" wording-accuracy guardrail — a full audit
-  of every Intelligence render path remains a candidate for this
-  session, as already noted when `S1-13` was recorded.
-- `B`'s (Session 6) "symbol grouping does not itself prove issuer/
-  security/share-class integrity" point and `OPS-006`'s registry-
-  fragmentation finding both bear directly on how Intelligence's own
-  company-development detection should describe identity.
-- `S5-01`-`S5-07`'s master-registry/coverage-count questions remain
-  relevant background for Intelligence's own data sourcing.
+- Session 6 §B's V2 qualification-baseline description grounds this
+  session's own fuller lifecycle discussion — not pre-empted, to be
+  reconciled when this session is actually conducted.
+- `S5-13`-`S5-20`'s three-session recovery correction (`OPS-003`) — the
+  dual-deadline discrepancy and fill-before-check ordering remain
+  unresolved implementation gates for this session to eventually
+  ground its own lifecycle discussion against.
+- `S1-06`'s Telegram-facing actionability/expiry-status surfacing
+  question, still not assessed for V2 specifically.
+- `S3-18`'s promotion/rollback governance (`talonx_research/`) as
+  background for how a future V2 strategy variant would reach this
+  lifecycle.
 
-Session 7 is not conducted by this task; nothing above is resolved
-here — this list only ensures Session 7, when it happens, has visible
+Session 8 is not conducted by this task; nothing above is resolved
+here — this list only ensures Session 8, when it happens, has visible
 pointers to the relevant open threads rather than starting cold.

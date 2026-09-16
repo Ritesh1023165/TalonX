@@ -369,6 +369,53 @@ claim execution readiness for any of them. Summary:
 `OPS-002` and `OPS-003` **remain open**, re-confirmed unaffected by
 this session's own targeted code reads.
 
+## 6f. Intelligence and useful company developments — `AGREED` (Session 7), implementation `LARGELY NOT BUILT`
+
+Recorded in full in `DECISION_LOG.md` Session 7, tracked as `S7-01`
+through `S7-26` in `REQUIREMENTS_TRACKER.md` (`S7-18`, `S7-25`,
+`S7-26` are open/deferred, not decisions). **Discussion closed; agreed
+requirements documented, with numerical policy choices deferred and
+implementation/validation separately tracked.** Summary:
+
+- **Purpose/routing**: primary Telegram = trading opportunities +
+  opted-in major developments, informational only — `Implemented`
+  (reaffirms `S1-01`/`S1-02`). Operations/Research routing remains
+  separate but unbuilt (`S7-02`).
+- **Six-question qualification rubric** and the **versioned
+  materiality-rules catalogue** (Routes 1/2) — both `Not implemented`.
+  The existing significance engine (`information-significance-v1`) and
+  content gate are **related but distinct**, narrower mechanisms — a
+  `HIGH`/`CRITICAL` band does not by itself satisfy either the rubric
+  or a materiality route (`OPERATIONAL_FINDINGS.md` `OPS-011`).
+- **Development-centric grouping and `UPDATE`/`CORRECTION`
+  linkage**: a real, working `UPDATE`/`SUPPRESS_DUPLICATE`/
+  `SUPPRESS_NOOP` decision mechanism exists (`update_policy.py`), but
+  operates per single event — no multi-filing "development record"
+  grouping and no `CORRECTION` type distinct from `UPDATE` exist
+  (`OPERATIONAL_FINDINGS.md` `OPS-010`).
+- **Timestamps/freshness**: the established `freshness_status: UNKNOWN`
+  gap (100% of persisted events, Task 140 evidence) remains
+  unaddressed; numerical freshness windows are explicitly deferred
+  (`S7-18`/`S7-25`), not invented.
+- **User controls/corrections**: no per-stock company-event mute
+  exists (a CSS class name was the only "mute" match found); trading
+  pause not auto-pausing company monitoring is **true today**, as a
+  structural side effect of Original's and Intelligence's separate
+  systems, not a deliberately designed control.
+- **Coverage/dashboard visibility**: the five-dimension distinction is
+  agreed but not yet surfaced as a unified view.
+
+This session performed a self-correction of a prior session's finding:
+Session 6's OPS-009 (exit-precedence gap) is **narrowed**, not
+reversed — direct control-flow reading found `talonx_paper/engine.py`'s
+`check_stop_take()` already applies a stop-first tiebreak, and exit
+fills already go through a spread-adjusted friction model
+(`apply_spread`) — the earlier "no matches for these status strings"
+finding was accurate as a string search but had been read too broadly;
+`S6-19`/`S6-20` are corrected to `Partially implemented`.
+
+`OPS-002` and `OPS-003` **remain open**, unaffected by this session.
+
 ## 7. Open / proposed — see `REQUIREMENTS_TRACKER.md` for tracked status
 
 - **Intraday-vs-multi-day scope** ("swing intelligence assistant"):
