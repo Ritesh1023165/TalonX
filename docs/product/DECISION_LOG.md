@@ -345,29 +345,394 @@ built.
 
 ---
 
-## Session 3 — Application Overview: Original, Intelligence and V2
+## Session 3 — Application Structure and Configuration: Original, Intelligence and V2
 
-**Not yet conducted.** Per `KNOWLEDGE_TRANSFER_PLAN.md`, this session
-already covers "Original, Intelligence and V2" as its topic. The
-following discussion items are added to its agenda from this
-documentation pass (raised by gaps and open questions surfaced during
-Session 2's recording, not answered here):
+**Recorded**: 2026-09-16, approximately 01:42 UTC / 02:42 BST (this
+documentation pass's own recording time, Python `zoneinfo`, per this
+project's established discipline). **Source**: the product-owner
+discussion supplied directly in this session's prompt (same pattern as
+Sessions 1–2 — the discussion's own internal timestamp is unavailable
+and not invented here).
 
-- The respective responsibilities of Original, Intelligence and V2 —
-  a single clear statement of what each of the three flows is for.
-- Whether Original's reported intraday and long-term accounts
-  represent distinct active strategies, dormant paths, or accounting
-  containers only — not inferred from the account labels alone.
-- How signal qualification differs from paper-portfolio admission
-  today, concretely (Session 2 requirement B's distinction, not yet
-  verified against the actual current code paths).
-- Which price source each flow actually uses today, and each source's
-  current coverage/freshness (directly motivated by the V2
-  pricing-freshness finding — see `OPERATIONAL_FINDINGS.md` `OPS-002`).
-- Where the existing implementation differs from the Session 1–2
-  decisions recorded so far — a consolidated gap list, not a new
-  round of decisions.
+### Context
 
-Product scope must not be inferred from account labels alone — this is
-an explicit instruction carried into Session 3, not a decision made in
-this pass.
+This session answers the agenda items Session 2's documentation pass
+added to Session 3's queue: Original/Intelligence/V2's respective
+responsibilities, the master stock coverage model, virtual-account
+capital defaults, the research-lab workflow, an optional research
+Telegram bot, user-facing naming, and a conditional database-reset
+permission. **Product scope was not inferred from account labels
+alone** — the "both horizons" decision below was made explicitly by
+the owner in this session's discussion, not derived from Original
+having two account labels.
+
+### Agreed product scope
+
+- **TalonX offers BOTH intraday and multi-day trading opportunities.**
+  This resolves Session 1's open `S1-09` question — see `S3-01`.
+- One main Telegram opportunity feed uses prominent INTRADAY/MULTI-DAY
+  labels and strategy identity, rather than separate feeds per
+  horizon.
+- Original is **not retired or disconnected** by this discussion.
+- Keeping intraday does **not** freeze Original's existing
+  implementation — it remains open to its own future changes,
+  independent of this decision.
+- **V2 is one multi-day strategy** (`INSIDER_BUY_CLUSTER_V2@1`), not
+  the name of the entire multi-day category — future multi-day
+  strategies are not implicitly "V2".
+- Intelligence supplies company facts/context, with optional
+  major-development notifications; routine disclosures remain on the
+  dashboard (reaffirms Session 1's `S1-02`/`S1-03`, not a new
+  decision).
+
+### Target architecture
+
+- Strategies remain independently identifiable and testable.
+- Each strategy owns its own qualification, timing, entry and exit
+  rules.
+- Strategies share supporting data, opportunity, accounting and
+  presentation **contracts** where appropriate — a shared interface,
+  not shared internal state by default.
+- **This does not authorize immediate process or database
+  consolidation.** Original and V2 remain separate processes/databases
+  unless and until a separately authorized task changes that.
+- Qualified opportunities and paper-account admission remain distinct
+  concepts (reaffirms Session 2's `S2-04`, extended to the multi-
+  strategy target architecture as `S3-06`).
+- A qualified opportunity remains visible when its virtual account
+  lacks cash or capacity (reaffirms `S2-03`, same extension).
+- Positions are identified by **account, strategy and opportunity** —
+  not ticker alone.
+- An intraday EXIT must not close a multi-day position in the same
+  stock (and, symmetrically, a multi-day exit must not touch an
+  intraday position in the same stock).
+
+### Master stock coverage model
+
+One **master stock list** combines: supported automatic-discovery
+universes, validated manual additions, and explicit exclusions.
+Duplicate security entries are removed while retaining source/
+provenance; ticker alone is insufficient to identify a security where
+issuer/security identity is ambiguous (e.g. a symbol reused across
+exchanges or after a corporate action).
+
+- **Global default**: both horizons permitted where supported.
+- **Per-stock/per-horizon overrides**: Intraday / Multi-day / Both /
+  Pause or exclusion from new opportunities.
+- **Manual additions require**: company/security/exchange identity
+  validation; provider and filing mapping where applicable;
+  strategy-specific data/readiness assessment; an explicit unsupported/
+  awaiting-data reason when applicable.
+- **Adding a stock never bypasses** strategy, liquidity, timing,
+  freshness, capacity, or other eligibility rules.
+- **Distinct visible states**: configured membership; identity
+  resolved; data ready; strategy eligibility; a currently qualified
+  opportunity — five separate states, not collapsed into one
+  "supported/not supported" flag.
+- **One master list does NOT authorize** expanding intraday polling
+  from the existing watchlist to every broad-universe symbol
+  immediately — that remains a separate, unauthorized decision.
+- Current symbol/scope counts (e.g. V2's `execution_scope_count: 626`,
+  Intelligence's ~569-symbol collection scope referenced in Session 2)
+  are **timestamped observations, not permanent product constants**.
+
+**Pause / Exclude / Mute** — agreed intended meanings:
+- **Pause**: reversible suspension of new opportunities, normally
+  until resumed.
+- **Exclude**: persistent exclusion from new opportunities, including
+  automatic rediscovery, until explicitly removed.
+- Either can apply **per horizon** (e.g. paused for intraday, still
+  eligible for multi-day).
+- **Neither** automatically closes a position, deletes history, or
+  abandons required exit management.
+- Prices and notifications required to manage **existing** obligations
+  continue regardless of pause/exclude state.
+- **Mute is a distinct concept**: notification suppression is not
+  equivalent to pausing strategy opportunities — a muted stock can
+  still qualify and be admitted; it just doesn't notify.
+- Exact mute controls, and the handling of already-committed, unfilled
+  intents when a stock is paused, are **explicitly deferred** — see
+  `S3-28` below; no cancellation semantics are invented in this
+  session.
+
+### Virtual account defaults
+
+**Agreed for NEW evaluation campaigns**:
+- Starting virtual cash: **$100,000 per strategy account**.
+- Allocation: **$10,000 per position**.
+- Both figures remain configurable.
+- No automatic borrowing, cash inflation, or reset to force entries.
+- Strategy position limits are preserved; available cash may impose a
+  tighter effective limit than the strategy's own stated maximum.
+- Fees and reservations can prevent funding ten simultaneous $10,000
+  positions out of $100,000 even before any strategy-level cap binds.
+
+**Separate strategy accounts and results**: approved strategy
+accounts, baseline shadow accounts, and experimental candidate
+accounts are tracked as three distinct categories.
+
+**Combined exposure view**: display overlapping exposure to the same
+security across accounts; clearly label aggregate capital. Two
+$100,000 accounts represent **$200,000 combined virtual capital**, not
+a shared $100,000 pool. Experimental results are never mixed into
+approved-account performance reporting.
+
+**Existing campaigns are not overwritten** to match these new
+defaults — V2's existing $300,000 campaign (Task 112's `$300k` F1
+fix, still running per `docs/research/evidence/eod_closure_2026-09-15/
+EOD_CLOSURE_REPORT.md`) is unaffected by this session; these are
+defaults for campaigns created going forward. The separately agreed
+**conditional reset policy** is recorded below, and does not itself
+apply these new defaults retroactively.
+
+A $100,000/$10,000 campaign can produce different capacity outcomes
+(more simultaneous positions, different percentage returns for the
+same dollar P&L) than the existing $300,000 V2 campaign — any future
+comparison between them must disclose the changed capital assumption,
+not transfer prior economic results as if the campaigns were
+equivalent.
+
+### Research lab workflow
+
+**Agreed process**: historical replay → internal live shadow
+comparison → review → explicitly approved promotion.
+
+- Reuse strategy/execution/accounting code with **versioned
+  configurations** (not forked code paths).
+- Isolate cash, positions, intents, reservations, cooldowns and
+  outcomes per experiment.
+- Share collected data where practical, without delaying approved
+  operation.
+- Historical baseline/candidate comparisons use **equivalent** data,
+  capital, cost and pricing assumptions.
+- Live candidate comparisons use an **equivalently-initialized
+  baseline shadow account**, not a comparison against an established
+  account carrying unmatched existing positions.
+- **Evaluation criteria are defined before inspecting candidate
+  results** — not chosen after seeing which criteria make the
+  candidate look best.
+- Failed experiments are preserved, and the count of attempted
+  variants is retained (no silent survivorship).
+- Suitable **unseen periods** are used where feasible.
+- **EOD is an interim report** for multi-day experiments, not final
+  acceptance — a multi-day candidate's EOD snapshot is not itself a
+  promotion decision.
+- A promoted version carries its **configuration, evidence, and
+  effective time** together.
+- **Existing positions retain the rules/version under which they were
+  opened** — a promotion does not retroactively change an open
+  position's own exit contract.
+- Rollback and historical attribution are preserved.
+- **Parameter experiments and changes to signal/entry/exit semantics
+  are distinguished** — a logic change must never be presented as a
+  mere configuration adjustment.
+- The two-year replay window remains **desired, not a verified
+  capability** (reaffirms `S2-06`). **No experiment or profitability
+  claim is authorized by this documentation.**
+
+**Research Lab dashboard** — agreed visibility:
+- Experiment identity, hypothesis, and changed parameters.
+- Baseline/candidate versions.
+- Historical-replay vs. live-shadow mode, clearly distinguished.
+- Opportunity, rejection, and non-execution records.
+- Positions, net results, drawdown, and exposure.
+- Data limitations and incomplete outcomes.
+- Evaluation criteria and decision history.
+- A prominent **"EXPERIMENTAL — INTERNAL ONLY"** label.
+- **No automatic promotion** merely because a dashboard metric turns
+  positive.
+
+### Optional research Telegram bot
+
+This **explicitly refines** the project's earlier general
+"experimental alerts stay off the main channel" understanding
+(`talonx_ops/external_boundary.py`'s existing 3-condition Experimental-
+send gate, this project's history) — it is not a reversal, it adds a
+specific, opt-in internal channel:
+
+- Experiments must **not** send to the main Telegram feed.
+- Experiments **MAY** use a separately configured **internal research
+  bot**.
+- Modes: **OFF** (default, dashboard only) / **SUMMARY**
+  (experiment/EOD comparisons) / **DETAILED** (selected experiments'
+  opportunities and outcomes).
+- Requires: explicit enablement; clearly experimental/paper-only
+  message wording; separate bot credentials and destination
+  configuration; **no fallback** from a missing research configuration
+  to the main bot; reply/details correlation scoped by bot, chat and
+  message identity; experimental-account isolation independent of
+  delivery destination (an experiment stays isolated in its own
+  account even if its delivery mode changes).
+- **No bot creation, credential entry, destination selection, or
+  message sending is authorized by this task.**
+
+### User-facing names
+
+Approved display names/direction:
+
+| Display name | Meaning |
+|---|---|
+| Intraday Opportunities | intraday product category |
+| Insider Buying Strategy | current V2 strategy |
+| Company Developments | Intelligence's user-facing information surface |
+| Virtual Portfolio | simulated accounts, positions and outcomes |
+| Stock Coverage | stock membership, permissions and readiness |
+| System Health | operational/data status |
+| Research Lab | isolated experiments |
+
+- "**Multi-Day**" remains a horizon category (not a strategy name).
+- Specific intraday strategy display names are deferred until after a
+  rule review.
+- "**Fundamental Opportunities**" is **provisional**, pending review of
+  Original's older long-term path — see `S3-24` (deferred).
+- **Internal strategy IDs, historical experiment identifiers, database
+  names and module names are preserved.** Display naming is **not**
+  authorization for a technical rename or migration.
+
+### Conditional database reset permission
+
+The owner agreed that a clean database/campaign reset **MAY** be used
+during a **separately authorized implementation**, if necessary for
+compatibility or trustworthy accounting. This **updates** the earlier
+absolute-preservation wording used in the EOD closure task
+(`docs/research/evidence/eod_closure_2026-09-15/
+EOD_CLOSURE_REPORT.md`'s originating task prompt: "Do not ... reset
+databases") and this documentation task's own restrictions — **it does
+not authorize resetting anything now**, in this or any past
+documentation-only session.
+
+**Required approach for any future authorized reset**:
+1. Identify affected stores/tables and the compatibility issue.
+2. Preserve consistent backups and useful historical evidence.
+3. Prefer a straightforward migration when suitable.
+4. If a clean store is necessary, version it and record the new
+   campaign boundary.
+5. Limit the reset to the affected state only.
+6. Preserve notification deduplication, or establish an explicit
+   delivery cutoff preventing historical alert replay.
+7. Reconcile open positions and uncertain delivery obligations before
+   retiring their operational state.
+8. Never fabricate settlements or silently abandon obligations.
+9. Explain the chosen migration/reset in the implementation plan and
+   report.
+
+A database reset is **permitted when necessary, not the default
+response** to an implementation problem. A future implementation task
+that already covers a specific reset action under this policy does not
+need a redundant separate permission request.
+
+### Implementation authorization
+
+**None.** Every decision above is an **agreed product direction**;
+all new implementation authorization is explicitly **"Not authorized
+by this documentation task."** See `REQUIREMENTS_TRACKER.md` (`S3-01`
+through `S3-28`) for the per-requirement breakdown, including which
+items describe already-existing behavior (documented, not newly
+authorized) and which describe genuine gaps.
+
+### Clarifications to Sessions 1–2 (dated notes, originals not rewritten)
+
+- **`S1-09`** (intraday-vs-multi-day scope) — **resolved** by this
+  session's "both horizons" decision. See `REQUIREMENTS_TRACKER.md`
+  `S1-09` for the dated resolution note and pointer to `S3-01`.
+- **`S1-07`** (standardized paper sizing, $10,000 proposed) —
+  **clarified and extended**, not finalized across existing lanes:
+  this session confirms $10,000 per-position allocation as a
+  **new-campaign default** (alongside a newly-agreed $100,000 starting
+  cash per strategy account), but does **not** retroactively change
+  Original's existing $2,500 default or V2's existing $300,000
+  campaign. See `REQUIREMENTS_TRACKER.md` `S1-07` for the dated note.
+- **`S2-01`** (alert-to-action mapping) — **clarified**: the
+  account/strategy/opportunity-specific identity requirement (`S3-07`)
+  sharpens how BUY/SELL/EXIT map to a position once multiple
+  strategies coexist under one master stock list. See
+  `REQUIREMENTS_TRACKER.md` `S2-01`.
+- **`S2-14`/`S2-15`** (experimental isolation) — **extended** by the
+  full replay → shadow → review → promotion workflow (`S3-15` through
+  `S3-20`) and the research-bot refinement (`S3-21`). See
+  `REQUIREMENTS_TRACKER.md` `S2-14`.
+- Session 1's preferred **08:00–22:00 UK operating window** (`S1-04`)
+  is **retained unchanged** — this session does not make continuous
+  overnight operation mandatory, and does not touch `S1-04`'s existing
+  "no scheduler exists" implementation finding.
+- Session 1's **optional major-development notifications** (`S1-02`)
+  are **preserved unchanged**.
+
+### Explicit deferrals
+
+Each deferred item below is recorded with its reason, its planned
+discussion session, and its dependency — per this project's closure
+discipline (every session-closing question is agreed, rejected, or
+explicitly deferred with a named destination, never silently dropped).
+
+- **`S3-24`** — Original's older fundamentals/long-term path: role
+  needs inspection before deciding whether to retain, adapt, or
+  retire it. **Reason**: "Fundamental Opportunities" naming is
+  provisional on this review. **Planned session**: a future session
+  covering Original's non-intraday path specifically (candidate:
+  extending Session 6's scope, or a dedicated session — not decided).
+  **Dependency**: direct code/data inspection of Original's long-term
+  lane, not yet performed.
+- **`S3-25`** — shared cross-strategy capital/exposure **enforcement**
+  policy: display of combined exposure is agreed now (`S3-13`);
+  enforcement (e.g. a cross-strategy exposure cap) is deferred.
+  **Reason**: enforcement policy needs its own risk discussion.
+  **Planned session**: Session 10 (Paper accounting, costs and risk).
+  **Dependency**: `S3-13`'s display feature existing first.
+- **`S3-26`** — detailed experiment evaluation criteria and evidence
+  sufficiency: deferred until a validation session, before any
+  experiment is authorized. **Reason**: needs its own
+  criteria-definition discussion, not assumed here. **Planned
+  session**: Session 12 (Technical validation, usefulness and economic
+  evidence). **Dependency**: none blocking; a prerequisite for any
+  future experiment authorization.
+- **`S3-27`** — exact historical data feasibility for a genuine 2-year
+  replay window: deferred. **Reason**: needs a dedicated data-coverage
+  audit. **Planned session**: Session 5 (Data sources, discovery and
+  coverage). **Dependency**: none blocking.
+- **`S3-28`** — remaining lifecycle semantics, including already-
+  committed pending intents when a stock is paused, and exact mute
+  controls: deferred. **Reason**: needs the full user-journey mapping
+  first. **Planned session**: Session 4 (End-to-end user journey) and/
+  or Session 11 (Operation, stop/start and recovery). **Dependency**:
+  `S3-11`'s pause/exclude/mute definitions (agreed this session) as
+  the starting point.
+
+`OPS-002` (V2 pricing-freshness gap) **remains `OPEN`** —
+`OPERATIONAL_FINDINGS.md` has a dated note confirming these product
+decisions do not fix it.
+
+### Proposed enhancements (not agreed as requirements)
+
+- None recorded beyond the agreed items above.
+
+### Any separately authorized implementation work
+
+**None.**
+
+---
+
+## Session 4 — End-to-End User Journey
+
+**Not yet conducted.** Per `KNOWLEDGE_TRANSFER_PLAN.md`, carries
+forward the following scenarios (must refine the existing requirement
+IDs above or add linked requirements — not a disconnected
+specification):
+
+1. Start application and inspect configuration/data readiness.
+2. Automatic discovery and manual stock addition.
+3. Intraday opportunity → alert → paper entry or explicit skip → exit.
+4. Multi-day opportunity → timely intent → entry → EOD open exposure →
+   scheduled exit.
+5. Same stock qualifies under two strategies.
+6. Pause/exclude a stock with existing obligations.
+7. Stale data, expired opportunities, and missed monitoring during
+   downtime.
+8. Research candidate displayed internally; optional research-bot
+   routing.
+9. Promotion affects new opportunities while existing positions retain
+   their original rules.
+
+Directly resolves `S3-28`'s deferred lifecycle-semantics question
+(scenarios 6, 7) and exercises `S3-06`/`S3-07` (scenarios 3, 4, 5),
+`S3-15`-`S3-20` (scenario 8), and `S3-18` (scenario 9) concretely.

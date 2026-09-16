@@ -184,6 +184,18 @@ eod_closure_2026-09-15/EOD_CLOSURE_REPORT.md` §4 (original finding).
 requirement) and `S2-06`/`S2-05` (live-vs-replay parity) both touch
 adjacent ground but do not resolve this upstream data-freshness gap.
 
+**Session 3 note (2026-09-16)**: the Session 3 documentation pass
+(`DECISION_LOG.md` Session 3 — application structure, master stock
+coverage, capital defaults, research-lab workflow) recorded a large
+set of product decisions but made **no code, runtime, configuration,
+or data changes**. `OPS-002` **remains `OPEN`**, exactly as described
+above — none of Session 3's decisions fix, mask, or otherwise touch
+V2's pricing-resolver gap. `S3-06`/`S3-07`/`S3-10` (master-list
+eligibility states) are conceptually adjacent — a future "data ready"
+state in `S3-10`'s five-state model would need to account for exactly
+this kind of upstream freshness gap — but none of them resolve it
+today.
+
 ---
 
 *See `REQUIREMENTS_TRACKER.md` for product-requirement tracking,

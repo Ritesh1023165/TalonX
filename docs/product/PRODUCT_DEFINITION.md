@@ -191,13 +191,57 @@ incomplete in its running `"csv"` pricing mode — is tracked separately
 in `OPERATIONAL_FINDINGS.md` (`OPS-002`), since it is a runtime data
 gap, not a product decision.
 
+## 6b. Application structure, coverage, capital and research workflow — `AGREED` (Session 3), implementation `LARGELY NOT BUILT`
+
+Recorded in full in `DECISION_LOG.md` Session 3 and tracked as `S3-01`
+through `S3-28` in `REQUIREMENTS_TRACKER.md` (`S3-24`-`S3-28` are
+explicit deferrals, not decisions). Summary only:
+
+- **Scope resolved**: TalonX offers both intraday and multi-day
+  opportunities through one main feed with prominent horizon/strategy
+  labels — this **resolves §7's former `S1-09` open item** below (kept
+  visible here with its resolution noted, not deleted). Original is
+  explicitly not retired; V2 is one multi-day strategy, not the
+  category name.
+- **Target architecture**: independently testable strategies sharing
+  contracts (not immediate consolidation); positions identified by
+  account+strategy+opportunity, not ticker alone — `Partially
+  implemented` (today's separation is achieved by using entirely
+  separate databases per lane, not a shared composite-key store).
+- **Master stock coverage model** (one list: discovery + manual +
+  exclusions, per-horizon overrides, Pause/Exclude/Mute as distinct
+  concepts) — `Not implemented`; three separate, unmerged lists exist
+  today (Original's watchlist, V2's execution scope, Intelligence's
+  collection scope). Original's own ticker store already has a working
+  Pause mechanism (`talonx_watchlist/store.py`), a real partial match.
+- **New-campaign capital defaults**: $100,000 starting cash per
+  strategy account, $10,000 per-position allocation — `Not
+  implemented` as a stated default; existing campaigns (V2's $300,000,
+  Original's $10,000/$15,000) are explicitly **not** overwritten by
+  this decision.
+- **Research lab workflow** (replay → live shadow → review → explicit
+  promotion, with dashboard visibility and an optional internal
+  research Telegram bot) — `Partially implemented`; the historical-
+  replay stage and immutable strategy-versioning already exist
+  (`talonx_research/`, Task 115/116); the live-shadow stage, the
+  dedicated "EXPERIMENTAL — INTERNAL ONLY" dashboard, and the research
+  bot do not.
+- **Conditional database-reset permission**: a future, separately
+  authorized implementation task may perform a reset if necessary for
+  compatibility/trustworthy accounting, following a defined 9-step
+  approach — this updates, but does not exercise, the project's
+  earlier absolute-preservation instruction from the EOD closure task.
+
+`OPS-002` (V2 pricing-freshness gap, `OPERATIONAL_FINDINGS.md`)
+**remains open** — none of Session 3's product decisions touch it.
+
 ## 7. Open / proposed — see `REQUIREMENTS_TRACKER.md` for tracked status
 
-- **Intraday-vs-multi-day scope** ("swing intelligence assistant"): does
-  TalonX retain Original's intraday lane, focus on V2's multi-day
-  opportunities, or support both as a stated product identity (as
-  opposed to today's de facto "both exist, historically accumulated"
-  state)? **Not decided.** (S1-09)
+- **Intraday-vs-multi-day scope** ("swing intelligence assistant"):
+  **Resolved in Session 3 (`S3-01`) — both horizons retained**, through
+  one main feed with prominent labels. This item is kept here,
+  historically, rather than deleted — see `REQUIREMENTS_TRACKER.md`
+  `S1-09` for the dated resolution note. (S1-09)
 - **Market-session labels vs. opportunity-status labels**: a proposal to
   stop implying "regular trading hours" automatically means "an
   opportunity is currently active" — these are two different concepts

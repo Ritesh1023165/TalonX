@@ -40,7 +40,7 @@ without naming which of these applies.
 | S1-06 | Clear actionability/expiry status, no chasing expired entries | Agreed | Not authorized | Partially implemented | Code inspection; Telegram-facing surfacing not assessed |
 | S1-07 | Standardized paper sizing; $10,000 proposed | Proposed (amount) / Agreed (need for standard) | Not authorized | Partially implemented (V2 only) | Code inspection |
 | S1-08 | Interactive Telegram buttons deferred | Agreed (to defer) | Explicitly not authorized | Not implemented | Code inspection |
-| S1-09 | Intraday vs. multi-day product-identity scope | **Open — not decided** | N/A | N/A | N/A |
+| S1-09 | Intraday vs. multi-day product-identity scope | **Resolved (Session 3) — see S3-01** | N/A | N/A | N/A |
 | S1-10 | Free-tier data / paper-only, no real capital | Agreed | Not authorized (pre-existing) | Implemented | Code inspection (established project-wide) |
 | S1-11 | Separate market-session label from opportunity-status label | Proposed | Not authorized | Not implemented | Not assessed in this documentation pass |
 | S1-12 | "High conviction" = desired quality, not profitability/confidence-score claim | Agreed | Not authorized | Implemented (no conflicting feature exists) | Code inspection |
@@ -60,6 +60,34 @@ without naming which of these applies.
 | S2-13 | Actual strategy exit rule + stop-loss status disclosed to the operator; V2-specific wording; allocation ≠ max/expected loss | Agreed | Not authorized by this documentation task | Partially implemented (rule exists and is frozen in code; operator-facing disclosure not found) | Code inspection (this session) |
 | S2-14 | Strategy/stop-loss variants use separate versioned experiments and isolated accounts; baseline preserved | Agreed | Not authorized by this documentation task | Implemented | Code inspection (established, `talonx_research/`, this project's history) |
 | S2-15 | No claim that a stop-loss necessarily helps/hurts; prior +2.0219% result is conditional evidence, not a live promise; no new experiment authorized here | Agreed | Explicitly not authorized (no new research experiment) | Not implemented (correctly — nothing to build) | Code inspection (this session) |
+| S3-01 | Both intraday and multi-day opportunities; one main feed, prominent horizon+strategy labels | Agreed (resolves S1-09) | Not authorized | Not implemented (no horizon-label UI found) | Code inspection (this session) |
+| S3-02 | Original not retired/disconnected; intraday retention doesn't freeze Original's implementation | Agreed | Not authorized | Implemented (Original runs unchanged) | Natural live behavior (this project's history) |
+| S3-03 | V2 is one multi-day strategy, not the whole multi-day category name | Agreed | Not authorized | Implemented (only one multi-day strategy exists today) | Code inspection (this session) |
+| S3-04 | Intelligence facts/optional major-dev alerts; routine stays on dashboard (reaffirms S1-02/S1-03) | Agreed | Not authorized (pre-existing) | Implemented | Code inspection (established) |
+| S3-05 | Strategies independently identifiable/testable; own rules; shared contracts; no immediate consolidation | Agreed | Not authorized | Partially implemented (separation exists; shared contracts do not) | Code inspection (this session) |
+| S3-06 | Qualified opportunity vs. paper admission distinct at target-architecture level | Agreed | Not authorized | Partially implemented (extends S2-03/S2-04) | Code inspection (this session) |
+| S3-07 | Positions identified by account+strategy+opportunity, not ticker alone; horizon-crossed EXIT must not close the other's position | Agreed | Not authorized | Partially implemented (achieved via separate DBs, not a composite key) | Code inspection (this session) |
+| S3-08 | Single master stock list (discovery+manual+exclusions); dedupe by security identity; global default + per-horizon overrides | Agreed | Not authorized | Not implemented (no unified master list found) | Code inspection (this session) |
+| S3-09 | Manual-addition validation requirements; never bypasses eligibility rules | Agreed | Not authorized | Not implemented (no manual-addition validation flow found) | Code inspection (this session) |
+| S3-10 | Distinct visible states (membership/identity/data-ready/eligible/qualified); no immediate broad-universe intraday expansion; counts not permanent | Agreed | Not authorized | Not implemented (states not distinctly surfaced) | Code inspection (this session) |
+| S3-11 | Pause/Exclude/Mute definitions; per-horizon; never closes positions/deletes history; mute ≠ pause | Agreed | Not authorized | Partially implemented (Original's own active/paused ticker status exists; not per-horizon, no Exclude/Mute distinction) | Code inspection (this session) |
+| S3-12 | New-campaign defaults: $100,000 cash, $10,000 allocation, configurable, no inflation/forced entry | Agreed | Not authorized | Not implemented (new default; no new campaign created) | Code inspection (this session) |
+| S3-13 | Separate approved/baseline-shadow/experimental accounts; combined-exposure view; no pooling; no mixing into approved results | Agreed | Not authorized | Not implemented (no combined-exposure view found) | Code inspection (this session) |
+| S3-14 | Existing campaigns not overwritten by new defaults; comparisons disclose changed capital assumptions | Agreed | Not authorized | Implemented (V2's $300k campaign untouched by this session) | Natural live behavior (this session; no write occurred) |
+| S3-15 | Research workflow: replay → live shadow → review → explicit promotion; versioned config; isolated state | Agreed | Not authorized | Partially implemented (replay engine exists; shadow/promotion workflow not confirmed) | Code inspection (this session) |
+| S3-16 | Equivalent assumptions for historical comparisons; live comparisons use an equivalently-initialized shadow account | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S3-17 | Evaluation criteria set before inspecting results; failed experiments preserved; unseen periods; EOD is interim not final | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S3-18 | Promotion carries config+evidence+effective time; existing positions retain prior rules; rollback preserved; logic vs. config changes distinguished | Agreed | Not authorized | Partially implemented (`talonx_research/`'s immutable StrategyVersion exists) | Code inspection (established, this project's history) |
+| S3-19 | Research Lab dashboard visibility list; "EXPERIMENTAL — INTERNAL ONLY" label; no auto-promotion from a metric | Agreed | Not authorized | Not implemented (no such dashboard view found) | Code inspection (this session) |
+| S3-20 | 2-year replay desired not verified; no experiment/profitability claim authorized here | Agreed | Explicitly not authorized | Not implemented (correctly — nothing to build) | Code inspection (this session) |
+| S3-21 | Experiments off main feed; optional internal research bot, OFF/SUMMARY/DETAILED, no fallback to main bot | Agreed | Explicitly not authorized (no bot creation) | Not implemented | Code inspection (this session) |
+| S3-22 | Approved display names; "Fundamental Opportunities" provisional; internal IDs/DBs/modules preserved | Agreed | Explicitly not authorized (no rename) | Not implemented (display layer; no renaming done) | Code inspection (this session) |
+| S3-23 | Conditional database-reset permission for a future authorized implementation, with a 9-step required approach | Agreed | Not authorized now; conditionally pre-authorized for a future task that follows the 9-step approach | Not implemented (no reset performed) | N/A |
+| S3-24 | Deferred: Original's long-term/fundamentals path role review | Open — deferred | N/A | N/A | N/A |
+| S3-25 | Deferred: cross-strategy capital/exposure enforcement policy | Open — deferred | N/A | N/A | N/A |
+| S3-26 | Deferred: detailed experiment evaluation criteria/evidence sufficiency | Open — deferred | N/A | N/A | N/A |
+| S3-27 | Deferred: exact 2-year historical data feasibility | Open — deferred | N/A | N/A | N/A |
+| S3-28 | Deferred: remaining lifecycle semantics (mute controls, pending intents on pause) | Open — deferred | N/A | N/A | N/A |
 
 ---
 
@@ -313,6 +341,19 @@ by design (intraday risk profile vs. multi-day) — not decided; depends
 on S1-09's scope decision (does Original's intraday lane remain part of
 the product at all).
 
+**Session 3 update (2026-09-16) — clarified, not finalized**: `S1-09`
+is now resolved (both horizons retained), which removes one blocker
+noted above. Session 3 separately agreed a **new-campaign default** of
+$10,000 per-position allocation **plus** $100,000 starting cash per
+strategy account (`DECISION_LOG.md` Session 3, "Virtual account
+defaults"; tracked as `S3-12`). This confirms the $10,000 figure as
+the forward default for new campaigns, but **does not retroactively
+change** Original's existing $2,500 default or V2's existing $300,000
+campaign — cross-lane unification for *existing* accounts remains
+undecided. **Decision status unchanged**: `Proposed` (the retroactive-
+unification question) / `Agreed` (the $10,000 new-campaign figure,
+newly settled by `S3-12`).
+
 ---
 
 ## S1-08 — Interactive Telegram buttons deferred
@@ -379,6 +420,19 @@ lane's opportunities are "first"), S1-07 (cross-lane sizing), and
 potentially the entire Session 8 (V2 lifecycle) / Session 6 (Original
 strategy) discussion structure. Should be prioritized early in a future
 session.
+
+**Session 3 update (2026-09-16) — RESOLVED**: the product owner
+decided TalonX offers **both** intraday and multi-day opportunities,
+through one main Telegram feed using prominent INTRADAY/MULTI-DAY
+labels and strategy identity (`DECISION_LOG.md` Session 3, "Agreed
+product scope"; tracked as `S3-01`). **Decision status updated**:
+`Open — not decided` → `Resolved — see S3-01`. This entry's original
+text above is preserved unedited as the historical record of how the
+question was first raised; this note documents the resolution, per
+this tracker's own never-silently-edited discipline. `S3-01`'s own
+implementation status is `Not implemented` (no horizon-label UI was
+found this session) — the decision is settled, the UI work is not
+authorized or built by this note.
 
 ---
 
@@ -550,6 +604,16 @@ pipeline.py:148`.
 intraday BUY/SELL signal-to-action mapping was not re-inspected this
 session (established in this project's prior history, not re-verified
 here).
+
+**Session 3 update (2026-09-16) — clarified**: with both horizons
+confirmed retained (`S3-01`) and a master stock list spanning both
+(`S3-08`), this mapping now needs to resolve to a specific **account +
+strategy + opportunity**, not just a ticker — see `S3-07` (positions
+identified by account/strategy/opportunity, not ticker alone) and
+`S3-08`/`S3-09` (master list, per-horizon overrides). This does not
+change the BUY/SELL/EXIT/BULLISH/BEARISH mapping itself, only sharpens
+which specific position/account it resolves to once multiple
+strategies coexist under one shared stock list.
 
 ---
 
@@ -1059,6 +1123,15 @@ STRATEGY_LIFECYCLE.md`; `docs/research/TALONX_RESEARCH_LEDGER.md`
 
 **Open questions/dependencies**: none.
 
+**Session 3 update (2026-09-16) — extended**: Session 3 recorded the
+**full** research-lab workflow this requirement's isolation mechanism
+supports — historical replay → internal live shadow → review →
+explicit promotion, with dashboard visibility and an optional internal
+research-bot delivery channel. See `S3-15` through `S3-21` for the
+complete, newly-agreed workflow; this entry (`S2-14`) remains the
+narrower "isolation exists" finding it always was, now a component of
+that larger agreed picture rather than a standalone item.
+
 ---
 
 ## S2-15 — No stop-loss-necessarily-helps claim; prior result is conditional evidence; no new experiment authorized
@@ -1094,3 +1167,437 @@ the +2.0219%/+2.196% figures' own origin and stated conditionality).
 
 **Open questions/dependencies**: whether/when a new stop-loss
 experiment should be authorized is a future decision, not made here.
+
+---
+
+# Session 3 requirements (S3-01 through S3-28)
+
+Compact format (same five required fields per entry: decision status,
+implementation authorization, current implementation status,
+validation evidence, dependencies) — used here given the volume of
+Session 3 items; see `DECISION_LOG.md` Session 3 for the full
+plain-language discussion each entry summarizes.
+
+## S3-01 — Both horizons; one main feed with prominent labels
+
+**Requirement**: TalonX offers both intraday and multi-day
+opportunities through one main Telegram feed with prominent INTRADAY/
+MULTI-DAY labels and strategy identity. **Resolves `S1-09`.**
+**Decision**: Agreed. **Authorization**: Not authorized by this
+documentation task. **Implementation**: Not implemented — no
+horizon-label UI (Telegram message formatting or dashboard) enforcing
+this distinction was found this session. **Validation**: Code
+inspection (this session; no positive match found for a horizon-label
+convention in `talonx_v2/delivery.py` or `dashboard_web_static/
+index.html`). **Dependencies**: `S3-08` (master stock list, per-
+horizon eligibility) is a natural prerequisite for a horizon label to
+be meaningful.
+
+## S3-02 — Original not retired or disconnected
+
+**Requirement**: keeping intraday does not retire/disconnect Original,
+and does not freeze its own future implementation changes.
+**Decision**: Agreed. **Authorization**: Not authorized (nothing to
+build — a non-action). **Implementation**: Implemented — Original
+continues running unchanged; no disconnection occurred.
+**Validation**: Natural live behavior (established across this
+project's history; Original's supervised process is unaffected by this
+documentation task). **Dependencies**: none.
+
+## S3-03 — V2 is one multi-day strategy, not the category name
+
+**Requirement**: "V2" names `INSIDER_BUY_CLUSTER_V2@1` specifically;
+future multi-day strategies are not implicitly "V2".
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Implemented — only one multi-day strategy exists
+today, consistent with this naming discipline (nothing yet violates
+it). **Validation**: Code inspection (`talonx_v2/config.py`'s single
+frozen strategy identity, this session). **Dependencies**: relevant
+again once a second multi-day strategy is proposed (`S3-15`-`S3-20`'s
+research workflow governs how that would happen).
+
+## S3-04 — Intelligence facts/optional alerts; routine on dashboard
+
+**Requirement**: reaffirms `S1-02`/`S1-03` — Intelligence supplies
+company facts/context with optional major-development notifications;
+routine disclosures stay on the dashboard. **Decision**: Agreed (not
+new). **Authorization**: Not authorized (pre-existing). \
+**Implementation**: Implemented (see `S1-02`/`S1-03` for full
+evidence). **Validation**: Code inspection (established).
+**Dependencies**: none.
+
+## S3-05 — Independently testable strategies with shared contracts
+
+**Requirement**: each strategy owns its own qualification/timing/
+entry/exit rules; strategies share data/opportunity/accounting/
+presentation contracts where appropriate; this does not authorize
+immediate process/database consolidation. **Decision**: Agreed.
+**Authorization**: Not authorized. **Implementation**: Partially
+implemented — the independence half is real (Original and V2 are
+fully separate processes/databases with their own rules today); the
+"shared contracts" half does not exist (no common opportunity/
+accounting/presentation interface spans both). **Validation**: Code
+inspection (separate `v2_lane.db`/`paper_trading.db`, separate config
+modules, this session and established history). **Dependencies**:
+`S3-07` (position identification) is a natural first shared contract
+if/when this is pursued — not authorized here.
+
+## S3-06 — Qualified opportunity vs. paper admission (target architecture)
+
+**Requirement**: extends `S2-03`/`S2-04` to the multi-strategy target
+architecture — qualification and admission stay distinct concepts
+regardless of how many strategies exist. **Decision**: Agreed.
+**Authorization**: Not authorized. **Implementation**: Partially
+implemented — true within V2 today (`S2-03`/`S2-04`'s evidence); not
+yet exercised across multiple concurrently-admitting strategies sharing
+one stock list, since that list doesn't exist yet (`S3-08`).
+**Validation**: Code inspection (this session, extending `S2-03`/
+`S2-04`'s evidence). **Dependencies**: `S3-08`.
+
+## S3-07 — Positions identified by account+strategy+opportunity
+
+**Requirement**: positions are identified by account, strategy and
+opportunity, not ticker alone; a horizon's EXIT must not close the
+other horizon's position in the same stock. **Decision**: Agreed.
+**Authorization**: Not authorized. **Implementation**: Partially
+implemented — the *outcome* is already achieved today (Original and V2
+use entirely separate database files, so an intraday EXIT structurally
+cannot reach a V2 position and vice versa), but **not** via a composite
+account+strategy+opportunity key within a shared store — there is no
+shared store yet. **Validation**: Code inspection
+(`talonx_v2/paper.py`'s `episode_id`+`symbol` keying is scoped to V2's
+own separate database; `talonx_watchlist/store.py` is Original's own
+separate ticker store, this session). **Dependencies**: `S3-05`'s
+shared-contracts question — a true composite key only becomes
+necessary if/when stores are ever shared, which is not authorized.
+
+## S3-08 — Single master stock list
+
+**Requirement**: one master list combining discovery universes,
+validated manual additions and explicit exclusions; dedupe by security
+identity, not ticker alone; global default both horizons; per-stock/
+per-horizon overrides. **Decision**: Agreed. **Authorization**: Not
+authorized. **Implementation**: Not implemented — no unified list was
+found. Today, Original has its own `talonx_watchlist/store.py`
+(`active`/`paused` per ticker, no horizon dimension), V2 has its own
+`execution_scope` (626 symbols, `talonx_v2/service.py`/`run.py`), and
+Intelligence has its own collection-scope CIK list
+(`talonx_ingest/intelligence/service/scope.py`,
+`watchlist_source.py`) — three separate lists, not one master list.
+**Validation**: Code inspection (this session — `talonx_watchlist/
+store.py`, `talonx_v2/service.py`, `talonx_ingest/intelligence/
+service/scope.py` each read directly). **Dependencies**: none
+blocking to design; a real merge would need identity resolution across
+all three today-separate lists.
+
+## S3-09 — Manual-addition validation requirements
+
+**Requirement**: manual additions require identity/provider/filing-
+mapping/readiness validation and an explicit unsupported/awaiting-data
+reason; adding a stock never bypasses eligibility rules.
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no manual-addition validation
+flow (as a distinct, user-facing feature) was found this session; the
+closest existing mechanism, Original's `TickerWatchlistStore.add_
+ticker()`, validates only `status in ("active","paused")` and basic
+symbol/name/exchange fields — it does not perform the richer identity/
+provider/filing-mapping/strategy-readiness validation this requirement
+describes. **Validation**: Code inspection (`talonx_watchlist/
+store.py:188-206`, this session). **Dependencies**: `S3-08`.
+
+## S3-10 — Distinct visible states; no automatic broad-universe expansion
+
+**Requirement**: five distinct states (configured membership/identity
+resolved/data ready/strategy eligibility/currently qualified); one
+master list does not itself authorize expanding intraday polling to
+the full broad universe; counts are timestamped, not permanent.
+**Decision**: Agreed. **Authorization**: Not authorized (the
+broad-universe-expansion prohibition is an explicit non-authorization).
+**Implementation**: Not implemented — no UI/API surface distinguishing
+these five states was found; existing surfaces report coarser states
+(e.g. V2's `execution_scope_enforced`/`execution_scope_count` as a
+single count, not five distinct per-symbol states). **Validation**:
+Code inspection (this session). **Dependencies**: `S3-08`.
+
+## S3-11 — Pause / Exclude / Mute definitions
+
+**Requirement**: Pause (reversible, until resumed) vs. Exclude
+(persistent, until explicitly removed) vs. Mute (notification
+suppression only, distinct from both); per-horizon applicability;
+neither Pause nor Exclude closes positions, deletes history, or
+abandons exit management; existing-obligation prices/notifications
+continue regardless. **Decision**: Agreed. **Authorization**: Not
+authorized. **Implementation**: Partially implemented — Original's
+`talonx_watchlist/store.py` already has a working `active`/`paused`
+per-ticker status with a dedicated `pause_ticker()` method
+(`store.py:222-225`) that survives without deleting the ticker's own
+name/exchange/added_at history (`store.py:20-22`) — a real, working
+partial match for the "Pause" half of this requirement. **Gaps**: no
+per-horizon dimension (V2 has no equivalent pause mechanism at all);
+no distinct "Exclude" (persistent, rediscovery-proof) state; no "Mute"
+concept anywhere in the codebase. **Validation**: Code inspection
+(`talonx_watchlist/store.py:20-22,188-225`, this session — direct grep
+confirms `pause`/`paused` exist, `exclude`/`mute` as this requirement's
+distinct concepts do not). **Dependencies**: `S3-28` (exact mute
+controls and pending-intent handling, deferred).
+
+## S3-12 — New-campaign virtual account defaults
+
+**Requirement**: $100,000 starting cash per strategy account, $10,000
+per-position allocation, both configurable; no borrowing/inflation/
+forced-entry reset; strategy limits preserved, cash may tighten
+further; fees/reservations can prevent funding 10 simultaneous
+positions. **Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented as a stated default — this is a
+new figure; no new campaign was created this session to apply it to.
+**Note**: $10,000-per-position already matches V2's existing
+`per_position_allocation_usd` default (`talonx_v2/config.py:58-60`,
+see `S1-07`); the **new** element is the $100,000-starting-cash-per-
+strategy-account figure, which does not match any existing running
+campaign ($300,000 for V2, $10,000/$15,000 for Original's two lanes).
+**Validation**: Code inspection (`talonx_v2/config.py:58-60` for the
+allocation figure; no starting-cash-default match found for $100,000
+specifically, this session). **Dependencies**: `S3-14` (existing
+campaigns not overwritten).
+
+## S3-13 — Separate accounts; combined-exposure view
+
+**Requirement**: approved / baseline-shadow / experimental-candidate
+accounts tracked separately; a combined-exposure view shows overlap
+and labelled aggregate capital (two $100k accounts = $200k combined,
+not a shared pool); experimental results never mixed into approved
+performance. **Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no combined-exposure view (a
+UI/API surface aggregating capital or exposure across more than one
+account) was found this session. The underlying account-separation
+precondition is met (V2 and Original already use physically separate
+databases, and `talonx_research/`'s replay engine physically refuses
+`v2_lane.db` — S2-14's evidence), but the aggregation/labelling view
+itself does not exist. **Validation**: Code inspection (this session).
+**Dependencies**: `S3-15`-`S3-19` (a baseline-shadow/experimental-
+candidate account only exists once the research-lab workflow is
+built).
+
+## S3-14 — Existing campaigns not overwritten by new defaults
+
+**Requirement**: V2's $300,000 campaign and Original's existing
+$10,000/$15,000 lanes are not overwritten by the new $100,000/$10,000
+defaults; future comparisons disclose changed capital assumptions.
+**Decision**: Agreed. **Authorization**: Not authorized (a
+non-action/constraint). **Implementation**: Implemented — trivially
+true as of this documentation-only session: no database was written,
+no campaign was reset or resized. **Validation**: Natural live
+behavior (this session made zero database writes — read-only
+inspection only, confirmed by this task's own restriction and this
+session's actual tool use). **Dependencies**: `S3-23` (the conditional
+reset policy governs how any *future* transition would be handled, not
+this session).
+
+## S3-15 — Research workflow: replay → shadow → review → promotion
+
+**Requirement**: historical replay → internal live shadow → review →
+explicit promotion; reuse strategy/execution/accounting code with
+versioned config; isolate cash/positions/intents/reservations/
+cooldowns/outcomes per experiment; share data without delaying
+approved operation. **Decision**: Agreed. **Authorization**: Not
+authorized. **Implementation**: Partially implemented — the
+**historical replay** stage exists and was exercised (Task 115/116,
+`talonx_research/replay_engine.py`, `S2-05`/`S2-06`'s evidence); an
+**internal live shadow** stage (running a candidate against live data
+in parallel, unpromoted) was **not confirmed** to exist this session —
+`talonx_research/`'s own scope, beyond the replay engine, was not
+re-audited in full this pass. **Validation**: Code inspection (replay
+engine confirmed; live-shadow stage not assessed). **Dependencies**:
+`S3-16`/`S3-17` depend on this stage existing to be meaningful.
+
+## S3-16 — Equivalent comparison assumptions
+
+**Requirement**: historical baseline/candidate comparisons use
+equivalent data/capital/cost/pricing; live comparisons use an
+equivalently-initialized baseline shadow account, not an established
+account with unmatched positions. **Decision**: Agreed.
+**Authorization**: Not authorized. **Implementation**: Not assessed in
+this documentation pass — verifying this requires tracing a specific
+past or hypothetical comparison's exact inputs, not performed this
+session. **Validation**: Not assessed in this documentation pass.
+**Dependencies**: `S3-15`'s live-shadow stage (unconfirmed) is a
+precondition for the live-comparison half of this requirement.
+
+## S3-17 — Evaluation criteria set in advance; failed experiments preserved
+
+**Requirement**: evaluation criteria defined before inspecting
+results; failed experiments preserved and variant count retained;
+unseen periods used where feasible; EOD is an interim report for
+multi-day experiments, not final acceptance. **Decision**: Agreed.
+**Authorization**: Not authorized. **Implementation**: Not assessed in
+this documentation pass — this is a process discipline that would need
+to be traced through an actual past experiment's own artifacts (e.g.
+Task 115/116's own prereg/evidence files) to confirm; not done this
+session. **Validation**: Not assessed in this documentation pass (a
+partial precedent: Task 107B/109's insider-cluster candidate was
+"prereg frozen before outcomes" per this project's memory of that
+task, suggesting the discipline has been followed before — not
+re-verified here). **Dependencies**: `S3-26` (detailed criteria/
+evidence-sufficiency discussion, deferred to Session 12).
+
+## S3-18 — Promotion carries config+evidence+time; existing positions keep prior rules
+
+**Requirement**: a promoted version carries its configuration,
+evidence and effective time together; existing positions retain the
+rules/version under which they were opened; rollback and historical
+attribution preserved; parameter experiments vs. signal/entry/exit
+semantic changes are distinguished. **Decision**: Agreed.
+**Authorization**: Not authorized. **Implementation**: Partially
+implemented — `talonx_research/`'s `StrategyVersion`/
+`StrategyRegistry` are explicitly **immutable** (this project's
+established Task 115/116 governance, `docs/STRATEGY_LIFECYCLE.md`'s
+R1-R7 rules) — a strong structural match for "existing positions keep
+their version's rules" and "rollback/attribution preserved." Whether a
+**live promotion** (as opposed to a research-registry entry) has ever
+been exercised, and whether it correctly distinguishes a parameter
+tweak from a signal/entry/exit logic change in practice, is **not
+assessed** this session. **Validation**: Code inspection
+(`talonx_research/`, `docs/STRATEGY_LIFECYCLE.md`, established;
+live-promotion exercise not assessed). **Dependencies**: `S3-15`'s
+live-shadow stage.
+
+## S3-19 — Research Lab dashboard visibility
+
+**Requirement**: experiment identity/hypothesis/params, baseline/
+candidate versions, replay-vs-live-shadow mode, opportunity/rejection/
+non-execution records, positions/net results/drawdown/exposure, data
+limitations, evaluation criteria/decision history; a prominent
+"EXPERIMENTAL — INTERNAL ONLY" label; no auto-promotion from a
+positive metric. **Decision**: Agreed. **Authorization**: Not
+authorized. **Implementation**: Not implemented — a direct search of
+`dashboard_web_static/index.html` for "EXPERIMENTAL" found no match;
+no dedicated Research Lab dashboard section exists today.
+**Validation**: Code inspection (targeted grep, this session — no
+match). **Dependencies**: `S3-15` (the workflow this dashboard would
+surface).
+
+## S3-20 — 2-year replay desired, not verified; no experiment authorized here
+
+**Requirement**: reaffirms `S2-06` — a 2-year replay window remains
+desired, not a verified capability; no experiment or profitability
+claim is authorized by this documentation. **Decision**: Agreed.
+**Authorization**: Explicitly not authorized (no new experiment).
+**Implementation**: Not implemented — correctly so; nothing was built
+or claimed. **Validation**: Code inspection / natural live behavior
+(no new experiment artifact created this session, same confirmation as
+`S2-15`). **Dependencies**: `S3-27` (exact data-feasibility question,
+deferred to Session 5).
+
+## S3-21 — Optional internal research Telegram bot
+
+**Requirement**: experiments never send to the main feed; MAY use a
+separate internal research bot with OFF(default)/SUMMARY/DETAILED
+modes, explicit enablement, clearly experimental wording, separate
+credentials/destination, no fallback to the main bot, and correlation
+scoped by bot+chat+message identity. **Decision**: Agreed.
+**Authorization**: Explicitly not authorized — "No bot creation,
+credential entry, destination selection, or message sending is
+authorized by this task." **Implementation**: Not implemented — no
+second bot configuration exists in the codebase inspected this
+session; the existing Experimental-send boundary
+(`talonx_ops/external_boundary.py`'s 3-condition gate, this project's
+established history) currently means Experimental sends nowhere
+external at all, which this requirement explicitly refines (adds an
+opt-in internal channel) rather than contradicts. **Validation**: Code
+inspection (targeted search for a second bot/research-bot
+configuration, this session — no match; `external_boundary.py`'s
+existing gate confirmed present by name only, not re-read line-by-line
+this session). **Dependencies**: none blocking to design.
+
+## S3-22 — User-facing display names
+
+**Requirement**: the approved display-name table (Intraday
+Opportunities, Insider Buying Strategy, Company Developments, Virtual
+Portfolio, Stock Coverage, System Health, Research Lab); "Multi-Day" as
+a horizon category; "Fundamental Opportunities" provisional; internal
+IDs/database/module names preserved — display naming is not rename
+authorization. **Decision**: Agreed. **Authorization**: Explicitly not
+authorized (no technical rename). **Implementation**: Not implemented
+— these are new display-layer names; no renaming of internal
+identifiers occurred or is planned by this entry. **Validation**: Code
+inspection (this session confirms no rename was made — `git diff`
+touches only `docs/`). **Dependencies**: `S3-24` (Original's long-term
+path review) gates "Fundamental Opportunities" specifically.
+
+## S3-23 — Conditional database-reset permission
+
+**Requirement**: a clean database/campaign reset MAY be used during a
+**separately authorized implementation**, if necessary for
+compatibility or trustworthy accounting, following a 9-step required
+approach (identify/preserve-backups/prefer-migration/version-if-reset-
+needed/limit-scope/preserve-dedup-or-set-cutoff/reconcile-obligations-
+first/never-fabricate-or-abandon/explain-the-choice). **Decision**:
+Agreed. **Authorization**: Not authorized *now*; conditionally
+pre-authorized for a **future** task that (a) is itself separately
+authorized to implement something requiring it, and (b) follows the
+9-step approach and reports against it — this documentation task
+performs no reset and authorizes none today. **Implementation**: Not
+implemented (no reset performed; nothing to implement from a
+permission-policy entry itself). **Validation**: N/A — a policy
+record, not a technical claim to verify. **Dependencies**: this policy
+updates, and should be read together with, the EOD closure task's
+earlier absolute-preservation instruction
+(`docs/research/evidence/eod_closure_2026-09-15/
+EOD_CLOSURE_REPORT.md`'s originating prompt) and `S3-14` (existing
+campaigns not overwritten *by this session*).
+
+## S3-24 — Deferred: Original's long-term/fundamentals path review
+
+**Requirement**: inspect Original's older fundamentals/long-term
+path's role before deciding whether to retain, adapt, or retire it —
+no activation/deactivation now. **Decision**: Open — deferred.
+**Authorization**: N/A. **Implementation**: N/A. **Validation**: N/A.
+**Reason**: "Fundamental Opportunities" naming is provisional on this
+review; the path itself was not inspected this session. **Planned
+session**: a future session covering Original's non-intraday path
+(candidate: extending Session 6, or a new dedicated session — not
+decided). **Dependency**: direct code/data inspection of Original's
+long-term lane, not yet performed.
+
+## S3-25 — Deferred: cross-strategy capital/exposure enforcement policy
+
+**Requirement**: `S3-13`'s combined-exposure **display** is agreed now;
+any **enforcement** policy (e.g. a cross-strategy exposure cap) is
+deferred. **Decision**: Open — deferred. **Authorization**: N/A.
+**Implementation**: N/A. **Validation**: N/A. **Reason**: enforcement
+needs its own risk discussion, not assumed alongside the display
+feature. **Planned session**: Session 10 (Paper accounting, costs and
+risk). **Dependency**: `S3-13`'s display feature existing first.
+
+## S3-26 — Deferred: experiment evaluation criteria and evidence sufficiency
+
+**Requirement**: detailed experiment evaluation criteria and what
+counts as sufficient evidence, deferred until a validation session,
+before any experiment is authorized. **Decision**: Open — deferred.
+**Authorization**: N/A. **Implementation**: N/A. **Validation**: N/A.
+**Reason**: needs its own criteria-definition discussion. **Planned
+session**: Session 12 (Technical validation, usefulness and economic
+evidence). **Dependency**: none blocking; a prerequisite for any
+future experiment authorization.
+
+## S3-27 — Deferred: exact 2-year historical data feasibility
+
+**Requirement**: whether a genuine, current 2-year-to-today replay
+window is actually data-feasible (as opposed to the existing bounded
+2024-09-01→2026-03-31 window). **Decision**: Open — deferred.
+**Authorization**: N/A. **Implementation**: N/A. **Validation**: N/A.
+**Reason**: needs a dedicated data-coverage audit. **Planned session**:
+Session 5 (Data sources, discovery and coverage). **Dependency**:
+none blocking.
+
+## S3-28 — Deferred: remaining lifecycle semantics (mute, pending intents on pause)
+
+**Requirement**: exact mute controls and the handling of already-
+committed, unfilled intents when a stock is paused. **Decision**: Open
+— deferred. **Authorization**: N/A. **Implementation**: N/A.
+**Validation**: N/A. **Reason**: needs the full user-journey mapping
+first — no cancellation semantics are invented in advance of that
+discussion. **Planned session**: Session 4 (End-to-end user journey)
+and/or Session 11 (Operation, stop/start and recovery). **Dependency**:
+`S3-11`'s Pause/Exclude/Mute definitions (agreed this session) as the
+starting point.
