@@ -1154,18 +1154,467 @@ evidence rather than relying on source inspection alone.
 
 ## Session 6 — Signal Discovery and Strategy Mechanics
 
-**Not yet conducted.** Carries forward from Sessions 1–5:
+**Recorded**: 2026-09-16, approximately 18:47 UTC / 19:47 BST (Python
+`zoneinfo`, this project's established recording-time discipline).
+**Source**: the product-owner discussion supplied directly in this
+session's prompt (same pattern as Sessions 1–5; the discussion's own
+internal timestamp is unavailable and is not invented here).
 
-- Both intraday and multi-day remain product scope (`S3-01`) — a V2
-  deep-dive in Session 6 does not retire the intraday strategy.
-- Distinguish signal qualification, portfolio admission, paper
-  execution, and Telegram delivery as four separate concepts
-  (`S2-04`/`S3-06`) — Session 6 should ground this distinction in
-  Original's and V2's actual current rule sets.
-- Explain current **frozen** rules (V2's `INSIDER_BUY_CLUSTER_V2@1`,
-  Original's existing intraday confluence rules) **separately** from
-  any **proposed** change — no tuning or implementation is authorized
-  by the discussion itself.
-- Preserve `S3-24`'s unresolved deferral: Original's long-term/
-  fundamentals path still needs its own role review before Session 6
-  or a later session decides to retain, adapt, or retire it.
+### Context
+
+This session grounds Sessions 1-5's distinctions (signal qualification
+vs. portfolio admission vs. paper execution vs. Telegram delivery,
+`S2-04`/`S3-06`) in Original's and V2's actual current rule sets, and
+resolves `S3-24` (Original's long-term/fundamentals path). It covers
+nine areas: strategy scope, V2's qualification baseline, Original's
+intraday baseline, alerts independent of paper capacity, a new
+"Delayed Market Simulation" evaluation mode, entry geometry/next-bar
+execution, exit precedence/ambiguity, intraday EOD-flatten recovery,
+and deadline-equality/audit-history semantics (resolving `S5-19` at
+the requirements level). **Discussion closed; documented requirements,
+with explicit deferrals and implementation gates** — this session does
+not authorize implementation, and several areas below describe an
+**approved target** distinct from the **inspected current baseline**.
+
+### A. Strategy scope — agreed
+
+- **Primary trading product scope**: Intraday Opportunities, and the
+  Insider Buying Strategy (V2). "Primary scope" does **not** mean
+  currently running, validated profitable, or execution-ready.
+- Optional major-company-development notifications remain agreed
+  (Session 1) as **informational**, not a third primary trading
+  strategy.
+- **Fundamental Opportunities is retained as an isolated Research Lab
+  candidate** — resolving `S3-24`. No primary Telegram routing or new
+  primary paper activation is authorized. The optional research bot
+  remains OFF by default. Future promotion requires explicit approval
+  following: data/report provenance and freshness review, valuation-
+  method review, causal replay, periodic-addition/exit qualification,
+  and performance evaluation. No existing process, account, or
+  obligation is changed by this decision.
+- **Both intraday and multi-day remain primary product scope** — this
+  session does **not** repeat or revive the earlier, already-superseded
+  proposal to demote Intraday (see `S1-09`'s Session 3 resolution,
+  `S3-01`); that decision stands unchanged.
+
+### B. V2 qualification — baseline description (inspected, not proposed)
+
+Recorded as the accurately inspected baseline, not a new decision:
+
+- Code **P only** qualifies a baseline cluster transaction: open-market
+  **or** private purchase. P alone does not by itself establish
+  personal funding or open-market execution specifically (both are
+  possible under code P). Code **M** means exercise/conversion — not
+  "acquired without holding" or any other informal reading. Code **J**
+  and other non-P codes do **not** qualify a baseline cluster, though
+  the underlying records may remain available for company monitoring
+  more broadly (Intelligence's own insider-activity tracking is not
+  restricted to only cluster-qualifying codes).
+- A qualifying cluster requires **at least two distinct reporting-owner
+  CIKs** — one owner's repeated purchases alone are insufficient.
+  **Filing dates, not purchase (transaction) dates, drive the
+  clustering window.** The exact inspected boundary is
+  `later_filing_session - first_filing_session <= 10`, described as
+  **up to ten trading-session steps apart**, not an inclusive
+  ten-session count.
+- The detector activates following the **second distinct owner's
+  filing date**; actual local receipt and prospective admission remain
+  **separate** checks from detection itself.
+- Episode construction is **greedy and non-overlapping**.
+- **No minimum individual or aggregate insider-purchase dollar amount**
+  is enforced by the baseline cluster definition itself.
+- The **inspected operational liquidity screen**: twenty prior
+  sessions, median daily dollar trading volume >= $5 million, latest
+  prior close >= $5.
+- Distinct buyers participating in a cluster do **not** by themselves
+  establish independent investment decisions or proven market
+  consensus — multiple filers can still share non-independent
+  motivations.
+- **Symbol grouping alone does not prove issuer/security/share-class
+  identity integrity** (directly connects to `S5-02`'s CIK-vs-security-
+  identity distinction and `OPS-006`'s registry-fragmentation finding).
+- **Purchase-size filtering is a future Research Lab hypothesis**, not
+  part of today's baseline definition.
+- **The frozen contract's own broader eligibility wording is preserved
+  as written, and is not silently rewritten to match the inspected
+  operational liquidity path** if the two differ — any such gap is
+  recorded as a finding (`OPS-006` extension, see below), not resolved
+  by editing the contract's own text here.
+
+**Diagnosing signal scarcity** requires the full funnel: coverage,
+collected evidence, clusters, qualification, admission, and completed
+trades — **no guaranteed trade count or profitability claim** is made
+or implied by this baseline description.
+
+### C. Intraday baseline — distinct from target enhancements (inspected, not proposed)
+
+Recorded as **inspected code defaults**, not asserted current runtime
+values (defaults can be overridden by environment configuration; this
+session records what the code defines, not necessarily what a specific
+live process happens to be running right now):
+
+- One-minute RSI recovery: below 30 to >= 30, with qualifying volume.
+- MACD 12/26/9 crossover.
+- MA 10/50 crossover with separation >= 0.15% of price.
+- Trigger-bar true range >= 1x ATR.
+- Minimum ATR/price 0.25%.
+- Legacy confirmation score >= 2.
+- Minimum reward-to-risk 1.5.
+- Regular-session bullish trend gate: 200-period SMA of 15-minute bars.
+- Twenty-minute cooldown; seventy-five-minute post-loss lockout.
+
+The **RSI-recovery/confirmation interaction** (a signal component that
+deliberately self-excludes unless a same-bar MACD cross also coincides
+— this project's own prior "RSI-Curl / Confluence Contract" design) is
+recorded here as **documented, intentional baseline behavior**, not a
+newly proven bug and not an explanation of every historical signal
+failure. The **separate legacy MACD direction-confirmation
+qualification** is preserved as its own distinct mechanism, not merged
+into the RSI-recovery discussion.
+
+**Diagnostics distinguish four separate categories**: strategy
+rejection (the signal itself didn't qualify); a data/readiness block
+(insufficient bars, missing indicator inputs); strategy suppression/
+re-entry restriction (cooldown, post-loss lockout); and portfolio
+admission restriction (capacity/cash, independent of signal quality).
+**Cooldown, post-loss lockout, and insufficient cash are explicitly
+NOT identical mechanisms** — they have different triggers, different
+durations, and different scopes, and must not be reported as
+interchangeable "blocked" states.
+
+**Bearish observations alone must not execute shorts or automatically
+close long positions**, under the agreed product rules (reaffirms
+`S2-01`/`S2-02`'s no-shorting rule). Legacy code mappings for this must
+be **verified separately** — this session does **not** assert that
+every existing path is already compliant; that is a distinct
+verification task, not concluded here.
+
+### D. Alerts independent of paper capacity — agreed
+
+- Timely, qualified opportunities remain eligible for **primary
+  Telegram notification** even when paper cash/capacity prevents entry
+  (reaffirms and sharpens `S2-03`/`S2-04`/`S3-06`). The message states
+  clearly that no paper position was opened, and explains the skip
+  reason.
+- A previously-alerted, still-unfilled opportunity receives **one**
+  expiry update.
+- A newly-discovered-but-already-expired opportunity stays
+  dashboard-visible; a Telegram summary of it is optional/configurable
+  (not forced).
+- Show deadline, discovery time, and notification time — three
+  distinct timestamps.
+- **Never present an expired opportunity as a fresh, actionable
+  instruction.** Never claim a missed trade "would have been
+  profitable."
+- Existing positions retain their own exit rules regardless of any of
+  the above.
+- Prevent duplicate/catch-up alert floods (a backlog of expired
+  opportunities must not spam the channel on recovery).
+- **Notification success is not a prerequisite for paper execution**
+  (reaffirms `S4-10`).
+
+### E. Delayed Market Simulation — agreed (a new, separately identified evaluation mode)
+
+- A distinct intraday evaluation mode, separate from live prospective
+  paper execution: processes data **chronologically, using actual
+  market timestamps** (not wall-clock arrival order).
+- Stores **actual receipt, processing, and notification times
+  separately** — never assumes a constant five-minute (or any fixed)
+  delay.
+- Preserves causal information order; prevents lookahead.
+- Every account, its returns, and its alerts are **labelled "Delayed
+  Market Simulation"** wherever shown.
+- Discloses data age and explicitly flags unverified current-entry
+  validity.
+- **Results measure the simulation's own contract** — not "returns a
+  user could actually have achieved after receiving the Telegram
+  message."
+- Kept **separate** from prospective (live) paper-execution accounts —
+  never the same account or balance.
+- Replay (`S3-15`-`S3-20`'s research-lab workflow) and this delayed
+  simulation mode **share the same underlying strategy/execution
+  rules**, while each records its own, different data-availability
+  assumptions distinctly.
+- EOD **waits** for required data, or explicitly reports incompleteness
+  — it does not fabricate a result from partial data.
+- **V2's separately agreed prospective-intent rules (Session 5's
+  three-session recovery, `S5-13`-`S5-20`) remain unchanged** by this
+  mode — it is an intraday-specific addition, not a V2 change.
+- **No existing campaign is silently switched into this mode.**
+
+### F. Entry geometry and next-bar execution — baseline preserved, target approved
+
+**Preserved corrected baseline finding** (inspected, confirmed this
+session by direct code reading — see Validation below):
+- `QuantScanner._revalidate_candidate()` (`talonx_quant/consumer.py`)
+  already recalculates the **full** trade geometry (stop, target, risk,
+  reward, ratio) against the **latest buffered close** immediately
+  before publication — not just price and ratio in isolation. It
+  rejects a candidate with missing geometry, an expired age, or
+  insufficient RRR.
+- Paper entry uses the alert's signal price, adjusted for simulated
+  spread (not the original screening-time price unadjusted).
+- The existing `fill_geometry_is_valid()` (`talonx_paper/engine.py`)
+  checks the fill lands strictly inside the stop/target bracket **when
+  both levels exist** — it deliberately **returns True (passes) when
+  either bound is absent**, a pre-existing, documented "nothing to
+  validate against" convention shared with the backtest engine's
+  identical check, not an oversight.
+- The **inspected paper-buy path does not recheck the minimum RRR
+  after the spread adjustment** — RRR is validated once, at
+  screening/revalidation time, not re-validated against the
+  spread-adjusted execution price.
+- The existing alert-driven entry mechanism is **not** a consecutive-
+  next-bar scheduler — it fires on the alert's own signal bar, not a
+  deliberately-delayed "next bar's open."
+- **This session explicitly rejects** any claim that "no revalidation
+  exists" or that there is a specific, quantified economic bias from
+  this behavior — neither claim is supported by the inspected code.
+
+**Approved target** (not implemented; a future design, not today's
+behavior):
+- Approve an entry using **only** information available at the
+  simulated approval time.
+- Freeze stop and target **upon approval** — not re-derived later.
+- Enter at the **next consecutive eligible one-minute bar's open**,
+  under the declared execution-cost model.
+- If a later revalidation uses newer information, the eligible entry
+  **advances accordingly** — it must never use an earlier bar's
+  already-passed open.
+- Require finite, valid entry/stop/target values; require
+  `stop < modeled long fill < target`.
+- Recalculate RRR at the **execution-adjusted** entry price and require
+  it to remain >= 1.5 (closing the gap noted in the baseline above).
+- **Never move the frozen stop/target levels to rescue an otherwise-
+  invalid setup.**
+- Record explicit, distinct skip reasons for geometry/data/admission
+  failures.
+- Missing one-minute intervals **block** new entries pending a bounded
+  recovery — **never substitute an arbitrary later bar**.
+- The exact missing-bar recovery **duration** remains deferred to
+  provider qualification (see deferrals below) — not decided here.
+- **No new entry at or after the T-10 cutoff**; cancel any unfilled
+  instructions at that point.
+
+**Cost-treatment caveat**: spread/slippage-adjusted entry is explicitly
+**not** the same claim as fully net-of-fees-and-exit-cost RRR — the
+exact cost treatment for the target design remains to be specified
+(deferred to Session 12, see below).
+
+### G. Exit precedence and ambiguity — agreed (target design; largely not implemented today, see validation)
+
+- Market-time sequence determines the first eligible exit; reliable
+  finer-granularity data takes precedence over an ambiguous OHLC-only
+  assumption when both are available.
+- For a position already open, if both stop and target are touched
+  within a bar and the actual order is unknown, **assume stop-first**
+  and tag the outcome `AMBIGUOUS_INTRABAR_ORDER` — an explicitly
+  **conservative assumption**, not a claim of the actual sequence.
+  **Never** describe such an unknown outcome as a "winner downgraded to
+  a loser" — it is an honestly-flagged ambiguity, not a demotion.
+- **Ordinary long stop crossing** fill model: the planned trigger price
+  minus a declared adverse sell-side slippage.
+- **Gap below stop**: the opening reference price minus a declared
+  adverse sell-side slippage — **never fabricate a fill at the
+  unavailable stop price itself.**
+- **Never automatically fill at a bar's extreme low.**
+- **Stop-market assumptions differ from stop-limit behavior** — the two
+  order types are not interchangeable in this model.
+- Intrabar price ranges **before** an actual entry occurred cannot
+  trigger a **post-entry** exit — causal ordering applies within a bar
+  too, not just across bars.
+- **Exactly-once position closure**: a duplicate or later exit
+  instruction for an already-closed position is recorded as resolved
+  and must never generate a second sale.
+- An explicit strategy **EXIT** signal remains distinct from a bearish
+  **observation** (reaffirms §C's no-automatic-close rule).
+
+### H. Intraday EOD flatten and recovery — baseline preserved, target approved
+
+**Inspected baseline** (confirmed this session by direct code reading
+— see Validation below):
+- Defaults to actual wall-clock **15:50 America/New_York**
+  (`talonx_paper/config.py`'s `eod_flatten_hour_et`/`minute_et`
+  defaults, `15`/`50`).
+- **DST-aware** (converts via `ZoneInfo`, not a fixed UTC offset — so
+  the wall-clock target stays correctly pinned across the spring/fall
+  transition) **but the scheduling helper is not exchange-calendar-
+  aware** — it does not check whether "today" is an actual XNYS
+  trading session before scheduling or firing.
+- Uses the **latest cached positive price**, adjusted for simulated
+  spread, to flatten.
+- **No price-age check** exists in this sweep.
+- A missing price is **logged and skipped** — **no dedicated, durable
+  EOD-recovery state** is established by this path (it is not
+  persisted for a later retry beyond the next day's own scheduled
+  sweep).
+- A scheduler started at or after the cutoff simply schedules its
+  **next daily** occurrence (tomorrow's 15:50 ET), not an immediate
+  catch-up.
+- This sweep is **distinct** from other operator reconciliation
+  commands (e.g. `talonx_ops.prospective close`, `talonx_ops.
+  eod_reconciliation`) — it is Original's own intraday-specific
+  mechanism, not the same code path.
+
+**Approved target** (not implemented; a future design):
+- Cutoff = the official exchange-session close **minus ten minutes**.
+- Use the open of the one-minute bar **starting at that cutoff**,
+  adjusted for declared sell-side execution costs.
+- **Scheduled in advance, in market time** (not a wall-clock-only
+  timer).
+- No new entries at/after the cutoff; cancel any outstanding unfilled
+  entries at that point.
+- A missing exact reference produces `EXIT_PENDING · AWAITING_PRICE` —
+  **no stale cached-price or later closing-auction substitution.**
+- **Recover through the official close of the next trading session.**
+- **Persist recovery state across restarts.**
+- While exit/account state is unresolved, **block new entries in that
+  specific strategy account**, while independent scanning/data
+  collection continues unaffected.
+- **Notify Operations once**, with deduplicated incident follow-ups
+  (not a repeated alert storm).
+- On final expiry of the recovery window, transition to
+  `EXIT_UNRESOLVED` — **retain the position/obligation and the account
+  block** until an auditable resolution occurs.
+- **Manual intervention means investigation and authorized
+  reconciliation — never inventing a price.**
+
+**Shared recovery handling** may architecturally cover other intraday
+exits (stop, target, strategy EXIT) alongside EOD flatten, but **each
+must recover its OWN evidence and reference**, not a shared/generic
+one:
+- **EOD**: the original cutoff bar's own open.
+- **Stop**: the crossing/gap evidence and the stop-fill model (§G).
+- **Target**: the crossing evidence and the declared target-fill model.
+- **Strategy EXIT**: its own designated subsequent execution reference.
+
+If missing data makes **whether or when** an exit occurred genuinely
+unknown, that uncertainty is represented **explicitly** — never
+silently resolved either way. **These intraday rules do not apply to
+V2 or to the (Research-Lab-only) fundamentals account** — V2 keeps its
+own, separately agreed three-session recovery (`S5-13`-`S5-20`), kept
+explicitly distinct from this intraday next-session-close EXIT
+recovery.
+
+### I. Deadline equality and audit history — agreed (resolves S5-19 at the requirements level)
+
+- **Evidence durably received AT OR BEFORE the deadline qualifies** for
+  subsequent processing; evidence first received **afterward** cannot
+  qualify the original entry.
+- **Serialize expiry/reconciliation** so that a reservation can never
+  be both released AND filled for the same instruction.
+- **Preserve original expired/unresolved history** — never overwritten.
+- **Later corrections are versioned, auditable reconciliation** — never
+  a silent edit of the original record.
+- **No silent conversion of a late discovery into an on-time
+  prospective trade.**
+- Implementations must correctly handle evidence that was **timely
+  received but is still awaiting validation** — and must never invent
+  a receipt timestamp from a batch/refresh label (reaffirms `S5-12`'s
+  "batch timestamps are not observation evidence").
+
+This resolves `S5-19`'s exact equality-at-deadline and receive-versus-
+commit semantics **at the requirements level** — the product's
+intended answer is now recorded. **Implementation and validation
+remain separately tracked under `OPS-003`** — this session does not
+itself implement or verify this semantics against V2's or Original's
+actual code; see `REQUIREMENTS_TRACKER.md` `S5-19`'s dated update and
+`S6-24` below.
+
+### Implementation authorization
+
+**None.** Every decision above is an agreed product direction (or, for
+§B/§C/§F's "inspected baseline"/§H's "inspected baseline" content, an
+accurately recorded description of existing code); all new
+implementation authorization is explicitly **"Not authorized by this
+documentation task."** See `REQUIREMENTS_TRACKER.md` (`S6-01` through
+`S6-24`).
+
+### Validation performed this session
+
+Targeted, read-only code inspection (not an exhaustive audit) directly
+confirmed: `QuantScanner._revalidate_candidate()`
+(`talonx_quant/consumer.py:2017`) and `fill_geometry_is_valid()`
+(`talonx_paper/engine.py:156-186`, including its documented
+either-bound-absent pass-through); `talonx_paper/config.py`'s
+`eod_flatten_hour_et=15`/`eod_flatten_minute_et=50` defaults and
+`seconds_until_next_eod_flatten()`'s `ZoneInfo`-based DST handling
+with no `exchange_calendars`/session-awareness in
+`talonx_paper/consumer.py`'s flatten loop; `talonx_quant/config.py`'s
+RSI/MACD/MA/ATR/cooldown/lockout defaults (`rsi_oversold=30`,
+`macd_fast/slow/signal=12/26/9`, `ma_fast/slow=10/50`,
+`min_ma_spread_pct=0.0015`, `min_atr_pct=0.25`,
+`cooldown_seconds=1200`, `loss_lockout_seconds=75*60`), all matching
+§C's recorded defaults exactly. **Not individually re-verified this
+session**: the exact `legacy confirmation score >= 2` and `minimum RRR
+1.5` constants specifically (not located by name in the same targeted
+read), and none of §G's exit-precedence/ambiguity claims — a repository
+-wide search for `AMBIGUOUS_INTRABAR_ORDER`, `EXIT_UNRESOLVED`, and
+`EXIT_PENDING` found **no matches anywhere in `talonx_paper/`**,
+confirming §G and §H's "approved target" content (these specific
+status labels) is **not implemented today** — a genuine gap, not
+merely undocumented.
+
+### Explicit deferrals
+
+- **`S6-25`** — numerical spread/slippage/fee assumptions for the
+  entry-geometry target design (§F). **Reason**: needs its own
+  cost-model evaluation. **Planned session**: Session 12 (Technical
+  validation, usefulness and economic evidence). **Dependency**: none
+  blocking to state the target qualitatively (done, §F); blocking for
+  exact numbers.
+- **`S6-26`** — missing intraday entry-bar recovery duration (§F).
+  **Reason**: depends on which data provider is ultimately qualified.
+  **Planned session**: none (a data-provider qualification task, not a
+  knowledge-transfer session) — extends `OPS-005`'s open provider-
+  qualification question. **Dependency**: `OPS-005`.
+
+Existing baseline cost settings (Original's current spread/slippage
+model as coded today) are **unchanged** by this session. Several
+subordinate technical details remain outstanding before any of §F/§G/H's
+approved targets could be implemented (exact cost treatment, missing-
+bar recovery duration, precise EOD-cutoff-bar sourcing) — this session
+does not claim all execution mechanics are implemented; see
+`OPERATIONAL_FINDINGS.md` `OPS-007` through `OPS-009` below.
+
+### Findings tracked in `OPERATIONAL_FINDINGS.md`
+
+- **`OPS-007`** — intraday EOD-flatten durable-recovery gap (§H's
+  approved target vs. inspected baseline).
+- **`OPS-008`** — entry-geometry next-bar-execution and pre-fill RRR
+  re-check gap (§F's approved target vs. inspected baseline).
+- **`OPS-009`** — exit-precedence/ambiguity handling gap (§G's target
+  vs. no matching status codes found in `talonx_paper/`).
+
+`OPS-002` and `OPS-003` **remain `OPEN`**, unaffected by this session
+— re-confirmed by this session's own targeted code reads (no evidence
+of closure found for either).
+
+### Any separately authorized implementation work
+
+**None.**
+
+---
+
+## Session 7 — Intelligence and Useful Company Developments
+
+**Not yet conducted.** Scope preserved exactly as already established
+in `KNOWLEDGE_TRANSFER_PLAN.md` — not expanded or narrowed by this
+task. Carries forward, by requirement ID, relevant unfinished details
+from Sessions 1-6:
+
+- `S1-05`'s unresolved gap: raw SEC item-number jargon still appears in
+  a real production message header (not addressed by Session 6).
+- `S1-13`'s "not exhaustive" wording-accuracy guardrail — a full audit
+  of every Intelligence render path remains a candidate for this
+  session, as already noted when `S1-13` was recorded.
+- `B`'s (Session 6) "symbol grouping does not itself prove issuer/
+  security/share-class integrity" point and `OPS-006`'s registry-
+  fragmentation finding both bear directly on how Intelligence's own
+  company-development detection should describe identity.
+- `S5-01`-`S5-07`'s master-registry/coverage-count questions remain
+  relevant background for Intelligence's own data sourcing.
+
+Session 7 is not conducted by this task; nothing above is resolved
+here — this list only ensures Session 7, when it happens, has visible
+pointers to the relevant open threads rather than starting cold.

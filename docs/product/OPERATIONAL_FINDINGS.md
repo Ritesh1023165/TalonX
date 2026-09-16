@@ -504,6 +504,145 @@ duplicated in `DECISION_LOG.md` Session 5 §A and
 **Related**: `REQUIREMENTS_TRACKER.md` `S3-08`, `S5-01` through
 `S5-07`.
 
+**Session 6 extension (2026-09-16, ~18:47 UTC) — disclosed, not
+confirmed**: Session 6 §B raised a related, but **not yet verified**,
+question — whether V2's own frozen contract's *stated* eligibility
+wording (the original Task 109 specification text) is broader than
+the *actual*, inspected operational liquidity screen currently
+enforced in code (20-session median-volume/price-floor gate). This
+session did **not** perform a side-by-side comparison of the frozen
+contract's exact text against the operational screen's exact code to
+confirm whether a real gap exists — it is recorded here as an open
+question to check, per the explicit instruction not to silently
+rewrite the frozen contract's wording to match the code (or vice
+versa) without that comparison first. **Status of this specific
+sub-question**: not assessed, tracked under this same `OPS-006` entry
+rather than a new ID, since it is the same underlying "stated
+eligibility vs. implemented registry/screening reality" theme.
+Related: `REQUIREMENTS_TRACKER.md` `S6-07`.
+
+---
+
+## OPS-007 — Intraday EOD-flatten durable-recovery gap
+
+**Status**: `OPEN` — approved target design exists (Session 6 §H); no
+implementation.
+
+**Found**: Session 6 documentation pass (2026-09-16), via targeted code
+inspection of `talonx_paper/config.py`, `talonx_paper/engine.py`, and
+`talonx_paper/consumer.py`.
+
+**Finding**: Original's intraday EOD-flatten sweep is real and running
+(`_eod_flatten_loop`, `talonx_paper/consumer.py:188-218`), defaulting
+to wall-clock 15:50 America/New_York (`config.py:141-143`) via a
+DST-aware (`ZoneInfo`-based, `engine.py:189-200`) but **not**
+exchange-calendar-aware scheduler — it does not check whether "today"
+is an actual XNYS trading session. It flattens using the latest cached
+positive price adjusted for simulated spread, **with no price-age
+check**. A missing price is logged and skipped, and **no durable
+recovery state is established** — nothing persists the miss for a
+later, evidence-based retry beyond simply waiting for tomorrow's own
+scheduled sweep to run again from scratch.
+
+**Explicit implications**: if a required flatten price is genuinely
+unavailable at 15:50 ET, the position is neither flattened nor
+tracked as a distinguishable "recovery pending" obligation — it simply
+waits for the next scheduled sweep, which may itself also miss, with
+no escalation, no `EXIT_PENDING`/`EXIT_UNRESOLVED` state, and no
+Operations notification. This is a **safe-but-silent** gap (nothing is
+fabricated), not a wrong-price risk — but it also provides no
+visibility or bounded-recovery guarantee.
+
+**Future corrective work — NOT IMPLEMENTED here**: make the scheduler
+exchange-calendar-aware; add a price-age check; build durable,
+cross-restart recovery state through the official close of the next
+session; add the per-account new-entry block while unresolved; add
+deduplicated Operations notification; add the `EXIT_PENDING ·
+AWAITING_PRICE` → `EXIT_UNRESOLVED` state progression described in
+Session 6 §H.
+
+**Evidence references**: `talonx_paper/config.py:141-143`; `talonx_paper/
+engine.py:189-200`; `talonx_paper/consumer.py:188-218`.
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S6-21`, `S6-22`, `S6-23`.
+
+---
+
+## OPS-008 — Entry-geometry next-bar-execution and pre-fill RRR re-check gap
+
+**Status**: `OPEN` — approved target design exists (Session 6 §F); no
+implementation. The **inspected baseline itself is sound** (see
+below) — this is a gap between baseline and target, not a defect in
+the baseline.
+
+**Found**: Session 6 documentation pass (2026-09-16), via targeted code
+inspection of `talonx_quant/consumer.py` and `talonx_paper/engine.py`.
+
+**Finding**: `QuantScanner._revalidate_candidate()`
+(`talonx_quant/consumer.py:2017`) genuinely recalculates full trade
+geometry against the latest buffered close before publication, and
+`fill_geometry_is_valid()` (`talonx_paper/engine.py:156-186`) genuinely
+checks the fill lands inside the stop/target bracket when both exist
+— **this session explicitly confirms neither "no revalidation exists"
+nor an unqualified economic-bias claim is supported**. The gap is
+narrower and more specific: (1) the paper-buy path does not re-check
+minimum RRR **after** the spread adjustment is applied to the fill
+price — RRR is validated once, pre-spread; (2) today's alert-driven
+entry fires on its own signal bar, not a deliberately-delayed
+"next consecutive eligible one-minute bar's open" as the approved
+target describes; (3) there is no explicit T-10 cutoff-and-cancel
+mechanism, no bounded missing-bar recovery, and no frozen-stop/target-
+never-moved enforcement distinct from what already exists structurally
+by not having a rescue path at all.
+
+**Future corrective work — NOT IMPLEMENTED here**: build the
+next-eligible-bar-open entry scheduler; add a post-spread RRR
+recheck (>= 1.5) at the execution-adjusted price; add explicit
+geometry/data/admission skip-reason recording; add the T-10 cutoff;
+define and implement the missing-bar bounded-recovery duration
+(pending `OPS-005`'s provider qualification, tracked as `S6-26`); the
+exact cost-model numbers remain deferred (`S6-25`).
+
+**Evidence references**: `talonx_quant/consumer.py:2017-2050`;
+`talonx_paper/engine.py:156-186`.
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S6-16`, `S6-17`, `S6-18`,
+`S6-25`, `S6-26`.
+
+---
+
+## OPS-009 — Exit-precedence and ambiguity-handling gap
+
+**Status**: `OPEN` — approved target design exists (Session 6 §G); no
+implementation.
+
+**Found**: Session 6 documentation pass (2026-09-16), via a
+repository-wide search.
+
+**Finding**: a search for `AMBIGUOUS_INTRABAR_ORDER`, `EXIT_UNRESOLVED`,
+and `EXIT_PENDING` found **no matches anywhere in `talonx_paper/`** or
+elsewhere in the codebase. None of Session 6 §G's agreed target
+behaviors exist today: market-time exit-precedence resolution between
+stop and target, the conservative stop-first assumption with an
+explicit `AMBIGUOUS_INTRABAR_ORDER` tag, the declared stop-crossing/
+gap-below-stop fill models, the extreme-low-fill prohibition, or the
+stop-market-vs-stop-limit distinction. Exactly-once **position**
+closure (distinct from V2's already-confirmed exactly-once
+**reservation-release**, `S5-17`) was not separately traced this
+session either.
+
+**Future corrective work — NOT IMPLEMENTED here**: implement
+market-time-sequenced exit resolution; implement the stop-first
+conservative assumption and its `AMBIGUOUS_INTRABAR_ORDER` tag;
+implement the declared fill models for ordinary and gap-below-stop
+stop crossings; implement exactly-once position-closure guarantees
+for duplicate/late exit instructions.
+
+**Evidence references**: repository-wide search, this session (no
+matches for the three cited status/tag strings).
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S6-19`, `S6-20`, `S6-23`.
+
 ---
 
 *See `REQUIREMENTS_TRACKER.md` for product-requirement tracking,

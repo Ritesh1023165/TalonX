@@ -46,13 +46,13 @@ today" specifies which one it means.
 | 3 | Application structure and configuration: Original, Intelligence and V2 | **Agreed decisions recorded (S3-01..S3-23); named deferrals remain (S3-24..S3-28).** Recorded in `DECISION_LOG.md` (title extended from "Application overview" to reflect its actual scope — master stock coverage, capital defaults, research-lab workflow, naming, and a conditional reset policy, in addition to the three flows' responsibilities). |
 | 4 | End-to-end user journey | **Agreed decisions recorded (S4-01..S4-14).** Recorded in `DECISION_LOG.md`. |
 | 5 | Data sources, discovery and coverage | **Closed at the requirements level (S5-01..S5-31); explicit technical decisions and implementation gates remain outstanding — not execution readiness or universal validation.** Recorded in `DECISION_LOG.md`. |
-| 6 | Signal discovery and strategy mechanics | Not yet conducted. Title updated (from "Original intraday strategy and filters") to reflect its actual planned scope: signal qualification vs. portfolio admission vs. paper execution vs. Telegram delivery, across **both** Original and V2, with frozen-vs-proposed rules kept separate — see `DECISION_LOG.md` Session 6 agenda. May absorb some of Session 8's originally-planned V2-specific content; reconciled when Session 8 is actually conducted, not decided now. Candidate for also covering `S3-24` (Original's long-term/fundamentals path review) — not decided; may instead become its own session. |
-| 7 | Intelligence and useful company developments | Not yet conducted |
-| 8 | V2 multi-day strategy and lifecycle | Not yet conducted. Scope may overlap with Session 6's now-broader "strategy mechanics" framing — to be reconciled (not merged or cancelled) when this session is actually conducted. |
-| 9 | Telegram and dashboard experience | Not yet conducted. Candidate destination for `S5-30` (pre-market lockout window, undefined). |
+| 6 | Signal discovery and strategy mechanics | **Discussion closed; documented requirements (S6-01..S6-26), with explicit deferrals and implementation gates.** Recorded in `DECISION_LOG.md`. Resolved `S3-24` (Fundamental Opportunities = isolated Research Lab candidate) and `S5-19` (deadline-equality semantics, requirements level only) — see `REQUIREMENTS_TRACKER.md` for both dated updates. |
+| 7 | Intelligence and useful company developments | Not yet conducted. **Scope preserved exactly as established** — not expanded by Session 6. See `DECISION_LOG.md` Session 7's carried-forward-ID pointer list (`S1-05`, `S1-13`, Session 6 §B's identity caveat, `S5-01`-`S5-07`). |
+| 8 | V2 multi-day strategy and lifecycle | Not yet conducted. Session 6 §B recorded V2's qualification baseline description as part of "strategy mechanics" — Session 8's own scope (V2's full lifecycle: entry through 10-session exit, `S5-13`-`S5-20`'s recovery semantics, `OPS-003` resolution) remains distinct and not pre-empted; to be reconciled, not merged or cancelled, when actually conducted. |
+| 9 | Telegram and dashboard experience | Not yet conducted. Candidate destination for `S5-30` (pre-market lockout window, undefined) and Session 6's `S6-13`/`S6-14` (capacity-independent alerts, expiry-update UI) and `S6-11` (four-category diagnostic surfacing). |
 | 10 | Paper accounting, costs and risk | Not yet conducted. Receives `S3-25` (cross-strategy exposure enforcement policy, deferred from Session 3). |
-| 11 | Operation, stop/start and recovery | Not yet conducted. Shares `S3-28` (mute controls, pending-intent handling) with Session 4; candidate destination for `S5-30` alongside Session 9. |
-| 12 | Technical validation, usefulness and economic evidence | Not yet conducted. Receives `S3-26` (experiment evaluation criteria/evidence sufficiency, deferred from Session 3) and is a candidate destination for `S5-31`'s 2-year-replay-feasibility audit — a prerequisite for authorizing any future experiment. |
+| 11 | Operation, stop/start and recovery | Not yet conducted. Shares `S3-28` (mute controls, pending-intent handling) with Session 4; candidate destination for `S5-30` alongside Session 9, and for Session 6's `OPS-007` (intraday EOD-flatten durable recovery) and `S6-22`/`S6-23`'s cross-restart persistence requirements. |
+| 12 | Technical validation, usefulness and economic evidence | Not yet conducted. Receives `S3-26` (experiment evaluation criteria/evidence sufficiency, deferred from Session 3), is a candidate destination for `S5-31`'s 2-year-replay-feasibility audit, and now also receives `S6-25` (numerical spread/slippage/fee assumptions for the entry-geometry target) — all prerequisites for authorizing any future experiment or implementation of Session 6's approved targets. |
 | 13 | Architecture, effective configuration and prioritized roadmap | Not yet conducted |
 
 **Closure discipline** (applies from Session 3 onward): before closing
@@ -60,9 +60,11 @@ each session, every question raised in it is recorded as **agreed**,
 **rejected**, or **explicitly deferred with a reason and a named
 destination session** — never silently dropped. Session 3's own
 deferrals (`S3-24` through `S3-28`) were the first application of this
-discipline; Session 5's own deferrals (`S5-10`, `S5-19`, `S5-20`,
-`S5-30`, `S5-31`) follow the same pattern — see `DECISION_LOG.md`
-Session 3/5's "Explicit deferrals" sections.
+discipline; Session 5's own deferrals (`S5-10`, `S5-19`→now resolved
+at requirements level by Session 6, `S5-20`, `S5-30`, `S5-31`) and
+Session 6's own deferrals (`S6-18`, `S6-25`, `S6-26`) follow the same
+pattern — see `DECISION_LOG.md` Session 3/5/6's "Explicit deferrals"
+sections.
 
 **This plan is adjustable by the owner** — the order, content, or
 existence of any future session may change; nothing here is fixed in

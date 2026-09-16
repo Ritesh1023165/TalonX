@@ -133,6 +133,32 @@ without naming which of these applies.
 | S5-29 | Prioritize obligations/timely intents over bulk historical work | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
 | S5-30 | Pre-market lockout window PROPOSED/UNDEFINED | Open — deferred | N/A | N/A | N/A |
 | S5-31 | 2-year replay feasibility remains OPEN (5 sub-questions) | Open — deferred (extends S3-27) | N/A | N/A | N/A |
+| S6-01 | Primary scope = Intraday Opportunities + V2; not implying running/validated/execution-ready | Agreed | Not authorized | Implemented (both exist and run; "primary scope" itself is a labelling decision) | Code inspection (established + this session) |
+| S6-02 | Major-development notifications remain informational, not a third primary strategy | Agreed (reaffirms S1-02) | Not authorized (pre-existing) | Implemented | Code inspection (established) |
+| S6-03 | Fundamental Opportunities = isolated Research Lab candidate; resolves S3-24; no primary routing/activation; promotion criteria defined | Agreed | Not authorized | Not implemented (no such Research Lab candidate account exists) | Code inspection (this session) |
+| S6-04 | Both intraday and multi-day remain primary scope; no demotion (reaffirms S3-01) | Agreed | Not authorized (pre-existing) | Implemented | Code inspection (established) |
+| S6-05 | Code P eligibility (open-market/private purchase); M=exercise/conversion; non-P doesn't qualify clusters | Agreed (inspected baseline) | Not authorized | Implemented (matches frozen V2 baseline) | Code inspection (established, Task 107B/109 history) |
+| S6-06 | >=2 distinct owner CIKs; filing-date-driven window <=10 session-steps; detector at 2nd filing; greedy non-overlapping; no min amount | Agreed (inspected baseline) | Not authorized | Implemented (matches frozen V2 baseline) | Code inspection (established) |
+| S6-07 | Operational liquidity screen (20-session median $5M vol, close>=$5); buyer-independence/symbol-grouping caveats; frozen wording preserved as-is | Agreed (inspected baseline) | Not authorized | Implemented (screen); gap disclosed re: frozen-wording-vs-operational-path (OPS-006 extension) | Code inspection (established) |
+| S6-08 | Diagnose scarcity via full funnel; no guaranteed count/profitability claim | Agreed | Not authorized | Implemented (this documentation's own framing) | Code inspection (this session) |
+| S6-09 | Intraday inspected code defaults (RSI/MACD/MA/ATR/confirmation/RRR/trend-gate/cooldown/lockout) | Agreed (inspected baseline) | Not authorized | Implemented (as code defaults; not a claim about live runtime overrides) | Code inspection (this session, talonx_quant/config.py) |
+| S6-10 | RSI-recovery/confirmation interaction is documented intentional behavior, not a proven bug | Agreed (inspected baseline) | Not authorized | Implemented | Code inspection (established, Task 28 RSI-Curl/Confluence Contract) |
+| S6-11 | Diagnostics distinguish 4 categories; cooldown/lockout/cash are not identical mechanisms | Agreed | Not authorized | Partially implemented (mechanisms exist distinctly in code; unified 4-category operator-facing diagnostic not confirmed) | Code inspection (this session) |
+| S6-12 | Bearish observations never execute shorts/auto-close longs; legacy mappings verified separately | Agreed (reaffirms S2-01/S2-02) | Not authorized | Not assessed in this documentation pass (legacy-path exhaustive verification not performed) | Not assessed in this documentation pass |
+| S6-13 | Timely opportunities stay Telegram-eligible despite capacity block; explicit skip explanation | Agreed (extends S2-03/S4-01) | Not authorized | Not implemented (no capacity-independent alert path confirmed for Original's intraday lane) | Code inspection (this session) |
+| S6-14 | One expiry update; expired-but-new stays dashboard-visible; 3 distinct timestamps; no false-fresh/would-have-profited claims; flood prevention | Agreed | Not authorized | Not implemented | Code inspection (this session) |
+| S6-15 | Delayed Market Simulation: separate labelled mode, chronological/causal, separate account, shares rules with replay | Agreed | Not authorized | Not implemented (no such mode exists) | Code inspection (this session) |
+| S6-16 | Preserve corrected baseline: revalidation + bracket-check + no-post-spread-RRR-recheck + not-a-scheduler; reject "no revalidation" claim | Agreed (inspected baseline) | Not authorized | Implemented (accurately describes current code) | Code inspection (this session, talonx_quant/consumer.py:2017, talonx_paper/engine.py:156-186) |
+| S6-17 | Approved target: approve-then-freeze, next-eligible-bar-open entry, RRR recheck at execution price, T-10 cutoff | Agreed | Not authorized | Not implemented (OPS-008) | Code inspection (this session) |
+| S6-18 | Spread-adjusted entry ≠ full net-of-fees/exit-cost RRR; exact cost treatment TBD | Open — deferred (S6-25) | N/A | N/A | N/A |
+| S6-19 | Market-time exit precedence; both-touched-unknown ⇒ stop-first + AMBIGUOUS_INTRABAR_ORDER (conservative, not proof) | Agreed | Not authorized | Not implemented (OPS-009; no matching status code found) | Code inspection (this session, repo-wide search) |
+| S6-20 | Stop/gap fill models; no extreme-low auto-fill; stop-market≠stop-limit; pre-entry ranges can't trigger post-entry exits; exactly-once closure | Agreed | Not authorized | Not implemented (OPS-009) | Code inspection (this session) |
+| S6-21 | Intraday EOD-flatten inspected baseline: 15:50 ET default, DST-aware not calendar-aware, no price-age check, no durable recovery state | Agreed (inspected baseline) | Not authorized | Implemented (accurately describes current code) | Code inspection (this session, talonx_paper/config.py, consumer.py) |
+| S6-22 | Approved EOD-flatten target: close-10min cutoff, durable cross-restart recovery, account block, EXIT_UNRESOLVED, Operations notify-once | Agreed | Not authorized | Not implemented (OPS-007) | Code inspection (this session) |
+| S6-23 | Shared recovery per-exit-type own evidence; explicit uncertainty; not applied to V2/fundamentals | Agreed | Not authorized | Not implemented (OPS-007/OPS-009) | Code inspection (this session) |
+| S6-24 | Deadline equality/receipt-vs-processing semantics resolved at requirements level (resolves S5-19) | Agreed (requirements-level only) | Not authorized | Not implemented; implementation/validation tracked under OPS-003 | Code inspection (this session) |
+| S6-25 | Deferred: numerical spread/slippage/fee assumptions for entry-geometry target | Open — deferred | N/A | N/A | N/A |
+| S6-26 | Deferred: missing intraday entry-bar recovery duration (extends OPS-005) | Open — deferred | N/A | N/A | N/A |
 
 ---
 
@@ -348,6 +374,15 @@ multi-day strategy and lifecycle) and Session 9 (Telegram and dashboard
 experience) — needs a concrete acceptance check of what the OPERATOR
 actually sees for a stale/expired opportunity, not just the internal
 state.
+
+**Session 6 update (2026-09-16, ~18:47 UTC) — extended, not resolved**:
+Session 6 §D agreed the concrete operator-facing requirement this
+entry always lacked — one expiry update per unfilled alerted
+opportunity, three distinct timestamps (deadline/discovery/
+notification) shown, and an explicit "no paper position opened" skip
+explanation (`S6-13`/`S6-14`). **Implementation status unchanged**:
+still not found in the code inspected this session — `S6-14`'s own
+verdict is `Not implemented`.
 
 ---
 
@@ -775,6 +810,15 @@ session).
 
 **Open questions/dependencies**: candidate for Session 8/Session 9,
 same as S2-03.
+
+**Session 6 update (2026-09-16, ~18:47 UTC) — extended for Original's
+intraday lane specifically**: Session 6 §D extended this distinction
+to Original's intraday alerts explicitly — a timely, qualified
+intraday opportunity stays Telegram-eligible even when paper capacity
+blocks entry, with a clear skip explanation (`S6-13`). Prior evidence
+for this entry was V2-only; `S6-13`'s own verdict is `Not implemented`
+for Original's intraday lane specifically (no capacity-independent
+alert path was found for it this session).
 
 ---
 
@@ -1423,6 +1467,15 @@ itself does not exist. **Validation**: Code inspection (this session).
 candidate account only exists once the research-lab workflow is
 built).
 
+**Session 6 update (2026-09-16, ~18:47 UTC) — reaffirmed, not
+downgraded**: Session 6 §A gave this entry's "experimental-candidate
+account" its first concrete instance — Fundamental Opportunities, now
+positioned as an isolated Research Lab candidate (`S6-03`) with the
+optional research bot remaining OFF by default (reaffirms `S3-21`), no
+existing process/account/obligation changed, and a labelled combined
+portfolio view remaining permitted (not yet built) rather than
+required. Verdict unchanged: `Not implemented`.
+
 ## S3-14 — Existing campaigns not overwritten by new defaults
 
 **Requirement**: V2's $300,000 campaign and Original's existing
@@ -1603,6 +1656,22 @@ session**: a future session covering Original's non-intraday path
 (candidate: extending Session 6, or a new dedicated session — not
 decided). **Dependency**: direct code/data inspection of Original's
 long-term lane, not yet performed.
+
+**Session 6 update (2026-09-16, ~18:47 UTC) — RESOLVED (product
+positioning only)**: the product owner decided "Fundamental
+Opportunities" is retained as an **isolated Research Lab candidate**,
+not primary product scope, with promotion requiring explicit future
+approval through a defined review (data/report provenance, valuation
+method, causal replay, qualification, performance) —
+`DECISION_LOG.md` Session 6 §A, tracked as `S6-03`. **Decision status
+updated**: `Open — deferred` → `Resolved — see S6-03` for the
+**product-positioning** question. This entry's original deferral text
+is preserved unedited above. **A direct code/data inspection of
+Original's long-term lane itself was still not performed this
+session** — `S6-03`'s own implementation status is `Not implemented`
+(no such Research Lab candidate account exists yet); the underlying
+path's technical role remains as undecided as before, only its
+**product category** is now settled.
 
 ## S3-25 — Deferred: cross-strategy capital/exposure enforcement policy
 
@@ -1788,6 +1857,18 @@ definition) and `S3-28` (deferred pending-intent-on-pause semantics) —
 this requirement sharpens that deferral into a specific atomicity
 guarantee, still not implemented.
 
+**Session 6 update (2026-09-16, ~18:47 UTC) — reaffirmed, not
+downgraded**: Session 6 (§D, §H) kept this entry's own distinction
+intact and extended it — paused-entry cancellation remains explicitly
+**distinct** from continuing position management (existing positions
+keep their own exit rules regardless of a pause, `S6-13`'s framing),
+and unresolved-exit recovery routing/Operations notification are now
+linked via `OPS-007` (intraday EOD-flatten recovery) for the
+**intraday** case specifically — V2's own analogous reservation-
+release path (`S5-17`) remains separately correct and unaffected.
+Verdict unchanged: `Not implemented` for this entry's own atomic-
+cancel-on-pause claim.
+
 ## S4-13 — EOD reports daily performance, open risk, unresolved obligations
 
 **Decision**: Agreed (extends `S2-07`). **Authorization**: Not
@@ -1916,6 +1997,13 @@ dedicated data-provider research. **Planned session**: not assigned;
 candidate is a dedicated technical task once Session 6 clarifies
 strategy-specific needs. **Dependency**: `OPS-005`.
 
+**Session 6 update (2026-09-16, ~18:47 UTC)**: Session 6 §F added a
+second, related open dependency on this same provider-selection
+question — the exact missing-intraday-entry-bar recovery duration
+(`S6-26`) cannot be decided until a provider is qualified. **Decision
+status unchanged**: still `Open — deferred`; no destination session
+assigned.
+
 ## S5-11 — No midday-price substitution/unvalidated fallback
 
 **Decision**: Agreed. **Authorization**: Not authorized.
@@ -1969,7 +2057,16 @@ unresolved by this correction. See `OPERATIONAL_FINDINGS.md` `OPS-003`
 for the complete finding, and `DECISION_LOG.md`'s dated "Documentation
 correction" note under Session 5 for the full narrative.
 
-## S5-14 — Only timely, durably admitted intents reconcile; check expiry before fill
+**Session 6 update (2026-09-16, ~18:47 UTC) — clarified, kept
+distinct**: `S5-19` is now resolved **at the requirements level** by
+Session 6 §I (`S6-24`) — see `S5-19`'s own dated update. **This entry's
+V2-specific three-session **ENTRY** recovery window is explicitly kept
+distinct from Session 6 §H's intraday **NEXT-session-close EXIT**
+recovery** (`S6-22`/`S6-23`, tracked under `OPS-007`) — the two are
+different mechanisms for different lanes (V2's prospective entry vs.
+Original's intraday exit), and Session 6 explicitly states its
+intraday recovery rules do not apply to V2. Neither this entry's
+`Partially implemented` verdict nor its `OPS-003` gates changed.
 
 **Decision**: Agreed. **Authorization**: Not authorized (pre-existing).
 **Implementation**: ~~Implemented — `service.py`'s retry-then-expire
@@ -2076,6 +2173,23 @@ product decision — needs definition before any implementation task
 touching this window. **Planned session**: none (a future
 implementation-acceptance task, not a knowledge-transfer session).
 **Dependency**: `S5-13`.
+
+**Session 6 update (2026-09-16, ~18:47 UTC) — RESOLVED AT REQUIREMENTS
+LEVEL**: the product owner agreed the general semantics — evidence
+durably received at or before the deadline qualifies, evidence
+received afterward cannot qualify the original entry, expiry/
+reconciliation are serialized to prevent double-release/double-fill,
+and corrections are versioned/auditable, never silent
+(`DECISION_LOG.md` Session 6 §I, tracked as `S6-24`). **Decision
+status updated**: `Open — deferred` → `Resolved at requirements level
+— see S6-24`. **Implementation and validation remain separately
+tracked and pending under `OPS-003`** — this resolution answers *what*
+the product wants, not *whether* `talonx_v2/service.py`'s actual code
+(the `S5-13`/`S5-14`-corrected dual-deadline behavior) yet implements
+it correctly; that remains open. `S5-13`'s own dependency on this
+entry is now satisfied at the requirements level; `S5-13`'s
+implementation status is unaffected and remains as corrected on
+2026-09-16 (`Partially implemented`, `OPS-003`).
 
 ## S5-20 — Deadline-consistency finding, recorded not corrected
 
@@ -2186,3 +2300,277 @@ actions, and licensing all need independent evidence — none resolved
 this session. **Planned session**: not assigned (candidate: Session 12
 or a dedicated data-engineering task). **Dependency**: `OPS-004`
 (corporate-action question specifically overlaps).
+
+---
+
+# Session 6 requirements (S6-01 through S6-26)
+
+Compact format, per `DECISION_LOG.md` Session 6, grouped A–I as
+discussed. `S6-25`/`S6-26` are explicit deferrals, not decisions.
+
+## S6-01 — Primary scope = Intraday Opportunities + V2
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Implemented — both exist and run today; "primary
+scope" is itself a labelling/positioning decision, not a runtime claim,
+and is explicitly not a claim of validated profitability or execution
+readiness. **Validation**: Code inspection (established + this
+session). **Dependency**: `S3-01` (both horizons retained).
+
+## S6-02 — Major-development notifications remain informational
+
+**Decision**: Agreed (reaffirms `S1-02`). **Authorization**: Not
+authorized (pre-existing). **Implementation**: Implemented.
+**Validation**: Code inspection (established). **Dependency**: none.
+
+## S6-03 — Fundamental Opportunities = isolated Research Lab candidate (resolves S3-24)
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no such Research Lab candidate
+account, promotion workflow instance, or research-bot report exists
+yet; this session settles the product category only. **Validation**:
+Code inspection (this session — no matching account/workflow found).
+**Dependency**: `S3-15`-`S3-20` (the research-lab workflow this
+candidate would eventually go through); `S3-24` (resolved by this
+entry at the product-positioning level only).
+
+## S6-04 — Both intraday and multi-day remain primary scope; no demotion
+
+**Decision**: Agreed (reaffirms `S3-01`). **Authorization**: Not
+authorized (pre-existing). **Implementation**: Implemented.
+**Validation**: Code inspection (established). **Dependency**: none.
+
+## S6-05 — V2 code-P eligibility definition
+
+**Decision**: Agreed (inspected baseline). **Authorization**: Not
+authorized. **Implementation**: Implemented — matches the frozen
+`INSIDER_BUY_CLUSTER_V2@1` baseline established in this project's Task
+107B/109 history; not re-derived from scratch this session, but
+consistent with prior evidence. **Validation**: Code inspection
+(established). **Dependency**: none.
+
+## S6-06 — V2 cluster window and detector-activation rules
+
+**Decision**: Agreed (inspected baseline). **Authorization**: Not
+authorized. **Implementation**: Implemented — matches the established
+frozen baseline (`<=10` trading-session-step filing-date window,
+second-distinct-owner activation, greedy non-overlapping episodes, no
+minimum amount). **Validation**: Code inspection (established, this
+project's Task 107B/109/112R history). **Dependency**: none.
+
+## S6-07 — V2 operational liquidity screen and identity caveats
+
+**Decision**: Agreed (inspected baseline). **Authorization**: Not
+authorized. **Implementation**: Implemented for the liquidity screen
+itself (20-session median-volume/price-floor gate, established); the
+"frozen contract's broader wording vs. inspected operational path"
+distinction is **disclosed, not resolved** — see `OPERATIONAL_FINDINGS.md`
+`OPS-006`'s extension. **Validation**: Code inspection (established).
+**Dependency**: `OPS-006`.
+
+## S6-08 — Diagnose scarcity via full funnel; no profitability claim
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Implemented — this documentation's own framing
+(coverage→evidence→clusters→qualification→admission→completed trades)
+follows this rule; no trade-count or profitability guarantee is made
+anywhere in this documentation layer. **Validation**: Code inspection
+(this session, self-check). **Dependency**: none.
+
+## S6-09 — Intraday inspected code defaults
+
+**Decision**: Agreed (inspected baseline). **Authorization**: Not
+authorized. **Implementation**: Implemented — directly confirmed this
+session: `rsi_oversold=30` (`talonx_quant/config.py:179`),
+`macd_fast/slow/signal=12/26/9` (`config.py:158-160`),
+`ma_fast/slow=10/50` (`config.py:161-162`),
+`min_ma_spread_pct=0.0015` (`config.py:213`),
+`min_atr_pct=0.25` (`config.py:355`),
+`cooldown_seconds=1200` (20 min, `config.py:196`),
+`loss_lockout_seconds=75*60` (`config.py:460`),
+`trend_gate_enabled=True` (`config.py:387`). The specific
+"confirmation score >= 2" and "minimum RRR 1.5" constants were **not**
+individually located by name in this same targeted read — recorded as
+given, consistent with the rest of the confirmed defaults, not
+independently re-verified. **Validation**: Code inspection (this
+session, `talonx_quant/config.py`, exact line numbers above).
+**Dependency**: none.
+
+## S6-10 — RSI-recovery/confirmation interaction is intentional
+
+**Decision**: Agreed (inspected baseline). **Authorization**: Not
+authorized. **Implementation**: Implemented — this project's own
+established "RSI-Curl / Confluence Contract" (Task 28,
+`RSI_CONFLUENCE_STATE_BASED_CONFIRMED`, 2026-08-21) directly documents
+this as intentional design. **Validation**: Code inspection
+(established, `talonx_quant/config.py`'s own inline documentation of
+Task 28). **Dependency**: none.
+
+## S6-11 — Diagnostics distinguish 4 categories; mechanisms are not identical
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — the four underlying
+mechanisms (signal rejection, data/readiness gating, cooldown/lockout
+suppression, capacity/cash admission) exist as genuinely distinct code
+paths; whether they are surfaced to an operator as one unified,
+four-category diagnostic was **not confirmed** this session.
+**Validation**: Code inspection (this session, mechanism existence
+only). **Dependency**: none blocking.
+
+## S6-12 — Bearish observations never execute/auto-close; legacy mappings verified separately
+
+**Decision**: Agreed (reaffirms `S2-01`/`S2-02`). **Authorization**:
+Not authorized. **Implementation**: Not assessed in this documentation
+pass — this session explicitly does not claim every legacy code path
+was checked; an exhaustive verification was not performed.
+**Validation**: Not assessed in this documentation pass. **Dependency**:
+none blocking; a candidate for a dedicated legacy-path audit.
+
+## S6-13 — Telegram-eligible despite capacity block; explicit skip explanation
+
+**Decision**: Agreed (extends `S2-03`/`S4-01`). **Authorization**: Not
+authorized. **Implementation**: Not implemented — no capacity-
+independent alert path was confirmed for Original's intraday lane
+specifically this session (V2's own analogous behavior was discussed
+under Session 4/5, not re-verified here for Original). **Validation**:
+Code inspection (this session, targeted search, no match found).
+**Dependency**: none blocking to design.
+
+## S6-14 — Expiry-update discipline and duplicate-flood prevention
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no one-time expiry-update
+mechanism, three-timestamp display, or flood-prevention logic specific
+to this requirement was found. **Validation**: Code inspection (this
+session). **Dependency**: `S6-13`.
+
+## S6-15 — Delayed Market Simulation mode
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no separately labelled,
+chronological-timestamp-driven simulation mode with its own isolated
+account was found. **Validation**: Code inspection (this session).
+**Dependency**: `S3-15`-`S3-20` (shares execution rules with the
+research-lab replay workflow).
+
+## S6-16 — Preserve corrected entry-geometry baseline finding
+
+**Decision**: Agreed (inspected baseline). **Authorization**: Not
+authorized. **Implementation**: Implemented — directly confirmed this
+session by reading `QuantScanner._revalidate_candidate()`
+(`talonx_quant/consumer.py:2017`, full-geometry recalculation against
+latest buffered close, rejects missing-geometry/expired/insufficient-
+RRR) and `fill_geometry_is_valid()` (`talonx_paper/engine.py:156-186`,
+`stop_price < fill_price < target_price` when both bounds exist,
+returns `True` when either is absent — a documented, pre-existing
+convention, not an oversight). Confirms this baseline description is
+accurate and rejects any "no revalidation exists" characterization.
+**Validation**: Code inspection (this session, exact lines cited
+above). **Dependency**: none.
+
+## S6-17 — Approved entry-geometry/next-bar-execution target
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — none of the target's specific
+mechanics (freeze-on-approval, next-eligible-bar-open entry,
+execution-adjusted RRR recheck, T-10 cutoff-and-cancel) were found in
+the inspected code; today's alert-driven entry fires on its own signal
+bar, not a deliberately-delayed next bar. **Validation**: Code
+inspection (this session — see `S6-16`'s confirmed baseline for what
+exists instead). **Dependency**: `OPS-008`, `S6-25` (cost-model
+detail), `S6-26` (missing-bar recovery duration).
+
+## S6-18 — Spread-adjusted entry ≠ full net-of-fees/exit-cost RRR
+
+**Decision**: Open — deferred (`S6-25`). **Authorization**: N/A.
+**Implementation**: N/A. **Validation**: N/A. **Dependency**: `S6-25`.
+
+## S6-19 — Market-time exit precedence and stop-first ambiguity assumption
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — a repository-wide search for
+`AMBIGUOUS_INTRABAR_ORDER` found no matches anywhere in `talonx_paper/`
+or elsewhere in the codebase; no code implements market-time exit-
+precedence resolution or the stop-first conservative-ambiguity
+assumption. **Validation**: Code inspection (this session, repo-wide
+search, no match). **Dependency**: `OPS-009`.
+
+## S6-20 — Stop/gap fill models, exactly-once closure
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no code matching the declared
+stop-crossing/gap-below-stop fill models, extreme-low-fill
+prohibition, or stop-market-vs-stop-limit distinction was found; a
+repository-wide search for `EXIT_UNRESOLVED`/`EXIT_PENDING` (target
+status labels used elsewhere in this design) found no matches in
+`talonx_paper/` either. Exactly-once closure at the *position* level
+(distinct from V2's own exactly-once *reservation-release*, `S5-17`)
+was not separately traced this session. **Validation**: Code
+inspection (this session, repo-wide search, no match). **Dependency**:
+`OPS-009`.
+
+## S6-21 — Intraday EOD-flatten inspected baseline
+
+**Decision**: Agreed (inspected baseline). **Authorization**: Not
+authorized. **Implementation**: Implemented — directly confirmed this
+session: `eod_flatten_hour_et=15`/`eod_flatten_minute_et=50`
+(`talonx_paper/config.py:141-143`), `seconds_until_next_eod_flatten()`
+(`talonx_paper/engine.py:189-200`) converts via `ZoneInfo` (DST-aware)
+with no `exchange_calendars`/session-date check anywhere in
+`talonx_paper/consumer.py`'s `_eod_flatten_loop`
+(`consumer.py:188-218`) — confirming "DST-aware but not exchange-
+calendar-aware" exactly as described. **Validation**: Code inspection
+(this session, exact lines cited above). **Dependency**: none.
+
+## S6-22 — Approved EOD-flatten recovery target
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — none of the target's specific
+mechanics (close-minus-10-minutes cutoff, durable cross-restart
+recovery state, per-account entry block while unresolved, `EXIT_
+PENDING`/`EXIT_UNRESOLVED` status labels, deduplicated Operations
+notification) were found; today's sweep logs-and-skips a missing price
+with no persisted recovery state (`S6-21`'s confirmed baseline).
+**Validation**: Code inspection (this session). **Dependency**:
+`OPS-007`.
+
+## S6-23 — Shared recovery with per-exit-type own evidence; scope limited to intraday
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no shared intraday-exit-recovery
+architecture exists yet to exhibit this per-type-evidence property.
+Explicitly **not** applicable to V2 (which keeps its own, separately-
+corrected three-session recovery, `S5-13`-`S5-20`) or the Research-
+Lab-only fundamentals account (`S6-03`). **Validation**: Code
+inspection (this session). **Dependency**: `OPS-007`, `OPS-009`.
+
+## S6-24 — Deadline equality/receipt-vs-processing semantics (resolves S5-19 at requirements level)
+
+**Decision**: Agreed (requirements-level resolution of `S5-19`).
+**Authorization**: Not authorized. **Implementation**: Not implemented
+— this is a cross-cutting semantics statement, not itself a feature;
+whether V2's actual `S5-13`/`S5-14`-corrected code already satisfies it
+is exactly `OPS-003`'s own open question, unresolved by this
+requirements-level agreement. **Validation**: Code inspection (this
+session — no new code re-read specifically against this exact
+semantics beyond what `OPS-003` already covers). **Dependency**:
+`OPS-003`, `S5-13`, `S5-14`.
+
+## S6-25 — Deferred: numerical spread/slippage/fee assumptions for entry-geometry target
+
+**Requirement**: exact cost-model numbers for `S6-17`'s approved
+target. **Decision**: Open — deferred. **Authorization**: N/A.
+**Implementation**: N/A. **Validation**: N/A. **Reason**: needs its
+own cost-model evaluation, not assumed alongside the qualitative
+target. **Planned session**: Session 12 (Technical validation,
+usefulness and economic evidence). **Dependency**: `S6-17`.
+
+## S6-26 — Deferred: missing intraday entry-bar recovery duration
+
+**Requirement**: exact bounded-recovery duration for a missing
+one-minute interval (`S6-17`). **Decision**: Open — deferred.
+**Authorization**: N/A. **Implementation**: N/A. **Validation**: N/A.
+**Reason**: depends on which data provider is ultimately qualified —
+extends `OPS-005`'s open provider-qualification question, not a
+knowledge-transfer-session topic. **Planned session**: none (a
+data-provider qualification task). **Dependency**: `OPS-005`.

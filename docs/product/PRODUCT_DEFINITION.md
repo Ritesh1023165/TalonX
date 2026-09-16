@@ -314,6 +314,61 @@ five areas below.** Summary:
 
 `OPS-002` **remains open**, unaffected by Session 4 or 5.
 
+## 6e. Signal discovery and strategy mechanics — `AGREED` (Session 6), implementation `LARGELY NOT BUILT`
+
+Recorded in full in `DECISION_LOG.md` Session 6, tracked as `S6-01`
+through `S6-26` in `REQUIREMENTS_TRACKER.md` (`S6-18`, `S6-25`,
+`S6-26` are open/deferred, not decisions). **Discussion closed;
+documented requirements, with explicit deferrals and implementation
+gates** — several areas record an inspected, accurate baseline
+separately from an approved-but-unbuilt target; this session does not
+claim execution readiness for any of them. Summary:
+
+- **Strategy scope**: primary scope = Intraday Opportunities + V2,
+  without implying execution-readiness; **Fundamental Opportunities is
+  retained as an isolated Research Lab candidate**, resolving `S3-24`
+  at the product-positioning level (its underlying technical role
+  remains uninspected); both horizons remain primary — no demotion.
+- **V2 qualification baseline** (code P, >=2 distinct owner CIKs,
+  filing-date-driven <=10-session-step window, operational liquidity
+  screen) — `Implemented`, matches this project's established frozen
+  `INSIDER_BUY_CLUSTER_V2@1` contract. Whether the frozen contract's
+  own broader wording matches the operational screen exactly was
+  **not verified this session** — disclosed, not resolved
+  (`OPERATIONAL_FINDINGS.md` `OPS-006`).
+- **Intraday baseline** (RSI/MACD/MA/ATR/cooldown/lockout defaults) —
+  `Implemented`, directly confirmed by reading `talonx_quant/config.py`
+  this session; the RSI-recovery/confirmation self-exclusion is
+  confirmed **intentional**, established design (Task 28), not a bug.
+- **Alerts independent of paper capacity** and **Delayed Market
+  Simulation** (a new, separately labelled evaluation mode) — both
+  `Not implemented`.
+- **Entry geometry/next-bar execution**: the **inspected baseline is
+  genuinely sound** — `QuantScanner._revalidate_candidate()` and
+  `fill_geometry_is_valid()` both confirmed by direct code reading this
+  session, explicitly refuting any "no revalidation exists" claim. The
+  **approved target** (freeze-on-approval, next-eligible-bar-open
+  entry, post-spread RRR recheck, T-10 cutoff) is `Not implemented` —
+  `OPERATIONAL_FINDINGS.md` `OPS-008`.
+- **Exit precedence/ambiguity**: `Not implemented` — a repository-wide
+  search found no matching status codes (`AMBIGUOUS_INTRABAR_ORDER`,
+  `EXIT_UNRESOLVED`, `EXIT_PENDING`) anywhere in `talonx_paper/` —
+  `OPERATIONAL_FINDINGS.md` `OPS-009`.
+- **Intraday EOD-flatten**: the **inspected baseline** (15:50 ET
+  default, DST-aware but not exchange-calendar-aware, no price-age
+  check, no durable recovery state) is confirmed accurate by direct
+  code reading. The **approved target** (close-minus-10-minutes
+  cutoff, durable cross-restart recovery, per-account entry block,
+  `EXIT_UNRESOLVED` terminal state) is `Not implemented` —
+  `OPERATIONAL_FINDINGS.md` `OPS-007`. **These intraday recovery rules
+  do not apply to V2 or the Research-Lab-only fundamentals account.**
+- **Deadline equality/audit history**: resolves `S5-19` **at the
+  requirements level only** — implementation/validation against V2's
+  actual code remain tracked under `OPS-003`, unresolved.
+
+`OPS-002` and `OPS-003` **remain open**, re-confirmed unaffected by
+this session's own targeted code reads.
+
 ## 7. Open / proposed — see `REQUIREMENTS_TRACKER.md` for tracked status
 
 - **Intraday-vs-multi-day scope** ("swing intelligence assistant"):
