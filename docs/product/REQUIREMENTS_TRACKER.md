@@ -185,6 +185,26 @@ without naming which of these applies.
 | S7-24 | Empty feed ≠ nothing happened; disclose limitations; no exhaustive-coverage claim | Agreed | Not authorized | Implemented (this documentation's own framing; dashboard's own wording not audited) | Code inspection (this session, self-check) |
 | S7-25 | Deferred: numerical freshness windows, requires bounded historical-filing review | Open — deferred | N/A | N/A | N/A |
 | S7-26 | Deferred: event-specific quantitative materiality thresholds, requires bounded historical-filing review | Open — deferred | N/A | N/A | N/A |
+| S8-01 | Startup catch-up intent valid only when admission durably committed strictly before target session's exchange-calendar open; delayed print/delivery doesn't extend deadline | Agreed | Not authorized | Implemented | Code inspection (this session, `_verify_temporal_boundary()`) |
+| S8-02 | Overnight operation not required, timely completion not guaranteed; separate filing/receipt/admission timestamps; no retrospective entry | Agreed | Not authorized | Partially implemented (temporal-boundary check confirmed; distinct 3-timestamp preservation not traced end-to-end) | Code inspection (this session) |
+| S8-03 | Late-discovered opportunities truthful expired/skipped status; qualification/admission/execution/delivery distinct; capacity-skipped still notify | Agreed (reaffirms S2-03/S2-04/S6-13) | Not authorized | Partially implemented (extends S6-13's own verdict) | Code inspection (established) |
+| S8-04 | PENDING_ENTRY·AWAITING_PRICE reservation preserved; reconcile only target-session open, never midday/later substitute | Agreed | Not authorized | Partially implemented (mechanism real under FAILED_NO_MARKET_DATA naming, S5-16) | Code inspection (established, this session) |
+| S8-05 | Applies Session-3-close entry-recovery incl. early closes; S5-19/S6-24 semantics; exact enforcement is OPS-003 work; intraday next-bar rules don't apply to V2 | Agreed | Not authorized | Partially implemented (corrected 2026-09-16 verdict, OPS-003) | Code inspection (established) |
+| S8-06 | Entry=Session 0, exit=close of 10th session after entry; holidays don't increment clock; delayed reconciliation doesn't shift exit session | Agreed (pre-existing) | Not authorized | Implemented | Code inspection (this session, `config.py:34,88`) |
+| S8-07 | No stop-loss in frozen baseline; no position additions from new cluster; pause/exclude/scope-removal doesn't abandon obligations | Agreed (pre-existing) | Not authorized | Implemented (stop-loss/single-position halves); Not assessed (scope-removal-preserves-obligations half) | Code inspection (established + this session) |
+| S8-08 | Missing valuations stale/unknown never fabricated zero; corp actions follow chronological policy without resetting exit clock (target only); no whole-share assumption | Agreed | Not authorized | Not implemented (corporate-action half, OPS-004); Implemented (missing-valuation half, reaffirms S2-12) | Code inspection (established) |
+| S8-09 | 3-step frozen fall-forward contract (target → earliest-of-next-5 → EXIT_UNRESOLVED); never best-price; no future data | Agreed (pre-existing) | Not authorized | Implemented | Code inspection + isolated test execution (this session, `pipeline.py:132-202`, `test_e8c_exit_unresolved_when_target_and_all_fallforward_missing` passed) |
+| S8-10 | "First available" ≠ race-arrival; record target/actual/source/price/reconciliation-time; V2 fall-forward distinct from intraday T-10 recovery | Agreed | Not authorized | Partially implemented (deterministic selection confirmed; full 5-field record-keeping not individually traced) | Code inspection (this session) |
+| S8-11 | Committed exit never silently replaced by later backfill; proven errors need versioned auditable correcting entries | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S8-12 | EXIT_PENDING·AWAITING_PRICE: open, occupies capacity, no anticipated-proceeds credit, other entries continue only if checks reliable | Agreed | Not authorized | Partially implemented (capacity-occupation and no-phantom-proceeds confirmed structurally; explicit status label not found) | Code inspection (this session) |
+| S8-13 | EXIT_UNRESOLVED: visible, blocks new entries account-wide until auditable resolution, not cleared by restart, containment not corruption-evidence, not auto-applied to other accounts | Agreed | Not authorized | Partially implemented (status/visibility/restart-persistence real; account-wide new-entry block NOT found, OPS-012) | Code inspection (this session, `store.py:410-419`, `paper.py` gate sequence) |
+| S8-14 | CLOSED: exactly-once settlement, duplicate/late instructions can't re-sell, notification failure doesn't roll back/duplicate; valuation freshness separate from exit status | Agreed (pre-existing) | Not authorized | Implemented | Code inspection (this session, `paper.py:155-191` atomic transaction) |
+| S8-15 | Cooldown anchor = actual modeled exit session incl. fall-forward; delayed notification doesn't restart; frozen length 5 sessions/issuer | Agreed (pre-existing) | Not authorized | Implemented | Code inspection (this session, `paper.py:188`, `config.py:45,91`) |
+| S8-16 | New entry still needs newly qualifying opportunity + timely admission; cooldown ending ≠ auto-BUY; boundary = first eligible re-entry session | Agreed (pre-existing) | Not authorized | Implemented (boundary directly resolved: exit_session+5 sessions, inclusive) | Code inspection (this session, `paper.py:104-106`) |
+| S8-17 | Track acceptance evidence separately for 8 listed lifecycle guarantees | Agreed | Not authorized | Partially implemented (items 1/2/4 directly exercised this session; 3/5/6/7/8 not individually re-verified) | Code inspection + isolated test execution (this session) |
+| S8-18 | Identify boundary coverage needs; existing tests may satisfy individually, cited not overclaimed | Agreed | Not authorized | Partially implemented (this documentation's own discipline; dedicated boundary tests for holidays/early-closes not located) | Code inspection (this session, self-check) |
+| S8-25 | Deferred: provider finality/publication-qualification boundary for target-closing data | Open — deferred | N/A | N/A | N/A |
+| S8-26 | Deferred: dedicated holiday/early-close-spanning fall-forward and admission-deadline boundary test coverage | Open — deferred | N/A | N/A | N/A |
 
 ---
 
@@ -980,6 +1000,18 @@ eod_closure_2026-09-15/EOD_CLOSURE_REPORT.md` §3.
 
 **Open questions/dependencies**: none.
 
+**Session 8 update (2026-09-16/17, ~23:05 UTC) — reaffirmed for V2's
+own lifecycle specifically**: Session 8 §E confirms this entry's
+"never auto-closes a multi-day position" claim extends correctly to
+V2's own exit machinery — `settle_due_exits()` only ever closes a
+position via its own frozen fall-forward contract (`S8-09`) or leaves
+it `EXIT_UNRESOLVED` (`S8-13`); no EOD/reconciliation code path was
+found that force-closes a pending or unresolved V2 exit. The
+realized/unrealized/unknown valuation distinction is also reaffirmed:
+`EXIT_UNRESOLVED` and `EXIT_PENDING`-style positions keep an
+explicitly stale/unknown valuation, never a fabricated zero
+(`S8-08`/`S8-12`). Verdict unchanged: `Implemented`.
+
 ---
 
 ## S2-08 — Exit follows strategy's own rules; unresolved outcome disclosed when data unavailable
@@ -1482,6 +1514,18 @@ confirms `pause`/`paused` exist, `exclude`/`mute` as this requirement's
 distinct concepts do not). **Dependencies**: `S3-28` (exact mute
 controls and pending-intent handling, deferred).
 
+**Session 8 update (2026-09-16/17, ~23:05 UTC) — linked, obligation-
+preservation confirmed**: Session 8 §C reaffirms that pause/exclude/
+scope removal must not abandon an existing V2 position's obligations
+(`S8-07`). No dedicated scope-removal code path was traced this
+session for V2 specifically (`S8-07`'s own "Not assessed" half) — this
+entry's own V2-side gap (no pause mechanism at all) remains
+unresolved and is not contradicted. V2's issuer-level re-entry
+cooldown (`S8-15`/`S8-16`, five sessions, anchored to actual exit) is
+a **different** mechanism from Pause/Exclude — a cooldown is
+automatic and time-bounded per issuer after a sale, not an operator-
+initiated suspension of new opportunities.
+
 ## S3-12 — New-campaign virtual account defaults
 
 **Requirement**: $100,000 starting cash per strategy account, $10,000
@@ -1500,6 +1544,13 @@ campaign ($300,000 for V2, $10,000/$15,000 for Original's two lanes).
 allocation figure; no starting-cash-default match found for $100,000
 specifically, this session). **Dependencies**: `S3-14` (existing
 campaigns not overwritten).
+
+**Session 8 update (2026-09-16/17, ~23:05 UTC) — unchanged,
+confirmed**: Session 8's lifecycle discussion does not change this
+entry's figures or apply them to V2's existing $300,000 campaign — no
+account was reset or resized this session (verified: this task made
+zero database writes). Verdict unchanged: `Not implemented` as a
+stated default.
 
 ## S3-13 — Separate accounts; combined-exposure view
 
@@ -1812,6 +1863,16 @@ discovery ordering, not performed this session. **Validation**: Not
 assessed in this documentation pass. **Dependency**: none blocking to
 design.
 
+**Session 8 update (2026-09-16/17, ~23:05 UTC) — clarified for V2
+specifically, still not fully assessed**: Session 8 §A confirms V2's
+own catch-up admission is timely-only — a startup catch-up may create
+a valid intent, but never a retrospective one where no timely intent
+existed (`S8-01`/`S8-02`). This directly supports (does not itself
+prove) the "no chronological-accounting change" half of this entry
+for V2's own lane; the cross-system (Original/Intelligence/V2)
+ordering question this entry was originally about remains **not
+assessed**.
+
 ## S4-04 — Preserve campaign balances/positions/reservations/exit rules across restart
 
 **Decision**: Agreed. **Authorization**: Not authorized (pre-existing).
@@ -1914,6 +1975,17 @@ as an explicit lifecycle-state display. **Validation**: Code
 inspection (this session). **Dependency**: `S5-16` (the product-level
 `EXPIRED_NO_MARKET_DATA` naming this internal code would need to
 adopt or map to).
+
+**Session 8 update (2026-09-16/17, ~23:05 UTC) — extended, exit-side
+gap found**: Session 8 §E confirms the entry-side finding above
+extends symmetrically to the exit side — `EXIT_BAR_PENDING_
+FALLFORWARD` and `EXIT_UNRESOLVED` are two more genuinely distinct
+internal dispositions (`talonx_v2/pipeline.py:179`, `store.py:410-419`,
+this session), reinforcing the "separate missing-price/valuation
+modifiers" pattern. **New gap disclosed**: unlike the entry-side
+mechanism, `EXIT_UNRESOLVED` was found to lack an account-wide new-
+entry block (`S8-13`/`OPS-012`) — a state-surfacing success paired
+with an enforcement gap. Verdict unchanged: `Partially implemented`.
 
 ## S4-12 — Pausing new entries atomically cancels unfilled intents
 
@@ -2157,6 +2229,19 @@ Original's intraday exit), and Session 6 explicitly states its
 intraday recovery rules do not apply to V2. Neither this entry's
 `Partially implemented` verdict nor its `OPS-003` gates changed.
 
+**Session 8 update (2026-09-16/17, ~23:05 UTC) — further distinguished
+from V2's OWN 5-session exit fall-forward**: this entry's three-session
+**ENTRY** recovery window must also be kept distinct from V2's **own**
+five-session **EXIT** fall-forward (`S8-09`/`S8-10`, Session 8 §D) —
+two different windows, for two different lifecycle phases, within the
+SAME strategy (V2), not to be confused with each other or with
+intraday's separate recovery (already distinguished above). The entry
+window is 3 sessions from the eligible entry session; the exit
+fall-forward is up to 5 sessions from the target 10th-session exit —
+neither number nor mechanism should be conflated with the other.
+Provider-selection/finality remains unresolved for **both** windows
+(`OPS-005`, `S8-25`) — this session does not resolve it for either.
+
 **Decision**: Agreed. **Authorization**: Not authorized (pre-existing).
 **Implementation**: ~~Implemented — `service.py`'s retry-then-expire
 ordering (`retry_deadline` checked before any fill attempt,
@@ -2341,6 +2426,12 @@ gate exists to block on. **Validation**: Code inspection (this session
 treatment exists in code today. **Validation**: Code inspection (this
 session — targeted search for split/merger/cash-in-lieu handling,
 `OPS-004`). **Dependency**: `OPS-004`.
+
+**Session 8 update (2026-09-16/17, ~23:05 UTC) — reaffirmed unchanged**:
+Session 8 §C explicitly reaffirms corporate-action handling as target
+behavior only, without resetting V2's holding-clock/exit-schedule
+(`S8-08`) — no corporate-action code was found or implemented this
+session either. Verdict unchanged: `Not implemented`.
 
 ## S5-27 — Decimal arithmetic; cents/4-decimal display; no intermediate truncation
 
@@ -2682,6 +2773,19 @@ corrected three-session recovery, `S5-13`-`S5-20`) or the Research-
 Lab-only fundamentals account (`S6-03`). **Validation**: Code
 inspection (this session). **Dependency**: `OPS-007`, `OPS-009`.
 
+**Session 8 update (2026-09-16/17, ~23:05 UTC) — V2's own analogous
+mechanism found, kept distinct**: V2 has its own real (not shared with
+intraday) version of "per-exit-type own evidence" — the fall-forward
+exit records a selected source/reference price/reconciliation time
+per position (`S8-09`/`S8-10`), and `EXIT_UNRESOLVED` is V2's own
+distinct terminal state, structurally unrelated to this entry's
+intraday-only `EXIT_UNRESOLVED`/`EXIT_PENDING` target labels
+(`OPS-007`/`OPS-009` remain Original-intraday-scoped; V2's status
+names live in a separate codebase, `talonx_v2/store.py`, not
+`talonx_paper/`). No entry-status naming is shared or reused between
+the two lanes. Verdict unchanged for this (intraday) entry: `Not
+implemented`.
+
 ## S6-24 — Deadline equality/receipt-vs-processing semantics (resolves S5-19 at requirements level)
 
 **Decision**: Agreed (requirements-level resolution of `S5-19`).
@@ -2878,6 +2982,16 @@ refresh-age, stale-backlog-flood-prevention specifically) was not
 performed this session. **Validation**: Code inspection (established).
 **Dependency**: `S7-18`.
 
+**Session 8 update (2026-09-16/17, ~23:05 UTC) — boundary clarified**:
+Session 8 confirms Intelligence's company-event freshness policy and
+per-stock mute (`S7-20`) do **not** automatically govern V2's or
+Original's own trade-lifecycle notifications, nor Operations
+incidents (`S7-02`) — these remain three separate notification
+domains with their own rules (Session 7 §A's routing separation,
+reaffirmed). V2's own lifecycle-status disclosure (`S8-12`/`S8-13`)
+follows V2's own agreed rules, not Intelligence's freshness policy.
+Verdict unchanged: `Partially implemented`.
+
 ## S7-18 — Deferred: numerical freshness windows
 
 **Decision**: Open — deferred (`S7-25`). **Authorization**: N/A.
@@ -2968,3 +3082,252 @@ Open — deferred. **Authorization**: N/A. **Implementation**: N/A.
 `S7-25`; this documentation task does not authorize a new extraction/
 LLM project by implication. **Planned session**: none assigned.
 **Dependency**: `S7-08`.
+
+---
+
+# Session 8 requirements (S8-01 through S8-18, S8-25, S8-26)
+
+Compact format, per `DECISION_LOG.md` Session 8, grouped A–G as
+discussed. `S8-25`/`S8-26` are explicit deferrals, not decisions.
+
+## S8-01 — Pre-open admission deadline
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Implemented — `V2Service._verify_temporal_
+boundary()` (`talonx_v2/service.py:796-`) is a real, fail-closed check
+that both the activating filing's dissemination and the admission
+decision itself occurred strictly before the entry session's RTH open;
+an unknown dissemination timestamp is a strict failure on any live
+tick. **Validation**: Code inspection (this session, full docstring +
+logic read). **Dependency**: none.
+
+## S8-02 — No retrospective entry; distinct timestamps; no guaranteed overnight completion
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — `S8-01`'s temporal-
+boundary check structurally prevents retrospective entry; whether
+filing-availability, first-receipt, and durable-admission are tracked
+as three genuinely separate, disclosed timestamps (vs. just enforced
+internally) was not traced end-to-end this session. **Validation**:
+Code inspection (this session, partial). **Dependency**: `S8-01`.
+
+## S8-03 — Truthful late-discovery status; capacity-skipped still notify
+
+**Decision**: Agreed (reaffirms `S2-03`/`S2-04`/`S6-13`).
+**Authorization**: Not authorized. **Implementation**: Partially
+implemented — extends `S6-13`'s own verdict (not implemented for
+Original's intraday lane specifically; V2's own capacity-skip
+disposition codes, `NO_CASH` etc., are real per `S2-03`'s evidence).
+**Validation**: Code inspection (established). **Dependency**: `S2-03`,
+`S6-13`.
+
+## S8-04 — Delayed entry-price reservation and reconciliation-source discipline
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — the retry-then-release
+mechanism is real (`FAILED_NO_MARKET_DATA`, `S5-16`'s established
+finding); whether the code could ever reconcile against something
+other than the exact target-session opening reference was not
+separately re-tested this session, though no such substitution path
+was found in the code read across this and prior sessions.
+**Validation**: Code inspection (established). **Dependency**: `S5-13`,
+`S5-16`.
+
+## S8-05 — Session-3-close recovery applies; intraday next-bar rules excluded
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — matches `S5-13`'s
+2026-09-16-corrected verdict exactly (session-based recovery exists;
+exact Session-3-close enforcement and pre-fill expiry remain pending
+`OPS-003`). Intraday next-bar simulation (`S6-16`/`S6-17`) is
+confirmed structurally inapplicable to V2 — the two codebases
+(`talonx_v2/`, `talonx_quant`/`talonx_paper/`) are separate.
+**Validation**: Code inspection (established, `S5-13`'s correction).
+**Dependency**: `S5-13`, `S5-19`, `OPS-003`.
+
+## S8-06 — Holding clock: Session 0 entry, 10th-session close exit
+
+**Decision**: Agreed (pre-existing). **Authorization**: Not
+authorized. **Implementation**: Implemented — `hold_trading_days=10`
+with a runtime assert (`talonx_v2/config.py:34,88`); `add_sessions()`
+is calendar-based (non-trading days never increment). **Validation**:
+Code inspection (this session, exact lines). **Dependency**: none.
+
+## S8-07 — No stop-loss; no cluster-triggered additions; obligations survive pause/exclude/scope-removal
+
+**Decision**: Agreed (pre-existing). **Authorization**: Not
+authorized. **Implementation**: Implemented for no-stop-loss
+(`stop_loss_enabled=False` with a runtime assert, `config.py:36,94`,
+established) and no-cluster-triggered-additions
+(`SYMBOL_ALREADY_OPEN` skip, `S2-03`'s evidence). **Not assessed**:
+whether a scope-removal/exclusion event specifically preserves an
+already-open V2 position's obligations — no scope-removal code path
+was traced this session. **Validation**: Code inspection (established
++ this session). **Dependency**: `S3-11` (Pause/Exclude semantics).
+
+## S8-08 — Missing valuations never fabricated zero; corporate actions target-only; no whole-share assumption
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Implemented for the missing-valuation half
+(reaffirms `S2-12`'s established `equity_value = None`-not-zero
+evidence); **Not implemented** for the corporate-action half — no such
+code exists (`OPS-004`, unchanged). **Validation**: Code inspection
+(established). **Dependency**: `S2-12`, `OPS-004`.
+
+## S8-09 — Three-step frozen fall-forward contract
+
+**Decision**: Agreed (pre-existing). **Authorization**: Not
+authorized. **Implementation**: Implemented — `settle_due_exits()`
+(`talonx_v2/pipeline.py:132-202`) matches the target→earliest-of-
+next-5→`EXIT_UNRESOLVED` contract exactly; the code's own comment
+states "Never backwards. Never 'best price.'" **Validation**: Code
+inspection + **isolated test execution** (`tests/
+test_task117_phase0_entry_timing.py::
+test_e8c_exit_unresolved_when_target_and_all_fallforward_missing`, run
+this session, passed). **Dependency**: none.
+
+## S8-10 — "First available" is deterministic, not race-arrival; full record-keeping
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — the selection itself is
+deterministic (a plain `for k in range(1, ff_max+1)` loop trying
+sessions in strict forward order, `pipeline.py:155-162`, not a race
+against provider response times); whether target session, actual
+exit session, selected source, reference price, and reconciliation
+time are ALL individually recorded as separate fields (vs. some being
+implicit/derivable) was not exhaustively traced this session.
+**Validation**: Code inspection (this session, loop structure).
+**Dependency**: none blocking.
+
+## S8-11 — Committed exit never silently replaced; correcting entries are versioned
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — requires
+tracing what happens if a price provider later revises an
+already-used closing print, not performed this session. **Validation**:
+Not assessed in this documentation pass. **Dependency**: `OPS-005`.
+
+## S8-12 — EXIT_PENDING·AWAITING_PRICE account behavior
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — the underlying behavior is
+structurally correct (an unresolved exit's position stays in
+`open_positions()`, occupying capacity via `n_open()`, and no proceeds
+are credited until `close_position()` actually runs); the literal
+`EXIT_PENDING · AWAITING_PRICE` label was not found — the code's own
+name is `EXIT_BAR_PENDING_FALLFORWARD` (`pipeline.py:179`), a naming
+gap not a behavior gap. **Validation**: Code inspection (this
+session). **Dependency**: none blocking.
+
+## S8-13 — EXIT_UNRESOLVED account-block behavior
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — `mark_exit_unresolved()`
+(`talonx_v2/store.py:410-419`) sets a real, distinct status,
+correctly not cleared by a restart (it's a durable DB row, not
+in-memory state) and correctly surfaced via
+`store.unresolved_positions()` in service status output
+(`service.py:1054,1159`). **Genuine gap**: no code path was found that
+blocks NEW entries account-wide while an `EXIT_UNRESOLVED` position
+exists — `unresolved_positions()` is read only for reporting, never
+consulted by `open_position()`'s own admission gate. **Validation**:
+Code inspection (this session, both files read in full relevant
+sections). **Dependency**: `OPS-012`.
+
+## S8-14 — CLOSED: exactly-once settlement
+
+**Decision**: Agreed (pre-existing). **Authorization**: Not
+authorized. **Implementation**: Implemented — `paper.close_position()`
+(`talonx_v2/paper.py:155-191`) commits position-close, cash-credit,
+trade-record, and cooldown-set together inside one
+`store.transaction()`, matching Task 131's own "Remediation Directive
+4" comment; a duplicate close is structurally impossible since
+`close_position`'s own SQL is `WHERE ... AND status='OPEN'`.
+**Validation**: Code inspection (this session, exact lines) +
+established `test_task131_atomic_transactions.py` evidence (run this
+session, passed). **Dependency**: none.
+
+## S8-15 — Cooldown anchored to actual modeled exit session
+
+**Decision**: Agreed (pre-existing). **Authorization**: Not
+authorized. **Implementation**: Implemented — `close_position()`
+computes `cooldown_until = add_sessions(exit_session, cfg.
+reentry_cooldown_trading_days)` using the actual `exit_session`
+**parameter** (the post-fall-forward value from `settle_due_exits()`,
+not the original target session) — directly confirming the agreed
+anchor. `reentry_cooldown_trading_days=5` is frozen with a runtime
+assert (`config.py:45,91`). **Validation**: Code inspection (this
+session, `paper.py:164,188`). **Dependency**: none.
+
+## S8-16 — First eligible re-entry session (boundary, directly resolved)
+
+**Decision**: Agreed (pre-existing). **Authorization**: Not
+authorized. **Implementation**: Implemented — `open_position()`'s own
+gate (`talonx_v2/paper.py:104-106`) reads `if cd is not None and es <
+cd: skip`, blocking entry only when the candidate entry session is
+**strictly before** `cooldown_until`. **The boundary is directly
+resolved by this code, not left ambiguous: the first eligible
+re-entry session is exactly `exit_session + 5` trading sessions
+(inclusive at +5), not +6.** This satisfies this task's own "boundary
+verification still required" instruction — the counting convention was
+not silently chosen; it was read directly from the comparison
+operator. Cooldown ending alone never generates a BUY — a fresh
+qualifying episode and timely admission are still required
+structurally (the cooldown check is only one of several independent
+gates in the same function). **Validation**: Code inspection (this
+session, exact operator read). **Dependency**: none.
+
+## S8-17 — Acceptance evidence tracked separately per lifecycle guarantee
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented (as a documentation
+discipline) — items 1 (restart, no duplicate entry), 2 (interruption,
+no duplicate economic effect), and 4 (earliest fall-forward, never
+best) were directly, freshly exercised this session (23 tests run
+across `test_task131_atomic_transactions.py` and
+`test_task117_phase0_entry_timing.py`, all passed). Items 3, 5, 6, 7,
+8 were **not** individually re-verified this session — 3 relies on
+`S8-05`'s established (corrected) evidence, 6 relies on `S8-12`'s
+structural finding, 7 is blocked entirely on `OPS-004` (no
+corporate-action code exists to test), 8 relies on `S4-10`'s
+established execution/delivery-separation evidence, and 5
+(scope-removal) was not traced at all this session. **Validation**:
+Code inspection + isolated test execution (this session, exact test
+names and counts cited). **Dependency**: `OPS-004`, `OPS-012`.
+
+## S8-18 — Boundary coverage identified; no overclaiming from unrelated evidence
+
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented (as a documentation
+discipline) — this entry itself follows the rule: `S8-16`'s cooldown
+boundary was directly resolved (not asserted from an unrelated test),
+`S8-09`'s fall-forward-exhaustion boundary was directly tested this
+session, and `S8-01`'s admission-at-vs-before-open boundary was
+confirmed by direct code reading. **Not located this session**: a
+dedicated test spanning a holiday or early-close specifically for the
+fall-forward loop or the admission deadline (`S8-26`). **This session
+does not claim the entire V2 lifecycle is accepted** — no zero-
+position live session or unrelated passing test is cited as blanket
+evidence anywhere in this documentation. **Validation**: Code
+inspection + isolated test execution (this session, self-check).
+**Dependency**: `S8-26`.
+
+## S8-25 — Deferred: provider finality/publication-qualification boundary
+
+**Requirement**: the exact boundary between provisional/delayed and
+genuinely unavailable target-closing data (§D). **Decision**: Open —
+deferred. **Authorization**: N/A. **Implementation**: N/A.
+**Validation**: N/A. **Reason**: depends on which data provider is
+ultimately qualified — extends `OPS-005`. No waiting duration is
+invented. **Planned session**: none (a data-provider qualification
+task). **Dependency**: `OPS-005`.
+
+## S8-26 — Deferred: holiday/early-close-spanning boundary test coverage
+
+**Requirement**: dedicated test coverage for the fall-forward loop and
+admission deadline across a holiday or early-close (§D/§G).
+**Decision**: Open — deferred. **Authorization**: N/A.
+**Implementation**: N/A. **Validation**: N/A. **Reason**: not located
+or authored this session; requires its own implementation-verification
+task, not a knowledge-transfer session. **Planned session**: none.
+**Dependency**: `S8-25`.

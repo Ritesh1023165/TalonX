@@ -416,6 +416,50 @@ finding was accurate as a string search but had been read too broadly;
 
 `OPS-002` and `OPS-003` **remain open**, unaffected by this session.
 
+## 6g. V2 multi-day strategy and lifecycle — `AGREED` (Session 8), implementation `MOSTLY BUILT AND VERIFIED`
+
+Recorded in full in `DECISION_LOG.md` Session 8, tracked as `S8-01`
+through `S8-18` in `REQUIREMENTS_TRACKER.md`, plus deferrals `S8-25`/
+`S8-26`. **Discussion closed; requirements documented, with provider-
+finality and cooldown-boundary verification outstanding, and
+implementation separately tracked.** Unlike several earlier sessions,
+much of this session's own subject matter is **already correctly
+implemented** — directly confirmed by code inspection and by running
+two pre-existing, isolated test files (23 tests, all passed) this
+session:
+
+- **Pre-open admission deadline** (`S8-01`) — `Implemented`, a real,
+  fail-closed temporal-boundary check.
+- **Holding clock** (Session 0 entry, 10th-session close exit, no
+  stop-loss) — `Implemented`, frozen with runtime asserts.
+- **Fall-forward exit contract** (target → earliest-of-next-5 →
+  `EXIT_UNRESOLVED`, never best-price) — `Implemented`, directly
+  tested this session.
+- **Re-entry cooldown** — `Implemented`; the anchor (actual modeled
+  exit session, including fall-forward) and the exact boundary (first
+  eligible re-entry = `exit_session + 5` sessions, inclusive) were
+  **both directly resolved by code inspection**, not left uncertain.
+- **`CLOSED` exactly-once settlement** — `Implemented`, atomic
+  transaction confirmed and tested.
+- **Genuine gap found**: `EXIT_UNRESOLVED`'s agreed account-wide
+  new-entry block is **not implemented** — the status exists and is
+  correctly surfaced, but nothing in `open_position()`'s admission
+  gate consults it (`OPERATIONAL_FINDINGS.md` `OPS-012`).
+- **Still deferred**: the provider-finality boundary for target-
+  closing-data availability (`S8-25`) and dedicated holiday/early-
+  close boundary test coverage (`S8-26`) — neither invented nor
+  resolved this session.
+
+This session also confirmed, by direct code reading, that Session 6's
+`OPS-009` finding was correctly scoped to Original's intraday engine
+all along and does not describe V2 — `EXIT_UNRESOLVED` genuinely
+exists in V2's own codebase (`talonx_v2/store.py`), a separate system
+from `talonx_paper/`; no correction to `OPS-009` was needed, only this
+clarifying note to prevent conflating the two.
+
+`OPS-003`, `OPS-004`, `OPS-005` **remain open** — this session adds
+confirming/disconfirming evidence but resolves none of them.
+
 ## 7. Open / proposed — see `REQUIREMENTS_TRACKER.md` for tracked status
 
 - **Intraday-vs-multi-day scope** ("swing intelligence assistant"):

@@ -1876,24 +1876,354 @@ closure found for either).
 
 ## Session 8 — V2 Multi-Day Strategy and Lifecycle
 
+**Recorded**: 2026-09-16/17 (UTC/UK boundary), approximately 23:05 UTC
+/ 00:05 BST 2026-09-17 (Python `zoneinfo`, this project's established
+recording-time discipline). **Source**: the product-owner discussion
+supplied directly in this session's prompt (same pattern as Sessions
+1–7; the discussion's own internal timestamp is unavailable and is not
+invented here). **Status: discussion closed; requirements documented,
+with provider-finality and cooldown-boundary verification outstanding,
+and implementation separately tracked.**
+
+### Context
+
+This session grounds Session 6 §B's V2 qualification-baseline
+description in the full lifecycle it always implied — pre-open
+catch-up/admission, delayed-price entry reconciliation, the holding
+clock, scheduled exit and fall-forward, pending-vs-unresolved account
+behavior, re-entry cooldown, and acceptance-evidence requirements. It
+directly grounds `S5-13`-`S5-20`'s three-session recovery correction
+(`OPS-003`) and `S1-06`'s V2-specific actionability-status question.
+
+### A. Pre-open catch-up and admission — agreed
+
+- Startup catch-up may create a valid V2 intent when all prerequisites
+  pass **and** admission is durably committed **strictly before** the
+  target session's exchange-calendar open.
+- A delayed opening print or delayed provider delivery does **not**
+  extend this admission deadline.
+- Continuous overnight operation is **not required** by this policy,
+  but timely startup/catch-up completion is **not guaranteed** either.
+- Preserve actual filing availability, first receipt, and durable
+  admission timestamps **separately**.
+- **No retrospective entry where no timely intent existed.**
+- Late-discovered opportunities remain visible with a **truthful**
+  expired/skipped status, under the previously agreed notification
+  policy (`S7-01`-`S7-24`).
+- Qualification, admission, paper execution, and Telegram delivery
+  remain distinct (reaffirms `S2-04`/`S3-06`/`S6-06`).
+- Capacity-skipped qualified opportunities remain eligible for
+  notification, with explicit disclosure that no paper position opened
+  (reaffirms `S2-03`/`S6-13`).
+
+### B. Valid intent with delayed entry price — agreed
+
+- A timely-admitted intent may remain `PENDING_ENTRY · AWAITING_PRICE`.
+- Its reservation is preserved during the approved recovery period.
+- Reconcile **only** the designated target-session opening reference —
+  **never** substitute a midday quote or a later session's opening
+  price.
+- Apply the previously agreed Session-3-close entry-recovery
+  requirement, including exchange-calendar early closes
+  (`S5-13`/`S6-24`).
+- Preserve `S5-19`/`S6-24`'s agreed durable-receipt deadline semantics.
+- **Exact enforcement remains implementation work under `OPS-003`**
+  unless directly established by current evidence (see Validation
+  below).
+- **Intraday next-bar simulation rules (`S6-16`/`S6-17`) do not apply
+  to V2.**
+
+### C. Holding clock and position management — agreed
+
+- Entry session is **Session 0**.
+- Scheduled exit is the close of the **tenth trading session after
+  entry**.
+- Holidays/non-trading days do **not** increment the holding clock.
+- Delayed entry reconciliation does **not** shift the scheduled exit
+  session.
+- Preserve intended market time and actual reconciliation time
+  **separately**.
+- **No price-based stop-loss** in the frozen V2 baseline.
+- **No position additions** merely because another cluster appears for
+  an already-open symbol.
+- Pause, exclusion, or scope removal **must not abandon existing
+  obligations** (reaffirms `S3-11`'s Pause/Exclude semantics, extended
+  to V2).
+- Missing valuations are explicitly **stale/unknown, never a
+  fabricated zero P&L** (reaffirms `S2-12`/`S5-16`).
+- Corporate actions follow the previously agreed chronological
+  accounting policy without resetting the exit clock — this is
+  **target behavior, not automatically implemented** (`OPS-004`
+  remains open).
+- This session does **not** imply all actual V2 quantities today are
+  already whole shares — fractional-share handling remains entirely
+  future policy (`S5-26`/`S5-27`, `OPS-004`).
+
+### D. Scheduled exit and fall-forward — preserved (V2's frozen contract)
+
+1. Use the target Session 10 closing reference when qualified and
+   available.
+2. If unavailable under the applicable policy, select the **earliest
+   eligible close** in the following five trading sessions.
+3. If no qualifying close is available through that extension, retain
+   the obligation explicitly as `EXIT_UNRESOLVED`.
+
+- **Never select the best-performing later price.**
+- Later sessions must actually have occurred — **no future-data use.**
+- "First available" must not be silently reinterpreted as whichever
+  provider response happens to arrive first (a genuine ordering, not a
+  race).
+- Record target exit session, actual modeled exit session, selected
+  source, reference price, and reconciliation time.
+- **V2 fall-forward may change the exit session; it differs from
+  intraday recovery of the original T-10 cutoff reference** (Session
+  6 §H, `S6-22`/`S6-23`) — the two mechanisms are for different lanes
+  and must not be conflated.
+- Once committed, the exit is **never silently replaced** when older
+  data is later backfilled or corrected.
+- Proven errors may require **versioned, auditable correcting
+  entries**, preserving the original record and complete provenance
+  (reaffirms `S6-18`'s corporate-action-recovery discipline and
+  `S7-14`'s correction-linkage intent).
+
+**Explicit deferral**: the boundary between provisional/delayed and
+genuinely unavailable target closing data requires chosen-provider
+finality/publication qualification. **No waiting duration is invented
+here, and this boundary is not claimed resolved.** Tracked as `S8-25`,
+linked to `OPS-005`'s open provider-qualification question.
+
+### E. Pending versus unresolved account behavior — agreed
+
+**`EXIT_PENDING · AWAITING_PRICE`**:
+- Position remains open and occupies capacity.
+- No anticipated sale proceeds are credited or reused.
+- Otherwise-valid entries for other securities may continue **only**
+  when account cash, capacity, risk, and data checks remain reliable.
+- This permission does **not** override another legitimate account
+  block.
+
+**`EXIT_UNRESOLVED`**:
+- Position and obligation remain visible.
+- **Block new entries in the affected V2 account until auditable
+  resolution.**
+- Continue managing other positions, collecting data, and reporting
+  status.
+- Requires operator investigation/recovery — **never invent a closing
+  price.**
+- The block is **not** cleared merely because the process restarts.
+- This is a **containment policy**, not evidence that ledger
+  corruption occurred.
+- **Do not automatically apply the V2 block to independent strategy
+  accounts** (Original, any future Research Lab account).
+
+**`CLOSED`**:
+- Commit settlement, proceeds, and capacity changes **exactly once**.
+- Duplicate or late instructions cannot create another sale.
+- Notification failure does not roll back or duplicate accounting
+  (reaffirms `S4-10`).
+
+**Valuation freshness is kept separate from exit lifecycle status**
+(reaffirms `S2-12`).
+
+### F. Re-entry cooldown — agreed
+
+- **Agreed anchor: the actual modeled exit session, including a
+  fall-forward exit** — not the original target session.
+- Delayed notification or reconciliation time does **not** restart the
+  cooldown.
+- Frozen cooldown length remains **five trading sessions per issuer**.
+- A new entry still needs a **newly qualifying opportunity** and
+  **timely admission** — cooldown ending does **not** itself generate
+  a BUY.
+
+### G. Acceptance requirements — agreed (evidence tracked separately per item, see Validation)
+
+Track evidence separately for: (1) restart after committed admission
+without duplicate reservation/entry; (2) interruption during entry/
+exit without duplicate economic effects; (3) delayed entry
+reconciliation preserving the scheduled exit clock; (4) earliest
+eligible fall-forward selection, never best-price selection; (5) scope
+removal preserving existing exit obligations; (6) pending/unresolved
+exits retaining capacity and preventing phantom proceeds; (7)
+corporate-action recovery without double adjustment; (8) notification
+failure leaving accounting intact.
+
+Also identify necessary boundary coverage for: admission at vs. before
+market open; holidays and early closes; account-block persistence/
+release; actual-exit-anchored cooldown; provider provisional/final
+data and late backfills.
+
+**Existing tests may satisfy individual requirements — cite what they
+exercise. The entire lifecycle is not accepted merely because a
+zero-position live session preserved cash, or because unrelated tests
+pass** (see Validation below for the specific tests actually run and
+what each one covers).
+
+### Implementation authorization
+
+**None.** Every decision above is an agreed product direction (§D
+preserves the existing frozen contract, it does not change it); all
+new implementation authorization is explicitly **"Not authorized by
+this documentation task."** See `REQUIREMENTS_TRACKER.md` (`S8-01`
+through `S8-18`, plus deferrals `S8-25`/`S8-26`).
+
+### Validation performed this session
+
+Targeted, read-only code inspection **and** execution of two
+pre-existing, isolated test files (not the full suite) directly
+confirmed:
+
+- **§A (pre-open admission)**: `V2Service._verify_temporal_boundary()`
+  (`talonx_v2/service.py:796-`) is a real, rigorous, fail-closed check
+  that BOTH the activating filing's real dissemination timestamp AND
+  the admission-decision moment occurred strictly before the entry
+  session's RTH open — an unknown dissemination timestamp is a
+  **strict failure** on any live tick, never silently treated as safe.
+  **Implemented.**
+- **§D (fall-forward)**: `settle_due_exits()`
+  (`talonx_v2/pipeline.py:132-202`) directly matches the three-step
+  contract verbatim — tries the target session first, then the
+  earliest available close in the next `exit_fallforward_max_sessions`
+  (frozen at `5`, `talonx_v2/config.py:41,98`) sessions (first found,
+  never best), then `store.mark_exit_unresolved()` if none is found.
+  The code's own comment states "Never backwards. Never 'best
+  price'." **Implemented**, and directly exercised by
+  `tests/test_task117_phase0_entry_timing.py::
+  test_e8c_exit_unresolved_when_target_and_all_fallforward_missing`
+  (run this session, **passed**).
+- **§F (cooldown anchor and boundary)**: `paper.close_position()`
+  (`talonx_v2/paper.py:155-191`) computes
+  `cooldown_until = add_sessions(exit_session, 5)` using the actual
+  **modeled** `exit_session` parameter (post-fall-forward, not the
+  original target session) — directly confirming the agreed anchor.
+  **The boundary question is directly resolved by code inspection,
+  not left uncertain**: `open_position()`'s own gate
+  (`talonx_v2/paper.py:104-106`) reads `if cd is not None and es < cd:
+  skip` — entry is blocked when the candidate entry session is
+  strictly before `cooldown_until`, and allowed when it equals or
+  follows it. **The first eligible re-entry session is exactly
+  `exit_session + 5` trading sessions (inclusive at exactly +5), not
+  +6.** `hold_trading_days=10`, `reentry_cooldown_trading_days=5`, and
+  `exit_fallforward_max_sessions=5` are all frozen with explicit
+  runtime asserts (`config.py:88,91,98`). **Implemented.**
+- **§E (`EXIT_UNRESOLVED` account block) — genuine gap found**:
+  `mark_exit_unresolved()` (`talonx_v2/store.py:410-419`) sets a real,
+  distinct `EXIT_UNRESOLVED` status (its own docstring: "Not OPEN...
+  not CLOSED... loudly surfaced for the operator") and is correctly
+  surfaced in service status output (`store.unresolved_positions()`,
+  referenced at `service.py:1054,1159`). **However, no code path was
+  found that blocks NEW entries account-wide when an `EXIT_UNRESOLVED`
+  position exists** — `unresolved_positions()` is used only for status
+  reporting, never consulted by `open_position()`'s own admission gate.
+  The agreed "block new entries in the affected account until
+  auditable resolution" is therefore **not implemented** — see
+  `OPERATIONAL_FINDINGS.md` `OPS-012`.
+- **§G items 1/2 (restart, no duplicates)**: directly exercised by
+  `tests/test_task117_phase0_entry_timing.py::
+  test_e5b_duplicate_filing_or_restart_no_second_buy` and
+  `tests/test_task131_atomic_transactions.py`'s full suite (atomic
+  commit of position+cash+trade+cooldown together; nested-transaction
+  rollback; `close_position` leaves nothing partial if `set_cooldown`
+  fails) — **23 tests run this session across both files, all
+  passed**, `tmp_path`-isolated, no live system touched.
+- **§B/naming gap, consistent with `OPS-003`'s prior findings**: no
+  code was found using the literal label `PENDING_ENTRY · AWAITING_
+  PRICE` or `EXIT_PENDING · AWAITING_PRICE` — the internal code's
+  actual names are `FAILED_NO_MARKET_DATA` (entry-side, `S5-16`'s
+  prior finding) and `EXIT_BAR_PENDING_FALLFORWARD`/`EXIT_UNRESOLVED`
+  (exit-side, confirmed this session) — functionally consistent, not
+  identically named. This is a **naming gap**, not a behavior gap, per
+  the same distinction already established for `S5-16`.
+
+**Not assessed this session** (targeted inspection was insufficient,
+marked honestly rather than guessed): §G items 3, 5, 6, 7, 8
+individually (only items 1/2/4 were directly, freshly exercised this
+session — 3/5/6/7/8 rely on established prior evidence or remain
+unverified); the exact holiday/early-close boundary coverage for §D's
+fall-forward loop (the loop uses `add_sessions`, which is
+calendar-correct by construction per `S5-13`'s established evidence,
+but a dedicated holiday-spanning fall-forward test was not located or
+run this session).
+
+### Corrections to Session 6's evidence (per this session's own instruction)
+
+Session 6's `OPS-009` finding ("no matches for `AMBIGUOUS_INTRABAR_
+ORDER`/`EXIT_UNRESOLVED`/`EXIT_PENDING` in `talonx_paper/`") was
+correctly scoped to **Original's intraday** engine
+(`talonx_paper/engine.py`) — it does **not** describe V2
+(`talonx_v2/`), which is a separate codebase. This session confirms
+`EXIT_UNRESOLVED` **does** exist as a real status in V2
+(`talonx_v2/store.py`), consistent with, not contradicting,
+`OPS-009`'s own scope (Original only). No correction to `OPS-009`
+itself is needed — this note exists only to prevent a reader from
+conflating the two systems' exit-status naming.
+
+Separately, this session reaffirms Session 7's own correction of
+`S6-19`/`S6-20`: `check_stop_take()` checking stop-before-target
+against **one current price** (Original's intraday engine) is a real,
+working tiebreak, but it is **not** the same claim as full OHLC
+intrabar-sequence resolution — that distinction stands unchanged,
+carried forward, not re-litigated here.
+
+### Findings tracked in `OPERATIONAL_FINDINGS.md`
+
+- **`OPS-012`** — V2's `EXIT_UNRESOLVED` account-block gap: the status
+  exists and is surfaced, but no code blocks new entries account-wide
+  while it is active.
+
+`OPS-003`, `OPS-004`, `OPS-005` **remain `OPEN`** — this session adds
+evidence (§A/§D/§F confirmed implemented) but resolves none of them;
+provider-finality (§D's deferral) and the exact `OPS-003` equality-at-
+deadline/pre-fill-check gates remain outstanding.
+
+### Explicit deferrals
+
+- **`S8-25`** — provider finality/publication-qualification boundary
+  for target-closing-data availability (§D). **Reason**: depends on
+  which data provider is ultimately qualified (`OPS-005`). **Planned
+  session**: none (a data-provider qualification task). **Dependency**:
+  `OPS-005`.
+- **`S8-26`** — dedicated holiday/early-close-spanning fall-forward and
+  admission-deadline boundary test coverage (§D/§G). **Reason**: not
+  located or run this session; needs its own targeted test authored
+  and executed. **Planned session**: none (an implementation-
+  verification task, not a knowledge-transfer session). **Dependency**:
+  `S8-25`.
+
+### Any separately authorized implementation work
+
+**None.**
+
+---
+
+## Session 9 — Telegram and Dashboard Experience
+
 **Not yet conducted.** Scope preserved exactly as already established
-in `KNOWLEDGE_TRANSFER_PLAN.md` — not expanded or narrowed by this
-task. Carries forward, by requirement ID, relevant unfinished details
-from Sessions 1-7:
+in `KNOWLEDGE_TRANSFER_PLAN.md` — this is **not** "Account Ledgers &
+Risk"; that topic belongs to the already-scheduled **Session 10
+("Paper accounting, costs and risk")**, where this session's own
+account-ledger/risk carry-forward items are recorded instead (see
+below). Session 9 already carries forward, from prior sessions:
+`S5-30` (pre-market lockout window), `S6-13`/`S6-14` (capacity-
+independent alerts, expiry-update UI), `S6-11` (four-category
+diagnostic surfacing), `S7-23`/`S7-24` (five-dimension coverage
+surfacing), and `S7-20`'s per-stock mute UI.
 
-- Session 6 §B's V2 qualification-baseline description grounds this
-  session's own fuller lifecycle discussion — not pre-empted, to be
-  reconciled when this session is actually conducted.
-- `S5-13`-`S5-20`'s three-session recovery correction (`OPS-003`) — the
-  dual-deadline discrepancy and fill-before-check ordering remain
-  unresolved implementation gates for this session to eventually
-  ground its own lifecycle discussion against.
-- `S1-06`'s Telegram-facing actionability/expiry-status surfacing
-  question, still not assessed for V2 specifically.
-- `S3-18`'s promotion/rollback governance (`talonx_research/`) as
-  background for how a future V2 strategy variant would reach this
-  lifecycle.
+**Carried forward to Session 10 ("Paper accounting, costs and risk")
+from this session's discussion**:
+- Separate strategy/execution-mode accounts (`S3-13`, V2's own account
+  behavior detailed by `S8-12`-`S8-14`).
+- Cash versus reservations versus invested capital (`S8-12`'s
+  no-anticipated-proceeds-credit rule).
+- New-campaign capital defaults and costs (`S3-12`, unchanged).
+- Same-stock exposure across strategies (`S3-25`, still deferred).
+- Corrections, deposits, and return attribution (`S2-11`, `S7-14`,
+  `S8-11`'s versioned-correction discipline).
+- Account blocks and auditable release (`S8-13`/`OPS-012`).
+- Combined portfolio views without double-counting experimental
+  capital (`S3-13`).
 
-Session 8 is not conducted by this task; nothing above is resolved
-here — this list only ensures Session 8, when it happens, has visible
-pointers to the relevant open threads rather than starting cold.
+Session 9 is not conducted by this task; nothing above is resolved
+here — this list only ensures both Session 9 and Session 10, when each
+happens, has visible pointers to the relevant open threads rather than
+starting cold.

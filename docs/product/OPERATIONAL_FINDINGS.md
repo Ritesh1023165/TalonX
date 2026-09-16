@@ -770,6 +770,56 @@ history); `talonx_ingest/intelligence/delivery/notification_policy.py`
 
 ---
 
+## OPS-012 — V2 `EXIT_UNRESOLVED` account-block gap
+
+**Status**: `OPEN` — agreed target design exists (Session 8 §E); no
+implementation.
+
+**Found**: Session 8 documentation pass (2026-09-16/17), via direct
+reading of `talonx_v2/store.py`, `talonx_v2/service.py`, and
+`talonx_v2/paper.py`.
+
+**Finding**: `mark_exit_unresolved()` (`talonx_v2/store.py:410-419`)
+correctly implements a real, distinct `EXIT_UNRESOLVED` status —
+neither `OPEN` nor `CLOSED`, its own docstring says "loudly surfaced
+for the operator" — set only after the full fall-forward window is
+exhausted (`talonx_v2/pipeline.py:164-175`), durable (a DB row, so
+correctly **not** cleared by a process restart), and correctly
+surfaced in service status output via `store.unresolved_positions()`
+(referenced at `service.py:1054,1159`). **However, `unresolved_
+positions()` is used only for status reporting — it is never consulted
+by `paper.py::open_position()`'s own admission gate**
+(`talonx_v2/paper.py:93-139`, the same gate sequence already read in
+this project's history: episode/intent checks, `SYMBOL_ALREADY_OPEN`,
+cooldown, `MAX_CONCURRENT_*`, entry price, cash). **No code path
+blocks a NEW entry (for any symbol) while an `EXIT_UNRESOLVED`
+position exists anywhere in the account.**
+
+**Explicit implication**: Session 8 §E's agreed containment policy
+("block new entries in the affected V2 account until auditable
+resolution") is a real product decision with **no corresponding
+enforcement** in the code inspected this session — an `EXIT_UNRESOLVED`
+position today reduces open capacity by one slot (via `n_open()`'s
+ordinary count) but does not otherwise prevent new admissions
+elsewhere in the same account, and does not require any operator
+action before the system resumes normal admission behavior.
+
+**Future corrective work — NOT IMPLEMENTED here**: add an explicit
+account-wide gate in `open_position()` (or an equivalent point) that
+consults `unresolved_positions()` and refuses new admissions while any
+row is `EXIT_UNRESOLVED`; define the exact "auditable resolution"
+release mechanism (manual investigation, never an invented price, per
+Session 8 §E).
+
+**Evidence references**: `talonx_v2/store.py:410-419`; `talonx_v2/
+pipeline.py:164-175`; `talonx_v2/service.py:1054,1159`; `talonx_v2/
+paper.py:93-139` (full admission-gate sequence, no `EXIT_UNRESOLVED`
+check present).
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S8-13`, `S8-17`, `S8-18`.
+
+---
+
 *See `REQUIREMENTS_TRACKER.md` for product-requirement tracking,
 `DECISION_LOG.md` for the session-by-session product-owner record, and
 `docs/research/TALONX_RESEARCH_LEDGER.md` for the research/validation
