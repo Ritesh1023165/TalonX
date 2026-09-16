@@ -1079,6 +1079,77 @@ task's own instruction.
 
 **None.**
 
+### Documentation correction (2026-09-16, ~14:03 UTC / 15:03 BST) — three-session recovery implementation status
+
+A follow-up documentation-only task re-examined `REQUIREMENTS_TRACKER.md`
+`S5-13`/`S5-14`'s original **`Implemented`** classification and found it
+**unsupported**. The original classification cited two real facts
+(`max_entry_staleness_sessions = 3` and calendar-aware `add_sessions()`
+both exist) but did not verify that they together produce the exact
+agreed boundary (target entry session = Session 1, recovery ends at the
+exchange-calendar official close of Session 3, expiry checked *before*
+any fill attempt).
+
+**Direct code inspection this pass** (`talonx_v2/service.py`,
+`talonx_v2/calendar.py`, `talonx_v2/store.py`) found:
+
+- **Two different deadline computations coexist for the same 3-session
+  parameter**, one session apart: the general staleness gate that
+  controls whether an episode is even attempted for entry at all
+  remains open through `eligible_entry_session + 3` sessions (a
+  **4-session** window under the product's own 1-indexed counting), while
+  the missing-price retry-then-release path's own deadline is
+  `eligible_entry_session + 2` sessions (a **3-session** window,
+  matching the agreed "ends at Session 3" framing exactly). The
+  code's own inline comment confirms this one-session gap is a
+  deliberate internal workaround, not an oversight — but it means the
+  **entry-attempt boundary** (the one that actually governs whether a
+  position can still open) is one session more permissive than the
+  agreed policy, even though the **missing-price-release boundary**
+  matches it.
+- **The fill attempt happens before any deadline check**, not after —
+  `_phase_open` unconditionally calls `pipeline.process_episode(...)`
+  (the actual fill) for every non-stale episode first; the
+  `retry_deadline` comparison is evaluated only reactively, after a
+  `NO_ENTRY_BAR` miss is already returned. A successful fill has no
+  deadline check gating it beyond the coarser 4-session staleness
+  gate above.
+- **Everything is date-granular, never close-time-granular** —
+  `talonx_v2/calendar.py` is built entirely on `exchange_calendars`
+  session *dates* (`[ts.date() for ts in ...]`); it correctly excludes
+  non-trading days and correctly includes early-close days as ordinary
+  valid sessions, but carries no close-timestamp information at all,
+  so there is no code path that can distinguish "before" from "after"
+  the actual close time of a given session.
+- **Restart/downtime does not extend the deadline** — both deadline
+  computations are pure functions of the episode's fixed
+  `eligible_entry_session` and the calendar, independent of process
+  uptime. This part of the agreed policy **is** correctly implemented.
+- **Reservation release is exactly-once** — a single, shared SQL guard
+  (`WHERE intent_id=? AND status='PENDING'`, `talonx_v2/store.py:531-533`)
+  backs every terminal release path (`EXPIRED_STALE`,
+  `FAILED_NO_MARKET_DATA`, and the normal `FILLED` path alike). This
+  part **is** correctly implemented, confirmed both by code inspection
+  and by running the two directly-relevant, pre-existing, isolated
+  tests this pass (`tests/test_task131_nonblocking_retry.py`,
+  `tests/test_task113_stale_entry_guard.py` — 8 passed, `tmp_path`-
+  isolated, no live system touched).
+
+**Corrected classification**: see `REQUIREMENTS_TRACKER.md` `S5-13`
+through `S5-20` for the full, itemized correction and
+`OPERATIONAL_FINDINGS.md` `OPS-003` for the complete finding. The
+overall three-session-recovery requirement is now classified
+**"Partially implemented — session-based recovery exists; exact
+Session-3-close enforcement and pre-fill expiry remain pending
+OPS-003."** `S5-19`'s unresolved equality-at-deadline and
+receive-vs-commit semantics remain **unresolved** — this correction
+does not choose them.
+
+This correction is **documentation only** — no code, test, or runtime
+behavior was changed. The two test files above were run read-only, as
+existing, already-committed tests, to obtain genuine executed-test
+evidence rather than relying on source inspection alone.
+
 ---
 
 ## Session 6 — Signal Discovery and Strategy Mechanics

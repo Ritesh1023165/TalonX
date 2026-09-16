@@ -198,10 +198,14 @@ today.
 
 ---
 
-## OPS-003 — Entry-session deadline-consistency finding (recorded for re-verification)
+## OPS-003 — Entry-session deadline-consistency finding
 
-**Status**: `OPEN` — recorded for future re-verification against
-current code; **not corrected by this documentation pass**.
+**Status**: `OPEN` — Finding A recorded for future re-verification;
+Finding B directly confirmed by code inspection and executed tests
+this pass. **Neither finding is corrected by any documentation pass —
+correction requires a separately authorized implementation task.**
+
+### Finding A — Task 112R cross-methodology entry-session difference (original, unchanged)
 
 **Found**: originally, Task 112R (this project's history, before this
 documentation track existed); re-surfaced and formally tracked during
@@ -221,19 +225,10 @@ research methodology is the one that differs — no code change was
 made, because the runtime was judged correct against its own frozen
 spec.
 
-**Why this is tracked again now**: Session 5's discussion of exact
-three-session-recovery deadline semantics (`S5-13`, `S5-19`,
-`S5-20`) raised this as a specific, named example of a
-previously-inspected deadline-related inconsistency that should be
-**re-verified against current code** before it is relied on further —
-the original Task 112R review predates this documentation track, used
-an offline comparison, and has not been re-run against the code as it
-exists today (multiple V2/Task 131+ changes have landed since).
-
-**Explicitly not done in this pass**: no code was re-read line-by-line
-to re-confirm Task 112R's original conclusion still holds; no fix,
-adjustment, or reclassification was made. This is a disclosed,
-tracked re-verification item, not a live defect claim.
+**Explicitly not done in any pass so far**: no code was re-read
+line-by-line to re-confirm Task 112R's original conclusion still
+holds; no fix, adjustment, or reclassification was made. This remains
+a disclosed, tracked re-verification item, not a live defect claim.
 
 **Future corrective work — NOT IMPLEMENTED here**: re-run or replicate
 Task 112R's own offline entry-session comparison against the current
@@ -244,9 +239,144 @@ has since changed, re-assess whether that conclusion needs updating.
 **Evidence references**: this project's Task 112R history (`docs/
 research/TALONX_RESEARCH_LEDGER.md`); `talonx_v2/service.py`,
 `talonx_v2/pipeline.py` (current code, not re-diffed against Task
-112R's version this session).
+112R's version).
 
-**Related**: `REQUIREMENTS_TRACKER.md` `S5-13`, `S5-19`, `S5-20`.
+### Finding B — intra-runtime dual-deadline discrepancy and fill-before-check ordering (new, 2026-09-16)
+
+**Found**: 2026-09-16, during a documentation-correction pass that
+re-examined `REQUIREMENTS_TRACKER.md` `S5-13`/`S5-14`'s original,
+unsupported `Implemented` classification. **This finding is directly
+confirmed by code inspection this pass, and corroborated by running
+two pre-existing, isolated tests** (`tests/
+test_task131_nonblocking_retry.py`, `tests/
+test_task113_stale_entry_guard.py` — 8 passed, `tmp_path`-isolated, no
+live system touched) — a stronger evidence standard than Finding A's
+"recorded for re-verification."
+
+**Agreed product behavior** (Session 5, `S5-13`/`S5-14`): for
+`max_entry_staleness_sessions = 3`, the target entry session counts as
+Session 1; recovery ends at the exchange-calendar official close of
+Session 3 (inclusive of early-close days, exclusive of non-trading
+days); expiry is checked **before** any fill is attempted; only
+timely, durably admitted intents may reconcile.
+
+**Observed implementation behavior**:
+1. **Two different deadline computations exist for the same
+   parameter, one session apart.** The general entry-attempt
+   eligibility gate (`talonx_v2/service.py:377-381`) computes
+   `stale_cut = ripe_through - max_entry_staleness_sessions` and keeps
+   an episode attemptable through `eligible_entry_session + 3`
+   sessions — a **4-session** window under the product's own
+   1-indexed counting (Session 1, 2, 3, **4**). The missing-price
+   retry-then-release path's own deadline
+   (`talonx_v2/service.py:546-547`) computes `retry_deadline =
+   add_sessions(eligible_entry_session, max_entry_staleness_sessions -
+   1)` = `eligible_entry_session + 2` sessions — a **3-session**
+   window (Session 1, 2, 3), matching the agreed policy exactly. The
+   code's own inline comment (`service.py:527-543`) confirms this
+   one-session gap between the two is a deliberate internal workaround
+   (to keep the release path reachable before the coarser guard would
+   otherwise sweep the episode up first) — the codebase's own authors
+   were aware these two boundaries diverge; the discrepancy was never
+   reconciled against the product's own stated policy, because that
+   policy was not written down until Session 5.
+2. **A fill is attempted before any deadline check, not after.**
+   `_phase_open` (`talonx_v2/service.py:504-513`) calls
+   `pipeline.process_episode(...)` (the actual fill attempt)
+   **unconditionally**, for every episode not already excluded by the
+   general 4-session staleness gate. The `retry_deadline` comparison
+   (`service.py:546-548`) is evaluated **only reactively**, after that
+   same attempt has already returned a `NO_ENTRY_BAR` miss — never
+   before a fill attempt. A **successful** fill has no deadline check
+   gating it at all beyond the (wider, 4-session) staleness gate.
+3. **Everything is date-granular; no close-time boundary exists
+   anywhere.** `talonx_v2/calendar.py` builds its entire session list
+   from `exchange_calendars`' XNYS session **dates** only
+   (`[ts.date() for ts in cal.sessions_in_range(...)]`, `calendar.py:
+   22-29`) — non-trading days are correctly excluded and early-close
+   days are correctly included as ordinary valid sessions (the
+   calendar itself handles this, per the module's own docstring), but
+   no function anywhere in this module or its callers carries or
+   checks an actual close **timestamp**. There is no code path capable
+   of distinguishing "before" vs. "after" the close of a given
+   session — the mechanism only knows which calendar date something
+   falls on.
+4. **Restart/downtime does not extend the deadline** — both deadline
+   computations above are pure functions of the episode's fixed
+   `eligible_entry_session` and the calendar's static session list;
+   neither consults process-uptime or last-run state. **This part of
+   the agreed policy is correctly implemented**, and is not affected
+   by findings 1-3 above.
+5. **Reservation release is exactly-once** — a single, shared SQL
+   guard (`WHERE intent_id=? AND status='PENDING'`, `talonx_v2/
+   store.py:526-536`) backs every terminal release path
+   (`EXPIRED_STALE`, `FAILED_NO_MARKET_DATA`, and the normal `FILLED`
+   path alike). **This part of the agreed policy is correctly
+   implemented**, confirmed by the executed test run above, and is not
+   affected by findings 1-3 either.
+
+**Concrete discrepancy**: a genuine entry fill remains structurally
+possible as late as `eligible_entry_session + 3` sessions (the wider
+gate) if a price happens to become available that late — one session
+beyond the agreed "ends at Session 3" boundary — because nothing
+gates a *successful* fill attempt against the narrower, policy-
+matching `retry_deadline`. The narrower boundary is only ever enforced
+reactively, and only for the specific missing-price-release path.
+
+**Remaining evidence gap**: whether this one-session/ordering
+discrepancy has ever actually produced a live fill outside the agreed
+window is **not established either way** — V2's campaign has had 0
+trades to date (2026-09-15 EOD closure), so this has not yet been
+exercised against a real, late-arriving price. This is a structural
+code-behavior finding, not a claim that a specific bad fill has
+occurred.
+
+**Future acceptance scenarios** (to define and test before any
+correction is implemented — none of these is resolved by this
+documentation pass):
+- **Normal week** (no holiday, no early close): confirm the corrected
+  boundary produces identical Session-1/2/3 dates under both the
+  general gate and the release-path deadline.
+- **Holiday within the 3-session window**: confirm `add_sessions()`
+  correctly skips the non-trading day for *both* deadline computations
+  once unified, and that Session 3 still resolves to a genuine trading
+  day.
+- **Early-close session as Session 3**: confirm whether "official
+  close" for an early-close day is meant literally (the actual early
+  close time) or treated as an ordinary session boundary (date-only,
+  as today) — this is exactly `S5-19`'s open equality-at-deadline
+  question, not resolved here.
+- **Price arriving after the deadline** (a late/backfilled bar dated
+  within the window but received after Session 3's close has passed):
+  confirm the corrected code refuses the fill and releases the
+  reservation as `EXPIRED_NO_MARKET_DATA`/`FAILED_NO_MARKET_DATA`,
+  rather than accepting a technically-in-range price that arrived too
+  late.
+- **Restart after the deadline** (service down through the whole
+  3-session window, resumed afterward): confirm the deadline is still
+  correctly computed as expired on resume, exactly as today's
+  restart-independence already demonstrates for the existing (albeit
+  off-by-one) boundaries.
+
+**Separate implementation authorization required**: no code change is
+authorized by this or any prior documentation-only task. A future
+implementation task would need to be separately authorized to: (a)
+decide which of the two existing boundaries (2-session-offset or
+3-session-offset) is the one to keep, or introduce a single, unified
+boundary; (b) decide whether to gate successful fills against that
+boundary proactively (check-before-attempt) rather than only the
+missing-price path reactively; (c) resolve `S5-19`'s exact equality-
+at-deadline and receive-vs-commit semantics as part of that same
+design, since they directly determine the corrected boundary's exact
+edge behavior; (d) test against the five acceptance scenarios above.
+
+**Evidence references**: `talonx_v2/service.py:377-381,504-513,
+527-548,555-571`; `talonx_v2/calendar.py:8-9,22-29`; `talonx_v2/
+store.py:526-536`; `tests/test_task131_nonblocking_retry.py` and
+`tests/test_task113_stale_entry_guard.py` (run this pass, 8 passed).
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S5-13`, `S5-14`, `S5-15`,
+`S5-16`, `S5-17`, `S5-19`, `S5-20`.
 
 ---
 

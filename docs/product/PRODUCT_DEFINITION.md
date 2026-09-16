@@ -288,13 +288,21 @@ five areas below.** Summary:
   `OPERATIONAL_FINDINGS.md` `OPS-005`.
 - **Three-session recovery**: target-entry-session and exchange-
   calendar-close semantics for `max_entry_staleness_sessions=3` —
-  `Implemented`, directly matching existing frozen code
-  (`talonx_v2/config.py:72`, `talonx_v2/calendar.py:88`). Exact
-  equality-at-deadline/receive-vs-commit semantics remain an explicit
-  open implementation-acceptance detail (`S5-19`). A previously-
-  inspected deadline-consistency finding (Task 112R's G1 entry-session
-  comparison) is recorded for future re-verification, not corrected —
-  `OPERATIONAL_FINDINGS.md` `OPS-003`.
+  **`Partially implemented — session-based recovery exists; exact
+  Session-3-close enforcement and pre-fill expiry remain pending
+  `OPS-003``** (corrected 2026-09-16; a session-based mechanism
+  genuinely exists, but direct code inspection found two different
+  deadline computations for the same parameter one session apart, and
+  a fill is attempted before any deadline check rather than after —
+  see `OPERATIONAL_FINDINGS.md` `OPS-003` Finding B). Restart-
+  independence and exactly-once reservation release **are** correctly
+  implemented and unaffected by this correction. Exact equality-at-
+  deadline/receive-vs-commit semantics remain an explicit open
+  implementation-acceptance detail (`S5-19`), not resolved by this
+  correction. A previously-inspected cross-methodology
+  deadline-consistency finding (Task 112R's G1 entry-session
+  comparison) remains recorded for future re-verification, not
+  corrected — `OPERATIONAL_FINDINGS.md` `OPS-003` Finding A.
 - **Corporate actions/fractional shares**: entirely future policy — no
   such code exists today (confirmed by targeted search) —
   `OPERATIONAL_FINDINGS.md` `OPS-004`.

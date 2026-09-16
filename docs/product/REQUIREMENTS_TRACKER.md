@@ -114,14 +114,14 @@ without naming which of these applies.
 | S5-10 | Provider selection + free-tier feasibility remain OPEN | Open — deferred | N/A | N/A | N/A |
 | S5-11 | No midday-price substitution/unvalidated fallback; qualified fallback is future work | Agreed | Not authorized | Implemented (CsvBarAdapter returns None, never substitutes — see OPS-002) | Code inspection (established, OPS-002) |
 | S5-12 | Preserve source/first-receipt/processing/notification timestamps separately; batch timestamps ≠ observation evidence | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
-| S5-13 | 3-session recovery: target entry = Session 1; recovery ends at exchange-calendar close of Session 3 | Agreed | Not authorized | Implemented (max_entry_staleness_sessions=3, calendar-aware add_sessions) | Code inspection (this session) |
-| S5-14 | Only timely, durably admitted intents reconcile; check expiry before fill | Agreed | Not authorized | Implemented | Code inspection (this session, service.py retry/expiry ordering) |
-| S5-15 | Downtime/identity/corp-action delays do not extend the deadline | Agreed | Not authorized | Partially implemented (deadline is calendar-fixed; corp-action-delay interaction not assessed, no corp-action code exists) | Code inspection (this session) |
-| S5-16 | Missing-price expiry = EXPIRED_NO_MARKET_DATA at product level; distinct identity/corp-action reasons preserved | Agreed | Not authorized | Partially implemented (internal code uses FAILED_NO_MARKET_DATA; product-level label not surfaced; no corp-action reason exists) | Code inspection (this session) |
-| S5-17 | Release reservations exactly once, no invented cash credit | Agreed | Not authorized (pre-existing) | Implemented | Code inspection (established, this project's history) |
+| S5-13 | 3-session recovery: target entry = Session 1; recovery ends at exchange-calendar close of Session 3 | Agreed | Not authorized | **Partially implemented — session-based recovery exists; exact Session-3-close enforcement and pre-fill expiry remain pending OPS-003** (corrected 2026-09-16, was overstated as "Implemented") | Code inspection (this session, corrected); isolated test execution (`tests/test_task131_nonblocking_retry.py`, `tests/test_task113_stale_entry_guard.py`, 8 passed) |
+| S5-14 | Only timely, durably admitted intents reconcile; check expiry before fill | Agreed | Not authorized | Partially implemented — admission/timeliness check exists; **pre-fill expiry check does not** (fill is attempted first, deadline checked only reactively after a miss) (corrected 2026-09-16, was overstated as "Implemented") | Code inspection (this session, corrected — `talonx_v2/service.py:504-548`) |
+| S5-15 | Downtime/identity/corp-action delays do not extend the deadline | Agreed | Not authorized | Partially implemented — **downtime does not extend the deadline, confirmed** (deadline is a pure function of calendar dates, independent of process uptime); corp-action-delay interaction not assessed, no corp-action code exists (`OPS-004`) | Code inspection (this session) |
+| S5-16 | Missing-price expiry = EXPIRED_NO_MARKET_DATA at product level; distinct identity/corp-action reasons preserved | Agreed | Not authorized | Partially implemented (internal code uses `FAILED_NO_MARKET_DATA`/`EXPIRED_STALE` as two distinct dispositions, not one; product-level `EXPIRED_NO_MARKET_DATA` label not surfaced; no corp-action reason exists — `OPS-004`) | Code inspection (this session) |
+| S5-17 | Release reservations exactly once, no invented cash credit | Agreed | Not authorized (pre-existing) | Implemented — confirmed by a shared, structural SQL guard (`WHERE intent_id=? AND status='PENDING'`) backing every release path | Code inspection (`talonx_v2/store.py:526-536`, this session) + isolated test execution (`test_price_still_missing_next_session_releases_intent_exactly_once`, passed) |
 | S5-18 | Delayed reconciliation preserves original entry-reference session/exit schedule; recorded-at disclosed separately | Agreed | Not authorized | Partially implemented (entry-session preservation confirmed; separate recorded-at disclosure not assessed) | Code inspection (this session) |
-| S5-19 | Exact equality-at-deadline / receive-vs-commit semantics — explicit open acceptance detail | Open — deferred | N/A | N/A | N/A |
-| S5-20 | Deadline-consistency finding recorded for re-verification, not corrected here | Open — tracked (OPS-003) | N/A | N/A | N/A |
+| S5-19 | Exact equality-at-deadline / receive-vs-commit semantics — explicit open acceptance detail | Open — deferred | N/A | N/A | N/A — **left unresolved by the 2026-09-16 correction pass**, per its own instruction not to choose this semantics |
+| S5-20 | Deadline-consistency finding recorded for re-verification, not corrected here | Open — tracked (`OPS-003`, extended 2026-09-16 with a directly-confirmed intra-runtime dual-deadline discrepancy, in addition to the original Task 112R cross-methodology finding) | N/A | N/A | N/A |
 | S5-21 | Verified renames preserve identity/intent via effective-dated mappings | Agreed | Not authorized | Not implemented | Code inspection (this session — OPS-004) |
 | S5-22 | Before-entry splits use post-split entry basis | Agreed | Not authorized | Not implemented | Code inspection (this session — OPS-004) |
 | S5-23 | After-target-entry splits require chronological reconstruction, transactional, exactly once | Agreed | Not authorized | Not implemented | Code inspection (this session — OPS-004) |
@@ -1937,21 +1937,63 @@ blocking.
 ## S5-13 — 3-session recovery: target entry = Session 1, ends at exchange-calendar close of Session 3
 
 **Decision**: Agreed. **Authorization**: Not authorized (pre-existing).
-**Implementation**: Implemented — `max_entry_staleness_sessions = 3`
+**Implementation**: ~~Implemented — `max_entry_staleness_sessions = 3`
 (`talonx_v2/config.py:72`) combined with the calendar-aware
 `add_sessions()` (`talonx_v2/calendar.py:88`, driving the staleness
-cutoff in `service.py:377-381`) matches this semantics exactly.
-**Validation**: Code inspection (this session, direct read of the
-cited lines). **Dependency**: `S5-19` (exact equality-at-deadline
-detail still open).
+cutoff in `service.py:377-381`) matches this semantics exactly.~~
+**Superseded, see correction below.** **Validation**: Code inspection
+(this session, direct read of the cited lines). **Dependency**:
+`S5-19` (exact equality-at-deadline detail still open).
+
+**Correction (2026-09-16, ~14:03 UTC)**: the original "Implemented"
+verdict above was **unsupported** — it verified that a session-based
+mechanism exists, not that it produces the exact agreed boundary. Full
+re-inspection found **two different deadline computations for the same
+`max_entry_staleness_sessions=3` parameter**: the general
+entry-attempt eligibility gate (`service.py:377-381`, `stale_cut =
+ripe_through - 3`) stays open through `eligible_entry_session + 3`
+sessions — a **4-session** window — while the missing-price
+retry-then-release path's own deadline (`service.py:546-547`,
+`retry_deadline = add_sessions(eligible_entry_session,
+max_entry_staleness_sessions - 1)`) is `eligible_entry_session + 2`
+sessions — a **3-session** window matching the agreed "ends at Session
+3" framing. These two boundaries are one session apart, confirmed by
+the code's own inline comment describing the gap as deliberate. A
+genuine entry fill remains possible through the wider, 4-session
+window if a price happens to become available that late — one session
+beyond the agreed policy. **Corrected classification: "Partially
+implemented — session-based recovery exists; exact Session-3-close
+enforcement and pre-fill expiry remain pending `OPS-003`."** No code
+was changed; `S5-19`'s own open equality-at-deadline question is left
+unresolved by this correction. See `OPERATIONAL_FINDINGS.md` `OPS-003`
+for the complete finding, and `DECISION_LOG.md`'s dated "Documentation
+correction" note under Session 5 for the full narrative.
 
 ## S5-14 — Only timely, durably admitted intents reconcile; check expiry before fill
 
 **Decision**: Agreed. **Authorization**: Not authorized (pre-existing).
-**Implementation**: Implemented — `service.py`'s retry-then-expire
+**Implementation**: ~~Implemented — `service.py`'s retry-then-expire
 ordering (`retry_deadline` checked before any fill attempt,
-`service.py:546-571`) matches this. **Validation**: Code inspection
-(this session). **Dependency**: none.
+`service.py:546-571`) matches this.~~ **Superseded, see correction
+below.** **Validation**: Code inspection (this session). **Dependency**:
+none.
+
+**Correction (2026-09-16, ~14:03 UTC)**: direct re-inspection of
+`_phase_open` (`service.py:504-548`) found the **opposite ordering**
+from what was originally reported: `pipeline.process_episode(...)`
+(the actual fill attempt) runs **unconditionally first**, for every
+episode not already excluded by the coarser staleness gate; the
+`retry_deadline` comparison is evaluated **only reactively**, after a
+`NO_ENTRY_BAR` miss has already been returned by that same attempt —
+never before it. A successful fill is not gated by `retry_deadline` at
+all. "Check expiry before attempting a fill" is therefore **not**
+correctly implemented as stated — admission-timeliness itself
+(whether the intent is durable and was created in time) is correctly
+enforced elsewhere, but the specific attempt-vs-check ordering is
+inverted from the agreed policy. **Corrected classification:
+"Partially implemented — the admission/durability check is real; the
+pre-fill expiry check is not."** Tracked under `OPS-003`. No code was
+changed.
 
 ## S5-15 — Downtime/identity/corp-action delays do not extend the deadline
 
@@ -1963,6 +2005,16 @@ assessed**, since no corporate-action code exists at all (`OPS-004`).
 **Validation**: Code inspection (this session, deadline computation
 only). **Dependency**: `OPS-004`.
 
+**Correction note (2026-09-16, ~14:03 UTC) — reaffirmed, not
+downgraded**: the 2026-09-16 correction pass re-confirmed the
+"restart does not extend the deadline" half of this requirement is
+genuinely correct — both of `S5-13`'s two (now-disclosed) deadline
+computations are pure functions of the episode's fixed
+`eligible_entry_session` and the calendar's static session list,
+consulting no process-uptime or last-run state. This sub-claim is
+**not** affected by `S5-13`/`S5-14`'s correction, per this task's own
+instruction not to downgrade independently demonstrated behavior.
+
 ## S5-16 — Missing-price expiry = EXPIRED_NO_MARKET_DATA at product level
 
 **Decision**: Agreed. **Authorization**: Not authorized.
@@ -1973,6 +2025,15 @@ named; no distinct identity/corporate-action expiry reason exists
 since no corporate-action code exists (`OPS-004`). **Validation**:
 Code inspection (this session). **Dependency**: `OPS-004`.
 
+**Correction note (2026-09-16, ~14:03 UTC) — clarified**: the
+2026-09-16 pass found `FAILED_NO_MARKET_DATA` and `EXPIRED_STALE` are
+in fact **two distinct** internal dispositions (not one generic
+"expired"), which is a stronger partial match for this requirement's
+"preserve distinct reasons" intent than previously credited — see
+`OPS-003`. The product-level `EXPIRED_NO_MARKET_DATA` naming itself is
+still not surfaced anywhere operator-facing; verdict unchanged
+(`Partially implemented`).
+
 ## S5-17 — Release reservations exactly once, no invented cash credit
 
 **Decision**: Agreed. **Authorization**: Not authorized (pre-existing).
@@ -1980,6 +2041,19 @@ Code inspection (this session). **Dependency**: `OPS-004`.
 work from this project's Task 140 history (reservation-expiry-exactly-
 once). **Validation**: Code inspection (established). **Dependency**:
 none.
+
+**Correction note (2026-09-16, ~14:03 UTC) — reaffirmed with stronger
+evidence, not downgraded**: this pass found the exactly-once guarantee
+is enforced by a single, shared, structural SQL guard in
+`V2Store.mark_entry_intent` (`WHERE intent_id=? AND status='PENDING'`,
+`talonx_v2/store.py:526-536`), used by **every** terminal release path
+alike (`EXPIRED_STALE`, `FAILED_NO_MARKET_DATA`, and the normal
+`FILLED` path) — a stronger, more structural guarantee than a
+per-caller check would be. Directly confirmed by **running** (not just
+reading) `tests/test_task131_nonblocking_retry.py::
+test_price_still_missing_next_session_releases_intent_exactly_once`
+this pass (passed). This requirement is **not** affected by `S5-13`/
+`S5-14`'s correction — it remains `Implemented`.
 
 ## S5-18 — Delayed reconciliation preserves original entry-reference session; recorded-at disclosed separately
 
@@ -2008,8 +2082,19 @@ implementation-acceptance task, not a knowledge-transfer session).
 **Decision**: Open — tracked as `OPS-003`. **Authorization**: N/A.
 **Implementation**: N/A (no correction made). **Validation**: N/A.
 **Dependency**: see `OPERATIONAL_FINDINGS.md` `OPS-003` for the full
-finding (Task 112R's G1 entry-session-semantics comparison,
-re-verification against current code not performed this session).
+finding (originally: Task 112R's G1 entry-session-semantics
+comparison, re-verification against current code not performed at the
+time).
+
+**Extended (2026-09-16, ~14:03 UTC)**: a second, directly-confirmed
+deadline-consistency finding was added to `OPS-003` this pass — the
+`S5-13`/`S5-14` intra-runtime dual-deadline discrepancy (a 3-session
+vs. 4-session boundary for the same parameter, plus fill-before-check
+ordering), found by direct code inspection and corroborated by
+executed tests, not merely recorded for future re-verification like
+the original Task 112R item. **Decision status unchanged**: `Open —
+tracked`; still no code correction made or authorized. See
+`OPERATIONAL_FINDINGS.md` `OPS-003` for both findings side by side.
 
 ## S5-21 — Verified renames preserve identity/intent via effective-dated mappings
 
