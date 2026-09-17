@@ -3370,3 +3370,77 @@ convention — no destructive migration, no new table.
 **PACKAGE 4 NOT STARTED. PACKAGE 5 NOT STARTED. V2 RELEASE INTEGRATION
 NOT STARTED. NEXT PACKAGE AWAITS GATEKEEPER REVIEW** of this Package 3
 report.
+
+## Package 4 — Whole-Share, Fee-Inclusive Sizing & Precise Accounting
+
+**Package 4 implementation and its isolated regression tests are
+authorized by this session**, following Package 3's acceptance — see
+`REQUIREMENTS_TRACKER.md` `S13-14` and `OPERATIONAL_FINDINGS.md`
+(`OPS-014` CLOSED for V2; new `OPS-022`) for the full record. Full
+evidence: `docs/research/evidence/package4_sizing_accounting/
+README.md`. **Package 5 and V2 release integration remain explicitly
+not authorized.**
+
+### Verdict
+
+**`PACKAGE4_ACCEPTED_WITH_BOUNDED_FOLLOWUPS`.** V2 now sizes whole
+shares only, fee-inclusive against the allocation cap, with an
+explicit, non-resizing refusal when available cash cannot cover the
+sized reservation (Session 10 §C's own explicit, non-ambiguous
+resolution of that exact question). A dormant P&L defect was found and
+closed in the same pass (`OPS-022`): exit P&L re-derived cost basis
+from `shares*entry_price` rather than the authoritative persisted
+`position_cost`, invisible under the zero-fee assumption but wrong in
+general. Money-precision boundary: `Decimal` used only inside the new
+`talonx_v2/sizing.py`'s own internal comparisons, never a repository-
+wide migration. Concurrent-admission cash-overcommit prevention proven
+with genuinely independent database connections. New-campaign
+defaults ($100,000 cash / $10,000 allocation) were found to ALREADY be
+correctly configured (`V2Config`'s own existing fields) and verified,
+not newly built; existing-account cash preservation on reopen was
+directly verified. The full multi-dimensional campaign-identity model
+(Session 10 §A) remains a disclosed, bounded follow-up, not built
+here, per the task's own explicit instruction not to create a broad
+campaign architecture in this package.
+
+### What was NOT done (per the task's own explicit non-goals)
+
+No Package 5 work, no strategy/qualification change, no numerical
+commission/spread/slippage/tax/fee assumption invented, no provider
+switch/activation, no profitability recomputation, no release
+integration, no broad campaign-architecture redesign, no
+`talonx_paper.engine`/Original accounting change, no application
+start/stop, no Telegram send, no production database mutation.
+
+### Cost model — explicit statement
+
+The current, approved cost assumption applied throughout sizing,
+reservation, position basis, and exit P&L is **zero-cost**
+(`talonx_v2.sizing.zero_fee`), matching the pre-Package-4 codebase's
+own actual behavior exactly. **This is not new profitability
+evidence.** `S10-22`'s own deferred numerical cost-assumption question
+remains fully unresolved; Package 4 guarantees only that whichever
+cost model is eventually approved will be applied consistently across
+all four accounting steps, via one shared `fee_fn` parameter.
+
+### Findings tracked in `OPERATIONAL_FINDINGS.md`
+
+- **`OPS-014`** — CLOSED for V2 (Original's own sizing unaffected,
+  out of scope).
+- **`OPS-022`** (new) — exit P&L re-derived cost basis instead of
+  reading the authoritative persisted entry total; found and closed
+  within this same session, dormant/never observed live.
+
+### Schema change
+
+`talonx_v2/store.py`: `positions` gained `entry_fee`/`exit_fee`
+(nullable REAL); `trades` gained `fee` (nullable REAL) — via the
+store's own pre-existing `ALTER TABLE ... ADD COLUMN` migration
+convention. No destructive migration, no new table, no `V2Config`
+change (fingerprint-safety preserved).
+
+### Package 5/release-integration gate
+
+**PACKAGE 5 NOT STARTED. V2 RELEASE INTEGRATION NOT STARTED.
+PROSPECTIVE PAPER VALIDATION NOT STARTED. NEXT STEP AWAITS GATEKEEPER
+REVIEW** of this Package 4 report.

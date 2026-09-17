@@ -429,10 +429,15 @@ def test_41_original_local_paper_only_no_alpaca():
     import talonx_v2.paper as p
     src = open(p.__file__).read().lower()
     assert "alpaca" not in src
-    # only reuse is the PURE math from talonx_paper.engine -- no broker/order client
+    # Package 4: V2's own sizing/P&L math now lives in talonx_v2.sizing
+    # (whole-share, fee-inclusive) -- no longer reused from
+    # talonx_paper.engine (which remains unmodified, still used by
+    # Original's own separate, fractional-share accounting). The
+    # underlying safety property this test protects -- no broker/
+    # order-client code in V2's paper module -- is unaffected.
     assert "import" in src
     assert "orderclient" not in src and "submit_order" not in src
-    assert "from talonx_paper.engine import" in src
+    assert "from talonx_v2.sizing import" in src
 
 
 def test_42_no_real_capital_flag():

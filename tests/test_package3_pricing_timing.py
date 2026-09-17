@@ -455,16 +455,23 @@ def test_p3a_same_entry_price_flows_into_sizing_reservation_fill_and_cost_basis(
     assert len(res.entries) == 1
     pos = store.all_positions()[0]
     assert pos["entry_price"] == ENTRY_PRICE
-    expected_shares = ALLOC / ENTRY_PRICE
-    assert pos["shares"] == pytest.approx(expected_shares)
-    assert pos["position_cost"] == pytest.approx(ALLOC)
+    # Package 4 P4-B: whole-share, fee-inclusive sizing -- the largest
+    # WHOLE quantity fitting the allocation (floor, never rounded up),
+    # superseding this test's own original continuous-division
+    # expectation (a disclosed, intended consequence, not a
+    # regression -- see docs/research/evidence/
+    # package4_sizing_accounting/README.md).
+    import math
+    expected_shares = math.floor(ALLOC / ENTRY_PRICE)
+    assert pos["shares"] == expected_shares
+    assert pos["position_cost"] == pytest.approx(expected_shares * ENTRY_PRICE)
     trade = store.trades()[0]
     assert trade["execution_price"] == ENTRY_PRICE
-    assert trade["shares"] == pytest.approx(expected_shares)
+    assert trade["shares"] == expected_shares
     # the res.entries record (what an alert/notification would carry)
     # must also agree -- never a second, divergent price.
     assert res.entries[0]["entry_price"] == ENTRY_PRICE
-    assert res.entries[0]["shares"] == pytest.approx(expected_shares)
+    assert res.entries[0]["shares"] == expected_shares
 
 
 # ======================================================================= #

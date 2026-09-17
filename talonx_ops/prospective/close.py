@@ -68,6 +68,16 @@ def _v2_reconcile() -> tuple[dict[str, Any], dict[str, str], list[str]]:
         stale_entered = con.execute(
             "SELECT p.episode_id FROM positions p JOIN processed_episodes e "
             "ON p.episode_id=e.episode_id WHERE e.disposition='SKIPPED_ENTRY_STALE'").fetchall()
+        # Package 4 P4-H: whole-share and positive-finite-cost-basis
+        # invariants -- reuses this SAME reconciliation/account-block
+        # mechanism (LEDGER_MISMATCH) rather than a parallel safety
+        # system, per Package 4's own explicit instruction.
+        non_whole = con.execute(
+            "SELECT episode_id, shares FROM positions WHERE shares IS NOT NULL "
+            "AND shares != CAST(shares AS INTEGER)").fetchall()
+        bad_cost = con.execute(
+            "SELECT episode_id, position_cost FROM positions WHERE status IN ('OPEN','EXIT_UNRESOLVED') "
+            "AND (position_cost IS NULL OR position_cost <= 0)").fetchall()
     finally:
         con.close()
 
@@ -90,6 +100,10 @@ def _v2_reconcile() -> tuple[dict[str, Any], dict[str, str], list[str]]:
        f"cash {cash} + open_cost {open_cost} + unresolved_cost {unresolved_cost} != "
        f"{CAMPAIGN_STARTING_CASH} + realized {realized}")
     _a("no_negative_cash", cash is not None and cash >= 0, f"cash {cash}")
+    _a("whole_share_positions", not non_whole,
+       str([(d[0], d[1]) for d in non_whole]))
+    _a("positive_finite_position_cost", not bad_cost,
+       str([(d[0], d[1]) for d in bad_cost]))
     _a("no_duplicate_buy_episode_id", not dup_buy, str([d[0] for d in dup_buy]))
     _a("no_duplicate_position_episode_id", not dup_pos, str([d[0] for d in dup_pos]))
     _a("no_stale_episode_entered", not stale_entered, str([s[0] for s in stale_entered]))
@@ -144,6 +158,17 @@ def _record_v2_reconciliation_blocks(asserts: dict[str, str], findings: list[str
     if asserts.get("no_negative_cash") == "FAIL":
         detail = next((f for f in findings if f.startswith("no_negative_cash")), "no_negative_cash: FAIL")
         to_record.append((account_blocks.REASON_CASH_DEFICIT, "no_negative_cash", detail))
+    # Package 4 P4-H: the two new whole-share/cost-basis invariants
+    # reuse the SAME LEDGER_MISMATCH mechanism -- never a parallel
+    # safety system.
+    if asserts.get("whole_share_positions") == "FAIL":
+        detail = next((f for f in findings if f.startswith("whole_share_positions")),
+                      "whole_share_positions: FAIL")
+        to_record.append((account_blocks.REASON_LEDGER_MISMATCH, "whole_share_positions", detail))
+    if asserts.get("positive_finite_position_cost") == "FAIL":
+        detail = next((f for f in findings if f.startswith("positive_finite_position_cost")),
+                      "positive_finite_position_cost: FAIL")
+        to_record.append((account_blocks.REASON_LEDGER_MISMATCH, "positive_finite_position_cost", detail))
     if not to_record:
         return []
 

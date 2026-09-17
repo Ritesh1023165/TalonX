@@ -60,7 +60,9 @@ CREATE TABLE IF NOT EXISTS positions (
     trading_days_held     INTEGER,
     source_meta           TEXT,
     opened_at             TEXT NOT NULL,
-    closed_at             TEXT
+    closed_at             TEXT,
+    entry_fee             REAL,     -- Package 4: position_cost = shares*entry_price + entry_fee
+    exit_fee              REAL      -- Package 4: realized_pnl_usd = (shares*exit_price - exit_fee) - position_cost
 );
 CREATE TABLE IF NOT EXISTS trades (
     trade_id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,7 +77,8 @@ CREATE TABLE IF NOT EXISTS trades (
     realized_pnl_pct      REAL,
     trading_days_held     INTEGER,
     portfolio_cash_after  REAL NOT NULL,
-    executed_at           TEXT NOT NULL
+    executed_at           TEXT NOT NULL,
+    fee                   REAL      -- Package 4: entry_fee on a BUY row, exit_fee on a SELL row
 );
 CREATE TABLE IF NOT EXISTS cooldowns (
     issuer_key            TEXT PRIMARY KEY,       -- symbol
@@ -310,6 +313,16 @@ class V2Store:
                 c.execute("ALTER TABLE pending_entry_intents ADD COLUMN source_event_ts_utc TEXT")
             if intent_cols and "receipt_ts_utc" not in intent_cols:
                 c.execute("ALTER TABLE pending_entry_intents ADD COLUMN receipt_ts_utc TEXT")
+            # Package 4: additive fee-breakdown columns for a positions/
+            # trades table that may have been created by an earlier build.
+            pos_cols = {r[1] for r in c.execute("PRAGMA table_info(positions)")}
+            if pos_cols and "entry_fee" not in pos_cols:
+                c.execute("ALTER TABLE positions ADD COLUMN entry_fee REAL")
+            if pos_cols and "exit_fee" not in pos_cols:
+                c.execute("ALTER TABLE positions ADD COLUMN exit_fee REAL")
+            trade_cols = {r[1] for r in c.execute("PRAGMA table_info(trades)")}
+            if trade_cols and "fee" not in trade_cols:
+                c.execute("ALTER TABLE trades ADD COLUMN fee REAL")
             row = c.execute("SELECT cash FROM portfolio WHERE id=1").fetchone()
             if row is None:
                 c.execute("INSERT INTO portfolio (id, cash) VALUES (1, ?)", (self._starting_cash,))
@@ -424,18 +437,18 @@ class V2Store:
 
     def insert_open_position(self, *, episode_id, symbol, issuer_cik, entry_session,
                              target_exit_session, entry_price, shares, position_cost,
-                             source_meta: dict | None = None) -> int:
+                             source_meta: dict | None = None, entry_fee: float = 0.0) -> int:
         with self._conn() as c:
             cur = c.execute(
                 """INSERT INTO positions
                    (episode_id, symbol, issuer_cik, status, entry_session, target_exit_session,
-                    entry_price, shares, position_cost, source_meta, opened_at)
-                   VALUES (?,?,?,'OPEN',?,?,?,?,?,?,?)""",
+                    entry_price, shares, position_cost, source_meta, opened_at, entry_fee)
+                   VALUES (?,?,?,'OPEN',?,?,?,?,?,?,?,?)""",
                 (episode_id, symbol.upper(), issuer_cik,
                  entry_session.isoformat() if isinstance(entry_session, date) else str(entry_session),
                  target_exit_session.isoformat() if isinstance(target_exit_session, date) else str(target_exit_session),
                  entry_price, shares, position_cost,
-                 json.dumps(source_meta or {}), _now()),
+                 json.dumps(source_meta or {}), _now(), entry_fee),
             )
             return int(cur.lastrowid)
 
@@ -469,7 +482,7 @@ class V2Store:
                 "SELECT * FROM positions WHERE status='EXIT_UNRESOLVED' ORDER BY entry_session")]
 
     def close_position(self, *, position_id, exit_session, exit_price, realized_pnl_usd,
-                       realized_pnl_pct, trading_days_held) -> bool:
+                       realized_pnl_pct, trading_days_held, exit_fee: float = 0.0) -> bool:
         """The ``WHERE status='OPEN'`` guard IS the authoritative,
         atomic eligibility check for this state transition (Package 1
         Settlement Integrity) -- it must run inside the same
@@ -486,28 +499,30 @@ class V2Store:
         with self._conn() as c:
             cur = c.execute(
                 """UPDATE positions SET status='CLOSED', exit_session=?, exit_price=?,
-                     realized_pnl_usd=?, realized_pnl_pct=?, trading_days_held=?, closed_at=?
+                     realized_pnl_usd=?, realized_pnl_pct=?, trading_days_held=?, closed_at=?,
+                     exit_fee=?
                    WHERE position_id=? AND status='OPEN'""",
                 (exit_session.isoformat() if isinstance(exit_session, date) else str(exit_session),
                  exit_price, realized_pnl_usd, realized_pnl_pct, trading_days_held, _now(),
-                 position_id),
+                 exit_fee, position_id),
             )
             return cur.rowcount > 0
 
     # ---- trades ----
     def append_trade(self, *, episode_id, symbol, action, execution_price, shares,
                      position_cost, portfolio_cash_after, entry_price=None,
-                     realized_pnl_usd=None, realized_pnl_pct=None, trading_days_held=None) -> int:
+                     realized_pnl_usd=None, realized_pnl_pct=None, trading_days_held=None,
+                     fee: float = 0.0) -> int:
         with self._conn() as c:
             cur = c.execute(
                 """INSERT INTO trades
                    (episode_id, symbol, action, execution_price, shares, position_cost,
                     entry_price, realized_pnl_usd, realized_pnl_pct, trading_days_held,
-                    portfolio_cash_after, executed_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    portfolio_cash_after, executed_at, fee)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (episode_id, symbol.upper(), action, execution_price, shares, position_cost,
                  entry_price, realized_pnl_usd, realized_pnl_pct, trading_days_held,
-                 portfolio_cash_after, _now()),
+                 portfolio_cash_after, _now(), fee),
             )
             return int(cur.lastrowid)
 

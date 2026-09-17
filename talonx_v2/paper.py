@@ -1,10 +1,14 @@
 """
 talonx_v2.paper -- V2 paper lifecycle (Phases 10-15)
 ==================================================
-Reuses the Original paper engine's PURE math (``talonx_paper.engine``:
-``calculate_buy`` / ``calculate_sell_pnl``).  No broker, no network, no
-real capital.  Separate ledger (``v2_lane.db``) so V1 and V2 positions
-are always attributable apart.
+No broker, no network, no real capital.  Separate ledger
+(``v2_lane.db``) so V1 and V2 positions are always attributable apart.
+
+Package 4: sizing/P&L math is V2's OWN (``talonx_v2.sizing`` --
+whole-share, fee-inclusive), no longer Original's shared
+``talonx_paper.engine.calculate_buy``/``calculate_sell_pnl`` (which
+remain unmodified, still used by Original's own, separate,
+fractional-share accounting).
 
 Lifecycle
 ---------
@@ -22,10 +26,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from talonx_paper.engine import calculate_buy, calculate_sell_pnl
 from talonx_v2 import calendar as v2cal
 from talonx_v2.config import V2Config
 from talonx_v2.schemas import V2Action, V2Decision
+from talonx_v2.sizing import compute_exit_economics, size_whole_shares_fee_inclusive, zero_fee
 from talonx_v2.store import V2Store
 
 
@@ -68,7 +72,16 @@ def enter_position(
     entry_session: date,
     config: V2Config | None = None,
     source_meta: dict | None = None,
+    fee_fn=None,
 ) -> EntryOutcome:
+    """``fee_fn``: optional ``(quantity, price) -> float`` cost model,
+    passed straight through to ``sizing.size_whole_shares_fee_inclusive``.
+    Defaults to ``sizing.zero_fee`` -- the current, frozen, approved
+    cost assumption (S10-22/OPS-014 remain unresolved; this default is
+    NOT an invented realistic fee, and is deliberately NOT added as a
+    ``V2Config`` field, to avoid any risk to the frozen-contract
+    validation/release-fingerprint hash a config-schema change could
+    create)."""
     cfg = config or V2Config()
     cfg.validate_frozen()
 
@@ -131,11 +144,29 @@ def enter_position(
         if entry_price is None or entry_price <= 0:
             return _skip("BAD_ENTRY_PRICE")
 
+        # Package 4 P4-B: whole-share, fee-inclusive sizing against the
+        # ALLOCATION cap, then a separate AVAILABLE-CASH check -- never
+        # silently resized down to fit available cash (Session 10 §C's
+        # own explicit distinction). AVAILABLE cash here excludes THIS
+        # episode's own reservation (its intent is still 'PENDING' at
+        # this exact moment, about to be consumed by this same fill)
+        # but DOES exclude every OTHER still-PENDING intent's own
+        # reserved allocation -- the same accounting
+        # `_capacity_rejection_reason` already uses at admission time,
+        # re-verified here as the final, authoritative, same-
+        # transaction check (Package 2's own established principle).
         cash = store.cash()
-        buy = calculate_buy(cash, cfg.per_position_allocation_usd, entry_price)
-        if buy is None:
-            return _skip("NO_CASH")
-        shares, cost = buy
+        others_pending = [i for i in store.pending_entry_intents()
+                          if i["episode_id"] != decision.episode_id]
+        available_cash = cash - (cfg.per_position_allocation_usd * len(others_pending))
+        sizing = size_whole_shares_fee_inclusive(
+            price=entry_price, allocation_usd=cfg.per_position_allocation_usd,
+            available_cash=available_cash, fee_fn=fee_fn or zero_fee,
+        )
+        if not sizing.ok or sizing.shares < 1:
+            return _skip(f"NO_CASH:{sizing.reason}")
+        shares = sizing.shares
+        cost = sizing.entry_total
 
         target_exit = v2cal.add_sessions(es, cfg.hold_trading_days)
 
@@ -147,22 +178,22 @@ def enter_position(
         pos_id = store.insert_open_position(
             episode_id=decision.episode_id, symbol=sym, issuer_cik=source_meta.get("issuer_cik", "") if source_meta else "",
             entry_session=es, target_exit_session=target_exit,
-            entry_price=entry_price, shares=shares, position_cost=cost,
-            source_meta=source_meta or {},
+            entry_price=entry_price, shares=float(shares), position_cost=cost,
+            source_meta=source_meta or {}, entry_fee=sizing.entry_fee,
         )
         store.set_cash(cash - cost)
         store.append_trade(
             episode_id=decision.episode_id, symbol=sym, action="BUY",
-            execution_price=entry_price, shares=shares, position_cost=cost,
-            portfolio_cash_after=cash - cost,
+            execution_price=entry_price, shares=float(shares), position_cost=cost,
+            portfolio_cash_after=cash - cost, fee=sizing.entry_fee,
         )
         store.record_disposition(
             episode_id=decision.episode_id, symbol=sym, disposition="ENTERED",
             issuer_cik=source_meta.get("issuer_cik", "") if source_meta else "",
             eligible_entry_session=es.isoformat(),
-            detail=f"pos={pos_id} shares={shares:.4f} target_exit={target_exit.isoformat()}",
+            detail=f"pos={pos_id} shares={shares} target_exit={target_exit.isoformat()}",
         )
-    return EntryOutcome(True, "ENTERED", pos_id, shares, target_exit)
+    return EntryOutcome(True, "ENTERED", pos_id, float(shares), target_exit)
 
 
 def due_exits(store: V2Store, as_of_session: date) -> list[dict]:
@@ -179,6 +210,7 @@ def close_position(
     exit_price: float,
     exit_session: date,
     config: V2Config | None = None,
+    fee_fn=None,
 ) -> ExitOutcome:
     """``position`` supplies ONLY the lookup key (``position_id``) --
     Package 2 acceptance A5: every economic value used below (symbol,
@@ -216,7 +248,17 @@ def close_position(
         position_cost = float(row["position_cost"])
         entry_session = row["entry_session"]
 
-        pnl_usd, pnl_pct = calculate_sell_pnl(shares, entry_price, exit_price)
+        # Package 4 P4-E: exit economics derived from the AUTHORITATIVE
+        # persisted `position_cost` (entry_total, fee-inclusive) --
+        # never re-derived as `shares * entry_price` alone (that would
+        # omit the entry fee, understating cost and overstating P&L
+        # the moment a non-zero fee model is ever configured; dormant
+        # today under the zero-fee default, wrong in general).
+        exit_econ = compute_exit_economics(
+            shares=shares, exit_price=exit_price, entry_total=position_cost,
+            fee_fn=fee_fn or zero_fee,
+        )
+        pnl_usd, pnl_pct = exit_econ.realized_pnl_usd, exit_econ.realized_pnl_pct
         held = v2cal.trading_days_elapsed(_as_date(entry_session), es)
 
         # Task 131 Remediation Directive 4 + Package 1 Settlement Integrity:
@@ -233,6 +275,7 @@ def close_position(
         transitioned = store.close_position(
             position_id=position_id, exit_session=es, exit_price=exit_price,
             realized_pnl_usd=pnl_usd, realized_pnl_pct=pnl_pct, trading_days_held=held,
+            exit_fee=exit_econ.exit_fee,
         )
         if not transitioned:
             # Already CLOSED/EXIT_UNRESOLVED/otherwise not OPEN -- an
@@ -241,14 +284,14 @@ def close_position(
             # exit notification from this outcome (see ``settled``).
             return ExitOutcome(symbol, episode_id, es, exit_price,
                                pnl_usd, pnl_pct, held, settled=False)
-        proceeds = shares * exit_price
-        cash_after = store.cash() + proceeds
+        cash_after = store.cash() + exit_econ.exit_net
         store.set_cash(cash_after)
         store.append_trade(
             episode_id=episode_id, symbol=symbol, action="SELL",
             execution_price=exit_price, shares=shares, position_cost=position_cost,
             portfolio_cash_after=cash_after, entry_price=entry_price,
             realized_pnl_usd=pnl_usd, realized_pnl_pct=pnl_pct, trading_days_held=held,
+            fee=exit_econ.exit_fee,
         )
         cooldown_until = v2cal.add_sessions(es, cfg.reentry_cooldown_trading_days)
         store.set_cooldown(symbol, cooldown_until)

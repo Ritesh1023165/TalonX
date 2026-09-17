@@ -972,8 +972,9 @@ update_policy.py`, `talonx_v2/paper.py` (established + this session).
 
 ## OPS-014 — Whole-share, fee-aware sizing not implemented
 
-**Status**: `OPEN` — agreed target formula exists (Session 10 §C); no
-implementation.
+**Status**: `CLOSED` (for V2) — Package 4, 2026-09-17. Original's own
+sizing is unaffected/unchanged (separate, out-of-scope). See the
+Package 4 update below for the full record.
 
 **Found**: Session 10 documentation pass (2026-09-17), via direct
 reading of `talonx_paper/engine.py`.
@@ -1007,6 +1008,34 @@ shares; wire the pre-commit validation list (§C) around it.
 paper.py:25,115`.
 
 **Related**: `REQUIREMENTS_TRACKER.md` `S10-07`, `S10-08`, `S10-09`.
+
+**Package 4 update (2026-09-17) — CLOSED for V2**: a new, V2-only
+module `talonx_v2/sizing.py` implements Session 10 §C's exact agreed
+formula — the largest whole `Q` such that `Q*price + fee_fn(Q,price)
+<= allocation`, via a bounded backward search (correct for ANY fee
+shape, not just a flat/quantity-independent one), never rounding up,
+with an explicit sizing-skip reason when zero shares are eligible.
+Wired into `talonx_v2/paper.py::enter_position()`/`close_position()`,
+replacing `talonx_paper.engine.calculate_buy`/`calculate_sell_pnl` for
+V2 specifically — Original's own shared copies remain completely
+unmodified (Original's fractional-share sizing is a separate,
+out-of-scope concern; the frozen "no fractional shares" requirement
+is scoped to "the first-release V2 paper strategy" only). The default
+`fee_fn` (`sizing.zero_fee`) returns `0.0` — the current, frozen,
+approved cost assumption; `S10-22`'s own numerical cost-assumption
+question remains unresolved and undecided by this closure. A dormant
+P&L defect was also found and fixed in the same pass:
+`calculate_sell_pnl` re-derived cost basis as `shares*entry_price`
+rather than reading the authoritative persisted `position_cost`
+(entry_total) — invisible under the zero-fee assumption (they were
+numerically identical), but would have silently omitted the entry fee
+from P&L the moment any non-zero fee was ever configured; V2's new
+`sizing.compute_exit_economics` uses the authoritative persisted total
+throughout. Verified by 28 new isolated tests
+(`tests/test_package4_sizing_accounting.py`), including a genuinely
+independent-connection concurrency proof that two admissions cannot
+together overcommit account cash. See `docs/research/evidence/
+package4_sizing_accounting/README.md` for full detail.
 
 ---
 
@@ -1414,6 +1443,49 @@ package3_pricing_timing/README.md` §5.
 
 **Related**: `OPS-003` (the deadline/timing finding this session
 otherwise closed Finding B of).
+
+---
+
+## OPS-022 — Exit P&L re-derived cost basis, never read the authoritative persisted entry total (found and closed same session)
+
+**Status**: `CLOSED` — found and fixed within Package 4 (2026-09-17);
+dormant (invisible under the zero-fee assumption then in force), never
+observed live (V2's campaign has had 0 trades to date).
+
+**Found**: Package 4 P4-A/P4-E, direct inspection of
+`talonx_paper.engine.calculate_sell_pnl()` and its call site in
+`talonx_v2/paper.py::close_position()`, while tracing the full
+capital-flow map before any code change.
+
+**Finding**: `calculate_sell_pnl(shares, entry_price, exit_price)`
+computed `cost_basis = shares * entry_price` internally, rather than
+using the persisted, authoritative `positions.position_cost`
+(entry_total) that Package 2 acceptance's own A5 principle already
+established as the correct source for every OTHER settlement value.
+Numerically invisible under the zero-fee assumption in force since
+this codebase's inception (`position_cost == shares*entry_price` when
+no fee is ever applied) — but wrong in general: the instant any
+non-zero entry fee is configured, this formula would have silently
+omitted it from realized P&L, overstating gains by exactly the entry
+fee amount.
+
+**Fix**: `talonx_v2/sizing.py::compute_exit_economics()` computes
+`realized_pnl = (shares*exit_price - exit_fee) - entry_total`, where
+`entry_total` is the caller-supplied, authoritative persisted
+`position_cost` — wired into `close_position()` in the same pass that
+introduced fee-inclusive sizing (`OPS-014`). `talonx_paper.engine.
+calculate_sell_pnl` itself is unmodified; Original's own P&L
+accounting is unaffected (out of scope).
+
+**Verification**: `tests/test_package4_sizing_accounting.py`
+(`test_p4e_exit_pnl_uses_authoritative_entry_total_not_notional_alone`,
+`test_p4e_round_trip_cash_reconciles_with_fees`).
+
+**Evidence references**: `docs/research/evidence/
+package4_sizing_accounting/README.md` §2, §6.
+
+**Related**: `OPS-014` (found in the same pass, same underlying
+capital-flow trace).
 
 ---
 

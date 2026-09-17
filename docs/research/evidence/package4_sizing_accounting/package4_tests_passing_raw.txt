@@ -1,0 +1,38 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- C:\workspace\TalonX\.venv\Scripts\python.exe
+rootdir: C:\workspace\TalonX
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.10.16, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 28 items
+
+tests/test_package4_sizing_accounting.py::test_p4b_allocation_exactly_fits_n_shares_no_fee PASSED [  3%]
+tests/test_package4_sizing_accounting.py::test_p4b_allocation_short_by_smallest_unit_drops_one_share PASSED [  7%]
+tests/test_package4_sizing_accounting.py::test_p4b_high_priced_stock_only_one_share_fits PASSED [ 10%]
+tests/test_package4_sizing_accounting.py::test_p4b_high_priced_stock_zero_shares_fit PASSED [ 14%]
+tests/test_package4_sizing_accounting.py::test_p4b_fee_causes_quantity_to_fall_from_n_to_n_minus_1 PASSED [ 17%]
+tests/test_package4_sizing_accounting.py::test_p4b_available_cash_smaller_than_allocation_rejects_not_resizes PASSED [ 21%]
+tests/test_package4_sizing_accounting.py::test_p4b_awkward_decimal_price_33_33 PASSED [ 25%]
+tests/test_package4_sizing_accounting.py::test_p4b_price_from_float_with_inexact_binary_representation PASSED [ 28%]
+tests/test_package4_sizing_accounting.py::test_p4b_zero_shares_reject_has_explicit_reason PASSED [ 32%]
+tests/test_package4_sizing_accounting.py::test_p4b_never_rounds_up PASSED [ 35%]
+tests/test_package4_sizing_accounting.py::test_p4b_end_to_end_via_enter_position_produces_whole_shares PASSED [ 39%]
+tests/test_package4_sizing_accounting.py::test_p4c_decimal_boundary_avoids_binary_float_accumulation_error PASSED [ 42%]
+tests/test_package4_sizing_accounting.py::test_p4d_creating_reservation_does_not_touch_cash PASSED [ 46%]
+tests/test_package4_sizing_accounting.py::test_p4d_fill_debits_cash_exactly_once PASSED [ 50%]
+tests/test_package4_sizing_accounting.py::test_p4d_release_via_expiry_does_not_change_cash PASSED [ 53%]
+tests/test_package4_sizing_accounting.py::test_p4d_duplicate_fill_attempt_is_refused PASSED [ 57%]
+tests/test_package4_sizing_accounting.py::test_p4d_restart_preserves_active_reservation PASSED [ 60%]
+tests/test_package4_sizing_accounting.py::test_p4d_account_block_still_prevents_new_reservation PASSED [ 64%]
+tests/test_package4_sizing_accounting.py::test_p4e_round_trip_cash_reconciles_with_fees PASSED [ 67%]
+tests/test_package4_sizing_accounting.py::test_p4e_exit_pnl_uses_authoritative_entry_total_not_notional_alone PASSED [ 71%]
+tests/test_package4_sizing_accounting.py::test_p4e_duplicate_settlement_attempt_is_safe PASSED [ 75%]
+tests/test_package4_sizing_accounting.py::test_p4f_new_campaign_file_receives_configured_defaults PASSED [ 78%]
+tests/test_package4_sizing_accounting.py::test_p4f_existing_account_retains_its_cash_when_reopened_with_different_config PASSED [ 82%]
+tests/test_package4_sizing_accounting.py::test_p4f_default_allocation_is_10000_and_configurable PASSED [ 85%]
+tests/test_package4_sizing_accounting.py::test_p4g_two_concurrent_admissions_cannot_together_overcommit_cash PASSED [ 89%]
+tests/test_package4_sizing_accounting.py::test_p4h_non_whole_share_position_triggers_ledger_mismatch_block PASSED [ 92%]
+tests/test_package4_sizing_accounting.py::test_p4h_invalid_cost_basis_triggers_ledger_mismatch_block PASSED [ 96%]
+tests/test_package4_sizing_accounting.py::test_p4h_healthy_ledger_produces_no_invariant_blocks PASSED [100%]
+
+============================= 28 passed in 1.89s ==============================
