@@ -84,7 +84,7 @@ without naming which of these applies.
 | S3-22 | Approved display names; "Fundamental Opportunities" provisional; internal IDs/DBs/modules preserved | Agreed | Explicitly not authorized (no rename) | Not implemented (display layer; no renaming done) | Code inspection (this session) |
 | S3-23 | Conditional database-reset permission for a future authorized implementation, with a 9-step required approach | Agreed | Not authorized now; conditionally pre-authorized for a future task that follows the 9-step approach | Not implemented (no reset performed) | N/A |
 | S3-24 | Deferred: Original's long-term/fundamentals path role review | Open — deferred | N/A | N/A | N/A |
-| S3-25 | Deferred: cross-strategy capital/exposure enforcement policy | Open — deferred | N/A | N/A | N/A |
+| S3-25 | Deferred: cross-strategy capital/exposure ENFORCEMENT policy (display resolved Agreed via S10-14; numerical limits split to S10-23/24/25) | Open — deferred (enforcement only) | N/A | N/A | N/A |
 | S3-26 | Deferred: detailed experiment evaluation criteria/evidence sufficiency | Open — deferred | N/A | N/A | N/A |
 | S3-27 | Deferred: exact 2-year historical data feasibility | Open — deferred | N/A | N/A | N/A |
 | S3-28 | Deferred: remaining lifecycle semantics (mute controls, pending intents on pause) | Open — deferred | N/A | N/A | N/A |
@@ -128,7 +128,7 @@ without naming which of these applies.
 | S5-24 | Unverified changes block execution without discarding obligations | Agreed | Not authorized | Not implemented | Code inspection (this session — OPS-004) |
 | S5-25 | Mergers/replacement securities require explicitly supported treatment | Agreed | Not authorized | Not implemented | Code inspection (this session — OPS-004) |
 | S5-26 | Truncate+cash-in-lieu modeled policy; proportional cost basis; CORP_ACTION_CASH separate but counted in returns; unresolved entitlement not fabricated cash | Agreed | Not authorized | Not implemented | Code inspection (this session — OPS-004) |
-| S5-27 | Decimal arithmetic internally; cents/4-decimal display; no intermediate truncation; rounding mode open | Agreed | Not authorized | Not assessed in this documentation pass (existing accounting precision not audited) | Not assessed in this documentation pass |
+| S5-27 | Decimal arithmetic internally; cents/4-decimal display; no intermediate truncation; rounding mode open | Agreed | Not authorized | Partially implemented (corrected 2026-09-17 — `calculate_buy`/`calculate_sell_pnl` confirmed `float`, not `Decimal`; full surface not audited) | Code inspection (this session, `talonx_paper/engine.py:71-93`) |
 | S5-28 | Durable checkpoints + overlap/dedup + recoverable enrichment state; no fixed 16-hour assumption | Agreed | Not authorized | Partially implemented (Intelligence's own checkpoint/backfill/poller exists, Task 96B; 16h-assumption search found none to remove) | Code inspection (established + this session) |
 | S5-29 | Prioritize obligations/timely intents over bulk historical work | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
 | S5-30 | Pre-market lockout window PROPOSED/UNDEFINED | Open — deferred | N/A | N/A | N/A |
@@ -205,6 +205,51 @@ without naming which of these applies.
 | S8-18 | Identify boundary coverage needs; existing tests may satisfy individually, cited not overclaimed | Agreed | Not authorized | Partially implemented (this documentation's own discipline; dedicated boundary tests for holidays/early-closes not located) | Code inspection (this session, self-check) |
 | S8-25 | Deferred: provider finality/publication-qualification boundary for target-closing data | Open — deferred | N/A | N/A | N/A |
 | S8-26 | Deferred: dedicated holiday/early-close-spanning fall-forward and admission-deadline boundary test coverage | Open — deferred | N/A | N/A | N/A |
+| S9-01 | Primary Trade & Event bot scope | Agreed | Not authorized | Not implemented (no dedicated bot exists) | Code inspection (established) |
+| S9-02 | Separate Operations bot: incidents, account blocks, recovery | Agreed (reaffirms S4-07) | Not authorized | Not implemented | Code inspection (established) |
+| S9-03 | Optional Research bot isolated, OFF by default | Agreed (reaffirms S3-21/S4-08) | Explicitly not authorized | Not implemented | Code inspection (established) |
+| S9-04 | Target not deployment-claim; "qualified" ≠ profitable edge | Agreed | Not authorized | Implemented (this documentation's own framing) | Code inspection (this session, self-check) |
+| S9-05 | Compact-message content requirements (status lines, identity, deadline/exit rule) | Agreed | Not authorized | Not implemented | Code inspection (this session) |
+| S9-06 | Delayed Market Simulation message disclosure (market time, data age, unverified validity) | Agreed (extends S6-15) | Not authorized | Not implemented | Code inspection (this session) |
+| S9-07 | Details/dashboard scope; critical limitations never hidden | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S9-08 | Main lifecycle notification set (not exhaustive whitelist) | Agreed | Not authorized | Not implemented (OPS-013) | Code inspection (this session) |
+| S9-09 | Routine polling/repeated awaiting-price/minute P&L stay dashboard-only | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S9-10 | Exit-problem routing (Trade&Event factual vs. Operations incident); avoid redundancy | Agreed | Not authorized | Not implemented (OPS-013) | Code inspection (this session) |
+| S9-11 | Obsolete-pending consolidation into truthful OPEN; preserve underlying events | Agreed | Not authorized | Not implemented (OPS-013) | Code inspection (this session) |
+| S9-12 | No blind post-downtime flush; truthful catch-up reporting; never present historical fills as executable | Agreed | Not authorized | Partially implemented (S4-05's established no-flood evidence; consolidation-specific behavior not found) | Code inspection (established + this session) |
+| S9-13 | Ambiguous delivery not assumed unsent/blindly retried; exactly-once execution ≠ exactly-once notification | Agreed (reaffirms established AMBIGUOUS contract) | Not authorized (pre-existing) | Implemented | Code inspection (established) |
+| S9-14 | Default overview excludes Research Lab; prospective vs. Delayed Simulation never blended | Agreed | Not authorized | Not assessed in this documentation pass (vacuously true, no Research Lab account exists yet) | Not assessed in this documentation pass |
+| S9-15 | Top-to-bottom layout: Action Required, equal Equity/Open-P&L, opportunities/positions, Recent Activity, Details | Agreed (extends S2-10) | Not authorized | Not implemented | Code inspection (established, S2-10) |
+| S9-16 | Distinct Research View; combined views identify accounts/modes, no double-counting | Agreed (reaffirms S3-13) | Not authorized | Not implemented | Code inspection (established) |
+| S9-17 | Pause Updates ≠ Pause New Entries; execution/position-management unaffected | Agreed (reaffirms S4-12/S8-07) | Not authorized | Partially implemented (Pause Updates real, dashboard refresh controls; Pause New Entries not implemented, S4-12) | Code inspection (established) |
+| S9-18 | Domain-specific mutes; manual refresh/controls from overview; auto-refresh preserves scroll/focus/panels | Agreed | Not authorized (pre-existing, partial) | Partially implemented (auto-refresh real and tested; domain-specific mutes not implemented, S7-20/OPS-011) | Code inspection (established, Task 140 evidence) |
+| S9-19 | Full-reload restoration requires explicit saved-state behavior, not claimed; assess not assume refresh-fix compliance | Agreed | Not authorized | Implemented (this documentation's own honest framing) | Code inspection (this session, established Task 140 evidence re-read) |
+| S9-20 | Dashboard P&L doesn't replace EOD Telegram; EOD retains account/mode separation + valuation limitations | Agreed (reaffirms S2-07/S4-13) | Not authorized (pre-existing) | Implemented | Code inspection (established) |
+| S10-01 | Account identity: ID·Strategy/Version·Execution Mode·Campaign·Currency | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S10-02 | New-campaign defaults $100k cash / $10k fee-inclusive max entry budget; existing accounts/frozen settings unchanged; USD-only initial scope | Agreed (extends S3-12/S3-14) | Not authorized | Not implemented (new default); Implemented (existing-unchanged half) | Code inspection (established) |
+| S10-03 | Reserved cash subset of ledger cash; available=ledger-reservations; atomic admission reserve; reservation doesn't alter equity | Agreed | Not authorized (pre-existing) | Implemented | Code inspection (established, this session, `talonx_v2/paper.py`) |
+| S10-04 | Atomic execution debit; unused-release changes available not ledger cash; exactly-once release; consistency | Agreed (reaffirms S5-17) | Not authorized (pre-existing) | Implemented | Code inspection (established) |
+| S10-05 | Cost-free illustrative sequence; execution not necessarily equity-neutral with costs | Agreed | Not authorized | Implemented (illustrative, this documentation) | Code inspection (this session, self-check) |
+| S10-06 | Separate spread/slippage-in-fill vs. explicit fees vs. reference basis; no double-counting | Agreed | Not authorized | Partially implemented (spread-in-fill real via apply_spread; explicit separate fee ledger not found for V2) | Code inspection (established + this session) |
+| S10-07 | Whole-share, fee-aware sizing formula; require ≥1 share else explicit skip | Agreed | Not authorized | Not implemented (OPS-014; actual sizing is fractional, fee-blind) | Code inspection (this session, `talonx_paper/engine.py:71-83`) |
+| S10-08 | Whole-share-within-budget distinct from cash-driven reduction; pre-commit validation list; no invented rounding | Agreed | Not authorized | Not implemented (OPS-014) | Code inspection (this session) |
+| S10-09 | Illustrative sizing example (not approved parameters) | Agreed | Not authorized | Implemented (illustrative, this documentation) | Code inspection (this session, self-check) |
+| S10-10 | Net proceeds/P&L formulas; no double-deducted entry fees; reconcilable gross/net breakdown | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S10-11 | Costs ≠ auto unrealized-loss; missing valuation never zero; contribution denominators preserved; no invented return methodology | Agreed (reaffirms S2-10/S2-12) | Not authorized | Implemented (missing-valuation half, established); pending (return-methodology half, explicitly not invented) | Code inspection (established) |
+| S10-12 | Position-limit slot-counting rules (pending/open/unresolved-continues/fall-forward-not-new-reservation/atomic-release) | Agreed | Not authorized | Partially implemented (limit itself real; count-once rules not individually traced) | Code inspection (this session) |
+| S10-13 | Cash/position limits independent; V2's frozen 20-position limit preserved; no implied 10-position limit | Agreed (pre-existing) | Not authorized | Implemented | Code inspection (this session, `talonx_v2/config.py:44,90`) |
+| S10-14 | Same-stock across independent accounts; exposure without merging performance; Research Lab excluded from default totals | Agreed | Not authorized | Not implemented (no exposure-display surface found) | Code inspection (this session) |
+| S10-15 | No borrowing/leverage/negative-cash/shorts; explicit skip on insufficient capacity; truthful deficit recording, block+raise Operations | Agreed | Not authorized | Partially implemented (no-shorts/explicit-skip established; deficit-recording+Operations-raise not found) | Code inspection (established + this session) |
+| S10-16 | Deposits/withdrawals explicit, auditable, separate from performance; no auto-top-ups; existing balances unchanged | Agreed | Not authorized | Not implemented (no deposit/withdrawal feature exists) | Code inspection (this session) |
+| S10-17 | Dividends: separate from price gains but in total return; verify entitlement; receivables ≠ cash; no double-count via price+cash | Agreed | Not authorized | Not implemented (OPS-004, no dividend code exists) | Code inspection (established) |
+| S10-18 | Preserve Session 5 split/cash-in-lieu requirements unchanged | Agreed (reaffirms S5-21..S5-27) | Not authorized | Not implemented (OPS-004) | Code inspection (established) |
+| S10-19 | Unsupported corporate actions preserve unresolved obligations; no guessed ratios/zero-write-offs; verified correction recordable | Agreed | Not authorized | Not implemented (OPS-004) | Code inspection (established) |
+| S10-20 | EOD/restart reconciles 7 listed items | Agreed (extends S4-13) | Not authorized (pre-existing, partial) | Partially implemented (detection real; full 7-item scope not individually traced) | Code inspection (established) |
+| S10-21 | Genuine mismatch blocks new admissions; missing valuations alone ≠ mismatch proof; clearance authority → Session 11 | Agreed | Not authorized | Not implemented (OPS-015) | Code inspection (this session, `talonx_ops/eod_reconciliation.py`) |
+| S10-22 | Deferred: numerical spread/slippage/fee assumptions | Open — deferred | N/A | N/A | N/A |
+| S10-23 | Deferred: cross-account hard concentration limits | Open — deferred | N/A | N/A | N/A |
+| S10-24 | Deferred: correlation-based admission gates | Open — deferred | N/A | N/A | N/A |
+| S10-25 | Deferred: concentration-warning thresholds | Open — deferred | N/A | N/A | N/A |
 
 ---
 
@@ -836,6 +881,15 @@ a live capacity skip — not confirmed this session; candidate for
 Session 8 (V2 multi-day strategy and lifecycle) or Session 9 (Telegram
 and dashboard experience).
 
+**Session 9 update (2026-09-17, ~07:12 UTC) — refined, capacity-
+independent visibility reaffirmed**: Session 9 §B/§C directly answer
+this entry's own "operator-facing surfacing" open question — the
+agreed message format shows "Opportunity status" and "Paper status" on
+separate lines, and the first-qualified notification is explicitly
+required to fire "including capacity-skipped outcomes" (`S9-08`). The
+exact wording remains undecided; the underlying skip mechanism this
+entry describes is unaffected and unchanged (`Partially implemented`).
+
 ---
 
 ## S2-04 — Signal qualification distinct from paper-portfolio admission
@@ -1121,6 +1175,25 @@ contribution labelling absent)` — **Code inspection**
 **Open questions/dependencies**: candidate for Session 9 (Telegram and
 dashboard experience) — this is a concrete, scoped presentation gap,
 not a data-availability gap.
+
+**Session 9 update (2026-09-17, ~07:12 UTC) — resolved into a concrete
+layout, still not implemented**: Session 9 §E directly answers this
+entry's own candidate-session pointer — Account Equity and Aggregate
+Open P&L are agreed to sit at position 2 of a five-part top-to-bottom
+layout, immediately below a conditional Action Required banner
+(`S9-15`). **This is the agreed target layout, not a claim it is
+built** — the same gaps this entry already identified (no contribution
+label, no explicit equal-prominence enforcement) remain unresolved.
+Verdict unchanged: `Partially implemented`.
+
+**Session 10 update (2026-09-17, ~07:12 UTC) — cost-free vs. cost-
+bearing distinction added**: Session 10 §B's illustrative cash/
+equity sequence is explicitly labelled **cost-free** — a pedagogical
+example, not a claim about what execution actually looks like once
+spread/slippage/fees apply (Session 10 §C explicitly states execution
+is "not necessarily equity-neutral once costs are included"). This
+sharpens, but does not change, this entry's own equity-tracking
+verdict.
 
 ---
 
@@ -1552,6 +1625,16 @@ account was reset or resized this session (verified: this task made
 zero database writes). Verdict unchanged: `Not implemented` as a
 stated default.
 
+**Session 10 update (2026-09-17, ~07:12 UTC) — linked to the
+inclusive-fee budget**: Session 10 §A sharpens the $10,000 figure into
+a **fee-inclusive maximum entry budget** specifically (`S10-02`), and
+§C's whole-share sizing formula (`S10-07`) is the concrete mechanism
+that would consume that budget. Verdict unchanged: `Not implemented`
+as a stated default — `OPS-014` additionally confirms today's actual
+sizing (`calculate_buy()`) has no fee-awareness at all, so this
+entry's figure could not yet be enforced as fee-inclusive even if
+adopted.
+
 ## S3-13 — Separate accounts; combined-exposure view
 
 **Requirement**: approved / baseline-shadow / experimental-candidate
@@ -1578,6 +1661,17 @@ optional research bot remaining OFF by default (reaffirms `S3-21`), no
 existing process/account/obligation changed, and a labelled combined
 portfolio view remaining permitted (not yet built) rather than
 required. Verdict unchanged: `Not implemented`.
+
+**Session 9/10 update (2026-09-17, ~07:12 UTC) — layout and identity
+requirements added, still not built**: Session 9 §E requires a
+"clearly distinct Research View" and combined views that identify
+included accounts/execution modes without double-counting (`S9-16`);
+Session 10 §A requires every account to identify Account ID/Strategy/
+Execution Mode/Campaign/Currency (`S10-01`), and §E requires excluding
+Research Lab replicas from default exposure totals (`S10-14`). All
+three sharpen this entry's own combined-exposure-view requirement into
+concrete UI/data rules — none of them is implemented. Verdict
+unchanged: `Not implemented`.
 
 ## S3-14 — Existing campaigns not overwritten by new defaults
 
@@ -1786,6 +1880,21 @@ needs its own risk discussion, not assumed alongside the display
 feature. **Planned session**: Session 10 (Paper accounting, costs and
 risk). **Dependency**: `S3-13`'s display feature existing first.
 
+**Session 10 update (2026-09-17, ~07:12 UTC) — display resolved as
+Agreed, enforcement remains deferred**: Session 10 §E explicitly
+**approves exposure display** ("Exposure display is approved") — same-
+stock exposure across independent accounts is shown, without merging
+individual performance (`S10-14`). **Numerical cross-account hard
+concentration limits, correlation-based admission gates, and
+concentration-warning thresholds all remain explicitly deferred**
+(`S10-23`, `S10-24`, `S10-25`), each requiring its own bounded
+evaluation before activation — no numerical limit is invented by this
+update. **Decision status**: the display half is now `Agreed` and
+tracked separately (`S10-14`); this entry's own scope narrows to the
+**enforcement** question specifically, which remains `Open —
+deferred`, now split across `S10-23`/`S10-24`/`S10-25` rather than one
+undifferentiated deferral.
+
 ## S3-26 — Deferred: experiment evaluation criteria and evidence sufficiency
 
 **Requirement**: detailed experiment evaluation criteria and what
@@ -1963,6 +2072,12 @@ delivery as four separate concepts (`S7-22`) — none of which is
 own claim that notification success never controls paper execution.
 Verdict unchanged: `Implemented`.
 
+**Session 9 update (2026-09-17, ~07:12 UTC) — reaffirmed at the
+delivery-safeguard level**: Session 9 §D's "financial exactly-once
+processing and notification-delivery guarantees are separate claims"
+(`S9-13`) restates this entry's own architectural separation from the
+delivery side specifically. Verdict unchanged: `Implemented`.
+
 ## S4-11 — Explicit lifecycle states with separate missing-price/valuation modifiers
 
 **Decision**: Agreed. **Authorization**: Not authorized.
@@ -2010,6 +2125,16 @@ linked via `OPS-007` (intraday EOD-flatten recovery) for the
 release path (`S5-17`) remains separately correct and unaffected.
 Verdict unchanged: `Not implemented` for this entry's own atomic-
 cancel-on-pause claim.
+
+**Session 9 update (2026-09-17, ~07:12 UTC) — named and distinguished
+from a separate dashboard control**: Session 9 §F gives this entry's
+own concept a name — **"Pause New Entries"** — and explicitly
+distinguishes it from a **separate** dashboard control, **"Pause
+Updates"** (which only pauses screen refresh, never execution,
+`S9-17`). The two must never be confused: Pause Updates is the
+established, real, tested dashboard-refresh-pause feature (Task 140
+evidence); Pause New Entries is this entry's own still-unimplemented
+V2 intent-cancellation feature. Verdict unchanged: `Not implemented`.
 
 ## S4-13 — EOD reports daily performance, open risk, unresolved obligations
 
@@ -2433,6 +2558,16 @@ behavior only, without resetting V2's holding-clock/exit-schedule
 (`S8-08`) — no corporate-action code was found or implemented this
 session either. Verdict unchanged: `Not implemented`.
 
+**Session 10 update (2026-09-17, ~07:12 UTC) — dividend-consistency
+dependency added**: Session 10 §G's dividend-double-counting-
+prevention rule (never through both a cash credit **and** an adjusted
+historical price, `S10-17`) must be designed **consistently** with
+this entry's own price-adjustment-basis requirement — both are
+instances of the same "don't adjust the same fact twice" principle.
+Neither is implemented; this is a design-consistency dependency for
+whenever `OPS-004` is eventually addressed, not a new requirement.
+Verdict unchanged: `Not implemented`.
+
 ## S5-27 — Decimal arithmetic; cents/4-decimal display; no intermediate truncation
 
 **Decision**: Agreed. **Authorization**: Not authorized.
@@ -2441,6 +2576,18 @@ V2's/Original's actual numeric types (whether `Decimal` or `float` is
 used internally today) was not performed this session. **Validation**:
 Not assessed in this documentation pass. **Dependency**: none
 blocking to state the policy; blocking to verify compliance.
+
+**Session 10 update (2026-09-17, ~07:12 UTC) — partial direct evidence
+found**: Session 10's own targeted read of `talonx_paper.engine.
+calculate_buy()`/`calculate_sell_pnl()` (`talonx_paper/engine.py:71-
+93`) found both use plain `float` arithmetic (Python type hints
+`float`, `spend / price` division) — **not** `Decimal`. This is
+**partial, not complete, evidence**: only this one sizing/P&L function
+was read; V2's/Original's full numeric surface (storage columns,
+display formatting, other calculation paths) was **not** audited this
+session. **Verdict refined**: `Partially implemented` → this specific
+function uses `float`, contradicting the agreed high-precision
+`Decimal` policy; the full-surface question remains `Not assessed`.
 
 ## S5-28 — Durable checkpoints + overlap/dedup + recoverable enrichment state; no fixed 16-hour assumption
 
@@ -2651,6 +2798,14 @@ account was found. **Validation**: Code inspection (this session).
 **Dependency**: `S3-15`-`S3-20` (shares execution rules with the
 research-lab replay workflow).
 
+**Session 9 update (2026-09-17, ~07:12 UTC) — message-disclosure
+requirement added, still not built**: Session 9 §B requires any
+Delayed Market Simulation message to prominently disclose market
+time, notification time/data age, and unverified current-entry
+validity (`S9-06`) — and requires this mode to be kept separate from
+prospective paper accounts on the dashboard (`S9-14`). Both extend,
+without resolving, this entry's own "not implemented" verdict.
+
 ## S6-16 — Preserve corrected entry-geometry baseline finding
 
 **Decision**: Agreed (inspected baseline). **Authorization**: Not
@@ -2677,6 +2832,15 @@ bar, not a deliberately-delayed next bar. **Validation**: Code
 inspection (this session — see `S6-16`'s confirmed baseline for what
 exists instead). **Dependency**: `OPS-008`, `S6-25` (cost-model
 detail), `S6-26` (missing-bar recovery duration).
+
+**Session 10 update (2026-09-17, ~07:12 UTC) — linked to the declared
+cost model**: Session 10 §C's "recheck the strategy's applicable
+modeled-fill geometry" pre-commit step (`S10-08`) is the general-
+accounting version of this entry's own execution-adjusted-RRR-recheck
+requirement — the two must eventually share one declared cost model,
+not be designed independently. Neither is implemented. `S6-25`'s own
+numerical deferral is reaffirmed unchanged, now also tracked alongside
+`S10-22` at the same destination (Session 12).
 
 ## S6-18 — Spread-adjusted entry ≠ full net-of-fees/exit-cost RRR
 
@@ -2950,6 +3114,19 @@ genuine new material change are not currently distinguished.
 **Validation**: Code inspection (this session, full file read).
 **Dependency**: `OPS-010`.
 
+**Session 9 update (2026-09-17, ~07:12 UTC) — boundaries preserved,
+kept distinct from a different consolidation rule**: Session 9 §D's
+material-correction boundaries (eligible despite mutes, must not
+bypass global delivery shutdown or a revoked destination, never
+broadcast to new recipients) are **reaffirmed unchanged** — Session 9
+does not touch `CORRECTION`'s missing decision type. Session 9 §D's
+own obsolete-pending-notification consolidation rule (`S9-11`,
+combining stale pending messages into one truthful `OPEN` message) is
+a **different** mechanism from `CORRECTION` — a pre-send consolidation
+of not-yet-delivered messages, not a post-send repair of already-
+delivered ones — and must not be conflated with it. Both remain
+unimplemented; `OPS-010` and `OPS-013` are separate, related findings.
+
 ## S7-15 — Four distinct timestamps kept separate
 
 **Decision**: Agreed. **Authorization**: Not authorized.
@@ -3219,6 +3396,14 @@ name is `EXIT_BAR_PENDING_FALLFORWARD` (`pipeline.py:179`), a naming
 gap not a behavior gap. **Validation**: Code inspection (this
 session). **Dependency**: none blocking.
 
+**Session 10 update (2026-09-17, ~07:12 UTC) — phantom-proceeds
+prevention reaffirmed at the general-accounting level**: Session 10
+§B/§H's own no-fabricated-cash-on-release rule (`S10-03`, `S10-04`)
+and no-phantom-proceeds requirement for pending/unresolved exits
+(`S10-21` references this entry directly) restate this entry's own
+"no anticipated sale proceeds are credited or reused" rule at the
+account-ledger level. No implementation changed; verdict unchanged.
+
 ## S8-13 — EXIT_UNRESOLVED account-block behavior
 
 **Decision**: Agreed. **Authorization**: Not authorized.
@@ -3233,6 +3418,18 @@ exists — `unresolved_positions()` is read only for reporting, never
 consulted by `open_position()`'s own admission gate. **Validation**:
 Code inspection (this session, both files read in full relevant
 sections). **Dependency**: `OPS-012`.
+
+**Session 10 update (2026-09-17, ~07:12 UTC) — same pattern confirmed
+at the general-ledger level, kept distinct**: Session 10 §H's own
+account-block requirement on a genuine reconciliation mismatch
+(`S10-21`, tracked as the new `OPS-015`) is the **same structural
+gap** as this entry's `OPS-012` — detection/status exists, enforcement
+does not — but for a **different trigger** (ledger mismatch vs.
+exhausted fall-forward) and **must not be merged into one finding**;
+`OPS-012` and `OPS-015` remain separate, both `OPEN`. Session 10 §H
+also explicitly assigns "block-clearance authority and evidence" to
+Session 11 — this entry's own clearance mechanism (never cleared by a
+restart) remains correct and unaffected.
 
 ## S8-14 — CLOSED: exactly-once settlement
 
@@ -3331,3 +3528,310 @@ admission deadline across a holiday or early-close (§D/§G).
 or authored this session; requires its own implementation-verification
 task, not a knowledge-transfer session. **Planned session**: none.
 **Dependency**: `S8-25`.
+
+---
+
+# Session 9 requirements (S9-01 through S9-20)
+
+Compact format, per `DECISION_LOG.md` Session 9, grouped A–F.
+
+## S9-01 — Primary Trade & Event bot scope
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no dedicated bot exists.
+**Validation**: Code inspection (established). **Dependency**: none.
+
+## S9-02 — Separate Operations bot
+**Decision**: Agreed (reaffirms `S4-07`). **Authorization**: Not
+authorized. **Implementation**: Not implemented. **Validation**: Code
+inspection (established). **Dependency**: `S4-07`.
+
+## S9-03 — Optional Research bot isolated, OFF by default
+**Decision**: Agreed (reaffirms `S3-21`/`S4-08`). **Authorization**:
+Explicitly not authorized. **Implementation**: Not implemented.
+**Validation**: Code inspection (established). **Dependency**: `S4-08`.
+
+## S9-04 — Target framing; qualified ≠ profitable
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Implemented (this documentation's own compliance).
+**Validation**: Code inspection (self-check). **Dependency**: none.
+
+## S9-05 — Compact-message content requirements
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no "Opportunity status"/"Paper
+status" separate-line format was found. **Validation**: Code
+inspection (this session). **Dependency**: `S9-08`.
+
+## S9-06 — Delayed Simulation message disclosure
+**Decision**: Agreed (extends `S6-15`). **Authorization**: Not
+authorized. **Implementation**: Not implemented — `S6-15`'s mode
+itself does not exist yet. **Validation**: Code inspection (this
+session). **Dependency**: `S6-15`.
+
+## S9-07 — Details/dashboard scope; limitations never hidden
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass.
+**Validation**: Not assessed in this documentation pass.
+**Dependency**: none blocking.
+
+## S9-08 — Main lifecycle notification set
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — the underlying mechanisms
+(per-strategy skip codes, `UPDATE` decisions) exist; the four-
+transition policy as its own explicit rule does not. **Validation**:
+Code inspection (this session — `OPS-013`). **Dependency**: `OPS-013`.
+
+## S9-09 — Dashboard-only routine updates
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass.
+**Validation**: Not assessed in this documentation pass.
+**Dependency**: none blocking.
+
+## S9-10 — Exit-problem routing; avoid redundancy
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no Operations bot exists to
+route to. **Validation**: Code inspection (this session — `OPS-013`).
+**Dependency**: `S9-02`, `OPS-013`.
+
+## S9-11 — Obsolete-pending consolidation
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented. **Validation**: Code inspection
+(this session — `OPS-013`). **Dependency**: `OPS-013`.
+
+## S9-12 — No blind post-downtime flush; truthful catch-up
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — `S4-05`'s established no-
+alert-flood evidence supports the intent; the specific consolidation-
+into-one-message behavior was not found. **Validation**: Code
+inspection (established + this session). **Dependency**: `S4-05`.
+
+## S9-13 — Ambiguous delivery not blindly retried; separate guarantees
+**Decision**: Agreed (reaffirms established `AMBIGUOUS` contract).
+**Authorization**: Not authorized (pre-existing). **Implementation**:
+Implemented. **Validation**: Code inspection (established, Task 96F/
+117 history). **Dependency**: none.
+
+## S9-14 — Default overview excludes Research Lab; no blended totals
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass —
+vacuously true today since no Research Lab account exists (`S6-03`).
+**Validation**: Not assessed in this documentation pass. **Dependency**:
+`S6-03`.
+
+## S9-15 — Top-to-bottom dashboard layout
+**Decision**: Agreed (extends `S2-10`). **Authorization**: Not
+authorized. **Implementation**: Not implemented — extends `S2-10`'s
+own established gap (no Action-Required banner or this exact layout
+order found). **Validation**: Code inspection (established, `S2-10`).
+**Dependency**: `S2-10`.
+
+## S9-16 — Distinct Research View; no double-counting
+**Decision**: Agreed (reaffirms `S3-13`). **Authorization**: Not
+authorized. **Implementation**: Not implemented. **Validation**: Code
+inspection (established). **Dependency**: `S3-13`.
+
+## S9-17 — Pause Updates ≠ Pause New Entries
+**Decision**: Agreed (reaffirms `S4-12`/`S8-07`). **Authorization**:
+Not authorized. **Implementation**: Partially implemented — Pause
+Updates (dashboard refresh pause/resume) is real and tested (Task 140
+evidence); Pause New Entries (V2 intent cancellation) is not
+implemented (`S4-12`). **Validation**: Code inspection (established).
+**Dependency**: `S4-12`.
+
+## S9-18 — Domain-specific mutes; refresh controls; state preservation
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing,
+partial). **Implementation**: Partially implemented — auto-refresh
+scroll/focus/panel preservation is real and tested (Task 140); domain-
+specific mutes are not implemented (`S7-20`/`OPS-011`). **Validation**:
+Code inspection (established, Task 140 evidence). **Dependency**:
+`OPS-011`.
+
+## S9-19 — Full-reload restoration not claimed; assess not assume
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Implemented (this documentation's own honest
+scoping — the established fix is re-confirmed to cover auto-refresh
+only, not a full page reload). **Validation**: Code inspection (this
+session, re-reading Task 140 evidence). **Dependency**: none.
+
+## S9-20 — Dashboard P&L doesn't replace EOD Telegram
+**Decision**: Agreed (reaffirms `S2-07`/`S4-13`). **Authorization**:
+Not authorized (pre-existing). **Implementation**: Implemented.
+**Validation**: Code inspection (established). **Dependency**: none.
+
+---
+
+# Session 10 requirements (S10-01 through S10-21, S10-22 through S10-25)
+
+Compact format, per `DECISION_LOG.md` Session 10, grouped A–I.
+`S10-22`-`S10-25` are explicit deferrals, not decisions.
+
+## S10-01 — Account identity fields
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — whether
+every account surface displays all five identity fields together was
+not traced. **Validation**: Not assessed in this documentation pass.
+**Dependency**: none blocking.
+
+## S10-02 — New-campaign defaults, fee-inclusive; USD-only initial scope
+**Decision**: Agreed (extends `S3-12`/`S3-14`). **Authorization**: Not
+authorized. **Implementation**: Not implemented (new default itself);
+Implemented (existing-accounts-unchanged half, reaffirms `S3-14`).
+**Validation**: Code inspection (established). **Dependency**: `S3-12`,
+`S3-14`.
+
+## S10-03 — Atomic reservation; available vs. ledger cash; no equity impact
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing).
+**Implementation**: Implemented — `talonx_v2/paper.py`'s reserve-then-
+execute pattern (established, re-confirmed this session).
+**Validation**: Code inspection (established + this session).
+**Dependency**: none.
+
+## S10-04 — Atomic execution debit; exactly-once release; consistency
+**Decision**: Agreed (reaffirms `S5-17`). **Authorization**: Not
+authorized (pre-existing). **Implementation**: Implemented.
+**Validation**: Code inspection (established). **Dependency**: `S5-17`.
+
+## S10-05 — Cost-free illustrative sequence
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Implemented (illustrative content, this
+documentation). **Validation**: Code inspection (self-check).
+**Dependency**: none.
+
+## S10-06 — Separate spread/fees/reference basis; no double-counting
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — `apply_spread`-style
+spread-in-fill is real (established, Original's `talonx_paper/
+engine.py`); V2 itself has no separate explicit-fee ledger line found
+this session. **Validation**: Code inspection (established + this
+session). **Dependency**: none blocking.
+
+## S10-07 — Whole-share, fee-aware sizing formula
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — `talonx_paper.engine.
+calculate_buy()` (reused by V2, `talonx_v2/paper.py:25,115`) returns
+`spend / price`, a continuous fractional share count with no fee
+parameter at all. **Validation**: Code inspection (this session,
+`engine.py:71-83` — `OPS-014`). **Dependency**: `OPS-014`.
+
+## S10-08 — Whole-share-within-budget vs. cash-driven reduction; pre-commit checks
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — depends on `S10-07`'s sizing
+mechanism, which does not exist as described. **Validation**: Code
+inspection (this session — `OPS-014`). **Dependency**: `S10-07`,
+`OPS-014`.
+
+## S10-09 — Illustrative sizing example
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Implemented (illustrative content, this
+documentation). **Validation**: Code inspection (self-check).
+**Dependency**: none.
+
+## S10-10 — Net proceeds/P&L formulas; reconcilable gross/net
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — the
+exact realized-P&L formula (`talonx_paper/engine.py::
+calculate_sell_pnl`) was read in a prior session but its fee-inclusion
+correctness was not re-verified against this exact formula this
+session. **Validation**: Not assessed in this documentation pass.
+**Dependency**: none blocking.
+
+## S10-11 — Costs ≠ auto-loss; no invented return methodology
+**Decision**: Agreed (reaffirms `S2-10`/`S2-12`). **Authorization**:
+Not authorized. **Implementation**: Implemented (missing-valuation-
+never-zero half, established); the return-methodology half is
+explicitly left pending, not invented. **Validation**: Code inspection
+(established). **Dependency**: `S2-10`, `S2-12`.
+
+## S10-12 — Position-limit slot-counting rules
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — the limit itself is real
+(`S10-13`); whether pending/open/unresolved/fall-forward each
+correctly count as claimed was not individually traced this session.
+**Validation**: Code inspection (this session, partial). **Dependency**:
+`S10-13`.
+
+## S10-13 — V2's frozen 20-position limit preserved
+**Decision**: Agreed (pre-existing). **Authorization**: Not
+authorized. **Implementation**: Implemented — `max_concurrent_
+positions = 20` with a runtime assert (`talonx_v2/config.py:44,90`).
+**Validation**: Code inspection (this session, exact lines).
+**Dependency**: none.
+
+## S10-14 — Same-stock cross-account exposure display
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no exposure-display surface
+(security/sector, cross-account) was found. **Validation**: Code
+inspection (this session). **Dependency**: none blocking.
+
+## S10-15 — Cash-only boundaries; truthful deficit recording
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — no-shorts/explicit-skip-
+on-insufficient-cash is established (`S2-03`'s `NO_CASH` evidence);
+deficit-recording-with-Operations-raise was not found this session.
+**Validation**: Code inspection (established + this session).
+**Dependency**: `S9-02` (Operations bot doesn't exist to raise to).
+
+## S10-16 — Deposits/withdrawals explicit and auditable
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no deposit/withdrawal feature
+exists anywhere in the codebase inspected this session. **Validation**:
+Code inspection (this session). **Dependency**: none blocking.
+
+## S10-17 — Dividend accounting rules
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no dividend-handling code exists
+(`OPS-004`). **Validation**: Code inspection (established).
+**Dependency**: `OPS-004`.
+
+## S10-18 — Preserve Session 5 split/cash-in-lieu requirements
+**Decision**: Agreed (reaffirms `S5-21`-`S5-27`). **Authorization**:
+Not authorized. **Implementation**: Not implemented (`OPS-004`,
+unchanged). **Validation**: Code inspection (established).
+**Dependency**: `OPS-004`.
+
+## S10-19 — Unsupported corporate actions stay unresolved
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented (`OPS-004`, unchanged).
+**Validation**: Code inspection (established). **Dependency**:
+`OPS-004`.
+
+## S10-20 — EOD/restart 7-item reconciliation scope
+**Decision**: Agreed (extends `S4-13`). **Authorization**: Not
+authorized (pre-existing, partial). **Implementation**: Partially
+implemented — `talonx_ops/eod_reconciliation.py` performs real
+detection; whether all 7 listed items (ledger cash, reservations,
+positions/quantities, fees, distributions/receivables, capital flows,
+corporate actions/corrections) are each individually reconciled was
+not traced item-by-item this session. **Validation**: Code inspection
+(established + this session, partial). **Dependency**: none blocking.
+
+## S10-21 — Genuine mismatch blocks new admissions
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — `STATUS_MISMATCH`
+(`talonx_ops/eod_reconciliation.py:43`) is detected but not connected
+to any admission-blocking code path. **Validation**: Code inspection
+(this session, exact line — `OPS-015`). **Dependency**: `OPS-015`,
+Session 11 (clearance authority).
+
+## S10-22 — Deferred: numerical spread/slippage/fee assumptions
+**Decision**: Open — deferred. **Authorization**: N/A.
+**Implementation**: N/A. **Validation**: N/A. **Reason**: needs a
+cost-model evaluation. **Planned session**: Session 12 (reaffirms
+`S6-25`/`S8-25`). **Dependency**: `S6-25`.
+
+## S10-23 — Deferred: cross-account hard concentration limits
+**Decision**: Open — deferred. **Authorization**: N/A.
+**Implementation**: N/A. **Validation**: N/A. **Reason**: requires
+bounded evaluation before activation; no numerical limit invented.
+**Planned session**: none assigned. **Dependency**: none blocking.
+
+## S10-24 — Deferred: correlation-based admission gates
+**Decision**: Open — deferred. **Authorization**: N/A.
+**Implementation**: N/A. **Validation**: N/A. **Reason**: same
+bounded-evaluation requirement. **Planned session**: none assigned.
+**Dependency**: none blocking.
+
+## S10-25 — Deferred: concentration-warning thresholds
+**Decision**: Open — deferred. **Authorization**: N/A.
+**Implementation**: N/A. **Validation**: N/A. **Reason**: same
+bounded-evaluation requirement; no numerical threshold invented.
+**Planned session**: none assigned. **Dependency**: `S10-23`, `S10-24`.

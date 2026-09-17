@@ -2198,32 +2198,511 @@ deadline/pre-fill-check gates remain outstanding.
 
 ## Session 9 — Telegram and Dashboard Experience
 
+**Recorded**: 2026-09-17, approximately 07:12 UTC / 08:12 BST (Python
+`zoneinfo`, this project's established recording-time discipline).
+**Source**: the product-owner discussion supplied directly in this
+session's prompt (same pattern as Sessions 1–8; the discussion's own
+internal timestamp is unavailable and is not invented here). **Status:
+discussion closed; requirements documented, with explicit deferrals
+and implementation/validation separately tracked.**
+
+### Context
+
+This session grounds the operator-facing surfaces (Telegram messages
+and the dashboard) that every earlier session's agreed backend
+behavior would need to be presented through. It answers the pointers
+Session 8's documentation pass queued here: `S5-30`, `S6-13`/`S6-14`,
+`S6-11`, `S7-23`/`S7-24`, and `S7-20`'s per-stock mute UI.
+
+### A. Destinations and purpose — agreed
+
+- **Primary Trade & Event bot**: qualified intraday/multi-day
+  opportunities, meaningful trade-lifecycle updates, and opted-in
+  major developments.
+- **Separate Operations bot**: meaningful incidents, account blocks,
+  and recovery.
+- **Optional Research bot**: isolated experimental reporting, **OFF by
+  default**.
+- These are **target requirements, not a claim that all bots are
+  deployed** (reaffirms `S4-07`/`S4-08`/`S4-09`/`S7-02`).
+- "**Qualified**" means the applicable rules passed — **not** a
+  demonstrated profitable edge (reaffirms `S6-08`).
+
+### B. Compact opportunity messages — agreed
+
+- Lead with a plain-English evidence statement.
+- Show **"Opportunity status"** and **"Paper status"** on separate
+  lines.
+- Identify strategy/horizon and execution mode.
+- Keep **market-session status** distinct from **opportunity
+  validity** (resolves `S1-11`'s proposal into a concrete rule).
+- Show **allocation versus actual invested amount** accurately (an
+  important distinction now that `S10-07`'s whole-share sizing means
+  the two are not always equal).
+- Explain the applicable entry deadline and exit rule.
+- **Delayed Market Simulation must prominently disclose**: market
+  time, notification time/data age, and unverified current-entry
+  validity (extends `S6-15`'s labelling requirement to message
+  content specifically).
+- Source links, detailed timestamps, rule evidence, account identity,
+  execution assumptions, and limitations belong in Details/dashboard
+  views. **Critical timing or risk limitations must never be hidden
+  behind Details.**
+
+### C. Notification transitions — agreed
+
+**Main lifecycle notifications** (not an exhaustive whitelist): first
+timely qualified opportunity, including capacity-skipped outcomes;
+pending entry → OPEN (one entry confirmation); a previously-alerted
+pending entry → expired/cancelled/rejected (one terminal update with
+reason); OPEN → CLOSED (one exit confirmation). Also eligible:
+meaningful changes to a previously communicated awaiting-price state;
+material corrections; previously agreed company-development
+notifications (`S7-01`-`S7-24`); EOD summaries under their own policy.
+
+**Dashboard-only**: routine polling, repeated "still awaiting price,"
+and minute-by-minute unrealized P&L.
+
+**Exit problems**: the Trade & Event bot sends a **factual lifecycle
+update** explaining the position state; the Operations bot sends an
+**incident** only when the relevant threshold is breached or an
+account block is instituted. **Avoid repetitive or redundant messages
+across both destinations.**
+
+### D. Delivery safeguards — agreed
+
+- If qualification and entry complete **before** the initial message
+  is sent, combine obsolete pending notifications into **one truthful
+  message showing OPEN** — never send a stale "still pending" message
+  followed by a separate "now open" message for the same fact.
+- **Preserve every underlying lifecycle event and audit record**
+  regardless of message consolidation.
+- After downtime, **do not blindly flush** obsolete entry
+  instructions.
+- Consolidate obsolete unsent notifications into **truthful catch-up
+  reporting**, respecting notification settings (reaffirms `S4-05`'s
+  no-stale-alert-flood rule for the intraday/V2 side, extended to
+  general delivery).
+- **Never present historical/reference fills as currently executable
+  prices.**
+- **Ambiguous delivery attempts must not be assumed unsent or blindly
+  retried** (reaffirms the existing `AMBIGUOUS` outbox contract, this
+  project's Task 96F/117 history).
+- **Financial exactly-once processing and notification-delivery
+  guarantees are separate claims** — a position closing exactly once
+  does not by itself guarantee its notification was sent exactly once,
+  and vice versa.
+
+### E. Dashboard layout — agreed
+
+Default overview includes primary accounts; **Research Lab is
+excluded by default**. **Prospective paper and Delayed Market
+Simulation must remain visibly separated — never blended into one
+unexplained performance total.**
+
+**Top to bottom**:
+1. **Action Required** — a conditional banner for meaningful account/
+   exit/data issues.
+2. **Account Equity and Aggregate Open P&L** — equal visual
+   prominence (reaffirms `S2-10`'s agreed requirement).
+3. **Opportunities and positions** — separate opportunity and paper
+   statuses.
+4. **Recent Activity** — entries, exits, skips, and corrections with
+   full history.
+5. **Details expansion** — supporting evidence and technical depth.
+
+A clearly distinct **Research View** is provided. Combined views must
+identify included accounts and execution modes, and must **never
+double-count** alternative/experimental capital (reaffirms `S3-13`).
+
+### F. Controls and reading state — agreed
+
+- **Pause Updates is separate from Pause New Entries.** Pausing screen
+  updates does **not** change execution. Pausing entries **preserves
+  existing position management** (reaffirms `S4-12`/`S8-07`).
+- Notification mutes **identify their domain** — no accidental
+  cross-domain mute (reaffirms `S7-02`'s separate-routing intent,
+  extended to muting specifically).
+- Manual refresh and relevant controls are accessible from the
+  overview. Automatic refresh preserves scroll, focus, and expanded
+  panels (this project's established Task 140 dashboard-refresh
+  fix, `dashboard_web_static/index.html`'s keyed-morph engine).
+- **Full browser-reload restoration requires its own explicit
+  saved-state behavior** — this session does **not** claim
+  uninterrupted focus survives a full page reload (only the
+  auto-refresh case, above, is an established fix).
+- **Preserve the existing refresh fix; this session assesses rather
+  than assumes full compliance** with every clause above (see
+  Validation below).
+- Routine dashboard P&L does **not** replace consolidated EOD Telegram
+  reporting. EOD reporting must retain account/mode separation and
+  valuation limitations (reaffirms `S2-07`/`S4-13`/`S8`'s EOD entries).
+
+### Implementation authorization
+
+**None.** All new implementation authorization is explicitly **"Not
+authorized by this documentation task."** See `REQUIREMENTS_TRACKER.md`
+(`S9-01` through `S9-20`).
+
+### Validation performed this session
+
+- **§F's auto-refresh claim**: directly re-confirmed against this
+  project's own established Task 140 evidence (`dashboard_web_static/
+  index.html`'s `morphNode`/`morphChildren`/`applyRefresh`,
+  `docs/research/evidence/task140/dashboard_refresh_fix/`) — this is a
+  **real, tested, already-shipped** fix (10 browser tests, this
+  project's history), genuinely covering scroll/tabs/expanded-sections
+  survival across the periodic auto-refresh specifically. **Full
+  browser-reload state restoration was never claimed or tested by that
+  work** — this session's own "requires explicit saved-state
+  behavior, not claimed" wording is a correction of scope, not a
+  retraction of the existing fix.
+- **§A/§E's bot/account-separation claims**: consistent with, not
+  contradicted by, `S4-07`/`S4-08`'s established "no second bot
+  exists" finding and `S3-13`'s established "no combined-exposure view
+  exists" finding — this session's own agreed target does not change
+  either verdict.
+- **§B/§C/§D's message-content and transition rules**: **not
+  implemented** — no code was found this session implementing
+  "Opportunity status"/"Paper status" as separate labelled lines, the
+  four-transition lifecycle-notification set as its own explicit
+  policy, or the obsolete-notification-consolidation rule; this
+  matches the established pattern from `S4-06`/`S4-11`/`S6-13`/`S6-14`
+  (real underlying mechanisms, no dedicated message-formatting layer
+  built on top of them yet).
+
+**Not assessed this session**: whether the dashboard's current
+Overview section already excludes Research Lab accounts by default
+(no Research Lab account exists yet, `S6-03`, so this is currently
+vacuously true rather than a tested exclusion rule); the exact current
+Action-Required-banner wording, if any.
+
+### Explicit deferrals
+
+None recorded as new deferrals this session beyond what earlier
+sessions already carry (`S5-30`, `S6-25`, `S7-25`/`S7-26`, `S8-25`/
+`S8-26`) — Session 9 §A-F are all agreed decisions, not open
+questions.
+
+### Findings tracked in `OPERATIONAL_FINDINGS.md`
+
+- **`OPS-013`** — Telegram lifecycle-message-formatting and delivery-
+  consolidation gap (§B/§C/§D): the underlying mechanisms this
+  formatting would draw from are real (per-strategy skip codes,
+  `UPDATE`/`SUPPRESS_DUPLICATE` decisions, `AMBIGUOUS` outbox states),
+  but no dedicated "Opportunity status"/"Paper status" message layer,
+  four-transition lifecycle policy, or obsolete-notification
+  consolidation rule exists yet.
+
+`OPS-002`, `OPS-003`, `OPS-010`, `OPS-011` **remain `OPEN`**,
+unaffected by this session.
+
+### Any separately authorized implementation work
+
+**None.**
+
+---
+
+## Session 10 — Paper Accounting, Costs and Risk
+
+**Recorded**: 2026-09-17, approximately 07:12 UTC / 08:12 BST (same
+recording pass as Session 9 above; both sessions were supplied
+together in this task's prompt). **Source**: the product-owner
+discussion supplied directly in this session's prompt. **Status:
+discussion closed; requirements documented, with explicit deferrals
+and implementation/validation separately tracked.**
+
+### Context
+
+This session receives Session 8's carried-forward account-ledger/risk
+items (separate strategy/mode accounts, cash-vs-reservations,
+new-campaign defaults, same-stock exposure, corrections/deposits/
+return-attribution, account blocks, combined-portfolio views) and
+`S3-25`'s deferred cross-strategy exposure-enforcement question. It
+covers account identity/defaults, cash/reservations, execution costs/
+sizing, returns/cost-basis, position limits/exposure, cash-only
+boundaries/capital flows, dividends/corporate actions, and
+reconciliation/account blocks.
+
+### A. Account identity and defaults — agreed
+
+- Every account identifies: **Account ID · Strategy/Version ·
+  Execution Mode · Campaign · Currency.**
+- **New-campaign defaults**: $100,000 starting cash; **$10,000 maximum
+  entry budget, inclusive of entry fees**; both configurable, **never
+  applied retrospectively** (extends `S3-12` with the explicit
+  fee-inclusive framing).
+- **Existing accounts and frozen strategy-specific settings remain
+  unchanged** (reaffirms `S3-14`).
+- **Initial scope: USD-denominated securities and USD accounts.**
+  Other currencies require a **separately qualified FX/accounting
+  policy** — not decided here.
+
+### B. Cash and reservations — agreed
+
+- Reserved cash is a **subset** of ledger cash, not additional
+  capital. **Available cash = ledger cash minus active reservations**,
+  subject to explicitly recorded liabilities/holds.
+- Admission reserves cash and position capacity **atomically**.
+- **Reservation does not itself alter equity or create a trading
+  loss.**
+- Execution consumes the reservation and debits actual purchase cost/
+  fees **atomically**.
+- An unused-reservation release changes **available** cash, not
+  ledger cash.
+- Cancellation/expiry **releases once, without a fabricated refund**
+  (reaffirms `S5-17`'s exactly-once reservation-release evidence).
+- Cash, positions, reservations, and economic audit entries must
+  remain **consistent**.
+
+**Agreed cost-free illustrative sequence** (labelled explicitly
+**cost-free** — execution is **not necessarily equity-neutral once
+costs are included**, see §C):
+
+| Step | Cash | Reserved | Position | Equity |
+|---|---|---|---|---|
+| Start | $100,000 | — | — | $100,000 |
+| Reserve $10,000 | $100,000 | $10,000 | — | $100,000 (available $90,000) |
+| Buy 100 @ $100 | $90,000 | — | $10,000 | $100,000 |
+| Mark @ $95 | $90,000 | — | $9,500 | $99,500 |
+| Sell @ $95 | $99,500 | — | — | $99,500 |
+
+### C. Execution costs and sizing — agreed
+
+Keep separate: spread/slippage incorporated into modeled fill prices;
+explicit fees charged in the ledger; reference prices and their
+bid/ask/trade basis. **Never double-count** a spread already
+represented in the reference; **never** apply a combined cost
+adjustment and then charge its components again.
+
+**Whole-share sizing** (for new whole-share accounts): choose the
+largest non-negative whole quantity such that
+`quantity × modeled_buy_price + fee(quantity, price) <= reserved
+allocation`. The simpler `floor((allocation - fee) / price)` applies
+**only** when the fee is known and independent of quantity —
+percentage/per-share/minimum fees require the applicable fee function.
+**Require at least one share; otherwise record an explicit sizing
+skip.**
+
+Whole-share sizing **within** an approved budget is distinct from
+**reducing** the budget merely because account cash is insufficient —
+insufficient cash to reserve the approved allocation causes a **skip**,
+not a smaller reservation.
+
+**Before commit**: validate price, quantity, fees, and reservation
+ownership; recheck the strategy's applicable modeled-fill geometry; do
+**not** spend cash reserved for another intent; use agreed decimal/
+rounding policies — **do not invent unresolved rounding modes.**
+
+**Illustrative sizing example** (numbers are **illustrative, not
+approved execution-cost parameters**): reference $100; modeled buy
+$100.10; fee $1; budget $10,000 → 99 shares; share cost $9,909.90;
+total debit $9,910.90; unused reservation $89.10. At a $100 valuation
+mark: cash $90,089.10 + stock $9,900 = equity $99,989.10.
+
+### D. Returns and cost basis — agreed
+
+`Net exit proceeds = quantity × modeled sell price - exit fees`.
+`Net position P&L = net exit proceeds - total entry spend`, with
+appropriate extensions for partial exits/distributions/corporate
+actions. Entry fees already included in basis/spend must **not** be
+deducted twice. Distinguish fill-price effects, explicit fees,
+realized P&L, and unrealized P&L. Maintain a **reconcilable gross/net
+breakdown**.
+
+Costs are **not** all automatically "unrealized losses." **Missing
+valuation produces stale/incomplete status, never a zero-value
+assumption** (reaffirms `S2-12`). Preserve explicit contribution
+denominators from earlier sessions (`S2-10`). **Deposits-driven
+account growth is not strategy return.** No unagreed cash-flow-
+adjusted return methodology is invented — any required methodological
+choice is identified as **pending**, not silently decided.
+
+### E. Position limits and exposure — agreed
+
+`Open positions + admitted pending-entry reservations <= account
+position limit`. Count once: a pending entry occupies a slot; an open
+position occupies a slot; an exit-pending/unresolved position
+**continues** occupying its existing slot (not a new one); fall-
+forward is **exit handling, not another entry reservation**; atomic
+cancellation/expiry or committed closure releases the relevant slot.
+
+**Cash and position limits operate independently.** **Preserve V2's
+frozen twenty-position limit** — the new $100,000/$10,000 defaults do
+**not** imply a permanent ten-position limit (ten $10,000 allocations
+happens to fit inside $100,000, but the position **limit** is a
+separate, already-frozen parameter).
+
+Independent strategy accounts may hold the **same stock**. Show
+security and sector exposure **without merging individual
+performance**. Separate execution modes; **exclude Research Lab
+replicas from default totals.**
+
+**Exposure display is approved.** Concentration warnings or
+"excessive exposure" labels are **not** issued before numerical
+thresholds are defined (see deferrals).
+
+### F. Cash-only boundaries and capital flows — agreed
+
+**No admission-created borrowing, leverage, negative available cash,
+or shorts.** Insufficient capacity produces an **explicit skip**.
+**Genuine charges/corrections that reveal a deficit must still be
+recorded** — the shortfall is shown **truthfully**; new admissions in
+the affected account are **blocked**, and Operations is **raised**.
+**Never hide a liability to maintain a non-negative display. Never
+duplicate a liability by both debiting and subtracting the same
+item.**
+
+**Deposits/withdrawals**: explicit, auditable capital movements,
+**separate from strategy performance**; **no automatic top-ups**;
+withdrawals cannot consume reserved cash or silently liquidate
+positions. **Existing campaign balances are unchanged by this
+documentation.**
+
+### G. Dividends and corporate actions — agreed
+
+Cash dividends are recorded **separately** from price gains but
+**included in total economic return**. Verify entitlement, amount, and
+relevant dates. **Receivables are not spendable cash.** Missing
+entitlement/value evidence remains **explicitly unresolved**. Record
+the price-adjustment basis; prevent double-counting a dividend through
+both a cash credit **and** an adjusted historical price.
+
+**Preserves Session 5's split/cash-in-lieu requirements** (`S5-21`-
+`S5-27`) unchanged: chronological, exactly-once quantity/basis
+adjustments; fractional settlement with proportional cost basis;
+corporate-action gain/loss included in total return; **no shift to
+original strategy holding clocks** (reaffirms `S8-06`); high-precision
+calculations with a defined posting/display precision.
+
+**Unsupported** mergers, spin-offs, delistings, or other actions:
+preserve explicit **unresolved** obligations — **no guessed
+conversion ratios and no unsupported zero-value write-offs.** A later
+**verified** economic loss/correction remains recordable through an
+**auditable process** — zero **can** be a validly established value
+when actually verified, this is not a blanket "never write to zero"
+rule.
+
+### H. Reconciliation and account blocks — agreed
+
+At EOD and restart, reconcile: ledger cash; reservations; positions
+and quantities; fees; distributions/receivables; capital flows;
+corporate actions and correcting entries. A **genuine ledger
+mismatch blocks new admissions** in the affected account, while
+**continuing** to manage existing obligations. **Missing market
+valuations alone are not proof of a ledger mismatch.** Preserve
+separate strategy-specific pending/unresolved-exit policies (`S8-12`/
+`S8-13`, unaffected). **Block-clearance authority and evidence belong
+in Session 11**, not decided here.
+
+### I. Explicit deferrals
+
+- **`S10-22`** — numerical spread/slippage/fee assumptions (§C).
+  **Reason**: needs its own cost-model evaluation. **Planned session**:
+  Session 12 (reaffirms `S6-25`/`S8-25`'s same destination).
+  **Dependency**: `S6-25`.
+- **`S10-23`** — cross-account hard concentration limits (§E).
+  **Reason**: requires bounded evaluation before activation. **Planned
+  session**: none assigned. **Dependency**: none blocking.
+- **`S10-24`** — correlation-based admission gates (§E). **Reason**:
+  same bounded-evaluation requirement. **Planned session**: none
+  assigned. **Dependency**: none blocking.
+- **`S10-25`** — concentration-warning thresholds (§E). **Reason**:
+  same bounded-evaluation requirement — no numerical limit is invented
+  here. **Planned session**: none assigned. **Dependency**: `S10-23`,
+  `S10-24`.
+
+Earlier deferred provider-qualification (`OPS-005`, `S8-25`) and
+entry-bar-recovery (`S6-26`) work is **preserved unchanged**, not
+resolved by this session.
+
+### Implementation authorization
+
+**None.** All new implementation authorization is explicitly **"Not
+authorized by this documentation task."** See `REQUIREMENTS_TRACKER.md`
+(`S10-01` through `S10-21`, plus deferrals `S10-22`-`S10-25`).
+
+### Validation performed this session
+
+Targeted, read-only code inspection directly found:
+
+- **§A/§B (account identity, reservations)** — `talonx_v2`'s reserve-
+  then-execute pattern (`talonx_v2/paper.py`'s `open_position`,
+  established this project's history and re-confirmed in Session 8)
+  matches §B's atomic-reservation and exactly-once-release claims.
+  **Implemented** for V2's own reservation lifecycle.
+- **§C (whole-share sizing) — genuine gap found**: V2's actual sizing
+  function, `talonx_paper.engine.calculate_buy()` (reused by
+  `talonx_v2/paper.py:25,115`), returns `spend / price` as `shares` —
+  a **continuous, fractional** share count, with **no fee parameter
+  and no whole-share floor at all**. This directly confirms `S8-08`'s
+  earlier caution ("do not imply all actual V2 quantities are already
+  whole shares") with concrete evidence: **today's actual sizing is
+  fractional, not whole-share, and has no fee-awareness whatsoever** —
+  §C's entire whole-share/fee-aware sizing formula is a **target**,
+  not current behavior. **Not implemented.**
+- **§E (position limit)** — `max_concurrent_positions = 20` confirmed
+  frozen with a runtime assert (`talonx_v2/config.py:44,90`) — directly
+  matches "preserve V2's frozen twenty-position limit." **Implemented**
+  for the limit's existence and value; the count-once-per-state-
+  category rules (§E's bullet list) were **not** individually traced
+  against every state transition this session.
+- **§H (reconciliation blocks admissions) — genuine gap found**:
+  `talonx_ops/eod_reconciliation.py` genuinely **detects** mismatches
+  (`STATUS_MISMATCH`, line 43) — but no code path was found that
+  **blocks new admissions** when a mismatch is detected; reconciliation
+  and admission-gating are structurally separate, unconnected
+  mechanisms today. **Not implemented** — the same pattern as
+  `OPS-012`'s `EXIT_UNRESOLVED` account-block gap.
+
+**Not assessed this session**: §D's exact gross/net breakdown
+presentation; §G's dividend/corporate-action code (already established
+as entirely absent, `OPS-004`, not re-searched this session); §F's
+exact deficit-recording/Operations-raising code path.
+
+### Findings tracked in `OPERATIONAL_FINDINGS.md`
+
+- **`OPS-014`** — whole-share, fee-aware sizing not implemented;
+  today's actual sizing (`calculate_buy()`) is fractional-share,
+  fee-blind.
+- **`OPS-015`** — EOD/restart reconciliation-mismatch does not block
+  new admissions; detection and enforcement are disconnected, the same
+  pattern as `OPS-012`.
+
+`OPS-002`, `OPS-003`, `OPS-004`, `OPS-005`, `OPS-012` **remain `OPEN`**,
+unaffected by this session.
+
+### Any separately authorized implementation work
+
+**None.**
+
+---
+
+## Session 11 — Operation, Stop/Start and Recovery
+
 **Not yet conducted.** Scope preserved exactly as already established
-in `KNOWLEDGE_TRANSFER_PLAN.md` — this is **not** "Account Ledgers &
-Risk"; that topic belongs to the already-scheduled **Session 10
-("Paper accounting, costs and risk")**, where this session's own
-account-ledger/risk carry-forward items are recorded instead (see
-below). Session 9 already carries forward, from prior sessions:
-`S5-30` (pre-market lockout window), `S6-13`/`S6-14` (capacity-
-independent alerts, expiry-update UI), `S6-11` (four-category
-diagnostic surfacing), `S7-23`/`S7-24` (five-dimension coverage
-surfacing), and `S7-20`'s per-stock mute UI.
+in `KNOWLEDGE_TRANSFER_PLAN.md` — not expanded or narrowed by this
+task. Carries forward, by requirement ID, from Sessions 1-10:
 
-**Carried forward to Session 10 ("Paper accounting, costs and risk")
-from this session's discussion**:
-- Separate strategy/execution-mode accounts (`S3-13`, V2's own account
-  behavior detailed by `S8-12`-`S8-14`).
-- Cash versus reservations versus invested capital (`S8-12`'s
-  no-anticipated-proceeds-credit rule).
-- New-campaign capital defaults and costs (`S3-12`, unchanged).
-- Same-stock exposure across strategies (`S3-25`, still deferred).
-- Corrections, deposits, and return attribution (`S2-11`, `S7-14`,
-  `S8-11`'s versioned-correction discipline).
-- Account blocks and auditable release (`S8-13`/`OPS-012`).
-- Combined portfolio views without double-counting experimental
-  capital (`S3-13`).
+- Stop behavior with open positions and pending obligations
+  (`S4-01`-`S4-04`, `S8-13`/`OPS-012`, `S10-21`/`OPS-015` — none of
+  these account-block/reconciliation gaps are resolved here).
+- Manual versus automated operating windows (`S1-04`'s preferred
+  08:00-22:00 UK window, still no scheduler; `S5-30`'s undefined
+  pre-market lockout).
+- Per-strategy readiness and restart (`S4-02`).
+- Pause/exclude/mute scope (`S3-11`/`S3-28`, `S9`'s Pause-Updates-vs-
+  Pause-New-Entries distinction).
+- Incident thresholds and recovery (`S9-01`/`S9-02`'s Operations-bot
+  scope, `OPS-007`/`OPS-012`/`OPS-015`).
+- Account block clearance (`S8-13`, `S10-21` — both explicitly
+  deferred their clearance authority/evidence to this session).
+- Configuration effective dates (no prior session has addressed this
+  directly — a genuinely new topic for Session 11).
+- Single ownership and outage detection (`S4-14`'s established
+  Telegram-poller single-owner dedup finding; broader outage detection
+  still not confirmed as its own capability).
 
-Session 9 is not conducted by this task; nothing above is resolved
-here — this list only ensures both Session 9 and Session 10, when each
-happens, has visible pointers to the relevant open threads rather than
-starting cold.
+Session 11 is not conducted by this task; nothing above is resolved
+here — this list only ensures Session 11, when it happens, has visible
+pointers to the relevant open threads rather than starting cold.

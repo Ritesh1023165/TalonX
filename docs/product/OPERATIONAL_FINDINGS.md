@@ -820,6 +820,118 @@ check present).
 
 ---
 
+## OPS-013 — Telegram lifecycle-message-formatting and delivery-consolidation gap
+
+**Status**: `OPEN` — agreed target design exists (Session 9 §B/§C/§D);
+no dedicated implementation.
+
+**Found**: Session 9 documentation pass (2026-09-17), via targeted
+code review against this project's own established delivery
+infrastructure.
+
+**Finding**: the underlying mechanisms Session 9's message-formatting
+requirements would draw from are real: per-strategy skip codes
+(`S2-03`), `update_policy.py`'s `NEW`/`UPDATE`/`SUPPRESS_DUPLICATE`/
+`SUPPRESS_NOOP` decisions (`S7-14`), and the `AMBIGUOUS`/`PENDING`/
+`SENT` outbox states (established, Task 96F/117). **No dedicated
+message-formatting layer exists on top of these** implementing: the
+"Opportunity status"/"Paper status" separate-line format (`S9-05`);
+the four-transition main-lifecycle-notification policy as its own
+explicit rule, distinct from the underlying mechanisms that could
+support it (`S9-08`); the exit-problem dual-destination routing rule
+(`S9-10`, blocked in part on `S9-02`'s Operations bot not existing);
+or the obsolete-pending-notification consolidation rule (`S9-11`).
+
+**Future corrective work — NOT IMPLEMENTED here**: design and build
+the message-formatting layer described in Session 9 §B; wire the
+four-transition policy explicitly (rather than relying on ad hoc
+per-strategy skip/update logic); build the consolidation rule for
+obsolete pending notifications; build the Operations bot (`S9-02`) as
+a prerequisite for the exit-problem dual-routing rule.
+
+**Evidence references**: `talonx_ingest/intelligence/delivery/
+update_policy.py`, `talonx_v2/paper.py` (established + this session).
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S9-05`, `S9-08`, `S9-10`,
+`S9-11`.
+
+---
+
+## OPS-014 — Whole-share, fee-aware sizing not implemented
+
+**Status**: `OPEN` — agreed target formula exists (Session 10 §C); no
+implementation.
+
+**Found**: Session 10 documentation pass (2026-09-17), via direct
+reading of `talonx_paper/engine.py`.
+
+**Finding**: `talonx_paper.engine.calculate_buy()` (reused by V2,
+`talonx_v2/paper.py:25,115`) is defined as `calculate_buy(cash:
+float, allocation_usd: float, price: float) -> tuple[float, float] |
+None`, and its body returns `spend / price, spend` where `spend =
+min(allocation_usd, cash)` — a **continuous, fractional** share count,
+computed with **no fee parameter at all**. This directly confirms, with
+concrete evidence, the caution already recorded in `S8-08` ("do not
+imply all actual V2 quantities are already whole shares") — today's
+actual sizing is not whole-share, and has no fee-awareness whatsoever
+to reduce for a fee even if it wanted to.
+
+**Explicit implication**: Session 10 §C's entire whole-share/fee-aware
+sizing formula (`quantity × modeled_buy_price + fee(quantity, price)
+<= reserved allocation`, choosing the largest non-negative whole
+quantity) is a **target design**, not a description of any existing
+behavior — there is no partial implementation to point to for this
+specific requirement.
+
+**Future corrective work — NOT IMPLEMENTED here**: replace
+`calculate_buy()`'s continuous division with a whole-share search (or
+closed-form `floor` when the fee is flat) against the agreed formula;
+add a fee function parameter supporting percentage/per-share/minimum
+fee structures; add an explicit sizing-skip outcome for zero eligible
+shares; wire the pre-commit validation list (§C) around it.
+
+**Evidence references**: `talonx_paper/engine.py:71-83`; `talonx_v2/
+paper.py:25,115`.
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S10-07`, `S10-08`, `S10-09`.
+
+---
+
+## OPS-015 — EOD/restart reconciliation-mismatch does not block new admissions
+
+**Status**: `OPEN` — agreed target design exists (Session 10 §H); no
+implementation. Same structural pattern as `OPS-012`, a **different**
+finding for a different trigger — kept as a separate ID, not merged.
+
+**Found**: Session 10 documentation pass (2026-09-17), via direct
+reading of `talonx_ops/eod_reconciliation.py`.
+
+**Finding**: `talonx_ops/eod_reconciliation.py` genuinely **detects**
+accounting mismatches — `STATUS_MISMATCH = "RECONCILED_WITH_MISMATCH"`
+(line 43), with real, working mismatch-detection logic (lines
+252-313) that produces this status whenever it finds a discrepancy.
+**No code path was found that connects this detection to blocking new
+admissions** in the affected account — reconciliation (a reporting/
+detection concern) and admission-gating (an execution concern) are
+structurally separate, unconnected mechanisms today, exactly the same
+pattern already found for V2's `EXIT_UNRESOLVED` status (`OPS-012`),
+but triggered by a ledger mismatch rather than an exhausted exit
+fall-forward.
+
+**Future corrective work — NOT IMPLEMENTED here**: wire
+`STATUS_MISMATCH` (or an equivalent authoritative reconciliation
+result) into each account's own admission gate, so a genuine mismatch
+blocks new admissions in that account while existing obligations
+continue to be managed; define and implement the block-clearance
+mechanism (explicitly assigned to Session 11, not decided here).
+
+**Evidence references**: `talonx_ops/eod_reconciliation.py:43,252-313`.
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S10-20`, `S10-21`; `OPS-012`
+(the analogous V2-specific finding).
+
+---
+
 *See `REQUIREMENTS_TRACKER.md` for product-requirement tracking,
 `DECISION_LOG.md` for the session-by-session product-owner record, and
 `docs/research/TALONX_RESEARCH_LEDGER.md` for the research/validation

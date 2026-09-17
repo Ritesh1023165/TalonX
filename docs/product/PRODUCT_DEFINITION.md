@@ -460,6 +460,81 @@ clarifying note to prevent conflating the two.
 `OPS-003`, `OPS-004`, `OPS-005` **remain open** — this session adds
 confirming/disconfirming evidence but resolves none of them.
 
+## 6h. Telegram and dashboard experience — `AGREED` (Session 9), implementation `LARGELY NOT BUILT`
+
+Recorded in full in `DECISION_LOG.md` Session 9, tracked as `S9-01`
+through `S9-20` in `REQUIREMENTS_TRACKER.md`. **Discussion closed;
+requirements documented, with explicit deferrals and implementation/
+validation separately tracked.** Summary:
+
+- **Destinations**: Primary Trade & Event, Operations, and Research
+  bots — all three `Not implemented` beyond the underlying mechanisms
+  each would draw from (`OPS-013`).
+- **Message content and lifecycle transitions**: a full compact-
+  message and four-transition-notification design agreed — `Not
+  implemented` as its own formatting/policy layer (`OPS-013`).
+- **Delivery safeguards**: obsolete-pending consolidation, no-blind-
+  flush catch-up, and ambiguous-delivery handling — the last is
+  `Implemented` (established `AMBIGUOUS` contract); the first two are
+  `Not implemented`/`Partially implemented`.
+- **Dashboard layout**: a concrete five-part top-to-bottom layout
+  (Action Required → equal Equity/Open-P&L → opportunities/positions →
+  Recent Activity → Details) resolves `S2-10`'s own long-open
+  candidate-session pointer — `Not implemented`.
+- **Controls**: "Pause Updates" (real, tested, dashboard-refresh-
+  scoped) is explicitly distinguished from "Pause New Entries" (not
+  implemented, `S4-12`) — a naming clarification that prevents
+  conflating a real, shipped feature with an unbuilt one. Full
+  browser-reload state restoration is explicitly **not** claimed —
+  only the established auto-refresh fix is (Task 140 evidence,
+  re-confirmed this session).
+
+## 6i. Paper accounting, costs and risk — `AGREED` (Session 10), implementation `MIXED — SOME BUILT, TWO GENUINE GAPS FOUND`
+
+Recorded in full in `DECISION_LOG.md` Session 10, tracked as `S10-01`
+through `S10-21` in `REQUIREMENTS_TRACKER.md`, plus deferrals
+`S10-22`-`S10-25`. **Discussion closed; requirements documented, with
+explicit deferrals and implementation/validation separately tracked.**
+Summary:
+
+- **Reservation mechanics** (atomic reserve, exactly-once release, no
+  equity impact) — `Implemented`, directly confirmed against V2's
+  established reserve-then-execute pattern.
+- **Whole-share, fee-aware sizing — genuine gap found**: today's actual
+  sizing (`talonx_paper.engine.calculate_buy()`, reused by V2) is a
+  **continuous, fractional** share count with **no fee parameter at
+  all** — the agreed whole-share/fee-aware formula is entirely target
+  design (`OPERATIONAL_FINDINGS.md` `OPS-014`).
+- **Position limits**: V2's frozen twenty-position limit is confirmed
+  unchanged and correctly independent of the new $100,000/$10,000
+  capital defaults — `Implemented`.
+- **Cash-only boundaries**: no-shorts/explicit-skip-on-insufficient-
+  cash is established; truthful-deficit-recording-with-Operations-
+  escalation was not found — `Partially implemented`.
+- **Dividends/corporate actions**: entirely `Not implemented`
+  (`OPS-004`, reaffirmed unchanged, with a new design-consistency
+  dependency between dividend double-counting prevention and
+  `S5-26`'s corporate-action price-adjustment basis).
+- **Reconciliation — genuine gap found**: `talonx_ops/
+  eod_reconciliation.py` genuinely detects ledger mismatches
+  (`STATUS_MISMATCH`), but nothing connects that detection to blocking
+  new admissions — the same structural pattern as `OPS-012`, tracked
+  separately as `OPS-015` since the trigger differs.
+- **Partial evidence on numeric precision**: `calculate_buy()`/
+  `calculate_sell_pnl()` were directly confirmed to use plain `float`
+  arithmetic, not `Decimal` — contradicting `S5-27`'s agreed high-
+  precision policy for at least this one function; the full numeric
+  surface was not audited.
+- **Exposure display is explicitly approved** (same-stock across
+  independent accounts, without merging performance); numerical
+  cross-account concentration limits, correlation-based admission
+  gates, and concentration-warning thresholds all remain **explicitly
+  deferred** (`S10-23`-`S10-25`) — `S3-25`'s own long-open deferral is
+  split accordingly, with its display half now `Agreed`.
+
+`OPS-002`, `OPS-003`, `OPS-004`, `OPS-005`, `OPS-012` **remain open**,
+unaffected by these two sessions.
+
 ## 7. Open / proposed — see `REQUIREMENTS_TRACKER.md` for tracked status
 
 - **Intraday-vs-multi-day scope** ("swing intelligence assistant"):
