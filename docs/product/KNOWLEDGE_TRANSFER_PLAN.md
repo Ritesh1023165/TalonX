@@ -51,9 +51,9 @@ today" specifies which one it means.
 | 8 | V2 multi-day strategy and lifecycle | **Discussion closed; requirements documented (S8-01..S8-18), with provider-finality and cooldown-boundary verification outstanding (S8-25/S8-26), and implementation separately tracked.** Recorded in `DECISION_LOG.md`. Much of the discussed lifecycle was found `Implemented` and directly test-confirmed this session (admission deadline, holding clock, fall-forward contract, cooldown anchor/boundary, exactly-once close); one genuine gap found (`OPS-012`, `EXIT_UNRESOLVED` account-block not enforced). |
 | 9 | Telegram and dashboard experience | **Discussion closed; requirements documented (S9-01..S9-20), with implementation/validation separately tracked (OPS-013).** Recorded in `DECISION_LOG.md`. |
 | 10 | Paper accounting, costs and risk | **Discussion closed; requirements documented (S10-01..S10-21), with explicit deferrals (S10-22..S10-25) and implementation/validation separately tracked (OPS-014, OPS-015).** Recorded in `DECISION_LOG.md`. Resolved `S3-25`'s display half as `Agreed` (`S10-14`); its enforcement half remains deferred, now split across `S10-23`-`S10-25`. |
-| 11 | Operation, stop/start and recovery | Not yet conducted. Carries forward `S3-28` (mute controls, pending-intent handling), `S5-30` (pre-market lockout window, undefined), `OPS-007` (intraday EOD-flatten durable recovery) and `S6-22`/`S6-23`'s cross-restart persistence requirements, `OPS-012` (V2 `EXIT_UNRESOLVED` account-block enforcement) and `S8-26` (holiday/early-close boundary test coverage), and now `OPS-015` (EOD/restart reconciliation-mismatch admission block) and `S10-21`'s explicitly-assigned block-clearance authority/evidence question — see `DECISION_LOG.md` Session 11's carried-forward-ID pointer list for the full mapping (stop behavior, operating windows, per-strategy restart, pause/exclude/mute scope, incident thresholds, account-block clearance, configuration effective dates, single ownership/outage detection). |
-| 12 | Technical validation, usefulness and economic evidence | Not yet conducted. Receives `S3-26` (experiment evaluation criteria/evidence sufficiency, deferred from Session 3), is a candidate destination for `S5-31`'s 2-year-replay-feasibility audit, `S6-25`/`S8-25` (numerical spread/slippage/fee assumptions), `S7-25`/`S7-26` (numerical freshness windows and event-specific materiality thresholds, each requiring a bounded historical-filing review), and now `S10-22` (numerical spread/slippage/fee assumptions, same destination) — all prerequisites for authorizing any future experiment or implementation of Sessions 6-10's approved targets. |
-| 13 | Architecture, effective configuration and prioritized roadmap | Not yet conducted |
+| 11 | Operation, stop/start and recovery | **Discussion closed; requirements documented (S11-01..S11-19), with implementation/validation separately tracked (OPS-016, and OPS-012/OPS-015's clearance policy now defined).** Recorded in `DECISION_LOG.md`. |
+| 12 | Research, tuning and promotion | **Discussion closed; requirements documented (S12-01..S12-22), with explicit deferrals (S12-23/S12-24) and implementation/validation separately tracked.** Recorded in `DECISION_LOG.md`. Title updated from "Technical validation, usefulness and economic evidence" to reflect its actual scope — prior-research review, experiment registration, isolation, evidence discipline, comparison methodology, cost treatment, shadow testing, and promotion/rollback authority, superseding this row's originally-planned title (the plan is owner-adjustable, same discipline as Session 2's earlier title update). Received and did not resolve `S3-26`, `S5-31`, `S6-25`/`S8-25`/`S10-22` (all folded into `S12-23`/`S12-24`), and `S7-25`/`S7-26` (numerical freshness/materiality thresholds — a genuinely separate topic from research-promotion cost calibration, still not addressed by this session; remains open, no destination reassigned). |
+| 13 | Architecture, effective configuration and prioritized roadmap | Not yet conducted. **A reconciliation/planning agenda was prepared** (`DECISION_LOG.md` Session 13, "agenda only, not conducted") covering: conflicts/open decisions, requirement-by-requirement implementation review, prior-research reuse, first-release scope, dependency-ordered implementation packages, and migration/cutover/acceptance boundaries — this is a **starting point for discussion**, not a decision record, and does not itself count as Session 13 having been conducted. |
 
 **Closure discipline** (applies from Session 3 onward): before closing
 each session, every question raised in it is recorded as **agreed**,
@@ -64,10 +64,11 @@ discipline; Session 5's own deferrals (`S5-10`, `S5-19`→now resolved
 at requirements level by Session 6, `S5-20`, `S5-30`, `S5-31`),
 Session 6's own deferrals (`S6-18`, `S6-25`, `S6-26`), Session 7's own
 deferrals (`S7-18`, `S7-25`, `S7-26`), Session 8's own deferrals
-(`S8-25`, `S8-26`), and Session 10's own deferrals (`S10-22` through
-`S10-25`) follow the same pattern — see `DECISION_LOG.md`
-Session 3/5/6/7/8/10's "Explicit deferrals" sections. (Session 9 had
-no new deferrals of its own — all of §A-F were agreed decisions.)
+(`S8-25`, `S8-26`), Session 10's own deferrals (`S10-22` through
+`S10-25`), and Session 12's own deferrals (`S12-23`, `S12-24`) follow
+the same pattern — see `DECISION_LOG.md` Session 3/5/6/7/8/10/12's
+"Explicit deferrals" sections. (Sessions 9 and 11 had no new
+deferrals of their own — all of their content was agreed decisions.)
 
 **This plan is adjustable by the owner** — the order, content, or
 existence of any future session may change; nothing here is fixed in

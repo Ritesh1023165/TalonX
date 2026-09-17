@@ -535,6 +535,55 @@ Summary:
 `OPS-002`, `OPS-003`, `OPS-004`, `OPS-005`, `OPS-012` **remain open**,
 unaffected by these two sessions.
 
+## 6j. Operation, stop/start and recovery — `AGREED` (Session 11), implementation `LARGELY NOT BUILT`
+
+Recorded in full in `DECISION_LOG.md` Session 11, tracked as `S11-01`
+through `S11-19` in `REQUIREMENTS_TRACKER.md`. **Discussion closed;
+requirements documented, with explicit deferrals and implementation/
+validation separately tracked.** This session defines the account-
+block **clearance policy** that `OPS-012` and `OPS-015` were both
+waiting on (ledger mismatches, unexplained deficits, terminal
+unresolved exits, and database identity mismatches all require
+auditable resolution and explicit operator clearance; restart never
+auto-clears a serious block) — **the policy is now agreed; the
+enforcement mechanism, and the five-state account-readiness model it
+would run inside, are not implemented** (`OPERATIONAL_FINDINGS.md`
+`OPS-016`, new this session). Real, established mechanisms this
+session builds on: `stop_stack()`/`run_close()` (bounded, ownership-
+verified shutdown and reconciliation), the `AMBIGUOUS`-delivery
+contract, and V2's own target-close-before-fall-forward ordering — all
+`Implemented`. Genuinely new and unbuilt: the five account states, a
+"Partially Ready" summary, an external outage watchdog, and
+configuration-effective-dates (immediate vs. versioned activation).
+
+## 6k. Research, tuning and promotion — `AGREED` (Session 12), implementation `MOSTLY NOT ASSESSED THIS SESSION`
+
+Recorded in full in `DECISION_LOG.md` Session 12, tracked as `S12-01`
+through `S12-22` in `REQUIREMENTS_TRACKER.md`, plus deferrals
+`S12-23`/`S12-24`. **Discussion closed; requirements documented, with
+explicit deferrals and implementation/validation separately tracked.**
+This session lays a full governance layer — mandatory prior-research
+review, experiment registration, isolation, evidence discipline
+(untouched evaluation data), comparison methodology (Strategy View vs.
+Account View, three-verdict taxonomy), cost treatment (apply-once,
+rerun-chronologically, intraday-RRR-not-for-V2), shadow-testing rules,
+and promotion/rollback authority — on top of `S3-15`-`S3-20`'s already-
+agreed qualitative research-lab workflow. **Most of Session 12's own
+requirements were explicitly marked `Not assessed in this
+documentation pass`, rather than guessed** — this documentation task
+reused the established `talonx_research/` record (Task 115/116) but
+did not re-audit its full current code against these newly detailed
+rules. Confirmed unchanged this session: the "EXPERIMENTAL — INTERNAL
+ONLY" dashboard label remains absent (re-run search, `S6-19`'s finding
+still holds); existing positions retain their original rules through
+any future promotion (`Implemented`, reaffirms `S8-06`). Numerical
+cost calibration (`S12-23`) and two-year data feasibility (`S12-24`)
+remain explicitly deferred — the discussion's own example numbers are
+labelled illustrations, not adopted.
+
+`OPS-002`-`OPS-005`, `OPS-012`, `OPS-015`, `OPS-016` **remain open**,
+unaffected by either session.
+
 ## 7. Open / proposed — see `REQUIREMENTS_TRACKER.md` for tracked status
 
 - **Intraday-vs-multi-day scope** ("swing intelligence assistant"):

@@ -2680,29 +2680,379 @@ unaffected by this session.
 
 ## Session 11 — Operation, Stop/Start and Recovery
 
-**Not yet conducted.** Scope preserved exactly as already established
-in `KNOWLEDGE_TRANSFER_PLAN.md` — not expanded or narrowed by this
-task. Carries forward, by requirement ID, from Sessions 1-10:
+**Recorded**: 2026-09-17, approximately 10:22 UTC / 11:22 BST (Python
+`zoneinfo`, this project's established recording-time discipline).
+**Source**: the product-owner discussion supplied directly in this
+session's prompt. **Status: discussion closed; requirements
+documented, with explicit deferrals and implementation/validation
+separately tracked.**
 
-- Stop behavior with open positions and pending obligations
-  (`S4-01`-`S4-04`, `S8-13`/`OPS-012`, `S10-21`/`OPS-015` — none of
-  these account-block/reconciliation gaps are resolved here).
-- Manual versus automated operating windows (`S1-04`'s preferred
-  08:00-22:00 UK window, still no scheduler; `S5-30`'s undefined
-  pre-market lockout).
-- Per-strategy readiness and restart (`S4-02`).
-- Pause/exclude/mute scope (`S3-11`/`S3-28`, `S9`'s Pause-Updates-vs-
-  Pause-New-Entries distinction).
-- Incident thresholds and recovery (`S9-01`/`S9-02`'s Operations-bot
-  scope, `OPS-007`/`OPS-012`/`OPS-015`).
-- Account block clearance (`S8-13`, `S10-21` — both explicitly
-  deferred their clearance authority/evidence to this session).
-- Configuration effective dates (no prior session has addressed this
-  directly — a genuinely new topic for Session 11).
-- Single ownership and outage detection (`S4-14`'s established
-  Telegram-poller single-owner dedup finding; broader outage detection
-  still not confirmed as its own capability).
+### Context
 
-Session 11 is not conducted by this task; nothing above is resolved
-here — this list only ensures Session 11, when it happens, has visible
-pointers to the relevant open threads rather than starting cold.
+This session receives the account-block-clearance question explicitly
+deferred here by `S8-13` and `S10-21`, and grounds `S4-01`-`S4-04`'s
+stop/restart behavior and `S9-17`'s Pause-Updates-vs-Pause-New-Entries
+distinction in concrete operational policy.
+
+### 1. Controls — agreed
+
+- **Pause Updates** affects dashboard refresh only.
+- **Pause New Entries** blocks admissions and atomically cancels
+  unfilled intents, releasing reservations; existing positions remain
+  managed (sharpens `S4-12`/`S9-17` into concrete effects).
+- **Stop Application** preserves valid intents, reservations,
+  positions, obligations, checkpoints, and delivery states — **deadlines
+  continue while offline** (no grace extension for downtime, reaffirms
+  `S8-05`'s "downtime does not extend the deadline").
+- **Resume** permits future admissions only — **cancelled intents are
+  not resurrected.**
+
+### 2. Controlled shutdown — agreed
+
+Block new admissions; finish or safely roll back accounting
+transactions; persist state; report remaining obligations; stop owned
+processes cleanly. **Manual shutdown with open intraday positions
+requires an explicit offline-risk warning.** **Unattended shutdown
+must abort and continue safe management** if an approved offline-
+obligation policy is not met, with Operations notification.
+
+### 3. Restart — agreed
+
+Verify single ownership and account/database/version/execution-mode
+identity; reconcile the ledger; classify persisted obligations; assess
+data readiness; recover notifications by confirmed delivery state.
+**These gates restrict new admissions only** — not necessary incoming
+data, independent collection, or safe management of existing
+obligations.
+
+### 4. Recovery boundaries — agreed
+
+- A timely V2 intent remains eligible for price recovery **after**
+  market open.
+- **Admission deadlines and price-recovery deadlines are distinct**
+  (sharpens `S8-05`'s own preserved distinction).
+- Evidence durably received by the deadline **may be processed
+  later** (reaffirms `S6-24`/`S8-05`'s deadline-equality semantics).
+- **V2 checks its original target close before applying its fall-
+  forward rules** (reaffirms `S8-09`'s three-step contract — step 1 is
+  always the target session first).
+- **Ambiguous deliveries remain preserved for investigation** — never
+  blindly resent, and never treated as confirmed-unsent catch-up
+  messages (sharpens `S9-13`'s existing `AMBIGUOUS` contract).
+
+### 5. Readiness and clearance — agreed
+
+**Account states**: Checking and recovering; Ready; Managing
+positions — new entries blocked; Paused by user; Stopped. **A
+truthful global "Partially Ready" summary is allowed** (some accounts
+ready, some not, honestly disclosed as a mixed state). Transient
+blocks clear **only when checks pass**; account readiness also
+requires all other prerequisites, pauses, and blocks to be satisfied.
+**Ledger mismatches, unexplained deficits, terminal unresolved exits,
+and database identity mismatches require auditable resolution and
+explicit operator clearance** — this is the clearance mechanism
+`S8-13` and `S10-21` both deferred here. **Restart never clears
+persisted user pauses or serious blocks.**
+
+### 6. Operations — agreed
+
+**Manual start/stop initially.** Optional saved automation uses
+Europe/London; **08:00-22:00 remains a preferred window, not an
+implemented scheduler** (reaffirms `S1-04`'s established finding).
+**Total application/host outage detection requires an independent
+external watchdog** — nothing internal to the application can detect
+its own total failure. **Immediate Operations notification means
+immediate attempt plus durable recording, not guaranteed delivery
+during an outage.** Transient failures use configurable grace periods;
+incidents, escalation, and recovery are deduplicated — **numerical
+thresholds remain pending** (no number invented here). **Display/
+notification preferences apply immediately; strategy/account/
+execution changes require versioned activation** (this is the
+**configuration effective dates** topic — genuinely new, not covered
+by any prior session). **Existing positions retain their rules**
+(reaffirms `S8-06`/`S6-18` throughout).
+
+### Implementation authorization
+
+**None.** All new implementation authorization is explicitly **"Not
+authorized by this documentation task."** See `REQUIREMENTS_TRACKER.md`
+(`S11-01` through `S11-19`).
+
+### Validation performed this session
+
+Targeted, read-only code inspection found: no formal five-state
+account-readiness model (Checking/Ready/Managing/Paused/Stopped) or
+"Partially Ready" summary anywhere in `talonx_ops/` (targeted search,
+this session) — `Not implemented`. No `grace_period`/incident-
+deduplication mechanism and no external-watchdog concept were found in
+`talonx_ops/` either — `Not implemented`. This is **consistent with**,
+not contradicted by, the established `stop_stack()`/`_terminate()`
+mechanics (`talonx_ops/prospective/proc.py`, this project's EOD-
+closure history: bounded, ownership-verified, ordered shutdown) and
+`run_close()`'s existing reconciliation (`talonx_ops/prospective/
+close.py`) — those are real, working **mechanisms**; the **readiness-
+state/notification-guarantee/watchdog policy layer** on top of them is
+what this session newly agrees and what remains unbuilt.
+
+### Explicit deferrals
+
+None recorded as new deferrals this session — §1-6 are all agreed
+decisions. Numerical incident-threshold/grace-period values are
+explicitly **pending**, tracked as an open dependency of `S11-18`
+rather than a separate deferral entry (no destination session named by
+the discussion itself).
+
+### Findings tracked in `OPERATIONAL_FINDINGS.md`
+
+- **`OPS-016`** — no formal account-readiness state model or external
+  outage watchdog exists; `OPS-012`/`OPS-015`'s clearance mechanism
+  (this session's own §5) is the concrete design those two findings
+  were waiting on.
+
+`OPS-007`, `OPS-012`, `OPS-015` **remain `OPEN`** — this session
+defines their clearance policy but does not implement it.
+
+### Any separately authorized implementation work
+
+**None.**
+
+---
+
+## Session 12 — Research, Tuning and Promotion
+
+**Recorded**: 2026-09-17, approximately 10:22 UTC / 11:22 BST (same
+recording pass as Session 11 above). **Source**: the product-owner
+discussion supplied directly in this session's prompt. **Status:
+discussion closed; requirements documented, with explicit deferrals
+and implementation/validation separately tracked.**
+
+### Context
+
+This session grounds `S3-15`-`S3-20`'s research-lab workflow (agreed
+in Session 3 as a qualitative replay→shadow→review→promotion pipeline)
+in concrete governance: mandatory prior-research review, experiment
+registration, isolation, evidence discipline, comparison methodology,
+cost treatment, shadow-testing rules, and promotion/rollback
+authority.
+
+### 1. Prior Research Review — agreed, mandatory
+
+Before any new experiment or framework work: identify previous
+relevant experiments, versions, data, results, and limitations; state
+what failed or remained uncertain, what is materially different now,
+what question the new run resolves, and its stopping criteria/
+experiment budget. **Do not repeat a settled experiment without a
+documented reason.** Replication is allowed but **must be labelled as
+replication**. **Reuse existing research capabilities before proposing
+replacements** (`talonx_research/`, this project's Task 115/116
+infrastructure). **This documentation task does not itself claim to
+have completed an exhaustive research audit** — see Validation below
+for what was actually reviewed.
+
+### 2. Experiment registration — agreed
+
+Before evaluation: record hypothesis, fixed baseline, candidate
+version, data period/universe, isolated account, execution
+assumptions, and judgment criteria. **Systematic parameter testing is
+allowed; every variation and outcome is retained** (no silent
+survivorship, reaffirms `S6-17`'s "record explicit skip reasons"
+discipline extended to research). **The best setting's own tuning
+dataset must never be presented as independent validation** — this is
+the core in-sample/out-of-sample discipline (§4 below).
+
+### 3. Isolation — agreed
+
+Separate research balances, reservations, positions, and results.
+**Exclude research from primary totals; label "EXPERIMENTAL — INTERNAL
+ONLY"** (reaffirms `S6-19`'s dashboard-label requirement — confirmed
+this session, still absent). **Optional research bot OFF by default**
+(reaffirms `S3-21`/`S9-03`). Shared collection is permitted; **research
+must not starve primary operations.** **No primary strategy/account
+mutation through experiments** (reaffirms `S3-15`-`S3-20`'s isolation
+guarantee).
+
+### 4. Evidence — agreed
+
+Separate development/tuning data from **untouched** evaluation data.
+If results influence a revision, **disclose the reuse** and obtain
+**fresh** evaluation evidence before promotion. **Two-year historical
+data feasibility remains open** (reaffirms `S3-27`/`S5-31`, unresolved
+by this session). **No fixed universal trade count or observation
+duration is invented here.**
+
+### 5. Comparison — agreed
+
+Evaluate net performance, downside, frequency, concentration, evidence
+quality, and operational reliability. **Strategy View** = qualified
+opportunities and hypothetical outcomes. **Account View** = constrained
+paper results. **Neither establishes real-world alpha.** Verdicts:
+**Reject / Inconclusive / Eligible for promotion review.** **Historical
+acceptance permits shadow testing, not primary activation** — a
+two-stage gate, not one.
+
+### 6. Costs — agreed
+
+Define feed/reference, spread basis, slippage, fees, and adverse
+scenarios. **Apply costs once, before sizing and applicable admission
+checks** (reaffirms `S10-06`'s no-double-counting rule, extended to
+research evaluation). **Intraday RRR uses modeled entry price and
+frozen stop/target — this gate is not applied to V2's time-exit
+strategy** (reaffirms `S6-16`'s baseline finding and the general
+"do not generalize intraday rules to V2" discipline, `S8-05`).
+**Whole-share sizing must respect fee-inclusive allocation**
+(reaffirms `S10-07`/`OPS-014`). **Rerun each scenario chronologically**
+because costs can alter admissions, sizing, capacity, and later trades
+— **a flat final-P&L haircut is insufficient.** Baseline and candidate
+use **comparable declared assumptions**. **The discussion's example
+prices, $0.02/$0.03 adjustments, and $1 fees are illustrations only,
+not approved numerical settings** — numerical calibration remains
+deferred pending evidence.
+
+### 7. Shadow — agreed
+
+Freeze version and criteria **before** forward observation. Record
+actual evidence availability; **no retrospective admission** (reaffirms
+`S8-01`/`S8-02`). **Delayed Market Simulation remains explicitly
+distinct from prospective execution** (reaffirms `S6-15`/`S9-06`/
+`S9-14`). Predeclared duration/evidence requirements **cannot be
+shortened for early profits.** Safety failures may stop a run early.
+**Insufficient evidence remains Inconclusive** (never silently
+promoted). Shadow validates **observed operational/data behavior and
+simulated results — not real broker execution.** **Historical and
+shadow acceptance are separate mandatory gates** — passing one does
+not waive the other.
+
+### 8. Promotion and rollback — agreed
+
+**Explicit operator approval** records version, evidence, destination
+campaign/account, activation time, readiness, cost/data/risk settings,
+and rollback conditions. **Each admission belongs to exactly one
+version.** **Existing positions retain original rules; research
+profits are not transferred into a primary campaign** (reaffirms
+`S8-06`'s no-holding-clock-shift rule and `S6-18`'s frozen-rule-
+separation discipline). **Protective blocking may be automatic;
+strategy replacement is not.** **Rollback preserves trades and
+accounting history — never restores old cash snapshots or silently
+forces liquidation.** **Previous-version restoration requires explicit
+approval and readiness.** **Unsafe existing obligations require
+separately approved, auditable remediation** (links to `S11-14`'s
+account-clearance mechanism).
+
+### Implementation authorization
+
+**None.** All new implementation authorization is explicitly **"Not
+authorized by this documentation task."** See `REQUIREMENTS_TRACKER.md`
+(`S12-01` through `S12-22`).
+
+### Validation performed this session
+
+**What prior research was actually reviewed this session** (per §1's
+own mandatory-review requirement, applied honestly to this
+documentation task itself): the existing `talonx_research/` governance
+(`StrategyVersion`/`StrategyRegistry`, immutable, `docs/
+STRATEGY_LIFECYCLE.md` R1-R7) and its Task 115/116 replay-engine
+evidence were **re-confirmed present by name and prior-session
+citation, not re-read line-by-line this session** — this documentation
+task reused the established record (`S3-18`, `S6-14`'s Session-3
+evidence) rather than re-auditing the code fresh. A targeted search
+this session for "EXPERIMENTAL" in `dashboard_web_static/index.html`
+(re-run, matching `S6-19`'s original search) again found **no match**
+— confirming the "EXPERIMENTAL — INTERNAL ONLY" label remains absent.
+**Still awaiting review**: `talonx_research/`'s exact promotion-
+authority code path (whether any promotion mechanism exists at all
+beyond the immutable-registry pattern), and whether any past
+experiment's own evidence bundle already followed §1's mandatory
+prior-research-review discipline — **neither was traced this
+session.**
+
+### Explicit deferrals
+
+- **`S12-23`** — numerical execution-cost calibration (§6): feed/
+  reference, spread, slippage, fee, and adverse-scenario values.
+  **Reason**: needs its own bounded evaluation against evidence, not
+  the discussion's illustrative $0.02/$0.03/$1 numbers. **Planned
+  session**: this session **is** the destination named by earlier
+  deferrals (`S6-25`/`S8-25`/`S10-22`) — the numbers themselves remain
+  unresolved even having arrived here; no further session is assigned.
+  **Dependency**: `S6-25`, `S8-25`, `S10-22`.
+- **`S12-24`** — two-year historical data feasibility (reaffirms
+  `S3-27`/`S5-31`). **Reason**: unresolved, not addressed by this
+  session's governance discussion. **Planned session**: none assigned.
+  **Dependency**: `S5-31`.
+
+### Findings tracked in `OPERATIONAL_FINDINGS.md`
+
+No new distinct gap beyond what `S3-15`-`S3-20`'s existing evidence
+and `S6-19`'s dashboard-label finding already cover — this session's
+own requirements are new governance rules layered on that same,
+already-tracked foundation, not a newly discovered code behavior.
+
+### Any separately authorized implementation work
+
+**None.**
+
+---
+
+## Session 13 — Reconciliation and Implementation Planning (agenda only, not conducted)
+
+**Not yet conducted.** This is a **preparatory agenda**, not a
+decision record — nothing below is agreed, authorized, or resolved.
+Session 13 is the first session in this series whose own purpose is
+reconciliation and planning rather than a new product-discussion
+topic; `KNOWLEDGE_TRANSFER_PLAN.md`'s existing Session 13 title
+("Architecture, effective configuration and prioritized roadmap") is
+preserved unchanged — this agenda is offered as its concrete starting
+content, not a replacement title.
+
+**Agenda**:
+
+1. **Conflicts and open decisions** — the three explicitly unresolved
+   choices this session's own reconciliation pass did **not** silently
+   settle:
+   - Whether a materially changed strategy defaults to a **new
+     primary campaign** — **recommended by pattern (`S8`'s "existing
+     positions retain original rules," `S12`'s "each admission belongs
+     to exactly one version"), but not explicitly confirmed by the
+     owner** as the answer for every future case.
+   - Treatment of **already-admitted pending intents** during a
+     version cutover — not addressed by any session to date.
+   - Numerical execution costs (`S12-23`), incident thresholds
+     (`S11-18`), and experiment-specific evidence/success criteria
+     (`S12`'s own qualitative-only comparison framework) — all
+     explicitly deferred, no number invented anywhere in this
+     documentation layer.
+2. **Requirement-by-requirement implementation/evidence review** —
+   `REQUIREMENTS_TRACKER.md` now carries `S1`-`S12` (over 250
+   requirement entries); Session 13 should decide which, if any,
+   graduate from `Agreed`/`Partially implemented` to `Implementation
+   authorized`, in dependency order (see item 5).
+3. **Prior research findings and reuse** — `talonx_research/`'s
+   existing governance and Task 115/116 evidence must be the
+   **starting point**, not re-derived; `S12-01`'s mandatory-review
+   discipline applies to Session 13's own planning work, not only to
+   future strategy experiments.
+4. **First-release scope** — which product surfaces (Telegram
+   formatting, dashboard layout, account-readiness states, whole-share
+   sizing, etc.) constitute a coherent minimum first release, as
+   opposed to the full backlog across all 12 sessions.
+5. **Dependency-ordered implementation packages** — e.g. `OPS-012`/
+   `OPS-015`'s account-block enforcement depends on `S11`'s readiness-
+   state model existing first; `S9`'s message formatting depends on
+   `S7`'s materiality catalogue for company-development content
+   specifically.
+6. **Migration, cutover, acceptance, and authorization boundaries** —
+   `S3-23`'s conditional database-reset policy, `S12-19`'s promotion-
+   approval record, and `S11`'s controlled-shutdown/restart sequence
+   all need to be composed into one coherent operational runbook
+   before any of this backlog is implemented.
+
+**Explicitly kept separate** throughout this agenda: correctness work
+(fixing a demonstrated code defect), product-experience work
+(building an agreed-but-unbuilt requirement), and strategy-performance
+research (evaluating whether a strategy variant is actually good) —
+three different kinds of work with three different evidence standards,
+not to be planned as one undifferentiated backlog.
+
+**This agenda does not authorize, schedule, or imply readiness for any
+implementation** — it is a starting point for a future Session 13
+discussion, not a roadmap.

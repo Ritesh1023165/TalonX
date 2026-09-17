@@ -250,6 +250,49 @@ without naming which of these applies.
 | S10-23 | Deferred: cross-account hard concentration limits | Open — deferred | N/A | N/A | N/A |
 | S10-24 | Deferred: correlation-based admission gates | Open — deferred | N/A | N/A | N/A |
 | S10-25 | Deferred: concentration-warning thresholds | Open — deferred | N/A | N/A | N/A |
+| S11-01 | Pause Updates = dashboard refresh only | Agreed (sharpens S9-17) | Not authorized | Implemented (dashboard-refresh pause, Task 140) | Code inspection (established) |
+| S11-02 | Pause New Entries blocks admissions + atomically cancels unfilled intents; existing positions still managed | Agreed (sharpens S4-12/S9-17) | Not authorized | Not implemented | Code inspection (established, S4-12) |
+| S11-03 | Stop Application preserves state; deadlines continue offline; Resume = future admissions only, no resurrection | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S11-04 | Controlled shutdown: block admissions, finish/rollback transactions, persist state, report obligations, clean stop | Agreed | Not authorized | Partially implemented (stop_stack()/run_close() real for process/reconciliation; admission-blocking not wired) | Code inspection (established, EOD closure evidence) |
+| S11-05 | Manual shutdown w/ intraday positions needs explicit offline-risk warning; unattended shutdown aborts if policy unmet | Agreed | Not authorized | Not implemented | Code inspection (this session) |
+| S11-06 | Restart verifies ownership/identity, reconciles ledger, classifies obligations, assesses readiness, recovers notifications | Agreed | Not authorized | Partially implemented (ownership-verification and reconciliation real, established) | Code inspection (established) |
+| S11-07 | Restart gates restrict new admissions only, not data/collection/safe management | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S11-08 | V2 intent eligible for price recovery after market open; admission vs. price-recovery deadlines distinct | Agreed (sharpens S8-05) | Not authorized | Partially implemented (OPS-003, corrected 2026-09-16) | Code inspection (established) |
+| S11-09 | Evidence durably received by deadline may be processed later | Agreed (reaffirms S6-24/S8-05) | Not authorized | Not implemented (cross-cutting semantics, OPS-003) | Code inspection (established) |
+| S11-10 | V2 checks original target close before fall-forward | Agreed (reaffirms S8-09) | Not authorized (pre-existing) | Implemented | Code inspection (established, this session) |
+| S11-11 | Ambiguous deliveries preserved for investigation, never blindly resent/treated as confirmed-unsent | Agreed (sharpens S9-13) | Not authorized (pre-existing) | Implemented | Code inspection (established) |
+| S11-12 | Five account-readiness states (Checking/Ready/Managing/Paused/Stopped) | Agreed | Not authorized | Not implemented (OPS-016) | Code inspection (this session, targeted search) |
+| S11-13 | Truthful global "Partially Ready" summary allowed | Agreed | Not authorized | Not implemented (OPS-016) | Code inspection (this session) |
+| S11-14 | Transient blocks clear only when checks pass; readiness requires all prerequisites | Agreed | Not authorized | Not implemented (OPS-016) | Code inspection (this session) |
+| S11-15 | Serious issues (mismatch/deficit/unresolved-exit/identity-mismatch) require auditable resolution + explicit clearance; restart never clears persisted pauses/serious blocks | Agreed | Not authorized | Not implemented (OPS-012/OPS-015/OPS-016) | Code inspection (this session) |
+| S11-16 | Manual start/stop initially; optional Europe/London saved automation; 08:00-22:00 preferred not scheduled | Agreed (reaffirms S1-04) | Not authorized | Implemented (manual)/Not implemented (automation) | Code inspection (established) |
+| S11-17 | Total outage detection requires independent external watchdog | Agreed | Not authorized | Not implemented | Code inspection (this session, targeted search) |
+| S11-18 | Immediate notification = attempt + durable recording, not guaranteed delivery; grace periods/dedup; numerical thresholds pending | Agreed | Not authorized | Not implemented | Code inspection (this session) |
+| S11-19 | Display/notification prefs apply immediately; strategy/account/execution changes need versioned activation; existing positions retain rules | Agreed | Not authorized | Not assessed in this documentation pass (config-effective-dates topic is new) | Not assessed in this documentation pass |
+| S12-01 | Mandatory Prior Research Review before new experiments/framework work | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S12-02 | No repeat without documented reason; replication labelled; reuse existing capabilities; no exhaustive-audit claim | Agreed | Not authorized | Implemented (this documentation's own compliance) | Code inspection (this session, self-check) |
+| S12-03 | Experiment registration before evaluation (hypothesis/baseline/candidate/data/account/assumptions/criteria) | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S12-04 | Systematic parameter testing retains all variations; tuning data ≠ independent validation | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S12-05 | Research isolation; EXPERIMENTAL — INTERNAL ONLY label; research bot OFF by default | Agreed (reaffirms S6-19/S3-21) | Explicitly not authorized (bot) | Not implemented (label confirmed absent again this session) | Code inspection (this session, re-run search, no match) |
+| S12-06 | Shared collection permitted, must not starve primary; no primary mutation through experiments | Agreed (reaffirms S3-15-S3-20) | Not authorized | Implemented (isolation architecture, established) | Code inspection (established) |
+| S12-07 | Separate dev/tuning vs. untouched evaluation data; disclose reuse + fresh evidence before promotion | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S12-08 | 2-year data feasibility open; no invented fixed trade-count/duration | Open — deferred (reaffirms S3-27/S5-31, tracked as S12-24) | N/A | N/A | N/A |
+| S12-09 | Comparison dimensions: net performance/downside/frequency/concentration/evidence-quality/operational-reliability | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S12-10 | Strategy View vs. Account View; neither = real-world alpha | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S12-11 | Verdicts Reject/Inconclusive/Eligible-for-promotion-review; historical acceptance permits shadow only | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S12-12 | Define feed/reference/spread/slippage/fees/adverse scenarios; apply once before sizing/admission | Agreed (reaffirms S10-06) | Not authorized | Not implemented (numerical values deferred, S12-23) | Code inspection (established) |
+| S12-13 | Intraday RRR gate uses modeled entry+frozen stop/target, not applied to V2; whole-share sizing fee-inclusive | Agreed (reaffirms S6-16/S10-07) | Not authorized | Implemented (baseline RRR mechanism, S6-16); Not implemented (fee-inclusive sizing, OPS-014) | Code inspection (established) |
+| S12-14 | Rerun scenarios chronologically, not flat haircut; comparable baseline/candidate assumptions | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S12-15 | Example numbers illustrative only; numerical calibration deferred | Open — deferred (tracked as S12-23) | N/A | N/A | N/A |
+| S12-16 | Freeze version/criteria before shadow observation; record actual evidence availability; no retrospective admission | Agreed (reaffirms S8-01/S8-02) | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S12-17 | Predeclared duration/evidence can't shorten for early profits; safety failures may stop early; insufficient evidence = Inconclusive | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S12-18 | Shadow validates observed behavior not real broker execution; historical+shadow are separate mandatory gates | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S12-19 | Explicit promotion approval records version/evidence/destination/activation/readiness/settings/rollback conditions | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S12-20 | Existing positions retain original rules; research profits not transferred to primary | Agreed (reaffirms S8-06/S6-18) | Not authorized (pre-existing) | Implemented | Code inspection (established) |
+| S12-21 | Protective blocking automatic, strategy replacement not; rollback preserves history, never restores old cash/forces liquidation | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S12-22 | Previous-version restoration needs explicit approval+readiness; unsafe obligations need separately approved remediation | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
+| S12-23 | Deferred: numerical execution-cost calibration | Open — deferred | N/A | N/A | N/A |
+| S12-24 | Deferred: 2-year historical data feasibility (reaffirms S3-27/S5-31) | Open — deferred | N/A | N/A | N/A |
 
 ---
 
@@ -1705,6 +1748,20 @@ re-audited in full this pass. **Validation**: Code inspection (replay
 engine confirmed; live-shadow stage not assessed). **Dependencies**:
 `S3-16`/`S3-17` depend on this stage existing to be meaningful.
 
+**Session 12 update (2026-09-17, ~10:22 UTC) — full governance
+layer specified, still not fully assessed**: Session 12 fills in the
+governance this entry's four stages were always missing detail for —
+mandatory prior-research review (`S12-01`/`S12-02`), experiment
+registration (`S12-03`/`S12-04`), isolation specifics including the
+"EXPERIMENTAL — INTERNAL ONLY" label (`S12-05`, re-confirmed absent
+this session), cost treatment (`S12-12`-`S12-15`), shadow rules
+(`S12-16`-`S12-18`), and promotion/rollback authority (`S12-19`-
+`S12-22`). **This is a large batch of new, mostly `Not assessed`
+requirements layered on this entry's own established "replay stage
+real, live-shadow stage unconfirmed" finding** — none of them was
+individually traced against `talonx_research/`'s actual code this
+session; see each `S12-*` entry's own verdict.
+
 ## S3-16 — Equivalent comparison assumptions
 
 **Requirement**: historical baseline/candidate comparisons use
@@ -2135,6 +2192,16 @@ Updates"** (which only pauses screen refresh, never execution,
 established, real, tested dashboard-refresh-pause feature (Task 140
 evidence); Pause New Entries is this entry's own still-unimplemented
 V2 intent-cancellation feature. Verdict unchanged: `Not implemented`.
+
+**Session 11 update (2026-09-17, ~10:22 UTC) — codified as an
+operational control, still not implemented**: Session 11 §1 restates
+Pause New Entries' exact agreed effect — blocks admissions and
+atomically cancels unfilled intents, releasing reservations, while
+existing positions remain managed (`S11-02`) — and §3's "Stop
+Application" control is explicitly **broader**: it also preserves
+checkpoints and delivery states and keeps deadlines running offline
+(`S11-03`), which Pause New Entries alone does not claim to do. The
+two remain distinct controls. Verdict unchanged: `Not implemented`.
 
 ## S4-13 — EOD reports daily performance, open risk, unresolved obligations
 
@@ -3330,6 +3397,14 @@ with a runtime assert (`talonx_v2/config.py:34,88`); `add_sessions()`
 is calendar-based (non-trading days never increment). **Validation**:
 Code inspection (this session, exact lines). **Dependency**: none.
 
+**Session 12 update (2026-09-17, ~10:22 UTC) — reaffirmed for research
+promotion specifically**: Session 12 §8 explicitly reaffirms that
+existing positions retain their original rules through any future
+strategy promotion, and research profits are never transferred into a
+primary campaign (`S12-20`) — this is the same frozen-holding-clock
+principle this entry already establishes, extended to the
+promotion/versioning context. Verdict unchanged: `Implemented`.
+
 ## S8-07 — No stop-loss; no cluster-triggered additions; obligations survive pause/exclude/scope-removal
 
 **Decision**: Agreed (pre-existing). **Authorization**: Not
@@ -3835,3 +3910,299 @@ bounded-evaluation requirement. **Planned session**: none assigned.
 **Implementation**: N/A. **Validation**: N/A. **Reason**: same
 bounded-evaluation requirement; no numerical threshold invented.
 **Planned session**: none assigned. **Dependency**: `S10-23`, `S10-24`.
+
+---
+
+# Session 11 requirements (S11-01 through S11-19)
+
+Compact format, per `DECISION_LOG.md` Session 11, grouped 1–6.
+
+## S11-01 — Pause Updates = dashboard refresh only
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Implemented (Task 140 dashboard pause/resume).
+**Validation**: Code inspection (established). **Dependency**: none.
+
+## S11-02 — Pause New Entries blocks admissions + cancels intents
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented (`S4-12`). **Validation**: Code
+inspection (established). **Dependency**: `S4-12`.
+
+## S11-03 — Stop Application state preservation; Resume semantics
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — the
+`stop_stack()` mechanism preserves databases (established), but
+whether "Resume never resurrects a cancelled intent" holds was not
+traced (no cancel mechanism exists yet, `S11-02`). **Validation**: Not
+assessed in this documentation pass. **Dependency**: `S11-02`.
+
+## S11-04 — Controlled shutdown sequence
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — `stop_stack()`/
+`run_close()` (`talonx_ops/prospective/proc.py`, `close.py`,
+established EOD-closure evidence) genuinely persist state and stop
+processes cleanly; explicit admission-blocking-before-shutdown was not
+found as its own step. **Validation**: Code inspection (established).
+**Dependency**: none blocking.
+
+## S11-05 — Offline-risk warning; unattended-shutdown abort condition
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no such warning or abort
+condition was found. **Validation**: Code inspection (this session).
+**Dependency**: none blocking.
+
+## S11-06 — Restart verification sequence
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — ownership verification
+(startlock/PID registry, established EOD-closure evidence) and ledger
+reconciliation (`run_close()`) are real; obligation-classification and
+data-readiness assessment as explicit, separate restart steps were not
+individually confirmed. **Validation**: Code inspection (established).
+**Dependency**: none blocking.
+
+## S11-07 — Restart gates restrict admissions only
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass.
+**Validation**: Not assessed in this documentation pass. **Dependency**:
+`S11-06`.
+
+## S11-08 — V2 price-recovery vs. admission-deadline distinction
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Partially implemented — matches `S8-05`'s
+corrected verdict, `OPS-003`'s gates remain open. **Validation**: Code
+inspection (established). **Dependency**: `OPS-003`.
+
+## S11-09 — Durably-received-by-deadline evidence may process later
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented as a unified cross-cutting rule
+(`S6-24`'s own verdict). **Validation**: Code inspection (established).
+**Dependency**: `OPS-003`.
+
+## S11-10 — V2 checks target close before fall-forward
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing).
+**Implementation**: Implemented — `settle_due_exits()` tries
+`target_session` first, unconditionally, before any fall-forward loop
+(`S8-09`'s established evidence, `pipeline.py:152-153`). **Validation**:
+Code inspection (established). **Dependency**: none.
+
+## S11-11 — Ambiguous deliveries preserved, never blindly resent
+**Decision**: Agreed. **Authorization**: Not authorized (pre-existing).
+**Implementation**: Implemented — established `AMBIGUOUS` outbox
+contract (`S9-13`). **Validation**: Code inspection (established).
+**Dependency**: none.
+
+## S11-12 — Five account-readiness states
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — a targeted search of
+`talonx_ops/` this session found no matching state model.
+**Validation**: Code inspection (this session — `OPS-016`).
+**Dependency**: `OPS-016`.
+
+## S11-13 — Truthful "Partially Ready" global summary
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented (`OPS-016`). **Validation**: Code
+inspection (this session). **Dependency**: `S11-12`, `OPS-016`.
+
+## S11-14 — Transient-block clearance conditions
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented (`OPS-016`, no readiness model to
+clear against). **Validation**: Code inspection (this session).
+**Dependency**: `S11-12`, `OPS-016`.
+
+## S11-15 — Serious-block auditable clearance; restart never auto-clears
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — this is the clearance mechanism
+`OPS-012`/`OPS-015` both need; none exists yet. **Validation**: Code
+inspection (this session). **Dependency**: `OPS-012`, `OPS-015`,
+`OPS-016`.
+
+## S11-16 — Manual start/stop; optional Europe/London automation
+**Decision**: Agreed (reaffirms `S1-04`). **Authorization**: Not
+authorized. **Implementation**: Implemented (manual, established) /
+Not implemented (optional saved automation). **Validation**: Code
+inspection (established). **Dependency**: `S1-04`.
+
+## S11-17 — External watchdog required for total-outage detection
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no watchdog concept found this
+session. **Validation**: Code inspection (this session, targeted
+search). **Dependency**: none blocking.
+
+## S11-18 — Notification-attempt vs. delivery-guarantee; grace/dedup
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no grace-period or incident-
+dedup mechanism found this session. **Validation**: Code inspection
+(this session, targeted search). **Dependency**: none blocking;
+numerical thresholds explicitly pending.
+
+## S11-19 — Configuration effective dates; immediate vs. versioned changes
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — a
+genuinely new topic, not covered by any prior session's code
+inspection. **Validation**: Not assessed in this documentation pass.
+**Dependency**: `S12-19` (versioned promotion activation is the
+research-side analogue of this same idea).
+
+---
+
+# Session 12 requirements (S12-01 through S12-22, plus deferrals S12-23/S12-24)
+
+Compact format, per `DECISION_LOG.md` Session 12, grouped 1–8.
+
+## S12-01 — Mandatory Prior Research Review
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — whether
+past experiments (Task 107B/109/112R/115/116) documented this exact
+review discipline at the time was not re-traced. **Validation**: Not
+assessed in this documentation pass. **Dependency**: none blocking.
+
+## S12-02 — No repeat without reason; labelled replication; reuse; no audit-completeness claim
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Implemented (this documentation's own compliance
+— see Validation in `DECISION_LOG.md` Session 12 for exactly what was
+and was not reviewed). **Validation**: Code inspection (self-check).
+**Dependency**: none.
+
+## S12-03 — Experiment registration before evaluation
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass.
+**Validation**: Not assessed in this documentation pass. **Dependency**:
+none blocking.
+
+## S12-04 — Systematic testing retains all variations; no tuning-as-validation
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass.
+**Validation**: Not assessed in this documentation pass. **Dependency**:
+`S12-03`.
+
+## S12-05 — Research isolation label and research-bot default
+**Decision**: Agreed (reaffirms `S6-19`/`S3-21`). **Authorization**:
+Explicitly not authorized (bot). **Implementation**: Not implemented —
+re-ran the "EXPERIMENTAL" search in `dashboard_web_static/index.html`
+this session, still no match. **Validation**: Code inspection (this
+session, re-run of `S6-19`'s search). **Dependency**: `S6-19`.
+
+## S12-06 — Shared collection without starving primary; no primary mutation
+**Decision**: Agreed (reaffirms `S3-15`-`S3-20`). **Authorization**:
+Not authorized. **Implementation**: Implemented — the established
+physical-isolation architecture (`talonx_research/`'s refusal to touch
+`v2_lane.db`) satisfies the no-mutation half; the collection-sharing-
+without-starving half was not separately measured. **Validation**:
+Code inspection (established). **Dependency**: none.
+
+## S12-07 — Separate dev/tuning vs. untouched evaluation data
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass.
+**Validation**: Not assessed in this documentation pass. **Dependency**:
+`S12-24`.
+
+## S12-08 — 2-year feasibility open; no invented fixed count/duration
+**Decision**: Open — deferred (reaffirms `S3-27`/`S5-31`, tracked as
+`S12-24`). **Authorization**: N/A. **Implementation**: N/A.
+**Validation**: N/A. **Dependency**: `S12-24`.
+
+## S12-09 — Comparison dimensions
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass.
+**Validation**: Not assessed in this documentation pass. **Dependency**:
+none blocking.
+
+## S12-10 — Strategy View vs. Account View
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — whether
+this distinction exists anywhere in `talonx_research/`'s reporting was
+not traced. **Validation**: Not assessed in this documentation pass.
+**Dependency**: none blocking.
+
+## S12-11 — Verdict taxonomy; historical acceptance ≠ activation
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass.
+**Validation**: Not assessed in this documentation pass. **Dependency**:
+`S12-18`.
+
+## S12-12 — Cost definition and single-application rule
+**Decision**: Agreed (reaffirms `S10-06`). **Authorization**: Not
+authorized. **Implementation**: Not implemented — numerical values
+explicitly deferred (`S12-23`). **Validation**: Code inspection
+(established). **Dependency**: `S10-06`, `S12-23`.
+
+## S12-13 — Intraday RRR gate scope; fee-inclusive whole-share sizing
+**Decision**: Agreed (reaffirms `S6-16`/`S10-07`). **Authorization**:
+Not authorized. **Implementation**: Implemented (RRR-gate baseline
+mechanism exists and is correctly intraday-only, `S6-16`) / Not
+implemented (fee-inclusive whole-share sizing, `OPS-014`).
+**Validation**: Code inspection (established). **Dependency**: `S6-16`,
+`OPS-014`.
+
+## S12-14 — Chronological cost rerun, not a flat haircut
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass.
+**Validation**: Not assessed in this documentation pass. **Dependency**:
+`S12-23`.
+
+## S12-15 — Illustrative numbers only; calibration deferred
+**Decision**: Open — deferred (tracked as `S12-23`). **Authorization**:
+N/A. **Implementation**: N/A. **Validation**: N/A. **Dependency**:
+`S12-23`.
+
+## S12-16 — Freeze-before-observation; no retrospective admission
+**Decision**: Agreed (reaffirms `S8-01`/`S8-02`). **Authorization**:
+Not authorized. **Implementation**: Not assessed in this documentation
+pass for the research-shadow context specifically (V2's own live
+admission timing is `Implemented`, `S8-01`; the research-shadow
+analogue was not traced). **Validation**: Not assessed in this
+documentation pass. **Dependency**: `S8-01`.
+
+## S12-17 — Predeclared criteria cannot shorten; Inconclusive on insufficient evidence
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass.
+**Validation**: Not assessed in this documentation pass. **Dependency**:
+none blocking.
+
+## S12-18 — Shadow scope; historical+shadow separate mandatory gates
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass.
+**Validation**: Not assessed in this documentation pass. **Dependency**:
+none blocking.
+
+## S12-19 — Explicit promotion-approval record
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass — whether
+any promotion mechanism exists in `talonx_research/` beyond the
+immutable-registry pattern was not traced this session. **Validation**:
+Not assessed in this documentation pass. **Dependency**: `S3-18`.
+
+## S12-20 — Existing positions retain original rules; no profit transfer
+**Decision**: Agreed (reaffirms `S8-06`/`S6-18`). **Authorization**:
+Not authorized (pre-existing). **Implementation**: Implemented.
+**Validation**: Code inspection (established). **Dependency**: `S8-06`.
+
+## S12-21 — Automatic protective blocking vs. non-automatic replacement; rollback preserves history
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass.
+**Validation**: Not assessed in this documentation pass. **Dependency**:
+`S12-19`.
+
+## S12-22 — Version-restoration approval; auditable remediation for unsafe obligations
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not assessed in this documentation pass.
+**Validation**: Not assessed in this documentation pass. **Dependency**:
+`S11-15` (same clearance mechanism).
+
+## S12-23 — Deferred: numerical execution-cost calibration
+**Requirement**: exact feed/reference/spread/slippage/fee/adverse-
+scenario values (§6). **Decision**: Open — deferred. **Authorization**:
+N/A. **Implementation**: N/A. **Validation**: N/A. **Reason**: the
+discussion's own example numbers are explicitly illustrative, not
+approved; needs bounded evaluation against evidence. **Planned
+session**: none further assigned — this session was itself the
+previously-named destination (`S6-25`/`S8-25`/`S10-22`) and still
+leaves the numbers unresolved. **Dependency**: `S6-25`, `S8-25`,
+`S10-22`.
+
+## S12-24 — Deferred: two-year historical data feasibility
+**Requirement**: data availability/granularity/point-in-time universe/
+corporate actions/licensing (reaffirms `S3-27`/`S5-31`). **Decision**:
+Open — deferred. **Authorization**: N/A. **Implementation**: N/A.
+**Validation**: N/A. **Reason**: unresolved, not addressed by this
+session's governance discussion. **Planned session**: none assigned.
+**Dependency**: `S5-31`.

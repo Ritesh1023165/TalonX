@@ -818,6 +818,17 @@ check present).
 
 **Related**: `REQUIREMENTS_TRACKER.md` `S8-13`, `S8-17`, `S8-18`.
 
+**Session 11 update (2026-09-17, ~10:22 UTC) — clearance policy
+defined, not implemented**: Session 11 §5 defines the exact clearance
+policy this finding was waiting on — `EXIT_UNRESOLVED` is exactly the
+"terminal unresolved exit" category requiring auditable resolution and
+explicit operator clearance (`S11-15`), and restart must never
+auto-clear it (`S11-15`). **This session still does not implement the
+gate** — the release mechanism above remains the correct future fix.
+Tracked jointly under `OPS-016` (the missing readiness-state model
+this clearance policy would run inside) without merging the two
+findings.
+
 ---
 
 ## OPS-013 — Telegram lifecycle-message-formatting and delivery-consolidation gap
@@ -929,6 +940,51 @@ mechanism (explicitly assigned to Session 11, not decided here).
 
 **Related**: `REQUIREMENTS_TRACKER.md` `S10-20`, `S10-21`; `OPS-012`
 (the analogous V2-specific finding).
+
+**Session 11 update (2026-09-17, ~10:22 UTC) — clearance policy
+defined, not implemented**: Session 11 §5 names "ledger mismatches"
+explicitly as one of the four serious-block categories requiring
+auditable resolution and explicit operator clearance (`S11-15`) — the
+same policy `OPS-012` received, now also covering this finding's own
+trigger. Still not implemented; tracked alongside `OPS-016`.
+
+---
+
+## OPS-016 — No account-readiness state model or external outage watchdog
+
+**Status**: `OPEN` — agreed target design exists (Session 11 §5/§6);
+no implementation.
+
+**Found**: Session 11 documentation pass (2026-09-17), via targeted
+search of `talonx_ops/`.
+
+**Finding**: no code in `talonx_ops/` implements the agreed five-state
+account-readiness model (Checking and recovering / Ready / Managing
+positions — new entries blocked / Paused by user / Stopped, `S11-12`),
+a truthful "Partially Ready" global summary (`S11-13`), or an
+independent external watchdog for total application/host outage
+detection (`S11-17`) — a targeted search for `grace_period`,
+incident-deduplication, and watchdog-related terms across `talonx_ops/`
+found no matches. This is the **missing policy layer** that `OPS-012`'s
+and `OPS-015`'s own clearance mechanisms (Session 11 §5, `S11-15`)
+would need to run inside — those two findings' underlying detection is
+real; this finding is about the **presentation/enforcement layer**
+that would consume that detection and gate admissions on it.
+
+**Future corrective work — NOT IMPLEMENTED here**: design and
+implement the five-state model as an explicit, queryable account
+status; implement the "Partially Ready" global summary; implement a
+transient-block-clears-when-checks-pass mechanism; implement the
+serious-block auditable-clearance workflow that `OPS-012`/`OPS-015`
+would both plug into; stand up (or integrate with) an external
+watchdog process, since nothing internal to the application can
+observe its own total failure.
+
+**Evidence references**: targeted repository-wide search, this
+session (no matches in `talonx_ops/` for the cited concepts).
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S11-12` through `S11-15`,
+`S11-17`, `S11-18`; `OPS-012`, `OPS-015`.
 
 ---
 
