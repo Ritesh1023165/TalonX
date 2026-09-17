@@ -120,7 +120,9 @@ def test_overview_active_v2_carries_the_new_fields(tmp_path):
     ov = dr.overview()
     v2 = ov["active_v2"]
     assert "error" not in v2
-    assert v2["v2_fingerprint"] == "11107198c5b81237"
+    from talonx_ops.prospective import V2_FINGERPRINT_EXPECTED
+    # RI-1: was a hardcoded stale "11107198c5b81237" literal.
+    assert v2["v2_fingerprint"] == V2_FINGERPRINT_EXPECTED
     assert v2["candidate_pricing"] is True and v2["pricing_mode"] == "composite-yf"
     assert v2["pricing_state"] == "DEGRADED"                  # independent of an open position
     assert v2["coverage_state"] in ("INCOMPLETE_COVERAGE", "DATA_STALE", "DATA_UNAVAILABLE")

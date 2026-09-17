@@ -35,8 +35,19 @@ _INTRADAY_METHOD = (
     "NO validated intraday edge (Task 94 ALPHA_DISCOVERY_NO_CANDIDATE_PASSED / "
     "Task 95A INTRADAY_ALPHA_NOT_SUPPORTED). Assessments are informational."
 )
+def _v2_fingerprint_display() -> str:
+    # RI-1: read the live constant rather than duplicating a literal that
+    # would silently go stale the next time it's legitimately updated
+    # (exactly the anti-pattern Task 137 fixed for V1_FINGERPRINT_EXPECTED).
+    try:
+        from talonx_ops.prospective import V2_FINGERPRINT_EXPECTED
+        return V2_FINGERPRINT_EXPECTED
+    except Exception:  # noqa: BLE001
+        return "e2acf6454789217e"
+
+
 _MULTIDAY_METHOD = (
-    "INSIDER_BUY_CLUSTER_V2@1 (fp 11107198c5b81237) -- the one PAPER_CANDIDATE. "
+    f"INSIDER_BUY_CLUSTER_V2@1 (fp {_v2_fingerprint_display()}) -- the one PAPER_CANDIDATE. "
     "Event-driven: only fires when >=2 distinct insiders file SEC code-P open-market "
     "purchases in the issuer within 10 trading days. 10-trading-day hold. Descriptive, "
     "not a profit claim."

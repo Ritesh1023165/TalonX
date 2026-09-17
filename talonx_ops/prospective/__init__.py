@@ -19,7 +19,32 @@ or reseeds ``v2_lane.db`` -- fails closed on ledger-integrity problems.
 from __future__ import annotations
 
 RELEASE_SHA_EXPECTED = "0d52e7c"  # Task 117 final activation release
-V2_FINGERPRINT_EXPECTED = "11107198c5b81237"
+V2_FINGERPRINT_EXPECTED = "e2acf6454789217e"
+# RI-1 (V2 Release Integration Task RI-1): updated from "11107198c5b81237".
+# `talonx_v2/config.py` -- one of the 5 files this fingerprint covers -- gained
+# two new fields, `campaign_id`/`execution_mode` (default "V2"/"PAPER",
+# reproducing the existing production campaign's identity exactly): account/
+# operational identity, the SAME category as the already-present, already-
+# NOT-frozen `starting_cash_usd`/`per_position_allocation_usd` fields just
+# above them (see that field's own docstring: "operational, NOT a research
+# lever"). Neither new field is asserted by `V2Config.validate_frozen()`, and
+# neither appears in `v2_release_fingerprint()`'s own hashed `cfg` dict (only
+# the STRATEGY-semantic fields are individually hashed there) -- confirmed
+# unchanged, byte-for-byte, before and after this edit:
+#   cluster_window_trading_days=10, min_distinct_owners=2, transaction_code=
+#   'P', direction='BULLISH', entry_offset_sessions=1, hold_trading_days=10,
+#   stop_loss_enabled=False, max_concurrent_positions=20,
+#   reentry_cooldown_trading_days=5, liquidity_lookback_sessions=20,
+#   liquidity_min_median_dollar_volume=5000000.0, liquidity_min_close=5.0,
+#   exit_fallforward_max_sessions=5, max_entry_staleness_sessions=3.
+# Only the FILE'S OWN BYTES changed (two new dataclass fields added), which
+# this fingerprint also hashes directly (`_STRATEGY_FILES` includes
+# `config.py` in full) -- an intentional, disclosed, non-strategy change,
+# exactly the same class of update Task 137 already made to
+# `V1_FINGERPRINT_EXPECTED` below (a legitimate, already-authorized change to
+# a fingerprinted file, confined to non-gating/non-entry/non-scoring
+# concerns). Recomputed directly via
+# `research/scripts/task112_v2_release_fingerprint.py`, not guessed.
 # Task 137: updated from the stale "2ae6216bca70". Investigated a reported
 # mismatch (get_strategy_version() read "2dea67a6f6d2" against this
 # constant) with a full per-file comparison across the baseline commit

@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from talonx_ops.prospective import CAMPAIGN_STARTING_CASH
+from talonx_ops.prospective.campaign_cash import authoritative_starting_cash
 
 ADMIN_RECOVERY_NOTE = (
     "If ledger integrity genuinely fails: STOP.  Do NOT let the operator create a new "
@@ -111,7 +111,11 @@ def check_ledger_continuity(db_path: str | Path) -> LedgerCheck:
         # sanity: cash cannot exceed starting + realized gains beyond reason
         realized = con.execute(
             "SELECT COALESCE(SUM(realized_pnl_usd),0) FROM positions WHERE status='CLOSED'").fetchone()[0] or 0.0
-        expected_cash_if_flat = CAMPAIGN_STARTING_CASH + realized
+        # RI-1 (RI1-C): the campaign's own authoritative persisted starting
+        # cash, not a single hardcoded constant -- see that function's own
+        # docstring for the full fallback-precedence rationale.
+        starting_cash = authoritative_starting_cash(con)
+        expected_cash_if_flat = starting_cash + realized
         open_cost = con.execute(
             "SELECT COALESCE(SUM(position_cost),0) FROM positions WHERE status='OPEN'").fetchone()[0] or 0.0
         # Package 1 Settlement Integrity (bounded correction, found during
@@ -127,7 +131,7 @@ def check_ledger_continuity(db_path: str | Path) -> LedgerCheck:
         if r.cash is not None and abs((r.cash + open_cost + unresolved_cost) - expected_cash_if_flat) > 1.0:
             r.problems.append(
                 f"cash accounting mismatch: cash({r.cash:.2f}) + open_cost({open_cost:.2f}) + "
-                f"unresolved_cost({unresolved_cost:.2f}) != start({CAMPAIGN_STARTING_CASH:.2f}) "
+                f"unresolved_cost({unresolved_cost:.2f}) != start({starting_cash:.2f}) "
                 f"+ realized({realized:.2f})")
 
         if not r.stale_skipped_episodes:

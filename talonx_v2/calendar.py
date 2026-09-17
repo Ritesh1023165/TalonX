@@ -128,3 +128,35 @@ def trading_days_elapsed(entry_session: date | datetime | str, as_of: date | dat
     ia = session_ordinal(a, anchor_forward=True)
     ib = session_ordinal(b, anchor_forward=False)
     return max(0, ib - ia)
+
+
+def recovery_deadline_session(eligible_entry_session: date, max_entry_staleness_sessions: int) -> date:
+    """Package 3 P3-D: Session 3 under the product's own 1-indexed
+    counting (target entry session = Session 1) -- the SINGLE, unified
+    recovery-deadline boundary. Extracted (RI-1) from
+    ``V2Service._recovery_deadline_session`` so both the live tick and
+    a cutover classification (``talonx_v2.cutover``) use the identical
+    calculation -- never two divergent copies."""
+    return add_sessions(eligible_entry_session, max(0, max_entry_staleness_sessions - 1))
+
+
+def recovery_deadline_passed(eligible_entry_session: date, *, max_entry_staleness_sessions: int,
+                             ripe_through: date, live: bool) -> bool:
+    """True once the recovery window has genuinely closed. Extracted
+    (RI-1) from ``V2Service._recovery_deadline_passed`` -- identical
+    behavior, now reusable outside a running service (e.g. cutover
+    classification, which has no live tick loop of its own).
+
+    LIVE: compares the real wall clock against Session 3's own ACTUAL
+    official close timestamp (``session_close_utc`` -- honors early
+    closes). Deadline passed only once now() is STRICTLY AFTER that
+    close ("at or before the deadline qualifies", S6-24).
+
+    Non-live: date-only, passed once ``ripe_through`` is STRICTLY AFTER
+    the deadline session -- a pure function of static inputs, consults
+    no process-uptime or last-run state."""
+    deadline_session = recovery_deadline_session(eligible_entry_session, max_entry_staleness_sessions)
+    if live:
+        deadline_close = session_close_utc(deadline_session)
+        return datetime.now(timezone.utc) > deadline_close
+    return ripe_through > deadline_session

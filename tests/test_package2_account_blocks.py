@@ -362,7 +362,10 @@ def test_clear_block_ledger_mismatch_allows_after_a_fresh_reconcile_passes(tmp_p
     bid = store.record_account_block(reason_type=account_blocks.REASON_LEDGER_MISMATCH,
                                      reference="cash_plus_open_cost_reconciles", detail="")
     monkeypatch.setattr(close_mod, "V2_DB_PATH", str(db))
-    monkeypatch.setattr(close_mod, "CAMPAIGN_STARTING_CASH", 300_000.0)
+    # RI-1: this store's own `campaign.starting_cash_usd` is already
+    # authoritatively 300_000.0 (seeded at creation, matching the
+    # constructor call above) -- the fresh reconcile passes on that
+    # basis alone; no CAMPAIGN_STARTING_CASH patch is load-bearing here.
 
     result = clearance.clear_block(str(db), "V2", block_id=bid, operator_id="ops1",
                                    reason="verified fixed", evidence_ref="recon-check")
@@ -378,8 +381,17 @@ def test_clear_block_ledger_mismatch_refuses_while_reconcile_still_fails(tmp_pat
     bid = store.record_account_block(reason_type=account_blocks.REASON_LEDGER_MISMATCH,
                                      reference="cash_plus_open_cost_reconciles", detail="")
     monkeypatch.setattr(close_mod, "V2_DB_PATH", str(db))
-    # a starting-cash mismatch that keeps the fresh re-check FAILing
-    monkeypatch.setattr(close_mod, "CAMPAIGN_STARTING_CASH", 999_999.0)
+    # RI-1: a wrong CAMPAIGN_STARTING_CASH patch is no longer sufficient
+    # to force a mismatch -- this store's own `campaign.starting_cash_usd`
+    # (seeded at creation, authoritative) correctly reports 300_000.0
+    # regardless of that fallback constant's value (RI1-C's whole point:
+    # the persisted campaign record wins). Force a GENUINE mismatch
+    # directly, the same way test_package4_sizing_accounting.py's own
+    # P4-H tests already corrupt raw ledger data.
+    import sqlite3
+    with sqlite3.connect(str(db)) as raw:
+        raw.execute("UPDATE portfolio SET cash = cash - 12345.0 WHERE id=1")
+        raw.commit()
 
     result = clearance.clear_block(str(db), "V2", block_id=bid, operator_id="ops1",
                                    reason="attempting", evidence_ref="recon-check")

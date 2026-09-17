@@ -89,6 +89,46 @@ CREATE TABLE IF NOT EXISTS portfolio (
     id      INTEGER PRIMARY KEY CHECK (id = 1),
     cash    REAL NOT NULL
 );
+-- RI-1 (V2 Release Integration Task RI-1): the canonical campaign identity
+-- record -- ONE row per ledger file (same one-account-per-file model
+-- `portfolio` and `V2_ACCOUNT_ID` already use), written EXACTLY ONCE at
+-- first creation (see V2Store._init below), NEVER rewritten afterward.
+-- Distinct from `portfolio.cash` (the MUTABLE live balance): this table is
+-- the IMMUTABLE-after-creation identity + capitalization-authority record.
+-- `starting_cash_usd` is the ACTUAL amount this campaign was seeded with
+-- (authoritative for reconciliation) -- NULL only for a pre-RI-1 legacy
+-- ledger file being opened for the first time under RI-1 code, whose true
+-- historical seed amount cannot be safely reconstructed from the current
+-- (already-traded) `portfolio.cash` balance (see cutover/legacy notes in
+-- docs/research/evidence/v2_release_integration_ri1/README.md) -- never
+-- fabricated. `config_fingerprint` LINKS to (does not equal) campaign
+-- identity -- see that same evidence doc for the explicit distinction.
+CREATE TABLE IF NOT EXISTS campaign (
+    id                        INTEGER PRIMARY KEY CHECK (id = 1),
+    campaign_id               TEXT NOT NULL,
+    strategy                  TEXT NOT NULL,
+    strategy_version          TEXT NOT NULL,
+    execution_mode            TEXT NOT NULL,
+    starting_cash_usd         REAL,
+    per_position_allocation_usd REAL,
+    config_fingerprint        TEXT,
+    provenance                TEXT NOT NULL,   -- SEEDED_AT_CREATION | LEGACY_MIGRATED
+    created_at_utc            TEXT NOT NULL
+);
+-- RI-1: durable, append-only audit record of every cutover classification
+-- run against this ledger's PENDING intents (RI1-D/E) -- NOT itself the
+-- source of idempotency (mark_entry_intent's own `WHERE status='PENDING'`
+-- guard is), but the auditable "what happened, when" record RI1-L needs.
+CREATE TABLE IF NOT EXISTS campaign_cutover_log (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    cutover_id        TEXT NOT NULL,
+    executed_at_utc   TEXT NOT NULL,
+    as_of_session     TEXT NOT NULL,
+    cancelled_count   INTEGER NOT NULL,
+    retained_count    INTEGER NOT NULL,
+    expired_count     INTEGER NOT NULL,
+    detail_json       TEXT NOT NULL
+);
 -- Task 117 overnight: a durable, idempotent PRE-OPEN entry intent.  It is
 -- created when a cluster fires and its eligible entry session has NOT started,
 -- so an actionable alert can be sent BEFORE that session's open.  It carries NO
@@ -165,9 +205,24 @@ def _utcnow() -> str:
 
 class V2Store:
     def __init__(self, path: str = "v2_lane.db", starting_cash: float = 100_000.0,
-                 busy_timeout_ms: int = 30_000):
+                 busy_timeout_ms: int = 30_000, *,
+                 campaign_id: str = V2_ACCOUNT_ID, strategy: str = "INSIDER_BUY_CLUSTER_V2",
+                 strategy_version: str = "INSIDER_BUY_CLUSTER_V2@1", execution_mode: str = "PAPER",
+                 per_position_allocation_usd: float | None = None, config_fingerprint: str | None = None):
         self.path = path
         self._starting_cash = starting_cash
+        # RI-1: campaign identity, threaded through to _init()'s seed-once
+        # write below. Defaults reproduce the EXISTING, single, pre-RI-1
+        # account's identity exactly (campaign_id == V2_ACCOUNT_ID == "V2")
+        # -- opening the existing production v2_lane.db with no explicit
+        # override is a complete no-op change vs pre-RI-1 behavior.
+        self._campaign_id = campaign_id
+        self._strategy = strategy
+        self._strategy_version = strategy_version
+        self._execution_mode = execution_mode
+        self._per_position_allocation_usd = per_position_allocation_usd
+        self._config_fingerprint = config_fingerprint
+        self.account_id = campaign_id
         # how long a connection waits for a contended SQLite write lock
         # (PRAGMA busy_timeout, applied to every connection this store
         # opens) before raising sqlite3.OperationalError -- the "bounded"
@@ -324,8 +379,39 @@ class V2Store:
             if trade_cols and "fee" not in trade_cols:
                 c.execute("ALTER TABLE trades ADD COLUMN fee REAL")
             row = c.execute("SELECT cash FROM portfolio WHERE id=1").fetchone()
+            portfolio_was_fresh = row is None
             if row is None:
                 c.execute("INSERT INTO portfolio (id, cash) VALUES (1, ?)", (self._starting_cash,))
+            # RI-1: seed the campaign identity record EXACTLY ONCE, the
+            # SAME instant portfolio's own seed-once check runs (same
+            # connection, same transaction -- both commit together or
+            # neither does). A genuinely fresh ledger file (portfolio row
+            # ALSO just created, above) is a NEW campaign: starting_cash_usd
+            # is the actual amount just seeded, provenance SEEDED_AT_
+            # CREATION. A ledger file that ALREADY had a portfolio row (this
+            # V2Store build is opening it for the first time, but the file
+            # itself predates RI-1) is a LEGACY campaign: starting_cash_usd
+            # is left NULL -- the current `cash` balance already reflects
+            # realized trading P&L, so the ORIGINAL seed amount cannot be
+            # safely reconstructed from it alone (RI1-K: never fabricate
+            # historical provenance). A caller migrating a KNOWN legacy
+            # ledger with an independently-documented true starting amount
+            # (e.g. the existing production account's own recorded
+            # CAMPAIGN_STARTING_CASH) may backfill it explicitly via
+            # `set_legacy_starting_cash()` below -- never inferred silently.
+            camp_row = c.execute("SELECT campaign_id FROM campaign WHERE id=1").fetchone()
+            if camp_row is None:
+                c.execute(
+                    """INSERT INTO campaign
+                       (id, campaign_id, strategy, strategy_version, execution_mode,
+                        starting_cash_usd, per_position_allocation_usd, config_fingerprint,
+                        provenance, created_at_utc)
+                       VALUES (1,?,?,?,?,?,?,?,?,?)""",
+                    (self._campaign_id, self._strategy, self._strategy_version, self._execution_mode,
+                     self._starting_cash if portfolio_was_fresh else None,
+                     self._per_position_allocation_usd, self._config_fingerprint,
+                     "SEEDED_AT_CREATION" if portfolio_was_fresh else "LEGACY_MIGRATED", _utcnow()),
+                )
             # Task 131 Directive 2: WAL is already requested on every connection
             # (``_conn`` above); this is a one-time, loud verification that the
             # filesystem/driver actually honoured it, rather than silently
@@ -348,6 +434,71 @@ class V2Store:
     def set_cash(self, v: float) -> None:
         with self._conn() as c:
             c.execute("UPDATE portfolio SET cash=? WHERE id=1", (v,))
+
+    # ---- campaign identity (RI-1) ----
+    def campaign_identity(self) -> dict:
+        """The immutable-after-creation campaign record. Always present
+        after ``_init()`` -- every V2Store (new or pre-RI-1 legacy) gets
+        exactly one row, seeded exactly once."""
+        with self._conn() as c:
+            r = c.execute("SELECT * FROM campaign WHERE id=1").fetchone()
+            return dict(r)
+
+    def campaign_starting_cash(self) -> float | None:
+        """The AUTHORITATIVE starting-cash figure for this campaign, for
+        reconciliation (RI1-C). None only for a legacy ledger whose true
+        historical seed amount was never durably recorded before RI-1 and
+        has not been explicitly backfilled -- callers (e.g.
+        ``talonx_ops.prospective``) must fall back to their own
+        previously-hardcoded constant in that case, never guess."""
+        with self._conn() as c:
+            r = c.execute("SELECT starting_cash_usd FROM campaign WHERE id=1").fetchone()
+            return float(r["starting_cash_usd"]) if r and r["starting_cash_usd"] is not None else None
+
+    def set_legacy_starting_cash(self, amount: float, *, evidence_ref: str) -> None:
+        """Explicit, evidence-cited, ONE-TIME backfill for a LEGACY
+        campaign's true historical starting cash (RI1-K) -- refuses to
+        overwrite a value that is already known (SEEDED_AT_CREATION, or
+        an already-backfilled legacy row), so this can never silently
+        rewrite a real number. ``evidence_ref`` is recorded in
+        `provenance` for audit (e.g. a citation to the specific
+        documented constant/decision this value came from) -- this
+        method NEVER infers the amount itself."""
+        with self._conn() as c:
+            row = c.execute("SELECT provenance, starting_cash_usd FROM campaign WHERE id=1").fetchone()
+            if row is None:
+                raise RuntimeError("campaign row missing -- V2Store not initialized")
+            if row["provenance"] != "LEGACY_MIGRATED" or row["starting_cash_usd"] is not None:
+                raise RuntimeError(
+                    "refusing to overwrite an already-known campaign starting_cash_usd "
+                    f"(provenance={row['provenance']!r}, starting_cash_usd={row['starting_cash_usd']!r})")
+            c.execute(
+                "UPDATE campaign SET starting_cash_usd=?, provenance=? WHERE id=1",
+                (amount, f"LEGACY_MIGRATED_BACKFILLED:{evidence_ref}"),
+            )
+
+    def record_cutover(self, *, cutover_id: str, as_of_session: date, cancelled_count: int,
+                       retained_count: int, expired_count: int, detail: dict) -> None:
+        """Durable, append-only audit record of one cutover classification
+        run (``talonx_v2.cutover``) against THIS campaign's PENDING
+        intents. Not itself the source of idempotency (``mark_entry_
+        intent``'s own guard is) -- purely the auditable "what happened,
+        when" trail RI1-L needs. Appends one row per call, including
+        repeat/duplicate invocations."""
+        with self._conn() as c:
+            c.execute(
+                """INSERT INTO campaign_cutover_log
+                   (cutover_id, executed_at_utc, as_of_session, cancelled_count,
+                    retained_count, expired_count, detail_json)
+                   VALUES (?,?,?,?,?,?,?)""",
+                (cutover_id, _utcnow(), as_of_session.isoformat(), cancelled_count,
+                 retained_count, expired_count, json.dumps(detail)),
+            )
+
+    def cutover_log(self) -> list[dict]:
+        with self._conn() as c:
+            return [dict(r) for r in c.execute(
+                "SELECT * FROM campaign_cutover_log ORDER BY id")]
 
     # ---- episode idempotency ----
     def episode_seen(self, episode_id: str) -> bool:
@@ -473,7 +624,7 @@ class V2Store:
             if c.execute("SELECT status FROM positions WHERE position_id=?",
                          (position_id,)).fetchone()["status"] == "EXIT_UNRESOLVED":
                 account_blocks.record_block(
-                    c, account_id=V2_ACCOUNT_ID, reason_type=account_blocks.REASON_EXIT_UNRESOLVED,
+                    c, account_id=self.account_id, reason_type=account_blocks.REASON_EXIT_UNRESOLVED,
                     reference=str(position_id), detail=detail)
 
     def unresolved_positions(self) -> list[dict]:
@@ -542,18 +693,18 @@ class V2Store:
         the serialized gate)."""
         from talonx_ops import account_blocks
         with self._conn() as c:
-            return account_blocks.blocked_reason(c, V2_ACCOUNT_ID)
+            return account_blocks.blocked_reason(c, self.account_id)
 
     def active_account_blocks(self) -> list[dict]:
         from talonx_ops import account_blocks
         with self._conn() as c:
-            return [b.__dict__ for b in account_blocks.active_blocks(c, V2_ACCOUNT_ID)]
+            return [b.__dict__ for b in account_blocks.active_blocks(c, self.account_id)]
 
     def record_account_block(self, *, reason_type: str, reference: str, detail: str = "") -> str:
         from talonx_ops import account_blocks
         with self.transaction() as c:
             return account_blocks.record_block(
-                c, account_id=V2_ACCOUNT_ID, reason_type=reason_type,
+                c, account_id=self.account_id, reason_type=reason_type,
                 reference=reference, detail=detail)
 
     def attempt_block_clearance(self, *, block_id: str, operator_id: str, reason: str,

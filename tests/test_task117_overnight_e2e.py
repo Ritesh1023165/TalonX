@@ -186,7 +186,9 @@ def test_p6_full_isolated_product_journey(tmp_path, monkeypatch):
         "spa_n_open_at_hold": 1,
         "external_messages_sent": 0,   # RecordingTransport is not a network
     }
-    assert corr["strategy_fingerprint_before"] == corr["strategy_fingerprint_after"] == "11107198c5b81237"
+    from talonx_ops.prospective import V2_FINGERPRINT_EXPECTED
+    # RI-1: was a hardcoded stale "11107198c5b81237" literal.
+    assert corr["strategy_fingerprint_before"] == corr["strategy_fingerprint_after"] == V2_FINGERPRINT_EXPECTED
     # every outbox row for this episode links back to it
     for o in s.all_outbox():
         assert o["episode_id"] == episode_id

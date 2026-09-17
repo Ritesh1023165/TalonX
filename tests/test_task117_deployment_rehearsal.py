@@ -224,7 +224,11 @@ def test_bounded_controlled_deployment_rehearsal(tmp_path, monkeypatch):
         "entry_session": closed["entry_session"], "exit_session": closed["exit_session"],
         "realized_pnl_usd": realized, "telegram_messages_actually_sent": 0,
     }
-    assert corr["fingerprint_before"] == corr["fingerprint_after"] == "11107198c5b81237"
+    from talonx_ops.prospective import V2_FINGERPRINT_EXPECTED
+    # RI-1: was a hardcoded stale "11107198c5b81237" literal; now references
+    # the live constant (updated when config.py gained campaign_id/
+    # execution_mode -- see that constant's own comment).
+    assert corr["fingerprint_before"] == corr["fingerprint_after"] == V2_FINGERPRINT_EXPECTED
     for o in s.all_outbox():
         assert o["episode_id"] == episode_id
     (tmp_path / "rehearsal_correlation.json").write_text(json.dumps(corr, indent=2, default=str))

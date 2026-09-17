@@ -468,7 +468,11 @@ def test_p4h_non_whole_share_position_triggers_ledger_mismatch_block(tmp_path, m
         raw.commit()
 
     monkeypatch.setattr(close_mod, "V2_DB_PATH", str(db))
-    monkeypatch.setattr(close_mod, "CAMPAIGN_STARTING_CASH", BALANCE)
+    # RI-1: this store's own `campaign.starting_cash_usd` is already
+    # authoritatively BALANCE (seeded at creation) -- this patch is
+    # belt-and-suspenders, not load-bearing.
+    import talonx_ops.prospective.campaign_cash as campaign_cash_mod
+    monkeypatch.setattr(campaign_cash_mod, "CAMPAIGN_STARTING_CASH", BALANCE)
     rec, asserts, findings = close_mod._v2_reconcile()
     assert asserts["whole_share_positions"] == "FAIL"
 
@@ -493,7 +497,11 @@ def test_p4h_invalid_cost_basis_triggers_ledger_mismatch_block(tmp_path, monkeyp
         raw.commit()
 
     monkeypatch.setattr(close_mod, "V2_DB_PATH", str(db))
-    monkeypatch.setattr(close_mod, "CAMPAIGN_STARTING_CASH", BALANCE)
+    # RI-1: this store's own `campaign.starting_cash_usd` is already
+    # authoritatively BALANCE (seeded at creation) -- this patch is
+    # belt-and-suspenders, not load-bearing.
+    import talonx_ops.prospective.campaign_cash as campaign_cash_mod
+    monkeypatch.setattr(campaign_cash_mod, "CAMPAIGN_STARTING_CASH", BALANCE)
     rec, asserts, findings = close_mod._v2_reconcile()
     assert asserts["positive_finite_position_cost"] == "FAIL"
 
@@ -510,7 +518,11 @@ def test_p4h_healthy_ledger_produces_no_invariant_blocks(tmp_path, monkeypatch):
     assert outcome.entered
 
     monkeypatch.setattr(close_mod, "V2_DB_PATH", str(db))
-    monkeypatch.setattr(close_mod, "CAMPAIGN_STARTING_CASH", BALANCE)
+    # RI-1: this store's own `campaign.starting_cash_usd` is already
+    # authoritatively BALANCE (seeded at creation) -- this patch is
+    # belt-and-suspenders, not load-bearing.
+    import talonx_ops.prospective.campaign_cash as campaign_cash_mod
+    monkeypatch.setattr(campaign_cash_mod, "CAMPAIGN_STARTING_CASH", BALANCE)
     rec, asserts, findings = close_mod._v2_reconcile()
     assert asserts["whole_share_positions"] == "PASS"
     assert asserts["positive_finite_position_cost"] == "PASS"

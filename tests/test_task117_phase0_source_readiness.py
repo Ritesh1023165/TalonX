@@ -110,7 +110,9 @@ def test_s1_dashboard_splits_db_read_from_upstream_poll(tmp_path, monkeypatch):
     assert r["source_poll_last_ok_utc"] is None          # no intel ledger -> distinct, not conflated
     assert r["coverage"]["completeness"] == "INCOMPLETE"
     assert "UNKNOWN" in r["coverage"]["eligible_universe_denominator"]
-    assert r["v2_fingerprint_frozen"] == "11107198c5b81237"
+    from talonx_ops.prospective import V2_FINGERPRINT_EXPECTED
+    # RI-1: was a hardcoded stale "11107198c5b81237" literal.
+    assert r["v2_fingerprint_frozen"] == V2_FINGERPRINT_EXPECTED
 
 
 # --------------------------------------------------------------------------- S6

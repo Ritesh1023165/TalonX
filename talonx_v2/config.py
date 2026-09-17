@@ -63,6 +63,19 @@ class V2Config:
     )
     friction_bps: float = 20.0                 # research primary friction (reporting only)
 
+    # --- campaign identity (RI-1, operational -- NOT a research lever,
+    # same treatment as starting_cash_usd/per_position_allocation_usd
+    # above: distinguishes WHICH economic paper-capital lifecycle a trade
+    # belongs to, never the strategy's own semantics). Default "V2"
+    # reproduces the existing, single, pre-RI-1 production campaign's
+    # identity exactly -- opening it with no override is a no-op.
+    campaign_id: str = field(
+        default_factory=lambda: os.environ.get("TALONX_V2_CAMPAIGN_ID", "V2")
+    )
+    execution_mode: str = field(
+        default_factory=lambda: os.environ.get("TALONX_V2_EXECUTION_MODE", "PAPER")
+    )
+
     # --- live operational guard (NOT strategy semantics) ---
     # the frozen rule is "enter at the OPEN of the first session strictly
     # after the cluster fires".  If the live service is started cold with a

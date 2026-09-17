@@ -411,11 +411,17 @@ def test_task114_does_not_change_fingerprints():
     # 5 fingerprinted files is confirmed, distinct from a stale value
     # silently drifting out of sync with a second hardcoded copy here.
     from talonx_backtest.reproducibility import get_strategy_version
-    from talonx_ops.prospective import V1_FINGERPRINT_EXPECTED
+    from talonx_ops.prospective import V1_FINGERPRINT_EXPECTED, V2_FINGERPRINT_EXPECTED
     assert get_strategy_version() == V1_FINGERPRINT_EXPECTED
     import importlib
     fp = importlib.import_module("research.scripts.task112_v2_release_fingerprint").v2_release_fingerprint()
-    assert fp["fingerprint"] == "11107198c5b81237"
+    # RI-1: was a hardcoded "11107198c5b81237" literal -- exactly the stale-
+    # duplicate anti-pattern this test's own docstring warns about for V1,
+    # now fixed the same way: assert against the live constant (updated,
+    # with full justification, when config.py gained the campaign_id/
+    # execution_mode account-identity fields -- see that constant's own
+    # comment in talonx_ops/prospective/__init__.py).
+    assert fp["fingerprint"] == V2_FINGERPRINT_EXPECTED
     assert fp["strategy_version"] == "INSIDER_BUY_CLUSTER_V2@1"
 
 

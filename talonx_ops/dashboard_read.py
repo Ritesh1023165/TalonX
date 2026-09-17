@@ -1115,7 +1115,7 @@ class DashboardReadModel:
         try:
             from talonx_ops.prospective import V2_FINGERPRINT_EXPECTED as _V2FP
         except Exception:  # noqa: BLE001
-            _V2FP = "11107198c5b81237"
+            _V2FP = "e2acf6454789217e"  # RI-1: fallback kept in sync with the live constant
         readiness = {
             "form4_source_configured": svc_status.get("form4_source"),
             "form4_source_actual": src.get("actual"),

@@ -59,7 +59,18 @@ def v2_release_fingerprint() -> dict:
     digest.update(V2_VERSION.encode())
     for p in _STRATEGY_FILES:
         try:
-            digest.update(p.read_bytes())
+            # RI-1: LF-normalize before hashing -- the SAME fix Task 137
+            # already applied to get_strategy_version() (V1's fingerprint)
+            # for the identical defect: a working tree that materializes
+            # these files with CRLF (Windows `core.autocrlf`) previously
+            # produced a DIFFERENT fingerprint than the LF blobs actually
+            # committed to git, so the same content could hash differently
+            # depending purely on line-ending churn (confirmed directly
+            # during RI-1 via a git stash/pop roundtrip, which alone
+            # shifted this fingerprint with zero real content change). A
+            # genuine content change is still fully detected; only the
+            # line-ending REPRESENTATION stops being significant.
+            digest.update(p.read_bytes().replace(b"\r\n", b"\n"))
         except OSError:
             digest.update(b"MISSING:" + str(p).encode())
 

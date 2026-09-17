@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from talonx_ops.prospective import CAMPAIGN_STARTING_CASH
+from talonx_ops.prospective.campaign_cash import authoritative_starting_cash
 from talonx_ops.prospective.checkpoint import capture, eod_state
 from talonx_ops.prospective.paths import V2_DB_PATH, V2_STATUS_PATH, atomic_write, now_pair
 
@@ -44,6 +44,7 @@ def _v2_reconcile() -> tuple[dict[str, Any], dict[str, str], list[str]]:
     try:
         cash = con.execute("SELECT cash FROM portfolio WHERE id=1").fetchone()
         cash = None if cash is None else float(cash[0])
+        starting_cash = authoritative_starting_cash(con)
         buys = con.execute("SELECT COUNT(*) FROM trades WHERE action='BUY'").fetchone()[0]
         sells = con.execute("SELECT COUNT(*) FROM trades WHERE action='SELL'").fetchone()[0]
         n_open = con.execute("SELECT COUNT(*) FROM positions WHERE status='OPEN'").fetchone()[0]
@@ -85,7 +86,7 @@ def _v2_reconcile() -> tuple[dict[str, Any], dict[str, str], list[str]]:
            "closed": int(n_closed), "exit_unresolved": int(n_unres),
            "realized_pnl_usd": round(realized, 2), "open_cost_usd": round(open_cost, 2),
            "exit_unresolved_cost_usd": round(unresolved_cost, 2),
-           "starting_cash": CAMPAIGN_STARTING_CASH}
+           "starting_cash": starting_cash}
 
     def _a(name, ok, why=""):
         asserts[name] = "PASS" if ok else "FAIL"
@@ -96,9 +97,9 @@ def _v2_reconcile() -> tuple[dict[str, Any], dict[str, str], list[str]]:
        f"{buys} != {sells}+{n_open}+{n_unres}")
     _a("cash_plus_open_cost_reconciles",
        cash is not None and
-       abs((cash + open_cost + unresolved_cost) - (CAMPAIGN_STARTING_CASH + realized)) <= 1.0,
+       abs((cash + open_cost + unresolved_cost) - (starting_cash + realized)) <= 1.0,
        f"cash {cash} + open_cost {open_cost} + unresolved_cost {unresolved_cost} != "
-       f"{CAMPAIGN_STARTING_CASH} + realized {realized}")
+       f"{starting_cash} + realized {realized}")
     _a("no_negative_cash", cash is not None and cash >= 0, f"cash {cash}")
     _a("whole_share_positions", not non_whole,
        str([(d[0], d[1]) for d in non_whole]))

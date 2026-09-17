@@ -119,8 +119,7 @@ def enter_position(
         # read is explicitly NOT sufficient (Package 2's own requirement)
         # -- this is the one check that actually blocks the mutation.
         from talonx_ops import account_blocks
-        from talonx_v2.store import V2_ACCOUNT_ID
-        br = account_blocks.blocked_reason(c, V2_ACCOUNT_ID)
+        br = account_blocks.blocked_reason(c, store.account_id)
         if br is not None:
             return _skip(f"ACCOUNT_BLOCKED:{br}")
 

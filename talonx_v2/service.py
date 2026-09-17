@@ -25,7 +25,8 @@ from pathlib import Path
 
 from talonx_v2 import form4_source, paper, pipeline
 from talonx_v2.calendar import (add_sessions, is_session, next_session_on_or_after,
-                                next_session_strictly_after, session_close_utc)
+                                next_session_strictly_after, recovery_deadline_session,
+                                session_close_utc)
 from talonx_v2.config import V2_VERSION, V2Config
 from talonx_v2.profile import active_profile
 from talonx_v2.schemas import V2Action
@@ -72,7 +73,10 @@ class V2Service:
                  broad_discovery_symbols: list[str] | None = None):
         self.cfg = config
         self.cfg.validate_frozen()
-        self.store = V2Store(config.db_path, starting_cash=config.starting_cash_usd)
+        self.store = V2Store(config.db_path, starting_cash=config.starting_cash_usd,
+                            campaign_id=config.campaign_id, execution_mode=config.execution_mode,
+                            strategy_version=V2_VERSION,
+                            per_position_allocation_usd=config.per_position_allocation_usd)
         self.bar_dirs = bar_dirs
         # EXECUTION SCOPE ENFORCEMENT (Task 117 final activation).  When set, ONLY
         # issuers whose symbol is in this allowlist are considered for a cluster /
@@ -689,9 +693,12 @@ class V2Service:
         own proactive pre-fill check below. Replaces the two previously
         -divergent computations OPS-003 Finding B documented (a
         4-session general admission gate vs. a 3-session reactive-only
-        missing-price release deadline)."""
-        return add_sessions(eligible_entry_session,
-                            max(0, self.cfg.max_entry_staleness_sessions - 1))
+        missing-price release deadline).
+
+        RI-1: delegates to ``calendar.recovery_deadline_session`` (the
+        SAME calculation, extracted so ``talonx_v2.cutover`` can reuse
+        it without a running service) -- behavior unchanged."""
+        return recovery_deadline_session(eligible_entry_session, self.cfg.max_entry_staleness_sessions)
 
     def _recovery_deadline_passed(self, eligible_entry_session: date, *,
                                   ripe_through: date, live: bool) -> bool:
@@ -699,19 +706,27 @@ class V2Service:
 
         LIVE: compares the real wall clock against Session 3's own
         ACTUAL official close timestamp (`calendar.session_close_utc`
-        -- correctly honors early closes, never approximated as
-        midnight UTC/local or a fixed hour offset). "At or before the
-        deadline qualifies" (Session 6 Section I / `S6-24`'s agreed
-        equality semantics) -- the deadline is passed only once now()
-        is STRICTLY AFTER that close.
+        -- correctly honors early closes). "At or before the deadline
+        qualifies" (Session 6 Section I / `S6-24`) -- passed only once
+        now() is STRICTLY AFTER that close.
 
-        Non-live (replay/backtest/dry-run): no real wall clock exists
-        to compare against -- the boundary is date-only, passed once
-        `ripe_through` is STRICTLY AFTER the deadline session. This
-        preserves the existing, already-correct restart-independent
-        replay semantics (a pure function of the episode's fixed
-        `eligible_entry_session` and the calendar's static session
-        list -- consults no process-uptime or last-run state)."""
+        Non-live: date-only, passed once `ripe_through` is STRICTLY
+        AFTER the deadline session -- a pure function of static inputs.
+
+        RI-1: the deadline-SESSION calculation delegates to
+        ``calendar.recovery_deadline_session`` (shared with
+        ``talonx_v2.cutover``, which has no running service/tick loop
+        of its own). The live-mode wall-clock read stays HERE, in this
+        module's own namespace, deliberately NOT extracted -- existing
+        tests (`test_package3_pricing_timing.py`) monkeypatch
+        ``service_module.datetime`` to freeze it; moving the read into
+        `calendar.py` would silently stop honoring that patch. A
+        second, self-contained copy of this same live/non-live
+        comparison lives in `calendar.recovery_deadline_passed` for
+        non-service callers (cutover) -- the DEADLINE-SESSION
+        computation (the part with real logic) is still shared; only
+        this trivial 3-line wall-clock comparison is duplicated, and
+        only for test-patchability."""
         deadline_session = self._recovery_deadline_session(eligible_entry_session)
         if live:
             deadline_close = session_close_utc(deadline_session)
@@ -857,8 +872,7 @@ class V2Service:
                     # stale sweep above, untouched), or open-position
                     # exits (_phase_close/settle_due_exits, untouched).
                     from talonx_ops import account_blocks
-                    from talonx_v2.store import V2_ACCOUNT_ID
-                    block_reason = account_blocks.blocked_reason(c, V2_ACCOUNT_ID)
+                    block_reason = account_blocks.blocked_reason(c, self.store.account_id)
                     if block_reason is not None:
                         self.store.record_disposition(
                             episode_id=e.episode_id, symbol=e.symbol,

@@ -249,13 +249,18 @@ def test_unresolved_position_never_produces_complete_cash_only_equity(tmp_path):
 
 
 def test_reconciliation_does_not_fabricate_a_cash_loss_for_unresolved(tmp_path, monkeypatch):
+    import talonx_ops.prospective.campaign_cash as campaign_cash_mod
     import talonx_ops.prospective.close as close_mod
 
     store, cfg, pos = _entered(tmp_path, cash=300_000.0)
     store.mark_exit_unresolved(pos["position_id"], detail="no bar found")
 
     monkeypatch.setattr(close_mod, "V2_DB_PATH", str(tmp_path / "v.db"))
-    monkeypatch.setattr(close_mod, "CAMPAIGN_STARTING_CASH", 300_000.0)
+    # RI-1: the fallback constant now lives in campaign_cash.py (only
+    # consulted when the ledger's own `campaign.starting_cash_usd` is
+    # unset -- this test's V2Store already seeds it to 300_000.0 at
+    # creation, so this patch is belt-and-suspenders, not load-bearing).
+    monkeypatch.setattr(campaign_cash_mod, "CAMPAIGN_STARTING_CASH", 300_000.0)
 
     rec, asserts, findings = close_mod._v2_reconcile()
     assert asserts["cash_plus_open_cost_reconciles"] == "PASS", (

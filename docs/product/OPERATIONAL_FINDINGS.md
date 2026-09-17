@@ -1489,6 +1489,114 @@ capital-flow trace).
 
 ---
 
+## OPS-023 — V2 release fingerprint was not line-ending-normalized (found and closed same session, RI-1)
+
+**Status**: FOUND AND FIXED (V2 Release Integration Task RI-1).
+
+**Finding**: `research/scripts/task112_v2_release_fingerprint.py`'s
+`v2_release_fingerprint()` hashed each of its 5 `_STRATEGY_FILES`' raw
+bytes directly (`digest.update(p.read_bytes())`), with no line-ending
+normalization — the EXACT class of defect Task 137 already found and
+fixed for `V1_FINGERPRINT_EXPECTED`/`get_strategy_version()`
+(`talonx_backtest/reproducibility.py`), but the fix was never mirrored
+onto V2's own fingerprint function. Confirmed directly during RI-1 (not
+hypothesized): a plain `git stash` / `git stash pop` roundtrip on this
+working tree — zero real content change — shifted the computed V2
+fingerprint THREE different ways across three re-computations, purely
+from CRLF/LF representation churn. The historically recorded
+`V2_FINGERPRINT_EXPECTED = "11107198c5b81237"` was itself unreproducible
+from a clean checkout of `c752af0` in this environment before this fix.
+
+**Fix**: `v2_release_fingerprint()` now hashes
+`p.read_bytes().replace(b"\r\n", b"\n")` for every strategy file — the
+identical technique already used by `get_strategy_version()` and by
+`tests/test_task65b_protected_fingerprints.py`'s other two frozen-
+candidate fingerprints. A genuine content change is still fully
+detected; only the line-ending REPRESENTATION stops being significant.
+
+**Separately, and NOT to be confused with this fix**: `V2_FINGERPRINT_
+EXPECTED` was ALSO updated (`"11107198c5b81237"` → `"e2acf6454789217e"`)
+for an unrelated, deliberate, disclosed reason — RI-1 added `campaign_id`/
+`execution_mode` fields to `talonx_v2/config.py` (one of the 5
+fingerprinted files), changing its bytes. Every individually-hashed
+STRATEGY value (`cluster_window_trading_days`, `min_distinct_owners`,
+`transaction_code`, `direction`, `entry_offset_sessions`,
+`hold_trading_days`, `stop_loss_enabled`, `max_concurrent_positions`,
+`reentry_cooldown_trading_days`, `liquidity_lookback_sessions`,
+`liquidity_min_median_dollar_volume`, `liquidity_min_close`,
+`exit_fallforward_max_sessions`, `max_entry_staleness_sessions`) was
+directly re-verified byte-for-byte unchanged before and after.
+
+**Verification**: `research/scripts/task112_v2_release_fingerprint.py`
+re-run after a deliberate stash/pop roundtrip, confirmed stable at
+`e2acf6454789217e` both times. `tests/test_task114_prospective.py`
+(`test_b1_preflight_fingerprints_are_expected`,
+`test_task114_does_not_change_fingerprints`), `tests/
+test_task117_deployment_rehearsal.py`, `tests/test_task117_overnight_e2e.py`,
+`tests/test_task117_phase0_source_readiness.py`, `tests/
+test_task117_spa_states.py` — all updated to assert against the live
+`V2_FINGERPRINT_EXPECTED` constant rather than a duplicated hardcoded
+literal (several already had this exact stale-duplicate defect,
+independent of RI-1's own change).
+
+**Evidence references**: `docs/research/evidence/
+v2_release_integration_ri1/README.md`.
+
+**Related**: mirrors Task 137's `V1_FINGERPRINT_EXPECTED` fix exactly;
+not itself a strategy-semantics change.
+
+---
+
+## OPS-024 — Campaign starting-cash had two disconnected sources of truth (found and closed same session, RI-1)
+
+**Status**: FOUND AND FIXED (V2 Release Integration Task RI-1).
+
+**Finding**: `talonx_v2.config.V2Config.starting_cash_usd` (env
+`TALONX_V2_STARTING_CASH_USD`, default $100,000 — the actual mechanism
+that seeds `V2Store`'s `portfolio.cash` row exactly once at first
+creation) and `talonx_ops.prospective.CAMPAIGN_STARTING_CASH` (a
+separate hardcoded module constant, $300,000 — used by `close.py`'s
+`_v2_reconcile()` and `ledger_guard.py`'s `check_ledger_continuity()` to
+compute "expected cash if flat") were two INDEPENDENT numbers for what
+should be the same concept. They happened to agree for the one existing
+production campaign only because an operator manually set both the env
+var and the constant to $300,000 at Task 112/113's own deployment. A
+second campaign created with the new $100,000 default would have
+produced a false `LEDGER_MISMATCH` (or masked a real one) in every
+reconciliation, since the constant would still say $300,000.
+
+**Fix**: `talonx_v2/store.py` gained a new `campaign` table (RI1-B) —
+an immutable-after-creation identity + capitalization record, seeded
+exactly once (`SEEDED_AT_CREATION` for a genuinely fresh ledger,
+`LEGACY_MIGRATED` with `starting_cash_usd=NULL` — never fabricated —
+for a ledger file that predates RI-1). New shared resolver
+`talonx_ops/prospective/campaign_cash.py::authoritative_starting_cash()`
+prefers this persisted, campaign-specific value; falls back to the
+pre-RI-1 `CAMPAIGN_STARTING_CASH` constant ONLY when the campaign row is
+absent or its `starting_cash_usd` is still NULL — preserving the
+EXISTING production campaign's reconciliation behavior byte-for-byte
+without requiring any migration.
+
+**Verification**: `tests/test_ri1_campaign_identity.py` (RI1-C, RI1-K
+sections). `tests/test_package1_settlement_integrity.py`, `tests/
+test_package2_account_blocks.py`, `tests/test_package4_sizing_accounting.py`
+re-run clean after their own `CAMPAIGN_STARTING_CASH` monkeypatches were
+retargeted to the new resolver module (one test —
+`test_clear_block_ledger_mismatch_refuses_while_reconcile_still_fails`
+— redesigned to inject a genuine ledger-data mismatch directly, since a
+wrong `CAMPAIGN_STARTING_CASH` patch is no longer sufficient to fool a
+reconciliation that now correctly reads the real persisted amount
+first).
+
+**Evidence references**: `docs/research/evidence/
+v2_release_integration_ri1/README.md`.
+
+**Related**: `S13-08` (material-version cutover rules), Package 4
+(`OPS-014`, sizing/allocation mechanics this campaign record also
+carries for audit).
+
+---
+
 *See `REQUIREMENTS_TRACKER.md` for product-requirement tracking,
 `DECISION_LOG.md` for the session-by-session product-owner record, and
 `docs/research/TALONX_RESEARCH_LEDGER.md` for the research/validation

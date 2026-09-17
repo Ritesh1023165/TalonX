@@ -43,7 +43,7 @@ except ImportError:  # pragma: no cover
     pass
 
 from talonx_v2 import form4_source, pipeline
-from talonx_v2.config import V2Config
+from talonx_v2.config import V2_VERSION, V2Config
 from talonx_v2.store import V2Store
 
 
@@ -143,7 +143,9 @@ def main(argv: list[str] | None = None) -> int:
 
     cfg = V2Config(db_path=args.db)
     cfg.validate_frozen()
-    store = V2Store(args.db, starting_cash=cfg.starting_cash_usd)
+    store = V2Store(args.db, starting_cash=cfg.starting_cash_usd,
+                    campaign_id=cfg.campaign_id, execution_mode=cfg.execution_mode,
+                    strategy_version=V2_VERSION, per_position_allocation_usd=cfg.per_position_allocation_usd)
 
     if args.mode == "recover":
         summary = pipeline.paper.recover(store, as_of_session=date.today())
