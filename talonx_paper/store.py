@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -208,6 +209,17 @@ class PaperTradingStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.path, check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")
+        # Package 2 acceptance A4: a genuinely competing writer (another
+        # process, or another PaperTradingStore instance in this same
+        # process -- this store's own threading.Lock only protects
+        # against contention on the SAME Python object) must WAIT for a
+        # held write lock rather than fail instantly. Without this, a
+        # connection with an implicit busy_timeout of 0 would raise
+        # "database is locked" the instant it contended with
+        # ``lock()``'s own explicit BEGIN IMMEDIATE below, rather than
+        # correctly serializing behind it -- matching V2Store's own
+        # existing default (`busy_timeout_ms=30_000`).
+        self._conn.execute("PRAGMA busy_timeout=30000")
         self._conn.executescript(_SCHEMA)
         self._migrate()
         self._conn.commit()
@@ -427,6 +439,25 @@ class PaperTradingStore:
             current_cash = self._conn.execute(
                 "SELECT current_cash FROM portfolio_state WHERE id = 1"
             ).fetchone()[0]
+            # Package 2 acceptance A2: the store must never trust a
+            # caller-supplied cost blindly (the same posture the
+            # account-block check above already established) -- a
+            # caller-side sizing bug, a stale/raced pre-check, or a
+            # future call site that skips sizing entirely could
+            # otherwise debit past available cash. Capping HERE, not
+            # merely at the caller (consumer.py's own calculate_buy
+            # sizing), is what makes a later CASH_DEFICIT detector's
+            # "current_cash < 0" invariant actually reliable rather
+            # than incidentally true.
+            if cost > current_cash + 1e-6:
+                self._conn.execute(
+                    "INSERT INTO ignored_decisions (ticker, reason, triggering_action, price, horizon, timestamp) "
+                    "VALUES (?, ?, ?, ?, 'intraday', ?)",
+                    (ticker, f"INSUFFICIENT_CASH_AT_EXECUTION:cost={cost:.2f}:cash={current_cash:.2f}",
+                     AlertAction.CONFIRMED_BULLISH.value, price, timestamp.isoformat()),
+                )
+                self._conn.commit()
+                return None
             new_cash = current_cash - cost
             self._conn.execute("UPDATE portfolio_state SET current_cash = ? WHERE id = 1", (new_cash,))
             self._conn.execute(
@@ -587,6 +618,38 @@ class PaperTradingStore:
         from talonx_ops import account_blocks
         with self._lock:
             return account_blocks.clearance_history(self._conn, block_id)
+
+    @contextmanager
+    def lock(self):
+        """Package 2 acceptance A4: lets a caller compose SEVERAL
+        operations -- e.g. a fresh clearance re-verification read
+        followed by the clearance write itself -- as one atomic unit,
+        so nothing else can commit a mutation in between.
+
+        Two layers, both needed: ``self._lock`` (a ``threading.Lock``)
+        serializes against another call on THIS SAME Python instance
+        (matching every other write method here); a real SQL
+        ``BEGIN IMMEDIATE`` additionally acquires SQLite's own
+        exclusive write lock on the FILE ITSELF the instant this
+        context opens -- so a genuinely SEPARATE ``PaperTradingStore``
+        instance (the live trading engine's own long-lived instance,
+        another process, or a second CLI invocation) attempting any
+        write of its own during this window correctly WAITS (up to
+        ``busy_timeout``, set in ``__init__``) rather than racing in.
+        This is what actually closes the A4 race for Original -- a
+        Python-level lock alone does not, since ``clearance.clear_
+        block`` constructs its own fresh store instance rather than
+        reusing any existing one.
+
+        Yields the live connection; the caller does the final
+        ``COMMIT``/``ROLLBACK`` on it."""
+        with self._lock:
+            self._conn.execute("BEGIN IMMEDIATE")
+            try:
+                yield self._conn
+            except Exception:
+                self._conn.execute("ROLLBACK")
+                raise
 
     def record_ignored(
         self, ticker: str, reason: str, triggering_action, price: float, timestamp: datetime,
@@ -752,6 +815,17 @@ class PaperTradingStore:
             current_cash = self._conn.execute(
                 "SELECT current_cash FROM long_term_portfolio_state WHERE id = 1"
             ).fetchone()[0]
+            # Package 2 acceptance A2: see the identical guard/rationale
+            # in execute_buy above.
+            if cost > current_cash + 1e-6:
+                self._conn.execute(
+                    "INSERT INTO ignored_decisions (ticker, reason, triggering_action, price, horizon, timestamp) "
+                    "VALUES (?, ?, ?, ?, 'long_term', ?)",
+                    (ticker, f"INSUFFICIENT_CASH_AT_EXECUTION:cost={cost:.2f}:cash={current_cash:.2f}",
+                     AlertAction.HIGH_CONVICTION_BUY.value, price, timestamp.isoformat()),
+                )
+                self._conn.commit()
+                return None
             new_cash = current_cash - cost
             self._conn.execute(
                 "UPDATE long_term_portfolio_state SET current_cash = ? WHERE id = 1", (new_cash,)
@@ -788,9 +862,27 @@ class PaperTradingStore:
         cost basis -- returns None if there's no open position for this
         ticker (defensive; the DCA loop only ever iterates currently-open
         positions, but the store never trusts a caller to have gotten
-        that right, same posture execute_sell already takes)."""
+        that right, same posture execute_sell already takes).
+
+        Package 2 acceptance A2/A1: a DCA contribution commits NEW
+        economic exposure into an existing position -- the same
+        category the account-block gate already covers for a fresh
+        BUY, and a gap this acceptance review found this function was
+        still missing entirely. Also caps the debit against current
+        cash (see the identical guard/rationale in execute_buy)."""
+        from talonx_ops import account_blocks
         ticker = ticker.upper()
         with self._lock:
+            br = account_blocks.blocked_reason(self._conn, ORIGINAL_LONGTERM_ACCOUNT_ID)
+            if br is not None:
+                self._conn.execute(
+                    "INSERT INTO ignored_decisions (ticker, reason, triggering_action, price, horizon, timestamp) "
+                    "VALUES (?, ?, ?, ?, 'long_term', ?)",
+                    (ticker, f"ACCOUNT_BLOCKED:{br}", AlertAction.DCA_CONTRIBUTION.value,
+                     price, timestamp.isoformat()),
+                )
+                self._conn.commit()
+                return None
             pos = self._conn.execute(
                 "SELECT total_shares, avg_cost_basis, total_contributed_usd FROM long_term_positions "
                 "WHERE ticker = ?", (ticker,),
@@ -801,14 +893,23 @@ class PaperTradingStore:
 
             if price <= 0 or contribution_usd <= 0:
                 return None
+            current_cash = self._conn.execute(
+                "SELECT current_cash FROM long_term_portfolio_state WHERE id = 1"
+            ).fetchone()[0]
+            if contribution_usd > current_cash + 1e-6:
+                self._conn.execute(
+                    "INSERT INTO ignored_decisions (ticker, reason, triggering_action, price, horizon, timestamp) "
+                    "VALUES (?, ?, ?, ?, 'long_term', ?)",
+                    (ticker, f"INSUFFICIENT_CASH_AT_EXECUTION:cost={contribution_usd:.2f}:cash={current_cash:.2f}",
+                     AlertAction.DCA_CONTRIBUTION.value, price, timestamp.isoformat()),
+                )
+                self._conn.commit()
+                return None
             new_shares = contribution_usd / price
             total_shares = existing_shares + new_shares
             new_avg_cost = calculate_average_cost_basis(existing_shares, existing_avg_cost, new_shares, price)
             new_contributed = existing_contributed + contribution_usd
 
-            current_cash = self._conn.execute(
-                "SELECT current_cash FROM long_term_portfolio_state WHERE id = 1"
-            ).fetchone()[0]
             new_cash = current_cash - contribution_usd
             self._conn.execute(
                 "UPDATE long_term_portfolio_state SET current_cash = ? WHERE id = 1", (new_cash,)

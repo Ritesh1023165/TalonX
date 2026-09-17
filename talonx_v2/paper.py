@@ -180,28 +180,58 @@ def close_position(
     exit_session: date,
     config: V2Config | None = None,
 ) -> ExitOutcome:
+    """``position`` supplies ONLY the lookup key (``position_id``) --
+    Package 2 acceptance A5: every economic value used below (symbol,
+    episode_id, entry_price, shares, position_cost, entry_session) is
+    re-read fresh from the authoritative persisted row, INSIDE the same
+    protected transaction as the close itself, never trusted from the
+    caller-supplied dict. These fields happen to be write-once by this
+    schema's own convention (never updated after ``insert_open_
+    position()``), but settlement must not depend on that convention
+    holding forever -- a caller passing a stale/inconsistent snapshot
+    (a different overlapping caller's earlier read, a future admin
+    correction tool that adjusts cost basis, a bug) must not be able to
+    make settlement disagree with what is actually persisted."""
     cfg = config or V2Config()
     es = _as_date(exit_session)
-    entry_price = float(position["entry_price"])
-    shares = float(position["shares"])
-    pnl_usd, pnl_pct = calculate_sell_pnl(shares, entry_price, exit_price)
-    held = v2cal.trading_days_elapsed(_as_date(position["entry_session"]), es)
 
-    # Task 131 Remediation Directive 4 + Package 1 Settlement Integrity:
-    # close + cash credit + trade record + cooldown commit together,
-    # atomically -- a crash mid-sequence can no longer leave a closed
-    # position without its cash credit, or credited cash without a
-    # trade record. store.close_position()'s own conditional UPDATE
-    # (``WHERE status='OPEN'``) IS the authoritative eligibility check
-    # for this transition; its return value MUST gate every subsequent
-    # mutation below, or a second call against a stale ``position``
-    # snapshot (e.g. two overlapping callers that both read the row
-    # while it was still OPEN) would credit cash and append a SELL a
-    # second time even though the state transition itself was correctly
-    # a no-op.
-    with store.transaction():
+    with store.transaction() as c:
+        row = c.execute(
+            "SELECT position_id, episode_id, symbol, entry_price, shares, position_cost, "
+            "entry_session, status FROM positions WHERE position_id=?",
+            (position["position_id"],),
+        ).fetchone()
+        if row is None:
+            # the position row no longer exists at all -- structurally
+            # unreachable via due_exits() (which only ever lists real
+            # rows), but never fabricate an exit for a position that
+            # isn't there.
+            return ExitOutcome(position.get("symbol", ""), position.get("episode_id", ""), es,
+                               exit_price, 0.0, 0.0, 0, settled=False)
+        position_id = row["position_id"]
+        episode_id = row["episode_id"]
+        symbol = row["symbol"]
+        entry_price = float(row["entry_price"])
+        shares = float(row["shares"])
+        position_cost = float(row["position_cost"])
+        entry_session = row["entry_session"]
+
+        pnl_usd, pnl_pct = calculate_sell_pnl(shares, entry_price, exit_price)
+        held = v2cal.trading_days_elapsed(_as_date(entry_session), es)
+
+        # Task 131 Remediation Directive 4 + Package 1 Settlement Integrity:
+        # close + cash credit + trade record + cooldown commit together,
+        # atomically -- a crash mid-sequence can no longer leave a closed
+        # position without its cash credit, or credited cash without a
+        # trade record. store.close_position()'s own conditional UPDATE
+        # (``WHERE status='OPEN'``) IS the authoritative eligibility check
+        # for this transition; its return value MUST gate every subsequent
+        # mutation below, or a second call against a stale snapshot (e.g.
+        # two overlapping callers that both read the row while it was
+        # still OPEN) would credit cash and append a SELL a second time
+        # even though the state transition itself was correctly a no-op.
         transitioned = store.close_position(
-            position_id=position["position_id"], exit_session=es, exit_price=exit_price,
+            position_id=position_id, exit_session=es, exit_price=exit_price,
             realized_pnl_usd=pnl_usd, realized_pnl_pct=pnl_pct, trading_days_held=held,
         )
         if not transitioned:
@@ -209,20 +239,20 @@ def close_position(
             # explicit, non-fabricating no-op. No cash, trade, or
             # cooldown mutation; the caller must not generate a second
             # exit notification from this outcome (see ``settled``).
-            return ExitOutcome(position["symbol"], position["episode_id"], es, exit_price,
+            return ExitOutcome(symbol, episode_id, es, exit_price,
                                pnl_usd, pnl_pct, held, settled=False)
         proceeds = shares * exit_price
         cash_after = store.cash() + proceeds
         store.set_cash(cash_after)
         store.append_trade(
-            episode_id=position["episode_id"], symbol=position["symbol"], action="SELL",
-            execution_price=exit_price, shares=shares, position_cost=float(position["position_cost"]),
+            episode_id=episode_id, symbol=symbol, action="SELL",
+            execution_price=exit_price, shares=shares, position_cost=position_cost,
             portfolio_cash_after=cash_after, entry_price=entry_price,
             realized_pnl_usd=pnl_usd, realized_pnl_pct=pnl_pct, trading_days_held=held,
         )
         cooldown_until = v2cal.add_sessions(es, cfg.reentry_cooldown_trading_days)
-        store.set_cooldown(position["symbol"], cooldown_until)
-    return ExitOutcome(position["symbol"], position["episode_id"], es, exit_price,
+        store.set_cooldown(symbol, cooldown_until)
+    return ExitOutcome(symbol, episode_id, es, exit_price,
                        pnl_usd, pnl_pct, held, settled=True)
 
 

@@ -628,7 +628,14 @@ class LongTermPaperEngine:
                 continue
             execution = self.store.execute_dca_contribution(ticker, contribution_usd, price, now)
             if execution is None:
-                continue  # position closed between the listing above and this write -- skip
+                # position closed between the listing above and this
+                # write, the ORIGINAL_LONGTERM account has an active
+                # integrity block, or the store's own defense-in-depth
+                # cash cap refused this contribution (Package 2
+                # acceptance A1/A2) -- execute_dca_contribution already
+                # recorded the ignored-decision row itself where
+                # applicable; nothing further to do here.
+                continue
             self._dca_contributions_made += 1
             summary = self.store.get_long_term_portfolio_summary()  # refresh cash for the next ticker this cycle
             logger.info(

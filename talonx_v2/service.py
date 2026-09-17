@@ -172,6 +172,14 @@ class V2Service:
         # policy; ON enables the corrected, gated policy.
         self.durable_store_gate_enabled = _env_flag("TALONX_V2_DURABLE_STORE_ENABLED", default=False)
         self._no_prior_intent_skipped = 0
+        # Package 2 acceptance A1: episodes refused a NEW PENDING intent
+        # (reservation) at admission time because the account carries an
+        # active, serious integrity block -- UNCONDITIONAL (unlike
+        # _capacity_rejected, never gated behind durable_store_gate_
+        # enabled): a serious account block is a safety mechanism, not
+        # an opt-in admission-policy refinement, and must apply
+        # regardless of which lifecycle-policy variant is active.
+        self._account_blocked_intent_rejected = 0
         # Task 131 Directive 5: symbols whose alerts should be tagged
         # BROAD_DISCOVERY origin for the dispatcher's own, independent
         # toggle -- empty by default (byte-identical routing for every
@@ -351,6 +359,7 @@ class V2Service:
         self._pending_retry_episodes = []
         self._capacity_rejected = 0
         self._admission_deadline_rejected = 0
+        self._account_blocked_intent_rejected = 0
         self._dissemination_lookup_refreshed_this_tick = False
 
         # Task 117 overnight P3: an unavailable Form-4 SOURCE blocks NEW
@@ -691,7 +700,35 @@ class V2Service:
                 # committed outcome -- `continue` inside `with` exits the
                 # block normally (no exception), so that single
                 # disposition write still commits on its own.
-                with self.store.transaction():
+                with self.store.transaction() as c:
+                    # Package 2 acceptance A1: a serious account block
+                    # must stop NEW account exposure from being
+                    # COMMITTED to, not merely stop the eventual fill --
+                    # a PENDING intent is itself a reservation (an
+                    # ACTIONABLE alert promising a future BUY, capacity/
+                    # cash set aside for it) even though no cash is
+                    # actually debited until the fill (Product Rule 4).
+                    # Checked on the SAME connection/transaction as the
+                    # write it gates (never an earlier, separate read),
+                    # UNCONDITIONALLY -- unlike the capacity check below,
+                    # this never depends on durable_store_gate_enabled.
+                    # This does NOT touch: the fill-time recheck inside
+                    # enter_position() (already correct and unconditional
+                    # -- see paper.py), legitimate expiry/cancellation of
+                    # an EXISTING PENDING intent (_phase_post_close's
+                    # stale sweep above, untouched), or open-position
+                    # exits (_phase_close/settle_due_exits, untouched).
+                    from talonx_ops import account_blocks
+                    from talonx_v2.store import V2_ACCOUNT_ID
+                    block_reason = account_blocks.blocked_reason(c, V2_ACCOUNT_ID)
+                    if block_reason is not None:
+                        self.store.record_disposition(
+                            episode_id=e.episode_id, symbol=e.symbol,
+                            disposition="SKIPPED_ACCOUNT_BLOCKED", issuer_cik=e.issuer_cik,
+                            eligible_entry_session=e.eligible_entry_session.isoformat(),
+                            detail=f"no new reservation created -- account blocked: {block_reason}")
+                        self._account_blocked_intent_rejected += 1
+                        continue
                     # Task 131 Remediation Directive 4: a HARD admission
                     # gate at intent-creation time, not merely at
                     # consumption -- cash/capacity are reserved by a
@@ -1083,6 +1120,7 @@ class V2Service:
             "no_prior_intent_skipped_this_tick": getattr(self, "_no_prior_intent_skipped", 0),
             "capacity_rejected_this_tick": getattr(self, "_capacity_rejected", 0),
             "admission_deadline_rejected_this_tick": getattr(self, "_admission_deadline_rejected", 0),
+            "account_blocked_intent_rejected_this_tick": getattr(self, "_account_blocked_intent_rejected", 0),
             "entries_this_tick": len(res.entries),
             "exits_this_tick": len(res.exits),
             # Task 131 Remediation Directive 2: non-blocking, cross-tick

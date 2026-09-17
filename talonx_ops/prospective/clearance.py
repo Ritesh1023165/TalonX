@@ -35,16 +35,6 @@ from pathlib import Path
 from typing import Any
 
 
-def _read_block(db_path: str | Path, block_id: str):
-    from talonx_ops import account_blocks
-    con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-    con.row_factory = sqlite3.Row
-    try:
-        return account_blocks.get_block(con, block_id)
-    finally:
-        con.close()
-
-
 def _verify_exit_unresolved(db_path: str | Path, blk) -> tuple[bool, str]:
     """No supported accounting-correction workflow exists (yet) for an
     EXIT_UNRESOLVED position -- Package 2 does not invent an exit
@@ -137,32 +127,62 @@ def clear_block(db_path: str | Path, account_kind: str, *, block_id: str,
     attempt -- approved or refused -- atomically, via the owning
     store's own ``attempt_block_clearance``, which re-evaluates
     nothing else: clearing this block never touches any other block or
-    a user pause (account_blocks' own contract)."""
-    blk = _read_block(db_path, block_id)
-    if blk is None:
-        raise ValueError(f"no such block: {block_id!r}")
-    if blk.account_id != {
-        "V2": "V2", "ORIGINAL_INTRADAY": "ORIGINAL_INTRADAY", "ORIGINAL_LONGTERM": "ORIGINAL_LONGTERM",
-    }.get(account_kind):
-        raise ValueError(
-            f"block {block_id!r} belongs to account_id={blk.account_id!r}, "
-            f"not account_kind={account_kind!r}")
+    a user pause (account_blocks' own contract).
 
-    allow, detail = verify_clearance_eligible(db_path, account_kind, blk)
-
+    Package 2 acceptance A4: the account's own write lock is acquired
+    FIRST (``V2Store.transaction()``'s real ``BEGIN IMMEDIATE`` for V2;
+    ``PaperTradingStore.lock()``'s in-process lock for Original) and
+    held continuously through BOTH the fresh verification read and the
+    clearance write, committing together. This closes the race where a
+    concurrent mutation lands between "verified healthy" and "clearance
+    committed": once this function holds the lock, no other writer
+    using the SAME serialization primitive can commit a change until
+    this clearance attempt itself commits or rolls back -- so the
+    verification this function reads can never be invalidated by a
+    concurrent writer before the clearance decision is persisted.
+    (``verify_clearance_eligible``'s own re-checks may still open
+    further READ-ONLY connections of their own, e.g. against a
+    genuinely separate file such as Experimental's ledger -- safe,
+    since nothing this lock protects can change while it is held.)"""
     if account_kind == "V2":
+        from talonx_ops import account_blocks
         from talonx_v2.store import V2Store
         store = V2Store(str(db_path))
-    else:
+        with store.transaction() as c:
+            blk = account_blocks.get_block(c, block_id)
+            _check_block(blk, block_id, account_kind)
+            allow, detail = verify_clearance_eligible(db_path, account_kind, blk)
+            result = account_blocks.attempt_clearance(
+                c, block_id_=block_id, operator_id=operator_id, reason=reason,
+                evidence_ref=evidence_ref, allow=allow, detail=detail)
+    elif account_kind in ("ORIGINAL_INTRADAY", "ORIGINAL_LONGTERM"):
+        from talonx_ops import account_blocks
         from talonx_paper.store import PaperTradingStore
         store = PaperTradingStore(str(db_path))
+        with store.lock() as c:
+            blk = account_blocks.get_block(c, block_id)
+            _check_block(blk, block_id, account_kind)
+            allow, detail = verify_clearance_eligible(db_path, account_kind, blk)
+            result = account_blocks.attempt_clearance(
+                c, block_id_=block_id, operator_id=operator_id, reason=reason,
+                evidence_ref=evidence_ref, allow=allow, detail=detail)
+            c.commit()
+    else:
+        raise ValueError(f"unknown account_kind: {account_kind!r}")
 
-    result = store.attempt_block_clearance(
-        block_id=block_id, operator_id=operator_id, reason=reason,
-        evidence_ref=evidence_ref, allow=allow, detail=detail,
-    )
     result["allow"] = allow
     result["verification_detail"] = detail
     result["block"] = {"reason_type": blk.reason_type, "reference": blk.reference,
                        "account_id": blk.account_id}
     return result
+
+
+def _check_block(blk, block_id: str, account_kind: str) -> None:
+    if blk is None:
+        raise ValueError(f"no such block: {block_id!r}")
+    expected = {"V2": "V2", "ORIGINAL_INTRADAY": "ORIGINAL_INTRADAY",
+               "ORIGINAL_LONGTERM": "ORIGINAL_LONGTERM"}.get(account_kind)
+    if blk.account_id != expected:
+        raise ValueError(
+            f"block {block_id!r} belongs to account_id={blk.account_id!r}, "
+            f"not account_kind={account_kind!r}")

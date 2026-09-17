@@ -491,6 +491,74 @@ def _record_original_intraday_reconciliation_blocks(rec: "EodReconciliation", ho
     return recorded
 
 
+def _record_original_cash_deficit_blocks(home: Path) -> list[str]:
+    """Package 2 acceptance A2: Original's cash model has exactly two
+    persisted cash fields -- ``portfolio_state.current_cash``
+    (ORIGINAL_INTRADAY) and ``long_term_portfolio_state.current_cash``
+    (ORIGINAL_LONGTERM) -- each debited by exactly three store methods
+    (``execute_buy``/``execute_long_term_buy``/
+    ``execute_dca_contribution``), all three of which now cap their own
+    debit against available cash before writing (see
+    ``talonx_paper/store.py``, fixed alongside this detector as part of
+    the SAME acceptance finding -- without that cap this invariant
+    would not have been reliable). No reservation concept exists for
+    Original (unlike V2's PENDING intents) that could otherwise explain
+    a negative balance as a benign in-flight state. A negative
+    ``current_cash`` therefore has NO ordinary/benign explanation --
+    it is only reachable via genuine corruption (a bug that bypassed
+    the store's own guards, external tampering, or a legacy pre-fix
+    row) -- distinct from `_record_original_intraday_reconciliation_
+    blocks`'s own more heuristic "open positions but no trades" check,
+    which keeps its own separate reference/reason.
+
+    Opens its own minimal WRITE connection for the same reason as the
+    sibling function above (never `PaperTradingStore`'s constructor)."""
+    from talonx_ops import account_blocks
+    from talonx_paper.store import ORIGINAL_INTRADAY_ACCOUNT_ID, ORIGINAL_LONGTERM_ACCOUNT_ID
+
+    p = home / "paper_trading.db"
+    if not p.exists():
+        return []
+    ro = _ro(p)
+    if ro is None:
+        return []
+    try:
+        intraday_cash = _q1(ro, "SELECT current_cash FROM portfolio_state WHERE id=1")
+        longterm_cash = (_q1(ro, "SELECT current_cash FROM long_term_portfolio_state WHERE id=1")
+                         if _has_table(ro, "long_term_portfolio_state") else None)
+    finally:
+        ro.close()
+
+    to_record: list[tuple[str, str, str]] = []
+    if intraday_cash is not None and intraday_cash < 0:
+        to_record.append((ORIGINAL_INTRADAY_ACCOUNT_ID, "intraday_current_cash",
+                          f"portfolio_state.current_cash = {intraday_cash!r} (negative)"))
+    if longterm_cash is not None and longterm_cash < 0:
+        to_record.append((ORIGINAL_LONGTERM_ACCOUNT_ID, "long_term_current_cash",
+                          f"long_term_portfolio_state.current_cash = {longterm_cash!r} (negative)"))
+    if not to_record:
+        return []
+
+    con = sqlite3.connect(str(p), isolation_level=None)
+    recorded: list[str] = []
+    try:
+        con.execute(f"PRAGMA busy_timeout={30_000}")
+        con.executescript(account_blocks.SCHEMA)
+        con.execute("BEGIN IMMEDIATE")
+        for account_id, reference, detail in to_record:
+            bid = account_blocks.record_block(
+                con, account_id=account_id, reason_type=account_blocks.REASON_CASH_DEFICIT,
+                reference=reference, detail=detail)
+            recorded.append(bid)
+        con.execute("COMMIT")
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
+    finally:
+        con.close()
+    return recorded
+
+
 def run_and_persist(
     *,
     session_date: str | None = None,
@@ -508,6 +576,7 @@ def run_and_persist(
         ledger_path=ledger_path, now=now, piv_reader=piv_reader,
     )
     _record_original_intraday_reconciliation_blocks(rec, home or _HOME)
+    _record_original_cash_deficit_blocks(home or _HOME)
     store = EodReconciliationStore(db_path)
     try:
         store.upsert(rec)

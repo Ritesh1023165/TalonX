@@ -3226,3 +3226,67 @@ task built neither a new pause UI nor touched the existing one.
 
 `OPS-001` through `OPS-011`, `OPS-013`, `OPS-014` **remain open**,
 unaffected by this session.
+
+## Package 2 Acceptance Review
+
+**Bounded acceptance review, not a new work package and not
+authorization for Package 3** — this session's scope was fixed by its
+own seven acceptance questions (A1-A7); see `REQUIREMENTS_TRACKER.md`
+`S13-11` and `OPERATIONAL_FINDINGS.md` (`OPS-012`/`OPS-015` acceptance
+updates, new `OPS-018`/`OPS-019`) for the full record. Full evidence:
+`docs/research/evidence/package2_account_blocks/ACCEPTANCE_REVIEW.md`
+(kept separate from the original Package 2 implementation evidence in
+the same directory — nothing there was rewritten).
+
+### Verdict
+
+**`PACKAGE2_ACCEPTED_WITH_BOUNDED_FOLLOWUPS`.** A1, A4, and A5 — the
+three questions the task required to be structurally safe for
+acceptance — are all now structurally safe, each with a real gap found
+and a narrow correction made (not merely confirmed already-safe): A1's
+reservation-creation step was missing an account-block check; A4's
+clearance flow verified-then-wrote across separate, unprotected
+connections; A5's settlement trusted caller-supplied economic values
+instead of the authoritative persisted row. A2 (Original CASH_DEFICIT)
+is now safely implemented, not merely explained as infeasible — a
+real prerequisite gap (three uncapped cash-debit paths) was found and
+closed first, making the detector's own invariant genuinely reliable.
+A3 found no live TalonX process currently running (disclosed as a
+snapshot judgement, not a guarantee). A6's three presentation-layer
+omissions are confirmed non-safety-critical and recorded as P3
+follow-ups, not fixed, per the task's own explicit boundary. A7's
+prior production-preservation wording was reviewed and found already
+appropriately scoped (no overclaim to correct); fresh read-only
+evidence was captured for this review's own work on the same standard.
+
+### What was NOT done (explicitly, per the task's own non-goals)
+
+No Package 3 work, no provider qualification, no market-data-provider
+change, no V2 strategy-rule change, no profitability research, no
+application start/stop, no Telegram sends, no production database
+mutation, no dashboard redesign, no EXIT_UNRESOLVED accounting-
+correction workflow, no new IDENTITY_MISMATCH detector (A1-A5 never
+required one). The three A6 findings were recorded, not fixed.
+
+### Findings tracked in `OPERATIONAL_FINDINGS.md`
+
+- **`OPS-012`** — acceptance update: A1's reservation-creation gap
+  found and closed.
+- **`OPS-015`** — acceptance update: A2's debit-cap prerequisite gap
+  and `execute_dca_contribution`'s missing block check found and
+  closed; CASH_DEFICIT detector for Original now implemented; `OPS-015`
+  is now closed for both V2 and Original.
+- **`OPS-018`** (new) — clearance verification/write race; found and
+  closed within this same session.
+- **`OPS-019`** (new) — settlement trusted caller-supplied economics;
+  found and closed within this same session.
+
+`OPS-016`, `OPS-017`, and every other pre-existing finding are
+unaffected by this session except as separately re-confirmed
+(`OPS-017` reproduced again, still pre-existing and unrelated).
+
+### Package 3 gate
+
+**PACKAGE 3 NOT STARTED. PACKAGE 3 AWAITS GATEKEEPER REVIEW** of this
+acceptance report, exactly as this session's own task specification
+required.

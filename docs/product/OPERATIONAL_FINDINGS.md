@@ -876,6 +876,29 @@ commit an entry after a prior block activation. See `OPS-015` and
 `OPS-016` below for the parts of this finding's own neighbouring
 findings this same change also affects.
 
+**Package 2 Acceptance Review update (2026-09-17) — a gap in the fill
+path's own upstream reservation step found and closed**: the
+acceptance review traced the FULL V2 lifecycle (candidate → reservation
+→ durable PENDING intent → a later tick's fill), not just the
+admission-gate check in isolation, per the review's own explicit
+instruction. The fill path itself was confirmed already safe (the
+account-block check is the only gate on the ONLY code path that ever
+marks an intent FILLED). A real gap was found one step upstream:
+`V2Service._capacity_rejection_reason()` — the sole gate on creating a
+NEW PENDING intent (reservation) — checked cash/slot capacity only,
+never the account block, so a brand-new episode discovered while the
+account was blocked could still receive a fresh reservation and an
+ACTIONABLE alert promising a fill that could never occur. Fixed: an
+unconditional account-block check (never gated behind
+`TALONX_V2_DURABLE_STORE_ENABLED`, unlike the capacity check) now runs
+first, inside the same transaction as the reservation write. Legitimate
+expiry/cancellation of an existing PENDING intent, and existing
+open-position exits, were confirmed to remain unaffected (both are
+already unconditional and were not touched). 5 new isolated tests
+(`tests/test_package2_acceptance_review.py`), including a genuinely
+independent-connection race. See `docs/research/evidence/
+package2_account_blocks/ACCEPTANCE_REVIEW.md` §A1 for full detail.
+
 ---
 
 ## OPS-013 — Telegram lifecycle-message-formatting and delivery-consolidation gap
@@ -1043,6 +1066,32 @@ fails. Verified by isolated tests in
 `tests/test_package2_account_blocks.py` (see `OPS-012`'s own update
 for the full count).
 
+**Package 2 Acceptance Review update (2026-09-17) — Original
+CASH_DEFICIT: implemented, plus a real debit-capping gap found and
+closed first**: the acceptance review inspected Original's persisted
+cash model (`portfolio_state.current_cash` / `long_term_portfolio_
+state.current_cash`, no reservation concept) and found that ALL THREE
+debit paths (`execute_buy`, `execute_long_term_buy`, `execute_dca_
+contribution`) trusted a caller-supplied cost value with NO internal
+cap against available cash — callers do pre-size/pre-check today, but
+the store itself never verified it, so the "current_cash < 0" signal
+this review wanted to build a detector on would not actually have been
+reliable. Fixed first (`talonx_paper/store.py`): all three methods now
+refuse (no mutation) rather than debit past available cash, the same
+"rejected, nothing mutated" contract the account-block check already
+uses. Also found `execute_dca_contribution` had NO account-block check
+at all (a real Package 2 coverage gap — a DCA contribution is new
+economic exposure into an existing position, the same category the
+block covers for a fresh BUY) — fixed, mirroring `execute_long_term_
+buy` exactly. With every debit path capped, a negative `current_cash`
+now has no benign explanation; `talonx_ops/eod_reconciliation.py`'s new
+`_record_original_cash_deficit_blocks()` (wired into `run_and_
+persist()`) records a `CASH_DEFICIT` block on the correct account when
+this occurs. `OPS-015` is now CLOSED for Original as well as V2. 7 new
+isolated tests (`tests/test_package2_acceptance_review.py`). See
+`docs/research/evidence/package2_account_blocks/ACCEPTANCE_REVIEW.md`
+§A2 for full detail.
+
 ---
 
 ## OPS-016 — No account-readiness state model or external outage watchdog
@@ -1156,6 +1205,107 @@ re-verified unchanged before/after this session's own changes via
 expected` and `::test_task114_does_not_change_fingerprints` (both
 pass). Still out of scope to fix here — same stale-literal defect as
 before, unchanged by two full task packages now.
+
+---
+
+## OPS-018 — Clearance verification/write race (found and closed same session)
+
+**Status**: `CLOSED` — found and fixed within the Package 2 Acceptance
+Review (2026-09-17); no window where this was OPEN in a released state.
+
+**Found**: Package 2 Acceptance Review, direct inspection of
+`talonx_ops/prospective/clearance.py::clear_block()` against the
+review's own A4 question ("a successful clearance must not be based on
+verification invalidated by a concurrent mutation before clearance
+commits").
+
+**Finding**: `clear_block()` called `verify_clearance_eligible()` on
+short-lived, separate read connections that opened and closed BEFORE
+the actual clearance write (`store.attempt_block_clearance()`) even
+began its own transaction — a textbook TOCTOU: a concurrent writer
+re-detecting the same underlying issue between "verified healthy" and
+"clearance committed" would not be seen, and the clearance would still
+proceed to mark the block CLEARED based on now-stale evidence.
+
+**Fix**: `clear_block()` now acquires the account's own write lock
+FIRST and holds it continuously through BOTH the fresh verification
+read and the clearance write, committing together — for V2 via
+`V2Store.transaction()`'s existing real `BEGIN IMMEDIATE`; for Original
+via a new `PaperTradingStore.lock()` context manager that issues a
+REAL `BEGIN IMMEDIATE` of its own (the store's existing `threading.
+Lock` alone was insufficient, since `clear_block()` constructs its own
+fresh store instance rather than reusing any existing one — a
+Python-level lock on a freshly-constructed object provides no
+protection against a genuinely separate instance). `PaperTradingStore`
+also gained `PRAGMA busy_timeout=30000` (previously absent — default
+0), so a contending writer correctly waits rather than raising
+`OperationalError: database is locked` immediately.
+
+**Verification**: two independent-writer race tests (real threads,
+real separate `V2Store`/`PaperTradingStore` connections, a bounded
+`Thread.join` liveness check proving the competing writer is genuinely
+blocked, not merely unlucky in timing) —
+`test_a4_concurrent_writer_cannot_land_between_verification_and_clearance_write`,
+`test_a4_original_clearance_also_serializes_verification_and_write`
+(`tests/test_package2_acceptance_review.py`).
+
+**Disclosed limitation**: this closes the race for the clearance path
+specifically. It does not retrofit `BEGIN IMMEDIATE` onto Original's
+OTHER writers (`execute_buy` etc., still implicit DEFERRED
+transactions) — a broader change than this review's bounded scope.
+
+**Evidence references**: `docs/research/evidence/
+package2_account_blocks/ACCEPTANCE_REVIEW.md` §A4.
+
+**Related**: `OPS-012`, `OPS-015` (the clearance mechanism this race
+was in).
+
+---
+
+## OPS-019 — Settlement trusted caller-supplied economics (found and closed same session)
+
+**Status**: `CLOSED` — found and fixed within the Package 2 Acceptance
+Review (2026-09-17); no window where this was OPEN in a released state.
+
+**Found**: Package 2 Acceptance Review, re-examining Package 1/2's own
+prior reasoning ("`close_position`'s caller-supplied shares/entry_
+price/position_cost are safe because the corresponding DB columns are
+write-once") against A5's explicit instruction that this reasoning was
+insufficient evidence.
+
+**Finding**: that reasoning was correct about today's SCHEMA but was
+proof the caller's copy currently happens to agree with the
+authoritative row, not proof settlement USES the authoritative row —
+a materially weaker guarantee, fragile to any future code that
+legitimately needs to touch those columns, a caller bug, or a stale
+snapshot held by an overlapping reader.
+`talonx_v2/paper.py::close_position()` computed realized P&L and
+holding period from the caller-supplied `position` dict BEFORE ever
+reading the database, and used the caller's `shares`/`position_cost`
+for the cash credit and trade record.
+
+**Fix**: `close_position()` now treats `position_id` as the ONLY
+trusted input. Inside the same protected transaction as the close
+itself, it re-reads `episode_id`/`symbol`/`entry_price`/`shares`/
+`position_cost`/`entry_session` fresh from the live row and uses ONLY
+those values for every subsequent computation and mutation. A
+`position_id` that no longer exists returns a non-fabricating
+`settled=False` outcome.
+
+**Verification**: `tests/test_package2_acceptance_review.py` proves a
+caller passing 100× the real share count and a wildly wrong entry
+price still produces the economically CORRECT cash credit and P&L (the
+authoritative row wins, not the caller's claim); a wrong symbol/
+episode_id in the caller dict still produces the correct trade record;
+a nonexistent `position_id` fabricates nothing. Package 1's own
+existing 14-test suite (`test_package1_settlement_integrity.py`)
+re-run unmodified against this rewrite: 14/14 still pass.
+
+**Evidence references**: `docs/research/evidence/
+package2_account_blocks/ACCEPTANCE_REVIEW.md` §A5.
+
+**Related**: `S13-09` (Package 1's own settlement-integrity work, which
+this closes a remaining gap in).
 
 ---
 
