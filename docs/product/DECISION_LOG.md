@@ -2993,66 +2993,152 @@ already-tracked foundation, not a newly discovered code behavior.
 
 ---
 
-## Session 13 — Reconciliation and Implementation Planning (agenda only, not conducted)
+## Session 13 — Reconciliation and Release Planning
 
-**Not yet conducted.** This is a **preparatory agenda**, not a
-decision record — nothing below is agreed, authorized, or resolved.
-Session 13 is the first session in this series whose own purpose is
-reconciliation and planning rather than a new product-discussion
-topic; `KNOWLEDGE_TRANSFER_PLAN.md`'s existing Session 13 title
-("Architecture, effective configuration and prioritized roadmap") is
-preserved unchanged — this agenda is offered as its concrete starting
-content, not a replacement title.
+**Recorded**: 2026-09-17, approximately 12:49 UTC / 13:49 BST (Python
+`zoneinfo`, this project's established recording-time discipline).
+**Source**: the product-owner discussion supplied directly in this
+session's prompt. **Status: discussion closed for the decisions
+recorded below.** `KNOWLEDGE_TRANSFER_PLAN.md`'s existing Session 13
+title ("Architecture, effective configuration and prioritized
+roadmap") is preserved — this session's content is its actual
+reconciliation-and-release-planning substance, not a title change.
 
-**Agenda**:
+### Context
 
-1. **Conflicts and open decisions** — the three explicitly unresolved
-   choices this session's own reconciliation pass did **not** silently
-   settle:
-   - Whether a materially changed strategy defaults to a **new
-     primary campaign** — **recommended by pattern (`S8`'s "existing
-     positions retain original rules," `S12`'s "each admission belongs
-     to exactly one version"), but not explicitly confirmed by the
-     owner** as the answer for every future case.
-   - Treatment of **already-admitted pending intents** during a
-     version cutover — not addressed by any session to date.
-   - Numerical execution costs (`S12-23`), incident thresholds
-     (`S11-18`), and experiment-specific evidence/success criteria
-     (`S12`'s own qualitative-only comparison framework) — all
-     explicitly deferred, no number invented anywhere in this
-     documentation layer.
-2. **Requirement-by-requirement implementation/evidence review** —
-   `REQUIREMENTS_TRACKER.md` now carries `S1`-`S12` (over 250
-   requirement entries); Session 13 should decide which, if any,
-   graduate from `Agreed`/`Partially implemented` to `Implementation
-   authorized`, in dependency order (see item 5).
-3. **Prior research findings and reuse** — `talonx_research/`'s
-   existing governance and Task 115/116 evidence must be the
-   **starting point**, not re-derived; `S12-01`'s mandatory-review
-   discipline applies to Session 13's own planning work, not only to
-   future strategy experiments.
-4. **First-release scope** — which product surfaces (Telegram
-   formatting, dashboard layout, account-readiness states, whole-share
-   sizing, etc.) constitute a coherent minimum first release, as
-   opposed to the full backlog across all 12 sessions.
-5. **Dependency-ordered implementation packages** — e.g. `OPS-012`/
-   `OPS-015`'s account-block enforcement depends on `S11`'s readiness-
-   state model existing first; `S9`'s message formatting depends on
-   `S7`'s materiality catalogue for company-development content
-   specifically.
-6. **Migration, cutover, acceptance, and authorization boundaries** —
-   `S3-23`'s conditional database-reset policy, `S12-19`'s promotion-
-   approval record, and `S11`'s controlled-shutdown/restart sequence
-   all need to be composed into one coherent operational runbook
-   before any of this backlog is implemented.
+Session 13's original preparatory agenda (this project's own prior
+documentation pass) queued six reconciliation items. This session
+resolves the **release-scope and staging** questions from that agenda
+explicitly; it does **not** resolve every item (see "Still open"
+below) and does **not** itself authorize any implementation beyond
+what is separately, explicitly authorized per package.
 
-**Explicitly kept separate** throughout this agenda: correctness work
-(fixing a demonstrated code defect), product-experience work
-(building an agreed-but-unbuilt requirement), and strategy-performance
-research (evaluating whether a strategy variant is actually good) —
-three different kinds of work with three different evidence standards,
-not to be planned as one undifferentiated backlog.
+### Agreed release decisions
 
-**This agenda does not authorize, schedule, or imply readiness for any
-implementation** — it is a starting point for a future Session 13
-discussion, not a roadmap.
+- **First release**: the Insider Buying strategy (V2,
+  `INSIDER_BUY_CLUSTER_V2@1`) is the **primary paper strategy** —
+  **conditional** on pricing, timing, ledger, lifecycle, and user-
+  facing acceptance criteria being met (not yet met; see Packages 1-4
+  below). This is a release-scope decision, not a claim of current
+  readiness.
+- **Intraday remains on the product roadmap** but is **Research-Lab-
+  only for the first release** — excluded from primary totals and
+  primary Telegram alerts (extends `S6-01`/`S9-01`'s primary-scope
+  framing with a concrete first-release boundary; does **not** reopen
+  or reverse `S3-01`'s "both horizons remain primary product scope"
+  long-term decision — this is a staged **release** sequencing choice,
+  not a permanent demotion).
+- **Company developments remain collected and dashboard-visible.**
+  Primary Telegram delivery requires **both** the existing explicit
+  opt-in (`S7-01`/`S9-01`) **and** the event-specific Session 7
+  acceptance criteria (the six-question rubric and materiality routes,
+  `S7-05`-`S7-10`) actually being met — neither is currently built
+  (`OPS-011`).
+- **Prior-research reconciliation is `PENDING`, not completed.**
+  Nothing in this session (or Package 1's own implementation work)
+  constitutes the mandatory prior-research review `S12-01` requires
+  before new strategy experiments — that review remains a distinct,
+  separately-scoped future task.
+- **Packages 1-5 are authorized in dependency order** (below); release
+  integration itself is **not yet scoped** — a concrete integration
+  plan is still required before any release-integration work is
+  authorized.
+
+### Agreed staging order
+
+`Stage 0` (baseline preservation) → **`Package 1`** (Settlement
+Integrity & Unresolved Obligations) → `Package 2` (Account-wide
+admission blocks & explicit clearance, `OPS-012`/`OPS-015`/`OPS-016`)
+→ `Package 3` (Price/timing: provider qualification, `OPS-002`/
+`OPS-003`/`OPS-005`) → `Package 4` (Costs/sizing: fee-aware whole-share
+sizing, `OPS-014`, numerical calibration `S12-23`) → `Package 5`
+(Intraday Research Lab execution — building the Research-Lab-only
+intraday path this session's own release decision requires) → release
+integration (not yet scoped).
+
+**Provider qualification and prior-research review are explicitly
+parallel tracks, run alongside the package sequence above — not
+permission to change strategy parameters.** Neither track authorizes
+touching `V2Config`'s frozen values (fingerprint `11107198c5b81237`)
+or Original's frozen strategy files (fingerprint `ed8272fe568d` — see
+`OPERATIONAL_FINDINGS.md` `OPS-017` for a related, distinct finding
+about this exact constant discovered during Package 1's own testing).
+
+### Agreed material-version cutover rules (documentation only — no cutover performed)
+
+- A material version change moves to a **new primary campaign with
+  explicitly approved capital.**
+- The **old campaign manages existing obligations only** — no new
+  admissions under the retired version.
+- **Future genuinely unfilled intents are cancelled atomically** at the
+  approved cutover moment.
+- **Timely admitted intents within their recovery window remain under
+  old rules** — a cutover does not retroactively reinterpret an
+  already-admitted intent's own version.
+- **Timely persisted evidence is reconciled even if processing occurs
+  later** (reaffirms `S6-24`/`S11-09`'s durable-receipt-deadline
+  semantics, extended explicitly to cutover).
+- **Existing positions retain their original rules** (reaffirms
+  `S8-06`/`S12-20` — a promotion or cutover never retroactively changes
+  an open position's own holding clock, exit rule, or cost basis).
+- **No historical accounting error is erased by starting a new
+  campaign** — a new campaign is a forward boundary, not a reset
+  of the historical record.
+
+**This session records these rules as agreed product decisions only —
+no cutover was performed, none is scheduled, and this task does not
+authorize one.**
+
+### Still open (not resolved by this session)
+
+- Whether a materially changed strategy **always** defaults to a new
+  primary campaign, or whether some future case could differ — the
+  general rule above is now agreed; a specific exception process (if
+  any) is not addressed.
+- The exact treatment of an already-admitted pending intent that is
+  **not yet timely-confirmed** at the moment of cutover (distinct from
+  the agreed "timely admitted intents remain under old rules" — the
+  boundary case of an intent mid-recovery at the exact cutover instant
+  is not specified).
+- Numerical execution costs (`S12-23`), incident thresholds (`S11-18`),
+  and experiment-specific evidence/success criteria (`S12`'s
+  qualitative-only comparison framework) — all remain explicitly
+  deferred; no number is invented here either.
+- Existing provider/data feasibility deferrals (`OPS-005`, `S12-24`)
+  are unaffected by this session.
+
+### Implementation authorization
+
+**Package 1 (Settlement Integrity & Unresolved Obligations) implementation
+and its isolated regression tests are authorized by this session** —
+see `REQUIREMENTS_TRACKER.md` `S13-09` for the record of what was
+actually built, and `OPERATIONAL_FINDINGS.md` for the corresponding
+findings closed/updated. **Packages 2-5 and release integration remain
+explicitly not authorized** — each requires its own future task with
+its own scoping, per the staging order above.
+
+### Findings tracked in `OPERATIONAL_FINDINGS.md`
+
+- **`OPS-017`** — Original's own frozen-strategy fingerprint constant
+  (`V1_FINGERPRINT_EXPECTED = "ed8272fe568d"`,
+  `talonx_ops/prospective/__init__.py:49`) has already diverged from a
+  stale, hardcoded `"2ae6216bca70"` expectation still present in two
+  test files (`tests/test_task112_tuesday_release.py`,
+  `tests/test_task111_v2_e2e.py`) — found while running Package 1's
+  regression suite; confirmed **pre-existing and unrelated** to Package
+  1 (reproduces identically with Package 1's changes stashed out).
+  Not fixed here — out of Package 1's scope.
+
+`OPS-001` through `OPS-012` and `OPS-015`/`OPS-016` **remain open**
+except where Package 1's own implementation record (`S13-09`) states
+otherwise.
+
+### Carried forward, unchanged
+
+The original Session 13 preparatory agenda's own items 2, 3, and 6
+(requirement-by-requirement review across all ~290 tracked
+requirements; full prior-research reuse audit; a composed migration/
+cutover/acceptance runbook) remain **not yet performed in full** — this
+session resolved the release-scope and staging questions specifically,
+not the entire original agenda. They remain open work for a future
+planning pass, explicitly not claimed complete here.

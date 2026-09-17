@@ -829,6 +829,26 @@ Tracked jointly under `OPS-016` (the missing readiness-state model
 this clearance policy would run inside) without merging the two
 findings.
 
+**Package 1 update (2026-09-17, ~12:49 UTC) — capacity/symbol/
+valuation half CLOSED; account-wide block still OPEN**: Session 13's
+Package 1 (`S13-09`) fixed the three consequences of this finding that
+were within its own scope — `n_open()` now counts `EXIT_UNRESOLVED`
+toward capacity (no longer silently frees a slot),
+`position_for_symbol()` now also matches `EXIT_UNRESOLVED` (a second
+position in the same symbol is correctly refused), and the reporting/
+reconciliation paths (`talonx_ops/paper_performance.py`,
+`talonx_ops/prospective/close.py`) now include an unresolved
+position's cost basis instead of silently omitting it. **The
+account-wide "block ALL new admissions while any `EXIT_UNRESOLVED`
+position exists" gate itself — Session 8 §E's actual containment
+policy — remains genuinely `OPEN`, not implemented**; this was
+explicitly out of Package 1's scope ("Package 2's account-wide
+admission block and explicit clearance workflow remain out of scope.
+Do not claim those requirements are satisfied by slot retention.").
+Verified by 5 new isolated tests
+(`tests/test_package1_settlement_integrity.py`), captured failing
+against the unmodified baseline first, then passing after the fix.
+
 ---
 
 ## OPS-013 — Telegram lifecycle-message-formatting and delivery-consolidation gap
@@ -948,6 +968,24 @@ auditable resolution and explicit operator clearance (`S11-15`) — the
 same policy `OPS-012` received, now also covering this finding's own
 trigger. Still not implemented; tracked alongside `OPS-016`.
 
+**Package 1 update (2026-09-17, ~12:49 UTC) — a related but DISTINCT
+V2-specific defect fixed; this finding's own admission-block gap
+remains fully OPEN**: this finding is specifically about
+`talonx_ops/eod_reconciliation.py` (Original/Experimental's base
+reconciliation). Package 1 (`S13-09`) did **not** touch that file —
+it fixed a separate, V2-specific bug in
+`talonx_ops/prospective/close.py::_v2_reconcile()`, where an
+`EXIT_UNRESOLVED` position's cost basis was omitted from the
+`cash_plus_open_cost_reconciles` formula, causing that check to
+**fabricate** a mismatch purely because the cost was missing from the
+arithmetic — not a real accounting problem. That specific fabrication
+is now fixed (verified by an isolated test, captured failing against
+the unmodified baseline first). **This does not close this finding**:
+the actual "genuine mismatches don't block new admissions" gap this
+entry describes — for either `eod_reconciliation.py` or
+`_v2_reconcile()` — is unchanged and remains fully `OPEN`, tracked
+alongside `OPS-016` exactly as before.
+
 ---
 
 ## OPS-016 — No account-readiness state model or external outage watchdog
@@ -985,6 +1023,54 @@ session (no matches in `talonx_ops/` for the cited concepts).
 
 **Related**: `REQUIREMENTS_TRACKER.md` `S11-12` through `S11-15`,
 `S11-17`, `S11-18`; `OPS-012`, `OPS-015`.
+
+---
+
+## OPS-017 — Stale hardcoded fingerprint constant in two pre-existing tests
+
+**Status**: `OPEN` — pre-existing, confirmed unrelated to Package 1,
+not fixed here (out of Package 1's scope).
+
+**Found**: Session 13 documentation pass (2026-09-17), while running
+Package 1's regression suite against a scoped set of 32 existing test
+files.
+
+**Finding**: `tests/test_task112_tuesday_release.py::
+test_03_v1_fingerprint_intact` and `tests/test_task111_v2_e2e.py::
+test_item3_original_strategy_fingerprint_unchanged` both assert
+`get_strategy_version() == "2ae6216bca70"` and fail — the actual
+computed value is `"ed8272fe568d"`. Direct inspection found
+`talonx_ops/prospective/__init__.py:49` already defines
+`V1_FINGERPRINT_EXPECTED = "ed8272fe568d"` — the **canonical** current
+value used elsewhere in the codebase (e.g. `talonx_ops/prospective/
+preflight.py`) — while these two specific test files still hardcode
+the **older** literal `"2ae6216bca70"` directly instead of importing
+the shared constant. **Confirmed pre-existing and unrelated to Package
+1**: reproduced identically with Package 1's changes fully reverted
+(`git stash`), against unmodified HEAD `58249ef`. Package 1 never
+touches any of Original's frozen strategy files
+(`talonx_quant/{strategy,indicators,config,session,consumer}.py`), so
+this divergence predates and is independent of this task's work.
+
+**Explicit implication**: these two tests have been silently failing
+(or were already known-failing/skipped) independent of any change in
+this session; their own historical record of when
+`V1_FINGERPRINT_EXPECTED` was last updated versus when these two test
+files were last touched was not traced this session.
+
+**Future corrective work — NOT IMPLEMENTED here**: update both test
+files to import `V1_FINGERPRINT_EXPECTED` from `talonx_ops.prospective`
+instead of hardcoding a literal value, so the two can never silently
+drift apart again; separately confirm which value is actually correct
+against Original's real, current frozen strategy files before treating
+either as authoritative.
+
+**Evidence references**: `talonx_ops/prospective/__init__.py:49`;
+`tests/test_task112_tuesday_release.py:84`;
+`tests/test_task111_v2_e2e.py:85`; baseline reproduction via `git
+stash` (this session).
+
+**Related**: `REQUIREMENTS_TRACKER.md` `S13-07`, `S13-09`.
 
 ---
 

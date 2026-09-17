@@ -293,6 +293,15 @@ without naming which of these applies.
 | S12-22 | Previous-version restoration needs explicit approval+readiness; unsafe obligations need separately approved remediation | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
 | S12-23 | Deferred: numerical execution-cost calibration | Open — deferred | N/A | N/A | N/A |
 | S12-24 | Deferred: 2-year historical data feasibility (reaffirms S3-27/S5-31) | Open — deferred | N/A | N/A | N/A |
+| S13-01 | First release: V2 = primary paper strategy, conditional on acceptance criteria | Agreed | Not authorized (release-scope decision, not a build) | Not implemented (conditional; acceptance criteria not yet met) | Code inspection (this session, Package 1 evidence) |
+| S13-02 | Intraday Research-Lab-only for first release; excluded from primary totals/Telegram | Agreed | Not authorized | Not implemented (Research Lab account doesn't exist, S6-03) | Code inspection (established) |
+| S13-03 | Company developments dashboard-visible; primary Telegram needs opt-in + Session 7 acceptance | Agreed (reaffirms S7-01/S9-01) | Not authorized | Not implemented (S7 rubric/routes not built, OPS-011) | Code inspection (established) |
+| S13-04 | Prior-research reconciliation is PENDING, not completed | Agreed | N/A (a status statement) | Not implemented (S12-01's mandatory review not performed) | Code inspection (this session, self-check) |
+| S13-05 | Packages 1-5 authorized in dependency order; release integration needs separate scoping | Agreed | Package 1 only: Authorized (this task) | Package 1: Implemented; Packages 2-5: Not implemented, not authorized | Isolated test execution (this session) |
+| S13-06 | Staging order: Stage0 → P1 → P2 → P3 → P4 → P5 → release integration | Agreed | Not authorized beyond Package 1 | Package 1 stage complete; later stages not started | Isolated test execution (this session) |
+| S13-07 | Provider qualification + prior-research review are parallel tracks, not strategy-parameter permission | Agreed | Explicitly not authorized (no parameter change) | Implemented (V2Config frozen values unchanged, fingerprint verified) | Code inspection (this session, direct fingerprint check) |
+| S13-08 | Material-version cutover rules (7 sub-rules) | Agreed | Explicitly not authorized (no cutover performed) | Not implemented (documentation only) | Code inspection (this session, self-check — no cutover code path exercised) |
+| S13-09 | Package 1 — Settlement Integrity & Unresolved Obligations | Agreed | Authorized and implemented (this task) | Implemented | Isolated test execution (this session, 14 new + 2 corrected existing tests, all passed) |
 
 ---
 
@@ -4206,3 +4215,169 @@ Open — deferred. **Authorization**: N/A. **Implementation**: N/A.
 **Validation**: N/A. **Reason**: unresolved, not addressed by this
 session's governance discussion. **Planned session**: none assigned.
 **Dependency**: `S5-31`.
+
+---
+
+# Session 13 requirements (S13-01 through S13-09)
+
+Compact format, per `DECISION_LOG.md` Session 13.
+
+## S13-01 — First release: V2 as primary paper strategy, conditional
+**Decision**: Agreed. **Authorization**: Not authorized (a release-
+scope decision, not a build). **Implementation**: Not implemented —
+conditional on pricing/timing/ledger/lifecycle/user-facing acceptance
+criteria, none of which are all met yet (`OPS-002`/`OPS-003`/`OPS-005`
+still open). **Validation**: Code inspection (this session, Package 1
+evidence — one prerequisite closed, others remain). **Dependency**:
+`Package 2` through `Package 4`.
+
+## S13-02 — Intraday Research-Lab-only for first release
+**Decision**: Agreed. **Authorization**: Not authorized.
+**Implementation**: Not implemented — no Research Lab account exists
+(`S6-03`). **Validation**: Code inspection (established). **Dependency**:
+`S6-03`, `Package 5`.
+
+## S13-03 — Company-development primary-Telegram gating
+**Decision**: Agreed (reaffirms `S7-01`/`S9-01`). **Authorization**:
+Not authorized. **Implementation**: Not implemented — the six-question
+rubric and materiality routes this gate depends on do not exist
+(`OPS-011`). **Validation**: Code inspection (established).
+**Dependency**: `OPS-011`.
+
+## S13-04 — Prior-research reconciliation is PENDING
+**Decision**: Agreed (a status statement, not a build item).
+**Authorization**: N/A. **Implementation**: Not implemented — `S12-01`'s
+mandatory prior-research review has not been performed as its own
+task; Package 1's own implementation reused established evidence by
+citation only (see `S13-09`'s own Validation for exactly what was and
+was not reviewed). **Validation**: Code inspection (this session,
+self-check). **Dependency**: `S12-01`.
+
+## S13-05 — Packages 1-5 authorized in dependency order; release integration unscoped
+**Decision**: Agreed. **Authorization**: Package 1 only —
+**"Package 1 implementation and isolated tests are authorized"** (this
+task's own explicit grant). Packages 2-5 and release integration
+remain **explicitly not authorized**. **Implementation**: Package 1
+`Implemented` (`S13-09`); Packages 2-5 `Not implemented`, `Not
+authorized`. **Validation**: Isolated test execution (this session,
+Package 1 only). **Dependency**: `S13-06`.
+
+## S13-06 — Staging order
+**Decision**: Agreed: `Stage 0` → `Package 1` → `Package 2` →
+`Package 3` → `Package 4` → `Package 5` → release integration.
+**Authorization**: Not authorized beyond Package 1. **Implementation**:
+Package 1 stage complete this session; no later stage started.
+**Validation**: Isolated test execution (this session). **Dependency**:
+none blocking to record the order itself.
+
+## S13-07 — Provider qualification / prior-research review are parallel, not parameter-change permission
+**Decision**: Agreed. **Authorization**: Explicitly not authorized (no
+strategy-parameter change of any kind). **Implementation**:
+Implemented — directly verified this session: `V2Config`'s frozen
+values are unchanged and the V2 release fingerprint
+(`research.scripts.task112_v2_release_fingerprint.
+v2_release_fingerprint()`) still equals `11107198c5b81237`
+(`talonx_ops/prospective/__init__.py`'s `V2_FINGERPRINT_EXPECTED`),
+confirmed by direct execution, not inference. **Validation**: Isolated
+test execution (this session, exact fingerprint values quoted).
+**Dependency**: none.
+
+## S13-08 — Material-version cutover rules (documentation only)
+**Decision**: Agreed (7 sub-rules — new primary campaign with approved
+capital; old campaign manages existing obligations only; future
+unfilled intents cancelled atomically at cutover; timely admitted
+intents within their recovery window stay under old rules; timely
+persisted evidence reconciled even if processed later; existing
+positions retain original rules; no historical accounting error erased
+by a new campaign). **Authorization**: Explicitly not authorized — no
+cutover performed or scheduled. **Implementation**: Not implemented —
+documentation only; no cutover code path exists or was exercised.
+**Validation**: Code inspection (this session, self-check — no cutover
+mechanism found or invoked). **Dependency**: `Package 2` (account-block
+clearance) is a natural prerequisite for any future cutover involving
+an account with an outstanding block.
+
+## S13-09 — Package 1: Settlement Integrity & Unresolved Obligations (implemented)
+
+**Decision**: Agreed and **authorized** (this task's own explicit
+grant — "Package 1 implementation and isolated tests are authorized").
+**Authorization**: Authorized. **Implementation**: **Implemented.**
+
+**What was built** (minimum-diff, read-only-verified-then-fixed):
+
+1. `talonx_v2/store.py::close_position()` — now returns whether its
+   own conditional `UPDATE ... WHERE status='OPEN'` actually matched a
+   row (`cursor.rowcount > 0`), instead of unconditionally `None`. This
+   IS the authoritative, atomic eligibility check for the state
+   transition (SQL-level, inside the same transaction).
+2. `talonx_v2/paper.py::close_position()` — now checks that return
+   value before crediting cash, appending a trade, or setting cooldown;
+   returns a new `ExitOutcome.settled: bool` field (`False` = no-op/
+   already-resolved, no economic mutation) instead of always assuming
+   settlement occurred.
+3. `talonx_v2/pipeline.py::settle_due_exits()` — checks `out.settled`
+   before appending to `res.exits`/building an exit alert, so a no-op
+   outcome never generates a duplicate exit notification.
+4. `talonx_v2/store.py::n_open()` and `::position_for_symbol()` —
+   broadened to `status IN ('OPEN','EXIT_UNRESOLVED')`. `open_positions()`
+   itself (and therefore `due_exits()`, the retryable/actionable set)
+   is **unchanged** — EXIT_UNRESOLVED positions remain correctly
+   excluded from automatic re-settlement.
+5. `talonx_ops/prospective/close.py::_v2_reconcile()` — now sums
+   `EXIT_UNRESOLVED` position cost separately and includes it in the
+   `cash_plus_open_cost_reconciles` formula, closing the fabricated-
+   mismatch gap.
+6. `talonx_ops/paper_performance.py::_v2_snapshot()` — now queries
+   unresolved-position rows (not just a count), includes their cost in
+   `expected_cash`, and forces `equity_status = "PARTIAL"` whenever any
+   unresolved position exists (previously vacuously `"COMPLETE"` when
+   `opens` was empty). Added a new, additive
+   `exit_unresolved_cost_basis_total` field; the existing
+   `exit_unresolved` integer-count field's type is unchanged (a known
+   consumer, `talonx_ops/dashboard_read.py:285`, treats it as a count).
+
+**Explicitly NOT done** (Package 2's own scope): no account-wide
+admission block was added for `EXIT_UNRESOLVED` (`OPS-012` remains
+open) or for a reconciliation mismatch (`OPS-015` remains open) — slot/
+capacity/symbol-ownership/valuation/reconciliation correctness is fixed;
+the separate "block ALL new admissions in the account" workflow and its
+explicit-clearance mechanism are not. No dashboard redesign, fee
+implementation, or provider work was done.
+
+**Validation**: **Isolated test execution** —
+`tests/test_package1_settlement_integrity.py` (14 new tests, all
+covering the specific properties this task required: sequential and
+concurrent duplicate-close prevention, no duplicate cooldown, atomic
+rollback on mid-settlement failure, no-op-outcome distinguishability,
+unresolved-position slot/cost/symbol-block retention, no phantom
+proceeds, honest non-COMPLETE equity, non-fabricated reconciliation,
+restart persistence, and OPEN/CLOSED sanity) — captured failing
+**before** the fix (9 of 14 failed against the unchanged baseline,
+reproducing both described defects precisely) and passing **after**
+(14/14). A scoped regression run of 32 existing test files touching
+the same store/paper/pipeline/close/paper_performance surface (406
+tests total across the full run) found **zero new failures** — the 9
+pre-existing failures (5 in `test_task117_migration.py`, 1 each in
+`test_task131_spa_discovery_backend.py`, `test_task117_deployment_
+rehearsal.py`, plus the two `OPS-017` fingerprint-constant mismatches)
+were independently reproduced against the unmodified baseline (`git
+stash`) and confirmed unrelated. Two pre-existing tests
+(`tests/test_task117_phase0_entry_timing.py::
+test_e8c_exit_unresolved_when_target_and_all_fallforward_missing`,
+`tests/test_task112_tuesday_release.py::
+test_15_missing_through_plus5_is_explicit_unresolved`) asserted the
+OLD (incorrect) `n_open() == 0` behavior for an `EXIT_UNRESOLVED`
+position and were corrected to assert the fixed behavior (`n_open()
+== 1`, `open_positions() == []`), preserving each test's original
+intent. The V2 strategy fingerprint (`11107198c5b81237`) was directly
+re-computed and confirmed unchanged.
+
+**Not tested this session** (Package 2's own future scope): the
+account-wide admission block itself, since it does not exist yet.
+
+**Dependency**: `OPS-012` (its capacity/symbol/valuation prerequisites
+are now fixed); `OPS-015` (a distinct, V2-specific fabricated-mismatch
+defect in `_v2_reconcile()` is fixed — `OPS-015`'s own described gap,
+`eod_reconciliation.py`'s missing admission-block wiring, is
+untouched). Both findings' own account-block-clearance requirements
+are unaffected and remain `Package 2`'s scope.

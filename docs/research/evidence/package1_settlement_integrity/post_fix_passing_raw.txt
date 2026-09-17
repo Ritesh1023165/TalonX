@@ -1,0 +1,25 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- C:\workspace\TalonX\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\workspace\TalonX
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.10.16, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 14 items
+
+tests/test_package1_settlement_integrity.py::test_sequential_duplicate_close_same_stale_snapshot PASSED [  7%]
+tests/test_package1_settlement_integrity.py::test_concurrent_duplicate_close_two_independent_connections PASSED [ 14%]
+tests/test_package1_settlement_integrity.py::test_duplicate_close_does_not_reset_cooldown_twice PASSED [ 21%]
+tests/test_package1_settlement_integrity.py::test_close_position_returns_a_no_op_outcome_for_an_already_closed_position PASSED [ 28%]
+tests/test_package1_settlement_integrity.py::test_close_position_failure_midway_rolls_back_completely PASSED [ 35%]
+tests/test_package1_settlement_integrity.py::test_unresolved_position_retains_one_occupied_slot PASSED [ 42%]
+tests/test_package1_settlement_integrity.py::test_unresolved_position_retains_its_invested_cost_on_the_row PASSED [ 50%]
+tests/test_package1_settlement_integrity.py::test_mark_unresolved_credits_no_proceeds PASSED [ 57%]
+tests/test_package1_settlement_integrity.py::test_unresolved_position_blocks_a_second_open_in_the_same_symbol PASSED [ 64%]
+tests/test_package1_settlement_integrity.py::test_normal_open_still_permits_entry_after_a_genuine_close PASSED [ 71%]
+tests/test_package1_settlement_integrity.py::test_unresolved_position_never_produces_complete_cash_only_equity PASSED [ 78%]
+tests/test_package1_settlement_integrity.py::test_reconciliation_does_not_fabricate_a_cash_loss_for_unresolved PASSED [ 85%]
+tests/test_package1_settlement_integrity.py::test_restart_preserves_unresolved_capacity_and_symbol_block PASSED [ 92%]
+tests/test_package1_settlement_integrity.py::test_normal_open_and_closed_counts_unaffected_by_the_fix PASSED [100%]
+
+============================= 14 passed in 1.51s ==============================

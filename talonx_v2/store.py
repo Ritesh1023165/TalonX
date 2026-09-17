@@ -376,9 +376,16 @@ class V2Store:
                 "SELECT * FROM positions ORDER BY opened_at")]
 
     def position_for_symbol(self, symbol: str) -> dict | None:
+        """OPEN **or** EXIT_UNRESOLVED (Package 1 Settlement Integrity):
+        an unresolved obligation in this symbol still economically owns
+        it -- a second entry must never be silently admitted through a
+        lookup that only sees OPEN. This is the symbol-ownership check
+        only; it does NOT change ``open_positions()`` (still OPEN-only,
+        the retryable/actionable set ``due_exits()`` relies on)."""
         with self._conn() as c:
-            r = c.execute("SELECT * FROM positions WHERE symbol=? AND status='OPEN'",
-                          (symbol.upper(),)).fetchone()
+            r = c.execute(
+                "SELECT * FROM positions WHERE symbol=? AND status IN ('OPEN','EXIT_UNRESOLVED')",
+                (symbol.upper(),)).fetchone()
             return dict(r) if r else None
 
     def position_for_episode(self, episode_id: str) -> dict | None:
@@ -387,8 +394,16 @@ class V2Store:
             return dict(r) if r else None
 
     def n_open(self) -> int:
+        """Occupied capacity slots -- OPEN **or** EXIT_UNRESOLVED
+        (Package 1 Settlement Integrity): an unresolved obligation still
+        occupies its slot until an operator auditably resolves it; it
+        must never silently free capacity for a new admission. This does
+        NOT change ``open_positions()`` (still OPEN-only, the
+        retryable/actionable set ``due_exits()`` relies on)."""
         with self._conn() as c:
-            return int(c.execute("SELECT COUNT(*) n FROM positions WHERE status='OPEN'").fetchone()["n"])
+            return int(c.execute(
+                "SELECT COUNT(*) n FROM positions WHERE status IN ('OPEN','EXIT_UNRESOLVED')"
+            ).fetchone()["n"])
 
     def insert_open_position(self, *, episode_id, symbol, issuer_cik, entry_session,
                              target_exit_session, entry_price, shares, position_cost,
@@ -424,9 +439,22 @@ class V2Store:
                 "SELECT * FROM positions WHERE status='EXIT_UNRESOLVED' ORDER BY entry_session")]
 
     def close_position(self, *, position_id, exit_session, exit_price, realized_pnl_usd,
-                       realized_pnl_pct, trading_days_held) -> None:
+                       realized_pnl_pct, trading_days_held) -> bool:
+        """The ``WHERE status='OPEN'`` guard IS the authoritative,
+        atomic eligibility check for this state transition (Package 1
+        Settlement Integrity) -- it must run inside the same
+        transaction as the caller's cash/trade/cooldown mutations, and
+        the caller MUST use this return value (True = the transition
+        just happened; False = the position was already CLOSED/
+        EXIT_UNRESOLVED/otherwise not OPEN) to decide whether any
+        further economic mutation is warranted. Returning ``None``
+        unconditionally here was the root cause of a duplicate-
+        settlement defect: a caller holding a stale snapshot of an
+        already-closed position had no way to detect that this UPDATE
+        was a no-op before it went on to credit cash and record a
+        second SELL."""
         with self._conn() as c:
-            c.execute(
+            cur = c.execute(
                 """UPDATE positions SET status='CLOSED', exit_session=?, exit_price=?,
                      realized_pnl_usd=?, realized_pnl_pct=?, trading_days_held=?, closed_at=?
                    WHERE position_id=? AND status='OPEN'""",
@@ -434,6 +462,7 @@ class V2Store:
                  exit_price, realized_pnl_usd, realized_pnl_pct, trading_days_held, _now(),
                  position_id),
             )
+            return cur.rowcount > 0
 
     # ---- trades ----
     def append_trade(self, *, episode_id, symbol, action, execution_price, shares,

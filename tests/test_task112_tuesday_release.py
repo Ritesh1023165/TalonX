@@ -211,7 +211,12 @@ def test_15_missing_through_plus5_is_explicit_unresolved(tmp_path):
     st, pos, target, pl = _one_open(tmp_path, cfg, [])          # no bars at all near target
     far = v2cal.add_sessions(target, 10)
     res = pipeline.settle_due_exits(store=st, as_of_session=far, price_lookup=pl, config=cfg)
-    assert st.n_open() == 0
+    # Package 1 Settlement Integrity: EXIT_UNRESOLVED is no longer OPEN
+    # (not retryable), but it still occupies its capacity slot until an
+    # operator auditably resolves it -- n_open() now correctly counts
+    # OPEN + EXIT_UNRESOLVED.
+    assert st.open_positions() == []
+    assert st.n_open() == 1
     unresolved = st.unresolved_positions()
     assert len(unresolved) == 1 and unresolved[0]["status"] == "EXIT_UNRESOLVED"
     assert any(s["reason"] == "EXIT_UNRESOLVED" for s in res.skipped)

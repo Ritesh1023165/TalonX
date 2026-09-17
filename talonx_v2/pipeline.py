@@ -180,6 +180,18 @@ def settle_due_exits(
             continue
         out = paper.close_position(store, pos, exit_price=float(px["close"]),
                                    exit_session=exit_session, config=cfg)
+        if not out.settled:
+            # Package 1 Settlement Integrity: the position was already
+            # not OPEN by the time this call's own transaction ran (a
+            # duplicate/stale-snapshot close attempt) -- no economic
+            # mutation occurred, so no exit record and no notification
+            # are generated for it either. `due_exits()` only lists
+            # OPEN positions, so this is a defensive no-op under normal
+            # single-threaded operation; it matters if this function is
+            # ever invoked twice concurrently over an overlapping list.
+            res.skipped.append({"episode_id": pos["episode_id"], "symbol": pos["symbol"],
+                                "reason": "ALREADY_SETTLED"})
+            continue
         from talonx_v2.schemas import V2Decision, V2Direction
         d = V2Decision(signal_id=f"v2sig-{pos['episode_id']}", episode_id=pos["episode_id"],
                        symbol=pos["symbol"], direction=V2Direction.BULLISH,

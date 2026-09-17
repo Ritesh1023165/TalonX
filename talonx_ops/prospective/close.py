@@ -53,6 +53,14 @@ def _v2_reconcile() -> tuple[dict[str, Any], dict[str, str], list[str]]:
             "SELECT COALESCE(SUM(realized_pnl_usd),0) FROM positions WHERE status='CLOSED'").fetchone()[0] or 0.0
         open_cost = con.execute(
             "SELECT COALESCE(SUM(position_cost),0) FROM positions WHERE status='OPEN'").fetchone()[0] or 0.0
+        # Package 1 Settlement Integrity: an EXIT_UNRESOLVED position's
+        # cash debit at entry is never returned (mark_exit_unresolved
+        # never touches cash) -- its cost basis must be included here or
+        # this reconciliation fabricates a cash-loss mismatch purely
+        # because that cost was omitted from the expected-cash formula.
+        unresolved_cost = con.execute(
+            "SELECT COALESCE(SUM(position_cost),0) FROM positions "
+            "WHERE status='EXIT_UNRESOLVED'").fetchone()[0] or 0.0
         dup_buy = con.execute("SELECT episode_id,COUNT(*) c FROM trades WHERE action='BUY' "
                               "GROUP BY episode_id HAVING c>1").fetchall()
         dup_pos = con.execute("SELECT episode_id,COUNT(*) c FROM positions "
@@ -66,6 +74,7 @@ def _v2_reconcile() -> tuple[dict[str, Any], dict[str, str], list[str]]:
     rec = {"cash": cash, "buys": int(buys), "sells": int(sells), "open": int(n_open),
            "closed": int(n_closed), "exit_unresolved": int(n_unres),
            "realized_pnl_usd": round(realized, 2), "open_cost_usd": round(open_cost, 2),
+           "exit_unresolved_cost_usd": round(unresolved_cost, 2),
            "starting_cash": CAMPAIGN_STARTING_CASH}
 
     def _a(name, ok, why=""):
@@ -76,8 +85,10 @@ def _v2_reconcile() -> tuple[dict[str, Any], dict[str, str], list[str]]:
     _a("buys_eq_sells_plus_open_plus_unresolved", buys == sells + n_open + n_unres,
        f"{buys} != {sells}+{n_open}+{n_unres}")
     _a("cash_plus_open_cost_reconciles",
-       cash is not None and abs((cash + open_cost) - (CAMPAIGN_STARTING_CASH + realized)) <= 1.0,
-       f"cash {cash} + open_cost {open_cost} != {CAMPAIGN_STARTING_CASH} + realized {realized}")
+       cash is not None and
+       abs((cash + open_cost + unresolved_cost) - (CAMPAIGN_STARTING_CASH + realized)) <= 1.0,
+       f"cash {cash} + open_cost {open_cost} + unresolved_cost {unresolved_cost} != "
+       f"{CAMPAIGN_STARTING_CASH} + realized {realized}")
     _a("no_negative_cash", cash is not None and cash >= 0, f"cash {cash}")
     _a("no_duplicate_buy_episode_id", not dup_buy, str([d[0] for d in dup_buy]))
     _a("no_duplicate_position_episode_id", not dup_pos, str([d[0] for d in dup_pos]))

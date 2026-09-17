@@ -534,10 +534,19 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
                             "exit_price, shares, position_cost, realized_pnl_usd, realized_pnl_pct, "
                             "trading_days_held, opened_at, closed_at FROM positions WHERE status='CLOSED'") \
             if _has_table(con, "positions") else []
-        unresolved = _q1(con, "SELECT COUNT(*) FROM positions WHERE status='EXIT_UNRESOLVED'") \
-            if _has_table(con, "positions") else 0
+        unresolved_rows = _qall(con, "SELECT symbol, episode_id, entry_session, entry_price, "
+                                     "shares, position_cost, opened_at FROM positions "
+                                     "WHERE status='EXIT_UNRESOLVED'") \
+            if _has_table(con, "positions") else []
+        unresolved = len(unresolved_rows)
 
         open_cost_total = sum((r["position_cost"] or 0.0) for r in opens)
+        # Package 1 Settlement Integrity: an EXIT_UNRESOLVED position's
+        # cost was debited at entry and never returned -- it must be
+        # included wherever "money currently tied up in a position" is
+        # computed, or the expected-cash/equity figures below silently
+        # omit a real, outstanding obligation.
+        unresolved_cost_total = sum((r["position_cost"] or 0.0) for r in unresolved_rows)
         realized_total = round(sum((r["realized_pnl_usd"] or 0.0) for r in closed), 4)
 
         marks: dict[str, tuple[Any, Any]] = {}
@@ -611,13 +620,25 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
                           (session_date,)) if _has_table(con, "trades") else 0
 
         starting_campaign_cash = 300_000.0
-        expected_cash = starting_campaign_cash - open_cost_total + realized_total
+        expected_cash = starting_campaign_cash - open_cost_total - unresolved_cost_total + realized_total
         recon_diff = round((cash or 0.0) - expected_cash, 4) if cash is not None else None
         recon_status = ("EXACT" if recon_diff is not None and abs(recon_diff) < 1e-2 else
                         "MISMATCH" if recon_diff is not None else "UNAVAILABLE")
 
-        equity_status = "COMPLETE" if marked_value_complete else ("PARTIAL" if opens else "COMPLETE")
-        equity_value = (cash or 0.0) + marked_value_total if (marked_value_complete or not opens) and cash is not None else None
+        # Package 1 Settlement Integrity: an EXIT_UNRESOLVED position's
+        # value is by definition unknown (that is why it is unresolved)
+        # -- equity can never be COMPLETE while one exists, even if
+        # `opens` (OPEN-only) happens to be empty. The old `if opens
+        # else COMPLETE` fallback vacuously reported COMPLETE cash-only
+        # equity whenever every open position was actually
+        # EXIT_UNRESOLVED (zero OPEN rows to iterate, so the loop above
+        # never ran and `marked_value_complete` stayed at its default
+        # True) -- silently discarding the unresolved obligation.
+        has_unresolved = bool(unresolved_rows)
+        equity_status = "COMPLETE" if (marked_value_complete and not has_unresolved) else "PARTIAL"
+        equity_value = ((cash or 0.0) + marked_value_total
+                        if (marked_value_complete and not has_unresolved) and cash is not None
+                        else None)
 
         status = "ACTIVE" if (opens or closed) else "ZERO_ACTIVITY"
 
@@ -648,13 +669,18 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
             "equity": {"value": round(equity_value, 4) if equity_value is not None else None,
                       "status": equity_status, "formula": "cash + marked open-position value",
                       "note": None if equity_status == "COMPLETE" else
-                              "one or more open positions lack a usable mark -- equity is PARTIAL"},
+                              ("one or more EXIT_UNRESOLVED positions have unknown value -- "
+                               "equity is PARTIAL" if has_unresolved else
+                               "one or more open positions lack a usable mark -- equity is PARTIAL")},
             "reconciliation": {"status": recon_status,
                               "expected_cash": round(expected_cash, 4) if expected_cash is not None else None,
                               "actual_cash": cash, "diff": recon_diff,
                               "basis": "expected_cash = starting_campaign_cash($300,000) - "
-                                       "open_position_cost_basis_total + realized_pnl_campaign_to_date"},
+                                       "open_position_cost_basis_total - "
+                                       "exit_unresolved_cost_basis_total + "
+                                       "realized_pnl_campaign_to_date"},
             "exit_unresolved": int(unresolved or 0),
+            "exit_unresolved_cost_basis_total": round(unresolved_cost_total, 4),
             "note": "" if (opens or closed) else "producer/flat book -- 0 natural insider clusters entered to date",
         }
     finally:

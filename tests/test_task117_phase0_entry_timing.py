@@ -324,7 +324,12 @@ def test_e8c_exit_unresolved_when_target_and_all_fallforward_missing(tmp_path):
     r = _resolver(_FakeAdapter(bars), today=as_of)          # bars has no post-entry sessions
     pipeline.settle_due_exits(store=store, as_of_session=as_of,
                               price_lookup=r.price_lookup, config=V2Config(), result=res)
-    assert store.n_open() == 0
+    # Package 1 Settlement Integrity: EXIT_UNRESOLVED is no longer OPEN
+    # (not retryable -- confirmed by open_positions() below), but it
+    # still occupies its capacity slot until an operator auditably
+    # resolves it -- n_open() now correctly counts OPEN + EXIT_UNRESOLVED.
+    assert store.open_positions() == []
+    assert store.n_open() == 1
     unresolved = store.unresolved_positions()
     assert len(unresolved) == 1 and unresolved[0]["symbol"] == sym
     assert any(s["reason"] == "EXIT_UNRESOLVED" for s in res.skipped)

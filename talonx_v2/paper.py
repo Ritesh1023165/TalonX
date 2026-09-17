@@ -47,6 +47,13 @@ class ExitOutcome:
     realized_pnl_usd: float
     realized_pnl_pct: float
     trading_days_held: int
+    # Package 1 Settlement Integrity: True iff THIS call performed the
+    # OPEN->CLOSED transition (state mutated, cash credited, trade
+    # appended, cooldown set). False means the position was already not
+    # OPEN (e.g. a duplicate/stale-snapshot close attempt) -- no
+    # economic mutation occurred and the caller must not treat this as a
+    # new exit (no alert, no res.exits entry).
+    settled: bool = True
 
 
 def _as_date(d) -> date:
@@ -167,15 +174,30 @@ def close_position(
     pnl_usd, pnl_pct = calculate_sell_pnl(shares, entry_price, exit_price)
     held = v2cal.trading_days_elapsed(_as_date(position["entry_session"]), es)
 
-    # Task 131 Remediation Directive 4: close + cash credit + trade record
-    # + cooldown commit together, atomically -- a crash mid-sequence can
-    # no longer leave a closed position without its cash credit, or
-    # credited cash without a trade record.
+    # Task 131 Remediation Directive 4 + Package 1 Settlement Integrity:
+    # close + cash credit + trade record + cooldown commit together,
+    # atomically -- a crash mid-sequence can no longer leave a closed
+    # position without its cash credit, or credited cash without a
+    # trade record. store.close_position()'s own conditional UPDATE
+    # (``WHERE status='OPEN'``) IS the authoritative eligibility check
+    # for this transition; its return value MUST gate every subsequent
+    # mutation below, or a second call against a stale ``position``
+    # snapshot (e.g. two overlapping callers that both read the row
+    # while it was still OPEN) would credit cash and append a SELL a
+    # second time even though the state transition itself was correctly
+    # a no-op.
     with store.transaction():
-        store.close_position(
+        transitioned = store.close_position(
             position_id=position["position_id"], exit_session=es, exit_price=exit_price,
             realized_pnl_usd=pnl_usd, realized_pnl_pct=pnl_pct, trading_days_held=held,
         )
+        if not transitioned:
+            # Already CLOSED/EXIT_UNRESOLVED/otherwise not OPEN -- an
+            # explicit, non-fabricating no-op. No cash, trade, or
+            # cooldown mutation; the caller must not generate a second
+            # exit notification from this outcome (see ``settled``).
+            return ExitOutcome(position["symbol"], position["episode_id"], es, exit_price,
+                               pnl_usd, pnl_pct, held, settled=False)
         proceeds = shares * exit_price
         cash_after = store.cash() + proceeds
         store.set_cash(cash_after)
@@ -188,7 +210,7 @@ def close_position(
         cooldown_until = v2cal.add_sessions(es, cfg.reentry_cooldown_trading_days)
         store.set_cooldown(position["symbol"], cooldown_until)
     return ExitOutcome(position["symbol"], position["episode_id"], es, exit_price,
-                       pnl_usd, pnl_pct, held)
+                       pnl_usd, pnl_pct, held, settled=True)
 
 
 def open_position_report(store: V2Store, as_of_session: date) -> list[dict]:

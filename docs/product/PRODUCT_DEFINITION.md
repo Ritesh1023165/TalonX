@@ -584,6 +584,47 @@ labelled illustrations, not adopted.
 `OPS-002`-`OPS-005`, `OPS-012`, `OPS-015`, `OPS-016` **remain open**,
 unaffected by either session.
 
+## 6l. Reconciliation and release planning — `AGREED` (Session 13), Package 1 `IMPLEMENTED`
+
+Recorded in full in `DECISION_LOG.md` Session 13, tracked as `S13-01`
+through `S13-09` in `REQUIREMENTS_TRACKER.md`. This is the **first
+session in this documentation series with an authorized, implemented
+code change** — Package 1 (Settlement Integrity & Unresolved
+Obligations), `S13-09`.
+
+- **Release scope agreed**: V2 (Insider Buying) is the first-release
+  primary paper strategy, conditional on acceptance criteria not yet
+  fully met; Intraday is Research-Lab-only for the first release
+  (does not reopen `S3-01`'s long-term both-horizons decision); company
+  developments stay dashboard-visible with primary-Telegram gating
+  requiring both opt-in and Session 7's (still unbuilt) acceptance
+  criteria.
+- **Staging agreed**: `Stage 0` → `Package 1` → `Package 2` →
+  `Package 3` → `Package 4` → `Package 5` → release integration.
+  **Only Package 1 is authorized and built** — Packages 2-5 and
+  release integration remain explicitly unauthorized.
+- **Package 1, built and verified**: fixed a genuine duplicate-
+  settlement defect (`talonx_v2/paper.py::close_position()` now checks
+  whether its own conditional state transition actually occurred
+  before crediting cash/appending a trade/setting cooldown) and a
+  genuine unresolved-obligation-visibility defect (`EXIT_UNRESOLVED`
+  positions now correctly retain their capacity slot and symbol
+  ownership, and their cost basis is no longer silently omitted from
+  V2's reconciliation/equity reporting). Both were reproduced failing
+  against the unmodified baseline first (9/14 new tests failed), then
+  fixed (14/14 pass). A scoped 32-file/406-test regression run found
+  zero new failures; the V2 strategy fingerprint (`11107198c5b81237`)
+  is directly confirmed unchanged.
+- **Explicitly not done**: the account-wide admission block for
+  `EXIT_UNRESOLVED`/reconciliation-mismatch (`OPS-012`/`OPS-015`'s own
+  described gap) remains open — that is `Package 2`'s scope, not
+  satisfied by Package 1's slot-retention fix.
+- **New finding**: `OPS-017` — a stale hardcoded fingerprint constant
+  in two unrelated pre-existing test files, confirmed pre-existing via
+  baseline reproduction, not fixed here.
+- **Material-version cutover rules recorded** (documentation only) —
+  no cutover performed or scheduled.
+
 ## 7. Open / proposed — see `REQUIREMENTS_TRACKER.md` for tracked status
 
 - **Intraday-vs-multi-day scope** ("swing intelligence assistant"):
