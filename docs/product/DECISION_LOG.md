@@ -3290,3 +3290,83 @@ unaffected by this session except as separately re-confirmed
 **PACKAGE 3 NOT STARTED. PACKAGE 3 AWAITS GATEKEEPER REVIEW** of this
 acceptance report, exactly as this session's own task specification
 required.
+
+## Package 3 — Authoritative Pricing, Refresh, Evidence Timestamps & Deadlines
+
+**Package 3 implementation and its isolated regression tests are
+authorized by this session**, following Package 2's acceptance — see
+`REQUIREMENTS_TRACKER.md` `S13-12`/`S13-13` and `OPERATIONAL_
+FINDINGS.md` (`OPS-003` Finding B closed / Finding A re-confirmed; new
+`OPS-020`/`OPS-021`) for the full record. Full evidence: `docs/
+research/evidence/package3_pricing_timing/README.md`. **Packages 4-5
+and V2 release integration remain explicitly not authorized.**
+
+### Verdict
+
+**`PACKAGE3_ACCEPTED_WITH_BOUNDED_FOLLOWUPS`.** All 11 acceptance-
+standard items satisfied. Two real defects were found and closed:
+(1) the default live-wired "csv" pricing path could silently parse a
+missing price as `NaN` (truthy in Python — bypassed every existing
+missing-price check); (2) admission causality checked only the
+source's own timestamp (SEC EDGAR `accepted_at_utc`), never TalonX's
+own durable receipt (`InsiderFiling.ingested_at_utc`) — a late
+receipt with an earlier source timestamp could have incorrectly
+passed. OPS-003 Finding B (the dual-deadline discrepancy: a 4-session
+general gate vs. a 3-session reactive-only retry deadline, and a fill
+attempted before any deadline check) is now CLOSED — a single, unified
+Session-3 boundary, computed from the REAL exchange-calendar close
+timestamp (honoring early closes), checked PROACTIVELY before any
+fill. OPS-003 Finding A was directly re-confirmed (not merely
+re-recorded) and classified `PARTIALLY_COMPATIBLE` against the
+corrected runtime — see below.
+
+### What was NOT done (per the task's own explicit non-goals)
+
+No Package 4/5 work, no strategy/qualification-rule change, no
+provider switch/activation, no paid data, no profitability
+recomputation, no historical result rewritten, no release integration,
+no application start/stop, no Telegram send, no production database
+mutation.
+
+### OPS-003 Finding A classification
+
+`PARTIALLY_COMPATIBLE`. `cluster_engine.py`'s activation rule (2nd
+distinct owner) is unchanged by this package and was directly
+re-verified by code inspection. The ORIGINAL `S2-15`-cited headline
+profitability figures (research `build_episodes`, last-filing
+activation) remain INCOMPATIBLE with this runtime semantics — they
+must not be attributed to the release implementation as-is. Task
+112R's own G2b re-evaluation and Task 115/116's replay already used
+runtime-matching semantics and may be treated as runtime-
+representative, though neither has been re-verified against this
+package's own pricing/deadline corrections — that reconciliation
+remains open for the parallel prior-research track. No profitability
+was recomputed and no historical result was rewritten to reach this
+classification.
+
+### Findings tracked in `OPERATIONAL_FINDINGS.md`
+
+- **`OPS-003`** — Finding B CLOSED (the deadline-consistency defect);
+  Finding A re-confirmed, still fully open (unaffected by this
+  package, which never touches episode/cluster detection).
+- **`OPS-020`** (new) — default-mode price loader could parse a
+  missing value as `NaN`; found and closed within this same session.
+- **`OPS-021`** (new) — admission causality checked source timestamp
+  only, never TalonX's own durable receipt; found and closed within
+  this same session.
+- **`OPS-005`** (provider-finality gap) remains open, unaffected —
+  this package inspected but did not switch/activate/qualify a
+  provider.
+
+### Schema change
+
+`talonx_v2/store.py`: `pending_entry_intents` gained two additive,
+nullable columns (`source_event_ts_utc`, `receipt_ts_utc`), via the
+store's own pre-existing `ALTER TABLE ... ADD COLUMN` migration
+convention — no destructive migration, no new table.
+
+### Package 4/5 gate
+
+**PACKAGE 4 NOT STARTED. PACKAGE 5 NOT STARTED. V2 RELEASE INTEGRATION
+NOT STARTED. NEXT PACKAGE AWAITS GATEKEEPER REVIEW** of this Package 3
+report.

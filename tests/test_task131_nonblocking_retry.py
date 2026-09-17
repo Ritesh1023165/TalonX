@@ -155,17 +155,33 @@ def test_price_still_missing_next_session_releases_intent_exactly_once(tmp_path)
     store = V2Store(str(tmp_path / "v2.db"), starting_cash=BALANCE)
     intents = store.all_entry_intents()
     assert len(intents) == 1
-    assert intents[0]["status"] == "FAILED_NO_MARKET_DATA"
+    # Package 3 P3-D (OPS-003 Finding B, item 1): the coarse, date-only
+    # staleness gate is now unified with this exact Session-3 boundary
+    # (previously one session wider, a documented defect) -- so at
+    # `past_deadline` the episode is now excluded by that OUTER gate
+    # before `_phase_open` ever runs its own reactive NO_ENTRY_BAR
+    # release logic, and is instead released via `_phase_post_close`'s
+    # pre-existing staleness sweep. Still terminal, still exactly-once,
+    # still no economic mutation -- only the specific terminal label
+    # changed, a direct and intended consequence of closing the
+    # 4-session/3-session gap this test's own timeline exercises.
+    assert intents[0]["status"] == "EXPIRED_STALE"
     assert store.n_open() == 0
     assert store.cash() == BALANCE
 
     disp = [r[0] for r in __import__("sqlite3").connect(str(tmp_path / "v2.db")).execute(
         "SELECT disposition FROM processed_episodes")]
-    assert disp == ["FAILED_NO_MARKET_DATA"]
+    # `processed_episodes.disposition` was already written as
+    # SKIPPED_NO_ENTRY_BAR by an EARLIER retry attempt inside the
+    # window (pipeline.process_episode) -- the later staleness sweep's
+    # own disposition write is guarded (episode_seen() already True)
+    # and correctly does not overwrite it; only the intent's own
+    # status (asserted above) records the final EXPIRED_STALE outcome.
+    assert disp == ["SKIPPED_NO_ENTRY_BAR"]
 
     # a further later tick does not re-release it or re-attempt it
     st2 = svc.tick(as_of=v2cal.next_session_strictly_after(past_deadline))
     assert st2["entries_this_tick"] == 0
     store2 = V2Store(str(tmp_path / "v2.db"), starting_cash=BALANCE)
-    assert store2.all_entry_intents()[0]["status"] == "FAILED_NO_MARKET_DATA"
+    assert store2.all_entry_intents()[0]["status"] == "EXPIRED_STALE"
     assert store2.n_open() == 0

@@ -11,7 +11,7 @@ early closes are handled by the calendar itself.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from functools import lru_cache
 
 logger = logging.getLogger("talonx_v2.calendar")
@@ -105,6 +105,18 @@ def sessions_between(start: date | datetime | str, end: date | datetime | str) -
     if b <= a:
         return 0
     return sum(1 for s in _sessions() if a < s <= b)
+
+
+def session_close_utc(d: date | datetime | str) -> datetime:
+    """Package 3 P3-D: the REAL, official XNYS close timestamp (UTC) for
+    session ``d`` -- honors early closes via ``exchange_calendars``' own
+    calendar data (e.g. 13:00 ET / 18:00 UTC the day after Thanksgiving),
+    never approximated as midnight UTC/local or a fixed hour offset.
+    ``d`` must be an actual trading session (raises if not -- callers
+    resolve to a real session first, e.g. via ``add_sessions``)."""
+    import exchange_calendars as xc
+    ts = xc.get_calendar("XNYS").session_close(_as_date(d).isoformat())
+    return ts.to_pydatetime().astimezone(timezone.utc)
 
 
 def trading_days_elapsed(entry_session: date | datetime | str, as_of: date | datetime | str) -> int:

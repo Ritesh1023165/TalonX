@@ -1,0 +1,29 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- C:\workspace\TalonX\.venv\Scripts\python.exe
+rootdir: C:\workspace\TalonX
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.10.16, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 19 items
+
+tests/test_package3_pricing_timing.py::test_p3b_missing_open_value_never_becomes_a_usable_price PASSED [  5%]
+tests/test_package3_pricing_timing.py::test_p3b_valid_price_is_used_normally PASSED [ 10%]
+tests/test_package3_pricing_timing.py::test_p3b_one_malformed_row_does_not_drop_the_whole_symbol PASSED [ 15%]
+tests/test_package3_pricing_timing.py::test_p3b_missing_price_does_not_fabricate_a_zero_cost_reservation PASSED [ 21%]
+tests/test_package3_pricing_timing.py::test_p3d_session3_is_computed_via_the_real_calendar_ordinary_week PASSED [ 26%]
+tests/test_package3_pricing_timing.py::test_p3d_weekend_is_skipped_by_the_real_calendar PASSED [ 31%]
+tests/test_package3_pricing_timing.py::test_p3d_market_holiday_is_skipped_by_the_real_calendar PASSED [ 36%]
+tests/test_package3_pricing_timing.py::test_p3d_early_close_session_uses_the_actual_early_close_timestamp PASSED [ 42%]
+tests/test_package3_pricing_timing.py::test_p3d_live_tick_immediately_before_session3_close_still_qualifies PASSED [ 47%]
+tests/test_package3_pricing_timing.py::test_p3d_live_tick_immediately_after_session3_close_is_refused PASSED [ 52%]
+tests/test_package3_pricing_timing.py::test_p3d_replay_tick_date_only_boundary_matches_live_session_boundary PASSED [ 57%]
+tests/test_package3_pricing_timing.py::test_p3d_pending_intent_released_not_left_zombie_after_deadline PASSED [ 63%]
+tests/test_package3_pricing_timing.py::test_p3e_late_receipt_is_refused_even_with_an_earlier_source_timestamp PASSED [ 68%]
+tests/test_package3_pricing_timing.py::test_p3e_timely_receipt_and_timely_processing_admits_normally PASSED [ 73%]
+tests/test_package3_pricing_timing.py::test_p3e_timely_receipt_but_delayed_processing_still_admits PASSED [ 78%]
+tests/test_package3_pricing_timing.py::test_p3e_restart_preserves_the_pending_intent_before_processing PASSED [ 84%]
+tests/test_package3_pricing_timing.py::test_p3e_duplicate_processing_does_not_create_duplicate_signal_or_position PASSED [ 89%]
+tests/test_package3_pricing_timing.py::test_p3a_same_entry_price_flows_into_sizing_reservation_fill_and_cost_basis PASSED [ 94%]
+tests/test_package3_pricing_timing.py::test_concurrency_independent_writers_cannot_double_fill_the_same_intent PASSED [100%]
+
+============================= 19 passed in 2.15s ==============================

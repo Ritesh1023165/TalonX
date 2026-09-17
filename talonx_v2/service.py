@@ -17,14 +17,15 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import signal
 import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from talonx_v2 import form4_source, paper, pipeline
-from talonx_v2.calendar import (is_session, next_session_on_or_after,
-                                next_session_strictly_after)
+from talonx_v2.calendar import (add_sessions, is_session, next_session_on_or_after,
+                                next_session_strictly_after, session_close_utc)
 from talonx_v2.config import V2_VERSION, V2Config
 from talonx_v2.profile import active_profile
 from talonx_v2.schemas import V2Action
@@ -142,6 +143,11 @@ class V2Service:
         # treats a missing entry as "unknown, skip the check", never a
         # fabricated pass or fail.
         self._dissemination_lookup: dict[tuple[str, str], datetime] = {}
+        # Package 3 P3-E: TalonX's own durable receipt timestamp
+        # (InsiderFiling.ingested_at_utc) per (symbol, filing_date) --
+        # see _refresh_dissemination_lookup's own docstring. Same
+        # missing-entry convention as _dissemination_lookup above.
+        self._receipt_lookup: dict[tuple[str, str], datetime] = {}
         # Final Remediation Directive 1: True only for a tick where
         # _refresh_dissemination_lookup ACTUALLY ran against the real
         # InsiderStore this tick -- distinct from ``form4_kind ==
@@ -204,9 +210,35 @@ class V2Service:
                     continue
                 if "date" not in df.columns:
                     continue
-                rows = [{"date": str(r.date)[:10], "open": float(getattr(r, "open", "nan")),
-                         "close": float(r.close), "volume": float(getattr(r, "volume", 0) or 0)}
-                        for r in df.itertuples(index=False)]
+                rows: list[dict] = []
+                for r in df.itertuples(index=False):
+                    # Package 3 P3-B: a missing/blank/non-numeric open
+                    # or close must never silently become a usable
+                    # price. The prior code's ``float(getattr(r,
+                    # "open", "nan"))`` turned a genuinely missing
+                    # value into an actual NaN float -- and NaN is
+                    # TRUTHY in Python (``not float("nan")`` is
+                    # False), so `pipeline.process_episode`'s own
+                    # "if not px or not px.get('open')" missing-price
+                    # check would have silently PASSED a NaN price
+                    # straight through into sizing/cost-basis. Skip
+                    # only the malformed row (never fabricate a price,
+                    # never crash the whole symbol's bar load).
+                    o, c = getattr(r, "open", None), getattr(r, "close", None)
+                    try:
+                        o_f, c_f = float(o), float(c)
+                    except (TypeError, ValueError):
+                        continue
+                    if not (math.isfinite(o_f) and o_f > 0 and math.isfinite(c_f) and c_f > 0):
+                        continue
+                    v_raw = getattr(r, "volume", 0)
+                    try:
+                        v_f = float(v_raw) if v_raw is not None else 0.0
+                        if not math.isfinite(v_f) or v_f < 0:
+                            v_f = 0.0
+                    except (TypeError, ValueError):
+                        v_f = 0.0
+                    rows.append({"date": str(r.date)[:10], "open": o_f, "close": c_f, "volume": v_f})
                 self._bar_cache[sym] = rows
                 return rows
         self._bar_cache[sym] = []
@@ -270,6 +302,7 @@ class V2Service:
         # A date-only source has no real wall-clock dissemination timestamp
         # -- the lookup is explicitly empty (never fabricated).
         self._dissemination_lookup = {}
+        self._receipt_lookup = {}
         recs = form4_source.from_research_parquet(self.form4_parquet, since=since)
         recs = self._apply_execution_allowlist(recs, stage="records")
         self._source_state.update(
@@ -290,9 +323,27 @@ class V2Service:
         ``_records()`` already reads from -- a separate, lightweight local
         SQLite read, not a new network call. Entirely contained in this
         operational module; the frozen cluster_engine.PurchaseRecord/
-        ClusterEpisode shapes are never touched."""
+        ClusterEpisode shapes are never touched.
+
+        Package 3 P3-E: also populates ``self._receipt_lookup``, keyed
+        identically, with the LATEST ``InsiderFiling.ingested_at_utc``
+        seen for that issuer/day -- TalonX's OWN durable receipt
+        timestamp (populated by the separate, already-running
+        ingestion service when a filing was first durably stored),
+        distinct from ``accepted_at_utc`` (SEC EDGAR's own acceptance
+        time -- a source/provider timestamp TalonX does not control
+        and could, in principle, receive well after). Without this,
+        the look-ahead-bias check below could pass purely on an early
+        SOURCE timestamp even if TalonX itself never durably received
+        the evidence until later -- exactly the "late receipt
+        masquerading as timely because the source timestamp was
+        earlier" failure mode this package must prevent. One
+        ``get_filing`` lookup per distinct accession (cached within
+        this call, not a new lookup per transaction)."""
         from talonx_ingest.intelligence.insider.domain import TransactionClass
         lookup: dict[tuple[str, str], datetime] = {}
+        receipt_lookup: dict[tuple[str, str], datetime] = {}
+        filing_cache: dict[str, datetime | None] = {}
         try:
             txns = insider_store.query_transactions(
                 classification=TransactionClass.OPEN_MARKET_PURCHASE,
@@ -300,6 +351,7 @@ class V2Service:
         except Exception:  # noqa: BLE001 -- best-effort; the boundary check simply no-ops without it
             logger.exception("dissemination_lookup_refresh_failed")
             self._dissemination_lookup = {}
+            self._receipt_lookup = {}
             return
         for t in txns:
             if not t.symbol or not t.accepted_at_utc:
@@ -309,7 +361,20 @@ class V2Service:
             prev = lookup.get(key)
             if prev is None or t.accepted_at_utc > prev:
                 lookup[key] = t.accepted_at_utc
+
+            if t.accession not in filing_cache:
+                try:
+                    filing = insider_store.get_filing(t.accession)
+                    filing_cache[t.accession] = filing.ingested_at_utc if filing is not None else None
+                except Exception:  # noqa: BLE001 -- a filing lookup fault must not fail the whole refresh
+                    filing_cache[t.accession] = None
+            ingested = filing_cache[t.accession]
+            if ingested is not None:
+                prev_r = receipt_lookup.get(key)
+                if prev_r is None or ingested > prev_r:
+                    receipt_lookup[key] = ingested
         self._dissemination_lookup = lookup
+        self._receipt_lookup = receipt_lookup
         # a genuine, successful query against the real InsiderStore ran --
         # from here on, "no matching record" for a specific episode means
         # it genuinely was not found, not merely "we never looked."
@@ -383,7 +448,17 @@ class V2Service:
         all_eps = self._apply_execution_allowlist(all_eps, stage="episodes")
         all_ripe = [e for e in all_eps if e.eligible_entry_session <= ripe_through]
 
-        stale_cut = add_sessions(ripe_through, -self.cfg.max_entry_staleness_sessions) \
+        # Package 3 P3-D (OPS-003 Finding B, item 1): this coarse,
+        # date-only outer gate must use the SAME Session-3 boundary as
+        # the policy itself (target entry = Session 1; recovery ends at
+        # Session 3) -- `max_entry_staleness_sessions - 1`, not
+        # `max_entry_staleness_sessions` (which produced a 4-session
+        # window one session wider than agreed). Session 3's own date
+        # remains attemptable here (inclusive boundary, S6-24's "at or
+        # before the deadline qualifies"); the FINER, real-close-time
+        # check for a live tick still on Session 3's own calendar date
+        # happens proactively inside `_phase_open` below.
+        stale_cut = add_sessions(ripe_through, -(self.cfg.max_entry_staleness_sessions - 1)) \
             if self.cfg.max_entry_staleness_sessions > 0 else date.min
 
         def _is_stale(e) -> bool:
@@ -493,6 +568,32 @@ class V2Service:
                 logger.error("temporal_boundary_violation episode_id=%s symbol=%s detail=%s",
                             ep.episode_id, ep.symbol, boundary_detail)
                 continue
+            # Package 3 P3-D (OPS-003 Finding B, item 2): the recovery
+            # deadline is now checked PROACTIVELY, before any fill is
+            # attempted -- not only reactively after a NO_ENTRY_BAR
+            # miss (the missing-price path below still keeps its own
+            # narrower within-window retry accounting; this is the
+            # single authoritative refusal for a fill attempted after
+            # the window has genuinely closed, for ANY reason, not only
+            # a missing price). For a live tick still on Session 3's
+            # own calendar date, this is the one place real close-time
+            # precision (not just date) is enforced -- see
+            # `_recovery_deadline_passed`'s own docstring.
+            if self._recovery_deadline_passed(ep.eligible_entry_session, ripe_through=ripe_through, live=live):
+                detail = (f"recovery deadline (official close of Session 3, "
+                          f"{self._recovery_deadline_session(ep.eligible_entry_session).isoformat()}) "
+                          f"has passed -- no new fill; reservation released, not left pending")
+                self.store.record_disposition(
+                    episode_id=ep.episode_id, symbol=ep.symbol,
+                    disposition="SKIPPED_RECOVERY_DEADLINE_PASSED", issuer_cik=ep.issuer_cik,
+                    eligible_entry_session=ep.eligible_entry_session.isoformat(), detail=detail)
+                if pre_intent is not None:
+                    self.store.mark_entry_intent(
+                        pre_intent["intent_id"], "EXPIRED_RECOVERY_DEADLINE", detail=detail)
+                    self._enqueue_alert(kind="ENTRY_STALE", episode=ep, decision=None,
+                                        intent=pre_intent, extra={"expired": True,
+                                                                  "reason": "RECOVERY_DEADLINE_PASSED"})
+                continue
             n_before = len(res.entries)
             n_skipped_before = len(res.skipped)
             # Final Remediation Directive 2: the entry attempt (capacity
@@ -579,6 +680,43 @@ class V2Service:
             self._enqueue_alert(kind="ENTRY_FAILED_NO_DATA", episode=ep, decision=None,
                                 intent=pre_intent, extra={"released": True})
         self._no_prior_intent_skipped = no_prior
+
+    def _recovery_deadline_session(self, eligible_entry_session: date) -> date:
+        """Package 3 P3-D: Session 3 under the product's own 1-indexed
+        counting (target entry session = Session 1) -- the SINGLE,
+        unified boundary now used both for the coarse date-only
+        staleness gate (`tick()`'s own `stale_cut`) and this method's
+        own proactive pre-fill check below. Replaces the two previously
+        -divergent computations OPS-003 Finding B documented (a
+        4-session general admission gate vs. a 3-session reactive-only
+        missing-price release deadline)."""
+        return add_sessions(eligible_entry_session,
+                            max(0, self.cfg.max_entry_staleness_sessions - 1))
+
+    def _recovery_deadline_passed(self, eligible_entry_session: date, *,
+                                  ripe_through: date, live: bool) -> bool:
+        """True once the recovery window has genuinely closed.
+
+        LIVE: compares the real wall clock against Session 3's own
+        ACTUAL official close timestamp (`calendar.session_close_utc`
+        -- correctly honors early closes, never approximated as
+        midnight UTC/local or a fixed hour offset). "At or before the
+        deadline qualifies" (Session 6 Section I / `S6-24`'s agreed
+        equality semantics) -- the deadline is passed only once now()
+        is STRICTLY AFTER that close.
+
+        Non-live (replay/backtest/dry-run): no real wall clock exists
+        to compare against -- the boundary is date-only, passed once
+        `ripe_through` is STRICTLY AFTER the deadline session. This
+        preserves the existing, already-correct restart-independent
+        replay semantics (a pure function of the episode's fixed
+        `eligible_entry_session` and the calendar's static session
+        list -- consults no process-uptime or last-run state)."""
+        deadline_session = self._recovery_deadline_session(eligible_entry_session)
+        if live:
+            deadline_close = session_close_utc(deadline_session)
+            return datetime.now(timezone.utc) > deadline_close
+        return ripe_through > deadline_session
 
     def _phase_close(self, ripe_through: date, res, *, price_lookup) -> None:
         try:
@@ -750,9 +888,18 @@ class V2Service:
                             detail=reject_reason)
                         self._capacity_rejected += 1
                         continue
+                    # Package 3 P3-F: capture whatever source/receipt
+                    # timestamps are known for this episode's activating
+                    # filing at the moment of admission -- the earliest
+                    # durable boundary they are available at.
+                    src_ts = self._dissemination_lookup.get(
+                        (e.symbol.upper(), e.activation_filing_date.isoformat()))
+                    recv_ts = self._receipt_lookup.get(
+                        (e.symbol.upper(), e.activation_filing_date.isoformat()))
                     intent = self.store.upsert_entry_intent(
                         e, dec, liq, horizon=self.cfg.hold_trading_days,
-                        planned_exit_session=planned_exit)
+                        planned_exit_session=planned_exit,
+                        source_event_ts_utc=src_ts, receipt_ts_utc=recv_ts)
                     intents_created += 1
                     self._enqueue_alert(kind="ENTRY_INTENT", episode=e, decision=dec,
                                         intent=intent, extra={
@@ -917,6 +1064,32 @@ class V2Service:
             return False, (f"activation filing disseminated at {ts.isoformat()}, which is NOT "
                            f"strictly before the entry session's own RTH open "
                            f"({rth_open.isoformat()}) -- refusing to prevent look-ahead bias")
+        # Package 3 P3-E: `ts` above is SEC EDGAR's own `accepted_at_utc`
+        # -- a source/provider timestamp, not proof TalonX itself
+        # durably received this evidence in time. When TalonX's own
+        # durable receipt timestamp (InsiderFiling.ingested_at_utc,
+        # populated by the separate ingestion service) IS available for
+        # this same filing, it must ALSO satisfy the identical boundary
+        # -- otherwise a filing accepted by SEC before RTH open but not
+        # actually durably stored by TalonX until AFTER RTH open would
+        # incorrectly pass based on the source timestamp alone (the
+        # exact "late receipt masquerading as timely" failure mode this
+        # package must prevent). Checked only when a receipt timestamp
+        # is actually available for this filing (soft no-op otherwise,
+        # matching this codebase's "never fabricate a pass OR a fail
+        # from absent data" posture elsewhere) -- in real InsiderStore
+        # data this field is always populated (a required, non-nullable
+        # column on InsiderFiling); it is absent only for a caller that
+        # never wired _receipt_lookup at all (e.g. a test exercising an
+        # unrelated concern), which this check must not spuriously break.
+        receipt_ts = self._receipt_lookup.get((ep.symbol.upper(), ep.activation_filing_date.isoformat()))
+        if receipt_ts is not None and receipt_ts >= rth_open:
+            return False, (f"TalonX's own durable receipt of the activating filing "
+                           f"(ingested_at_utc={receipt_ts.isoformat()}) is NOT strictly before "
+                           f"the entry session's own RTH open ({rth_open.isoformat()}), even "
+                           f"though the source's own accepted_at_utc ({ts.isoformat()}) was -- "
+                           f"refusing: a late TalonX receipt must never be treated as timely "
+                           f"merely because the source's own timestamp was earlier")
         # Targeted Remediation Directive 1/2: on a true LIVE tick, the
         # moment THIS admission decision is being evaluated -- the
         # existing intent's own creation time if one already exists,

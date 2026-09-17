@@ -114,7 +114,9 @@ CREATE TABLE IF NOT EXISTS pending_entry_intents (
     fill_entry_session    TEXT,
     fill_price            REAL,
     reconciled_at_utc     TEXT,
-    detail                TEXT
+    detail                TEXT,
+    source_event_ts_utc   TEXT,      -- Package 3 P3-F: provider/source timestamp (e.g. SEC EDGAR accepted_at_utc), where available
+    receipt_ts_utc        TEXT       -- Package 3 P3-F: TalonX's OWN durable receipt timestamp (e.g. InsiderFiling.ingested_at_utc), where available
 );
 -- Task 117 overnight: durable V2 official-alert outbox.  Written by the service,
 -- drained by a delivery worker that asks OfficialExternalRouter and hands the
@@ -301,6 +303,13 @@ class V2Store:
             cols = {r[1] for r in c.execute("PRAGMA table_info(v2_alert_outbox)")}
             if cols and "deliver_by_utc" not in cols:
                 c.execute("ALTER TABLE v2_alert_outbox ADD COLUMN deliver_by_utc TEXT")
+            # Package 3 P3-F: additive audit columns for an intents table
+            # that may have been created by an earlier build.
+            intent_cols = {r[1] for r in c.execute("PRAGMA table_info(pending_entry_intents)")}
+            if intent_cols and "source_event_ts_utc" not in intent_cols:
+                c.execute("ALTER TABLE pending_entry_intents ADD COLUMN source_event_ts_utc TEXT")
+            if intent_cols and "receipt_ts_utc" not in intent_cols:
+                c.execute("ALTER TABLE pending_entry_intents ADD COLUMN receipt_ts_utc TEXT")
             row = c.execute("SELECT cash FROM portfolio WHERE id=1").fetchone()
             if row is None:
                 c.execute("INSERT INTO portfolio (id, cash) VALUES (1, ?)", (self._starting_cash,))
@@ -569,9 +578,20 @@ class V2Store:
         return hashlib.sha256(f"{episode_id}|{target_entry_session}".encode()).hexdigest()[:16]
 
     def upsert_entry_intent(self, ep, decision, liquidity, *, horizon: int,
-                            planned_exit_session: str = "") -> dict:
+                            planned_exit_session: str = "",
+                            source_event_ts_utc=None, receipt_ts_utc=None) -> dict:
         """Create (idempotently) a PENDING pre-open entry intent for ``ep``.
-        Never overwrites a FILLED/EXPIRED/SUPERSEDED terminal state."""
+        Never overwrites a FILLED/EXPIRED/SUPERSEDED terminal state.
+
+        Package 3 P3-F: ``source_event_ts_utc``/``receipt_ts_utc``, when
+        supplied, durably capture -- at the EARLIEST point they are known
+        (admission time, this call) -- the provider/source timestamp and
+        TalonX's own durable receipt timestamp that justified admission,
+        so a later audit can reconstruct WHY this trade was allowed
+        without needing to re-query the (mutable, retention-bounded)
+        upstream InsiderStore. Both optional/nullable -- absent for a
+        date-only source (research parquet) or when the caller did not
+        have this information available, never fabricated."""
         tes = ep.eligible_entry_session.isoformat()
         iid = self._intent_id(ep.episode_id, tes)
         with self._conn() as c:
@@ -585,13 +605,16 @@ class V2Store:
                     activation_filing_date, target_entry_session, planned_exit_session,
                     decision_action, decision_rationale, horizon_trading_days,
                     liquidity_ok, liquidity_median_dv, liquidity_last_close,
-                    status, created_at_utc, updated_at_utc)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'PENDING', ?, ?)""",
+                    status, created_at_utc, updated_at_utc,
+                    source_event_ts_utc, receipt_ts_utc)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'PENDING', ?, ?, ?, ?)""",
                 (iid, ep.episode_id, ep.symbol.upper(), ep.issuer_cik,
                  decision.strategy_version, ep.activation_filing_date.isoformat(), tes,
                  planned_exit_session, decision.action.value, decision.rationale[:400],
                  int(horizon), 1 if liquidity.ok else 0, liquidity.median_dollar_volume,
-                 liquidity.last_close, _utcnow(), _utcnow()),
+                 liquidity.last_close, _utcnow(), _utcnow(),
+                 source_event_ts_utc.isoformat() if source_event_ts_utc else None,
+                 receipt_ts_utc.isoformat() if receipt_ts_utc else None),
             )
         return self.entry_intent(ep.episode_id)
 

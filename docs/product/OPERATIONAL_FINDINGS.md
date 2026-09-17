@@ -378,6 +378,38 @@ store.py:526-536`; `tests/test_task131_nonblocking_retry.py` and
 **Related**: `REQUIREMENTS_TRACKER.md` `S5-13`, `S5-14`, `S5-15`,
 `S5-16`, `S5-17`, `S5-19`, `S5-20`.
 
+**Package 3 update (2026-09-17) — Finding B CLOSED; Finding A
+re-confirmed (still open, unaffected)**:
+
+Finding B (the intra-runtime dual-deadline discrepancy) is now
+corrected: `talonx_v2/calendar.py::session_close_utc()` (new) gives the
+REAL official XNYS close timestamp (honoring early closes, e.g.
+13:00 ET the day after Thanksgiving, never approximated as a fixed
+hour offset). `V2Service._recovery_deadline_session()`/
+`_recovery_deadline_passed()` (new) provide ONE unified Session-3
+boundary, used by BOTH the coarse admission gate (`tick()`'s
+`stale_cut`, corrected from a 4-session to the agreed 3-session
+window) and a new PROACTIVE check inside `_phase_open()` that refuses
+a fill attempt once the deadline has genuinely passed — live ticks
+compare the real wall clock against the actual close; non-live
+(replay/restart) ticks use the pre-existing, already-correct
+date-only boundary. All 5 of Finding B's own listed acceptance
+scenarios are now tested (ordinary week, weekend, holiday, live
+immediately-before/after the actual close). See
+`docs/research/evidence/package3_pricing_timing/README.md` §4.
+
+Finding A was DIRECTLY RE-CONFIRMED this session (previously only
+"recorded for re-verification," not re-checked since Task 112R):
+`talonx_v2/cluster_engine.py` still fires episode activation at the
+2nd distinct owner filing, unchanged. Task 112R's own original
+cross-methodology difference against the research `build_episodes`
+methodology (last-filing activation) therefore still stands, fully
+unresolved by Package 3 (which never touches `cluster_engine.py`).
+See `REQUIREMENTS_TRACKER.md`'s new `S13-12` and the evidence README
+§7 for the full `PARTIALLY_COMPATIBLE` classification and its exact
+consequences for which prior V2 result figures may/may not be
+attributed to the release runtime.
+
 ---
 
 ## OPS-004 — Corporate-action and fractional-share handling gap
@@ -1306,6 +1338,82 @@ package2_account_blocks/ACCEPTANCE_REVIEW.md` §A5.
 
 **Related**: `S13-09` (Package 1's own settlement-integrity work, which
 this closes a remaining gap in).
+
+---
+
+## OPS-020 — Default-mode price loader could parse a missing value as NaN (found and closed same session)
+
+**Status**: `CLOSED` — found and fixed within Package 3 (2026-09-17);
+no window where this was OPEN in a released state.
+
+**Found**: Package 3 P3-B, direct inspection of `V2Service._bars()`
+(the "csv"-mode bar loader — the DEFAULT, live-wired pricing path).
+
+**Finding**: `float(getattr(r, "open", "nan"))` turned a genuinely
+missing/blank CSV cell into an actual `NaN` float. `NaN` is TRUTHY in
+Python (`not float("nan")` is `False`), so `pipeline.process_episode`'s
+own `if not px or not px.get("open"):` missing-price check would have
+silently passed a NaN price straight through — and `calculate_buy()`'s
+own `if price <= 0: return None` guard does not catch NaN either
+(`NaN <= 0` is `False`) — a genuine "missing price masquerades as a
+legitimate fill" defect reachable in the default live pricing mode.
+
+**Fix**: `_bars()` now validates each row's `open`/`close`
+(`math.isfinite(x) and x > 0`) before including it; a malformed row is
+excluded (never fabricated, never crashes the whole symbol's load).
+`pricing.PricingResolver`'s own `validate_bar()` (the "composite-yf"/
+"composite-iex" modes) already had this protection — only the default
+"csv" mode's own separate, less-defensive loader was affected.
+
+**Verification**: `tests/test_package3_pricing_timing.py`
+(`test_p3b_missing_open_value_never_becomes_a_usable_price` and
+siblings).
+
+**Evidence references**: `docs/research/evidence/
+package3_pricing_timing/README.md` §2.
+
+---
+
+## OPS-021 — Admission causality checked source timestamp only, never TalonX's own durable receipt (found and closed same session)
+
+**Status**: `CLOSED` — found and fixed within Package 3 (2026-09-17);
+no window where this was OPEN in a released state.
+
+**Found**: Package 3 P3-E, direct inspection of
+`V2Service._verify_temporal_boundary()` /
+`_refresh_dissemination_lookup()`.
+
+**Finding**: the admission-time look-ahead-bias check compared only
+`InsiderTransaction.accepted_at_utc` (SEC EDGAR's own source/provider
+acceptance timestamp) against the entry session's RTH open.
+`InsiderFiling.ingested_at_utc` — TalonX's OWN durable receipt
+timestamp, already captured by the separate, already-running
+ingestion service — was never consulted at all. A filing SEC accepted
+before RTH open but that TalonX itself did not durably ingest until
+AFTER RTH open would have incorrectly passed, based purely on the
+source's own timestamp — the "late receipt masquerading as timely
+because the source timestamp was earlier" failure mode.
+
+**Fix**: `_refresh_dissemination_lookup` now also populates
+`self._receipt_lookup` (one `InsiderStore.get_filing()` lookup per
+distinct accession, cached per refresh); `_verify_temporal_boundary`
+additionally refuses when a KNOWN receipt timestamp is not strictly
+before RTH open (soft no-op when no receipt timestamp is available at
+all, so an unrelated caller/test is not spuriously broken). Both
+timestamps are now also durably persisted onto the admission record
+(`pending_entry_intents.source_event_ts_utc`/`receipt_ts_utc`, an
+additive, non-destructive schema change) for later audit (P3-F).
+
+**Verification**: `tests/test_package3_pricing_timing.py`
+(`test_p3e_late_receipt_is_refused_even_with_an_earlier_source_timestamp`
+and siblings); full 252-test V2 regression confirms the soft-no-op
+design does not regress any existing caller.
+
+**Evidence references**: `docs/research/evidence/
+package3_pricing_timing/README.md` §5.
+
+**Related**: `OPS-003` (the deadline/timing finding this session
+otherwise closed Finding B of).
 
 ---
 
