@@ -1,0 +1,35 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- C:\workspace\TalonX\.venv\Scripts\python.exe
+rootdir: C:\workspace\TalonX
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.10.16, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 25 items
+
+tests/test_package2_account_blocks.py::test_idempotent_repeated_detection_does_not_duplicate_or_perturb_detected_at PASSED [  4%]
+tests/test_package2_account_blocks.py::test_multiple_block_reasons_remain_independent PASSED [  8%]
+tests/test_package2_account_blocks.py::test_clearance_without_required_evidence_is_refused PASSED [ 12%]
+tests/test_package2_account_blocks.py::test_authorized_clearance_preserves_its_audit_trail PASSED [ 16%]
+tests/test_package2_account_blocks.py::test_restart_preserves_active_blocks PASSED [ 20%]
+tests/test_package2_account_blocks.py::test_restart_preserves_clearance_history PASSED [ 24%]
+tests/test_package2_account_blocks.py::test_v2_exit_unresolved_blocks_new_admission_for_a_different_symbol PASSED [ 28%]
+tests/test_package2_account_blocks.py::test_pending_entry_execution_rechecks_a_block_activated_after_the_decision_was_formed PASSED [ 32%]
+tests/test_package2_account_blocks.py::test_competing_writer_cannot_commit_an_entry_after_a_prior_block_activation PASSED [ 36%]
+tests/test_package2_account_blocks.py::test_ledger_mismatch_block_isolated_to_its_own_v2_account PASSED [ 40%]
+tests/test_package2_account_blocks.py::test_exits_and_safe_obligation_recovery_continue_while_entries_are_blocked PASSED [ 44%]
+tests/test_package2_account_blocks.py::test_mark_exit_unresolved_continues_while_entries_already_blocked PASSED [ 48%]
+tests/test_package2_account_blocks.py::test_recorded_reconciliation_block_survives_a_later_pipeline_step_failure PASSED [ 52%]
+tests/test_package2_account_blocks.py::test_clear_block_exit_unresolved_refuses_while_still_unresolved PASSED [ 56%]
+tests/test_package2_account_blocks.py::test_clear_block_ledger_mismatch_allows_after_a_fresh_reconcile_passes PASSED [ 60%]
+tests/test_package2_account_blocks.py::test_clear_block_ledger_mismatch_refuses_while_reconcile_still_fails PASSED [ 64%]
+tests/test_package2_account_blocks.py::test_clear_block_refuses_for_reason_types_with_no_reverification_workflow PASSED [ 68%]
+tests/test_package2_account_blocks.py::test_clear_block_raises_if_account_kind_does_not_match_the_blocks_own_account PASSED [ 72%]
+tests/test_package2_account_blocks.py::test_original_intraday_execute_buy_blocked_mutates_nothing PASSED [ 76%]
+tests/test_package2_account_blocks.py::test_original_longterm_block_does_not_affect_intraday_same_file PASSED [ 80%]
+tests/test_package2_account_blocks.py::test_restart_preserves_original_account_blocks PASSED [ 84%]
+tests/test_package2_account_blocks.py::test_eod_reconciliation_mismatch_blocks_original_intraday_only PASSED [ 88%]
+tests/test_package2_account_blocks.py::test_clear_block_original_intraday_reconcile_allows_after_fresh_check_passes PASSED [ 92%]
+tests/test_package2_account_blocks.py::test_intraday_engine_handles_account_blocked_none_gracefully PASSED [ 96%]
+tests/test_package2_account_blocks.py::test_long_term_engine_handles_account_blocked_none_gracefully PASSED [100%]
+
+============================= 25 passed in 2.27s ==============================

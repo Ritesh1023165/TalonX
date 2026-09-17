@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import sys
 import time
 from datetime import datetime, timezone
@@ -254,6 +255,42 @@ def cmd_session_loop(args) -> int:
                     until_close=not args.no_until_close, max_iterations=args.max_iterations)
 
 
+def cmd_list_blocks(args) -> int:
+    """Package 2 Part 5: minimal explicit operator interface -- list
+    ACTIVE account blocks so an operator can find a block_id to act on."""
+    from talonx_ops import account_blocks
+    from talonx_ops.prospective.paths import V2_DB_PATH
+    db_path = args.db_path or str(V2_DB_PATH)
+    con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    con.row_factory = sqlite3.Row
+    try:
+        blocks = account_blocks.active_blocks(con, args.account)
+    finally:
+        con.close()
+    print(json.dumps([b.__dict__ for b in blocks], indent=2, default=str))
+    return 0
+
+
+def cmd_clear_block(args) -> int:
+    """Package 2 Part 5: minimal explicit operator clearance interface.
+    Re-verifies fresh evidence for the specific block/reason (see
+    talonx_ops.prospective.clearance) and persists exactly one
+    clearance attempt -- approved or refused -- with a full audit
+    trail. See clearance.py's own docstring for the operator trust
+    boundary (this is NOT an authentication mechanism)."""
+    from talonx_ops.prospective.clearance import clear_block
+    from talonx_ops.prospective.paths import V2_DB_PATH
+    db_path = args.db_path or (str(V2_DB_PATH) if args.account == "V2" else None)
+    if not db_path:
+        print("error: --db-path is required for a non-V2 --account", file=sys.stderr)
+        return 2
+    result = clear_block(db_path, args.account, block_id=args.block_id,
+                         operator_id=args.operator, reason=args.reason,
+                         evidence_ref=args.evidence_ref)
+    print(json.dumps(result, indent=2, default=str))
+    return 0 if result["allow"] else 1
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser("talonx_ops.prospective")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -298,6 +335,20 @@ def main(argv=None) -> int:
     sl.add_argument("--every", type=int, default=1800)
     sl.add_argument("--no-until-close", action="store_true")
     sl.add_argument("--max-iterations", type=int, default=None)
+
+    # Package 2 Durable Account Blocks -- Part 5 minimal operator interface.
+    _ACCOUNT_CHOICES = ["V2", "ORIGINAL_INTRADAY", "ORIGINAL_LONGTERM"]
+    lb = sub.add_parser("list-blocks"); lb.set_defaults(fn=cmd_list_blocks)
+    lb.add_argument("--account", required=True, choices=_ACCOUNT_CHOICES)
+    lb.add_argument("--db-path", default="", help="defaults to v2_lane.db for --account V2")
+
+    cb = sub.add_parser("clear-block"); cb.set_defaults(fn=cmd_clear_block)
+    cb.add_argument("--account", required=True, choices=_ACCOUNT_CHOICES)
+    cb.add_argument("--block-id", required=True)
+    cb.add_argument("--operator", required=True, help="self-reported operator identity (audit trail, not authentication)")
+    cb.add_argument("--reason", required=True)
+    cb.add_argument("--evidence-ref", required=True, help="reference to the supporting reconciliation/resolution evidence")
+    cb.add_argument("--db-path", default="", help="required for a non-V2 --account")
 
     args = ap.parse_args(argv)
     return args.fn(args)

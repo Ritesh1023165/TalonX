@@ -114,10 +114,21 @@ def check_ledger_continuity(db_path: str | Path) -> LedgerCheck:
         expected_cash_if_flat = CAMPAIGN_STARTING_CASH + realized
         open_cost = con.execute(
             "SELECT COALESCE(SUM(position_cost),0) FROM positions WHERE status='OPEN'").fetchone()[0] or 0.0
-        if r.cash is not None and abs((r.cash + open_cost) - expected_cash_if_flat) > 1.0:
+        # Package 1 Settlement Integrity (bounded correction, found during
+        # Package 2's own prerequisite verification): an EXIT_UNRESOLVED
+        # position's cash debit at entry is never returned -- its cost
+        # basis must be included here too, or this restart-continuity
+        # guard fabricates a "cash accounting mismatch" finding purely
+        # because that cost was omitted, exactly the same defect already
+        # fixed in talonx_ops/prospective/close.py::_v2_reconcile().
+        unresolved_cost = con.execute(
+            "SELECT COALESCE(SUM(position_cost),0) FROM positions "
+            "WHERE status='EXIT_UNRESOLVED'").fetchone()[0] or 0.0
+        if r.cash is not None and abs((r.cash + open_cost + unresolved_cost) - expected_cash_if_flat) > 1.0:
             r.problems.append(
-                f"cash accounting mismatch: cash({r.cash:.2f}) + open_cost({open_cost:.2f}) "
-                f"!= start({CAMPAIGN_STARTING_CASH:.2f}) + realized({realized:.2f})")
+                f"cash accounting mismatch: cash({r.cash:.2f}) + open_cost({open_cost:.2f}) + "
+                f"unresolved_cost({unresolved_cost:.2f}) != start({CAMPAIGN_STARTING_CASH:.2f}) "
+                f"+ realized({realized:.2f})")
 
         if not r.stale_skipped_episodes:
             r.notes.append("no SKIPPED_ENTRY_STALE record yet (fine on a truly fresh carry-forward; "

@@ -212,7 +212,13 @@ def test_unresolved_position_blocks_a_second_open_in_the_same_symbol(tmp_path):
         "an OPEN-only symbol lookup silently permitted a second position "
         "in a symbol that already has an unresolved obligation"
     )
-    assert outcome.reason == "SYMBOL_ALREADY_OPEN"
+    # Package 2 Durable Account Blocks added an earlier, account-wide
+    # EXIT_UNRESOLVED check that now fires FIRST for this exact scenario
+    # (a stricter superset of this test's own SYMBOL_ALREADY_OPEN check --
+    # see tests/test_package2_account_blocks.py for dedicated coverage
+    # of the account-wide block itself). This test's actual invariant --
+    # `entered is False` above -- is unaffected.
+    assert outcome.reason.startswith("ACCOUNT_BLOCKED") or outcome.reason == "SYMBOL_ALREADY_OPEN"
 
 
 def test_normal_open_still_permits_entry_after_a_genuine_close(tmp_path):
@@ -268,7 +274,10 @@ def test_restart_preserves_unresolved_capacity_and_symbol_block(tmp_path):
     outcome = paper.enter_position(restarted, _decision(episode_id="ep2", symbol="AAA"),
                                    entry_price=50.0, entry_session=date(2026, 9, 9), config=cfg)
     assert outcome.entered is False
-    assert outcome.reason == "SYMBOL_ALREADY_OPEN"
+    # see the comment in test_unresolved_position_blocks_a_second_open_in_
+    # the_same_symbol above: Package 2's account-wide block now fires
+    # first for this scenario.
+    assert outcome.reason.startswith("ACCOUNT_BLOCKED") or outcome.reason == "SYMBOL_ALREADY_OPEN"
 
 
 def test_normal_open_and_closed_counts_unaffected_by_the_fix(tmp_path):

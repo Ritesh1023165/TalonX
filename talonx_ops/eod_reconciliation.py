@@ -433,6 +433,64 @@ def _rec_from_payload(payload_json: str) -> EodReconciliation | None:
         return None
 
 
+def _record_original_intraday_reconciliation_blocks(rec: "EodReconciliation", home: Path) -> list[str]:
+    """Package 2 Durable Account Blocks: connects this module's OWN
+    already-verified ``original_paper`` mismatch detection (the
+    conservative check in ``build_reconciliation`` above) to a
+    persisted, enforced ``ORIGINAL_INTRADAY`` account block -- this is
+    what closes OPS-015's own literal finding location (this file) for
+    the Original/Intraday lane it actually covers.
+
+    ``original_paper`` here is read by ``_paper_counts`` from ONLY the
+    ``positions``/``trade_history`` tables -- the intraday-specific
+    tables, never ``long_term_positions``/``long_term_trade_history``
+    (a completely separate table set `talonx_paper.store` never
+    queries here) -- so attributing this to
+    ``ORIGINAL_INTRADAY_ACCOUNT_ID`` (never ``ORIGINAL_LONGTERM``) is
+    exact, not an invented identity check. ``experimental_paper``
+    mismatches are deliberately NOT wired here: Package 2's own scope
+    is "local Intraday and V2" -- Experimental is a separate,
+    untouched architecture (disclosed limitation, not an oversight).
+
+    Opens its own minimal WRITE connection (a plain ``sqlite3.connect``,
+    NOT ``PaperTradingStore``'s constructor) so this never triggers
+    that store's own unrelated schema-migration/portfolio-seed side
+    effects on a production ledger this function does not own the
+    lifecycle of."""
+    from talonx_ops import account_blocks
+    from talonx_paper.store import ORIGINAL_INTRADAY_ACCOUNT_ID
+
+    orig_mismatches = [m for m in rec.mismatches if m.startswith("original_paper:")]
+    if not orig_mismatches:
+        return []
+    p = home / "paper_trading.db"
+    if not p.exists():
+        return []
+
+    con = sqlite3.connect(str(p), isolation_level=None)
+    recorded: list[str] = []
+    try:
+        con.execute(f"PRAGMA busy_timeout={30_000}")
+        # executescript() implicitly ends any open transaction on this
+        # connection -- run the additive DDL BEFORE BEGIN IMMEDIATE, see
+        # the identical note in talonx_ops/prospective/close.py.
+        con.executescript(account_blocks.SCHEMA)
+        con.execute("BEGIN IMMEDIATE")
+        for m in orig_mismatches:
+            bid = account_blocks.record_block(
+                con, account_id=ORIGINAL_INTRADAY_ACCOUNT_ID,
+                reason_type=account_blocks.REASON_LEDGER_MISMATCH,
+                reference="original_paper_open_with_no_trades", detail=m)
+            recorded.append(bid)
+        con.execute("COMMIT")
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
+    finally:
+        con.close()
+    return recorded
+
+
 def run_and_persist(
     *,
     session_date: str | None = None,
@@ -449,6 +507,7 @@ def run_and_persist(
         session_date=session_date, home=home, exp_home=exp_home,
         ledger_path=ledger_path, now=now, piv_reader=piv_reader,
     )
+    _record_original_intraday_reconciliation_blocks(rec, home or _HOME)
     store = EodReconciliationStore(db_path)
     try:
         store.upsert(rec)

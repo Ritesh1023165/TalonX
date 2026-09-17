@@ -3142,3 +3142,87 @@ cutover/acceptance runbook) remain **not yet performed in full** — this
 session resolved the release-scope and staging questions specifically,
 not the entire original agenda. They remain open work for a future
 planning pass, explicitly not claimed complete here.
+
+## Package 2 — Durable Account Blocks and Auditable Clearance
+
+**Package 2 implementation and its isolated regression tests are
+authorized by this session** (same authorization scope as Package 1
+above) — see `REQUIREMENTS_TRACKER.md` `S13-10` for the record of what
+was actually built, and `OPERATIONAL_FINDINGS.md` (`OPS-012`, `OPS-015`,
+`OPS-016`, `OPS-017`) for the corresponding findings closed/updated.
+**Packages 3-5 and release integration remain explicitly not
+authorized.**
+
+### What was built
+
+A new, generic, storage-layer-agnostic `account_blocks`/
+`block_clearances` table pair (`talonx_ops/account_blocks.py`),
+embedded additively into each account's own existing ledger file
+(`v2_lane.db` for V2; `paper_trading.db` for Original's Intraday and
+Long-term lanes, sharing one file under two separate account
+identities). A block is admission-blocking, restart-durable, and
+idempotent (repeated detection of the same issue never duplicates an
+active block or perturbs its original detection time). The
+authoritative check runs as the FIRST statement inside the SAME
+protected database transaction as the entry's own economic mutation —
+`talonx_v2/paper.py::enter_position()` and
+`talonx_paper/store.py::execute_buy()`/`execute_long_term_buy()` — not
+an earlier read or a dashboard flag, proven by a real two-independent-
+connection SQLite write-lock race test.
+
+Four reason types exist (`EXIT_UNRESOLVED`, `LEDGER_MISMATCH`,
+`CASH_DEFICIT`, `IDENTITY_MISMATCH`); this task wired the first three
+to their actual, already-verified detection sources: V2's
+`mark_exit_unresolved()`, V2's own `_v2_reconcile()` (via
+`talonx_ops/prospective/close.py`), and Original/Intraday's
+`eod_reconciliation.py::build_reconciliation()` (OPS-015's own literal
+finding location). `IDENTITY_MISMATCH` has **no detector** — per this
+task's own instruction not to invent identity checks — and clearance
+for it always refuses, by design.
+
+Clearance is a minimal CLI (`python -m talonx_ops.prospective
+{list-blocks,clear-block}`), not a new dashboard: it requires an
+operator id, a reason, and an evidence reference; re-verifies FRESH
+evidence at clearance time (re-running the same bounded reconciliation,
+or checking the referenced position is no longer `EXIT_UNRESOLVED`)
+before deciding whether to allow it; and always appends to the audit
+trail whether approved or refused. The operator identity is
+self-reported (an audit-trail field, not an authentication mechanism —
+the actual trust boundary is the same OS/filesystem access every other
+local administrative script in this project already relies on; this is
+disclosed, not fixed, as a limitation for any future remote/multi-
+operator deployment). A serious integrity block and the pre-existing
+user-pause control remain two structurally separate mechanisms — this
+task built neither a new pause UI nor touched the existing one.
+
+### Explicit deferrals
+
+- Experimental's own reconciliation mismatches (`experimental_paper`
+  in `eod_reconciliation.py`) are **not** wired to a block — Package
+  2's own scope is "local Intraday and V2" only.
+- `IDENTITY_MISMATCH` remains fully undetected and unclearable by
+  design (no identity-verification mechanism exists anywhere in this
+  codebase to draw on without inventing one).
+- The five-state account-readiness model, the "Partially Ready" global
+  summary, and the external outage watchdog (`OPS-016`) remain
+  unimplemented; this task's enforcement was deliberately built to be
+  independently useful without them, per the task's own instruction.
+- `OPS-003`'s pre-existing entry-deadline limitations are unchanged and
+  were not touched.
+
+### Findings tracked in `OPERATIONAL_FINDINGS.md`
+
+- **`OPS-012`** — CLOSED (see the Package 2 update appended there).
+- **`OPS-015`** — CLOSED for both its own cited reconciliation sources
+  (V2's `_v2_reconcile()` and this finding's own literal
+  `eod_reconciliation.py` location).
+- **`OPS-016`** — remains `OPEN`, unaffected in substance; noted that
+  Package 2's enforcement was built independently of it, and that a
+  future readiness-state layer can consume `account_blocks`'s own read
+  functions as its data source.
+- **`OPS-017`** — reproduced again against this session's own scoped
+  regression run; confirmed still pre-existing, still unrelated
+  (Package 2 never touches `talonx_quant/*`), still not fixed here.
+
+`OPS-001` through `OPS-011`, `OPS-013`, `OPS-014` **remain open**,
+unaffected by this session.

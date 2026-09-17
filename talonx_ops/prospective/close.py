@@ -113,6 +113,64 @@ def _base_reconcile() -> dict[str, Any]:
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
+def _record_v2_reconciliation_blocks(asserts: dict[str, str], findings: list[str]) -> list[str]:
+    """Package 2 Durable Account Blocks: connects `_v2_reconcile()`'s own
+    VERIFIED results to a persisted, enforced account block -- this is
+    what closes OPS-015's own described gap for V2 specifically
+    (detection already existed; nothing was connected to admission
+    enforcement). Only ever called with ALREADY-COMPUTED asserts from
+    `_v2_reconcile()` above -- this function performs no reconciliation
+    of its own, it only persists a block for a genuine, already-verified
+    failure.
+
+    Opens its own minimal WRITE connection (a plain ``sqlite3.connect``,
+    NOT ``V2Store``'s constructor) so this step never triggers V2Store's
+    own unrelated schema-migration/WAL-verification/portfolio-seed side
+    effects on a production ledger this function does not own the
+    lifecycle of -- it writes ONLY the additive account_blocks/
+    block_clearances tables (``CREATE TABLE IF NOT EXISTS``) plus the
+    block row(s) themselves, inside one short transaction."""
+    from talonx_ops import account_blocks
+    from talonx_v2.store import V2_ACCOUNT_ID
+
+    p = Path(V2_DB_PATH)
+    if not p.exists():
+        return []
+    to_record: list[tuple[str, str, str]] = []
+    if asserts.get("cash_plus_open_cost_reconciles") == "FAIL":
+        detail = next((f for f in findings if f.startswith("cash_plus_open_cost_reconciles")),
+                      "cash_plus_open_cost_reconciles: FAIL")
+        to_record.append((account_blocks.REASON_LEDGER_MISMATCH, "cash_plus_open_cost_reconciles", detail))
+    if asserts.get("no_negative_cash") == "FAIL":
+        detail = next((f for f in findings if f.startswith("no_negative_cash")), "no_negative_cash: FAIL")
+        to_record.append((account_blocks.REASON_CASH_DEFICIT, "no_negative_cash", detail))
+    if not to_record:
+        return []
+
+    con = sqlite3.connect(str(p), isolation_level=None)
+    recorded: list[str] = []
+    try:
+        con.execute(f"PRAGMA busy_timeout={30_000}")
+        # executescript() implicitly commits/ends any open transaction on
+        # this connection (a stdlib sqlite3 quirk) -- so the additive
+        # CREATE TABLE IF NOT EXISTS DDL must run BEFORE BEGIN IMMEDIATE,
+        # never inside the transaction it would otherwise silently close.
+        con.executescript(account_blocks.SCHEMA)
+        con.execute("BEGIN IMMEDIATE")
+        for reason_type, reference, detail in to_record:
+            bid = account_blocks.record_block(
+                con, account_id=V2_ACCOUNT_ID, reason_type=reason_type,
+                reference=reference, detail=detail)
+            recorded.append(bid)
+        con.execute("COMMIT")
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
+    finally:
+        con.close()
+    return recorded
+
+
 def _experimental_external_zero(ck: dict) -> tuple[bool, str]:
     exp = ck.get("experimental", {})
     if exp.get("override_active"):
@@ -137,6 +195,12 @@ def run_close(session_dir: str | Path, *, force: bool = False,
     atomic_write(sd / "eod_final_checkpoint.json", json.dumps(ck, indent=2, default=str))
 
     v2_rec, asserts, findings = _v2_reconcile()
+    blocks_recorded = _record_v2_reconciliation_blocks(asserts, findings)
+    if blocks_recorded:
+        findings.append(
+            f"account block(s) recorded for V2 due to the above reconciliation "
+            f"failure(s): {blocks_recorded} -- new admissions blocked until "
+            f"auditable clearance (Package 2)")
     base_rec = _base_reconcile()
     ext_ok, ext_why = _experimental_external_zero(ck)
     asserts["experimental_external_sends_zero"] = "PASS" if ext_ok else "FAIL"

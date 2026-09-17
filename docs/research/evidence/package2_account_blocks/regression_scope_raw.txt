@@ -1,0 +1,258 @@
+........................................................................ [ 10%]
+........................................................................ [ 21%]
+................F..........F............................................ [ 32%]
+.................................F...........FFFFF...................... [ 43%]
+........................................................................ [ 54%]
+.......................................F................................ [ 65%]
+........................................................................ [ 76%]
+........................................................................ [ 87%]
+........................................................................ [ 98%]
+.......                                                                  [100%]
+================================== FAILURES ===================================
+_____________ test_item3_original_strategy_fingerprint_unchanged ______________
+
+    def test_item3_original_strategy_fingerprint_unchanged():
+        import talonx_v2  # noqa: F401  -- importing the V2 lane must not perturb Original
+        from talonx_backtest.reproducibility import get_strategy_version
+    
+        # frozen Original strategy fingerprint (talonx_quant/{strategy,indicators,
+        # config,session,consumer}.py) -- byte-identical since well before V2 work
+>       assert get_strategy_version() == "2ae6216bca70"
+E       AssertionError: assert 'ed8272fe568d' == '2ae6216bca70'
+E         
+E         - 2ae6216bca70
+E         + ed8272fe568d
+
+tests\test_task111_v2_e2e.py:85: AssertionError
+________________________ test_03_v1_fingerprint_intact ________________________
+
+    def test_03_v1_fingerprint_intact():
+        from talonx_backtest.reproducibility import get_strategy_version
+>       assert get_strategy_version() == "2ae6216bca70"
+E       AssertionError: assert 'ed8272fe568d' == '2ae6216bca70'
+E         
+E         - 2ae6216bca70
+E         + ed8272fe568d
+
+tests\test_task112_tuesday_release.py:84: AssertionError
+________________ test_bounded_controlled_deployment_rehearsal _________________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_bounded_controlled_deploy0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000015B6C9EAAE0>
+
+    def test_bounded_controlled_deployment_rehearsal(tmp_path, monkeypatch):
+        home = tmp_path / "home"; home.mkdir()
+        ledger = tmp_path / "v2_lane.db"
+        shutil.copy2(PROD, ledger)
+>       assert hashlib.md5(ledger.read_bytes()).hexdigest() in EXPECTED_MD5
+E       assert 'cff00b0f46e7e5b65e6f5903366fab28' in {'29e57dbcd1a567fbc4bb0e73efdba95f', 'c09c6a88188e65fd987b54f672a9759e'}
+E        +  where 'cff00b0f46e7e5b65e6f5903366fab28' = <built-in method hexdigest of _hashlib.HASH object at 0x0000015B6D191930>()
+E        +    where <built-in method hexdigest of _hashlib.HASH object at 0x0000015B6D191930> = <md5 _hashlib.HASH object @ 0x0000015B6D191930>.hexdigest
+E        +      where <md5 _hashlib.HASH object @ 0x0000015B6D191930> = <built-in function openssl_md5>(b"SQLite format 3\x00\x10\x00\x02\x02\x00@  \x00\x00\x00\x03\x00\x00\x00\x11\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x..._session    TEXT,\n    fill_price            REAL,\n    reconciled_at_utc     TEXT,\n    detail                TEXT\n)")
+E        +        where <built-in function openssl_md5> = hashlib.md5
+E        +        and   b"SQLite format 3\x00\x10\x00\x02\x02\x00@  \x00\x00\x00\x03\x00\x00\x00\x11\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x..._session    TEXT,\n    fill_price            REAL,\n    reconciled_at_utc     TEXT,\n    detail                TEXT\n)" = read_bytes()
+E        +          where read_bytes = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_bounded_controlled_deploy0/v2_lane.db').read_bytes
+
+tests\test_task117_deployment_rehearsal.py:112: AssertionError
+_________________ test_migration_preserves_all_existing_state _________________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_migration_preserves_all_e0')
+
+    def test_migration_preserves_all_existing_state(tmp_path):
+>       db = _iso_copy(tmp_path)
+             ^^^^^^^^^^^^^^^^^^^
+
+tests\test_task117_migration.py:74: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_migration_preserves_all_e0')
+
+    def _iso_copy(tmp_path) -> Path:
+        dst = tmp_path / "v2_lane.db"
+        shutil.copy2(PROD_LEDGER, dst)
+>       assert _md5(dst) in EXPECTED_MD5, "isolated copy must match a known production hash"
+E       AssertionError: isolated copy must match a known production hash
+E       assert 'cff00b0f46e7e5b65e6f5903366fab28' in {'29e57dbcd1a567fbc4bb0e73efdba95f', 'c09c6a88188e65fd987b54f672a9759e'}
+E        +  where 'cff00b0f46e7e5b65e6f5903366fab28' = _md5(WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_migration_preserves_all_e0/v2_lane.db'))
+
+tests\test_task117_migration.py:46: AssertionError
+________________ test_migration_is_idempotent_across_restarts _________________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_migration_is_idempotent_a0')
+
+    def test_migration_is_idempotent_across_restarts(tmp_path):
+>       db = _iso_copy(tmp_path)
+             ^^^^^^^^^^^^^^^^^^^
+
+tests\test_task117_migration.py:102: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_migration_is_idempotent_a0')
+
+    def _iso_copy(tmp_path) -> Path:
+        dst = tmp_path / "v2_lane.db"
+        shutil.copy2(PROD_LEDGER, dst)
+>       assert _md5(dst) in EXPECTED_MD5, "isolated copy must match a known production hash"
+E       AssertionError: isolated copy must match a known production hash
+E       assert 'cff00b0f46e7e5b65e6f5903366fab28' in {'29e57dbcd1a567fbc4bb0e73efdba95f', 'c09c6a88188e65fd987b54f672a9759e'}
+E        +  where 'cff00b0f46e7e5b65e6f5903366fab28' = _md5(WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_migration_is_idempotent_a0/v2_lane.db'))
+
+tests\test_task117_migration.py:46: AssertionError
+_____ test_alter_migration_on_a_preexisting_outbox_without_the_new_column _____
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_alter_migration_on_a_pree0')
+
+    def test_alter_migration_on_a_preexisting_outbox_without_the_new_column(tmp_path):
+>       db = _iso_copy(tmp_path)
+             ^^^^^^^^^^^^^^^^^^^
+
+tests\test_task117_migration.py:111: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_alter_migration_on_a_pree0')
+
+    def _iso_copy(tmp_path) -> Path:
+        dst = tmp_path / "v2_lane.db"
+        shutil.copy2(PROD_LEDGER, dst)
+>       assert _md5(dst) in EXPECTED_MD5, "isolated copy must match a known production hash"
+E       AssertionError: isolated copy must match a known production hash
+E       assert 'cff00b0f46e7e5b65e6f5903366fab28' in {'29e57dbcd1a567fbc4bb0e73efdba95f', 'c09c6a88188e65fd987b54f672a9759e'}
+E        +  where 'cff00b0f46e7e5b65e6f5903366fab28' = _md5(WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_alter_migration_on_a_pree0/v2_lane.db'))
+
+tests\test_task117_migration.py:46: AssertionError
+______ test_historical_episode_in_store_makes_no_fresh_actionable_alert _______
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_historical_episode_in_sto0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000015B6C96BB30>
+
+    def test_historical_episode_in_store_makes_no_fresh_actionable_alert(tmp_path, monkeypatch):
+>       db = _iso_copy(tmp_path)
+             ^^^^^^^^^^^^^^^^^^^
+
+tests\test_task117_migration.py:140: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_historical_episode_in_sto0')
+
+    def _iso_copy(tmp_path) -> Path:
+        dst = tmp_path / "v2_lane.db"
+        shutil.copy2(PROD_LEDGER, dst)
+>       assert _md5(dst) in EXPECTED_MD5, "isolated copy must match a known production hash"
+E       AssertionError: isolated copy must match a known production hash
+E       assert 'cff00b0f46e7e5b65e6f5903366fab28' in {'29e57dbcd1a567fbc4bb0e73efdba95f', 'c09c6a88188e65fd987b54f672a9759e'}
+E        +  where 'cff00b0f46e7e5b65e6f5903366fab28' = _md5(WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_historical_episode_in_sto0/v2_lane.db'))
+
+tests\test_task117_migration.py:46: AssertionError
+________ test_interrupted_tick_leaves_a_consistent_recoverable_ledger _________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_interrupted_tick_leaves_a0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000015B6C968AA0>
+
+    def test_interrupted_tick_leaves_a_consistent_recoverable_ledger(tmp_path, monkeypatch):
+>       db = _iso_copy(tmp_path)
+             ^^^^^^^^^^^^^^^^^^^
+
+tests\test_task117_migration.py:184: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_interrupted_tick_leaves_a0')
+
+    def _iso_copy(tmp_path) -> Path:
+        dst = tmp_path / "v2_lane.db"
+        shutil.copy2(PROD_LEDGER, dst)
+>       assert _md5(dst) in EXPECTED_MD5, "isolated copy must match a known production hash"
+E       AssertionError: isolated copy must match a known production hash
+E       assert 'cff00b0f46e7e5b65e6f5903366fab28' in {'29e57dbcd1a567fbc4bb0e73efdba95f', 'c09c6a88188e65fd987b54f672a9759e'}
+E        +  where 'cff00b0f46e7e5b65e6f5903366fab28' = _md5(WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_interrupted_tick_leaves_a0/v2_lane.db'))
+
+tests\test_task117_migration.py:46: AssertionError
+______________ test_admission_policy_reflects_permissive_default ______________
+
+home = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_admission_policy_reflects1/.talonx')
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1820/test_admission_policy_reflects1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000015B6B414110>
+
+    def test_admission_policy_reflects_permissive_default(home, tmp_path, monkeypatch):
+        monkeypatch.setenv("TALONX_V2_DB_PATH", str(tmp_path / "v2.db"))
+        monkeypatch.delenv("TALONX_V2_DURABLE_STORE_ENABLED", raising=False)
+        panel = _model(home, tmp_path / "v2.db").v2_broad_discovery()
+>       assert panel["admission_policy"]["mode"] == "PERMISSIVE"
+E       AssertionError: assert 'GATED' == 'PERMISSIVE'
+E         
+E         - PERMISSIVE
+E         + GATED
+
+tests\test_task131_spa_discovery_backend.py:115: AssertionError
+============================== warnings summary ===============================
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+  C:\workspace\TalonX\dashboard_web.py:514: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["admin_enabled"] = bool(admin_enabled)
+
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+  C:\workspace\TalonX\dashboard_web.py:519: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["piv_state_dir"] = piv_state_dir if piv_state_dir is not None else PivConfig().state_dir
+
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+  C:\workspace\TalonX\dashboard_web.py:520: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["compare_config"] = CompareConfig()
+
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+  C:\workspace\TalonX\dashboard_web.py:521: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["stats"] = {watch.key: ChannelStats() for watch in CHANNELS}
+
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+  C:\workspace\TalonX\dashboard_web.py:522: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["websockets"] = set()
+
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+  C:\workspace\TalonX\dashboard_web.py:523: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["started_at"] = time.monotonic()
+
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+  C:\workspace\TalonX\dashboard_web.py:524: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["stop_event"] = asyncio.Event()
+
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+  C:\workspace\TalonX\dashboard_web.py:525: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["quant_config"] = QuantConfig()
+
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+  C:\workspace\TalonX\dashboard_web.py:534: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["buffer_stats"] = {
+
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+  C:\workspace\TalonX\dashboard_web.py:493: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["redis_task"] = asyncio.create_task(_redis_consumer(app))
+
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+  C:\workspace\TalonX\dashboard_web.py:494: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["broadcast_task"] = asyncio.create_task(_broadcaster(app))
+
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+  C:\workspace\TalonX\dashboard_web.py:495: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    app["buffer_poll_task"] = asyncio.create_task(_buffer_stats_poll(app))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_task111_v2_e2e.py::test_item3_original_strategy_fingerprint_unchanged
+FAILED tests/test_task112_tuesday_release.py::test_03_v1_fingerprint_intact
+FAILED tests/test_task117_deployment_rehearsal.py::test_bounded_controlled_deployment_rehearsal
+FAILED tests/test_task117_migration.py::test_migration_preserves_all_existing_state
+FAILED tests/test_task117_migration.py::test_migration_is_idempotent_across_restarts
+FAILED tests/test_task117_migration.py::test_alter_migration_on_a_preexisting_outbox_without_the_new_column
+FAILED tests/test_task117_migration.py::test_historical_episode_in_store_makes_no_fresh_actionable_alert
+FAILED tests/test_task117_migration.py::test_interrupted_tick_leaves_a_consistent_recoverable_ledger
+FAILED tests/test_task131_spa_discovery_backend.py::test_admission_policy_reflects_permissive_default
+9 failed, 646 passed, 12 warnings in 73.93s (0:01:13)

@@ -849,6 +849,33 @@ Verified by 5 new isolated tests
 (`tests/test_package1_settlement_integrity.py`), captured failing
 against the unmodified baseline first, then passing after the fix.
 
+**Package 2 update (2026-09-17, ~15:27 UTC) — CLOSED**: the
+account-wide gate this finding described as missing is now
+implemented. `talonx_v2/store.py::mark_exit_unresolved()` durably
+records an `EXIT_UNRESOLVED` row in a new, generic, additive
+`account_blocks` table (`talonx_ops/account_blocks.py`) in the SAME
+commit as the status transition; `talonx_v2/paper.py::enter_position()`
+checks `account_blocks.blocked_reason()` as the FIRST statement inside
+its own protected `store.transaction()` block — the same transaction
+as the entry's economic mutation, not an earlier read or a dashboard
+flag — and refuses admission for ANY symbol, not only the affected
+one, until an operator clears it. Restart-durable (ordinary DB rows);
+idempotent (repeated detection never duplicates an active block);
+clearance requires an identified operator, a stated reason, and a
+reference to supporting evidence, is refused while the position is
+still `EXIT_UNRESOLVED` (Package 2 does not invent an exit price or
+force settlement), and is invoked via
+`python -m talonx_ops.prospective clear-block` (a minimal CLI, not a
+new dashboard). The identical mechanism was also extended to
+`talonx_paper.store` (`execute_buy`/`execute_long_term_buy`) for the
+local Intraday/Long-term accounts, with separate account identities
+sharing one file. Verified by 25 new isolated tests
+(`tests/test_package2_account_blocks.py`), including a real two-
+connection SQLite-write-lock race proving a competing writer cannot
+commit an entry after a prior block activation. See `OPS-015` and
+`OPS-016` below for the parts of this finding's own neighbouring
+findings this same change also affects.
+
 ---
 
 ## OPS-013 — Telegram lifecycle-message-formatting and delivery-consolidation gap
@@ -986,6 +1013,36 @@ entry describes — for either `eod_reconciliation.py` or
 `_v2_reconcile()` — is unchanged and remains fully `OPEN`, tracked
 alongside `OPS-016` exactly as before.
 
+**Package 2 update (2026-09-17, ~15:27 UTC) — CLOSED for both cited
+reconciliation sources**: both halves of this finding are now wired to
+persisted, enforced blocks via the same generic `account_blocks`
+mechanism described under `OPS-012`. (1) V2:
+`talonx_ops/prospective/close.py::_record_v2_reconciliation_blocks()`
+connects `_v2_reconcile()`'s own already-verified
+`cash_plus_open_cost_reconciles`/`no_negative_cash` FAIL results to a
+`LEDGER_MISMATCH`/`CASH_DEFICIT` block on the `V2` account, called from
+`run_close()` immediately after `_v2_reconcile()`. (2)
+Original/Intraday — this finding's own literal finding location:
+`talonx_ops/eod_reconciliation.py::_record_original_intraday_
+reconciliation_blocks()` connects `build_reconciliation()`'s own
+conservative `original_paper: N open position(s) but 0 trades recorded
+ever` mismatch to a `LEDGER_MISMATCH` block on `ORIGINAL_INTRADAY`
+specifically — `original_paper` is read from ONLY the
+`positions`/`trade_history` tables (never `long_term_positions`/
+`long_term_trade_history`), so this attribution is exact, not an
+invented identity check. `experimental_paper` mismatches are
+deliberately **not** wired (Package 2's scope is "local Intraday and
+V2"; Experimental is a separate, untouched architecture — still an
+open gap, not claimed closed). Both connections open their own minimal
+write connection rather than the owning store's constructor, so
+neither ever triggers unrelated schema-migration/portfolio-seed side
+effects on a production ledger. Clearance for either reason type
+re-runs the SAME bounded reconciliation fresh at clearance time (never
+the evidence attached at detection time) and refuses if it still
+fails. Verified by isolated tests in
+`tests/test_package2_account_blocks.py` (see `OPS-012`'s own update
+for the full count).
+
 ---
 
 ## OPS-016 — No account-readiness state model or external outage watchdog
@@ -1023,6 +1080,22 @@ session (no matches in `talonx_ops/` for the cited concepts).
 
 **Related**: `REQUIREMENTS_TRACKER.md` `S11-12` through `S11-15`,
 `S11-17`, `S11-18`; `OPS-012`, `OPS-015`.
+
+**Package 2 update (2026-09-17, ~15:27 UTC) — still OPEN, by design**:
+Package 2 implemented `OPS-012`/`OPS-015`'s underlying serious-block
+enforcement and clearance mechanism directly (`talonx_ops/
+account_blocks.py` + a minimal `python -m talonx_ops.prospective
+{list-blocks,clear-block}` CLI), deliberately **independently** of the
+five-state readiness model / "Partially Ready" summary / external
+watchdog this finding describes — the task's own scope explicitly
+excluded "the full readiness dashboard" and "unrelated pause UI." A
+serious integrity block and the pre-existing user-pause control remain
+two separate mechanisms; clearing one never touches the other. This
+finding's own remaining gaps (the five-state model, the global
+summary, the watchdog) are unaffected and remain fully `OPEN` — a
+future readiness-state layer can consume `account_blocks.
+blocked_reason()`/`active_blocks()` as its data source rather than
+needing to invent its own detection.
 
 ---
 
@@ -1071,6 +1144,18 @@ either as authoritative.
 stash` (this session).
 
 **Related**: `REQUIREMENTS_TRACKER.md` `S13-07`, `S13-09`.
+
+**Package 2 update (2026-09-17, ~15:27 UTC) — reproduced again,
+confirmed still unrelated, not fixed here**: the same two tests fail
+identically (`ed8272fe568d` vs the hardcoded `2ae6216bca70`) against
+Package 2's own scoped 34-file regression run. Package 2 never touches
+`talonx_quant/*` either; both V1's `get_strategy_version()` output and
+`V2_FINGERPRINT_EXPECTED = "11107198c5b81237"` were independently
+re-verified unchanged before/after this session's own changes via
+`tests/test_task114_prospective.py::test_b1_preflight_fingerprints_are_
+expected` and `::test_task114_does_not_change_fingerprints` (both
+pass). Still out of scope to fix here — same stale-literal defect as
+before, unchanged by two full task packages now.
 
 ---
 

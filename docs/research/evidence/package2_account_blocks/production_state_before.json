@@ -1,0 +1,41 @@
+{
+  "v2_lane.db": {
+    "exists": true,
+    "size_bytes": 69632,
+    "mtime": 1789447551.774307,
+    "tables": [
+      "cooldowns",
+      "pending_entry_intents",
+      "portfolio",
+      "positions",
+      "processed_episodes",
+      "sqlite_sequence",
+      "trades",
+      "v2_alert_outbox"
+    ],
+    "cash": 300000.0,
+    "n_open": 0,
+    "n_closed": 0,
+    "n_unresolved": 0,
+    "n_trades": 0,
+    "has_account_blocks_table": false
+  },
+  "paper_trading.db": {
+    "exists": true,
+    "size_bytes": 81920,
+    "mtime": 1789505109.6550515,
+    "tables": [
+      "ignored_decisions",
+      "latest_prices",
+      "long_term_portfolio_state",
+      "long_term_positions",
+      "long_term_trade_history",
+      "portfolio_state",
+      "positions",
+      "sqlite_sequence",
+      "trade_history"
+    ],
+    "intraday_current_cash": 10000.0,
+    "has_account_blocks_table": false
+  }
+}

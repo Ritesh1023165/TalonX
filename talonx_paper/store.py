@@ -49,8 +49,16 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
+from talonx_ops.account_blocks import SCHEMA as _ACCOUNT_BLOCKS_SCHEMA
 from talonx_paper.engine import calculate_average_cost_basis, calculate_partial_sell_pnl, calculate_sell_pnl
 from talonx_paper.schemas import AlertAction, LongTermOrderType, LongTermTradeExecution, OrderType, PaperTradeExecution
+
+# Package 2 Durable Account Blocks: this store's file is shared by BOTH
+# the intraday and long-term lanes -- account identity distinguishes
+# which lane a block/clearance row applies to; a block recorded for one
+# never blocks the other (separate account_id values, same file).
+ORIGINAL_INTRADAY_ACCOUNT_ID = "ORIGINAL_INTRADAY"
+ORIGINAL_LONGTERM_ACCOUNT_ID = "ORIGINAL_LONGTERM"
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS portfolio_state (
@@ -184,7 +192,7 @@ CREATE TABLE IF NOT EXISTS long_term_trade_history (
     timestamp               TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_lt_trade_history_timestamp ON long_term_trade_history (timestamp);
-"""
+""" + _ACCOUNT_BLOCKS_SCHEMA
 
 
 class PaperTradingStore:
@@ -386,14 +394,36 @@ class PaperTradingStore:
     def execute_buy(
         self, ticker: str, shares: float, price: float, cost: float, timestamp: datetime,
         stop_price: float | None = None, target_price: float | None = None,
-    ) -> PaperTradeExecution:
+    ) -> PaperTradeExecution | None:
         """stop_price/target_price, when provided, are the ATR-anchored
         dollar levels captured at signal time (see engine.check_stop_take)
         -- persisted with the position so every SUBSEQUENT tick checks
         against the level the trade was actually sized against, not a
-        live-recomputed one (ATR drifts after entry)."""
+        live-recomputed one (ATR drifts after entry).
+
+        Package 2 Durable Account Blocks: returns None (no cash debit, no
+        position, no trade record) if the ORIGINAL_INTRADAY account has
+        an active integrity block -- the SAME established "rejected,
+        nothing mutated" contract this method's own sibling
+        ``execute_sell``/``execute_dca_contribution`` already use for a
+        missing position. Checked inside this same locked block, as the
+        final authoritative gate, not as an earlier/separate read."""
+        from talonx_ops import account_blocks
         ticker = ticker.upper()
         with self._lock:
+            br = account_blocks.blocked_reason(self._conn, ORIGINAL_INTRADAY_ACCOUNT_ID)
+            if br is not None:
+                # NOTE: cannot call self.record_ignored() here -- it
+                # acquires self._lock itself (not reentrant) and would
+                # deadlock. Inline the same INSERT instead.
+                self._conn.execute(
+                    "INSERT INTO ignored_decisions (ticker, reason, triggering_action, price, horizon, timestamp) "
+                    "VALUES (?, ?, ?, ?, 'intraday', ?)",
+                    (ticker, f"ACCOUNT_BLOCKED:{br}", AlertAction.CONFIRMED_BULLISH.value,
+                     price, timestamp.isoformat()),
+                )
+                self._conn.commit()
+                return None
             current_cash = self._conn.execute(
                 "SELECT current_cash FROM portfolio_state WHERE id = 1"
             ).fetchone()[0]
@@ -516,6 +546,47 @@ class PaperTradingStore:
             return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     # --- Ignored decisions (the "why didn't it trade" trail) ---------------
+
+    # ---- account blocks (Package 2 Durable Account Blocks) ----
+    def blocked_reason(self, account_id: str) -> str | None:
+        """Point-in-time snapshot for the given account_id (either
+        ORIGINAL_INTRADAY_ACCOUNT_ID or ORIGINAL_LONGTERM_ACCOUNT_ID).
+        Not the serialized gate itself -- execute_buy()/
+        execute_long_term_buy() re-check this inside their own locked
+        block, which is the authoritative, race-free check."""
+        from talonx_ops import account_blocks
+        with self._lock:
+            return account_blocks.blocked_reason(self._conn, account_id)
+
+    def active_account_blocks(self, account_id: str) -> list[dict]:
+        from talonx_ops import account_blocks
+        with self._lock:
+            return [b.__dict__ for b in account_blocks.active_blocks(self._conn, account_id)]
+
+    def record_account_block(self, *, account_id: str, reason_type: str, reference: str,
+                             detail: str = "") -> str:
+        from talonx_ops import account_blocks
+        with self._lock:
+            bid = account_blocks.record_block(
+                self._conn, account_id=account_id, reason_type=reason_type,
+                reference=reference, detail=detail)
+            self._conn.commit()
+            return bid
+
+    def attempt_block_clearance(self, *, block_id: str, operator_id: str, reason: str,
+                                evidence_ref: str, allow: bool, detail: str = "") -> dict:
+        from talonx_ops import account_blocks
+        with self._lock:
+            result = account_blocks.attempt_clearance(
+                self._conn, block_id_=block_id, operator_id=operator_id, reason=reason,
+                evidence_ref=evidence_ref, allow=allow, detail=detail)
+            self._conn.commit()
+            return result
+
+    def block_clearance_history(self, block_id: str) -> list[dict]:
+        from talonx_ops import account_blocks
+        with self._lock:
+            return account_blocks.clearance_history(self._conn, block_id)
 
     def record_ignored(
         self, ticker: str, reason: str, triggering_action, price: float, timestamp: datetime,
@@ -655,12 +726,29 @@ class PaperTradingStore:
 
     def execute_long_term_buy(
         self, ticker: str, shares: float, price: float, cost: float, timestamp: datetime,
-    ) -> LongTermTradeExecution:
+    ) -> LongTermTradeExecution | None:
         """Opens a NEW long-term position -- decide_long_term_trade only
         ever calls this when flat (HIGH_CONVICTION_BUY's own gate), so
-        this always INSERTs, never needs to handle an existing row."""
+        this always INSERTs, never needs to handle an existing row.
+
+        Package 2 Durable Account Blocks: returns None (no mutation) if
+        the ORIGINAL_LONGTERM account has an active integrity block --
+        a DIFFERENT account identity from ORIGINAL_INTRADAY (same file,
+        separate blocks; a block on one lane never blocks the other),
+        checked inside this same locked block as the final gate."""
+        from talonx_ops import account_blocks
         ticker = ticker.upper()
         with self._lock:
+            br = account_blocks.blocked_reason(self._conn, ORIGINAL_LONGTERM_ACCOUNT_ID)
+            if br is not None:
+                self._conn.execute(
+                    "INSERT INTO ignored_decisions (ticker, reason, triggering_action, price, horizon, timestamp) "
+                    "VALUES (?, ?, ?, ?, 'long_term', ?)",
+                    (ticker, f"ACCOUNT_BLOCKED:{br}", AlertAction.HIGH_CONVICTION_BUY.value,
+                     price, timestamp.isoformat()),
+                )
+                self._conn.commit()
+                return None
             current_cash = self._conn.execute(
                 "SELECT current_cash FROM long_term_portfolio_state WHERE id = 1"
             ).fetchone()[0]

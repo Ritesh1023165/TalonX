@@ -374,6 +374,15 @@ class PaperTradingEngine:
             alert.ticker, shares, fill_price, cost, alert.correlated_at,
             stop_price=alert.triggering_signal.stop_price, target_price=alert.triggering_signal.target_price,
         )
+        if execution is None:
+            # Package 2 Durable Account Blocks: the ORIGINAL_INTRADAY
+            # account has an active integrity block -- execute_buy()
+            # already recorded the ignored-decision row itself (inside
+            # the same locked block as the block re-check), so there is
+            # nothing further to persist here.
+            self._trades_ignored += 1
+            logger.warning("Paper trade ignored for %s: ACCOUNT_BLOCKED", alert.ticker)
+            return
         self._trades_executed += 1
         logger.info(
             "Paper BUY: %s %.4f shares @ $%.2f (cost $%.2f, cash after $%.2f)",
@@ -725,6 +734,15 @@ class LongTermPaperEngine:
 
         shares, cost = sized
         execution = self.store.execute_long_term_buy(alert.ticker, shares, fill_price, cost, alert.correlated_at)
+        if execution is None:
+            # Package 2 Durable Account Blocks: the ORIGINAL_LONGTERM
+            # account has an active integrity block -- execute_long_
+            # term_buy() already recorded the ignored-decision row
+            # itself (inside the same locked block as the block
+            # re-check).
+            self._trades_ignored += 1
+            logger.warning("Long-term paper trade ignored for %s: ACCOUNT_BLOCKED", alert.ticker)
+            return
         self._trades_executed += 1
         logger.info(
             "Long-term BUY: %s %.4f shares @ $%.2f (cost $%.2f, cash after $%.2f)",

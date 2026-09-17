@@ -97,7 +97,20 @@ def enter_position(
     # acquires its own BEGIN IMMEDIATE here instead. Either way, no
     # admission decision is ever made on a read taken before the write
     # lock was held.
-    with store.transaction():
+    with store.transaction() as c:
+        # --- Package 2 Durable Account Blocks: the FINAL, authoritative
+        # admission gate -- evaluated against the active connection
+        # inside this same protected transaction, so a block recorded by
+        # a concurrent writer between an earlier in-memory check and this
+        # point can never be raced past. A dashboard flag or an earlier
+        # read is explicitly NOT sufficient (Package 2's own requirement)
+        # -- this is the one check that actually blocks the mutation.
+        from talonx_ops import account_blocks
+        from talonx_v2.store import V2_ACCOUNT_ID
+        br = account_blocks.blocked_reason(c, V2_ACCOUNT_ID)
+        if br is not None:
+            return _skip(f"ACCOUNT_BLOCKED:{br}")
+
         # --- idempotency / restart safety: one logical cluster = one BUY ---
         if store.position_for_episode(decision.episode_id) is not None:
             return EntryOutcome(False, "EPISODE_ALREADY_HAS_POSITION")

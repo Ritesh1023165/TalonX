@@ -20,6 +20,14 @@ from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
 
+from talonx_ops.account_blocks import SCHEMA as _ACCOUNT_BLOCKS_SCHEMA
+
+# Package 2 Durable Account Blocks: this store's own account identity for
+# every account_blocks/block_clearances row it writes or reads. V2 has
+# exactly one logical account per ledger file, unlike talonx_paper's
+# store (which shares one file across ORIGINAL_INTRADAY/ORIGINAL_LONGTERM).
+V2_ACCOUNT_ID = "V2"
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS processed_episodes (
     episode_id            TEXT PRIMARY KEY,
@@ -138,7 +146,7 @@ CREATE TABLE IF NOT EXISTS v2_alert_outbox (
     updated_at_utc        TEXT NOT NULL,
     sent_at_utc           TEXT
 );
-"""
+""" + _ACCOUNT_BLOCKS_SCHEMA
 
 
 def _now() -> str:
@@ -425,13 +433,26 @@ class V2Store:
     def mark_exit_unresolved(self, position_id: int, *, detail: str = "") -> None:
         """Explicit terminal-ish state: the +10-td exit bar and all
         fall-forward sessions were missing.  Not OPEN (stops retrying),
-        not CLOSED (no realised P&L) -- loudly surfaced for the operator."""
+        not CLOSED (no realised P&L) -- loudly surfaced for the operator.
+
+        Package 2 Durable Account Blocks: in the SAME connection/commit
+        as the status transition, durably records an EXIT_UNRESOLVED
+        account_blocks row (idempotent -- see account_blocks.record_block)
+        so this position's own unresolved obligation blocks NEW admissions
+        account-wide until an operator auditably clears it (Session 8 §E /
+        Session 11 §5's agreed containment policy, OPS-012)."""
+        from talonx_ops import account_blocks
         with self._conn() as c:
             c.execute(
                 "UPDATE positions SET status='EXIT_UNRESOLVED', source_meta=?, closed_at=? "
                 "WHERE position_id=? AND status='OPEN'",
                 (json.dumps({"exit_unresolved": True, "detail": detail}), _now(), position_id),
             )
+            if c.execute("SELECT status FROM positions WHERE position_id=?",
+                         (position_id,)).fetchone()["status"] == "EXIT_UNRESOLVED":
+                account_blocks.record_block(
+                    c, account_id=V2_ACCOUNT_ID, reason_type=account_blocks.REASON_EXIT_UNRESOLVED,
+                    reference=str(position_id), detail=detail)
 
     def unresolved_positions(self) -> list[dict]:
         with self._conn() as c:
@@ -484,6 +505,45 @@ class V2Store:
     def trades(self) -> list[dict]:
         with self._conn() as c:
             return [dict(r) for r in c.execute("SELECT * FROM trades ORDER BY trade_id")]
+
+    # ---- account blocks (Package 2 Durable Account Blocks) ----
+    def blocked_reason(self) -> str | None:
+        """The authoritative admission-gate check for THIS V2 account --
+        None means no active block. Callers that need this to be the
+        FINAL, race-free check (entry admission) must call
+        ``account_blocks.blocked_reason`` directly against the active
+        connection inside their own ``with store.transaction():`` block
+        instead of this convenience wrapper (which opens/commits its own
+        connection and is therefore only a point-in-time snapshot, not
+        the serialized gate)."""
+        from talonx_ops import account_blocks
+        with self._conn() as c:
+            return account_blocks.blocked_reason(c, V2_ACCOUNT_ID)
+
+    def active_account_blocks(self) -> list[dict]:
+        from talonx_ops import account_blocks
+        with self._conn() as c:
+            return [b.__dict__ for b in account_blocks.active_blocks(c, V2_ACCOUNT_ID)]
+
+    def record_account_block(self, *, reason_type: str, reference: str, detail: str = "") -> str:
+        from talonx_ops import account_blocks
+        with self.transaction() as c:
+            return account_blocks.record_block(
+                c, account_id=V2_ACCOUNT_ID, reason_type=reason_type,
+                reference=reference, detail=detail)
+
+    def attempt_block_clearance(self, *, block_id: str, operator_id: str, reason: str,
+                                evidence_ref: str, allow: bool, detail: str = "") -> dict:
+        from talonx_ops import account_blocks
+        with self.transaction() as c:
+            return account_blocks.attempt_clearance(
+                c, block_id_=block_id, operator_id=operator_id, reason=reason,
+                evidence_ref=evidence_ref, allow=allow, detail=detail)
+
+    def block_clearance_history(self, block_id: str) -> list[dict]:
+        from talonx_ops import account_blocks
+        with self._conn() as c:
+            return account_blocks.clearance_history(c, block_id)
 
     # ---- cooldowns ----
     def set_cooldown(self, symbol: str, until_session: date) -> None:
