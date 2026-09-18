@@ -130,9 +130,9 @@ class TelegramSenderAdapter:
 
     def __init__(self, client=None):
         if client is None:
-            from talonx_dispatch.telegram_client import TelegramClient
+            from talonx_ops.notify import TRADE_EVENT, telegram_client_for
 
-            client = TelegramClient()
+            client = telegram_client_for(TRADE_EVENT)
         self._client = client
 
     @property

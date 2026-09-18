@@ -220,7 +220,8 @@ def test_costs_not_double_deducted(tmp_path):
     assert "NOT modelled" in costs["explicit_commissions_fees"]
     assert "NOT" in costs["summary"] and "net of all costs" in costs["summary"]
     v2_costs = out["lanes"]["v2"]["costs"]
-    assert v2_costs["modeled"] is False
+    assert v2_costs["modeled"] is True  # Package 4 persists configured entry/exit fees
+    assert "persisted entry total" in v2_costs["summary"]
     assert "NOT modelled" in v2_costs["spread_slippage"]
     # a closed trade's own cost annotation must say the same, never a second deduction
     _mk_paper_db(

@@ -625,6 +625,19 @@ Obligations), `S13-09`.
 - **Material-version cutover rules recorded** (documentation only) —
   no cutover performed or scheduled.
 
+## Implementation note — 2026-09-18, RI-3
+
+The first-release V2 dashboard/operator layer now reads the persisted campaign
+identity, nullable historical seed, settled/reserved/available cash,
+OPEN/EXIT_UNRESOLVED/CLOSED positions, intent recovery status, blocks,
+clearance attempts, reconciliation and per-destination notification state.
+Original/Intraday output is restricted to the default-off Research destination;
+primary `/ping` and approved Intelligence replies remain available. This is an
+implementation-status update under `S13-18`, not a change to Sessions 1–13.
+See `docs/research/evidence/v2_release_integration_ri3/README.md` for the
+validation and bounded release follow-ups. No physical Telegram destination
+was provisioned or validated and no release gate was advanced.
+
 ## 7. Open / proposed — see `REQUIREMENTS_TRACKER.md` for tracked status
 
 - **Intraday-vs-multi-day scope** ("swing intelligence assistant"):

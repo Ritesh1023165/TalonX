@@ -225,7 +225,15 @@ class DispatchAgent:
     ):
         self.config = config or DispatchConfig()
         self.store = store or AuditStore(self.config.audit_db_path)
-        self.telegram_client = telegram_client or TelegramClient(self.config)
+        # First release: Original output belongs exclusively to Research.
+        # Explicitly injected transports remain available for isolated tests.
+        from talonx_ops.notify import RESEARCH, TRADE_EVENT, telegram_client_for
+        self.telegram_client = telegram_client or telegram_client_for(RESEARCH) or TelegramClient(
+            DispatchConfig(telegram_bot_token=None, telegram_chat_id=None))
+        # Keep the existing single primary command/Intelligence reply owner.
+        # Original/Research details are excluded from this listener below.
+        self.reply_client = telegram_client or telegram_client_for(TRADE_EVENT) or TelegramClient(
+            DispatchConfig(telegram_bot_token=None, telegram_chat_id=None))
         self.watchlist_store = watchlist_store or TickerWatchlistStore(WatchlistConfig().db_path)
         # /ping health check's uptime source -- process start, not just
         # this consumer loop's connect time (matches "Server Status: Active").
@@ -236,8 +244,10 @@ class DispatchAgent:
         # resolver here so there is still exactly ONE get_updates poller. The
         # Original app passing None keeps behaviour byte-identical.
         self.reply_listener = TelegramReplyListener(
-            self.store, self.config, self.telegram_client, dispatch_agent=self,
+            self.store, self.reply_client.config if telegram_client is None else self.config,
+            self.reply_client, dispatch_agent=self,
             extra_resolvers=extra_resolvers, message_resolvers=message_resolvers,
+            primary_only=telegram_client is None,
         )
         self._client = None
         self._stop_event = asyncio.Event()
@@ -428,7 +438,7 @@ class DispatchAgent:
             asyncio.create_task(self._retention_sweep_loop(), name="dispatch_retention_sweep"),
             asyncio.create_task(self._earnings_heads_up_loop(), name="dispatch_earnings_heads_up"),
         ]
-        if self.telegram_client.is_configured:
+        if self.reply_client.is_configured:
             tasks.append(asyncio.create_task(self.reply_listener.run(), name="telegram_reply_listener"))
         await asyncio.gather(*tasks)
 

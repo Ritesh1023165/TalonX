@@ -167,3 +167,27 @@ def enqueue_delivery_subsystem_failure(ops_store, *, destination: str, reason: s
         producer=producer, dedup_key=dedup_key, payload_text=payload,
         provenance={"failed_destination": destination, "reason": reason},
     )
+
+
+def enqueue_degraded_health(ops_store, *, component: str, condition: str, now=None) -> bool:
+    """One incident per component/condition/hour; raw errors never enter payloads."""
+    from datetime import timedelta
+    now = now or datetime.now(timezone.utc)
+    key = f"health:{component}:{condition}:{now:%Y-%m-%dT%H}"
+    return ops_store.enqueue(
+        event_id=_event_id(key), destination=OPERATIONS, event_type="DEGRADED_HEALTH",
+        producer=component, dedup_key=key,
+        payload_text=f"OPERATIONS: {component}: {condition}. Inspect dashboard and local evidence.",
+        provenance={"component": component, "condition": condition},
+        deliver_by_utc=(now + timedelta(hours=1)).isoformat())
+
+
+def record_intelligence_health(*, degraded: bool, now=None):
+    """Runtime-only opt-in; shared independently enabled Operations outbox."""
+    import os
+    if not degraded or os.environ.get("TALONX_NOTIFY_OPERATIONS_ENABLED", "0") != "1":
+        return False
+    from talonx_ops.notify.outbox import NotifyStore
+    return enqueue_degraded_health(
+        NotifyStore(os.environ.get("TALONX_NOTIFY_DB_PATH", "notifications.db")),
+        component="intelligence", condition="PROCESSING_OR_INPUT_DEGRADED", now=now)

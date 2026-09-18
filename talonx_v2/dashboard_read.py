@@ -12,6 +12,9 @@ be rendered under the Experimental/Validation section.
 from __future__ import annotations
 
 from datetime import date, datetime
+from types import SimpleNamespace
+
+from talonx_ops.operator_read import operator_snapshot, read_tables
 
 from talonx_v2 import paper
 from talonx_v2.config import V2_STATUS, V2_VERSION, V2Config
@@ -28,12 +31,15 @@ def build_section(store: V2Store, *, as_of_session: date | None = None,
     cfg = config or V2Config()
     as_of = as_of_session or _today()
     prof = active_profile()
-    trades = store.trades()
-    closed = [p for p in store.all_positions() if p["status"] == "CLOSED"]
+    operator = operator_snapshot(store.path)
+    tables = read_tables(store.path, ("trades", "processed_episodes"))
+    trades = tables["trades"] or []
+    closed = operator["positions"]["CLOSED"]
     realized = round(sum(float(p["realized_pnl_usd"] or 0.0) for p in closed), 2)
     wins = [p for p in closed if (p["realized_pnl_usd"] or 0) > 0]
 
-    open_report = paper.open_position_report(store, as_of)
+    reader = SimpleNamespace(open_positions=lambda: operator["positions"]["OPEN"])
+    open_report = paper.open_position_report(reader, as_of)
     return {
         "panel": "ACTIVE STRATEGY (Original flow)",
         "not_experimental": True,
@@ -53,36 +59,37 @@ def build_section(store: V2Store, *, as_of_session: date | None = None,
             "liquidity_min_median_dollar_volume": cfg.liquidity_min_median_dollar_volume,
             "liquidity_min_close": cfg.liquidity_min_close,
         },
-        "episodes_processed": len(store.all_positions()) + _skipped_count(store),
+        "episodes_processed": sum(len(rows) for rows in operator["positions"].values()) + sum(
+            r["disposition"].startswith("SKIPPED") for r in tables["processed_episodes"] or []),
         "open_positions": open_report,
         "n_open": len(open_report),
+        "unresolved_positions": operator["positions"]["EXIT_UNRESOLVED"],
+        "occupied_capacity": operator["account"]["capacity_used"],
+        "operator": operator,
         "buys": [t for t in trades if t["action"] == "BUY"],
         "sells": [t for t in trades if t["action"] == "SELL"],
         "realized_pnl_usd": realized,
         "closed_positions": len(closed),
         "win_rate": round(len(wins) / len(closed), 3) if closed else None,
-        "cash": store.cash(),
+        "cash": operator["account"]["settled_cash"],
         "paper_only": True,
         "real_capital": False,
     }
-
-
-def _skipped_count(store: V2Store) -> int:
-    with store._conn() as c:
-        return int(c.execute(
-            "SELECT COUNT(*) n FROM processed_episodes WHERE disposition LIKE 'SKIPPED%'"
-        ).fetchone()["n"])
 
 
 def eod_view(store: V2Store, *, as_of_session: date | None = None) -> dict:
     """EOD reconciliation (Phase 13): V2 positions are NOT flattened.
     Report every open position with expected exit / days held / remaining."""
     as_of = as_of_session or _today()
-    rows = paper.open_position_report(store, as_of)
+    operator = operator_snapshot(store.path)
+    reader = SimpleNamespace(open_positions=lambda: operator["positions"]["OPEN"])
+    rows = paper.open_position_report(reader, as_of)
     return {
         "as_of_session": as_of.isoformat(),
         "v2_positions_flattened_at_eod": False,
         "open_v2_positions": rows,
         "n_open": len(rows),
+        "exit_unresolved": operator["positions"]["EXIT_UNRESOLVED"],
+        "obligation_slots": operator["account"]["obligation_slots"],
         "overdue": [r for r in rows if r["overdue"]],
     }

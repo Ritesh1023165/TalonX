@@ -193,7 +193,8 @@ def cmd_close(args) -> int:
                    f"{res.shutdown.get('performed')}")
     except Exception:  # noqa: BLE001
         pass
-    atomic_write(sd / "eod.json", json.dumps(res.to_dict(), indent=2, default=str))
+    eod_evidence = dict(res.to_dict(), reconciled_at_utc=now_pair()["utc"])
+    atomic_write(sd / "eod.json", json.dumps(eod_evidence, indent=2, default=str))
     report = render_report(res, sd)
     atomic_write(sd / "final_report.md", report)
     ts = _terminal_summary(res, sd)

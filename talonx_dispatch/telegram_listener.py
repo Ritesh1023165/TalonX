@@ -203,8 +203,10 @@ class TelegramReplyListener:
         bot_factory: BotFactory | None = None,
         extra_resolvers=None,
         message_resolvers=None,
+        primary_only: bool = False,
     ):
         self.store = store
+        self.primary_only = primary_only
         self.config = config or DispatchConfig()
         # Task 99A additive hook: ordered list of callables `str -> str | None`.
         # Each is tried (before the numeric alert-ID path) against an inbound
@@ -366,6 +368,12 @@ class TelegramReplyListener:
                 # (it already strips HTML for the same reason).
                 await self._reply(reply, plain=True)
                 return
+
+        if self.primary_only:
+            # RI-3: primary commands/Intelligence correlation remain available;
+            # historical Original/Experimental IDs cannot leak Research output.
+            await self._reply("Research/Original details are available in the dashboard. Use /ping for status.", plain=True)
+            return
 
         for resolver in self.extra_resolvers:
             try:

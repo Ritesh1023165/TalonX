@@ -1642,3 +1642,18 @@ separate, confirmed via direct code trace.
 `DECISION_LOG.md` for the session-by-session product-owner record, and
 `docs/research/TALONX_RESEARCH_LEDGER.md` for the research/validation
 task history. This file tracks operational/runtime findings only.*
+
+
+## OPS-026 — V2 dashboard presentation understated capital and obligations (found and closed in RI-3)
+
+**Status:** CLOSED for the RI-3 operator surfaces (2026-09-18).
+
+`talonx_ops/dashboard_read.py` displayed a hardcoded $300,000 seed for every
+campaign, equated settled cash with available cash despite PENDING reservations,
+and excluded EXIT_UNRESOLVED cost/slots from allocated capital and capacity.
+`talonx_ops/paper_performance.py` independently repeated the fixed seed.
+These were presentation errors, not trading-ledger or settlement defects.
+The RI-3 read-only projection now uses the RI-1 campaign row, Package-4
+persisted economics and accepted reservation/obligation semantics. Unknown
+legacy seed remains unknown. Tests and full operator fixture:
+`docs/research/evidence/v2_release_integration_ri3/README.md`.

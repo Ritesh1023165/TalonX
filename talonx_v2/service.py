@@ -536,6 +536,11 @@ class V2Service:
                 from talonx_ops.notify.producers import scan_v2_operational_events
                 from talonx_ops.notify.worker import drain as _drain_ops
                 scan_v2_operational_events(self.store, self._ops_notify_store)
+                from talonx_ops.notify.producers import enqueue_degraded_health
+                if source_degraded or (self._resolver is not None and any(
+                        not hasattr(v, "open") for v in self._resolver.last.values())):
+                    enqueue_degraded_health(self._ops_notify_store, component="v2",
+                                            condition="SOURCE_OR_PRICING_DEGRADED")
                 ops_now = (None if as_of is None else
                           datetime.combine(today, _ops_time(20, 0), tzinfo=timezone.utc))
                 self._last_ops_delivery = _drain_ops(
@@ -1401,6 +1406,11 @@ class V2Service:
             "real_capital": False,
             "shorts": False,
         }
+        import os
+        import psutil
+        status["process_id"] = os.getpid()
+        status["process_created_at"] = psutil.Process().create_time()
+        status["operations_delivery_enabled"] = self._ops_notify_store is not None
         self._atomic_write_status(status)
         self._last_status = status
         return status

@@ -250,7 +250,18 @@ class DashboardReadModel:
         except Exception as exc:  # noqa: BLE001
             active_v2 = {"error": f"{type(exc).__name__}: {exc}"}
 
+        if "error" not in active_v2:
+            operator = v2.get("operator", {})
+            active_v2["operator"] = operator
+            active_v2["pending_entry_intents"] = operator.get("account", {}).get("reserved_slots")
         needs_attention = self._overview_needs_attention(runtime, market, active_v2, alerts)
+        if active_v2.get("operator", {}).get("account", {}).get("blocked"):
+            needs_attention = [x for x in needs_attention if "EXIT_UNRESOLVED" not in x]
+        for item in active_v2.get("operator", {}).get("needs_attention", []):
+            if item == "EXIT_UNRESOLVED" and any("EXIT_UNRESOLVED" in x for x in needs_attention):
+                continue
+            if item not in needs_attention:
+                needs_attention.append(item)
 
         return {
             "generated_at": self.now.isoformat(),
@@ -1184,7 +1195,27 @@ class DashboardReadModel:
             out["coverage_state"] = "INCOMPLETE_COVERAGE"   # until the universe decision
         out["pricing_state"] = ("DEGRADED" if readiness.get("pricing_unavailable_recent")
                                 else "READY")
-        return out
+        from talonx_ops.operator_read import operator_snapshot, redact_output
+        operator = operator_snapshot(Path(db), now=self.now, status=svc_status,
+                                     intel_path=self.home / "ingestion_ledger.db")
+        out["operator"] = operator
+        account = operator["account"]
+        out["ledger"].update(
+            cash=account["settled_cash"],
+            realized_pnl_usd=account["realized_pnl"],
+            starting_campaign_cash=account["starting_capital"],
+            reserved_capital=account["reserved_capital"],
+            available_capital=account["available_capital"],
+            allocated_capital=account["allocated_capital"],
+            capacity=f"{account['capacity_used']}/{account['capacity_limit']}",
+            unresolved_positions=operator["positions"]["EXIT_UNRESOLVED"],
+        )
+        out["service"]["runtime_state"] = operator["runtime"]["state"]
+        if operator["runtime"]["state"] in ("STOPPED", "UNKNOWN", "DEGRADED"):
+            out["health"] = operator["runtime"]["state"]
+            out["service"]["health"] = out["health"]
+            out["service"]["status"] = out["health"]
+        return redact_output(out)
 
     # ------------------------------------------------------------------ #
     # BROAD DISCOVERY -- Task 131 Directive 4/5, extended for the SPA

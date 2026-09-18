@@ -562,6 +562,14 @@ class IntelligenceService:
                 "delivery_ok": (delivery or {}).get("ok", True),
                 "errors": res.errors[:10],
             }
+            try:
+                from talonx_ops.notify.producers import record_intelligence_health
+                record_intelligence_health(
+                    degraded=bool(res.symbols_failed or res.errors or recovery.get("failed")
+                                  or recovery.get("timed_out") or not summary["delivery_ok"]
+                                  or res.submissions_freshness in ("DOWN", "STALE")), now=now)
+            except Exception:  # notification bookkeeping cannot interrupt ingestion
+                logger.warning("Operations health recording failed")
             cycle_summaries.append(summary)
             cycles += 1
 

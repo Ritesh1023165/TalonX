@@ -75,6 +75,15 @@ def resolve_destination_config(destination: str) -> DestinationConfig:
             return DestinationConfig(RESEARCH, False, None, None,
                                      "RESEARCH enabled but TALONX_NOTIFY_RESEARCH_BOT_TOKEN/"
                                      "_CHAT_ID not configured -- no fallback to the primary bot")
+        # A distinct token does not isolate output if it targets the primary chat.
+        primary_chat = _env("TALONX_NOTIFY_TRADE_EVENT_CHAT_ID") or _env("TELEGRAM_CHAT_ID")
+        primary_token = _env("TALONX_NOTIFY_TRADE_EVENT_BOT_TOKEN") or _env("TELEGRAM_BOT_TOKEN")
+        if primary_token and token == primary_token:
+            return DestinationConfig(RESEARCH, False, None, None,
+                                     "RESEARCH bot aliases TRADE_EVENT; independent poller required")
+        if primary_chat and chat == primary_chat:
+            return DestinationConfig(RESEARCH, False, None, None,
+                                     "RESEARCH chat aliases TRADE_EVENT; isolation required")
         return DestinationConfig(RESEARCH, True, token, chat, "RESEARCH explicitly enabled")
 
     # TRADE_EVENT / OPERATIONS: destination-specific credentials, or fall

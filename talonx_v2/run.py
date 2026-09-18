@@ -141,6 +141,18 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", default="results/task110_v2_integration/_replay_summary.json")
     args = ap.parse_args(argv)
 
+    if args.mode == "status":
+        from talonx_ops.operator_read import operator_snapshot
+        import os
+        status_path = Path(args.status_path or os.environ.get("TALONX_V2_STATUS_PATH")
+                           or str(Path(args.db).parent / "v2_service_status.json"))
+        try:
+            status = json.loads(status_path.read_text())
+        except (OSError, ValueError):
+            status = {}
+        print(json.dumps(operator_snapshot(args.db, status=status), indent=2, default=str))
+        return 0
+
     cfg = V2Config(db_path=args.db)
     cfg.validate_frozen()
     store = V2Store(args.db, starting_cash=cfg.starting_cash_usd,
@@ -150,16 +162,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.mode == "recover":
         summary = pipeline.paper.recover(store, as_of_session=date.today())
         print(json.dumps(summary, indent=2))
-        return 0
-
-    if args.mode == "status":
-        from talonx_v2.service import V2Service
-        svc = V2Service(config=cfg, bar_dirs=[Path(p) for p in args.bar_dir],
-                        status_path=args.status_path or None)
-        try:
-            print(Path(svc.status_path).read_text())
-        except OSError:
-            print(json.dumps({"error": "no status file yet", "path": str(svc.status_path)}))
         return 0
 
     if args.mode == "live":
@@ -229,6 +231,11 @@ def main(argv: list[str] | None = None) -> int:
                 len(broad_discovery_symbols), mp,
                 "on" if _os.environ.get("TALONX_DISPATCH_ENABLE_BROAD_DISCOVERY") else "off")
 
+        import os as _os
+        ops_store = None
+        if _os.environ.get("TALONX_NOTIFY_OPERATIONS_ENABLED", "0") == "1":
+            from talonx_ops.notify.outbox import NotifyStore
+            ops_store = NotifyStore(_os.environ.get("TALONX_NOTIFY_DB_PATH", "notifications.db"))
         svc = V2Service(
             config=cfg, bar_dirs=[Path(p) for p in args.bar_dir],
             form4_kind=args.form4_source, form4_parquet=args.form4_parquet,
@@ -238,6 +245,7 @@ def main(argv: list[str] | None = None) -> int:
             pricing_mode=args.pricing_mode,
             router=router, transport=transport, deliver=args.deliver,
             broad_discovery_symbols=broad_discovery_symbols,
+            ops_notify_store=ops_store,
         )
         if args.once and args.as_of:
             st = svc.tick(as_of=date.fromisoformat(args.as_of))

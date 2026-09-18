@@ -560,9 +560,9 @@ function renderV2(d){
   // (equity/reconciliation/cost breakdown) is folded in HERE, its one
   // existing destination, rather than a second tab.
   const vperf=l.performance||{}, veq=vperf.equity||{}, vrc=vperf.reconciliation||{}, vco=vperf.costs;
-  h+=`<div class="card card-wide"><h3>$300,000 campaign ledger ${pill(l.status)}</h3><div class="grid">`+
+  h+=`<div class="card card-wide"><h3>Campaign ledger ${pill(l.status)}</h3><div class="grid">`+
      `<div>`+kv('starting cash', num(l.starting_campaign_cash))+kv('cash', num(l.cash))+
-       kv('available', num(l.available_capital))+kv('allocated', num(l.allocated_capital))+
+       kv('reserved', num(l.reserved_capital))+kv('available', num(l.available_capital))+kv('allocated', num(l.allocated_capital))+
        kv('capacity', l.capacity)+kv('equity (cash+marked open)', num(veq.value)+' '+pill(veq.status))+`</div>`+
      `<div>`+kv('open positions', l.n_open)+kv('closed positions', l.closed_positions)+
        kv('BUY / SELL (lifetime)', (l.buys==null?'—':l.buys)+' / '+(l.sells==null?'—':l.sells))+
@@ -575,13 +575,54 @@ function renderV2(d){
         {label:'days held', get:p=>p.days_held}, {label:'shares', get:p=>p.shares}], 20,
         p=>p.symbol+'|'+p.entry_session)+
      `</div>`;
-  // PENDING pre-open intents (actionable, not yet filled)
-  h+=`<div class="card card-wide"><h3>Pre-open entry intents (actionable — filled at the session OPEN)</h3>`+
-     boundedTable((intt.pending && intt.pending.length? intt.pending : (sv.pending_entry_intents||[])), [
-        {label:'symbol', get:i=>i.symbol}, {label:'target entry session', get:i=>i.target_entry_session},
-        {label:'intent created (UTC)', get:i=>i.created_at_utc}], 20,
-        i=>i.symbol+'|'+i.created_at_utc)+
-     `<div class="muted small">by status: ${esc(JSON.stringify(intt.by_status||{}))}</div></div>`;
+  const op=d.operator||{}, ac=op.account||{}, camp=op.campaign||{}, rt=op.runtime||{};
+  h+=`<div class="card card-wide"><h3>Campaign and operator state</h3>`+
+    kv('campaign', esc(camp.campaign_id||'unknown / legacy'))+
+    kv('strategy / version / mode', esc([camp.strategy,camp.strategy_version,camp.execution_mode].filter(Boolean).join(' / ')))+
+    kv('capital provenance', esc(camp.provenance||'unknown'))+kv('allocation cap',num(ac.allocation_cap))+
+    kv('runtime',pill(rt.state))+kv('last heartbeat',esc(rt.last_heartbeat||'unknown'))+
+    kv('data',pill(rt.data_state))+kv('Redis',pill(rt.redis_health))+
+    kv('last market event',esc(rt.last_market_event||'unknown'))+
+    kv('account blocked',ac.blocked==null?'unknown':String(ac.blocked))+
+    kv('needs attention',esc((op.needs_attention||[]).join(', ')||'none detected'))+
+    kv('ledger arithmetic',pill((op.reconciliation||{}).state))+
+    kv('persisted reconciliation',esc((op.reconciliation||{}).persisted_run_state||'NOT_RUN'))+
+    kv('last persisted run (historical)',esc((op.reconciliation||{}).last_persisted_run||'unknown'))+
+    kv('reconciliation evidence',esc((op.reconciliation||{}).evidence_reference||'not available'))+
+    `<div class="muted small">${esc((op.reconciliation||{}).basis||'')}</div></div>`;
+  for(const lifecycle of ['EXIT_UNRESOLVED','CLOSED']){
+    h+=`<div class="card card-wide"><h3>${esc(lifecycle)} positions</h3>`+
+      boundedTable((op.positions||{})[lifecycle]||[],[
+        {label:'symbol',get:x=>x.symbol},{label:'status',get:x=>x.status},
+        {label:'entry total',get:x=>num(x.position_cost)},{label:'shares',get:x=>x.shares},
+        {label:'realized P&L',get:x=>num(x.realized_pnl_usd)}],20,x=>x.position_id)+`</div>`;
+  }
+  h+=`<div class="card card-wide"><h3>Entry intents - reservations, not open trades</h3>`+
+    boundedTable(op.entry_intents||[],[
+      {label:'symbol',get:x=>x.symbol},{label:'campaign',get:x=>x.campaign_id},
+      {label:'admitted',get:x=>x.created_at_utc},{label:'status',get:x=>x.status},
+      {label:'recovery',get:x=>x.recovery_state},{label:'deadline UTC',get:x=>x.recovery_deadline_utc},
+      {label:'reserved',get:x=>num(x.reserved_capital)}],20,x=>x.intent_id)+`</div>`;
+  h+=`<div class="card card-wide"><h3>Account blocks and clearance evidence</h3>`+
+    boundedTable(op.blocks||[],[
+      {label:'account',get:x=>x.account_id},{label:'type',get:x=>x.reason_type},
+      {label:'status',get:x=>x.status},{label:'created',get:x=>x.detected_at_utc},
+      {label:'reason',get:x=>x.detail},{label:'reference',get:x=>x.reference}],20,x=>x.block_id)+
+    boundedTable(op.clearance_history||[],[
+      {label:'operator',get:x=>x.operator_id},{label:'reason',get:x=>x.reason},
+      {label:'evidence',get:x=>x.evidence_ref},{label:'outcome',get:x=>x.outcome},
+      {label:'at',get:x=>x.attempted_at_utc}],20,x=>x.clearance_id)+
+    `<div class="muted small">${esc(op.clearance_action||'')}</div></div>`;
+  h+=`<div class="card card-wide"><h3>Logical Telegram destinations</h3>`;
+  for(const [dest,n] of Object.entries(op.notifications||{})){
+    h+=`<h4>${esc(dest)}</h4>`+kv('enabled / physically configured',String(n.enabled)+' / '+String(n.physical_destination_configured))+
+      kv('credential source',esc(n.credential_source))+kv('configuration reason',esc(n.configuration_reason))+kv('shares chat with',esc(n.shares_chat_with.join(', ')||'none known'))+
+      kv('delivery counts',esc(JSON.stringify(n.counts)))+kv('last success',esc(n.last_success||'none'))+
+      kv('last failure',esc(n.last_failure||'none'))+kv('real delivery validated',String(n.real_delivery_validated))+
+      `<div class="muted small">${esc(n.configuration_scope)}</div>`;
+  }
+  h+=kv('runtime Trade/Event activated',rt.delivery_activated==null?'unknown':String(rt.delivery_activated))+
+     kv('runtime Operations activated',rt.operations_delivery_activated==null?'unknown':String(rt.operations_delivery_activated))+`</div>`;
   // FUNNEL: Form4 -> purchases -> distinct owners -> clusters -> eligibility/staleness -> decisions -> paper -> delivery
   h+=`<div class="card card-wide"><h3>Funnel — Form 4 → clusters → decisions → paper → delivery</h3><div class="tblwrap"><table class="tbl"><tbody>`+
      `<tr><td>Form 4 code-P records (window / today)</td><td>${num(f4.code_p_records_window)} / ${num(f4.code_p_records_today)}</td></tr>`+

@@ -121,14 +121,12 @@ _TALONX_PAPER_COST_BREAKDOWN = {
     "modeled": True,
 }
 _V2_COST_BREAKDOWN = {
-    "spread_slippage": "NOT modelled -- V2 (talonx_v2/paper.py) fills at the exact quoted price with no spread adjustment (confirmed by reading the source)",
-    "explicit_commissions_fees": "NOT modelled",
+    "spread_slippage": "NOT modelled/calibrated; quoted fills",
+    "explicit_commissions_fees": "Persisted entry_fee and exit_fee where recorded; default zero",
     "additional_modeled_costs": "none",
-    "unmodeled_costs": "spread/slippage of any kind, commissions/fees",
-    "summary": ("V2's realized/unrealized P&L are fully GROSS -- no friction of any kind is "
-               "simulated (unlike Original/Experimental's spread-adjusted fills) -- the most "
-               "optimistic of the three lanes, not \"net of all costs.\""),
-    "modeled": False,
+    "unmodeled_costs": "market impact and uncalibrated spread/slippage",
+    "summary": "Realized P&L = exit net minus persisted entry total, including recorded fees. Costs remain uncalibrated.",
+    "modeled": True,
 }
 
 
@@ -619,9 +617,12 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
         sells_today = _q1(con, "SELECT COUNT(*) FROM trades WHERE action='SELL' AND substr(executed_at,1,10)=?",
                           (session_date,)) if _has_table(con, "trades") else 0
 
-        starting_campaign_cash = 300_000.0
-        expected_cash = starting_campaign_cash - open_cost_total - unresolved_cost_total + realized_total
-        recon_diff = round((cash or 0.0) - expected_cash, 4) if cash is not None else None
+        campaign_rows = _qall(con, "SELECT * FROM campaign WHERE id=1") if _has_table(con, "campaign") else []
+        campaign = dict(campaign_rows[0]) if campaign_rows else {}
+        starting_campaign_cash = campaign.get("starting_cash_usd")
+        expected_cash = (starting_campaign_cash - open_cost_total - unresolved_cost_total + realized_total
+                         if starting_campaign_cash is not None else None)
+        recon_diff = round((cash or 0.0) - expected_cash, 4) if cash is not None and expected_cash is not None else None
         recon_status = ("EXACT" if recon_diff is not None and abs(recon_diff) < 1e-2 else
                         "MISMATCH" if recon_diff is not None else "UNAVAILABLE")
 
@@ -640,16 +641,16 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
                         if (marked_value_complete and not has_unresolved) and cash is not None
                         else None)
 
-        status = "ACTIVE" if (opens or closed) else "ZERO_ACTIVITY"
+        status = "ACTIVE" if (opens or closed or unresolved_rows) else "ZERO_ACTIVITY"
 
         return {
             "lane": "V2", "strategy_identity": "INSIDER_BUY_CLUSTER_V2@1",
             "attribution": "V2 / multi-day insider-cluster paper campaign (Original-flow, not Experimental)",
             "status": status,
-            "period": {"as_of_date": session_date, "campaign_start": "2026-09-08",
-                      "campaign_start_basis": "Task 112 frozen release day-1 (documented, not derived)"},
+            "period": {"as_of_date": session_date, "campaign_start": campaign.get("created_at_utc"),
+                      "campaign_start_basis": campaign.get("provenance", "UNKNOWN_LEGACY")},
             "starting_capital": {"amount": starting_campaign_cash,
-                                 "accounting_period": "campaign inception, 2026-09-08"},
+                                 "accounting_period": "persisted campaign inception; unknown for legacy"},
             "cash": cash,
             "open_positions": {"count": len(opens), "cost_basis_total": round(open_cost_total, 4),
                               "marked_value_total": round(marked_value_total, 4) if marked_value_complete else None,
@@ -675,7 +676,7 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
             "reconciliation": {"status": recon_status,
                               "expected_cash": round(expected_cash, 4) if expected_cash is not None else None,
                               "actual_cash": cash, "diff": recon_diff,
-                              "basis": "expected_cash = starting_campaign_cash($300,000) - "
+                              "basis": "expected_cash = persisted starting_campaign_cash - "
                                        "open_position_cost_basis_total - "
                                        "exit_unresolved_cost_basis_total + "
                                        "realized_pnl_campaign_to_date"},
