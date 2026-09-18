@@ -7,6 +7,7 @@ shutdown.  NEVER flattens a legitimate open V2 position; NEVER deletes
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import sqlite3
 from dataclasses import dataclass, field
@@ -17,6 +18,8 @@ from typing import Any
 from talonx_ops.prospective.campaign_cash import authoritative_starting_cash
 from talonx_ops.prospective.checkpoint import capture, eod_state
 from talonx_ops.prospective.paths import V2_DB_PATH, V2_STATUS_PATH, atomic_write, now_pair
+
+logger = logging.getLogger("talonx_ops.prospective.close")
 
 
 @dataclass
@@ -45,6 +48,11 @@ def _v2_reconcile() -> tuple[dict[str, Any], dict[str, str], list[str]]:
         cash = con.execute("SELECT cash FROM portfolio WHERE id=1").fetchone()
         cash = None if cash is None else float(cash[0])
         starting_cash = authoritative_starting_cash(con)
+        try:
+            camp_row = con.execute("SELECT campaign_id FROM campaign WHERE id=1").fetchone()
+            campaign_id = camp_row["campaign_id"] if camp_row else "V2"
+        except sqlite3.OperationalError:
+            campaign_id = "V2"  # pre-RI-1 ledger file, no `campaign` table yet
         buys = con.execute("SELECT COUNT(*) FROM trades WHERE action='BUY'").fetchone()[0]
         sells = con.execute("SELECT COUNT(*) FROM trades WHERE action='SELL'").fetchone()[0]
         n_open = con.execute("SELECT COUNT(*) FROM positions WHERE status='OPEN'").fetchone()[0]
@@ -86,7 +94,7 @@ def _v2_reconcile() -> tuple[dict[str, Any], dict[str, str], list[str]]:
            "closed": int(n_closed), "exit_unresolved": int(n_unres),
            "realized_pnl_usd": round(realized, 2), "open_cost_usd": round(open_cost, 2),
            "exit_unresolved_cost_usd": round(unresolved_cost, 2),
-           "starting_cash": starting_cash}
+           "starting_cash": starting_cash, "campaign_id": campaign_id}
 
     def _a(name, ok, why=""):
         asserts[name] = "PASS" if ok else "FAIL"
@@ -194,7 +202,48 @@ def _record_v2_reconciliation_blocks(asserts: dict[str, str], findings: list[str
         raise
     finally:
         con.close()
+
+    if recorded:
+        # RI-2 RI2-E: a reconciliation failure is an OPERATIONS incident.
+        # Best-effort, enqueued immediately after the block commit above
+        # (a SEPARATE database file -- no cross-file atomicity is possible
+        # with plain sqlite3; the account block itself, the actual safety
+        # mechanism, is already durably committed by this point regardless
+        # of whether this notification enqueue succeeds -- see this
+        # module's own evidence bundle for the disclosed limitation).
+        try:
+            from talonx_ops.notify.producers import enqueue_reconciliation_failure
+            campaign_id = "V2"
+            con2 = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
+            try:
+                row = con2.execute("SELECT campaign_id FROM campaign WHERE id=1").fetchone()
+                if row:
+                    campaign_id = row[0]
+            except sqlite3.OperationalError:
+                pass
+            finally:
+                con2.close()
+            ops_store = _default_ops_notify_store()
+            enqueue_reconciliation_failure(
+                ops_store, campaign_id=campaign_id,
+                findings=[f for f in findings if any(
+                    f.startswith(k) for k in ("cash_plus_open_cost_reconciles", "no_negative_cash",
+                                              "whole_share_positions", "positive_finite_position_cost"))],
+                reference=",".join(recorded))
+        except Exception:  # noqa: BLE001
+            logger.exception("failed to enqueue OPERATIONS reconciliation-failure notification")
     return recorded
+
+
+def _default_ops_notify_store():
+    """RI-2: the shared OPERATIONS/RESEARCH outbox path -- one small,
+    separate db file, configurable via TALONX_NOTIFY_DB_PATH (same
+    per-subsystem-db convention as v2_lane.db/paper_trading.db/
+    ingestion_ledger.db)."""
+    import os
+
+    from talonx_ops.notify.outbox import NotifyStore
+    return NotifyStore(os.environ.get("TALONX_NOTIFY_DB_PATH", "notifications.db"))
 
 
 def _experimental_external_zero(ck: dict) -> tuple[bool, str]:

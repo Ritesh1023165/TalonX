@@ -1597,6 +1597,47 @@ carries for audit).
 
 ---
 
+## OPS-025 — Historical Intelligence-outbox drain gap re-traced: already fixed, not re-open (RI-2)
+
+**Status**: CONFIRMED FIXED (by a prior task, re-verified by RI-2 — no new code change).
+
+**Historical finding** (`docs/audits/task117_output_closure/README.md`
+D5, 2026-09 era): the `intelligence_delivery` outbox accumulated 9,843
+rows, 100% `PENDING`, 0 ever `SENT` — a missing runtime-wiring
+integration, not a strictness/threshold issue. At the time, "implementation
+deferred" pending a product decision.
+
+**RI-2's re-trace** (V2 Release Integration Task RI-2, direct code
+read, not doc trust): `talonx_ops/prospective/proc.py:241-264`
+(Task 140, building on Task 132's own investigation) already closes
+this — whenever `prospective start --deliver --transport telegram` is
+invoked, the SAME flags now also propagate `TALONX_INTEL_DELIVER_
+CARDS=1`/`TALONX_INTEL_DRY_RUN_DELIVERY=0` into the supervisor
+subprocess's environment, which inherits to the Intelligence child
+process (`talonx_ops/supervisor.py`'s `default_talonx_components()`
+unconditionally spawns `python -m talonx_ingest.intelligence.service
+poll --with-backfill` as a supervised component). Previously only V2's
+own companion argv received the delivery-enablement flags; Intelligence
+silently stayed in permanent dry-run regardless of operator intent —
+this is the exact defect D5 described, already fixed.
+
+**Not re-tested end-to-end by RI-2**: Intelligence's own delivery
+pipeline internals (backlog/expiry safety, restart behavior) were
+traced for WIRING only — its own prior test coverage (referenced in
+`docs/audits/task117_delivery_timestamp_completion/`) is relied upon,
+consistent with RI-2's own scope boundary against broadly refactoring
+or re-verifying unrelated messaging subsystems.
+
+**Evidence references**: `docs/research/evidence/
+v2_release_integration_ri2/README.md` §3.
+
+**Related**: this is a DIFFERENT outbox/pipeline than V2's own
+`v2_alert_outbox` (`OPS-023`/`OPS-024`, RI-1) — the two were
+historically conflated in casual discussion but are architecturally
+separate, confirmed via direct code trace.
+
+---
+
 *See `REQUIREMENTS_TRACKER.md` for product-requirement tracking,
 `DECISION_LOG.md` for the session-by-session product-owner record, and
 `docs/research/TALONX_RESEARCH_LEDGER.md` for the research/validation

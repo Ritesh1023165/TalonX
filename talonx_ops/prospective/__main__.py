@@ -113,6 +113,18 @@ def cmd_start(args) -> int:
             {"verdict": "REFUSED_ALREADY_RUNNING", "detail": str(exc)}, indent=2))
         return 3
 
+    # RI-2 RI2-M: durable STARTUP notification (OPERATIONS). Best-effort --
+    # a failure here never blocks or unwinds the already-successful start.
+    try:
+        from talonx_ops.notify.producers import enqueue_lifecycle_event
+        from talonx_ops.prospective.close import _default_ops_notify_store
+        campaign_id = env.get("TALONX_V2_CAMPAIGN_ID", "V2")
+        enqueue_lifecycle_event(
+            _default_ops_notify_store(), event_type="STARTUP", campaign_id=campaign_id,
+            detail=f"prospective start: deliver={args.deliver} transport={args.transport}")
+    except Exception:  # noqa: BLE001
+        pass
+
     # D4 / Section 3: bounded readiness wait -> a FIRST-CLASS verdict from the
     # actual process + heartbeat + dashboard state. READY needs EVERY mandatory
     # component (supervisor, companion, :8787) AND a fresh first tick.
@@ -170,6 +182,17 @@ def cmd_close(args) -> int:
         sd = session_dir()  # fall back to today's
     sd.mkdir(parents=True, exist_ok=True)
     res = run_close(sd, force=args.force, do_shutdown=not args.no_shutdown)
+    # RI-2 RI2-M: durable SHUTDOWN notification (OPERATIONS). Best-effort.
+    try:
+        from talonx_ops.notify.producers import enqueue_lifecycle_event
+        from talonx_ops.prospective.close import _default_ops_notify_store
+        campaign_id = (res.v2_reconciliation or {}).get("campaign_id", "V2")
+        enqueue_lifecycle_event(
+            _default_ops_notify_store(), event_type="SHUTDOWN", campaign_id=campaign_id,
+            detail=f"prospective close: verdict={res.verdict} shutdown_performed="
+                   f"{res.shutdown.get('performed')}")
+    except Exception:  # noqa: BLE001
+        pass
     atomic_write(sd / "eod.json", json.dumps(res.to_dict(), indent=2, default=str))
     report = render_report(res, sd)
     atomic_write(sd / "final_report.md", report)

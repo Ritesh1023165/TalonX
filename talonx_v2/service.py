@@ -70,7 +70,8 @@ class V2Service:
                  pricing_mode: str = "csv",
                  router=None, transport=None, deliver: bool = False,
                  execution_allowlist: list[str] | None = None,
-                 broad_discovery_symbols: list[str] | None = None):
+                 broad_discovery_symbols: list[str] | None = None,
+                 ops_notify_store=None):
         self.cfg = config
         self.cfg.validate_frozen()
         self.store = V2Store(config.db_path, starting_cash=config.starting_cash_usd,
@@ -99,6 +100,16 @@ class V2Service:
         self._transport = transport
         self._deliver = bool(deliver)
         self._last_delivery: dict = {}
+        # RI-2: the OPERATIONS-destination outbox (talonx_ops.notify) --
+        # a SEPARATE store from v2_alert_outbox (which stays TRADE_EVENT-
+        # only). None (default) = no OPERATIONS drain attempted this tick,
+        # same opt-in philosophy as `deliver`/`transport` above. Reuses
+        # this SAME already-proven tick loop rather than a new supervised
+        # process (RI2-I) -- gated independently of `self._deliver` so an
+        # operator can enable OPERATIONS drain without necessarily
+        # enabling V2's own TRADE_EVENT delivery, or vice versa.
+        self._ops_notify_store = ops_notify_store
+        self._last_ops_delivery: dict = {}
         # Pricing: "csv" (default) = the frozen CSV snapshot, byte-identical to
         # the pre-Task-117 behaviour.  Any other mode routes bar/price lookups
         # through talonx_v2.pricing.make_resolver (strict validation,
@@ -498,8 +509,39 @@ class V2Service:
                 self._last_delivery = deliver_outbox(
                     self.store, router=self._router, transport=self._transport,
                     now=deliver_now, broad_discovery_symbols=self.broad_discovery_symbols)
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
                 logger.exception("deliver_outbox failed")
+                # RI-2 RI2-E: "notification-delivery failure itself" is an
+                # operations condition -- hour-bucketed dedup (see that
+                # function's own docstring) prevents this from ever
+                # flooding, including the self-referential case where
+                # OPERATIONS delivery is itself what's failing.
+                if self._ops_notify_store is not None:
+                    try:
+                        from talonx_ops.notify.producers import enqueue_delivery_subsystem_failure
+                        enqueue_delivery_subsystem_failure(
+                            self._ops_notify_store, destination="TRADE_EVENT",
+                            reason=f"deliver_outbox raised: {exc!r}", producer="talonx_v2.service")
+                    except Exception:  # noqa: BLE001
+                        pass
+
+        # RI-2: drain the OPERATIONS-destination outbox on the SAME tick,
+        # independently gated -- an operator may enable this without
+        # necessarily enabling V2's own TRADE_EVENT delivery above.
+        if self._ops_notify_store is not None:
+            try:
+                from datetime import time as _ops_time
+
+                from talonx_ops.notify import OPERATIONS
+                from talonx_ops.notify.producers import scan_v2_operational_events
+                from talonx_ops.notify.worker import drain as _drain_ops
+                scan_v2_operational_events(self.store, self._ops_notify_store)
+                ops_now = (None if as_of is None else
+                          datetime.combine(today, _ops_time(20, 0), tzinfo=timezone.utc))
+                self._last_ops_delivery = _drain_ops(
+                    self._ops_notify_store, destination=OPERATIONS, now=ops_now)
+            except Exception:  # noqa: BLE001
+                logger.exception("ops_notify drain failed")
 
         status = self._write_status(today, len(records or []), len(ripe_attemptable), res,
                                     source_degraded=source_degraded, marks=marks)
@@ -1158,6 +1200,7 @@ class V2Service:
         dedup_key = f"{episode.episode_id}:{action}:{kind}"
         provenance = {
             "episode_id": episode.episode_id, "kind": kind,
+            "campaign_id": self.store.campaign_identity().get("campaign_id", self.cfg.campaign_id),
             "issuer_cik": episode.issuer_cik,
             "distinct_owner_ciks": list(episode.distinct_owner_ciks),
             "activation_filing_date": episode.activation_filing_date.isoformat(),
@@ -1207,9 +1250,13 @@ class V2Service:
                     f"expired without a FINAL entry bar within "
                     f"{self.cfg.max_entry_staleness_sessions} sessions. No position opened. "
                     "Informational only.")
+        # RI-2 RI2-D: campaign identity (RI-1) is surfaced in the message
+        # itself, not only in the durable provenance record.
+        campaign_id = self.store.campaign_identity().get("campaign_id", self.cfg.campaign_id)
         payload = "\n".join([f"⚡ *{action}* — *{sym}*  INSIDER BUY CLUSTER",
                              "—" * 12, headline, "", body,
-                             "", "[INSIDER_BUY_CLUSTER_V2@1 · PAPER_CANDIDATE · PAPER ONLY · dry-run/candidate]"])
+                             "", f"[INSIDER_BUY_CLUSTER_V2@1 · campaign {campaign_id} · "
+                                 "PAPER_CANDIDATE · PAPER ONLY · dry-run/candidate]"])
         # actionable-instruction deadline: a PLANNED BUY is only deliverable
         # BEFORE its target session's XNYS open (Task 117 deployment-readiness).
         deliver_by = None

@@ -189,7 +189,8 @@ CREATE TABLE IF NOT EXISTS v2_alert_outbox (
     deliver_by_utc        TEXT,
     created_at_utc        TEXT NOT NULL,
     updated_at_utc        TEXT NOT NULL,
-    sent_at_utc           TEXT
+    sent_at_utc           TEXT,
+    destination           TEXT NOT NULL DEFAULT 'TRADE_EVENT'   -- RI-2: logical destination (talonx_ops.notify)
 );
 """ + _ACCOUNT_BLOCKS_SCHEMA
 
@@ -361,6 +362,12 @@ class V2Store:
             cols = {r[1] for r in c.execute("PRAGMA table_info(v2_alert_outbox)")}
             if cols and "deliver_by_utc" not in cols:
                 c.execute("ALTER TABLE v2_alert_outbox ADD COLUMN deliver_by_utc TEXT")
+            # RI-2: additive destination column for a pre-RI-2 outbox table.
+            # Existing rows default to TRADE_EVENT (every pre-RI-2 V2 alert
+            # WAS a trade/event notification -- correct backfill, not a guess).
+            if cols and "destination" not in cols:
+                c.execute("ALTER TABLE v2_alert_outbox ADD COLUMN destination "
+                         "TEXT NOT NULL DEFAULT 'TRADE_EVENT'")
             # Package 3 P3-F: additive audit columns for an intents table
             # that may have been created by an earlier build.
             intent_cols = {r[1] for r in c.execute("PRAGMA table_info(pending_entry_intents)")}
