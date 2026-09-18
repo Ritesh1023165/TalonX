@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from talonx_ops.operator_read import operator_snapshot, runtime_view, notification_view
+from talonx_ops.operator_read import _destination_fingerprint, operator_snapshot, runtime_view, notification_view
 from talonx_ops.notify import resolve_destination_config
 from talonx_ops.notify.outbox import NotifyStore
 from talonx_ops.notify.producers import enqueue_degraded_health, record_intelligence_health
@@ -152,6 +152,29 @@ def test_configuration_secrets_and_shared_physical_chat(monkeypatch):
     monkeypatch.setenv('TALONX_NOTIFY_OPERATIONS_CHAT_ID','ops-chat')
     assert notification_view([],[])['OPERATIONS']['shares_chat_with']==[]
     assert not view['TRADE_EVENT']['real_delivery_validated']
+
+
+def test_explicit_validation_evidence_requires_current_destination_config(tmp_path, monkeypatch):
+    monkeypatch.setenv('TALONX_NOTIFY_TRADE_EVENT_BOT_TOKEN', '123456:trade-token-abcdefghijklmnopqrstuvwxyz')
+    monkeypatch.setenv('TALONX_NOTIFY_TRADE_EVENT_CHAT_ID', 'trade-chat')
+    monkeypatch.setenv('TALONX_NOTIFY_OPERATIONS_BOT_TOKEN', '234567:ops-token-abcdefghijklmnopqrstuvwxyz')
+    monkeypatch.setenv('TALONX_NOTIFY_OPERATIONS_CHAT_ID', 'ops-chat')
+    signal = resolve_destination_config('TRADE_EVENT')
+    sentinel = resolve_destination_config('OPERATIONS')
+    evidence = tmp_path / 'ri4-validation.json'
+    evidence.write_text(json.dumps({
+        'schema_version': 1,
+        'kind': 'ri4_controlled_telegram_validation',
+        'destinations': {
+            'TRADE_EVENT': {'state': 'SENT', 'configuration_fingerprint': _destination_fingerprint(signal)},
+            'OPERATIONS': {'state': 'SENT', 'configuration_fingerprint': _destination_fingerprint(sentinel)},
+        },
+    }))
+    view = notification_view([], [], validation_path=evidence)
+    assert view['TRADE_EVENT']['real_delivery_validated']
+    assert view['OPERATIONS']['real_delivery_validated']
+    monkeypatch.setenv('TALONX_NOTIFY_OPERATIONS_CHAT_ID', 'different-chat')
+    assert not notification_view([], [], validation_path=evidence)['OPERATIONS']['real_delivery_validated']
 
 @pytest.mark.parametrize('enabled,chat,expected',[('0','research',False),('1','primary',False),('1','research',True)])
 def test_research_no_primary_fallback(monkeypatch,enabled,chat,expected):

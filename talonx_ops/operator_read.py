@@ -13,6 +13,34 @@ from pathlib import Path
 from talonx_ops.notify import DESTINATIONS, resolve_destination_config
 
 
+def _destination_fingerprint(cfg):
+    """Return a non-reversible binding between validation evidence and config."""
+    if not (cfg.bot_token and cfg.chat_id):
+        return None
+    import hashlib
+    return hashlib.sha256((cfg.bot_token + '\\0' + cfg.chat_id).encode('utf-8')).hexdigest()
+
+
+def notification_validation_view(path, configs):
+    """Read explicit, sanitized RI-4 validation evidence; fail closed on errors."""
+    output = {destination: False for destination in DESTINATIONS}
+    if not path:
+        return output
+    try:
+        record = json.loads(Path(path).read_text(encoding='utf-8'))
+        if record.get('schema_version') != 1 or record.get('kind') != 'ri4_controlled_telegram_validation':
+            return output
+        for destination in ("TRADE_EVENT", "OPERATIONS"):
+            item = (record.get('destinations') or {}).get(destination) or {}
+            output[destination] = (
+                item.get('state') == 'SENT'
+                and item.get('configuration_fingerprint') == _destination_fingerprint(configs[destination])
+            )
+    except (OSError, ValueError, TypeError):
+        return output
+    return output
+
+
 def read_tables(path, names):
     """One consistent read transaction; missing tables remain explicitly unknown."""
     result = {name: None for name in names}
@@ -63,8 +91,10 @@ def runtime_view(status, *, now, process_probe=None):
                 operations_delivery_activated=status.get('operations_delivery_enabled') if fresh and alive else None)
 
 
-def notification_view(v2_rows, ops_rows, intel_rows=None):
+def notification_view(v2_rows, ops_rows, intel_rows=None, validation_path=None):
     configs = {d: resolve_destination_config(d) for d in DESTINATIONS}
+    validation = notification_validation_view(
+        validation_path if validation_path is not None else os.environ.get('TALONX_NOTIFY_VALIDATION_PATH'), configs)
     output = {}
     for d, cfg in configs.items():
         rows = [r for r in (v2_rows or []) + (ops_rows or []) if r.get('destination', 'TRADE_EVENT') == d]
@@ -84,7 +114,7 @@ def notification_view(v2_rows, ops_rows, intel_rows=None):
                          configuration_reason=cfg.reason,
                          credential_source='DEDICATED' if dedicated else 'LEGACY_OR_MIXED' if configured else 'UNCONFIGURED',
                          shares_chat_with=shared, configuration_scope='observer process environment; runtime may differ',
-                         real_delivery_validated=False, counts=counts,
+                         real_delivery_validated=validation[d], counts=counts,
                          sources_available=dict(v2=v2_rows is not None, operations=ops_rows is not None,
                                                 intelligence=intel_rows is not None),
                          last_success=max((r.get('sent_at_utc') or '' for r in rows if r.get('state') == 'SENT'), default='') or None,
@@ -93,7 +123,7 @@ def notification_view(v2_rows, ops_rows, intel_rows=None):
     return output
 
 
-def operator_snapshot(db_path, *, now=None, status=None, notify_path=None, intel_path=None, process_probe=None, reconciliation_path=None):
+def operator_snapshot(db_path, *, now=None, status=None, notify_path=None, intel_path=None, process_probe=None, reconciliation_path=None, validation_path=None):
     now = now or datetime.now(timezone.utc)
     tables = read_tables(db_path, ('campaign', 'portfolio', 'positions', 'pending_entry_intents',
                                   'account_blocks', 'block_clearances', 'campaign_cutover_log', 'v2_alert_outbox'))
@@ -131,10 +161,10 @@ def operator_snapshot(db_path, *, now=None, status=None, notify_path=None, intel
                 r['recovery_state'] = 'UNKNOWN'
     ops = read_tables(notify_path or os.environ.get('TALONX_NOTIFY_DB_PATH', 'notifications.db'), ('ops_notification_outbox',))
     intel = read_tables(intel_path, ('intelligence_delivery',)) if intel_path else {}
-    delivery = notification_view(tables['v2_alert_outbox'], ops['ops_notification_outbox'], intel.get('intelligence_delivery'))
+    delivery = notification_view(tables['v2_alert_outbox'], ops['ops_notification_outbox'], intel.get('intelligence_delivery'), validation_path=validation_path)
     runtime = runtime_view(status or {}, now=now, process_probe=process_probe)
     for item in delivery.values():
-        item['real_delivery_validation_state'] = 'NOT_VALIDATED_BY_RI3'
+        item['real_delivery_validation_state'] = 'VALIDATED' if item['real_delivery_validated'] else 'NOT_VALIDATED'
     attention = []
     if active:
         attention.append('ACCOUNT_BLOCKED')
