@@ -228,6 +228,11 @@ def test_original_default_transport_is_research_only(tmp_path,monkeypatch):
     from talonx_dispatch.consumer import DispatchAgent
     from talonx_dispatch.store import AuditStore
     from talonx_watchlist.store import TickerWatchlistStore
+    # Keep this legacy-primary fixture hermetic when a developer's .env
+    # supplies RI-3 destination-specific credentials.
+    monkeypatch.setenv('TALONX_NOTIFY_TRADE_EVENT_BOT_TOKEN', '')
+    monkeypatch.setenv('TALONX_NOTIFY_TRADE_EVENT_CHAT_ID', '')
+    monkeypatch.setenv('TALONX_NOTIFY_RESEARCH_ENABLED', '0')
     monkeypatch.setenv('TELEGRAM_BOT_TOKEN','primary-token')
     monkeypatch.setenv('TELEGRAM_CHAT_ID','primary-chat')
     agent=DispatchAgent(store=AuditStore(tmp_path/'audit.db'),watchlist_store=TickerWatchlistStore(tmp_path/'watch.db'))
