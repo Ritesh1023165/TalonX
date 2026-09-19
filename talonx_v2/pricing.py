@@ -46,10 +46,16 @@ class Bar:
     volume: float
     status: str = "FINAL"            # FINAL | PROVISIONAL
     source: str = ""
+    source_timestamp: str | None = None
+    receipt_timestamp: str | None = None
+    adjustment_state: str = "UNKNOWN"
 
     def as_dict(self) -> dict:
         return {"date": self.date, "open": self.open, "close": self.close,
-                "volume": self.volume, "status": self.status, "source": self.source}
+                "volume": self.volume, "status": self.status, "source": self.source,
+                "source_timestamp": self.source_timestamp,
+                "receipt_timestamp": self.receipt_timestamp,
+                "adjustment_state": self.adjustment_state}
 
 
 @dataclass(frozen=True)
@@ -92,8 +98,13 @@ def validate_bar(raw: dict, *, symbol: str, want_session: str,
     if sd > today:
         return PriceUnavailable(symbol, want_session, "FUTURE_SESSION")
     status = "PROVISIONAL" if sd == today else "FINAL"
+    # A composite adapter tags each row with the sub-adapter that actually
+    # supplied it (PQ-1) so persisted provenance names the real source.
     return Bar(date=d, open=float(o), close=float(c), volume=float(v),
-              status=status, source=source)
+              status=status, source=str(raw.get("_source_adapter") or source),
+              source_timestamp=raw.get("_source_timestamp") or raw.get("t"),
+              receipt_timestamp=datetime.now(timezone.utc).isoformat(),
+              adjustment_state=str(raw.get("_adjustment_state") or "UNKNOWN"))
 
 
 # --------------------------------------------------------------------------- #
@@ -114,6 +125,7 @@ class DailyBarAdapter(Protocol):
 # --------------------------------------------------------------------------- #
 class CsvBarAdapter:
     name = "csv:task107a_sip_adjustment_all"
+    adjustment_state = "SPLIT_DIVIDEND_ADJUSTED"
 
     def __init__(self, bar_dirs: list[str | Path]):
         self.bar_dirs = [Path(p) for p in bar_dirs]
@@ -136,6 +148,8 @@ class CsvBarAdapter:
                 rows = [{"date": str(r.date)[:10], "open": float(getattr(r, "open", "nan")),
                          "close": float(r.close), "volume": float(getattr(r, "volume", 0) or 0)}
                         for r in df.itertuples(index=False)]
+                for row in rows:
+                    row["_adjustment_state"] = self.adjustment_state
                 break
         rows.sort(key=lambda r: r["date"])
         self._cache[symbol] = rows
@@ -158,6 +172,7 @@ class CsvBarAdapter:
 class AlpacaIexBarAdapter:
     name = "alpaca:iex:1Day:adjustment=all(NON_CONFORMANT_vs_SIP)"
     CONFORMANT = False
+    adjustment_state = "SPLIT_DIVIDEND_ADJUSTED"
 
     def __init__(self, *, key_id: str | None = None, secret: str | None = None,
                  http_get: Callable[[str, dict], dict] | None = None):
@@ -185,7 +200,8 @@ class AlpacaIexBarAdapter:
                        "feed": "iex", "limit": str(_LOOKBACK_LOAD_SESSIONS + 5)})
         bars = d.get("bars", {}).get(symbol, []) or []
         rows = [{"date": str(b["t"])[:10], "open": float(b["o"]), "close": float(b["c"]),
-                 "volume": float(b["v"])} for b in bars]
+                 "volume": float(b["v"]), "_source_timestamp": str(b["t"]),
+                 "_adjustment_state": self.adjustment_state} for b in bars]
         rows.sort(key=lambda r: r["date"])
         self._cache[symbol] = rows
         return rows
@@ -219,6 +235,7 @@ class YFinanceBarAdapter:
     """
     name = "yfinance:1d:auto_adjust=all"
     CONFORMANT = True                       # within the Phase 0 parity-study domain
+    adjustment_state = "SPLIT_DIVIDEND_ADJUSTED"
 
     def __init__(self, *, ticker_factory: Callable[[str], object] | None = None,
                  lookback_sessions: int = _LOOKBACK_LOAD_SESSIONS):
@@ -243,7 +260,9 @@ class YFinanceBarAdapter:
             for r in h.itertuples(index=False):
                 d = getattr(r, "Date", None) or getattr(r, "index", None)
                 rows.append({"date": str(d)[:10], "open": float(r.Open),
-                             "close": float(r.Close), "volume": float(r.Volume)})
+                             "close": float(r.Close), "volume": float(r.Volume),
+                             "_source_timestamp": str(d),
+                             "_adjustment_state": self.adjustment_state})
         rows.sort(key=lambda x: x["date"])
         self._cache[symbol] = rows
         return rows
@@ -270,15 +289,21 @@ class CompositeBarAdapter:
         self.hist, self.live = hist, live
         self.name = f"composite({hist.name}+{live.name})"
 
+    @staticmethod
+    def _tag(row: dict | None, adapter) -> dict | None:
+        return None if row is None else {**row, "_source_adapter": adapter.name}
+
     def history(self, symbol: str) -> list[dict]:
-        h = self.hist.history(symbol)
+        h = [self._tag(r, self.hist) for r in self.hist.history(symbol)]
         seen = {r["date"] for r in h}
-        merged = h + [r for r in self.live.history(symbol) if r["date"] not in seen]
+        merged = h + [self._tag(r, self.live) for r in self.live.history(symbol)
+                      if r["date"] not in seen]
         merged.sort(key=lambda r: r["date"])
         return merged
 
     def session(self, symbol: str, session: date) -> dict | None:
-        return self.hist.session(symbol, session) or self.live.session(symbol, session)
+        return (self._tag(self.hist.session(symbol, session), self.hist)
+                or self._tag(self.live.session(symbol, session), self.live))
 
 
 # --------------------------------------------------------------------------- #
@@ -306,7 +331,12 @@ class PricingResolver:
             b = validate_bar(r, symbol=symbol, want_session=str(r["date"])[:10],
                              today=t, source=self.adapter.name)
             if isinstance(b, Bar) and b.status == "FINAL":
-                out.append({"date": b.date, "open": b.open, "close": b.close, "volume": b.volume})
+                out.append({"date": b.date, "open": b.open, "close": b.close, "volume": b.volume,
+                            "_provenance": {"provider": b.source, "session": b.date,
+                                             "source_timestamp": b.source_timestamp,
+                                             "receipt_timestamp": b.receipt_timestamp,
+                                             "adjustment_state": b.adjustment_state,
+                                             "finality": b.status}})
         return out
 
     def resolve(self, symbol: str, session: date) -> Bar | PriceUnavailable:
@@ -336,7 +366,12 @@ class PricingResolver:
         sd = session if isinstance(session, date) else date.fromisoformat(str(session)[:10])
         r = self.resolve(symbol, sd)
         if isinstance(r, Bar):
-            return {"open": r.open, "close": r.close, "volume": r.volume}
+            return {"open": r.open, "close": r.close, "volume": r.volume,
+                    "_provenance": {"provider": r.source, "session": r.date,
+                                     "source_timestamp": r.source_timestamp,
+                                     "receipt_timestamp": r.receipt_timestamp,
+                                     "adjustment_state": r.adjustment_state,
+                                     "finality": r.status}}
         return None            # pipeline treats None as SKIPPED_NO_ENTRY_BAR / fall-forward
 
 

@@ -1,0 +1,12 @@
+candidate,purpose,status,basis
+CsvBarAdapter,historical replay,QUALIFIED_FOR_HISTORICAL_V2_REPLAY,deterministic Task107A/95G SIP adjustment=all snapshot
+CsvBarAdapter,prospective entry exit,NOT_QUALIFIED_FOR_PROSPECTIVE_DAILY_V2_ENTRY_EXIT,snapshot ends before prospective sessions
+YFinanceBarAdapter,liquidity history,QUALIFIED_FOR_BOUNDED_PARITY_DOMAIN,1722 gate observations zero flips including four splits
+YFinanceBarAdapter,causal open close,INSUFFICIENT_EVIDENCE,unofficial source; point-in-time availability and correction stability unproven
+YFinanceBarAdapter,fallback,INSUFFICIENT_EVIDENCE,delisted omissions and no compatible finality contract
+Alpaca IEX,liquidity history,NOT_QUALIFIED_FOR_LIQUIDITY_HISTORY,single-exchange volume breaks dollar-volume economics
+Alpaca IEX,daily entry exit,NOT_QUALIFIED_FOR_DAILY_V2_ENTRY_EXIT,single-venue first/last eligible trade differs from SIP
+Alpaca SIP historical,liquidity history,QUALIFIED_FOR_LIQUIDITY_HISTORY,consolidated daily bars and current entitlement
+Alpaca SIP historical,prospective entry exit,INSUFFICIENT_EVIDENCE_FOR_CAUSAL_OPEN_CLOSE,no immutable-finality guarantee located; runtime adapter absent
+Alpaca SIP historical,corporate-action-safe lifecycle,NOT_QUALIFIED_FOR_CURRENT_RUNTIME,all-adjusted bars lack split share/basis and dividend entitlement accounting
+Any candidate,automatic fallback,NOT_QUALIFIED_FOR_FALLBACK,no compatible qualified pair and activation policy

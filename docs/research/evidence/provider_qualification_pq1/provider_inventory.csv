@@ -1,0 +1,8 @@
+provider_or_adapter,available_in_code,configured,qualified,active,release_assessment
+CsvBarAdapter,YES,YES,QUALIFIED_FOR_BOUNDED_REPLAY_ONLY,DEFAULT WHEN STARTED,static Task107A/95G SIP adjustment=all snapshot; stale prospectively
+YFinanceBarAdapter/composite-yf,YES,YES,INSUFFICIENT_EVIDENCE_FOR_CAUSAL_OPEN_CLOSE_OR_FALLBACK,NO,strong retrospective parity but unofficial and correction/finality gaps
+Alpaca IEX daily adapter/composite-iex,YES,YES,NOT_QUALIFIED_FOR_LIQUIDITY_OR_V2_EXECUTION,NO,single venue volume/open/close differ from consolidated contract
+Alpaca SIP historical API,YES VIA RESEARCH SCRIPTS; NO V2 ADAPTER,YES,QUALIFIED_FOR_CONSOLIDATED_HISTORY; INSUFFICIENT_FOR_PROSPECTIVE FINALITY,NO,current entitlement succeeds but lifecycle gaps remain
+Task107A/95G cached SIP CSV,YES,YES,QUALIFIED_FOR_HISTORICAL_REPLAY,YES WITH CSV,retrospective all-adjusted evidence
+Original yfinance intraday poller,YES,YES,NOT_QUALIFIED_FOR_V2_DAILY,NO FOR V2,different subsystem and fields
+Alpaca shared intraday gateway,YES,YES,NOT_QUALIFIED_FOR_V2_DAILY,NO FOR V2,IEX intraday stream for other lanes

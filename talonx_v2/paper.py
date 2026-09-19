@@ -72,6 +72,7 @@ def enter_position(
     entry_session: date,
     config: V2Config | None = None,
     source_meta: dict | None = None,
+    price_provenance: dict | None = None,
     fee_fn=None,
 ) -> EntryOutcome:
     """``fee_fn``: optional ``(quantity, price) -> float`` cost model,
@@ -179,12 +180,14 @@ def enter_position(
             entry_session=es, target_exit_session=target_exit,
             entry_price=entry_price, shares=float(shares), position_cost=cost,
             source_meta=source_meta or {}, entry_fee=sizing.entry_fee,
+            price_provenance=price_provenance,
         )
         store.set_cash(cash - cost)
         store.append_trade(
             episode_id=decision.episode_id, symbol=sym, action="BUY",
             execution_price=entry_price, shares=float(shares), position_cost=cost,
             portfolio_cash_after=cash - cost, fee=sizing.entry_fee,
+            price_provenance=price_provenance,
         )
         store.record_disposition(
             episode_id=decision.episode_id, symbol=sym, disposition="ENTERED",
@@ -210,6 +213,7 @@ def close_position(
     exit_session: date,
     config: V2Config | None = None,
     fee_fn=None,
+    price_provenance: dict | None = None,
 ) -> ExitOutcome:
     """``position`` supplies ONLY the lookup key (``position_id``) --
     Package 2 acceptance A5: every economic value used below (symbol,
@@ -274,7 +278,7 @@ def close_position(
         transitioned = store.close_position(
             position_id=position_id, exit_session=es, exit_price=exit_price,
             realized_pnl_usd=pnl_usd, realized_pnl_pct=pnl_pct, trading_days_held=held,
-            exit_fee=exit_econ.exit_fee,
+            exit_fee=exit_econ.exit_fee, price_provenance=price_provenance,
         )
         if not transitioned:
             # Already CLOSED/EXIT_UNRESOLVED/otherwise not OPEN -- an
@@ -290,7 +294,7 @@ def close_position(
             execution_price=exit_price, shares=shares, position_cost=position_cost,
             portfolio_cash_after=cash_after, entry_price=entry_price,
             realized_pnl_usd=pnl_usd, realized_pnl_pct=pnl_pct, trading_days_held=held,
-            fee=exit_econ.exit_fee,
+            fee=exit_econ.exit_fee, price_provenance=price_provenance,
         )
         cooldown_until = v2cal.add_sessions(es, cfg.reentry_cooldown_trading_days)
         store.set_cooldown(symbol, cooldown_until)

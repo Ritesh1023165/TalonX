@@ -108,7 +108,10 @@ def test_resolver_today_bar_is_provisional_only():
 def test_resolver_final_bar_returns_prices():
     r = _resolver({"X": [_row("2026-09-08", o=50.0, c=52.0, v=2_000_000)]})
     px = r.price_lookup("X", date(2026, 9, 8))
-    assert px == {"open": 50.0, "close": 52.0, "volume": 2_000_000}
+    assert {k: px[k] for k in ("open", "close", "volume")} == {
+        "open": 50.0, "close": 52.0, "volume": 2_000_000}
+    assert px["_provenance"]["provider"] == "mem"
+    assert px["_provenance"]["finality"] == "FINAL"
 
 
 def test_bars_lookup_excludes_provisional_today():
@@ -181,7 +184,10 @@ def test_make_resolver_composite_yf(tmp_path):
                       yf_ticker_factory=lambda s: _FakeTicker(rows))
     r.today = lambda: date(2026, 9, 9)
     assert "yfinance" in r.adapter.name
-    assert r.price_lookup("X", date(2026, 9, 8)) == {"open": 5.0, "close": 5.1, "volume": 9e5}
+    px = r.price_lookup("X", date(2026, 9, 8))
+    assert {k: px[k] for k in ("open", "close", "volume")} == {
+        "open": 5.0, "close": 5.1, "volume": 9e5}
+    assert "yfinance" in px["_provenance"]["provider"]
 
 
 def test_v2service_pricing_mode_csv_is_default_unchanged(tmp_path):

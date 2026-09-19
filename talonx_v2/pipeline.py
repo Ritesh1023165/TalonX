@@ -44,6 +44,18 @@ def _d(v) -> date:
     return v if isinstance(v, date) else date.fromisoformat(str(v)[:10])
 
 
+def _field_provenance(px: dict, field: str) -> dict | None:
+    """Copy adapter provenance and bind it to the exact consumed field.
+
+    Legacy/injected lookups may not carry provenance; keep those rows NULL
+    rather than inventing an adapter identity.
+    """
+    raw = px.get("_provenance") if isinstance(px, dict) else None
+    if not isinstance(raw, dict):
+        return None
+    return {**raw, "field": field}
+
+
 def process_episode(
     ep: ClusterEpisode,
     *,
@@ -99,11 +111,19 @@ def process_episode(
                             "reason": "NO_ENTRY_BAR"})
         return res
 
+    liquidity_sources = []
+    for bar in bars:
+        p = bar.get("_provenance") if isinstance(bar, dict) else None
+        if isinstance(p, dict) and p not in liquidity_sources:
+            liquidity_sources.append(p)
+    entry_provenance = _field_provenance(px, "open")
     outcome = paper.enter_position(
         store, decision, entry_price=float(px["open"]),
         entry_session=ep.eligible_entry_session, config=cfg,
         source_meta={"issuer_cik": ep.issuer_cik, "episode": ep.to_dict(),
-                     "research_source": "Task107B", "frozen_contract": V2_FROZEN_CONTRACT},
+                     "research_source": "Task107B", "frozen_contract": V2_FROZEN_CONTRACT,
+                     "liquidity_price_provenance": liquidity_sources},
+        price_provenance=entry_provenance,
     )
     if not outcome.entered:
         res.skipped.append({"episode_id": ep.episode_id, "symbol": ep.symbol,
@@ -178,8 +198,10 @@ def settle_due_exits(
                 res.skipped.append({"episode_id": pos["episode_id"], "symbol": pos["symbol"],
                                     "reason": "EXIT_BAR_PENDING_FALLFORWARD"})
             continue
+        exit_provenance = _field_provenance(px, "close")
         out = paper.close_position(store, pos, exit_price=float(px["close"]),
-                                   exit_session=exit_session, config=cfg)
+                                   exit_session=exit_session, config=cfg,
+                                   price_provenance=exit_provenance)
         if not out.settled:
             # Package 1 Settlement Integrity: the position was already
             # not OPEN by the time this call's own transaction ran (a

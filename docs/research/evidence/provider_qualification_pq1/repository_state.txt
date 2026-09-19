@@ -1,0 +1,10 @@
+PQ-1 repository state
+captured: 2026-09-19 Europe/London
+branch: feature/task131-option-a-integration
+starting_sha: be5720d8197d4c1cf265b5baea8f0b39f2057537
+reported_accepted_sha: be5720d8197d4c1cf265b5baea8f0b39f2057537
+head_difference_at_start: none
+status_at_start: clean; tracking origin/feature/task131-option-a-integration
+talonx_processes_at_start: none detected
+production_database_mutation: none
+production_provider_switch: none

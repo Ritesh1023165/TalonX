@@ -62,7 +62,9 @@ CREATE TABLE IF NOT EXISTS positions (
     opened_at             TEXT NOT NULL,
     closed_at             TEXT,
     entry_fee             REAL,     -- Package 4: position_cost = shares*entry_price + entry_fee
-    exit_fee              REAL      -- Package 4: realized_pnl_usd = (shares*exit_price - exit_fee) - position_cost
+    exit_fee              REAL,     -- Package 4: realized_pnl_usd = (shares*exit_price - exit_fee) - position_cost
+    entry_price_provenance TEXT,    -- PQ-1: NULL for legacy rows; never fabricated
+    exit_price_provenance  TEXT     -- PQ-1: NULL for legacy rows; never fabricated
 );
 CREATE TABLE IF NOT EXISTS trades (
     trade_id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,7 +80,8 @@ CREATE TABLE IF NOT EXISTS trades (
     trading_days_held     INTEGER,
     portfolio_cash_after  REAL NOT NULL,
     executed_at           TEXT NOT NULL,
-    fee                   REAL      -- Package 4: entry_fee on a BUY row, exit_fee on a SELL row
+    fee                   REAL,     -- Package 4: entry_fee on a BUY row, exit_fee on a SELL row
+    price_provenance      TEXT      -- PQ-1: provider/field/session/finality; NULL for legacy
 );
 CREATE TABLE IF NOT EXISTS cooldowns (
     issuer_key            TEXT PRIMARY KEY,       -- symbol
@@ -382,9 +385,15 @@ class V2Store:
                 c.execute("ALTER TABLE positions ADD COLUMN entry_fee REAL")
             if pos_cols and "exit_fee" not in pos_cols:
                 c.execute("ALTER TABLE positions ADD COLUMN exit_fee REAL")
+            if pos_cols and "entry_price_provenance" not in pos_cols:
+                c.execute("ALTER TABLE positions ADD COLUMN entry_price_provenance TEXT")
+            if pos_cols and "exit_price_provenance" not in pos_cols:
+                c.execute("ALTER TABLE positions ADD COLUMN exit_price_provenance TEXT")
             trade_cols = {r[1] for r in c.execute("PRAGMA table_info(trades)")}
             if trade_cols and "fee" not in trade_cols:
                 c.execute("ALTER TABLE trades ADD COLUMN fee REAL")
+            if trade_cols and "price_provenance" not in trade_cols:
+                c.execute("ALTER TABLE trades ADD COLUMN price_provenance TEXT")
             row = c.execute("SELECT cash FROM portfolio WHERE id=1").fetchone()
             portfolio_was_fresh = row is None
             if row is None:
@@ -595,18 +604,21 @@ class V2Store:
 
     def insert_open_position(self, *, episode_id, symbol, issuer_cik, entry_session,
                              target_exit_session, entry_price, shares, position_cost,
-                             source_meta: dict | None = None, entry_fee: float = 0.0) -> int:
+                             source_meta: dict | None = None, entry_fee: float = 0.0,
+                             price_provenance: dict | None = None) -> int:
         with self._conn() as c:
             cur = c.execute(
                 """INSERT INTO positions
                    (episode_id, symbol, issuer_cik, status, entry_session, target_exit_session,
-                    entry_price, shares, position_cost, source_meta, opened_at, entry_fee)
-                   VALUES (?,?,?,'OPEN',?,?,?,?,?,?,?,?)""",
+                    entry_price, shares, position_cost, source_meta, opened_at, entry_fee,
+                    entry_price_provenance)
+                   VALUES (?,?,?,'OPEN',?,?,?,?,?,?,?,?,?)""",
                 (episode_id, symbol.upper(), issuer_cik,
                  entry_session.isoformat() if isinstance(entry_session, date) else str(entry_session),
                  target_exit_session.isoformat() if isinstance(target_exit_session, date) else str(target_exit_session),
                  entry_price, shares, position_cost,
-                 json.dumps(source_meta or {}), _now(), entry_fee),
+                 json.dumps(source_meta or {}), _now(), entry_fee,
+                 json.dumps(price_provenance) if price_provenance is not None else None),
             )
             return int(cur.lastrowid)
 
@@ -623,10 +635,18 @@ class V2Store:
         Session 11 §5's agreed containment policy, OPS-012)."""
         from talonx_ops import account_blocks
         with self._conn() as c:
+            existing = c.execute("SELECT source_meta FROM positions WHERE position_id=?",
+                                 (position_id,)).fetchone()
+            try:
+                meta = json.loads(existing["source_meta"] or "{}") if existing else {}
+            except (TypeError, ValueError, json.JSONDecodeError):
+                meta = {"legacy_source_meta": existing["source_meta"] if existing else None}
+            meta["exit_unresolved"] = True
+            meta["exit_unresolved_detail"] = detail
             c.execute(
                 "UPDATE positions SET status='EXIT_UNRESOLVED', source_meta=?, closed_at=? "
                 "WHERE position_id=? AND status='OPEN'",
-                (json.dumps({"exit_unresolved": True, "detail": detail}), _now(), position_id),
+                (json.dumps(meta), _now(), position_id),
             )
             if c.execute("SELECT status FROM positions WHERE position_id=?",
                          (position_id,)).fetchone()["status"] == "EXIT_UNRESOLVED":
@@ -640,7 +660,8 @@ class V2Store:
                 "SELECT * FROM positions WHERE status='EXIT_UNRESOLVED' ORDER BY entry_session")]
 
     def close_position(self, *, position_id, exit_session, exit_price, realized_pnl_usd,
-                       realized_pnl_pct, trading_days_held, exit_fee: float = 0.0) -> bool:
+                       realized_pnl_pct, trading_days_held, exit_fee: float = 0.0,
+                       price_provenance: dict | None = None) -> bool:
         """The ``WHERE status='OPEN'`` guard IS the authoritative,
         atomic eligibility check for this state transition (Package 1
         Settlement Integrity) -- it must run inside the same
@@ -658,11 +679,12 @@ class V2Store:
             cur = c.execute(
                 """UPDATE positions SET status='CLOSED', exit_session=?, exit_price=?,
                      realized_pnl_usd=?, realized_pnl_pct=?, trading_days_held=?, closed_at=?,
-                     exit_fee=?
+                     exit_fee=?, exit_price_provenance=?
                    WHERE position_id=? AND status='OPEN'""",
                 (exit_session.isoformat() if isinstance(exit_session, date) else str(exit_session),
                  exit_price, realized_pnl_usd, realized_pnl_pct, trading_days_held, _now(),
-                 exit_fee, position_id),
+                 exit_fee, json.dumps(price_provenance) if price_provenance is not None else None,
+                 position_id),
             )
             return cur.rowcount > 0
 
@@ -670,17 +692,18 @@ class V2Store:
     def append_trade(self, *, episode_id, symbol, action, execution_price, shares,
                      position_cost, portfolio_cash_after, entry_price=None,
                      realized_pnl_usd=None, realized_pnl_pct=None, trading_days_held=None,
-                     fee: float = 0.0) -> int:
+                     fee: float = 0.0, price_provenance: dict | None = None) -> int:
         with self._conn() as c:
             cur = c.execute(
                 """INSERT INTO trades
                    (episode_id, symbol, action, execution_price, shares, position_cost,
                     entry_price, realized_pnl_usd, realized_pnl_pct, trading_days_held,
-                    portfolio_cash_after, executed_at, fee)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    portfolio_cash_after, executed_at, fee, price_provenance)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (episode_id, symbol.upper(), action, execution_price, shares, position_cost,
                  entry_price, realized_pnl_usd, realized_pnl_pct, trading_days_held,
-                 portfolio_cash_after, _now(), fee),
+                 portfolio_cash_after, _now(), fee,
+                 json.dumps(price_provenance) if price_provenance is not None else None),
             )
             return int(cur.lastrowid)
 

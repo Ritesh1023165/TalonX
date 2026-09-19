@@ -1,0 +1,25 @@
+Command 1:
+.venv\Scripts\python.exe -m py_compile talonx_v2\pricing.py talonx_v2\pipeline.py talonx_v2\paper.py talonx_v2\store.py
+Result: PASS (4 modules compiled).
+
+Command 2 (first attempt):
+.venv\Scripts\python.exe -m pytest tests\test_package3_pricing_timing.py tests\test_package4_sizing_accounting.py -q --disable-warnings
+Result: 11 passed, 36 setup errors. Provenance: sandbox denied pytest's default user Temp directory; no assertion failed.
+
+Command 3 (verified focused scope):
+.venv\Scripts\python.exe -m pytest tests\test_provider_qualification_pq1.py tests\test_task117_phase0_pricing_adapter.py tests\test_package3_pricing_timing.py tests\test_package4_sizing_accounting.py tests\test_ri1_campaign_identity.py -q --disable-warnings --basetemp C:\workspace\TalonX\test_artifacts\pq1
+Result (Codex run): 110 passed, 0 failed, 0 skipped in 6.90s.
+Result (completion run, after 7 added tests + composite provenance fix): 117 passed, 0 failed, 0 skipped in 8.02s.
+(--basetemp dir must exist beforehand; a missing dir yields setup errors, not assertion failures.)
+
+Coverage: validation/open/close/missing/provider error; early close and Session-3; split price-volume economics; timeout/rate-limit; entry/exit recovery; resolver and default-CSV provenance persistence/restart/legacy; explicit primary authority on disagreement. Delisted AAN/WOW and four split cases reuse Task117 bounded evidence.
+
+Command 4 (broader regression, completion review):
+.venv\Scripts\python.exe -m pytest tests\test_provider_qualification_pq1.py tests\test_task117_phase0_pricing_adapter.py tests\test_task117_phase0_entry_timing.py tests\test_package1_settlement_integrity.py tests\test_package2_account_blocks.py tests\test_package3_pricing_timing.py tests\test_package4_sizing_accounting.py tests\test_ri1_campaign_identity.py tests\test_ri2_notification_routing.py tests\test_ri3_operator.py tests\test_task110_v2_integration.py tests\test_task111_v2_e2e.py tests\test_task112_tuesday_release.py -q --disable-warnings --basetemp <existing dir>
+Result: 325 passed, 3 failed, 0 skipped.
+Failure provenance (all 3 reproduced identically on clean HEAD be5720d via git stash, i.e. NOT caused by PQ-1):
+  - tests/test_task111_v2_e2e.py::test_item3_original_strategy_fingerprint_unchanged  (OPS-017: hardcoded 2ae6216bca70 vs canonical ed8272fe568d)
+  - tests/test_task112_tuesday_release.py::test_03_v1_fingerprint_intact              (OPS-017, same cause)
+  - tests/test_ri3_operator.py::test_renderer_shows_end_to_end_fixture                (FileNotFoundError: required external executable absent; environmental)
+
+Fingerprint check (completion review): V2 release fingerprint e2acf6454789217e computed identically with and without PQ-1 changes; none of the 5 fingerprinted strategy files were modified.

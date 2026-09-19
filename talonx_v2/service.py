@@ -253,7 +253,24 @@ class V2Service:
                             v_f = 0.0
                     except (TypeError, ValueError):
                         v_f = 0.0
-                    rows.append({"date": str(r.date)[:10], "open": o_f, "close": c_f, "volume": v_f})
+                    session_s = str(r.date)[:10]
+                    rows.append({
+                        "date": session_s, "open": o_f, "close": c_f, "volume": v_f,
+                        "_provenance": {
+                            "provider": "csv:frozen_bar_dirs",
+                            "session": session_s,
+                            "source_timestamp": None,
+                            "receipt_timestamp": datetime.now(timezone.utc).isoformat(),
+                            # Direct legacy CSVs carry no per-file adjustment
+                            # manifest; preserve that uncertainty instead of
+                            # inferring semantics from the directory name.
+                            "adjustment_state": "UNKNOWN_LEGACY_CSV",
+                            # The legacy/default loader has no provider publication
+                            # timestamp. Do not upgrade a date heuristic into a
+                            # fabricated provider-finality claim.
+                            "finality": "LEGACY_DATE_ONLY",
+                        },
+                    })
                 self._bar_cache[sym] = rows
                 return rows
         self._bar_cache[sym] = []

@@ -491,6 +491,26 @@ narrower freshness-telemetry finding).
 
 **Related**: `REQUIREMENTS_TRACKER.md` `S5-08` through `S5-12`.
 
+**PQ-1 update (2026-09-19)**: **remains OPEN**. Current configured
+credentials now successfully return recent Alpaca SIP historical
+`1Day adjustment=all` bars (bounded read-only probe: AAPL, five
+completed sessions, HTTP 200; no broker/order call), superseding the
+old Task 117 entitlement observation for current availability only.
+This does not close qualification: no V2 runtime SIP adapter exists;
+no provider-guaranteed immutable/sufficient-finality boundary was
+established for the consumed daily open/close; and the current
+all-adjusted execution model is not paired with split share/basis or
+dividend-entitlement accounting (`OPS-004`). `PQ1_NOT_ACCEPTED` is
+therefore the evidence-based gate verdict. Automatic fallback remains
+unqualified; default/provider activation remains unchanged. New
+resolver-backed trades now persist additive entry/exit provider
+provenance (composite modes name the actual supplying sub-adapter), while
+legacy provenance remains NULL rather than invented. Also found: composite
+history can mix adjustment bases across a split between snapshot and live
+tail, and a characterization test demonstrates a spurious ~-89% realized
+loss for a 10:1 split during a hold (same open corporate-action gap).
+Evidence: `docs/research/evidence/provider_qualification_pq1/`.
+
 ---
 
 ## OPS-006 — Registry/coverage-scope fragmentation
