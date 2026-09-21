@@ -1,0 +1,29 @@
+(rendered locally from the LIVE status file; nothing was sent to Telegram)
+🔎 DISCOVERY
+  Collection scope: 39 watchlist -> 39 effective (broad-discovery-inclusive)
+  Last completed upstream poll: none yet (first cycle still in progress)
+  Current cycle: IN PROGRESS (enriching), elapsed 48s
+  Issuers polled: 39/39 (as of 5s ago)
+  New filings enriched: 13/42 (same snapshot)
+  New filing events persisted (today, UTC): 42
+
+📈 V2
+  Execution-eligible scope: 39
+  Last successful tick: 2026-09-21T18:42:51.359006+00:00 (snapshot read 7s ago)
+  Release mode: ON
+  Price provider: alpaca SIP adjustment=split | V2_RELEASE_PRICE_CONTRACT@1 (ac5e51aa3599d6c9) | fallback=NONE
+  Market-data health: OK (no recent unavailability)
+  Campaign: V2-PAPER-RC1 (PAPER), cash 100000.0
+  Account blocks: none
+  EXIT_UNRESOLVED: 0
+  Candidates evaluated (last tick): 0
+  Leading rejection reasons (last tick): out_of_scope=44, stale_entry=1
+  Pending intents: 0
+  Open positions: 0
+  Entries/exits (last tick): 0/0
+  Admission mode: GATED (source: live companion)
+
+📬 DELIVERY
+  Discovery informational queue -- pending: 126, sent: 268, expired/held: 39749, failed: 0
+  Last successful discovery delivery: 2026-09-15T20:31:35.405532+00:00
+  V2 actionable outbox -- total: 0, by state: {}

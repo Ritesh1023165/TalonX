@@ -1,0 +1,156 @@
+{
+ "label": "cp7_final_after_close",
+ "utc": "2026-09-21T20:06:41+00:00",
+ "processes": {
+  "supervisor_pid": {
+   "pid": 25460,
+   "alive": false
+  },
+  "v2_companion_pid": {
+   "pid": 8576,
+   "alive": false
+  },
+  "checkpoint_daemon_pid": {
+   "pid": 14688,
+   "alive": false
+  }
+ },
+ "session_started_utc": "2026-09-21T18:42:30.314424+00:00",
+ "uptime_min": 84.2,
+ "status": {
+  "heartbeat_utc": "2026-09-21T20:06:14.305265+00:00",
+  "heartbeat_kind": "LIGHTWEIGHT",
+  "last_tick_utc": "2026-09-21T20:05:14.217016+00:00",
+  "tick": 34,
+  "data_state": "CURRENT",
+  "release_mode": true,
+  "campaign_id": "V2-PAPER-RC1",
+  "pricing_mode": "sip",
+  "form4_records_seen": 10,
+  "ripe_episodes_this_tick": 1,
+  "stale_entry_skipped_this_tick": 1,
+  "no_prior_intent_skipped_this_tick": 1,
+  "capacity_rejected_this_tick": 0,
+  "admission_deadline_rejected_this_tick": 0,
+  "account_blocked_intent_rejected_this_tick": 0,
+  "entries_this_tick": 0,
+  "exits_this_tick": 0,
+  "pending_retry_count_this_tick": 0,
+  "pending_entry_intents": [],
+  "open_symbols": [],
+  "exit_unresolved": [],
+  "account_blocks_active": [],
+  "pricing_unavailable_recent": [],
+  "execution_scope_count": 39,
+  "execution_scope_out_of_scope_dropped_this_tick": 44,
+  "cash": 100000.0,
+  "open_positions": 0,
+  "delivery_enabled": true,
+  "operations_delivery_enabled": true,
+  "real_capital": false,
+  "shorts": false
+ },
+ "alert_outbox": {
+  "total": 0,
+  "by_state": {},
+  "recent": []
+ },
+ "last_delivery": {
+  "transport": "official_telegram",
+  "considered": 0,
+  "sent": 0,
+  "held": 0,
+  "retry": 0,
+  "failed": 0,
+  "ambiguous": 0,
+  "dedup_skipped": 0,
+  "events": []
+ },
+ "corporate_action_guard": {
+  "state": "ACTIVE",
+  "sources": [
+   "alpaca:v1/corporate-actions"
+  ],
+  "last_sweep": [],
+  "dividends": {
+   "accrued_usd": 0,
+   "credited_usd": 0.0,
+   "last_run": []
+  }
+ },
+ "provider": {
+  "mode": "sip",
+  "release_contract_active": true,
+  "contract_id": "V2_RELEASE_PRICE_CONTRACT@1",
+  "contract_fingerprint": "ac5e51aa3599d6c9",
+  "provider": "alpaca",
+  "feed": "sip",
+  "adjustment": "split",
+  "fallback_mode": "NONE",
+  "witness_disagreements_recent": []
+ },
+ "ledger": {
+  "exists": true,
+  "settled_cash": 100000.0,
+  "open_positions": 0,
+  "closed_positions": 0,
+  "exit_unresolved": 0,
+  "reserved_capital": 0,
+  "pending_entry_intents": 0,
+  "entry_intents_total": 0,
+  "active_account_blocks": 0,
+  "realized_pnl": 0,
+  "dividend_receivables": 0,
+  "trades": 0,
+  "processed_episodes": 2,
+  "v2_alert_outbox_rows": 0,
+  "corporate_action_rows": 0
+ },
+ "v2_alert_outbox": [],
+ "entry_intents": [],
+ "processed_episodes": [
+  [
+   "SKIPPED_ENTRY_STALE",
+   1
+  ],
+  [
+   "SKIPPED_NO_PRIOR_INTENT",
+   1
+  ]
+ ],
+ "trades": [],
+ "dividends": "n/a: aggregate functions are not allowed in the GROUP BY clause",
+ "corporate_action_rows": [
+  [
+   0
+  ]
+ ],
+ "ops_outbox_cols": [
+  "event_id",
+  "destination",
+  "event_type",
+  "producer",
+  "dedup_key",
+  "payload_text",
+  "provenance_json",
+  "state",
+  "attempts",
+  "next_attempt_utc",
+  "last_error",
+  "transport_ref"
+ ],
+ "ops_outbox": [
+  [
+   "OPERATIONS",
+   "PENDING",
+   1
+  ],
+  [
+   "OPERATIONS",
+   "SENT",
+   11
+  ]
+ ],
+ "dashboard_v2_summary": "n/a: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>",
+ "legacy_v2_lane_md5": "cff00b0f46e7e5b65e6f5903366fab28"
+}

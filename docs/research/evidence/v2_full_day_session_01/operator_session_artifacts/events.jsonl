@@ -1,0 +1,6 @@
+{"ts_utc": "2026-09-21T18:42:30.768461+00:00", "checkpoint": 1, "level": "INFO", "kind": "single_insider_near_miss", "message": "first insider (near-miss) in: ADC, INTC"}
+{"ts_utc": "2026-09-21T18:42:30.768461+00:00", "checkpoint": 1, "level": "INFO", "kind": "cluster_formed", "message": ">=2-distinct-insider cluster formed: ABCL"}
+{"ts_utc": "2026-09-21T18:42:30.768461+00:00", "checkpoint": 1, "level": "WARNING", "kind": "market_degraded", "message": "market feed state: STALE"}
+{"ts_utc": "2026-09-21T18:42:30.768461+00:00", "checkpoint": 1, "level": "WARNING", "kind": "intelligence_stale", "message": "Intelligence processing log 510901s old"}
+{"ts_utc": "2026-09-21T19:12:38.219620+00:00", "checkpoint": 2, "level": "INFO", "kind": "cluster_formed", "message": ">=2-distinct-insider cluster formed: ADC"}
+{"ts_utc": "2026-09-21T19:12:38.219620+00:00", "checkpoint": 2, "level": "INFO", "kind": "fresh_eligible_cluster", "message": "fresh eligible cluster(s): 0 -> 1"}

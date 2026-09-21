@@ -1,0 +1,38 @@
+============================================================
+  PROSPECTIVE V2 -- EVENING CLOSE
+============================================================
+  time            : 2026-09-21T21:06:22.387757+01:00
+  verdict         : PASS_WITH_FINDINGS
+  V2 health       : HEALTHY
+  market feed     : HEALTHY
+  cash            : 100000.0  (start 100000.0)
+  open / closed   : 0 / 0   unresolved 0
+  BUY / SELL      : 0 / 0
+  clusters(>=2)   : 2  fresh-eligible 1  stale 1
+  interpretation  : REVIEW_POSSIBLE_SUPPRESSION
+  asserts:
+    buys_eq_sells_plus_open_plus_unresolved: PASS
+    cash_plus_open_cost_reconciles: PASS
+    no_negative_cash: PASS
+    whole_share_positions: PASS
+    positive_finite_position_cost: PASS
+    corporate_action_adjustments_consistent: PASS
+    dividend_accounting_consistent: PASS
+    no_duplicate_buy_episode_id: PASS
+    no_duplicate_position_episode_id: PASS
+    no_stale_episode_entered: PASS
+    no_illegal_eod_flatten: PASS
+    real_capital_off: PASS
+    shorts_off: PASS
+    experimental_external_sends_zero: PASS
+    no_cross_lane_contamination: PASS
+    official_dispatch_healthy: PASS
+    base_reconciliation: PARTIAL
+    v2_ledger_preserved_copy: PASS
+    lane_accounting_snapshot: PASS
+    controlled_shutdown_complete: PASS
+  findings:
+    - base eod_reconciliation PARTIAL (typically: no PIV reader) -- mismatches=[]
+  shutdown        : {"checkpoint_daemon": {"status": "stopped", "signalled": 14688, "tree_size": 3, "reaped": [], "residual": []}, "v2_companion": {"status": "stopped", "signalled": 8576, "tree_size": 3, "reaped": [], "residual": []}, "supervisor": {"status": "stopped", "signalled": 25460, "tree_size": 11, "reaped": [], "residual": []}, "residual_talonx_processes": [], "overall_budget_s": 120.0, "elapsed_s": 3.5, "po
+  evidence        : C:\workspace\TalonX\results\prospective_2026-09-21
+============================================================

@@ -1,0 +1,48 @@
+{
+  "procs": {
+    "supervisor_pid": 25460,
+    "v2_companion_pid": 8576,
+    "checkpoint_daemon_pid": 14688,
+    "started_utc": "2026-09-21T18:42:30.314424+00:00",
+    "v2_argv": [
+      "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "-m",
+      "talonx_v2.run",
+      "--mode",
+      "live",
+      "--form4-source",
+      "insider",
+      "--db",
+      "C:\\workspace\\TalonX\\v2_release_rc1.db",
+      "--status-path",
+      "C:\\workspace\\TalonX\\v2_release_rc1_status.json",
+      "--tick-seconds",
+      "150",
+      "--heartbeat-seconds",
+      "30",
+      "--live-lookback-days",
+      "45",
+      "--pricing-mode",
+      "sip",
+      "--execution-scope",
+      "resolved-active-watchlist",
+      "--release",
+      "--deliver",
+      "--transport",
+      "telegram"
+    ],
+    "startlock_path": "C:\\workspace\\TalonX\\v2_release_rc1.db.startlock",
+    "startlock_owner_token": "8c054b26e6a44aac99fdd177df3e3e9f"
+  },
+  "verify": {
+    "supervisor_alive": true,
+    "v2_companion_alive": true,
+    "checkpoint_daemon_alive": true,
+    "dashboard_8787": true,
+    "attempts": 1,
+    "ready": true
+  },
+  "poststart_overall": "READY_WITH_FINDINGS",
+  "verdict": "READY",
+  "heartbeat_fresh": true
+}

@@ -1,0 +1,95 @@
+2026-09-21 19:42:31,524 INFO talonx_v2.run V2 delivery ENABLED -- transport=official_telegram
+2026-09-21 19:42:31,620 INFO talonx_v2.run V2 execution scope ENFORCED -- 39 allowed issuers: AAPL, ABCL, ABT, ACHR, ADC, ADP, AFL, AGNC, AMAT, AMD, AVGO, BAC, BLK, C, CSCO, CVX, DELL, GOOGL, IBM, INTC, JNJ, JPM, KO, MA, MCD, MSFT, MSTR, NUE, NVDA, ORCL, PG, PYPL, SHOP, STX, TSLA, UNH, V, VRT, WMT
+2026-09-21 19:42:32,596 INFO talonx_v2.run V2 release readiness gate READY (18 checks)
+2026-09-21 19:42:33,540 INFO talonx_v2.run V2 release provider QUALIFIED -- contract V2_RELEASE_PRICE_CONTRACT@1 fingerprint ac5e51aa3599d6c9
+2026-09-21 19:42:33,553 INFO talonx_v2.service talonx_v2 service start (once=False tick=150s heartbeat=30s db=C:\workspace\TalonX\v2_release_rc1.db)
+2026-09-21 19:42:34,343 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 8
+2026-09-21 19:42:35,974 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/getMe "HTTP/1.1 200 OK"
+2026-09-21 19:42:36,079 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/sendMessage "HTTP/1.1 200 OK"
+2026-09-21 19:42:37,087 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/getMe "HTTP/1.1 200 OK"
+2026-09-21 19:42:37,155 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/sendMessage "HTTP/1.1 200 OK"
+2026-09-21 19:42:38,193 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/getMe "HTTP/1.1 200 OK"
+2026-09-21 19:42:38,252 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/sendMessage "HTTP/1.1 200 OK"
+2026-09-21 19:42:39,561 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/getMe "HTTP/1.1 200 OK"
+2026-09-21 19:42:39,678 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/sendMessage "HTTP/1.1 200 OK"
+2026-09-21 19:42:41,134 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/getMe "HTTP/1.1 200 OK"
+2026-09-21 19:42:41,219 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/sendMessage "HTTP/1.1 200 OK"
+2026-09-21 19:42:42,573 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/getMe "HTTP/1.1 200 OK"
+2026-09-21 19:42:42,682 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/sendMessage "HTTP/1.1 200 OK"
+2026-09-21 19:42:44,338 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/getMe "HTTP/1.1 200 OK"
+2026-09-21 19:42:44,433 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/sendMessage "HTTP/1.1 200 OK"
+2026-09-21 19:42:46,642 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/getMe "HTTP/1.1 200 OK"
+2026-09-21 19:42:46,885 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/sendMessage "HTTP/1.1 200 OK"
+2026-09-21 19:42:48,874 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/getMe "HTTP/1.1 200 OK"
+2026-09-21 19:42:48,941 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/sendMessage "HTTP/1.1 200 OK"
+2026-09-21 19:42:51,255 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/getMe "HTTP/1.1 200 OK"
+2026-09-21 19:42:51,344 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/sendMessage "HTTP/1.1 200 OK"
+2026-09-21 19:42:51,410 INFO talonx_v2.service tick 1: entries=0 exits=0 open=0 cash=100000
+2026-09-21 19:45:03,689 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 19:45:03,763 INFO talonx_v2.service tick 2: entries=0 exits=0 open=0 cash=100000
+2026-09-21 19:47:34,023 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 19:47:35,209 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/getMe "HTTP/1.1 200 OK"
+2026-09-21 19:47:35,263 INFO httpx HTTP Request: POST https://api.telegram.org/bot<REDACTED>/sendMessage "HTTP/1.1 200 OK"
+2026-09-21 19:47:35,315 INFO talonx_v2.service tick 3: entries=0 exits=0 open=0 cash=100000
+2026-09-21 19:50:04,595 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 19:50:04,657 INFO talonx_v2.service tick 4: entries=0 exits=0 open=0 cash=100000
+2026-09-21 19:52:34,389 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 19:52:34,460 INFO talonx_v2.service tick 5: entries=0 exits=0 open=0 cash=100000
+2026-09-21 19:55:04,705 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 19:55:04,753 INFO talonx_v2.service tick 6: entries=0 exits=0 open=0 cash=100000
+2026-09-21 19:57:35,081 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 19:57:35,143 INFO talonx_v2.service tick 7: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:00:05,423 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:00:05,486 INFO talonx_v2.service tick 8: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:02:35,821 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:02:35,883 INFO talonx_v2.service tick 9: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:05:06,147 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:05:06,196 INFO talonx_v2.service tick 10: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:07:36,589 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:07:36,653 INFO talonx_v2.service tick 11: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:10:06,936 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:10:06,982 INFO talonx_v2.service tick 12: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:12:37,246 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:12:37,300 INFO talonx_v2.service tick 13: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:15:07,581 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:15:07,616 INFO talonx_v2.service tick 14: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:17:37,891 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:17:37,950 INFO talonx_v2.service tick 15: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:20:08,177 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:20:08,228 INFO talonx_v2.service tick 16: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:22:38,479 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:22:38,542 INFO talonx_v2.service tick 17: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:25:08,808 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:25:08,864 INFO talonx_v2.service tick 18: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:27:39,131 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:27:39,186 INFO talonx_v2.service tick 19: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:30:09,459 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:30:09,542 INFO talonx_v2.service tick 20: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:32:39,882 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:32:39,945 INFO talonx_v2.service tick 21: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:35:10,184 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:35:10,239 INFO talonx_v2.service tick 22: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:37:41,089 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:37:41,147 INFO talonx_v2.service tick 23: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:40:10,882 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:40:10,937 INFO talonx_v2.service tick 24: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:42:41,192 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:42:41,249 INFO talonx_v2.service tick 25: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:45:11,514 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:45:11,573 INFO talonx_v2.service tick 26: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:47:41,911 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:47:41,967 INFO talonx_v2.service tick 27: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:50:12,280 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:50:12,340 INFO talonx_v2.service tick 28: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:52:42,603 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:52:42,667 INFO talonx_v2.service tick 29: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:55:12,884 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:55:12,942 INFO talonx_v2.service tick 30: entries=0 exits=0 open=0 cash=100000
+2026-09-21 20:57:43,252 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 20:57:43,312 INFO talonx_v2.service tick 31: entries=0 exits=0 open=0 cash=100000
+2026-09-21 21:00:13,543 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 21:00:13,594 INFO talonx_v2.service tick 32: entries=0 exits=0 open=0 cash=100000
+2026-09-21 21:02:43,863 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 21:02:43,926 INFO talonx_v2.service tick 33: entries=0 exits=0 open=0 cash=100000
+2026-09-21 21:05:14,174 INFO talonx_v2.service execution allowlist: dropped 44 out-of-scope records (e.g. ['ALK', 'ALLE', 'AME', 'AMT', 'AON', 'APTV', 'ARE', 'ATO']); kept 10
+2026-09-21 21:05:14,234 INFO talonx_v2.service tick 34: entries=0 exits=0 open=0 cash=100000
