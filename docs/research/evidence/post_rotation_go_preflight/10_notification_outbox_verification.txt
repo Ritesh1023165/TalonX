@@ -1,0 +1,3 @@
+release outbox path: v2_release_rc1_notifications.db | exists: False | is shared notifications.db: False
+shared notifications.db (NOT used by the release): [('DEGRADED_HEALTH', 'SENT', 1), ('RECONCILIATION_FAILURE', 'SENT', 9), ('SHUTDOWN', 'EXPIRED', 1), ('STARTUP', 'SENT', 1)]
+FOREIGN PENDING ROWS in release outbox: 0 (outbox not created yet; created empty on first use)
