@@ -1,0 +1,5 @@
+HEAD=8b1f4c8 branch=hardening/pre-full-day-cleanup (PR #13 head 8b1f4c8 checked out, redaction module present: yes)
+FAILED tests/test_ri3_operator.py::test_renderer_shows_end_to_end_fixture
+1 failed, 159 passed in 15.54s
+redaction subset (request logs / exception+stack / provider+Authorization secrets / process-wide): 5 passed, 19 deselected in 0.85s
+-- carried failure = renderer test needs node (environment, pre-existing) --
