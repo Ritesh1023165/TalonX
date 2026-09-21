@@ -1251,7 +1251,13 @@ class DashboardReadModel:
             unresolved_positions=operator["positions"]["EXIT_UNRESOLVED"],
         )
         out["service"]["runtime_state"] = operator["runtime"]["state"]
-        if operator["runtime"]["state"] in ("STOPPED", "UNKNOWN", "DEGRADED"):
+        # Final-acceptance fix: an UNKNOWN process probe (no probe supplied) must not MASK the more
+        # specific DOWN / STARTING / STARTUP_FAILED health derived from the status file + startup grace --
+        # otherwise a companion that never started reads as merely "UNKNOWN".  STOPPED / DEGRADED (positive
+        # evidence) still override as before.
+        _specific = out.get("health") in ("DOWN", "STARTING", "STARTUP_FAILED")
+        if operator["runtime"]["state"] in ("STOPPED", "UNKNOWN", "DEGRADED") and not (
+                operator["runtime"]["state"] == "UNKNOWN" and _specific):
             out["health"] = operator["runtime"]["state"]
             out["service"]["health"] = out["health"]
             out["service"]["status"] = out["health"]

@@ -879,7 +879,7 @@ history); `talonx_ingest/intelligence/delivery/notification_policy.py`
 
 ---
 
-## OPS-012 — V2 `EXIT_UNRESOLVED` account-block gap
+## OPS-012 — V2 `EXIT_UNRESOLVED` account-block gap [CLOSED by Package 2 — header retained from discovery; see Package 2 and Final Release Acceptance]
 
 **Status**: `OPEN` — agreed target design exists (Session 8 §E); no
 implementation.
@@ -1116,7 +1116,7 @@ package4_sizing_accounting/README.md` for full detail.
 
 ---
 
-## OPS-015 — EOD/restart reconciliation-mismatch does not block new admissions
+## OPS-015 — EOD/restart reconciliation-mismatch does not block new admissions [CLOSED by Package 2 — header retained from discovery; see Package 2 and Final Release Acceptance]
 
 **Status**: `OPEN` — agreed target design exists (Session 10 §H); no
 implementation. Same structural pattern as `OPS-012`, a **different**
@@ -1734,3 +1734,23 @@ The RI-3 read-only projection now uses the RI-1 campaign row, Package-4
 persisted economics and accepted reservation/obligation semantics. Unknown
 legacy seed remains unknown. Tests and full operator fixture:
 `docs/research/evidence/v2_release_integration_ri3/README.md`.
+
+---
+
+## Final V2 Release Acceptance — classification of all open findings
+
+Reviewed against the actual code and tests at the Final V2 Release Acceptance gate. **Zero findings are RELEASE_BLOCKING.**
+Full table: `docs/research/evidence/v2_final_release_acceptance/ops_classification.csv`.
+
+| Class | Findings |
+|---|---|
+| RELEASE_BLOCKING | none |
+| BOUNDED_FOLLOWUP | OPS-002 (mark-freshness wording), OPS-004 (unsupported corporate actions fail closed), OPS-005 (residuals: no provider correction metadata; rate-limit stress not measured; SIP activation is the gated release-start step), OPS-006 (registry/scope fragmentation), OPS-010, OPS-011, OPS-013, OPS-016 (five-state readiness + external watchdog) |
+| HISTORICAL / CLOSED | OPS-001, OPS-003, OPS-012, OPS-014, OPS-015, OPS-017 (stale V1 fingerprint literal, not fixed), OPS-018..026 |
+| RESEARCH_ONLY | OPS-007, OPS-008, OPS-009 (Original intraday) |
+
+**OPS-027 (found and closed in Final Acceptance).** The qualified SIP provider (PQ-2B) was unreachable from the operator launch path: `prospective start` and
+`talonx_v2.run` defaulted to the stale `csv` pricing mode, so a routine start would silently have bypassed the qualified provider. Fixed by an explicit, gated
+`--release` profile (`talonx_v2/release_gate.py`); research/replay defaults unchanged; `--force` never bypasses the gate.
+**Also closed:** the dashboard override could mask `DOWN`/`STARTING`/`STARTUP_FAILED` health with `UNKNOWN`; alert text claimed "market-on-open"
+(now: daily-bar OPEN = provider first eligible trade, NOT the official opening-auction price).

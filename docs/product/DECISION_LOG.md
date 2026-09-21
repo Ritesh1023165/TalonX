@@ -3558,3 +3558,20 @@ precondition lives in the plumbing module `liquidity_window.py`). Evidence:
 7. **Activation boundary:** `--pricing-mode sip` is opt-in and refuses to start unless a bounded read-only
    readiness check reaches QUALIFIED (configured -> reachable -> entitled -> split-only honoured). Default mode is
    unchanged. Nothing was activated.
+
+---
+
+## Final V2 Release Acceptance
+
+**Verdict: V2_RELEASE_ACCEPTED_WITH_BOUNDED_FOLLOWUPS** (paper only). Requirement matrix: 34 PASS / 4 BOUNDED_FOLLOWUP / 0 FAIL / 0 blocking.
+Evidence: `docs/research/evidence/v2_final_release_acceptance/`.
+
+Decisions recorded:
+1. **Release profile is explicit and gated** (`V2_RELEASE_CANDIDATE_PROFILE@1`): `--release` forces Alpaca SIP daily, `adjustment=split`, `V2_RELEASE_PRICE_CONTRACT@1`
+   (`ac5e51aa3599d6c9`), fallback NONE, Signal delivery on Telegram. The stale csv default is never used for a release start. Research/replay paths unchanged.
+2. **Entry OPEN disclosure.** The entry price is the SIP daily `o` — the provider's first eligible trade of the session — **not** the official opening-auction print.
+   The exit price is the SIP daily `c`, which equals the official closing cross (30/30 samples). Alert wording corrected accordingly.
+3. **Notification model:** Signal (TRADE_EVENT), Sentinel (OPERATIONS), Lab (RESEARCH) OFF. Release start requires both destinations validated for the ACTIVE configuration.
+4. **No profitability claim.** V2 profitability is UNPROVEN; no profitability research was performed; strategy rules and fingerprint `e2acf6454789217e` unchanged.
+5. **Not started:** full-day paper session, prospective validation, real-money trading. Operator decisions still open: continue the legacy production campaign vs. a new
+   campaign; update `RELEASE_SHA_EXPECTED` (currently `0d52e7c`) or pass `--expected-sha <RC SHA>` at the freeze step.

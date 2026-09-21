@@ -662,3 +662,12 @@ was provisioned or validated and no release gate was advanced.
 statement above was reached, `REQUIREMENTS_TRACKER.md` for the
 authoritative per-requirement tracking table, and
 `KNOWLEDGE_TRANSFER_PLAN.md` for the session schedule and workflow.*
+
+---
+
+## Release status note (Final V2 Release Acceptance)
+
+V2 (`INSIDER_BUY_CLUSTER_V2@1`) is **functionally accepted and release-ready as a paper-only strategy** (`V2_RELEASE_ACCEPTED_WITH_BOUNDED_FOLLOWUPS`).
+Its **profitability is UNPROVEN**: no full-day paper session, prospective validation or profitability research has been performed, and real-money trading is not enabled.
+The entry OPEN is the provider's first eligible trade (SIP daily open), not the official opening-auction print. See
+`docs/research/evidence/v2_final_release_acceptance/`.

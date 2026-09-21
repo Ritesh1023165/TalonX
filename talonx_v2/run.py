@@ -124,7 +124,12 @@ def main(argv: list[str] | None = None) -> int:
                     help="delivery transport when --deliver is set: dryrun (HOLD, default) | "
                          "telegram (the real official Telegram sender; HOLDS unless "
                          "TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID are configured)")
-    ap.add_argument("--pricing-mode", default="csv",
+    ap.add_argument("--release", action="store_true",
+                    help="FIRST-RELEASE profile (live mode only): pricing mode is EXPLICITLY sip "
+                         "(V2_RELEASE_PRICE_CONTRACT@1), paper only, Signal delivery required "
+                         "(--deliver --transport telegram); refuses to start unless the read-only release "
+                         "readiness gate is READY.  Never falls back to the stale csv default.")
+    ap.add_argument("--pricing-mode", default=None,
                     choices=["csv", "composite-yf", "composite-iex", "sip"],
                     help="daily-bar source: csv (frozen snapshot, default; STALE prospectively) | "
                          "composite-yf / composite-iex (candidate/study only; refused when the "
@@ -155,6 +160,13 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(operator_snapshot(args.db, status=status), indent=2, default=str))
         return 0
 
+    from talonx_v2.release_gate import resolve_pricing_mode
+    try:
+        args.pricing_mode = resolve_pricing_mode(args.pricing_mode, release=args.release)
+    except ValueError as exc:
+        raise SystemExit(f"FATAL: {exc}") from exc
+    if args.release and args.mode != "live":
+        raise SystemExit("FATAL: --release is only valid with --mode live")
     cfg = V2Config(db_path=args.db)
     cfg.validate_frozen()
     store = V2Store(args.db, starting_cash=cfg.starting_cash_usd,
@@ -244,6 +256,17 @@ def main(argv: list[str] | None = None) -> int:
                 "live (fail closed: splits cannot be accounted for).")
         ca_guard = CorporateActionGuard(_ca_src)
 
+        if args.release:
+            # FINAL ACCEPTANCE: the complete read-only release gate (provider QUALIFIED, contract + strategy
+            # fingerprints, Signal/Sentinel configured + previously validated for the ACTIVE config, Lab OFF,
+            # no active account block, ledger reconciles).  Nothing is sent; no secret is printed.
+            from talonx_v2.release_gate import evaluate_release_readiness
+            _gate = evaluate_release_readiness(db_path=args.db, pricing_mode=args.pricing_mode,
+                                               deliver=args.deliver, transport=args.transport)
+            if _gate.status != "READY":
+                raise SystemExit("FATAL: release readiness gate NOT_READY -- refusing to start: "
+                                 + "; ".join(f"{c.name}: {c.detail}" for c in _gate.failed))
+            logging.getLogger("talonx_v2.run").info("V2 release readiness gate READY (%d checks)", len(_gate.checks))
         # PQ-2B: the release provider is selected EXPLICITLY (never implicitly) and only starts when a
         # bounded, read-only readiness check reaches QUALIFIED (configured -> reachable -> entitled ->
         # split-only basis honoured).  Env vars merely existing is NOT enough.
@@ -274,6 +297,7 @@ def main(argv: list[str] | None = None) -> int:
             broad_discovery_symbols=broad_discovery_symbols,
             ops_notify_store=ops_store,
             corporate_actions=ca_guard,
+            release_mode=args.release,
         )
         if args.once and args.as_of:
             st = svc.tick(as_of=date.fromisoformat(args.as_of))

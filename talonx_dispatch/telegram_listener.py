@@ -1013,6 +1013,30 @@ class TelegramReplyListener:
             lines.append(f"  Execution-eligible scope: {exec_scope}")
             last_tick = v2.get("last_tick_utc", "unknown")
             lines.append(f"  Last successful tick: {last_tick} (snapshot read {_fmt_seconds(v2_age_s)} ago)")
+            # FINAL ACCEPTANCE: release state, read ONLY from the companion's own status file (never a claim
+            # the file does not support).  The stale csv default is labelled as NOT release-grade.
+            rel = v2.get("release_mode")
+            lines.append("  Release mode: " + ("ON" if rel is True else "OFF" if rel is False else "unknown"))
+            pcs = v2.get("price_provider_contract")
+            if isinstance(pcs, dict) and pcs.get("release_contract_active"):
+                lines.append(f"  Price provider: {pcs.get('provider')} {str(pcs.get('feed')).upper()} "
+                             f"adjustment={pcs.get('adjustment')} | {pcs.get('contract_id')} "
+                             f"({pcs.get('contract_fingerprint')}) | fallback={pcs.get('fallback_mode')}")
+            elif isinstance(pcs, dict):
+                lines.append(f"  Price provider: NOT the release contract (pricing mode "
+                             f"{pcs.get('mode', 'unknown')}) -- not release-grade")
+            else:
+                lines.append("  Price provider: unknown")
+            unavailable = v2.get("pricing_unavailable_recent")
+            lines.append("  Market-data health: " + (
+                "unknown" if unavailable is None else
+                ("OK (no recent unavailability)" if not unavailable else f"DEGRADED ({len(unavailable)} recent unavailable)")))
+            lines.append(f"  Campaign: {v2.get('campaign_id', 'unknown')} ({v2.get('execution_mode', 'unknown')}), "
+                         f"cash {v2.get('cash', 'unknown')}")
+            blocks = v2.get("account_blocks_active")
+            lines.append("  Account blocks: " + ("unknown" if blocks is None else ("none" if not blocks else ", ".join(blocks))))
+            unresolved = v2.get("exit_unresolved")
+            lines.append("  EXIT_UNRESOLVED: " + ("unknown" if unresolved is None else str(len(unresolved))))
             rejects = {
                 "out_of_scope": v2.get("execution_scope_out_of_scope_dropped_this_tick"),
                 "stale_entry": v2.get("stale_entry_skipped_this_tick"),

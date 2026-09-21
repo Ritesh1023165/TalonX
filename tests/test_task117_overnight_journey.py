@@ -105,7 +105,8 @@ def test_p1_fill_reconciles_to_intent_at_entry_session_open(tmp_path):
     svc._records = lambda *, as_of: from_rows(_rows())
     svc.tick(as_of=ACT_FRI)
     st = svc.tick(as_of=ENTRY_MON)
-    assert st["entries_this_tick"] == 1 and st["cash"] == 290_000.0
+    # Package 4 whole-share sizing: floor($10,000 / $101) = 99 shares = $9,999 (pre-Package-4 this expected a fractional $10,000)
+    assert st["entries_this_tick"] == 1 and st["cash"] == 290_001.0
     s = V2Store(str(tmp_path / "v.db"), starting_cash=300_000.0)
     i = s.all_entry_intents()[0]
     assert i["status"] == "FILLED"

@@ -1,0 +1,24 @@
+starting HEAD: cb010de1f09c82726bf6c80b5b6409fd689942ca
+branch: feature/task131-option-a-integration
+origin: https://github.com/Ritesh1023165/TalonX.git
+python processes running: 0 (none stopped/killed)
+v2 strategy fingerprint: e2acf6454789217e ; contract fingerprint: ac5e51aa3599d6c9 (verified by release_gate)
+notifications.db-shm/-wal: untracked test side-effect files, NOT staged
+
+ M docs/OPERATIONS.md
+ M docs/product/DECISION_LOG.md
+ M docs/product/OPERATIONAL_FINDINGS.md
+ M docs/product/PRODUCT_DEFINITION.md
+ M docs/product/REQUIREMENTS_TRACKER.md
+ M talonx_dispatch/telegram_listener.py
+ M talonx_ops/dashboard_read.py
+ M talonx_ops/prospective/__main__.py
+ M talonx_ops/prospective/proc.py
+ M talonx_v2/run.py
+ M talonx_v2/service.py
+ M tests/test_task117_overnight_journey.py
+?? docs/research/evidence/v2_final_release_acceptance/
+?? notifications.db-shm
+?? notifications.db-wal
+?? talonx_v2/release_gate.py
+?? tests/test_v2_final_release_acceptance.py

@@ -1,0 +1,92 @@
+{
+  "profile": "V2_RELEASE_CANDIDATE_PROFILE@1",
+  "status": "READY",
+  "checks": [
+    {
+      "name": "release_pricing_mode",
+      "status": "PASS",
+      "detail": "pricing_mode='sip'; release requires 'sip' (csv default is stale prospectively and is NOT a release provider)"
+    },
+    {
+      "name": "provider_readiness",
+      "status": "PASS",
+      "detail": "level=QUALIFIED"
+    },
+    {
+      "name": "provider_contract_fingerprint",
+      "status": "PASS",
+      "detail": "contract=V2_RELEASE_PRICE_CONTRACT@1 fingerprint=ac5e51aa3599d6c9 expected=V2_RELEASE_PRICE_CONTRACT@1/ac5e51aa3599d6c9"
+    },
+    {
+      "name": "strategy_fingerprint",
+      "status": "PASS",
+      "detail": "computed=e2acf6454789217e expected=e2acf6454789217e"
+    },
+    {
+      "name": "provider_semantics",
+      "status": "PASS",
+      "detail": "alpaca/sip/adjustment=split/fallback=NONE"
+    },
+    {
+      "name": "paper_only_frozen_contract",
+      "status": "PASS",
+      "detail": "execution_mode=PAPER allow_real_capital=False starting_cash=100,000 allocation=10,000"
+    },
+    {
+      "name": "signal_destination_configured",
+      "status": "PASS",
+      "detail": "TRADE_EVENT: using dedicated destination credentials"
+    },
+    {
+      "name": "sentinel_destination_configured",
+      "status": "PASS",
+      "detail": "OPERATIONS: using dedicated destination credentials"
+    },
+    {
+      "name": "signal_sentinel_distinct",
+      "status": "PASS",
+      "detail": "Signal and Sentinel resolve to different destination pairs"
+    },
+    {
+      "name": "lab_off",
+      "status": "PASS",
+      "detail": "RESEARCH is OFF by default (TALONX_NOTIFY_RESEARCH_ENABLED not set)"
+    },
+    {
+      "name": "signal_delivery_validation_bound",
+      "status": "PASS",
+      "detail": "TRADE_EVENT: prior controlled delivery VALIDATED and its one-way fingerprint matches the ACTIVE config"
+    },
+    {
+      "name": "sentinel_delivery_validation_bound",
+      "status": "PASS",
+      "detail": "OPERATIONS: prior controlled delivery VALIDATED and its one-way fingerprint matches the ACTIVE config"
+    },
+    {
+      "name": "signal_delivery_enabled",
+      "status": "PASS",
+      "detail": "deliver=True transport='telegram'; release requires --deliver --transport telegram"
+    },
+    {
+      "name": "intelligence_card_delivery",
+      "status": "PASS",
+      "detail": "Intelligence card delivery is OFF (company developments stay dashboard-visible)"
+    },
+    {
+      "name": "campaign_identity",
+      "status": "WARN",
+      "detail": "legacy ledger without a campaign record: it is migrated once (starting cash NOT fabricated)"
+    },
+    {
+      "name": "account_blocks",
+      "status": "PASS",
+      "detail": "no active account block"
+    },
+    {
+      "name": "startup_reconciliation",
+      "status": "PASS",
+      "detail": "ledger reconciles"
+    }
+  ],
+  "evaluated_at_utc": "2026-09-21T15:38:02.809706+00:00"
+}

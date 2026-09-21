@@ -1,0 +1,22 @@
+{
+  "status": "PREPARED_NOT_FROZEN_NOT_LAUNCHED",
+  "profile": "V2_RELEASE_CANDIDATE_PROFILE@1",
+  "rc_sha": "the acceptance commit that adds this file (recorded in the final report); freeze step passes it as --expected-sha",
+  "strategy": {"id": "INSIDER_BUY_CLUSTER_V2@1", "fingerprint": "e2acf6454789217e", "rules_changed": false, "execution_mode": "PAPER", "real_capital": false},
+  "pricing": {
+    "mode": "sip", "provider": "alpaca", "endpoint": "/v2/stocks/bars", "feed": "sip", "timeframe": "1Day", "adjustment": "split", "fallback": "NONE",
+    "contract": "V2_RELEASE_PRICE_CONTRACT@1", "contract_fingerprint": "ac5e51aa3599d6c9",
+    "entry_open": "SIP daily o = provider first eligible trade (NOT the official opening-auction print)",
+    "exit_close": "SIP daily c = official closing cross",
+    "finality": "now >= session_close + 4h + 15min + 1min margin",
+    "csv_default_used_for_release": false
+  },
+  "campaign": {"new_campaign_defaults": {"starting_cash_usd": 100000, "max_entry_budget_usd": 10000, "max_concurrent": 20},
+               "existing_production_campaign": "legacy $300,000 ledger, no campaign record; operator must choose continue vs new campaign (NOT decided here)"},
+  "notifications": {"signal": "TRADE_EVENT (TalonX Signal) - ENABLED, validated", "sentinel": "OPERATIONS (TalonX Sentinel) - ENABLED, validated", "lab": "RESEARCH (TalonX Lab) - OFF, double opt-in, no fallback",
+                    "ping_owner": "talonx_dispatch/telegram_listener.py (/ping) - one owner"},
+  "launch_argv": ["python", "-m", "talonx_ops.prospective", "start", "--release", "--expected-sha", "<RC SHA>", "--tick-seconds", "150", "--heartbeat-seconds", "30", "--live-lookback-days", "45", "--execution-scope", "resolved-active-watchlist", "--deliver", "--transport", "telegram"],
+  "readiness_gate": "python -m talonx_v2.release_gate (read-only, 17 checks; last real-environment result READY with 1 WARN campaign_identity legacy ledger)",
+  "freeze_step_items": ["update RELEASE_SHA_EXPECTED (currently 0d52e7c) in the operator launcher or pass --expected-sha <RC SHA>", "operator decision: continue legacy campaign vs new campaign"],
+  "not_started": {"full_day_paper_session": true, "prospective_validation": true, "profitability_research": true, "real_money_trading": true}
+}

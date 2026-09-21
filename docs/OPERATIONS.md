@@ -153,3 +153,17 @@ Task 103 (one 45-60 min real-RTH operational qualification) is **not yet run** â
 by a closed market. Re-run on a real US trading day (next open a weekday 13:30 UTC) via the
 bounded supervisor command above. Nothing about the architecture needs to change first. See
 `results/task103_live_qualification/` and `results/task102_operational_finalization/post_task100_live_verification.md`.
+
+---
+
+## V2 release start (paper only)
+
+The release profile is explicit â€” a plain start still defaults to the research/replay pricing path. To start V2 on the qualified SIP provider:
+
+```
+python -m talonx_ops.prospective start --release --expected-sha <RC SHA> --tick-seconds 150 --heartbeat-seconds 30 \
+    --live-lookback-days 45 --execution-scope resolved-active-watchlist --deliver --transport telegram
+```
+
+`--release` forces `sip` + `V2_RELEASE_PRICE_CONTRACT@1`, requires `--deliver --transport telegram`, and refuses to start (exit 2, `release_gate.json` written to the session dir)
+unless the read-only readiness gate is READY. `--force` never bypasses it. Check readiness without starting: `python -m talonx_v2.release_gate`.

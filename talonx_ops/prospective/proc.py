@@ -148,7 +148,13 @@ def start_stack(session_dir: str | Path, *, env: dict[str, str],
                 pricing_mode: str = "csv", execution_scope: str = "none",
                 deliver: bool = False, transport: str = "dryrun",
                 enable_broad_discovery: bool = False,
-                allow_when_running: bool = False) -> dict[str, Any]:
+                allow_when_running: bool = False, release: bool = False) -> dict[str, Any]:
+    if release:
+        # FINAL ACCEPTANCE: the release profile is explicit -- SIP pricing, Signal delivery on Telegram.
+        from talonx_v2.release_gate import resolve_pricing_mode
+        pricing_mode = resolve_pricing_mode(pricing_mode if pricing_mode != "csv" else None, release=True)
+        if not deliver or transport != "telegram":
+            raise ValueError("release profile requires --deliver --transport telegram")
     sd = Path(session_dir)
     sd.mkdir(parents=True, exist_ok=True)
     logs = sd / "logs"
@@ -193,7 +199,7 @@ def start_stack(session_dir: str | Path, *, env: dict[str, str],
         checkpoint_every_s=checkpoint_every_s, pricing_mode=pricing_mode,
         execution_scope=execution_scope, deliver=deliver, transport=transport,
         enable_broad_discovery=enable_broad_discovery,
-        lock=_lock,
+        lock=_lock, release=release,
     )
 
 
@@ -201,7 +207,7 @@ def _start_stack_locked(sd, logs, py, *, env, tick_seconds, heartbeat_seconds,
                         live_lookback_days, with_dashboard, with_checkpoint_daemon,
                         checkpoint_every_s, pricing_mode, execution_scope, deliver,
                         transport, enable_broad_discovery=False,
-                        lock: "SingleWriterLock") -> dict[str, Any]:
+                        lock: "SingleWriterLock", release: bool = False) -> dict[str, Any]:
     lock_path = str(lock.lock_path)
     spawned: list[tuple[str, int]] = []
     # Task 118A: stop_stack() writes <session_dir>/stop.flag so a running
@@ -280,6 +286,8 @@ def _start_stack_locked(sd, logs, py, *, env, tick_seconds, heartbeat_seconds,
                    "--tick-seconds", str(tick_seconds), "--heartbeat-seconds", str(heartbeat_seconds),
                    "--live-lookback-days", str(live_lookback_days),
                    "--pricing-mode", pricing_mode, "--execution-scope", execution_scope]
+        if release:
+            v2_argv += ["--release"]
         if deliver:
             v2_argv += ["--deliver", "--transport", transport]
         if enable_broad_discovery:

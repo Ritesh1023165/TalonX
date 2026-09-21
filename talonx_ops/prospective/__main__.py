@@ -37,7 +37,7 @@ except ImportError:  # pragma: no cover
     pass
 
 from talonx_ops.prospective import RELEASE_SHA_EXPECTED
-from talonx_ops.prospective.paths import (atomic_write, ensure_session_dir, now_pair,
+from talonx_ops.prospective.paths import (V2_DB_PATH, atomic_write, ensure_session_dir, now_pair,
                                           resolve_env, session_dir)
 
 
@@ -85,6 +85,21 @@ def cmd_start(args) -> int:
     sd = ensure_session_dir()
     env = resolve_env()
 
+    from talonx_v2.release_gate import evaluate_release_readiness, resolve_pricing_mode
+    try:
+        args.pricing_mode = resolve_pricing_mode(args.pricing_mode, release=args.release)
+    except ValueError as exc:
+        print(f"START REFUSED: {exc}")
+        return 2
+    if args.release:
+        gate = evaluate_release_readiness(db_path=V2_DB_PATH, pricing_mode=args.pricing_mode,
+                                          deliver=args.deliver, transport=args.transport, env=env)
+        atomic_write(sd / "release_gate.json", json.dumps(gate.to_dict(), indent=2, default=str))
+        if gate.status != "READY":
+            print("START REFUSED: release readiness gate NOT_READY")
+            for c in gate.failed:
+                print(f"  - {c.name}: {c.detail}")
+            return 2
     pre = run_preflight(expected_sha=args.expected_sha, require_stack_up=False)
     atomic_write(sd / "preflight.json", json.dumps(pre.to_dict(), indent=2, default=str))
     atomic_write(sd / "preflight.md", pre.to_markdown())
@@ -102,7 +117,8 @@ def cmd_start(args) -> int:
                            execution_scope=args.execution_scope,
                            deliver=args.deliver, transport=args.transport,
                            enable_broad_discovery=args.enable_broad_discovery,
-                           allow_when_running=getattr(args, "force", False))
+                           allow_when_running=getattr(args, "force", False),
+                           release=args.release)
     except ConcurrentStartError as exc:
         print("=" * 66)
         print("  PROSPECTIVE V2 -- START REFUSED (a stack is already running)")
@@ -329,8 +345,11 @@ def main(argv=None) -> int:
     # Task 117 final activation: the V2 companion deployment config, passed
     # straight through to `talonx_v2.run` so `prospective start` launches the
     # ONE correctly-configured companion.
-    s.add_argument("--pricing-mode", default="csv",
-                   choices=["csv", "composite-yf", "composite-iex"])
+    s.add_argument("--pricing-mode", default=None,
+                   choices=["csv", "composite-yf", "composite-iex", "sip"])
+    # FINAL ACCEPTANCE: the explicit FIRST-RELEASE profile (SIP, paper, Signal delivery); refuses to start
+    # unless the read-only release readiness gate is READY.  --force never bypasses it.
+    s.add_argument("--release", action="store_true")
     s.add_argument("--execution-scope", default="none",
                    choices=["none", "resolved-active-watchlist"])
     s.add_argument("--deliver", action="store_true")

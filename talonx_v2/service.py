@@ -72,7 +72,15 @@ class V2Service:
                  execution_allowlist: list[str] | None = None,
                  broad_discovery_symbols: list[str] | None = None,
                  ops_notify_store=None,
-                 corporate_actions=None):
+                 corporate_actions=None,
+                 release_mode: bool = False):
+        # FINAL ACCEPTANCE (defence in depth): a release-mode service can ONLY run on the qualified SIP
+        # provider with the corporate-action guard -- it can never silently sit on the stale csv default.
+        if release_mode and pricing_mode != "sip":
+            raise ValueError(f"release_mode requires pricing_mode='sip', got {pricing_mode!r}")
+        if release_mode and corporate_actions is None:
+            raise ValueError("release_mode requires the corporate-action guard")
+        self.release_mode = bool(release_mode)
         self.cfg = config
         self.cfg.validate_frozen()
         self.store = V2Store(config.db_path, starting_cash=config.starting_cash_usd,
@@ -225,6 +233,12 @@ class V2Service:
         if h.get("d") is not None and not h.get("live", True):
             return datetime.combine(h["d"], datetime.min.time(), tzinfo=timezone.utc)
         return datetime.now(timezone.utc)
+
+    def _active_block_reasons(self) -> list:
+        try:
+            return sorted({b["reason_type"] for b in self.store.active_account_blocks()})
+        except Exception:  # noqa: BLE001 -- status must never break the tick
+            return ["UNKNOWN"]
 
     def _provider_contract_status(self) -> dict:
         if self.pricing_mode != "sip":
@@ -1315,17 +1329,19 @@ class V2Service:
             headline = (f"INSIDER BUY CLUSTER — PLANNED BUY — {sym}  "
                         f"(open of {extra.get('target_entry_session')})")
             body = (f"{decision.rationale}\n"
-                    f"ACTIONABLE: a market-on-open paper entry is planned for the OPEN of "
+                    f"ACTIONABLE: a paper entry is planned at the daily-bar OPEN of "
                     f"{extra.get('target_entry_session')} (first XNYS session strictly after the "
-                    f"cluster fired). Planned exit {extra.get('planned_exit_session')} "
+                    f"cluster fired; the paper price is the provider's first eligible trade of that session, "
+                    f"NOT the official opening-auction price). Planned exit {extra.get('planned_exit_session')} "
                     f"(+{self.cfg.hold_trading_days} trading days). Multi-day horizon. Paper only.")
         elif kind == "ENTRY_FILL":
             delayed = extra.get("delayed")
             headline = f"INSIDER BUY CLUSTER — BUY FILLED — {sym}"
             body = (("(delayed notification of a previously-recorded paper intent) "
                      if delayed else "")
-                    + f"Paper long opened at the {extra.get('entry_session')} OPEN "
-                    f"{extra.get('entry_price')}. Planned exit {extra.get('target_exit_session')}. "
+                    + f"Paper long opened at the {extra.get('entry_session')} daily-bar OPEN "
+                    f"{extra.get('entry_price')} (provider first eligible trade, not the official opening-auction "
+                    f"price). Planned exit {extra.get('target_exit_session')}. "
                     f"Paper only. Strategy INSIDER_BUY_CLUSTER_V2@1.")
             if extra.get("backfill"):
                 body += (" NOTE: no earlier intent existed (cold-start backfill); the "
@@ -1476,6 +1492,11 @@ class V2Service:
             # PQ-2A: corporate-action guard visibility (operator/dashboards read this).
             # PQ-2B: which provider contract this process is actually running under
             "price_provider_contract": self._provider_contract_status(),
+            # FINAL ACCEPTANCE: identity/safety state surfaced for /ping + the operator
+            "release_mode": self.release_mode,
+            "campaign_id": self.cfg.campaign_id,
+            "execution_mode": self.cfg.execution_mode,
+            "account_blocks_active": self._active_block_reasons(),
             "corporate_action_guard": ({"state": "ACTIVE", "sources": self.ca_guard.source_names,
                                         "last_sweep": self._last_ca_sweep[-20:],
                                         "dividends": {"accrued_usd": sum(
