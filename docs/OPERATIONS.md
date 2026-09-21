@@ -166,6 +166,7 @@ Full procedure and checklist: `docs/research/evidence/release_freeze_preflight/1
 ```
 $env:TALONX_V2_CAMPAIGN_ID='V2-PAPER-RC1'; $env:TALONX_V2_DB_PATH='v2_release_rc1.db'; $env:TALONX_V2_STATUS_PATH='v2_release_rc1_status.json'
 $env:TALONX_V2_STARTING_CASH_USD='100000'; $env:TALONX_V2_ALLOCATION_USD='10000'; $env:TALONX_V2_EXECUTION_MODE='PAPER'
+$env:TALONX_NOTIFY_DB_PATH='v2_release_rc1_notifications.db'   # the release owns its Sentinel outbox (the gate refuses the shared notifications.db)
 .venv\Scripts\python.exe -m talonx_v2.release_gate --init-campaign      # ONE time only
 .venv\Scripts\python.exe -m talonx_v2.release_gate                      # read-only readiness: expect READY
 .venv\Scripts\python.exe -m talonx_ops.prospective start --release --expected-sha a56ec8c --tick-seconds 150 --heartbeat-seconds 30 --live-lookback-days 45 --execution-scope resolved-active-watchlist --deliver --transport telegram
@@ -173,3 +174,9 @@ $env:TALONX_V2_STARTING_CASH_USD='100000'; $env:TALONX_V2_ALLOCATION_USD='10000'
 
 `--release` forces `sip` + `V2_RELEASE_PRICE_CONTRACT@1`, requires `--deliver --transport telegram`, and refuses to start (exit 2, `release_gate.json` in the session dir) unless the
 read-only readiness gate is READY - including the release campaign identity. `--force` never bypasses it. A plain start still defaults to the research/replay pricing path.
+
+### Credential rotation and Sentinel re-validation (pre-full-day cleanup)
+Bot tokens that were written to local logs are recorded by one-way fingerprint in the release gate; `--release` refuses to start while a configured token still matches (`compromised_credentials_rotated`).
+Rotate in BotFather (`/mybots` -> bot -> API Token -> Revoke), update `.env`, re-run `python -m talonx_v2.release_gate`, then re-validate the changed destination (one harmless message; dry-run without `--send`):
+`.venv\Scripts\python.exe -m talonx_ops.notify.validate --destination OPERATIONS --send`. Details: `docs/research/evidence/pre_full_day_cleanup/09_credential_rotation_status.md`.
+Start the stack at least 45 minutes before the pre-open so the Intelligence/insider store is current.

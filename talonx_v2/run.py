@@ -22,6 +22,7 @@ Never sends Telegram, never touches a broker, never uses real capital.
 """
 from __future__ import annotations
 
+import talonx_ops.log_redaction  # noqa: F401  (process-wide secret redaction; must load before any logging/HTTP)
 import argparse
 import json
 import sys

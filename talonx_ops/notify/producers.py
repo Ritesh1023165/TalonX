@@ -20,7 +20,7 @@ type (RI2-O) -- there is no other code path that enqueues these into
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from talonx_ops.notify import OPERATIONS, RESEARCH
 
@@ -121,6 +121,7 @@ def enqueue_lifecycle_event(ops_store, *, event_type: str, campaign_id: str, det
         event_id=eid, destination=OPERATIONS, event_type=event_type,
         producer="talonx_ops.prospective.__main__", dedup_key=dedup_key, payload_text=payload,
         provenance={"campaign_id": campaign_id, "detail": detail},
+        deliver_by_utc=(now + timedelta(hours=2)).isoformat(),
     )
 
 

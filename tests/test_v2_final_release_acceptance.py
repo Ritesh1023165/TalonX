@@ -446,7 +446,8 @@ def good_env(tmp_path, validated=True, fname="validation.json"):
            "TALONX_NOTIFY_TRADE_EVENT_BOT_TOKEN": "sig-token-SECRET", "TALONX_NOTIFY_TRADE_EVENT_CHAT_ID": "sig-chat-SECRET",
            "TALONX_NOTIFY_OPERATIONS_BOT_TOKEN": "sen-token-SECRET", "TALONX_NOTIFY_OPERATIONS_CHAT_ID": "sen-chat-SECRET"}
     env.update({"TALONX_V2_CAMPAIGN_ID": rg.RELEASE_PROFILE.campaign_id, "TALONX_V2_STARTING_CASH_USD": "100000",
-                "TALONX_V2_ALLOCATION_USD": "10000", "TALONX_V2_EXECUTION_MODE": "PAPER"})
+                "TALONX_V2_ALLOCATION_USD": "10000", "TALONX_V2_EXECUTION_MODE": "PAPER",
+                "TALONX_NOTIFY_DB_PATH": str(tmp_path / rg.RELEASE_PROFILE.notify_db_filename)})
     from talonx_ops.notify import resolve_destination_config
     from talonx_ops.operator_read import _destination_fingerprint
     for k, v in env.items():

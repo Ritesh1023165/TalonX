@@ -1754,3 +1754,12 @@ Full table: `docs/research/evidence/v2_final_release_acceptance/ops_classificati
 `--release` profile (`talonx_v2/release_gate.py`); research/replay defaults unchanged; `--force` never bypasses the gate.
 **Also closed:** the dashboard override could mask `DOWN`/`STARTING`/`STARTUP_FAILED` health with `UNKNOWN`; alert text claimed "market-on-open"
 (now: daily-bar OPEN = provider first eligible trade, NOT the official opening-auction price).
+
+---
+
+## Pre-full-day cleanup findings (from the partial-day RC1 canary)
+
+**OPS-028 - Tests wrote fixture notifications into the shared production Sentinel outbox** (found in the canary, closed): `close._default_ops_notify_store()` defaults to the cwd-relative `notifications.db`; package tests enqueued fixture RECONCILIATION_FAILURE rows there and the first real release start delivered 9 of them to real Sentinel. Closed by the release-specific outbox + gate check + conftest isolation (see evidence). Class: was RELEASE_BLOCKING for the full-day run; closed.
+**OPS-029 - Telegram bot tokens written to logs** (found in the canary, code closed / rotation pending user action): httpx INFO request lines carry the token in the URL path; central redaction now applies. Two tokens (legacy primary, Sentinel) are compromised until rotated. Class: RELEASE_BLOCKING until rotated.
+**OPS-030 - Sentinel lifecycle/label issues** (BOUNDED, closed for label and staleness): STARTUP labelled the campaign `V2`; SHUTDOWN is enqueued after the drain process is stopped (never delivered; now expires instead of arriving out of order).
+**OPS-031 - Intelligence/insider store ~6 days stale at start** (BOUNDED): caught up in ~30 min after start; operational rule: start >= 45 min before pre-open and confirm freshness.

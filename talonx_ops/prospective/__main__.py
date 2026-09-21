@@ -136,7 +136,7 @@ def cmd_start(args) -> int:
     try:
         from talonx_ops.notify.producers import enqueue_lifecycle_event
         from talonx_ops.prospective.close import _default_ops_notify_store
-        campaign_id = env.get("TALONX_V2_CAMPAIGN_ID", "V2")
+        campaign_id = _campaign_label(env)
         enqueue_lifecycle_event(
             _default_ops_notify_store(), event_type="STARTUP", campaign_id=campaign_id,
             detail=f"prospective start: deliver={args.deliver} transport={args.transport}")
@@ -331,6 +331,12 @@ def cmd_clear_block(args) -> int:
                          evidence_ref=args.evidence_ref)
     print(json.dumps(result, indent=2, default=str))
     return 0 if result["allow"] else 1
+
+
+def _campaign_label(env: dict) -> str:
+    """The campaign id shown in Sentinel lifecycle notices: the REAL configured campaign (``resolve_env()`` only carries 4
+    variables and never includes it, which made the canary STARTUP say ``V2`` instead of ``V2-PAPER-RC1``)."""
+    return os.environ.get("TALONX_V2_CAMPAIGN_ID") or env.get("TALONX_V2_CAMPAIGN_ID") or "V2"
 
 
 def main(argv=None) -> int:

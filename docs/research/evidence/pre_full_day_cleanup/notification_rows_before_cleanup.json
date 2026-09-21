@@ -1,0 +1,167 @@
+[
+ {
+  "event_id": "eddccc99bf02f06c21fbb628",
+  "event_type": "RECONCILIATION_FAILURE",
+  "producer": "talonx_ops.prospective.close",
+  "state_before": "SENT",
+  "created_at_utc": "2026-09-18T08:43:11.688531+00:00",
+  "sent_at_utc": "2026-09-21T18:42:36.084578+00:00",
+  "campaign_id": "V2",
+  "findings": [
+   "whole_share_positions: [('ep1', 12.5)]"
+  ],
+  "deliver_by_utc": null,
+  "classification": "TEST_FIXTURE (episode ep1 / 'FAIL some detail' / campaign V2 / $300k fixture, from tests/test_package2_account_blocks.py + tests/test_package4_sizing_accounting.py)"
+ },
+ {
+  "event_id": "da5731fbdb4d2e2e6b45a346",
+  "event_type": "RECONCILIATION_FAILURE",
+  "producer": "talonx_ops.prospective.close",
+  "state_before": "SENT",
+  "created_at_utc": "2026-09-18T08:43:11.717644+00:00",
+  "sent_at_utc": "2026-09-21T18:42:37.155452+00:00",
+  "campaign_id": "V2",
+  "findings": [
+   "cash_plus_open_cost_reconciles: cash 290000.0 + open_cost -50.0 + unresolved_cost 0.0 != 300000.0 + realized 0.0",
+   "positive_finite_position_cost: [('ep1', -50.0)]"
+  ],
+  "deliver_by_utc": null,
+  "classification": "TEST_FIXTURE (episode ep1 / 'FAIL some detail' / campaign V2 / $300k fixture, from tests/test_package2_account_blocks.py + tests/test_package4_sizing_accounting.py)"
+ },
+ {
+  "event_id": "cb4283aeb6b01588b62c64af",
+  "event_type": "RECONCILIATION_FAILURE",
+  "producer": "talonx_ops.prospective.close",
+  "state_before": "SENT",
+  "created_at_utc": "2026-09-18T08:43:12.582640+00:00",
+  "sent_at_utc": "2026-09-21T18:42:38.272546+00:00",
+  "campaign_id": "V2",
+  "findings": [
+   "cash_plus_open_cost_reconciles: FAIL some detail"
+  ],
+  "deliver_by_utc": null,
+  "classification": "TEST_FIXTURE (episode ep1 / 'FAIL some detail' / campaign V2 / $300k fixture, from tests/test_package2_account_blocks.py + tests/test_package4_sizing_accounting.py)"
+ },
+ {
+  "event_id": "36523b9e0b7e2b8227025b4b",
+  "event_type": "RECONCILIATION_FAILURE",
+  "producer": "talonx_ops.prospective.close",
+  "state_before": "SENT",
+  "created_at_utc": "2026-09-19T09:05:34.205243+00:00",
+  "sent_at_utc": "2026-09-21T18:42:39.682999+00:00",
+  "campaign_id": "V2",
+  "findings": [
+   "whole_share_positions: [('ep1', 12.5)]"
+  ],
+  "deliver_by_utc": null,
+  "classification": "TEST_FIXTURE (episode ep1 / 'FAIL some detail' / campaign V2 / $300k fixture, from tests/test_package2_account_blocks.py + tests/test_package4_sizing_accounting.py)"
+ },
+ {
+  "event_id": "36bb769fd1eba909f63a1fa3",
+  "event_type": "RECONCILIATION_FAILURE",
+  "producer": "talonx_ops.prospective.close",
+  "state_before": "SENT",
+  "created_at_utc": "2026-09-19T09:05:34.252585+00:00",
+  "sent_at_utc": "2026-09-21T18:42:41.227686+00:00",
+  "campaign_id": "V2",
+  "findings": [
+   "cash_plus_open_cost_reconciles: cash 290000.0 + open_cost -50.0 + unresolved_cost 0.0 != 300000.0 + realized 0.0",
+   "positive_finite_position_cost: [('ep1', -50.0)]"
+  ],
+  "deliver_by_utc": null,
+  "classification": "TEST_FIXTURE (episode ep1 / 'FAIL some detail' / campaign V2 / $300k fixture, from tests/test_package2_account_blocks.py + tests/test_package4_sizing_accounting.py)"
+ },
+ {
+  "event_id": "150039728a73ee551a48ca76",
+  "event_type": "RECONCILIATION_FAILURE",
+  "producer": "talonx_ops.prospective.close",
+  "state_before": "SENT",
+  "created_at_utc": "2026-09-19T09:43:43.827929+00:00",
+  "sent_at_utc": "2026-09-21T18:42:42.687270+00:00",
+  "campaign_id": "V2",
+  "findings": [
+   "cash_plus_open_cost_reconciles: FAIL some detail"
+  ],
+  "deliver_by_utc": null,
+  "classification": "TEST_FIXTURE (episode ep1 / 'FAIL some detail' / campaign V2 / $300k fixture, from tests/test_package2_account_blocks.py + tests/test_package4_sizing_accounting.py)"
+ },
+ {
+  "event_id": "7b0b311d842d00496fda4a15",
+  "event_type": "RECONCILIATION_FAILURE",
+  "producer": "talonx_ops.prospective.close",
+  "state_before": "SENT",
+  "created_at_utc": "2026-09-21T07:16:57.732371+00:00",
+  "sent_at_utc": "2026-09-21T18:42:44.440672+00:00",
+  "campaign_id": "V2",
+  "findings": [
+   "cash_plus_open_cost_reconciles: FAIL some detail"
+  ],
+  "deliver_by_utc": null,
+  "classification": "TEST_FIXTURE (episode ep1 / 'FAIL some detail' / campaign V2 / $300k fixture, from tests/test_package2_account_blocks.py + tests/test_package4_sizing_accounting.py)"
+ },
+ {
+  "event_id": "4ac55d17ff785f0198b76391",
+  "event_type": "RECONCILIATION_FAILURE",
+  "producer": "talonx_ops.prospective.close",
+  "state_before": "SENT",
+  "created_at_utc": "2026-09-21T07:17:02.486045+00:00",
+  "sent_at_utc": "2026-09-21T18:42:46.894522+00:00",
+  "campaign_id": "V2",
+  "findings": [
+   "whole_share_positions: [('ep1', 12.5)]"
+  ],
+  "deliver_by_utc": null,
+  "classification": "TEST_FIXTURE (episode ep1 / 'FAIL some detail' / campaign V2 / $300k fixture, from tests/test_package2_account_blocks.py + tests/test_package4_sizing_accounting.py)"
+ },
+ {
+  "event_id": "8c0d60745134776fb33982fe",
+  "event_type": "RECONCILIATION_FAILURE",
+  "producer": "talonx_ops.prospective.close",
+  "state_before": "SENT",
+  "created_at_utc": "2026-09-21T07:17:02.531025+00:00",
+  "sent_at_utc": "2026-09-21T18:42:48.950188+00:00",
+  "campaign_id": "V2",
+  "findings": [
+   "cash_plus_open_cost_reconciles: cash 290000.0 + open_cost -50.0 + unresolved_cost 0.0 != 300000.0 + realized 0.0",
+   "positive_finite_position_cost: [('ep1', -50.0)]"
+  ],
+  "deliver_by_utc": null,
+  "classification": "TEST_FIXTURE (episode ep1 / 'FAIL some detail' / campaign V2 / $300k fixture, from tests/test_package2_account_blocks.py + tests/test_package4_sizing_accounting.py)"
+ },
+ {
+  "event_id": "98d31d97fe2f6058d3571dfc",
+  "event_type": "STARTUP",
+  "producer": "talonx_ops.prospective.__main__",
+  "state_before": "SENT",
+  "created_at_utc": "2026-09-21T18:42:30.325932+00:00",
+  "sent_at_utc": "2026-09-21T18:42:51.348172+00:00",
+  "campaign_id": "V2",
+  "findings": null,
+  "deliver_by_utc": null,
+  "classification": "RC1_CANARY_STARTUP"
+ },
+ {
+  "event_id": "9c82569d6a1c4d2285647979",
+  "event_type": "DEGRADED_HEALTH",
+  "producer": "intelligence",
+  "state_before": "SENT",
+  "created_at_utc": "2026-09-21T18:45:14.233160+00:00",
+  "sent_at_utc": "2026-09-21T18:47:35.266353+00:00",
+  "campaign_id": null,
+  "findings": null,
+  "deliver_by_utc": "2026-09-21T19:42:35.332917+00:00",
+  "classification": "RC1_CANARY_DEGRADED_HEALTH"
+ },
+ {
+  "event_id": "7519bf86d1ca66910b556fa9",
+  "event_type": "SHUTDOWN",
+  "producer": "talonx_ops.prospective.__main__",
+  "state_before": "PENDING",
+  "created_at_utc": "2026-09-21T20:06:22.375713+00:00",
+  "sent_at_utc": null,
+  "campaign_id": "V2-PAPER-RC1",
+  "findings": null,
+  "deliver_by_utc": null,
+  "classification": "RC1_CANARY_SHUTDOWN"
+ }
+]

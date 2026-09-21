@@ -1,0 +1,11 @@
+# Tests (TASK O) - fake Telegram only, network guard on
+New: `tests/test_pre_full_day_cleanup.py` - 24 tests: 1 test cannot write the release/shared store - 2 gate requires isolated outbox - 3 foreign rows refused / drain ignores them - 4 real RC1 notification still drains - 5 stale pre-RC1 rows cannot emit -
+6 isolation survives restart - 7 token absent from request/failure logs - 8 exception/stack - 9 provider secret + Authorization + api_key + password - 10/11 process-wide + entry points - 12/13 compromised-credential gate (fingerprint only) -
+14 STARTUP label - 15 stale lifecycle notice expires - 16 campaign verification - 17 Signal/Sentinel routing + Lab OFF - 18 fingerprints - 19 allow-list has no strategy/provider/pricing/accounting file - 20 HEAD = frozen SHA + declared changes only -
+21 continuation verify - 22-24 controlled validation command (dry-run / fingerprint-bound record / refuses compromised).
+Mutation checks: redaction disabled -> tests 7-10 fail; conftest isolation removed -> test 1 fails.
+
+Command: `TALONX_TEST_NETWORK_GUARD=1 .venv\Scripts\python.exe -m pytest -q -p no:cacheprovider tests/test_pre_full_day_cleanup.py tests/test_v2_final_release_acceptance.py tests/test_ri2_notification_routing.py tests/test_ri3_operator.py tests/test_ri1_campaign_identity.py tests/test_package2_account_blocks.py tests/test_package4_sizing_accounting.py tests/test_task114_prospective.py tests/test_telegram_listener.py tests/test_telegram_ping_safety.py tests/test_task132_ping_discovery_section.py tests/test_task117_delivery_reliability.py tests/test_task117_official_transport.py tests/test_task117_telegram_owner_dedup.py tests/test_task117_startup_verdict.py tests/test_pq2b_provider_contract.py tests/test_task112_tuesday_release.py tests/test_task111_v2_e2e.py`
+Result: **455 passed, 9 failed**. All 9 failures are the documented pre-existing set and were **reproduced on the starting HEAD 0130a13** in a scratch worktree (removed): `test_ri3_operator::test_renderer_shows_end_to_end_fixture` (needs `node`),
+`test_task114_prospective::{b3 x3, b7, b1 x2}`, `test_task112::test_03_v1_fingerprint_intact` and `test_task111::test_item3_original_strategy_fingerprint_unchanged` (OPS-017 stale V1 literals, not fixed).
+The shared `notifications.db` is byte-identical before/after the run.

@@ -149,3 +149,32 @@ def make_article(url: str, ticker: str = "AAPL") -> NewsArticle:
 @pytest.fixture
 def ledger_path(tmp_path):
     return tmp_path / "test_ledger.db"
+
+
+# ---------------------------------------------------------------------------
+# Pre-full-day cleanup: tests must NEVER touch the shared / release ops (Sentinel) outbox.
+#
+# Canary finding: tests calling `close._record_v2_reconciliation_blocks` etc. enqueued fixture RECONCILIATION_FAILURE rows
+# (campaign "V2", episode "ep1", 12.5 shares ...) into the real repo-root `notifications.db` (the cwd-relative default), and
+# the first real release start drained them to the real Sentinel channel.  Two layers, both automatic for every test:
+#   1. TALONX_NOTIFY_DB_PATH points at a per-test temp file (every default-store consumer honours it);
+#   2. constructing a NotifyStore on the shared/production/release outbox path raises, even if a test scrubbed the env var.
+# ---------------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def _isolate_ops_notification_store(tmp_path_factory, monkeypatch):
+    from pathlib import Path
+
+    from talonx_ops.notify import outbox
+
+    repo = Path(__file__).resolve().parents[1]
+    forbidden = {os.path.normcase(str(repo / n)) for n in ("notifications.db", "v2_release_rc1_notifications.db")}
+    d = tmp_path_factory.mktemp("opsnotify")
+    monkeypatch.setenv("TALONX_NOTIFY_DB_PATH", str(d / "notifications_test.db"))
+    orig_init = outbox.NotifyStore.__init__
+
+    def guarded(self, path="notifications.db", *a, **k):
+        if os.path.normcase(os.path.abspath(str(path))) in forbidden:
+            raise RuntimeError(f"tests must not open the shared/production ops outbox: {path!r}")
+        orig_init(self, path, *a, **k)
+
+    monkeypatch.setattr(outbox.NotifyStore, "__init__", guarded)
