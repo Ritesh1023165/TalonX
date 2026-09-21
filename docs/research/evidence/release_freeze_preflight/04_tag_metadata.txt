@@ -1,0 +1,6 @@
+tag:            v2-paper-rc1 (annotated)     did not previously exist locally or on origin
+tag object:     814a18afba5759a98e8148a5e94fbf28450de1a3
+peels to:       a56ec8c8d10adb36a113ebd373204f297c230081 (the frozen release SHA)
+pushed:         yes (origin)
+message records: frozen SHA, accepted candidate b723901, paper-only, strategy fp, provider contract fp, campaign V2-PAPER-RC1 $100k/$10k,
+                 "profitability UNPROVEN", "full-day paper validation NOT started", "prospective validation NOT started"

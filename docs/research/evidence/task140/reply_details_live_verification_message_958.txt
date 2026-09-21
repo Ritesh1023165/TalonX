@@ -1,0 +1,111 @@
+DIAGNOSTIC resolver invocation against the REAL production
+~/.talonx/ingestion_ledger.db, message_id=958 -- direct call through
+build_intelligence_details_resolver (the exact production wiring
+run_talonx.py uses), performed AFTER both Task 140 correction fixes
+(ordering/index/source-link/wording, and the evidence_urls decoding
+fix found by this same diagnostic run). This is NOT a live Telegram
+round trip -- no message was sent, no chat was contacted; it exercises
+the resolver function directly against real, already-persisted data,
+exactly as the prior turn's diagnostic re-verification also did.
+No chat IDs or credentials appear below -- only public SEC filing
+identifiers (accessions, CIKs) and already-public company symbols.
+
+=== details (index) ===
+This message covered 14 event(s), numbered below reconstructed from the original renderer's own ordering rule -- this message predates durable per-item order tracking, so this is a verified deterministic reconstruction, not a stored record; see 'details N' below:
+  1. AKAM -- 0001867203-26-000016
+  2. AMZN -- 0001104659-26-107526
+  3. APO -- 0001689315-26-000002
+  4. CMG -- 0001058090-26-000088
+  5. CNP -- 0001104659-26-107560
+  6. D -- 0001193125-26-390654
+  7. FDX -- 0001104659-26-107511
+  8. FITB -- 0000035527-26-000219
+  9. MTB -- 0000036270-26-000052
+  10. NEE -- 0001104659-26-107537
+  11. PH -- 0001193125-26-390561
+  12. SYY -- 0001104659-26-107510
+  13. TDG -- 0001260221-26-000059
+  14. TECH -- 0001140361-26-036499
+
+Reply "details N" (e.g. "details 1") for a specific item's full facts, source link, and timestamps.
+
+=== details 1 ===
+[Item 1 of 14 (order reconstructed -- see 'details' index)]
+
+AKAM -- DIGEST disposition (delivery telegram...)
+Accession: 0001867203-26-000016
+Filing link: https://www.sec.gov/Archives/edgar/data/1086222/000186720326000016/wk-form4_1789417447.xml
+Source accepted: 2026-09-14 16:24 UTC
+Delivery enqueued: 2026-09-14 20:32 UTC
+Delivery sent: 2026-09-15 00:07 UTC
+
+Facts from the filing (computed by the significance/insider engines, not interpretation):
+  (no persisted filing-level facts found for this event)
+
+Why this was selected (system routing reason, not a fact stated by the filing itself):
+  - insider ownership filing (Form 3/4/5)  [EVENT_TYPE_BASE]
+  - this company is on your watchlist (user priority, not market significance)  [ON_WATCHLIST]
+
+The digest line you actually received for this item:
+- AKAM: Insider ownership filing (Form 3/4/5) (enqueued 2026-09-14T20:32Z)
+
+Stored supporting card (fuller detail than the compact digest line above -- this fuller text was NOT itself sent to you; HTML markup stripped for this plain-text reply, wording/facts unchanged from what is stored):
+🟡 MEDIUM INFORMATION SIGNIFICANCE
+AKAM (AKAMAI TECHNOLOGIES INC) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AKAM had an insider ownership form filed
+Accepted: 2026-09-14 16:24 UTC
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• this company is on your watchlist (user priority, not market significance)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001867203-26-000016
+
+ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.
+
+Data limitations: aggregation windows/insider-activity detail beyond what the original card showed are not separately re-derived here -- the facts above are the SAME ones already used to decide this card's routing, evaluated as of the original send, not re-computed against any later enrichment update.
+
+=== details 2 ===
+[Item 2 of 14 (order reconstructed -- see 'details' index)]
+
+AMZN -- DIGEST disposition (delivery telegram...)
+Accession: 0001104659-26-107526
+Filing link: https://www.sec.gov/Archives/edgar/data/1018724/000110465926107526/0001104659-26-107526-index.htm
+Source accepted: 2026-09-14 16:45 UTC
+Delivery enqueued: 2026-09-14 21:02 UTC
+Delivery sent: 2026-09-15 00:07 UTC
+
+Facts from the filing (computed by the significance/insider engines, not interpretation):
+  - 3 distinct disclosure types from this company within 7 days  [EVENT_CLUSTER]
+
+Why this was selected (system routing reason, not a fact stated by the filing itself):
+  - other-events 8-K (Item 8.01)  [EVENT_TYPE_BASE]
+  - this company is on your watchlist (user priority, not market significance)  [ON_WATCHLIST]
+
+The digest line you actually received for this item:
+- AMZN: Other material event (8-K Item 8.01) (enqueued 2026-09-14T21:02Z) https://www.sec.gov/Archives/edgar/data/1018724/000110465926107526/0001104659-26-107526-index.htm
+
+Stored supporting card (fuller detail than the compact digest line above -- this fuller text was NOT itself sent to you; HTML markup stripped for this plain-text reply, wording/facts unchanged from what is stored):
+🟡 MEDIUM INFORMATION SIGNIFICANCE
+AMZN (AMAZON COM INC) · regular hours
+
+Other material event (8-K Item 8.01)
+AMZN filed an 8-K under Item 8.01 (other events)
+Accepted: 2026-09-14 16:45 UTC
+
+Why surfaced:
+• other-events 8-K (Item 8.01)
+• 3 distinct disclosure types from this company within 7 days
+
+⚠️ Source freshness unknown at emit time
+
+🔗 SEC filing · ref 0001104659-26-107526
+
+ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.
+
+Data limitations: aggregation windows/insider-activity detail beyond what the original card showed are not separately re-derived here -- the facts above are the SAME ones already used to decide this card's routing, evaluated as of the original send, not re-computed against any later enrichment update.
+

@@ -1,0 +1,29 @@
+FINAL ACCEPTANCE FOCUSED REGRESSION (TALONX_TEST_NETWORK_GUARD=1, .venv python 3.12)
+
+Group 1 (PQ-1, PQ-2A, PQ-2A closure, PQ-2B, Packages 1-5, RI-1, RI-2, RI-3, final acceptance): 369 passed, 1 failed (stopped at first failure via -x)
+Group 2 (RI-3, final acceptance, task110-114, task117 pricing/journey/lane, /ping, telegram listener): 316 passed, 9 failed
+Group 3 (dashboard read/viewmodel/claim-safety, task100c, task117 delivery/scope/e2e/rehearsal/startup/lock/migration/readiness, task118a): 136 passed, 7 failed
+Final acceptance suite alone: 31 passed
+
+CARRIED FAILURES (16) - ALL REPRODUCED ON STARTING HEAD cb010de in a scratch worktree (v2_lane.db copied in); worktree removed:
+FAILED tests/test_ri3_operator.py::test_renderer_shows_end_to_end_fixture
+FAILED tests/test_task111_v2_e2e.py::test_item3_original_strategy_fingerprint_unchanged
+FAILED tests/test_task112_tuesday_release.py::test_03_v1_fingerprint_intact
+FAILED tests/test_task114_prospective.py::test_b1_preflight_fingerprints_are_expected
+FAILED tests/test_task114_prospective.py::test_b1_preflight_runs_and_reports_overall
+FAILED tests/test_task114_prospective.py::test_b3_checkpoint_has_required_fields
+FAILED tests/test_task114_prospective.py::test_b3_session_loop_stop_flag
+FAILED tests/test_task114_prospective.py::test_b3_session_loop_writes_and_stops
+FAILED tests/test_task114_prospective.py::test_b7_close_reconciles_zero_activity_ledger
+FAILED tests/test_task117_migration.py::test_alter_migration_on_a_preexisting_outbox_without_the_new_column
+FAILED tests/test_task117_migration.py::test_historical_episode_in_store_makes_no_fresh_actionable_alert
+FAILED tests/test_task117_migration.py::test_interrupted_tick_leaves_a_consistent_recoverable_ledger
+FAILED tests/test_task117_migration.py::test_migration_is_idempotent_across_restarts
+FAILED tests/test_task117_migration.py::test_migration_preserves_all_existing_state
+FAILED tests/test_task117_release_rehearsal.py::test_bounded_release_rehearsal
+FAILED tests/test_task118a_dashboard_message_count.py::test_immediate_and_digest_sends_count_messages_correctly
+
+Baseline also fails tests/test_task114_prospective.py::test_a4_v2_section_separates_health_data_activity; it PASSES with this task's dashboard_read.py health-override fix (defect fixed, not carried).
+Causes: node not installed (1); stale V1 fingerprint literal OPS-017 (2); task114/task117-migration/rehearsal/task118a environment+historical (13). None touch V2 release paths.
+
+Production v2_lane.db md5 before/after regression: cff00b0f46e7e5b65e6f5903366fab28 (unchanged)

@@ -1,0 +1,11 @@
+{
+  "v2_strategy_fingerprint": "e2acf6454789217e",
+  "provider_contract_id": "V2_RELEASE_PRICE_CONTRACT@1",
+  "provider_contract_fingerprint": "ac5e51aa3599d6c9",
+  "verified_by": [
+    "release gate checks strategy_fingerprint + provider_contract_fingerprint (real environment, isolated campaign, and post-merge on main)",
+    "prospective preflight v2_fingerprint READY"
+  ],
+  "unchanged_since_accepted_candidate": true,
+  "note": "V1 (Original) fingerprint ed8272fe568d also READY in preflight; OPS-017 stale literals in two legacy tests are historical and untouched"
+}

@@ -1,0 +1,226 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- C:\workspace\TalonX\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\workspace\TalonX
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.10.16, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 94 items
+
+tests/test_task131_spa_frontend.py::test_broad_discovery_nav_button_present_and_wired PASSED [  1%]
+tests/test_task131_spa_frontend.py::test_broad_discovery_renderer_registered_in_section_dispatch PASSED [  2%]
+tests/test_task131_spa_frontend.py::test_broad_discovery_renderer_never_puts_pill_markup_inside_a_bounded_table_cell PASSED [  3%]
+tests/test_task131_spa_frontend.py::test_broad_discovery_never_invents_a_reference_price_or_hardcodes_universe_counts PASSED [  4%]
+tests/test_task131_spa_frontend.py::test_new_pill_states_have_explicit_css_rules PASSED [  5%]
+tests/test_task131_spa_frontend.py::test_shared_campaign_ledger_note_rendered_not_dropped PASSED [  6%]
+tests/test_task131_spa_frontend.py::test_narrow_layout_rule_still_intact PASSED [  7%]
+tests/test_task131_spa_frontend.py::test_all_sections_endpoint_serves_broad_discovery_alongside_every_other_section PASSED [  8%]
+tests/test_task100c_unified_dashboard.py::test_01_all_sections_load_with_stores_present PASSED [  9%]
+tests/test_task100c_unified_dashboard.py::test_02_sections_load_with_optional_stores_missing PASSED [ 10%]
+tests/test_task100c_unified_dashboard.py::test_03_overview_runtime_state PASSED [ 11%]
+tests/test_task100c_unified_dashboard.py::test_04_market_health_rendering PASSED [ 12%]
+tests/test_task100c_unified_dashboard.py::test_05_active_state PASSED    [ 13%]
+tests/test_task100c_unified_dashboard.py::test_06_zero_activity_state PASSED [ 14%]
+tests/test_task100c_unified_dashboard.py::test_07_no_active_producer_state PASSED [ 15%]
+tests/test_task100c_unified_dashboard.py::test_08_superseded_state PASSED [ 17%]
+tests/test_task100c_unified_dashboard.py::test_09_stale_state PASSED     [ 18%]
+tests/test_task100c_unified_dashboard.py::test_10_suppressions_visible_with_zero_published PASSED [ 19%]
+tests/test_task100c_unified_dashboard.py::test_11_brain_active_no_input_distinction PASSED [ 20%]
+tests/test_task100c_unified_dashboard.py::test_12_official_alerts_isolated PASSED [ 21%]
+tests/test_task100c_unified_dashboard.py::test_13_experimental_alerts_clearly_internal PASSED [ 22%]
+tests/test_task100c_unified_dashboard.py::test_14_experimental_external_send_blocked PASSED [ 23%]
+tests/test_task100c_unified_dashboard.py::test_15_16_17_18_forward_horizons_render PASSED [ 24%]
+tests/test_task100c_unified_dashboard.py::test_19_mfe_mae_render PASSED  [ 25%]
+tests/test_task100c_unified_dashboard.py::test_20_pending_outcome_render PASSED [ 26%]
+tests/test_task100c_unified_dashboard.py::test_21_original_vs_experimental_comparison PASSED [ 27%]
+tests/test_task100c_unified_dashboard.py::test_22_filing_rendering PASSED [ 28%]
+tests/test_task100c_unified_dashboard.py::test_23_insider_rendering_key_present PASSED [ 29%]
+tests/test_task100c_unified_dashboard.py::test_24_significance_descriptive_wording PASSED [ 30%]
+tests/test_task100c_unified_dashboard.py::test_25_deep_link_to_8760 PASSED [ 31%]
+tests/test_task100c_unified_dashboard.py::test_26_original_paper_isolated PASSED [ 32%]
+tests/test_task100c_unified_dashboard.py::test_27_experimental_paper_isolated PASSED [ 34%]
+tests/test_task100c_unified_dashboard.py::test_28_piv_not_checked_rendering PASSED [ 35%]
+tests/test_task100c_unified_dashboard.py::test_29_eod_reconciliation_rendering PASSED [ 36%]
+tests/test_task100c_unified_dashboard.py::test_30_parity_gate1_experimental_alert_visibility PASSED [ 37%]
+tests/test_task100c_unified_dashboard.py::test_31_parity_gate2_forward_outcome_visibility PASSED [ 38%]
+tests/test_task100c_unified_dashboard.py::test_32_parity_gate3_profile_gate_diagnostics PASSED [ 39%]
+tests/test_task100c_unified_dashboard.py::test_33_parity_gate4_earnings_intelligence_bridge_visibility PASSED [ 40%]
+tests/test_task100c_unified_dashboard.py::test_34_parity_gate5_operational_health_freshness PASSED [ 41%]
+tests/test_task100c_unified_dashboard.py::test_35_streamlit_config_editing_retained PASSED [ 42%]
+tests/test_task100c_unified_dashboard.py::test_36_no_dashboard_write_side_effect PASSED [ 43%]
+tests/test_task100c_unified_dashboard.py::test_37_no_strategy_mutation PASSED [ 44%]
+tests/test_task100c_unified_dashboard.py::test_38_no_broker_action PASSED [ 45%]
+tests/test_task100c_unified_dashboard.py::test_39_no_experimental_telegram_action PASSED [ 46%]
+tests/test_task100c_unified_dashboard.py::test_40_websocket_and_section_routes_stable PASSED [ 47%]
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe PASSED [ 48%]
+tests/test_task100c_unified_dashboard.py::test_42_stale_timestamp_safe PASSED [ 50%]
+tests/test_task100c_unified_dashboard.py::test_43_empty_db_safe PASSED   [ 51%]
+tests/test_task100c_unified_dashboard.py::test_44_large_alert_table_bounded PASSED [ 52%]
+tests/test_task100c_unified_dashboard.py::test_45_narrow_layout_integrity PASSED [ 53%]
+tests/test_task104_p2_cleanup.py::test_01_existing_source_reused_not_recomputed PASSED [ 54%]
+tests/test_task104_p2_cleanup.py::test_02_no_second_provider_or_poller PASSED [ 55%]
+tests/test_task104_p2_cleanup.py::test_03_causal_timestamp_from_payload PASSED [ 56%]
+tests/test_task104_p2_cleanup.py::test_04_baseline_missing_is_not_available PASSED [ 57%]
+tests/test_task104_p2_cleanup.py::test_05_idempotent_persistence PASSED  [ 58%]
+tests/test_task104_p2_cleanup.py::test_06_session_scoping PASSED         [ 59%]
+tests/test_task104_p2_cleanup.py::test_07_duplicate_suppression_below_threshold PASSED [ 60%]
+tests/test_task104_p2_cleanup.py::test_08_dashboard_display PASSED       [ 61%]
+tests/test_task104_p2_cleanup.py::test_09_no_strategy_side_effect PASSED [ 62%]
+tests/test_task104_p2_cleanup.py::test_10_11_loopback_allow_nonloopback_deny PASSED [ 63%]
+tests/test_task104_p2_cleanup.py::test_12_get_is_read_only PASSED        [ 64%]
+tests/test_task104_p2_cleanup.py::test_13_post_requires_confirmation PASSED [ 65%]
+tests/test_task104_p2_cleanup.py::test_14_invalid_payload_blocked PASSED [ 67%]
+tests/test_task104_p2_cleanup.py::test_15_16_17_18_denylist_keys_blocked PASSED [ 68%]
+tests/test_task104_p2_cleanup.py::test_19_audit_write_on_success PASSED  [ 69%]
+tests/test_task104_p2_cleanup.py::test_20_21_no_secret_display_or_logging PASSED [ 70%]
+tests/test_task104_p2_cleanup.py::test_22_no_duplicate_post_semantics_in_page PASSED [ 71%]
+tests/test_task104_p2_cleanup.py::test_23_main_cockpit_remains_read_only PASSED [ 72%]
+tests/test_task104_p2_cleanup.py::test_24_residual_inventory_accurate PASSED [ 73%]
+tests/test_task104_p2_cleanup.py::test_25_destructive_reset_classification PASSED [ 74%]
+tests/test_task104_p2_cleanup.py::test_26_starting_balance_classification PASSED [ 75%]
+tests/test_task104_p2_cleanup.py::test_27_research_view_classification PASSED [ 76%]
+tests/test_task104_p2_cleanup.py::test_28_no_capability_lost_on_disposition PASSED [ 77%]
+tests/test_task104_p2_cleanup.py::test_29_parity_still_5_of_5 PASSED     [ 78%]
+tests/test_task104_p2_cleanup.py::test_30_no_default_startup PASSED      [ 79%]
+tests/test_task104_p2_cleanup.py::test_31_compatibility_start_available PASSED [ 80%]
+tests/test_task104_p2_cleanup.py::test_32_33_original_strategy_and_thresholds_unchanged FAILED [ 81%]
+tests/test_task104_p2_cleanup.py::test_34_experimental_v1_unchanged PASSED [ 82%]
+tests/test_task104_p2_cleanup.py::test_35_quant_brain_unchanged PASSED   [ 84%]
+tests/test_task104_p2_cleanup.py::test_36_task101_not_wired_live PASSED  [ 85%]
+tests/test_task104_p2_cleanup.py::test_37_experimental_telegram_impossible PASSED [ 86%]
+tests/test_task104_p2_cleanup.py::test_38_39_broker_and_short_unchanged PASSED [ 87%]
+tests/test_task104_p2_cleanup.py::test_40_no_paid_data_no_aiml PASSED    [ 88%]
+tests/test_task104_p2_cleanup.py::test_41_no_live_runtime_started_by_tests PASSED [ 89%]
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes PASSED [ 90%]
+tests/test_task140_dashboard_refresh.py::test_new_rows_above_do_not_auto_jump_and_show_an_indicator PASSED [ 91%]
+tests/test_task140_dashboard_refresh.py::test_expanded_details_state_survives_refresh PASSED [ 92%]
+tests/test_task140_dashboard_refresh.py::test_focus_outside_the_refreshed_region_is_not_disturbed PASSED [ 93%]
+tests/test_task140_dashboard_refresh.py::test_pause_stops_automatic_updates_and_timestamp_freezes PASSED [ 94%]
+tests/test_task140_dashboard_refresh.py::test_manual_refresh_works_while_paused_and_stays_paused PASSED [ 95%]
+tests/test_task140_dashboard_refresh.py::test_resume_does_not_create_duplicate_timers PASSED [ 96%]
+tests/test_task140_dashboard_refresh.py::test_delayed_response_cannot_overwrite_newer_state PASSED [ 97%]
+tests/test_task140_dashboard_refresh.py::test_failed_request_keeps_content_and_recovers_without_losing_position PASSED [ 98%]
+tests/test_task140_dashboard_refresh.py::test_tab_switch_during_in_flight_refresh_shows_the_new_tab PASSED [100%]
+
+================================== FAILURES ===================================
+____________ test_32_33_original_strategy_and_thresholds_unchanged ____________
+
+    def test_32_33_original_strategy_and_thresholds_unchanged():
+        out = subprocess.run(
+            ["git", "diff", "--stat", "113b97f", "--",
+             "talonx_quant/", "talonx_core/", "talonx_paper/", "talonx_piv/", "talonx_brain/", "run_talonx.py"],
+            capture_output=True, text=True, cwd=_REPO,
+        )
+>       assert out.stdout.strip() == "", f"frozen path changed:\n{out.stdout}"
+E       AssertionError: frozen path changed:
+E          run_talonx.py                    |  45 ++++++++++++-
+E          talonx_quant/consumer.py         |  28 +++++++-
+E          talonx_quant/preseed_ordering.py | 142 +++++++++++++++++++++++++++++++++++++++
+E          3 files changed, 211 insertions(+), 4 deletions(-)
+E         
+E       assert 'run_talonx.p... deletions(-)' == ''
+E         
+E         + run_talonx.py                    |  45 ++++++++++++-
+E         +  talonx_quant/consumer.py         |  28 +++++++-
+E         +  talonx_quant/preseed_ordering.py | 142 +++++++++++++++++++++++++++++++++++++++
+E         +  3 files changed, 211 insertions(+), 4 deletions(-)
+
+tests\test_task104_p2_cleanup.py:389: AssertionError
+============================== warnings summary ===============================
+tests/test_task131_spa_frontend.py::test_all_sections_endpoint_serves_broad_discovery_alongside_every_other_section
+tests/test_task100c_unified_dashboard.py::test_40_websocket_and_section_routes_stable
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+tests/test_task104_p2_cleanup.py::test_10_11_loopback_allow_nonloopback_deny
+tests/test_task104_p2_cleanup.py::test_12_get_is_read_only
+tests/test_task104_p2_cleanup.py::test_23_main_cockpit_remains_read_only
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task131_spa_frontend.py::test_all_sections_endpoint_serves_broad_discovery_alongside_every_other_section
+tests/test_task100c_unified_dashboard.py::test_40_websocket_and_section_routes_stable
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+tests/test_task104_p2_cleanup.py::test_10_11_loopback_allow_nonloopback_deny
+tests/test_task104_p2_cleanup.py::test_12_get_is_read_only
+tests/test_task104_p2_cleanup.py::test_23_main_cockpit_remains_read_only
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task131_spa_frontend.py::test_all_sections_endpoint_serves_broad_discovery_alongside_every_other_section
+tests/test_task100c_unified_dashboard.py::test_40_websocket_and_section_routes_stable
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+tests/test_task104_p2_cleanup.py::test_10_11_loopback_allow_nonloopback_deny
+tests/test_task104_p2_cleanup.py::test_12_get_is_read_only
+tests/test_task104_p2_cleanup.py::test_23_main_cockpit_remains_read_only
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task131_spa_frontend.py::test_all_sections_endpoint_serves_broad_discovery_alongside_every_other_section
+tests/test_task100c_unified_dashboard.py::test_40_websocket_and_section_routes_stable
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+tests/test_task104_p2_cleanup.py::test_10_11_loopback_allow_nonloopback_deny
+tests/test_task104_p2_cleanup.py::test_12_get_is_read_only
+tests/test_task104_p2_cleanup.py::test_23_main_cockpit_remains_read_only
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task131_spa_frontend.py::test_all_sections_endpoint_serves_broad_discovery_alongside_every_other_section
+tests/test_task100c_unified_dashboard.py::test_40_websocket_and_section_routes_stable
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+tests/test_task104_p2_cleanup.py::test_10_11_loopback_allow_nonloopback_deny
+tests/test_task104_p2_cleanup.py::test_12_get_is_read_only
+tests/test_task104_p2_cleanup.py::test_23_main_cockpit_remains_read_only
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task131_spa_frontend.py::test_all_sections_endpoint_serves_broad_discovery_alongside_every_other_section
+tests/test_task100c_unified_dashboard.py::test_40_websocket_and_section_routes_stable
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+tests/test_task104_p2_cleanup.py::test_10_11_loopback_allow_nonloopback_deny
+tests/test_task104_p2_cleanup.py::test_12_get_is_read_only
+tests/test_task104_p2_cleanup.py::test_23_main_cockpit_remains_read_only
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task131_spa_frontend.py::test_all_sections_endpoint_serves_broad_discovery_alongside_every_other_section
+tests/test_task100c_unified_dashboard.py::test_40_websocket_and_section_routes_stable
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+tests/test_task104_p2_cleanup.py::test_10_11_loopback_allow_nonloopback_deny
+tests/test_task104_p2_cleanup.py::test_12_get_is_read_only
+tests/test_task104_p2_cleanup.py::test_23_main_cockpit_remains_read_only
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task131_spa_frontend.py::test_all_sections_endpoint_serves_broad_discovery_alongside_every_other_section
+tests/test_task100c_unified_dashboard.py::test_40_websocket_and_section_routes_stable
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+tests/test_task104_p2_cleanup.py::test_10_11_loopback_allow_nonloopback_deny
+tests/test_task104_p2_cleanup.py::test_12_get_is_read_only
+tests/test_task104_p2_cleanup.py::test_23_main_cockpit_remains_read_only
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task131_spa_frontend.py::test_all_sections_endpoint_serves_broad_discovery_alongside_every_other_section
+tests/test_task100c_unified_dashboard.py::test_40_websocket_and_section_routes_stable
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+tests/test_task104_p2_cleanup.py::test_10_11_loopback_allow_nonloopback_deny
+tests/test_task104_p2_cleanup.py::test_12_get_is_read_only
+tests/test_task104_p2_cleanup.py::test_23_main_cockpit_remains_read_only
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task131_spa_frontend.py::test_all_sections_endpoint_serves_broad_discovery_alongside_every_other_section
+tests/test_task100c_unified_dashboard.py::test_40_websocket_and_section_routes_stable
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+tests/test_task104_p2_cleanup.py::test_10_11_loopback_allow_nonloopback_deny
+tests/test_task104_p2_cleanup.py::test_23_main_cockpit_remains_read_only
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task131_spa_frontend.py::test_all_sections_endpoint_serves_broad_discovery_alongside_every_other_section
+tests/test_task100c_unified_dashboard.py::test_40_websocket_and_section_routes_stable
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+tests/test_task104_p2_cleanup.py::test_10_11_loopback_allow_nonloopback_deny
+tests/test_task104_p2_cleanup.py::test_23_main_cockpit_remains_read_only
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task131_spa_frontend.py::test_all_sections_endpoint_serves_broad_discovery_alongside_every_other_section
+tests/test_task100c_unified_dashboard.py::test_40_websocket_and_section_routes_stable
+tests/test_task100c_unified_dashboard.py::test_41_missing_redis_safe
+tests/test_task104_p2_cleanup.py::test_10_11_loopback_allow_nonloopback_deny
+tests/test_task104_p2_cleanup.py::test_23_main_cockpit_remains_read_only
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_task104_p2_cleanup.py::test_32_33_original_strategy_and_thresholds_unchanged
+================= 1 failed, 93 passed, 81 warnings in 20.60s ==================

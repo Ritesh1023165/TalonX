@@ -1,5 +1,11 @@
 # Architecture Overview
 
+> **Superseded (Task 105).** This describes the pre-Task-100 "six cooperating modules" layout.
+> The authoritative current description is **[`CURRENT_ARCHITECTURE.md`](CURRENT_ARCHITECTURE.md)**
+> (supervisor, `:8787` cockpit, Experimental lane, Intelligence, Ops read model, boundaries).
+> This file is retained for its still-accurate project-layout and data-flow detail; when it
+> conflicts with the current doc, the current doc wins.
+
 ## Project layout
 
 ```

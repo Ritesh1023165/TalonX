@@ -1,0 +1,6 @@
+2026-09-15 04:50:29,847 INFO talonx_v2.service execution allowlist: dropped 16 out-of-scope records (e.g. ['MUNEX', 'NMZ', 'PML']); kept 38
+--
+2026-09-15 04:55:49,049 INFO talonx_v2.run V2 execution scope ENFORCED -- 39 allowed issuers: AAPL, ABCL, ABT, ACHR, ADC, ADP, AFL, AGNC, AMAT, AMD, AVGO, BAC, BLK, C, CSCO, CVX, DELL, GOOGL, IBM, INTC, JNJ, JPM, KO, MA, MCD, MSFT, MSTR, NUE, NVDA, ORCL, PG, PYPL, SHOP, STX, TSLA, UNH, V, VRT, WMT
+2026-09-15 04:55:49,051 INFO talonx_v2.run V2 broad discovery ENABLED -- 587 symbols added (manifest=talonx_ingest\intelligence\service\data\discovery_universe_v1_626.json); dispatch toggle TALONX_DISPATCH_ENABLE_BROAD_DISCOVERY=off
+2026-09-15 04:55:49,055 INFO talonx_v2.service talonx_v2 service start (once=False tick=300s heartbeat=30s db=C:\workspace\TalonX\v2_lane.db)
+2026-09-15 04:55:49,545 INFO talonx_v2.service execution allowlist: dropped 16 out-of-scope records (e.g. ['MUNEX', 'NMZ', 'PML']); kept 38

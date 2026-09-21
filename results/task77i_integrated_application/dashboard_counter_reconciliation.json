@@ -1,0 +1,17 @@
+{
+  "purpose": "Task 77I Stage 4 -- proof that every counter talonx_piv.observability.build_integrated_projection reports reconciles exactly to its own underlying ledger, and that historical/other-session records never leak into a current-session count.",
+  "module": "talonx_piv/observability.py::build_integrated_projection",
+  "verified_by": [
+    "tests/test_task77i_observability.py (5 unit tests: empty state, per-ledger reconciliation, cross-session exclusion, PAPER order status buckets, explicit session-scope override)",
+    "tests/test_task77i_end_to_end.py::test_12_dashboard_counters_match_ledgers (drives the REAL DecisionEngine/SessionRunner stack, then asserts projection['decisions']['total'] == len(decision_ledger.records), projection['notifications']['total'] == len(outbox.records), projection['shadow']['total'] == len(shadow.positions))"
+  ],
+  "scoping_rules": {
+    "decisions": "decision_ledger.json records filtered to session_id == target session (decisions carry session_id directly)",
+    "notifications_and_shadow": "filtered by cross-referencing decision_id against the ALREADY session-scoped decision set above -- neither NotificationRecord nor ShadowPosition stores session_id directly, so this cross-reference is the only correct way to scope them without duplicating session bookkeeping into two more schemas",
+    "paper_orders": "intentionally NOT session-scoped -- lifecycle_state.json's own orders dict has never been session-scoped in this codebase (pre-existing schema, unchanged by this task); documented as such in the projection's own 'scope' field rather than silently implying a scoping guarantee that does not exist",
+    "natural_vs_test_and_data_health": "reused unchanged from reporting.build_session_report, which already scopes by trading_date_et when supplied (Task 69Q Part 2's own established convention) -- not re-implemented here"
+  },
+  "historical_probe_exclusion": "confirmed by test_historical_probe_records_do_not_leak_into_current_session -- a decision_ledger record from a DIFFERENT session_id is correctly excluded from every count derived from it",
+  "no_full_dashboard_redesign": "dashboard.py/dashboard_web.py (an unrelated subsystem) are untouched -- zero diff. observability.py is a NEW, minimal, read-only, standalone module.",
+  "no_order_placement_controls": "build_integrated_projection performs ZERO writes and holds no reference to any broker/lifecycle mutation method -- confirmed by inspection: it only ever calls Path.read_text/json.loads and the pre-existing, also-read-only reporting.build_session_report."
+}

@@ -49,6 +49,8 @@ import redis
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
+from talonx_compare.config import CompareConfig
+from talonx_compare.dashboard_views import streamlit_piv_comparison_payload
 from talonx_dispatch.config import DispatchConfig
 from talonx_dispatch.store import AuditStore
 from talonx_paper.config import PaperConfig
@@ -1001,6 +1003,83 @@ def render_audit_trail(df: pd.DataFrame, long_term_rows: list[dict]) -> None:
         st.caption(f"{len(filtered)} of {len(lt_df)} alert(s) shown")
 
 
+def render_piv_comparison() -> None:
+    """Task 83 §4 -- read-only PIV & Comparison section.
+
+    Reads the collector's date-partitioned archive plus the live PIV state
+    dir. Contains NO PIV activation, broker execution, experimental
+    authorization, safety override, or strategy-approval control -- data
+    only.
+    """
+    st.subheader("\U0001F52C PIV & Comparison")
+    st.caption(
+        "Read-only. Operational agreement between the Original pipeline and the isolated PIV "
+        "validation runtime. NOT alpha or profitability evidence -- strategy UNVALIDATED, "
+        "profitability UNDETERMINED, PAPER pilot unauthorized."
+    )
+
+    payload = streamlit_piv_comparison_payload(config=CompareConfig())
+
+    dates = payload["available_dates"]
+    if not dates:
+        st.info("No comparison evidence has been collected yet (collector NOT_RUN).")
+    selected = st.selectbox(
+        "Trading date / session",
+        options=dates or ["(none)"],
+        index=(len(dates) - 1) if dates else 0,
+        key="piv_compare_date",
+    )
+    if dates and selected != payload["selected_date"]:
+        payload = streamlit_piv_comparison_payload(config=CompareConfig(), trading_date=selected)
+
+    ident = payload["live_piv_identity"]
+    cols = st.columns(4)
+    cols[0].metric("PIV session", (ident.get("session_id") or "—")[:22])
+    cols[1].metric("Strategy", payload["strategy_approval_status"])
+    cols[2].metric("Feed mode", payload["feed_mode"])
+    cols[3].metric("Execution mode", payload["execution_mode"])
+
+    st.markdown("**Archived Original vs PIV funnels**")
+    st.dataframe(pd.DataFrame([
+        {"stage": s,
+         "original": payload["archived_funnels"]["original"].get(s, 0),
+         "piv": payload["archived_funnels"]["piv"].get(s, 0)}
+        for s in sorted(set(payload["archived_funnels"]["original"]) | set(payload["archived_funnels"]["piv"]))
+    ]), hide_index=True, width="stretch")
+
+    st.markdown("**Readiness / freshness exclusions**")
+    st.json(payload["readiness_freshness_exclusions"], expanded=False)
+
+    st.markdown("**Decisions & reason codes**")
+    st.json(payload["decisions_and_reason_codes"], expanded=False)
+
+    st.markdown("**Notification & lifecycle records**")
+    st.json(payload["notification_and_lifecycle"], expanded=False)
+
+    st.markdown("**Outcomes by execution class** (never combined)")
+    st.json(payload["outcomes_by_execution_class"], expanded=False)
+
+    st.markdown("**EOD reconciliation & divergence**")
+    st.json(payload["eod_reconciliation"], expanded=False)
+    if payload["divergence_table"]:
+        st.dataframe(pd.DataFrame(payload["divergence_table"]), hide_index=True, width="stretch")
+    else:
+        st.caption("No divergences recorded for this date.")
+
+    st.markdown("**Source-health & archive-integrity diagnostics**")
+    integrity = payload["archive_integrity"] or {}
+    st.write({
+        "archive_health": payload["archive_health"],
+        "file_hashes_ok": integrity.get("file_hashes_ok"),
+        "problems": integrity.get("problems", []),
+        "diagnostics": payload["diagnostics"],
+    })
+
+    st.markdown("**Known capability limitation**")
+    st.json({"capability_limitations": payload["capability_limitations"],
+             "unresolved_questions": payload["unresolved_questions"]}, expanded=False)
+
+
 def main() -> None:
     st.set_page_config(page_title="TalonX", page_icon="\U0001F4E1", layout="wide")
 
@@ -1035,6 +1114,7 @@ def main() -> None:
         [
             "\U0001F4C8 Intraday Monitor", "\U0001F48E Long-Term Radar",
             "\U0001F4CA Daily Funnel & Metrics", "⚙️ Watchlist & Settings",
+            "\U0001F52C PIV & Comparison",
         ],
         horizontal=True,
         label_visibility="collapsed",
@@ -1073,6 +1153,9 @@ def main() -> None:
     elif section == "\U0001F4CA Daily Funnel & Metrics":
         redis_client = get_redis_client(config.redis_url)
         render_daily_funnel_metrics(redis_client)
+
+    elif section == "\U0001F52C PIV & Comparison":
+        render_piv_comparison()
 
     else:
         render_ticker_watchlist(watchlist_store, watchlist_config.poll_interval_seconds)

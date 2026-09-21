@@ -1,0 +1,86 @@
+{
+  "purpose": "Task 79G -- bounded, non-mutating actual-service checks using existing, normally configured credentials. No order submitted/cancelled/replaced/closed, no Telegram message sent, no Gemini model-generation call made, no Redis key changed. Every credential value is redacted; only presence/length/derived identity fields are recorded.",
+  "checks": [
+    {
+      "service": "Alpaca PAPER account identity",
+      "timestamp_utc": "2026-08-27T22:46:17.819290+00:00",
+      "method": "GET https://paper-api.alpaca.markets/v2/account (via AlpacaPaperClient.verify_paper_identity())",
+      "result": {
+        "broker_endpoint_configured": "https://paper-api.alpaca.markets",
+        "paper_trading_flag": true,
+        "real_capital_flag": false,
+        "identity_environment": "PAPER",
+        "identity_status": "ACTIVE",
+        "account_number_suffix_redacted": "***YZF7"
+      },
+      "limitation": "Confirms the account is PAPER and ACTIVE at this instant only -- does not prove tomorrow's connectivity, quota, or that the account remains ACTIVE at handoff time. Task 80 must re-verify."
+    },
+    {
+      "service": "Alpaca PAPER open orders (read-only)",
+      "timestamp_utc": "2026-08-27T22:46:28.374792+00:00",
+      "method": "GET https://paper-api.alpaca.markets/v2/orders?status=open",
+      "result": {"open_orders_count": 0, "symbols": []},
+      "limitation": "Point-in-time only; no order was cancelled, created, or replaced by this check."
+    },
+    {
+      "service": "Alpaca PAPER positions (read-only)",
+      "timestamp_utc": "2026-08-27T22:46:28.374792+00:00",
+      "method": "GET https://paper-api.alpaca.markets/v2/positions",
+      "result": {"positions_count": 0, "symbols": []},
+      "limitation": "Point-in-time only; no position was opened or closed by this check. Matches the last cached reconciliation (2026-08-26) coincidentally -- this is a FRESH read, not a reuse of that cache."
+    },
+    {
+      "service": "Alpaca clock",
+      "timestamp_utc": "2026-08-27T22:47:13.820943+00:00",
+      "method": "GET https://paper-api.alpaca.markets/v2/clock",
+      "result": {
+        "is_open": false, "next_open": "2026-08-28T09:30:00-04:00", "next_close": "2026-08-28T16:00:00-04:00",
+        "broker_reported_timestamp": "2026-08-27T18:47:14.325031304-04:00"
+      },
+      "limitation": "Confirms the broker's own clock agrees the next session opens 2026-08-28 09:30 ET -- cross-checked against the local exchange_calendars (XNYS) computation below, independently agreeing."
+    },
+    {
+      "service": "Alpaca calendar",
+      "timestamp_utc": "2026-08-27T22:47:13.820943+00:00",
+      "method": "GET https://paper-api.alpaca.markets/v2/calendar?start=2026-08-28&end=2026-08-28",
+      "result": [{"date": "2026-08-28", "open": "09:30", "close": "16:00", "session_open": "0400", "session_close": "2000"}],
+      "limitation": "Single-day bounded query only, as instructed -- no bulk calendar download."
+    },
+    {
+      "service": "Local exchange_calendars (XNYS) -- independent, non-network cross-check",
+      "timestamp_utc": "2026-08-27T22:44:xx (see stage0 log)",
+      "method": "exchange_calendars.get_calendar('XNYS').is_session/.schedule -- static package data, no network call",
+      "result": {"is_session_2026_08_28": true, "open_utc": "2026-08-28T13:30:00Z", "close_utc": "2026-08-28T20:00:00Z"},
+      "limitation": "Agrees exactly with Alpaca's own live clock/calendar (09:30-16:00 ET = 13:30-20:00 UTC) -- two independent sources concur. No early-close/holiday flag for this date."
+    },
+    {
+      "service": "Redis connectivity",
+      "timestamp_utc": "2026-08-27T22:46:35.406686+00:00",
+      "method": "redis.Redis.from_url(TALONX_REDIS_URL).ping() + INFO server (read-only commands only)",
+      "result": {"redis_url": "redis://localhost:6379/0", "ping": true, "redis_version": "7.0.15"},
+      "limitation": "Local Redis instance reachable right now; no key was read, written, or deleted. Task 80 must re-verify Redis is still up at handoff -- a local service can stop between now and then."
+    },
+    {
+      "service": "Telegram bot identity",
+      "timestamp_utc": "2026-08-27T22:46:43.029477+00:00",
+      "method": "GET https://api.telegram.org/bot<TOKEN>/getMe -- never sendMessage",
+      "result": {"http_status": 200, "ok": true, "bot_username": "Talonxbot", "bot_id_present": true},
+      "limitation": "Confirms the bot token is valid and Telegram's API is reachable. ACTUAL MESSAGE DELIVERY IS NOT YET VERIFIED -- no sendMessage call was made, per the hard boundary against sending notifications in this task."
+    },
+    {
+      "service": "Gemini / talonx_brain configuration and chain construction",
+      "timestamp_utc": "2026-08-27T22:46:52.837028+00:00",
+      "method": "BrainConfig() + talonx_brain.llm.build_research_chain(config) construction only -- .generate() NEVER called",
+      "result": {
+        "gemini_api_key_present": true, "llm_provider": "gemini", "gemini_model": "gemini-flash-lite-latest",
+        "chain_constructed": true, "chain_describe": "Gemini (gemini-flash-lite-latest)",
+        "talonx_piv_gemini_enabled_env_var": null
+      },
+      "limitation": "Only proves the chain object can be CONSTRUCTED (API key present, provider importable) -- no real model inference was attempted, per this task's explicit deferral. TALONX_PIV_GEMINI_ENABLED is unset, so the PIV supervisor's own gemini_chain remains None (disabled) by default regardless of this successful construction -- Task 80 must explicitly decide whether to set this env var."
+    }
+  ],
+  "credentials_redacted": true,
+  "no_mutations_performed": true,
+  "no_notifications_sent": true,
+  "no_model_generation_calls_made": true
+}

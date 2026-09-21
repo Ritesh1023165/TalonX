@@ -112,12 +112,46 @@ class QuantSignal(BaseModel):
     confluence_score: int | None = None
     risk_reward_ratio: float | None = None
 
+    # Task 51: independent-confirmation telemetry -- optional/defaulted for
+    # backward wire compatibility (a consumer on an older schema version
+    # simply never sees these keys; an older serialized payload deserializes
+    # fine with all four None). Only populated when config.confluence_contract
+    # is INDEPENDENT_CONFIRMATION_EXPERIMENTAL (see strategy.py's
+    # evaluate_independent_confirmations) -- always None under LEGACY, which
+    # continues to use confluence_score/confluence_score_min exactly as
+    # before Task 51. confirmation_count IS confluence_score under the
+    # experimental contract (same field, redefined meaning -- see
+    # evaluate_independent_confirmations's own docstring), duplicated here
+    # explicitly so a consumer never has to infer which semantics apply.
+    confirmation_count: int | None = None
+    confirmation_macd: bool | None = None
+    confirmation_rsi: bool | None = None
+    confirmation_volume: bool | None = None
+    confirmation_contract: str | None = None
+
     # Phase 2 requirement doc: explicit dollar stop/target (1x ATR stop /
     # pivot-or-2x-ATR target), rather than only the derived ratio above --
     # see strategy.py's _stop_target_prices. None when atr is None
     # (insufficient history).
     stop_price: float | None = None
     target_price: float | None = None
+
+    # Task 35 (owner-confirmed ATR-RISK-001: MARKET_STRUCTURE_PRIMARY) --
+    # which path calculate_trade_geometry actually used for THIS signal's
+    # stop: "STRUCTURAL_PRIMARY" (stop_price == the prior-session S1 pivot
+    # support) or "ATR_FALLBACK" (stop_price == 1.5x ATR, unchanged
+    # formula). fallback_reason is populated only on the fallback path
+    # (NO_STRUCTURAL_SUPPORT / STRUCTURE_INVALID_OR_NONFINITE /
+    # STRUCTURE_NOT_BELOW_ENTRY). structural_level/structural_level_type
+    # record the specific structural anchor used when geometry_path is
+    # STRUCTURAL_PRIMARY (currently always the prior-session S1 pivot --
+    # see strategy.py's calculate_trade_geometry). All None for BEARISH
+    # signals (the owner's contract is scoped to LONG stops only) and for
+    # any signal where geometry itself couldn't be computed (atr missing).
+    geometry_path: str | None = None
+    fallback_reason: str | None = None
+    structural_level: float | None = None
+    structural_level_type: str | None = None
 
     # 15-min 200 SMA higher-timeframe trend gate (regular session, BULLISH
     # candidates only -- see strategy.py). trend_aligned is None when the

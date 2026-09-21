@@ -1,0 +1,19 @@
+READY repo_head_matches_release {'head': 'a56ec8c', 'expected': 'a56ec8c', 'match': 'HEAD is the frozen release SHA'}
+FINDING repo_tree_clean {'porcelain_lines': ['?? docs/research/evidence/release_freeze_preflight/', '?? notifications.db-shm', '?? notifications.db-wal']}
+READY v1_fingerprint {'got': 'ed8272fe568d', 'expected': 'ed8272fe568d'}
+READY v2_fingerprint {'got': 'e2acf6454789217e', 'expected': 'e2acf6454789217e', 'strategy_version': 'INSIDER_BUY_CLUSTER_V2@1'}
+READY v2_strategy_version {'got': 'INSIDER_BUY_CLUSTER_V2@1'}
+READY redis_reachable None
+READY no_stale_talonx_processes {'pids': [], 'note': 'stop them before a fresh start'}
+READY required_ports_free {'busy': []}
+READY v2_ledger_continuity {'cash': 100000.0, 'open': 0, 'closed': 0}
+READY v2_ledger_not_recreated {'note': 'preflight never creates/resets v2_lane.db'}
+READY v2_env_vars_resolved {'TALONX_ACTIVE_STRATEGY_PROFILE': 'INSIDER_BUY_CLUSTER_V2', 'TALONX_V2_STARTING_CASH_USD': '100000', 'TALONX_V2_DB_PATH': 'v2_release_rc1.d
+READY active_profile_is_v2 None
+READY real_capital_off {'TALONX_PIV_REAL_CAPITAL': 'false'}
+READY experimental_external_override_absent {'present': False}
+READY heartbeat_decoupled_from_tick {'note': 'companion writes a lightweight heartbeat every --heartbeat-seconds (default 30), independent of --tick-seconds; HEARTBEAT_TTL_S=18
+READY experimental_external_boundary_blocked None
+READY telegram_logical_owner {'logical_owners': 0, 'healthy': True, 'network_pids': [], 'cmdline_matches': 0, 'method': 'network', 'detail': '0 distinct PID(s) with an e
+READY dashboard_v2_section_present {'sections': ['overview', 'premarket', 'original_quant', 'v2_active_strategy', 'v2_broad_discovery', 'validation', 'intelligence', 'paper_eo
+OVERALL: READY_WITH_FINDINGS

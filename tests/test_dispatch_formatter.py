@@ -890,6 +890,50 @@ def test_earnings_heads_up_includes_a_separator_line():
     assert "─" in text
 
 
+# --- Task 91 DELL price-provenance fix: signal.price is the last
+#     fundamental-re-score reference price, frozen until the next EDGAR
+#     filing -- it must NOT be presented as a live "Current Price". ---
+
+def test_earnings_heads_up_labels_price_as_reference_not_current():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(175.50), _longterm_report(210.0),
+    )
+    assert "Reference Price" in text
+    assert "Current Price" not in text
+    # the number and the fair value are still shown
+    assert "175.50" in text and "210.00" in text
+
+
+def test_earnings_heads_up_reference_price_carries_its_capture_date():
+    sig = FundamentalFactorSignal(
+        ticker="GOOGL", fiscal_year=2026, price=175.50,
+        computed_at=datetime(2026, 8, 20, 12, 0, tzinfo=timezone.utc),
+    )
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), sig, _longterm_report(),
+    )
+    assert "Aug 20" in text  # provenance: when the reference price was captured
+
+
+def test_earnings_heads_up_status_does_not_imply_a_portfolio_position():
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(), _longterm_report(),
+    )
+    assert "Active Holding" not in text
+    assert "Not a portfolio position" in text
+
+
+def test_earnings_heads_up_margin_of_safety_reads_against_the_reference_price():
+    # unchanged formula (fair_value - signal.price)/fair_value -- only the
+    # wording/label changed; a stale reference price still yields the same %.
+    text = format_telegram_earnings_heads_up(
+        "GOOGL", _upcoming_earnings_row(), _fundamental_signal(490.81), _longterm_report(510.0),
+    )
+    # (510 - 490.81) / 510 = 3.76% -> "3.8% Discount"
+    assert "3.8%" in text and "Discount" in text
+    assert "Margin of Safety" in text
+
+
 # ==========================================================================
 # Event-Driven Earnings Radar -- format_telegram_post_earnings_alert
 # ==========================================================================

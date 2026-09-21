@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "kind": "ri4_controlled_telegram_validation",
+  "validated_at_utc": "2026-09-18T20:36:37.753220+00:00",
+  "destinations": {
+    "TRADE_EVENT": {
+      "event_id": "ri4-signal-300d2e5b09534d518e3818d9e693c61e",
+      "state": "SENT",
+      "attempts": 1,
+      "configuration_fingerprint": "e391ab2add09c9b47e7691cea196d356a0f540ebaa0ac85560a210caf691f11d"
+    },
+    "OPERATIONS": {
+      "event_id": "ri4-sentinel-deb6b2acb8364f8583d9e943a9fa2250",
+      "state": "SENT",
+      "attempts": 1,
+      "configuration_fingerprint": "226d34067adbed3a18f722e5a7a60e66818a7d8505421d95c32de60a33a95daf"
+    }
+  }
+}

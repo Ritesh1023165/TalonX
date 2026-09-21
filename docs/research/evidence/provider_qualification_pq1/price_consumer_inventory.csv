@@ -1,0 +1,15 @@
+consumer,required_field,frequency,session,timing,current_provider_adapter,adjustment,finality_assumption,fallback,missing_behavior,release_critical
+liquidity prior close,close,per candidate,latest of 20 sessions before target entry,after source session,csv/default or selected adapter,all-adjusted,prior-date treated FINAL,none,fail eligibility explicitly,YES
+liquidity median dollar volume,close*volume,per candidate,20 sessions strictly before target entry,after all 20 sessions,csv/default or selected adapter,all-adjusted price plus split-adjusted volume,prior-date treated FINAL,none,fail insufficient/no-history,YES
+candidate admission,open availability plus liquidity,per candidate,target entry,post-close/open phase,current price_lookup,adapter-dependent,prior-date treated FINAL,none,skip or retry intent,YES
+target entry,open,once per intent,first XNYS session strictly after activation,after validated lookup,current price_lookup,adapter-dependent,prior-date treated FINAL,none,no fill,YES
+entry recovery,open,through Session 3,original target session,at or before Session-3 official close,current price_lookup,same as target entry,same as target entry,no provider switch,expire after boundary,YES
+actual paper fill,open,once,original target entry session,after validated lookup,current price_lookup,same as target entry,same as target entry,no provider switch,no trade,YES
+position cost,entry open,once,fill session,atomic with fill,persisted entry price,same as entry,immutable persisted execution,n/a,no position,YES
+target exit,close,once plus retries,entry plus 10 XNYS sessions,after target close,current price_lookup,adapter-dependent,prior-date treated FINAL,next sessions only,hold/retry,YES
+exit fall-forward,close,up to five sessions,target plus 1 through plus 5,after each eligible close,current price_lookup,same as exit,same as exit,same provider semantics only,EXIT_UNRESOLVED after exhaustion,YES
+settlement,exit close,once,selected exit session,atomic with close,persisted execution price,same as exit,immutable persisted execution,n/a,no credit/no SELL,YES
+reconciliation,persisted entry/exit,daily/campaign,as persisted,after ledger commits,V2Store,as persisted,persisted values authoritative,none,incomplete/unresolved surfaced,YES
+dashboard open mark,close,daily/latest completed,latest completed available session,EOD/service tick,current price_lookup,adapter-dependent,prior-date treated FINAL,none,partial/unknown never zero,YES
+dashboard realized trade,persisted entry/exit,on read,trade sessions,after settlement,V2Store,as persisted,immutable ledger values,n/a,unknown provenance stays unknown,YES
+research replay,open close volume,per replay,historical,replay time,frozen SIP CSV,all-adjusted,retrospective snapshot,none,missing explicit,NO

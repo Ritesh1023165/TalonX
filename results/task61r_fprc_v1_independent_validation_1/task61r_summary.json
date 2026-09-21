@@ -1,0 +1,30 @@
+{
+  "bootstrap_95_ci": [
+    -0.22545660723578992,
+    -0.05540115986884469
+  ],
+  "cost_feasibility_pass": true,
+  "deployment": "MONDAY_DECISION_SHADOW_ONLY",
+  "five_bps_expectancy_R": -0.14436671801762782,
+  "five_bps_profit_factor": 0.5375509234835696,
+  "gross_expectancy_R": -0.003284592893532709,
+  "mandatory_criteria": "FAIL",
+  "replication_required": false,
+  "symbols_traded": 32,
+  "task": "61R",
+  "temporal_correction": "PASS",
+  "top3_sensitivity_5bps_expectancy_R": -0.18791295943877523,
+  "trades": 205,
+  "trades_by_window": {
+    "V1": 68,
+    "V2": 72,
+    "V3": 65
+  },
+  "untouched_data_audit": "PASS",
+  "validation_classification": "FPRC_V1_REJECTED",
+  "window_5bps_expectancy": {
+    "V1": -0.16613902258891067,
+    "V2": -0.02665916511865533,
+    "V3": -0.25197328875422453
+  }
+}

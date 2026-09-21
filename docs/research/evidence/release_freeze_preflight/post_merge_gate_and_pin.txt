@@ -1,0 +1,7 @@
+release gate on main: READY | checks: 18 | non-PASS: [('campaign_identity', 'WARN')]
+strategy_fingerprint: computed=e2acf6454789217e expected=e2acf6454789217e
+provider_contract_fingerprint: contract=V2_RELEASE_PRICE_CONTRACT@1 fingerprint=ac5e51aa3599d6c9 expected=V2_RELEASE_PRICE_CONTRACT@1/ac5e51aa3599d6c9
+release_pricing_mode: pricing_mode='sip'; release requires 'si
+lab_off: RESEARCH is OFF by default (TALONX_NOTIFY_RESEARCH_ENABLED not set)
+RELEASE_SHA_EXPECTED = a56ec8c | HEAD = f556eb7 | (True, 'HEAD descends from the frozen release; only docs/tests/pin changed (27 files)')
+tag peels to: a56ec8c8d10adb36a113ebd373204f297c230081

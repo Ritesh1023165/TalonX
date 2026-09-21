@@ -1,0 +1,35 @@
+{
+  "stage": "STAGE_5",
+  "status": "COMPLETE",
+  "starting_sha": "848de0d",
+  "preregistration_sha": "4a3fc3e",
+  "stage2_launch_sha": "f7ff865",
+  "ending_sha": "PENDING_FINAL_COMMIT",
+  "tests": {
+    "task73s_control_fixture_before_replay": "3 passed",
+    "final_full_suite": "2168 passed, 1 skipped, 10 xfailed -- identical to Task73S's own final count, zero regressions"
+  },
+  "known_environment_gap": {
+    "modules": ["tests/test_task61_validation_protocol.py", "tests/test_task61r_temporal_freeze.py"],
+    "cause": "missing optional dependency exchange-calendars (research/requirements-task61.txt, not the main dev/runtime requirements)",
+    "caused_by_this_task": false,
+    "action_taken": "excluded via --ignore and disclosed; not installed/fixed (out of this task's declared scope)"
+  },
+  "artifacts": [
+    "stage0_verification_and_inventory.md",
+    "preregistration.json", "universe_manifest.csv", "data_manifest.csv", "evaluation_protocol.md",
+    "stage2_data_quality_report.csv", "stage2_integrity_and_preroll.md", "stage3_replay_launch_manifest.json",
+    "stage3_funnel.csv", "stage3_per_symbol_summary.csv", "stage3_per_bucket_summary.csv",
+    "stage3_per_symbol_rejection_pivot.csv", "stage3_non_volatility_rejections.csv",
+    "stage3_zero_trade_diagnosis.md", "stage3_raw_output_manifest.md",
+    "stage4_economics_and_robustness.md", "stage5_conclusion.md",
+    "next_research_recommendation.md", "final_full_suite_results.txt",
+    "task74s_summary.md", "task74s_summary.json", "execution_journal.md"
+  ],
+  "blockers": [],
+  "next_stage": "NONE -- task complete",
+  "universe_selected": "10_symbol_frozen_research_universe",
+  "overall_outcome": "NO_ELIGIBLE_LONG_SETUPS",
+  "profitability_verdict": "INCONCLUSIVE",
+  "trades_executed": 0
+}

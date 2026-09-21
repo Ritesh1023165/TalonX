@@ -1,0 +1,395 @@
+{
+  "after_remove_top10_cost_trades": {
+    "MACD": {
+      "gross_expectancy": -0.1438704683923581,
+      "net_expectancy_5bps": -0.45820648340690534
+    },
+    "RSI": {
+      "gross_expectancy": 0.2022386527804381,
+      "net_expectancy_5bps": -0.03164747680704684
+    }
+  },
+  "break_even": [
+    {
+      "N": 17,
+      "break_even_gross_expectancy_5bps": 0.35697973963335816,
+      "family": "MACD",
+      "implied_max_per_side_bps_for_zero_mean_net": -4.765615474732952,
+      "implied_max_round_trip_bps_for_zero_mean_net": -9.531230949465904,
+      "margin_at_5bps": -0.6972253739059326,
+      "observed_mean_cost_R_5bps": 0.35697973963335816,
+      "observed_mean_gross_expectancy": -0.3402456342725744,
+      "task": "Task53"
+    },
+    {
+      "N": 17,
+      "break_even_gross_expectancy_5bps": 0.3330504837229343,
+      "family": "RSI",
+      "implied_max_per_side_bps_for_zero_mean_net": 5.479697198714657,
+      "implied_max_round_trip_bps_for_zero_mean_net": 10.959394397429314,
+      "margin_at_5bps": 0.0319526768144906,
+      "observed_mean_cost_R_5bps": 0.3330504837229343,
+      "observed_mean_gross_expectancy": 0.3650031605374249,
+      "task": "Task53"
+    },
+    {
+      "N": 50,
+      "break_even_gross_expectancy_5bps": 0.6761778894268774,
+      "family": "MACD",
+      "implied_max_per_side_bps_for_zero_mean_net": -1.1067194427412037,
+      "implied_max_round_trip_bps_for_zero_mean_net": -2.2134388854824074,
+      "margin_at_5bps": -0.8258457328229648,
+      "observed_mean_cost_R_5bps": 0.6761778894268774,
+      "observed_mean_gross_expectancy": -0.14966784339608744,
+      "task": "Task54"
+    },
+    {
+      "N": 39,
+      "break_even_gross_expectancy_5bps": 0.34026512502836614,
+      "family": "RSI",
+      "implied_max_per_side_bps_for_zero_mean_net": 10.76591060385839,
+      "implied_max_round_trip_bps_for_zero_mean_net": 21.53182120771678,
+      "margin_at_5bps": 0.39238765850485124,
+      "observed_mean_cost_R_5bps": 0.34026512502836614,
+      "observed_mean_gross_expectancy": 0.7326527835332174,
+      "task": "Task54"
+    },
+    {
+      "N": 61,
+      "break_even_gross_expectancy_5bps": 0.40656574300284537,
+      "family": "MACD",
+      "implied_max_per_side_bps_for_zero_mean_net": -0.2535830840970161,
+      "implied_max_round_trip_bps_for_zero_mean_net": -0.5071661681940322,
+      "margin_at_5bps": -0.42718538200261663,
+      "observed_mean_cost_R_5bps": 0.40656574300284537,
+      "observed_mean_gross_expectancy": -0.020619638999771275,
+      "task": "Task56"
+    },
+    {
+      "N": 44,
+      "break_even_gross_expectancy_5bps": 0.25606522299719003,
+      "family": "RSI",
+      "implied_max_per_side_bps_for_zero_mean_net": 0.3206902347004436,
+      "implied_max_round_trip_bps_for_zero_mean_net": 0.6413804694008872,
+      "margin_at_5bps": -0.23964169970487198,
+      "observed_mean_cost_R_5bps": 0.25606522299719003,
+      "observed_mean_gross_expectancy": 0.016423523292318064,
+      "task": "Task56"
+    },
+    {
+      "N": 128,
+      "break_even_gross_expectancy_5bps": 0.5052973466272229,
+      "family": "MACD",
+      "implied_max_per_side_bps_for_zero_mean_net": -1.1228974592555059,
+      "implied_max_round_trip_bps_for_zero_mean_net": -2.2457949185110118,
+      "margin_at_5bps": -0.6187767679664744,
+      "observed_mean_cost_R_5bps": 0.5052973466272229,
+      "observed_mean_gross_expectancy": -0.11347942133925143,
+      "task": "COMBINED"
+    },
+    {
+      "N": 100,
+      "break_even_gross_expectancy_5bps": 0.30199067911272515,
+      "family": "RSI",
+      "implied_max_per_side_bps_for_zero_mean_net": 5.877854809310527,
+      "implied_max_round_trip_bps_for_zero_mean_net": 11.755709618621054,
+      "margin_at_5bps": 0.05302079400521165,
+      "observed_mean_cost_R_5bps": 0.30199067911272515,
+      "observed_mean_gross_expectancy": 0.3550114731179368,
+      "task": "COMBINED"
+    }
+  ],
+  "classification": "BOTH_GROSS_AND_COST_WEAK",
+  "combined": {
+    "MACD_N": 128,
+    "MA_N": 0,
+    "N": 228,
+    "RSI_N": 100,
+    "gross_PF": 1.1501682406951137,
+    "gross_expectancy": 0.09199904114197151,
+    "gross_total_R": 20.975781380369504,
+    "mean_cost_R": 0.4161277556120923,
+    "median_cost_R": 0.2517100109713939,
+    "net_PF_5bps": 0.6594581785514859,
+    "net_expectancy_5bps": -0.3241287144701208,
+    "net_total_R_5bps": -73.90134689918754,
+    "win_rate": 0.32456140350877194
+  },
+  "cost_pathology_shares": {
+    "top10_cost_R_share": 0.29435353286315524,
+    "top1_cost_R_share": 0.15726832100988125,
+    "top3_cost_R_share": 0.19654737359773716,
+    "top5_cost_R_share": 0.22931613873484982
+  },
+  "deployment_state": "MONDAY_DECISION_SHADOW_ONLY",
+  "family": {
+    "MACD": {
+      "MACD_N": 128,
+      "MA_N": 0,
+      "N": 128,
+      "RSI_N": 0,
+      "gross_PF": 0.8202209530230202,
+      "gross_expectancy": -0.11347942133925143,
+      "gross_total_R": -14.525365931424183,
+      "mean_cost_R": 0.5052973466272229,
+      "median_cost_R": 0.29559030866212044,
+      "net_PF_5bps": 0.4187641395723943,
+      "net_expectancy_5bps": -0.6187767679664743,
+      "net_total_R_5bps": -79.20342629970871,
+      "win_rate": 0.3125
+    },
+    "RSI": {
+      "MACD_N": 0,
+      "MA_N": 0,
+      "N": 100,
+      "RSI_N": 100,
+      "gross_PF": 1.6028770015739777,
+      "gross_expectancy": 0.3550114731179368,
+      "gross_total_R": 35.50114731179368,
+      "mean_cost_R": 0.30199067911272515,
+      "median_cost_R": 0.2153834169072832,
+      "net_PF_5bps": 1.065665466729301,
+      "net_expectancy_5bps": 0.05302079400521168,
+      "net_total_R_5bps": 5.302079400521168,
+      "win_rate": 0.34
+    }
+  },
+  "geometry_by_family": {
+    "MACD": {
+      "N": 128,
+      "cost_R_5bps_max": 14.921166666765059,
+      "cost_R_5bps_mean": 0.5052973466272229,
+      "cost_R_5bps_median": 0.29559030866212044,
+      "cost_R_5bps_min": 0.02126124818577655,
+      "cost_R_5bps_p10": 0.06921497096654503,
+      "cost_R_5bps_p25": 0.10994238322476468,
+      "cost_R_5bps_p50": 0.29559030866212044,
+      "cost_R_5bps_p75": 0.5197270562286482,
+      "cost_R_5bps_p90": 0.8508250470827043,
+      "family": "MACD",
+      "risk_pct_entry_max": 4.7149798124957085,
+      "risk_pct_entry_mean": 0.6376412083594102,
+      "risk_pct_entry_median": 0.3378371314473054,
+      "risk_pct_entry_min": 0.006701664246577055,
+      "risk_pct_entry_p10": 0.11749562033354143,
+      "risk_pct_entry_p25": 0.19227561255875023,
+      "risk_pct_entry_p50": 0.3378371314473054,
+      "risk_pct_entry_p75": 0.9063607988546211,
+      "risk_pct_entry_p90": 1.456373600441528
+    },
+    "RSI": {
+      "N": 100,
+      "cost_R_5bps_max": 1.3196034482762864,
+      "cost_R_5bps_mean": 0.30199067911272515,
+      "cost_R_5bps_median": 0.2153834169072832,
+      "cost_R_5bps_min": 0.0162905668866227,
+      "cost_R_5bps_p10": 0.05357158486739507,
+      "cost_R_5bps_p25": 0.11864625529891505,
+      "cost_R_5bps_p50": 0.2153834169072832,
+      "cost_R_5bps_p75": 0.41834464417807515,
+      "cost_R_5bps_p90": 0.6881461006040465,
+      "family": "RSI",
+      "risk_pct_entry_max": 6.168933296327125,
+      "risk_pct_entry_mean": 0.7550884990203651,
+      "risk_pct_entry_median": 0.4655480617893889,
+      "risk_pct_entry_min": 0.07575163910871845,
+      "risk_pct_entry_p10": 0.1452669724014263,
+      "risk_pct_entry_p25": 0.23875645556643388,
+      "risk_pct_entry_p50": 0.4655480617893889,
+      "risk_pct_entry_p75": 0.8408313738382706,
+      "risk_pct_entry_p90": 1.8627457508165066
+    }
+  },
+  "interpretation": {
+    "cost_pathology_primary": false,
+    "execution_friction_material": true,
+    "family_within_geometry_note": "Only strata with N>=10 per family are treated as adequate; smaller cells remain descriptive.",
+    "gross_edge_weak": true,
+    "no_filter_authorized": true,
+    "no_new_edge_claimed": true
+  },
+  "reasonable_risk_ge_0_35pct": {
+    "MACD_N": 62,
+    "MA_N": 0,
+    "N": 120,
+    "RSI_N": 58,
+    "gross_PF": 1.3223054391305227,
+    "gross_expectancy": 0.13881124432979217,
+    "gross_total_R": 16.65734931957506,
+    "mean_cost_R": 0.1295859590789096,
+    "median_cost_R": 0.11771420766541013,
+    "net_PF_5bps": 1.0181325328743613,
+    "net_expectancy_5bps": 0.009225285250882597,
+    "net_total_R_5bps": 1.1070342301059117,
+    "win_rate": 0.45
+  },
+  "task": "Task 57 - Execution Friction vs Trade Geometry Diagnostic",
+  "task56_decomposition": [
+    {
+      "END_OF_SESSION_rate": 0.19642857142857142,
+      "N": 56,
+      "SIGNAL_EXIT_rate": 0.14285714285714285,
+      "STOP_rate": 0.6607142857142857,
+      "TARGET_rate": 0.0,
+      "average_losing_R": -1.0,
+      "average_winning_R": 3.7778164361543,
+      "family": "RSI",
+      "gross_expectancy": 0.6210448622666375,
+      "group": "Task53+54",
+      "mean_cost_R": 0.33807496606064574,
+      "median_cost_R": 0.23472303678881412,
+      "median_holding_minutes": 25.5,
+      "median_stop_risk_pct": 0.4305968398609795,
+      "net_expectancy_5bps": 0.2829698962059916,
+      "share_holding_gt_60m": 0.375,
+      "top1_positive_R_concentration": 0.1872370558714919,
+      "top3_positive_R_concentration": 0.4417614582076468,
+      "top5_positive_R_concentration": 0.6080483458375628,
+      "winner_rate": 0.3392857142857143
+    },
+    {
+      "END_OF_SESSION_rate": 0.36363636363636365,
+      "N": 44,
+      "SIGNAL_EXIT_rate": 0.18181818181818182,
+      "STOP_rate": 0.45454545454545453,
+      "TARGET_rate": 0.0,
+      "average_losing_R": -0.7816506884671387,
+      "average_winning_R": 1.507256953462792,
+      "family": "RSI",
+      "gross_expectancy": 0.016423523292318064,
+      "group": "Task56",
+      "mean_cost_R": 0.25606522299719003,
+      "median_cost_R": 0.18123748541027757,
+      "median_holding_minutes": 64.5,
+      "median_stop_risk_pct": 0.551483244127011,
+      "net_expectancy_5bps": -0.239641699704872,
+      "share_holding_gt_60m": 0.5227272727272727,
+      "top1_positive_R_concentration": 0.2418411157549848,
+      "top3_positive_R_concentration": 0.5161291165814909,
+      "top5_positive_R_concentration": 0.7248754709576508,
+      "winner_rate": 0.3409090909090909
+    },
+    {
+      "END_OF_SESSION_rate": 0.26865671641791045,
+      "N": 67,
+      "SIGNAL_EXIT_rate": 0.08955223880597014,
+      "STOP_rate": 0.6268656716417911,
+      "TARGET_rate": 0.014925373134328358,
+      "average_losing_R": -0.945037654559423,
+      "average_winning_R": 1.4382935312997769,
+      "family": "MACD",
+      "gross_expectancy": -0.19802340227519608,
+      "group": "Task53+54",
+      "mean_cost_R": 0.5951873141061337,
+      "median_cost_R": 0.3029459459459772,
+      "median_holding_minutes": 30.0,
+      "median_stop_risk_pct": 0.33140025926977373,
+      "net_expectancy_5bps": -0.7932107163813297,
+      "share_holding_gt_60m": 0.3880597014925373,
+      "top1_positive_R_concentration": 0.21090085558176389,
+      "top3_positive_R_concentration": 0.49638432623833323,
+      "top5_positive_R_concentration": 0.6382585047710314,
+      "winner_rate": 0.31343283582089554
+    },
+    {
+      "END_OF_SESSION_rate": 0.21311475409836064,
+      "N": 61,
+      "SIGNAL_EXIT_rate": 0.19672131147540983,
+      "STOP_rate": 0.5901639344262295,
+      "TARGET_rate": 0.0,
+      "average_losing_R": -0.8886648407386627,
+      "average_winning_R": 1.8982171227388307,
+      "family": "MACD",
+      "gross_expectancy": -0.020619638999771275,
+      "group": "Task56",
+      "mean_cost_R": 0.40656574300284537,
+      "median_cost_R": 0.2850098601680906,
+      "median_holding_minutes": 25.0,
+      "median_stop_risk_pct": 0.35025060059616214,
+      "net_expectancy_5bps": -0.4271853820026167,
+      "share_holding_gt_60m": 0.32786885245901637,
+      "top1_positive_R_concentration": 0.3175098304419676,
+      "top3_positive_R_concentration": 0.6378826369600816,
+      "top5_positive_R_concentration": 0.8091311098534781,
+      "winner_rate": 0.3114754098360656
+    }
+  ],
+  "validation": {
+    "all_frozen_totals_match": true,
+    "counts_match": true,
+    "duplicate_source_trade_keys": 0,
+    "expected_counts": {
+      "Task53": 34,
+      "Task54": 89,
+      "Task56": 105
+    },
+    "family_counts": {
+      "Task53": {
+        "MACD": 17,
+        "RSI": 17
+      },
+      "Task54": {
+        "MACD": 50,
+        "RSI": 39
+      },
+      "Task56": {
+        "MACD": 61,
+        "RSI": 44
+      }
+    },
+    "frozen_5bps_totals": {
+      "Task53": -11.309635850554516,
+      "Task54": -25.989167959459053,
+      "Task56": -36.60254308916701
+    },
+    "native_task56_max_abs_difference": 3.785416424761934e-12,
+    "reproduced_5bps_totals": {
+      "Task53": -11.309635850554516,
+      "Task54": -25.989167959459053,
+      "Task56": -36.602543089173984
+    },
+    "source_counts": {
+      "Task53": 34,
+      "Task54": 89,
+      "Task56": 105
+    },
+    "source_sha256": {
+      "Task53": "72db7a33b2cc2487eafac6a9c5c630e8189c6fac84d250c045e59bd81b70708a",
+      "Task54": "2cbe75bcf1e5262cf27cce3a9d1b31529284c8b765537f8454a1dd7ad73e109f",
+      "Task56": "2a9ae0af16529be244c58037015102789f5d97bff0b4c21e6933bc2cbf3a661f"
+    },
+    "unmapped_families": []
+  },
+  "within_geometry_comparisons": [
+    {
+      "RSI_gt_MACD_5bps": false,
+      "RSI_gt_MACD_gross": false,
+      "bucket": "0.15-0.25%"
+    },
+    {
+      "RSI_gt_MACD_5bps": true,
+      "RSI_gt_MACD_gross": true,
+      "bucket": "0.25-0.35%"
+    },
+    {
+      "RSI_gt_MACD_5bps": true,
+      "RSI_gt_MACD_gross": true,
+      "bucket": "0.35-0.50%"
+    },
+    {
+      "RSI_gt_MACD_5bps": true,
+      "RSI_gt_MACD_gross": true,
+      "bucket": "0.50-0.75%"
+    },
+    {
+      "RSI_gt_MACD_5bps": true,
+      "RSI_gt_MACD_gross": true,
+      "bucket": "<0.15%"
+    },
+    {
+      "RSI_gt_MACD_5bps": false,
+      "RSI_gt_MACD_gross": false,
+      "bucket": ">=0.75%"
+    }
+  ]
+}

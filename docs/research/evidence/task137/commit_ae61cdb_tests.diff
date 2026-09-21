@@ -1,0 +1,633 @@
+commit ae61cdb82d0e753a34851c7ce0b4ce532ad71514
+Author: Ritesh Talwadekar <[REDACTED-EMAIL]>
+Date:   Mon Sep 14 22:56:59 2026 +0100
+
+    fix(ops,ingest): Task 137 -- overnight continuity, scope accuracy, delivery fairness
+    
+    Five concrete findings from Task 136's evidence review, each investigated
+    and closed with a bounded, demonstrated fix:
+    
+    1. EOD "PARTIAL" status is a standing, permanent condition for this
+       deployment (piv_paper is intentionally never checked -- PIV/Alpaca is
+       opt-in-only and never wired up), not evidence of a real problem, so
+       eod_reconciled_today could never become true here even on a fully
+       correct, on-time reconciliation. New talonx_ops.eod_reconciliation.
+       reconciled_to_available_scope() distinguishes "PARTIAL solely because
+       piv_paper is NOT_CHECKED, no mismatches, everything else CHECKED" from
+       a genuinely broken/incomplete reconciliation -- exposed as a SEPARATE,
+       explicitly-named signal (eod_reconciled_today_available_scope /
+       today_reconciled_available_scope) in supervisor.py and authoritative_
+       read_model.py, never silently reclassifying the existing strict field.
+    
+    2. Deferred-lookup SATURATION (not merely "one failing row doesn't stop
+       the rest of an already-selected batch", already covered): reproduced
+       with a bounded selection `limit` entirely filled by rows whose lookup
+       always raises -- a valid, eligible row sitting behind them in band/
+       enqueue order was never selected at all, on any cycle. Fixed: a DEFER
+       outcome now writes a bounded, fixed backoff (_DEFER_BACKOFF_SECONDS=
+       30s) to the row's own next_retry_at_utc -- the SAME column/mechanism
+       pending() already filters on -- so a permanently-failing row stops
+       monopolizing its slot after a short window, while `state` itself is
+       never touched (not terminal, fully recoverable, exactly-once on
+       success). The bulk expire_stale() sweep deliberately does NOT filter
+       on next_retry_at_utc itself (that column is shared with the UNRELATED
+       send-attempt backoff mark_failed() sets; filtering the age sweep on it
+       would let a row merely awaiting a send retry escape an age expiry it
+       still needs) -- it still benefits by writing the same backoff if it
+       reaches a failing row first.
+    
+    3. Scope reporting was narrower than actual runtime evaluation: the
+       observational V2 near-miss funnel (talonx_ops/prospective/funnel.py)
+       independently recomputed a ~39-issuer (watchlist-only) execution scope
+       for its own Form 4/code-P/cluster analysis, while the LIVE V2 companion
+       (talonx_v2/run.py --enable-broad-discovery) actually evaluates the
+       union with the frozen 626-name Discovery Universe v1 manifest --
+       confirmed genuinely wider runtime evaluation, narrow REPORTING only.
+       funnel.build_funnel() gains include_broad_discovery, unioning in the
+       SAME manifest talonx_v2/run.py uses and reporting BOTH the resolved
+       and watchlist-only counts, explicitly labelled (never silently
+       substituting one for the other). checkpoint.py's capture() determines
+       whether to pass it from the LIVE companion's own reported execution_
+       scope_count (v2_service_status.json), never a hardcoded assumption.
+    
+    4. Original ("V1") strategy fingerprint mismatch (2dea67a6f6d2 vs
+       expected 2ae6216bca70) fully traced per-file/per-commit: TWO distinct
+       causes, not one. (a) line-ending representation -- the working tree
+       materialises the 5 fingerprinted files with CRLF (Windows checkout);
+       the committed git blobs are pure LF -- fixed by LF-normalizing before
+       hashing in get_strategy_version() (talonx_backtest/reproducibility.py),
+       the same technique tests/test_task65b_protected_fingerprints.py
+       already uses for two other frozen fingerprints. (b) a REAL, substantive,
+       already-authorized change: commit 66a49f9 (Task 135, same session)
+       modified talonx_quant/consumer.py -- one of the 5 fingerprinted files
+       -- after the constant was frozen; that commit's own message incorrectly
+       claimed no fingerprinted file was touched. Not reverted (legitimate,
+       tested, already-pushed) -- confined to Pub/Sub delivery-observability
+       logging/metrics around an already-decided signal publish, not gating/
+       scoring logic. V1_FINGERPRINT_EXPECTED corrected to the new, current,
+       LF-normalized, reproducible-from-git baseline: ed8272fe568d.
+    
+    5. The 35 real FAILED_RETRYABLE rows rejected for "token:buy" are 100%
+       one issuer (BBY / Best Buy Co Inc) across every filing type --
+       conclusively a deterministic classification false positive, not a
+       transient failure: the company's own factual, SEC-sourced name
+       contains the literal word "Buy". claim_safety.scan_rendered/
+       assert_clean gain an optional company_name exemption (threaded through
+       from enqueue_card's already-available card.company_name) that excludes
+       only bare buy/sell tokens that are part of the filer's own known name
+       string -- every other rule, including phrase-level predictive language
+       ("strong buy", "should buy") and unrelated bare tokens, is completely
+       unaffected. No global content-guard relaxation.
+    
+    Also investigated and traced (evidence-only, no code change needed):
+    LULU pre-enqueue latency (accession 0001397187-26-000129) -- enrichment
+    (sub-second, 20:18:30-31Z) and delivery (~8-9s to send) are precisely
+    measured with no defect; the source-to-local-discovery interval (SEC
+    accepted 16:15:47Z -> our poller) cannot be precisely localized --
+    `ingested_at_utc`/`enqueued_at_utc` is confirmed BATCH-fixed (shared
+    across many unrelated records, not a true per-record marker); the best
+    available circumstantial evidence (poll-cycle `filings=` counter
+    increments) points to a poll cycle completing ~20:18:31Z, ~4h after SEC
+    acceptance, but the true cause (SEC-side propagation lag vs our own
+    scheduling) cannot be determined from available evidence -- reported as
+    an explicit gap, not invented.
+    
+    19 new/updated focused tests (test_task137_overnight_continuity.py new;
+    test_delivery_claim_safety.py +5; test_backtest_reproducibility.py +1;
+    test_task114_prospective.py fingerprint assertion now reads the live
+    constant instead of a duplicated stale literal; test_task136b_freshness_
+    edge_cases.py 2 assertions updated for the new DEFER-backoff timing).
+    575 tests pass across every directly affected module; 11 pre-existing,
+    unrelated failures reconfirmed present on unmodified HEAD (environmental
+    live-process-scan refusals + date-dependent fixtures), none caused by
+    this change.
+    
+    Frozen V2 fingerprint 11107198c5b81237 unchanged and re-verified. No
+    strategy/gating/scoring logic touched anywhere in this change.
+    
+    Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+
+diff --git a/tests/test_backtest_reproducibility.py b/tests/test_backtest_reproducibility.py
+index 6fca852..5340b39 100644
+--- a/tests/test_backtest_reproducibility.py
++++ b/tests/test_backtest_reproducibility.py
+@@ -136,6 +136,31 @@ def test_strategy_version_changes_when_a_fingerprinted_file_changes(monkeypatch,
+     assert len(before) == len(after) == 12
+ 
+ 
++def test_strategy_version_is_the_same_for_crlf_and_lf_line_endings(monkeypatch, tmp_path):
++    """Task 137: a working tree that materialises the fingerprinted files
++    with CRLF (e.g. a Windows checkout under core.autocrlf) must produce
++    the SAME fingerprint as an LF checkout of the identical logical
++    content -- this was the demonstrated, confirmed cause of a false-
++    positive mismatch against V1_FINGERPRINT_EXPECTED. Line-ending
++    REPRESENTATION must never be significant on its own; the previous
++    test in this file already proves a genuine content change still is."""
++    from talonx_backtest import reproducibility
++
++    lf_file = tmp_path / "fake_strategy_lf.py"
++    crlf_file = tmp_path / "fake_strategy_crlf.py"
++    content = "line one\nline two\nline three\n"
++    lf_file.write_bytes(content.encode("utf-8"))
++    crlf_file.write_bytes(content.replace("\n", "\r\n").encode("utf-8"))
++    assert lf_file.read_bytes() != crlf_file.read_bytes()  # genuinely different bytes on disk
++
++    monkeypatch.setattr(reproducibility, "_STRATEGY_FILES", (lf_file,))
++    lf_version = get_strategy_version()
++    monkeypatch.setattr(reproducibility, "_STRATEGY_FILES", (crlf_file,))
++    crlf_version = get_strategy_version()
++
++    assert lf_version == crlf_version
++
++
+ def test_working_tree_dirty_is_false_for_a_clean_tree(monkeypatch):
+     clean_result = MagicMock(returncode=0, stdout="", stderr="")
+     monkeypatch.setattr(subprocess_module, "run", lambda *a, **k: clean_result)
+diff --git a/tests/test_delivery_claim_safety.py b/tests/test_delivery_claim_safety.py
+index 74aae80..9cd6ba3 100644
+--- a/tests/test_delivery_claim_safety.py
++++ b/tests/test_delivery_claim_safety.py
+@@ -68,3 +68,67 @@ def test_bare_buy_sell_without_context_flagged():
+ def test_empty_text_is_clean():
+     assert scan_rendered("") == []
+     assert scan_rendered(None) == []
++
++
++# ---------------------------------------------------------------------
++# Task 137: a company's own factual, SEC-sourced name that happens to
++# contain "buy"/"sell" (e.g. "Best Buy") must not be misclassified as
++# predictive/advice language -- the exact, confirmed, deterministic
++# false positive behind all 35 real FAILED_RETRYABLE BBY rows.
++# ---------------------------------------------------------------------
++
++def test_company_name_containing_bare_buy_is_not_flagged_when_given():
++    text = "BEST BUY CO INC filed a Form 8-K today."
++    assert scan_rendered(text) == ["token:buy"]           # without context: the real prior bug
++    assert scan_rendered(text, company_name="BEST BUY CO INC") == []
++    assert_clean(text, company_name="BEST BUY CO INC")    # does not raise
++
++
++def test_company_name_exemption_does_not_weaken_real_predictive_detection():
++    # a genuine predictive PHRASE touching the same word is still caught,
++    # even with the company name present.
++    text = "BEST BUY CO INC is a strong buy right now."
++    v = scan_rendered(text, company_name="BEST BUY CO INC")
++    assert "phrase:strong buy" in v
++
++
++def test_company_name_exemption_does_not_hide_an_unrelated_bare_buy():
++    # a bare "buy" that is NOT part of the company name's own text is
++    # still flagged -- the exemption is scoped to the exact name string,
++    # not a blanket "buy is fine somewhere in this card" relaxation.
++    text = "insiders should buy more shares of XYZ based on this filing."
++    v = scan_rendered(text, company_name="BEST BUY CO INC")
++    assert "token:buy" in v
++
++
++def test_short_or_missing_company_name_is_ignored():
++    # a too-short/degenerate company_name (e.g. a data-quality gap) must
++    # not accidentally exempt unrelated text via a coincidental overlap.
++    assert scan_rendered("time to buy", company_name="") == ["token:buy"]
++    assert scan_rendered("time to buy", company_name="A") == ["token:buy"]
++    assert scan_rendered("time to buy", company_name=None) == ["token:buy"]
++
++
++def test_enqueue_card_passes_the_events_company_name_through(monkeypatch):
++    """End-to-end through the real call site: enqueue_card must pass the
++    card's own company_name into assert_clean, not just scan_rendered
++    directly -- the actual path that produced the real BBY rejections."""
++    import talonx_ingest.intelligence.delivery.pipeline as dp
++
++    captured = {}
++    real_assert_clean = dp.assert_clean
++
++    def _spy(text, *, company_name=None):
++        captured["company_name"] = company_name
++        return real_assert_clean(text, company_name=company_name)
++
++    monkeypatch.setattr(dp, "assert_clean", _spy)
++
++    from _delivery_helpers import make_card
++    from talonx_ingest.intelligence.delivery.outbox import DeliveryOutbox
++
++    card, _ = make_card(symbol="BBY", company="BEST BUY CO INC")
++    ob = DeliveryOutbox(":memory:")
++    dp.enqueue_card(card, outbox=ob)
++    assert captured["company_name"] == "BEST BUY CO INC"
++    ob.close()
+diff --git a/tests/test_task114_prospective.py b/tests/test_task114_prospective.py
+index f0ec32b..cb29e91 100644
+--- a/tests/test_task114_prospective.py
++++ b/tests/test_task114_prospective.py
+@@ -403,8 +403,16 @@ def test_a2_overview_healthy_zero_is_not_an_attention_item(_dash, monkeypatch):
+ # ======================================================================
+ 
+ def test_task114_does_not_change_fingerprints():
++    # Task 137: asserts against the live V1_FINGERPRINT_EXPECTED constant
++    # (not a hardcoded literal duplicated here) -- that constant is the
++    # single source of truth for what the CURRENT baseline is, and is
++    # itself updated (with full per-file/commit evidence in its own
++    # comment) only when a real, already-authorized change to one of the
++    # 5 fingerprinted files is confirmed, distinct from a stale value
++    # silently drifting out of sync with a second hardcoded copy here.
+     from talonx_backtest.reproducibility import get_strategy_version
+-    assert get_strategy_version() == "2ae6216bca70"
++    from talonx_ops.prospective import V1_FINGERPRINT_EXPECTED
++    assert get_strategy_version() == V1_FINGERPRINT_EXPECTED
+     import importlib
+     fp = importlib.import_module("research.scripts.task112_v2_release_fingerprint").v2_release_fingerprint()
+     assert fp["fingerprint"] == "11107198c5b81237"
+diff --git a/tests/test_task136b_freshness_edge_cases.py b/tests/test_task136b_freshness_edge_cases.py
+index adf38ea..d8d11dc 100644
+--- a/tests/test_task136b_freshness_edge_cases.py
++++ b/tests/test_task136b_freshness_edge_cases.py
+@@ -163,20 +163,25 @@ def test_lookup_failure_defers_and_remains_recoverable(ledger_path):
+     snd = RecordingSender()
+     res = _drain(ob, snd, now=now, event_time_lookup=_flaky_lookup, route="IMMEDIATE")
+     row = ob.get(did)
+-    assert row.state == STATE_PENDING            # left completely untouched -- not terminal
++    assert row.state == STATE_PENDING            # `state` itself untouched -- not terminal
+     assert snd.sent == []
+     assert res.expired == 0 and res.unqualified == 0   # neither verdict was reached
+-    # the lookup is consulted twice per drain pass by design -- once by the
+-    # bulk expire_stale() sweep, once more by the per-row inline gate
+-    # immediately before send (the two independent checks Task 136A/136B
+-    # deliberately keep in agreement) -- a DEFER from either leaves the row
+-    # untouched, so both see the same still-PENDING row.
+-    assert calls["n"] == 2
++    # Task 137: a DEFER now writes a bounded next_retry_at_utc backoff (see
++    # outbox._DEFER_BACKOFF_SECONDS) -- whichever of the bulk expire_stale()
++    # sweep or the per-row inline send-path gate reaches this row FIRST
++    # within one drain cycle sets that backoff, which then correctly
++    # excludes the row from pending()'s own already-next_retry_at_utc-
++    # filtered send-selection for the REST of this same cycle -- so the
++    # lookup is consulted once per cycle now, not twice (a deliberate,
++    # beneficial side effect of closing the starvation gap, not a
++    # regression: see test_task137_overnight_continuity.py for the
++    # starvation fix itself).
++    assert calls["n"] == 1
+ 
+     def _recovered_lookup(event_id):
+         return now - timedelta(seconds=5)          # a genuinely fresh, valid time
+ 
+-    res2 = _drain(ob, snd, now=now + timedelta(seconds=1),
++    res2 = _drain(ob, snd, now=now + timedelta(seconds=31),
+                   event_time_lookup=_recovered_lookup, route="IMMEDIATE")
+     assert ob.get(did).state == STATE_SENT
+     assert did in [r.delivery_id for r in snd.sent]
+diff --git a/tests/test_task137_overnight_continuity.py b/tests/test_task137_overnight_continuity.py
+new file mode 100644
+index 0000000..f0d9982
+--- /dev/null
++++ b/tests/test_task137_overnight_continuity.py
+@@ -0,0 +1,350 @@
++"""
++tests/test_task137_overnight_continuity.py
++-------------------------------------------
++Task 137: overnight continuity, scope accuracy and delivery fairness.
++
++Sections:
++1. EOD reconciliation "PARTIAL solely because PIV is never checked in
++   this deployment" is a standing, permanent condition, not evidence of a
++   real problem -- ``reconciled_to_available_scope`` distinguishes it
++   from a genuinely incomplete/broken reconciliation, as a SEPARATE,
++   explicitly-named signal (never a silent reclassification of the
++   existing strict `today_reconciled`/`eod_reconciled_today`).
++2. Deferred-lookup SATURATION (not merely one failing row alongside an
++   eligible one): a small selection limit filled entirely by repeatedly-
++   failing, higher-priority rows must not starve a valid eligible row
++   sitting behind them, across multiple drain cycles with a controlled
++   clock, and the row must recover normally once the lookup succeeds.
++"""
++from __future__ import annotations
++
++import asyncio
++from datetime import datetime, timedelta, timezone
++
++from talonx_ingest.intelligence.domain import EventType
++from talonx_ingest.intelligence.delivery.outbox import (
++    STATE_PENDING,
++    STATE_SENT,
++    DeliveryOutbox,
++)
++from talonx_ingest.intelligence.delivery.pipeline import (
++    RecordingSender,
++    enqueue_card,
++    process_pending,
++)
++from _delivery_helpers import make_card
++
++UTC = timezone.utc
++
++
++# ---------------------------------------------------------------------
++# 1. EOD reconciliation scope-accuracy signal
++# ---------------------------------------------------------------------
++
++def _enq_piv_only_partial(tmp_path, session):
++    """Build the EXACT real-world pattern: original_paper/experimental_
++    paper/alert_stores all CHECKED, piv_paper NOT_CHECKED (no piv_reader
++    injected -- this deployment never wires PIV up), no mismatches."""
++    from talonx_ops.eod_reconciliation import build_reconciliation
++
++    (tmp_path / "experimental").mkdir(exist_ok=True)
++    import sqlite3
++    for db, tbl in (
++        (tmp_path / "paper_trading.db", None),
++        (tmp_path / "experimental" / "experimental_paper.db", None),
++    ):
++        con = sqlite3.connect(db)
++        con.execute("CREATE TABLE positions (id INTEGER PRIMARY KEY)")
++        con.execute("CREATE TABLE trade_history (id INTEGER PRIMARY KEY, timestamp TEXT)")
++        con.commit()
++        con.close()
++    con = sqlite3.connect(tmp_path / "ingestion_ledger.db")
++    con.execute("CREATE TABLE text_events (id INTEGER PRIMARY KEY)")
++    con.commit()
++    con.close()
++
++    return build_reconciliation(
++        session_date=session, home=tmp_path, exp_home=tmp_path / "experimental",
++        ledger_path=tmp_path / "ingestion_ledger.db",
++        now=datetime(2026, 9, 14, 20, 13, 32, tzinfo=UTC),
++    )
++
++
++def test_reconciled_to_available_scope_true_for_piv_only_partial(tmp_path):
++    from talonx_ops.eod_reconciliation import STATUS_PARTIAL, reconciled_to_available_scope
++
++    rec = _enq_piv_only_partial(tmp_path, "2026-09-14")
++    assert rec.status == STATUS_PARTIAL            # reproduces the real Task 136 pattern
++    assert reconciled_to_available_scope(rec) is True
++
++
++def test_reconciled_to_available_scope_false_for_a_genuinely_broken_component():
++    """A PARTIAL caused by something OTHER than piv_paper being NOT_CHECKED
++    (e.g. alert_stores itself came back UNKNOWN -- a real local read
++    problem) must NOT be reported as available-scope-reconciled."""
++    from talonx_ops.eod_reconciliation import STATUS_PARTIAL, reconciled_to_available_scope
++
++    rec = {
++        "status": STATUS_PARTIAL,
++        "mismatches": [],
++        "component_status": [
++            {"name": "original_paper", "outcome": "CHECKED"},
++            {"name": "experimental_paper", "outcome": "CHECKED"},
++            {"name": "piv_paper", "outcome": "NOT_CHECKED"},
++            {"name": "alert_stores", "outcome": "UNKNOWN"},   # the real problem
++        ],
++    }
++    assert reconciled_to_available_scope(rec) is False
++
++
++def test_reconciled_to_available_scope_false_when_mismatches_present():
++    from talonx_ops.eod_reconciliation import STATUS_PARTIAL, reconciled_to_available_scope
++
++    rec = {
++        "status": STATUS_PARTIAL,
++        "mismatches": ["original_paper: 1 open position(s) but 0 trades recorded ever"],
++        "component_status": [
++            {"name": "original_paper", "outcome": "CHECKED"},
++            {"name": "experimental_paper", "outcome": "CHECKED"},
++            {"name": "piv_paper", "outcome": "NOT_CHECKED"},
++            {"name": "alert_stores", "outcome": "CHECKED"},
++        ],
++    }
++    assert reconciled_to_available_scope(rec) is False
++
++
++def test_reconciled_to_available_scope_false_for_fully_reconciled_status():
++    """The new field is meaningless (and stays False) once `status` is
++    already RECONCILED -- it exists ONLY to rescue the PARTIAL-because-
++    PIV-only case, never as an alternate route to "true" generally."""
++    from talonx_ops.eod_reconciliation import STATUS_RECONCILED, reconciled_to_available_scope
++
++    rec = {
++        "status": STATUS_RECONCILED,
++        "mismatches": [],
++        "component_status": [
++            {"name": "original_paper", "outcome": "CHECKED"},
++            {"name": "experimental_paper", "outcome": "CHECKED"},
++            {"name": "piv_paper", "outcome": "CHECKED"},
++            {"name": "alert_stores", "outcome": "CHECKED"},
++        ],
++    }
++    assert reconciled_to_available_scope(rec) is False
++
++
++def test_authoritative_read_model_exposes_the_narrower_signal_without_changing_the_strict_one(tmp_path):
++    """End-to-end through the real read path: `today_reconciled` keeps its
++    existing strict (False) meaning for a PIV-only-PARTIAL record, while
++    the new `today_reconciled_available_scope` is True -- both present,
++    neither silently overwriting the other."""
++    from talonx_ops.authoritative_read_model import AuthoritativeReadModel
++    from talonx_ops.eod_reconciliation import EodReconciliationStore
++
++    session = datetime.now(timezone.utc).strftime("%Y-%m-%d")
++    rec = _enq_piv_only_partial(tmp_path, session)
++    store = EodReconciliationStore(tmp_path / "eod_reconciliation.db")
++    store.upsert(rec)
++    store.close()
++
++    da = AuthoritativeReadModel(home=tmp_path, check_processes=False).eod_reconciliation()
++    assert da.values["today_record_status"] == "PARTIAL"
++    assert da.values["today_reconciled"] is False             # unchanged, strict
++    assert da.values["today_reconciled_available_scope"] is True   # new, narrower signal
++
++
++# ---------------------------------------------------------------------
++# 2. Deferred-lookup SATURATION -- a bounded selection limit filled
++#    entirely by repeatedly-failing rows must not starve a valid row.
++# ---------------------------------------------------------------------
++
++def _enq(ob, *, symbol, accession, enqueued_at, event_type=EventType.EARNINGS_RESULTS,
++         on_watchlist=True):
++    card, _ = make_card(symbol=symbol, accession=accession, event_type=event_type,
++                        on_watchlist=on_watchlist, now=enqueued_at)
++    r = enqueue_card(card, outbox=ob, now=enqueued_at).row
++    return r.delivery_id, r.event_id, r.route
++
++
++def _drain(ob, sender, **kw):
++    kw.setdefault("mode", "enabled")
++    kw.setdefault("enforce_age_cutoff", True)
++    return asyncio.run(process_pending(ob, sender, **kw))
++
++
++def test_saturated_batch_of_failing_lookups_does_not_permanently_starve_a_valid_row(ledger_path):
++    """A bounded per-cycle selection `limit` is entirely filled by rows
++    whose lookup ALWAYS raises (DEFER every time) and which sort AHEAD of
++    one valid, eligible row (older enqueue time -> selected first by
++    ``pending()``'s band+enqueue ordering). The eligible row must still
++    reach SENT within a bounded number of drain cycles -- proving
++    fairness ACROSS cycles, not merely "does not stop mid-batch"."""
++    ob = DeliveryOutbox(ledger_path)
++    now = datetime(2026, 9, 14, 16, 0, 0, tzinfo=UTC)
++    LIMIT = 3
++
++    flaky_ids = []
++    flaky_eids = set()
++    for i in range(LIMIT):
++        did, eid, _ = _enq(ob, symbol=f"FLK{i}", accession=f"000000004{i}-26-00004{i}",
++                           enqueued_at=now - timedelta(minutes=30 - i))
++        flaky_ids.append(did)
++        flaky_eids.add(eid)
++
++    good_did, good_eid, _ = _enq(ob, symbol="GOOD", accession="0000000050-26-000050",
++                                 enqueued_at=now - timedelta(minutes=5))
++
++    def _lookup(event_id):
++        if event_id in flaky_eids:
++            raise RuntimeError("permanently flaky lookup")
++        return now - timedelta(minutes=5)          # GOOD: valid, fresh
++
++    snd = RecordingSender()
++    sent_ever: set[str] = set()
++    for cycle in range(6):
++        res = _drain(ob, snd, now=now + timedelta(seconds=cycle), event_time_lookup=_lookup,
++                    route="IMMEDIATE", limit=LIMIT)
++        sent_ever |= {r.delivery_id for r in snd.sent}
++        if good_did in sent_ever:
++            break
++
++    assert good_did in sent_ever, (
++        "the eligible row was never sent across repeated cycles -- a "
++        "saturated batch of permanently-failing lookups starved it"
++    )
++    assert ob.get(good_did).state == STATE_SENT
++    # every flaky row is still PENDING and recoverable -- never terminally
++    # discarded just because its lookup temporarily (repeatedly) failed
++    assert all(ob.get(d).state == STATE_PENDING for d in flaky_ids)
++    ob.close()
++
++
++def test_saturated_batch_row_recovers_once_its_lookup_succeeds(ledger_path):
++    """One of the LIMIT-filling flaky rows starts failing, then its
++    lookup starts succeeding on a later cycle -- it must be delivered
++    normally afterward, exactly-once, with no special-cased state."""
++    ob = DeliveryOutbox(ledger_path)
++    now = datetime(2026, 9, 14, 16, 0, 0, tzinfo=UTC)
++    LIMIT = 2
++    did_a, eid_a, _ = _enq(ob, symbol="RCA", accession="0000000060-26-000060",
++                           enqueued_at=now - timedelta(minutes=20))
++    did_b, eid_b, _ = _enq(ob, symbol="RCB", accession="0000000061-26-000061",
++                           enqueued_at=now - timedelta(minutes=19))
++
++    state = {"a_fails": True}
++
++    def _lookup(event_id):
++        if event_id == eid_a and state["a_fails"]:
++            raise RuntimeError("transient failure")
++        if event_id == eid_a:
++            return now - timedelta(minutes=20)
++        return now - timedelta(minutes=19)          # B always valid
++
++    snd = RecordingSender()
++    _drain(ob, snd, now=now, event_time_lookup=_lookup, route="IMMEDIATE", limit=LIMIT)
++    assert ob.get(did_a).state == STATE_PENDING     # DEFER'd, not terminal
++    assert ob.get(did_b).state == STATE_SENT
++
++    state["a_fails"] = False                        # the lookup recovers
++    # past the fixed DEFER backoff window (_DEFER_BACKOFF_SECONDS=30) set
++    # on the first cycle -- otherwise the row is correctly still excluded
++    # from selection by its own bounded retry delay, independent of
++    # whether the lookup itself would now succeed.
++    _drain(ob, snd, now=now + timedelta(seconds=31), event_time_lookup=_lookup,
++          route="IMMEDIATE", limit=LIMIT)
++    assert ob.get(did_a).state == STATE_SENT
++    # exactly-once: B was never re-sent on the second cycle
++    assert [r.delivery_id for r in snd.sent].count(did_b) == 1
++    ob.close()
++
++
++# ---------------------------------------------------------------------
++# 3. Scope accuracy -- the observational V2 near-miss funnel must match
++#    the actual live companion's (possibly broad-discovery-widened)
++#    execution scope, not silently keep recomputing a narrower one.
++#    Uses an isolated, synthetic "broad-only" symbol -- never live state.
++# ---------------------------------------------------------------------
++
++def test_resolved_execution_scope_excludes_broad_only_symbol_by_default(tmp_path, monkeypatch):
++    import talonx_ops.prospective.funnel as funnel_mod
++
++    manifest = tmp_path / "discovery_universe_v1_626.json"
++    manifest.write_text('{"symbols": ["ZZBROADONLY"]}', encoding="utf-8")
++    monkeypatch.setattr(funnel_mod, "_BROAD_DISCOVERY_MANIFEST", manifest)
++    # the real import site is inside the function (`from talonx_ops.
++    # watchlist_coverage import build_coverage_map`) -- patch the module
++    # actually imported from, not the funnel module's own namespace.
++    import talonx_ops.watchlist_coverage as wc_mod
++    monkeypatch.setattr(
++        wc_mod, "build_coverage_map",
++        lambda: {"tickers": [{"symbol": "AAPL", "v2_collection_scope": "POLLED"}]},
++    )
++
++    narrow = funnel_mod._resolved_execution_scope(include_broad_discovery=False)
++    assert narrow == ["AAPL"]
++    assert "ZZBROADONLY" not in narrow
++
++
++def test_resolved_execution_scope_includes_broad_only_symbol_when_requested(tmp_path, monkeypatch):
++    import talonx_ops.prospective.funnel as funnel_mod
++    import talonx_ops.watchlist_coverage as wc_mod
++
++    manifest = tmp_path / "discovery_universe_v1_626.json"
++    manifest.write_text('{"symbols": ["ZZBROADONLY"]}', encoding="utf-8")
++    monkeypatch.setattr(funnel_mod, "_BROAD_DISCOVERY_MANIFEST", manifest)
++    monkeypatch.setattr(
++        wc_mod, "build_coverage_map",
++        lambda: {"tickers": [{"symbol": "AAPL", "v2_collection_scope": "POLLED"}]},
++    )
++
++    wide = funnel_mod._resolved_execution_scope(include_broad_discovery=True)
++    assert set(wide) == {"AAPL", "ZZBROADONLY"}
++
++
++def test_build_funnel_reports_both_the_narrow_and_resolved_scope_explicitly(tmp_path, monkeypatch):
++    """The intended end-to-end path: build_funnel(include_broad_discovery=
++    True) must report BOTH counts, explicitly labelled -- never silently
++    substituting the wider one for the narrower one, and never claiming a
++    wide scope while a caller who asked for the narrow (default) behaviour
++    still gets exactly that."""
++    import talonx_ops.prospective.funnel as funnel_mod
++    import talonx_ops.watchlist_coverage as wc_mod
++
++    manifest = tmp_path / "discovery_universe_v1_626.json"
++    manifest.write_text('{"symbols": ["ZZBROADONLY"]}', encoding="utf-8")
++    monkeypatch.setattr(funnel_mod, "_BROAD_DISCOVERY_MANIFEST", manifest)
++    monkeypatch.setattr(
++        wc_mod, "build_coverage_map",
++        lambda: {"tickers": [{"symbol": "AAPL", "v2_collection_scope": "POLLED"}]},
++    )
++    empty_db = tmp_path / "empty_v2_lane.db"
++    import sqlite3
++    sqlite3.connect(empty_db).close()
++
++    narrow = funnel_mod.build_funnel(db_path=empty_db, include_broad_discovery=False)
++    assert narrow["scope"]["execution_scope_count"] == 1        # AAPL only
++    assert narrow["scope"]["watchlist_only_count"] == 1
++    assert narrow["scope"]["broad_discovery_included"] is False
++
++    wide = funnel_mod.build_funnel(db_path=empty_db, include_broad_discovery=True)
++    assert wide["scope"]["execution_scope_count"] == 2           # AAPL + ZZBROADONLY
++    assert wide["scope"]["watchlist_only_count"] == 1            # unchanged, still explicit
++    assert wide["scope"]["broad_discovery_included"] is True
++
++
++def test_live_companion_broad_discovery_detected_from_its_own_reported_scope(monkeypatch):
++    """The checkpoint must derive broad-discovery inclusion from the ACTUAL
++    running companion's own live-reported execution_scope_count -- never a
++    hardcoded assumption -- and default to False (the safe/narrow prior
++    behaviour) when the companion is not running / status is stale."""
++    import talonx_ops.prospective.checkpoint as ck_mod
++
++    def _fake_narrow_scope(*, include_broad_discovery=False):
++        return ["AAPL"] * 39   # count is all that matters here
++
++    monkeypatch.setattr(
++        "talonx_ops.prospective.funnel._resolved_execution_scope", _fake_narrow_scope)
++
++    assert ck_mod._live_companion_uses_broad_discovery({"execution_scope_count": 626}) is True
++    assert ck_mod._live_companion_uses_broad_discovery({"execution_scope_count": 39}) is False
++    assert ck_mod._live_companion_uses_broad_discovery({}) is False            # no status at all
++    assert ck_mod._live_companion_uses_broad_discovery({"execution_scope_count": None}) is False

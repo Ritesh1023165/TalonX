@@ -1,0 +1,18 @@
+SMOKE / REGRESSION EVIDENCE (TALONX_TEST_NETWORK_GUARD=1)
+
+A. Post-merge smoke set on main (10 items): 337 passed, 0 failed
+   1 release gate / 2-3 fingerprints / 4 SIP mode / 5 campaign bootstrap (+ frozen pin) / 6 V2 entry-exit journey / 7 fake-transport Telegram routing / 8 /ping /
+   9 dashboard + operator read-only / 10 split + dividend accounting
+   tests/test_v2_final_release_acceptance.py (39)  tests/test_pq2a_corporate_actions.py  tests/test_pq2a_closure_dividends.py  tests/test_package4_sizing_accounting.py
+   tests/test_ri1_campaign_identity.py  tests/test_ri2_notification_routing.py  tests/test_task132_ping_discovery_section.py  tests/test_telegram_ping_safety.py
+   tests/test_task100c_unified_dashboard.py  tests/test_pq2b_provider_contract.py
+
+B. Regression on the frozen SHA a56ec8c (PQ-1, PQ-2A, closure, PQ-2B, Packages 1-5, RI-1/2, task110/111/113, task117 journey + delivery, telegram listener): 485 passed, 1 failed
+   the one failure = tests/test_task111_v2_e2e.py::test_item3_original_strategy_fingerprint_unchanged (OPS-017 stale V1 literal; carried, fails identically on the pre-freeze baseline)
+
+C. Affected-suite run (task114 prospective, task117 startup/lock/scope, RI-1, RI-3, task112, ping, package2, PQ-2B): 275 passed, 8 failed
+   all 8 are in the documented carried set of 16 pre-existing failures (6 x task114 prospective, ri3 renderer needs `node`, task112 V1 fingerprint literal),
+   each reproduced on the accepted baseline in the previous acceptance task.
+
+D. New freeze tests (8, in the acceptance suite): campaign creation/cleanliness, clean-state detection, gate READY on the fresh campaign + refusal of legacy identities/cash/allocation/mode/ledger,
+   env-driven ledger selection with unchanged default, launch env block, frozen-pin acceptance/refusal, operator read-only on the fresh campaign.

@@ -79,6 +79,19 @@ class TriggeringSignalRef(BaseModel):
     stop_price: float | None = None
     target_price: float | None = None
 
+    # Task 35 (owner-confirmed ATR-RISK-001: MARKET_STRUCTURE_PRIMARY) --
+    # mirrored from talonx_quant.schemas.QuantSignal, same widening pattern
+    # as stop_price/target_price above. Lets a future consumer of this
+    # alert distinguish a structural stop from an ATR-fallback one without
+    # recomputing anything -- see talonx_quant.strategy.calculate_trade_
+    # geometry for what each value means. Not yet persisted into the
+    # SQLite trade_history table (store.execute_buy) -- see Task 35's
+    # schema_observability_changes.md for that scoped-out follow-up.
+    geometry_path: str | None = None
+    fallback_reason: str | None = None
+    structural_level: float | None = None
+    structural_level_type: str | None = None
+
 
 class ActionableAlert(BaseModel):
     """Consumed from talonx:alerts:dispatch (published by talonx_core)."""

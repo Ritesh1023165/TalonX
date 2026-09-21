@@ -1,0 +1,6 @@
+bounded READ-ONLY probe (1 market-data call, symbol=AAPL, no broker endpoint, no secret printed)
+utc_now: 2026-09-21T16:29:15+00:00
+adapter: alpaca:sip:1Day:adjustment=split | contract: V2_RELEASE_PRICE_CONTRACT@1
+bars returned: 73 | last session: 2026-09-21 | adjustment_state: SPLIT_ADJUSTED | feed: sip
+calendar: next session on/after today: 2026-09-22
+20-session contiguous liquidity window: LiquidityResult(ok=True, median_dollar_volume=12345058790.455, last_close=338.69, n_sessions_used=20, reason='PASS')

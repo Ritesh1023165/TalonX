@@ -1,0 +1,43 @@
+{
+  "purpose": "Task 137: live re-verification of the scope-reconciliation and fingerprint fixes against the real running system, captured after the fixes were applied (before the Intelligence restart that loaded them into the long-running process -- these funnel/checkpoint reads are always fresh CLI invocations).",
+  "scope_reconciliation": {
+    "manifest_symbol_count": 626,
+    "watchlist_polled_count": 39,
+    "watchlist_is_subset_of_manifest": true,
+    "union_count": 626,
+    "matches_live_v2_service_status_execution_scope_count": true,
+    "funnel_before_fix_reported_code_p_records_window": 8,
+    "funnel_after_fix_reported_code_p_records_window": 26,
+    "funnel_after_fix_distinct_issuers_window": 11,
+    "funnel_after_fix_clusters_ge2_distinct_insiders": 2,
+    "funnel_after_fix_cluster_symbols": ["ABCL", "APTV"]
+  },
+  "fingerprint_reconciliation": {
+    "reported_mismatch": {"expected": "2ae6216bca70", "actual": "2dea67a6f6d2"},
+    "combined_hash_at_freeze_commit_18e93d9_committed_blobs": "68afe1f8fa08",
+    "combined_hash_at_HEAD_committed_blobs": "ed8272fe568d",
+    "combined_hash_working_tree_raw_bytes": "2dea67a6f6d2",
+    "combined_hash_working_tree_lf_normalized": "ed8272fe568d",
+    "conclusion": "working-tree LF-normalized == HEAD committed blobs exactly; the reported mismatch was real (not solely CRLF) -- commit 66a49f9 (Task 135) legitimately modified talonx_quant/consumer.py after the constant was frozen",
+    "commit_that_changed_a_fingerprinted_file_since_freeze": "66a49f9fc8b3285ece4e693d5c9fb16133cdb4a4",
+    "file_changed": "talonx_quant/consumer.py",
+    "change_scope": "QuantScanner._publish_signal Redis PUBLISH subscriber-count observability (logging + new metric) around an already-decided signal publish -- no gating/entry/exit/opportunity-scoring logic touched",
+    "corrected_v1_fingerprint_expected": "ed8272fe568d",
+    "v2_fingerprint_unaffected": "11107198c5b81237 (confirmed unchanged, separate mechanism)"
+  },
+  "claim_safety_bby_false_positive": {
+    "affected_rows_before_fix": 35,
+    "distinct_issuers_affected": ["BBY"],
+    "distinct_error_strings": 1,
+    "error_text": "claim-safety (render): rendered Telegram text contains prohibited claim language: ['token:buy']",
+    "root_cause": "company_name 'BEST BUY CO INC' contains the bare token 'Buy', matched by claim_safety._BUY_SELL_RE with no prior company-name exemption",
+    "fix_verified": {
+      "without_company_name_context": ["token:buy"],
+      "with_company_name_context": [],
+      "predictive_phrase_still_caught": ["phrase:strong buy", "token:buy"],
+      "unrelated_bare_buy_still_caught": ["token:buy"]
+    },
+    "next_natural_retry_scheduled_utc": "2026-09-14T22:02:31.438143+00:00",
+    "note": "not manually replayed or force-resent -- will self-heal via the existing retry_after_utc mechanism, now against the fixed code (Intelligence restarted 21:57:41Z, before this retry time)"
+  }
+}

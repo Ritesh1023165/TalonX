@@ -94,7 +94,18 @@ def _real_run_result() -> BacktestResult:
     config = dataclasses.replace(QuantConfig(), atr_move_multiplier=0.0, min_atr_pct=0.0)
     df = _bars_to_df(_build_bars())
     engine = BacktestEngine(BacktestConfig(quant_config=config, eod_flatten_enabled=False))
-    return engine.run(df), df
+    result = engine.run(df)
+    # Task 25A: TalonX is LONG_ONLY -- this fixture's own published
+    # candidates all happen to be BEARISH-while-flat (correctly ignored,
+    # see NO_ACTIVE_POSITION in result.rejections), so the real run
+    # itself produces zero trades. Two hand-built trades (same
+    # convention as _trade() above / test_backtest_engine_state.py's
+    # _signal()) are layered on top of the real run's authentic
+    # signal-generation/rejection funnel so the report/breakdown code
+    # paths below still have real trade data to render -- this is not a
+    # strategy-outcome claim, only a rendering fixture.
+    result = dataclasses.replace(result, trades=[_trade(gross_r=1.0, net_r=0.9, exit_offset=2), _trade(gross_r=-0.5, net_r=-0.55, exit_offset=1)])
+    return result, df
 
 
 # --- equity_curve.csv ---

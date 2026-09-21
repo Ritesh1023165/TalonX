@@ -1,0 +1,81 @@
+5eb9f360a183ce6a310b1725aaf119cc7bc52744
+Ritesh Talwadekar <[REDACTED-EMAIL]>
+Tue Sep 15 00:48:13 2026 +0100
+feat(dispatch,ingest): Task 138 Workstream 3 -- reply "details" for informational alerts
+
+Implements deterministic, durable reply-for-details correlation for
+Intelligence informational cards through the existing (single) Original
+TelegramReplyListener -- no external LLM, no new process, no new
+schema.
+
+- talonx_ingest/intelligence/delivery/reply_correlation.py (new):
+  correlates an inbound Telegram reply (chat identity already enforced
+  upstream; Telegram message ID) against the durable
+  `intelligence_delivery` table, reusing its existing
+  `transport_message_id` column. A single-card send stores the bare
+  numeric id; a digest send stores `digest:<digest_id>:<message_id>`
+  across every constituent row -- one SQL query resolves both, so one
+  Telegram message can map to multiple events. Returns a compact
+  indexed summary for a multi-event message, or full facts (accession,
+  filing link, source-accepted/enqueued/sent timestamps, persisted
+  significance reasons, the original card text with HTML markup
+  stripped for this plain-text reply) for one. Old messages predating
+  this feature get a truthful "can't identify, won't guess" response,
+  never a guess. Production wiring
+  (`build_intelligence_details_resolver`) opens a read-only
+  (file:...?mode=ro) handle to Intelligence's own ingestion_ledger.db,
+  mirroring talonx_signals/reply.py's established
+  build_experimental_dxre_resolver contract exactly, including graceful
+  (None, None) on any construction failure.
+
+- talonx_dispatch/telegram_listener.py: new `message_resolvers` ordered
+  list (Message -> str | None), tried BEFORE the existing
+  `extra_resolvers` (str -> str | None) -- receives the full inbound
+  Message so a resolver can read reply_to_message.message_id for true
+  message-ID correlation, which extra_resolvers' text-only contract
+  cannot. Empty by default (byte-identical when unused). Its reply is
+  sent with plain=True (parse_mode=None): resolver output can carry
+  arbitrary, uncontrolled SEC-sourced text not guaranteed Markdown-safe,
+  and sending it under the default MARKDOWN parse mode risked a
+  Telegram "can't parse entities" send failure.
+
+- talonx_dispatch/consumer.py: DispatchAgent gains a passthrough
+  `message_resolvers` constructor param.
+
+- run_talonx.py: registers build_intelligence_details_resolver's
+  resolver into the single DispatchAgent alongside the existing
+  Experimental D/X/R/E resolver (same read-only, no-second-poller
+  posture); closes the reader handle in the existing shutdown `finally`
+  block alongside exp_reply_store.
+
+Tests (51 new, isolated):
+- tests/test_task138_reply_correlation.py (43): text-trigger parsing;
+  single-card vs digest transport-id correlation; full details
+  rendering (facts/link/timestamps/reasons/HTML-stripped text/data
+  limitations); missing event/significance reported not guessed;
+  multi-event indexed summary + "details N" follow-up + out-of-range
+  guidance; reply-length safety cap; downstream store-failure
+  degradation; production ReadOnlyIntelligenceReader + resolver against
+  a real on-disk sqlite file (mode=ro): end-to-end real message,
+  non-details passthrough, no-reply-target, unmapped-old-message,
+  missing-db graceful (None, None), idempotent repeat, restart-recovery
+  (independent reader re-opened against the same file), and a
+  concurrent-writer-mid-session case (new card written after the
+  resolver was built still resolves without restart).
+- tests/test_task138_telegram_message_resolvers.py (8): dispatch
+  ordering vs extra_resolvers and the numeric-alert-id path, full
+  Message object access, plain=True/parse_mode=None verified via the
+  mock send call, exception-in-resolver safety, no-resolvers
+  byte-identical default, unauthorized chat never reaches resolvers.
+
+Regression: tests/test_telegram_listener.py, test_dispatch_consumer.py,
+test_telegram_ping_safety.py, test_task117_telegram_owner_dedup.py,
+test_task131_broad_discovery_dispatch.py,
+test_task69p_telegram_piv_parity.py, test_task99a_dispatch.py,
+test_task99h_telegram_escape.py -- 249/249 pass. Live inbound Telegram
+verification (a real operator reply) remains PENDING -- not
+manufactured here; isolated coverage above stands in for it until a
+natural reply occurs.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+

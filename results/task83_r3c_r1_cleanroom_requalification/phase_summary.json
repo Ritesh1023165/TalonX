@@ -1,0 +1,124 @@
+{
+  "task": "Task 83-R3C-R1 clean offline requalification",
+  "verdict": "CLEAN_OFFLINE_REQUALIFICATION_PASS",
+  "generated_utc": "2026-08-30T19:55:00Z",
+  "qualification_sha": "5955e82938f965a16ed2c779851c75dc593421cc",
+  "prior_qualification_sha": "320da7b8e606ed5aad642c2d5fa4c4e489c4fd29",
+  "sha_delta": {
+    "commit": "5955e82938f965a16ed2c779851c75dc593421cc",
+    "message": "test: make offline suite hermetic against clean-room env and CRLF checkout",
+    "files_changed": [
+      "tests/conftest.py",
+      "tests/test_task65b_protected_fingerprints.py",
+      "tests/test_task66b_prep_preflight.py",
+      "tests/test_task79e_r2_activation_safety.py"
+    ],
+    "line_delta": "+51 / -3",
+    "production_code_touched": false
+  },
+  "phases": [
+    {"phase": "pre_test_integrity", "sha": "320da7b8", "attempt": 2, "result": "PASS", "exit_code": 0, "counts": "2 passed"},
+    {"phase": "A_focused_run_1", "sha": "320da7b8", "attempt": 2, "result": "PASS", "exit_code": 0, "counts": "300 passed"},
+    {"phase": "B_focused_run_2", "sha": "320da7b8", "attempt": 2, "result": "PASS", "exit_code": 0, "counts": "300 passed"},
+    {"phase": "C_adjacent_suites", "sha": "320da7b8", "attempt": 2, "result": "PASS", "exit_code": 0, "counts": "530 passed"},
+    {"phase": "D_retained_and_expanded_scenarios", "sha": "320da7b8", "attempt": 2, "result": "PASS", "exit_code": 0, "counts": "34 passed (retained 20/20 + expanded 13/13 + scenario 33)"},
+    {"phase": "E_guarded_full_collection", "sha": "320da7b8", "attempt": 2, "result": "PASS", "exit_code": 0, "counts": "2927 tests collected"},
+    {"phase": "F_complete_suite", "sha": "5955e82", "attempt": 3, "result": "PASS", "exit_code": 0, "counts": "2927 passed, 0 failed, 0 errors, 0 skipped, 0 xfailed, 0 xpassed", "warnings": 321, "duration_seconds": 2362.72}
+  ],
+  "phase_f_run": {
+    "spec": "attempt3_phase_f.spec.json",
+    "runner_pid": 26292,
+    "test_pid": 21260,
+    "start_utc": "2026-08-30T19:08:09.0696030Z",
+    "end_utc": "2026-08-30T19:47:35.1899176Z",
+    "observed_sha": "5955e82938f965a16ed2c779851c75dc593421cc",
+    "basetemp": "C:\\Users\\rites\\AppData\\Local\\Temp\\talonx_task83_r3c_r1_attempt3_phase_f_6f7c870cd1de40ddb733f61fe628f3bf",
+    "stderr_bytes": 0
+  },
+  "collection_full_suite_reconciliation": {
+    "phase_e_collected": 2927,
+    "phase_f_executed": 2927,
+    "phase_f_passed": 2927,
+    "reconciled": true
+  },
+  "network_guard": {
+    "guard_initialized_successfully": true,
+    "guard_initialization_failures": 0,
+    "unexpected_external_attempts": 0,
+    "permitted_loopback_connections": 881,
+    "expected_negative_control_blocks": 4,
+    "negative_controls_reconciled": true,
+    "expected_negative_controls": {"unfaked_telegram_getme": 1, "block_ipv4": 1, "block_ipv6": 1, "block_hostname": 1},
+    "observed_expected_negative_control_blocks": {"unfaked_telegram_getme": 1, "block_ipv4": 1, "block_ipv6": 1, "block_hostname": 1},
+    "malformed_reports": 0,
+    "leftover_writer_temp_files": 0
+  },
+  "repair_history": [
+    {
+      "id": "attempt2_phase_f_failure",
+      "sha": "320da7b8",
+      "observed": "exit 1; 6 failed, 2921 passed; network guard recorded 10 unexpected huggingface.co:443 attempts",
+      "failing_tests": [
+        "tests/test_task65b_protected_fingerprints.py::test_orpb_v1_fingerprint_unchanged",
+        "tests/test_task65b_protected_fingerprints.py::test_fprc_v1_fingerprint_unchanged",
+        "tests/test_task66b_prep_preflight.py::test_no_secrets_printed_check_never_echoes_a_token",
+        "tests/test_task79e_r2_activation_safety.py::test_session_identity_reuse_requires_current_config_and_runtime_bindings",
+        "tests/test_task83_r3b_network_isolation.py::test_unfaked_telegram_is_blocked_before_external_access",
+        "tests/test_task83_r3b_network_isolation.py::test_zz_guard_report_reconciles_expected_and_unexpected_attempts"
+      ],
+      "root_causes": {
+        "huggingface_egress": "tests/test_task66b_prep_preflight.py ran FullAppPreflight().run() unmocked; brain_operational_hard_requirement built a real ResearchAgent whose ContextRetriever eagerly constructs SentenceTransformerEmbeddingFunction, reaching huggingface.co for the embedding model. run()'s try/except hid the failure but the session network guard recorded the attempts, breaking test_task83_r3b_network_isolation reconciliation and conftest.pytest_unconfigure.",
+        "crlf_fingerprints": "tests/test_task65b_protected_fingerprints.py hashed raw read_bytes(); the detached clean-room worktree materialised the frozen files as CRLF (core.autocrlf) while committed blobs are LF, so the frozen fingerprints did not match.",
+        "non_hermetic_piv_config": "tests/test_task79e_r2_activation_safety.py::test_session_identity_reuse_... built PivConfig without explicit paper bindings, relying on ambient TALONX_PIV_* env vars that the clean-room sanitiser strips -> PaperGuardError at verify_paper_identity().",
+        "overbroad_secret_assertion": "tests/test_task66b_prep_preflight.py::test_no_secrets_printed_... asserted the env-var NAME 'TELEGRAM_BOT_TOKEN' never appears in any check detail; the check's own diagnostic 'TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID missing' (a name, not a value) tripped it once tokens were sanitised."
+      },
+      "fix_commit": "5955e82938f965a16ed2c779851c75dc593421cc",
+      "fixes": [
+        "test_task66b_prep_preflight.py: autouse _offline_brain fixture faking talonx_brain.consumer.ResearchAgent (same pattern test_task80_p1_process_guard already uses)",
+        "conftest.py: set HF_HUB_OFFLINE=1 / TRANSFORMERS_OFFLINE=1 at import time (defense in depth)",
+        "test_task65b_protected_fingerprints.py: _fingerprint() normalises CRLF->LF before hashing; frozen constants unchanged",
+        "test_task79e_r2_activation_safety.py: PivConfig at the failing test now passes key_id/secret_key/paper_trading=True/real_capital=False/broker_endpoint explicitly like every sibling test",
+        "test_task66b_prep_preflight.py: test_no_secrets_printed_... now asserts no configured secret VALUE is echoed, permitting env-var names"
+      ],
+      "local_pre_run_verification": "affected 4 files (61 tests) pass with TALONX_TEST_NETWORK_GUARD=1 and TALONX_PIV_*/TELEGRAM_* scrubbed; 111 adjacent brain/ingestion/pipeline/process-guard tests pass with the conftest change; LF-normalised fingerprints verified against the CRLF clean-room worktree",
+      "status": "RESOLVED_BY_ATTEMPT3_PHASE_F"
+    }
+  ],
+  "raw_ignored_evidence": {
+    "directory": "results/task83_r3c_r1_cleanroom_requalification/raw_test_output/",
+    "gitignored": true,
+    "attempt3_phase_f_sha256": {
+      "attempt3_phase_f.spec.json": "d53cbb92f757f712f24dd951d99652c3aef69abd0fcb15e241d49eccd246e738",
+      "attempt3_phase_f_20260830_200809_062.stdout.log": "6a9b957543da5da6c23773f5e48e08a3015baf545e0b65b44f368ca9a87c6757",
+      "attempt3_phase_f_20260830_200809_062.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "attempt3_phase_f_20260830_200809_062.exitcode.txt": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354",
+      "attempt3_phase_f_20260830_200809_062.status.json": "7d63f7e5894e584f0dbc2743f5f000400b4a4d454ebc947e11d1bd57c22196ff",
+      "attempt3_phase_f_20260830_200809_062.network_guard.json": "0dcca5b27bc8005302a429a6c6b77e9f36bfd9772f533f118b4cad713f331010",
+      "attempt3_phase_f_20260830_200809_062.environment.json": "5c94effc42552310f149a37f9d29a0493abf81003b9be66309f9f9c4a1a6ae81"
+    },
+    "note": "stderr.log sha256 e3b0c442... is the digest of empty input, confirming a clean stderr."
+  },
+  "protected_files": {
+    "talonx_quant_diff_head_vs_320da7b8": "empty",
+    "talonx_quant_diff_worktree": "empty",
+    "quant_state_store_and_iex_timestamp": "still open, untouched by this task"
+  },
+  "stashes_intact": [
+    "stash@{0} On research/talonx-strategy-validation: task83-r2-preexisting-partial-rehearsal-evidence",
+    "stash@{1} On research/talonx-strategy-validation: task56-resume-ledger-intact",
+    "stash@{2} On research/talonx-strategy-validation: task56-resume-preserve-intact-blocker"
+  ],
+  "worktree_cleanup": {
+    "path": "C:\\workspace\\TalonX_task83r3c_cleanroom",
+    "removed": true
+  },
+  "restrictions_observed": [
+    "no production or non-test code modified",
+    "no external service contacted (Telegram/Alpaca/Gemini/HuggingFace) - guard confirms 0 unexpected external attempts",
+    "no Original/PIV/Redis/dashboard launched",
+    "PAPER/experimental authorization never enabled",
+    "no holdouts accessed",
+    "no strategy tuned or approved",
+    "R3D not started"
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "always": [
+    "corrected_window_manifest.json",
+    "contamination_audit.json",
+    "contamination_audit.csv",
+    "artifact_schema.json",
+    "pre_replay_gates.json",
+    "task61r_summary.json",
+    "task61r_summary.md",
+    "task61r_conclusion.md"
+  ],
+  "classification_enum": [
+    "FPRC_V1_REPLICATION_REQUIRED",
+    "FPRC_V1_REJECTED",
+    "VALIDATION_BLOCKED"
+  ],
+  "if_blocked": [
+    "validation_blocker.json"
+  ],
+  "if_replayed": [
+    "trades.csv",
+    "rejections.csv",
+    "aggregate_economics.json",
+    "window_economics.csv",
+    "symbol_economics.csv",
+    "time_bucket_economics.csv",
+    "geometry_cost_economics.csv",
+    "exit_path_economics.csv",
+    "excursion.csv",
+    "winner_loser_sensitivity.csv",
+    "concentration.json",
+    "parity_diagnostics.json",
+    "criteria.json",
+    "replay_manifest.json"
+  ],
+  "schema_version": 1
+}

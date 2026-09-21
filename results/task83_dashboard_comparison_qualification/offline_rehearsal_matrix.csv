@@ -1,0 +1,21 @@
+scenario,name,expected,observed,verdict,label
+1,Original alone,PIV honestly NOT_RUN; collector read-only,"piv_identity=MISSING, original_writes=[]",PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+2,PIV alone (shadow),PIV SHADOW recorded; Original absent handled,execution_mode=SHADOW,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+3,Original + isolated PIV,isolation validates; both sides recorded,isolation_passed=True; orig=1; piv=3,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+4,Duplicate Original rejected,guard blocks a second ORIGINAL,"ok=False; runtime-role process policy blocked peer PID(s): [13832, 16288]",PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+5,Duplicate PIV rejected,guard blocks a second PIV even when isolation-verified,"ok=False; runtime-role process policy blocked peer PID(s): [14992, 23544]",PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+6,Overlapping/uncertain bindings rejected,same-DB isolation fails AND unmarked PIV peer blocks Original,same_db_isolation=False; unmarked_peer_ok=False,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+7,DB separate + channel overlap rejected,different DB does not save an overlapping channel name,passed=False; every PIV Redis channel must use the configured non-empty PIV namespace; one or more PIV Pub/Sub channels overlap Original channels,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+8,Correct DB + prefixed channels accepted,isolation passes,passed=True; all_prefixed=True,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+9,Collector observes without republish,zero collector publishes/writes,publishes_added=0,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+10,PIV outbound Telegram == 0,"no sender constructed, zero attempts",sender=None; attempts=0,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+11,PIV inbound poller zero starts,no listener built when telegram disabled,telegram_enabled=False; listener=None,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+12,Shadow == 0 broker mutations,no POST/DELETE to broker in shadow mode,mutating_calls=[],PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+13,Original notifications unaffected,collector never mutates Original keyspace,keyspace_changed=False,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+14,Bad source states honest,UNREADABLE + WRONG_SESSION + STALE all surfaced,"kinds=['MISSING', 'UNREADABLE', 'WRONG_SESSION']; states=['HEALTHY', 'NOT_RUN', 'STALE', 'UNREADABLE']",PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+15,Restart no duplicate,second pass appends 0; evidence has unique ids,second_pass_appended=0; unique=True,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+16,Late EOD correct session,"one eod record, bound to archived session",eod_records=1; session=piv_2026-08-28_100000_abcd1234,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+17,One failure isolated,PIV UNREADABLE; Original view still renders,piv_state=UNREADABLE; original_ok=ORIGINAL,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+18,Recovery priority over startup markers,RECOVERY_REQUIRED despite a startup marker being present,mode=RECOVERY_REQUIRED; raised=True,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+19,Abrupt termination owned locks only,collector lock self-heals; PIV lock untouched; evidence preserved,piv_lock_intact=True,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE
+20,Dashboard + collector read-only,"no writes, no publishes across collector + all three views",original_writes=0; piv_writes=0,PASS,TEST_FIXTURE_ONLY -- NOT ALPHA EVIDENCE

@@ -1,0 +1,39 @@
+{
+  "bootstrap": {
+    "ci_95": [
+      -0.22545660723578992,
+      -0.05540115986884469
+    ],
+    "resamples": 10000,
+    "seed": 59
+  },
+  "economic_robustness_cost_correctness": {
+    "bootstrap_lower_bound_above_zero": false,
+    "gross_exceeds_mean_cost_by_at_least_0_15R": false,
+    "max_symbol_positive_R_share_at_most_25pct": true,
+    "max_window_positive_R_share_at_most_60pct": true,
+    "mean_and_every_actual_fill_cost_at_most_0_20R": true,
+    "net_5bps_expectancy_at_least_0_15R": false,
+    "net_5bps_pf_at_least_1_25": false,
+    "technical_correctness_invariants_green": true,
+    "top3_winner_removal_net_expectancy_above_zero": false,
+    "two_positive_windows_none_below_minus_0_15R": false
+  },
+  "economic_robustness_cost_correctness_pass": false,
+  "interpretability": {
+    "at_least_10_symbols": true,
+    "at_least_15_each_window": true,
+    "at_least_15_winners": true,
+    "at_least_30_losses": true,
+    "at_least_60_trades": true,
+    "max_symbol_trade_share_at_most_25pct": true
+  },
+  "interpretability_pass": true,
+  "mandatory_criteria_pass": false,
+  "top3_sensitivity_5bps_expectancy": -0.18791295943877523,
+  "window_5bps_expectancy": {
+    "V1": -0.16613902258891067,
+    "V2": -0.02665916511865533,
+    "V3": -0.25197328875422453
+  }
+}

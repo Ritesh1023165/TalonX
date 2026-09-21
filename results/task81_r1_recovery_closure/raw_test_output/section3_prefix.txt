@@ -1,0 +1,25 @@
+>       assert life.state.reconciliation_flags["entry_admission_blocked"] is True
+E       assert False is True
+
+tests\test_task81_r1_reconciliation_completeness.py:220: AssertionError
+______________ test_block_persists_and_clears_only_on_clean_pass ______________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-824/test_block_persists_and_clears0')
+
+    def test_block_persists_and_clears_only_on_clean_pass(tmp_path):
+        cfg = _cfg(tmp_path)
+        transport = Transport()
+        life = _life(cfg, transport)
+        intent_id = _make_orphan_intent(life)
+        life.reconcile(now=NOW)
+>       assert life.state.reconciliation_flags["entry_admission_blocked"] is True
+E       assert False is True
+
+tests\test_task81_r1_reconciliation_completeness.py:261: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_task81_r1_reconciliation_completeness.py::test_cancelled_order_reported_open_is_contradiction_and_blocks
+FAILED tests/test_task81_r1_reconciliation_completeness.py::test_broker_order_matched_only_with_consistent_symbol_side_qty
+FAILED tests/test_task81_r1_reconciliation_completeness.py::test_orphan_order_intent_is_unresolved_and_blocks_clear
+FAILED tests/test_task81_r1_reconciliation_completeness.py::test_orphan_intent_clears_only_after_documented_operator_resolution
+FAILED tests/test_task81_r1_reconciliation_completeness.py::test_block_persists_and_clears_only_on_clean_pass
+5 failed, 1 passed in 0.29s

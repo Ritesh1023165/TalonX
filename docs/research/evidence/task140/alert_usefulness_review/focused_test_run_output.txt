@@ -1,0 +1,20 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- C:\workspace\TalonX\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\workspace\TalonX
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.10.16, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 9 items
+
+tests/test_task140c_cluster_evidence_preference.py::test_dd_sell_cluster_prefers_direction_stating_cluster_text_over_bare_dollar PASSED [ 11%]
+tests/test_task140c_cluster_evidence_preference.py::test_buy_side_co_occurrence_says_bought_not_sold PASSED [ 22%]
+tests/test_task140c_cluster_evidence_preference.py::test_large_transaction_alone_with_no_cluster_is_unchanged PASSED [ 33%]
+tests/test_task140c_cluster_evidence_preference.py::test_large_transaction_with_insider_activity_but_no_clusters_is_unchanged PASSED [ 44%]
+tests/test_task140c_cluster_evidence_preference.py::test_filing_change_code_is_never_overridden_by_an_unrelated_cluster PASSED [ 55%]
+tests/test_task140c_cluster_evidence_preference.py::test_sell_cluster_alone_still_does_not_grant_eligibility PASSED [ 66%]
+tests/test_task140c_cluster_evidence_preference.py::test_render_concise_shows_the_corrected_direction_stating_evidence PASSED [ 77%]
+tests/test_task140c_cluster_evidence_preference.py::test_reclassify_pending_rows_refreshes_stale_evidence_text_in_place PASSED [ 88%]
+tests/test_task140c_cluster_evidence_preference.py::test_reclassify_pending_rows_without_events_store_preserves_old_text_only_behavior PASSED [100%]
+
+============================== 9 passed in 0.39s ==============================

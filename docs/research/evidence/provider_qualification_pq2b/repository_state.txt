@@ -1,0 +1,8 @@
+PQ-2B repository state (2026-09-21)
+branch:            feature/task131-option-a-integration
+starting HEAD:     37b0fec43d4eacdc99c726ae8db6d38874e88600  (== origin/feature/task131-option-a-integration)
+starting status:   clean except git-untracked notifications.db-shm/-wal (test-suite side files; not staged)
+TalonX processes:  none running at start (none killed)
+worktrees:         5 unrelated pre-existing left untouched; temporary baseline worktrees created for failure reproduction were removed
+production ledger: repo-root v2_lane.db NOT opened by any PQ-2B code path; md5 cff00b0f46e7e5b65e6f5903366fab28, mtime 2026-09-15 05:45 -- unchanged
+activation:        IMPLEMENTED (talonx_v2/sip_adapter.py, provider_contract.py, --pricing-mode sip); NOT ACTIVATED (default pricing mode still csv; no session started; no environment/config mutated)

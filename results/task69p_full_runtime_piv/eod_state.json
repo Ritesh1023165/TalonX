@@ -1,0 +1,23 @@
+{
+  "task": "69P Part 12 - EOD final state",
+  "eod_utc": "2026-08-25T19:51:57Z",
+  "eod_uk_approx": "20:51:57 BST",
+  "live_loop_self_stopped_at": "~15:50 ET (config eod_flatten_et), process exited cleanly (exit code 0), no crash/exception logged",
+  "eod_command_run_manually": "python -m talonx_piv.cli eod -- required as a separate step after the live loop stops itself; matches 2026-08-24's identical pattern (EOD_FLATTEN fired ~2 minutes after that day's loop also self-stopped)",
+  "paper_open_orders_after": 0,
+  "paper_open_positions_after": 0,
+  "broker_internal_matched": true,
+  "no_overnight_exposure": true,
+  "process_state_after_eod": {
+    "active_talonx_runners": 0,
+    "active_schedulers": 0,
+    "verified_via": "PowerShell Get-Process (python*) / Get-ScheduledTask (talon*) counts, both 0"
+  },
+  "canonical_worktree_final": {
+    "branch": "research/talonx-strategy-validation",
+    "head": "2b32aaf43f6ae2c6702c43ba28c015e6e5f6ed47",
+    "starting_head_for_task69p": "d9749f3813d2c5495109b470df616faceb127ffc",
+    "tree_clean": true,
+    "protected_files_confirmed_untouched": "Verified via git diff --stat across the full commit range (7 commits, 14 files touched, zero overlap with talonx_quant/{strategy,indicators,consumer,config,fprc_v1,orpb_v1,fprc_v1_shadow,orpb_v1_shadow}.py)"
+  }
+}

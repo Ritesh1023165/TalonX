@@ -156,8 +156,22 @@ class RedisConfig:
         "TALONX_REDIS_WS_HEARTBEAT_KEY", "talonx:ingest:ws_heartbeat"
     )
     ws_heartbeat_ttl_seconds: int = _env_int("TALONX_REDIS_WS_HEARTBEAT_TTL_SECONDS", 120)
+    # Task 87B FC_03: market-INDEPENDENT liveness beat (talonx_ingest.
+    # liveness.LivenessBeacon). Written on a fixed timer regardless of
+    # market activity so /ping can tell "process/redis down" from "market
+    # legitimately quiet". TTL comfortably > the interval so a single
+    # missed write never reads as DISCONNECTED.
+    liveness_key: str = os.environ.get("TALONX_REDIS_LIVENESS_KEY", "talonx:ingest:liveness")
+    liveness_interval_seconds: float = _env_float("TALONX_REDIS_LIVENESS_INTERVAL_SECONDS", 20.0)
+    liveness_ttl_seconds: int = _env_int("TALONX_REDIS_LIVENESS_TTL_SECONDS", 90)
     connect_timeout_seconds: float = _env_float("TALONX_REDIS_CONNECT_TIMEOUT", 5.0)
     socket_timeout_seconds: float = _env_float("TALONX_REDIS_SOCKET_TIMEOUT", 5.0)
+    # RedisEventPublisher's background reconnect loop (2026-08-18
+    # correctness fix, code-review finding #3) -- same naming/default
+    # convention as talonx_quant/talonx_brain/talonx_dispatch's own
+    # reconnect_backoff_base_seconds/reconnect_backoff_max_seconds.
+    reconnect_backoff_base_seconds: float = _env_float("TALONX_REDIS_RECONNECT_BASE", 1.0)
+    reconnect_backoff_max_seconds: float = _env_float("TALONX_REDIS_RECONNECT_MAX", 30.0)
 
 
 @dataclass(frozen=True)

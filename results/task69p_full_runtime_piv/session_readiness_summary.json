@@ -1,0 +1,23 @@
+{
+  "task": "69P Part 5 - session readiness finalization (10:00 ET / 15:00 UK checkpoint)",
+  "checked_utc": "2026-08-25T14:01:00Z",
+  "finalized_count": 35,
+  "ready_count": 15,
+  "ready_symbols": ["AAPL", "AMAT", "AMD", "AMZN", "AVGO", "CSCO", "GOOGL", "INTC", "KLAC", "META", "MSFT", "MU", "NFLX", "NVDA", "TSLA"],
+  "not_ready_count": 20,
+  "not_ready_reason": "MISSING_REQUIRED_OPENING_MINUTES (all 20) -- consistent with the per-symbol IEX bar sparsity independently confirmed in stale_data_summary.json; no interpolation/forward-fill/synthetic data used.",
+  "decision_eligible_estimate": {
+    "method": "session-ready INTERSECT warmup-ready (warmup_verification_summary.json's 17 warmup-ready symbols)",
+    "symbols": ["AAPL", "AMAT", "AMD", "AMZN", "AVGO", "GOOGL", "INTC", "KLAC", "META", "MSFT", "MU", "NFLX", "NVDA", "TSLA"],
+    "count": 14,
+    "note": "Non-empty -- the strategy decision path now has a real, healthy set of symbols to evaluate as the session continues. CSCO is session-ready but was not warmup-ready; STX/LRCX/QCOM were warmup-ready but not session-ready."
+  },
+  "broker_reconciliation_at_checkpoint": {
+    "method": "Direct read-only Alpaca PAPER API call (AlpacaPaperClient.open_orders()/positions()), independent verification, not just internal state.",
+    "open_orders": 0,
+    "positions": 0,
+    "internal_lifecycle_state_positions": "2 entries present, BOTH status=CLOSED (position_c616f6e525ec57690bd0, position_fb1dd2a8474dd69431d2 -- yesterday's 2026-08-24 PIV_LIFECYCLE_PROBE round trip, an append-only audit ledger, not a currently-open list). Confirms zero actual open exposure, consistent with the broker-side check.",
+    "kill_switch": false
+  },
+  "process_status": "unchanged since session start (PIDs 4172/21600, StartTime 12:54:03 -- session was never interrupted or restarted for this checkpoint)."
+}

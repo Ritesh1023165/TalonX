@@ -99,6 +99,72 @@ async def test_signal_then_matching_report_publishes_confirmed_alert(engine):
     assert engine.alerts_published == 1
 
 
+# --- 2026-08-18 /ping observability completion: signals_received/
+# reports_received -- genuine, type-specific Redis counters distinct from
+# "correlated" below, which fires once per handled message REGARDLESS of
+# whether it was a signal or a report and so can't answer "which did Core
+# actually receive". -----------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_signal_message_increments_signals_received_not_reports_received(engine):
+    await engine._handle_message(_message(engine.config.signals_channel, _signal_payload()))
+
+    signals_calls = [c for c in engine._client.incrby.await_args_list if "core:signals_received" in c.args[0]]
+    reports_calls = [c for c in engine._client.incrby.await_args_list if "core:reports_received" in c.args[0]]
+    correlated_calls = [c for c in engine._client.incrby.await_args_list if "core:correlated" in c.args[0]]
+    assert len(signals_calls) == 1
+    assert len(reports_calls) == 0
+    assert len(correlated_calls) == 1  # unchanged: still fires once per message
+
+
+@pytest.mark.asyncio
+async def test_report_message_increments_reports_received_not_signals_received(engine):
+    await engine._handle_message(_message(engine.config.reports_channel, _report_payload()))
+
+    signals_calls = [c for c in engine._client.incrby.await_args_list if "core:signals_received" in c.args[0]]
+    reports_calls = [c for c in engine._client.incrby.await_args_list if "core:reports_received" in c.args[0]]
+    assert len(signals_calls) == 0
+    assert len(reports_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_signal_and_report_do_not_double_count_each_others_counter(engine):
+    await engine._handle_message(_message(engine.config.signals_channel, _signal_payload("bullish")))
+    await engine._handle_message(
+        _message(engine.config.reports_channel, _report_payload("bullish", confidence=0.9))
+    )
+
+    signals_calls = [c for c in engine._client.incrby.await_args_list if "core:signals_received" in c.args[0]]
+    reports_calls = [c for c in engine._client.incrby.await_args_list if "core:reports_received" in c.args[0]]
+    bullish_calls = [c for c in engine._client.incrby.await_args_list if "core:action_bullish" in c.args[0]]
+    bearish_calls = [c for c in engine._client.incrby.await_args_list if "core:action_bearish" in c.args[0]]
+    contradicted_calls = [c for c in engine._client.incrby.await_args_list if "core:action_contradicted" in c.args[0]]
+    assert len(signals_calls) == 1
+    assert len(reports_calls) == 1
+    assert len(bullish_calls) == 1  # confirmed_bullish -- exactly one action counter fires
+    assert len(bearish_calls) == 0
+    assert len(contradicted_calls) == 0
+
+
+@pytest.mark.asyncio
+async def test_contradicted_pair_increments_only_contradicted_action_counter(engine):
+    # bullish quant signal + bearish research report -> CONTRADICTED, not
+    # a third kind of actionable alert (2026-08-18 correctness fix).
+    await engine._handle_message(_message(engine.config.signals_channel, _signal_payload("bullish")))
+    await engine._handle_message(
+        _message(engine.config.reports_channel, _report_payload("bearish", confidence=0.9))
+    )
+
+    body = json.loads(engine._client.publish.await_args.args[1])
+    assert body["action"] == "contradicted"
+    bullish_calls = [c for c in engine._client.incrby.await_args_list if "core:action_bullish" in c.args[0]]
+    bearish_calls = [c for c in engine._client.incrby.await_args_list if "core:action_bearish" in c.args[0]]
+    contradicted_calls = [c for c in engine._client.incrby.await_args_list if "core:action_contradicted" in c.args[0]]
+    assert len(bullish_calls) == 0
+    assert len(bearish_calls) == 0
+    assert len(contradicted_calls) == 1
+
+
 @pytest.mark.asyncio
 async def test_report_then_matching_signal_publishes_alert_regardless_of_arrival_order(engine):
     await engine._handle_message(

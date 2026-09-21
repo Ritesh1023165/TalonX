@@ -1,0 +1,201 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- C:\workspace\TalonX\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\workspace\TalonX
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.10.16, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 49 items
+
+tests/test_task117_delivery_runner_integration.py::test_disabled_by_default_holds_then_enable_sends_after_restart PASSED [  2%]
+tests/test_task117_delivery_runner_integration.py::test_enabled_cycle_expires_stale_backlog_and_delivers_only_fresh PASSED [  4%]
+tests/test_task117_delivery_runner_integration.py::test_old_event_enqueued_today_is_not_fresh PASSED [  6%]
+tests/test_task117_delivery_runner_integration.py::test_ambiguous_send_is_durable_and_not_retried PASSED [  8%]
+tests/test_task117_delivery_runner_integration.py::test_digest_not_treated_as_immediate PASSED [ 10%]
+tests/test_task117_delivery_runner_integration.py::test_digest_delivery_defaults_off_even_when_immediate_delivery_is_enabled PASSED [ 12%]
+tests/test_task117_delivery_runner_integration.py::test_digest_delivery_explicit_opt_in_sends_the_aggregated_digest PASSED [ 14%]
+tests/test_task117_delivery_runner_integration.py::test_digest_default_off_is_durable_across_the_existing_pending_backlog PASSED [ 16%]
+tests/test_task117_delivery_runner_integration.py::test_cli_send_flag_flips_both_enablement_gates PASSED [ 18%]
+tests/test_task114_prospective.py::test_b5_heartbeat_independent_of_tick_seconds PASSED [ 20%]
+tests/test_task114_prospective.py::test_b5_status_file_written_atomically PASSED [ 22%]
+tests/test_task114_prospective.py::test_b2_ledger_continuity_healthy PASSED [ 24%]
+tests/test_task114_prospective.py::test_b2_ledger_missing_fails_closed PASSED [ 26%]
+tests/test_task114_prospective.py::test_b2_negative_cash_fails_closed PASSED [ 28%]
+tests/test_task114_prospective.py::test_b2_broken_equation_fails_closed PASSED [ 30%]
+tests/test_task114_prospective.py::test_b2_guard_never_writes PASSED     [ 32%]
+tests/test_task114_prospective.py::test_b6_shim_child_pair_is_one_logical_owner PASSED [ 34%]
+tests/test_task114_prospective.py::test_b6_two_independent_network_pollers_is_degraded PASSED [ 36%]
+tests/test_task114_prospective.py::test_b6_single_network_poller_healthy PASSED [ 38%]
+tests/test_task114_prospective.py::test_a3_funnel_stale_abcl_is_accounted PASSED [ 40%]
+tests/test_task114_prospective.py::test_b3_checkpoint_has_required_fields PASSED [ 42%]
+tests/test_task114_prospective.py::test_b3_eod_state_not_due_before_close PASSED [ 44%]
+tests/test_task114_prospective.py::test_b3_eod_state_pending_then_stale PASSED [ 46%]
+tests/test_task114_prospective.py::test_b4_critical_on_stale_episode_entered PASSED [ 48%]
+tests/test_task114_prospective.py::test_b4_critical_on_experimental_external_send PASSED [ 51%]
+tests/test_task114_prospective.py::test_b4_info_on_cluster_formed PASSED [ 53%]
+tests/test_task114_prospective.py::test_b4_warning_on_market_degraded PASSED [ 55%]
+tests/test_task114_prospective.py::test_b4_healthy_zero_activity_emits_nothing PASSED [ 57%]
+tests/test_task114_prospective.py::test_b3_session_loop_writes_and_stops PASSED [ 59%]
+tests/test_task114_prospective.py::test_b3_session_loop_stop_flag PASSED [ 61%]
+tests/test_task114_prospective.py::test_b7_close_not_due_yet_before_market_close PASSED [ 63%]
+tests/test_task114_prospective.py::test_b7_close_reconciles_zero_activity_ledger PASSED [ 65%]
+tests/test_task114_prospective.py::test_b1_preflight_runs_and_reports_overall PASSED [ 67%]
+tests/test_task114_prospective.py::test_b1_preflight_fingerprints_are_expected PASSED [ 69%]
+tests/test_task114_prospective.py::test_a4_v2_section_separates_health_data_activity FAILED [ 71%]
+tests/test_task114_prospective.py::test_a5_v2_section_eod_not_due_yet PASSED [ 73%]
+tests/test_task114_prospective.py::test_a5_v2_section_no_eod_flatten_and_10td_hold PASSED [ 75%]
+tests/test_task114_prospective.py::test_a2_overview_has_first_class_active_v2 PASSED [ 77%]
+tests/test_task114_prospective.py::test_a2_overview_healthy_zero_is_not_an_attention_item PASSED [ 79%]
+tests/test_task114_prospective.py::test_task114_does_not_change_fingerprints PASSED [ 81%]
+tests/test_task114_prospective.py::test_task114_v2config_frozen_unchanged PASSED [ 83%]
+tests/test_task114_prospective.py::test_start_stack_omits_enable_broad_discovery_by_default FAILED [ 85%]
+tests/test_task114_prospective.py::test_start_stack_passes_enable_broad_discovery_through_to_the_v2_companion FAILED [ 87%]
+tests/test_task114_prospective.py::test_start_stack_does_not_set_intel_broad_discovery_env_by_default PASSED [ 89%]
+tests/test_task114_prospective.py::test_start_stack_enable_broad_discovery_also_sets_the_intelligence_env_var PASSED [ 91%]
+tests/test_task114_prospective.py::test_start_stack_deliver_telegram_also_enables_intelligence_delivery PASSED [ 93%]
+tests/test_task114_prospective.py::test_start_stack_dryrun_transport_does_not_enable_intelligence_delivery PASSED [ 95%]
+tests/test_task114_prospective.py::test_start_stack_deliver_telegram_never_overrides_an_explicit_shell_value PASSED [ 97%]
+tests/test_task114_prospective.py::test_start_stack_enable_broad_discovery_never_overrides_an_explicit_shell_value PASSED [100%]
+
+================================== FAILURES ===================================
+______________ test_a4_v2_section_separates_health_data_activity ______________
+
+_dash = <talonx_ops.dashboard_read.DashboardReadModel object at 0x00000225EF02F320>
+
+    def test_a4_v2_section_separates_health_data_activity(_dash):
+        v2 = _dash.v2_active_strategy()
+>       assert v2["health"] in {"HEALTHY", "DEGRADED", "DOWN", "UNKNOWN"}
+E       AssertionError: assert 'STARTUP_FAILED' in {'DEGRADED', 'DOWN', 'HEALTHY', 'UNKNOWN'}
+
+tests\test_task114_prospective.py:352: AssertionError
+__________ test_start_stack_omits_enable_broad_discovery_by_default ___________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1738/test_start_stack_omits_enable_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000225EF1A1460>
+
+    def test_start_stack_omits_enable_broad_discovery_by_default(tmp_path, monkeypatch):
+        proc, spawned, v2_db = _patched_proc(monkeypatch, tmp_path)
+>       proc.start_stack(tmp_path / "session", env={}, with_dashboard=False,
+                         with_checkpoint_daemon=False)
+
+tests\test_task114_prospective.py:459: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+session_dir = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1738/test_start_stack_omits_enable_0/session')
+env = {}, tick_seconds = 300, heartbeat_seconds = 30, live_lookback_days = 45
+with_dashboard = False, with_checkpoint_daemon = False
+checkpoint_every_s = 1800, pricing_mode = 'csv', execution_scope = 'none'
+deliver = False, transport = 'dryrun', enable_broad_discovery = False
+allow_when_running = False
+
+    def start_stack(session_dir: str | Path, *, env: dict[str, str],
+                    tick_seconds: int = 300, heartbeat_seconds: int = 30,
+                    live_lookback_days: int = 45, with_dashboard: bool = True,
+                    with_checkpoint_daemon: bool = True,
+                    checkpoint_every_s: int = 1800,
+                    pricing_mode: str = "csv", execution_scope: str = "none",
+                    deliver: bool = False, transport: str = "dryrun",
+                    enable_broad_discovery: bool = False,
+                    allow_when_running: bool = False) -> dict[str, Any]:
+        sd = Path(session_dir)
+        sd.mkdir(parents=True, exist_ok=True)
+        logs = sd / "logs"
+        py = sys.executable
+    
+        # D4 / Section 3: ATOMIC single-writer guard. os.open(O_CREAT|O_EXCL) keyed
+        # on the V2 ledger identity -- two racing starts: exactly one creates the
+        # lock, the other sees a LIVE owner and refuses. --force (allow_when_running)
+        # breaks a STALE lock (owner verified gone) but NEVER a live one, and NEVER
+        # an 'unknown' (corrupt/incomplete) one either.
+        #
+        # Lifecycle: acquired here by this short-lived CLI process, then REBOUND
+        # (inside _start_stack_locked) to the pid of the actual long-lived ledger
+        # writer -- the V2 companion -- before this command returns, so the lock's
+        # liveness tracks the writer even after 'start' itself exits. The
+        # owner_token travels across that rebind; only a holder of the matching
+        # token may ever release it (see stop_stack).
+        _lock = SingleWriterLock(V2_DB_PATH)
+        try:
+            _lock.acquire(force=allow_when_running, break_stale=allow_when_running)
+        except LockStateUnknownError:
+            raise  # never silently bypassed by --force; needs explicit recovery
+        try:
+            # secondary, best-effort process scan (covers a stack started without
+            # the lock, e.g. a stale-lock break where the old owner is somehow back)
+            if not allow_when_running:
+                live = _live_prior_stack()
+                if live:
+>                   raise ConcurrentStartError(
+                        "process scan found a live prospective stack: "
+                        + "; ".join(f"pid {h['pid']}" for h in live))
+E                       talonx_ops.prospective.lock.ConcurrentStartError: process scan found a live prospective stack: pid 2836; pid 5400; pid 6052; pid 10772; pid 11324; pid 16140
+
+talonx_ops\prospective\proc.py:180: ConcurrentStartError
+_ test_start_stack_passes_enable_broad_discovery_through_to_the_v2_companion __
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1738/test_start_stack_passes_enable0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000225EF1A0E30>
+
+    def test_start_stack_passes_enable_broad_discovery_through_to_the_v2_companion(tmp_path, monkeypatch):
+        proc, spawned, v2_db = _patched_proc(monkeypatch, tmp_path)
+>       proc.start_stack(tmp_path / "session", env={}, with_dashboard=False,
+                         with_checkpoint_daemon=False, enable_broad_discovery=True)
+
+tests\test_task114_prospective.py:469: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+session_dir = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1738/test_start_stack_passes_enable0/session')
+env = {}, tick_seconds = 300, heartbeat_seconds = 30, live_lookback_days = 45
+with_dashboard = False, with_checkpoint_daemon = False
+checkpoint_every_s = 1800, pricing_mode = 'csv', execution_scope = 'none'
+deliver = False, transport = 'dryrun', enable_broad_discovery = True
+allow_when_running = False
+
+    def start_stack(session_dir: str | Path, *, env: dict[str, str],
+                    tick_seconds: int = 300, heartbeat_seconds: int = 30,
+                    live_lookback_days: int = 45, with_dashboard: bool = True,
+                    with_checkpoint_daemon: bool = True,
+                    checkpoint_every_s: int = 1800,
+                    pricing_mode: str = "csv", execution_scope: str = "none",
+                    deliver: bool = False, transport: str = "dryrun",
+                    enable_broad_discovery: bool = False,
+                    allow_when_running: bool = False) -> dict[str, Any]:
+        sd = Path(session_dir)
+        sd.mkdir(parents=True, exist_ok=True)
+        logs = sd / "logs"
+        py = sys.executable
+    
+        # D4 / Section 3: ATOMIC single-writer guard. os.open(O_CREAT|O_EXCL) keyed
+        # on the V2 ledger identity -- two racing starts: exactly one creates the
+        # lock, the other sees a LIVE owner and refuses. --force (allow_when_running)
+        # breaks a STALE lock (owner verified gone) but NEVER a live one, and NEVER
+        # an 'unknown' (corrupt/incomplete) one either.
+        #
+        # Lifecycle: acquired here by this short-lived CLI process, then REBOUND
+        # (inside _start_stack_locked) to the pid of the actual long-lived ledger
+        # writer -- the V2 companion -- before this command returns, so the lock's
+        # liveness tracks the writer even after 'start' itself exits. The
+        # owner_token travels across that rebind; only a holder of the matching
+        # token may ever release it (see stop_stack).
+        _lock = SingleWriterLock(V2_DB_PATH)
+        try:
+            _lock.acquire(force=allow_when_running, break_stale=allow_when_running)
+        except LockStateUnknownError:
+            raise  # never silently bypassed by --force; needs explicit recovery
+        try:
+            # secondary, best-effort process scan (covers a stack started without
+            # the lock, e.g. a stale-lock break where the old owner is somehow back)
+            if not allow_when_running:
+                live = _live_prior_stack()
+                if live:
+>                   raise ConcurrentStartError(
+                        "process scan found a live prospective stack: "
+                        + "; ".join(f"pid {h['pid']}" for h in live))
+E                       talonx_ops.prospective.lock.ConcurrentStartError: process scan found a live prospective stack: pid 2836; pid 5400; pid 6052; pid 10772; pid 11324; pid 16140
+
+talonx_ops\prospective\proc.py:180: ConcurrentStartError
+=========================== short test summary info ===========================
+FAILED tests/test_task114_prospective.py::test_a4_v2_section_separates_health_data_activity
+FAILED tests/test_task114_prospective.py::test_start_stack_omits_enable_broad_discovery_by_default
+FAILED tests/test_task114_prospective.py::test_start_stack_passes_enable_broad_discovery_through_to_the_v2_companion
+======================== 3 failed, 46 passed in 31.51s ========================

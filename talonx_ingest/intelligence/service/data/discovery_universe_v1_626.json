@@ -1,0 +1,3724 @@
+{
+  "provenance": {
+    "source": "research/talonx-profitability-2026-09 branch, Task 118D/130/130A/130B",
+    "source_commit": "5282219b076aa340d36c387e2709b4464c5fa5f2",
+    "source_file": "results/task118_profitability/reconciliation/population_manifest.json",
+    "key": "C_full_panel_A_union_B",
+    "description": "Discovery Universe v1 -- Task 116 620-name panel union Tier-1 39-name SEC-resolved watchlist, matched-post-Task-117-runtime population. Frozen, validated by Task 130/130A/130B research (net@20bps +2.02%%, N=153).",
+    "imported_for": "TASK131_DIRECTIVE_4_SEC_INGESTION_EXPANSION"
+  },
+  "symbols": [
+    "A",
+    "AAL",
+    "AAP",
+    "AAPL",
+    "ABBV",
+    "ABCL",
+    "ABMD",
+    "ABNB",
+    "ABT",
+    "ACGL",
+    "ACHR",
+    "ACN",
+    "ADBE",
+    "ADC",
+    "ADI",
+    "ADM",
+    "ADP",
+    "ADS",
+    "ADSK",
+    "AEE",
+    "AEP",
+    "AES",
+    "AFL",
+    "AGN",
+    "AGNC",
+    "AIG",
+    "AIV",
+    "AIZ",
+    "AJG",
+    "AKAM",
+    "ALB",
+    "ALGN",
+    "ALK",
+    "ALL",
+    "ALLE",
+    "ALXN",
+    "AMAT",
+    "AMCR",
+    "AMD",
+    "AME",
+    "AMGN",
+    "AMP",
+    "AMT",
+    "AMTM",
+    "AMZN",
+    "ANET",
+    "AON",
+    "AOS",
+    "APA",
+    "APD",
+    "APH",
+    "APO",
+    "APP",
+    "APTV",
+    "ARE",
+    "ARES",
+    "ARNC",
+    "ATO",
+    "ATVI",
+    "AVB",
+    "AVGO",
+    "AVY",
+    "AWK",
+    "AXON",
+    "AXP",
+    "AZO",
+    "BA",
+    "BAC",
+    "BALL",
+    "BAX",
+    "BBWI",
+    "BBY",
+    "BDX",
+    "BEN",
+    "BF.B",
+    "BG",
+    "BIIB",
+    "BIO",
+    "BKNG",
+    "BKR",
+    "BLDR",
+    "BLK",
+    "BLL",
+    "BMY",
+    "BNY",
+    "BR",
+    "BRK.B",
+    "BRO",
+    "BSX",
+    "BWA",
+    "BX",
+    "BXP",
+    "C",
+    "CAG",
+    "CAH",
+    "CARR",
+    "CASY",
+    "CAT",
+    "CB",
+    "CBOE",
+    "CBRE",
+    "CCI",
+    "CCL",
+    "CDNS",
+    "CDW",
+    "CE",
+    "CEG",
+    "CERN",
+    "CF",
+    "CFG",
+    "CHD",
+    "CHRW",
+    "CHTR",
+    "CI",
+    "CIEN",
+    "CINF",
+    "CL",
+    "CLX",
+    "CMA",
+    "CMCSA",
+    "CME",
+    "CMG",
+    "CMI",
+    "CMS",
+    "CNC",
+    "CNP",
+    "COF",
+    "COHR",
+    "COIN",
+    "COO",
+    "COP",
+    "COR",
+    "COST",
+    "COTY",
+    "CPAY",
+    "CPB",
+    "CPRI",
+    "CPRT",
+    "CPT",
+    "CRH",
+    "CRL",
+    "CRM",
+    "CRWD",
+    "CSCO",
+    "CSGP",
+    "CSX",
+    "CTAS",
+    "CTL",
+    "CTLT",
+    "CTRA",
+    "CTSH",
+    "CTVA",
+    "CTXS",
+    "CVNA",
+    "CVS",
+    "CVX",
+    "CXO",
+    "CZR",
+    "D",
+    "DAL",
+    "DASH",
+    "DAY",
+    "DD",
+    "DDOG",
+    "DE",
+    "DECK",
+    "DELL",
+    "DFS",
+    "DG",
+    "DGX",
+    "DHI",
+    "DHR",
+    "DINO",
+    "DIS",
+    "DISH",
+    "DLR",
+    "DLTR",
+    "DOC",
+    "DOV",
+    "DOW",
+    "DPZ",
+    "DRE",
+    "DRI",
+    "DTE",
+    "DUK",
+    "DVA",
+    "DVN",
+    "DXC",
+    "DXCM",
+    "EA",
+    "EBAY",
+    "ECHO",
+    "ECL",
+    "ED",
+    "EFX",
+    "EG",
+    "EIX",
+    "EL",
+    "ELV",
+    "EME",
+    "EMN",
+    "EMR",
+    "ENPH",
+    "EOG",
+    "EPAM",
+    "EQIX",
+    "EQR",
+    "EQT",
+    "ERIE",
+    "ES",
+    "ESS",
+    "ETFC",
+    "ETN",
+    "ETR",
+    "ETSY",
+    "EVRG",
+    "EW",
+    "EXC",
+    "EXE",
+    "EXPD",
+    "EXPE",
+    "EXR",
+    "F",
+    "FANG",
+    "FAST",
+    "FBIN",
+    "FCX",
+    "FDS",
+    "FDX",
+    "FDXF",
+    "FE",
+    "FFIV",
+    "FI",
+    "FICO",
+    "FIS",
+    "FITB",
+    "FIX",
+    "FLEX",
+    "FLIR",
+    "FLS",
+    "FLT",
+    "FMC",
+    "FOX",
+    "FOXA",
+    "FRC",
+    "FRT",
+    "FSLR",
+    "FTI",
+    "FTNT",
+    "FTV",
+    "GD",
+    "GDDY",
+    "GE",
+    "GEHC",
+    "GEN",
+    "GEV",
+    "GILD",
+    "GIS",
+    "GL",
+    "GLW",
+    "GM",
+    "GNRC",
+    "GOOG",
+    "GOOGL",
+    "GPC",
+    "GPN",
+    "GPS",
+    "GRMN",
+    "GS",
+    "GWW",
+    "HAL",
+    "HAS",
+    "HBAN",
+    "HBI",
+    "HCA",
+    "HD",
+    "HES",
+    "HIG",
+    "HII",
+    "HLT",
+    "HOG",
+    "HOLX",
+    "HON",
+    "HONA",
+    "HOOD",
+    "HP",
+    "HPE",
+    "HPQ",
+    "HRB",
+    "HRL",
+    "HSIC",
+    "HST",
+    "HSY",
+    "HUBB",
+    "HUM",
+    "HWM",
+    "IBKR",
+    "IBM",
+    "ICE",
+    "IDXX",
+    "IEX",
+    "IFF",
+    "ILMN",
+    "INCY",
+    "INFO",
+    "INTC",
+    "INTU",
+    "INVH",
+    "IP",
+    "IPG",
+    "IPGP",
+    "IQV",
+    "IR",
+    "IRM",
+    "ISRG",
+    "IT",
+    "ITW",
+    "IVZ",
+    "J",
+    "JBHT",
+    "JBL",
+    "JCI",
+    "JKHY",
+    "JNJ",
+    "JPM",
+    "JWN",
+    "K",
+    "KDP",
+    "KEY",
+    "KEYS",
+    "KHC",
+    "KIM",
+    "KKR",
+    "KLAC",
+    "KMB",
+    "KMI",
+    "KMX",
+    "KO",
+    "KR",
+    "KSS",
+    "KSU",
+    "KVUE",
+    "L",
+    "LB",
+    "LDOS",
+    "LEG",
+    "LEN",
+    "LH",
+    "LHX",
+    "LII",
+    "LIN",
+    "LITE",
+    "LKQ",
+    "LLY",
+    "LMT",
+    "LNC",
+    "LNT",
+    "LOW",
+    "LRCX",
+    "LULU",
+    "LUMN",
+    "LUV",
+    "LVS",
+    "LW",
+    "LYB",
+    "LYV",
+    "M",
+    "MA",
+    "MAA",
+    "MAR",
+    "MAS",
+    "MCD",
+    "MCHP",
+    "MCK",
+    "MCO",
+    "MDLZ",
+    "MDT",
+    "MET",
+    "META",
+    "MGM",
+    "MHK",
+    "MKC",
+    "MKTX",
+    "MLM",
+    "MMM",
+    "MNST",
+    "MO",
+    "MOH",
+    "MOS",
+    "MPC",
+    "MPWR",
+    "MRK",
+    "MRNA",
+    "MRO",
+    "MRSH",
+    "MRVL",
+    "MS",
+    "MSCI",
+    "MSFT",
+    "MSI",
+    "MSTR",
+    "MTB",
+    "MTCH",
+    "MTD",
+    "MU",
+    "MXIM",
+    "MYL",
+    "NBL",
+    "NCLH",
+    "NDAQ",
+    "NDSN",
+    "NEE",
+    "NEM",
+    "NFLX",
+    "NI",
+    "NKE",
+    "NLSN",
+    "NOC",
+    "NOV",
+    "NOW",
+    "NRG",
+    "NSC",
+    "NTAP",
+    "NTRS",
+    "NUE",
+    "NVDA",
+    "NVR",
+    "NWL",
+    "NWS",
+    "NWSA",
+    "NXPI",
+    "O",
+    "ODFL",
+    "OGN",
+    "OKE",
+    "OMC",
+    "ON",
+    "ORCL",
+    "ORLY",
+    "OTIS",
+    "OXY",
+    "PANW",
+    "PARA",
+    "PAYC",
+    "PAYX",
+    "PBCT",
+    "PCAR",
+    "PCG",
+    "PEG",
+    "PENN",
+    "PEP",
+    "PFE",
+    "PFG",
+    "PG",
+    "PGR",
+    "PH",
+    "PHM",
+    "PKG",
+    "PLD",
+    "PLTR",
+    "PM",
+    "PNC",
+    "PNR",
+    "PNW",
+    "PODD",
+    "POOL",
+    "PPG",
+    "PPL",
+    "PRGO",
+    "PRU",
+    "PSA",
+    "PSX",
+    "PTC",
+    "PVH",
+    "PWR",
+    "PXD",
+    "PYPL",
+    "Q",
+    "QCOM",
+    "QRVO",
+    "RCL",
+    "REG",
+    "REGN",
+    "RF",
+    "RHI",
+    "RJF",
+    "RL",
+    "RMD",
+    "ROK",
+    "ROL",
+    "ROP",
+    "ROST",
+    "RSG",
+    "RTN",
+    "RTX",
+    "RVTY",
+    "SATS",
+    "SBAC",
+    "SBNY",
+    "SBUX",
+    "SCHW",
+    "SEDG",
+    "SEE",
+    "SHOP",
+    "SHW",
+    "SIVB",
+    "SJM",
+    "SLB",
+    "SLG",
+    "SMCI",
+    "SNA",
+    "SNDK",
+    "SNPS",
+    "SO",
+    "SOLS",
+    "SOLV",
+    "SPG",
+    "SPGI",
+    "SRE",
+    "STE",
+    "STLD",
+    "STT",
+    "STX",
+    "STZ",
+    "SW",
+    "SWK",
+    "SWKS",
+    "SYF",
+    "SYK",
+    "SYY",
+    "T",
+    "TAP",
+    "TDG",
+    "TDY",
+    "TECH",
+    "TEL",
+    "TER",
+    "TFC",
+    "TFX",
+    "TGT",
+    "TIF",
+    "TJX",
+    "TKO",
+    "TMO",
+    "TMUS",
+    "TPL",
+    "TPR",
+    "TRGP",
+    "TRMB",
+    "TROW",
+    "TRV",
+    "TSCO",
+    "TSLA",
+    "TSN",
+    "TT",
+    "TTD",
+    "TTWO",
+    "TWTR",
+    "TXN",
+    "TXT",
+    "TYL",
+    "UA",
+    "UAA",
+    "UAL",
+    "UBER",
+    "UDR",
+    "UHS",
+    "ULTA",
+    "UNH",
+    "UNM",
+    "UNP",
+    "UPS",
+    "URI",
+    "USB",
+    "UTX",
+    "V",
+    "VAR",
+    "VEEV",
+    "VFC",
+    "VICI",
+    "VLO",
+    "VLTO",
+    "VMC",
+    "VNO",
+    "VNT",
+    "VRSK",
+    "VRSN",
+    "VRT",
+    "VRTX",
+    "VST",
+    "VTR",
+    "VTRS",
+    "VZ",
+    "WAB",
+    "WAT",
+    "WBA",
+    "WBD",
+    "WDAY",
+    "WDC",
+    "WEC",
+    "WELL",
+    "WFC",
+    "WHR",
+    "WM",
+    "WMB",
+    "WMT",
+    "WRB",
+    "WSM",
+    "WST",
+    "WTW",
+    "WU",
+    "WY",
+    "WYNN",
+    "XEC",
+    "XEL",
+    "XLNX",
+    "XOM",
+    "XRAY",
+    "XRX",
+    "XYL",
+    "XYZ",
+    "YUM",
+    "ZBH",
+    "ZBRA",
+    "ZION",
+    "ZTS"
+  ],
+  "n_symbols": 626,
+  "cik_manifest": {
+    "manifest_version": "CIK_MANIFEST_V1",
+    "description": "Task 131 Remediation Directive 6: a STATIC, VERSIONED CIK mapping for the 626-name Discovery Universe v1 population, resolved ONCE from a snapshot of SEC company_tickers.json and frozen here -- never re-resolved dynamically at runtime for this specific, historical, point-in-time population (which legitimately spans delisted/acquired/renamed names a LIVE lookup would silently drop). The primary product watchlist (~39-48 names) and the live identity_guard check both continue to use the existing, dynamic CikDirectory -- this static manifest is scoped ONLY to the broad-discovery 626-name expansion.",
+    "resolved_at_utc": "2026-09-13T17:02:55.941282+00:00",
+    "source_snapshot": "C:/Users/rites/.talonx/intelligence/company_tickers.json (local cache)",
+    "n_resolved": 569,
+    "n_unresolved": 57,
+    "resolved": {
+      "A": {
+        "cik": "0001090872",
+        "company_name": "AGILENT TECHNOLOGIES, INC.",
+        "source": "sec_company_tickers"
+      },
+      "AAL": {
+        "cik": "0000006201",
+        "company_name": "American Airlines Group Inc.",
+        "source": "sec_company_tickers"
+      },
+      "AAP": {
+        "cik": "0001158449",
+        "company_name": "ADVANCE AUTO PARTS INC",
+        "source": "sec_company_tickers"
+      },
+      "AAPL": {
+        "cik": "0000320193",
+        "company_name": "Apple Inc.",
+        "source": "sec_company_tickers"
+      },
+      "ABBV": {
+        "cik": "0001551152",
+        "company_name": "AbbVie Inc.",
+        "source": "sec_company_tickers"
+      },
+      "ABCL": {
+        "cik": "0001703057",
+        "company_name": "AbCellera Biologics Inc.",
+        "source": "sec_company_tickers"
+      },
+      "ABNB": {
+        "cik": "0001559720",
+        "company_name": "Airbnb, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "ABT": {
+        "cik": "0000001800",
+        "company_name": "ABBOTT LABORATORIES",
+        "source": "sec_company_tickers"
+      },
+      "ACGL": {
+        "cik": "0000947484",
+        "company_name": "ARCH CAPITAL GROUP LTD.",
+        "source": "sec_company_tickers"
+      },
+      "ACHR": {
+        "cik": "0001824502",
+        "company_name": "Archer Aviation Inc.",
+        "source": "sec_company_tickers"
+      },
+      "ACN": {
+        "cik": "0001467373",
+        "company_name": "Accenture plc",
+        "source": "sec_company_tickers"
+      },
+      "ADBE": {
+        "cik": "0000796343",
+        "company_name": "ADOBE INC.",
+        "source": "sec_company_tickers"
+      },
+      "ADC": {
+        "cik": "0000917251",
+        "company_name": "AGREE REALTY CORP",
+        "source": "sec_company_tickers"
+      },
+      "ADI": {
+        "cik": "0000006281",
+        "company_name": "ANALOG DEVICES INC",
+        "source": "sec_company_tickers"
+      },
+      "ADM": {
+        "cik": "0000007084",
+        "company_name": "Archer-Daniels-Midland Co",
+        "source": "sec_company_tickers"
+      },
+      "ADP": {
+        "cik": "0000008670",
+        "company_name": "AUTOMATIC DATA PROCESSING INC",
+        "source": "sec_company_tickers"
+      },
+      "ADSK": {
+        "cik": "0000769397",
+        "company_name": "Autodesk, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "AEE": {
+        "cik": "0001002910",
+        "company_name": "AMEREN CORP",
+        "source": "sec_company_tickers"
+      },
+      "AEP": {
+        "cik": "0000004904",
+        "company_name": "AMERICAN ELECTRIC POWER CO INC",
+        "source": "sec_company_tickers"
+      },
+      "AES": {
+        "cik": "0000874761",
+        "company_name": "AES CORP",
+        "source": "sec_company_tickers"
+      },
+      "AFL": {
+        "cik": "0000004977",
+        "company_name": "AFLAC INC",
+        "source": "sec_company_tickers"
+      },
+      "AGNC": {
+        "cik": "0001423689",
+        "company_name": "AGNC Investment Corp.",
+        "source": "sec_company_tickers"
+      },
+      "AIG": {
+        "cik": "0000005272",
+        "company_name": "AMERICAN INTERNATIONAL GROUP, INC.",
+        "source": "sec_company_tickers"
+      },
+      "AIV": {
+        "cik": "0000922864",
+        "company_name": "APARTMENT INVESTMENT & MANAGEMENT CO",
+        "source": "sec_company_tickers"
+      },
+      "AIZ": {
+        "cik": "0001267238",
+        "company_name": "ASSURANT, INC.",
+        "source": "sec_company_tickers"
+      },
+      "AJG": {
+        "cik": "0000354190",
+        "company_name": "Arthur J. Gallagher & Co.",
+        "source": "sec_company_tickers"
+      },
+      "AKAM": {
+        "cik": "0001086222",
+        "company_name": "AKAMAI TECHNOLOGIES INC",
+        "source": "sec_company_tickers"
+      },
+      "ALB": {
+        "cik": "0000915913",
+        "company_name": "ALBEMARLE CORP",
+        "source": "sec_company_tickers"
+      },
+      "ALGN": {
+        "cik": "0001097149",
+        "company_name": "ALIGN TECHNOLOGY INC",
+        "source": "sec_company_tickers"
+      },
+      "ALK": {
+        "cik": "0000766421",
+        "company_name": "ALASKA AIR GROUP, INC.",
+        "source": "sec_company_tickers"
+      },
+      "ALL": {
+        "cik": "0000899051",
+        "company_name": "ALLSTATE CORP",
+        "source": "sec_company_tickers"
+      },
+      "ALLE": {
+        "cik": "0001579241",
+        "company_name": "Allegion plc",
+        "source": "sec_company_tickers"
+      },
+      "AMAT": {
+        "cik": "0000006951",
+        "company_name": "APPLIED MATERIALS INC /DE",
+        "source": "sec_company_tickers"
+      },
+      "AMCR": {
+        "cik": "0001748790",
+        "company_name": "Amcor plc",
+        "source": "sec_company_tickers"
+      },
+      "AMD": {
+        "cik": "0000002488",
+        "company_name": "ADVANCED MICRO DEVICES INC",
+        "source": "sec_company_tickers"
+      },
+      "AME": {
+        "cik": "0001037868",
+        "company_name": "AMETEK INC/",
+        "source": "sec_company_tickers"
+      },
+      "AMGN": {
+        "cik": "0000318154",
+        "company_name": "AMGEN INC",
+        "source": "sec_company_tickers"
+      },
+      "AMP": {
+        "cik": "0000820027",
+        "company_name": "AMERIPRISE FINANCIAL INC",
+        "source": "sec_company_tickers"
+      },
+      "AMT": {
+        "cik": "0001053507",
+        "company_name": "AMERICAN TOWER CORP /MA/",
+        "source": "sec_company_tickers"
+      },
+      "AMTM": {
+        "cik": "0002011286",
+        "company_name": "Amentum Holdings, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "AMZN": {
+        "cik": "0001018724",
+        "company_name": "AMAZON COM INC",
+        "source": "sec_company_tickers"
+      },
+      "ANET": {
+        "cik": "0001596532",
+        "company_name": "Arista Networks, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "AON": {
+        "cik": "0000315293",
+        "company_name": "Aon plc",
+        "source": "sec_company_tickers"
+      },
+      "AOS": {
+        "cik": "0000091142",
+        "company_name": "SMITH A O CORP",
+        "source": "sec_company_tickers"
+      },
+      "APA": {
+        "cik": "0001841666",
+        "company_name": "APA Corp",
+        "source": "sec_company_tickers"
+      },
+      "APD": {
+        "cik": "0000002969",
+        "company_name": "Air Products & Chemicals, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "APH": {
+        "cik": "0000820313",
+        "company_name": "AMPHENOL CORP /DE/",
+        "source": "sec_company_tickers"
+      },
+      "APO": {
+        "cik": "0001858681",
+        "company_name": "Apollo Global Management, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "APP": {
+        "cik": "0001751008",
+        "company_name": "AppLovin Corp",
+        "source": "sec_company_tickers"
+      },
+      "APTV": {
+        "cik": "0001521332",
+        "company_name": "Aptiv PLC",
+        "source": "sec_company_tickers"
+      },
+      "ARE": {
+        "cik": "0001035443",
+        "company_name": "ALEXANDRIA REAL ESTATE EQUITIES, INC.",
+        "source": "sec_company_tickers"
+      },
+      "ARES": {
+        "cik": "0001176948",
+        "company_name": "Ares Management Corp",
+        "source": "sec_company_tickers"
+      },
+      "ATO": {
+        "cik": "0000731802",
+        "company_name": "ATMOS ENERGY CORP",
+        "source": "sec_company_tickers"
+      },
+      "AVGO": {
+        "cik": "0001730168",
+        "company_name": "Broadcom Inc.",
+        "source": "sec_company_tickers"
+      },
+      "AVY": {
+        "cik": "0000008818",
+        "company_name": "Avery Dennison Corp",
+        "source": "sec_company_tickers"
+      },
+      "AWK": {
+        "cik": "0001410636",
+        "company_name": "American Water Works Company, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "AXON": {
+        "cik": "0001069183",
+        "company_name": "AXON ENTERPRISE, INC.",
+        "source": "sec_company_tickers"
+      },
+      "AXP": {
+        "cik": "0000004962",
+        "company_name": "AMERICAN EXPRESS CO",
+        "source": "sec_company_tickers"
+      },
+      "AZO": {
+        "cik": "0000866787",
+        "company_name": "AUTOZONE INC",
+        "source": "sec_company_tickers"
+      },
+      "BA": {
+        "cik": "0000012927",
+        "company_name": "BOEING CO",
+        "source": "sec_company_tickers"
+      },
+      "BAC": {
+        "cik": "0000070858",
+        "company_name": "BANK OF AMERICA CORP /DE/",
+        "source": "sec_company_tickers"
+      },
+      "BALL": {
+        "cik": "0000009389",
+        "company_name": "BALL Corp",
+        "source": "sec_company_tickers"
+      },
+      "BAX": {
+        "cik": "0000010456",
+        "company_name": "BAXTER INTERNATIONAL INC",
+        "source": "sec_company_tickers"
+      },
+      "BBWI": {
+        "cik": "0000701985",
+        "company_name": "Bath & Body Works, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "BBY": {
+        "cik": "0000764478",
+        "company_name": "BEST BUY CO INC",
+        "source": "sec_company_tickers"
+      },
+      "BDX": {
+        "cik": "0000010795",
+        "company_name": "BECTON DICKINSON & CO",
+        "source": "sec_company_tickers"
+      },
+      "BEN": {
+        "cik": "0000038777",
+        "company_name": "FRANKLIN TEMPLETON INC",
+        "source": "sec_company_tickers"
+      },
+      "BG": {
+        "cik": "0001996862",
+        "company_name": "Bunge Global SA",
+        "source": "sec_company_tickers"
+      },
+      "BIIB": {
+        "cik": "0000875045",
+        "company_name": "BIOGEN INC.",
+        "source": "sec_company_tickers"
+      },
+      "BIO": {
+        "cik": "0000012208",
+        "company_name": "BIO-RAD LABORATORIES, INC.",
+        "source": "sec_company_tickers"
+      },
+      "BKNG": {
+        "cik": "0001075531",
+        "company_name": "Booking Holdings Inc.",
+        "source": "sec_company_tickers"
+      },
+      "BKR": {
+        "cik": "0001701605",
+        "company_name": "Baker Hughes Co",
+        "source": "sec_company_tickers"
+      },
+      "BLDR": {
+        "cik": "0001316835",
+        "company_name": "Builders FirstSource, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "BLK": {
+        "cik": "0002012383",
+        "company_name": "BlackRock, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "BMY": {
+        "cik": "0000014272",
+        "company_name": "BRISTOL MYERS SQUIBB CO",
+        "source": "sec_company_tickers"
+      },
+      "BNY": {
+        "cik": "0001390777",
+        "company_name": "Bank of New York Mellon Corp",
+        "source": "sec_company_tickers"
+      },
+      "BR": {
+        "cik": "0001383312",
+        "company_name": "BROADRIDGE FINANCIAL SOLUTIONS, INC.",
+        "source": "sec_company_tickers"
+      },
+      "BRO": {
+        "cik": "0000079282",
+        "company_name": "BROWN & BROWN, INC.",
+        "source": "sec_company_tickers"
+      },
+      "BSX": {
+        "cik": "0000885725",
+        "company_name": "BOSTON SCIENTIFIC CORP",
+        "source": "sec_company_tickers"
+      },
+      "BWA": {
+        "cik": "0000908255",
+        "company_name": "BORGWARNER INC",
+        "source": "sec_company_tickers"
+      },
+      "BX": {
+        "cik": "0001393818",
+        "company_name": "Blackstone Inc.",
+        "source": "sec_company_tickers"
+      },
+      "BXP": {
+        "cik": "0001037540",
+        "company_name": "BXP, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "C": {
+        "cik": "0000831001",
+        "company_name": "CITIGROUP INC",
+        "source": "sec_company_tickers"
+      },
+      "CAG": {
+        "cik": "0000023217",
+        "company_name": "CONAGRA BRANDS INC.",
+        "source": "sec_company_tickers"
+      },
+      "CAH": {
+        "cik": "0000721371",
+        "company_name": "CARDINAL HEALTH INC",
+        "source": "sec_company_tickers"
+      },
+      "CARR": {
+        "cik": "0001783180",
+        "company_name": "CARRIER GLOBAL Corp",
+        "source": "sec_company_tickers"
+      },
+      "CASY": {
+        "cik": "0000726958",
+        "company_name": "CASEYS GENERAL STORES INC",
+        "source": "sec_company_tickers"
+      },
+      "CAT": {
+        "cik": "0000018230",
+        "company_name": "CATERPILLAR INC",
+        "source": "sec_company_tickers"
+      },
+      "CB": {
+        "cik": "0000896159",
+        "company_name": "Chubb Ltd",
+        "source": "sec_company_tickers"
+      },
+      "CBOE": {
+        "cik": "0001374310",
+        "company_name": "Cboe Global Markets, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "CBRE": {
+        "cik": "0001138118",
+        "company_name": "CBRE GROUP, INC.",
+        "source": "sec_company_tickers"
+      },
+      "CCI": {
+        "cik": "0001051470",
+        "company_name": "CROWN CASTLE INC.",
+        "source": "sec_company_tickers"
+      },
+      "CCL": {
+        "cik": "0000815097",
+        "company_name": "Carnival Corp Ltd.",
+        "source": "sec_company_tickers"
+      },
+      "CDNS": {
+        "cik": "0000813672",
+        "company_name": "CADENCE DESIGN SYSTEMS INC",
+        "source": "sec_company_tickers"
+      },
+      "CDW": {
+        "cik": "0001402057",
+        "company_name": "CDW Corp",
+        "source": "sec_company_tickers"
+      },
+      "CE": {
+        "cik": "0001306830",
+        "company_name": "Celanese Corp",
+        "source": "sec_company_tickers"
+      },
+      "CEG": {
+        "cik": "0001868275",
+        "company_name": "Constellation Energy Corp",
+        "source": "sec_company_tickers"
+      },
+      "CF": {
+        "cik": "0001324404",
+        "company_name": "CF Industries Holdings, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "CFG": {
+        "cik": "0000759944",
+        "company_name": "CITIZENS FINANCIAL GROUP INC/RI",
+        "source": "sec_company_tickers"
+      },
+      "CHD": {
+        "cik": "0000313927",
+        "company_name": "CHURCH & DWIGHT CO INC /DE/",
+        "source": "sec_company_tickers"
+      },
+      "CHRW": {
+        "cik": "0001043277",
+        "company_name": "C. H. ROBINSON WORLDWIDE, INC.",
+        "source": "sec_company_tickers"
+      },
+      "CHTR": {
+        "cik": "0001091667",
+        "company_name": "CHARTER COMMUNICATIONS, INC. /MO/",
+        "source": "sec_company_tickers"
+      },
+      "CI": {
+        "cik": "0001739940",
+        "company_name": "Cigna Group",
+        "source": "sec_company_tickers"
+      },
+      "CIEN": {
+        "cik": "0000936395",
+        "company_name": "CIENA CORP",
+        "source": "sec_company_tickers"
+      },
+      "CINF": {
+        "cik": "0000020286",
+        "company_name": "CINCINNATI FINANCIAL CORP",
+        "source": "sec_company_tickers"
+      },
+      "CL": {
+        "cik": "0000021665",
+        "company_name": "COLGATE PALMOLIVE CO",
+        "source": "sec_company_tickers"
+      },
+      "CLX": {
+        "cik": "0000021076",
+        "company_name": "CLOROX CO /DE/",
+        "source": "sec_company_tickers"
+      },
+      "CMCSA": {
+        "cik": "0001166691",
+        "company_name": "COMCAST CORP",
+        "source": "sec_company_tickers"
+      },
+      "CME": {
+        "cik": "0001156375",
+        "company_name": "CME GROUP INC.",
+        "source": "sec_company_tickers"
+      },
+      "CMG": {
+        "cik": "0001058090",
+        "company_name": "CHIPOTLE MEXICAN GRILL INC",
+        "source": "sec_company_tickers"
+      },
+      "CMI": {
+        "cik": "0000026172",
+        "company_name": "CUMMINS INC",
+        "source": "sec_company_tickers"
+      },
+      "CMS": {
+        "cik": "0000811156",
+        "company_name": "CMS ENERGY CORP",
+        "source": "sec_company_tickers"
+      },
+      "CNC": {
+        "cik": "0001071739",
+        "company_name": "CENTENE CORP",
+        "source": "sec_company_tickers"
+      },
+      "CNP": {
+        "cik": "0001130310",
+        "company_name": "CENTERPOINT ENERGY INC",
+        "source": "sec_company_tickers"
+      },
+      "COF": {
+        "cik": "0000927628",
+        "company_name": "CAPITAL ONE FINANCIAL CORP",
+        "source": "sec_company_tickers"
+      },
+      "COHR": {
+        "cik": "0000820318",
+        "company_name": "COHERENT CORP.",
+        "source": "sec_company_tickers"
+      },
+      "COIN": {
+        "cik": "0001679788",
+        "company_name": "Coinbase Global, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "COO": {
+        "cik": "0000711404",
+        "company_name": "COOPER COMPANIES, INC.",
+        "source": "sec_company_tickers"
+      },
+      "COP": {
+        "cik": "0001163165",
+        "company_name": "CONOCOPHILLIPS",
+        "source": "sec_company_tickers"
+      },
+      "COR": {
+        "cik": "0001140859",
+        "company_name": "Cencora, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "COST": {
+        "cik": "0000909832",
+        "company_name": "COSTCO WHOLESALE CORP /NEW",
+        "source": "sec_company_tickers"
+      },
+      "COTY": {
+        "cik": "0001024305",
+        "company_name": "COTY INC.",
+        "source": "sec_company_tickers"
+      },
+      "CPAY": {
+        "cik": "0001175454",
+        "company_name": "CORPAY, INC.",
+        "source": "sec_company_tickers"
+      },
+      "CPB": {
+        "cik": "0000016732",
+        "company_name": "CAMPBELL'S Co",
+        "source": "sec_company_tickers"
+      },
+      "CPRI": {
+        "cik": "0001530721",
+        "company_name": "Capri Holdings Ltd",
+        "source": "sec_company_tickers"
+      },
+      "CPRT": {
+        "cik": "0000900075",
+        "company_name": "COPART INC",
+        "source": "sec_company_tickers"
+      },
+      "CPT": {
+        "cik": "0000906345",
+        "company_name": "CAMDEN PROPERTY TRUST",
+        "source": "sec_company_tickers"
+      },
+      "CRH": {
+        "cik": "0000849395",
+        "company_name": "CRH PUBLIC LTD CO",
+        "source": "sec_company_tickers"
+      },
+      "CRL": {
+        "cik": "0001100682",
+        "company_name": "CHARLES RIVER LABORATORIES INTERNATIONAL, INC.",
+        "source": "sec_company_tickers"
+      },
+      "CRM": {
+        "cik": "0001108524",
+        "company_name": "Salesforce, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "CRWD": {
+        "cik": "0001535527",
+        "company_name": "CrowdStrike Holdings, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "CSCO": {
+        "cik": "0000858877",
+        "company_name": "CISCO SYSTEMS, INC.",
+        "source": "sec_company_tickers"
+      },
+      "CSGP": {
+        "cik": "0001057352",
+        "company_name": "COSTAR GROUP, INC.",
+        "source": "sec_company_tickers"
+      },
+      "CSX": {
+        "cik": "0000277948",
+        "company_name": "CSX CORP",
+        "source": "sec_company_tickers"
+      },
+      "CTAS": {
+        "cik": "0000723254",
+        "company_name": "CINTAS CORP",
+        "source": "sec_company_tickers"
+      },
+      "CTSH": {
+        "cik": "0001058290",
+        "company_name": "COGNIZANT TECHNOLOGY SOLUTIONS CORP",
+        "source": "sec_company_tickers"
+      },
+      "CTVA": {
+        "cik": "0001755672",
+        "company_name": "Corteva, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "CVNA": {
+        "cik": "0001690820",
+        "company_name": "CARVANA CO.",
+        "source": "sec_company_tickers"
+      },
+      "CVS": {
+        "cik": "0000064803",
+        "company_name": "CVS HEALTH Corp",
+        "source": "sec_company_tickers"
+      },
+      "CVX": {
+        "cik": "0000093410",
+        "company_name": "CHEVRON CORP",
+        "source": "sec_company_tickers"
+      },
+      "CZR": {
+        "cik": "0001590895",
+        "company_name": "Caesars Entertainment, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "D": {
+        "cik": "0000715957",
+        "company_name": "DOMINION ENERGY, INC",
+        "source": "sec_company_tickers"
+      },
+      "DAL": {
+        "cik": "0000027904",
+        "company_name": "DELTA AIR LINES, INC.",
+        "source": "sec_company_tickers"
+      },
+      "DASH": {
+        "cik": "0001792789",
+        "company_name": "DoorDash, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "DD": {
+        "cik": "0001666700",
+        "company_name": "DuPont de Nemours, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "DDOG": {
+        "cik": "0001561550",
+        "company_name": "Datadog, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "DE": {
+        "cik": "0000315189",
+        "company_name": "DEERE & CO",
+        "source": "sec_company_tickers"
+      },
+      "DECK": {
+        "cik": "0000910521",
+        "company_name": "DECKERS OUTDOOR CORP",
+        "source": "sec_company_tickers"
+      },
+      "DELL": {
+        "cik": "0001571996",
+        "company_name": "Dell Technologies Inc.",
+        "source": "sec_company_tickers"
+      },
+      "DG": {
+        "cik": "0000029534",
+        "company_name": "DOLLAR GENERAL CORP",
+        "source": "sec_company_tickers"
+      },
+      "DGX": {
+        "cik": "0001022079",
+        "company_name": "QUEST DIAGNOSTICS INC",
+        "source": "sec_company_tickers"
+      },
+      "DHI": {
+        "cik": "0000882184",
+        "company_name": "HORTON D R INC /DE/",
+        "source": "sec_company_tickers"
+      },
+      "DHR": {
+        "cik": "0000313616",
+        "company_name": "DANAHER CORP /DE/",
+        "source": "sec_company_tickers"
+      },
+      "DINO": {
+        "cik": "0001915657",
+        "company_name": "HF Sinclair Corp",
+        "source": "sec_company_tickers"
+      },
+      "DIS": {
+        "cik": "0001744489",
+        "company_name": "Walt Disney Co",
+        "source": "sec_company_tickers"
+      },
+      "DLR": {
+        "cik": "0001297996",
+        "company_name": "DIGITAL REALTY TRUST, INC.",
+        "source": "sec_company_tickers"
+      },
+      "DLTR": {
+        "cik": "0000935703",
+        "company_name": "DOLLAR TREE, INC.",
+        "source": "sec_company_tickers"
+      },
+      "DOC": {
+        "cik": "0000765880",
+        "company_name": "HEALTHPEAK PROPERTIES, INC.",
+        "source": "sec_company_tickers"
+      },
+      "DOV": {
+        "cik": "0000029905",
+        "company_name": "DOVER Corp",
+        "source": "sec_company_tickers"
+      },
+      "DOW": {
+        "cik": "0001751788",
+        "company_name": "DOW INC.",
+        "source": "sec_company_tickers"
+      },
+      "DPZ": {
+        "cik": "0001286681",
+        "company_name": "DOMINOS PIZZA INC",
+        "source": "sec_company_tickers"
+      },
+      "DRI": {
+        "cik": "0000940944",
+        "company_name": "DARDEN RESTAURANTS INC",
+        "source": "sec_company_tickers"
+      },
+      "DTE": {
+        "cik": "0000936340",
+        "company_name": "DTE ENERGY CO",
+        "source": "sec_company_tickers"
+      },
+      "DUK": {
+        "cik": "0001326160",
+        "company_name": "Duke Energy CORP",
+        "source": "sec_company_tickers"
+      },
+      "DVA": {
+        "cik": "0000927066",
+        "company_name": "DAVITA INC.",
+        "source": "sec_company_tickers"
+      },
+      "DVN": {
+        "cik": "0001090012",
+        "company_name": "DEVON ENERGY CORP/DE",
+        "source": "sec_company_tickers"
+      },
+      "DXC": {
+        "cik": "0001688568",
+        "company_name": "DXC Technology Co",
+        "source": "sec_company_tickers"
+      },
+      "DXCM": {
+        "cik": "0001093557",
+        "company_name": "DEXCOM INC",
+        "source": "sec_company_tickers"
+      },
+      "EBAY": {
+        "cik": "0001065088",
+        "company_name": "EBAY INC",
+        "source": "sec_company_tickers"
+      },
+      "ECHO": {
+        "cik": "0001415404",
+        "company_name": "EchoStar CORP",
+        "source": "sec_company_tickers"
+      },
+      "ECL": {
+        "cik": "0000031462",
+        "company_name": "ECOLAB INC.",
+        "source": "sec_company_tickers"
+      },
+      "ED": {
+        "cik": "0001047862",
+        "company_name": "CONSOLIDATED EDISON INC",
+        "source": "sec_company_tickers"
+      },
+      "EFX": {
+        "cik": "0000033185",
+        "company_name": "EQUIFAX INC",
+        "source": "sec_company_tickers"
+      },
+      "EG": {
+        "cik": "0001095073",
+        "company_name": "EVEREST GROUP, LTD.",
+        "source": "sec_company_tickers"
+      },
+      "EIX": {
+        "cik": "0000827052",
+        "company_name": "EDISON INTERNATIONAL",
+        "source": "sec_company_tickers"
+      },
+      "EL": {
+        "cik": "0001001250",
+        "company_name": "ESTEE LAUDER COMPANIES INC",
+        "source": "sec_company_tickers"
+      },
+      "ELV": {
+        "cik": "0001156039",
+        "company_name": "Elevance Health, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "EME": {
+        "cik": "0000105634",
+        "company_name": "EMCOR Group, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "EMN": {
+        "cik": "0000915389",
+        "company_name": "EASTMAN CHEMICAL CO",
+        "source": "sec_company_tickers"
+      },
+      "EMR": {
+        "cik": "0000032604",
+        "company_name": "EMERSON ELECTRIC CO",
+        "source": "sec_company_tickers"
+      },
+      "ENPH": {
+        "cik": "0001463101",
+        "company_name": "Enphase Energy, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "EOG": {
+        "cik": "0000821189",
+        "company_name": "EOG RESOURCES INC",
+        "source": "sec_company_tickers"
+      },
+      "EPAM": {
+        "cik": "0001352010",
+        "company_name": "EPAM Systems, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "EQIX": {
+        "cik": "0001101239",
+        "company_name": "EQUINIX INC",
+        "source": "sec_company_tickers"
+      },
+      "EQT": {
+        "cik": "0000033213",
+        "company_name": "EQT Corp",
+        "source": "sec_company_tickers"
+      },
+      "ERIE": {
+        "cik": "0000922621",
+        "company_name": "ERIE INDEMNITY CO",
+        "source": "sec_company_tickers"
+      },
+      "ES": {
+        "cik": "0000072741",
+        "company_name": "EVERSOURCE ENERGY",
+        "source": "sec_company_tickers"
+      },
+      "ESS": {
+        "cik": "0000920522",
+        "company_name": "ESSEX PROPERTY TRUST, INC.",
+        "source": "sec_company_tickers"
+      },
+      "ETN": {
+        "cik": "0001551182",
+        "company_name": "Eaton Corp plc",
+        "source": "sec_company_tickers"
+      },
+      "ETR": {
+        "cik": "0000065984",
+        "company_name": "ENTERGY CORP /DE/",
+        "source": "sec_company_tickers"
+      },
+      "ETSY": {
+        "cik": "0001370637",
+        "company_name": "ETSY INC",
+        "source": "sec_company_tickers"
+      },
+      "EVRG": {
+        "cik": "0001711269",
+        "company_name": "Evergy, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "EW": {
+        "cik": "0001099800",
+        "company_name": "Edwards Lifesciences Corp",
+        "source": "sec_company_tickers"
+      },
+      "EXC": {
+        "cik": "0001109357",
+        "company_name": "EXELON CORP",
+        "source": "sec_company_tickers"
+      },
+      "EXE": {
+        "cik": "0000895126",
+        "company_name": "EXPAND ENERGY Corp",
+        "source": "sec_company_tickers"
+      },
+      "EXPD": {
+        "cik": "0000746515",
+        "company_name": "EXPEDITORS INTERNATIONAL OF WASHINGTON INC",
+        "source": "sec_company_tickers"
+      },
+      "EXPE": {
+        "cik": "0001324424",
+        "company_name": "Expedia Group, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "EXR": {
+        "cik": "0001289490",
+        "company_name": "Extra Space Storage Inc.",
+        "source": "sec_company_tickers"
+      },
+      "F": {
+        "cik": "0000037996",
+        "company_name": "FORD MOTOR CO",
+        "source": "sec_company_tickers"
+      },
+      "FANG": {
+        "cik": "0001539838",
+        "company_name": "Diamondback Energy, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "FAST": {
+        "cik": "0000815556",
+        "company_name": "FASTENAL CO",
+        "source": "sec_company_tickers"
+      },
+      "FBIN": {
+        "cik": "0001519751",
+        "company_name": "Fortune Brands Innovations, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "FCX": {
+        "cik": "0000831259",
+        "company_name": "FREEPORT-MCMORAN INC",
+        "source": "sec_company_tickers"
+      },
+      "FDS": {
+        "cik": "0001013237",
+        "company_name": "FACTSET RESEARCH SYSTEMS INC",
+        "source": "sec_company_tickers"
+      },
+      "FDX": {
+        "cik": "0001048911",
+        "company_name": "FEDEX CORP",
+        "source": "sec_company_tickers"
+      },
+      "FDXF": {
+        "cik": "0002082247",
+        "company_name": "FedEx Freight Holding Company, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "FE": {
+        "cik": "0001031296",
+        "company_name": "FIRSTENERGY CORP",
+        "source": "sec_company_tickers"
+      },
+      "FFIV": {
+        "cik": "0001048695",
+        "company_name": "F5, INC.",
+        "source": "sec_company_tickers"
+      },
+      "FICO": {
+        "cik": "0000814547",
+        "company_name": "FAIR ISAAC CORP",
+        "source": "sec_company_tickers"
+      },
+      "FIS": {
+        "cik": "0001136893",
+        "company_name": "Fidelity National Information Services, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "FITB": {
+        "cik": "0000035527",
+        "company_name": "FIFTH THIRD BANCORP",
+        "source": "sec_company_tickers"
+      },
+      "FIX": {
+        "cik": "0001035983",
+        "company_name": "COMFORT SYSTEMS USA INC",
+        "source": "sec_company_tickers"
+      },
+      "FLEX": {
+        "cik": "0000866374",
+        "company_name": "FLEX LTD.",
+        "source": "sec_company_tickers"
+      },
+      "FLS": {
+        "cik": "0000030625",
+        "company_name": "FLOWSERVE CORP",
+        "source": "sec_company_tickers"
+      },
+      "FMC": {
+        "cik": "0000037785",
+        "company_name": "FMC CORP",
+        "source": "sec_company_tickers"
+      },
+      "FOX": {
+        "cik": "0001754301",
+        "company_name": "Fox Corp",
+        "source": "sec_company_tickers"
+      },
+      "FOXA": {
+        "cik": "0001754301",
+        "company_name": "Fox Corp",
+        "source": "sec_company_tickers"
+      },
+      "FRT": {
+        "cik": "0000034903",
+        "company_name": "FEDERAL REALTY INVESTMENT TRUST",
+        "source": "sec_company_tickers"
+      },
+      "FSLR": {
+        "cik": "0001274494",
+        "company_name": "FIRST SOLAR, INC.",
+        "source": "sec_company_tickers"
+      },
+      "FTI": {
+        "cik": "0001681459",
+        "company_name": "TechnipFMC plc",
+        "source": "sec_company_tickers"
+      },
+      "FTNT": {
+        "cik": "0001262039",
+        "company_name": "Fortinet, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "FTV": {
+        "cik": "0001659166",
+        "company_name": "Fortive Corp",
+        "source": "sec_company_tickers"
+      },
+      "GD": {
+        "cik": "0000040533",
+        "company_name": "GENERAL DYNAMICS CORP",
+        "source": "sec_company_tickers"
+      },
+      "GDDY": {
+        "cik": "0001609711",
+        "company_name": "GoDaddy Inc.",
+        "source": "sec_company_tickers"
+      },
+      "GE": {
+        "cik": "0000040545",
+        "company_name": "GENERAL ELECTRIC CO",
+        "source": "sec_company_tickers"
+      },
+      "GEHC": {
+        "cik": "0001932393",
+        "company_name": "GE HealthCare Technologies Inc.",
+        "source": "sec_company_tickers"
+      },
+      "GEN": {
+        "cik": "0000849399",
+        "company_name": "Gen Digital Inc.",
+        "source": "sec_company_tickers"
+      },
+      "GEV": {
+        "cik": "0001996810",
+        "company_name": "GE Vernova Inc.",
+        "source": "sec_company_tickers"
+      },
+      "GILD": {
+        "cik": "0000882095",
+        "company_name": "GILEAD SCIENCES, INC.",
+        "source": "sec_company_tickers"
+      },
+      "GIS": {
+        "cik": "0000040704",
+        "company_name": "GENERAL MILLS INC",
+        "source": "sec_company_tickers"
+      },
+      "GL": {
+        "cik": "0000320335",
+        "company_name": "GLOBE LIFE INC.",
+        "source": "sec_company_tickers"
+      },
+      "GLW": {
+        "cik": "0000024741",
+        "company_name": "CORNING INC /NY",
+        "source": "sec_company_tickers"
+      },
+      "GM": {
+        "cik": "0001467858",
+        "company_name": "General Motors Co",
+        "source": "sec_company_tickers"
+      },
+      "GNRC": {
+        "cik": "0001474735",
+        "company_name": "GENERAC HOLDINGS INC.",
+        "source": "sec_company_tickers"
+      },
+      "GOOG": {
+        "cik": "0001652044",
+        "company_name": "Alphabet Inc.",
+        "source": "sec_company_tickers"
+      },
+      "GOOGL": {
+        "cik": "0001652044",
+        "company_name": "Alphabet Inc.",
+        "source": "sec_company_tickers"
+      },
+      "GPC": {
+        "cik": "0000040987",
+        "company_name": "GENUINE PARTS CO",
+        "source": "sec_company_tickers"
+      },
+      "GPN": {
+        "cik": "0001123360",
+        "company_name": "GLOBAL PAYMENTS INC",
+        "source": "sec_company_tickers"
+      },
+      "GRMN": {
+        "cik": "0001121788",
+        "company_name": "GARMIN LTD",
+        "source": "sec_company_tickers"
+      },
+      "GS": {
+        "cik": "0000886982",
+        "company_name": "GOLDMAN SACHS GROUP INC",
+        "source": "sec_company_tickers"
+      },
+      "GWW": {
+        "cik": "0000277135",
+        "company_name": "W.W. GRAINGER, INC.",
+        "source": "sec_company_tickers"
+      },
+      "HAL": {
+        "cik": "0000045012",
+        "company_name": "HALLIBURTON CO",
+        "source": "sec_company_tickers"
+      },
+      "HAS": {
+        "cik": "0000046080",
+        "company_name": "HASBRO, INC.",
+        "source": "sec_company_tickers"
+      },
+      "HBAN": {
+        "cik": "0000049196",
+        "company_name": "HUNTINGTON BANCSHARES INC /MD/",
+        "source": "sec_company_tickers"
+      },
+      "HCA": {
+        "cik": "0000860730",
+        "company_name": "HCA Healthcare, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "HD": {
+        "cik": "0000354950",
+        "company_name": "HOME DEPOT, INC.",
+        "source": "sec_company_tickers"
+      },
+      "HIG": {
+        "cik": "0000874766",
+        "company_name": "HARTFORD INSURANCE GROUP, INC.",
+        "source": "sec_company_tickers"
+      },
+      "HII": {
+        "cik": "0001501585",
+        "company_name": "HUNTINGTON INGALLS INDUSTRIES, INC.",
+        "source": "sec_company_tickers"
+      },
+      "HLT": {
+        "cik": "0001585689",
+        "company_name": "Hilton Worldwide Holdings Inc.",
+        "source": "sec_company_tickers"
+      },
+      "HOG": {
+        "cik": "0000793952",
+        "company_name": "HARLEY-DAVIDSON, INC.",
+        "source": "sec_company_tickers"
+      },
+      "HON": {
+        "cik": "0000773840",
+        "company_name": "HONEYWELL INTERNATIONAL INC",
+        "source": "sec_company_tickers"
+      },
+      "HONA": {
+        "cik": "0002089271",
+        "company_name": "Honeywell Aerospace Inc.",
+        "source": "sec_company_tickers"
+      },
+      "HOOD": {
+        "cik": "0001783879",
+        "company_name": "Robinhood Markets, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "HP": {
+        "cik": "0000046765",
+        "company_name": "Helmerich & Payne, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "HPE": {
+        "cik": "0001645590",
+        "company_name": "Hewlett Packard Enterprise Co",
+        "source": "sec_company_tickers"
+      },
+      "HPQ": {
+        "cik": "0000047217",
+        "company_name": "HP INC",
+        "source": "sec_company_tickers"
+      },
+      "HRB": {
+        "cik": "0000012659",
+        "company_name": "H&R BLOCK INC",
+        "source": "sec_company_tickers"
+      },
+      "HRL": {
+        "cik": "0000048465",
+        "company_name": "HORMEL FOODS CORP /DE/",
+        "source": "sec_company_tickers"
+      },
+      "HSIC": {
+        "cik": "0001000228",
+        "company_name": "HENRY SCHEIN INC",
+        "source": "sec_company_tickers"
+      },
+      "HST": {
+        "cik": "0001070750",
+        "company_name": "HOST HOTELS & RESORTS, INC.",
+        "source": "sec_company_tickers"
+      },
+      "HSY": {
+        "cik": "0000047111",
+        "company_name": "HERSHEY CO",
+        "source": "sec_company_tickers"
+      },
+      "HUBB": {
+        "cik": "0000048898",
+        "company_name": "HUBBELL INC",
+        "source": "sec_company_tickers"
+      },
+      "HUM": {
+        "cik": "0000049071",
+        "company_name": "HUMANA INC",
+        "source": "sec_company_tickers"
+      },
+      "HWM": {
+        "cik": "0000004281",
+        "company_name": "Howmet Aerospace Inc.",
+        "source": "sec_company_tickers"
+      },
+      "IBKR": {
+        "cik": "0001381197",
+        "company_name": "Interactive Brokers Group, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "IBM": {
+        "cik": "0000051143",
+        "company_name": "INTERNATIONAL BUSINESS MACHINES CORP",
+        "source": "sec_company_tickers"
+      },
+      "ICE": {
+        "cik": "0001571949",
+        "company_name": "Intercontinental Exchange, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "IDXX": {
+        "cik": "0000874716",
+        "company_name": "IDEXX LABORATORIES INC /DE",
+        "source": "sec_company_tickers"
+      },
+      "IEX": {
+        "cik": "0000832101",
+        "company_name": "IDEX CORP /DE/",
+        "source": "sec_company_tickers"
+      },
+      "IFF": {
+        "cik": "0000051253",
+        "company_name": "INTERNATIONAL FLAVORS & FRAGRANCES INC",
+        "source": "sec_company_tickers"
+      },
+      "ILMN": {
+        "cik": "0001110803",
+        "company_name": "ILLUMINA, INC.",
+        "source": "sec_company_tickers"
+      },
+      "INCY": {
+        "cik": "0000879169",
+        "company_name": "INCYTE CORP",
+        "source": "sec_company_tickers"
+      },
+      "INTC": {
+        "cik": "0000050863",
+        "company_name": "INTEL CORP",
+        "source": "sec_company_tickers"
+      },
+      "INTU": {
+        "cik": "0000896878",
+        "company_name": "INTUIT INC.",
+        "source": "sec_company_tickers"
+      },
+      "INVH": {
+        "cik": "0001687229",
+        "company_name": "Invitation Homes Inc.",
+        "source": "sec_company_tickers"
+      },
+      "IP": {
+        "cik": "0000051434",
+        "company_name": "INTERNATIONAL PAPER CO /NEW/",
+        "source": "sec_company_tickers"
+      },
+      "IPGP": {
+        "cik": "0001111928",
+        "company_name": "IPG PHOTONICS CORP",
+        "source": "sec_company_tickers"
+      },
+      "IQV": {
+        "cik": "0001478242",
+        "company_name": "IQVIA HOLDINGS INC.",
+        "source": "sec_company_tickers"
+      },
+      "IR": {
+        "cik": "0001699150",
+        "company_name": "Ingersoll Rand Inc.",
+        "source": "sec_company_tickers"
+      },
+      "IRM": {
+        "cik": "0001020569",
+        "company_name": "IRON MOUNTAIN INC",
+        "source": "sec_company_tickers"
+      },
+      "ISRG": {
+        "cik": "0001035267",
+        "company_name": "INTUITIVE SURGICAL INC",
+        "source": "sec_company_tickers"
+      },
+      "IT": {
+        "cik": "0000749251",
+        "company_name": "GARTNER INC",
+        "source": "sec_company_tickers"
+      },
+      "ITW": {
+        "cik": "0000049826",
+        "company_name": "ILLINOIS TOOL WORKS INC",
+        "source": "sec_company_tickers"
+      },
+      "IVZ": {
+        "cik": "0000914208",
+        "company_name": "Invesco Ltd.",
+        "source": "sec_company_tickers"
+      },
+      "J": {
+        "cik": "0000052988",
+        "company_name": "JACOBS SOLUTIONS INC.",
+        "source": "sec_company_tickers"
+      },
+      "JBHT": {
+        "cik": "0000728535",
+        "company_name": "HUNT J B TRANSPORT SERVICES INC",
+        "source": "sec_company_tickers"
+      },
+      "JBL": {
+        "cik": "0000898293",
+        "company_name": "JABIL INC",
+        "source": "sec_company_tickers"
+      },
+      "JCI": {
+        "cik": "0000833444",
+        "company_name": "Johnson Controls International plc",
+        "source": "sec_company_tickers"
+      },
+      "JKHY": {
+        "cik": "0000779152",
+        "company_name": "JACK HENRY & ASSOCIATES INC",
+        "source": "sec_company_tickers"
+      },
+      "JNJ": {
+        "cik": "0000200406",
+        "company_name": "JOHNSON & JOHNSON",
+        "source": "sec_company_tickers"
+      },
+      "JPM": {
+        "cik": "0000019617",
+        "company_name": "JPMORGAN CHASE & CO",
+        "source": "sec_company_tickers"
+      },
+      "KDP": {
+        "cik": "0001418135",
+        "company_name": "Keurig Dr Pepper Inc.",
+        "source": "sec_company_tickers"
+      },
+      "KEY": {
+        "cik": "0000091576",
+        "company_name": "KEYCORP /NEW/",
+        "source": "sec_company_tickers"
+      },
+      "KEYS": {
+        "cik": "0001601046",
+        "company_name": "Keysight Technologies, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "KHC": {
+        "cik": "0001637459",
+        "company_name": "Kraft Heinz Co",
+        "source": "sec_company_tickers"
+      },
+      "KIM": {
+        "cik": "0000879101",
+        "company_name": "KIMCO REALTY CORP",
+        "source": "sec_company_tickers"
+      },
+      "KKR": {
+        "cik": "0001404912",
+        "company_name": "KKR & Co. Inc.",
+        "source": "sec_company_tickers"
+      },
+      "KLAC": {
+        "cik": "0000319201",
+        "company_name": "KLA CORP",
+        "source": "sec_company_tickers"
+      },
+      "KMB": {
+        "cik": "0000055785",
+        "company_name": "KIMBERLY CLARK CORP",
+        "source": "sec_company_tickers"
+      },
+      "KMI": {
+        "cik": "0001506307",
+        "company_name": "KINDER MORGAN, INC.",
+        "source": "sec_company_tickers"
+      },
+      "KMX": {
+        "cik": "0001170010",
+        "company_name": "CARMAX INC",
+        "source": "sec_company_tickers"
+      },
+      "KO": {
+        "cik": "0000021344",
+        "company_name": "COCA COLA CO",
+        "source": "sec_company_tickers"
+      },
+      "KR": {
+        "cik": "0000056873",
+        "company_name": "KROGER CO",
+        "source": "sec_company_tickers"
+      },
+      "KSS": {
+        "cik": "0000885639",
+        "company_name": "KOHLS Corp",
+        "source": "sec_company_tickers"
+      },
+      "KVUE": {
+        "cik": "0001944048",
+        "company_name": "Kenvue Inc.",
+        "source": "sec_company_tickers"
+      },
+      "L": {
+        "cik": "0000060086",
+        "company_name": "LOEWS CORP",
+        "source": "sec_company_tickers"
+      },
+      "LB": {
+        "cik": "0001995807",
+        "company_name": "LandBridge Co LLC",
+        "source": "sec_company_tickers"
+      },
+      "LDOS": {
+        "cik": "0001336920",
+        "company_name": "Leidos Holdings, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "LEN": {
+        "cik": "0000920760",
+        "company_name": "LENNAR CORP /NEW/",
+        "source": "sec_company_tickers"
+      },
+      "LH": {
+        "cik": "0000920148",
+        "company_name": "LABCORP HOLDINGS INC.",
+        "source": "sec_company_tickers"
+      },
+      "LHX": {
+        "cik": "0000202058",
+        "company_name": "L3HARRIS TECHNOLOGIES, INC. /DE/",
+        "source": "sec_company_tickers"
+      },
+      "LII": {
+        "cik": "0001069202",
+        "company_name": "LENNOX INTERNATIONAL INC",
+        "source": "sec_company_tickers"
+      },
+      "LIN": {
+        "cik": "0001707925",
+        "company_name": "LINDE PLC",
+        "source": "sec_company_tickers"
+      },
+      "LITE": {
+        "cik": "0001633978",
+        "company_name": "Lumentum Holdings Inc.",
+        "source": "sec_company_tickers"
+      },
+      "LKQ": {
+        "cik": "0001065696",
+        "company_name": "LKQ CORP",
+        "source": "sec_company_tickers"
+      },
+      "LLY": {
+        "cik": "0000059478",
+        "company_name": "ELI LILLY & Co",
+        "source": "sec_company_tickers"
+      },
+      "LMT": {
+        "cik": "0000936468",
+        "company_name": "LOCKHEED MARTIN CORP",
+        "source": "sec_company_tickers"
+      },
+      "LNC": {
+        "cik": "0000059558",
+        "company_name": "LINCOLN NATIONAL CORP",
+        "source": "sec_company_tickers"
+      },
+      "LNT": {
+        "cik": "0000352541",
+        "company_name": "ALLIANT ENERGY CORP",
+        "source": "sec_company_tickers"
+      },
+      "LOW": {
+        "cik": "0000060667",
+        "company_name": "LOWES COMPANIES INC",
+        "source": "sec_company_tickers"
+      },
+      "LRCX": {
+        "cik": "0000707549",
+        "company_name": "LAM RESEARCH CORP",
+        "source": "sec_company_tickers"
+      },
+      "LULU": {
+        "cik": "0001397187",
+        "company_name": "lululemon athletica inc.",
+        "source": "sec_company_tickers"
+      },
+      "LUMN": {
+        "cik": "0000018926",
+        "company_name": "Lumen Technologies, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "LUV": {
+        "cik": "0000092380",
+        "company_name": "SOUTHWEST AIRLINES CO",
+        "source": "sec_company_tickers"
+      },
+      "LVS": {
+        "cik": "0001300514",
+        "company_name": "LAS VEGAS SANDS CORP",
+        "source": "sec_company_tickers"
+      },
+      "LW": {
+        "cik": "0001679273",
+        "company_name": "Lamb Weston Holdings, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "LYB": {
+        "cik": "0001489393",
+        "company_name": "LyondellBasell Industries N.V.",
+        "source": "sec_company_tickers"
+      },
+      "LYV": {
+        "cik": "0001335258",
+        "company_name": "Live Nation Entertainment, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "M": {
+        "cik": "0000794367",
+        "company_name": "Macy's, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "MA": {
+        "cik": "0001141391",
+        "company_name": "Mastercard Inc",
+        "source": "sec_company_tickers"
+      },
+      "MAA": {
+        "cik": "0000912595",
+        "company_name": "MID AMERICA APARTMENT COMMUNITIES INC.",
+        "source": "sec_company_tickers"
+      },
+      "MAR": {
+        "cik": "0001048286",
+        "company_name": "MARRIOTT INTERNATIONAL INC /MD/",
+        "source": "sec_company_tickers"
+      },
+      "MAS": {
+        "cik": "0000062996",
+        "company_name": "MASCO CORP /DE/",
+        "source": "sec_company_tickers"
+      },
+      "MCD": {
+        "cik": "0000063908",
+        "company_name": "MCDONALDS CORP",
+        "source": "sec_company_tickers"
+      },
+      "MCHP": {
+        "cik": "0000827054",
+        "company_name": "MICROCHIP TECHNOLOGY INC",
+        "source": "sec_company_tickers"
+      },
+      "MCK": {
+        "cik": "0000927653",
+        "company_name": "MCKESSON CORP",
+        "source": "sec_company_tickers"
+      },
+      "MCO": {
+        "cik": "0001059556",
+        "company_name": "MOODYS CORP /DE/",
+        "source": "sec_company_tickers"
+      },
+      "MDLZ": {
+        "cik": "0001103982",
+        "company_name": "Mondelez International, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "MDT": {
+        "cik": "0001613103",
+        "company_name": "Medtronic plc",
+        "source": "sec_company_tickers"
+      },
+      "MET": {
+        "cik": "0001099219",
+        "company_name": "METLIFE INC",
+        "source": "sec_company_tickers"
+      },
+      "META": {
+        "cik": "0001326801",
+        "company_name": "Meta Platforms, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "MGM": {
+        "cik": "0000789570",
+        "company_name": "MGM Resorts International",
+        "source": "sec_company_tickers"
+      },
+      "MHK": {
+        "cik": "0000851968",
+        "company_name": "MOHAWK INDUSTRIES INC",
+        "source": "sec_company_tickers"
+      },
+      "MKC": {
+        "cik": "0000063754",
+        "company_name": "MCCORMICK & CO INC",
+        "source": "sec_company_tickers"
+      },
+      "MKTX": {
+        "cik": "0001278021",
+        "company_name": "MARKETAXESS HOLDINGS INC",
+        "source": "sec_company_tickers"
+      },
+      "MLM": {
+        "cik": "0000916076",
+        "company_name": "MARTIN MARIETTA MATERIALS INC",
+        "source": "sec_company_tickers"
+      },
+      "MMM": {
+        "cik": "0000066740",
+        "company_name": "3M CO",
+        "source": "sec_company_tickers"
+      },
+      "MNST": {
+        "cik": "0000865752",
+        "company_name": "Monster Beverage Corp",
+        "source": "sec_company_tickers"
+      },
+      "MO": {
+        "cik": "0000764180",
+        "company_name": "ALTRIA GROUP, INC.",
+        "source": "sec_company_tickers"
+      },
+      "MOH": {
+        "cik": "0001179929",
+        "company_name": "MOLINA HEALTHCARE, INC.",
+        "source": "sec_company_tickers"
+      },
+      "MOS": {
+        "cik": "0001285785",
+        "company_name": "MOSAIC CO",
+        "source": "sec_company_tickers"
+      },
+      "MPC": {
+        "cik": "0001510295",
+        "company_name": "Marathon Petroleum Corp",
+        "source": "sec_company_tickers"
+      },
+      "MPWR": {
+        "cik": "0001280452",
+        "company_name": "MONOLITHIC POWER SYSTEMS, INC.",
+        "source": "sec_company_tickers"
+      },
+      "MRK": {
+        "cik": "0000310158",
+        "company_name": "Merck & Co., Inc.",
+        "source": "sec_company_tickers"
+      },
+      "MRNA": {
+        "cik": "0001682852",
+        "company_name": "Moderna, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "MRSH": {
+        "cik": "0000062709",
+        "company_name": "MARSH & MCLENNAN COMPANIES, INC.",
+        "source": "sec_company_tickers"
+      },
+      "MRVL": {
+        "cik": "0001835632",
+        "company_name": "Marvell Technology, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "MS": {
+        "cik": "0000895421",
+        "company_name": "MORGAN STANLEY",
+        "source": "sec_company_tickers"
+      },
+      "MSCI": {
+        "cik": "0001408198",
+        "company_name": "MSCI Inc.",
+        "source": "sec_company_tickers"
+      },
+      "MSFT": {
+        "cik": "0000789019",
+        "company_name": "MICROSOFT CORP",
+        "source": "sec_company_tickers"
+      },
+      "MSI": {
+        "cik": "0000068505",
+        "company_name": "Motorola Solutions, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "MSTR": {
+        "cik": "0001050446",
+        "company_name": "Strategy Inc",
+        "source": "sec_company_tickers"
+      },
+      "MTB": {
+        "cik": "0000036270",
+        "company_name": "M&T BANK CORP",
+        "source": "sec_company_tickers"
+      },
+      "MTCH": {
+        "cik": "0000891103",
+        "company_name": "Match Group, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "MTD": {
+        "cik": "0001037646",
+        "company_name": "METTLER TOLEDO INTERNATIONAL INC/",
+        "source": "sec_company_tickers"
+      },
+      "MU": {
+        "cik": "0000723125",
+        "company_name": "MICRON TECHNOLOGY INC",
+        "source": "sec_company_tickers"
+      },
+      "NCLH": {
+        "cik": "0001513761",
+        "company_name": "Norwegian Cruise Line Holdings Ltd.",
+        "source": "sec_company_tickers"
+      },
+      "NDAQ": {
+        "cik": "0001120193",
+        "company_name": "NASDAQ, INC.",
+        "source": "sec_company_tickers"
+      },
+      "NDSN": {
+        "cik": "0000072331",
+        "company_name": "NORDSON CORP",
+        "source": "sec_company_tickers"
+      },
+      "NEE": {
+        "cik": "0000753308",
+        "company_name": "NEXTERA ENERGY INC",
+        "source": "sec_company_tickers"
+      },
+      "NEM": {
+        "cik": "0001164727",
+        "company_name": "NEWMONT Corp /DE/",
+        "source": "sec_company_tickers"
+      },
+      "NFLX": {
+        "cik": "0001065280",
+        "company_name": "NETFLIX INC",
+        "source": "sec_company_tickers"
+      },
+      "NI": {
+        "cik": "0001111711",
+        "company_name": "NISOURCE INC.",
+        "source": "sec_company_tickers"
+      },
+      "NKE": {
+        "cik": "0000320187",
+        "company_name": "NIKE, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "NOC": {
+        "cik": "0001133421",
+        "company_name": "NORTHROP GRUMMAN CORP /DE/",
+        "source": "sec_company_tickers"
+      },
+      "NOV": {
+        "cik": "0001021860",
+        "company_name": "NOV Inc.",
+        "source": "sec_company_tickers"
+      },
+      "NOW": {
+        "cik": "0001373715",
+        "company_name": "ServiceNow, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "NRG": {
+        "cik": "0001013871",
+        "company_name": "NRG ENERGY, INC.",
+        "source": "sec_company_tickers"
+      },
+      "NSC": {
+        "cik": "0000702165",
+        "company_name": "NORFOLK SOUTHERN CORP",
+        "source": "sec_company_tickers"
+      },
+      "NTAP": {
+        "cik": "0001002047",
+        "company_name": "NetApp, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "NTRS": {
+        "cik": "0000073124",
+        "company_name": "NORTHERN TRUST CORP",
+        "source": "sec_company_tickers"
+      },
+      "NUE": {
+        "cik": "0000073309",
+        "company_name": "NUCOR CORP",
+        "source": "sec_company_tickers"
+      },
+      "NVDA": {
+        "cik": "0001045810",
+        "company_name": "NVIDIA CORP",
+        "source": "sec_company_tickers"
+      },
+      "NVR": {
+        "cik": "0000906163",
+        "company_name": "NVR INC",
+        "source": "sec_company_tickers"
+      },
+      "NWL": {
+        "cik": "0000814453",
+        "company_name": "NEWELL BRANDS INC.",
+        "source": "sec_company_tickers"
+      },
+      "NWS": {
+        "cik": "0001564708",
+        "company_name": "NEWS CORP",
+        "source": "sec_company_tickers"
+      },
+      "NWSA": {
+        "cik": "0001564708",
+        "company_name": "NEWS CORP",
+        "source": "sec_company_tickers"
+      },
+      "NXPI": {
+        "cik": "0001413447",
+        "company_name": "NXP Semiconductors N.V.",
+        "source": "sec_company_tickers"
+      },
+      "O": {
+        "cik": "0000726728",
+        "company_name": "REALTY INCOME CORP",
+        "source": "sec_company_tickers"
+      },
+      "ODFL": {
+        "cik": "0000878927",
+        "company_name": "OLD DOMINION FREIGHT LINE, INC.",
+        "source": "sec_company_tickers"
+      },
+      "OGN": {
+        "cik": "0001821825",
+        "company_name": "Organon & Co.",
+        "source": "sec_company_tickers"
+      },
+      "OKE": {
+        "cik": "0001039684",
+        "company_name": "ONEOK INC /NEW/",
+        "source": "sec_company_tickers"
+      },
+      "OMC": {
+        "cik": "0000029989",
+        "company_name": "OMNICOM GROUP INC.",
+        "source": "sec_company_tickers"
+      },
+      "ON": {
+        "cik": "0001097864",
+        "company_name": "ON SEMICONDUCTOR CORP",
+        "source": "sec_company_tickers"
+      },
+      "ORCL": {
+        "cik": "0001341439",
+        "company_name": "ORACLE CORP",
+        "source": "sec_company_tickers"
+      },
+      "ORLY": {
+        "cik": "0000898173",
+        "company_name": "O REILLY AUTOMOTIVE INC",
+        "source": "sec_company_tickers"
+      },
+      "OTIS": {
+        "cik": "0001781335",
+        "company_name": "Otis Worldwide Corp",
+        "source": "sec_company_tickers"
+      },
+      "OXY": {
+        "cik": "0000797468",
+        "company_name": "OCCIDENTAL PETROLEUM CORP /DE/",
+        "source": "sec_company_tickers"
+      },
+      "PANW": {
+        "cik": "0001327567",
+        "company_name": "Palo Alto Networks Inc",
+        "source": "sec_company_tickers"
+      },
+      "PARA": {
+        "cik": "0001826011",
+        "company_name": "Banzai International, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "PAYC": {
+        "cik": "0001590955",
+        "company_name": "Paycom Software, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "PAYX": {
+        "cik": "0000723531",
+        "company_name": "PAYCHEX INC",
+        "source": "sec_company_tickers"
+      },
+      "PCAR": {
+        "cik": "0000075362",
+        "company_name": "PACCAR INC",
+        "source": "sec_company_tickers"
+      },
+      "PCG": {
+        "cik": "0001004980",
+        "company_name": "PG&E Corp",
+        "source": "sec_company_tickers"
+      },
+      "PEG": {
+        "cik": "0000788784",
+        "company_name": "PUBLIC SERVICE ENTERPRISE GROUP INC",
+        "source": "sec_company_tickers"
+      },
+      "PENN": {
+        "cik": "0000921738",
+        "company_name": "PENN Entertainment, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "PEP": {
+        "cik": "0000077476",
+        "company_name": "PEPSICO INC",
+        "source": "sec_company_tickers"
+      },
+      "PFE": {
+        "cik": "0000078003",
+        "company_name": "PFIZER INC",
+        "source": "sec_company_tickers"
+      },
+      "PFG": {
+        "cik": "0001126328",
+        "company_name": "PRINCIPAL FINANCIAL GROUP INC",
+        "source": "sec_company_tickers"
+      },
+      "PG": {
+        "cik": "0000080424",
+        "company_name": "PROCTER & GAMBLE Co",
+        "source": "sec_company_tickers"
+      },
+      "PGR": {
+        "cik": "0000080661",
+        "company_name": "PROGRESSIVE CORP/OH/",
+        "source": "sec_company_tickers"
+      },
+      "PH": {
+        "cik": "0000076334",
+        "company_name": "Parker-Hannifin Corp",
+        "source": "sec_company_tickers"
+      },
+      "PHM": {
+        "cik": "0000822416",
+        "company_name": "PULTEGROUP INC/MI/",
+        "source": "sec_company_tickers"
+      },
+      "PKG": {
+        "cik": "0000075677",
+        "company_name": "PACKAGING CORP OF AMERICA",
+        "source": "sec_company_tickers"
+      },
+      "PLD": {
+        "cik": "0001045609",
+        "company_name": "Prologis, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "PLTR": {
+        "cik": "0001321655",
+        "company_name": "Palantir Technologies Inc.",
+        "source": "sec_company_tickers"
+      },
+      "PM": {
+        "cik": "0001413329",
+        "company_name": "Philip Morris International Inc.",
+        "source": "sec_company_tickers"
+      },
+      "PNC": {
+        "cik": "0000713676",
+        "company_name": "PNC FINANCIAL SERVICES GROUP, INC.",
+        "source": "sec_company_tickers"
+      },
+      "PNR": {
+        "cik": "0000077360",
+        "company_name": "PENTAIR plc",
+        "source": "sec_company_tickers"
+      },
+      "PNW": {
+        "cik": "0000764622",
+        "company_name": "PINNACLE WEST CAPITAL CORP",
+        "source": "sec_company_tickers"
+      },
+      "PODD": {
+        "cik": "0001145197",
+        "company_name": "INSULET CORP",
+        "source": "sec_company_tickers"
+      },
+      "POOL": {
+        "cik": "0000945841",
+        "company_name": "POOL CORP",
+        "source": "sec_company_tickers"
+      },
+      "PPG": {
+        "cik": "0000079879",
+        "company_name": "PPG INDUSTRIES INC",
+        "source": "sec_company_tickers"
+      },
+      "PPL": {
+        "cik": "0000922224",
+        "company_name": "PPL Corp",
+        "source": "sec_company_tickers"
+      },
+      "PRGO": {
+        "cik": "0001585364",
+        "company_name": "PERRIGO Co plc",
+        "source": "sec_company_tickers"
+      },
+      "PRU": {
+        "cik": "0001137774",
+        "company_name": "PRUDENTIAL FINANCIAL INC",
+        "source": "sec_company_tickers"
+      },
+      "PSA": {
+        "cik": "0001393311",
+        "company_name": "Public Storage",
+        "source": "sec_company_tickers"
+      },
+      "PSX": {
+        "cik": "0001534701",
+        "company_name": "Phillips 66",
+        "source": "sec_company_tickers"
+      },
+      "PTC": {
+        "cik": "0000857005",
+        "company_name": "PTC INC.",
+        "source": "sec_company_tickers"
+      },
+      "PVH": {
+        "cik": "0000078239",
+        "company_name": "PVH CORP. /DE/",
+        "source": "sec_company_tickers"
+      },
+      "PWR": {
+        "cik": "0001050915",
+        "company_name": "QUANTA SERVICES, INC.",
+        "source": "sec_company_tickers"
+      },
+      "PYPL": {
+        "cik": "0001633917",
+        "company_name": "PayPal Holdings, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "Q": {
+        "cik": "0002058873",
+        "company_name": "Qnity Electronics, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "QCOM": {
+        "cik": "0000804328",
+        "company_name": "QUALCOMM INC/DE",
+        "source": "sec_company_tickers"
+      },
+      "QRVO": {
+        "cik": "0001604778",
+        "company_name": "Qorvo, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "RCL": {
+        "cik": "0000884887",
+        "company_name": "ROYAL CARIBBEAN CRUISES LTD",
+        "source": "sec_company_tickers"
+      },
+      "REG": {
+        "cik": "0000910606",
+        "company_name": "REGENCY CENTERS CORP",
+        "source": "sec_company_tickers"
+      },
+      "REGN": {
+        "cik": "0000872589",
+        "company_name": "REGENERON PHARMACEUTICALS, INC.",
+        "source": "sec_company_tickers"
+      },
+      "RF": {
+        "cik": "0001281761",
+        "company_name": "REGIONS FINANCIAL CORP",
+        "source": "sec_company_tickers"
+      },
+      "RHI": {
+        "cik": "0000315213",
+        "company_name": "ROBERT HALF INC.",
+        "source": "sec_company_tickers"
+      },
+      "RJF": {
+        "cik": "0000720005",
+        "company_name": "RAYMOND JAMES FINANCIAL INC",
+        "source": "sec_company_tickers"
+      },
+      "RL": {
+        "cik": "0001037038",
+        "company_name": "RALPH LAUREN CORP",
+        "source": "sec_company_tickers"
+      },
+      "RMD": {
+        "cik": "0000943819",
+        "company_name": "RESMED INC",
+        "source": "sec_company_tickers"
+      },
+      "ROK": {
+        "cik": "0001024478",
+        "company_name": "ROCKWELL AUTOMATION, INC",
+        "source": "sec_company_tickers"
+      },
+      "ROL": {
+        "cik": "0000084839",
+        "company_name": "ROLLINS INC",
+        "source": "sec_company_tickers"
+      },
+      "ROP": {
+        "cik": "0000882835",
+        "company_name": "ROPER TECHNOLOGIES INC",
+        "source": "sec_company_tickers"
+      },
+      "ROST": {
+        "cik": "0000745732",
+        "company_name": "ROSS STORES, INC.",
+        "source": "sec_company_tickers"
+      },
+      "RSG": {
+        "cik": "0001060391",
+        "company_name": "REPUBLIC SERVICES, INC.",
+        "source": "sec_company_tickers"
+      },
+      "RTX": {
+        "cik": "0000101829",
+        "company_name": "RTX Corp",
+        "source": "sec_company_tickers"
+      },
+      "RVTY": {
+        "cik": "0000031791",
+        "company_name": "REVVITY, INC.",
+        "source": "sec_company_tickers"
+      },
+      "SBAC": {
+        "cik": "0001034054",
+        "company_name": "SBA COMMUNICATIONS CORP",
+        "source": "sec_company_tickers"
+      },
+      "SBUX": {
+        "cik": "0000829224",
+        "company_name": "STARBUCKS CORP",
+        "source": "sec_company_tickers"
+      },
+      "SCHW": {
+        "cik": "0000316709",
+        "company_name": "SCHWAB CHARLES CORP",
+        "source": "sec_company_tickers"
+      },
+      "SEDG": {
+        "cik": "0001419612",
+        "company_name": "SOLAREDGE TECHNOLOGIES, INC.",
+        "source": "sec_company_tickers"
+      },
+      "SHOP": {
+        "cik": "0001594805",
+        "company_name": "SHOPIFY INC.",
+        "source": "sec_company_tickers"
+      },
+      "SHW": {
+        "cik": "0000089800",
+        "company_name": "SHERWIN WILLIAMS CO",
+        "source": "sec_company_tickers"
+      },
+      "SJM": {
+        "cik": "0000091419",
+        "company_name": "J M SMUCKER Co",
+        "source": "sec_company_tickers"
+      },
+      "SLB": {
+        "cik": "0000087347",
+        "company_name": "SLB LIMITED/NV",
+        "source": "sec_company_tickers"
+      },
+      "SLG": {
+        "cik": "0001040971",
+        "company_name": "SL GREEN REALTY CORP",
+        "source": "sec_company_tickers"
+      },
+      "SMCI": {
+        "cik": "0001375365",
+        "company_name": "Super Micro Computer, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "SNA": {
+        "cik": "0000091440",
+        "company_name": "Snap-on Inc",
+        "source": "sec_company_tickers"
+      },
+      "SNDK": {
+        "cik": "0002023554",
+        "company_name": "Sandisk Corp",
+        "source": "sec_company_tickers"
+      },
+      "SNPS": {
+        "cik": "0000883241",
+        "company_name": "SYNOPSYS INC",
+        "source": "sec_company_tickers"
+      },
+      "SO": {
+        "cik": "0000092122",
+        "company_name": "SOUTHERN CO",
+        "source": "sec_company_tickers"
+      },
+      "SOLS": {
+        "cik": "0002064953",
+        "company_name": "Solstice Advanced Materials Inc.",
+        "source": "sec_company_tickers"
+      },
+      "SOLV": {
+        "cik": "0001964738",
+        "company_name": "Solventum Corp",
+        "source": "sec_company_tickers"
+      },
+      "SPG": {
+        "cik": "0001063761",
+        "company_name": "SIMON PROPERTY GROUP INC.",
+        "source": "sec_company_tickers"
+      },
+      "SPGI": {
+        "cik": "0000064040",
+        "company_name": "S&P Global Inc.",
+        "source": "sec_company_tickers"
+      },
+      "SRE": {
+        "cik": "0001032208",
+        "company_name": "SEMPRA",
+        "source": "sec_company_tickers"
+      },
+      "STE": {
+        "cik": "0001757898",
+        "company_name": "STERIS plc",
+        "source": "sec_company_tickers"
+      },
+      "STLD": {
+        "cik": "0001022671",
+        "company_name": "STEEL DYNAMICS INC",
+        "source": "sec_company_tickers"
+      },
+      "STT": {
+        "cik": "0000093751",
+        "company_name": "STATE STREET CORP",
+        "source": "sec_company_tickers"
+      },
+      "STX": {
+        "cik": "0001137789",
+        "company_name": "Seagate Technology Holdings plc",
+        "source": "sec_company_tickers"
+      },
+      "STZ": {
+        "cik": "0000016918",
+        "company_name": "CONSTELLATION BRANDS, INC.",
+        "source": "sec_company_tickers"
+      },
+      "SW": {
+        "cik": "0002005951",
+        "company_name": "Smurfit Westrock plc",
+        "source": "sec_company_tickers"
+      },
+      "SWK": {
+        "cik": "0000093556",
+        "company_name": "STANLEY BLACK & DECKER, INC.",
+        "source": "sec_company_tickers"
+      },
+      "SWKS": {
+        "cik": "0000004127",
+        "company_name": "SKYWORKS SOLUTIONS, INC.",
+        "source": "sec_company_tickers"
+      },
+      "SYF": {
+        "cik": "0001601712",
+        "company_name": "Synchrony Financial",
+        "source": "sec_company_tickers"
+      },
+      "SYK": {
+        "cik": "0000310764",
+        "company_name": "STRYKER CORP",
+        "source": "sec_company_tickers"
+      },
+      "SYY": {
+        "cik": "0000096021",
+        "company_name": "SYSCO CORP",
+        "source": "sec_company_tickers"
+      },
+      "T": {
+        "cik": "0000732717",
+        "company_name": "AT&T INC.",
+        "source": "sec_company_tickers"
+      },
+      "TAP": {
+        "cik": "0000024545",
+        "company_name": "MOLSON COORS BEVERAGE CO",
+        "source": "sec_company_tickers"
+      },
+      "TDG": {
+        "cik": "0001260221",
+        "company_name": "TransDigm Group INC",
+        "source": "sec_company_tickers"
+      },
+      "TDY": {
+        "cik": "0001094285",
+        "company_name": "TELEDYNE TECHNOLOGIES INC",
+        "source": "sec_company_tickers"
+      },
+      "TECH": {
+        "cik": "0000842023",
+        "company_name": "BIO-TECHNE Corp",
+        "source": "sec_company_tickers"
+      },
+      "TEL": {
+        "cik": "0001385157",
+        "company_name": "TE Connectivity plc",
+        "source": "sec_company_tickers"
+      },
+      "TER": {
+        "cik": "0000097210",
+        "company_name": "TERADYNE, INC",
+        "source": "sec_company_tickers"
+      },
+      "TFC": {
+        "cik": "0000092230",
+        "company_name": "TRUIST FINANCIAL CORP",
+        "source": "sec_company_tickers"
+      },
+      "TFX": {
+        "cik": "0000096943",
+        "company_name": "TELEFLEX INC",
+        "source": "sec_company_tickers"
+      },
+      "TGT": {
+        "cik": "0000027419",
+        "company_name": "TARGET CORP",
+        "source": "sec_company_tickers"
+      },
+      "TJX": {
+        "cik": "0000109198",
+        "company_name": "TJX COMPANIES INC /DE/",
+        "source": "sec_company_tickers"
+      },
+      "TKO": {
+        "cik": "0001973266",
+        "company_name": "TKO Group Holdings, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "TMO": {
+        "cik": "0000097745",
+        "company_name": "THERMO FISHER SCIENTIFIC INC.",
+        "source": "sec_company_tickers"
+      },
+      "TMUS": {
+        "cik": "0001283699",
+        "company_name": "T-Mobile US, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "TPL": {
+        "cik": "0001811074",
+        "company_name": "Texas Pacific Land Corp",
+        "source": "sec_company_tickers"
+      },
+      "TPR": {
+        "cik": "0001116132",
+        "company_name": "TAPESTRY, INC.",
+        "source": "sec_company_tickers"
+      },
+      "TRGP": {
+        "cik": "0001389170",
+        "company_name": "Targa Resources Corp.",
+        "source": "sec_company_tickers"
+      },
+      "TRMB": {
+        "cik": "0000864749",
+        "company_name": "TRIMBLE INC.",
+        "source": "sec_company_tickers"
+      },
+      "TROW": {
+        "cik": "0001113169",
+        "company_name": "PRICE T ROWE GROUP INC",
+        "source": "sec_company_tickers"
+      },
+      "TRV": {
+        "cik": "0000086312",
+        "company_name": "TRAVELERS COMPANIES, INC.",
+        "source": "sec_company_tickers"
+      },
+      "TSCO": {
+        "cik": "0000916365",
+        "company_name": "TRACTOR SUPPLY CO /DE/",
+        "source": "sec_company_tickers"
+      },
+      "TSLA": {
+        "cik": "0001318605",
+        "company_name": "Tesla, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "TSN": {
+        "cik": "0000100493",
+        "company_name": "TYSON FOODS, INC.",
+        "source": "sec_company_tickers"
+      },
+      "TT": {
+        "cik": "0001466258",
+        "company_name": "Trane Technologies plc",
+        "source": "sec_company_tickers"
+      },
+      "TTD": {
+        "cik": "0001671933",
+        "company_name": "Trade Desk, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "TTWO": {
+        "cik": "0000946581",
+        "company_name": "TAKE TWO INTERACTIVE SOFTWARE INC",
+        "source": "sec_company_tickers"
+      },
+      "TXN": {
+        "cik": "0000097476",
+        "company_name": "TEXAS INSTRUMENTS INC",
+        "source": "sec_company_tickers"
+      },
+      "TXT": {
+        "cik": "0000217346",
+        "company_name": "TEXTRON INC",
+        "source": "sec_company_tickers"
+      },
+      "TYL": {
+        "cik": "0000860731",
+        "company_name": "TYLER TECHNOLOGIES INC",
+        "source": "sec_company_tickers"
+      },
+      "UA": {
+        "cik": "0001336917",
+        "company_name": "Under Armour, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "UAA": {
+        "cik": "0001336917",
+        "company_name": "Under Armour, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "UAL": {
+        "cik": "0000100517",
+        "company_name": "United Airlines Holdings, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "UBER": {
+        "cik": "0001543151",
+        "company_name": "Uber Technologies, Inc",
+        "source": "sec_company_tickers"
+      },
+      "UDR": {
+        "cik": "0000074208",
+        "company_name": "UDR, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "UHS": {
+        "cik": "0000352915",
+        "company_name": "UNIVERSAL HEALTH SERVICES INC",
+        "source": "sec_company_tickers"
+      },
+      "ULTA": {
+        "cik": "0001403568",
+        "company_name": "Ulta Beauty, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "UNH": {
+        "cik": "0000731766",
+        "company_name": "UNITEDHEALTH GROUP INC",
+        "source": "sec_company_tickers"
+      },
+      "UNM": {
+        "cik": "0000005513",
+        "company_name": "Unum Group",
+        "source": "sec_company_tickers"
+      },
+      "UNP": {
+        "cik": "0000100885",
+        "company_name": "UNION PACIFIC CORP",
+        "source": "sec_company_tickers"
+      },
+      "UPS": {
+        "cik": "0001090727",
+        "company_name": "UNITED PARCEL SERVICE INC",
+        "source": "sec_company_tickers"
+      },
+      "URI": {
+        "cik": "0001067701",
+        "company_name": "UNITED RENTALS, INC.",
+        "source": "sec_company_tickers"
+      },
+      "USB": {
+        "cik": "0000036104",
+        "company_name": "US BANCORP \\DE\\",
+        "source": "sec_company_tickers"
+      },
+      "V": {
+        "cik": "0001403161",
+        "company_name": "VISA INC.",
+        "source": "sec_company_tickers"
+      },
+      "VEEV": {
+        "cik": "0001393052",
+        "company_name": "VEEVA SYSTEMS INC",
+        "source": "sec_company_tickers"
+      },
+      "VFC": {
+        "cik": "0000103379",
+        "company_name": "V F CORP",
+        "source": "sec_company_tickers"
+      },
+      "VICI": {
+        "cik": "0001705696",
+        "company_name": "VICI PROPERTIES INC.",
+        "source": "sec_company_tickers"
+      },
+      "VLO": {
+        "cik": "0001035002",
+        "company_name": "VALERO ENERGY CORP/TX",
+        "source": "sec_company_tickers"
+      },
+      "VLTO": {
+        "cik": "0001967680",
+        "company_name": "Veralto Corp",
+        "source": "sec_company_tickers"
+      },
+      "VMC": {
+        "cik": "0001396009",
+        "company_name": "Vulcan Materials CO",
+        "source": "sec_company_tickers"
+      },
+      "VNO": {
+        "cik": "0000899689",
+        "company_name": "VORNADO REALTY TRUST",
+        "source": "sec_company_tickers"
+      },
+      "VNT": {
+        "cik": "0001786842",
+        "company_name": "Vontier Corp",
+        "source": "sec_company_tickers"
+      },
+      "VRSK": {
+        "cik": "0001442145",
+        "company_name": "Verisk Analytics, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "VRSN": {
+        "cik": "0001014473",
+        "company_name": "VERISIGN INC/CA",
+        "source": "sec_company_tickers"
+      },
+      "VRT": {
+        "cik": "0001674101",
+        "company_name": "Vertiv Holdings Co",
+        "source": "sec_company_tickers"
+      },
+      "VRTX": {
+        "cik": "0000875320",
+        "company_name": "VERTEX PHARMACEUTICALS INC / MA",
+        "source": "sec_company_tickers"
+      },
+      "VST": {
+        "cik": "0001692819",
+        "company_name": "Vistra Corp.",
+        "source": "sec_company_tickers"
+      },
+      "VTR": {
+        "cik": "0000740260",
+        "company_name": "Ventas, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "VTRS": {
+        "cik": "0001792044",
+        "company_name": "Viatris Inc",
+        "source": "sec_company_tickers"
+      },
+      "VZ": {
+        "cik": "0000732712",
+        "company_name": "VERIZON COMMUNICATIONS INC",
+        "source": "sec_company_tickers"
+      },
+      "WAB": {
+        "cik": "0000943452",
+        "company_name": "WESTINGHOUSE AIR BRAKE TECHNOLOGIES CORP",
+        "source": "sec_company_tickers"
+      },
+      "WAT": {
+        "cik": "0001000697",
+        "company_name": "WATERS CORP /DE/",
+        "source": "sec_company_tickers"
+      },
+      "WBD": {
+        "cik": "0001437107",
+        "company_name": "Warner Bros. Discovery, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "WDAY": {
+        "cik": "0001327811",
+        "company_name": "Workday, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "WDC": {
+        "cik": "0000106040",
+        "company_name": "WESTERN DIGITAL CORP",
+        "source": "sec_company_tickers"
+      },
+      "WEC": {
+        "cik": "0000783325",
+        "company_name": "WEC ENERGY GROUP, INC.",
+        "source": "sec_company_tickers"
+      },
+      "WELL": {
+        "cik": "0000766704",
+        "company_name": "WELLTOWER INC.",
+        "source": "sec_company_tickers"
+      },
+      "WFC": {
+        "cik": "0000072971",
+        "company_name": "WELLS FARGO & COMPANY/MN",
+        "source": "sec_company_tickers"
+      },
+      "WHR": {
+        "cik": "0000106640",
+        "company_name": "WHIRLPOOL CORP /DE/",
+        "source": "sec_company_tickers"
+      },
+      "WM": {
+        "cik": "0000823768",
+        "company_name": "WASTE MANAGEMENT INC",
+        "source": "sec_company_tickers"
+      },
+      "WMB": {
+        "cik": "0000107263",
+        "company_name": "WILLIAMS COMPANIES, INC.",
+        "source": "sec_company_tickers"
+      },
+      "WMT": {
+        "cik": "0000104169",
+        "company_name": "Walmart Inc.",
+        "source": "sec_company_tickers"
+      },
+      "WRB": {
+        "cik": "0000011544",
+        "company_name": "BERKLEY W R CORP",
+        "source": "sec_company_tickers"
+      },
+      "WSM": {
+        "cik": "0000719955",
+        "company_name": "WILLIAMS SONOMA INC",
+        "source": "sec_company_tickers"
+      },
+      "WST": {
+        "cik": "0000105770",
+        "company_name": "WEST PHARMACEUTICAL SERVICES INC",
+        "source": "sec_company_tickers"
+      },
+      "WTW": {
+        "cik": "0001140536",
+        "company_name": "WILLIS TOWERS WATSON PLC",
+        "source": "sec_company_tickers"
+      },
+      "WU": {
+        "cik": "0001365135",
+        "company_name": "Western Union CO",
+        "source": "sec_company_tickers"
+      },
+      "WY": {
+        "cik": "0000106535",
+        "company_name": "WEYERHAEUSER CO",
+        "source": "sec_company_tickers"
+      },
+      "WYNN": {
+        "cik": "0001174922",
+        "company_name": "WYNN RESORTS LTD",
+        "source": "sec_company_tickers"
+      },
+      "XEL": {
+        "cik": "0000072903",
+        "company_name": "XCEL ENERGY INC",
+        "source": "sec_company_tickers"
+      },
+      "XOM": {
+        "cik": "0002115436",
+        "company_name": "ExxonMobil Holdings Corp",
+        "source": "sec_company_tickers"
+      },
+      "XRAY": {
+        "cik": "0000818479",
+        "company_name": "DENTSPLY SIRONA Inc.",
+        "source": "sec_company_tickers"
+      },
+      "XRX": {
+        "cik": "0001770450",
+        "company_name": "Xerox Holdings Corp",
+        "source": "sec_company_tickers"
+      },
+      "XYL": {
+        "cik": "0001524472",
+        "company_name": "Xylem Inc.",
+        "source": "sec_company_tickers"
+      },
+      "XYZ": {
+        "cik": "0001512673",
+        "company_name": "Block, Inc.",
+        "source": "sec_company_tickers"
+      },
+      "YUM": {
+        "cik": "0001041061",
+        "company_name": "YUM BRANDS INC",
+        "source": "sec_company_tickers"
+      },
+      "ZBH": {
+        "cik": "0001136869",
+        "company_name": "ZIMMER BIOMET HOLDINGS, INC.",
+        "source": "sec_company_tickers"
+      },
+      "ZBRA": {
+        "cik": "0000877212",
+        "company_name": "ZEBRA TECHNOLOGIES CORP",
+        "source": "sec_company_tickers"
+      },
+      "ZION": {
+        "cik": "0000109380",
+        "company_name": "ZIONS BANCORPORATION, NATIONAL ASSOCIATION /UT/",
+        "source": "sec_company_tickers"
+      },
+      "ZTS": {
+        "cik": "0001555280",
+        "company_name": "Zoetis Inc.",
+        "source": "sec_company_tickers"
+      }
+    },
+    "unresolved": [
+      {
+        "symbol": "ABMD",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "ADS",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "AGN",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "ALXN",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "ARNC",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "ATVI",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "AVB",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "BF.B",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "BLL",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "BRK.B",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "CERN",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "CMA",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "CTL",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "CTLT",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "CTRA",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "CTXS",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "CXO",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "DAY",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "DFS",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "DISH",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "DRE",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "EA",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "EQR",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "ETFC",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "FI",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "FLIR",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "FLT",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "FRC",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "GPS",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "HBI",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "HES",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "HOLX",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "INFO",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "IPG",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "JWN",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "K",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "KSU",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "LEG",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "MRO",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "MXIM",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "MYL",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "NBL",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "NLSN",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "PBCT",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "PXD",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "RTN",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "SATS",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "SBNY",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "SEE",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "SIVB",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "TIF",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "TWTR",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "UTX",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "VAR",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "WBA",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "XEC",
+        "reason": "no_sec_cik_mapping"
+      },
+      {
+        "symbol": "XLNX",
+        "reason": "no_sec_cik_mapping"
+      }
+    ]
+  }
+}

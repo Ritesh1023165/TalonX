@@ -30,10 +30,14 @@ EventCallback = Callable[[MarketEvent], Awaitable[None]]
 
 
 class MarketDataManager:
-    def __init__(self, config: MarketDataConfig | None = None):
+    def __init__(self, config: MarketDataConfig | None = None, metrics_publisher=None):
         self.config = config or settings.market_data
         self._ws_client: PolygonWebSocketClient | None = None
         self._poller: YFinancePoller | None = None
+        # 2026-08-18 /ping observability fix: forwarded straight through to
+        # the yfinance fallback poller (see YFinancePoller.__init__'s own
+        # docstring) -- optional, additive, no behavior change when omitted.
+        self._metrics_publisher = metrics_publisher
 
     def stop(self) -> None:
         """Signal a graceful shutdown of whichever source is currently active."""
@@ -76,5 +80,5 @@ class MarketDataManager:
                 "(delayed data, not true real-time)."
             )
 
-        self._poller = YFinancePoller(self.config)
+        self._poller = YFinancePoller(self.config, metrics_publisher=self._metrics_publisher)
         await self._poller.stream(symbols, on_event)

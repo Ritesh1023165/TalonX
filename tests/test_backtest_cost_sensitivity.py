@@ -84,12 +84,18 @@ def test_trade_count_is_identical_across_cost_scenarios(scenario_rows):
     assert len(trade_counts) == 1, f"trade count should not vary with cost, got {scenario_rows}"
 
 
-def test_higher_cost_never_improves_expectancy(scenario_rows):
-    expectancies = [r["expectancy_r"] for r in scenario_rows if r["expectancy_r"] is not None]
-    if len(expectancies) < 2:
-        pytest.skip("fixture produced too few trades to compare expectancy across scenarios")
-    for earlier, later in zip(expectancies, expectancies[1:]):
-        assert later <= earlier + 1e-9
+def test_zero_trade_fixture_reports_no_expectancy_in_any_scenario(scenario_rows):
+    """`sample_df` is `_small_bars()` -- a small, generated, deliberately
+    trade-FREE fixture (NOT sample_AAPL_trade_1m.csv). Every cost scenario
+    must therefore report zero trades and no expectancy -- explicit
+    zero-trade coverage, no skip. The expectancy-versus-cost monotonicity
+    assertion is exercised against a trade-producing fixture by
+    test_multi_trade_higher_cost_never_improves_expectancy_without_skipping
+    below.
+    """
+    assert {r["trades"] for r in scenario_rows} == {0}
+    assert all(r["expectancy_r"] is None for r in scenario_rows)
+    assert all(r.get("total_r") in (None, 0, 0.0) for r in scenario_rows)
 
 
 def test_zero_cost_scenario_matches_a_plain_zero_cost_backtest(sample_df, scenario_rows):
@@ -123,6 +129,17 @@ def test_zero_cost_scenario_matches_a_plain_zero_cost_backtest(sample_df, scenar
 # ------------------------------------------------------------------
 
 _MULTI_TRADE_CSV = _REPO_ROOT / "examples" / "data" / "sample_multi_trade_1m.csv"
+
+# Task 25A finding (2026-08-20): see the identical marker in
+# tests/test_backtest_sample_data.py -- all three of this CSV's
+# TSTW/TSTL/TSTE demo trades turn out to be built entirely around a
+# BEARISH macd_bearish_cross opening a short position while flat, i.e.
+# the exact long/short bug Task 24/25A fixes. Correctly zero trades
+# now; CSV regeneration tracked as a BLOCKING FOLLOW-UP, not rushed
+# here.
+# Task 81-R2: sample_multi_trade_1m.csv regenerated (see
+# scripts/gen_sample_multi_trade_1m.py) -- the xfail marker is removed;
+# multi_trade_df now yields three genuine long trades.
 
 
 @pytest.fixture(scope="module")

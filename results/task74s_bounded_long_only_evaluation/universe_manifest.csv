@@ -1,0 +1,11 @@
+symbol,source_directory,file,provider,feed,status,actual_start_utc,actual_end_utc,bars,selection_rationale
+AAPL,data/historical_1m/task7b_alpaca_long_history,AAPL.csv,alpaca,SIP,FULL,2025-08-15 08:00:00+00:00,2026-08-14 23:59:00+00:00,189563,frozen_10_symbol_research_universe
+MSFT,data/historical_1m/task7b_alpaca_long_history,MSFT.csv,alpaca,SIP,FULL,2025-08-15 08:00:00+00:00,2026-08-14 23:59:00+00:00,199156,frozen_10_symbol_research_universe
+NVDA,data/historical_1m/task7b_alpaca_long_history,NVDA.csv,alpaca,SIP,FULL,2025-08-15 08:00:00+00:00,2026-08-14 23:59:00+00:00,237875,frozen_10_symbol_research_universe
+AMZN,data/historical_1m/task7b_alpaca_long_history,AMZN.csv,alpaca,SIP,FULL,2025-08-15 08:00:00+00:00,2026-08-14 23:59:00+00:00,194988,frozen_10_symbol_research_universe
+META,data/historical_1m/task7b_alpaca_long_history,META.csv,alpaca,SIP,FULL,2025-08-15 08:19:00+00:00,2026-08-14 23:59:00+00:00,184201,frozen_10_symbol_research_universe
+AMD,data/historical_1m/task7b_alpaca_long_history,AMD.csv,alpaca,SIP,FULL,2025-08-15 08:00:00+00:00,2026-08-14 23:59:00+00:00,204714,frozen_10_symbol_research_universe
+TSLA,data/historical_1m/task7b_alpaca_long_history,TSLA.csv,alpaca,SIP,FULL,2025-08-15 08:00:00+00:00,2026-08-14 23:59:00+00:00,234652,frozen_10_symbol_research_universe
+GOOGL,data/historical_1m/task7b_alpaca_long_history,GOOGL.csv,alpaca,SIP,FULL,2025-08-15 08:00:00+00:00,2026-08-14 23:59:00+00:00,191394,frozen_10_symbol_research_universe
+PYPL,data/historical_1m/task7b_alpaca_long_history,PYPL.csv,alpaca,SIP,FULL,2025-08-15 08:00:00+00:00,2026-08-14 23:59:00+00:00,142095,frozen_10_symbol_research_universe
+STX,data/historical_1m/task7b_alpaca_long_history,STX.csv,alpaca,SIP,FULL,2025-08-15 13:03:00+00:00,2026-08-14 23:58:00+00:00,124406,frozen_10_symbol_research_universe

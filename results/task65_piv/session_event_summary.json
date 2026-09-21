@@ -1,0 +1,56 @@
+{
+  "session_date": "2026-08-24",
+  "approved_sha": "b935588b69967081eebacb8f9ae8d3685ae1e578",
+  "feed_mode": "IEX_PAPER_PIV",
+  "runs": [
+    {
+      "run": 1,
+      "checkpoint_sha": "fbc0a0d1b56d3816e6d8c0de16eb069e9de21587",
+      "started_et": "~09:31",
+      "ended_et": "10:33:58",
+      "outcome": "CRASHED",
+      "reason": "Unhandled requests.exceptions.ReadTimeout inside fetch_bars_latest() propagated out of process_tick(), uncaught, terminating the process. Zero orders/positions were open at the time (confirmed against the live PAPER account before restart).",
+      "warmup_ready_symbols": "12/35 not directly captured for this run's own start (see standalone smoke tests at 06:45 ET: 12/35, and at process-start ~09:15 ET: 22/35 -- both superseded by run 2's fresh, authoritative warmup)"
+    },
+    {
+      "run": 2,
+      "checkpoint_sha": "b935588b69967081eebacb8f9ae8d3685ae1e578",
+      "started_et": "~14:41",
+      "ended_et": "15:50 (EOD flatten, clean exit)",
+      "outcome": "COMPLETED",
+      "reason": "Ran to the configured EOD flatten time with zero tick failures after the crash fix. Session-readiness state does not persist across a process restart (SessionReadinessValidator is in-memory only, unlike lifecycle_state.json) -- restarting after 10:00 ET meant this run's own readiness finalization had zero opening-minute observations for every symbol, so all 35 were DATA_NOT_READY for this run despite 35/35 warmup readiness. Natural strategy decisions were therefore structurally unavailable this run through no fault of the decision path itself. The predeclared 15:00 ET PIV_LIFECYCLE_PROBE fallback fired exactly as designed and exercised the full order lifecycle."
+    }
+  ],
+  "event_counts": {
+    "STARTUP": 2,
+    "PAPER_SESSION_STARTED": 4,
+    "PREFLIGHT_PASS": 7,
+    "PREFLIGHT_FAIL": 7,
+    "MARKET_DATA_READY": 21,
+    "DATA_NOT_READY": 49,
+    "SIGNAL": 1,
+    "ORDER_INTENT": 2,
+    "PAPER_ORDER_SUBMITTED": 2,
+    "FILLED": 2,
+    "POSITION_OPENED": 2,
+    "EXIT_REQUESTED": 1,
+    "STALE_DATA": 19,
+    "BROKER_ERROR": 1,
+    "EOD_FLATTEN": 1
+  },
+  "event_counts_note": "PREFLIGHT_PASS/PREFLIGHT_FAIL/STARTUP counts span every preflight invocation made today (both the Task65 baseline checks and the Task65B decision-path/warmup-fix checkpoints), not just the two live session runs. BROKER_ERROR count of 1 is the single run-1 crash; run 2 produced zero BROKER_ERROR/TICK_FAILED_* events.",
+  "readiness_run2_breakdown": {
+    "MARKET_DATA_READY": 0,
+    "DATA_NOT_READY": 35,
+    "note": "See runs[1].reason -- in-memory readiness state loss on restart, not a live-feed data-quality defect. Run 1's own readiness check (10:00 ET) found 21/35 READY, 14/35 DATA_NOT_READY from genuine IEX opening-minute gaps -- that evidence is real and independent of the restart."
+  },
+  "order_lifecycle_source_breakdown": {
+    "STRATEGY": {"SIGNAL": 0, "ORDER_INTENT": 0, "PAPER_ORDER_SUBMITTED": 0, "FILLED": 0},
+    "PIV_LIFECYCLE_PROBE": {"SIGNAL": 1, "ORDER_INTENT": 2, "PAPER_ORDER_SUBMITTED": 2, "FILLED": 2, "EXIT_REQUESTED": 1, "POSITION_OPENED": 2}
+  },
+  "duplicate_submissions_prevented": 0,
+  "unexpected_orders": 0,
+  "missed_expected_orders": 0,
+  "telegram_status": "PASS (reachable; observational fail-soft channel, isolated from processing per design)",
+  "known_limitation_discovered": "SessionReadinessValidator state is in-memory only and does not survive a process restart. A restart after 10:00 ET (as happened today, forced by the run-1 crash) causes every symbol to appear DATA_NOT_READY for the remainder of that session's restarted process, even if the original opening data was fine. Recommended follow-up: persist readiness state to disk (same pattern lifecycle_state.json already uses) or document that a restart should only be attempted before 10:00 ET."
+}

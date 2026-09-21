@@ -1,0 +1,39 @@
+{
+  "candidate": "ORPB_V1",
+  "identical_trades_for_0bps_and_5bps": true,
+  "single_replay": true,
+  "task": "63P",
+  "total_trades": 46,
+  "windows": {
+    "O1": {
+      "evaluation_bars": 262769,
+      "pending_entries_after_finalize": 0,
+      "pending_exits_after_finalize": 0,
+      "positions_after_finalize": 0,
+      "published": 15,
+      "rejections": 264,
+      "trades": 13,
+      "warmup_bars": 132260
+    },
+    "O2": {
+      "evaluation_bars": 263482,
+      "pending_entries_after_finalize": 0,
+      "pending_exits_after_finalize": 0,
+      "positions_after_finalize": 0,
+      "published": 10,
+      "rejections": 262,
+      "trades": 10,
+      "warmup_bars": 132189
+    },
+    "O3": {
+      "evaluation_bars": 264399,
+      "pending_entries_after_finalize": 0,
+      "pending_exits_after_finalize": 0,
+      "positions_after_finalize": 0,
+      "published": 23,
+      "rejections": 333,
+      "trades": 23,
+      "warmup_bars": 131593
+    }
+  }
+}

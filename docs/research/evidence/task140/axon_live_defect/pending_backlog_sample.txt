@@ -1,0 +1,96 @@
+=== CVNA SEC:0001700537-26-000020:INSIDER_TRANSACTION
+[INFO] <b>CVNA</b> — Insider ownership filing (Form 3/4/5)
+an open-market insider transaction of about $2,669,292 was reported
+Source: 2026-09-03 22:10 UTC (source age: 277.3h)
+⚠️ Source freshness unknown at emit time
+<i>Reply "details" for facts and filing link.</i>
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+
+=== CVNA SEC:0001783558-26-000020:INSIDER_TRANSACTION
+[INFO] <b>CVNA</b> — Insider ownership filing (Form 3/4/5)
+an open-market insider transaction of about $2,669,292 was reported
+Source: 2026-09-03 22:10 UTC (source age: 277.3h)
+⚠️ Source freshness unknown at emit time
+<i>Reply "details" for facts and filing link.</i>
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+
+=== CVNA SEC:0001700545-26-000020:INSIDER_TRANSACTION
+[INFO] <b>CVNA</b> — Insider ownership filing (Form 3/4/5)
+an open-market insider transaction of about $2,669,292 was reported
+Source: 2026-09-03 22:10 UTC (source age: 277.3h)
+⚠️ Source freshness unknown at emit time
+<i>Reply "details" for facts and filing link.</i>
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+
+=== CVNA SEC:0001700540-26-000020:INSIDER_TRANSACTION
+[INFO] <b>CVNA</b> — Insider ownership filing (Form 3/4/5)
+an open-market insider transaction of about $2,669,292 was reported
+Source: 2026-09-03 22:10 UTC (source age: 277.3h)
+⚠️ Source freshness unknown at emit time
+<i>Reply "details" for facts and filing link.</i>
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+
+=== CVNA SEC:0001607889-26-000032:INSIDER_TRANSACTION
+[INFO] <b>CVNA</b> — Insider ownership filing (Form 3/4/5)
+an open-market insider transaction of about $2,669,292 was reported
+Source: 2026-09-03 22:10 UTC (source age: 277.3h)
+⚠️ Source freshness unknown at emit time
+<i>Reply "details" for facts and filing link.</i>
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+
+=== CVNA SEC:0001700542-26-000020:INSIDER_TRANSACTION
+[INFO] <b>CVNA</b> — Insider ownership filing (Form 3/4/5)
+an open-market insider transaction of about $2,669,292 was reported
+Source: 2026-09-03 22:10 UTC (source age: 277.3h)
+⚠️ Source freshness unknown at emit time
+<i>Reply "details" for facts and filing link.</i>
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+
+=== MEDIUM CVNA SEC:0001690820-25-000061:INSIDER_TRANSACTION
+[INFO] <b>CVNA</b> — Insider ownership filing (Form 3/4/5)
+an open-market insider transaction of about $3,367,088 was reported
+Source: 2025-02-04 22:29 UTC (source age: 14101.1h)
+⚠️ Source freshness unknown at emit time
+<i>Reply "details" for facts and filing link.</i>
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+
+=== MEDIUM CVNA SEC:0001690820-25-000060:INSIDER_TRANSACTION
+[INFO] <b>CVNA</b> — Insider ownership filing (Form 3/4/5)
+an open-market insider transaction of about $3,367,088 was reported
+Source: 2025-02-04 22:29 UTC (source age: 14101.1h)
+⚠️ Source freshness unknown at emit time
+<i>Reply "details" for facts and filing link.</i>
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+
+=== MEDIUM CVNA SEC:0001690820-25-000059:INSIDER_TRANSACTION
+[INFO] <b>CVNA</b> — Insider ownership filing (Form 3/4/5)
+an open-market insider transaction of about $3,367,088 was reported
+Source: 2025-02-04 22:29 UTC (source age: 14101.1h)
+⚠️ Source freshness unknown at emit time
+<i>Reply "details" for facts and filing link.</i>
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+
+=== MEDIUM CVNA SEC:0001690820-25-000058:INSIDER_TRANSACTION
+[INFO] <b>CVNA</b> — Insider ownership filing (Form 3/4/5)
+an open-market insider transaction of about $3,367,088 was reported
+Source: 2025-02-04 22:29 UTC (source age: 14101.1h)
+⚠️ Source freshness unknown at emit time
+<i>Reply "details" for facts and filing link.</i>
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+
+=== MEDIUM CVNA SEC:0001690820-25-000057:INSIDER_TRANSACTION
+[INFO] <b>CVNA</b> — Insider ownership filing (Form 3/4/5)
+an open-market insider transaction of about $3,367,088 was reported
+Source: 2025-02-04 22:28 UTC (source age: 14101.1h)
+⚠️ Source freshness unknown at emit time
+<i>Reply "details" for facts and filing link.</i>
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+
+=== MEDIUM CVNA SEC:0001690820-25-000056:INSIDER_TRANSACTION
+[INFO] <b>CVNA</b> — Insider ownership filing (Form 3/4/5)
+an open-market insider transaction of about $3,367,088 was reported
+Source: 2025-02-04 22:28 UTC (source age: 14101.1h)
+⚠️ Source freshness unknown at emit time
+<i>Reply "details" for facts and filing link.</i>
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+

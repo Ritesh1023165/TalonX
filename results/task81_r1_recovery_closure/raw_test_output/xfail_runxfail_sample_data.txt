@@ -1,0 +1,27 @@
+        assert exit_code == 0
+        assert "CRITICAL CORRUPTION:     no" in out
+>       assert summary["trades_executed"] == 3
+E       assert 0 == 3
+tests\test_backtest_sample_data.py:283: AssertionError
+>       assert exit_reasons == {"TSTW": "TARGET", "TSTL": "STOP", "TSTE": "END_OF_SESSION"}
+E       AssertionError: assert {} == {'TSTW': 'TAR...D_OF_SESSION'}
+tests\test_backtest_sample_data.py:292: AssertionError
+>       assert any(r > 0 for r in gross_r_values), "expected at least one winning trade"
+E       AssertionError: expected at least one winning trade
+E       assert False
+tests\test_backtest_sample_data.py:301: AssertionError
+E       KeyError: 'net'
+tests\test_backtest_sample_data.py:316: KeyError
+>       assert len(lines) == 4  # header + 3 trades
+E       AssertionError: assert 1 == 4
+tests\test_backtest_sample_data.py:333: AssertionError
+>       assert payload["metrics"]["net"]["total_trades"] == 3
+E       KeyError: 'net'
+tests\test_backtest_sample_data.py:351: KeyError
+FAILED tests/test_backtest_sample_data.py::test_multi_trade_dataset_runs_the_documented_command_and_produces_three_trades
+FAILED tests/test_backtest_sample_data.py::test_multi_trade_dataset_exercises_target_stop_and_eod_exit_reasons
+FAILED tests/test_backtest_sample_data.py::test_multi_trade_dataset_has_at_least_one_winner_and_one_loser
+FAILED tests/test_backtest_sample_data.py::test_multi_trade_dataset_populates_aggregate_statistics
+FAILED tests/test_backtest_sample_data.py::test_multi_trade_dataset_equity_curve_reflects_the_win_loss_sequence
+FAILED tests/test_backtest_sample_data.py::test_multi_trade_dataset_html_report_contains_populated_metrics
+================== 6 failed, 1 warning in 167.89s (0:02:47) ===================

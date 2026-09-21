@@ -58,6 +58,7 @@ from talonx_paper.engine import (
     check_stop_take,
     decide_long_term_trade,
     decide_trade,
+    fill_geometry_is_valid,
     seconds_until_next_eod_flatten,
 )
 from talonx_paper.schemas import (
@@ -335,6 +336,26 @@ class PaperTradingEngine:
 
     async def _execute_buy(self, alert: ActionableAlert, decision: TradeDecision) -> None:
         fill_price = apply_spread(decision.price, self.config.simulated_spread_bps, "BUY")
+
+        # Task 25B (Task 24 P1 finding): the fill (screening price +
+        # simulated spread) can land outside the screening-time stop/
+        # target bracket -- reject fail-closed rather than persist an
+        # invalid position, BEFORE any sizing/cash allocation happens
+        # (no partial state). See engine.fill_geometry_is_valid's own
+        # docstring for why this validates rather than recomputes.
+        stop_price = alert.triggering_signal.stop_price
+        target_price = alert.triggering_signal.target_price
+        if not fill_geometry_is_valid(fill_price, stop_price, target_price):
+            self._trades_ignored += 1
+            logger.warning(
+                "Paper trade ignored for %s: FILL_GEOMETRY_INVALID (fill=$%.4f, stop=%s, target=%s)",
+                alert.ticker, fill_price, stop_price, target_price,
+            )
+            self.store.record_ignored(
+                alert.ticker, "FILL_GEOMETRY_INVALID", alert.action, fill_price, alert.correlated_at,
+            )
+            return
+
         summary = self.store.get_portfolio_summary()
         sized = calculate_buy(summary["current_cash"], summary["trade_allocation_usd"], fill_price)
         if sized is None:
@@ -353,6 +374,15 @@ class PaperTradingEngine:
             alert.ticker, shares, fill_price, cost, alert.correlated_at,
             stop_price=alert.triggering_signal.stop_price, target_price=alert.triggering_signal.target_price,
         )
+        if execution is None:
+            # Package 2 Durable Account Blocks: the ORIGINAL_INTRADAY
+            # account has an active integrity block -- execute_buy()
+            # already recorded the ignored-decision row itself (inside
+            # the same locked block as the block re-check), so there is
+            # nothing further to persist here.
+            self._trades_ignored += 1
+            logger.warning("Paper trade ignored for %s: ACCOUNT_BLOCKED", alert.ticker)
+            return
         self._trades_executed += 1
         logger.info(
             "Paper BUY: %s %.4f shares @ $%.2f (cost $%.2f, cash after $%.2f)",
@@ -598,7 +628,14 @@ class LongTermPaperEngine:
                 continue
             execution = self.store.execute_dca_contribution(ticker, contribution_usd, price, now)
             if execution is None:
-                continue  # position closed between the listing above and this write -- skip
+                # position closed between the listing above and this
+                # write, the ORIGINAL_LONGTERM account has an active
+                # integrity block, or the store's own defense-in-depth
+                # cash cap refused this contribution (Package 2
+                # acceptance A1/A2) -- execute_dca_contribution already
+                # recorded the ignored-decision row itself where
+                # applicable; nothing further to do here.
+                continue
             self._dca_contributions_made += 1
             summary = self.store.get_long_term_portfolio_summary()  # refresh cash for the next ticker this cycle
             logger.info(
@@ -704,6 +741,15 @@ class LongTermPaperEngine:
 
         shares, cost = sized
         execution = self.store.execute_long_term_buy(alert.ticker, shares, fill_price, cost, alert.correlated_at)
+        if execution is None:
+            # Package 2 Durable Account Blocks: the ORIGINAL_LONGTERM
+            # account has an active integrity block -- execute_long_
+            # term_buy() already recorded the ignored-decision row
+            # itself (inside the same locked block as the block
+            # re-check).
+            self._trades_ignored += 1
+            logger.warning("Long-term paper trade ignored for %s: ACCOUNT_BLOCKED", alert.ticker)
+            return
         self._trades_executed += 1
         logger.info(
             "Long-term BUY: %s %.4f shares @ $%.2f (cost $%.2f, cash after $%.2f)",

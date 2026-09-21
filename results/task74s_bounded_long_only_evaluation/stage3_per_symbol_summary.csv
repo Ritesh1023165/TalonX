@@ -1,0 +1,11 @@
+symbol,bars_processed,raw_candidates,bullish_candidates,bearish_candidates,bullish_confluence_ge2,signals_published,trades_executed,low_confluence_rejections,trend_gate_rejections,low_risk_reward_rejections,opening_blackout_rejections,closing_blackout_rejections,session_closed_rejections,no_active_position_rejections
+AAPL,189563,71,34,37,1,0,0,34,0,1,13,0,22,0
+AMD,204714,1242,614,628,1,0,0,938,0,0,232,19,53,0
+AMZN,194988,140,69,71,0,0,0,73,0,0,39,1,27,0
+GOOGL,191394,153,76,77,1,0,0,93,0,1,38,1,19,0
+META,184201,207,90,117,2,0,0,127,0,2,62,0,14,0
+MSFT,199156,105,42,63,0,0,0,55,0,0,25,0,23,0
+NVDA,237875,303,157,146,1,0,0,206,0,0,66,0,29,0
+PYPL,142095,273,133,140,2,0,0,172,0,0,86,4,11,0
+STX,124406,1994,1017,977,3,0,0,1552,1,2,253,28,147,3
+TSLA,234652,533,256,277,1,0,0,390,0,1,116,2,23,0

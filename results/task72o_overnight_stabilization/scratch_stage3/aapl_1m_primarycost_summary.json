@@ -1,0 +1,45 @@
+{
+  "period": {
+    "start": "2025-08-15 08:00:00+00:00",
+    "end": "2025-09-12 23:59:00+00:00"
+  },
+  "symbols": [
+    "AAPL"
+  ],
+  "bars_processed": 14288,
+  "signals_generated": 0,
+  "signals_published": 0,
+  "trades_executed": 0,
+  "throttle_fidelity": "LIMITED (flushed once per 1-minute bar-close, not continuously every throttle_window_seconds)",
+  "execution_assumptions": {
+    "entry_slippage_bps": 5.0,
+    "exit_slippage_bps": 5.0,
+    "spread_bps": 10.0,
+    "same_bar_resolution": "stop_first",
+    "eod_flatten_enabled": true,
+    "allow_overlapping_trades": false
+  },
+  "zero_cost_baseline_warning": false,
+  "small_sample_warning": false,
+  "timezone": {
+    "input_timezone": "America/New_York",
+    "internal_timezone": "UTC",
+    "session_timezone": "America/New_York"
+  },
+  "reproducibility": {
+    "git_commit": "3be9eaccdda659f875ee77a06a65a0b1afcb0160",
+    "working_tree_dirty": true,
+    "backtester_version": "0.1.0",
+    "strategy_version": "2ae6216bca70",
+    "config_hash": "3556debe52af",
+    "dataset_hash": "7b14ce2e50df",
+    "run_timestamp": "2026-08-27T01:14:39.331695+00:00"
+  },
+  "portfolio_disclaimer": "This backtest evaluates TRADE-LEVEL strategy performance (R-multiples per signal). It does NOT model starting capital, position sizing, maximum portfolio exposure, concurrent-position limits, or buying power. Aggregate R/expectancy figures here describe the strategy's per-trade edge, not a realistic portfolio-level return.",
+  "survivorship_bias_note": "This is an INDIVIDUAL-SECURITY backtest, not a historical-universe backtest. If the symbol(s) tested were selected because they are prominent/liquid TODAY (e.g. current S&P 500 constituents), results may overstate historical edge relative to a point-in-time universe that would have also included names that were later delisted, acquired, or otherwise dropped out -- classic survivorship bias. Point-in-time universe construction is not implemented by this engine; interpret results accordingly, especially over long lookback periods.",
+  "metrics": {},
+  "rejections_by_reason": {
+    "LOW_VOLATILITY": 14110
+  },
+  "cost_sensitivity": []
+}

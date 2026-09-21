@@ -1,0 +1,47 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- C:\workspace\TalonX\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\workspace\TalonX
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.10.16, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 10 items
+
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes PASSED [ 10%]
+tests/test_task140_dashboard_refresh.py::test_new_rows_above_do_not_auto_jump_and_show_an_indicator PASSED [ 20%]
+tests/test_task140_dashboard_refresh.py::test_expanded_details_state_survives_refresh PASSED [ 30%]
+tests/test_task140_dashboard_refresh.py::test_focus_outside_the_refreshed_region_is_not_disturbed PASSED [ 40%]
+tests/test_task140_dashboard_refresh.py::test_pause_stops_automatic_updates_and_timestamp_freezes PASSED [ 50%]
+tests/test_task140_dashboard_refresh.py::test_manual_refresh_works_while_paused_and_stays_paused PASSED [ 60%]
+tests/test_task140_dashboard_refresh.py::test_resume_does_not_create_duplicate_timers PASSED [ 70%]
+tests/test_task140_dashboard_refresh.py::test_delayed_response_cannot_overwrite_newer_state PASSED [ 80%]
+tests/test_task140_dashboard_refresh.py::test_failed_request_keeps_content_and_recovers_without_losing_position PASSED [ 90%]
+tests/test_task140_dashboard_refresh.py::test_tab_switch_during_in_flight_refresh_shows_the_new_tab PASSED [100%]
+
+============================== warnings summary ===============================
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+tests/test_task140_dashboard_refresh.py::test_scroll_position_survives_three_automatic_refreshes
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 10 passed, 12 warnings in 4.87s =======================

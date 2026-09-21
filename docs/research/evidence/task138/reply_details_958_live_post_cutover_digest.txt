@@ -1,0 +1,10 @@
+This message covered 14 event(s):
+  1. PH -- 0001193125-26-390561
+  2. APO -- 0001689315-26-000002
+  3. MTB -- 0000036270-26-000052
+  4. AKAM -- 0001867203-26-000016
+  5. D -- 0001193125-26-390654
+  6. FDX -- 0001104659-26-107511
+  ... and 8 more
+
+Reply "details N" (e.g. "details 1") for a specific item's full facts, source link, and timestamps.

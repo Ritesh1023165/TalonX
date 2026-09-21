@@ -80,6 +80,12 @@ def make_on_event(publisher: RedisEventPublisher):
         # "polling" (see TickSource), so a reader can tell Polygon WS
         # apart from the yfinance-polling fallback, not just "alive".
         await publisher.write_ws_heartbeat(event.source.value)
+        # Task 87B FC_08: cheap in-process per-symbol last-event stamp
+        # (the LivenessBeacon flushes the whole map to Redis once per
+        # beat) -- lets 87C prove every configured symbol is accounted
+        # for and spot a symbol that has gone dark, with no per-event
+        # Redis write and no persistence subsystem.
+        publisher.note_symbol_event(event.symbol, event.source.value)
         if event.event_type.value == "bar":
             await publisher.incr_metric("ingest", "bars_read")
 

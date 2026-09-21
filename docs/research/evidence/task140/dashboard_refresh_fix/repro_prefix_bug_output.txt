@@ -1,0 +1,9 @@
+Reproduction of the pre-fix scroll-jump bug -- isolated environment,
+the REAL pre-fix dashboard_web_static/index.html (git commit 4f0af50,
+the last commit to touch this file before this correction), served
+via a monkeypatched STATIC_DIR (the real repo file was never touched
+or reverted) against synthetic /api/section fixtures (never live data).
+
+PRE-FIX CODE -- scrollY before 3 auto-refresh cycles: 900
+PRE-FIX CODE -- scrollY after 3 auto-refresh cycles: 0
+PRE-FIX CODE -- jump distance: 900 px

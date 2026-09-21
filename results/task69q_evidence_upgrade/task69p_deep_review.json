@@ -1,0 +1,106 @@
+{
+  "task": "69Q_PART_1_DEEP_REVIEW_OF_TASK69P",
+  "reviewed_at": "2026-08-25",
+  "reviewed_artifacts_root": "results/task69p_full_runtime_piv/",
+  "cross_checked_against": [
+    "results/task64_paper_piv_readiness/runtime/piv_events.jsonl",
+    "results/task64_paper_piv_readiness/runtime/lifecycle_state.json",
+    "stale_data_summary_ground_truth.json (raw Alpaca bars/latest snapshot)"
+  ],
+  "classifications_used": ["PASS", "DEFECT", "DATA_LIMITATION", "OBSERVABILITY_GAP", "ALPHA_NOT_TESTED", "DEFERRED"],
+  "findings": [
+    {
+      "id": "F01", "claim": "35 configured symbols", "verdict": "CONFIRMED", "classification": "PASS",
+      "evidence": "warmup_verification_summary.json: configured_universe_count=35; session_readiness_summary.json: finalized_count=35; preflight_result.json universe_loaded=35 symbols"
+    },
+    {
+      "id": "F02", "claim": "17 warmup-ready symbols", "verdict": "CONFIRMED", "classification": "PASS",
+      "evidence": "warmup_verification_summary.json: warmup_ready_count=17, warmup_not_ready_count=18 (all INSUFFICIENT_1M_HISTORY); 17+18=35 reconciles"
+    },
+    {
+      "id": "F03", "claim": "15 session-ready symbols", "verdict": "CONFIRMED", "classification": "PASS",
+      "evidence": "session_readiness_summary.json: ready_count=15, not_ready_count=20 (all MISSING_REQUIRED_OPENING_MINUTES); 15+20=35 reconciles"
+    },
+    {
+      "id": "F04", "claim": "14 warmup ∩ session-ready estimate", "verdict": "CONFIRMED", "classification": "PASS",
+      "evidence": "session_readiness_summary.json decision_eligible_estimate.count=14 (session-ready ∩ warmup-ready); arithmetic consistent with F02/F03's exclusion sets"
+    },
+    {
+      "id": "F05", "claim": "transient stale symbols existed", "verdict": "CONFIRMED", "classification": "PASS",
+      "evidence": "stale_data_summary.json: 7 symbols flagged stale (COST, REGN, HON, VRTX, ISRG, LRCX, ADBE), several recovered; cross-checked against raw Alpaca snapshot (31 fresh/4 stale at 13:40:53Z)"
+    },
+    {
+      "id": "F06", "claim": "exactly 1 Quant candidate metric", "verdict": "CONFIRMED_BUT_UNAUDITED", "classification": "OBSERVABILITY_GAP",
+      "evidence": "signal_lifecycle_summary.json: quant_evaluated_via_redis_metric=1 -- a single Redis counter read from talonx_dispatch's own audit DB, never cross-verified against a raw QuantScanner-side event trail (PIV's own event log carries no per-candidate evaluation record). This is the gap Task69Q Part 3 closes: DecisionEngine now taps both signals_channel and rejected_candidates_channel directly and can independently reconcile candidates = published + rejected + errored (+ pending, always 0 in this synchronous poll model) with an explicit unaccounted_candidates field."
+    },
+    {
+      "id": "F07", "claim": "0 published natural signals", "verdict": "CONFIRMED", "classification": "PASS",
+      "evidence": "signal_lifecycle_summary.json: published_signals_today=0; raw piv_events.jsonl has zero SIGNAL rows with source != PIV_LIFECYCLE_PROBE for 2026-08-25"
+    },
+    {
+      "id": "F08", "claim": "no natural broker lifecycle", "verdict": "CONFIRMED", "classification": "PASS",
+      "evidence": "paper_lifecycle_coverage.json: natural_lifecycle_observed=false; every ORDER_INTENT/PAPER_ORDER_SUBMITTED/FILLED/POSITION_OPENED row on 2026-08-25 carries source=PIV_LIFECYCLE_PROBE"
+    },
+    {
+      "id": "F09", "claim": "only approved PIV lifecycle probe created broker activity", "verdict": "CONFIRMED", "classification": "PASS",
+      "evidence": "paper_lifecycle_coverage.json lists all probe preconditions verified: explicit --confirm-piv-lifecycle-probe flag, paper-only, 0/0 broker state before"
+    },
+    {
+      "id": "F10", "claim": "0 residual orders/positions at EOD", "verdict": "CONFIRMED", "classification": "PASS",
+      "evidence": "eod_state.json: broker_open_orders=0, broker_positions=0, matched=true; reconciliation_summary.json matches"
+    },
+    {
+      "id": "F11", "claim": "broker/internal reconciliation clean", "verdict": "CONFIRMED", "classification": "PASS",
+      "evidence": "reconciliation_summary.json: missing_broker_symbols=[], unexpected_broker_symbols=[]"
+    },
+    {
+      "id": "F12", "claim": "F6_FADE_V1 not integrated", "verdict": "CONFIRMED_INDEPENDENTLY", "classification": "PASS",
+      "evidence": "task69p_summary.json: f6_fade_v1.runtime_integration=false; git merge-base --is-ancestor of F6_FADE_V1 freeze commit against research/talonx-strategy-validation returns NOT an ancestor; zero grep hits for F6_FADE/task68_f6 in .py files"
+    },
+    {
+      "id": "F13", "claim": "zero alpha evidence produced", "verdict": "CONFIRMED", "classification": "ALPHA_NOT_TESTED",
+      "evidence": "every non-null alpha_evidence field in piv_events.jsonl for 2026-08-25 probe events is false; feed_mode=IEX_PAPER_PIV (not RESEARCH_SIP), so canonical_alpha_evidence is also false by reporting.py's own rule"
+    }
+  ],
+  "unexpected_findings_beyond_the_checklist": [
+    {
+      "id": "U01",
+      "title": "Quant candidate rejection accounting trail did not exist",
+      "classification": "OBSERVABILITY_GAP",
+      "detail": "signal_lifecycle_summary.json explicitly states the rejection-stage breakdown was 'not separately queried' and would require an audit-trail table PIV does not use. candidates=1, published=0, but no rejected/pending/errored breakdown reconciled to that 1. Fixed in Task69Q Part 3 (decision_engine.py funnel accounting, see quant_funnel_contract.json).",
+      "status": "FIXED_THIS_TASK"
+    },
+    {
+      "id": "U02",
+      "title": "Exit fill produced a second POSITION_OPENED event instead of POSITION_CLOSED",
+      "classification": "DEFECT",
+      "detail": "Confirmed in raw piv_events.jsonl: event-type histogram shows POSITION_OPENED=4, POSITION_CLOSED=0 across the whole file. The 2026-08-25 probe's exit fill at 19:01:30.31Z produced a second POSITION_OPENED (different position_id, keyed by the exit order's own intent_id) rather than closing the entry's position record. Broker exposure was correct and flat throughout (not a financial bug) -- purely an event-log/state naming defect in PaperLifecycle.apply_broker_update, which keyed position identity by intent_id (unique per order) rather than by symbol-scoped open-position tracking.",
+      "status": "FIXED_THIS_TASK",
+      "fix_location": "talonx_piv/lifecycle.py -- see production_readiness_gaps.json and this task's git log for the exact commit"
+    },
+    {
+      "id": "U03",
+      "title": "piv_events.jsonl is a single append-only file spanning multiple trading dates with no session_id/trading_date field",
+      "classification": "OBSERVABILITY_GAP",
+      "detail": "Confirmed: the file spans 2026-08-23 (5 events), 2026-08-24 (119 events), 2026-08-25 (85 events) in one unfiltered stream. eod_state.json itself flags this ('built_in_session_report_caveat') -- the derived latest_session_report.json counters are cumulative across days, not day-scoped, because the file is never rotated per session/date. Any per-day analysis (including Task69P's own summaries) required manual timestamp-prefix filtering with no built-in session boundary.",
+      "status": "FIXED_THIS_TASK",
+      "fix_location": "talonx_piv/events.py (session_id/trading_date_et stamped on every event), talonx_piv/session_identity.py (canonical session identity), talonx_piv/reporting.py (trading_date_et-scoped report filtering)"
+    },
+    {
+      "id": "U04",
+      "title": "/ping's headline Pipeline status was derived from an unrelated general-ingest subsystem, not PIV's own feed",
+      "classification": "OBSERVABILITY_GAP",
+      "detail": "talonx_dispatch/telegram_listener.py's _pipeline_status() always read talonx_ingest's WS-heartbeat freshness, even for a PIV caller whose SessionRunner never writes to that heartbeat at all (it polls Alpaca's REST bars/latest directly). Task69P's own commit history (fix(dispatch): clarify /ping Pipeline/MARKET labels are ingest-pipeline-scoped) added an explanatory SUFFIX to the MARKET section body, but the headline verdict itself remained ingest-scoped and could read DEGRADED/Disconnected while PIV's actual Alpaca feed was healthy -- confirmed live per that commit's own note.",
+      "status": "FIXED_THIS_TASK",
+      "fix_location": "talonx_dispatch/telegram_listener.py's _pipeline_status(), now PIV-aware via a live-updated piv_info['feed_health'] dict (talonx_piv/session_runner.py, talonx_piv/telegram_inbound.py)"
+    },
+    {
+      "id": "U05",
+      "title": "Warmup provider (yfinance) vs live provider (Alpaca IEX) mismatch is a real, unresolved data-availability limitation",
+      "classification": "DATA_LIMITATION",
+      "detail": "18 of 35 symbols failed warmup solely due to INSUFFICIENT_1M_HISTORY from yfinance, not from any strategy/session-readiness gate. This is the single largest driver of the 35->17->14 funnel narrowing. See warmup_provider_assessment.json for the Task69Q investigation into an Alpaca-historical alternative.",
+      "status": "PARTIALLY_ADDRESSED_THIS_TASK -- see warmup_provider_assessment.json"
+    }
+  ],
+  "overall_assessment": "Task69P's PASS/FAIL claims about broker lifecycle, reconciliation, and F6 non-integration are all independently reconfirmed and hold up under raw-evidence cross-check. The review surfaced four real gaps beyond the original checklist (U01-U04), all fixed as part of Task69Q, plus one data-availability limitation (U05) that is documented with a concrete remediation path but not fully resolved (requires verifying Alpaca historical entitlement in a live account context -- see warmup_provider_assessment.json)."
+}

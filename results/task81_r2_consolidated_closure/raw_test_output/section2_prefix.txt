@@ -1,0 +1,30 @@
+tests\test_task81_r2_reconcile_identity.py:350: AssertionError
+_________________________ test_block_survives_restart _________________________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-839/test_block_survives_restart0')
+
+    def test_block_survives_restart(tmp_path):
+        fake = AlpacaFake()
+        cfg = _cfg(tmp_path)
+        life = _life(cfg, fake)
+        entry = life.order_intent("s1", "AAPL", "buy", 2, source="STRATEGY", reference_price=100.0)
+        fake.open_orders_body = [_order_row(entry["id"], "FOREIGN", "AAPL", "buy", 2)]
+        life.reconcile(now=NOW)
+>       assert life.state.reconciliation_flags["entry_admission_blocked"] is True
+E       assert False is True
+
+tests\test_task81_r2_reconcile_identity.py:372: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_task81_r2_reconcile_identity.py::test_reproduce_filled_order_reported_open_false_pass
+FAILED tests/test_task81_r2_reconcile_identity.py::test_internally_filled_order_still_open_at_broker_is_contradiction
+FAILED tests/test_task81_r2_reconcile_identity.py::test_no_eventual_consistency_exemption_for_filled
+FAILED tests/test_task81_r2_reconcile_identity.py::test_reproduce_wrong_client_order_id_false_pass
+FAILED tests/test_task81_r2_reconcile_identity.py::test_id_with_wrong_client_order_id_is_contradiction
+FAILED tests/test_task81_r2_reconcile_identity.py::test_missing_intent_ambiguous_conflicting_malformed_never_ok[<lambda>-impossible_filled_qty]
+FAILED tests/test_task81_r2_reconcile_identity.py::test_missing_intent_ambiguous_conflicting_malformed_never_ok[<lambda>-missing_client_id]
+FAILED tests/test_task81_r2_reconcile_identity.py::test_conflicting_ids_map_to_different_intents_is_contradiction
+FAILED tests/test_task81_r2_reconcile_identity.py::test_reproduce_internal_order_missing_from_broker_list_false_pass
+FAILED tests/test_task81_r2_reconcile_identity.py::test_internal_outstanding_order_absent_from_broker_list_is_unresolved
+FAILED tests/test_task81_r2_reconcile_identity.py::test_block_persists_over_transient_snapshot_and_clears_on_clean_pass
+FAILED tests/test_task81_r2_reconcile_identity.py::test_block_survives_restart
+12 failed, 6 passed in 0.90s

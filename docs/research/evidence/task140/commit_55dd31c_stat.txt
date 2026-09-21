@@ -1,0 +1,44 @@
+commit 55dd31c86c51cf4a721b5af009e8709f35182226
+Author: Ritesh Talwadekar <ritesh160290@gmail.com>
+Date:   Tue Sep 15 04:16:55 2026 +0100
+
+    feat(ingest): Task 140 B1/B4/B5 -- DIGEST delivery off by default, explicit opt-in
+    
+    Routine filing-inventory digests were still reaching Telegram by default
+    under Task 138's policy (a non-substantive event routed to DIGEST, not
+    DASHBOARD_ONLY, and the periodic DIGEST message itself was always sent).
+    Per the explicit product goal: moving noise into a smaller bundle is
+    still noise if the bundle itself was never requested.
+    
+    talonx_ingest/intelligence/service/config.py: new
+    ServiceConfig.deliver_digest_enabled (env TALONX_INTEL_DELIVER_DIGEST_
+    ENABLED), default False -- independent of the existing
+    deliver_intelligence_cards/TALONX_INTEL_DELIVER_CARDS master switch,
+    which continues to govern IMMEDIATE alone.
+    
+    talonx_ingest/intelligence/service/runner.py: deliver_cycle computes a
+    separate digest_mode (forced "disabled" whenever deliver_digest_enabled
+    is False, regardless of the overall IMMEDIATE mode) and passes it to
+    process_digest -- reuses process_digest's OWN existing mode="disabled"
+    branch (rows stay PENDING, logged HELD/"delivery disabled", nothing
+    sent, nothing lost, nothing mutated) rather than a new delivery engine
+    or a one-time reclassification batch. Because this check runs on EVERY
+    deliver_cycle call, not once at cutover, no backlog row -- old or new --
+    can ever bypass the new default by outliving a batch job; it is held on
+    every single cycle it is evaluated.
+    
+    9 new tests in tests/test_task117_delivery_runner_integration.py:
+    default-off holds a fresh DIGEST row while IMMEDIATE is unaffected;
+    explicit opt-in sends the aggregated digest exactly as before;
+    durability across 3 repeated cycles (the same row never escapes).
+    
+    docs/research/NOTIFICATION_POLICY.md Sec 2.1: documents the new default
+    and how it was verified reaching the running process.
+    
+    Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+
+ docs/research/NOTIFICATION_POLICY.md              | 39 ++++++++++-
+ talonx_ingest/intelligence/service/config.py      | 13 ++++
+ talonx_ingest/intelligence/service/runner.py      |  7 +-
+ tests/test_task117_delivery_runner_integration.py | 82 +++++++++++++++++++++++
+ 4 files changed, 139 insertions(+), 2 deletions(-)

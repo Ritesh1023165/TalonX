@@ -1,0 +1,471 @@
+FFFFFFFFFFFFFFF                                                          [100%]
+================================== FAILURES ===================================
+________________ test_2_no_producer_yields_no_active_producer _________________
+
+home = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_2_no_producer_yields_no_a0/.talonx')
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_2_no_producer_yields_no_a0')
+
+    def test_2_no_producer_yields_no_active_producer(home, tmp_path):
+        _db(home / "brain.db", [("CREATE TABLE report_counts(date TEXT, category TEXT, count INT)", [])])
+        dead_meta = home / "rm.json"
+        dead_meta.write_text(json.dumps({"pid": 999999999,
+                                         "started_at": (NOW - timedelta(days=2)).isoformat()}))
+        m = AuthoritativeReadModel(home=home, now=NOW, check_processes=True, runtime_metadata_path=dead_meta)
+        d = m.brain_reports()
+>       assert d.status == AuthorityStatus.NO_ACTIVE_PRODUCER
+E       AssertionError: assert <AuthoritySta...ERO_ACTIVITY'> == <AuthoritySta...IVE_PRODUCER'>
+E         
+E         - NO_ACTIVE_PRODUCER
+E         + ZERO_ACTIVITY
+
+tests\test_task100a_authoritative_read_model.py:91: AssertionError
+_____________________ test_36_original_strategy_unchanged _____________________
+
+    def test_36_original_strategy_unchanged():
+        import subprocess
+    
+        out = subprocess.run(
+            ["git", "diff", "--stat", "a657750", "--",
+             "talonx_quant/", "talonx_core/", "talonx_paper/", "talonx_piv/", "talonx_brain/", "run_talonx.py"],
+            capture_output=True, text=True, cwd=Path(__file__).resolve().parent.parent,
+        )
+>       assert out.stdout.strip() == "", f"frozen path changed:\n{out.stdout}"
+E       AssertionError: frozen path changed:
+E          run_talonx.py                    |  45 ++++++++++++-
+E          talonx_quant/consumer.py         |  28 +++++++-
+E          talonx_quant/preseed_ordering.py | 142 +++++++++++++++++++++++++++++++++++++++
+E          3 files changed, 211 insertions(+), 4 deletions(-)
+E         
+E       assert 'run_talonx.p... deletions(-)' == ''
+E         
+E         + run_talonx.py                    |  45 ++++++++++++-
+E         +  talonx_quant/consumer.py         |  28 +++++++-
+E         +  talonx_quant/preseed_ordering.py | 142 +++++++++++++++++++++++++++++++++++++++
+E         +  3 files changed, 211 insertions(+), 4 deletions(-)
+
+tests\test_task102_operational_finalization.py:487: AssertionError
+____________ test_32_33_original_strategy_and_thresholds_unchanged ____________
+
+    def test_32_33_original_strategy_and_thresholds_unchanged():
+        out = subprocess.run(
+            ["git", "diff", "--stat", "113b97f", "--",
+             "talonx_quant/", "talonx_core/", "talonx_paper/", "talonx_piv/", "talonx_brain/", "run_talonx.py"],
+            capture_output=True, text=True, cwd=_REPO,
+        )
+>       assert out.stdout.strip() == "", f"frozen path changed:\n{out.stdout}"
+E       AssertionError: frozen path changed:
+E          run_talonx.py                    |  45 ++++++++++++-
+E          talonx_quant/consumer.py         |  28 +++++++-
+E          talonx_quant/preseed_ordering.py | 142 +++++++++++++++++++++++++++++++++++++++
+E          3 files changed, 211 insertions(+), 4 deletions(-)
+E         
+E       assert 'run_talonx.p... deletions(-)' == ''
+E         
+E         + run_talonx.py                    |  45 ++++++++++++-
+E         +  talonx_quant/consumer.py         |  28 +++++++-
+E         +  talonx_quant/preseed_ordering.py | 142 +++++++++++++++++++++++++++++++++++++++
+E         +  3 files changed, 211 insertions(+), 4 deletions(-)
+
+tests\test_task104_p2_cleanup.py:389: AssertionError
+_____________ test_item3_original_strategy_fingerprint_unchanged ______________
+
+    def test_item3_original_strategy_fingerprint_unchanged():
+        import talonx_v2  # noqa: F401  -- importing the V2 lane must not perturb Original
+        from talonx_backtest.reproducibility import get_strategy_version
+    
+        # frozen Original strategy fingerprint (talonx_quant/{strategy,indicators,
+        # config,session,consumer}.py) -- byte-identical since well before V2 work
+>       assert get_strategy_version() == "2ae6216bca70"
+E       AssertionError: assert 'ed8272fe568d' == '2ae6216bca70'
+E         
+E         - 2ae6216bca70
+E         + ed8272fe568d
+
+tests\test_task111_v2_e2e.py:85: AssertionError
+________________________ test_03_v1_fingerprint_intact ________________________
+
+    def test_03_v1_fingerprint_intact():
+        from talonx_backtest.reproducibility import get_strategy_version
+>       assert get_strategy_version() == "2ae6216bca70"
+E       AssertionError: assert 'ed8272fe568d' == '2ae6216bca70'
+E         
+E         - 2ae6216bca70
+E         + ed8272fe568d
+
+tests\test_task112_tuesday_release.py:84: AssertionError
+________________ test_bounded_controlled_deployment_rehearsal _________________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_bounded_controlled_deploy0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000028716AADF70>
+
+    def test_bounded_controlled_deployment_rehearsal(tmp_path, monkeypatch):
+        home = tmp_path / "home"; home.mkdir()
+        ledger = tmp_path / "v2_lane.db"
+        shutil.copy2(PROD, ledger)
+>       assert hashlib.md5(ledger.read_bytes()).hexdigest() in EXPECTED_MD5
+E       assert '774be81e3b0655fbc6e2d5525e198969' in {'29e57dbcd1a567fbc4bb0e73efdba95f', 'c09c6a88188e65fd987b54f672a9759e'}
+E        +  where '774be81e3b0655fbc6e2d5525e198969' = <built-in method hexdigest of _hashlib.HASH object at 0x0000028716B15250>()
+E        +    where <built-in method hexdigest of _hashlib.HASH object at 0x0000028716B15250> = <md5 _hashlib.HASH object @ 0x0000028716B15250>.hexdigest
+E        +      where <md5 _hashlib.HASH object @ 0x0000028716B15250> = <built-in function openssl_md5>(b"SQLite format 3\x00\x10\x00\x02\x02\x00@  \x00\x00\x00\x03\x00\x00\x00\x11\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x..._session    TEXT,\n    fill_price            REAL,\n    reconciled_at_utc     TEXT,\n    detail                TEXT\n)")
+E        +        where <built-in function openssl_md5> = hashlib.md5
+E        +        and   b"SQLite format 3\x00\x10\x00\x02\x02\x00@  \x00\x00\x00\x03\x00\x00\x00\x11\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x..._session    TEXT,\n    fill_price            REAL,\n    reconciled_at_utc     TEXT,\n    detail                TEXT\n)" = read_bytes()
+E        +          where read_bytes = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_bounded_controlled_deploy0/v2_lane.db').read_bytes
+
+tests\test_task117_deployment_rehearsal.py:112: AssertionError
+__________ test_prospective_start_stack_passes_the_deployment_flags ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000287169EFFB0>
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_prospective_start_stack_p0')
+
+    def test_prospective_start_stack_passes_the_deployment_flags(monkeypatch, tmp_path):
+        from talonx_ops.prospective import proc as _proc
+        from talonx_ops.prospective.lock import SingleWriterLock
+        # Isolate the single-writer lock onto a tmp ledger -- start_stack() always
+        # acquires SingleWriterLock(V2_DB_PATH) internally; without this override
+        # this test would take/leak a REAL lock next to the production
+        # v2_lane.db (confirmed: a prior run of this exact test left a stray
+        # v2_lane.db.startlock, with a fake pid, sitting next to the live
+        # ledger). Never touch V2_DB_PATH from a test.
+        iso_ledger = tmp_path / "iso_v2_lane.db"
+        monkeypatch.setattr(_proc, "SingleWriterLock", lambda _p: SingleWriterLock(iso_ledger))
+        captured = []
+        monkeypatch.setattr(_proc, "_spawn", lambda argv, **k: (captured.append(argv), 4242)[1])
+        monkeypatch.setattr(_proc.time, "sleep", lambda *_: None)
+>       _proc.start_stack(tmp_path, env={}, tick_seconds=150,
+                          pricing_mode="composite-yf", execution_scope="resolved-active-watchlist",
+                          deliver=True, transport="telegram", with_checkpoint_daemon=False)
+
+tests\test_task117_execution_scope.py:222: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+session_dir = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_prospective_start_stack_p0')
+env = {}, tick_seconds = 150, heartbeat_seconds = 30, live_lookback_days = 45
+with_dashboard = True, with_checkpoint_daemon = False, checkpoint_every_s = 1800
+pricing_mode = 'composite-yf', execution_scope = 'resolved-active-watchlist'
+deliver = True, transport = 'telegram', enable_broad_discovery = False
+allow_when_running = False
+
+    def start_stack(session_dir: str | Path, *, env: dict[str, str],
+                    tick_seconds: int = 300, heartbeat_seconds: int = 30,
+                    live_lookback_days: int = 45, with_dashboard: bool = True,
+                    with_checkpoint_daemon: bool = True,
+                    checkpoint_every_s: int = 1800,
+                    pricing_mode: str = "csv", execution_scope: str = "none",
+                    deliver: bool = False, transport: str = "dryrun",
+                    enable_broad_discovery: bool = False,
+                    allow_when_running: bool = False) -> dict[str, Any]:
+        sd = Path(session_dir)
+        sd.mkdir(parents=True, exist_ok=True)
+        logs = sd / "logs"
+        py = sys.executable
+    
+        # D4 / Section 3: ATOMIC single-writer guard. os.open(O_CREAT|O_EXCL) keyed
+        # on the V2 ledger identity -- two racing starts: exactly one creates the
+        # lock, the other sees a LIVE owner and refuses. --force (allow_when_running)
+        # breaks a STALE lock (owner verified gone) but NEVER a live one, and NEVER
+        # an 'unknown' (corrupt/incomplete) one either.
+        #
+        # Lifecycle: acquired here by this short-lived CLI process, then REBOUND
+        # (inside _start_stack_locked) to the pid of the actual long-lived ledger
+        # writer -- the V2 companion -- before this command returns, so the lock's
+        # liveness tracks the writer even after 'start' itself exits. The
+        # owner_token travels across that rebind; only a holder of the matching
+        # token may ever release it (see stop_stack).
+        _lock = SingleWriterLock(V2_DB_PATH)
+        try:
+            _lock.acquire(force=allow_when_running, break_stale=allow_when_running)
+        except LockStateUnknownError:
+            raise  # never silently bypassed by --force; needs explicit recovery
+        try:
+            # secondary, best-effort process scan (covers a stack started without
+            # the lock, e.g. a stale-lock break where the old owner is somehow back)
+            if not allow_when_running:
+                live = _live_prior_stack()
+                if live:
+>                   raise ConcurrentStartError(
+                        "process scan found a live prospective stack: "
+                        + "; ".join(f"pid {h['pid']}" for h in live))
+E                       talonx_ops.prospective.lock.ConcurrentStartError: process scan found a live prospective stack: pid 13288; pid 17080; pid 19984; pid 23456
+
+talonx_ops\prospective\proc.py:180: ConcurrentStartError
+_________________ test_migration_preserves_all_existing_state _________________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_migration_preserves_all_e0')
+
+    def test_migration_preserves_all_existing_state(tmp_path):
+>       db = _iso_copy(tmp_path)
+             ^^^^^^^^^^^^^^^^^^^
+
+tests\test_task117_migration.py:74: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_migration_preserves_all_e0')
+
+    def _iso_copy(tmp_path) -> Path:
+        dst = tmp_path / "v2_lane.db"
+        shutil.copy2(PROD_LEDGER, dst)
+>       assert _md5(dst) in EXPECTED_MD5, "isolated copy must match a known production hash"
+E       AssertionError: isolated copy must match a known production hash
+E       assert '774be81e3b0655fbc6e2d5525e198969' in {'29e57dbcd1a567fbc4bb0e73efdba95f', 'c09c6a88188e65fd987b54f672a9759e'}
+E        +  where '774be81e3b0655fbc6e2d5525e198969' = _md5(WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_migration_preserves_all_e0/v2_lane.db'))
+
+tests\test_task117_migration.py:46: AssertionError
+________________ test_migration_is_idempotent_across_restarts _________________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_migration_is_idempotent_a0')
+
+    def test_migration_is_idempotent_across_restarts(tmp_path):
+>       db = _iso_copy(tmp_path)
+             ^^^^^^^^^^^^^^^^^^^
+
+tests\test_task117_migration.py:102: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_migration_is_idempotent_a0')
+
+    def _iso_copy(tmp_path) -> Path:
+        dst = tmp_path / "v2_lane.db"
+        shutil.copy2(PROD_LEDGER, dst)
+>       assert _md5(dst) in EXPECTED_MD5, "isolated copy must match a known production hash"
+E       AssertionError: isolated copy must match a known production hash
+E       assert '774be81e3b0655fbc6e2d5525e198969' in {'29e57dbcd1a567fbc4bb0e73efdba95f', 'c09c6a88188e65fd987b54f672a9759e'}
+E        +  where '774be81e3b0655fbc6e2d5525e198969' = _md5(WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_migration_is_idempotent_a0/v2_lane.db'))
+
+tests\test_task117_migration.py:46: AssertionError
+_____ test_alter_migration_on_a_preexisting_outbox_without_the_new_column _____
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_alter_migration_on_a_pree0')
+
+    def test_alter_migration_on_a_preexisting_outbox_without_the_new_column(tmp_path):
+>       db = _iso_copy(tmp_path)
+             ^^^^^^^^^^^^^^^^^^^
+
+tests\test_task117_migration.py:111: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_alter_migration_on_a_pree0')
+
+    def _iso_copy(tmp_path) -> Path:
+        dst = tmp_path / "v2_lane.db"
+        shutil.copy2(PROD_LEDGER, dst)
+>       assert _md5(dst) in EXPECTED_MD5, "isolated copy must match a known production hash"
+E       AssertionError: isolated copy must match a known production hash
+E       assert '774be81e3b0655fbc6e2d5525e198969' in {'29e57dbcd1a567fbc4bb0e73efdba95f', 'c09c6a88188e65fd987b54f672a9759e'}
+E        +  where '774be81e3b0655fbc6e2d5525e198969' = _md5(WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_alter_migration_on_a_pree0/v2_lane.db'))
+
+tests\test_task117_migration.py:46: AssertionError
+______ test_historical_episode_in_store_makes_no_fresh_actionable_alert _______
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_historical_episode_in_sto0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000028716AD77D0>
+
+    def test_historical_episode_in_store_makes_no_fresh_actionable_alert(tmp_path, monkeypatch):
+>       db = _iso_copy(tmp_path)
+             ^^^^^^^^^^^^^^^^^^^
+
+tests\test_task117_migration.py:140: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_historical_episode_in_sto0')
+
+    def _iso_copy(tmp_path) -> Path:
+        dst = tmp_path / "v2_lane.db"
+        shutil.copy2(PROD_LEDGER, dst)
+>       assert _md5(dst) in EXPECTED_MD5, "isolated copy must match a known production hash"
+E       AssertionError: isolated copy must match a known production hash
+E       assert '774be81e3b0655fbc6e2d5525e198969' in {'29e57dbcd1a567fbc4bb0e73efdba95f', 'c09c6a88188e65fd987b54f672a9759e'}
+E        +  where '774be81e3b0655fbc6e2d5525e198969' = _md5(WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_historical_episode_in_sto0/v2_lane.db'))
+
+tests\test_task117_migration.py:46: AssertionError
+________ test_interrupted_tick_leaves_a_consistent_recoverable_ledger _________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_interrupted_tick_leaves_a0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000028716AB0110>
+
+    def test_interrupted_tick_leaves_a_consistent_recoverable_ledger(tmp_path, monkeypatch):
+>       db = _iso_copy(tmp_path)
+             ^^^^^^^^^^^^^^^^^^^
+
+tests\test_task117_migration.py:184: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_interrupted_tick_leaves_a0')
+
+    def _iso_copy(tmp_path) -> Path:
+        dst = tmp_path / "v2_lane.db"
+        shutil.copy2(PROD_LEDGER, dst)
+>       assert _md5(dst) in EXPECTED_MD5, "isolated copy must match a known production hash"
+E       AssertionError: isolated copy must match a known production hash
+E       assert '774be81e3b0655fbc6e2d5525e198969' in {'29e57dbcd1a567fbc4bb0e73efdba95f', 'c09c6a88188e65fd987b54f672a9759e'}
+E        +  where '774be81e3b0655fbc6e2d5525e198969' = _md5(WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_interrupted_tick_leaves_a0/v2_lane.db'))
+
+tests\test_task117_migration.py:46: AssertionError
+_______________________ test_bounded_release_rehearsal ________________________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_bounded_release_rehearsal0')
+
+    def test_bounded_release_rehearsal(tmp_path):
+        led = tmp_path / "iso_ledger.db"
+        rec: dict[str, object] = {"generated_utc": datetime.now(UTC).isoformat(),
+                                  "ledger": "ISOLATED FIXTURE (tmp)", "steps": {}}
+        snd = _Sender()
+    
+        # ---- 1) disabled -> enabled, SAME fresh event -----------------------------
+        ob = DeliveryOutbox(led)
+        fresh1 = _fresh(ob, "ORCL", "0001193125-26-000001", at=T0)
+        d = asyncio.run(process_pending(ob, snd, mode="disabled", now=T0 + timedelta(minutes=1)))
+        assert ob.get(fresh1).state == STATE_PENDING and snd.calls == []
+        held_state = ob.get(fresh1).state
+        e = asyncio.run(process_pending(ob, snd, mode="enabled", now=T0 + timedelta(minutes=2)))
+        row = ob.get(fresh1)
+        assert row.state == STATE_SENT and row.transport_message_id == "mid-1"
+        rec["steps"]["1_disabled_then_enabled_same_event"] = {
+            "held_state": held_state, "after_enable_state": row.state,
+            "message_id_recorded": row.transport_message_id,
+            "sender_calls_while_disabled": 0, "PASS": True}
+    
+        # ---- 2) fresh event alongside a stale backlog row ------------------------
+        stale = _fresh(ob, "AAPL", "0000320193-26-000002", at=T0 - timedelta(days=40), watch=True)
+        fresh2 = _fresh(ob, "MSFT", "0000789019-26-000003", at=T0 + timedelta(minutes=3))
+        r2 = asyncio.run(process_pending(
+            ob, snd, mode="enabled", now=T0 + timedelta(minutes=4),
+            enforce_age_cutoff=True, route="IMMEDIATE"))
+        assert ob.get(stale).state == STATE_EXPIRED       # auditable expiry
+        assert ob.get(fresh2).state == STATE_SENT         # fresh still delivered
+        assert ob.get(stale).state != STATE_SENT          # never a false SENT
+        assert ob.get(stale) is not None                 # row not deleted
+        rec["steps"]["2_fresh_alongside_stale_backlog"] = {
+            "stale_state": ob.get(stale).state, "fresh_state": ob.get(fresh2).state,
+            "stale_row_deleted": False, "stale_marked_sent": False,
+            "expired_ids": r2.expired, "PASS": True}
+    
+        # ---- 3) DIGEST scheduling + restart dedup ------------------------------
+        dids = [_digest_row(ob, s, a, at=T0 + timedelta(minutes=5))
+                for s, a in (("TSLA", "0001104659-26-000010"),
+                             ("NVDA", "0001045810-26-000011"),
+                             ("AMD", "0000002488-26-000012"))]
+        dg1 = asyncio.run(process_digest(ob, snd, mode="enabled",
+                                         interval_seconds=DIGEST_INTERVAL, now=T0 + timedelta(minutes=6)))
+        one_msg = dg1.delivered == 3
+        for did in dids:
+            assert ob.get(did).state == STATE_SENT
+            assert ob.get(did).transport_message_id.startswith("digest:")
+        ob.close()
+        # restart in the SAME 6h bucket -> no re-send
+        ob = DeliveryOutbox(led)
+        calls_before = len(snd.calls)
+        dg2 = asyncio.run(process_digest(ob, snd, mode="enabled",
+                                         interval_seconds=DIGEST_INTERVAL, now=T0 + timedelta(minutes=20)))
+        assert len(snd.calls) == calls_before            # nothing re-sent
+        rec["steps"]["3_digest_schedule_and_restart_dedup"] = {
+            "rows_in_one_message": 3, "aggregated": one_msg,
+            "resend_after_restart_same_window": len(snd.calls) - calls_before,
+            "PASS": one_msg and (len(snd.calls) == calls_before)}
+    
+        # ---- 4) clean transient failure -- retry-eligible, != permanent -------
+        tr = _fresh(ob, "IBM", "0000051143-26-000004", at=T0 + timedelta(minutes=7))
+        snd.script[tr] = SenderResult(ok=False, ambiguous=False, permanent=False,
+                                      error="rate limited -- retry later")
+        asyncio.run(process_pending(ob, snd, mode="enabled", now=T0 + timedelta(minutes=8), route="IMMEDIATE"))
+        trow = ob.get(tr)
+        transient_ok = trow.state == STATE_PENDING and (trow.attempts or 0) >= 1
+        rec["steps"]["4_clean_transient_failure"] = {
+            "state": trow.state, "attempts": trow.attempts,
+            "retry_eligible": trow.state == STATE_PENDING,
+            "distinct_from_permanent": True, "PASS": transient_ok}
+    
+        # ---- 5) timeout AFTER possible remote acceptance -> AMBIGUOUS --------
+        to = _fresh(ob, "CSCO", "0000858877-26-000005", at=T0 + timedelta(minutes=9))
+        snd.script[to] = TimeoutError("no ack within budget -- Telegram MAY have accepted")
+        asyncio.run(process_pending(ob, snd, mode="enabled", now=T0 + timedelta(minutes=10), route="IMMEDIATE"))
+        arow = ob.get(to)
+        calls_at_ambig = len(snd.calls)
+        # a second drain must NOT blind-retry an AMBIGUOUS row
+        asyncio.run(process_pending(ob, snd, mode="enabled", now=T0 + timedelta(minutes=11), route="IMMEDIATE"))
+        rec["steps"]["5_timeout_after_possible_acceptance"] = {
+            "state": arow.state, "blind_retried": len(snd.calls) != calls_at_ambig,
+            "PASS": arow.state == STATE_AMBIGUOUS and len(snd.calls) == calls_at_ambig}
+    
+        # ---- 6) restart with an in-flight attempt -> recovered AMBIGUOUS -----
+        inflt = _fresh(ob, "INTC", "0000050863-26-000006", at=T0 + timedelta(minutes=12))
+        claimed = ob.claim_for_send(inflt, "attempt-xyz", now=T0 + timedelta(minutes=12, seconds=1))
+        assert claimed and ob.get(inflt).state == STATE_IN_FLIGHT
+        ob.close()
+        ob = DeliveryOutbox(led)                          # a fresh drainer after a crash
+        rec_ids = ob.recover_in_flight(now=T0 + timedelta(minutes=20), stale_after_seconds=90.0)
+        irow = ob.get(inflt)
+        rec["steps"]["6_restart_with_in_flight_attempt"] = {
+            "recovered_ids": len(rec_ids), "state": irow.state,
+            "not_retried": irow.state == STATE_AMBIGUOUS,
+            "PASS": inflt in rec_ids and irow.state == STATE_AMBIGUOUS}
+    
+        # ---- pending obligations preserved: PENDING rows still drainable -----
+        pend_before = [r.delivery_id for r in ob.pending(route="IMMEDIATE", now=T0 + timedelta(minutes=21))]
+        # the transient row from step 4 is still PENDING and eligible
+>       assert tr in pend_before
+E       AssertionError: assert 'telegram:card:SEC:0000051143-26-000004:EARNINGS_RESULTS:telegram-intel-v1' in []
+
+tests\test_task117_release_rehearsal.py:183: AssertionError
+__________ test_immediate_and_digest_sends_count_messages_correctly ___________
+
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_immediate_and_digest_send0')
+
+    def test_immediate_and_digest_sends_count_messages_correctly(tmp_path):
+        home = tmp_path / ".talonx"
+        home.mkdir()
+        ledger = home / "ingestion_ledger.db"
+        ob = DeliveryOutbox(ledger)
+        _enq_immediate(ob, "TSLA", "0001318605-26-000099", at=NOW - timedelta(minutes=30))
+        for i, sym in enumerate(["AFL", "ORCL"]):
+            _enq_digest(ob, sym, f"0001225208-26-00773{i}", at=NOW - timedelta(minutes=10 - i))
+        # route="IMMEDIATE" matches the real runner (intelligence/service/runner.py
+        # deliver_cycle) -- DIGEST-route rows are drained only by process_digest.
+        asyncio.run(process_pending(ob, _Sender(), mode="enabled", route="IMMEDIATE", now=NOW))
+        asyncio.run(process_digest(ob, _Sender(), mode="enabled",
+                                   interval_seconds=6 * 3600.0, now=NOW))
+    
+        model = DashboardReadModel(home=home, exp_home=home / "experimental",
+                                   intel_ledger=ledger, now=NOW, check_processes=False)
+        cd = model.intelligence()["card_delivery"]
+>       assert cd["sent_today"] == 3           # 1 immediate + 2 digest-aggregated rows
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert 2 == 3
+
+tests\test_task118a_dashboard_message_count.py:82: AssertionError
+________________ test_original_watchlist_view_untouched_shape _________________
+
+home = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1717/test_original_watchlist_view_u0/.talonx')
+
+    def test_original_watchlist_view_untouched_shape(home):
+        # v2_active_strategy's own keys are exactly as before Task 131 -- no
+        # new/renamed keys leaked in from the broad-discovery work.
+        v2sec = _model(home).v2_active_strategy()
+        assert v2sec["panel"] == "Active V2 -- INSIDER_BUY_CLUSTER_V2@1"
+        assert "v2_broad_discovery" not in v2sec
+>       assert "broad_discovery" not in json.dumps(v2sec).lower()
+E       assert 'broad_discovery' not in '{"generated...e": "ready"}'
+E         
+E         'broad_discovery' is contained here:
+E         ?           ^^^^^^^^^^^
+E           nt": 39, "broad_discovery_included": false}, "available": true, "form4": {"code_p_records_window": 8, "code_p_records_today": 0, "distinct_issuers_window": 3, "distinct_issuers_today": 0}, "clusters": {"single_insider_near_miss_issuers": ["adc", "intc"], "single_insider_near_miss_count": 2, "clusters_ge2_distinct_insiders": 1, "cluster_symbols": ["abcl"], "stale_historical_clusters": 1, "stale_episode_ids": ["07242bc857569f60"], "fresh_eligible_clusters": 0, "fresh_eligible_episode_ids": [], "not_yet_eligible_clusters": ...
+E         
+E         ...Full output truncated (2 lines hidden), use '-vv' to show
+
+tests\test_task131_dashboard_broad_discovery.py:75: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_task100a_authoritative_read_model.py::test_2_no_producer_yields_no_active_producer
+FAILED tests/test_task102_operational_finalization.py::test_36_original_strategy_unchanged
+FAILED tests/test_task104_p2_cleanup.py::test_32_33_original_strategy_and_thresholds_unchanged
+FAILED tests/test_task111_v2_e2e.py::test_item3_original_strategy_fingerprint_unchanged
+FAILED tests/test_task112_tuesday_release.py::test_03_v1_fingerprint_intact
+FAILED tests/test_task117_deployment_rehearsal.py::test_bounded_controlled_deployment_rehearsal
+FAILED tests/test_task117_execution_scope.py::test_prospective_start_stack_passes_the_deployment_flags
+FAILED tests/test_task117_migration.py::test_migration_preserves_all_existing_state
+FAILED tests/test_task117_migration.py::test_migration_is_idempotent_across_restarts
+FAILED tests/test_task117_migration.py::test_alter_migration_on_a_preexisting_outbox_without_the_new_column
+FAILED tests/test_task117_migration.py::test_historical_episode_in_store_makes_no_fresh_actionable_alert
+FAILED tests/test_task117_migration.py::test_interrupted_tick_leaves_a_consistent_recoverable_ledger
+FAILED tests/test_task117_release_rehearsal.py::test_bounded_release_rehearsal
+FAILED tests/test_task118a_dashboard_message_count.py::test_immediate_and_digest_sends_count_messages_correctly
+FAILED tests/test_task131_dashboard_broad_discovery.py::test_original_watchlist_view_untouched_shape
+15 failed in 3.68s

@@ -1,0 +1,17 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- C:\workspace\TalonX\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\workspace\TalonX
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.10.16, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 6 items
+
+tests/test_task61_validation_protocol.py::test_task61_windows_are_mechanically_resolved PASSED [ 16%]
+tests/test_task61_validation_protocol.py::test_task61_stops_at_temporal_gate_without_provider_or_replay PASSED [ 33%]
+tests/test_task61_validation_protocol.py::test_task61_frozen_identity_and_universe PASSED [ 50%]
+tests/test_task61r_temporal_freeze.py::test_corrected_windows_are_exact_and_complete PASSED [ 66%]
+tests/test_task61r_temporal_freeze.py::test_block_is_strictly_pre_exposure_and_uncontaminated PASSED [ 83%]
+tests/test_task61r_temporal_freeze.py::test_only_temporal_contract_changed PASSED [100%]
+
+============================== 6 passed in 0.78s ==============================

@@ -1,0 +1,10 @@
+tasks,role,window,warmup_start,warmup_end,evaluation_start,evaluation_end
+"37/38/41",development_calibration,A_early,,,2025-08-29,2025-09-12
+"37/38/41",development_calibration,B_middle,,,2026-02-06,2026-02-20
+"37/38/41",development_calibration,C_late,,,2026-07-20,2026-07-31
+"46/52/53",validation,X_early,2025-10-13,2025-10-24,2025-10-27,2025-10-31
+"46/52/53",validation,Y_middle,2026-03-09,2026-03-20,2026-03-23,2026-03-27
+"46/52/53",validation,Z_late,2026-05-19,2026-06-02,2026-06-03,2026-06-09
+54,validation,W1,2025-09-15,2025-09-26,2025-09-29,2025-10-24
+54,validation,W2,2025-11-12,2025-11-25,2025-11-26,2025-12-24
+54,validation,W3,2026-04-07,2026-04-20,2026-04-21,2026-05-18

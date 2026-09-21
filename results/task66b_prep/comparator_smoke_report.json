@@ -1,0 +1,172 @@
+{
+  "classification_counts": {
+    "MISSING_EVENT": 4,
+    "NOT_APPLICABLE_TO_PIV": 9
+  },
+  "date": "2026-08-24",
+  "full_app_symbols_with_evidence": [],
+  "piv_events_path": "results\\task64_paper_piv_readiness\\runtime\\piv_events.jsonl",
+  "piv_symbols_with_evidence": [
+    "AAPL"
+  ],
+  "rows": [
+    {
+      "classification": "NOT_APPLICABLE_TO_PIV",
+      "detail": "This stage is structurally out of PIV's scope (no Brain/Core/Dispatch in PIV).",
+      "full_app_evidence": null,
+      "piv_evidence": null,
+      "stage": "market_event_seen",
+      "symbol": "AAPL"
+    },
+    {
+      "classification": "NOT_APPLICABLE_TO_PIV",
+      "detail": "This stage is structurally out of PIV's scope (no Brain/Core/Dispatch in PIV).",
+      "full_app_evidence": null,
+      "piv_evidence": null,
+      "stage": "quant_candidate",
+      "symbol": "AAPL"
+    },
+    {
+      "classification": "NOT_APPLICABLE_TO_PIV",
+      "detail": "This stage is structurally out of PIV's scope (no Brain/Core/Dispatch in PIV).",
+      "full_app_evidence": null,
+      "piv_evidence": null,
+      "stage": "quant_rejection",
+      "symbol": "AAPL"
+    },
+    {
+      "classification": "MISSING_EVENT",
+      "detail": "No evidence on either side.",
+      "full_app_evidence": null,
+      "piv_evidence": null,
+      "stage": "quant_signal",
+      "symbol": "AAPL"
+    },
+    {
+      "classification": "NOT_APPLICABLE_TO_PIV",
+      "detail": "This stage is structurally out of PIV's scope (no Brain/Core/Dispatch in PIV).",
+      "full_app_evidence": null,
+      "piv_evidence": null,
+      "stage": "brain_received",
+      "symbol": "AAPL"
+    },
+    {
+      "classification": "NOT_APPLICABLE_TO_PIV",
+      "detail": "This stage is structurally out of PIV's scope (no Brain/Core/Dispatch in PIV).",
+      "full_app_evidence": null,
+      "piv_evidence": null,
+      "stage": "brain_report",
+      "symbol": "AAPL"
+    },
+    {
+      "classification": "NOT_APPLICABLE_TO_PIV",
+      "detail": "This stage is structurally out of PIV's scope (no Brain/Core/Dispatch in PIV).",
+      "full_app_evidence": null,
+      "piv_evidence": null,
+      "stage": "core_received",
+      "symbol": "AAPL"
+    },
+    {
+      "classification": "NOT_APPLICABLE_TO_PIV",
+      "detail": "This stage is structurally out of PIV's scope (no Brain/Core/Dispatch in PIV).",
+      "full_app_evidence": null,
+      "piv_evidence": null,
+      "stage": "core_result",
+      "symbol": "AAPL"
+    },
+    {
+      "classification": "NOT_APPLICABLE_TO_PIV",
+      "detail": "This stage is structurally out of PIV's scope (no Brain/Core/Dispatch in PIV).",
+      "full_app_evidence": null,
+      "piv_evidence": null,
+      "stage": "dispatch_received",
+      "symbol": "AAPL"
+    },
+    {
+      "classification": "NOT_APPLICABLE_TO_PIV",
+      "detail": "This stage is structurally out of PIV's scope (no Brain/Core/Dispatch in PIV).",
+      "full_app_evidence": null,
+      "piv_evidence": null,
+      "stage": "telegram_event",
+      "symbol": "AAPL"
+    },
+    {
+      "classification": "MISSING_EVENT",
+      "detail": "PIV has evidence; no corresponding full-app evidence found for this date.",
+      "full_app_evidence": null,
+      "piv_evidence": {
+        "alpha_evidence": false,
+        "broker_order_id": null,
+        "correlation_id": "intent_b1d500aaf45cd7d7dbba",
+        "event": "ORDER_INTENT",
+        "feed_mode": "IEX_PAPER_PIV",
+        "order_intent_id": "intent_b1d500aaf45cd7d7dbba",
+        "paper": true,
+        "position_id": null,
+        "price": null,
+        "quantity": 1.0,
+        "real_capital": false,
+        "reason": null,
+        "signal_id": "piv_probe_exit_2026-08-24",
+        "source": "PIV_LIFECYCLE_PROBE",
+        "status": null,
+        "symbol": "AAPL",
+        "timestamp": "2026-08-24T19:01:56.084163+00:00"
+      },
+      "stage": "paper_decision",
+      "symbol": "AAPL"
+    },
+    {
+      "classification": "MISSING_EVENT",
+      "detail": "PIV has evidence; no corresponding full-app evidence found for this date.",
+      "full_app_evidence": null,
+      "piv_evidence": {
+        "alpha_evidence": false,
+        "broker_order_id": "b511478f-f5f1-4eff-8c0b-5ccfb77c1bca",
+        "correlation_id": "intent_b1d500aaf45cd7d7dbba",
+        "event": "FILLED",
+        "feed_mode": "IEX_PAPER_PIV",
+        "order_intent_id": "intent_b1d500aaf45cd7d7dbba",
+        "paper": true,
+        "position_id": null,
+        "price": 311.4,
+        "quantity": 1.0,
+        "real_capital": false,
+        "reason": null,
+        "signal_id": null,
+        "source": "PIV_LIFECYCLE_PROBE",
+        "status": "filled",
+        "symbol": "AAPL",
+        "timestamp": "2026-08-24T19:01:58.199128+00:00"
+      },
+      "stage": "paper_execution",
+      "symbol": "AAPL"
+    },
+    {
+      "classification": "MISSING_EVENT",
+      "detail": "PIV has evidence; no corresponding full-app evidence found for this date.",
+      "full_app_evidence": null,
+      "piv_evidence": {
+        "alpha_evidence": false,
+        "broker_order_id": "b511478f-f5f1-4eff-8c0b-5ccfb77c1bca",
+        "correlation_id": "intent_b1d500aaf45cd7d7dbba",
+        "event": "POSITION_OPENED",
+        "feed_mode": "IEX_PAPER_PIV",
+        "order_intent_id": null,
+        "paper": true,
+        "position_id": "position_fb1dd2a8474dd69431d2",
+        "price": 311.4,
+        "quantity": 1.0,
+        "real_capital": false,
+        "reason": null,
+        "signal_id": null,
+        "source": "PIV_LIFECYCLE_PROBE",
+        "status": null,
+        "symbol": "AAPL",
+        "timestamp": "2026-08-24T19:01:58.641366+00:00"
+      },
+      "stage": "final_position_state",
+      "symbol": "AAPL"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+stage,unit,count,source,note
+1a,input_rows_in_requested_window (independent check via load_ohlcv_csv + date filter),67021,stage2 independent verification,"AAPL.csv rows with timestamp in [2025-08-15,2025-12-31] per talonx_backtest.data.load_ohlcv_csv"
+1b,bars_processed (engine's own count),67002,aapl_repro_summary.json,"19-row difference from 1a is a minor --start/--end boundary-inclusivity difference between the engine's own filter and this stage's independent pandas check -- verified immaterial (0.03%), does not change the zero-trade finding"
+1c,requested_period,"2025-08-15 to 2025-12-31",stage3_preregistration.json (Task72O),unchanged
+1d,actual_data_coverage_in_window,"2025-08-15 08:00 UTC to 2025-12-31 00:59 UTC",stage2 independent verification,full requested window is covered by on-disk data -- no missing date range
+2a,duplicate_timestamps,0,talonx_backtest.data.check_data_quality,none found
+2b,out_of_order_timestamps,0,talonx_backtest.data.check_data_quality,none found
+2c,unexpected_intra_session_gap_bars,1358,talonx_backtest.data.check_data_quality,"~2%% of in-window bars are missing WITHIN a session (not overnight/weekend, which are expected) -- a real but non-critical data-completeness gap; has_critical_corruption=False"
+3a,available_preroll_bars_before_requested_start,0,stage2 independent verification,"AAPL.csv's own earliest row IS 2025-08-15 08:00 UTC -- there is no earlier data in this file to serve as warmup"
+3b,required_warmup_bars_approx,120-200,talonx_quant/config.py (min_bars_required / htf_sma_period),"RSI(14)/MACD(12/26/9)/ATR(14) settle within ~120 bars; the 200-bar 15-min HTF SMA needs ~200 RTH 15-min bars (~8 trading days) -- both comfortably complete within the first few days of this 4.5-month window; HTF_DATA_UNAVAILABLE never appears in rejections_by_reason, confirming this was NOT a blocking factor for this real dataset (unlike the tiny fixture in Stage 1)"
+4,bars_processed_after_warmup_period,~66900 (67002 minus the first ~1-2 trading days' partial-warmup bars),derived,"the vast majority of the window has fully-warmed indicators available"
+5,readiness_exclusions,NOT_APPLICABLE_TO_THIS_HARNESS,stage0_baseline_audit.md item 4,"talonx_backtest.BacktestEngine has no separate PIV-style SessionReadinessValidator concept (talonx_piv/readiness.py is never imported here) -- the closest functional analogue is the volatility gate (stage 6 below), which IS the dominant filter"
+6,candidate_generating_evaluations,6,aapl_repro_summary.json signals_generated,"every bar clears (or fails) the volatility gate; only 354 of 67002 bars (67002-66648) ever clear it to reach trigger evaluation; of those, only 6 bars actually produced a qualifying RSI/MACD/MA trigger condition"
+7a,candidates_by_direction_bullish,6,aapl_repro_research_candidate_telemetry.csv,"all 6 generated candidates were BULLISH -- zero BEARISH candidates were ever generated in this window"
+7b,candidates_by_direction_bearish,0,aapl_repro_research_candidate_telemetry.csv,none
+8,rejections_by_stage_and_reason,"see stage2_rejections.csv",aapl_repro_summary.json + telemetry,"66648 LOW_VOLATILITY (pre-trigger) + 4 US_MARKET_SESSION_CLOSED (post-trigger, session gate) + 2 LOW_CONFLUENCE (post-trigger, confluence gate) = 66654; NOTE: this sum is bars-with-a-rejection-record, NOT bars_processed -- LOW_VOLATILITY bars never generate a candidate at all, so this is not a single unified funnel stage, per this task's own instruction not to force a misleading reconciliation"
+9,signals_published,0,aapl_repro_summary.json,none of the 6 candidates cleared confluence -- nothing was ever eligible to publish
+10,simulated_order_attempts,0,aapl_repro_trades.csv (empty),zero -- no published signal to act on
+11,simulated_fills,0,aapl_repro_trades.csv (empty),zero
+12,closed_or_open_simulated_trades,0,aapl_repro_trades.json (empty list),zero
+13,errors_skipped_or_unaccounted_events,0,aapl_repro_summary.json,"6 signals_generated = 66648+4+2-66648 is NOT how these reconcile (see note in row 8) -- the correct, verified accounting is: 6 candidates generated, 6 candidates rejected (4+2, since LOW_VOLATILITY bars never became candidates), 0 unaccounted. No exception was raised, no empty output was misclassified as success (exit_code=0 reflects a genuinely completed, zero-trade run, not a crash)"

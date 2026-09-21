@@ -1,0 +1,33 @@
+{
+  "v2_lane.db": {
+    "exists": true,
+    "tables": [
+      "cooldowns",
+      "pending_entry_intents",
+      "portfolio",
+      "positions",
+      "processed_episodes",
+      "sqlite_sequence",
+      "trades",
+      "v2_alert_outbox"
+    ],
+    "cash": 300000.0,
+    "n_open": 0,
+    "positions_has_entry_fee_col": false
+  },
+  "paper_trading.db": {
+    "exists": true,
+    "tables": [
+      "ignored_decisions",
+      "latest_prices",
+      "long_term_portfolio_state",
+      "long_term_positions",
+      "long_term_trade_history",
+      "portfolio_state",
+      "positions",
+      "sqlite_sequence",
+      "trade_history"
+    ],
+    "intraday_current_cash": 10000.0
+  }
+}

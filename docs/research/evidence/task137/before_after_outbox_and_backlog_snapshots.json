@@ -1,0 +1,20 @@
+{
+  "purpose": "Task 137: intelligence_delivery outbox and enrichment-backlog state-count snapshots taken immediately before and shortly after the managed Intelligence restart that loaded this task's fixes. Aggregate counts only.",
+  "pre_restart": {
+    "captured_at_utc": "2026-09-14T21:56:26Z (approx, via prospective status)",
+    "delivery_by_state": {"AMBIGUOUS": 2, "EXPIRED": 20599, "PENDING": 201, "SENT": 249},
+    "failed_retryable_count": 35
+  },
+  "post_restart": {
+    "captured_at_utc": "2026-09-14T22:01:15.578862+00:00",
+    "delivery_by_state": {"AMBIGUOUS": 2, "EXPIRED": 20599, "PENDING": 207, "SENT": 249},
+    "backlog_by_stage": {"COMPLETE": 21057, "ENRICHMENT_PENDING": 1, "FAILED_RETRYABLE": 35, "STORED": 10226},
+    "failed_retryable_count": 35,
+    "note": "the 35 BBY rows have not yet hit their scheduled retry_after_utc (2026-09-14T22:02:31Z) at this capture point -- expected to resolve on the next natural retry against the now-fixed, already-restarted code, not manually forced."
+  },
+  "v2_lane_unchanged_throughout": {
+    "cash": 300000.0,
+    "open_positions": 0,
+    "pending_entry_intents": 0
+  }
+}

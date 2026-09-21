@@ -1,0 +1,13 @@
+STAGE 1 -- EOD LIFECYCLE TEST RESULTS
+
+Targeted: tests/test_task72o_eod_lifecycle.py -- 22 passed, 0 failed
+Directly related (12 files incl. new): 220 passed, 0 failed
+Full repo suite: 1 failed, 2159 passed, 1 skipped, 15 xfailed, 397.17s
+
+FAILED: tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset
+(known baseline failure, unchanged; delta vs 71S-R1 baseline is exactly
++22 = this stage's new tests: 2159 - 2137 = 22)
+
+Verdict: PASS. No protected file changed. No broker mutation (FakeBroker/
+NoOpTransport only, zero real HTTP). Diff limited to talonx_piv/{eod_lifecycle.py (new),
+session_runner.py, cli.py, events.py}.

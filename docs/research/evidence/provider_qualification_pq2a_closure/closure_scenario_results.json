@@ -1,0 +1,178 @@
+[
+  {
+    "scenario": "A_100sh_at_100_plus_0.50_dividend",
+    "note": "held through ex-date; payable AFTER the +10 exit",
+    "entry": {
+      "shares": 100,
+      "price": 100.0,
+      "entry_fee": 0.0,
+      "economic_cost": 10000.0
+    },
+    "exit_close": 105.0,
+    "exit_fee": 0.0,
+    "economic_shares_at_exit": 100.0,
+    "price_pnl_usd": 500.0,
+    "dividend_receivable_at_close": [
+      [
+        "ACCRUED",
+        "100",
+        "0.5",
+        50.0,
+        "2026-09-26"
+      ]
+    ],
+    "cash": {
+      "after_entry": 290000.0,
+      "after_close_before_payable": 300500.0,
+      "after_dividend_credited": 300550.0
+    },
+    "dividend_pnl_usd": 50.0,
+    "total_return_pnl_usd": 550.0,
+    "cash_minus_start": 550.0,
+    "reconstruction": "500.0 (price, fee-inclusive) + 50.0 (dividends) = 550.0"
+  },
+  {
+    "scenario": "B_10sh_10to1_split_then_0.20_dividend",
+    "note": "dividend uses the POST-split quantity: 100 sh x $0.20 = $20 (not $2, not $200)",
+    "entry": {
+      "shares": 10,
+      "price": 100.0,
+      "entry_fee": 0.0,
+      "economic_cost": 1000.0
+    },
+    "exit_close": 11.0,
+    "exit_fee": 0.0,
+    "economic_shares_at_exit": 100.0,
+    "price_pnl_usd": 100.0,
+    "dividend_receivable_at_close": [
+      [
+        "ACCRUED",
+        "100",
+        "0.2",
+        20.0,
+        "2026-09-23"
+      ]
+    ],
+    "cash": {
+      "after_entry": 299000.0,
+      "after_close_before_payable": 300100.0,
+      "after_dividend_credited": 300120.0
+    },
+    "dividend_pnl_usd": 20.0,
+    "total_return_pnl_usd": 120.0,
+    "cash_minus_start": 120.0,
+    "reconstruction": "100.0 (price, fee-inclusive) + 20.0 (dividends) = 120.0"
+  },
+  {
+    "scenario": "C_5sh_1for10_reverse_split_then_1.00_dividend",
+    "note": "exact 0.5 share; dividend $0.50; no truncation, no cash-in-lieu",
+    "entry": {
+      "shares": 5,
+      "price": 100.0,
+      "entry_fee": 0.0,
+      "economic_cost": 500.0
+    },
+    "exit_close": 1050.0,
+    "exit_fee": 0.0,
+    "economic_shares_at_exit": 0.5,
+    "price_pnl_usd": 25.0,
+    "dividend_receivable_at_close": [
+      [
+        "ACCRUED",
+        "1/2",
+        "1",
+        0.5,
+        "2026-09-23"
+      ]
+    ],
+    "cash": {
+      "after_entry": 299500.0,
+      "after_close_before_payable": 300025.0,
+      "after_dividend_credited": 300025.5
+    },
+    "dividend_pnl_usd": 0.5,
+    "total_return_pnl_usd": 25.5,
+    "cash_minus_start": 25.5,
+    "reconstruction": "25.0 (price, fee-inclusive) + 0.5 (dividends) = 25.5"
+  },
+  {
+    "scenario": "D_with_fees_100sh_entry_fee_1_exit_fee_1_plus_0.50_dividend",
+    "note": "TOTAL = price P&L (net of $2 fees) + dividend P&L",
+    "entry": {
+      "shares": 100,
+      "price": 100.0,
+      "entry_fee": 1.0,
+      "economic_cost": 10001.0
+    },
+    "exit_close": 105.0,
+    "exit_fee": 1.0,
+    "economic_shares_at_exit": 100.0,
+    "price_pnl_usd": 498.0,
+    "dividend_receivable_at_close": [
+      [
+        "ACCRUED",
+        "100",
+        "0.5",
+        50.0,
+        "2026-09-18"
+      ]
+    ],
+    "cash": {
+      "after_entry": 289999.0,
+      "after_close_before_payable": 300498.0,
+      "after_dividend_credited": 300548.0
+    },
+    "dividend_pnl_usd": 50.0,
+    "total_return_pnl_usd": 548.0,
+    "cash_minus_start": 548.0,
+    "reconstruction": "498.0 (price, fee-inclusive) + 50.0 (dividends) = 548.0"
+  },
+  {
+    "scenario": "E_entered_on_ex_date_not_eligible",
+    "note": "buyer on the ex-date is not entitled",
+    "entry": {
+      "shares": 100,
+      "price": 100.0,
+      "entry_fee": 0.0,
+      "economic_cost": 10000.0
+    },
+    "exit_close": 105.0,
+    "exit_fee": 0.0,
+    "economic_shares_at_exit": 100.0,
+    "price_pnl_usd": 500.0,
+    "dividend_receivable_at_close": [],
+    "cash": {
+      "after_entry": 290000.0,
+      "after_close_before_payable": 300500.0,
+      "after_dividend_credited": 300500.0
+    },
+    "dividend_pnl_usd": 0.0,
+    "total_return_pnl_usd": 500.0,
+    "cash_minus_start": 500.0,
+    "reconstruction": "500.0 (price, fee-inclusive) + 0.0 (dividends) = 500.0"
+  },
+  {
+    "scenario": "F_exit_before_ex_date_not_eligible",
+    "note": "sold before the ex-date",
+    "entry": {
+      "shares": 100,
+      "price": 100.0,
+      "entry_fee": 0.0,
+      "economic_cost": 10000.0
+    },
+    "exit_close": 105.0,
+    "exit_fee": 0.0,
+    "economic_shares_at_exit": 100.0,
+    "price_pnl_usd": 500.0,
+    "dividend_receivable_at_close": [],
+    "cash": {
+      "after_entry": 290000.0,
+      "after_close_before_payable": 300500.0,
+      "after_dividend_credited": 300500.0
+    },
+    "dividend_pnl_usd": 0.0,
+    "total_return_pnl_usd": 500.0,
+    "cash_minus_start": 500.0,
+    "reconstruction": "500.0 (price, fee-inclusive) + 0.0 (dividends) = 500.0"
+  }
+]

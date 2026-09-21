@@ -1,0 +1,44 @@
+{
+  "stage": "Stage 4 -- protective exits and EOD compatibility",
+  "test_file": "tests/test_task76s_protective_exit_eod.py",
+  "claims_proven": [
+    {
+      "claim": "Disabling a ticker's paper_entry_enabled AFTER a position is opened does not suppress its stop exit",
+      "test": "test_disable_entries_after_opening_protective_exit_still_works",
+      "result": "PASS"
+    },
+    {
+      "claim": "A ticker that was NEVER entry-enabled (readiness/entry failure) still has an existing position fully managed",
+      "test": "test_entry_readiness_failure_does_not_disable_position_management",
+      "result": "PASS"
+    },
+    {
+      "claim": "Target-price exits are unaffected by the new decision/execution contract",
+      "test": "test_target_hit_triggers_controlled_exit_unaffected_by_contract",
+      "result": "PASS"
+    },
+    {
+      "claim": "EOD reconciliation retries are idempotent -- no duplicate cancel_all_orders/close_all_positions calls",
+      "test": "test_eod_retries_do_not_duplicate_cancel_close",
+      "result": "PASS"
+    },
+    {
+      "claim": "The original live session_id remains attached across an EOD retry (Task 72O's own fix, re-verified unbroken)",
+      "test": "test_original_session_id_remains_attached_across_retry",
+      "result": "PASS"
+    },
+    {
+      "claim": "A reconciliation mismatch (broker still reports a position after close) resolves FAILED, never a false PASSED, and SESSION_COMPLETED never fires on it",
+      "test": "test_reconciliation_mismatch_prevents_successful_terminal_verdict",
+      "result": "PASS"
+    },
+    {
+      "claim": "A broker outage during cancel resolves INCONCLUSIVE, never a false PASSED",
+      "test": "test_broker_failure_during_cancel_resolves_inconclusive_not_passed",
+      "result": "PASS"
+    }
+  ],
+  "eod_implementation_redesigned": false,
+  "note": "eod_lifecycle.py itself is read, not modified -- these tests exercise its existing, unmodified idempotency/session-identity/mismatch-handling contract against the new lifecycle.py boundary changes, proving no interaction regression.",
+  "all_tests_passed": true
+}

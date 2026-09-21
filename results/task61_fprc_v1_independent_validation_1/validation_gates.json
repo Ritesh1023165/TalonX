@@ -1,0 +1,62 @@
+{
+  "alpaca_requests_made": 0,
+  "attempt_date": "2026-08-23",
+  "gates": [
+    {
+      "gate": "base_checkpoint",
+      "observed": "4a5923d9150283febf50d1b8c3634ba7735992ee",
+      "status": "PASS"
+    },
+    {
+      "gate": "frozen_strategy_config_fingerprints",
+      "observed": {
+        "current_candidate_strategy": "2ae6216bca70",
+        "fprc_v1": "be91c38047cf9aa9dbb6c8a948eaf52dd64ed4b16c7d8a70359388b58e5c2a64"
+      },
+      "status": "PASS"
+    },
+    {
+      "gate": "current_candidate_zero_drift",
+      "status": "PASS"
+    },
+    {
+      "gate": "fprc_v1_state_isolation",
+      "status": "PASS"
+    },
+    {
+      "gate": "live_research_semantic_parity",
+      "status": "PASS"
+    },
+    {
+      "gate": "all_evaluation_windows_complete",
+      "observed": {
+        "N1": 20,
+        "N2": 11,
+        "N3": 0
+      },
+      "required": {
+        "N1": 20,
+        "N2": 20,
+        "N3": 20
+      },
+      "status": "FAIL"
+    },
+    {
+      "gate": "alpaca_35_of_35_complete_coverage",
+      "reason": "temporal completeness gate failed before provider access",
+      "status": "NOT_RUN"
+    },
+    {
+      "gate": "bar_data_quality",
+      "status": "NOT_RUN"
+    },
+    {
+      "gate": "35_of_35_first_bar_readiness",
+      "status": "NOT_RUN"
+    }
+  ],
+  "outcomes_unblinded": false,
+  "overall": "FAIL",
+  "strategy_replays_run": 0,
+  "task": 61
+}

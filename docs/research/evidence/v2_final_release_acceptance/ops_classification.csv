@@ -1,0 +1,20 @@
+finding,current_status,classification,evidence_based_reason
+OPS-001,CLOSED,HISTORICAL,documentation review note
+OPS-002,OPEN,BOUNDED_FOLLOWUP,"V2 mark freshness wording: execution uses persisted values + SIP finality; marks fall back to the last FINAL close flagged stale, never zero; presentation only"
+OPS-003,OPEN (Finding B closed by Package 3),HISTORICAL,Finding A = research last-filing methodology vs runtime 2nd-owner activation (S13-13 PARTIALLY_COMPATIBLE); runtime is contract-correct
+OPS-004,PARTIALLY_RESOLVED,BOUNDED_FOLLOWUP,V2 split/dividend accounting done; mergers/spin-offs/renames/unit splits/special+foreign dividends FAIL CLOSED (safe); Original's own accounting out of scope
+OPS-005,RESOLVED at contract level,BOUNDED_FOLLOWUP,"residuals: no provider correction metadata, rate-limit stress not measured, SIP mode opt-in (activation is the gated freeze/session step)"
+OPS-006,OPEN,BOUNDED_FOLLOWUP,registry/scope fragmentation: V2 execution scope is explicit (--execution-scope resolved-active-watchlist allowlist); unified master registry not built
+OPS-007,OPEN,RESEARCH_ONLY,"Original intraday EOD-flatten durable recovery - intraday is Research-Lab-only, isolated from V2"
+OPS-008,OPEN,RESEARCH_ONLY,intraday entry geometry / RRR re-check - not V2
+OPS-009,OPEN,RESEARCH_ONLY,intraday exit precedence - not V2
+OPS-010,OPEN,BOUNDED_FOLLOWUP,company-development grouping/CORRECTION linkage - dashboard-visible only; primary Telegram for developments needs Session-7 acceptance (gate WARNs if Intelligence delivery is enabled)
+OPS-011,OPEN,BOUNDED_FOLLOWUP,per-stock mute + materiality catalogue - same scope boundary as OPS-010
+OPS-012,CLOSED by Package 2 (header was stale),HISTORICAL,"EXIT_UNRESOLVED account block implemented and tested (flow3, flow9, tests/test_package2_*)"
+OPS-013,OPEN,BOUNDED_FOLLOWUP,Telegram lifecycle message formatting/consolidation polish; durable delivery itself is accepted
+OPS-014,CLOSED (V2),HISTORICAL,whole-share fee-aware sizing (Package 4)
+OPS-015,CLOSED by Package 2 (header was stale),HISTORICAL,reconciliation mismatch blocks admissions (Package 2)
+OPS-016,OPEN,BOUNDED_FOLLOWUP,five-state readiness model + external outage watchdog not built; first release is manually started/stopped and now has a read-only release readiness gate + runtime health states (RI-3)
+OPS-017,OPEN,HISTORICAL,stale V1 (Original) fingerprint literal in two tests; V2 fingerprint tests are correct; not fixed
+OPS-018..022,CLOSED,HISTORICAL,found and closed within Packages 2-4
+OPS-023..026,FIXED/CONFIRMED,HISTORICAL,RI-1/RI-2/RI-3 findings closed

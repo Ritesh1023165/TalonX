@@ -23,6 +23,7 @@ from talonx_paper.engine import (
     check_stop_take,
     decide_long_term_trade,
     decide_trade,
+    fill_geometry_is_valid,
     seconds_until_next_eod_flatten,
 )
 from talonx_paper.schemas import ActionableAlert, AlertAction, LongTermActionableAlert, MoatRating, TriggeringSignalRef
@@ -222,6 +223,43 @@ def test_apply_spread_sell_fills_below_quoted_price():
 def test_apply_spread_zero_bps_is_a_noop():
     assert apply_spread(131.50, spread_bps=0.0, side="BUY") == 131.50
     assert apply_spread(131.50, spread_bps=0.0, side="SELL") == 131.50
+
+
+# --- fill_geometry_is_valid (Task 25B) ---------------------------------------
+
+def test_fill_geometry_valid_when_fill_stays_inside_the_bracket():
+    # 98 < 101 < 105
+    assert fill_geometry_is_valid(101.0, stop_price=98.0, target_price=105.0) is True
+
+
+def test_fill_geometry_invalid_when_fill_crosses_the_target():
+    # target <= fill
+    assert fill_geometry_is_valid(105.50, stop_price=98.0, target_price=105.0) is False
+
+
+def test_fill_geometry_invalid_when_fill_crosses_the_stop():
+    # stop >= fill
+    assert fill_geometry_is_valid(97.50, stop_price=98.0, target_price=105.0) is False
+
+
+def test_fill_geometry_boundary_at_stop_is_invalid():
+    assert fill_geometry_is_valid(98.0, stop_price=98.0, target_price=105.0) is False
+
+
+def test_fill_geometry_boundary_at_target_is_invalid():
+    assert fill_geometry_is_valid(105.0, stop_price=98.0, target_price=105.0) is False
+
+
+def test_fill_geometry_passes_through_when_stop_is_missing():
+    assert fill_geometry_is_valid(200.0, stop_price=None, target_price=105.0) is True
+
+
+def test_fill_geometry_passes_through_when_target_is_missing():
+    assert fill_geometry_is_valid(1.0, stop_price=98.0, target_price=None) is True
+
+
+def test_fill_geometry_passes_through_when_both_missing():
+    assert fill_geometry_is_valid(1234.5, stop_price=None, target_price=None) is True
 
 
 # ==========================================================================

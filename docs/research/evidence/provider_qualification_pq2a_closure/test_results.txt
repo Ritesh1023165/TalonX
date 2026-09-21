@@ -1,0 +1,44 @@
+PQ-2A CLOSURE test evidence (2026-09-21).  Interpreter: .venv/Scripts/python.exe.
+Command form: <interpreter> -m pytest <files> -q -p no:cacheprovider
+
+1. New closure suite
+   tests/test_pq2a_closure_dividends.py                -> 45 passed, 0 failed, 0 skipped
+   tests/test_pq2a_corporate_actions.py (PQ-2A, one dividend test superseded)  -> 44 passed
+   tests/test_provider_qualification_pq1.py                                    -> 14 passed
+
+2. Focused regression, one run (21 files):
+   test_pq2a_closure_dividends, test_pq2a_corporate_actions, test_provider_qualification_pq1,
+   test_package1_settlement_integrity, test_package2_account_blocks, test_package2_acceptance_review,
+   test_package3_pricing_timing, test_package4_sizing_accounting, test_ri1_campaign_identity,
+   test_ri2_notification_routing, test_ri3_operator, test_task110_v2_integration, test_task111_v2_e2e,
+   test_task112_tuesday_release, test_task114_prospective, test_task100b_runtime_integration,
+   test_task117_phase0_pricing_adapter, test_task117_pricing_readiness, test_task117_phase0_source_readiness,
+   test_task117_execution_scope, test_task117_phase0_dashboard_readiness
+   -> 534 passed, 4 failed, 0 skipped (77 s)
+   The 4 failures:
+     tests/test_ri3_operator.py::test_renderer_shows_end_to_end_fixture           (absent renderer executable)
+     tests/test_task111_v2_e2e.py::test_item3_original_strategy_fingerprint_unchanged   (OPS-017 stale V1 fingerprint literal)
+     tests/test_task112_tuesday_release.py::test_03_v1_fingerprint_intact               (OPS-017)
+     tests/test_task114_prospective.py::test_a4_v2_section_separates_health_data_activity
+   -> ALL 4 REPRODUCE on this task's starting HEAD b8b98e0 (fresh scratch worktree) => pre-existing, unrelated.  OPS-017 not touched.
+
+3. Wider group: tests/test_task117_*.py test_task118*.py test_task119*.py test_task131*.py test_task133*.py test_task140*.py
+   -> 452 passed, 12 failed, 0 skipped (91 s)
+   The 12 failures:
+     test_task117_migration x5 + test_task117_deployment_rehearsal x1  (copy the production ledger and require its md5 to be in a stale expected-hash set)
+     test_task117_overnight_journey::test_p1_fill_reconciles_to_intent_at_entry_session_open, test_task117_release_rehearsal,
+     test_task117_spa_states x2, test_task118a_dashboard_message_count, test_task131_dashboard_broad_discovery
+   -> ALL 12 REPRODUCE on starting HEAD b8b98e0 (scratch worktree; ledger file copied in for the six md5-dependent tests) => pre-existing.
+   No timing-only failures were observed in these runs (no concurrent load).
+
+4. Not re-run (untouched by this task): tests/test_package5_intraday_causality.py (20 passed on the PQ-2A tree; ~15 min); no code it exercises was changed.
+
+5. Mutation check of the new suite (deliberate regressions, each run against tests/test_pq2a_closure_dividends.py):
+   caught:  entry-on-ex-date eligible (store+guard+window combined); exit-on-ex-date ineligible; dividend price-basis guard removed;
+            split trail ignored for the dividend quantity; entry shares used instead of ex-date shares;
+            credit ignores payable date; once-only credit gate removed (both guards); credited dividends omitted from the reconciliation equation.
+   equivalent (not caught by design): removing the provider re-confirmation `is None` branch -- the code then raises and the exception
+            path still credits nothing.
+   Single-guard mutations of the layered eligibility check are masked by the redundant window/store guards (defense in depth), as intended.
+
+6. Strategy integrity: test_34 asserts thresholds (2,10,1,20,5000000.0,5.0,5,3) and v2_release_fingerprint == e2acf6454789217e -> PASS.

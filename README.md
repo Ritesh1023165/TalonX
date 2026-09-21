@@ -1,108 +1,162 @@
 # TalonX
 
-**Project TalonX** is an event-driven, dual-horizon algorithmic trading &
-fundamental research engine. It runs two decoupled strategies side by
-side against the same watchlist:
+TalonX is a **descriptive, human-in-the-loop, event-driven trading & risk-intelligence system**
+for US equities. It ingests live market data and SEC filings, runs one frozen selective intraday
+strategy (**Original**), runs a second internal-only validation lane (**Experimental**), produces
+deterministic event/risk intelligence, and surfaces everything on a single read-only operator
+cockpit.
 
-- **Intraday Momentum Scanner** — minutes-to-hours holding period,
-  technical-signal-triggered.
-- **Long-Term Quality & Valuation Compounder** — quarterly-SEC-filing-
-  driven, months-to-years holding period.
+**TalonX makes no profitability claim. It executes no real capital, takes no short positions, and
+uses no paid data. The current Original strategy is deliberately selective and its edge is
+UNPROVEN.**
 
-It's built from six cooperating modules:
+Full docs: **[`docs/README.md`](docs/README.md)** ·
+architecture: **[`docs/CURRENT_ARCHITECTURE.md`](docs/CURRENT_ARCHITECTURE.md)**.
 
-- **`talonx_ingest`** (Module 1) — Data Ingestion & Event Producer Engine.
-  Pulls SEC filings, news/social content, and live market data into
-  searchable/structured form, and publishes real-time events to Redis.
-- **`talonx_quant`** (Module 2) — Technical & Quantitative Scanner.
-  Listens to the market data Module 1 produces, computes technical
-  indicators, and publishes trade-setup signals.
-- **`talonx_brain`** (Module 3) — Deep Research Agent & RAG Engine.
-  Listens to the trade-setup signals Module 2 produces, retrieves relevant
-  SEC filing and news context from Module 1's ChromaDB store, and asks
-  an LLM to ground or challenge each technical signal against that
-  context, publishing a structured research report.
-- **`talonx_core`** (Module 4) — Core Event Bus & Decision Engine.
-  Correlates Module 2's technical signals with Module 3's research
-  reports per ticker, runs a Decision Matrix against them (do they agree,
-  or contradict?), and publishes an actionable alert when one clears the
-  confidence bar and isn't in cooldown.
-- **`talonx_dispatch`** (Module 5) — Notification Dispatcher & Streamlit
-  Interface. Listens for Module 4's actionable alerts, pushes them to
-  Telegram as mobile notifications (including an interactive `/ping`
-  health check), records every one to a durable audit trail, and serves
-  a live Streamlit dashboard over that trail for monitoring and trade
-  audit review.
-- **`talonx_paper`** (Module 6) — Live Paper Trading Engine. Simulates
-  BUY/SELL execution for both horizons per ticker, with ATR-anchored
-  intraday stops and a DCA-aware long-term ledger.
+## 1. What TalonX is
 
----
+An operator's cockpit over four supervised processes: an Original control pipeline, an
+internal-only Experimental shadow lane, a descriptive SEC intelligence service, and a read-only
+dashboard — all owned by `talonx_ops.supervisor`.
 
-## Documentation
+## 2. Current capabilities
 
-Full documentation lives in **[`docs/`](docs/README.md)** — start there
-for anything beyond this quick overview:
+- Live market ingestion → one authoritative market path + one authoritative health accessor.
+- Original Quant → Brain → Decision pipeline with **frozen** thresholds; long-only local paper.
+- Experimental shadow lane: relaxed-profile directional alerts, `WOULD_PASS`/`WOULD_REJECT`
+  labels, experimental paper, forward outcomes (MFE/MAE/+30m/+60m/EOD/+1D), persisted pre-market
+  surface — **never externally dispatched**.
+- Risk & Event Intelligence: SEC 8-K/10-Q/10-K + Form 3/4/5, deterministic "what changed",
+  insider aggregation, an explainable **Information Significance** band — **no forward-return
+  input, no direction**.
+- One unified `:8787` cockpit (six sections) + a loopback-only `/admin/` config page.
+- Durable EOD reconciliation; one official Telegram send path; one `get_updates` poller.
 
-| | |
+## 3. Architecture overview
+
+`talonx_ops.supervisor` → `run_talonx.py` (Original, MANDATORY) ∥ `talonx_signals.run`
+(Experimental, OPTIONAL) ∥ `talonx_ingest.intelligence.service` (Intelligence, OPTIONAL) ∥
+`dashboard_web.py` (`:8787`, OPTIONAL). Market data has a single publisher; Telegram has one
+send path and one poller. See [`docs/CURRENT_ARCHITECTURE.md`](docs/CURRENT_ARCHITECTURE.md).
+
+## 4. Runtime components
+
+| package | role |
 |---|---|
-| **Getting started** | [Setup](docs/setup.md) · [Running things](docs/running.md) · [Troubleshooting](docs/troubleshooting.md) · [Configuration reference](docs/configuration.md) · [Backtesting](docs/backtesting.md) |
-| **Architecture** | [Overview & data flow](docs/architecture-overview.md) · [Module 1: ingest](docs/modules/ingest.md) · [Module 2: quant](docs/modules/quant.md) · [Module 3: brain](docs/modules/brain.md) · [Module 4: core](docs/modules/core.md) · [Module 5: dispatch](docs/modules/dispatch.md) · [Module 6: paper](docs/modules/paper.md) · [Orchestrator](docs/modules/orchestrator.md) |
-| **Cross-cutting features** | [Phase 2 multi-horizon](docs/phase2-multi-horizon.md) · [Earnings Radar](docs/earnings-radar.md) · [Pre-Market Radar](docs/premarket-radar.md) · [Bar buffer persistence](docs/bar_buffer_persistence.md) |
-| **Reference** | [Roadmap / not built yet](docs/roadmap.md) · [Performance & Gemini tradeoffs](docs/performance.md) |
+| `talonx_ingest` | market-data + SEC/news ingestion; `talonx_ingest/intelligence/` = Task 96 significance service |
+| `talonx_quant` | technical scanner (frozen) |
+| `talonx_brain` | LLM-grounded descriptive research report (context only) |
+| `talonx_core` | decision engine |
+| `talonx_dispatch` | official Telegram + audit trail + the one `get_updates` listener |
+| `talonx_paper` | Original local paper engine (no broker) |
+| `talonx_watchlist` | watchlist store (config, editable via `/admin/`) |
+| `talonx_signals` | the internal-only Experimental lane |
+| `talonx_ops` | supervisor, read model, market health, EOD store, official router, admin config, dashboard read model |
+| `talonx_compare` | Original-vs-PIV comparison collector (dormant with PIV) |
+| `talonx_piv` | opt-in Alpaca **PAPER-only** order-lifecycle validation harness |
+| `talonx_backtest` | frozen-strategy replay + cost model (also used by `talonx_piv`) |
 
-## Quick start
+## 5. Original vs Experimental
 
-1. **[Prerequisites & first-time setup](docs/setup.md)** — Python
-   3.11/3.12, Redis (`docker compose up -d`), a `.env` file, and (for
-   Module 3) either a `GEMINI_API_KEY` or a local Ollama install.
-2. Install and run everything together:
-   ```powershell
-   python -m venv .venv
-   .venv\Scripts\activate
-   pip install -r talonx_ingest\requirements.txt
-   copy .env.example .env
-   # edit .env: at minimum, set TALONX_SEC_USER_AGENT
-   python run_talonx.py
-   ```
-3. In a second terminal, the live dashboard:
-   ```powershell
-   streamlit run talonx_dispatch\app.py
-   ```
+| | Original | Experimental |
+|---|---|---|
+| thresholds (frozen) | `0.25 / 2 / 1.5` | `0.10 / 1 / 1.0` |
+| external alerts | sole official/external lane | **never** |
+| paper store | `paper_trading.db` | `experimental_paper.db` (isolated) |
 
-See **[docs/running.md](docs/running.md)** for every module's standalone
-entrypoint, `--skip-*` flags, and the test suite.
+`BEARISH` is informational. `SELL`/`EXIT` closes an existing long. Details:
+[`docs/SAFETY_BOUNDARIES.md`](docs/SAFETY_BOUNDARIES.md).
 
-## Run your first backtest
+## 6. Intelligence module
 
-`talonx_backtest` replays historical 1-minute OHLCV data through the
-same, frozen live strategy code — it measures TalonX, it doesn't change
-it. No market data needed to try it:
+Descriptive only — see [`docs/INTELLIGENCE.md`](docs/INTELLIGENCE.md). The significance band is
+"how much human attention this event deserves", never a prediction or a signal.
 
-1. Install dependencies (`pip install -r talonx_quant\requirements.txt`
-   covers `talonx_backtest` too — no separate requirements file).
-2. Run the deterministic sample:
-   ```powershell
-   python -m talonx_backtest --data examples\data\sample_AAPL_1m.csv --symbol AAPL --tz America/New_York --out results\sample
-   ```
-3. Open:
-   ```text
-   results\sample\backtest_results.html
-   ```
-4. For real historical data:
-   ```powershell
-   python -m talonx_backtest --data data\AAPL_1m.csv --symbol AAPL --tz America/New_York --start 2025-01-01 --end 2025-12-31 --out results\AAPL
-   ```
-5. Review: profit factor, expectancy, max drawdown, MFE/MAE, and (with
-   `--cost-sensitivity`) how sensitive the result is to execution costs.
+## 7. Paper trading model
 
-See **[docs/backtesting.md](docs/backtesting.md)** for data-format
-requirements, timezone handling, data-quality validation, and what the
-report does and doesn't tell you.
+Three completely separate simulated ledgers (Original / Experimental / PIV Alpaca PAPER), never
+merged. See [`docs/PAPER_TRADING.md`](docs/PAPER_TRADING.md).
 
-## Project layout
+## 8. Dashboards
 
-See **[docs/architecture-overview.md](docs/architecture-overview.md)**
-for the full annotated directory tree. `.env` lives at the repo root and
-is shared by every module; run all commands from `C:\workspace\TalonX`
-(the repo root), not from inside a `talonx_*` package folder.
+`:8787` primary (read-only) · `:8787/admin/` (loopback-only writes) · `:8760` intelligence deep
+evidence (retained) · `:8770` legacy validation (`[COMPATIBILITY]`) · `:8501` Streamlit residual
+(`[COMPATIBILITY]`). See [`docs/DASHBOARD.md`](docs/DASHBOARD.md),
+[`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md).
+
+## 9. Admin / config
+
+`:8787/admin/` — 9 operational controls only (watchlist + paper $ amounts), confirm-required,
+audited, strategy/execution keys permanently denied. [`docs/ADMIN.md`](docs/ADMIN.md).
+
+## 10. Startup / status / shutdown
+
+```powershell
+.\scripts\start_talonx_supervised.ps1          # START
+python -m talonx_ops.supervisor status         # STATUS
+# Ctrl+C in the supervisor console             # controlled shutdown + EOD
+```
+
+See [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
+
+## 11. Backtesting & research
+
+`python -m talonx_backtest --data examples\data\sample_AAPL_1m.csv --symbol AAPL --tz America/New_York --out results\sample`
+replays the **frozen** live strategy. Datasets, methodology contract, and how to add a materially
+new hypothesis safely: [`docs/BACKTESTING.md`](docs/BACKTESTING.md).
+
+## 12. Data sources
+
+Free only. Live: yfinance (+ optional Polygon WS); SEC EDGAR (`TALONX_SEC_USER_AGENT` required).
+Research datasets: Alpaca **SIP** (account-entitled), Wikipedia point-in-time S&P membership.
+`PAID_DATA_SPEND = £0`. Catalog: [`docs/DATA.md`](docs/DATA.md).
+
+## 13. Safety boundaries
+
+No shorts · no real capital (`talonx_piv` raises `PaperGuardError` on `real_capital=True`) · no
+paid data by default · no runtime AI/ML on the trading path · frozen strategy settings ·
+structural Experimental external-send block. [`docs/SAFETY_BOUNDARIES.md`](docs/SAFETY_BOUNDARIES.md).
+
+## 14. Current limitations
+
+- The Original strategy is highly selective and **unproven** — zero published signals over long
+  stretches is expected behaviour, not a bug.
+- The free intraday structural-long alpha research lane is **CLOSED** (no robust net edge found —
+  [`docs/RESEARCH_STATUS.md`](docs/RESEARCH_STATUS.md)).
+- One real-RTH live operational qualification (Task 103) is **pending**.
+- `:8770` and `:8501` are retained for residual capability (see `docs/COMPATIBILITY.md`).
+
+## 15. Repository layout
+
+`talonx_*` packages (above) · `dashboard_web.py` + `dashboard_web_static/` (`:8787`) ·
+`run_talonx.py` (Original orchestrator) · `scripts/` (start/stop; `start_talonx_supervised.ps1`
+is primary) · `talonx_backtest/` + `research/scripts/` (backtest & research) · `tests/` ·
+`examples/data/` (sample inputs) · `docs/` · `results/` (task artifacts — `task55…88` tracked,
+`task9*+` local-only). Run everything from the repo root.
+
+## 16. Development / testing
+
+```powershell
+python -m venv .venv ; .venv\Scripts\activate
+pip install -r talonx_ingest\requirements.txt
+copy .env.example .env         # set TALONX_SEC_USER_AGENT
+.venv\Scripts\python.exe -m pytest tests/ -q
+```
+
+## 17. Historical research conclusions
+
+Tasks 93-95K + 97 + 101A/B: **no robust, cost-survivable free intraday structural-long alpha**
+(intraday drift ≈ 5 bps ≈ round-trip cost across all regimes / 6.6 years). The product decision
+(`95J`) reframed TalonX as a descriptive risk & event intelligence system. Full index:
+[`docs/RESEARCH_STATUS.md`](docs/RESEARCH_STATUS.md); append-only history:
+[`docs/research/TALONX_RESEARCH_LEDGER.md`](docs/research/TALONX_RESEARCH_LEDGER.md).
+
+## 18. Roadmap / pending
+
+- Run the pending Task 103 live operational qualification on a real trading day.
+- After it passes: physically retire `:8770`.
+- Build safe replacements for `:8501`'s destructive resets + long-term research views, then
+  retire `:8501`.
+- Backtest infrastructure remains available for a **materially new** hypothesis class (paid
+  point-in-time consensus, options, non-price information) under a separate authorised mandate —
+  not a parameter sweep of a closed lane.

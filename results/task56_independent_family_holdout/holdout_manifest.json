@@ -1,0 +1,135 @@
+{
+  "task": "Task 56 - Independent Family Holdout Validation Protocol Freeze",
+  "protocol_checkpoint": "0295672",
+  "protocol_status": "FROZEN_PENDING_EXPLICIT_REPLAY_APPROVAL",
+  "deployment_state": "MONDAY_DECISION_SHADOW_ONLY",
+  "capital_authorized": false,
+  "download_started": false,
+  "replay_started": false,
+  "calendar": {
+    "source": "ET-localized trading dates from local AAPL full-year Alpaca data",
+    "first_date": "2025-08-15",
+    "last_date": "2026-08-14",
+    "trading_days": 251,
+    "excluded_development_or_evaluation_days": 105,
+    "eligible_20_day_start_indices": 17,
+    "selection_rule": "Target evaluation centers at 1/6, 1/2, and 5/6 of the 251-day calendar; choose the nearest start having 20 consecutive dates outside every prior development/evaluation window and 10 preceding trading dates; earlier start wins a tie.",
+    "outcomes_inspected_before_freeze": false,
+    "stronger_full_package_exclusion_feasible": false,
+    "stronger_rule_note": "No 30-trading-day package remains if both the 10-day state-only warmup and 20-day evaluation must avoid every prior development/evaluation date. Evaluation independence is therefore frozen; warmup reuse is allowed only through the state-only pre-roll path."
+  },
+  "windows": {
+    "H1_early": {
+      "target_center_index": 42,
+      "evaluation_index_start": 92,
+      "evaluation_index_end": 111,
+      "warmup_start": "2025-12-11",
+      "warmup_end": "2025-12-24",
+      "evaluation_start": "2025-12-26",
+      "evaluation_end": "2026-01-26",
+      "warmup_trading_days": 10,
+      "evaluation_trading_days": 20,
+      "original_10_warmup_rows": 69530,
+      "original_10_evaluation_rows": 145307,
+      "available_35_symbol_warmup_rows": 187512,
+      "warmup_readiness": "35/35"
+    },
+    "H2_middle": {
+      "target_center_index": 125,
+      "evaluation_index_start": 130,
+      "evaluation_index_end": 149,
+      "warmup_start": "2026-02-06",
+      "warmup_end": "2026-02-20",
+      "evaluation_start": "2026-02-23",
+      "evaluation_end": "2026-03-20",
+      "warmup_trading_days": 10,
+      "evaluation_trading_days": 20,
+      "original_10_warmup_rows": 76031,
+      "original_10_evaluation_rows": 147010,
+      "available_35_symbol_warmup_rows": 201894,
+      "warmup_readiness": "35/35"
+    },
+    "H3_late": {
+      "target_center_index": 208,
+      "evaluation_index_start": 205,
+      "evaluation_index_end": 224,
+      "warmup_start": "2026-05-27",
+      "warmup_end": "2026-06-09",
+      "evaluation_start": "2026-06-10",
+      "evaluation_end": "2026-07-09",
+      "warmup_trading_days": 10,
+      "evaluation_trading_days": 20,
+      "original_10_warmup_rows": 81546,
+      "original_10_evaluation_rows": 160139,
+      "available_35_symbol_warmup_rows": 222569,
+      "warmup_readiness": "35/35"
+    }
+  },
+  "universe": {
+    "size": 35,
+    "original_10_local_full_year": [
+      "AAPL", "MSFT", "NVDA", "AMZN", "META", "AMD", "TSLA", "GOOGL", "PYPL", "STX"
+    ],
+    "additional_25_requiring_complete_packages": [
+      "ADBE", "ADI", "AMAT", "AVGO", "BKNG", "CMCSA", "COST", "CSCO", "GILD", "HON",
+      "INTC", "INTU", "ISRG", "KLAC", "LRCX", "MDLZ", "MU", "NFLX", "PANW", "PEP",
+      "QCOM", "REGN", "SBUX", "TXN", "VRTX"
+    ]
+  },
+  "proposed_downloads": {
+    "provider": "alpaca",
+    "authorized": false,
+    "requests": [
+      {"window": "H1_early", "start": "2025-12-11", "end": "2026-01-26", "symbols": 25},
+      {"window": "H2_middle", "start": "2026-02-06", "end": "2026-03-20", "symbols": 25},
+      {"window": "H3_late", "start": "2026-05-27", "end": "2026-07-09", "symbols": 25}
+    ],
+    "total_symbol_window_requests": 75
+  },
+  "frozen_candidate": {
+    "strategy_version": "2ae6216bca70",
+    "quant_config_hash": "fdf4922d0728",
+    "backtest_config_hash": "0c7dd13d75c4",
+    "volatility_gate_mode": "MULTITIMEFRAME_EXPERIMENTAL",
+    "confluence_contract": "INDEPENDENT_CONFIRMATION_EXPERIMENTAL",
+    "regime_15m_threshold_pct": 0.329,
+    "regime_60m_threshold_pct": 0.839,
+    "warmup_trading_days": 10,
+    "direction_policy": "LONG_ONLY",
+    "family_disabling_authorized": false,
+    "parameter_sweep_authorized": false,
+    "symbol_tuning_authorized": false,
+    "cost_tuning_authorized": false
+  },
+  "hypotheses": {
+    "H1": "RSI gross expectancy > MACD gross expectancy on the Task 56 holdout.",
+    "H2": "RSI 5bps expectancy > MACD 5bps expectancy on the Task 56 holdout.",
+    "absolute_questions": [
+      "RSI gross expectancy > 0",
+      "RSI 5bps expectancy > 0",
+      "MACD gross expectancy < 0",
+      "MACD 5bps expectancy < 0"
+    ]
+  },
+  "interpretability_floor": {
+    "minimum_total_rsi_macd_trades": 60,
+    "minimum_trades_per_family": 20,
+    "minimum_windows_per_family": 2,
+    "minimum_symbols_per_family": 5
+  },
+  "allowed_final_classifications": [
+    "FAMILY_EFFECT_REPLICATED",
+    "FAMILY_EFFECT_WEAKENED",
+    "FAMILY_EFFECT_NOT_REPLICATED",
+    "INCONCLUSIVE_TOO_THIN",
+    "VALIDATION_BLOCKED"
+  ],
+  "expected_workload": {
+    "warmup_bars": 611975,
+    "estimated_evaluation_bars": 1219322,
+    "estimated_total_bars": 1831297,
+    "estimated_runtime_minutes": 287.8,
+    "estimated_runtime_hours": 4.8,
+    "practical_runtime_range_hours": "4.5-6"
+  }
+}

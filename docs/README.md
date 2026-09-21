@@ -1,51 +1,72 @@
 # TalonX Documentation
 
-Split out of the single top-level `README.md` for easier navigation.
-Start with [../README.md](../README.md) for the project overview and
-quick start, then come here for depth on any specific topic.
+Start with the root [`../README.md`](../README.md) for the one-page overview, then use this index.
 
-## Getting started
+## Product-experience knowledge transfer (started Session 1, 2026-09-15)
 
-- [setup.md](setup.md) — prerequisites and first-time setup (`.env`,
-  API keys, Telegram/Reddit registration)
-- [running.md](running.md) — how to run everything together, or each
-  module standalone
-- [troubleshooting.md](troubleshooting.md) — common problems and their
-  fixes, including a live per-ticker diagnostic tool
-- [configuration.md](configuration.md) — environment variable reference
+- [product/PRODUCT_DEFINITION.md](product/PRODUCT_DEFINITION.md) — what
+  the product is, who it's for, and how it communicates (Telegram-first
+  opportunities, optional major-development alerts, dashboard as the
+  general-monitoring surface).
+- [product/DECISION_LOG.md](product/DECISION_LOG.md) — the append-only,
+  session-by-session record of product-owner knowledge-transfer
+  discussions.
+- [product/REQUIREMENTS_TRACKER.md](product/REQUIREMENTS_TRACKER.md) —
+  stable-ID tracking (`S<session>-<sequence>`) from proposal through
+  verified implementation.
+- [product/KNOWLEDGE_TRANSFER_PLAN.md](product/KNOWLEDGE_TRANSFER_PLAN.md)
+  — the 13-session plan and the workflow for tracking future decisions.
+- [product/OPERATIONAL_FINDINGS.md](product/OPERATIONAL_FINDINGS.md) —
+  operational/runtime findings (e.g. price-freshness gaps) discovered
+  outside the strategy-tuning and product-requirement tracks, tracked
+  through to a future corrective task.
 
-## Architecture
+This is a **separate layer** from `research/TALONX_PRODUCT_STRATEGY_
+SPEC.md`/`research/TALONX_OWNER_DECISIONS.md` below, which govern
+Original's intraday strategy-tuning parameters specifically (confluence,
+ATR semantics, signal-family independence) — not the full product
+experience across Original, Intelligence and V2.
 
-- [architecture-overview.md](architecture-overview.md) — project layout
-  and the end-to-end data-flow diagram
-- Per-module deep dives:
-  - [modules/ingest.md](modules/ingest.md) — Module 1: Data Ingestion & Event Producer
-  - [modules/quant.md](modules/quant.md) — Module 2: Technical & Quantitative Scanner
-  - [modules/brain.md](modules/brain.md) — Module 3: Deep Research Agent & RAG Engine
-  - [modules/core.md](modules/core.md) — Module 4: Core Event Bus & Decision Engine
-  - [modules/dispatch.md](modules/dispatch.md) — Module 5: Notification Dispatcher & Streamlit Interface
-  - [modules/paper.md](modules/paper.md) — Module 6: Live Paper Trading Engine
-  - [modules/orchestrator.md](modules/orchestrator.md) — `run_talonx.py`
+## Current product docs (authoritative — post-Task 104)
 
-## Cross-cutting features
+| doc | covers |
+|---|---|
+| [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md) | **the single authoritative architecture description** — supervision, market path, Original, Experimental, Intelligence, Ops, UI, Telegram, PIV, boundaries |
+| [OPERATIONS.md](OPERATIONS.md) | start / status / stop / EOD; which script is authoritative; the pending live qualification |
+| [DASHBOARD.md](DASHBOARD.md) | `:8787` cockpit (six sections + legacy tabs), false-zero semantics, `:8760`, `:8770`, `:8501` |
+| [ADMIN.md](ADMIN.md) | `:8787/admin/` — the 9 controls, the denylist, the audit log, safety properties |
+| [INTELLIGENCE.md](INTELLIGENCE.md) | the Risk & Event Intelligence layer (Task 96) — descriptive, deterministic, no forward-return |
+| [PAPER_TRADING.md](PAPER_TRADING.md) | the three separate simulated ledgers, EOD reconciliation, forward outcomes |
+| [BACKTESTING.md](BACKTESTING.md) | `talonx_backtest`, datasets, methodology contract, how to add a new hypothesis safely |
+| [RESEARCH_STATUS.md](RESEARCH_STATUS.md) | consolidated Task 93-101 verdicts — **no robust free intraday alpha; research lane closed** |
+| [DATA.md](DATA.md) | data catalog — live stores, SEC data, research datasets (locations, sizes, sources) |
+| [SAFETY_BOUNDARIES.md](SAFETY_BOUNDARIES.md) | Original vs Experimental, external-alert boundary, no shorts / no real capital / no paid data, frozen settings |
+| [COMPATIBILITY.md](COMPATIBILITY.md) | `:8770` / `:8501` deprecation status + removal conditions; legacy scripts |
+| [CHANGELOG.md](CHANGELOG.md) | baseline changelog — Task 100 → 105 |
 
-- [phase2-multi-horizon.md](phase2-multi-horizon.md) — the `LONG_TERM`/
-  `DUAL_HORIZON` fundamentals-driven investing horizon, alongside the
-  original intraday engine
-- [earnings-radar.md](earnings-radar.md) — Event-Driven Earnings Radar
-  (calendar sync, T-48h heads-up, fast-track filing ingestion,
-  two-stage revaluation)
-- [premarket-radar.md](premarket-radar.md) — whole-watchlist pre-market
-  price capture, and `talonx_quant`'s own pre-market signal-quality gates
-- [bar_buffer_persistence.md](bar_buffer_persistence.md) — how
-  `talonx_quant`'s rolling bar buffers checkpoint to and reload from
-  disk, and exactly how a restart gap (redeploy, overnight, weekend) is
-  handled
+## Research / owner history (kept — do not merge into the current docs)
 
-## Reference
+- [research/TALONX_RESEARCH_LEDGER.md](research/TALONX_RESEARCH_LEDGER.md) — append-only
+  chronological history of every research/validation task.
+- [research/TALONX_PRODUCT_STRATEGY_SPEC.md](research/TALONX_PRODUCT_STRATEGY_SPEC.md),
+  [research/TALONX_OWNER_DECISIONS.md](research/TALONX_OWNER_DECISIONS.md),
+  [research/TALONX_PIV_RUNTIME_PRODUCT_TARGET.md](research/TALONX_PIV_RUNTIME_PRODUCT_TARGET.md),
+  `research/task21_frozen_early_failure_spec.json` — frozen product/strategy decisions and a
+  SHA-referenced early-failure spec.
 
-- [roadmap.md](roadmap.md) — what's not built yet, and why
-- [performance.md](performance.md) — throughput profile, the Gemini
-  model tradeoff and upgrade path, the Ollama local alternative,
-  `talonx_quant`'s noise-filter history, and yfinance session
-  self-healing
+## Pre-consolidation docs (superseded — retained as history)
+
+These describe the pre-Task-100 "six cooperating modules" layout and are **superseded by
+`CURRENT_ARCHITECTURE.md`**. They remain for their still-accurate low-level detail (indicator
+math, env-var reference, bar-buffer persistence, earnings/pre-market radar internals) and are not
+deleted:
+
+`architecture-overview.md` · `modules/{ingest,quant,brain,core,dispatch,paper,orchestrator}.md` ·
+`setup.md` · `running.md` · `troubleshooting.md` · `configuration.md` · `performance.md` ·
+`roadmap.md` · `phase2-multi-horizon.md` · `earnings-radar.md` · `premarket-radar.md` ·
+`bar_buffer_persistence.md`.
+
+(`backtesting.md` was renamed to `BACKTESTING.md` and rewritten in Task 105 — it is a **current**
+doc, not superseded.)
+
+When these conflict with a current doc, the current doc wins.

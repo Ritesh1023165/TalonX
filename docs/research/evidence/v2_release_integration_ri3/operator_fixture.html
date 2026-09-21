@@ -1,0 +1,117 @@
+<!doctype html><meta charset="utf-8"><title>RI3 isolated fixture</title><style>
+  :root {
+    --bg: #0b0f14; --panel: #121821; --panel-2:#0f151d; --panel-border: #1f2937;
+    --text: #e5e7eb; --muted: #8b96a5; --good: #34d399; --warn: #fbbf24; --bad: #f87171;
+    --accent:#6b7280; --orig:#22d3ee; --exp:#a78bfa; --intel:#60a5fa;
+  }
+  * { box-sizing: border-box; }
+  html, body { max-width:100%; overflow-x:hidden; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size:14px; }
+  header { display:flex; align-items:center; gap:20px; padding:12px 20px;
+    border-bottom:1px solid var(--panel-border); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0; font-weight:600; }
+  .status { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); }
+  .status-dot { width:9px; height:9px; border-radius:50%; background:var(--bad); transition:background .3s; }
+  .status-dot.connected { background:var(--good); }
+  .status-dot.reconnecting { background:var(--warn); }
+  .stat { font-size:12px; color:var(--muted); } .stat b { color:var(--text); font-size:14px; }
+  nav#primary { display:flex; gap:4px; padding:8px 16px; border-bottom:1px solid var(--panel-border); flex-wrap:wrap; }
+  nav#primary button { background:var(--panel); color:var(--text); border:1px solid var(--panel-border);
+    border-radius:6px; padding:6px 12px; cursor:pointer; font-size:12px; }
+  nav#primary button.active { border-color:var(--good); color:#fff; background:#16202b; }
+  nav#legacy { display:flex; gap:4px; padding:6px 16px; border-bottom:1px solid var(--panel-border); flex-wrap:wrap; }
+  nav#legacy button { background:transparent; color:var(--muted); border:1px solid var(--panel-border);
+    border-radius:6px; padding:4px 10px; cursor:pointer; font-size:11px; }
+  nav#legacy button.active { color:#fff; border-color:var(--muted); }
+  main { padding:16px 20px 48px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px; min-width:0; }
+  .card { background:var(--panel); border:1px solid var(--panel-border); border-left:3px solid var(--accent);
+    border-radius:10px; padding:14px 16px; min-width:0; }
+  .card.orig { border-left-color:var(--orig); } .card.exp { border-left-color:var(--exp); }
+  .card.intel { border-left-color:var(--intel); }
+  .card h3 { margin:0 0 8px; font-size:13px; font-weight:600; letter-spacing:.02em; }
+  .card-wide { grid-column:1/-1; }
+  .kv { display:flex; flex-wrap:wrap; justify-content:space-between; gap:2px 12px; padding:3px 0; border-bottom:1px solid #1a212c; font-size:13px; }
+  .kv:last-child { border-bottom:none; }
+  .kv .k { color:var(--muted); flex-shrink:0; }
+  .kv .v { font-family:ui-monospace,Consolas,monospace; text-align:right; flex:1 1 auto; min-width:0;
+    word-break:break-word; overflow-wrap:anywhere; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+  .pill.ACTIVE,.pill.READY,.pill.HEALTHY,.pill.RECONCILED { background:#08351f; color:var(--good); }
+  .pill.ZERO_ACTIVITY,.pill.NOT_DUE,.pill.UNKNOWN,.pill.NOT_CHECKED,.pill.NOT_PERSISTED { background:#20262e; color:var(--muted); }
+  .pill.DEGRADED,.pill.STALE,.pill.SUPERSEDED,.pill.PARTIAL { background:#3a2c07; color:var(--warn); }
+  .pill.FAILED,.pill.NO_ACTIVE_PRODUCER,.pill.DOWN,.pill.DISCONNECTED,.pill.BLOCKED { background:#3a1113; color:var(--bad); }
+  .pill.BLOCKED { background:#08351f; color:var(--good); } /* boundary BLOCKED = good */
+  .pill.CURRENT,.pill.SENT,.pill.NO_OPPORTUNITIES { background:#08351f; color:var(--good); }
+  .pill.STARTING,.pill.POSITION_OPEN,.pill.ACTIVITY,.pill.PENDING,.pill.RETRY { background:#20262e; color:var(--muted); }
+  .pill.INCOMPLETE_COVERAGE,.pill.HELD,.pill.AMBIGUOUS,.pill.DATA_STALE { background:#3a2c07; color:var(--warn); }
+  .pill.DATA_UNAVAILABLE,.pill.STARTUP_FAILED { background:#3a1113; color:var(--bad); }
+  .pill.GATED,.pill.FILLED { background:#08351f; color:var(--good); }
+  .pill.PERMISSIVE,.pill.DISCOVERED { background:#20262e; color:var(--muted); }
+  .pill.REJECTED { background:#3a1113; color:var(--bad); }
+  .pill.EXPIRED,.pill.UNCLASSIFIED { background:#3a2c07; color:var(--warn); }
+  .banner { border-radius:8px; padding:8px 12px; font-size:12px; margin-bottom:12px; }
+  .banner.internal { background:#241a3a; color:#c4b5fd; border:1px solid #3b2d63; }
+  .banner.info { background:#12202b; color:#93c5fd; border:1px solid #223a4d; }
+  .banner.warn { background:#2c2207; color:var(--warn); border:1px solid #4d3c12; }
+  table.tbl { width:100%; border-collapse:collapse; font-size:12px; margin-top:6px; }
+  table.tbl th { text-align:left; color:var(--muted); font-weight:500; padding:4px 8px 6px 0; border-bottom:1px solid var(--panel-border); }
+  table.tbl td { padding:4px 8px 4px 0; border-bottom:1px solid #1a212c; font-family:ui-monospace,Consolas,monospace;
+    overflow-wrap:anywhere; word-break:break-word; }
+  .tblwrap { overflow-x:auto; }
+  details { margin-top:8px; } summary { cursor:pointer; color:var(--muted); font-size:12px; }
+  .muted { color:var(--muted); } .small { font-size:11px; }
+  a { color:#7dd3fc; }
+  .src { font-size:10px; color:var(--muted); margin-top:6px; font-family:ui-monospace,Consolas,monospace; }
+  footer { padding:12px 20px 30px; color:var(--muted); font-size:11px; }
+  h2.section-title { font-size:15px; margin:2px 0 12px; }
+  /* legacy live cards reuse */
+  .bars { margin-top:8px; } .bar-row { display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:4px; }
+  .bar-label { width:56px; flex-shrink:0; color:var(--muted); font-family:ui-monospace,Consolas,monospace; text-align:right; }
+  .bar-label.wide { width:150px; }
+  .bar-track { flex:1; background:#1a212c; border-radius:3px; height:12px; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:3px; background:var(--accent); }
+  .bar-count { width:34px; flex-shrink:0; color:var(--muted); font-size:11px; text-align:right; }
+  .empty { color:var(--muted); font-size:12px; font-style:italic; }
+  .card-total { font-size:26px; font-weight:700; line-height:1; }
+  .card-rate { font-size:12px; color:var(--muted); margin-top:2px; }
+  .sparkline { width:100%; height:36px; margin:8px 0 4px; display:block; }
+  .card-channel { font-size:11px; color:var(--muted); font-family:ui-monospace,Consolas,monospace; }
+  pre.json { white-space:pre-wrap; font-size:11px; background:var(--panel-2); border:1px solid var(--panel-border);
+    border-radius:6px; padding:8px; overflow:auto; max-height:340px; }
+  #refresh-controls { display:flex; align-items:center; gap:6px; min-width:0; }
+  #refresh-controls button { background:var(--panel); color:var(--text); border:1px solid var(--panel-border);
+    border-radius:6px; padding:3px 10px; cursor:pointer; font-size:11px; flex-shrink:0; }
+  #refresh-controls button.paused { border-color:var(--warn); color:var(--warn); }
+  #refresh-controls button:disabled { opacity:.5; cursor:default; }
+  /* A longer status message (e.g. an error) must NEVER wrap onto a
+     second line -- that would grow the header's own height and shift
+     every scroll position on the page below it, exactly the kind of
+     refresh-triggered jump this task eliminates elsewhere. Ellipsis
+     instead of reflow. */
+  /* a FIXED width (not max-width) -- the element must occupy the same
+     footprint whether its text is empty or long, otherwise the header's
+     own flex-wrap layout can drop to a second row purely because the
+     status text got longer, growing header height and shifting the
+     whole page's scroll position exactly like the bug this fixes. */
+  #refresh-status { display:inline-block; width:190px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #refresh-status.error { color:var(--bad); }
+  #refresh-status.updating { color:var(--muted); }
+  .new-items-pill { position:sticky; top:6px; z-index:5; display:inline-block; margin:0 0 10px;
+    background:#16202b; color:#93c5fd; border:1px solid #223a4d; border-radius:14px;
+    padding:4px 12px; font-size:12px; cursor:pointer; }
+  .new-items-pill:hover { background:#1a2733; }
+  @media (max-width:640px) {
+    .grid { grid-template-columns:1fr; }
+    header { gap:10px; }
+    /* stack key/value vertically -- sidesteps flex-wrap+space-between
+       edge cases with long values/identifiers entirely; guaranteed to
+       never force horizontal overflow since both lines are full-width
+       block-level content. */
+    .kv { flex-direction:column; align-items:flex-start; gap:1px; }
+    .kv .v { text-align:left; }
+    nav#primary, nav#legacy { gap:6px; }
+    nav#primary button, nav#legacy button { flex:0 0 auto; }
+  }
+</style><h2 class="section-title">Active V2 — INSIDER_BUY_CLUSTER_V2@1 <span class="muted small">multi-day insider buy-cluster · PAPER CANDIDATE · descriptive, not a profit claim</span></h2><div class="grid"><div class="card"><h3>Strategy</h3><div class="kv"><span class="k">version</span><span class="v">—</span></div><div class="kv"><span class="k">fingerprint</span><span class="v">—</span></div><div class="kv"><span class="k">status</span><span class="v">—</span></div><div class="kv"><span class="k">horizon</span><span class="v">10 trading days</span></div><div class="kv"><span class="k">real capital</span><span class="v"><span class="pill BLOCKED">BLOCKED</span></span></div><div class="kv"><span class="k">shorts</span><span class="v"><span class="pill BLOCKED">BLOCKED</span></span></div><div class="src">read-only · V2 is one multi-day strategy in the product; it does not serve intraday or fundamental analysis</div></div><div class="card"><h3>Health — 5 independent signals</h3><div class="kv"><span class="k">process health</span><span class="v"><span class="pill UNKNOWN">—</span></span></div><div class="kv"><span class="k">data state</span><span class="v"><span class="pill UNKNOWN">—</span></span></div><div class="kv"><span class="k">coverage</span><span class="v"><span class="pill UNKNOWN">—</span></span></div><div class="kv"><span class="k">pricing</span><span class="v"><span class="pill UNKNOWN">—</span></span></div><div class="kv"><span class="k">activity</span><span class="v"><span class="pill UNKNOWN">—</span></span></div><div class="muted small">an open position never masks a degraded coverage/pricing signal — each is shown on its own line</div></div><div class="card"><h3>Process</h3><div class="kv"><span class="k">heartbeat</span><span class="v">undefined · — ago</span></div><div class="kv"><span class="k">tick</span><span class="v">—</span></div><div class="kv"><span class="k">last tick</span><span class="v">—</span></div><div class="kv"><span class="k">form4 source</span><span class="v">—</span></div><div class="kv"><span class="k">records seen</span><span class="v">—</span></div><div class="kv"><span class="k">delivery drain</span><span class="v"><span class="pill OFF">OFF</span></span></div><div class="muted small"></div></div><div class="card"><h3>Event source readiness</h3><div class="kv"><span class="k">source ok</span><span class="v"><span class="pill UNKNOWN">UNKNOWN</span></span></div><div class="kv"><span class="k">DB read last ok</span><span class="v">—</span></div><div class="kv"><span class="k">DB read age</span><span class="v">—</span></div><div class="kv"><span class="k">upstream poll last ok</span><span class="v">—</span></div><div class="kv"><span class="k">upstream poll age</span><span class="v">—</span></div><div class="kv"><span class="k">degraded</span><span class="v">—</span></div></div><div class="card"><h3>Coverage &amp; pricing</h3><div class="kv"><span class="k">coverage source</span><span class="v">—</span></div><div class="kv"><span class="k">issuers evaluated</span><span class="v">—</span></div><div class="kv"><span class="k">eligible-universe denominator</span><span class="v">—</span></div><div class="kv"><span class="k">completeness</span><span class="v"><span class="pill UNKNOWN">—</span></span></div><div class="kv"><span class="k">pricing mode</span><span class="v">—</span></div><div class="kv"><span class="k">pricing adapter</span><span class="v">—</span></div><div class="kv"><span class="k">pricing unavailable</span><span class="v">none</span></div></div><div class="card card-wide"><h3>Campaign ledger <span class="pill UNKNOWN">—</span></h3><div class="grid"><div><div class="kv"><span class="k">starting cash</span><span class="v">100000</span></div><div class="kv"><span class="k">cash</span><span class="v">81000</span></div><div class="kv"><span class="k">reserved</span><span class="v">10000</span></div><div class="kv"><span class="k">available</span><span class="v">71000</span></div><div class="kv"><span class="k">allocated</span><span class="v">—</span></div><div class="kv"><span class="k">capacity</span><span class="v">—</span></div><div class="kv"><span class="k">equity (cash+marked open)</span><span class="v">— <span class="pill UNKNOWN">—</span></span></div></div><div><div class="kv"><span class="k">open positions</span><span class="v">—</span></div><div class="kv"><span class="k">closed positions</span><span class="v">—</span></div><div class="kv"><span class="k">BUY / SELL (lifetime)</span><span class="v">— / —</span></div><div class="kv"><span class="k">realized P&L</span><span class="v">—</span></div><div class="kv"><span class="k">EXIT_UNRESOLVED</span><span class="v">—</span></div><div class="kv"><span class="k">reconciliation</span><span class="v"><span class="pill UNKNOWN">—</span></span></div><div class="kv"><span class="k">costs</span><span class="v">UNMODELED</span></div></div></div><div class="empty">none</div></div><div class="card card-wide"><h3>Campaign and operator state</h3><div class="kv"><span class="k">campaign</span><span class="v">RI3</span></div><div class="kv"><span class="k">strategy / version / mode</span><span class="v">INSIDER_V2 / INSIDER_BUY_CLUSTER_V2@1 / PAPER</span></div><div class="kv"><span class="k">capital provenance</span><span class="v">SEEDED_AT_CREATION</span></div><div class="kv"><span class="k">allocation cap</span><span class="v">10000</span></div><div class="kv"><span class="k">runtime</span><span class="v"><span class="pill RUNNING">RUNNING</span></span></div><div class="kv"><span class="k">last heartbeat</span><span class="v">2026-09-18T15:00:00+00:00</span></div><div class="kv"><span class="k">data</span><span class="v"><span class="pill CURRENT">CURRENT</span></span></div><div class="kv"><span class="k">Redis</span><span class="v"><span class="pill UNKNOWN">UNKNOWN</span></span></div><div class="kv"><span class="k">last market event</span><span class="v">unknown</span></div><div class="kv"><span class="k">account blocked</span><span class="v">true</span></div><div class="kv"><span class="k">needs attention</span><span class="v">ACCOUNT_BLOCKED, TELEGRAM_DELIVERY_FAILING</span></div><div class="kv"><span class="k">ledger arithmetic</span><span class="v"><span class="pill HEALTHY">HEALTHY</span></span></div><div class="kv"><span class="k">persisted reconciliation</span><span class="v">NOT_RUN_OR_NOT_AVAILABLE</span></div><div class="kv"><span class="k">last persisted run (historical)</span><span class="v">unknown</span></div><div class="kv"><span class="k">reconciliation evidence</span><span class="v">not available</span></div><div class="muted small">Current read-only ledger arithmetic; not a persisted EOD run</div></div><div class="card card-wide"><h3>EXIT_UNRESOLVED positions</h3><div class="tblwrap"><table class="tbl"><thead><tr><th>symbol</th><th>status</th><th>entry total</th><th>shares</th><th>realized P&L</th></tr></thead><tbody><tr data-key="2"><td>UNRESOLVED</td><td>EXIT_UNRESOLVED</td><td>10000</td><td>100</td><td>—</td></tr></tbody></table></div></div><div class="card card-wide"><h3>CLOSED positions</h3><div class="tblwrap"><table class="tbl"><thead><tr><th>symbol</th><th>status</th><th>entry total</th><th>shares</th><th>realized P&L</th></tr></thead><tbody><tr data-key="3"><td>SETTLED</td><td>CLOSED</td><td>10000</td><td>100</td><td>1000</td></tr></tbody></table></div></div><div class="card card-wide"><h3>Entry intents - reservations, not open trades</h3><div class="tblwrap"><table class="tbl"><thead><tr><th>symbol</th><th>campaign</th><th>admitted</th><th>status</th><th>recovery</th><th>deadline UTC</th><th>reserved</th></tr></thead><tbody><tr data-key="685eee650fe2c292"><td>AAA</td><td>RI3</td><td>2026-09-18T14:41:17.006302+00:00</td><td>PENDING</td><td>WAITING_FOR_PRICE_RECOVERY</td><td>2026-09-21T20:00:00+00:00</td><td>10000</td></tr><tr data-key="9f02a2bfcc8f6b89"><td>AAA</td><td>RI3</td><td>2026-09-18T14:41:17.018437+00:00</td><td>CANCELLED_CUTOVER</td><td>CANCELLED_CUTOVER</td><td>2026-09-21T20:00:00+00:00</td><td>0</td></tr><tr data-key="5795774da9b71abd"><td>AAA</td><td>RI3</td><td>2026-09-18T14:41:17.029017+00:00</td><td>FILLED</td><td>FILLED</td><td>2026-09-21T20:00:00+00:00</td><td>0</td></tr><tr data-key="0a8ecd751d7cf0e1"><td>AAA</td><td>RI3</td><td>2026-09-18T14:41:17.044696+00:00</td><td>EXPIRED_STALE</td><td>EXPIRED_STALE</td><td>2026-09-21T20:00:00+00:00</td><td>0</td></tr></tbody></table></div></div><div class="card card-wide"><h3>Account blocks and clearance evidence</h3><div class="tblwrap"><table class="tbl"><thead><tr><th>account</th><th>type</th><th>status</th><th>created</th><th>reason</th><th>reference</th></tr></thead><tbody><tr data-key="5b7bab6781e4776577093210"><td>RI3</td><td>EXIT_UNRESOLVED</td><td>ACTIVE</td><td>2026-09-18T14:41:16.998331+00:00</td><td>missing exit price; evidence RI3-N</td><td>2</td></tr></tbody></table></div><div class="empty">none</div><div class="muted small">Use python -m talonx_ops.prospective clear-block --help; operator, reason and evidence required. No dashboard clearance.</div></div><div class="card card-wide"><h3>Logical Telegram destinations</h3><h4>TRADE_EVENT</h4><div class="kv"><span class="k">enabled / physically configured</span><span class="v">false / false</span></div><div class="kv"><span class="k">credential source</span><span class="v">UNCONFIGURED</span></div><div class="kv"><span class="k">configuration reason</span><span class="v">TRADE_EVENT: no destination-specific credentials and no TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID fallback configured</span></div><div class="kv"><span class="k">shares chat with</span><span class="v">none known</span></div><div class="kv"><span class="k">delivery counts</span><span class="v">{"PENDING":0,"SENT":1,"FAILED":0,"EXPIRED":0,"RETRY":0,"HELD":0,"AMBIGUOUS":0}</span></div><div class="kv"><span class="k">last success</span><span class="v">2026-09-18T14:41:17.080584+00:00</span></div><div class="kv"><span class="k">last failure</span><span class="v">none</span></div><div class="kv"><span class="k">real delivery validated</span><span class="v">false</span></div><div class="muted small">observer process environment; runtime may differ</div><h4>OPERATIONS</h4><div class="kv"><span class="k">enabled / physically configured</span><span class="v">false / false</span></div><div class="kv"><span class="k">credential source</span><span class="v">UNCONFIGURED</span></div><div class="kv"><span class="k">configuration reason</span><span class="v">OPERATIONS: no destination-specific credentials and no TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID fallback configured</span></div><div class="kv"><span class="k">shares chat with</span><span class="v">none known</span></div><div class="kv"><span class="k">delivery counts</span><span class="v">{"PENDING":0,"SENT":0,"FAILED":0,"EXPIRED":0,"RETRY":1,"HELD":0,"AMBIGUOUS":0}</span></div><div class="kv"><span class="k">last success</span><span class="v">none</span></div><div class="kv"><span class="k">last failure</span><span class="v">2026-09-18T14:41:17.062896+00:00</span></div><div class="kv"><span class="k">real delivery validated</span><span class="v">false</span></div><div class="muted small">observer process environment; runtime may differ</div><h4>RESEARCH</h4><div class="kv"><span class="k">enabled / physically configured</span><span class="v">false / false</span></div><div class="kv"><span class="k">credential source</span><span class="v">UNCONFIGURED</span></div><div class="kv"><span class="k">configuration reason</span><span class="v">RESEARCH is OFF by default (TALONX_NOTIFY_RESEARCH_ENABLED not set)</span></div><div class="kv"><span class="k">shares chat with</span><span class="v">none known</span></div><div class="kv"><span class="k">delivery counts</span><span class="v">{"PENDING":0,"SENT":0,"FAILED":0,"EXPIRED":0,"RETRY":0,"HELD":0,"AMBIGUOUS":0}</span></div><div class="kv"><span class="k">last success</span><span class="v">none</span></div><div class="kv"><span class="k">last failure</span><span class="v">none</span></div><div class="kv"><span class="k">real delivery validated</span><span class="v">false</span></div><div class="muted small">observer process environment; runtime may differ</div><div class="kv"><span class="k">runtime Trade/Event activated</span><span class="v">false</span></div><div class="kv"><span class="k">runtime Operations activated</span><span class="v">unknown</span></div></div><div class="card card-wide"><h3>Funnel — Form 4 → clusters → decisions → paper → delivery</h3><div class="tblwrap"><table class="tbl"><tbody><tr><td>Form 4 code-P records (window / today)</td><td>— / —</td></tr><tr><td>distinct issuers with code-P (window / today)</td><td>— / —</td></tr><tr><td>single-insider near-miss issuers <span class="muted">(reason: only 1 distinct owner)</span></td><td>— </td></tr><tr><td>≥2-distinct-owner clusters</td><td>— </td></tr><tr><td>stale (reason: entry > 3 sessions old) / fresh-eligible / not-yet-eligible</td><td>— / — / —</td></tr><tr><td>pre-open intents PENDING (decision made, awaiting the open)</td><td>—</td></tr><tr><td>V2 signals / BUY paper actions / SELL paper actions</td><td>— / — / —</td></tr><tr><td><b>delivery</b> — SENT / HELD / RETRY / FAILED / AMBIGUOUS / PENDING</td><td>— / — / — / — / — / —</td></tr><tr><td>interpretation</td><td><span class="pill UNKNOWN">—</span></td></tr></tbody></table></div></div><div class="card card-wide"><h3>Alert delivery — this is a TRADING lane (separate from Intelligence &amp; Experimental)</h3><div class="empty">none</div><div class="muted small">Experimental external delivery is structurally blocked; Intelligence alerts are informational and rendered under the Intelligence tab.</div></div></div>

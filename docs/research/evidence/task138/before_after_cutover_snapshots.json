@@ -1,0 +1,78 @@
+{
+  "note": "Snapshots taken directly against the live ~/.talonx/ingestion_ledger.db, v2_lane.db and paper_trading.db via short-lived read-only (or, for the one authorized one-time Workstream-2-Section-9 backlog reclassification, a brief additive write) connections. All timestamps UTC, captured via `date -u` / Python datetime.now(timezone.utc), never inferred from unlabelled local log prefixes.",
+  "pre_restart_snapshot": {
+    "captured_at_utc": "2026-09-14T23:48Z (approx, immediately before the two managed restarts)",
+    "intelligence_delivery_by_state_route": {
+      "AMBIGUOUS/IMMEDIATE": 2,
+      "EXPIRED/DIGEST": 11148,
+      "EXPIRED/IMMEDIATE": 11602,
+      "PENDING/DIGEST": 58,
+      "PENDING/IMMEDIATE": 63,
+      "SENT/DIGEST": 34,
+      "SENT/IMMEDIATE": 216
+    },
+    "intelligence_delivery_total": 23123,
+    "v2_lane_portfolio": {"cash": 300000.0, "open_positions": 0, "pending_entry_intents": 0,
+                          "cooldowns": 0, "trades": 0, "v2_alert_outbox_rows": 0},
+    "original_paper_trading": {
+      "portfolio_state": {"initial_balance": 10000.0, "current_cash": 10000.0, "open_positions": 0},
+      "long_term_portfolio_state": {"initial_balance": 15000.0, "current_cash": 15000.0, "open_positions": 0}
+    },
+    "v2_release_fingerprint": "11107198c5b81237",
+    "running_pids_pre_restart": {
+      "supervisor": {"shim": 23456, "real": 13288},
+      "experimental": {"shim": 12196, "real": 17928},
+      "v2_companion": {"shim": 19984, "real": 17080},
+      "dashboard": {"shim": 22876, "real": 13364},
+      "intelligence_OLD": {"shim": 13200, "real": 26220},
+      "original_OLD": {"shim": 13180, "real": 21596}
+    },
+    "session_started_utc": "2026-09-14T09:50:24Z (per results/prospective_2026-09-14/session.pids.json)"
+  },
+  "managed_restart_actions": [
+    {
+      "component": "intelligence",
+      "action_utc": "2026-09-14T23:52:15Z",
+      "method": "PowerShell Stop-Process -Force on both the .venv shim PID (13200) and the real pythoncore-3.12-64 worker PID (26220) -- established Windows-venv-shim pattern; supervisor's own dead-child detection (2s poll tick) then auto-respawned it (RestartPolicy max_restarts=None, backoff_base_s=15.0)",
+      "supervisor_log_evidence": "2026-09-15 00:52:17,212 WARNING talonx_ops.supervisor: intelligence exited unexpectedly code=4294967295 / 00:52:33,225 restarting intelligence (attempt 1) / 00:52:33,245 spawned intelligence pid=24332 (local BST timestamps; UTC = -1h)",
+      "new_pids": {"shim": 24332, "real": 24372}
+    },
+    {
+      "component": "original",
+      "action_utc": "2026-09-14T23:53:06Z",
+      "method": "Same Stop-Process -Force pattern on shim PID 13180 and real worker PID 21596; supervisor RestartPolicy max_restarts=3, backoff_base_s=10.0",
+      "supervisor_log_evidence": "2026-09-15 00:53:07,254 WARNING talonx_ops.supervisor: original exited unexpectedly code=4294967295 / 00:53:17,257 restarting original (attempt 1) / 00:53:17,288 spawned original pid=23600 (local BST timestamps; UTC = -1h)",
+      "new_pids": {"shim": 23600, "real": 14332}
+    }
+  ],
+  "components_deliberately_not_restarted": {
+    "experimental": "talonx_signals/reply.py and the Experimental D/X/R/E resolver were not modified by Task 138",
+    "v2_companion": "talonx_v2/ was not modified by Task 138; frozen fingerprint 11107198c5b81237 verified unchanged",
+    "dashboard": "dashboard_web.py / talonx_ops/dashboard_read.py were not modified by Task 138"
+  },
+  "post_restart_verification": {
+    "process_listing_utc": "2026-09-14T23:56Z",
+    "single_owner_confirmed": "exactly one shim+real pair per component; no duplicate stack",
+    "original_runtime_commit_sha": "5eb9f360a183ce6a310b1725aaf119cc7bc52744 (talonx_ops.supervisor status -> producers.original.metadata.commit_sha; written by run_talonx.py's own process via a live `git rev-parse HEAD` subprocess call at ITS OWN startup -- talonx_ops/runtime_metadata.py -- not inferred from a log marker)",
+    "intelligence_runtime_attribution_method": "INDIRECT: (1) the exact shim+real PIDs were killed and a fresh `python -m talonx_ingest.intelligence.service poll --with-backfill` process was launched after that kill, so no stale bytecode/module state could survive across the restart; (2) `git status --short` was verified clean (no uncommitted changes to any Intelligence file) both before and immediately after the restart, at HEAD 5eb9f36 which contains Workstream 1/2/3. Unlike Original, the Intelligence service process does not itself write a commit_sha readout, so no direct in-process SHA claim is made for it -- this is the stated limitation.",
+    "accounting_unchanged": {
+      "original_paper_trading_portfolio_state": {"current_cash": 10000.0, "open_positions": 0},
+      "v2_lane_portfolio": {"cash": 300000.0, "open_positions": 0},
+      "verdict": "byte-identical to the pre-restart snapshot above"
+    },
+    "in_flight_claims_at_restart": "0 IN_FLIGHT rows found in intelligence_delivery immediately after restart; AMBIGUOUS count unchanged at 2 (no new ambiguous claim created, none force-resent); PENDING/SENT/EXPIRED totals immediately post-restart summed to the exact same figures as the pre-restart snapshot (63+58=121 PENDING, 216+34=250 SENT, 11602+11148=22750 EXPIRED) -- the restart landed in a between-cycle gap with no send in flight.",
+    "v2_release_fingerprint_post_restart": "11107198c5b81237 (recomputed via research.scripts.task112_v2_release_fingerprint.v2_release_fingerprint(); unchanged)"
+  },
+  "one_time_cutover_step_executed": {
+    "what": "talonx_ingest.intelligence.delivery.notification_policy.reclassify_pending_rows -- per NOTIFICATION_POLICY.md Section 9, applying the new disposition policy to the already-PENDING/IMMEDIATE backlog once, as documented",
+    "when_utc": "2026-09-14T23:5X:XXZ (immediately after both restarts, before the dashboard-responsiveness check)",
+    "result": "ReclassifyResult(scanned=58, downgraded=0, downgraded_ids=[], errors=[])",
+    "interpretation": "Zero downgrades is a truthful, valid outcome, not evidence of malfunction: every currently-PENDING IMMEDIATE row already carried a substantive trigger (or a CRITICAL band, which routes IMMEDIATE by construction) at the time of the scan. No row was deleted; no SENT/AMBIGUOUS row was touched."
+  },
+  "post_cutover_delivery_cycle_observation": {
+    "observed_ingestion_activity": "Continuous ENQUEUE log entries through at least 2026-09-15T00:00:03Z, confirming the restarted Intelligence process resumed ingestion/enrichment without a gap",
+    "observed_expiry_sweep": "2026-09-14T23:58:42Z -- multiple genuinely stale backlog rows (hundreds to tens of thousands of hours old) correctly transitioned to EXPIRED; no route filter defect reproduced (matches the fixed bulk-sweep behavior)",
+    "observed_send_activity": "A real live DIGEST send occurred at 2026-09-15T00:07:55Z (Telegram message 958, 14 constituent events) -- generated entirely under the new post-cutover code. Verified directly: reply_details_958_live_post_cutover_digest.txt (compact index) and reply_details_958_item1.txt (full detail for item 1, a Parker-Hannifin 8-K Item 8.01 with only EVENT_TYPE_BASE + ON_WATCHLIST reasons, correctly routed to DIGEST -- a live confirmation of the disposition rule itself). No live CONCISE-tier IMMEDIATE send occurred in this window.",
+    "honest_limitation": "Absence of a qualifying IMMEDIATE-disposition event in this bounded observation window is a valid outcome per the task's own instruction, not a defect to be manufactured around. The CONCISE-tier render path and the live DASHBOARD_ONLY skip were verified by dedicated unit/integration tests (see focused_test_run_output.txt and the Workstream 2 test file); the DIGEST path and the policy's actual routing decision were additionally confirmed live, end-to-end, against real data (above) -- only the specific IMMEDIATE+CONCISE combination was not directly witnessed live in this window."
+  }
+}

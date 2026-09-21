@@ -1,0 +1,27 @@
+commit c9fb63d1bbacfadfd6d3f87292958532d8c80503
+Author: Ritesh Talwadekar <ritesh160290@gmail.com>
+Date:   Tue Sep 15 05:00:31 2026 +0100
+
+    test(v2): Task 140 A4 closure -- exit eligibility after a scope change
+    
+    Closes the one genuine gap left open in docs/research/evidence/task139/
+    completion_map.md: "existing positions remain eligible for exit after
+    scope changes" was previously verified only by code inspection (no open
+    position has existed this campaign to exercise it against). Now backed
+    by 2 isolated tests, fully separate from the live campaign ledger:
+    
+    - test_open_position_outside_the_current_allowlist_still_exits_normally:
+      a position opened for a symbol NOT in the current execution_allowlist
+      (simulating a scope change after entry) still settles normally through
+      settle_due_exits() -- confirms len(res.exits)==1, the position closes,
+      and cash reflects a genuine economic effect (not a silent no-op).
+    - test_execution_allowlist_only_ever_gates_new_candidates_not_open_
+      positions: constructing V2Service with an allowlist excluding an
+      already-open position's symbol never touches that position --
+      _apply_execution_allowlist is applied only to freshly-detected
+      records/episodes, confirmed structurally.
+    
+    Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+
+ ..._task140_exit_eligibility_after_scope_change.py | 103 +++++++++++++++++++++
+ 1 file changed, 103 insertions(+)

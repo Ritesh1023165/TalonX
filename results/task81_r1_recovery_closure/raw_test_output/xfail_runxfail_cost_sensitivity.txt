@@ -1,0 +1,18 @@
+>       assert [r["trades"] for r in multi_trade_scenario_rows] == [3, 3, 3, 3]
+E       assert [0, 0, 0, 0] == [3, 3, 3, 3]
+tests\test_backtest_cost_sensitivity.py:158: AssertionError
+>       assert all(v is not None for v in total_rs)
+E       assert False
+tests\test_backtest_cost_sensitivity.py:168: AssertionError
+>       assert all(v is not None for v in expectancies)
+E       assert False
+tests\test_backtest_cost_sensitivity.py:178: AssertionError
+>       assert {r["trades"] for r in multi_trade_scenario_rows} == {3}
+E       assert {0} == {3}
+tests\test_backtest_cost_sensitivity.py:188: AssertionError
+SKIPPED [1] tests\test_backtest_cost_sensitivity.py:90: fixture produced too few trades to compare expectancy across scenarios
+FAILED tests/test_backtest_cost_sensitivity.py::test_multi_trade_fixture_produces_three_trades_in_every_scenario
+FAILED tests/test_backtest_cost_sensitivity.py::test_multi_trade_net_r_actually_changes_with_cost
+FAILED tests/test_backtest_cost_sensitivity.py::test_multi_trade_higher_cost_never_improves_expectancy_without_skipping
+FAILED tests/test_backtest_cost_sensitivity.py::test_multi_trade_trade_count_and_win_loss_mix_are_cost_invariant
+============= 4 failed, 1 skipped, 1 warning in 105.54s (0:01:45) =============

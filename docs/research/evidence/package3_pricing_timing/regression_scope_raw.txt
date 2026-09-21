@@ -1,0 +1,53 @@
+....................................................F..........F........ [ 28%]
+........................................................................ [ 56%]
+........................................................................ [ 84%]
+.....F.................................                                  [100%]
+================================== FAILURES ===================================
+_____________ test_item3_original_strategy_fingerprint_unchanged ______________
+
+    def test_item3_original_strategy_fingerprint_unchanged():
+        import talonx_v2  # noqa: F401  -- importing the V2 lane must not perturb Original
+        from talonx_backtest.reproducibility import get_strategy_version
+    
+        # frozen Original strategy fingerprint (talonx_quant/{strategy,indicators,
+        # config,session,consumer}.py) -- byte-identical since well before V2 work
+>       assert get_strategy_version() == "2ae6216bca70"
+E       AssertionError: assert 'ed8272fe568d' == '2ae6216bca70'
+E         
+E         - 2ae6216bca70
+E         + ed8272fe568d
+
+tests\test_task111_v2_e2e.py:85: AssertionError
+________________________ test_03_v1_fingerprint_intact ________________________
+
+    def test_03_v1_fingerprint_intact():
+        from talonx_backtest.reproducibility import get_strategy_version
+>       assert get_strategy_version() == "2ae6216bca70"
+E       AssertionError: assert 'ed8272fe568d' == '2ae6216bca70'
+E         
+E         - 2ae6216bca70
+E         + ed8272fe568d
+
+tests\test_task112_tuesday_release.py:84: AssertionError
+______________ test_admission_policy_reflects_permissive_default ______________
+
+home = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1854/test_admission_policy_reflects1/.talonx')
+tmp_path = WindowsPath('C:/Users/rites/AppData/Local/Temp/pytest-of-rites/pytest-1854/test_admission_policy_reflects1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001FF4C71ABD0>
+
+    def test_admission_policy_reflects_permissive_default(home, tmp_path, monkeypatch):
+        monkeypatch.setenv("TALONX_V2_DB_PATH", str(tmp_path / "v2.db"))
+        monkeypatch.delenv("TALONX_V2_DURABLE_STORE_ENABLED", raising=False)
+        panel = _model(home, tmp_path / "v2.db").v2_broad_discovery()
+>       assert panel["admission_policy"]["mode"] == "PERMISSIVE"
+E       AssertionError: assert 'GATED' == 'PERMISSIVE'
+E         
+E         - PERMISSIVE
+E         + GATED
+
+tests\test_task131_spa_discovery_backend.py:115: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_task111_v2_e2e.py::test_item3_original_strategy_fingerprint_unchanged
+FAILED tests/test_task112_tuesday_release.py::test_03_v1_fingerprint_intact
+FAILED tests/test_task131_spa_discovery_backend.py::test_admission_policy_reflects_permissive_default
+3 failed, 252 passed in 57.62s

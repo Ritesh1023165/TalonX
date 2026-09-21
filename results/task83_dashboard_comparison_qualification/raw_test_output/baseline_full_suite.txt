@@ -1,0 +1,130 @@
+........................................................................ [  2%]
+........................................................................ [  5%]
+........................................................................ [  8%]
+........................................................................ [ 10%]
+........................................................................ [ 13%]
+........................................................................ [ 16%]
+........................................................................ [ 18%]
+........................................................................ [ 21%]
+........................................................................ [ 24%]
+........................................................................ [ 26%]
+........................................................................ [ 29%]
+........................................................................ [ 32%]
+........................................................................ [ 34%]
+........................................................................ [ 37%]
+........................................................................ [ 40%]
+........................................................................ [ 42%]
+........................................................................ [ 45%]
+........................................................................ [ 48%]
+........................................................................ [ 50%]
+........................................................................ [ 53%]
+........................................................................ [ 56%]
+........................................................................ [ 58%]
+........................................................................ [ 61%]
+........................................................................ [ 64%]
+........................................................................ [ 66%]
+........................................................................ [ 69%]
+........................................................................ [ 72%]
+........................................................................ [ 74%]
+........................................................................ [ 77%]
+........................................................................ [ 80%]
+........................................................................ [ 82%]
+........................................................................ [ 85%]
+........................................................................ [ 88%]
+........................................................................ [ 90%]
+........................................................................ [ 93%]
+........................................................................ [ 96%]
+........................................................................ [ 98%]
+................................                                         [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\pandas_ta\__init__.py:37
+  C:\workspace\TalonX\.venv\Lib\site-packages\pandas_ta\__init__.py:37: Pandas4Warning: The 'mode.copy_on_write' option is deprecated. Copy-on-Write can no longer be disabled (it is always enabled with pandas >= 3.0), and setting the option has no impact. This option will be removed in pandas 4.0.
+    from pandas_ta.core import AnalysisIndicators
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:312: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    return web.json_response(payload)
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:313: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:314: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:315: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    async def piv_view_handler(request: web.Request) -> web.Response:
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:316: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    """Task 83 §3 -- read-only PIV view: provider/readiness/freshness,
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:317: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    quant funnel, decisions, shadow, PAPER lifecycle, reconciliation, EOD,
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+tests/test_task78i_dashboard_integration.py::test_default_piv_state_dir_matches_pivconfig_own_default
+  C:\workspace\TalonX\dashboard_web.py:326: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    "state_dir": str(state_dir)}, status=500)
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+  C:\workspace\TalonX\dashboard_web.py:290: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+  C:\workspace\TalonX\dashboard_web.py:291: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    async def original_view_handler(request: web.Request) -> web.Response:
+
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_returns_the_integrated_projection
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_on_empty_state_dir_returns_zero_counts_not_an_error
+tests/test_task78i_dashboard_integration.py::test_piv_status_route_reports_read_failure_explicitly
+tests/test_task78i_dashboard_integration.py::test_existing_routes_unaffected
+  C:\workspace\TalonX\dashboard_web.py:292: NotAppKeyWarning: It is recommended to use web.AppKey instances for keys.
+  https://docs.aiohttp.org/en/stable/web_advanced.html#application-s-config
+    """Task 83 §3 -- read-only Original view. Redis health, the
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+2696 passed, 48 warnings in 2655.83s (0:44:15)
+EXIT=0

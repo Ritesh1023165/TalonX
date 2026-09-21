@@ -1,0 +1,272 @@
+==========================================================================================
+CATEGORY: insider_purchase | EVENT_ID: SEC:0001628280-26-058684:INSIDER_TRANSACTION
+  accession: 0001628280-26-058684 | form_type: 4 | symbol: ABCL
+  accepted_at_utc: 2026-08-24T21:21:48+00:00
+  data_quality_flags: ()
+  persisted band: HIGH | score: 4
+  persisted reasons:
+    - EVENT_TYPE_BASE | 1 pts | insider ownership filing (Form 3/4/5)
+    - INSIDER_CLUSTER | 2 pts | 3 distinct insiders reported open-market buyers within 30 days
+    - ON_WATCHLIST | 1 pts | this company is on your watchlist (user priority, not market significance)
+  insider_activity.clusters: [('MULTIPLE_OPEN_MARKET_BUYERS', 3, 30)]
+  aggregate window=10d largest=$570,442 purchasers=3 sellers=0 txns=3
+  aggregate window=30d largest=$570,442 purchasers=3 sellers=0 txns=4
+  aggregate window=90d largest=$570,442 purchasers=3 sellers=0 txns=4
+  CURRENT POLICY DECISION: IMMEDIATE | reason: HIGH band with a >=2-distinct-insider open-market BUY cluster present.
+  evidence_text: 3 distinct insiders bought in the open market within 30 days (4 transactions, ~$1,545,680 total)
+  --- would-send CONCISE text ---
+   | [INFO] <b>ABCL</b> — Insider ownership filing (Form 3/4/5)
+   | 3 distinct insiders bought in the open market within 30 days (4 transactions, ~$1,545,680 total)
+   | Source: 2026-08-24 21:21 UTC (source age: 519.5h)
+   | ⚠️ Ingestion feed-poll currency not tracked for this source (the filing date/age above is exact and unaffected)
+   | <i>Reply "details" for facts and filing link.</i>
+   | <i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  real delivery row state: EXPIRED | enqueued_at_utc: 2026-09-04 10:18:48.843796+00:00
+  send-time freshness-gate re-check (against isolated copy, now): EXPIRED | stale_card: 266.6h old by enqueue_time > 6h IMMEDIATE cutoff
+
+==========================================================================================
+CATEGORY: insider_purchase | EVENT_ID: SEC:0000902132-26-000005:INSIDER_TRANSACTION
+  accession: 0000902132-26-000005 | form_type: 4 | symbol: ABT
+  accepted_at_utc: 2026-04-28T23:37:56+00:00
+  data_quality_flags: ()
+  persisted band: HIGH | score: 5
+  persisted reasons:
+    - EVENT_TYPE_BASE | 1 pts | insider ownership filing (Form 3/4/5)
+    - INSIDER_CLUSTER | 2 pts | 2 distinct insiders reported open-market buyers within 30 days
+    - EVENT_CLUSTER | 1 pts | 4 distinct disclosure types from this company within 7 days
+    - ON_WATCHLIST | 1 pts | this company is on your watchlist (user priority, not market significance)
+  insider_activity.clusters: [('MULTIPLE_OPEN_MARKET_BUYERS', 2, 30)]
+  aggregate window=10d largest=$926,537 purchasers=2 sellers=0 txns=2
+  aggregate window=30d largest=$926,537 purchasers=2 sellers=0 txns=2
+  aggregate window=90d largest=$926,537 purchasers=2 sellers=6 txns=10
+  CURRENT POLICY DECISION: IMMEDIATE | reason: HIGH band with a >=2-distinct-insider open-market BUY cluster present.
+  evidence_text: 2 distinct insiders bought in the open market within 30 days (2 transactions, ~$1,127,837 total)
+  --- would-send CONCISE text ---
+   | [INFO] <b>ABT</b> — Insider ownership filing (Form 3/4/5)
+   | 2 distinct insiders bought in the open market within 30 days (2 transactions, ~$1,127,837 total)
+   | Source: 2026-04-28 23:37 UTC (source age: 3349.3h)
+   | ⚠️ Ingestion feed-poll currency not tracked for this source (the filing date/age above is exact and unaffected)
+   | <i>Reply "details" for facts and filing link.</i>
+   | <i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  real delivery row state: EXPIRED | enqueued_at_utc: 2026-09-04 10:24:31.650227+00:00
+  send-time freshness-gate re-check (against isolated copy, now): EXPIRED | stale_card: 266.5h old by enqueue_time > 6h IMMEDIATE cutoff
+
+==========================================================================================
+CATEGORY: insider_sale_sellcluster | EVENT_ID: SEC:0001628280-25-054484:INSIDER_TRANSACTION
+  accession: 0001628280-25-054484 | form_type: 4 | symbol: DD
+  accepted_at_utc: 2025-12-01T21:58:23+00:00
+  data_quality_flags: ()
+  persisted band: HIGH | score: 5
+  persisted reasons:
+    - EVENT_TYPE_BASE | 1 pts | insider ownership filing (Form 3/4/5)
+    - LARGE_OPEN_MARKET_TRANSACTION | 1 pts | an open-market insider transaction of about $3,026,466 was reported
+    - INSIDER_CLUSTER | 2 pts | 2 distinct insiders reported open-market sellers within 30 days
+    - ON_WATCHLIST | 1 pts | this company is on your watchlist (user priority, not market significance)
+  insider_activity.clusters: [('MULTIPLE_OPEN_MARKET_SELLERS', 2, 30)]
+  aggregate window=10d largest=$355,574 purchasers=0 sellers=2 txns=2
+  aggregate window=30d largest=$355,574 purchasers=0 sellers=2 txns=2
+  aggregate window=90d largest=$3,026,466 purchasers=0 sellers=3 txns=6
+  CURRENT POLICY DECISION: IMMEDIATE | reason: HIGH band with a substantive, evidenced trigger present: ['LARGE_OPEN_MARKET_TRANSACTION'].
+  evidence_text: 2 distinct insiders sold in the open market within 30 days (2 transactions, ~$594,513 total)
+  --- would-send CONCISE text ---
+   | [INFO] <b>DD</b> — Insider ownership filing (Form 3/4/5)
+   | 2 distinct insiders sold in the open market within 30 days (2 transactions, ~$594,513 total)
+   | Source: 2025-12-01 21:58 UTC (source age: 6902.9h)
+   | ⚠️ Ingestion feed-poll currency not tracked for this source (the filing date/age above is exact and unaffected)
+   | <i>Reply "details" for facts and filing link.</i>
+   | <i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  real delivery row state: PENDING | enqueued_at_utc: 2026-09-15 12:31:56.883902+00:00
+  send-time freshness-gate re-check (against isolated copy, now): OK | None
+
+==========================================================================================
+CATEGORY: insider_sale_sellcluster | EVENT_ID: SEC:0001062993-24-009906:INSIDER_TRANSACTION
+  accession: 0001062993-24-009906 | form_type: 4 | symbol: DD
+  accepted_at_utc: 2024-05-10T20:18:20+00:00
+  data_quality_flags: ()
+  persisted band: HIGH | score: 5
+  persisted reasons:
+    - EVENT_TYPE_BASE | 1 pts | insider ownership filing (Form 3/4/5)
+    - LARGE_OPEN_MARKET_TRANSACTION | 1 pts | an open-market insider transaction of about $1,450,400 was reported
+    - INSIDER_CLUSTER | 2 pts | 2 distinct insiders reported open-market sellers within 30 days
+    - ON_WATCHLIST | 1 pts | this company is on your watchlist (user priority, not market significance)
+  insider_activity.clusters: [('MULTIPLE_OPEN_MARKET_SELLERS', 2, 30)]
+  aggregate window=10d largest=$1,450,400 purchasers=0 sellers=2 txns=2
+  aggregate window=30d largest=$1,450,400 purchasers=0 sellers=2 txns=2
+  aggregate window=90d largest=$1,450,400 purchasers=0 sellers=2 txns=2
+  CURRENT POLICY DECISION: IMMEDIATE | reason: HIGH band with a substantive, evidenced trigger present: ['LARGE_OPEN_MARKET_TRANSACTION'].
+  evidence_text: 2 distinct insiders sold in the open market within 30 days (2 transactions, ~$1,555,284 total)
+  --- would-send CONCISE text ---
+   | [INFO] <b>DD</b> — Insider ownership filing (Form 3/4/5)
+   | 2 distinct insiders sold in the open market within 30 days (2 transactions, ~$1,555,284 total)
+   | Source: 2024-05-10 20:18 UTC (source age: 20584.6h)
+   | ⚠️ Ingestion feed-poll currency not tracked for this source (the filing date/age above is exact and unaffected)
+   | <i>Reply "details" for facts and filing link.</i>
+   | <i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  real delivery row state: PENDING | enqueued_at_utc: 2026-09-15 12:31:56.883902+00:00
+  send-time freshness-gate re-check (against isolated copy, now): OK | None
+
+==========================================================================================
+CATEGORY: buy_cluster | EVENT_ID: SEC:0001834423-26-000008:INSIDER_TRANSACTION
+  accession: 0001834423-26-000008 | form_type: 4 | symbol: ABCL
+  accepted_at_utc: 2026-08-18T18:45:24+00:00
+  data_quality_flags: ()
+  persisted band: HIGH | score: 5
+  persisted reasons:
+    - EVENT_TYPE_BASE | 1 pts | insider ownership filing (Form 3/4/5)
+    - INSIDER_CLUSTER | 2 pts | 3 distinct insiders reported open-market buyers within 30 days
+    - EVENT_CLUSTER | 1 pts | 3 distinct disclosure types from this company within 7 days
+    - ON_WATCHLIST | 1 pts | this company is on your watchlist (user priority, not market significance)
+  insider_activity.clusters: [('MULTIPLE_OPEN_MARKET_BUYERS', 3, 30)]
+  aggregate window=10d largest=$481,033 purchasers=3 sellers=0 txns=3
+  aggregate window=30d largest=$481,033 purchasers=3 sellers=0 txns=3
+  aggregate window=90d largest=$481,033 purchasers=3 sellers=0 txns=3
+  CURRENT POLICY DECISION: IMMEDIATE | reason: HIGH band with a >=2-distinct-insider open-market BUY cluster present.
+  evidence_text: 3 distinct insiders bought in the open market within 30 days (3 transactions, ~$975,237 total)
+  --- would-send CONCISE text ---
+   | [INFO] <b>ABCL</b> — Insider ownership filing (Form 3/4/5)
+   | 3 distinct insiders bought in the open market within 30 days (3 transactions, ~$975,237 total)
+   | Source: 2026-08-18 18:45 UTC (source age: 666.1h)
+   | ⚠️ Ingestion feed-poll currency not tracked for this source (the filing date/age above is exact and unaffected)
+   | <i>Reply "details" for facts and filing link.</i>
+   | <i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  real delivery row state: EXPIRED | enqueued_at_utc: 2026-09-04 10:18:48.843796+00:00
+  send-time freshness-gate re-check (against isolated copy, now): EXPIRED | stale_card: 266.6h old by enqueue_time > 6h IMMEDIATE cutoff
+
+==========================================================================================
+CATEGORY: filing_comparison | EVENT_ID: SEC:0000007084-24-000054:QUARTERLY_FILING
+  accession: 0000007084-24-000054 | form_type: 10-Q | symbol: ADM
+  accepted_at_utc: 2024-11-18T21:05:08+00:00
+  data_quality_flags: ()
+  persisted band: CRITICAL | score: 7
+  persisted reasons:
+    - EVENT_TYPE_BASE | 1 pts | Form 10-Q quarterly report
+    - SECTION_CHANGE_DECILE | 2 pts | Liquidity & Capital Resources rewrite in the top decile of this filing type's history (change magnitude 40%)
+    - RISK_TERM_COUNT_ROSE | 1 pts | count of frozen risk-term lexicon entries rose by 21 vs the prior filing (e.g. material weakness, impairment, restructuring)
+    - XBRL_MAGNITUDE | 2 pts | very large reported eps diluted YOY change (magnitude 97%; size only, not direction)
+    - EVENT_CLUSTER | 1 pts | 2 distinct disclosure types from this company within 7 days
+    - ON_WATCHLIST | 1 pts | this company is on your watchlist (user priority, not market significance)
+    - FILING_COMPARISON_INCOMPLETE | -1 pts | filing comparison evidence is incomplete (ambiguous_section, section_not_found, xbrl_concept_missing)
+  CURRENT POLICY DECISION: IMMEDIATE | reason: CRITICAL band with a substantive, evidenced trigger present: ['RISK_TERM_COUNT_ROSE', 'SECTION_CHANGE_DECILE', 'XBRL_MAGNITUDE'].
+  evidence_text: Liquidity & Capital Resources rewrite in the top decile of this filing type's history (change magnitude 40%)
+  --- would-send CONCISE text ---
+   | [INFO] <b>ADM</b> — Quarterly report (Form 10-Q)
+   | Liquidity &amp; Capital Resources rewrite in the top decile of this filing type's history (change magnitude 40%)
+   | Source: 2024-11-18 21:05 UTC (source age: 15975.8h)
+   | ⚠️ Ingestion feed-poll currency not tracked for this source (the filing date/age above is exact and unaffected)
+   | <i>Reply "details" for facts and filing link.</i>
+   | <i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  real delivery row state: EXPIRED | enqueued_at_utc: 2026-09-14 09:50:29.210769+00:00
+  send-time freshness-gate re-check (against isolated copy, now): EXPIRED | stale_card: 27.1h old by enqueue_time > 6h IMMEDIATE cutoff
+
+==========================================================================================
+CATEGORY: filing_comparison | EVENT_ID: SEC:0000766421-24-000082:QUARTERLY_FILING
+  accession: 0000766421-24-000082 | form_type: 10-Q | symbol: ALK
+  accepted_at_utc: 2024-11-08T00:21:30+00:00
+  data_quality_flags: ()
+  persisted band: CRITICAL | score: 7
+  persisted reasons:
+    - EVENT_TYPE_BASE | 1 pts | Form 10-Q quarterly report
+    - SECTION_CHANGE_DECILE | 2 pts | Risk Factors rewrite in the top decile of this filing type's history (change magnitude 85%)
+    - WHOLE_DOCUMENT_CHANGE | 1 pts | whole-document rewrite in the top decile of history (change magnitude 27%)
+    - NEW_MATERIAL_PASSAGES | 1 pts | 28 new multi-sentence passage(s) inserted into Risk Factors / MD&A
+    - FILING_CHANGE_CONTRIBUTION_CAPPED | -1 pts | filing change contribution limited to the frozen category cap (3)
+    - RISK_TERM_COUNT_ROSE | 1 pts | count of frozen risk-term lexicon entries rose by 17 vs the prior filing (e.g. impairment, restructuring, litigation)
+    - XBRL_MAGNITUDE | 2 pts | very large reported eps diluted YOY change (magnitude 70%; size only, not direction)
+    - ON_WATCHLIST | 1 pts | this company is on your watchlist (user priority, not market significance)
+    - FILING_COMPARISON_INCOMPLETE | -1 pts | filing comparison evidence is incomplete (xbrl_concept_missing)
+  CURRENT POLICY DECISION: IMMEDIATE | reason: CRITICAL band with a substantive, evidenced trigger present: ['NEW_MATERIAL_PASSAGES', 'RISK_TERM_COUNT_ROSE', 'SECTION_CHANGE_DECILE', 'WHOLE_DOCUMENT_CHANGE', 'XBRL_MAGNITUDE'].
+  evidence_text: Risk Factors rewrite in the top decile of this filing type's history (change magnitude 85%)
+  --- would-send CONCISE text ---
+   | [INFO] <b>ALK</b> — Quarterly report (Form 10-Q)
+   | Risk Factors rewrite in the top decile of this filing type's history (change magnitude 85%)
+   | Source: 2024-11-08 00:21 UTC (source age: 16236.5h)
+   | ⚠️ Ingestion feed-poll currency not tracked for this source (the filing date/age above is exact and unaffected)
+   | <i>Reply "details" for facts and filing link.</i>
+   | <i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  real delivery row state: EXPIRED | enqueued_at_utc: 2026-09-14 09:50:29.210769+00:00
+  send-time freshness-gate re-check (against isolated copy, now): EXPIRED | stale_card: 27.1h old by enqueue_time > 6h IMMEDIATE cutoff
+
+==========================================================================================
+CATEGORY: same_accession_axon | EVENT_ID: SEC:0001193125-26-391320:DEBT_FINANCING
+  accession: 0001193125-26-391320 | form_type: 8-K | symbol: AXON
+  accepted_at_utc: 2026-09-15T07:20:33+00:00
+  data_quality_flags: ('multi_item_filing',)
+  persisted band: CRITICAL | score: 7
+  persisted reasons:
+    - EVENT_TYPE_BASE | 2 pts | direct financial obligation 8-K (Item 2.03/2.04)
+    - MULTI_ITEM_8K | 1 pts | bundled 8-K carrying 3 distinct material items (1.01, 2.03, 7.01)
+    - EVENT_RARE_FOR_FILER | 2 pts | this company has not filed a DEBT_FINANCING event in 24 months of tracked history
+    - EVENT_CLUSTER | 1 pts | 4 distinct disclosure types from this company within 7 days
+    - ON_WATCHLIST | 1 pts | this company is on your watchlist (user priority, not market significance)
+  CURRENT POLICY DECISION: DIGEST | reason: CRITICAL band but no substantive trigger present (routed to DIGEST, not suppressed -- band/watchlist/item-number/multi-item-count/rarity/clustering-count/sell-cluster alone do not justify an immediate interruption, regardless of significance band).
+  evidence_text: None
+  (not IMMEDIATE under current policy -- no CONCISE render)
+  real delivery row state: SENT | enqueued_at_utc: 2026-09-15 11:21:40.551898+00:00
+  send-time freshness-gate re-check (against isolated copy, now): OK | None
+
+==========================================================================================
+CATEGORY: same_accession_axon | EVENT_ID: SEC:0001193125-26-391320:REGULATION_FD
+  accession: 0001193125-26-391320 | form_type: 8-K | symbol: AXON
+  accepted_at_utc: 2026-09-15T07:20:33+00:00
+  data_quality_flags: ('multi_item_filing',)
+  persisted band: CRITICAL | score: 7
+  persisted reasons:
+    - EVENT_TYPE_BASE | 2 pts | Regulation FD disclosure 8-K (Item 7.01)
+    - MULTI_ITEM_8K | 1 pts | bundled 8-K carrying 3 distinct material items (1.01, 2.03, 7.01)
+    - EVENT_RARE_FOR_FILER | 2 pts | this company has not filed a REGULATION_FD event in 24 months of tracked history
+    - EVENT_CLUSTER | 1 pts | 4 distinct disclosure types from this company within 7 days
+    - ON_WATCHLIST | 1 pts | this company is on your watchlist (user priority, not market significance)
+  CURRENT POLICY DECISION: DIGEST | reason: CRITICAL band but no substantive trigger present (routed to DIGEST, not suppressed -- band/watchlist/item-number/multi-item-count/rarity/clustering-count/sell-cluster alone do not justify an immediate interruption, regardless of significance band).
+  evidence_text: None
+  (not IMMEDIATE under current policy -- no CONCISE render)
+  real delivery row state: SENT | enqueued_at_utc: 2026-09-15 11:21:40.551898+00:00
+  send-time freshness-gate re-check (against isolated copy, now): OK | None
+
+==========================================================================================
+CATEGORY: same_accession_earnings | EVENT_ID: SEC:0001703057-26-000044:EARNINGS_RESULTS
+  accession: 0001703057-26-000044 | form_type: 8-K | symbol: ABCL
+  accepted_at_utc: 2026-08-05T20:18:02+00:00
+  data_quality_flags: ('multi_item_filing',)
+  persisted band: HIGH | score: 4
+  persisted reasons:
+    - EVENT_TYPE_BASE | 2 pts | results-of-operations 8-K (Item 2.02)
+    - EVENT_CLUSTER | 1 pts | 2 distinct disclosure types from this company within 7 days
+    - ON_WATCHLIST | 1 pts | this company is on your watchlist (user priority, not market significance)
+  CURRENT POLICY DECISION: DIGEST | reason: HIGH band but no substantive trigger present (routed to DIGEST, not suppressed -- band/watchlist/item-number/multi-item-count/rarity/clustering-count/sell-cluster alone do not justify an immediate interruption, regardless of significance band).
+  evidence_text: None
+  (not IMMEDIATE under current policy -- no CONCISE render)
+  real delivery row state: EXPIRED | enqueued_at_utc: 2026-09-04 08:57:39.678193+00:00
+  send-time freshness-gate re-check (against isolated copy, now): EXPIRED | stale_card: 267.9h old by enqueue_time > 6h IMMEDIATE cutoff
+
+==========================================================================================
+CATEGORY: same_accession_earnings | EVENT_ID: SEC:0001703057-26-000044:REGULATION_FD
+  accession: 0001703057-26-000044 | form_type: 8-K | symbol: ABCL
+  accepted_at_utc: 2026-08-05T20:18:02+00:00
+  data_quality_flags: ('multi_item_filing',)
+  persisted band: HIGH | score: 4
+  persisted reasons:
+    - EVENT_TYPE_BASE | 2 pts | Regulation FD disclosure 8-K (Item 7.01)
+    - EVENT_CLUSTER | 1 pts | 2 distinct disclosure types from this company within 7 days
+    - ON_WATCHLIST | 1 pts | this company is on your watchlist (user priority, not market significance)
+  CURRENT POLICY DECISION: DIGEST | reason: HIGH band but no substantive trigger present (routed to DIGEST, not suppressed -- band/watchlist/item-number/multi-item-count/rarity/clustering-count/sell-cluster alone do not justify an immediate interruption, regardless of significance band).
+  evidence_text: None
+  (not IMMEDIATE under current policy -- no CONCISE render)
+  real delivery row state: EXPIRED | enqueued_at_utc: 2026-09-04 08:57:39.678193+00:00
+  send-time freshness-gate re-check (against isolated copy, now): EXPIRED | stale_card: 267.9h old by enqueue_time > 6h IMMEDIATE cutoff
+
+==========================================================================================
+CATEGORY: pre_fix_historical_other | EVENT_ID: SEC:0001628280-26-061900:REGULATION_FD
+  accession: 0001628280-26-061900 | form_type: 8-K | symbol: PSA
+  accepted_at_utc: 2026-09-14T17:08:22+00:00
+  data_quality_flags: ()
+  persisted band: HIGH | score: 4
+  persisted reasons:
+    - EVENT_TYPE_BASE | 2 pts | Regulation FD disclosure 8-K (Item 7.01)
+    - EVENT_CLUSTER | 1 pts | 2 distinct disclosure types from this company within 7 days
+    - ON_WATCHLIST | 1 pts | this company is on your watchlist (user priority, not market significance)
+  CURRENT POLICY DECISION: DIGEST | reason: HIGH band but no substantive trigger present (routed to DIGEST, not suppressed -- band/watchlist/item-number/multi-item-count/rarity/clustering-count/sell-cluster alone do not justify an immediate interruption, regardless of significance band).
+  evidence_text: None
+  (not IMMEDIATE under current policy -- no CONCISE render)
+  real delivery row state: EXPIRED | enqueued_at_utc: 2026-09-14 21:16:36.718930+00:00
+  send-time freshness-gate re-check (against isolated copy, now): EXPIRED | stale_card: 15.6h old by enqueue_time > 6h IMMEDIATE cutoff
+

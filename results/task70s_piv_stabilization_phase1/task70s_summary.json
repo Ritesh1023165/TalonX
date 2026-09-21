@@ -1,0 +1,79 @@
+{
+  "task": "Task70S_PIV_STABILIZATION_PHASE1",
+  "mode": "PAPER_NO_REAL_CAPITAL",
+  "no_order_submitted": true,
+  "no_live_piv_session_started": true,
+  "root_cause": {
+    "failure": "WARMUP_CATASTROPHIC_FAILURE_ZERO_SYMBOLS_READY (Task69R attempt 1, 2026-08-26 04:19 ET)",
+    "mechanism": "talonx_quant/preseed.py::fetch_1m_history calls yfinance.Ticker(symbol).history(period='1d', interval='1m', prepost=True) -- a wall-clock-relative window with no prior-day fallback. Queried 19 minutes into the 04:00 ET premarket open, it can only return ~18-20 real minutes of data against a 120-bar requirement.",
+    "unaffected_leg": "The 15-minute HTF leg (preseed_15m_period='1mo') succeeded 200/200 for all 35 symbols -- only the 1-minute leg's short relative window is time-of-day-sensitive."
+  },
+  "files_changed": [
+    "talonx_piv/alpaca_historical_warmup.py",
+    "talonx_piv/warmup.py",
+    "talonx_piv/decision_engine.py",
+    "talonx_piv/cli.py",
+    "tests/test_task70s_alpaca_warmup_stabilization.py"
+  ],
+  "files_explicitly_not_touched": [
+    "talonx_quant/strategy.py",
+    "talonx_quant/indicators.py",
+    "talonx_quant/consumer.py",
+    "talonx_quant/config.py"
+  ],
+  "outcome_taxonomy": ["READY", "INSUFFICIENT_HISTORY", "EMPTY", "TIMEOUT", "RATE_LIMITED", "PROVIDER_ERROR", "INVALID_DATA"],
+  "backward_compatibility": {
+    "preseed_and_verify_default_behavior_unchanged": true,
+    "reason": "piv_config defaults to None; every pre-Task-70S caller/test omits it and gets exactly the prior yfinance-only code path.",
+    "proof_test": "test_alpaca_disabled_by_default_reproduces_prior_yfinance_only_behavior"
+  },
+  "test_results": {
+    "new_suite": {"file": "tests/test_task70s_alpaca_warmup_stabilization.py", "passed": 26, "failed": 0},
+    "pre_existing_suites_reverified": {
+      "files": [
+        "tests/test_task65b_warmup.py",
+        "tests/test_task69q_alpaca_historical_warmup.py",
+        "tests/test_task64_piv.py",
+        "tests/test_task65_piv.py",
+        "tests/test_task69p_telegram_piv_parity.py"
+      ],
+      "passed": 62, "failed": 0
+    },
+    "full_repo_regression": {
+      "passed": 2090, "failed": 1, "skipped": 1, "xfailed": 15,
+      "failure": "tests/test_run_historical_regimes.py::test_real_end_to_end_run_against_the_sample_trade_dataset -- pre-existing, data-dependent, confirmed identical on the untouched baseline via git stash A/B re-run; unrelated to talonx_piv warmup path. See regression_test_results.txt Section 4.",
+      "collection_errors_ignored": ["tests/test_task61_validation_protocol.py", "tests/test_task61r_temporal_freeze.py"],
+      "collection_errors_reason": "ModuleNotFoundError: exchange_calendars -- pre-existing missing environment dependency, unrelated to this task"
+    }
+  },
+  "live_readiness_verification": {
+    "type": "LIVE_READ_ONLY_HISTORICAL_DATA_NOT_MOCKED",
+    "endpoint": "GET /v2/stocks/{symbol}/bars (feed=iex)",
+    "credentials_source": ".env (real PAPER account, already configured; no order endpoint touched)",
+    "causal_cutoff_utc": "2026-08-26T08:19:00Z",
+    "causal_cutoff_source": "Exact value recorded in logs/task69r_live_paper_2026_08_26/attempt_1_preserved/attempt_1_record.json",
+    "universe_size": 35,
+    "ready_count": 35,
+    "artifact": "readiness_by_symbol.csv"
+  },
+  "causality_guarantees": {
+    "end_param_equals_causal_cutoff": true,
+    "defense_in_depth_future_bar_filter": true,
+    "no_persisted_cross_date_cache": true,
+    "no_fabricated_or_forward_filled_bars": true
+  },
+  "acceptance_criteria_self_assessment": {
+    "root_cause_supported_by_evidence": true,
+    "alpaca_iex_historical_warmup_integrated_safely": true,
+    "no_look_ahead_leakage": true,
+    "no_fabricated_bars": true,
+    "per_symbol_failures_fail_closed": true,
+    "retry_backoff_bounded_and_tested": true,
+    "cross_date_persisted_readiness_cannot_be_reused": true,
+    "existing_strategy_behavior_unchanged": true,
+    "no_trading_order_calls": true,
+    "targeted_and_regression_tests_pass": true,
+    "artifacts_distinguish_mocked_preserved_and_live_evidence": true,
+    "no_credentials_or_generated_junk_in_repo": true
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "task": "Task 83-R3D final qualification closure",
+  "final_evidence_source_sha": "961e6cae531d76abb33d72d5cbd487eaaed1cffc",
+  "authoritative_qualification_sha": "5955e82938f965a16ed2c779851c75dc593421cc",
+  "manifest_verification_count": 13,
+  "evidence_files": [
+    {"path":"results/task83_r3a_telegram_incident/evidence_inventory.md","size":5461,"sha256":"f5805d8559a47a9118110bb0100da52a4e65d3678e60bfce45242e27a40ba9ff"},
+    {"path":"results/task83_r3a_telegram_incident/incident_report.md","size":10583,"sha256":"e5604ed5b41e3bc11008b45ce94d103a29f212d9e9b22ed1e8b3379780fe016d"},
+    {"path":"results/task83_r3a_telegram_incident/next_task_handoff.md","size":2631,"sha256":"498c182e48861478fbad8dd61a552e94cfa98e4622f42eea2589cc2654ed428e"},
+    {"path":"results/task83_r3b_network_isolation/acceptance_matrix.md","size":2564,"sha256":"d7d56bf75786579ed7c686d439b9f5f6672f067aacb709e0cb1c377a8042e365"},
+    {"path":"results/task83_r3b_network_isolation/next_task_handoff.md","size":1162,"sha256":"a804e4dc1ad9b914d6bc888cd6982ee4f0dd7546a7f786388fd7c32ffe945bb4"},
+    {"path":"results/task83_r3b_network_isolation/verification_report.md","size":8015,"sha256":"4da38e8393af356c3fcb90aa6bc28aa88a71c2ec3022713162200d54d735d551"},
+    {"path":"results/task83_r3b_r1_guard_report_concurrency/r3c_restart_handoff.md","size":979,"sha256":"29034a53063b2f26e8243d37b295c96a00bbbd63ad1552d89267402e9da7df39"},
+    {"path":"results/task83_r3b_r1_guard_report_concurrency/regression_evidence.md","size":3656,"sha256":"ed4bb4e61ee51fa01a89887b325fc3528672777c45a294826e8970cf8d1cbf1d"},
+    {"path":"results/task83_r3b_r1_guard_report_concurrency/root_cause.md","size":2160,"sha256":"d61756bace6e0f5687b2bbd5669ca3cea535a4e5ee7568a1b1a06e1ca676d920"},
+    {"path":"results/task83_r3b_r1_guard_report_concurrency/verification_report.md","size":4860,"sha256":"60e1deaa0d25eb81691ad1000e430a47c338049de0f4f61a69399735417d4f9e"},
+    {"path":"results/task83_r3c_r1_cleanroom_requalification/phase_summary.json","size":8642,"sha256":"b24503126f9bd9bc91ff237977b8100c9aac8f8f8f08e17aca3e0a1db0af9bd0"},
+    {"path":"results/task83_r3c_r1_cleanroom_requalification/task83_r3d_handoff.md","size":2203,"sha256":"babbc02c08782c3c445a31649d6840d7c733a47a71a050aa9607854c2ae626c8"},
+    {"path":"results/task83_r3c_r1_cleanroom_requalification/verification_report.md","size":8096,"sha256":"089258e4c91b111102d1a2f67dc2c0191f43001f95b00752e2a72e47cef2e818"}
+  ],
+  "protected_files": {
+    "paths": ["talonx_quant/strategy.py","talonx_quant/indicators.py","talonx_quant/consumer.py","talonx_quant/config.py"],
+    "working_tree_diff": "empty"
+  },
+  "qualification": {
+    "collection": 2927,
+    "passed": 2927,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "xfailed": 0,
+    "xpassed": 0,
+    "exit_code": 0,
+    "retained_scenarios": "20/20 PASS",
+    "expanded_scenarios": "13/13 PASS",
+    "scenario_33": "PASS",
+    "network_guard_initialized": true,
+    "network_guard_initialization_failures": 0,
+    "unexpected_external_attempts": 0,
+    "expected_negative_controls": "4/4",
+    "malformed_reports": 0,
+    "leftover_writer_temp_files": 0
+  },
+  "exclusions": [
+    "raw ignored test logs and runtime artifacts",
+    "results/task83_r3d_final_qualification/qualification_manifest.json"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "task": "Task70S_PIV_STABILIZATION_PHASE1",
+  "retry_backoff_contract": {
+    "max_retries_default": 3,
+    "backoff_seconds_default": [1.0, 2.0, 4.0],
+    "retryable_conditions": [
+      "A transport-raised exception whose class name contains 'timeout' (case-insensitive) -- classified TIMEOUT.",
+      "HTTP 429 -- classified RATE_LIMITED.",
+      "HTTP 5xx -- classified PROVIDER_ERROR (retried the same as a rate limit/timeout, since a 5xx is transient-server-side by definition)."
+    ],
+    "non_retryable_conditions": [
+      "Any other 4xx (e.g. 401/403/404) fails immediately with zero retries -- an auth/permission/not-found error will not resolve by waiting."
+    ],
+    "partial_success_rule": "If a later page's fetch fails after retries are exhausted, but the bars already sanitized from EARLIER successful pages already meet required_bars, the failure is ignored and the symbol is still reported READY -- a transient failure fetching MORE history than needed must not downgrade an already-sufficient result."
+  },
+  "unit_test_evidence": {
+    "file": "tests/test_task70s_alpaca_warmup_stabilization.py",
+    "tests": {
+      "test_timeout_then_successful_retry_reaches_ready": "1 timeout exception, then a successful page -> READY, retries=1, exactly one backoff sleep of 1.0s recorded via an injected sleep_fn (no real sleeping occurs in the test).",
+      "test_timeout_retry_exhaustion_fails_closed": "4 consecutive timeout exceptions (1 initial + 3 retries, all failing) -> status TIMEOUT, retries=3, zero bars returned.",
+      "test_rate_limit_then_success": "One HTTP 429 then a successful page -> READY, retries=1.",
+      "test_rate_limit_exhaustion_fails_closed": "4 consecutive HTTP 429 responses -> status RATE_LIMITED, retries=3.",
+      "test_non_retryable_4xx_fails_immediately_no_retry": "A single HTTP 403 -> status PROVIDER_ERROR, retries=0, exactly one transport call made (no retry attempted)."
+    }
+  },
+  "pagination_evidence": {
+    "test_multi_page_response_paginates_until_sufficient": "Two pages (80 bars each, linked via next_page_token) both fetched, combined bar_count=160 -> READY, pages_fetched=2, second request's params include page_token from the first response.",
+    "test_pagination_stops_once_sufficient_even_with_more_pages_available": "A single page already meeting required_bars, WITH a next_page_token present in the response, does NOT trigger a second request -- pages_fetched=1. Bounded by both sufficiency and a hard max_pages=20 safety cap (never exercised in these tests, since no symbol needs 20 pages of 1-minute bars to reach 120)."
+  },
+  "isolation_evidence": {
+    "test_one_symbol_alpaca_failure_isolated_other_symbol_unaffected": "AAPL's transport call raises a timeout on every attempt (Alpaca fully fails for AAPL, and this fake's yfinance leg also gives 0 for AAPL, so AAPL ends not-ready); MSFT's own separate transport call succeeds normally and reaches READY in the same preseed_and_verify() batch call -- one bad symbol does not abort or affect any other symbol's fetch."
+  },
+  "live_read_evidence": {
+    "description": "35/35 real symbols against the live Alpaca PAPER data endpoint all returned on the FIRST page with zero retries (see readiness_by_symbol.csv) -- no rate limiting or timeout was encountered in this live check, which exercised the non-error, non-retry path against the real account/entitlement. Retry/rate-limit/timeout behavior itself is only exercisable deterministically via the mocked unit tests above (a real rate-limit or outage cannot be reliably triggered on demand against a live provider)."
+  }
+}

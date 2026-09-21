@@ -1,0 +1,39 @@
+{
+  "task": "69Q",
+  "purpose": "Post-Task69P evidence closure + pre-market/runtime notification upgrade",
+  "branch": "research/talonx-strategy-validation",
+  "starting_sha": "3d0778360e81aca6c8f8fd8aafe80811ab7b622d",
+  "strategy_semantics_changed": false,
+  "f6_fade_v1_changed": false,
+  "f6_fade_v1_integrated": false,
+  "real_capital_introduced": false,
+  "fake_signal_generation": false,
+  "watch_can_submit_orders": false,
+  "code_changes": {
+    "talonx_piv/events.py": "session_id/trading_date_et/notification_class fields + auto-stamping; execution-economics fields; notification_class_for(); trading_date_for()",
+    "talonx_piv/session_identity.py": "NEW -- canonical session identity (session_id, config_hash, runtime_sha)",
+    "talonx_piv/reporting.py": "trading_date_et-scoped filtering; natural_strategy vs piv_test_traffic split; quant_funnel merge",
+    "talonx_piv/decision_engine.py": "quant funnel accounting (published/rejected/errored/unaccounted_candidates, rejected_breakdown, evaluation_cycles); execution-economics plumbing (reference_price/stop_price/horizon/strategy_id) into order_intent calls",
+    "talonx_piv/lifecycle.py": "position lifecycle fix -- exit fill now emits POSITION_CLOSED against the SAME logical position instead of a second POSITION_OPENED; execution-economics computation (slippage, gross/net PnL, gross/net R, holding_seconds)",
+    "talonx_piv/premarket_radar.py": "NEW -- observational pre-market WATCH/CLEARED, structurally cannot place an order (no broker/lifecycle import)",
+    "talonx_piv/session_runner.py": "premarket tick wiring, piv_info live updates, quant_funnel_report.json persistence, STATUS_HEARTBEAT rate-limited heartbeat",
+    "talonx_piv/cli.py": "session identity construction/persistence; piv_info construction; eod command reads back identity+funnel for scoped reporting",
+    "talonx_piv/telegram_inbound.py": "build_piv_info() -- the shared, live-updated /ping dict",
+    "talonx_dispatch/telegram_listener.py": "/ping Pipeline headline is now PIV-aware (fixed a confirmed Task69P live finding); extended PIV section with unified-view fields",
+    "talonx_piv/alpaca_historical_warmup.py": "NEW -- prototype fetch function for an Alpaca-based warmup alternative, NOT wired into the live warmup path",
+    "docs/research/TALONX_PIV_RUNTIME_PRODUCT_TARGET.md": "NEW -- permanent product target record"
+  },
+  "protected_files_touched": [],
+  "tests_added": [
+    "tests/test_task69q_evidence_upgrade.py (25 tests)",
+    "tests/test_task69q_alpaca_historical_warmup.py (4 tests)"
+  ],
+  "tests_fixed_pre_existing": [
+    "tests/test_task65_session_runner.py::test_decision_engine_only_called_for_ready_symbols (AsyncMock funnel_summary fixture update)",
+    "tests/test_task66a_runtime_parity.py::test_build_piv_telegram_listener_uses_piv_scoped_audit_db (stale assertion predating Task69Q, confirmed pre-existing via git stash)"
+  ],
+  "test_results": {
+    "focused_new_tests": "29 passed",
+    "full_regression": "2060 passed, 1 pre-existing unrelated failure (test_run_historical_regimes.py, confirmed via git stash to fail identically without this task's changes), 1 skipped, 15 xfailed"
+  }
+}

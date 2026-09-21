@@ -1,0 +1,56 @@
+{
+  "source": "reprocessed from Task 74S's preserved telemetry only -- no rerun of the 1.9M-bar evaluation",
+  "bar_level": {
+    "denominator": "bars_processed",
+    "bars_processed": 1903044,
+    "rejected_LOW_VOLATILITY": 1781848,
+    "rejected_LOW_VOLATILITY_pct_of_bars": 93.63,
+    "raw_candidates_generated_pct_of_bars": 0.26
+  },
+  "candidate_level": {
+    "denominator": "signals_generated (raw candidates)",
+    "signals_generated": 5021,
+    "bullish": 2488,
+    "bearish": 2533,
+    "bullish_pct_of_candidates": 49.55,
+    "bearish_pct_of_candidates": 50.45,
+    "rejected_LOW_CONFLUENCE": 3640,
+    "rejected_LOW_CONFLUENCE_pct_of_candidates": 72.50
+  },
+  "bullish_subfunnel": {
+    "denominator": "bullish_candidates",
+    "bullish_candidates": 2488,
+    "confluence_score_ge_2": 12,
+    "confluence_score_ge_2_pct_of_bullish": 0.48,
+    "of_those_in_regular_session": 4,
+    "of_those_in_regular_session_pct_of_confluence_ge_2": 33.33
+  },
+  "four_surviving_candidates": {
+    "denominator": "the 4 in-session confluence-eligible bullish candidates",
+    "rejected_TREND_GATE": 1,
+    "rejected_TREND_GATE_pct": 25.0,
+    "rejected_CLOSING_BLACKOUT": 3,
+    "rejected_CLOSING_BLACKOUT_pct": 75.0,
+    "detail": [
+      {"symbol": "STX", "timestamp_utc": "2025-10-22 14:43:00+00:00", "reason": "TREND_GATE"},
+      {"symbol": "AMD", "timestamp_utc": "2025-11-20 20:55:00+00:00", "reason": "CLOSING_BLACKOUT"},
+      {"symbol": "PYPL", "timestamp_utc": "2026-08-14 19:44:00+00:00", "signal_type": "rsi_oversold_volume_surge", "reason": "CLOSING_BLACKOUT"},
+      {"symbol": "PYPL", "timestamp_utc": "2026-08-14 19:44:00+00:00", "signal_type": "ma_golden_cross", "reason": "CLOSING_BLACKOUT"}
+    ]
+  },
+  "final": {
+    "signals_published": 3,
+    "signals_published_direction": "all bearish, rejected NO_ACTIVE_POSITION downstream",
+    "trades_executed": 0,
+    "trades_executed_pct_of_bars": 0.0,
+    "trades_executed_pct_of_candidates": 0.0
+  },
+  "gate_order_established": [
+    "LOW_VOLATILITY", "OPENING_BLACKOUT", "CLOSING_BLACKOUT", "LOSS_LOCKOUT", "COOLDOWN",
+    "LOW_CONFLUENCE", "LOW_RISK_REWARD", "TREND_GATE/HTF_DATA_UNAVAILABLE"
+  ],
+  "gate_order_source": "talonx_quant/consumer.py::_GATE_NAMES insertion order (read-only inspection, file unmodified)",
+  "key_finding": "candidate_telemetry's diagnostic trend_component/confluence_score/risk_reward_ratio values are computed unconditionally at every triggering bar for research observability, independent of which gate the actual replay path stops at first (blackout gates precede confluence/RR/trend in evaluation order) -- resolves Task 74S's own previously-unresolved question about AMD's classification without any code change or rerun",
+  "correctness_defect_found": false,
+  "reproduction_needed": false
+}

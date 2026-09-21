@@ -1,0 +1,12 @@
+ISOLATED verification -- direct classify_disposition call using the
+SAME .venv the live Intelligence process runs from, reproducing the
+exact real AXON DEBT_FINANCING reasons_json. This is NOT a live
+Telegram round trip and NOT a manufactured/replayed AXON send --
+no message was sent, the real AXON delivery rows (already SENT)
+were never touched or replayed.
+
+=== SEC:0001193125-26-391320:DEBT_FINANCING (real reasons) ===
+disposition: DIGEST | evidence_text: None
+
+=== SEC:0001193125-26-391320:REGULATION_FD (real reasons) ===
+disposition: DIGEST | evidence_text: None

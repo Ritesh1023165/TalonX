@@ -1,0 +1,44 @@
+PQ-2B test evidence (2026-09-21).  Interpreter: .venv/Scripts/python.exe.   Command form: <interpreter> -m pytest <files> -q -p no:cacheprovider
+
+1. New PQ-2B suite
+   tests/test_pq2b_provider_contract.py                                -> 51 passed, 0 failed, 0 skipped
+   (matrix items 1-50: adapter/contract, OPEN, CLOSE, early close, outages, recovery windows, liquidity, split window,
+    composite contamination, disagreement, fallback, CA + dividend compatibility, provenance/restart, replay classification,
+    configuration/entitlement/readiness, strategy integrity, late-dividend catch-up)
+
+2. Focused regression, one run (17 files):
+   test_pq2b_provider_contract, test_pq2a_closure_dividends, test_pq2a_corporate_actions, test_provider_qualification_pq1,
+   test_package1_settlement_integrity, test_package2_account_blocks, test_package2_acceptance_review, test_package3_pricing_timing,
+   test_package4_sizing_accounting, test_ri1_campaign_identity, test_ri2_notification_routing, test_ri3_operator,
+   test_task110_v2_integration, test_task111_v2_e2e, test_task112_tuesday_release, test_task114_prospective, test_task100b_runtime_integration
+   -> 535 passed, 4 failed, 0 skipped (73 s)
+   failures (all 4 REPRODUCE on this task's starting HEAD 37b0fec):
+     tests/test_ri3_operator.py::test_renderer_shows_end_to_end_fixture                    (absent renderer executable)
+     tests/test_task111_v2_e2e.py::test_item3_original_strategy_fingerprint_unchanged      (OPS-017)
+     tests/test_task112_tuesday_release.py::test_03_v1_fingerprint_intact                  (OPS-017)
+     tests/test_task114_prospective.py::test_a4_v2_section_separates_health_data_activity
+
+3. Wider group: tests/test_task117_*.py test_task118*.py test_task119*.py test_task131*.py test_task133*.py test_task140*.py
+   -> 452 passed, 12 failed, 0 skipped (91 s)
+   failures: test_task117_migration x5 + test_task117_deployment_rehearsal (stale expected production-ledger md5 set),
+             test_task117_overnight_journey P1, test_task117_release_rehearsal, test_task117_spa_states x2,
+             test_task118a_dashboard_message_count, test_task131_dashboard_broad_discovery
+   -> ALL 12 REPRODUCE on starting HEAD 37b0fec (scratch worktree; ledger file copied in for the md5-dependent six).
+   No timing-only failures were observed (no concurrent load).  OPS-017 not touched.
+
+4. Test edits forced by the intended contract change (not regressions):
+   - tests/test_task117_pricing_readiness.py: the composite-yf fixture's CSV history is declared split-only (a real all-adjusted
+     snapshot + split-only tail is now refused; proven in test_pq2b_provider_contract::test_31_*).
+   - the PQ-2A closure/PQ-2A suites are unchanged.
+
+5. Mutation check of the new suite: 11 deliberate regressions, all caught
+   (dividend-adjusted request; finality ignoring post-market span / 15-min lag / early-close calendar; contiguity removed;
+   intraday timestamp accepted; composite adjustment-state check removed; witness averaging; unbounded catch-up; legacy backfill;
+   fallback enabled in release mode).
+
+6. Real-API end-to-end smoke (read-only, real credentials, no broker): docs/.../real_api_smoke.json
+   check_readiness() -> QUALIFIED (open ratio 10.0, volume ratio 10.0); AlpacaSipBarAdapter/make_resolver(mode='sip') returned
+   AAPL/SOFI/GME 2026-09-18 open/close with full provenance, 72 FINAL bars each, today's incomplete bar correctly unavailable.
+
+7. Strategy integrity: test_43_44 asserts thresholds (2,10,1,20,5000000.0,5.0,5,3) and v2_release_fingerprint == e2acf6454789217e -> PASS.
+   talonx_v2/liquidity.py and talonx_v2/config.py are byte-identical to the starting HEAD (git diff empty).

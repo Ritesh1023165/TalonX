@@ -1,0 +1,36 @@
+{
+  "contract": "OPERATOR_NOTIFICATION_CONTRACT",
+  "permanent_product_target_reference": "See next_live_session_plan.md and this task's PERMANENT PRODUCT TARGET section for the full ticker-decision-contract (horizon/decision/status enums etc.) that this notification layer is built to eventually surface.",
+  "notification_classes": {
+    "SYSTEM": "startup, preflight, session-readiness state, stale data, broker errors, kill switch, status heartbeat -- operational health, never a trading signal",
+    "PREMARKET_RADAR": "PREMARKET_WATCH / PREMARKET_WATCH_CLEARED -- observational only, see premarket_radar_contract.json. NEVER alpha evidence, NEVER an order.",
+    "NATURAL_SIGNAL": "a real QuantScanner-published SIGNAL, source=STRATEGY -- the only class that represents actual strategy output",
+    "PAPER_EXECUTION": "order/fill/position lifecycle events with source=STRATEGY -- real (paper) broker activity driven by a NATURAL_SIGNAL",
+    "PIV_TEST": "anything with source=PIV_LIFECYCLE_PROBE -- operational lifecycle-proof traffic, alpha_evidence=false always, structurally excluded from strategy statistics",
+    "EOD": "EOD_FLATTEN, SESSION_SUMMARY, EOD_SUMMARY -- end-of-day reconciliation and rollup"
+  },
+  "classification_mechanism": "talonx_piv.events.notification_class_for(event, source) is a pure function; EventBus.emit() auto-stamps PivEvent.notification_class if the caller didn't set one explicitly. EventBus.format_telegram() prefixes every Telegram line with '[CLASS]' so an operator can visually separate a NATURAL_SIGNAL from a PIV_TEST or PREMARKET_RADAR line at a glance.",
+  "spam_avoidance": {
+    "existing_mechanism_reused": "EventBus._key()-based dedup (event+correlation_id+broker_order_id+status+reason) already suppresses a repeated identical event from reaching Telegram twice -- unchanged, reused as-is.",
+    "premarket_radar_specific": "PremarketRadarEngine only emits a transition (new WATCH, bias change, or WATCH clearing) per symbol -- an unchanged bias produces zero further notifications no matter how many radar ticks run.",
+    "heartbeat_specific": "STATUS_HEARTBEAT is rate-limited to at most once per HEARTBEAT_INTERVAL_SECONDS (1800s / 30min) AND is suppressed entirely if a NATURAL SIGNAL published more recently than that interval -- see session_runner.py's _maybe_emit_heartbeat."
+  },
+  "cadence_by_session_phase": {
+    "premarket": "startup/mode/provider/universe/warmup status at start; PREMARKET_WATCH/CLEARED only on transition; no per-tick chatter",
+    "regular_session": "ACTIONABLE (NATURAL_SIGNAL) immediately; STATUS_HEARTBEAT only if no natural signal for >=30min ('No actionable trades. Engine active.' plus decision-ready symbol count, evaluation cycles, candidates, top rejection reason)",
+    "eod": "EOD_SUMMARY via build_session_report's natural_strategy/piv_test_traffic split, reconciliation, quant_funnel"
+  },
+  "watch_safety_invariants": {
+    "watch_is_not_alpha_evidence": "PREMARKET_WATCH events always carry alpha_evidence=false and notification_class=PREMARKET_RADAR -- reporting.py never folds them into natural_strategy counts",
+    "watch_cannot_place_an_order": "structural, not just behavioral -- talonx_piv/premarket_radar.py imports neither talonx_piv.broker nor talonx_piv.lifecycle at all (enforced by tests/test_task69q_evidence_upgrade.py::test_premarket_radar_module_never_imports_broker_or_lifecycle, an AST-level import check)"
+  },
+  "longer_term_multi_day_horizon": {
+    "status": "contract/category retained (PivEvent.horizon field, NATURAL_STRATEGY_HORIZON constant), but NOT emitted -- no MULTI_DAY strategy has been researched/frozen/validated. decision_engine.py hardcodes horizon=INTRADAY_SHORT for every natural QuantScanner-driven event; nothing in this task manufactures a MULTI_DAY signal or WATCH."
+  },
+  "general_app_backward_compatibility": "Every change described here is additive and read through optional fields (notification_class, piv_info dict) that default to None/absent for the general (non-PIV) run_talonx.py application -- see tests/test_task69q_evidence_upgrade.py::test_pipeline_status_general_app_behavior_unchanged_when_no_piv_info.",
+  "tests": [
+    "tests/test_task69q_evidence_upgrade.py::test_notification_class_for",
+    "tests/test_task69q_evidence_upgrade.py::test_format_telegram_prefixes_notification_class",
+    "tests/test_task69q_evidence_upgrade.py::test_natural_vs_probe_traffic_never_conflated_in_report"
+  ]
+}

@@ -1,0 +1,732 @@
+=== text_events for AXON around 2026-09-15 07:20 UTC ===
+{'event_id': 'SEC:0001193125-26-391320:MATERIAL_AGREEMENT', 'symbol': 'AXON', 'event_type': 'MATERIAL_AGREEMENT', 'form_type': '8-K', 'accession': '0001193125-26-391320', 'accepted_at_utc': '2026-09-15T07:20:33+00:00', 'ingested_at_utc': '2026-09-15T11:21:40.551898+00:00', 'is_amendment': 0, 'data_quality_flags': '["multi_item_filing"]', 'filing_index_url': 'https://www.sec.gov/Archives/edgar/data/1069183/000119312526391320/0001193125-26-391320-index.htm', 'source_url': 'https://www.sec.gov/Archives/edgar/data/1069183/000119312526391320/0001193125-26-391320-index.htm'}
+{'event_id': 'SEC:0001193125-26-391320:DEBT_FINANCING', 'symbol': 'AXON', 'event_type': 'DEBT_FINANCING', 'form_type': '8-K', 'accession': '0001193125-26-391320', 'accepted_at_utc': '2026-09-15T07:20:33+00:00', 'ingested_at_utc': '2026-09-15T11:21:40.551898+00:00', 'is_amendment': 0, 'data_quality_flags': '["multi_item_filing"]', 'filing_index_url': 'https://www.sec.gov/Archives/edgar/data/1069183/000119312526391320/0001193125-26-391320-index.htm', 'source_url': 'https://www.sec.gov/Archives/edgar/data/1069183/000119312526391320/0001193125-26-391320-index.htm'}
+{'event_id': 'SEC:0001193125-26-391320:REGULATION_FD', 'symbol': 'AXON', 'event_type': 'REGULATION_FD', 'form_type': '8-K', 'accession': '0001193125-26-391320', 'accepted_at_utc': '2026-09-15T07:20:33+00:00', 'ingested_at_utc': '2026-09-15T11:21:40.551898+00:00', 'is_amendment': 0, 'data_quality_flags': '["multi_item_filing"]', 'filing_index_url': 'https://www.sec.gov/Archives/edgar/data/1069183/000119312526391320/0001193125-26-391320-index.htm', 'source_url': 'https://www.sec.gov/Archives/edgar/data/1069183/000119312526391320/0001193125-26-391320-index.htm'}
+
+=== event_significance rows for those event_ids ===
+SIG for SEC:0001193125-26-391320:MATERIAL_AGREEMENT {'significance_id': 'SIG:SEC:0001193125-26-391320:MATERIAL_AGREEMENT:information-significance-v1', 'event_id': 'SEC:0001193125-26-391320:MATERIAL_AGREEMENT', 'symbol': 'AXON', 'score': 6, 'raw_score': 6, 'band': 'HIGH', 'reasons_json': '[{"code": "EVENT_TYPE_BASE", "description": "material definitive agreement 8-K (Item 1.01)", "points": 2, "component": "event_type_base", "evidence_ref": "0001193125-26-391320"}, {"code": "MULTI_ITEM_8K", "description": "bundled 8-K carrying 3 distinct material items (1.01, 2.03, 7.01)", "points": 1, "component": "material_items", "evidence_ref": "0001193125-26-391320"}, {"code": "EVENT_UNCOMMON_FOR_FILER", "description": "this company has not filed a MATERIAL_AGREEMENT event in the last 12 months", "points": 1, "component": "rarity", "evidence_ref": "event_store:rarity_count"}, {"code": "EVENT_CLUSTER", "description": "4 distinct disclosure types from this company within 7 days", "points": 1, "component": "simultaneous_events", "evidence_ref": "event_store:simultaneous_count"}, {"code": "ON_WATCHLIST", "description": "this company is on your watchlist (user priority, not market significance)", "points": 1, "component": "watchlist_priority", "evidence_ref": null}]', 'input_fingerprint': '4074e6fcaf0c892674cdefdc39c769c5263ac2d0f72b6dbb8dae247d2be3af50', 'evaluated_at_utc': '2026-09-15T11:21:40.551898+00:00'}
+SIG for SEC:0001193125-26-391320:DEBT_FINANCING {'significance_id': 'SIG:SEC:0001193125-26-391320:DEBT_FINANCING:information-significance-v1', 'event_id': 'SEC:0001193125-26-391320:DEBT_FINANCING', 'symbol': 'AXON', 'score': 7, 'raw_score': 7, 'band': 'CRITICAL', 'reasons_json': '[{"code": "EVENT_TYPE_BASE", "description": "direct financial obligation 8-K (Item 2.03/2.04)", "points": 2, "component": "event_type_base", "evidence_ref": "0001193125-26-391320"}, {"code": "MULTI_ITEM_8K", "description": "bundled 8-K carrying 3 distinct material items (1.01, 2.03, 7.01)", "points": 1, "component": "material_items", "evidence_ref": "0001193125-26-391320"}, {"code": "EVENT_RARE_FOR_FILER", "description": "this company has not filed a DEBT_FINANCING event in 24 months of tracked history", "points": 2, "component": "rarity", "evidence_ref": "event_store:rarity_count"}, {"code": "EVENT_CLUSTER", "description": "4 distinct disclosure types from this company within 7 days", "points": 1, "component": "simultaneous_events", "evidence_ref": "event_store:simultaneous_count"}, {"code": "ON_WATCHLIST", "description": "this company is on your watchlist (user priority, not market significance)", "points": 1, "component": "watchlist_priority", "evidence_ref": null}]', 'input_fingerprint': '47d38bad789c90d63b5a50c3a7104629fa233fffa8d5cb92f0ae7d30a68def3c', 'evaluated_at_utc': '2026-09-15T11:21:40.551898+00:00'}
+SIG for SEC:0001193125-26-391320:REGULATION_FD {'significance_id': 'SIG:SEC:0001193125-26-391320:REGULATION_FD:information-significance-v1', 'event_id': 'SEC:0001193125-26-391320:REGULATION_FD', 'symbol': 'AXON', 'score': 7, 'raw_score': 7, 'band': 'CRITICAL', 'reasons_json': '[{"code": "EVENT_TYPE_BASE", "description": "Regulation FD disclosure 8-K (Item 7.01)", "points": 2, "component": "event_type_base", "evidence_ref": "0001193125-26-391320"}, {"code": "MULTI_ITEM_8K", "description": "bundled 8-K carrying 3 distinct material items (1.01, 2.03, 7.01)", "points": 1, "component": "material_items", "evidence_ref": "0001193125-26-391320"}, {"code": "EVENT_RARE_FOR_FILER", "description": "this company has not filed a REGULATION_FD event in 24 months of tracked history", "points": 2, "component": "rarity", "evidence_ref": "event_store:rarity_count"}, {"code": "EVENT_CLUSTER", "description": "4 distinct disclosure types from this company within 7 days", "points": 1, "component": "simultaneous_events", "evidence_ref": "event_store:simultaneous_count"}, {"code": "ON_WATCHLIST", "description": "this company is on your watchlist (user priority, not market significance)", "points": 1, "component": "watchlist_priority", "evidence_ref": null}]', 'input_fingerprint': '95d9315304832902b18c58869566ba1d76ffdc1a094ab653178e1c5edc0ac156', 'evaluated_at_utc': '2026-09-15T11:21:40.551898+00:00'}
+
+=== intelligence_delivery rows for AXON sent around then ===
+---
+  delivery_id: telegram:card:SEC:0001193125-26-391320:MATERIAL_AGREEMENT:telegram-intel-v1
+  card_id: card:SEC:0001193125-26-391320:MATERIAL_AGREEMENT
+  event_id: SEC:0001193125-26-391320:MATERIAL_AGREEMENT
+  symbol: AXON
+  band: HIGH
+  tier: EXPANDED
+  route: DIGEST
+  state: PENDING
+  disposition: NEW
+  text: 🟠 <b>HIGH INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · before market open
+
+Material definitive agreement (8-K Item 1.01)
+AXON filed an 8-K reporting a material definitive agreement (Item 1.01)
+Accepted: 2026-09-15 07:20 UTC
+Form 8-K · items 1.01, 2.03, 7.01, 9.01
+
+Why surfaced:
+• material definitive agreement 8-K (Item 1.01)
+• bundled 8-K carrying 3 distinct material items (1.01, 2.03, 7.01)
+• this company has not filed a MATERIAL_AGREEMENT event in the last 12 months
+• 4 distinct disclosure types from this company within 7 days
+
+⚠️ Source freshness unknown at emit time
+⚠️ Data limitations: multi_item_filing
+
+🔗 <a href="https://www.sec.gov/Archives/edgar/data/1069183/000119312526391320/0001193125-26-391320-index.htm">SEC filing</a> · ref 0001193125-26-391320
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-15T11:21:40.551898+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001193125-26-391320:DEBT_FINANCING:telegram-intel-v1
+  card_id: card:SEC:0001193125-26-391320:DEBT_FINANCING
+  event_id: SEC:0001193125-26-391320:DEBT_FINANCING
+  symbol: AXON
+  band: CRITICAL
+  tier: CONCISE
+  route: IMMEDIATE
+  state: SENT
+  disposition: NEW
+  text: [INFO] <b>AXON</b> — Direct financial obligation (8-K Item 2.03/2.04)
+direct financial obligation 8-K (Item 2.03/2.04)
+Source: 2026-09-15 07:20 UTC (source age: 4.1h)
+⚠️ Source freshness unknown at emit time
+⚠️ Data limitations: multi_item_filing
+<i>Reply "details" for facts and filing link.</i>
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-15T11:21:40.551898+00:00
+  sent_at_utc: 2026-09-15T11:26:51.655750+00:00
+  transport_message_id: 973
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001193125-26-391320:REGULATION_FD:telegram-intel-v1
+  card_id: card:SEC:0001193125-26-391320:REGULATION_FD
+  event_id: SEC:0001193125-26-391320:REGULATION_FD
+  symbol: AXON
+  band: CRITICAL
+  tier: CONCISE
+  route: IMMEDIATE
+  state: SENT
+  disposition: NEW
+  text: [INFO] <b>AXON</b> — Regulation FD disclosure (8-K Item 7.01)
+Regulation FD disclosure 8-K (Item 7.01)
+Source: 2026-09-15 07:20 UTC (source age: 4.1h)
+⚠️ Source freshness unknown at emit time
+⚠️ Data limitations: multi_item_filing
+<i>Reply "details" for facts and filing link.</i>
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-15T11:21:40.551898+00:00
+  sent_at_utc: 2026-09-15T11:26:52.917000+00:00
+  transport_message_id: 974
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-060209:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-060209:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-060209:INSIDER_TRANSACTION
+  symbol: AXON
+  band: HIGH
+  tier: EXPANDED
+  route: IMMEDIATE
+  state: EXPIRED
+  disposition: NEW
+  text: 🟠 <b>HIGH INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-09-02 22:07 UTC
+Form 4 · items —
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+• 3 distinct insiders reported open-market sellers within 30 days
+• this company is on your watchlist (user priority, not market significance)
+
+What changed:
+• Insiders (30d): 3 reported open-market sale(s)
+• Largest single open-market transaction: $964k
+• 3 distinct insiders reported open-market sales within 30 days
+• CEO reported open-market 31 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-060209
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-060121:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-060121:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-060121:INSIDER_TRANSACTION
+  symbol: AXON
+  band: HIGH
+  tier: EXPANDED
+  route: IMMEDIATE
+  state: EXPIRED
+  disposition: NEW
+  text: 🟠 <b>HIGH INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-09-02 20:26 UTC
+Form 4 · items —
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+• 3 distinct insiders reported open-market sellers within 30 days
+• this company is on your watchlist (user priority, not market significance)
+
+What changed:
+• Insiders (30d): 3 reported open-market sale(s)
+• Largest single open-market transaction: $964k
+• 3 distinct insiders reported open-market sales within 30 days
+• CEO reported open-market 31 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-060121
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-058683:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-058683:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-058683:INSIDER_TRANSACTION
+  symbol: AXON
+  band: HIGH
+  tier: EXPANDED
+  route: IMMEDIATE
+  state: EXPIRED
+  disposition: NEW
+  text: 🟠 <b>HIGH INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-08-24 21:18 UTC
+Form 4 · items —
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+• 2 distinct insiders reported open-market sellers within 30 days
+• this company is on your watchlist (user priority, not market significance)
+
+What changed:
+• Insiders (30d): 2 reported open-market sale(s)
+• Largest single open-market transaction: $852k
+• 2 distinct insiders reported open-market sales within 30 days
+• CEO reported open-market 31 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-058683
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-057455:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-057455:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-057455:INSIDER_TRANSACTION
+  symbol: AXON
+  band: MEDIUM
+  tier: COMPACT
+  route: DIGEST
+  state: EXPIRED
+  disposition: NEW
+  text: 🟡 <b>MEDIUM INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-08-17 21:31 UTC
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+
+What changed:
+• Insiders (30d): 1 reported open-market sale(s)
+• Largest single open-market transaction: $647k
+• CEO reported open-market 31 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-057455
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-057453:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-057453:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-057453:INSIDER_TRANSACTION
+  symbol: AXON
+  band: MEDIUM
+  tier: COMPACT
+  route: DIGEST
+  state: EXPIRED
+  disposition: NEW
+  text: 🟡 <b>MEDIUM INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-08-17 21:28 UTC
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+
+What changed:
+• Insiders (30d): 1 reported open-market sale(s)
+• Largest single open-market transaction: $647k
+• CEO reported open-market 31 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-057453
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-057449:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-057449:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-057449:INSIDER_TRANSACTION
+  symbol: AXON
+  band: MEDIUM
+  tier: COMPACT
+  route: DIGEST
+  state: EXPIRED
+  disposition: NEW
+  text: 🟡 <b>MEDIUM INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-08-17 21:25 UTC
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+
+What changed:
+• Insiders (30d): 1 reported open-market sale(s)
+• Largest single open-market transaction: $647k
+• CEO reported open-market 31 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-057449
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-057445:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-057445:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-057445:INSIDER_TRANSACTION
+  symbol: AXON
+  band: MEDIUM
+  tier: COMPACT
+  route: DIGEST
+  state: EXPIRED
+  disposition: NEW
+  text: 🟡 <b>MEDIUM INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-08-17 21:21 UTC
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+
+What changed:
+• Insiders (30d): 1 reported open-market sale(s)
+• Largest single open-market transaction: $647k
+• CEO reported open-market 31 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-057445
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-057442:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-057442:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-057442:INSIDER_TRANSACTION
+  symbol: AXON
+  band: MEDIUM
+  tier: COMPACT
+  route: DIGEST
+  state: EXPIRED
+  disposition: NEW
+  text: 🟡 <b>MEDIUM INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-08-17 21:18 UTC
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+
+What changed:
+• Insiders (30d): 1 reported open-market sale(s)
+• Largest single open-market transaction: $647k
+• CEO reported open-market 31 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-057442
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-057440:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-057440:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-057440:INSIDER_TRANSACTION
+  symbol: AXON
+  band: MEDIUM
+  tier: COMPACT
+  route: DIGEST
+  state: EXPIRED
+  disposition: NEW
+  text: 🟡 <b>MEDIUM INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-08-17 21:16 UTC
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+
+What changed:
+• Insiders (30d): 1 reported open-market sale(s)
+• Largest single open-market transaction: $647k
+• CEO reported open-market 31 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-057440
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-057438:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-057438:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-057438:INSIDER_TRANSACTION
+  symbol: AXON
+  band: MEDIUM
+  tier: COMPACT
+  route: DIGEST
+  state: EXPIRED
+  disposition: NEW
+  text: 🟡 <b>MEDIUM INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-08-17 21:12 UTC
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+
+What changed:
+• Insiders (30d): 1 reported open-market sale(s)
+• Largest single open-market transaction: $647k
+• CEO reported open-market 31 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-057438
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-057434:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-057434:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-057434:INSIDER_TRANSACTION
+  symbol: AXON
+  band: MEDIUM
+  tier: COMPACT
+  route: DIGEST
+  state: EXPIRED
+  disposition: NEW
+  text: 🟡 <b>MEDIUM INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-08-17 21:10 UTC
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+
+What changed:
+• Insiders (30d): 1 reported open-market sale(s)
+• Largest single open-market transaction: $647k
+• CEO reported open-market 31 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-057434
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-055761:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-055761:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-055761:INSIDER_TRANSACTION
+  symbol: AXON
+  band: HIGH
+  tier: EXPANDED
+  route: IMMEDIATE
+  state: EXPIRED
+  disposition: NEW
+  text: 🟠 <b>HIGH INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-08-11 20:41 UTC
+Form 4 · items —
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+• 3 distinct disclosure types from this company within 7 days
+• this company is on your watchlist (user priority, not market significance)
+
+What changed:
+• Insiders (30d): 1 reported open-market sale(s)
+• Largest single open-market transaction: $647k
+• CEO reported open-market 31 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-055761
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-055749:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-055749:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-055749:INSIDER_TRANSACTION
+  symbol: AXON
+  band: HIGH
+  tier: EXPANDED
+  route: IMMEDIATE
+  state: EXPIRED
+  disposition: NEW
+  text: 🟠 <b>HIGH INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-08-11 20:36 UTC
+Form 4 · items —
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+• 3 distinct disclosure types from this company within 7 days
+• this company is on your watchlist (user priority, not market significance)
+
+What changed:
+• Insiders (30d): 1 reported open-market sale(s)
+• Largest single open-market transaction: $647k
+• CEO reported open-market 31 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-055749
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-053943:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-053943:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-053943:INSIDER_TRANSACTION
+  symbol: AXON
+  band: HIGH
+  tier: EXPANDED
+  route: IMMEDIATE
+  state: EXPIRED
+  disposition: NEW
+  text: 🟠 <b>HIGH INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-08-06 12:50 UTC
+Form 4 · items —
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+• 3 distinct disclosure types from this company within 7 days
+• this company is on your watchlist (user priority, not market significance)
+
+What changed:
+• Insiders (30d): 1 reported open-market sale(s)
+• Largest single open-market transaction: $1.16m
+• CEO reported open-market 26 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-053943
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-053937:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-053937:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-053937:INSIDER_TRANSACTION
+  symbol: AXON
+  band: HIGH
+  tier: EXPANDED
+  route: IMMEDIATE
+  state: EXPIRED
+  disposition: NEW
+  text: 🟠 <b>HIGH INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-08-06 12:48 UTC
+Form 4 · items —
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+• 3 distinct disclosure types from this company within 7 days
+• this company is on your watchlist (user priority, not market significance)
+
+What changed:
+• Insiders (30d): 1 reported open-market sale(s)
+• Largest single open-market transaction: $1.16m
+• CEO reported open-market 26 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-053937
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-053931:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-053931:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-053931:INSIDER_TRANSACTION
+  symbol: AXON
+  band: HIGH
+  tier: EXPANDED
+  route: IMMEDIATE
+  state: EXPIRED
+  disposition: NEW
+  text: 🟠 <b>HIGH INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-08-06 12:44 UTC
+Form 4 · items —
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+• 3 distinct disclosure types from this company within 7 days
+• this company is on your watchlist (user priority, not market significance)
+
+What changed:
+• Insiders (30d): 1 reported open-market sale(s)
+• Largest single open-market transaction: $1.16m
+• CEO reported open-market 26 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-053931
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None
+---
+  delivery_id: telegram:card:SEC:0001628280-26-053928:INSIDER_TRANSACTION:telegram-intel-v1
+  card_id: card:SEC:0001628280-26-053928:INSIDER_TRANSACTION
+  event_id: SEC:0001628280-26-053928:INSIDER_TRANSACTION
+  symbol: AXON
+  band: HIGH
+  tier: EXPANDED
+  route: IMMEDIATE
+  state: EXPIRED
+  disposition: NEW
+  text: 🟠 <b>HIGH INFORMATION SIGNIFICANCE</b>
+<b>AXON</b> (AXON ENTERPRISE, INC.) · session unknown
+
+Insider ownership filing (Form 3/4/5)
+AXON had an insider ownership form filed
+Accepted: 2026-08-06 12:41 UTC
+Form 4 · items —
+
+Why surfaced:
+• insider ownership filing (Form 3/4/5)
+• an open-market insider transaction of about $10,000,000 was reported
+• 3 distinct disclosure types from this company within 7 days
+• this company is on your watchlist (user priority, not market significance)
+
+What changed:
+• Insiders (30d): 1 reported open-market sale(s)
+• Largest single open-market transaction: $1.16m
+• CEO reported open-market 26 sale(s) (30d)
+
+⚠️ Source freshness unknown at emit time
+
+Source ref: 0001628280-26-053928
+
+<i>ℹ️ Information, not advice. TalonX makes no prediction about future price or returns.</i>
+  attempts: 0
+  enqueued_at_utc: 2026-09-14T21:50:21.483329+00:00
+  sent_at_utc: None
+  transport_message_id: None
+  digest_item_ordinal: None

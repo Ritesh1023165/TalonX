@@ -136,6 +136,31 @@ def test_strategy_version_changes_when_a_fingerprinted_file_changes(monkeypatch,
     assert len(before) == len(after) == 12
 
 
+def test_strategy_version_is_the_same_for_crlf_and_lf_line_endings(monkeypatch, tmp_path):
+    """Task 137: a working tree that materialises the fingerprinted files
+    with CRLF (e.g. a Windows checkout under core.autocrlf) must produce
+    the SAME fingerprint as an LF checkout of the identical logical
+    content -- this was the demonstrated, confirmed cause of a false-
+    positive mismatch against V1_FINGERPRINT_EXPECTED. Line-ending
+    REPRESENTATION must never be significant on its own; the previous
+    test in this file already proves a genuine content change still is."""
+    from talonx_backtest import reproducibility
+
+    lf_file = tmp_path / "fake_strategy_lf.py"
+    crlf_file = tmp_path / "fake_strategy_crlf.py"
+    content = "line one\nline two\nline three\n"
+    lf_file.write_bytes(content.encode("utf-8"))
+    crlf_file.write_bytes(content.replace("\n", "\r\n").encode("utf-8"))
+    assert lf_file.read_bytes() != crlf_file.read_bytes()  # genuinely different bytes on disk
+
+    monkeypatch.setattr(reproducibility, "_STRATEGY_FILES", (lf_file,))
+    lf_version = get_strategy_version()
+    monkeypatch.setattr(reproducibility, "_STRATEGY_FILES", (crlf_file,))
+    crlf_version = get_strategy_version()
+
+    assert lf_version == crlf_version
+
+
 def test_working_tree_dirty_is_false_for_a_clean_tree(monkeypatch):
     clean_result = MagicMock(returncode=0, stdout="", stderr="")
     monkeypatch.setattr(subprocess_module, "run", lambda *a, **k: clean_result)

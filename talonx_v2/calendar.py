@@ -1,0 +1,182 @@
+"""
+talonx_v2.calendar -- NYSE (XNYS) trading-session arithmetic (Phase 6, 12)
+========================================================================
+Explicit exchange-calendar semantics for the frozen causal entry rule and
+the 10-trading-day hold.  Uses ``exchange_calendars`` (XNYS) -- the same
+proven dependency ``talonx_signals.market_sessions`` already uses.
+
+NEVER fabricates a session for a non-trading day.  Weekends, holidays and
+early closes are handled by the calendar itself.
+"""
+from __future__ import annotations
+
+import logging
+from datetime import date, datetime, timezone
+from functools import lru_cache
+
+logger = logging.getLogger("talonx_v2.calendar")
+
+_XNYS_START = "2015-01-01"
+
+
+@lru_cache(maxsize=1)
+def _sessions() -> list[date]:
+    import exchange_calendars as xc
+
+    cal = xc.get_calendar("XNYS")
+    start = max(cal.first_session, __import__("pandas").Timestamp(_XNYS_START))
+    end = cal.last_session
+    return [ts.date() for ts in cal.sessions_in_range(start, end)]
+
+
+@lru_cache(maxsize=1)
+def _ord_map() -> dict[date, int]:
+    return {d: i for i, d in enumerate(_sessions())}
+
+
+@lru_cache(maxsize=1)
+def _session_set() -> frozenset[date]:
+    return frozenset(_sessions())
+
+
+def session_ordinal(d: date | datetime | str, *, anchor_forward: bool = True) -> int:
+    """Trading-day ordinal of ``d``.  If ``d`` is not itself a session and
+    ``anchor_forward`` is True, returns the ordinal of the next session."""
+    tgt = _as_date(d)
+    m = _ord_map()
+    i = m.get(tgt)
+    if i is not None:
+        return i
+    if anchor_forward:
+        return m[next_session_on_or_after(tgt)]
+    sess = _sessions()
+    for k in range(len(sess) - 1, -1, -1):
+        if sess[k] <= tgt:
+            return k
+    raise ValueError(f"no session on/before {tgt}")
+
+
+def _as_date(d: date | datetime | str) -> date:
+    if isinstance(d, datetime):
+        return d.date()
+    if isinstance(d, str):
+        return date.fromisoformat(d[:10])
+    return d
+
+
+def is_session(d: date | datetime | str) -> bool:
+    return _as_date(d) in _session_set()
+
+
+def next_session_on_or_after(d: date | datetime | str) -> date:
+    tgt = _as_date(d)
+    for s in _sessions():
+        if s >= tgt:
+            return s
+    raise ValueError(f"no XNYS session on/after {tgt}")
+
+
+def next_session_strictly_after(d: date | datetime | str) -> date:
+    """The frozen entry rule: first NYSE session STRICTLY after ``d``."""
+    tgt = _as_date(d)
+    for s in _sessions():
+        if s > tgt:
+            return s
+    raise ValueError(f"no XNYS session strictly after {tgt}")
+
+
+def add_sessions(d: date | datetime | str, n: int) -> date:
+    """The session that is ``n`` trading days after session ``d``
+    (``d`` must itself be a session; n>=0).  n=10 -> the frozen exit
+    session."""
+    sess = _sessions()
+    i = _ord_map().get(_as_date(d))
+    if i is None:
+        i = _ord_map()[next_session_on_or_after(d)]
+    j = i + n
+    if j >= len(sess):
+        raise ValueError(f"session index {j} out of calendar range")
+    return sess[j]
+
+
+def sessions_between(start: date | datetime | str, end: date | datetime | str) -> int:
+    """Count of trading sessions in (start, end] -- 0 if end <= start."""
+    a, b = _as_date(start), _as_date(end)
+    if b <= a:
+        return 0
+    return sum(1 for s in _sessions() if a < s <= b)
+
+
+def session_close_utc(d: date | datetime | str) -> datetime:
+    """Package 3 P3-D: the REAL, official XNYS close timestamp (UTC) for
+    session ``d`` -- honors early closes via ``exchange_calendars``' own
+    calendar data (e.g. 13:00 ET / 18:00 UTC the day after Thanksgiving),
+    never approximated as midnight UTC/local or a fixed hour offset.
+    ``d`` must be an actual trading session (raises if not -- callers
+    resolve to a real session first, e.g. via ``add_sessions``)."""
+    import exchange_calendars as xc
+    ts = xc.get_calendar("XNYS").session_close(_as_date(d).isoformat())
+    return ts.to_pydatetime().astimezone(timezone.utc)
+
+
+def session_open_utc(d: date | datetime | str) -> datetime:
+    """PQ-2B: the official XNYS open timestamp (UTC) for session ``d`` (DST-aware)."""
+    import exchange_calendars as xc
+    ts = xc.get_calendar("XNYS").session_open(_as_date(d).isoformat())
+    return ts.to_pydatetime().astimezone(timezone.utc)
+
+
+# The consolidated SIP tape's post-market session ends this long after the OFFICIAL close
+# (measured PQ-2B: 20:00 ET after a 16:00 close; 17:00 ET after a 13:00 early close, i.e. +4h).
+EXTENDED_SESSION_AFTER_CLOSE_HOURS = 4
+
+
+def session_extended_end_utc(d: date | datetime | str) -> datetime:
+    """PQ-2B: end of the post-market session for ``d`` = official close + 4h (calendar-aware, so
+    an early close ends at 17:00 ET, not 20:00 ET).  The SIP daily bar aggregates trades over the
+    whole 04:00-post-market span, so the bar is not COMPLETE before this instant."""
+    from datetime import timedelta
+    return session_close_utc(d) + timedelta(hours=EXTENDED_SESSION_AFTER_CLOSE_HOURS)
+
+
+def trading_days_elapsed(entry_session: date | datetime | str, as_of: date | datetime | str) -> int:
+    """How many sessions have elapsed since (and including) the entry
+    session, as of ``as_of``.  entry day == day 0."""
+    a, b = _as_date(entry_session), _as_date(as_of)
+    if b < a:
+        return 0
+    ia = session_ordinal(a, anchor_forward=True)
+    ib = session_ordinal(b, anchor_forward=False)
+    return max(0, ib - ia)
+
+
+def recovery_deadline_session(eligible_entry_session: date, max_entry_staleness_sessions: int) -> date:
+    """Package 3 P3-D: Session 3 under the product's own 1-indexed
+    counting (target entry session = Session 1) -- the SINGLE, unified
+    recovery-deadline boundary. Extracted (RI-1) from
+    ``V2Service._recovery_deadline_session`` so both the live tick and
+    a cutover classification (``talonx_v2.cutover``) use the identical
+    calculation -- never two divergent copies."""
+    return add_sessions(eligible_entry_session, max(0, max_entry_staleness_sessions - 1))
+
+
+def recovery_deadline_passed(eligible_entry_session: date, *, max_entry_staleness_sessions: int,
+                             ripe_through: date, live: bool) -> bool:
+    """True once the recovery window has genuinely closed. Extracted
+    (RI-1) from ``V2Service._recovery_deadline_passed`` -- identical
+    behavior, now reusable outside a running service (e.g. cutover
+    classification, which has no live tick loop of its own).
+
+    LIVE: compares the real wall clock against Session 3's own ACTUAL
+    official close timestamp (``session_close_utc`` -- honors early
+    closes). Deadline passed only once now() is STRICTLY AFTER that
+    close ("at or before the deadline qualifies", S6-24).
+
+    Non-live: date-only, passed once ``ripe_through`` is STRICTLY AFTER
+    the deadline session -- a pure function of static inputs, consults
+    no process-uptime or last-run state."""
+    deadline_session = recovery_deadline_session(eligible_entry_session, max_entry_staleness_sessions)
+    if live:
+        deadline_close = session_close_utc(deadline_session)
+        return datetime.now(timezone.utc) > deadline_close
+    return ripe_through > deadline_session

@@ -1,0 +1,120 @@
+{
+  "generated_at": "2026-09-15T10:32:55.479755+00:00",
+  "telegram_get_updates_owners": 1,
+  "producers": {
+    "original": {
+      "live": true,
+      "reason": "run_talonx.py process found",
+      "metadata": {
+        "commit_sha": "229c607917f2fe808c879f30f51d279b44e5d2fa",
+        "market_data_provider_configured": "YFINANCE_POLLING",
+        "modules_enabled": {
+          "brain": true,
+          "core": true,
+          "dispatch": true,
+          "paper_trading": true,
+          "quant": true
+        },
+        "paper_execution_path": "LOCAL_SIMULATED_LEDGER (talonx_paper, SQLite -- not a broker)",
+        "pid": 13132,
+        "run_mode": "FULL_APP",
+        "started_at": "2026-09-15T03:56:23.278048+00:00"
+      }
+    },
+    "experimental": {
+      "live": true,
+      "reason": "talonx_signals.run process found"
+    },
+    "intelligence": {
+      "live": true,
+      "reason": "heartbeat 92s old",
+      "heartbeat_at": "2026-09-15T10:31:23.092061+00:00"
+    }
+  },
+  "market": {
+    "state": "HEALTHY",
+    "producer_live": true,
+    "producer_reason": "run_talonx.py process found",
+    "symbols_priced": 51,
+    "newest_tick": "2026-09-15T10:31:05.278011+00:00",
+    "newest_tick_age_seconds": 110,
+    "last_bar_age_seconds": null,
+    "session_phase": null,
+    "active_poller": null,
+    "configured_symbols": 48,
+    "selected_symbols": 43,
+    "coverage_ratio": 1.0,
+    "provider_failures": null,
+    "provider_retries": null,
+    "redis_failures": null,
+    "redis_reconnects": null,
+    "redis_reachable": null,
+    "source": "talonx_ingest.market_data.manager (via run_talonx.py); taps: paper_trading.db.latest_prices, watchlist.db, talonx:ingest:liveness",
+    "notes": []
+  },
+  "eod_latest": {
+    "session_date": "2026-09-15",
+    "status": "PARTIAL",
+    "generated_at_utc": "2026-09-15T10:17:17.726399+00:00",
+    "original_paper": {
+      "open_positions": 0,
+      "trades_all_time": 0,
+      "trades_today": 0
+    },
+    "experimental_paper": {
+      "open_positions": 0,
+      "trades_all_time": 10,
+      "trades_today": 0
+    },
+    "piv_paper": {
+      "positions": null,
+      "orders": null
+    },
+    "alert_counts": {
+      "official": 0,
+      "experimental": 513,
+      "intelligence_events": 55506
+    },
+    "component_status": [
+      {
+        "name": "original_paper",
+        "outcome": "CHECKED",
+        "detail": "read-only local ledger"
+      },
+      {
+        "name": "experimental_paper",
+        "outcome": "CHECKED",
+        "detail": "read-only local ledger"
+      },
+      {
+        "name": "piv_paper",
+        "outcome": "NOT_CHECKED",
+        "detail": "no piv_reader injected (offline / not opted in)"
+      },
+      {
+        "name": "alert_stores",
+        "outcome": "CHECKED",
+        "detail": "dispatch_audit.db / exp_alerts.db / ingestion_ledger.db"
+      }
+    ],
+    "mismatches": []
+  },
+  "eod_reconciled_today": false,
+  "eod_reconciled_today_available_scope": true,
+  "answers": {
+    "talonx_running": true,
+    "original_ready": true,
+    "market_feed_healthy": true,
+    "market_feed_state": "HEALTHY",
+    "experimental_shadow_alive": true,
+    "intelligence_alive": true,
+    "telegram_send_ok": true,
+    "telegram_receive_owner_count": 1,
+    "original_open_positions": 0,
+    "experimental_open_positions": 0,
+    "eod_reconciled_today": false,
+    "eod_reconciled_today_available_scope": true,
+    "dashboard_url": "http://localhost:8787",
+    "intelligence_deep_viewer": "http://localhost:8760"
+  }
+}
