@@ -1,0 +1,49 @@
+PQ-2A test evidence (2026-09-21).  Interpreter: .venv/Scripts/python.exe (system python lacks deps).
+Command form: <interpreter> -m pytest <files> -q -p no:cacheprovider
+
+1. PQ-2A + PQ-1
+   tests/test_pq2a_corporate_actions.py tests/test_provider_qualification_pq1.py
+   -> 59 passed, 0 failed, 0 skipped
+   (PQ-2A file: 45 tests incl. parametrized; PQ-1 known-gap converted to a passing correctness test, not deleted;
+    one PQ-1 composite test updated to supply a compatible basis -- intentional contract change)
+
+2. Package 1 / 2 / 3 / 4
+   tests/test_package1_settlement_integrity.py test_package2_account_blocks.py test_package2_acceptance_review.py
+   test_package3_pricing_timing.py test_package4_sizing_accounting.py
+   -> 103 passed, 0 failed, 0 skipped
+
+3. RI-1 / RI-2 / RI-3 / Task110
+   tests/test_ri1_campaign_identity.py test_ri2_notification_routing.py test_ri3_operator.py test_task110_v2_integration.py
+   -> 148 passed, 1 failed, 0 skipped
+   failure: test_ri3_operator.py::test_renderer_shows_end_to_end_fixture (FileNotFoundError: absent renderer executable)
+   -> REPRODUCES on starting HEAD 9b3f7ca (scratch worktree)  => pre-existing, unrelated
+
+4. Task111 / Task112 / Task114 / Task100b
+   -> 130 passed, 3 failed
+   failures: test_task111_v2_e2e.py::test_item3_original_strategy_fingerprint_unchanged,
+             test_task112_tuesday_release.py::test_03_v1_fingerprint_intact           (OPS-017 stale V1 fingerprint literals, out of scope)
+             test_task114_prospective.py::test_a4_v2_section_separates_health_data_activity
+   -> all 3 REPRODUCE on starting HEAD 9b3f7ca => pre-existing
+
+5. Task117 pricing / composite consumers
+   tests/test_task117_phase0_pricing_adapter.py test_task117_pricing_readiness.py test_task117_phase0_source_readiness.py
+   test_task117_execution_scope.py test_task117_phase0_dashboard_readiness.py
+   -> 50 passed, 0 failed
+   Four of these (composite splice fixtures without a basis / evidence source) FAILED after the PQ-2A change and were
+   updated to supply a no-split evidence source (tests/test_task117_phase0_pricing_adapter.py::test_composite_prefers_history_then_live_tail,
+   tests/test_task117_pricing_readiness.py fixtures).  This is the intended fail-closed contract change, not a regression.
+
+6. Broader broad-run triage (1,872 tests over V2/ops/paper/dispatch/task1xx, run under heavy CPU contention): 38 failed / 1,834 passed.
+   Classification against starting HEAD 9b3f7ca (scratch worktree, same test ids):
+   - 10 fail identically on starting HEAD (pre-existing): ri3 renderer, task111/112 fingerprint literals (OPS-017), task114 a4,
+     task117_overnight_journey P1, task117_release_rehearsal, task117_spa_states x2, task118a_dashboard_message_count, task131 broad-discovery shape
+   - 18 passed when re-run in isolation on this tree (process-timing tests failed only under CPU contention)
+   - 6 (task117_migration x5, task117_deployment_rehearsal) require the production ledger md5 to be in a stale expected-hash
+     set; they FAIL IDENTICALLY on starting HEAD once the ledger file is present (skipped in the scratch worktree only because it has no ledger)
+   - 4 were genuine composite-contract impacts (item 5) and are fixed.
+   OPS-017 (stale fingerprint literals) was NOT touched.
+
+7. Slow suite: tests/test_package5_intraday_causality.py produces no output within 100 s on BOTH starting HEAD and this tree (CPU-bound intraday suite).
+   Unrelated to corporate actions.  Run to completion on this tree: 20 passed, 0 failed, 0 skipped (868 s).
+
+Strategy integrity: tests::test_28_29 asserts thresholds (2,10,1,20,5000000.0,5.0,5,3) and v2_release_fingerprint == e2acf6454789217e -> PASS.

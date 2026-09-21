@@ -525,8 +525,8 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
                                   "v2_lane.db unavailable")
     try:
         cash = _q1(con, "SELECT cash FROM portfolio WHERE id=1") if _has_table(con, "portfolio") else None
-        opens = _qall(con, "SELECT symbol, episode_id, entry_session, target_exit_session, entry_price, "
-                           "shares, position_cost, opened_at FROM positions WHERE status='OPEN'") \
+        opens = _qall(con, "SELECT position_id, symbol, episode_id, entry_session, target_exit_session, "
+                           "entry_price, shares, position_cost, opened_at FROM positions WHERE status='OPEN'") \
             if _has_table(con, "positions") else []
         closed = _qall(con, "SELECT symbol, episode_id, entry_session, exit_session, entry_price, "
                             "exit_price, shares, position_cost, realized_pnl_usd, realized_pnl_pct, "
@@ -562,6 +562,13 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
         marked_value_total = 0.0
         marked_value_complete = True
         unrealized_total = 0.0
+        # PQ-2A: economic (post-corporate-action) quantity, read-only; positions
+        # with no APPLIED action fall back to their entry shares unchanged.
+        try:
+            from talonx_v2.corporate_actions import effective_shares_map
+            eff_map = effective_shares_map(con)
+        except Exception:  # noqa: BLE001
+            eff_map = {}
         for r in opens:
             sym = r["symbol"]
             mark_px, mark_ts = marks.get(sym, (None, None))
@@ -570,7 +577,9 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
                 "symbol": sym, "lane": "V2", "episode_id": r["episode_id"],
                 "entry_time": r["opened_at"], "entry_session": r["entry_session"],
                 "planned_exit_session": r["target_exit_session"],
-                "quantity": r["shares"], "entry_price": r["entry_price"], "cost_basis": r["position_cost"],
+                "quantity": eff_map.get(r["position_id"], r["shares"]),
+                "entry_quantity": r["shares"],
+                "entry_price": r["entry_price"], "cost_basis": r["position_cost"],
                 "mark": mark_px, "mark_timestamp": cls["mark_timestamp"],
                 "mark_source": (f"{Path(price_source_db).name}.latest_prices (shared quant feed; "
                                 "V2 has no per-lane latest_prices table of its own)" if mark_px is not None else None),
@@ -588,7 +597,7 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
                 entry["unrealized_pnl_usd"] = None
                 entry["unrealized_status"] = "UNAVAILABLE -- no usable mark for this symbol"
             else:
-                mv = (r["shares"] or 0.0) * mark_px
+                mv = (eff_map.get(r["position_id"], r["shares"]) or 0.0) * mark_px
                 upnl = mv - (r["position_cost"] or 0.0)
                 marked_value_total += mv
                 unrealized_total += upnl

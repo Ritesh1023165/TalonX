@@ -170,8 +170,11 @@ def _liquid_history(entry, **extra):
 
 def test_composite_provenance_names_the_sub_adapter_that_supplied_the_bar():
     entry = date(2026, 9, 8)
-    hist = MemAdapter("hist-snapshot", [row(s, close=20.0) for s in _prior(entry)])
-    live = MemAdapter("live-tail", [row(entry, open_=25.0, close=25.5)])
+    # PQ-2A: splicing two sources requires a PROVABLY compatible adjustment basis
+    # (same basis date); an unknown/unequal basis is refused (see the PQ-2A tests).
+    basis = "2026-09-10"
+    hist = MemAdapter("hist-snapshot", [row(s, close=20.0, _basis_as_of=basis) for s in _prior(entry)])
+    live = MemAdapter("live-tail", [row(entry, open_=25.0, close=25.5, _basis_as_of=basis)])
     resolver = PricingResolver(CompositeBarAdapter(hist, live), today=lambda: date(2026, 9, 10))
     assert resolver.price_lookup("PQX", entry)["_provenance"]["provider"] == "live-tail"
     covered = _prior(entry)[-1]
@@ -262,19 +265,32 @@ def test_strategy_thresholds_and_release_fingerprint_unchanged_by_pq1():
     assert mod.v2_release_fingerprint()["fingerprint"] == "e2acf6454789217e"
 
 
-def test_KNOWN_GAP_split_during_hold_is_not_normalized_by_the_ledger(tmp_path):
-    """CHARACTERIZATION of an OPEN gap (OPS-004/OPS-005), not desired behaviour.
+def test_split_during_hold_is_normalized_by_the_ledger_pq2a_supersedes_known_gap(tmp_path):
+    """PQ-1 KNOWN_GAP, now a CORRECTNESS test (superseded by PQ-2A; the original
+    characterization -- ~-89% spurious loss on a 10:1 split during a hold -- is
+    reproduced in tests/test_pq2a_corporate_actions.py::test_root_cause_*).
 
-    Entry is persisted on the basis the provider served at entry time (pre-split);
-    if a 10:1 forward split happens during the hold, the exit close is served on
-    the post-split basis while shares/cost are not adjusted, so realized P&L is
-    economically wrong. This is why PQ-1 is NOT accepted. If a corporate-action
-    layer is later added, this test must be replaced, not silently deleted."""
+    Same fixture: 10:1 forward split during the hold, exit ~2.7.  With the
+    corporate-action guard the position is re-expressed as 10x shares at
+    unchanged aggregate cost, so realized P&L is the true ~+8%, not -89%."""
+    from talonx_v2.corporate_actions import (
+        CorporateActionGuard, StaticCorporateActionSource, make_split_event)
     entry = date(2026, 9, 8)
-    store, resolver, cfg, target = _open_position(
-        tmp_path, entry, lambda t: [row(t, open_=2.6, close=2.7)])   # ~25.5 / 10
-    pipeline.settle_due_exits(store=store, as_of_session=target,
-                              price_lookup=resolver.price_lookup, config=cfg)
+    basis = "2026-09-08"
+    exit_session = v2cal.add_sessions(entry, 10)
+    rows = ([row(s, close=20.0, volume=1_000_000, _basis_as_of=basis) for s in _prior(entry)]
+            + [row(entry, open_=25.0, close=25.5, _basis_as_of=basis),
+               row(exit_session, open_=2.6, close=2.7, _basis_as_of="2026-09-23")])   # ~25.5 / 10
+    resolver = PricingResolver(MemAdapter("fixture", rows), today=lambda: date(2026, 12, 31))
+    store = V2Store(str(tmp_path / "lc.db"), starting_cash=300_000.0)
+    cfg = V2Config(starting_cash_usd=300_000.0)
+    pipeline.process_episode(episode(entry), store=store, bars_lookup=resolver.bars_lookup,
+                             price_lookup=resolver.price_lookup, config=cfg)
+    guard = CorporateActionGuard(StaticCorporateActionSource(
+        [make_split_event("PQX", v2cal.add_sessions(entry, 4), 10, 1)]))
+    pipeline.settle_due_exits(store=store, as_of_session=exit_session,
+                              price_lookup=resolver.price_lookup, config=cfg, corporate_actions=guard)
     pos = store.all_positions()[0]
     assert pos["status"] == "CLOSED"
-    assert pos["realized_pnl_pct"] < -50.0          # spurious ~-89% "loss" on a split
+    assert pos["realized_pnl_pct"] == 8.0 or abs(pos["realized_pnl_pct"] - 8.0) < 1e-6
+    assert pos["realized_pnl_pct"] > -50.0                       # the spurious ~-89% is gone

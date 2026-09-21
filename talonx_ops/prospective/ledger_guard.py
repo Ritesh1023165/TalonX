@@ -134,6 +134,14 @@ def check_ledger_continuity(db_path: str | Path) -> LedgerCheck:
                 f"unresolved_cost({unresolved_cost:.2f}) != start({starting_cash:.2f}) "
                 f"+ realized({realized:.2f})")
 
+        # PQ-2A: corporate-action adjustment state must be internally consistent.
+        try:
+            from talonx_v2.corporate_actions import consistency_problems
+            for prob in consistency_problems(con):
+                r.problems.append(f"corporate-action adjustment inconsistent: {prob}")
+        except Exception as exc:  # noqa: BLE001 -- an unreadable trail is itself a problem
+            r.problems.append(f"corporate-action consistency check failed: {exc!r}")
+
         if not r.stale_skipped_episodes:
             r.notes.append("no SKIPPED_ENTRY_STALE record yet (fine on a truly fresh carry-forward; "
                            "the ABCL episode 07242bc857569f60 is re-recorded on the first live tick)")

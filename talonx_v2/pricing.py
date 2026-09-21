@@ -28,7 +28,7 @@ from __future__ import annotations
 import math
 import os
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Protocol
 
@@ -49,13 +49,18 @@ class Bar:
     source_timestamp: str | None = None
     receipt_timestamp: str | None = None
     adjustment_state: str = "UNKNOWN"
+    # PQ-2A: the date on which the provider computed the adjustment basis this row
+    # is expressed on (splits/dividends with ex_date <= basis_as_of are reflected).
+    # None = UNKNOWN (e.g. a static snapshot) -- never guessed.
+    basis_as_of: str | None = None
 
     def as_dict(self) -> dict:
         return {"date": self.date, "open": self.open, "close": self.close,
                 "volume": self.volume, "status": self.status, "source": self.source,
                 "source_timestamp": self.source_timestamp,
                 "receipt_timestamp": self.receipt_timestamp,
-                "adjustment_state": self.adjustment_state}
+                "adjustment_state": self.adjustment_state,
+                "basis_as_of": self.basis_as_of}
 
 
 @dataclass(frozen=True)
@@ -104,7 +109,8 @@ def validate_bar(raw: dict, *, symbol: str, want_session: str,
               status=status, source=str(raw.get("_source_adapter") or source),
               source_timestamp=raw.get("_source_timestamp") or raw.get("t"),
               receipt_timestamp=datetime.now(timezone.utc).isoformat(),
-              adjustment_state=str(raw.get("_adjustment_state") or "UNKNOWN"))
+              adjustment_state=str(raw.get("_adjustment_state") or "UNKNOWN"),
+              basis_as_of=(str(raw["_basis_as_of"])[:10] if raw.get("_basis_as_of") else None))
 
 
 # --------------------------------------------------------------------------- #
@@ -199,9 +205,10 @@ class AlpacaIexBarAdapter:
                       {"symbols": symbol, "timeframe": "1Day", "adjustment": "all",
                        "feed": "iex", "limit": str(_LOOKBACK_LOAD_SESSIONS + 5)})
         bars = d.get("bars", {}).get(symbol, []) or []
+        basis = datetime.now(timezone.utc).date().isoformat()     # PQ-2A: fetch-date basis
         rows = [{"date": str(b["t"])[:10], "open": float(b["o"]), "close": float(b["c"]),
                  "volume": float(b["v"]), "_source_timestamp": str(b["t"]),
-                 "_adjustment_state": self.adjustment_state} for b in bars]
+                 "_adjustment_state": self.adjustment_state, "_basis_as_of": basis} for b in bars]
         rows.sort(key=lambda r: r["date"])
         self._cache[symbol] = rows
         return rows
@@ -255,6 +262,7 @@ class YFinanceBarAdapter:
         start = (_dt.date.today() - _dt.timedelta(days=int(self._lb * 1.6) + 10)).isoformat()
         h = tk.history(start=start, interval="1d", auto_adjust=True, actions=False)
         rows: list[dict] = []
+        basis = datetime.now(timezone.utc).date().isoformat()     # PQ-2A: fetch-date basis
         if h is not None and not h.empty:
             h = h.reset_index()
             for r in h.itertuples(index=False):
@@ -262,7 +270,8 @@ class YFinanceBarAdapter:
                 rows.append({"date": str(d)[:10], "open": float(r.Open),
                              "close": float(r.Close), "volume": float(r.Volume),
                              "_source_timestamp": str(d),
-                             "_adjustment_state": self.adjustment_state})
+                             "_adjustment_state": self.adjustment_state,
+                             "_basis_as_of": basis})
         rows.sort(key=lambda x: x["date"])
         self._cache[symbol] = rows
         return rows
@@ -278,26 +287,87 @@ class YFinanceBarAdapter:
 # --------------------------------------------------------------------------- #
 # composite: FINAL history from `hist`, recent tail from `live`
 # --------------------------------------------------------------------------- #
+class IncompatibleAdjustmentBasis(RuntimeError):
+    """Raised when a merged history would combine rows on adjustment bases that
+    cannot be PROVEN compatible across a corporate action (PQ-2A)."""
+
+
 class CompositeBarAdapter:
     """Liquidity window (older, FINAL) from ``hist``; the entry/exit session
     (recent) from ``live`` when ``hist`` has no bar for it.  Keeps the
     deterministic historical snapshot authoritative for everything it
-    covers and only reaches ``live`` for the uncovered recent tail."""
+    covers and only reaches ``live`` for the uncovered recent tail.
+
+    PQ-2A: ``history()`` may only splice the two sources when their adjustment
+    bases are PROVEN compatible.  Rows carry ``_basis_as_of`` (fetch date; None
+    for a static snapshot).  If both are known and equal -> compatible.  Else the
+    ``ca_source`` (a corporate-action source) must show NO split/unsupported
+    action with an effective date in ``(hist basis, live basis]`` -- otherwise (or
+    if evidence is unavailable / no source is configured) the merge is REFUSED
+    (``IncompatibleAdjustmentBasis``) rather than silently mixing a pre-split
+    snapshot with a post-split tail.  ``session()`` returns ONE source's row and
+    never mixes."""
     name = "composite"
 
-    def __init__(self, hist: DailyBarAdapter, live: DailyBarAdapter):
+    def __init__(self, hist: DailyBarAdapter, live: DailyBarAdapter, *, ca_source=None,
+                 today: Callable[[], date] | None = None):
         self.hist, self.live = hist, live
         self.name = f"composite({hist.name}+{live.name})"
+        self.ca_source = ca_source
+        self._today = today or (lambda: datetime.now(timezone.utc).date())
 
     @staticmethod
     def _tag(row: dict | None, adapter) -> dict | None:
         return None if row is None else {**row, "_source_adapter": adapter.name}
 
+    @staticmethod
+    def _basis(rows: list[dict]) -> date | None:
+        """Earliest known basis among rows; None if ANY row lacks one (unknown)."""
+        bases = []
+        for r in rows:
+            b = r.get("_basis_as_of")
+            if not b:
+                return None
+            bases.append(date.fromisoformat(str(b)[:10]))
+        return min(bases) if bases else None
+
+    def _require_compatible(self, symbol: str, h: list[dict], live_rows: list[dict]) -> None:
+        hb, lb = self._basis(h), self._basis(live_rows)
+        if hb is not None and lb is not None and hb == lb:
+            return                                            # same basis date -> compatible
+        if self.ca_source is None:
+            raise IncompatibleAdjustmentBasis(
+                f"{symbol}: hist basis {hb} != live basis {lb} and no corporate-action evidence "
+                f"source configured -- refusing to splice")
+        hist_last = max(date.fromisoformat(r["date"]) for r in h)
+        lower = hb if hb is not None else hist_last
+        upper = lb if lb is not None else self._today()
+        if upper <= lower:
+            return
+        res = self.ca_source.fetch(symbol, lower + timedelta(days=1), upper)
+        if not res.ok:
+            raise IncompatibleAdjustmentBasis(
+                f"{symbol}: corporate-action evidence unavailable ({res.detail}) -- cannot prove "
+                f"hist basis {hb} and live basis {lb} are compatible")
+        if res.conflicts:
+            raise IncompatibleAdjustmentBasis(f"{symbol}: conflicting corporate-action evidence "
+                                              f"{list(res.conflicts)}")
+        for e in res.events:
+            # dividends only rescale by a tiny factor inside the frozen `adjustment=all`
+            # contract; splits and unsupported actions are NOT safe to splice across.
+            if e.kind != "CASH_DIVIDEND" and (e.ex_date is None or lower < e.ex_date <= upper):
+                raise IncompatibleAdjustmentBasis(
+                    f"{symbol}: {e.kind} ({e.action_key}) effective {e.ex_date} lies between the "
+                    f"snapshot basis ({hb}) and live basis ({lb}) -- mixed adjustment bases")
+
     def history(self, symbol: str) -> list[dict]:
         h = [self._tag(r, self.hist) for r in self.hist.history(symbol)]
         seen = {r["date"] for r in h}
-        merged = h + [self._tag(r, self.live) for r in self.live.history(symbol)
-                      if r["date"] not in seen]
+        live_rows = [self._tag(r, self.live) for r in self.live.history(symbol)
+                     if r["date"] not in seen]
+        if h and live_rows:
+            self._require_compatible(symbol, h, live_rows)
+        merged = h + live_rows
         merged.sort(key=lambda r: r["date"])
         return merged
 
@@ -322,6 +392,11 @@ class PricingResolver:
         out = []
         try:
             hist = self.adapter.history(symbol)
+        except IncompatibleAdjustmentBasis:
+            # PQ-2A: fail closed -- an unprovable/mixed adjustment basis is never used.
+            self.last[f"{symbol}|history"] = PriceUnavailable(
+                symbol, "history", "REJECTED_INCOMPATIBLE_ADJUSTMENT_BASIS")
+            return out
         except Exception:  # noqa: BLE001 -- transient provider fault -> empty history
             # (the liquidity gate then reports NO_PRIOR_BARS / INSUFFICIENT_HISTORY,
             # a non-terminal skip that retries next tick, rather than crashing the tick).
@@ -336,6 +411,7 @@ class PricingResolver:
                                              "source_timestamp": b.source_timestamp,
                                              "receipt_timestamp": b.receipt_timestamp,
                                              "adjustment_state": b.adjustment_state,
+                                             "basis_as_of": b.basis_as_of,
                                              "finality": b.status}})
         return out
 
@@ -371,13 +447,15 @@ class PricingResolver:
                                      "source_timestamp": r.source_timestamp,
                                      "receipt_timestamp": r.receipt_timestamp,
                                      "adjustment_state": r.adjustment_state,
+                                     "basis_as_of": r.basis_as_of,
                                      "finality": r.status}}
         return None            # pipeline treats None as SKIPPED_NO_ENTRY_BAR / fall-forward
 
 
 def make_resolver(*, mode: str, bar_dirs: list[str | Path],
                   today: Callable[[], date] | None = None,
-                  yf_ticker_factory: Callable[[str], object] | None = None) -> PricingResolver:
+                  yf_ticker_factory: Callable[[str], object] | None = None,
+                  ca_source=None) -> PricingResolver:
     """``mode``:
       "csv"          -- frozen CSV snapshot only (default live wiring; the
                         companion stays here until the provider decision is
@@ -395,9 +473,10 @@ def make_resolver(*, mode: str, bar_dirs: list[str | Path],
     if mode == "csv":
         adapter: DailyBarAdapter = csv
     elif mode == "composite-yf":
-        adapter = CompositeBarAdapter(csv, YFinanceBarAdapter(ticker_factory=yf_ticker_factory))
+        adapter = CompositeBarAdapter(csv, YFinanceBarAdapter(ticker_factory=yf_ticker_factory),
+                                      ca_source=ca_source, today=today)
     elif mode == "composite-iex":
-        adapter = CompositeBarAdapter(csv, AlpacaIexBarAdapter())
+        adapter = CompositeBarAdapter(csv, AlpacaIexBarAdapter(), ca_source=ca_source, today=today)
     else:
         raise ValueError(f"unknown pricing mode {mode!r}")
     r = PricingResolver(adapter=adapter)

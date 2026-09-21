@@ -195,6 +195,41 @@ CREATE TABLE IF NOT EXISTS v2_alert_outbox (
     sent_at_utc           TEXT,
     destination           TEXT NOT NULL DEFAULT 'TRADE_EVENT'   -- RI-2: logical destination (talonx_ops.notify)
 );
+-- PQ-2A: corporate-action registry + per-position append-only application trail.
+-- Purely additive (CREATE IF NOT EXISTS); no existing table is altered and no
+-- existing row is rewritten.  The original entry row is NEVER modified: the
+-- economic (post-action) quantity is entry `shares` x product of APPLIED ratios.
+CREATE TABLE IF NOT EXISTS corporate_actions (
+    action_key            TEXT PRIMARY KEY,      -- content-derived idempotency key
+    symbol                TEXT NOT NULL,
+    kind                  TEXT NOT NULL,         -- FORWARD_SPLIT | REVERSE_SPLIT | CASH_DIVIDEND
+    provider_type         TEXT,
+    ex_date               TEXT,
+    ratio_num             TEXT,
+    ratio_den             TEXT,
+    cash_rate             TEXT,
+    sources_json          TEXT NOT NULL,         -- [{source, provider_id, received_at_utc}]
+    first_received_at_utc TEXT NOT NULL,
+    raw_json              TEXT
+);
+CREATE TABLE IF NOT EXISTS position_corporate_actions (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    position_id           INTEGER NOT NULL,
+    action_key            TEXT NOT NULL,
+    kind                  TEXT NOT NULL,
+    ex_date               TEXT,
+    ratio_num             TEXT,
+    ratio_den             TEXT,
+    status                TEXT NOT NULL,         -- APPLIED | REFLECTED_IN_ENTRY_BASIS | DIVIDEND_OBSERVED_NOT_CREDITED | BLOCKED_<code>
+    shares_before         TEXT,                  -- exact fraction ("10", "10/3")
+    shares_after          TEXT,
+    cost_basis            REAL,                  -- aggregate cost basis at application (UNCHANGED by a pure split)
+    entry_basis_as_of     TEXT,
+    exit_basis_as_of      TEXT,
+    detail                TEXT,
+    applied_at_utc        TEXT NOT NULL,
+    UNIQUE(position_id, action_key)
+);
 """ + _ACCOUNT_BLOCKS_SCHEMA
 
 
@@ -686,6 +721,125 @@ class V2Store:
                  exit_fee, json.dumps(price_provenance) if price_provenance is not None else None,
                  position_id),
             )
+            return cur.rowcount > 0
+
+    # ---- PQ-2A corporate actions (append-only trail; original entry row untouched) ----
+    def position_by_id(self, position_id: int) -> dict | None:
+        with self._conn() as c:
+            r = c.execute("SELECT * FROM positions WHERE position_id=?", (position_id,)).fetchone()
+            return dict(r) if r else None
+
+    def position_action_trail(self, position_id: int) -> list[dict]:
+        with self._conn() as c:
+            return [dict(r) for r in c.execute(
+                "SELECT * FROM position_corporate_actions WHERE position_id=? ORDER BY id", (position_id,))]
+
+    def effective_shares_exact(self, position_id: int):
+        """Economic quantity as an exact ``Fraction``: entry shares x product of
+        APPLIED split ratios.  Derived from the trail (source of truth) -- never
+        from a denormalised counter that could be applied twice."""
+        with self._conn() as c:
+            return self._effective_shares_exact_c(c, position_id)
+
+    @staticmethod
+    def _effective_shares_exact_c(c, position_id: int):
+        from fractions import Fraction
+        r = c.execute("SELECT shares FROM positions WHERE position_id=?", (position_id,)).fetchone()
+        q = Fraction(str(r["shares"])) if r and r["shares"] is not None else Fraction(0)
+        for a in c.execute("SELECT ratio_num, ratio_den FROM position_corporate_actions "
+                           "WHERE position_id=? AND status='APPLIED' ORDER BY id", (position_id,)):
+            q *= Fraction(int(a["ratio_num"]), int(a["ratio_den"]))
+        return q
+
+    @staticmethod
+    def _blocked_action_rows_c(c, position_id: int) -> list[dict]:
+        return [dict(r) for r in c.execute(
+            "SELECT * FROM position_corporate_actions WHERE position_id=? AND substr(status,1,8)='BLOCKED_'",
+            (position_id,))]
+
+    def blocked_action_rows(self, position_id: int) -> list[dict]:
+        with self._conn() as c:
+            return self._blocked_action_rows_c(c, position_id)
+
+    def clear_blocked_action_rows(self, position_id: int) -> None:
+        """BLOCKED_* rows are DERIVED diagnostics (never economics); they are
+        recomputed on every assessment so a resolved condition stops blocking."""
+        with self._conn() as c:
+            c.execute("DELETE FROM position_corporate_actions WHERE position_id=? "
+                      "AND substr(status,1,8)='BLOCKED_'", (position_id,))
+
+    def record_blocked_action(self, position_id: int, action_key: str, status: str, detail: str) -> None:
+        with self._conn() as c:
+            c.execute(
+                """INSERT OR IGNORE INTO position_corporate_actions
+                   (position_id, action_key, kind, status, detail, applied_at_utc)
+                   VALUES (?,?,?,?,?,?)""",
+                (position_id, action_key, "BLOCK", status, detail, _utcnow()))
+
+    def register_corporate_action(self, event) -> None:
+        """Idempotent registry of the evidence event (provenance: every source
+        ref that reported it is retained; later corroboration appends)."""
+        with self._conn() as c:
+            row = c.execute("SELECT sources_json FROM corporate_actions WHERE action_key=?",
+                            (event.action_key,)).fetchone()
+            refs = [event.source_ref()]
+            for extra in (event.raw or {}).get("_source_refs", []):
+                if extra not in refs:
+                    refs.append(extra)
+            if row is None:
+                c.execute(
+                    """INSERT INTO corporate_actions
+                       (action_key, symbol, kind, provider_type, ex_date, ratio_num, ratio_den,
+                        cash_rate, sources_json, first_received_at_utc, raw_json)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                    (event.action_key, event.symbol, event.kind, event.provider_type,
+                     event.ex_date.isoformat() if event.ex_date else None,
+                     str(event.ratio.numerator) if event.ratio is not None else None,
+                     str(event.ratio.denominator) if event.ratio is not None else None,
+                     event.cash_rate, json.dumps(refs), event.received_at_utc,
+                     json.dumps(event.raw, default=str)))
+            else:
+                known = json.loads(row["sources_json"] or "[]")
+                merged = known + [r for r in refs if r not in known]
+                if merged != known:
+                    c.execute("UPDATE corporate_actions SET sources_json=? WHERE action_key=?",
+                              (json.dumps(merged), event.action_key))
+
+    def corporate_action_registry(self) -> list[dict]:
+        with self._conn() as c:
+            return [dict(r) for r in c.execute("SELECT * FROM corporate_actions ORDER BY ex_date, action_key")]
+
+    def apply_position_action(self, *, position_id: int, event, status: str, detail: str = "",
+                              entry_basis_as_of=None, exit_basis_as_of=None) -> bool:
+        """Append ONE trail row.  Returns True iff a NEW row was inserted --
+        the ``UNIQUE(position_id, action_key)`` constraint makes a repeated
+        call (restart, replay, duplicate provider event) a no-op, so a split
+        can never be applied twice.  Status APPLIED records the exact
+        before/after quantity; the aggregate cost basis is carried, unchanged."""
+        from fractions import Fraction
+        with self.transaction() as c:
+            self.register_corporate_action(event)
+            pos = c.execute("SELECT shares, position_cost FROM positions WHERE position_id=?",
+                            (position_id,)).fetchone()
+            if pos is None:
+                return False
+            before = self._effective_shares_exact_c(c, position_id)
+            ratio = event.ratio if (status == "APPLIED" and event.ratio is not None) else Fraction(1)
+            after = before * ratio
+            cur = c.execute(
+                """INSERT OR IGNORE INTO position_corporate_actions
+                   (position_id, action_key, kind, ex_date, ratio_num, ratio_den, status,
+                    shares_before, shares_after, cost_basis, entry_basis_as_of, exit_basis_as_of,
+                    detail, applied_at_utc)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (position_id, event.action_key, event.kind,
+                 event.ex_date.isoformat() if event.ex_date else None,
+                 str(event.ratio.numerator) if event.ratio is not None else "1",
+                 str(event.ratio.denominator) if event.ratio is not None else "1",
+                 status, str(before), str(after), pos["position_cost"],
+                 entry_basis_as_of.isoformat() if entry_basis_as_of else None,
+                 exit_basis_as_of.isoformat() if exit_basis_as_of else None,
+                 detail, _utcnow()))
             return cur.rowcount > 0
 
     # ---- trades ----

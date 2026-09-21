@@ -1061,6 +1061,25 @@ class DashboardReadModel:
                         "available_capital": None if cash is None else round(cash, 2),
                         "capacity": f"{len(opens)}/20",
                     }
+                    # PQ-2A: read-only corporate-action visibility (symbol, action
+                    # type, effective session, ratio, adjustment status).  Never
+                    # mutates the ledger; absent table -> NONE.
+                    try:
+                        from talonx_v2.corporate_actions import trail_rows
+                        ca = [{"symbol": t["symbol"], "action_type": t["kind"], "ex_date": t["ex_date"],
+                               "ratio": (f'{t["ratio_num"]}/{t["ratio_den"]}' if t["kind"] != "BLOCK" else None),
+                               "adjustment_status": t["status"], "shares_before": t["shares_before"],
+                               "shares_after": t["shares_after"], "detail": t["detail"]}
+                              for t in trail_rows(con)]
+                        blocked = [c for c in ca if str(c["adjustment_status"]).startswith("BLOCKED_")]
+                        out["ledger"]["corporate_actions"] = {
+                            "status": ("BLOCKED" if blocked else
+                                       "ADJUSTED" if any(c["adjustment_status"] == "APPLIED" for c in ca)
+                                       else "NONE" if not ca else "OBSERVED"),
+                            "items": ca}
+                    except Exception as exc:  # noqa: BLE001
+                        out["ledger"]["corporate_actions"] = {"status": "UNKNOWN",
+                                                              "note": f"{type(exc).__name__}: {exc}"}
                     # Task 119A A1: fold V2's richer accounting (equity,
                     # arithmetic reconciliation, cost-treatment breakdown,
                     # marked open-position value) into this SAME ledger

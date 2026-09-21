@@ -414,8 +414,11 @@ attributed to the release runtime.
 
 ## OPS-004 — Corporate-action and fractional-share handling gap
 
-**Status**: `OPEN` — no such code exists today; Session 5 §D is
-entirely future policy, not implemented behavior.
+**Status**: `PARTIALLY_RESOLVED (V2 forward/reverse-split accounting, PQ-2A
+2026-09-21)` — see the *PQ-2A update* below. Still open: cash-dividend
+accounting (`DIVIDEND_POLICY_DECISION_REQUIRED`), mergers/spin-offs/renames
+(fail closed, not supported), truncate+cash-in-lieu (`S5-26`), Original's
+own accounting. Original text of this finding follows unchanged.
 
 **Found**: Session 5 documentation pass (2026-09-16), via targeted
 code search.
@@ -447,6 +450,26 @@ split/merger-adjusted entry-basis and chronological-reconstruction
 logic; build proportional cost-basis allocation and `CORP_ACTION_CASH`
 accounting; decide and implement the exact rounding mode and residual-
 reconciliation policy (`S5-27`).
+
+**PQ-2A update (2026-09-21)** — V2 only. Root cause of the PQ-1 "-89% on a
+10:1 split" was a price-BASIS mismatch: entry price/shares/cost persisted on
+the basis the provider served at entry time, exit close served on the
+post-split basis, shares never re-expressed. Implemented (additive, no
+migration): explicit-event corporate-action layer `talonx_v2/corporate_actions.py`
+(Alpaca `/v1/corporate-actions` + optional yfinance witness), append-only
+`position_corporate_actions` trail, exact-`Fraction` share adjustment with
+unchanged aggregate cost basis, idempotent by content key, per-fill
+`basis_as_of` proof, settlement on economic quantity, fail closed
+(hold-in-window / `EXIT_UNRESOLVED`) for unavailable/conflicting/unsupported/
+unknown-basis evidence, reconciliation + read-only operator projection, and
+`CompositeBarAdapter.history()` now refuses to splice bases it cannot prove
+compatible. Reverse-split fractional entitlement is retained EXACTLY (not the
+agreed `S5-26` truncate+cash-in-lieu, whose settlement reference no source
+provides) — recorded as a gatekeeper decision. Cash dividends are observed and
+never credited (interim price-return-only mechanics; agreed `S10-17`
+total-return treatment needs a receivable lifecycle). Legacy/unknown-basis
+positions are never back-filled. Evidence:
+`docs/research/evidence/provider_qualification_pq2a/`.
 
 **Evidence references**: targeted repository-wide search, this
 session (no matches in `talonx_v2/`, `talonx_paper/`, `talonx_ops/`).

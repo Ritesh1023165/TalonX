@@ -87,6 +87,11 @@ def _v2_reconcile() -> tuple[dict[str, Any], dict[str, str], list[str]]:
         bad_cost = con.execute(
             "SELECT episode_id, position_cost FROM positions WHERE status IN ('OPEN','EXIT_UNRESOLVED') "
             "AND (position_cost IS NULL OR position_cost <= 0)").fetchall()
+        # PQ-2A: corporate-action adjustment state must be internally consistent
+        # (trail chain, ex_date vs entry, settled quantity == economic quantity).
+        # A correctly adjusted split raises NO problem here.
+        from talonx_v2.corporate_actions import consistency_problems
+        ca_problems = consistency_problems(con)
     finally:
         con.close()
 
@@ -113,6 +118,7 @@ def _v2_reconcile() -> tuple[dict[str, Any], dict[str, str], list[str]]:
        str([(d[0], d[1]) for d in non_whole]))
     _a("positive_finite_position_cost", not bad_cost,
        str([(d[0], d[1]) for d in bad_cost]))
+    _a("corporate_action_adjustments_consistent", not ca_problems, "; ".join(ca_problems[:5]))
     _a("no_duplicate_buy_episode_id", not dup_buy, str([d[0] for d in dup_buy]))
     _a("no_duplicate_position_episode_id", not dup_pos, str([d[0] for d in dup_pos]))
     _a("no_stale_episode_entered", not stale_entered, str([s[0] for s in stale_entered]))
@@ -178,6 +184,10 @@ def _record_v2_reconciliation_blocks(asserts: dict[str, str], findings: list[str
         detail = next((f for f in findings if f.startswith("positive_finite_position_cost")),
                       "positive_finite_position_cost: FAIL")
         to_record.append((account_blocks.REASON_LEDGER_MISMATCH, "positive_finite_position_cost", detail))
+    if asserts.get("corporate_action_adjustments_consistent") == "FAIL":
+        detail = next((f for f in findings if f.startswith("corporate_action_adjustments_consistent")),
+                      "corporate_action_adjustments_consistent: FAIL")
+        to_record.append((account_blocks.REASON_LEDGER_MISMATCH, "corporate_action_adjustments_consistent", detail))
     if not to_record:
         return []
 
@@ -228,7 +238,8 @@ def _record_v2_reconciliation_blocks(asserts: dict[str, str], findings: list[str
                 ops_store, campaign_id=campaign_id,
                 findings=[f for f in findings if any(
                     f.startswith(k) for k in ("cash_plus_open_cost_reconciles", "no_negative_cash",
-                                              "whole_share_positions", "positive_finite_position_cost"))],
+                                              "whole_share_positions", "positive_finite_position_cost",
+                                              "corporate_action_adjustments_consistent"))],
                 reference=",".join(recorded))
         except Exception:  # noqa: BLE001
             logger.exception("failed to enqueue OPERATIONS reconciliation-failure notification")

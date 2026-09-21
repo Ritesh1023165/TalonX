@@ -76,7 +76,9 @@ def _svc(tmp, *, today, yf_rows_by_sym, kind="parquet"):
     svc._resolver = pricing.make_resolver(
         mode="composite-yf", bar_dirs=[str(bd)],
         today=lambda: holder["d"],
-        yf_ticker_factory=lambda s: _StubTicker(s, yf_rows_by_sym.get(s, [])))
+        yf_ticker_factory=lambda s: _StubTicker(s, yf_rows_by_sym.get(s, [])),
+        # PQ-2A: composite splicing needs corporate-action evidence (none in window)
+        ca_source=__import__("talonx_v2.corporate_actions", fromlist=["x"]).StaticCorporateActionSource([]))
     return svc, holder
 
 

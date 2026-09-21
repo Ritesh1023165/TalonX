@@ -58,6 +58,11 @@ class ExitOutcome:
     # economic mutation occurred and the caller must not treat this as a
     # new exit (no alert, no res.exits entry).
     settled: bool = True
+    # PQ-2A: non-None when settlement was REFUSED because a corporate-action
+    # block is recorded for the position (no cash/trade/cooldown mutation).
+    blocked_reason: str | None = None
+    # PQ-2A: the quantity actually settled (post-corporate-action economic shares).
+    exit_shares: float | None = None
 
 
 def _as_date(d) -> date:
@@ -247,9 +252,22 @@ def close_position(
         episode_id = row["episode_id"]
         symbol = row["symbol"]
         entry_price = float(row["entry_price"])
-        shares = float(row["shares"])
         position_cost = float(row["position_cost"])
         entry_session = row["entry_session"]
+
+        # PQ-2A: settlement quantity is the persisted ECONOMIC quantity --
+        # entry shares x the exact product of APPLIED split ratios (append-only
+        # trail); aggregate cost basis is unchanged by a pure split.  A recorded
+        # corporate-action block (unsupported/conflicting/unknown-basis) REFUSES
+        # settlement here, in the same transaction: no cash, no SELL, no P&L.
+        blocked = store._blocked_action_rows_c(c, position_id)
+        if blocked:
+            return ExitOutcome(symbol, episode_id, es, exit_price, 0.0, 0.0, 0, settled=False,
+                               blocked_reason=blocked[0]["status"] + ": " + str(blocked[0]["detail"]))
+        qty_exact = store._effective_shares_exact_c(c, position_id)
+        shares = float(qty_exact)
+        from talonx_v2.corporate_actions import fraction_to_decimal
+        qty_decimal = fraction_to_decimal(qty_exact)
 
         # Package 4 P4-E: exit economics derived from the AUTHORITATIVE
         # persisted `position_cost` (entry_total, fee-inclusive) --
@@ -258,7 +276,7 @@ def close_position(
         # the moment a non-zero fee model is ever configured; dormant
         # today under the zero-fee default, wrong in general).
         exit_econ = compute_exit_economics(
-            shares=shares, exit_price=exit_price, entry_total=position_cost,
+            shares=qty_decimal, exit_price=exit_price, entry_total=position_cost,
             fee_fn=fee_fn or zero_fee,
         )
         pnl_usd, pnl_pct = exit_econ.realized_pnl_usd, exit_econ.realized_pnl_pct
@@ -299,7 +317,7 @@ def close_position(
         cooldown_until = v2cal.add_sessions(es, cfg.reentry_cooldown_trading_days)
         store.set_cooldown(symbol, cooldown_until)
     return ExitOutcome(symbol, episode_id, es, exit_price,
-                       pnl_usd, pnl_pct, held, settled=True)
+                       pnl_usd, pnl_pct, held, settled=True, exit_shares=shares)
 
 
 def open_position_report(store: V2Store, as_of_session: date) -> list[dict]:

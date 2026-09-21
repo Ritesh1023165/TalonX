@@ -1,0 +1,171 @@
+{
+ "alpaca_all_types_keys": {
+  "cash_dividends": 32,
+  "cash_mergers": 2,
+  "name_changes": 3,
+  "reverse_splits": 1,
+  "spin_offs": 2,
+  "stock_and_cash_mergers": 1,
+  "stock_mergers": 3,
+  "unit_splits": 1
+ },
+ "alpaca_all_types_sample": {
+  "cash_dividends": [
+   {
+    "cusip": "74349Y613",
+    "ex_date": "2025-09-24",
+    "foreign": false,
+    "id": "1ab26fcd-1a98-478d-9750-3a4588436712",
+    "payable_date": "2025-09-30",
+    "process_date": "2025-09-30",
+    "rate": 0.144678,
+    "record_date": "2025-09-24",
+    "special": false,
+    "symbol": "FB"
+   }
+  ],
+  "cash_mergers": [
+   {
+    "acquiree_cusip": "90184L102",
+    "acquiree_symbol": "TWTR",
+    "effective_date": "2022-10-28",
+    "id": "0cfca8cd-6187-47d5-8ee0-45fde44d03e5",
+    "process_date": "2022-10-28",
+    "rate": 54.2
+   }
+  ],
+  "name_changes": [
+   {
+    "id": "e1caeee7-6581-4958-a248-e232edb839ad",
+    "new_cusip": "25400Q105",
+    "new_symbol": "DJT",
+    "old_cusip": "25400Q105",
+    "old_symbol": "DWAC",
+    "process_date": "2024-03-26"
+   }
+  ],
+  "reverse_splits": [
+   {
+    "ex_date": "2021-08-02",
+    "id": "74199d56-24db-4226-9678-6363edc1531d",
+    "new_cusip": "369604301",
+    "new_rate": 1,
+    "old_cusip": "369604103",
+    "old_rate": 8,
+    "payable_date": "2021-08-02",
+    "process_date": "2021-08-02",
+    "record_date": "2021-08-02",
+    "symbol": "GE"
+   }
+  ],
+  "spin_offs": [
+   {
+    "due_bill_redemption_date": "2023-01-05",
+    "ex_date": "2023-01-04",
+    "id": "0b2e940e-e28d-4944-9e08-9e9761769d92",
+    "new_cusip": "36266G107",
+    "new_rate": 0.33333,
+    "new_symbol": "GEHC",
+    "payable_date": "2023-01-03",
+    "process_date": "2023-01-04",
+    "record_date": "2022-12-16",
+    "source_cusip": "369604301",
+    "source_rate": 1,
+    "source_symbol": "GE"
+   }
+  ],
+  "stock_and_cash_mergers": [
+   {
+    "acquiree_cusip": "101119105",
+    "acquiree_rate": 1,
+    "acquiree_symbol": "BPFH",
+    "acquirer_cusip": "78486Q101",
+    "acquirer_rate": 0.0228,
+    "acquirer_symbol": "SIVB",
+    "cash_rate": 2.1,
+    "effective_date": "2021-07-01",
+    "id": "69dbd57d-28b8-41bb-bb0b-c34e9409ba62",
+    "process_date": "2021-07-01"
+   }
+  ],
+  "stock_mergers": [
+   {
+    "acquiree_cusip": "25400Q105",
+    "acquiree_rate": 1,
+    "acquiree_symbol": "DWAC",
+    "acquirer_cusip": "25400Q105",
+    "acquirer_rate": 1,
+    "acquirer_symbol": "DWAC",
+    "effective_date": "2024-03-25",
+    "id": "668157c1-c660-4a92-b1dc-243ba6321827",
+    "process_date": "2024-03-25"
+   }
+  ],
+  "unit_splits": [
+   {
+    "alternate_cusip": "25400Q113",
+    "alternate_rate": 0.5,
+    "alternate_symbol": "DWACW",
+    "effective_date": "2024-03-26",
+    "id": "1b9db815-e869-44b7-8417-083b492480ff",
+    "new_cusip": "25400Q105",
+    "new_rate": 1,
+    "new_symbol": "DWAC",
+    "old_cusip": "25400Q204",
+    "old_rate": 1,
+    "old_symbol": "DWACU",
+    "process_date": "2024-03-26"
+   }
+  ]
+ },
+ "alpaca_bulk_day_2024_06_10": [
+  200,
+  {
+   "forward_splits": [
+    [
+     "NVDA",
+     1,
+     10
+    ]
+   ],
+   "reverse_splits": [
+    [
+     "CHYPF",
+     4,
+     1
+    ],
+    [
+     "CRNCY",
+     79,
+     62
+    ],
+    [
+     "ICU",
+     25,
+     1
+    ],
+    [
+     "RTC",
+     5,
+     1
+    ],
+    [
+     "TNXP",
+     32,
+     1
+    ]
+   ]
+  }
+ ],
+ "yfinance_splits": {
+  "NVDA": {
+   "2024-06-10": 10.0
+  },
+  "CMG": {
+   "2024-06-26": 50.0
+  },
+  "AMC": {
+   "2023-08-24": 0.1
+  }
+ }
+}

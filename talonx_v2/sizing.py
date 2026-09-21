@@ -146,11 +146,14 @@ def compute_exit_economics(
     general -- exactly the defect this function exists to avoid,
     Package 2 acceptance's own A5 principle applied to the fee
     dimension)."""
-    dshares = _d(shares)
+    # PQ-2A: ``shares`` may be a ``Decimal`` (the exact post-corporate-action
+    # economic quantity, e.g. a fractional reverse-split entitlement) -- never
+    # round-tripped through a binary float.
+    dshares = shares if isinstance(shares, Decimal) else _d(shares)
     dprice = _d(exit_price)
     dentry_total = _d(entry_total)
     notional = dshares * dprice
-    raw_fee = fee_fn(shares, exit_price)
+    raw_fee = fee_fn(float(shares), exit_price)
     dfee = _d(raw_fee) if raw_fee is not None and math.isfinite(raw_fee) and raw_fee > 0 else Decimal(0)
     net = notional - dfee
     pnl_usd = net - dentry_total

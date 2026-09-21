@@ -231,6 +231,17 @@ def main(argv: list[str] | None = None) -> int:
                 len(broad_discovery_symbols), mp,
                 "on" if _os.environ.get("TALONX_DISPATCH_ENABLE_BROAD_DISCOVERY") else "off")
 
+        # PQ-2A: corporate-action evidence is MANDATORY for a live run.  Without
+        # it a split during a hold would be booked as a trading loss/profit.
+        from talonx_v2.corporate_actions import AlpacaCorporateActionSource, CorporateActionGuard
+        _ca_src = AlpacaCorporateActionSource()
+        if not (_ca_src._kid and _ca_src._sec):
+            raise SystemExit(
+                "FATAL: corporate-action source (Alpaca market-data credentials "
+                "APCA_API_KEY_ID/APCA_API_SECRET_KEY) not configured -- refusing to start "
+                "live (fail closed: splits cannot be accounted for).")
+        ca_guard = CorporateActionGuard(_ca_src)
+
         import os as _os
         ops_store = None
         if _os.environ.get("TALONX_NOTIFY_OPERATIONS_ENABLED", "0") == "1":
@@ -246,6 +257,7 @@ def main(argv: list[str] | None = None) -> int:
             router=router, transport=transport, deliver=args.deliver,
             broad_discovery_symbols=broad_discovery_symbols,
             ops_notify_store=ops_store,
+            corporate_actions=ca_guard,
         )
         if args.once and args.as_of:
             st = svc.tick(as_of=date.fromisoformat(args.as_of))

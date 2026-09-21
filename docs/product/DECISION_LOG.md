@@ -3444,3 +3444,57 @@ change (fingerprint-safety preserved).
 **PACKAGE 5 NOT STARTED. V2 RELEASE INTEGRATION NOT STARTED.
 PROSPECTIVE PAPER VALIDATION NOT STARTED. NEXT STEP AWAITS GATEKEEPER
 REVIEW** of this Package 4 report.
+
+---
+
+### PQ-2A — Corporate-action safety & accounting (engineering decisions, 2026-09-21; pending gatekeeper confirmation)
+
+Scope: correctness of V2 paper accounting across corporate actions only.
+Evidence: `docs/research/evidence/provider_qualification_pq2a/`. No strategy
+value, threshold, lifecycle rule or fingerprint (`e2acf6454789217e`) changed.
+
+- **Evidence is an explicit provider event, never a price move.** Alpaca
+  `/v1/corporate-actions` (existing free market-data credentials) is the
+  single authoritative source; yfinance is an optional independent witness
+  (disagreement = conflict = fail closed). Nothing is inferred from a large
+  price change.
+- **Split accounting**: `economic_shares = entry_shares × R` (`R = new/old`,
+  exact `Fraction`); AGGREGATE cost basis unchanged; original entry row never
+  rewritten; append-only `position_corporate_actions` trail; idempotent by a
+  content key (symbol, ex-date, ratio), so a restart, replay or a duplicate
+  provider event applies once. This is `S5-22`/`S5-23`/`S5-26`'s
+  "exactly-once, proportional basis" in its V2 form.
+- **Basis proof**: every fill records `basis_as_of` (the date the provider
+  computed its adjustment basis; unknown for static snapshots). A split with
+  ex-date before the entry basis date is already reflected (recorded, no
+  change); ex-date on the basis date, or an unknown basis, fails closed; a
+  split after the exit fill session needs a strictly later exit basis.
+- **Fractional reverse-split entitlement — DECISION FOR GATEKEEPER**: retained
+  EXACTLY (e.g. 5 sh × 1:10 = 0.5 sh; settled at exit at 0.5 × price). This is
+  a deliberate deviation from the agreed `S5-26` truncate + cash-in-lieu: no
+  free source provides the cash-in-lieu settlement reference, so crediting
+  cash would fabricate it, and rounding would invent economics. `S5-26`
+  truncate + cash-in-lieu remains the agreed target and is NOT implemented;
+  the retained-entitlement model conserves aggregate economics and can be
+  replaced without touching the trail.
+- **Dividends — `DIVIDEND_POLICY_DECISION_REQUIRED`**: `S10-17`/Session 10 §G
+  agree total economic return with cash dividends recorded separately (and no
+  double counting via cash + adjusted price). That receivable lifecycle
+  (entitlement, ex/record/payable dates, receivable ≠ cash) is not implemented.
+  Interim, fail-safe mechanics: dividends are OBSERVED
+  (`DIVIDEND_OBSERVED_NOT_CREDITED`), never credited and never used to
+  adjust ledger prices, so the ledger measures PRICE RETURN ONLY and cannot
+  double count. Gatekeeper must decide whether first release may ship as
+  price-return-only (with performance labelled accordingly) or must implement
+  the agreed total-return lifecycle first.
+- **Unsupported actions** (mergers, spin-offs, name changes, unit splits, stock
+  dividends, malformed/undated events) are detected and block settlement
+  (`EXIT_UNRESOLVED`, capacity and account block retained); no guessed ratio
+  and no zero write-off (`S5-25`, `S10-19`). No new lifecycle state and no new
+  account-block reason type were added.
+- **Composite price history**: `CompositeBarAdapter.history()` refuses to
+  splice snapshot and live rows unless their adjustment bases are provably
+  compatible (equal basis date, or corporate-action evidence shows no split
+  between them).
+- **Live requirement**: `talonx_v2.run --mode live` refuses to start without a
+  corporate-action source (Alpaca market-data credentials).

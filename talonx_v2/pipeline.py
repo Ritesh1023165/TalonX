@@ -149,6 +149,38 @@ def process_episode(
     return res
 
 
+def _basis_of(px: dict | None) -> date | None:
+    """``basis_as_of`` of the price row actually consumed (None = unknown)."""
+    raw = px.get("_provenance") if isinstance(px, dict) else None
+    v = raw.get("basis_as_of") if isinstance(raw, dict) else None
+    try:
+        return date.fromisoformat(str(v)[:10]) if v else None
+    except ValueError:
+        return None
+
+
+def sweep_corporate_actions(*, store: V2Store, as_of: date, guard) -> list[dict]:
+    """PQ-2A: observe/apply explicit corporate-action evidence for every OPEN
+    position (idempotent; original entry rows untouched).  This is NOT a
+    settlement -- it only keeps the append-only trail current so marks,
+    reconciliation and the operator view are correct DURING the hold.  A
+    failure for one position never blocks another."""
+    out: list[dict] = []
+    if guard is None:
+        return out
+    for pos in store.open_positions():
+        try:
+            v = guard.assess_position(store, pos, as_of=as_of, settlement=False)
+            out.append({"symbol": pos["symbol"], "episode_id": pos["episode_id"],
+                        "status": v.status, "code": v.code, "detail": v.detail,
+                        "applied": list(v.applied)})
+        except Exception as exc:  # noqa: BLE001 -- never abort the tick
+            out.append({"symbol": pos["symbol"], "episode_id": pos["episode_id"],
+                        "status": "ERROR", "code": type(exc).__name__, "detail": str(exc)[:200],
+                        "applied": []})
+    return out
+
+
 def settle_due_exits(
     *,
     store: V2Store,
@@ -157,7 +189,12 @@ def settle_due_exits(
     config: V2Config | None = None,
     router=None,
     result: ProcessResult | None = None,
+    corporate_actions=None,
 ) -> ProcessResult:
+    """``corporate_actions``: a ``talonx_v2.corporate_actions.CorporateActionGuard``.
+    ``None`` keeps the pre-PQ-2A behaviour and is for REPLAY/TEST callers only;
+    the live companion always passes a guard (``run.py`` refuses to start live
+    without one)."""
     cfg = config or V2Config()
     res = result or ProcessResult()
     ff_max = cfg.exit_fallforward_max_sessions
@@ -199,9 +236,37 @@ def settle_due_exits(
                                     "reason": "EXIT_BAR_PENDING_FALLFORWARD"})
             continue
         exit_provenance = _field_provenance(px, "close")
+        if corporate_actions is not None:
+            # PQ-2A: authoritative corporate-action assessment IMMEDIATELY before
+            # settlement (also applies any split not yet on the trail).  Never
+            # fabricates shares/price/basis/P&L: HOLD retries inside the existing
+            # +5 window; BLOCK / window exhaustion -> the existing EXIT_UNRESOLVED.
+            verdict = corporate_actions.assess_position(
+                store, pos, as_of=as_of, exit_basis_as_of=_basis_of(px), exit_session=exit_session,
+                settlement=True)
+            if not verdict.settle_ok:
+                last_ff = v2cal.add_sessions(target_session, ff_max)
+                if verdict.status == "BLOCK" or as_of >= last_ff:
+                    store.mark_exit_unresolved(
+                        pos["position_id"],
+                        detail=f"CORPORATE_ACTION {verdict.text()} (target exit "
+                               f"{target_session.isoformat()})")
+                    res.skipped.append({"episode_id": pos["episode_id"], "symbol": pos["symbol"],
+                                        "reason": "EXIT_UNRESOLVED", "corporate_action": verdict.code})
+                else:
+                    res.skipped.append({"episode_id": pos["episode_id"], "symbol": pos["symbol"],
+                                        "reason": "EXIT_HOLD_CORPORATE_ACTION", "corporate_action": verdict.code})
+                continue
         out = paper.close_position(store, pos, exit_price=float(px["close"]),
                                    exit_session=exit_session, config=cfg,
                                    price_provenance=exit_provenance)
+        if not out.settled and out.blocked_reason:
+            # defense in depth: a recorded corporate-action block refused settlement
+            store.mark_exit_unresolved(pos["position_id"],
+                                       detail=f"CORPORATE_ACTION {out.blocked_reason}")
+            res.skipped.append({"episode_id": pos["episode_id"], "symbol": pos["symbol"],
+                                "reason": "EXIT_UNRESOLVED", "corporate_action": "TRAIL_BLOCK"})
+            continue
         if not out.settled:
             # Package 1 Settlement Integrity: the position was already
             # not OPEN by the time this call's own transaction ran (a

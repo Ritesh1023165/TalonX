@@ -71,7 +71,8 @@ class V2Service:
                  router=None, transport=None, deliver: bool = False,
                  execution_allowlist: list[str] | None = None,
                  broad_discovery_symbols: list[str] | None = None,
-                 ops_notify_store=None):
+                 ops_notify_store=None,
+                 corporate_actions=None):
         self.cfg = config
         self.cfg.validate_frozen()
         self.store = V2Store(config.db_path, starting_cash=config.starting_cash_usd,
@@ -116,13 +117,19 @@ class V2Service:
         # PROVISIONAL/FINAL, explicit unavailability).  Never auto-enabled for
         # ACTIVE -- an operator opts in with --pricing-mode.
         self.pricing_mode = pricing_mode
+        # PQ-2A: corporate-action evidence + accounting guard
+        # (talonx_v2.corporate_actions.CorporateActionGuard).  None = REPLAY/TEST
+        # only -- the live entry point (run.py) refuses to start without one.
+        self.ca_guard = corporate_actions
+        self._last_ca_sweep: list[dict] = []
         self._as_of_holder = {"d": None}
         self._resolver = None
         if pricing_mode != "csv":
             from talonx_v2 import pricing as _pricing
             self._resolver = _pricing.make_resolver(
                 mode=pricing_mode, bar_dirs=[str(p) for p in bar_dirs],
-                today=lambda: self._as_of_holder["d"] or datetime.now(timezone.utc).date())
+                today=lambda: self._as_of_holder["d"] or datetime.now(timezone.utc).date(),
+                ca_source=self.ca_guard)
         self.form4_kind = form4_kind
         self.form4_parquet = form4_parquet or \
             "results/task107a_form4_feasibility/_build/form4_open_market_txn.parquet"
@@ -503,6 +510,9 @@ class V2Service:
         self._phase_open(ripe_attemptable, ripe_through, res, price_lookup=price_lookup,
                          today=today, live=live)
 
+        # --- PHASE CORPORATE ACTIONS (PQ-2A) ---------------------------------
+        self._phase_corporate_actions(today)
+
         # --- PHASE CLOSE -------------------------------------------------
         self._phase_close(ripe_through, res, price_lookup=price_lookup)
 
@@ -797,11 +807,26 @@ class V2Service:
             return datetime.now(timezone.utc) > deadline_close
         return ripe_through > deadline_session
 
+    def _phase_corporate_actions(self, today: date) -> None:
+        """PQ-2A: keep the append-only corporate-action trail current for every
+        OPEN position (idempotent).  Never raises into the tick; settlement
+        re-assesses authoritatively, so a sweep failure cannot fabricate P&L."""
+        if self.ca_guard is None:
+            self._last_ca_sweep = []
+            return
+        try:
+            self._last_ca_sweep = pipeline.sweep_corporate_actions(
+                store=self.store, as_of=today, guard=self.ca_guard)
+        except Exception:  # noqa: BLE001
+            logger.exception("corporate_action_sweep_failed as_of=%s", today)
+            self._last_ca_sweep = [{"status": "ERROR", "code": "SWEEP_FAILED"}]
+
     def _phase_close(self, ripe_through: date, res, *, price_lookup) -> None:
         try:
             n_exits_before = len(res.exits)
             pipeline.settle_due_exits(store=self.store, as_of_session=ripe_through,
-                                      price_lookup=price_lookup, config=self.cfg, result=res)
+                                      price_lookup=price_lookup, config=self.cfg, result=res,
+                                      corporate_actions=self.ca_guard)
             for x in res.exits[n_exits_before:]:
                 self._on_exit_recorded(x)
         except Exception:  # noqa: BLE001
@@ -1005,16 +1030,20 @@ class V2Service:
                         mark_date, mark_price, stale = row["date"], float(row["close"]), True
                         break
             entry_price = p["entry_price"]
-            unrealized_pct = (100.0 * (mark_price - entry_price) / entry_price
-                              if mark_price is not None else None)
+            # PQ-2A: mark on ECONOMIC shares vs the unchanged aggregate cost basis
+            # (a split must never appear as an unrealised loss/gain).
+            eff_shares = float(self.store.effective_shares_exact(p["position_id"]))
+            unrealized_pct = (100.0 * (eff_shares * mark_price - p["position_cost"]) / p["position_cost"]
+                              if (mark_price is not None and p["position_cost"]) else None)
             marks.append({
                 "symbol": p["symbol"], "position_id": p["position_id"],
                 "requested_date": today.isoformat(), "mark_date": mark_date,
                 "mark_price": mark_price, "mark_available": mark_price is not None,
                 "mark_stale": stale if mark_price is not None else None,
-                "entry_price": entry_price, "shares": p["shares"], "cost_basis": p["position_cost"],
+                "entry_price": entry_price, "shares": p["shares"], "economic_shares": eff_shares,
+                "cost_basis": p["position_cost"],
                 "unrealized_pnl_pct": (round(unrealized_pct, 4) if unrealized_pct is not None else None),
-                "unrealized_pnl_usd": (round(p["shares"] * (mark_price - entry_price), 2)
+                "unrealized_pnl_usd": (round(eff_shares * mark_price - p["position_cost"], 2)
                                       if mark_price is not None else None),
             })
         return marks
@@ -1396,6 +1425,10 @@ class V2Service:
             # surfaced twice tonight for broad-discovery and delivery-
             # enablement -- see docs/research/evidence/task140/).
             "durable_store_gate_enabled": self.durable_store_gate_enabled,
+            # PQ-2A: corporate-action guard visibility (operator/dashboards read this).
+            "corporate_action_guard": ({"state": "ACTIVE", "sources": self.ca_guard.source_names,
+                                        "last_sweep": self._last_ca_sweep[-20:]}
+                                       if self.ca_guard is not None else {"state": "OFF"}),
             # execution scope enforcement (Task 117 final activation)
             "execution_scope_enforced": self.execution_allowlist is not None,
             "execution_scope_count": (len(self.execution_allowlist)

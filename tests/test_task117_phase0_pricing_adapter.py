@@ -127,7 +127,11 @@ def test_bars_lookup_excludes_provisional_today():
 def test_composite_prefers_history_then_live_tail():
     hist = _MemAdapter("hist", {"X": [_row("2026-08-12"), _row("2026-08-13")]})
     live = _MemAdapter("live", {"X": [_row("2026-08-13", c=999.0), _row("2026-09-08", c=77.0)]})
-    comp = CompositeBarAdapter(hist, live)
+    # PQ-2A: splicing requires provable basis compatibility -> supply corporate-action
+    # evidence (none in the window) so the historical+tail merge is proven safe.
+    from talonx_v2.corporate_actions import StaticCorporateActionSource
+    comp = CompositeBarAdapter(hist, live, ca_source=StaticCorporateActionSource([]),
+                               today=lambda: date(2026, 9, 9))
     h = comp.history("X")
     assert [b["date"] for b in h] == ["2026-08-12", "2026-08-13", "2026-09-08"]
     # 08-13 came from history, not the live duplicate

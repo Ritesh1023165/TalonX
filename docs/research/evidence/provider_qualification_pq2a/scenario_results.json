@@ -1,0 +1,308 @@
+[
+  {
+    "scenario": "headline_10sh_100_10to1_exit11_UNGUARDED",
+    "guarded": false,
+    "entry": {
+      "shares": 10,
+      "price": 100.0,
+      "cost": 1000.0
+    },
+    "exit_close_served": 11.0,
+    "status": "CLOSED",
+    "economic_shares": 10.0,
+    "exit_shares_settled": 10.0,
+    "position_cost_after": 1000.0,
+    "realized_pnl_usd": -890.0,
+    "realized_pnl_pct": -89.0,
+    "cash_after": 299110.0,
+    "skipped": [],
+    "trail": [],
+    "expected": {
+      "realized_pnl_usd": 100.0
+    },
+    "note": "PRE-FIX behaviour: false -$890 (-89%)"
+  },
+  {
+    "scenario": "headline_10sh_100_10to1_exit11_GUARDED",
+    "guarded": true,
+    "entry": {
+      "shares": 10,
+      "price": 100.0,
+      "cost": 1000.0
+    },
+    "exit_close_served": 11.0,
+    "status": "CLOSED",
+    "economic_shares": 100.0,
+    "exit_shares_settled": 100.0,
+    "position_cost_after": 1000.0,
+    "realized_pnl_usd": 100.0,
+    "realized_pnl_pct": 10.0,
+    "cash_after": 300100.0,
+    "skipped": [],
+    "trail": [
+      {
+        "kind": "FORWARD_SPLIT",
+        "ex_date": "2026-09-14",
+        "ratio_num": "10",
+        "ratio_den": "1",
+        "status": "APPLIED",
+        "shares_before": "10",
+        "shares_after": "100",
+        "cost_basis": 1000.0
+      }
+    ],
+    "expected": {
+      "economic_shares": 100,
+      "realized_pnl_usd": 100.0
+    }
+  },
+  {
+    "scenario": "forward_2to1",
+    "guarded": true,
+    "entry": {
+      "shares": 10,
+      "price": 100.0,
+      "cost": 1000.0
+    },
+    "exit_close_served": 52.0,
+    "status": "CLOSED",
+    "economic_shares": 20.0,
+    "exit_shares_settled": 20.0,
+    "position_cost_after": 1000.0,
+    "realized_pnl_usd": 40.0,
+    "realized_pnl_pct": 4.0,
+    "cash_after": 300040.0,
+    "skipped": [],
+    "trail": [
+      {
+        "kind": "FORWARD_SPLIT",
+        "ex_date": "2026-09-11",
+        "ratio_num": "2",
+        "ratio_den": "1",
+        "status": "APPLIED",
+        "shares_before": "10",
+        "shares_after": "20",
+        "cost_basis": 1000.0
+      }
+    ]
+  },
+  {
+    "scenario": "reverse_1for10_exact_whole",
+    "guarded": true,
+    "entry": {
+      "shares": 100,
+      "price": 10.0,
+      "cost": 1000.0
+    },
+    "exit_close_served": 105.0,
+    "status": "CLOSED",
+    "economic_shares": 10.0,
+    "exit_shares_settled": 10.0,
+    "position_cost_after": 1000.0,
+    "realized_pnl_usd": 50.0,
+    "realized_pnl_pct": 5.0,
+    "cash_after": 300050.0,
+    "skipped": [],
+    "trail": [
+      {
+        "kind": "REVERSE_SPLIT",
+        "ex_date": "2026-09-14",
+        "ratio_num": "1",
+        "ratio_den": "10",
+        "status": "APPLIED",
+        "shares_before": "100",
+        "shares_after": "10",
+        "cost_basis": 1000.0
+      }
+    ]
+  },
+  {
+    "scenario": "reverse_1for10_FRACTIONAL_5sh",
+    "guarded": true,
+    "entry": {
+      "shares": 5,
+      "price": 100.0,
+      "cost": 500.0
+    },
+    "exit_close_served": 1050.0,
+    "status": "CLOSED",
+    "economic_shares": 0.5,
+    "exit_shares_settled": 0.5,
+    "position_cost_after": 500.0,
+    "realized_pnl_usd": 25.0,
+    "realized_pnl_pct": 5.0,
+    "cash_after": 300025.0,
+    "skipped": [],
+    "trail": [
+      {
+        "kind": "REVERSE_SPLIT",
+        "ex_date": "2026-09-14",
+        "ratio_num": "1",
+        "ratio_den": "10",
+        "status": "APPLIED",
+        "shares_before": "5",
+        "shares_after": "1/2",
+        "cost_basis": 500.0
+      }
+    ],
+    "expected": {
+      "economic_shares": 0.5,
+      "realized_pnl_usd": 25.0
+    },
+    "note": "0.5 share retained EXACTLY (not 0, not 1); no cash-in-lieu invented"
+  },
+  {
+    "scenario": "no_action",
+    "guarded": true,
+    "entry": {
+      "shares": 10,
+      "price": 100.0,
+      "cost": 1000.0
+    },
+    "exit_close_served": 110.0,
+    "status": "CLOSED",
+    "economic_shares": 10.0,
+    "exit_shares_settled": 10.0,
+    "position_cost_after": 1000.0,
+    "realized_pnl_usd": 100.0,
+    "realized_pnl_pct": 10.0,
+    "cash_after": 300100.0,
+    "skipped": [],
+    "trail": []
+  },
+  {
+    "scenario": "dividend_observed_not_credited",
+    "guarded": true,
+    "entry": {
+      "shares": 10,
+      "price": 100.0,
+      "cost": 1000.0
+    },
+    "exit_close_served": 110.0,
+    "status": "CLOSED",
+    "economic_shares": 10.0,
+    "exit_shares_settled": 10.0,
+    "position_cost_after": 1000.0,
+    "realized_pnl_usd": 100.0,
+    "realized_pnl_pct": 10.0,
+    "cash_after": 300100.0,
+    "skipped": [],
+    "trail": [
+      {
+        "kind": "CASH_DIVIDEND",
+        "ex_date": "2026-09-11",
+        "ratio_num": "1",
+        "ratio_den": "1",
+        "status": "DIVIDEND_OBSERVED_NOT_CREDITED",
+        "shares_before": "10",
+        "shares_after": "10",
+        "cost_basis": 1000.0
+      }
+    ],
+    "note": "price return only: cash == start - cost + proceeds; no dividend credit"
+  },
+  {
+    "scenario": "unsupported_spin_off_blocks",
+    "guarded": true,
+    "entry": {
+      "shares": 10,
+      "price": 100.0,
+      "cost": 1000.0
+    },
+    "exit_close_served": 110.0,
+    "status": "EXIT_UNRESOLVED",
+    "economic_shares": 10.0,
+    "exit_shares_settled": null,
+    "position_cost_after": 1000.0,
+    "realized_pnl_usd": null,
+    "realized_pnl_pct": null,
+    "cash_after": 299000.0,
+    "skipped": [
+      {
+        "episode_id": "ep-unsupported_spin_off_blocks",
+        "symbol": "PQX",
+        "reason": "EXIT_UNRESOLVED",
+        "corporate_action": "CA_UNSUPPORTED_ACTION"
+      }
+    ],
+    "trail": [
+      {
+        "kind": "BLOCK",
+        "ex_date": null,
+        "ratio_num": null,
+        "ratio_den": null,
+        "status": "BLOCKED_CA_UNSUPPORTED_ACTION",
+        "shares_before": null,
+        "shares_after": null,
+        "cost_basis": null
+      }
+    ]
+  },
+  {
+    "scenario": "unknown_entry_basis_with_split_blocks",
+    "guarded": true,
+    "entry": {
+      "shares": 10,
+      "price": 100.0,
+      "cost": 1000.0
+    },
+    "exit_close_served": 11.0,
+    "status": "EXIT_UNRESOLVED",
+    "economic_shares": 10.0,
+    "exit_shares_settled": null,
+    "position_cost_after": 1000.0,
+    "realized_pnl_usd": null,
+    "realized_pnl_pct": null,
+    "cash_after": 299000.0,
+    "skipped": [
+      {
+        "episode_id": "ep-unknown_entry_basis_with_split_blocks",
+        "symbol": "PQX",
+        "reason": "EXIT_UNRESOLVED",
+        "corporate_action": "CA_PRICE_BASIS_UNKNOWN"
+      }
+    ],
+    "trail": [
+      {
+        "kind": "BLOCK",
+        "ex_date": null,
+        "ratio_num": null,
+        "ratio_den": null,
+        "status": "BLOCKED_CA_PRICE_BASIS_UNKNOWN",
+        "shares_before": null,
+        "shares_after": null,
+        "cost_basis": null
+      }
+    ]
+  },
+  {
+    "scenario": "split_on_target_exit_session",
+    "guarded": true,
+    "entry": {
+      "shares": 10,
+      "price": 100.0,
+      "cost": 1000.0
+    },
+    "exit_close_served": 11.0,
+    "status": "CLOSED",
+    "economic_shares": 100.0,
+    "exit_shares_settled": 100.0,
+    "position_cost_after": 1000.0,
+    "realized_pnl_usd": 100.0,
+    "realized_pnl_pct": 10.0,
+    "cash_after": 300100.0,
+    "skipped": [],
+    "trail": [
+      {
+        "kind": "FORWARD_SPLIT",
+        "ex_date": "2026-09-22",
+        "ratio_num": "10",
+        "ratio_den": "1",
+        "status": "APPLIED",
+        "shares_before": "10",
+        "shares_after": "100",
+        "cost_basis": 1000.0
+      }
+    ]
+  }
+]
