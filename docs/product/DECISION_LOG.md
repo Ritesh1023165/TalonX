@@ -3587,3 +3587,12 @@ Decisions recorded:
    The legacy $300k `v2_lane.db` is untouched. Creation is `PREPARED_FOR_CREATION_AT_LAUNCH` (explicit, create-once `--init-campaign`), proven on an isolated ledger.
 4. **Main is the authoritative release branch** from this merge: future release/validation branches start from `main`; the feature branch remains for traceability until after full-day validation; research branches stay separate.
 5. Not started: full-day paper session, prospective validation, profitability research; real money NOT enabled; V2 profitability UNPROVEN.
+
+---
+
+## Pre-full-day operational cleanup (after the partial-day RC1 canary)
+
+1. **Release owns its Sentinel outbox** (`v2_release_rc1_notifications.db`, enforced by the release gate); tests are structurally unable to write the shared/release outbox. 9 stale test-fixture RECONCILIATION_FAILURE rows that reached real Sentinel were traced (tests -> shared `notifications.db` -> release drain) and are unrelated to V2-PAPER-RC1.
+2. **Secrets are redacted at log-record level for the whole process** (`talonx_ops/log_redaction.py`). Two Telegram bot tokens found in local logs are treated as compromised: a release start is refused until they are rotated (fingerprint check). Rotation itself is a user action.
+3. STARTUP notice carries the real campaign id; STARTUP/SHUTDOWN notices expire (+2 h). Frozen release identity remains `v2-paper-rc1 / a56ec8c`; the runtime delta is an explicit closed list of operational files (no strategy/provider/pricing/accounting/ledger file).
+4. Full-day session tomorrow is NO_GO until rotation + Sentinel re-validation.

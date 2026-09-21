@@ -51,6 +51,12 @@ class ReleaseProfile:
     campaign_id: str = "V2-PAPER-RC1"
     campaign_db_filename: str = "v2_release_rc1.db"
     campaign_status_filename: str = "v2_release_rc1_status.json"
+    # The release owns its OWN Sentinel/ops notification outbox: the shared default ``notifications.db`` is written by
+    # tests and other tooling (the canary drained 9 stale test-fixture RECONCILIATION_FAILURE rows to real Sentinel).
+    notify_db_filename: str = "v2_release_rc1_notifications.db"
+    # One-way sha256[:12] fingerprints of bot tokens that were written to local logs (canary finding) and are therefore
+    # compromised.  A release start REFUSES while any configured token still matches one of these.  (Not reversible.)
+    compromised_secret_fingerprints: tuple = ("92abd15ddbe9", "7252d11e93a2")
     signal_destination: str = "TRADE_EVENT"          # TalonX Signal
     sentinel_destination: str = "OPERATIONS"         # TalonX Sentinel
     lab_destination: str = "RESEARCH"                # TalonX Lab
@@ -252,6 +258,47 @@ def evaluate_release_readiness(*, db_path: str | Path, pricing_mode: str | None,
             f"campaign_id={profile.campaign_id} cash={profile.default_starting_cash_usd:g} "
             f"allocation={profile.default_allocation_usd:g} mode={profile.execution_mode}"
             if not _env_problems else "; ".join(_env_problems) + f".  Required env: {release_env_block(profile)}")
+    # 7b. release notification store: isolated from the shared default, and free of foreign/stale contamination
+    _ndb = str(env.get("TALONX_NOTIFY_DB_PATH", "") or "notifications.db")
+    if Path(_ndb).name == "notifications.db":
+        rep.add("release_notification_store", "FAIL",
+                "TALONX_NOTIFY_DB_PATH is unset/the shared default notifications.db (written by tests/other tooling); "
+                f"the release uses its own outbox.  Required env: {release_env_block(profile)}")
+    elif Path(_ndb).name != profile.notify_db_filename:
+        rep.add("release_notification_store", "FAIL", f"notification store {Path(_ndb).name!r} is not the release outbox {profile.notify_db_filename!r}")
+    else:
+        _np = Path(_ndb) if Path(_ndb).is_absolute() else REPO_ROOT / _ndb
+        _ncon = _ro(_np)
+        if _ncon is None:
+            rep.add("release_notification_store", "PASS", "release outbox not created yet (created empty on first use); shared notifications.db is not used")
+        else:
+            try:
+                _rows = [dict(r) for r in _ncon.execute(
+                    "SELECT event_id, event_type, state, provenance_json, created_at_utc FROM ops_notification_outbox "
+                    "WHERE state IN ('PENDING','RETRY')")]
+            except sqlite3.OperationalError:
+                _rows = []
+            finally:
+                _ncon.close()
+            _bad = []
+            for _r in _rows:
+                try:
+                    _cid = (json.loads(_r["provenance_json"] or "{}") or {}).get("campaign_id")
+                except ValueError:
+                    _cid = "UNPARSEABLE"
+                if _cid not in (None, profile.campaign_id):
+                    _bad.append(f"{_r['event_type']}(campaign={_cid})")
+            rep.add("release_notification_store", "PASS" if not _bad else "FAIL",
+                    "release outbox holds no foreign-campaign pending/retry rows" if not _bad
+                    else f"release outbox contaminated with foreign pending rows: {_bad[:5]}")
+    # 7c. credentials known to be compromised (written to local logs before redaction existed) must have been rotated
+    from talonx_ops.log_redaction import secret_fingerprint
+    _cfg_fps = {k: secret_fingerprint(str(v)) for k, v in env.items()
+                if k.upper().endswith("BOT_TOKEN") and str(v).strip()}
+    _stale = sorted(k for k, f in _cfg_fps.items() if f in profile.compromised_secret_fingerprints)
+    rep.add("compromised_credentials_rotated", "PASS" if not _stale else "FAIL",
+            "no configured bot token matches a known-compromised fingerprint" if not _stale
+            else f"ROTATION_REQUIRED: {_stale} still hold a token that was written to local logs; revoke/replace it in BotFather and update .env")
     con = _ro(db_path)
     if con is None:
         rep.add("campaign_identity", "WARN",
@@ -297,6 +344,7 @@ def release_env_block(profile: ReleaseProfile = RELEASE_PROFILE) -> str:
         f"$env:TALONX_V2_CAMPAIGN_ID='{profile.campaign_id}'",
         f"$env:TALONX_V2_DB_PATH='{profile.campaign_db_filename}'",
         f"$env:TALONX_V2_STATUS_PATH='{profile.campaign_status_filename}'",
+        f"$env:TALONX_NOTIFY_DB_PATH='{profile.notify_db_filename}'",
         f"$env:TALONX_V2_STARTING_CASH_USD='{profile.default_starting_cash_usd:g}'",
         f"$env:TALONX_V2_ALLOCATION_USD='{profile.default_allocation_usd:g}'",
         f"$env:TALONX_V2_EXECUTION_MODE='{profile.execution_mode}'"])
@@ -334,6 +382,7 @@ def campaign_state(db_path: str | Path) -> dict:
             "dividend_receivables": n("SELECT COUNT(*) FROM dividend_entitlements"),
             "trades": n("SELECT COUNT(*) FROM trades"),
             "processed_episodes": n("SELECT COUNT(*) FROM processed_episodes"),
+            "skipped_episode_records": n("SELECT COUNT(*) FROM processed_episodes WHERE disposition LIKE 'SKIPPED_%'"),
             "v2_alert_outbox_rows": n("SELECT COUNT(*) FROM v2_alert_outbox"),
             "corporate_action_rows": n("SELECT COUNT(*) FROM position_corporate_actions"),
         }
@@ -341,7 +390,7 @@ def campaign_state(db_path: str | Path) -> dict:
         con.close()
 
 
-def clean_campaign_problems(state: dict, profile: ReleaseProfile = RELEASE_PROFILE) -> list:
+def clean_campaign_problems(state: dict, profile: ReleaseProfile = RELEASE_PROFILE, *, allow_skipped_episodes: bool = False) -> list:
     """Empty list <=> the ledger is a CLEAN, fresh release campaign (no inherited trading/account/notification state)."""
     if not state.get("exists"):
         return ["ledger does not exist"]
@@ -356,9 +405,18 @@ def clean_campaign_problems(state: dict, profile: ReleaseProfile = RELEASE_PROFI
     cash_want = profile.default_starting_cash_usd
     if state["settled_cash"] != cash_want:
         p.append(f"settled cash {state['settled_cash']} != {cash_want}")
-    for k in ("open_positions", "closed_positions", "exit_unresolved", "reserved_capital", "pending_entry_intents",
-              "entry_intents_total", "active_account_blocks", "realized_pnl", "dividend_receivables", "trades",
-              "processed_episodes", "v2_alert_outbox_rows", "corporate_action_rows"):
+    # ``allow_skipped_episodes`` (continuation verify, not first creation): non-economic SKIPPED_* episode records left by an
+    # earlier no-trade session (e.g. the partial-day canary) are not trading state; anything else must still be zero.
+    _zero = ["open_positions", "closed_positions", "exit_unresolved", "reserved_capital", "pending_entry_intents",
+             "entry_intents_total", "active_account_blocks", "realized_pnl", "dividend_receivables", "trades",
+             "v2_alert_outbox_rows", "corporate_action_rows"]
+    if allow_skipped_episodes:
+        if state["processed_episodes"] != state.get("skipped_episode_records", 0):
+            p.append(f"processed_episodes={state['processed_episodes']} of which non-skipped="
+                     f"{state['processed_episodes'] - state.get('skipped_episode_records', 0)} (must be 0)")
+    else:
+        _zero.append("processed_episodes")
+    for k in _zero:
         if state[k]:
             p.append(f"{k}={state[k]} (must be 0)")
     return p
@@ -410,8 +468,10 @@ def main(argv=None) -> int:      # pragma: no cover - CLI, read-only
         except RuntimeError as exc:
             print(str(exc))
             return 2
-        prob = clean_campaign_problems(st)
-        print(json.dumps({"state": st, "clean": not prob, "problems": prob}, indent=2, default=str))
+        prob = clean_campaign_problems(st, allow_skipped_episodes=a.verify_campaign)
+        print(json.dumps({"state": st, "clean": not prob, "problems": prob,
+                          "note": "continuation verify: non-economic SKIPPED_* episode records from earlier no-trade sessions are allowed"
+                          if a.verify_campaign else "fresh creation"}, indent=2, default=str))
         return 0 if not prob else 2
     rep = evaluate_release_readiness(db_path=a.db, pricing_mode=a.pricing_mode, deliver=a.deliver, transport=a.transport)
     print(json.dumps(rep.to_dict(), indent=2))

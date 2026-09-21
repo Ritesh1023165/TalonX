@@ -1,0 +1,5 @@
+baseline captured: 2026-09-21T18:41:52+00:00 (LAUNCH DECISION: user chose PARTIAL-day launch, session already ~79% elapsed)
+campaign: {'campaign_id': 'V2-PAPER-RC1', 'strategy_version': 'INSIDER_BUY_CLUSTER_V2@1', 'execution_mode': 'PAPER', 'starting_cash_usd': 100000.0, 'per_position_allocation_usd': 10000.0}
+state: {'exists': True, 'settled_cash': 100000.0, 'open_positions': 0, 'closed_positions': 0, 'exit_unresolved': 0, 'reserved_capital': 0, 'pending_entry_intents': 0, 'entry_intents_total': 0, 'active_account_blocks': 0, 'realized_pnl': 0, 'dividend_receivables': 0, 'trades': 0, 'processed_episodes': 0, 'v2_alert_outbox_rows': 0, 'corporate_action_rows': 0}
+ops_notification_outbox n/a no such column: status
+status file exists: False

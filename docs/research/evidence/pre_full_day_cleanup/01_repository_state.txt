@@ -1,0 +1,5 @@
+branch:        main   (work continued on branch hardening/pre-full-day-cleanup, see commit details in the report)
+starting SHA:  0130a13a32041107122b951a250b856e2b44dc65  (== origin/main; frozen release a56ec8c reachable; tag v2-paper-rc1 present)
+status:        only untracked runtime artifacts (notifications.db-shm/-wal, v2_release_rc1.db*, v2_release_rc1_status.json)
+processes:     no TalonX/Python process running (none stopped or killed); unrelated node.exe processes left alone
+drift:         none (diff a56ec8c..0130a13 outside docs/ = talonx_ops/prospective/__init__.py, the pin)

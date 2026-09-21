@@ -17,6 +17,7 @@ Usage:
 """
 from __future__ import annotations
 
+import talonx_ops.log_redaction  # noqa: F401  (process-wide secret redaction; must load before any logging/HTTP)
 import asyncio
 import logging
 import signal

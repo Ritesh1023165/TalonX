@@ -1,0 +1,5 @@
+2026-09-21 19:42:28,909 INFO talonx_ops.supervisor: spawned original pid=24240 state=STARTING
+2026-09-21 19:42:28,933 INFO talonx_ops.supervisor: spawned experimental pid=2404 state=STARTING
+2026-09-21 19:42:33,955 INFO talonx_ops.supervisor: spawned intelligence pid=22748 state=STARTING
+2026-09-21 19:42:35,470 INFO talonx_ops.supervisor: spawned dashboard pid=26656 state=STARTING
+2026-09-21 19:42:38,479 INFO talonx_ops.supervisor: start_all complete: {'original': 'READY', 'experimental': 'READY', 'intelligence': 'READY', 'dashboard': 'READY'}

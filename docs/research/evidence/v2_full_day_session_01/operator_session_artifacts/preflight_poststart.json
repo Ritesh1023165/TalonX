@@ -1,0 +1,199 @@
+{
+  "overall": "READY_WITH_FINDINGS",
+  "generated_utc": "2026-09-21T18:43:00.244066+00:00",
+  "expected_sha": "a56ec8c",
+  "head_sha": "0130a13",
+  "rows": [
+    {
+      "check": "repo_head_matches_release",
+      "status": "READY",
+      "detail": {
+        "head": "0130a13",
+        "expected": "a56ec8c",
+        "match": "HEAD descends from the frozen release; only docs/tests/pin changed (34 files)"
+      }
+    },
+    {
+      "check": "repo_tree_clean",
+      "status": "FINDING",
+      "detail": {
+        "porcelain_lines": [
+          "?? docs/research/evidence/v2_full_day_session_01/",
+          "?? v2_release_rc1.db.startlock",
+          "?? v2_release_rc1_status.json"
+        ]
+      }
+    },
+    {
+      "check": "v1_fingerprint",
+      "status": "READY",
+      "detail": {
+        "got": "ed8272fe568d",
+        "expected": "ed8272fe568d"
+      }
+    },
+    {
+      "check": "v2_fingerprint",
+      "status": "READY",
+      "detail": {
+        "got": "e2acf6454789217e",
+        "expected": "e2acf6454789217e",
+        "strategy_version": "INSIDER_BUY_CLUSTER_V2@1"
+      }
+    },
+    {
+      "check": "v2_strategy_version",
+      "status": "READY",
+      "detail": {
+        "got": "INSIDER_BUY_CLUSTER_V2@1"
+      }
+    },
+    {
+      "check": "redis_reachable",
+      "status": "READY",
+      "detail": null
+    },
+    {
+      "check": "talonx_processes_present",
+      "status": "READY",
+      "detail": {
+        "pids": [
+          2404,
+          4684,
+          6348,
+          8576,
+          13248,
+          24240,
+          25460,
+          26140
+        ]
+      }
+    },
+    {
+      "check": "dashboard_port_8787_listening",
+      "status": "READY",
+      "detail": null
+    },
+    {
+      "check": "v2_ledger_continuity",
+      "status": "READY",
+      "detail": {
+        "cash": 100000.0,
+        "open": 0,
+        "closed": 0
+      }
+    },
+    {
+      "check": "v2_ledger_not_recreated",
+      "status": "READY",
+      "detail": {
+        "note": "preflight never creates/resets v2_lane.db"
+      }
+    },
+    {
+      "check": "v2_env_vars_resolved",
+      "status": "READY",
+      "detail": {
+        "TALONX_ACTIVE_STRATEGY_PROFILE": "INSIDER_BUY_CLUSTER_V2",
+        "TALONX_V2_STARTING_CASH_USD": "100000",
+        "TALONX_V2_DB_PATH": "v2_release_rc1.db",
+        "TALONX_V2_STATUS_PATH": "v2_release_rc1_status.json"
+      }
+    },
+    {
+      "check": "active_profile_is_v2",
+      "status": "READY",
+      "detail": null
+    },
+    {
+      "check": "real_capital_off",
+      "status": "READY",
+      "detail": {
+        "TALONX_PIV_REAL_CAPITAL": "false"
+      }
+    },
+    {
+      "check": "experimental_external_override_absent",
+      "status": "READY",
+      "detail": {
+        "present": false
+      }
+    },
+    {
+      "check": "heartbeat_decoupled_from_tick",
+      "status": "READY",
+      "detail": {
+        "note": "companion writes a lightweight heartbeat every --heartbeat-seconds (default 30), independent of --tick-seconds; HEARTBEAT_TTL_S=180"
+      }
+    },
+    {
+      "check": "v2_heartbeat_fresh",
+      "status": "READY",
+      "detail": {
+        "age_s": 1.5
+      }
+    },
+    {
+      "check": "v2_source_is_insider",
+      "status": "READY",
+      "detail": {
+        "form4_source": "insider",
+        "records_seen": 8
+      }
+    },
+    {
+      "check": "v2_strategy_version_live",
+      "status": "READY",
+      "detail": {
+        "got": "INSIDER_BUY_CLUSTER_V2@1"
+      }
+    },
+    {
+      "check": "v2_no_exit_unresolved",
+      "status": "READY",
+      "detail": []
+    },
+    {
+      "check": "base_stack_alive",
+      "status": "READY",
+      "detail": {
+        "original": true,
+        "experimental": true,
+        "intelligence": true
+      }
+    },
+    {
+      "check": "experimental_external_boundary_blocked",
+      "status": "READY",
+      "detail": null
+    },
+    {
+      "check": "telegram_logical_owner",
+      "status": "READY",
+      "detail": {
+        "logical_owners": 1,
+        "healthy": true,
+        "network_pids": [],
+        "cmdline_matches": 1,
+        "method": "cmdline-fallback",
+        "detail": "no established Telegram connection right now (mid long-poll); cmdline heuristic -> 1 logical"
+      }
+    },
+    {
+      "check": "dashboard_v2_section_present",
+      "status": "READY",
+      "detail": {
+        "sections": [
+          "overview",
+          "premarket",
+          "original_quant",
+          "v2_active_strategy",
+          "v2_broad_discovery",
+          "validation",
+          "intelligence",
+          "paper_eod"
+        ]
+      }
+    }
+  ]
+}

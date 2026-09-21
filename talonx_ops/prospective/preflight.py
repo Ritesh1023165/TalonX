@@ -85,6 +85,25 @@ def _port_open(p: int) -> bool:
 # the running code is no longer the frozen release and preflight is NO_GO.
 FREEZE_ALLOWED_PREFIXES = ("docs/", "tests/")
 FREEZE_ALLOWED_FILES = ("talonx_ops/prospective/__init__.py",)
+# POST-FREEZE OPERATIONAL/SECURITY HARDENING (pre-full-day cleanup) -- an EXPLICIT, closed list of runtime files that were
+# changed after the frozen SHA a56ec8c for (1) process-wide secret redaction in logs, (2) an isolated release notification
+# outbox + compromised-credential refusal in the release gate, (3) the Sentinel STARTUP campaign label, (4) time-bound
+# STARTUP/SHUTDOWN notices.  NONE of them is a strategy / provider / pricing / accounting / ledger file (guarded by a test);
+# the strategy fingerprint and provider-contract fingerprint are unchanged.  Any other runtime change is still NO_GO.
+FREEZE_OPS_HARDENING_FILES = (
+    "talonx_ops/log_redaction.py",
+    "talonx_ops/logging_setup.py",
+    "talonx_ops/supervisor.py",
+    "talonx_ops/notify/__init__.py",
+    "talonx_ops/notify/producers.py",
+    "talonx_ops/notify/validate.py",
+    "talonx_ops/prospective/preflight.py",
+    "talonx_ops/prospective/__main__.py",
+    "talonx_dispatch/run.py",
+    "talonx_dispatch/telegram_client.py",
+    "talonx_v2/release_gate.py",
+    "talonx_v2/run.py",
+)
 
 
 def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None) -> tuple[bool, str]:
@@ -101,10 +120,11 @@ def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None)
                               capture_output=True, text=True).stdout.split()
     except Exception as exc:  # noqa: BLE001 -- fail closed
         return False, f"could not verify ancestry: {type(exc).__name__}"
-    extra = [f for f in diff if not (f.startswith(FREEZE_ALLOWED_PREFIXES) or f in FREEZE_ALLOWED_FILES)]
+    extra = [f for f in diff if not (f.startswith(FREEZE_ALLOWED_PREFIXES) or f in FREEZE_ALLOWED_FILES
+                                       or f in FREEZE_OPS_HARDENING_FILES)]
     if extra:
         return False, f"runtime files changed after the frozen release: {extra[:5]}"
-    return True, f"HEAD descends from the frozen release; only docs/tests/pin changed ({len(diff)} files)"
+    return True, f"HEAD descends from the frozen release; only docs/tests/pin/declared ops-hardening files changed ({len(diff)} files)"
 
 
 def run_preflight(*, expected_sha: str = RELEASE_SHA_EXPECTED,

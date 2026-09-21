@@ -1,0 +1,17 @@
+START 2026-09-21T18:42:19Z
+==================================================================
+  PROSPECTIVE V2 -- MORNING START   2026-09-21T19:43:00.272105+01:00 (Europe/London)
+==================================================================
+  preflight overall : READY_WITH_FINDINGS
+    [FINDING] repo_tree_clean  {'porcelain_lines': ['?? docs/research/evidence/v2_full_day_session_01/', '?? v2_release_rc1.db.startlock', '?? v2_release_rc1_status.json']}
+  base stack alive : True
+  V2 companion     : True
+  checkpoint daemon: True
+  dashboard :8787  : True
+  session dir      : C:\workspace\TalonX\results\prospective_2026-09-21
+  env (non-secret) : profile=INSIDER_BUY_CLUSTER_V2 cash=100000
+==================================================================
+  startup verdict  : READY
+  READY -- stack up. Dashboard: http://localhost:8787  --  no intervention needed.
+  Evening:  python -m talonx_ops.prospective close
+==================================================================
