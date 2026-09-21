@@ -1,0 +1,11 @@
+POST-MERGE VERIFICATION (on `main`; tree identical to the PR merge result because main had no independent commits)
+  release gate on main ........ READY, 18 checks, 1 WARN (campaign_identity: release ledger is created at launch)   -> release_gate_on_main.json
+  strategy fingerprint ........ computed = expected = e2acf6454789217e
+  provider contract fp ........ V2_RELEASE_PRICE_CONTRACT@1 / ac5e51aa3599d6c9
+  release pricing mode ........ sip (csv NOT used)         Lab: OFF
+  frozen pin .................. RELEASE_SHA_EXPECTED = a56ec8c ; HEAD descends from it ; only docs/tests/pin changed since the freeze
+  tag v2-paper-rc1 ............ peels to a56ec8c8d10adb36a113ebd373204f297c230081 ; ancestor of main
+  legacy v2_lane.db md5 ....... cff00b0f46e7e5b65e6f5903366fab28 (unchanged) ; v2_release_rc1.db NOT created (prepared for creation at launch)
+  no session started, no Telegram send, no broker call, no process started
+  (the gate + tree-identity check are re-run on the actual merge commit after the PR merge; result is stated in the final report)
+See post_merge_gate_and_pin.txt.
