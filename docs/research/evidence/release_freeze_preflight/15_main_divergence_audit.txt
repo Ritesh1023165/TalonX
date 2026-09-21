@@ -1,0 +1,12 @@
+MAIN DIVERGENCE AUDIT (before merge; git fetch origin performed)
+  main            = origin/main = 5f5553836c3f4eceb9f82c447010ab8791d35ce4  (Merge pull request #9 from Ritesh1023165/feature/talonx-backtest-engine)
+  feature (frozen S) = a56ec8c8d10adb36a113ebd373204f297c230081
+  common ancestor = 5f5553836c3f4eceb9f82c447010ab8791d35ce4 (== main HEAD; main is a strict ancestor of the feature branch)
+  MAIN-ONLY commits    : 0  (nothing on main needs preserving)
+  FEATURE-ONLY commits : 331 up to S (2026-08-18 .. 2026-09-21: research hardening, Tasks 100-140, V2 integration, Packages 1-5, RI-1..RI-4, PQ-1/2A/2B, final acceptance, freeze); 1613 files, +377,195/-2,735
+  merge-tree (main,S)  : clean, no conflicts
+  fast-forward possible: YES
+  merge method         : FAST_FORWARD (no merge commit, no force, no rewrite, no squash)
+  hotfix/task118a, hotfix/task118f, hotfix/task119 are all ancestors of the feature branch (already contained)
+  research branches (alpha-phenomenon-discovery, profitability-2026-09, strategy-validation*) are NOT part of this merge and remain separate
+  local feature/* legacy branches on origin are untouched

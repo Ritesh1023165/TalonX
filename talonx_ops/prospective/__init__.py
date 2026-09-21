@@ -18,7 +18,9 @@ or reseeds ``v2_lane.db`` -- fails closed on ledger-integrity problems.
 """
 from __future__ import annotations
 
-RELEASE_SHA_EXPECTED = "0d52e7c"  # Task 117 final activation release
+# FROZEN RELEASE (v2-paper-rc1): the ONE immutable runtime SHA.  Descendants may only change docs/, tests/ and this pin
+# (see preflight.frozen_release_ok).  The CLI --expected-sha may still override it explicitly.
+RELEASE_SHA_EXPECTED = "a56ec8c"
 V2_FINGERPRINT_EXPECTED = "e2acf6454789217e"
 # RI-1 (V2 Release Integration Task RI-1): updated from "11107198c5b81237".
 # `talonx_v2/config.py` -- one of the 5 files this fingerprint covers -- gained

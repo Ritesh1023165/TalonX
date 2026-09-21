@@ -1,0 +1,4 @@
+reading (mode=ro): v2_release_rc1.db
+summary: {"cash": 100000.0, "buys": 0, "sells": 0, "open": 0, "closed": 0, "exit_unresolved": 0, "realized_pnl_usd": 0.0, "open_cost_usd": 0.0, "exit_unresolved_cost_usd": 0.0, "dividends_credited_usd": 0.0, "dividends_accrued_usd": 0.0, "total_return_pnl_usd": 0.0, "starting_cash": 100000.0, "campaign_id": "V2-PAPER-RC1"}
+asserts: {'buys_eq_sells_plus_open_plus_unresolved': 'PASS', 'cash_plus_open_cost_reconciles': 'PASS', 'no_negative_cash': 'PASS', 'whole_share_positions': 'PASS', 'positive_finite_position_cost': 'PASS', 'corporate_action_adjustments_consistent': 'PASS', 'dividend_accounting_consistent': 'PASS', 'no_duplicate_buy_episode_id': 'PASS', 'no_duplicate_position_episode_id': 'PASS', 'no_stale_episode_entered': 'PASS', 'v2_status_readable': 'FAIL'}
+findings: ['v2 status file unreadable at close']

@@ -3575,3 +3575,15 @@ Decisions recorded:
 4. **No profitability claim.** V2 profitability is UNPROVEN; no profitability research was performed; strategy rules and fingerprint `e2acf6454789217e` unchanged.
 5. **Not started:** full-day paper session, prospective validation, real-money trading. Operator decisions still open: continue the legacy production campaign vs. a new
    campaign; update `RELEASE_SHA_EXPECTED` (currently `0d52e7c`) or pass `--expected-sha <RC SHA>` at the freeze step.
+
+---
+
+## Release Freeze + Preflight (v2-paper-rc1)
+
+1. **Frozen release SHA `a56ec8c`**, annotated tag `v2-paper-rc1` (accepted candidate b723901 + the release-freeze mechanism only; no strategy/provider semantic change).
+   Strategy fingerprint `e2acf6454789217e`, provider contract `V2_RELEASE_PRICE_CONTRACT@1` / `ac5e51aa3599d6c9` unchanged.
+2. **The frozen SHA is authoritative in configuration:** `RELEASE_SHA_EXPECTED = "a56ec8c"`. A descendant is accepted only if it changed nothing but `docs/`, `tests/` and the pin.
+3. **New campaign, not the legacy one.** First frozen prospective run = `V2-PAPER-RC1`, $100,000 starting cash, $10,000 fee-inclusive allocation, PAPER, own ledger `v2_release_rc1.db`.
+   The legacy $300k `v2_lane.db` is untouched. Creation is `PREPARED_FOR_CREATION_AT_LAUNCH` (explicit, create-once `--init-campaign`), proven on an isolated ledger.
+4. **Main is the authoritative release branch** from this merge: future release/validation branches start from `main`; the feature branch remains for traceability until after full-day validation; research branches stay separate.
+5. Not started: full-day paper session, prospective validation, profitability research; real money NOT enabled; V2 profitability UNPROVEN.

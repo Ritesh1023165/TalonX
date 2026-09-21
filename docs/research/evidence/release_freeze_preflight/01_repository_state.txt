@@ -1,0 +1,8 @@
+Repository state BEFORE the freeze work (recorded 2026-09-21 ~16:20 UTC)
+  branch:            feature/task131-option-a-integration
+  starting HEAD:     b7239014ad6e2ec1ba873094b1d061410fca979c (b723901) == reported accepted release candidate (no drift)
+  origin/feature:    b723901 (in sync)     main == origin/main == 5f5553836c3f4eceb9f82c447010ab8791d35ce4
+  git status:        clean apart from untracked test side-effect files notifications.db-shm / notifications.db-wal (NOT staged)
+  tags:              no v2-* tag existed
+  TalonX/python processes running: 0 (none stopped or killed)
+  production v2_lane.db md5 (legacy $300k campaign): cff00b0f46e7e5b65e6f5903366fab28 -- unchanged throughout this task

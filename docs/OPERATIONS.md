@@ -156,14 +156,20 @@ bounded supervisor command above. Nothing about the architecture needs to change
 
 ---
 
-## V2 release start (paper only)
+## V2 release start (paper only) - frozen release `v2-paper-rc1`
 
-The release profile is explicit — a plain start still defaults to the research/replay pricing path. To start V2 on the qualified SIP provider:
+Frozen release SHA `a56ec8c` (tag `v2-paper-rc1`); `RELEASE_SHA_EXPECTED` in `talonx_ops/prospective/__init__.py` pins it. A checkout may be that SHA or a descendant that
+only changed `docs/`, `tests/` and the pin. The first release runs on a NEW campaign ledger (`V2-PAPER-RC1`, $100,000 / $10,000, `v2_release_rc1.db`); the legacy `v2_lane.db` ($300k) is never used or modified.
+
+Full procedure and checklist: `docs/research/evidence/release_freeze_preflight/13_full_day_launch_command.md` and `14_operator_checklist.md`. In one PowerShell window:
 
 ```
-python -m talonx_ops.prospective start --release --expected-sha <RC SHA> --tick-seconds 150 --heartbeat-seconds 30 \
-    --live-lookback-days 45 --execution-scope resolved-active-watchlist --deliver --transport telegram
+$env:TALONX_V2_CAMPAIGN_ID='V2-PAPER-RC1'; $env:TALONX_V2_DB_PATH='v2_release_rc1.db'; $env:TALONX_V2_STATUS_PATH='v2_release_rc1_status.json'
+$env:TALONX_V2_STARTING_CASH_USD='100000'; $env:TALONX_V2_ALLOCATION_USD='10000'; $env:TALONX_V2_EXECUTION_MODE='PAPER'
+.venv\Scripts\python.exe -m talonx_v2.release_gate --init-campaign      # ONE time only
+.venv\Scripts\python.exe -m talonx_v2.release_gate                      # read-only readiness: expect READY
+.venv\Scripts\python.exe -m talonx_ops.prospective start --release --expected-sha a56ec8c --tick-seconds 150 --heartbeat-seconds 30 --live-lookback-days 45 --execution-scope resolved-active-watchlist --deliver --transport telegram
 ```
 
-`--release` forces `sip` + `V2_RELEASE_PRICE_CONTRACT@1`, requires `--deliver --transport telegram`, and refuses to start (exit 2, `release_gate.json` written to the session dir)
-unless the read-only readiness gate is READY. `--force` never bypasses it. Check readiness without starting: `python -m talonx_v2.release_gate`.
+`--release` forces `sip` + `V2_RELEASE_PRICE_CONTRACT@1`, requires `--deliver --transport telegram`, and refuses to start (exit 2, `release_gate.json` in the session dir) unless the
+read-only readiness gate is READY - including the release campaign identity. `--force` never bypasses it. A plain start still defaults to the research/replay pricing path.

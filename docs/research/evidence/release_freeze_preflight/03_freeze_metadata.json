@@ -1,0 +1,13 @@
+{
+  "frozen_release_sha": "a56ec8c8d10adb36a113ebd373204f297c230081",
+  "frozen_release_sha_short": "a56ec8c",
+  "accepted_release_candidate": "b723901",
+  "frozen_at_utc": "2026-09-21T16:38:59Z",
+  "release_tag": "v2-paper-rc1",
+  "authoritative_pin": "talonx_ops/prospective/__init__.py: RELEASE_SHA_EXPECTED = 'a56ec8c' (CLI --expected-sha may still override)",
+  "pin_semantics": "HEAD == frozen SHA, or HEAD descends from it and only docs/, tests/ and the pin file changed; any other changed file => preflight NO_GO",
+  "strategy_fingerprint": "e2acf6454789217e",
+  "provider_contract": "V2_RELEASE_PRICE_CONTRACT@1",
+  "provider_contract_fingerprint": "ac5e51aa3599d6c9",
+  "strategy_or_provider_semantics_changed": false
+}

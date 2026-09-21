@@ -671,3 +671,8 @@ V2 (`INSIDER_BUY_CLUSTER_V2@1`) is **functionally accepted and release-ready as 
 Its **profitability is UNPROVEN**: no full-day paper session, prospective validation or profitability research has been performed, and real-money trading is not enabled.
 The entry OPEN is the provider's first eligible trade (SIP daily open), not the official opening-auction print. See
 `docs/research/evidence/v2_final_release_acceptance/`.
+
+## Release freeze status note
+
+V2 is **frozen as `v2-paper-rc1`** (SHA `a56ec8c`) for the first prospective paper campaign (`V2-PAPER-RC1`, $100,000 / $10,000). Paper only; real money not enabled; profitability UNPROVEN;
+the controlled full-day paper session has NOT yet been run. `main` is the authoritative source for the frozen release.
