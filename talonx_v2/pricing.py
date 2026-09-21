@@ -176,9 +176,11 @@ class CsvBarAdapter:
 # Alpaca IEX adapter -- DATA-ONLY, NON-CONFORMANT (parity not established)
 # --------------------------------------------------------------------------- #
 class AlpacaIexBarAdapter:
-    name = "alpaca:iex:1Day:adjustment=all(NON_CONFORMANT_vs_SIP)"
+    # PQ-2A closure: LIVE fills are on the SPLIT-ONLY basis (``adjustment=split``): dividend cash
+    # is credited explicitly (total return), so a dividend-adjusted price would double count it.
+    name = "alpaca:iex:1Day:adjustment=split(NON_CONFORMANT_vs_SIP)"
     CONFORMANT = False
-    adjustment_state = "SPLIT_DIVIDEND_ADJUSTED"
+    adjustment_state = "SPLIT_ADJUSTED"
 
     def __init__(self, *, key_id: str | None = None, secret: str | None = None,
                  http_get: Callable[[str, dict], dict] | None = None):
@@ -202,7 +204,7 @@ class AlpacaIexBarAdapter:
         if symbol in self._cache:
             return self._cache[symbol]
         d = self._get("https://data.alpaca.markets/v2/stocks/bars",
-                      {"symbols": symbol, "timeframe": "1Day", "adjustment": "all",
+                      {"symbols": symbol, "timeframe": "1Day", "adjustment": "split",
                        "feed": "iex", "limit": str(_LOOKBACK_LOAD_SESSIONS + 5)})
         bars = d.get("bars", {}).get(symbol, []) or []
         basis = datetime.now(timezone.utc).date().isoformat()     # PQ-2A: fetch-date basis
@@ -240,9 +242,12 @@ class YFinanceBarAdapter:
     substitution.  `CONFORMANT = True` **only within that tested domain**;
     still not enabled for ACTIVE by default.
     """
-    name = "yfinance:1d:auto_adjust=all"
+    # PQ-2A closure: ``auto_adjust=False`` => Yahoo's split-adjusted, dividend-UNADJUSTED OHLC
+    # (verified: NVDA 2024-06-07 open 119.77 == Alpaca adjustment=split; AAPL 2026-05-06 open
+    # 281.92 == raw).  Dividend cash is credited explicitly, so prices must not embed it.
+    name = "yfinance:1d:auto_adjust=False(split-adjusted)"
     CONFORMANT = True                       # within the Phase 0 parity-study domain
-    adjustment_state = "SPLIT_DIVIDEND_ADJUSTED"
+    adjustment_state = "SPLIT_ADJUSTED"
 
     def __init__(self, *, ticker_factory: Callable[[str], object] | None = None,
                  lookback_sessions: int = _LOOKBACK_LOAD_SESSIONS):
@@ -260,7 +265,7 @@ class YFinanceBarAdapter:
             tk = yf.Ticker(symbol)
         import datetime as _dt
         start = (_dt.date.today() - _dt.timedelta(days=int(self._lb * 1.6) + 10)).isoformat()
-        h = tk.history(start=start, interval="1d", auto_adjust=True, actions=False)
+        h = tk.history(start=start, interval="1d", auto_adjust=False, actions=False)
         rows: list[dict] = []
         basis = datetime.now(timezone.utc).date().isoformat()     # PQ-2A: fetch-date basis
         if h is not None and not h.empty:

@@ -92,6 +92,12 @@ def _v2_reconcile() -> tuple[dict[str, Any], dict[str, str], list[str]]:
         # A correctly adjusted split raises NO problem here.
         from talonx_v2.corporate_actions import consistency_problems
         ca_problems = consistency_problems(con)
+        # PQ-2A closure: total-return dividend accounting.  CREDITED dividend cash is part of the
+        # cash equation; lineage/quantity/amount/duplicate/overdue problems are checked read-only.
+        from talonx_v2 import dividends as _div
+        div_credited = _div.credited_total(con)
+        div_accrued = _div.accrued_total(con)
+        div_problems = _div.problems(con, as_of=datetime.now(timezone.utc).date())
     finally:
         con.close()
 
@@ -99,6 +105,8 @@ def _v2_reconcile() -> tuple[dict[str, Any], dict[str, str], list[str]]:
            "closed": int(n_closed), "exit_unresolved": int(n_unres),
            "realized_pnl_usd": round(realized, 2), "open_cost_usd": round(open_cost, 2),
            "exit_unresolved_cost_usd": round(unresolved_cost, 2),
+           "dividends_credited_usd": round(div_credited, 2), "dividends_accrued_usd": round(div_accrued, 2),
+           "total_return_pnl_usd": round(realized + div_credited, 2),
            "starting_cash": starting_cash, "campaign_id": campaign_id}
 
     def _a(name, ok, why=""):
@@ -110,15 +118,16 @@ def _v2_reconcile() -> tuple[dict[str, Any], dict[str, str], list[str]]:
        f"{buys} != {sells}+{n_open}+{n_unres}")
     _a("cash_plus_open_cost_reconciles",
        cash is not None and
-       abs((cash + open_cost + unresolved_cost) - (starting_cash + realized)) <= 1.0,
+       abs((cash + open_cost + unresolved_cost) - (starting_cash + realized + div_credited)) <= 1.0,
        f"cash {cash} + open_cost {open_cost} + unresolved_cost {unresolved_cost} != "
-       f"{starting_cash} + realized {realized}")
+       f"{starting_cash} + realized {realized} + credited_dividends {div_credited}")
     _a("no_negative_cash", cash is not None and cash >= 0, f"cash {cash}")
     _a("whole_share_positions", not non_whole,
        str([(d[0], d[1]) for d in non_whole]))
     _a("positive_finite_position_cost", not bad_cost,
        str([(d[0], d[1]) for d in bad_cost]))
     _a("corporate_action_adjustments_consistent", not ca_problems, "; ".join(ca_problems[:5]))
+    _a("dividend_accounting_consistent", not div_problems, "; ".join(div_problems[:5]))
     _a("no_duplicate_buy_episode_id", not dup_buy, str([d[0] for d in dup_buy]))
     _a("no_duplicate_position_episode_id", not dup_pos, str([d[0] for d in dup_pos]))
     _a("no_stale_episode_entered", not stale_entered, str([s[0] for s in stale_entered]))
@@ -188,6 +197,10 @@ def _record_v2_reconciliation_blocks(asserts: dict[str, str], findings: list[str
         detail = next((f for f in findings if f.startswith("corporate_action_adjustments_consistent")),
                       "corporate_action_adjustments_consistent: FAIL")
         to_record.append((account_blocks.REASON_LEDGER_MISMATCH, "corporate_action_adjustments_consistent", detail))
+    if asserts.get("dividend_accounting_consistent") == "FAIL":
+        detail = next((f for f in findings if f.startswith("dividend_accounting_consistent")),
+                      "dividend_accounting_consistent: FAIL")
+        to_record.append((account_blocks.REASON_LEDGER_MISMATCH, "dividend_accounting_consistent", detail))
     if not to_record:
         return []
 
@@ -239,7 +252,8 @@ def _record_v2_reconciliation_blocks(asserts: dict[str, str], findings: list[str
                 findings=[f for f in findings if any(
                     f.startswith(k) for k in ("cash_plus_open_cost_reconciles", "no_negative_cash",
                                               "whole_share_positions", "positive_finite_position_cost",
-                                              "corporate_action_adjustments_consistent"))],
+                                              "corporate_action_adjustments_consistent",
+                                              "dividend_accounting_consistent"))],
                 reference=",".join(recorded))
         except Exception:  # noqa: BLE001
             logger.exception("failed to enqueue OPERATIONS reconciliation-failure notification")

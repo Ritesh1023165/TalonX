@@ -236,6 +236,7 @@ def settle_due_exits(
                                     "reason": "EXIT_BAR_PENDING_FALLFORWARD"})
             continue
         exit_provenance = _field_provenance(px, "close")
+        eligible_dividends: tuple = ()
         if corporate_actions is not None:
             # PQ-2A: authoritative corporate-action assessment IMMEDIATELY before
             # settlement (also applies any split not yet on the trail).  Never
@@ -243,7 +244,10 @@ def settle_due_exits(
             # +5 window; BLOCK / window exhaustion -> the existing EXIT_UNRESOLVED.
             verdict = corporate_actions.assess_position(
                 store, pos, as_of=as_of, exit_basis_as_of=_basis_of(px), exit_session=exit_session,
+                exit_adjustment_state=((px.get("_provenance") or {}).get("adjustment_state")
+                                       if isinstance(px, dict) else None),
                 settlement=True)
+            eligible_dividends = verdict.dividends
             if not verdict.settle_ok:
                 last_ff = v2cal.add_sessions(target_session, ff_max)
                 if verdict.status == "BLOCK" or as_of >= last_ff:
@@ -259,7 +263,8 @@ def settle_due_exits(
                 continue
         out = paper.close_position(store, pos, exit_price=float(px["close"]),
                                    exit_session=exit_session, config=cfg,
-                                   price_provenance=exit_provenance)
+                                   price_provenance=exit_provenance,
+                                   dividends=eligible_dividends)
         if not out.settled and out.blocked_reason:
             # defense in depth: a recorded corporate-action block refused settlement
             store.mark_exit_unresolved(pos["position_id"],

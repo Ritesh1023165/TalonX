@@ -1080,6 +1080,27 @@ class DashboardReadModel:
                     except Exception as exc:  # noqa: BLE001
                         out["ledger"]["corporate_actions"] = {"status": "UNKNOWN",
                                                               "note": f"{type(exc).__name__}: {exc}"}
+                    # PQ-2A closure (TOTAL RETURN): read-only dividend receivable/credit view.
+                    # `realized_pnl_usd` above stays PRICE P&L; total return adds credited dividends.
+                    try:
+                        from talonx_v2 import dividends as _dv
+                        drows = _dv.rows(con)
+                        d_cred = round(sum(d["amount_usd"] for d in drows if d["state"] == "CREDITED"), 2)
+                        d_acc = round(sum(d["amount_usd"] for d in drows if d["state"] == "ACCRUED"), 2)
+                        out["ledger"]["dividend_pnl_usd"] = d_cred
+                        out["ledger"]["total_return_pnl_usd"] = round(realized + d_cred, 2)
+                        out["ledger"]["dividends"] = {
+                            "status": ("NONE" if not drows else "RECEIVABLE" if d_acc else "CREDITED"),
+                            "credited_usd": d_cred, "accrued_receivable_usd": d_acc,
+                            "items": [{"symbol": d["symbol"], "ex_date": d["ex_date"],
+                                       "payable_date": d["payable_date"], "rate_per_share": d["rate"],
+                                       "eligible_quantity": d["eligible_qty"], "total_usd": d["amount_usd"],
+                                       "state": d["state"], "position_id": d["position_id"],
+                                       "provenance": d["provenance_json"], "detail": d["detail"]}
+                                      for d in drows]}
+                    except Exception as exc:  # noqa: BLE001
+                        out["ledger"]["dividends"] = {"status": "UNKNOWN",
+                                                      "note": f"{type(exc).__name__}: {exc}"}
                     # Task 119A A1: fold V2's richer accounting (equity,
                     # arithmetic reconciliation, cost-treatment breakdown,
                     # marked open-position value) into this SAME ledger

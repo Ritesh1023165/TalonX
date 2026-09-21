@@ -127,7 +127,7 @@ without naming which of these applies.
 | S5-23 | After-target-entry splits require chronological reconstruction, transactional, exactly once | Agreed | Not authorized | **Partially implemented (PQ-2A, V2 only)** — split applied to economic shares transactionally, exactly once (content-keyed, append-only trail), chronologically by ex-date; unit-tested incl. restart/duplicate-event | Code inspection (this session — OPS-004); PQ-2A `docs/research/evidence/provider_qualification_pq2a/` |
 | S5-24 | Unverified changes block execution without discarding obligations | Agreed | Not authorized | **Partially implemented (PQ-2A, V2 only)** — unavailable/conflicting/unsupported/unknown-basis evidence holds inside the +5 window or moves to EXIT_UNRESOLVED (capacity + account block retained); obligations never discarded | Code inspection (this session — OPS-004); PQ-2A `docs/research/evidence/provider_qualification_pq2a/` |
 | S5-25 | Mergers/replacement securities require explicitly supported treatment | Agreed | Not authorized | **Fail-closed only (PQ-2A, V2)** — mergers/spin-offs/renames/unit splits/stock dividends are DETECTED (Alpaca action classes) and block settlement; no supported treatment exists | Code inspection (this session — OPS-004); PQ-2A `docs/research/evidence/provider_qualification_pq2a/` |
-| S5-26 | Truncate+cash-in-lieu modeled policy; proportional cost basis; CORP_ACTION_CASH separate but counted in returns; unresolved entitlement not fabricated cash | Agreed | Not authorized | **Partially implemented (PQ-2A, V2 only)** — proportional/unchanged aggregate cost basis and exact fractional entitlement retained; truncate+cash-in-lieu and `CORP_ACTION_CASH` NOT implemented (no settlement-reference source) — gatekeeper decision recorded in DECISION_LOG | Code inspection (this session — OPS-004); PQ-2A `docs/research/evidence/provider_qualification_pq2a/` |
+| S5-26 | **REVISED (PQ-2A closure, gatekeeper decision): V2 paper accounting keeps EXACT fractional economic entitlement after a corporate action (5 sh x 1:10 reverse split = 0.5 sh); NO truncate, NO round-up, NO fabricated cash-in-lieu; NEW entries stay whole-share only (Package 4); proportional/unchanged aggregate cost basis. `CORP_ACTION_CASH` for cash-in-lieu is not modelled (no approved source of a settlement reference); ordinary cash dividends are handled by S10-17.** | Agreed (revised by gatekeeper; supersedes truncate + cash-in-lieu for V2 paper accounting) | Not authorized | **Implemented (PQ-2A + closure, V2 only)** — exact `Fraction` economic shares, append-only trail, unchanged aggregate cost, idempotent; cash-in-lieu deliberately absent | Code inspection (this session — OPS-004); PQ-2A `docs/research/evidence/provider_qualification_pq2a/`; PQ-2A closure `docs/research/evidence/provider_qualification_pq2a_closure/`; `tests/test_pq2a_closure_dividends.py::test_02_to_05_*` |
 | S5-27 | Decimal arithmetic internally; cents/4-decimal display; no intermediate truncation; rounding mode open | Agreed | Not authorized | Partially implemented (corrected 2026-09-17 — `calculate_buy`/`calculate_sell_pnl` confirmed `float`, not `Decimal`; full surface not audited) | Code inspection (this session, `talonx_paper/engine.py:71-93`) |
 | S5-28 | Durable checkpoints + overlap/dedup + recoverable enrichment state; no fixed 16-hour assumption | Agreed | Not authorized | Partially implemented (Intelligence's own checkpoint/backfill/poller exists, Task 96B; 16h-assumption search found none to remove) | Code inspection (established + this session) |
 | S5-29 | Prioritize obligations/timely intents over bulk historical work | Agreed | Not authorized | Not assessed in this documentation pass | Not assessed in this documentation pass |
@@ -241,7 +241,7 @@ without naming which of these applies.
 | S10-14 | Same-stock across independent accounts; exposure without merging performance; Research Lab excluded from default totals | Agreed | Not authorized | Not implemented (no exposure-display surface found) | Code inspection (this session) |
 | S10-15 | No borrowing/leverage/negative-cash/shorts; explicit skip on insufficient capacity; truthful deficit recording, block+raise Operations | Agreed | Not authorized | Partially implemented (no-shorts/explicit-skip established; deficit-recording+Operations-raise not found) | Code inspection (established + this session) |
 | S10-16 | Deposits/withdrawals explicit, auditable, separate from performance; no auto-top-ups; existing balances unchanged | Agreed | Not authorized | Not implemented (no deposit/withdrawal feature exists) | Code inspection (this session) |
-| S10-17 | Dividends: separate from price gains but in total return; verify entitlement; receivables ≠ cash; no double-count via price+cash | Agreed | Not authorized | **Interim (PQ-2A, V2)** — dividends are OBSERVED (`DIVIDEND_OBSERVED_NOT_CREDITED`), never credited, never used to adjust ledger prices (price-return-only mechanics, no double count); agreed total-return/receivable lifecycle NOT implemented — `DIVIDEND_POLICY_DECISION_REQUIRED` | Code inspection (established); PQ-2A `docs/research/evidence/provider_qualification_pq2a/` |
+| S10-17 | Dividends: **TOTAL RETURN retained (gatekeeper)** — ordinary cash dividends economically received while held are included in performance; recorded separately from price P&L; entitlement by explicit provider event and ex-date ownership (`entry_session < ex_date <= exit_fill_session`); receivable != cash (credited on/after payable date after fresh re-confirmation, also after the trade is closed); no double count (fills must be dividend-unadjusted, else fail closed); special/foreign/malformed dividends unsupported | Agreed (retained; implementation contract recorded) | Not authorized | **Implemented (PQ-2A closure, V2 only)** — `dividend_entitlements` ACCRUED->CREDITED lifecycle, quantity from the split trail, cash + total-return reconciliation, read-only operator view; live adapters moved to a split-only basis | Code inspection (established); PQ-2A `docs/research/evidence/provider_qualification_pq2a/`; PQ-2A closure evidence; `tests/test_pq2a_closure_dividends.py` |
 | S10-18 | Preserve Session 5 split/cash-in-lieu requirements unchanged | Agreed (reaffirms S5-21..S5-27) | Not authorized | **Partially implemented (PQ-2A, V2 only)** — see S5-22..S5-26 | Code inspection (established); PQ-2A `docs/research/evidence/provider_qualification_pq2a/` |
 | S10-19 | Unsupported corporate actions preserve unresolved obligations; no guessed ratios/zero-write-offs; verified correction recordable | Agreed | Not authorized | **Partially implemented (PQ-2A, V2 only)** — unsupported actions preserve an unresolved position (no guessed ratio, no zero write-off); verified-correction recording not implemented | Code inspection (established); PQ-2A `docs/research/evidence/provider_qualification_pq2a/` |
 | S10-20 | EOD/restart reconciles 7 listed items | Agreed (extends S4-13) | Not authorized (pre-existing, partial) | Partially implemented (detection real; full 7-item scope not individually traced) | Code inspection (established) |
@@ -313,6 +313,7 @@ without naming which of these applies.
 | S13-18 | RI-3 — Dashboard and Operator Integration (S9/S10/S11/S13 release visibility) | Agreed | Authorized and implemented (2026-09-18) | Implemented with bounded follow-ups: read-only campaign/account, reservations, unresolved obligations, intents, blocks/clearance, scoped reconciliation, realized P&L, notification/runtime state and attention; Intelligence/Operations routing and first-release Intraday isolation closed. Physical credentials/delivery validation, provider qualification and prospective validation remain separate gates. | `docs/research/evidence/v2_release_integration_ri3/README.md`; isolated fixture and targeted tests |
 | S13-19 | PQ-1 — Provider Qualification & Price Finality | Agreed release gate | Authorized and completed as qualification; no provider activation authorized/performed | `PQ1_NOT_ACCEPTED`: current Alpaca credentials can read recent historical SIP daily bars, but prospective open/close finality and corporate-action-safe position accounting remain unqualified; OPS-005 stays open. Additive provider provenance persistence implemented for new runtime trades; legacy rows remain unknown. No strategy threshold/lifecycle changed. | `docs/research/evidence/provider_qualification_pq1/`; 117 focused tests passed (broader regression 325 passed / 3 pre-existing unrelated failures); bounded read-only entitlement probe |
 | S13-20 | PQ-2A — Corporate Action Safety & Accounting Contract | Agreed release gate (corporate-action correctness only) | Authorized and completed; no provider activation, SIP runtime, finality, PQ-2B or release acceptance authorized/performed | `PQ2A_ACCEPTED_WITH_BOUNDED_FOLLOWUPS`: V2 forward/reverse splits can no longer manufacture P&L (explicit-event, basis-proven, exactly-once, unchanged aggregate cost basis, exact fractional entitlement); unsupported/conflicting/unavailable/unknown-basis evidence fails closed; composite history refuses unprovable basis mixes; dividends observed-not-credited (`DIVIDEND_POLICY_DECISION_REQUIRED`). Strategy fingerprint `e2acf6454789217e` unchanged; OPS-005 stays open. | `docs/research/evidence/provider_qualification_pq2a/`; see README §Tests |
+| S13-21 | PQ-2A CLOSURE — Fractional entitlement decision + dividend total-return accounting | Agreed release gate | Authorized and completed; no PQ-2B, SIP runtime, finality, release acceptance or prospective validation authorized/performed | See closure evidence README for the verdict. Exact fractional entitlement documented as the V2 paper rule (S5-26 revised); ordinary-cash-dividend total-return lifecycle implemented (S10-17); live adapters on a split-only basis; special/foreign/unsupported distributions fail closed. Fingerprint `e2acf6454789217e` unchanged. | `docs/research/evidence/provider_qualification_pq2a_closure/` |
 
 ---
 
@@ -2655,6 +2656,16 @@ Neither is implemented; this is a design-consistency dependency for
 whenever `OPS-004` is eventually addressed, not a new requirement.
 Verdict unchanged: `Not implemented`.
 
+**PQ-2A closure update (2026-09-21) — gatekeeper decision, REVISES this entry for V2 paper
+accounting**: the agreed truncate + cash-in-lieu treatment is **superseded**. After a corporate action
+a V2 paper position keeps its **exact fractional economic entitlement** (5 shares under a 1-for-10
+reverse split = exactly 0.5 share; settled at exit as 0.5 x price). It is never truncated, never
+rounded up, and **no cash-in-lieu is fabricated** (no approved/free source provides a reliable
+cash-in-lieu execution price). **New entries remain whole-share only** (Package 4 sizing is
+unchanged): fractional quantity can only arise later, from a corporate action. Aggregate cost basis
+is unchanged by a pure split. `CORP_ACTION_CASH` for cash-in-lieu is therefore not used; ordinary cash
+dividends are handled under `S10-17`. Verdict for V2: `Implemented`.
+
 ## S5-27 — Decimal arithmetic; cents/4-decimal display; no intermediate truncation
 
 **Decision**: Agreed. **Authorization**: Not authorized.
@@ -3876,6 +3887,21 @@ Code inspection (this session). **Dependency**: none blocking.
 **Implementation**: Not implemented — no dividend-handling code exists
 (`OPS-004`). **Validation**: Code inspection (established).
 **Dependency**: `OPS-004`.
+
+**PQ-2A closure update (2026-09-21) — gatekeeper decision: total return RETAINED; contract
+implemented for V2.** Performance = price P&L (`positions.realized_pnl_usd`, fee-inclusive) +
+credited ordinary cash dividends (`dividend_entitlements`). Contract: (1) explicit provider event
+(Alpaca `/v1/corporate-actions`; amount = raw per-share rate as of the ex-date), never inferred from
+price; (2) entitled iff `entry_session < ex_date <= exit_fill_session` (a buyer on/after the ex-date is
+not entitled; a seller on/after it keeps the dividend); (3) quantity = exact economic shares at the
+ex-date from the split trail (10 sh -> 10:1 -> 100 sh, later $0.20 => $20); (4) `ACCRUED` receivable
+recorded atomically with settlement, `CREDITED` to cash on/after `payable_date` after a fresh provider
+re-confirmation, including after the trade is CLOSED (no trade is reopened), never without a
+payable date; (5) no double count: fills must be RAW/SPLIT_ADJUSTED (live adapters now request the
+split-only basis), otherwise a position with an eligible dividend fails closed; (6) special, foreign,
+malformed, zero/negative/NaN dividends are unsupported => fail closed; (7) cash equation:
+`cash + open cost + unresolved cost = starting + price P&L + credited dividends`; accrued
+receivables count in equity, not cash; (8) idempotent by content key + once-only conditional UPDATE.
 
 ## S10-18 — Preserve Session 5 split/cash-in-lieu requirements
 **Decision**: Agreed (reaffirms `S5-21`-`S5-27`). **Authorization**:

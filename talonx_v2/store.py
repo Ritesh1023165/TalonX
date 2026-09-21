@@ -230,6 +230,35 @@ CREATE TABLE IF NOT EXISTS position_corporate_actions (
     applied_at_utc        TEXT NOT NULL,
     UNIQUE(position_id, action_key)
 );
+-- PQ-2A closure: ordinary-cash-dividend receivable/credit ledger (total-return accounting).
+-- Additive; never rewrites a position/trade row.  One row per (position, dividend event);
+-- ACCRUED = entitlement established at settlement, cash NOT yet credited; CREDITED = cash
+-- credited to `portfolio.cash` (atomically with this state change) on/after payable_date
+-- after a fresh provider re-confirmation.  Survives the position being CLOSED.
+CREATE TABLE IF NOT EXISTS dividend_entitlements (
+    entitlement_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaign_id           TEXT NOT NULL,
+    account_id            TEXT NOT NULL,
+    position_id           INTEGER NOT NULL,
+    episode_id            TEXT NOT NULL,
+    symbol                TEXT NOT NULL,
+    action_key            TEXT NOT NULL,         -- DIV|SYM|ex_date|rate (content identity)
+    ex_date               TEXT NOT NULL,
+    record_date           TEXT,
+    payable_date          TEXT,                  -- NULL = unknown => never credited
+    rate                  TEXT NOT NULL,         -- provider per-share amount AS OF ex_date (Decimal string)
+    eligible_qty          TEXT NOT NULL,         -- exact fraction of shares held at the ex-date
+    amount_exact          TEXT NOT NULL,         -- rate x qty (Decimal, unrounded)
+    amount_usd            REAL NOT NULL,         -- cents, ROUND_HALF_UP
+    state                 TEXT NOT NULL,         -- ACCRUED | CREDITED
+    accrued_at_utc        TEXT NOT NULL,
+    credited_at_utc       TEXT,
+    credited_as_of        TEXT,
+    cash_after            REAL,
+    provenance_json       TEXT,
+    detail                TEXT,
+    UNIQUE(position_id, action_key)
+);
 """ + _ACCOUNT_BLOCKS_SCHEMA
 
 
@@ -841,6 +870,83 @@ class V2Store:
                  exit_basis_as_of.isoformat() if exit_basis_as_of else None,
                  detail, _utcnow()))
             return cur.rowcount > 0
+
+    # ---- PQ-2A closure: dividend entitlements (receivable -> credited) ----
+    def record_dividend_entitlement(self, *, position_id: int, event, exit_session) -> bool:
+        """Create ONE ACCRUED entitlement for ``position_id`` (idempotent: the content key +
+        UNIQUE(position_id, action_key) make a repeat a no-op).  Quantity is the exact economic
+        share count at the ex-date (split trail); amount = provider per-share rate x quantity,
+        rounded once to cents (ROUND_HALF_UP).  No cash moves here."""
+        from decimal import ROUND_HALF_UP, Decimal
+        from talonx_v2.corporate_actions import fraction_to_decimal, shares_at_date
+        with self.transaction() as c:
+            pos = c.execute("SELECT position_id, episode_id, symbol, entry_session FROM positions "
+                            "WHERE position_id=?", (position_id,)).fetchone()
+            if pos is None or event.ex_date is None or event.cash_rate is None:
+                return False
+            es = exit_session.isoformat() if isinstance(exit_session, date) else str(exit_session)[:10]
+            # eligibility re-checked HERE (defense in depth): entry < ex <= exit fill session
+            if not (pos["entry_session"] < event.ex_date.isoformat() <= es):
+                return False
+            self.register_corporate_action(event)
+            qty = shares_at_date(c, position_id, event.ex_date)
+            exact = Decimal(event.cash_rate) * fraction_to_decimal(qty)
+            usd = exact.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            refs = [event.source_ref()] + [r for r in (event.raw or {}).get("_source_refs", [])
+                                           if r != event.source_ref()]
+            cur = c.execute(
+                """INSERT OR IGNORE INTO dividend_entitlements
+                   (campaign_id, account_id, position_id, episode_id, symbol, action_key, ex_date,
+                    record_date, payable_date, rate, eligible_qty, amount_exact, amount_usd, state,
+                    accrued_at_utc, provenance_json, detail)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'ACCRUED',?,?,?)""",
+                (self._campaign_id, self.account_id, position_id, pos["episode_id"], pos["symbol"],
+                 event.action_key, event.ex_date.isoformat(),
+                 event.record_date.isoformat() if event.record_date else None,
+                 event.payable_date.isoformat() if event.payable_date else None,
+                 event.cash_rate, str(qty), str(exact), float(usd), _utcnow(),
+                 json.dumps({"sources": refs, "provider_type": event.provider_type}),
+                 f"exit_fill_session={es}"))
+            return cur.rowcount > 0
+
+    def dividend_entitlements(self, *, state: str | None = None) -> list[dict]:
+        with self._conn() as c:
+            q = "SELECT * FROM dividend_entitlements"
+            args: tuple = ()
+            if state:
+                q += " WHERE state=?"
+                args = (state,)
+            return [dict(r) for r in c.execute(q + " ORDER BY entitlement_id", args)]
+
+    def note_dividend_check(self, entitlement_id: int, detail: str) -> None:
+        with self._conn() as c:
+            c.execute("UPDATE dividend_entitlements SET detail=? WHERE entitlement_id=? AND state='ACCRUED'",
+                      (detail[:300], entitlement_id))
+
+    def credit_dividend(self, entitlement_id: int, *, as_of, detail: str = "") -> bool:
+        """ACCRUED -> CREDITED and the cash credit in ONE transaction.  The conditional
+        ``WHERE state='ACCRUED'`` UPDATE is the authoritative once-only gate: a repeated call
+        (repeated poll, restart, stale caller) sees rowcount 0 and credits nothing."""
+        as_of_s = as_of.isoformat() if isinstance(as_of, date) else str(as_of)[:10]
+        with self.transaction() as c:
+            r = c.execute("SELECT amount_usd, payable_date FROM dividend_entitlements "
+                          "WHERE entitlement_id=? AND state='ACCRUED'", (entitlement_id,)).fetchone()
+            if r is None or not r["payable_date"] or r["payable_date"] > as_of_s:
+                return False
+            cash_after = self.cash() + float(r["amount_usd"])
+            cur = c.execute(
+                "UPDATE dividend_entitlements SET state='CREDITED', credited_at_utc=?, credited_as_of=?, "
+                "cash_after=?, detail=? WHERE entitlement_id=? AND state='ACCRUED'",
+                (_utcnow(), as_of_s, cash_after, detail[:300], entitlement_id))
+            if cur.rowcount == 0:
+                return False
+            self.set_cash(cash_after)
+            return True
+
+    def dividends_credited_total(self) -> float:
+        with self._conn() as c:
+            return float(c.execute("SELECT COALESCE(SUM(amount_usd),0) FROM dividend_entitlements "
+                                   "WHERE state='CREDITED'").fetchone()[0] or 0.0)
 
     # ---- trades ----
     def append_trade(self, *, episode_id, symbol, action, execution_price, shares,

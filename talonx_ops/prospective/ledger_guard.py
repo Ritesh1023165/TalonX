@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -128,11 +129,21 @@ def check_ledger_continuity(db_path: str | Path) -> LedgerCheck:
         unresolved_cost = con.execute(
             "SELECT COALESCE(SUM(position_cost),0) FROM positions "
             "WHERE status='EXIT_UNRESOLVED'").fetchone()[0] or 0.0
-        if r.cash is not None and abs((r.cash + open_cost + unresolved_cost) - expected_cash_if_flat) > 1.0:
+        # PQ-2A closure: credited dividend cash (total return) is part of the equation.
+        try:
+            from talonx_v2 import dividends as _div
+            div_credited = _div.credited_total(con)
+            for prob in _div.problems(con, as_of=datetime.now(timezone.utc).date()):
+                r.problems.append(f"dividend accounting inconsistent: {prob}")
+        except Exception as exc:  # noqa: BLE001 -- unreadable dividend ledger is itself a problem
+            div_credited = 0.0
+            r.problems.append(f"dividend consistency check failed: {exc!r}")
+        if r.cash is not None and abs((r.cash + open_cost + unresolved_cost)
+                                      - (expected_cash_if_flat + div_credited)) > 1.0:
             r.problems.append(
                 f"cash accounting mismatch: cash({r.cash:.2f}) + open_cost({open_cost:.2f}) + "
                 f"unresolved_cost({unresolved_cost:.2f}) != start({starting_cash:.2f}) "
-                f"+ realized({realized:.2f})")
+                f"+ realized({realized:.2f}) + credited_dividends({div_credited:.2f})")
 
         # PQ-2A: corporate-action adjustment state must be internally consistent.
         try:

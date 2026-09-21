@@ -28,10 +28,14 @@ CONTRACT (first release, deterministic, machine-tested):
   replay or a duplicate provider event (different provider id) applies once.
 * Reverse-split fractional entitlement is retained EXACTLY (no rounding, no
   invented cash-in-lieu); see DECISION_LOG S5-26 / PQ-2A evidence.
-* Cash dividends are OBSERVED, never credited and never used to adjust the
-  ledger (interim PRICE_RETURN_ONLY mechanics; the agreed total-return
-  treatment S10-17 needs a receivable lifecycle -- DIVIDEND_POLICY_DECISION_
-  REQUIRED).  Nothing here can double count a dividend.
+* Ordinary cash dividends are TOTAL-RETURN accounted (PQ-2A closure): explicit
+  provider event; entitled iff ``entry_session < ex_date <= exit_fill_session``;
+  quantity = economic shares AT the ex-date (split trail); recorded atomically
+  with settlement as an ACCRUED receivable and CREDITED to cash on/after the
+  payable date after a fresh provider re-confirmation (``talonx_v2.dividends``).
+  Price fills must be on a dividend-UNADJUSTED basis (RAW/SPLIT_ADJUSTED) or the
+  position fails closed -- one coherent model, no double count.  Special,
+  foreign, malformed, zero/negative/NaN dividends are unsupported => fail closed.
 * Unsupported action types, conflicting evidence, unavailable evidence and
   unknown basis NEVER produce a fabricated settlement: they hold (transient)
   or move the position to the existing ``EXIT_UNRESOLVED`` state (deterministic).
@@ -63,7 +67,7 @@ SPLIT_KINDS = frozenset({KIND_FORWARD_SPLIT, KIND_REVERSE_SPLIT})
 # ---- trail statuses --------------------------------------------------------
 TRAIL_APPLIED = "APPLIED"
 TRAIL_REFLECTED = "REFLECTED_IN_ENTRY_BASIS"
-TRAIL_DIVIDEND_OBSERVED = "DIVIDEND_OBSERVED_NOT_CREDITED"
+TRAIL_DIVIDEND_OBSERVED = "DIVIDEND_OBSERVED"
 TRAIL_BLOCKED_PREFIX = "BLOCKED_"
 ECONOMIC_TRAIL_STATUSES = frozenset({TRAIL_APPLIED})
 
@@ -80,6 +84,10 @@ C_UNSUPPORTED = "CA_UNSUPPORTED_ACTION"
 C_BASIS_UNKNOWN = "CA_PRICE_BASIS_UNKNOWN"
 C_EXIT_BASIS_STALE = "CA_EXIT_BASIS_PREDATES_SPLIT"
 C_MALFORMED = "CA_MALFORMED_EVENT"
+C_DIVIDEND_BASIS = "CA_DIVIDEND_PRICE_BASIS_NOT_UNADJUSTED"
+C_DIVIDEND_SPLIT_SAME_DAY = "CA_DIVIDEND_SPLIT_SAME_EX_DATE"
+# price-fill adjustment states that carry NO dividend adjustment (safe for explicit dividend cash)
+DIVIDEND_SAFE_BASES = frozenset({"RAW", "SPLIT_ADJUSTED"})
 C_BASIS_AMBIGUOUS = "CA_PRICE_BASIS_AMBIGUOUS"
 
 DEFAULT_ALPACA_URL = "https://data.alpaca.markets/v1/corporate-actions"
@@ -136,6 +144,8 @@ class CorporateActionEvent:
     received_at_utc: str
     raw: dict = field(default_factory=dict, compare=False, hash=False)
     malformed: str | None = None
+    payable_date: date | None = None       # dividends: provider payable_date (None = unknown)
+    record_date: date | None = None
 
     def source_ref(self) -> dict:
         return {"source": self.source, "provider_id": self.provider_id,
@@ -184,15 +194,29 @@ def classify_alpaca_record(symbol: str, provider_type: str, rec: dict, *, source
                                         malformed=bad, **base)
         return CorporateActionEvent(action_key=split_key(sym, ex_split, ratio), kind=kind,
                                     ex_date=ex_split, ratio=ratio, cash_rate=None, **base)
-    # CASH_DIVIDEND
+    # CASH_DIVIDEND -- ordinary cash only.  Anything the provider flags special/foreign, or
+    # with a non-finite / non-positive amount, is UNSUPPORTED (fail closed), never coerced.
     rate = rec.get("rate")
     ex_div = _d(rec.get("ex_date"))
-    if ex_div is None or _fraction(rate) is None or _fraction(rate) < 0:
+    r = _fraction(rate)
+    bad = None
+    if ex_div is None:
+        bad = "dividend has no ex_date"
+    elif r is None or r <= 0:
+        bad = f"dividend rate missing/non-finite/non-positive ({rate!r})"
+    elif rec.get("special"):
+        bad = "special dividend (unsupported)"
+    elif rec.get("foreign"):
+        bad = "foreign dividend (unsupported: withholding/FX not modelled)"
+    if bad:
         return CorporateActionEvent(action_key=f"MALFORMED|{sym}|{provider_type}|{ex}|{pid}",
                                     kind=KIND_UNSUPPORTED, ex_date=ex, ratio=None, cash_rate=None,
-                                    malformed="dividend has no ex_date or invalid rate", **base)
-    return CorporateActionEvent(action_key=f"DIV|{sym}|{ex_div.isoformat()}|{rate}", kind=kind,
-                                ex_date=ex_div, ratio=None, cash_rate=str(rate), **base)
+                                    malformed=bad, **base)
+    rate_s = format(Decimal(str(rate)).normalize(), "f")
+    return CorporateActionEvent(action_key=f"DIV|{sym}|{ex_div.isoformat()}|{rate_s}", kind=kind,
+                                ex_date=ex_div, ratio=None, cash_rate=rate_s,
+                                payable_date=_d(rec.get("payable_date")),
+                                record_date=_d(rec.get("record_date")), **base)
 
 
 # --------------------------------------------------------------------------- #
@@ -275,9 +299,12 @@ class AlpacaCorporateActionSource:
 
 
 class YFinanceCorporateActionSource:
-    """OPTIONAL independent split/dividend witness (``Ticker.splits`` /
-    ``Ticker.dividends``).  No provider id, float ratios: usable only to
-    cross-check, never as the sole authority.  NOT wired by default."""
+    """OPTIONAL independent SPLIT witness (``Ticker.splits``).  No provider id,
+    float ratios: usable only to cross-check, never as the sole authority.  NOT
+    wired by default.  Dividends are deliberately NOT read: yfinance dividend
+    amounts are split-normalised to today's share basis (NVDA 2024-03-05 = 0.004
+    vs the raw 0.04 per share actually paid), so they cannot be compared to, or
+    used instead of, the provider's per-share-as-of-ex-date rate."""
     name = "yfinance:actions"
 
     def __init__(self, *, ticker_factory: Callable[[str], object] | None = None,
@@ -295,7 +322,6 @@ class YFinanceCorporateActionSource:
                 import yfinance as yf
                 tk = yf.Ticker(sym)
             splits = tk.splits
-            divs = tk.dividends
             events: list[CorporateActionEvent] = []
             for idx, val in (splits.items() if splits is not None else []):
                 ex = _d(str(idx)[:10])
@@ -314,14 +340,6 @@ class YFinanceCorporateActionSource:
                     action_key=split_key(sym, ex, ratio), symbol=sym, kind=kind, provider_type="yf_split",
                     ex_date=ex, ratio=ratio, cash_rate=None, source=self.name, provider_id="",
                     received_at_utc=received, raw={"value": float(val)}))
-            for idx, val in (divs.items() if divs is not None else []):
-                ex = _d(str(idx)[:10])
-                if ex is None or not (start <= ex <= end):
-                    continue
-                events.append(CorporateActionEvent(
-                    action_key=f"DIV|{sym}|{ex.isoformat()}|{val}", symbol=sym, kind=KIND_CASH_DIVIDEND,
-                    provider_type="yf_dividend", ex_date=ex, ratio=None, cash_rate=str(val),
-                    source=self.name, provider_id="", received_at_utc=received, raw={"value": float(val)}))
         except Exception as exc:  # noqa: BLE001
             return CASourceResult(self.name, "UNAVAILABLE", detail=f"{type(exc).__name__}: {exc}"[:200])
         return _finalize(self.name, events)
@@ -357,12 +375,16 @@ def make_split_event(symbol: str, ex_date: date, new_rate, old_rate, *, source: 
 
 
 def make_dividend_event(symbol: str, ex_date: date, rate: str, *, source: str = "static",
-                        provider_id: str = "") -> CorporateActionEvent:
+                        provider_id: str = "", payable_date: date | None = None,
+                        record_date: date | None = None) -> CorporateActionEvent:
+    rate_s = format(Decimal(str(rate)).normalize(), "f")
     return CorporateActionEvent(
-        action_key=f"DIV|{symbol.upper()}|{ex_date.isoformat()}|{rate}", symbol=symbol.upper(),
+        action_key=f"DIV|{symbol.upper()}|{ex_date.isoformat()}|{rate_s}", symbol=symbol.upper(),
         kind=KIND_CASH_DIVIDEND, provider_type="cash_dividends", ex_date=ex_date, ratio=None,
-        cash_rate=str(rate), source=source, provider_id=provider_id or f"div-{symbol}-{ex_date}",
-        received_at_utc=datetime.now(timezone.utc).isoformat(), raw={"rate": str(rate)})
+        cash_rate=rate_s, source=source, provider_id=provider_id or f"div-{symbol}-{ex_date}",
+        received_at_utc=datetime.now(timezone.utc).isoformat(),
+        raw={"rate": rate_s, "payable_date": payable_date.isoformat() if payable_date else None},
+        payable_date=payable_date, record_date=record_date)
 
 
 def make_unsupported_event(symbol: str, effective: date, provider_type: str = "spin_offs", *,
@@ -391,6 +413,15 @@ def _finalize(source: str, events: list[CorporateActionEvent]) -> CASourceResult
         if len(ratios) > 1:
             conflicts.append(f"CONFLICT|{sym}|{ex.isoformat()}|" +
                              ",".join(sorted(f"{r.numerator}/{r.denominator}" for r in ratios)))
+    # two ordinary dividends on the same (symbol, ex_date) with different amounts: a provider
+    # correction re-listed under a new id (or an undeclared special) -- never credit both.
+    divs: dict[tuple[str, date], set[str]] = {}
+    for e in uniq:
+        if e.kind == KIND_CASH_DIVIDEND and e.ex_date is not None:
+            divs.setdefault((e.symbol, e.ex_date), set()).add(e.cash_rate)
+    for (sym, ex), rates in sorted(divs.items()):
+        if len(rates) > 1:
+            conflicts.append(f"CONFLICT|{sym}|{ex.isoformat()}|dividend_rates:" + ",".join(sorted(rates)))
     return CASourceResult(source, "OK", tuple(uniq), conflicts=tuple(conflicts))
 
 
@@ -441,6 +472,7 @@ class Verdict:
     detail: str = ""
     applied: tuple[str, ...] = ()
     effective_shares: Fraction | None = None
+    dividends: tuple = ()                  # ELIGIBLE ordinary dividends to accrue at settlement
 
     @property
     def settle_ok(self) -> bool:
@@ -459,6 +491,17 @@ def _parse_basis(provenance) -> date | None:
     except (TypeError, ValueError):
         return None
     return _d(p.get("basis_as_of")) if isinstance(p, dict) else None
+
+
+def _parse_adjustment_state(provenance) -> str | None:
+    if provenance is None:
+        return None
+    try:
+        p = json.loads(provenance) if isinstance(provenance, str) else provenance
+    except (TypeError, ValueError):
+        return None
+    v = p.get("adjustment_state") if isinstance(p, dict) else None
+    return str(v) if v else None
 
 
 # --------------------------------------------------------------------------- #
@@ -500,6 +543,7 @@ class CorporateActionGuard:
 
     def assess_position(self, store, position: dict, *, as_of: date,
                         exit_basis_as_of: date | None = None, exit_session: date | None = None,
+                        exit_adjustment_state: str | None = None,
                         settlement: bool = False) -> Verdict:
         row = store.position_by_id(position["position_id"])
         if row is None or row["status"] != "OPEN":
@@ -525,7 +569,12 @@ class CorporateActionGuard:
         in_window = [e for e in res.events
                      if e.ex_date is None or (entry_session < e.ex_date <= end)]
         # ---- unsupported / malformed / undated: deterministic -------------
-        bad = [e for e in in_window if e.kind == KIND_UNSUPPORTED or e.ex_date is None]
+        fill_for_div = (exit_session or as_of) if settlement else None
+        bad = [e for e in in_window if (e.kind == KIND_UNSUPPORTED or e.ex_date is None)
+               # a malformed/unsupported DIVIDEND effective after the exit fill session is irrelevant
+               # to this position (it was not held through that ex-date)
+               and not (fill_for_div is not None and e.provider_type == "cash_dividends"
+                        and e.ex_date is not None and e.ex_date > fill_for_div)]
         if bad:
             e = bad[0]
             why = e.malformed or f"unsupported action type {e.provider_type}"
@@ -586,6 +635,33 @@ class CorporateActionGuard:
                                                 f"exit price basis {exit_basis_as_of} does not yet include "
                                                 f"split ex_date {e.ex_date} (fill session {fill})"), key=None)
 
+        # ---- dividend entitlement (settlement only) ------------------------
+        # Entitled iff entry_session < ex_date <= exit fill session (T+1-era convention: a buyer
+        # on/after the ex-date is NOT entitled; a seller on/after it keeps the dividend).
+        eligible_divs: list[CorporateActionEvent] = []
+        if settlement:
+            fill = exit_session or as_of
+            eligible_divs = [e for e in dividends if entry_session < e.ex_date <= fill]
+            if eligible_divs:
+                entry_state = _parse_adjustment_state(row.get("entry_price_provenance"))
+                bad_basis = [(w, st) for w, st in (("entry", entry_state), ("exit", exit_adjustment_state))
+                             if st not in DIVIDEND_SAFE_BASES]
+                if bad_basis:
+                    return self._persist_block(
+                        store, pid, Verdict(
+                            V_BLOCK, C_DIVIDEND_BASIS,
+                            f"eligible dividend {eligible_divs[0].action_key} but fill price basis is "
+                            f"not dividend-unadjusted: {bad_basis} (allowed {sorted(DIVIDEND_SAFE_BASES)}); "
+                            f"crediting cash on a dividend-adjusted price would double count"),
+                        key=eligible_divs[0].action_key)
+                for d in eligible_divs:
+                    if any(sp.ex_date == d.ex_date for sp in splits):
+                        return self._persist_block(
+                            store, pid, Verdict(V_BLOCK, C_DIVIDEND_SPLIT_SAME_DAY,
+                                                f"dividend {d.action_key} and a split share ex_date "
+                                                f"{d.ex_date}: entitled share basis is ambiguous"),
+                            key=d.action_key)
+
         # ---- apply (atomic, idempotent) ------------------------------------
         applied_now: list[str] = []
         with store.transaction():
@@ -600,13 +676,17 @@ class CorporateActionGuard:
                                                exit_basis_as_of=exit_basis_as_of):
                     applied_now.append(e.action_key)
             for e in dividends:
-                store.apply_position_action(position_id=pid, event=e, status=TRAIL_DIVIDEND_OBSERVED,
-                                            detail="price-return-only ledger: dividend cash not credited",
-                                            entry_basis_as_of=entry_basis)
+                if e.ex_date <= entry_session:
+                    continue
+                store.apply_position_action(
+                    position_id=pid, event=e, status=TRAIL_DIVIDEND_OBSERVED,
+                    detail=("eligible: receivable created at settlement" if e in eligible_divs
+                            else "observed during hold (entitlement decided at settlement)"),
+                    entry_basis_as_of=entry_basis)
             eff = store.effective_shares_exact(pid)
         adjusted = any(a["status"] == TRAIL_APPLIED for a in store.position_action_trail(pid))
         return Verdict(V_ADJUSTED if adjusted else V_CLEAR, applied=tuple(applied_now),
-                       effective_shares=eff)
+                       effective_shares=eff, dividends=tuple(eligible_divs))
 
     @staticmethod
     def _conflict_in_window(conflict: str, entry_session: date, end: date) -> bool:
@@ -644,6 +724,29 @@ def effective_shares_map(con: sqlite3.Connection) -> dict[int, float]:
         base = out.get(r[0], Fraction(str(r[1])))
         out[r[0]] = base * Fraction(int(r[2]), int(r[3]))
     return {k: float(v) for k, v in out.items()}
+
+
+def shares_at_date(con: sqlite3.Connection, position_id: int, on_date: date) -> Fraction:
+    """Economic shares held at the close BEFORE ``on_date``'s open (a dividend's ex-date), exact.
+
+    ``positions.shares`` is expressed on the entry price basis ``B_e``: splits already
+    reflected in that basis (REFLECTED rows) must be UNDONE for a date before their
+    ex-date; splits applied afterwards (APPLIED rows) count only once their ex-date is
+    strictly before ``on_date``.  Provider dividend ``rate`` is per share AS OF the ex-date
+    (raw, not split-normalised), so ``rate x shares_at_date`` is the correct amount."""
+    r = con.execute("SELECT shares FROM positions WHERE position_id=?", (position_id,)).fetchone()
+    q = Fraction(str(r[0] if not isinstance(r, sqlite3.Row) else r["shares"])) if r else Fraction(0)
+    for a in con.execute(
+            "SELECT status, ex_date, ratio_num, ratio_den FROM position_corporate_actions "
+            "WHERE position_id=? AND status IN ('APPLIED','REFLECTED_IN_ENTRY_BASIS') AND kind LIKE '%SPLIT' "
+            "ORDER BY id", (position_id,)):
+        status, ex, num, den = a[0], _d(a[1]), int(a[2]), int(a[3])
+        ratio = Fraction(num, den)
+        if status == TRAIL_APPLIED and ex < on_date:
+            q *= ratio
+        elif status == TRAIL_REFLECTED and ex > on_date:
+            q /= ratio
+    return q
 
 
 def trail_rows(con: sqlite3.Connection, *, position_id: int | None = None) -> list[dict]:

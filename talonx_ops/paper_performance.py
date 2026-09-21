@@ -528,7 +528,7 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
         opens = _qall(con, "SELECT position_id, symbol, episode_id, entry_session, target_exit_session, "
                            "entry_price, shares, position_cost, opened_at FROM positions WHERE status='OPEN'") \
             if _has_table(con, "positions") else []
-        closed = _qall(con, "SELECT symbol, episode_id, entry_session, exit_session, entry_price, "
+        closed = _qall(con, "SELECT position_id, symbol, episode_id, entry_session, exit_session, entry_price, "
                             "exit_price, shares, position_cost, realized_pnl_usd, realized_pnl_pct, "
                             "trading_days_held, opened_at, closed_at FROM positions WHERE status='CLOSED'") \
             if _has_table(con, "positions") else []
@@ -569,6 +569,16 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
             eff_map = effective_shares_map(con)
         except Exception:  # noqa: BLE001
             eff_map = {}
+        # PQ-2A closure (TOTAL RETURN): credited dividend cash is part of the cash equation;
+        # accrued (not yet paid) receivables are an ASSET counted in equity but NOT in cash.
+        try:
+            from talonx_v2 import dividends as _dv
+            div_credited = _dv.credited_total(con)
+            div_accrued = _dv.accrued_total(con)
+            div_rows = _dv.rows(con)
+            div_by_pos = _dv.per_position_totals(con)
+        except Exception:  # noqa: BLE001
+            div_credited, div_accrued, div_rows, div_by_pos = 0.0, 0.0, [], {}
         for r in opens:
             sym = r["symbol"]
             mark_px, mark_ts = marks.get(sym, (None, None))
@@ -613,6 +623,11 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
             "quantity": r["shares"], "entry_price": r["entry_price"], "exit_price": r["exit_price"],
             "cost_basis": r["position_cost"], "realized_pnl_usd": r["realized_pnl_usd"],
             "realized_pnl_pct": r["realized_pnl_pct"], "trading_days_held": r["trading_days_held"],
+            "price_pnl_usd": r["realized_pnl_usd"],
+            "dividend_pnl_usd": round(div_by_pos.get(r["position_id"], {}).get("credited", 0.0), 4),
+            "dividend_receivable_usd": round(div_by_pos.get(r["position_id"], {}).get("accrued", 0.0), 4),
+            "total_return_pnl_usd": round((r["realized_pnl_usd"] or 0.0)
+                                          + div_by_pos.get(r["position_id"], {}).get("credited", 0.0), 4),
             "exit_reason": "10-trading-day hold horizon (frozen V2 contract)",
             "recovery_affected": False, "recovery_affected_reason": None,
             "provenance": "CONFIRMED -- v2_lane.db.positions (authoritative campaign ledger row)",
@@ -630,6 +645,7 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
         campaign = dict(campaign_rows[0]) if campaign_rows else {}
         starting_campaign_cash = campaign.get("starting_cash_usd")
         expected_cash = (starting_campaign_cash - open_cost_total - unresolved_cost_total + realized_total
+                         + div_credited
                          if starting_campaign_cash is not None else None)
         recon_diff = round((cash or 0.0) - expected_cash, 4) if cash is not None and expected_cash is not None else None
         recon_status = ("EXACT" if recon_diff is not None and abs(recon_diff) < 1e-2 else
@@ -646,7 +662,7 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
         # True) -- silently discarding the unresolved obligation.
         has_unresolved = bool(unresolved_rows)
         equity_status = "COMPLETE" if (marked_value_complete and not has_unresolved) else "PARTIAL"
-        equity_value = ((cash or 0.0) + marked_value_total
+        equity_value = ((cash or 0.0) + marked_value_total + div_accrued
                         if (marked_value_complete and not has_unresolved) and cash is not None
                         else None)
 
@@ -669,7 +685,15 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
             "closed_trades": closed_detail,
             "trade_counts": {"entries_today": buys_today or 0, "exits_today": sells_today or 0,
                             "entries_campaign_to_date": buy_count or 0, "exits_campaign_to_date": sell_count or 0},
-            "realized_pnl": {"campaign_to_date": realized_total, "source": "v2_lane.db.positions (status=CLOSED)"},
+            "realized_pnl": {"campaign_to_date": realized_total, "source": "v2_lane.db.positions (status=CLOSED)",
+                             "meaning": "PRICE P&L (exit proceeds - entry economic cost, fee-inclusive)"},
+            "dividend_pnl": {"credited_usd": round(div_credited, 4), "accrued_receivable_usd": round(div_accrued, 4),
+                            "source": "v2_lane.db.dividend_entitlements"},
+            "total_return_pnl": {"realized_price_plus_credited_dividends": round(realized_total + div_credited, 4),
+                                "including_accrued_receivable": round(realized_total + div_credited + div_accrued, 4)},
+            "dividends": [{k: d[k] for k in ("symbol", "ex_date", "payable_date", "rate", "eligible_qty",
+                                             "amount_usd", "state", "position_id", "provenance_json")}
+                          for d in div_rows],
             "unrealized_pnl": {"total": (0.0 if not opens else
                                         round(unrealized_total, 4) if marked_value_complete else None),
                               "status": ("N/A -- zero open positions (a valid 0)" if not opens else
@@ -677,7 +701,8 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
                                         "UNAVAILABLE -- unavailable, not an empty profitable portfolio")},
             "costs": dict(_V2_COST_BREAKDOWN),
             "equity": {"value": round(equity_value, 4) if equity_value is not None else None,
-                      "status": equity_status, "formula": "cash + marked open-position value",
+                      "status": equity_status,
+                      "formula": "cash + marked open-position value + accrued dividend receivable",
                       "note": None if equity_status == "COMPLETE" else
                               ("one or more EXIT_UNRESOLVED positions have unknown value -- "
                                "equity is PARTIAL" if has_unresolved else
@@ -688,7 +713,7 @@ def _v2_snapshot(v2_db: Path, *, now: datetime, session_date: str,
                               "basis": "expected_cash = persisted starting_campaign_cash - "
                                        "open_position_cost_basis_total - "
                                        "exit_unresolved_cost_basis_total + "
-                                       "realized_pnl_campaign_to_date"},
+                                       "realized_pnl_campaign_to_date + credited_dividends"},
             "exit_unresolved": int(unresolved or 0),
             "exit_unresolved_cost_basis_total": round(unresolved_cost_total, 4),
             "note": "" if (opens or closed) else "producer/flat book -- 0 natural insider clusters entered to date",

@@ -1,0 +1,9 @@
+PQ-2A closure repository state (2026-09-21)
+branch:            feature/task131-option-a-integration
+starting HEAD:     b8b98e00d3c6cc774a1c1f7949d8d7276a916752  (== origin/feature/task131-option-a-integration)
+starting status:   clean except git-untracked notifications.db-shm/-wal (test-suite side files; not staged)
+stale processes:   none (no python.exe running at start); nothing killed
+worktrees:         5 unrelated pre-existing (alpha-phenomenon-discovery, task115, task118-profitability, task118a-hotfix, task118f-hotfix) left untouched;
+                   PQ-2A scratch worktree already unregistered, its leftover scratch directory (session scratchpad, outside the repo) deleted;
+                   two temporary worktrees created here for baseline reproduction (b8b98e0) were removed afterwards
+production ledger: repo-root v2_lane.db NOT opened by any PQ-2A-closure code path; md5 cff00b0f46e7e5b65e6f5903366fab28, mtime 2026-09-15 05:45 -- identical to the start of PQ-2A

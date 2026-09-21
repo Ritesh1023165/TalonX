@@ -208,7 +208,8 @@ def operator_snapshot(db_path, *, now=None, status=None, notify_path=None, intel
                 state = ("CASH_DEFICIT" if assertions.get(keys[1]) == "FAIL" else
                          "LEDGER_MISMATCH" if any(assertions.get(k) == "FAIL" for k in
                                                   (keys[0],) + ledger_checks
-                                                  + ("corporate_action_adjustments_consistent",)) else
+                                                  + ("corporate_action_adjustments_consistent",
+                                                     "dividend_accounting_consistent")) else
                          "HEALTHY" if all(assertions.get(k) == "PASS" for k in keys + ledger_checks) else "UNKNOWN")
                 result["reconciliation"].update(
                     persisted_run_state=state, evidence_reference=str(path),

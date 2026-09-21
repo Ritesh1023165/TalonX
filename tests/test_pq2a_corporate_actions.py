@@ -69,9 +69,10 @@ class _World:
     mutable price fixture so tests can stage exit bars / bases."""
 
     def __init__(self, tmp_path, *, entry_open=25.0, entry_basis=ENTRY_BASIS, name="w"):
-        self.rows = [row(s, close=20.0, volume=1_000_000, _basis_as_of=entry_basis)
-                     for s in _prior()]
-        self.rows.append(row(ENTRY, open_=entry_open, close=entry_open + 0.5, _basis_as_of=entry_basis))
+        self.rows = [row(s, close=20.0, volume=1_000_000, _basis_as_of=entry_basis,
+                         _adjustment_state="SPLIT_ADJUSTED") for s in _prior()]
+        self.rows.append(row(ENTRY, open_=entry_open, close=entry_open + 0.5, _basis_as_of=entry_basis,
+                             _adjustment_state="SPLIT_ADJUSTED"))
         self.adapter = MemAdapter("fixture", self.rows)
         self.resolver = PricingResolver(self.adapter, today=lambda: date(2026, 12, 31))
         self.db = str(tmp_path / f"{name}.db")
@@ -83,7 +84,8 @@ class _World:
         self.pos = self.store.all_positions()[0]
 
     def add_exit_bar(self, session, close, *, basis, open_=None):
-        self.rows.append(row(session, open_=open_ or close, close=close, _basis_as_of=basis))
+        self.rows.append(row(session, open_=open_ or close, close=close, _basis_as_of=basis,
+                             _adjustment_state="SPLIT_ADJUSTED"))
 
     def settle(self, guard, *, as_of=None):
         return pipeline.settle_due_exits(
@@ -580,23 +582,11 @@ def test_24_normal_composite_fallback_stays_valid_when_bases_are_compatible():
 
 
 # =========================================================================== #
-# 25-26: dividend policy
+# 25-26: dividend policy -- SUPERSEDED by the PQ-2A CLOSURE gatekeeper decision
+# (total return).  The original price-return-only test asserted the interim
+# "observed, never credited" mechanics; the total-return lifecycle is tested in
+# tests/test_pq2a_closure_dividends.py.
 # =========================================================================== #
-def test_25_26_dividend_is_observed_never_credited_and_never_double_counted(tmp_path):
-    w = _World(tmp_path)
-    div = make_dividend_event("PQX", v2cal.add_sessions(ENTRY, 3), "0.50")
-    w.add_exit_bar(TARGET, 27.0, basis="2026-09-23")
-    cash_before = w.store.cash()
-    pipeline.sweep_corporate_actions(store=w.store, as_of=v2cal.add_sessions(ENTRY, 5), guard=guard_with(div))
-    assert w.store.cash() == cash_before                                     # 26: no dividend cash mutation
-    trail = w.store.position_action_trail(w.pos["position_id"])
-    assert [(t["kind"], t["status"]) for t in trail] == [("CASH_DIVIDEND", "DIVIDEND_OBSERVED_NOT_CREDITED")]
-    assert w.store.effective_shares_exact(w.pos["position_id"]) == 400       # shares unchanged
-    w.settle(guard_with(div))
-    pos = w.position()
-    assert pos["realized_pnl_usd"] == pytest.approx(400 * 27.0 - 10_000.0)   # PRICE RETURN only
-    assert w.store.cash() == pytest.approx(300_000.0 + pos["realized_pnl_usd"])
-    assert [t["action"] for t in w.store.trades()] == ["BUY", "SELL"]        # no dividend trade/credit row
 
 
 # =========================================================================== #

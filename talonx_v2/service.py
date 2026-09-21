@@ -122,6 +122,7 @@ class V2Service:
         # only -- the live entry point (run.py) refuses to start without one.
         self.ca_guard = corporate_actions
         self._last_ca_sweep: list[dict] = []
+        self._last_dividend_run: list[dict] = []
         self._as_of_holder = {"d": None}
         self._resolver = None
         if pricing_mode != "csv":
@@ -516,6 +517,9 @@ class V2Service:
         # --- PHASE CLOSE -------------------------------------------------
         self._phase_close(ripe_through, res, price_lookup=price_lookup)
 
+        # --- PHASE DIVIDENDS (PQ-2A closure) -----------------------------------
+        self._phase_dividends(today)
+
         # --- PHASE POST-CLOSE --------------------------------------------
         self._phase_post_close(all_eps, all_ripe, today, ripe_through, _is_stale, live=live)
 
@@ -820,6 +824,20 @@ class V2Service:
         except Exception:  # noqa: BLE001
             logger.exception("corporate_action_sweep_failed as_of=%s", today)
             self._last_ca_sweep = [{"status": "ERROR", "code": "SWEEP_FAILED"}]
+
+    def _phase_dividends(self, today: date) -> None:
+        """PQ-2A closure: credit ACCRUED dividend receivables whose payable date has arrived
+        (including for CLOSED positions).  Idempotent; a failure never aborts the tick and
+        never credits on missing/unavailable evidence."""
+        if self.ca_guard is None:
+            self._last_dividend_run = []
+            return
+        try:
+            from talonx_v2 import dividends as _div
+            self._last_dividend_run = _div.settle_receivables(self.store, self.ca_guard, as_of=today)
+        except Exception:  # noqa: BLE001
+            logger.exception("dividend_settlement_failed as_of=%s", today)
+            self._last_dividend_run = [{"status": "ERROR"}]
 
     def _phase_close(self, ripe_through: date, res, *, price_lookup) -> None:
         try:
@@ -1427,7 +1445,11 @@ class V2Service:
             "durable_store_gate_enabled": self.durable_store_gate_enabled,
             # PQ-2A: corporate-action guard visibility (operator/dashboards read this).
             "corporate_action_guard": ({"state": "ACTIVE", "sources": self.ca_guard.source_names,
-                                        "last_sweep": self._last_ca_sweep[-20:]}
+                                        "last_sweep": self._last_ca_sweep[-20:],
+                                        "dividends": {"accrued_usd": sum(
+                                            e["amount_usd"] for e in self.store.dividend_entitlements(state="ACCRUED")),
+                                            "credited_usd": self.store.dividends_credited_total(),
+                                            "last_run": self._last_dividend_run[-20:]}}
                                        if self.ca_guard is not None else {"state": "OFF"}),
             # execution scope enforcement (Task 117 final activation)
             "execution_scope_enforced": self.execution_allowlist is not None,

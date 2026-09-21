@@ -471,6 +471,17 @@ total-return treatment needs a receivable lifecycle). Legacy/unknown-basis
 positions are never back-filled. Evidence:
 `docs/research/evidence/provider_qualification_pq2a/`.
 
+**PQ-2A closure update (2026-09-21)** — the two PQ-2A follow-ups are resolved by
+gatekeeper decision for V2: exact fractional entitlement (S5-26 revised; no
+cash-in-lieu, new entries whole-share only) and TOTAL-RETURN dividend
+accounting (S10-17 retained and implemented: explicit-event ACCRUED->CREDITED
+lifecycle, ex-date ownership rule, split-trail quantity, post-close credit,
+dividend-unadjusted fill basis). Still fail-closed / open: mergers, spin-offs,
+renames, unit splits, stock/special/foreign distributions; ex-date == entry
+basis-date ambiguity; provider corporate-action SLA. Status remains
+`PARTIALLY_RESOLVED (V2)` for complex actions and Original's own accounting.
+Evidence: `docs/research/evidence/provider_qualification_pq2a_closure/`.
+
 **Evidence references**: targeted repository-wide search, this
 session (no matches in `talonx_v2/`, `talonx_paper/`, `talonx_ops/`).
 

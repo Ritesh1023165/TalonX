@@ -3498,3 +3498,27 @@ value, threshold, lifecycle rule or fingerprint (`e2acf6454789217e`) changed.
   between them).
 - **Live requirement**: `talonx_v2.run --mode live` refuses to start without a
   corporate-action source (Alpaca market-data credentials).
+
+---
+
+### PQ-2A CLOSURE — gatekeeper decisions (2026-09-21) — AUTHORITATIVE; resolves the two "pending gatekeeper" items above
+
+1. **Fractional post-corporate-action entitlement — APPROVED as implemented.** For V2 paper
+   accounting the exact fractional economic entitlement after a corporate action is the rule (5 sh x
+   1-for-10 = 0.5 sh). No truncation, no rounding up, **no fabricated cash-in-lieu**. **New entries stay
+   whole-share only** (Package 4 unchanged). `S5-26`'s truncate + cash-in-lieu is superseded for V2;
+   the requirements tracker is updated so the requirement no longer conflicts with the implementation.
+2. **Dividends — TOTAL RETURN retained** (`S10-17`). `DIVIDEND_POLICY_DECISION_REQUIRED` is closed by
+   implementation, not by downgrading to price-return-only. Implementation contract (V2): explicit
+   provider event; entitled iff `entry_session < ex_date <= exit_fill_session`; quantity from the split
+   trail at the ex-date; `ACCRUED` receivable created atomically with settlement, `CREDITED` on/after the
+   payable date after fresh provider re-confirmation (also after the trade closed); one coherent price
+   basis: live fills are split-adjusted and dividend-UNadjusted, and a position with an eligible dividend
+   on a dividend-adjusted/unknown fill basis fails closed; special/foreign/malformed dividends unsupported.
+   `positions.realized_pnl_usd` remains PRICE P&L; total return = price P&L + credited dividends.
+3. **Price-basis contract change for LIVE fills** (required by 2): `AlpacaIexBarAdapter` requests
+   `adjustment=split`; `YFinanceBarAdapter` uses `auto_adjust=False` (verified equal to Alpaca split-only).
+   The frozen research/replay snapshot (`adjustment=all`) is unchanged and is fail-closed for dividends.
+   A bounded residual: a composite splice of the all-adjusted CSV snapshot and a split-only live tail differs
+   by the cumulative dividend factor (fractions of a percent), relevant only at the `$5` / `$5M` liquidity
+   boundary; recorded, not corrected.

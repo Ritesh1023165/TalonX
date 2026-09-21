@@ -219,6 +219,7 @@ def close_position(
     config: V2Config | None = None,
     fee_fn=None,
     price_provenance: dict | None = None,
+    dividends=(),
 ) -> ExitOutcome:
     """``position`` supplies ONLY the lookup key (``position_id``) --
     Package 2 acceptance A5: every economic value used below (symbol,
@@ -316,6 +317,12 @@ def close_position(
         )
         cooldown_until = v2cal.add_sessions(es, cfg.reentry_cooldown_trading_days)
         store.set_cooldown(symbol, cooldown_until)
+        # PQ-2A closure (total return): ELIGIBLE ordinary dividends are recorded as ACCRUED
+        # receivables ATOMICALLY with this settlement (no cash yet -- credited later, after the
+        # payable date, even though this trade is now CLOSED).  ``dividends`` were vetted by the
+        # corporate-action guard; ``record_dividend_entitlement`` re-checks eligibility.
+        for ev in dividends or ():
+            store.record_dividend_entitlement(position_id=position_id, event=ev, exit_session=es)
     return ExitOutcome(symbol, episode_id, es, exit_price,
                        pnl_usd, pnl_pct, held, settled=True, exit_shares=shares)
 
