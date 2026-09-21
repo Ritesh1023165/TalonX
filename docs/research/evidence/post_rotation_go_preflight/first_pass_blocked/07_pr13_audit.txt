@@ -1,0 +1,18 @@
+== PR #13 audit ==
+files: 70
+-- non-docs/tests files --
+talonx_dispatch/run.py
+talonx_dispatch/telegram_client.py
+talonx_ops/log_redaction.py
+talonx_ops/logging_setup.py
+talonx_ops/notify/__init__.py
+talonx_ops/notify/producers.py
+talonx_ops/notify/validate.py
+talonx_ops/prospective/__main__.py
+talonx_ops/prospective/preflight.py
+talonx_ops/supervisor.py
+talonx_v2/release_gate.py
+talonx_v2/run.py
+-- strategy/provider/pricing/accounting/ledger files touched (must be none) --
+(none above = PASS)
+runtime files in PR: 12 | not in declared allow-list: []

@@ -1,0 +1,4 @@
+checked 2026-09-21 ~22:43 UTC (second pass, after the user rotated TELEGRAM_BOT_TOKEN)
+main before PR #13:  0130a13a32041107122b951a250b856e2b44dc65
+PR #13:              OPEN, head 8b1f4c8c012c732e76651d43da38b81efc053f25 (unchanged since the audit), MERGEABLE/CLEAN
+tag v2-paper-rc1:    present; frozen SHA a56ec8c reachable; no TalonX/Python process running (none touched)

@@ -1,0 +1,8 @@
+Controlled validation (authorized: exactly two harmless messages) - 2026-09-21T22:44:40Z
+command: .venv\Scripts\python.exe -m talonx_ops.notify.validate --destination OPERATIONS --destination TRADE_EVENT --send   (a dry run was done first: DRY_RUN for both, nothing sent)
+NOTE: a first attempt in this session did NOT execute (its output directory did not exist so the shell chain stopped before the command); nothing was sent by it and no record changed.
+OPERATIONS (Sentinel): SENT, attempts 1, drain considered 1 / sent 1 / failed 0
+TRADE_EVENT (Signal):  SENT, attempts 1, drain considered 1 / sent 1 / failed 0
+RESEARCH (Lab): not selected, nothing sent.   CONTROLLED VALIDATION MESSAGES SENT: 2
+Record updated: docs/research/evidence/v2_release_integration_ri4/delivery_validation.json (validated_at 2026-09-21T22:44:48Z; event ids ri4-sentinel-a33a46ba..., ri4-signal-f076a29c...; one-way pair fingerprints only).
+Both messages went through a TEMPORARY outbox (not the release or shared outbox); no trading state touched. No token in the command output or the record.
