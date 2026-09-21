@@ -125,10 +125,12 @@ def main(argv: list[str] | None = None) -> int:
                          "telegram (the real official Telegram sender; HOLDS unless "
                          "TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID are configured)")
     ap.add_argument("--pricing-mode", default="csv",
-                    choices=["csv", "composite-yf", "composite-iex"],
-                    help="daily-bar source: csv (frozen snapshot, default) | "
-                         "composite-yf (CSV history + yfinance tail, Phase-0 conformant candidate) | "
-                         "composite-iex (NON-CONFORMANT, study only)")
+                    choices=["csv", "composite-yf", "composite-iex", "sip"],
+                    help="daily-bar source: csv (frozen snapshot, default; STALE prospectively) | "
+                         "composite-yf / composite-iex (candidate/study only; refused when the "
+                         "snapshot and tail are on different adjustment bases) | "
+                         "sip (PQ-2B RELEASE provider: Alpaca SIP daily bars, adjustment=split, one "
+                         "authoritative provider, fail closed; requires a QUALIFIED readiness check)")
     ap.add_argument("--form4-parquet",
                     default="results/task107a_form4_feasibility/_build/form4_open_market_txn.parquet")
     ap.add_argument("--bar-dir", action="append", default=[
@@ -241,6 +243,20 @@ def main(argv: list[str] | None = None) -> int:
                 "APCA_API_KEY_ID/APCA_API_SECRET_KEY) not configured -- refusing to start "
                 "live (fail closed: splits cannot be accounted for).")
         ca_guard = CorporateActionGuard(_ca_src)
+
+        # PQ-2B: the release provider is selected EXPLICITLY (never implicitly) and only starts when a
+        # bounded, read-only readiness check reaches QUALIFIED (configured -> reachable -> entitled ->
+        # split-only basis honoured).  Env vars merely existing is NOT enough.
+        if args.pricing_mode == "sip":
+            from talonx_v2.provider_contract import check_readiness
+            _rd = check_readiness()
+            if not _rd.qualified:
+                raise SystemExit(
+                    f"FATAL: --pricing-mode sip requested but the release provider is not QUALIFIED "
+                    f"(level={_rd.level}; problems={_rd.problems}) -- refusing to start (fail closed).")
+            logging.getLogger("talonx_v2.run").info(
+                "V2 release provider QUALIFIED -- contract %s fingerprint %s",
+                _rd.to_dict()["contract_id"], _rd.to_dict()["contract_fingerprint"])
 
         import os as _os
         ops_store = None

@@ -492,8 +492,31 @@ through `S5-27`.
 
 ## OPS-005 — Price-provider qualification gap
 
-**Status**: `OPEN` — extends `OPS-002`'s pricing-freshness finding
-with the broader, unresolved provider-selection question.
+**Status**: `RESOLVED (PQ-2B, 2026-09-21, contract level; V2 release mode implemented, NOT activated)`
+— see the *PQ-2B update* below. Original finding text follows unchanged; it
+extends `OPS-002`'s pricing-freshness finding with the provider-selection
+question.
+
+**PQ-2B update (2026-09-21)** — ONE executable first-release provider contract
+now exists (`talonx_v2/provider_contract.py`, `talonx_v2/sip_adapter.py`):
+Alpaca Market Data v2 `/v2/stocks/bars`, `feed=sip`, `1Day`, `adjustment=split`,
+fallback `NONE` (fail closed), opt-in via `--pricing-mode sip` behind a QUALIFIED
+readiness check. Measured semantics: daily **close == official closing-auction
+cross** (30/30 samples incl. 4 early closes); daily **open is the provider's
+first eligible trade, NOT the official opening auction print** (exact in 7/29,
+max deviation 1.2%); daily **volume is consolidated full-tape-day** (regular +
+post-market). OPEN and CLOSE of session S are usable only once the daily bar is
+COMPLETE: `now >= close(S)+4h (post-market end; 17:00 ET on an early close) + 15 min
+(conservative margin = the documented free-tier SIP delay window; the `end` parameter rule
+is verified: end=now-10min -> 403, now-16min -> 200; a live probe showed the in-progress
+current-day bar is served ~81 s after the open but is provisional) + 1 min`. Liquidity history comes from the SAME provider/basis (no snapshot splice;
+exact 20 contiguous sessions). Revision study: 3,150 bars over 150 symbols,
+snapshot (2026-09-06) vs re-fetch (2026-09-21): 2,751 identical, 399 uniform
+dividend basis shifts, **0 genuine revisions**. Residual (bounded): the provider
+exposes no correction/version metadata, so a correction after first usability is
+not detectable — the persisted execution value is immutable and a later provider
+value is never applied silently. Production activation NOT performed.
+Evidence: `docs/research/evidence/provider_qualification_pq2b/`.
 
 **Found**: Session 5 documentation pass (2026-09-16).
 

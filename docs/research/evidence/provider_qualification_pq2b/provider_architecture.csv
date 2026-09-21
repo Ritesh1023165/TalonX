@@ -1,0 +1,9 @@
+component,AVAILABLE_IN_CODE,CONFIGURED,ENTITLED,QUALIFIED,ACTIVE,PURPOSE,ADJUSTMENT_BASIS,notes
+AlpacaSipBarAdapter (talonx_v2/sip_adapter.py),YES (PQ-2B),YES (APCA_API_KEY_ID/APCA_API_SECRET_KEY present in .env; values never recorded),YES (SIP daily bars HTTP 200; recent-data rule confirmed),YES for release contract (readiness self-check + tests),NO (implemented; --pricing-mode sip is opt-in; no process running),release: liquidity/open/close,split-only,the authoritative release provider
+CsvBarAdapter (Task107A/95G snapshot),YES,YES (bar dirs),n/a,PARTIAL (historical replay only),YES as the DEFAULT pricing mode (stale prospectively),replay/research,SPLIT_DIVIDEND_ADJUSTED (all) relative to 2026-09-06 fetch,basis_as_of unknown by design
+Legacy service CSV loader (V2Service._bars csv mode),YES,YES,n/a,NO,YES (default),legacy/replay,UNKNOWN_LEGACY_CSV,fills only if a bar exists for the session (none prospectively)
+CompositeBarAdapter (composite-yf / composite-iex),YES,opt-in only,n/a,NO for release,NO,candidate/study only,mixed,PQ-2B: refuses any splice whose adjustment STATES differ (all-adjusted snapshot + split-only tail) as well as PQ-2A split/evidence checks
+AlpacaIexBarAdapter,YES,YES,YES (IEX free),NO (single-venue volume breaks the $5M gate),NO,probes/study,split-only since PQ-2A closure,NON_CONFORMANT
+YFinanceBarAdapter,YES,n/a (public),n/a,NO (open/close semantics unverified; no correction/version metadata),NO,diagnostic witness only,split-only since PQ-2A closure,may be attached as a LOGGING-ONLY witness; never a price source or fallback
+Original's yfinance poller / Alpaca intraday gateway,YES,YES,YES,n/a (different lane/contract),per its own lane,Original intraday,intraday quotes,not V2 daily providers
+Research SIP loaders (research/scripts, Task107A/95G),YES,YES,YES,historical only,NO,research,adjustment=all,not runtime

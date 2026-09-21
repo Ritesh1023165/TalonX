@@ -22,7 +22,7 @@ from talonx_v2 import brain_bridge, dispatch_bridge, paper, quant_bridge
 from talonx_v2 import calendar as v2cal
 from talonx_v2.cluster_engine import ClusterEpisode, PurchaseRecord, detect_episodes
 from talonx_v2.config import V2_FROZEN_CONTRACT, V2Config
-from talonx_v2.liquidity import evaluate_liquidity
+from talonx_v2.liquidity_window import evaluate_liquidity_checked
 from talonx_v2.schemas import V2Action
 from talonx_v2.store import V2Store
 
@@ -42,6 +42,21 @@ class ProcessResult:
 
 def _d(v) -> date:
     return v if isinstance(v, date) else date.fromisoformat(str(v)[:10])
+
+
+def liquidity_window_summary(bars: list[dict], entry_session: date, cfg: V2Config, *, strict: bool) -> dict:
+    """PQ-2B: auditable summary of WHICH provider/basis/sessions decided the liquidity gate."""
+    n = cfg.liquidity_lookback_sessions
+    prior = sorted((b for b in bars if _d(b["date"]) < entry_session), key=lambda b: str(b["date"]))[-n:]
+    provs = [b.get("_provenance") for b in prior if isinstance(b.get("_provenance"), dict)]
+    return {"n_sessions": len(prior),
+            "first_session": str(prior[0]["date"])[:10] if prior else None,
+            "last_session": str(prior[-1]["date"])[:10] if prior else None,
+            "providers": sorted({p.get("provider") for p in provs if p.get("provider")}),
+            "feeds": sorted({p.get("feed") for p in provs if p.get("feed")}),
+            "adjustment_states": sorted({p.get("adjustment_state") for p in provs if p.get("adjustment_state")}),
+            "contract": next((p.get("contract") for p in provs if p.get("contract")), None),
+            "strict_contiguous_window": strict}
 
 
 def _field_provenance(px: dict, field: str) -> dict | None:
@@ -65,6 +80,7 @@ def process_episode(
     config: V2Config | None = None,
     router=None,
     result: ProcessResult | None = None,
+    strict_liquidity_window: bool = False,
 ) -> ProcessResult:
     cfg = config or V2Config()
     res = result or ProcessResult()
@@ -80,7 +96,8 @@ def process_episode(
 
     # --- liquidity gate (causal: only bars strictly before entry session) ---
     bars = bars_lookup(ep.symbol) or []
-    liq = evaluate_liquidity(bars, entry_session=ep.eligible_entry_session, config=cfg)
+    liq = evaluate_liquidity_checked(bars, entry_session=ep.eligible_entry_session, config=cfg,
+                                     require_contiguous=strict_liquidity_window)
 
     sig = quant_bridge.build_signal(ep, liq, config=cfg)
     res.signals_built += 1
@@ -122,7 +139,9 @@ def process_episode(
         entry_session=ep.eligible_entry_session, config=cfg,
         source_meta={"issuer_cik": ep.issuer_cik, "episode": ep.to_dict(),
                      "research_source": "Task107B", "frozen_contract": V2_FROZEN_CONTRACT,
-                     "liquidity_price_provenance": liquidity_sources},
+                     "liquidity_price_provenance": liquidity_sources,
+                     "liquidity_window": liquidity_window_summary(bars, ep.eligible_entry_session, cfg,
+                                                                  strict=strict_liquidity_window)},
         price_provenance=entry_provenance,
     )
     if not outcome.entered:

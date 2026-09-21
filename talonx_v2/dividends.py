@@ -37,6 +37,62 @@ from fractions import Fraction
 logger = logging.getLogger(__name__)
 
 OVERDUE_DAYS = 10          # ACCRUED this long past payable_date => reconciliation problem
+# PQ-2B: bounded catch-up for a dividend the provider published only AFTER a trade already settled.
+# Same length as the exit-recovery window; never scanned indefinitely, never reopens a trade.
+LATE_DIVIDEND_LOOKBACK_SESSIONS = 5
+
+
+def catch_up_recent_closed(store, guard, *, as_of: date,
+                           lookback_sessions: int = LATE_DIVIDEND_LOOKBACK_SESSIONS) -> list[dict]:
+    """Create the SAME idempotent ACCRUED receivable for an eligible ordinary cash dividend that was
+    published only after the position settled.  Strictly bounded: only positions CLOSED within the last
+    ``lookback_sessions`` sessions; only positions whose entry AND exit fills carry a dividend-unadjusted
+    basis (a legacy / provenance-less trade is NEVER back-filled); unsupported/conflicting evidence in the
+    hold window skips the position (operator-visible status).  Never reopens or mutates the trade."""
+    from talonx_v2 import calendar as v2cal
+    from talonx_v2 import corporate_actions as ca
+    out: list[dict] = []
+    if guard is None:
+        return out
+    for p in store.all_positions():
+        if p["status"] != "CLOSED" or not p.get("exit_session"):
+            continue
+        exit_s = date.fromisoformat(str(p["exit_session"])[:10])
+        entry_s = date.fromisoformat(str(p["entry_session"])[:10])
+        if v2cal.sessions_between(exit_s, as_of) > lookback_sessions:
+            continue                                            # lookback bound
+        row = {"position_id": p["position_id"], "symbol": p["symbol"], "exit_session": exit_s.isoformat()}
+        try:
+            res = guard.fetch(p["symbol"], entry_s, exit_s, fresh=True)
+            if not res.ok:
+                out.append({**row, "status": "EVIDENCE_UNAVAILABLE"})
+                continue
+            window = [e for e in res.events if e.ex_date is None or entry_s < e.ex_date <= exit_s]
+            divs = [e for e in window if e.kind == ca.KIND_CASH_DIVIDEND]
+            if not divs and not [e for e in window if e.kind == ca.KIND_UNSUPPORTED]:
+                continue
+            if any(ca.CorporateActionGuard._conflict_in_window(c, entry_s, exit_s) for c in res.conflicts) \
+                    or any(e.kind == ca.KIND_UNSUPPORTED for e in window):
+                out.append({**row, "status": "SKIPPED_UNSUPPORTED_OR_CONFLICTING_EVIDENCE"})
+                continue
+            states = (ca._parse_adjustment_state(p.get("entry_price_provenance")),
+                      ca._parse_adjustment_state(p.get("exit_price_provenance")))
+            if any(s not in ca.DIVIDEND_SAFE_BASES for s in states):
+                out.append({**row, "status": "SKIPPED_PRICE_BASIS_NOT_UNADJUSTED_OR_LEGACY", "states": list(states)})
+                continue
+            splits = [e for e in window if e.kind in ca.SPLIT_KINDS]
+            for d in divs:
+                if any(sp.ex_date == d.ex_date for sp in splits):
+                    out.append({**row, "status": "SKIPPED_DIVIDEND_SPLIT_SAME_EX_DATE", "ex_date": d.ex_date.isoformat()})
+                    continue
+                created = store.record_dividend_entitlement(position_id=p["position_id"], event=d, exit_session=exit_s)
+                if created:
+                    out.append({**row, "status": "LATE_DIVIDEND_ACCRUED", "ex_date": d.ex_date.isoformat(),
+                                "action_key": d.action_key})
+        except Exception as exc:  # noqa: BLE001 -- one position never blocks another
+            logger.exception("late_dividend_catch_up_failed position=%s", p.get("position_id"))
+            out.append({**row, "status": "ERROR", "detail": f"{type(exc).__name__}: {exc}"[:160]})
+    return out
 
 
 def settle_receivables(store, guard, *, as_of: date) -> list[dict]:

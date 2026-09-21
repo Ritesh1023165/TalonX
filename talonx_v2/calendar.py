@@ -119,6 +119,26 @@ def session_close_utc(d: date | datetime | str) -> datetime:
     return ts.to_pydatetime().astimezone(timezone.utc)
 
 
+def session_open_utc(d: date | datetime | str) -> datetime:
+    """PQ-2B: the official XNYS open timestamp (UTC) for session ``d`` (DST-aware)."""
+    import exchange_calendars as xc
+    ts = xc.get_calendar("XNYS").session_open(_as_date(d).isoformat())
+    return ts.to_pydatetime().astimezone(timezone.utc)
+
+
+# The consolidated SIP tape's post-market session ends this long after the OFFICIAL close
+# (measured PQ-2B: 20:00 ET after a 16:00 close; 17:00 ET after a 13:00 early close, i.e. +4h).
+EXTENDED_SESSION_AFTER_CLOSE_HOURS = 4
+
+
+def session_extended_end_utc(d: date | datetime | str) -> datetime:
+    """PQ-2B: end of the post-market session for ``d`` = official close + 4h (calendar-aware, so
+    an early close ends at 17:00 ET, not 20:00 ET).  The SIP daily bar aggregates trades over the
+    whole 04:00-post-market span, so the bar is not COMPLETE before this instant."""
+    from datetime import timedelta
+    return session_close_utc(d) + timedelta(hours=EXTENDED_SESSION_AFTER_CLOSE_HOURS)
+
+
 def trading_days_elapsed(entry_session: date | datetime | str, as_of: date | datetime | str) -> int:
     """How many sessions have elapsed since (and including) the entry
     session, as of ``as_of``.  entry day == day 0."""

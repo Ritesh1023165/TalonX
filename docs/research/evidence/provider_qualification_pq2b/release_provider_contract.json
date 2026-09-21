@@ -1,0 +1,112 @@
+{
+ "contract": {
+  "contract_id": "V2_RELEASE_PRICE_CONTRACT@1",
+  "provider": "alpaca",
+  "endpoint": "https://data.alpaca.markets/v2/stocks/bars",
+  "timeframe": "1Day",
+  "feed": "sip",
+  "adjustment": "split",
+  "open_field": "o",
+  "close_field": "c",
+  "volume_field": "v",
+  "open_semantics": "PROVIDER_DAILY_FIRST_ELIGIBLE_TRADE_OPEN_NOT_OFFICIAL_AUCTION_PRINT",
+  "close_semantics": "OFFICIAL_CLOSING_CROSS_PRINT",
+  "volume_semantics": "CONSOLIDATED_FULL_TAPE_DAY_INVERSE_SPLIT_ADJUSTED",
+  "session_tz": "America/New_York",
+  "fallback_mode": "NONE",
+  "timeout_s": 20.0,
+  "max_pages": 5,
+  "cache_ttl_s": 300.0,
+  "required_env": [
+   "APCA_API_KEY_ID",
+   "APCA_API_SECRET_KEY"
+  ]
+ },
+ "fingerprint": "ac5e51aa3599d6c9",
+ "finality_rule": "usable iff now >= session_extended_end(S)=close(S)+4h + 15min SIP lag + 1min settle",
+ "usable_after_examples": {
+  "2026-09-18": "2026-09-19T00:16:00+00:00",
+  "2025-11-26": "2025-11-27T01:16:00+00:00",
+  "2025-11-28": "2025-11-28T22:16:00+00:00",
+  "2025-12-24": "2025-12-24T22:16:00+00:00",
+  "2026-01-15": "2026-01-16T01:16:00+00:00"
+ },
+ "semantics_registry": {
+  "sip_release": {
+   "name": "alpaca:sip:1Day:split",
+   "feed_scope": "CONSOLIDATED_SIP",
+   "adjustment": "split",
+   "open_semantics": "PROVIDER_DAILY_FIRST_ELIGIBLE_TRADE_OPEN_NOT_OFFICIAL_AUCTION_PRINT",
+   "close_semantics": "OFFICIAL_CLOSING_CROSS_PRINT",
+   "volume_semantics": "CONSOLIDATED_FULL_TAPE_DAY_INVERSE_SPLIT_ADJUSTED",
+   "session_tz": "America/New_York",
+   "source_kind": "live",
+   "qualified": true,
+   "corporate_action_accounting": true
+  },
+  "iex_split": {
+   "name": "alpaca:iex:1Day:split",
+   "feed_scope": "SINGLE_VENUE_IEX",
+   "adjustment": "split",
+   "open_semantics": "IEX_SINGLE_VENUE_FIRST_TRADE",
+   "close_semantics": "IEX_SINGLE_VENUE_LAST_TRADE",
+   "volume_semantics": "IEX_SINGLE_VENUE_VOLUME",
+   "session_tz": "America/New_York",
+   "source_kind": "live",
+   "qualified": false,
+   "corporate_action_accounting": true
+  },
+  "yfinance_split": {
+   "name": "yfinance:1d:auto_adjust=False",
+   "feed_scope": "UNVERIFIED",
+   "adjustment": "split",
+   "open_semantics": "UNVERIFIED_YAHOO_DAILY_OPEN",
+   "close_semantics": "UNVERIFIED_YAHOO_DAILY_CLOSE",
+   "volume_semantics": "UNVERIFIED_YAHOO_VOLUME",
+   "session_tz": "America/New_York",
+   "source_kind": "live",
+   "qualified": false,
+   "corporate_action_accounting": true
+  },
+  "task107a_sip_snapshot": {
+   "name": "csv:task107a_sip_adjustment_all",
+   "feed_scope": "CONSOLIDATED_SIP",
+   "adjustment": "all",
+   "open_semantics": "PROVIDER_DAILY_FIRST_ELIGIBLE_TRADE_OPEN_NOT_OFFICIAL_AUCTION_PRINT",
+   "close_semantics": "OFFICIAL_CLOSING_CROSS_PRINT",
+   "volume_semantics": "CONSOLIDATED_FULL_TAPE_DAY_INVERSE_SPLIT_ADJUSTED",
+   "session_tz": "America/New_York",
+   "source_kind": "snapshot",
+   "qualified": true,
+   "corporate_action_accounting": false
+  }
+ },
+ "replay_classification": {
+  "iex_split": {
+   "verdict": "INCOMPATIBLE",
+   "reasons": [
+    "feed_scope: SINGLE_VENUE_IEX != CONSOLIDATED_SIP",
+    "open_semantics: IEX_SINGLE_VENUE_FIRST_TRADE != PROVIDER_DAILY_FIRST_ELIGIBLE_TRADE_OPEN_NOT_OFFICIAL_AUCTION_PRINT",
+    "close_semantics: IEX_SINGLE_VENUE_LAST_TRADE != OFFICIAL_CLOSING_CROSS_PRINT",
+    "volume_semantics: IEX_SINGLE_VENUE_VOLUME != CONSOLIDATED_FULL_TAPE_DAY_INVERSE_SPLIT_ADJUSTED"
+   ]
+  },
+  "yfinance_split": {
+   "verdict": "INCOMPATIBLE",
+   "reasons": [
+    "feed_scope: UNVERIFIED != CONSOLIDATED_SIP",
+    "open_semantics: UNVERIFIED_YAHOO_DAILY_OPEN != PROVIDER_DAILY_FIRST_ELIGIBLE_TRADE_OPEN_NOT_OFFICIAL_AUCTION_PRINT",
+    "close_semantics: UNVERIFIED_YAHOO_DAILY_CLOSE != OFFICIAL_CLOSING_CROSS_PRINT",
+    "volume_semantics: UNVERIFIED_YAHOO_VOLUME != CONSOLIDATED_FULL_TAPE_DAY_INVERSE_SPLIT_ADJUSTED"
+   ]
+  },
+  "task107a_sip_snapshot": {
+   "verdict": "PARTIALLY_COMPATIBLE",
+   "reasons": [
+    "adjustment: replay all vs release split",
+    "source_kind: replay snapshot snapshot vs live release feed (finality/timing not reproduced)",
+    "corporate-action position accounting absent in replay"
+   ]
+  }
+ }
+}

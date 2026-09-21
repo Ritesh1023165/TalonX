@@ -1,0 +1,55 @@
+{
+ "queried_at": "2026-09-21T14:06:19Z",
+ "end": "2026-09-21T13:50:19Z",
+ "AAPL": {
+  "daily_partial": {
+   "o": 335.28,
+   "h": 336.92,
+   "l": 333.05,
+   "c": 336.82,
+   "v": 5967450
+  },
+  "first_premarket_minute_open": 334.8,
+  "first_premarket_minute_t": "2026-09-21T08:00:00Z",
+  "first_regular_minute_open_0930": 335.36,
+  "first_regular_minute_t": "2026-09-21T13:30:00Z",
+  "daily_o_equals_first_premarket": false,
+  "daily_o_equals_first_regular": false,
+  "premarket_high": 336.6,
+  "daily_h_ge_regular_high": 336.05
+ },
+ "MARA": {
+  "daily_partial": {
+   "o": 13.94,
+   "h": 13.98,
+   "l": 13.405,
+   "c": 13.435,
+   "v": 14072697
+  },
+  "first_premarket_minute_open": 13.46,
+  "first_premarket_minute_t": "2026-09-21T08:00:00Z",
+  "first_regular_minute_open_0930": 13.94,
+  "first_regular_minute_t": "2026-09-21T13:30:00Z",
+  "daily_o_equals_first_premarket": false,
+  "daily_o_equals_first_regular": true,
+  "premarket_high": 14.0107,
+  "daily_h_ge_regular_high": 13.98
+ },
+ "SOFI": {
+  "daily_partial": {
+   "o": 17.46,
+   "h": 17.52,
+   "l": 16.83,
+   "c": 16.875,
+   "v": 13174296
+  },
+  "first_premarket_minute_open": 17.09,
+  "first_premarket_minute_t": "2026-09-21T08:00:00Z",
+  "first_regular_minute_open_0930": 17.46,
+  "first_regular_minute_t": "2026-09-21T13:30:00Z",
+  "daily_o_equals_first_premarket": false,
+  "daily_o_equals_first_regular": true,
+  "premarket_high": 17.49,
+  "daily_h_ge_regular_high": 17.52
+ }
+}

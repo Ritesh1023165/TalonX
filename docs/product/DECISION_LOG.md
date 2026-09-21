@@ -3522,3 +3522,39 @@ value, threshold, lifecycle rule or fingerprint (`e2acf6454789217e`) changed.
    A bounded residual: a composite splice of the all-adjusted CSV snapshot and a split-only live tail differs
    by the cumulative dividend factor (fractions of a percent), relevant only at the `$5` / `$5M` liquidity
    boundary; recorded, not corrected.
+
+---
+
+### PQ-2B — First-release provider contract (engineering decisions, 2026-09-21; pending gatekeeper confirmation)
+
+Scope: provider/runtime/finality only. No strategy value, threshold, lifecycle rule or the fingerprint
+(`e2acf6454789217e`) changed; `talonx_v2/liquidity.py` is byte-identical (the release-mode contiguity
+precondition lives in the plumbing module `liquidity_window.py`). Evidence:
+`docs/research/evidence/provider_qualification_pq2b/`.
+
+1. **Authoritative release provider: Alpaca Market Data v2 daily bars, `feed=sip`, `adjustment=split`; fallback
+   NONE (one provider, fail closed).** A fallback is only valid if session, OPEN, CLOSE, volume, adjustment and
+   timezone semantics all match and the candidate is qualified; none currently is (IEX single-venue volume;
+   yfinance unverified). An optional witness may LOG disagreement; it never supplies or averages a price.
+2. **OPEN semantics (measured):** the SIP daily open is the provider's first eligible trade by participant
+   timestamp — **not** the official opening-auction print (exact in 7/29 samples, max deviation 1.2%). It is the
+   same definition the frozen Task107A/95G research snapshots used, so it is retained and documented, not "fixed".
+3. **CLOSE semantics (measured):** the SIP daily close equals the official closing-auction cross print in 30/30
+   samples, including four early-close sessions; it is NOT the last extended-hours trade.
+4. **Finality/usability (both OPEN and CLOSE):** usable only when the daily bar is complete and queryable:
+   `now >= session_close + 4h + 15 min + 1 min` (calendar-aware; early closes end post-market at 17:00 ET). The
+   15 min is a CONSERVATIVE margin (the provider's documented free-tier SIP delay window): a live probe showed the
+   in-progress current-day bar is served ~81 s after the open (not bounded by the request `end`) but is provisional,
+   so the 15 min is not required for visibility; it is not shortened because the minimal safe close margin could not
+   be measured. This replaces the earlier UTC-date heuristic (1 h early in winter, blind to early closes).
+   Recorded limitation: no correction/version metadata exists; the persisted execution value is immutable.
+5. **Liquidity history:** from the same provider/basis for the whole window; release mode requires exactly the 20
+   XNYS sessions immediately preceding entry (stale/partial responses fail closed, non-terminal). A composite splice
+   is refused whenever the adjustment STATES differ (closes the PQ-2A residual).
+6. **Late-published dividends:** a small bounded catch-up (positions closed within the last 5 sessions, same
+   idempotent receivable lineage, never reopens a trade, legacy/basis-unknown trades skipped) was implemented;
+   provider lead-time evidence (ex-dates listed >= 9 days ahead in 8/8 future-dated events) suggests it will rarely
+   fire, but a silent miss would understate total return.
+7. **Activation boundary:** `--pricing-mode sip` is opt-in and refuses to start unless a bounded read-only
+   readiness check reaches QUALIFIED (configured -> reachable -> entitled -> split-only honoured). Default mode is
+   unchanged. Nothing was activated.

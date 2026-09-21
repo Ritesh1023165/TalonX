@@ -336,7 +336,19 @@ class CompositeBarAdapter:
             bases.append(date.fromisoformat(str(b)[:10]))
         return min(bases) if bases else None
 
+    @staticmethod
+    def _states(rows: list[dict]) -> set:
+        return {r.get("_adjustment_state") for r in rows}
+
     def _require_compatible(self, symbol: str, h: list[dict], live_rows: list[dict]) -> None:
+        # PQ-2B (residual from PQ-2A): the price basis STATE must match exactly.  An all-adjusted
+        # (dividend-adjusted) snapshot spliced with a split-only tail differs by the cumulative dividend
+        # factor -- silently mixing them at the $5 / $5M liquidity boundary is not allowed.
+        hs, ls = self._states(h), self._states(live_rows)
+        if hs != ls:
+            raise IncompatibleAdjustmentBasis(
+                f"{symbol}: adjustment state mismatch hist={sorted(map(str, hs))} live={sorted(map(str, ls))} "
+                f"-- refusing to splice (e.g. dividend-adjusted snapshot + split-only tail)")
         hb, lb = self._basis(h), self._basis(live_rows)
         if hb is not None and lb is not None and hb == lb:
             return                                            # same basis date -> compatible
@@ -389,10 +401,70 @@ class PricingResolver:
     adapter: DailyBarAdapter
     today: Callable[[], date] = field(default=lambda: datetime.now(timezone.utc).date())
     last: dict = field(default_factory=dict)   # symbol|session -> Bar|PriceUnavailable (introspection)
+    # PQ-2B: calendar-aware finality (``provider_contract.FinalityPolicy``) + a clock.  When
+    # ``finality`` is None the legacy date heuristic (bar dated before ``today`` is FINAL) applies.
+    finality: object | None = None
+    now: Callable[[], datetime] | None = None
+    # PQ-2B: optional DIAGNOSTIC witness provider -- disagreements are logged, NEVER averaged, NEVER
+    # used as a price or a fallback.  The primary adapter is always authoritative.
+    witness: object | None = None
+    witness_tolerance: float = 0.005
+    disagreements: list = field(default_factory=list)
+    provenance_extra: dict = field(default_factory=dict)
 
+    # ---- helpers ----------------------------------------------------------
+    def _now_utc(self) -> datetime:
+        if self.now is not None:
+            return self.now()
+        # pinned/replay: the START of ``today`` -- same-day data is never treated as final
+        return datetime.combine(self.today(), datetime.min.time(), tzinfo=timezone.utc)
+
+    def _with_finality(self, b: Bar) -> Bar:
+        if self.finality is None:
+            return b
+        import dataclasses
+        sd = date.fromisoformat(b.date)
+        ok = self.finality.is_usable(sd, self._now_utc())
+        return dataclasses.replace(b, status="FINAL" if ok else "PROVISIONAL")
+
+    def _prov(self, b: Bar, raw: dict | None = None) -> dict:
+        p = {"provider": b.source, "session": b.date,
+             "source_timestamp": b.source_timestamp, "receipt_timestamp": b.receipt_timestamp,
+             "adjustment_state": b.adjustment_state, "basis_as_of": b.basis_as_of, "finality": b.status}
+        feed = (raw or {}).get("_feed")
+        if feed:
+            p["feed"] = feed
+        if self.finality is not None:
+            p["usable_after_utc"] = self.finality.usable_at(date.fromisoformat(b.date)).isoformat()
+            p["session_tz"] = getattr(getattr(self.finality, "contract", None), "session_tz", None)
+        p.update(self.provenance_extra)
+        return p
+
+    def _check_witness(self, symbol: str, session: date, b: Bar) -> None:
+        if self.witness is None:
+            return
+        try:
+            w = self.witness.session(symbol, session)
+        except Exception:  # noqa: BLE001 -- a diagnostic witness must never affect the tick
+            return
+        if not w:
+            return
+        for fld, mine, theirs in (("open", b.open, w.get("open")), ("close", b.close, w.get("close"))):
+            try:
+                t = float(theirs)
+            except (TypeError, ValueError):
+                continue
+            if t > 0 and abs(t / mine - 1.0) > self.witness_tolerance:
+                self.disagreements.append({
+                    "symbol": symbol, "session": session.isoformat(), "field": fld,
+                    "primary": {"provider": b.source, "value": mine},
+                    "witness": {"provider": getattr(self.witness, "name", "witness"), "value": t},
+                    "rel_diff": abs(t / mine - 1.0), "action": "LOGGED_ONLY_PRIMARY_AUTHORITATIVE"})
+
+    # ---- lookups ----------------------------------------------------------
     def bars_lookup(self, symbol: str) -> list[dict]:
-        # FINAL sessions only -- never feed a PROVISIONAL "today" bar into the
-        # 20-session liquidity median (no future close/full-day volume leak).
+        # FINAL sessions only -- never feed a PROVISIONAL bar into the 20-session liquidity
+        # median (no future close/full-day volume leak).
         t = self.today()
         out = []
         try:
@@ -402,22 +474,20 @@ class PricingResolver:
             self.last[f"{symbol}|history"] = PriceUnavailable(
                 symbol, "history", "REJECTED_INCOMPATIBLE_ADJUSTMENT_BASIS")
             return out
-        except Exception:  # noqa: BLE001 -- transient provider fault -> empty history
+        except Exception as exc:  # noqa: BLE001 -- transient provider fault -> empty history
             # (the liquidity gate then reports NO_PRIOR_BARS / INSUFFICIENT_HISTORY,
             # a non-terminal skip that retries next tick, rather than crashing the tick).
-            self.last[f"{symbol}|history"] = PriceUnavailable(symbol, "history", "PROVIDER_ERROR")
+            self.last[f"{symbol}|history"] = PriceUnavailable(
+                symbol, "history", getattr(exc, "reason", "PROVIDER_ERROR"))
             return out
         for r in hist:
             b = validate_bar(r, symbol=symbol, want_session=str(r["date"])[:10],
                              today=t, source=self.adapter.name)
+            if isinstance(b, Bar):
+                b = self._with_finality(b)
             if isinstance(b, Bar) and b.status == "FINAL":
                 out.append({"date": b.date, "open": b.open, "close": b.close, "volume": b.volume,
-                            "_provenance": {"provider": b.source, "session": b.date,
-                                             "source_timestamp": b.source_timestamp,
-                                             "receipt_timestamp": b.receipt_timestamp,
-                                             "adjustment_state": b.adjustment_state,
-                                             "basis_as_of": b.basis_as_of,
-                                             "finality": b.status}})
+                            "_provenance": self._prov(b, r)})
         return out
 
     def resolve(self, symbol: str, session: date) -> Bar | PriceUnavailable:
@@ -429,17 +499,22 @@ class PricingResolver:
             return r
         try:
             raw = self.adapter.session(symbol, session)
-        except Exception:  # noqa: BLE001 -- a transient provider fault is an explicit
+        except Exception as exc:  # noqa: BLE001 -- a transient provider fault is an explicit
             # *temporary* unavailability, never a tick-aborting crash (Task 117 Phase 0 §2).
-            r = PriceUnavailable(symbol, s, "PROVIDER_ERROR")
+            r = PriceUnavailable(symbol, s, getattr(exc, "reason", "PROVIDER_ERROR"))
             self.last[f"{symbol}|{s}"] = r
             return r
         if raw is None:
             r = PriceUnavailable(symbol, s, "NO_BAR")
         else:
             r = validate_bar(raw, symbol=symbol, want_session=s, today=t, source=self.adapter.name)
-            if isinstance(r, Bar) and r.status == "PROVISIONAL":
-                r = PriceUnavailable(symbol, s, "PROVISIONAL_ONLY")
+            if isinstance(r, Bar):
+                r = self._with_finality(r)
+                if r.status == "PROVISIONAL":
+                    r = PriceUnavailable(symbol, s, "PROVISIONAL_ONLY")
+                else:
+                    self._raw_for = raw
+                    self._check_witness(symbol, session, r)
         self.last[f"{symbol}|{s}"] = r
         return r
 
@@ -447,20 +522,17 @@ class PricingResolver:
         sd = session if isinstance(session, date) else date.fromisoformat(str(session)[:10])
         r = self.resolve(symbol, sd)
         if isinstance(r, Bar):
+            raw = getattr(self, "_raw_for", None)
             return {"open": r.open, "close": r.close, "volume": r.volume,
-                    "_provenance": {"provider": r.source, "session": r.date,
-                                     "source_timestamp": r.source_timestamp,
-                                     "receipt_timestamp": r.receipt_timestamp,
-                                     "adjustment_state": r.adjustment_state,
-                                     "basis_as_of": r.basis_as_of,
-                                     "finality": r.status}}
+                    "_provenance": self._prov(r, raw)}
         return None            # pipeline treats None as SKIPPED_NO_ENTRY_BAR / fall-forward
 
 
 def make_resolver(*, mode: str, bar_dirs: list[str | Path],
                   today: Callable[[], date] | None = None,
                   yf_ticker_factory: Callable[[str], object] | None = None,
-                  ca_source=None) -> PricingResolver:
+                  ca_source=None, now: Callable[[], datetime] | None = None,
+                  sip_http_get=None, witness=None) -> PricingResolver:
     """``mode``:
       "csv"          -- frozen CSV snapshot only (default live wiring; the
                         companion stays here until the provider decision is
@@ -473,7 +545,21 @@ def make_resolver(*, mode: str, bar_dirs: list[str | Path],
       "composite-iex" -- CSV history + Alpaca IEX tail.  NON-CONFORMANT
                         (single-venue volume breaks the liquidity gate) --
                         probes / study only.
+      "sip"          -- PQ-2B RELEASE provider: Alpaca SIP daily bars, ``adjustment=split``, ONE
+                        authoritative provider for the WHOLE liquidity window + open + close (no
+                        snapshot splice, no fallback), calendar-aware finality.  See
+                        ``talonx_v2.provider_contract``.
     """
+    if mode == "sip":
+        from talonx_v2.provider_contract import RELEASE_CONTRACT, FinalityPolicy
+        from talonx_v2.sip_adapter import AlpacaSipBarAdapter
+        r = PricingResolver(adapter=AlpacaSipBarAdapter(http_get=sip_http_get, now=now),
+                            finality=FinalityPolicy(RELEASE_CONTRACT), now=now, witness=witness,
+                            provenance_extra={"contract": RELEASE_CONTRACT.contract_id,
+                                              "contract_fingerprint": RELEASE_CONTRACT.fingerprint()})
+        if today is not None:
+            r.today = today
+        return r
     csv = CsvBarAdapter(bar_dirs)
     if mode == "csv":
         adapter: DailyBarAdapter = csv

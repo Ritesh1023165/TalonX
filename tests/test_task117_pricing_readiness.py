@@ -73,12 +73,18 @@ def _svc(tmp, *, today, yf_rows_by_sym, kind="parquet"):
     # deterministic composite-yf resolver: CSV history + stubbed yf tail
     holder = {"d": today}
     svc._as_of_holder = holder
+    # PQ-2B: composite splicing needs an IDENTICAL adjustment state; this fixture's CSV history stands in
+    # for a split-only snapshot (a real all-adjusted snapshot + split-only tail is refused, see PQ-2B tests).
+    _orig_state = pricing.CsvBarAdapter.adjustment_state
+    pricing.CsvBarAdapter.adjustment_state = "SPLIT_ADJUSTED"
     svc._resolver = pricing.make_resolver(
         mode="composite-yf", bar_dirs=[str(bd)],
         today=lambda: holder["d"],
         yf_ticker_factory=lambda s: _StubTicker(s, yf_rows_by_sym.get(s, [])),
         # PQ-2A: composite splicing needs corporate-action evidence (none in window)
         ca_source=__import__("talonx_v2.corporate_actions", fromlist=["x"]).StaticCorporateActionSource([]))
+    svc._resolver.adapter.hist.adjustment_state = "SPLIT_ADJUSTED"
+    pricing.CsvBarAdapter.adjustment_state = _orig_state
     return svc, holder
 
 

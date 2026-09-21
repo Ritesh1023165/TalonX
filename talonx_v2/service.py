@@ -130,7 +130,7 @@ class V2Service:
             self._resolver = _pricing.make_resolver(
                 mode=pricing_mode, bar_dirs=[str(p) for p in bar_dirs],
                 today=lambda: self._as_of_holder["d"] or datetime.now(timezone.utc).date(),
-                ca_source=self.ca_guard)
+                ca_source=self.ca_guard, now=self._pricing_now)
         self.form4_kind = form4_kind
         self.form4_parquet = form4_parquet or \
             "results/task107a_form4_feasibility/_build/form4_open_market_txn.parquet"
@@ -216,6 +216,31 @@ class V2Service:
         # --enable-broad-discovery wiring).
         self.broad_discovery_symbols = frozenset(
             s.upper() for s in (broad_discovery_symbols or ()))
+
+    def _pricing_now(self) -> datetime:
+        """PQ-2B: the clock the finality policy uses.  A live tick uses the real wall clock; a pinned
+        (as_of / replay / dry-run) tick uses the START of the pinned date, so same-day data is never
+        treated as final."""
+        h = self._as_of_holder
+        if h.get("d") is not None and not h.get("live", True):
+            return datetime.combine(h["d"], datetime.min.time(), tzinfo=timezone.utc)
+        return datetime.now(timezone.utc)
+
+    def _provider_contract_status(self) -> dict:
+        if self.pricing_mode != "sip":
+            return {"mode": self.pricing_mode, "release_contract_active": False}
+        from talonx_v2.provider_contract import RELEASE_CONTRACT, FinalityPolicy
+        return {"mode": "sip", "release_contract_active": True, "contract_id": RELEASE_CONTRACT.contract_id,
+                "contract_fingerprint": RELEASE_CONTRACT.fingerprint(), "provider": RELEASE_CONTRACT.provider,
+                "feed": RELEASE_CONTRACT.feed, "adjustment": RELEASE_CONTRACT.adjustment,
+                "fallback_mode": RELEASE_CONTRACT.fallback_mode, "finality_rule": FinalityPolicy().rule_text(),
+                "witness_disagreements_recent": (self._resolver.disagreements[-5:]
+                                                 if self._resolver is not None else [])}
+
+    @property
+    def strict_liquidity_window(self) -> bool:
+        """RELEASE (``sip``) mode requires the exact 20 contiguous sessions."""
+        return self.pricing_mode == "sip"
 
     # ---- bar access ----
     def _bars(self, sym: str) -> list[dict]:
@@ -450,6 +475,7 @@ class V2Service:
         self._tick += 1
         today = as_of or datetime.now(timezone.utc).date()
         self._as_of_holder["d"] = today          # pricing resolver's causal "today"
+        self._as_of_holder["live"] = as_of is None
         ripe_through = today if is_session(today) else next_session_on_or_after(today)
         live = as_of is None                     # true live wall-clock tick vs. pinned replay/dry-run
 
@@ -696,7 +722,8 @@ class V2Service:
             try:
                 with self.store.transaction():
                     pipeline.process_episode(ep, store=self.store, bars_lookup=self._bars,
-                                             price_lookup=price_lookup, config=self.cfg, result=res)
+                                             price_lookup=price_lookup, config=self.cfg, result=res,
+                                             strict_liquidity_window=self.strict_liquidity_window)
                     if len(res.entries) > n_before:
                         self._on_entry_recorded(ep, res.entries[-1], pre_intent, ripe_through)
             except Exception:  # noqa: BLE001
@@ -834,7 +861,9 @@ class V2Service:
             return
         try:
             from talonx_v2 import dividends as _div
-            self._last_dividend_run = _div.settle_receivables(self.store, self.ca_guard, as_of=today)
+            # PQ-2B: bounded late-publication catch-up FIRST, then credit anything payable
+            catch = _div.catch_up_recent_closed(self.store, self.ca_guard, as_of=today)
+            self._last_dividend_run = catch + _div.settle_receivables(self.store, self.ca_guard, as_of=today)
         except Exception:  # noqa: BLE001
             logger.exception("dividend_settlement_failed as_of=%s", today)
             self._last_dividend_run = [{"status": "ERROR"}]
@@ -1072,9 +1101,10 @@ class V2Service:
         before its eligible entry session (identical to what process_episode
         derives -- no economic divergence, just evaluated earlier)."""
         from talonx_v2 import brain_bridge, quant_bridge
-        from talonx_v2.liquidity import evaluate_liquidity
+        from talonx_v2.liquidity_window import evaluate_liquidity_checked
         bars = self._bars(ep.symbol) or []
-        liq = evaluate_liquidity(bars, entry_session=ep.eligible_entry_session, config=self.cfg)
+        liq = evaluate_liquidity_checked(bars, entry_session=ep.eligible_entry_session, config=self.cfg,
+                                         require_contiguous=self.strict_liquidity_window)
         sig = quant_bridge.build_signal(ep, liq, config=self.cfg)
         return liq, brain_bridge.contextualize(sig)
 
@@ -1444,6 +1474,8 @@ class V2Service:
             # enablement -- see docs/research/evidence/task140/).
             "durable_store_gate_enabled": self.durable_store_gate_enabled,
             # PQ-2A: corporate-action guard visibility (operator/dashboards read this).
+            # PQ-2B: which provider contract this process is actually running under
+            "price_provider_contract": self._provider_contract_status(),
             "corporate_action_guard": ({"state": "ACTIVE", "sources": self.ca_guard.source_names,
                                         "last_sweep": self._last_ca_sweep[-20:],
                                         "dividends": {"accrued_usd": sum(

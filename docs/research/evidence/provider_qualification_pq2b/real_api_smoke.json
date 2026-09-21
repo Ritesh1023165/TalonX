@@ -1,0 +1,91 @@
+{
+ "run_at_utc": "2026-09-21T12:13:23.508326+00:00",
+ "readiness": {
+  "level": "QUALIFIED",
+  "checks": {
+   "configured": {
+    "ok": true,
+    "missing": []
+   },
+   "entitled": {
+    "ok": true,
+    "n_bars": 6
+   },
+   "split_only_enforced": {
+    "ok": true,
+    "open_ratio": 10.0,
+    "volume_ratio": 10.0
+   }
+  },
+  "problems": [],
+  "contract_id": "V2_RELEASE_PRICE_CONTRACT@1",
+  "contract_fingerprint": "ac5e51aa3599d6c9"
+ },
+ "adapter": {
+  "AAPL": {
+   "open": 337.905,
+   "close": 336.13,
+   "provenance": {
+    "provider": "alpaca:sip:1Day:adjustment=split",
+    "session": "2026-09-18",
+    "source_timestamp": "2026-09-18T04:00:00Z",
+    "receipt_timestamp": "2026-09-21T12:13:24.901645+00:00",
+    "adjustment_state": "SPLIT_ADJUSTED",
+    "basis_as_of": "2026-09-21",
+    "finality": "FINAL",
+    "feed": "sip",
+    "usable_after_utc": "2026-09-19T00:16:00+00:00",
+    "session_tz": "America/New_York",
+    "contract": "V2_RELEASE_PRICE_CONTRACT@1",
+    "contract_fingerprint": "ac5e51aa3599d6c9"
+   },
+   "n_final_bars": 72,
+   "first": "2026-06-08",
+   "last": "2026-09-18"
+  },
+  "SOFI": {
+   "open": 16.83,
+   "close": 16.96,
+   "provenance": {
+    "provider": "alpaca:sip:1Day:adjustment=split",
+    "session": "2026-09-18",
+    "source_timestamp": "2026-09-18T04:00:00Z",
+    "receipt_timestamp": "2026-09-21T12:13:25.895726+00:00",
+    "adjustment_state": "SPLIT_ADJUSTED",
+    "basis_as_of": "2026-09-21",
+    "finality": "FINAL",
+    "feed": "sip",
+    "usable_after_utc": "2026-09-19T00:16:00+00:00",
+    "session_tz": "America/New_York",
+    "contract": "V2_RELEASE_PRICE_CONTRACT@1",
+    "contract_fingerprint": "ac5e51aa3599d6c9"
+   },
+   "n_final_bars": 72,
+   "first": "2026-06-08",
+   "last": "2026-09-18"
+  },
+  "GME": {
+   "open": 22.9,
+   "close": 22.64,
+   "provenance": {
+    "provider": "alpaca:sip:1Day:adjustment=split",
+    "session": "2026-09-18",
+    "source_timestamp": "2026-09-18T04:00:00Z",
+    "receipt_timestamp": "2026-09-21T12:13:26.216666+00:00",
+    "adjustment_state": "SPLIT_ADJUSTED",
+    "basis_as_of": "2026-09-21",
+    "finality": "FINAL",
+    "feed": "sip",
+    "usable_after_utc": "2026-09-19T00:16:00+00:00",
+    "session_tz": "America/New_York",
+    "contract": "V2_RELEASE_PRICE_CONTRACT@1",
+    "contract_fingerprint": "ac5e51aa3599d6c9"
+   },
+   "n_final_bars": 72,
+   "first": "2026-06-08",
+   "last": "2026-09-18"
+  },
+  "today_bar_for_AAPL": "PriceUnavailable(symbol='AAPL', session='2026-09-21', reason='NO_BAR')"
+ },
+ "rejected_rows": []
+}
