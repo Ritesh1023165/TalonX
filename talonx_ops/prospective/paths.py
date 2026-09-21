@@ -8,8 +8,18 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Frozen operational locations (Task 113 / Task 114 locked governance).
-V2_DB_PATH = REPO_ROOT / "v2_lane.db"
-V2_STATUS_PATH = REPO_ROOT / "v2_service_status.json"
+def _env_path(name: str, default: Path) -> Path:
+    """A campaign ledger/status file may be selected EXPLICITLY (a fresh release campaign lives in its own
+    ledger so the legacy ``v2_lane.db`` is never touched); unset => the frozen default, unchanged."""
+    v = os.environ.get(name, "").strip()
+    if not v:
+        return default
+    p = Path(v)
+    return p if p.is_absolute() else REPO_ROOT / p
+
+
+V2_DB_PATH = _env_path("TALONX_V2_DB_PATH", REPO_ROOT / "v2_lane.db")
+V2_STATUS_PATH = _env_path("TALONX_V2_STATUS_PATH", REPO_ROOT / "v2_service_status.json")
 RESULTS_ROOT = REPO_ROOT / "results"
 
 

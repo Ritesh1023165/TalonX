@@ -80,6 +80,33 @@ def _port_open(p: int) -> bool:
         s.close()
 
 
+# A frozen release is ONE immutable runtime SHA.  Commits AFTER it may only add documentation/evidence/tests or move
+# the pin itself (`RELEASE_SHA_EXPECTED` lives in `talonx_ops/prospective/__init__.py`); any other changed file means
+# the running code is no longer the frozen release and preflight is NO_GO.
+FREEZE_ALLOWED_PREFIXES = ("docs/", "tests/")
+FREEZE_ALLOWED_FILES = ("talonx_ops/prospective/__init__.py",)
+
+
+def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None) -> tuple[bool, str]:
+    if head.startswith(expected_sha):
+        return True, "HEAD is the frozen release SHA"
+    try:
+        import subprocess
+        cwd = str(repo) if repo else None
+        anc = subprocess.run(["git", "merge-base", "--is-ancestor", expected_sha, head], cwd=cwd,
+                             capture_output=True, text=True)
+        if anc.returncode != 0:
+            return False, "frozen release SHA is not an ancestor of HEAD"
+        diff = subprocess.run(["git", "diff", "--name-only", expected_sha, head], cwd=cwd,
+                              capture_output=True, text=True).stdout.split()
+    except Exception as exc:  # noqa: BLE001 -- fail closed
+        return False, f"could not verify ancestry: {type(exc).__name__}"
+    extra = [f for f in diff if not (f.startswith(FREEZE_ALLOWED_PREFIXES) or f in FREEZE_ALLOWED_FILES)]
+    if extra:
+        return False, f"runtime files changed after the frozen release: {extra[:5]}"
+    return True, f"HEAD descends from the frozen release; only docs/tests/pin changed ({len(diff)} files)"
+
+
 def run_preflight(*, expected_sha: str = RELEASE_SHA_EXPECTED,
                   require_stack_up: bool = False) -> PreflightResult:
     rows: list[Row] = []
@@ -91,8 +118,9 @@ def run_preflight(*, expected_sha: str = RELEASE_SHA_EXPECTED,
     head_short = _git("rev-parse", "--short", "HEAD")
 
     # 1-2 repo / release
-    add("repo_head_matches_release", "READY" if head.startswith(expected_sha) else "NO_GO",
-        {"head": head_short, "expected": expected_sha})
+    _ok, _why = frozen_release_ok(head, expected_sha)
+    add("repo_head_matches_release", "READY" if _ok else "NO_GO",
+        {"head": head_short, "expected": expected_sha, "match": _why})
     dirty = _git("status", "--porcelain")
     add("repo_tree_clean", "READY" if dirty == "" else "FINDING",
         {"porcelain_lines": dirty.splitlines()[:8]} if dirty else None)

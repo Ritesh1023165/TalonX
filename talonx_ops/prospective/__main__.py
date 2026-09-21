@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sqlite3
 import sys
 import time
@@ -93,7 +94,8 @@ def cmd_start(args) -> int:
         return 2
     if args.release:
         gate = evaluate_release_readiness(db_path=V2_DB_PATH, pricing_mode=args.pricing_mode,
-                                          deliver=args.deliver, transport=args.transport, env=env)
+                                          deliver=args.deliver, transport=args.transport,
+                                          env={**os.environ, **env})
         atomic_write(sd / "release_gate.json", json.dumps(gate.to_dict(), indent=2, default=str))
         if gate.status != "READY":
             print("START REFUSED: release readiness gate NOT_READY")

@@ -99,7 +99,7 @@ class Rig:
         self.transport = transport or RecordingTransport()
         self.ops = NotifyStore(str(tmp / f"{name}_notify.db"))
         self.db = str(tmp / f"{name}.db")
-        cfg = V2Config(db_path=self.db, starting_cash_usd=100_000.0)
+        cfg = V2Config(db_path=self.db, starting_cash_usd=100_000.0, campaign_id=rg.RELEASE_PROFILE.campaign_id)
         self.svc = V2Service(config=cfg, bar_dirs=[tmp], form4_kind="parquet", status_path=str(tmp / f"{name}_s.json"),
                              router=_Router(), transport=self.transport, deliver=deliver, pricing_mode="sip",
                              corporate_actions=self.guard, release_mode=True, ops_notify_store=self.ops)
@@ -113,7 +113,7 @@ class Rig:
 
     @property
     def store(self) -> V2Store:
-        return V2Store(self.db, starting_cash=100_000.0)
+        return V2Store(self.db, starting_cash=100_000.0, campaign_id=rg.RELEASE_PROFILE.campaign_id)
 
     def ops_rows(self, dest=OPERATIONS):
         return self.ops.all_outbox(destination=dest)
@@ -363,7 +363,7 @@ def test_flow8_restart_preserves_campaign_provenance_reservations_and_idempotenc
     r2.guard = CorporateActionGuard(StaticCorporateActionSource([make_split_event(SYM, ex, 10, 1), div]), cache_ttl_s=0)
     r2.transport, r2.db = RecordingTransport(), r.db
     r2.ops = NotifyStore(str(tmp_path / "v_notify.db"))
-    r2.svc = V2Service(config=V2Config(db_path=r.db, starting_cash_usd=100_000.0), bar_dirs=[tmp_path], form4_kind="parquet",
+    r2.svc = V2Service(config=V2Config(db_path=r.db, starting_cash_usd=100_000.0, campaign_id=rg.RELEASE_PROFILE.campaign_id), bar_dirs=[tmp_path], form4_kind="parquet",
                        status_path=str(tmp_path / "s2.json"), router=_Router(), transport=r2.transport, deliver=True,
                        pricing_mode="sip", corporate_actions=r2.guard, release_mode=True, ops_notify_store=r2.ops)
     r2.svc._resolver = make_resolver(mode="sip", bar_dirs=[], today=lambda: r2.svc._as_of_holder["d"] or ACT_FRI,
@@ -445,6 +445,8 @@ def good_env(tmp_path, validated=True, fname="validation.json"):
     env = {"APCA_API_KEY_ID": "k", "APCA_API_SECRET_KEY": "s",
            "TALONX_NOTIFY_TRADE_EVENT_BOT_TOKEN": "sig-token-SECRET", "TALONX_NOTIFY_TRADE_EVENT_CHAT_ID": "sig-chat-SECRET",
            "TALONX_NOTIFY_OPERATIONS_BOT_TOKEN": "sen-token-SECRET", "TALONX_NOTIFY_OPERATIONS_CHAT_ID": "sen-chat-SECRET"}
+    env.update({"TALONX_V2_CAMPAIGN_ID": rg.RELEASE_PROFILE.campaign_id, "TALONX_V2_STARTING_CASH_USD": "100000",
+                "TALONX_V2_ALLOCATION_USD": "10000", "TALONX_V2_EXECUTION_MODE": "PAPER"})
     from talonx_ops.notify import resolve_destination_config
     from talonx_ops.operator_read import _destination_fingerprint
     for k, v in env.items():
@@ -646,7 +648,7 @@ def test_ping_shows_release_provider_contract_campaign_blocks_and_unresolved_fro
     text = _ping_text(tmp_path, monkeypatch, status)
     assert "Release mode: ON" in text
     assert "alpaca SIP adjustment=split | V2_RELEASE_PRICE_CONTRACT@1 (ac5e51aa3599d6c9) | fallback=NONE" in text
-    assert "Campaign: V2 (PAPER)" in text and "Account blocks: none" in text and "EXIT_UNRESOLVED: 0" in text
+    assert "Campaign: V2-PAPER-RC1 (PAPER)" in text and "Account blocks: none" in text and "EXIT_UNRESOLVED: 0" in text
     assert "Open positions: 1" in text and "Market-data health:" in text
 
 
@@ -731,3 +733,146 @@ def test_gate_discloses_intelligence_card_delivery_as_a_warning_not_a_blocker(tm
     assert c.status == "WARN" and "OPS-011" in c.detail and on.status == "READY"
     off = {x.name: x for x in gate(tmp_path, env=env, vpath=vp).checks}["intelligence_card_delivery"]
     assert off.status == "PASS"
+
+
+# =========================================================================== #
+# RELEASE FREEZE + PREFLIGHT: new clean campaign, frozen SHA, isolated paths
+# =========================================================================== #
+def _release_env_ok(tmp_path):
+    env, vp = good_env(tmp_path)
+    return env, vp
+
+
+def test_freeze_new_campaign_is_created_once_clean_and_never_inherits_state(tmp_path):
+    db = tmp_path / rg.RELEASE_PROFILE.campaign_db_filename
+    st = rg.init_release_campaign(db)
+    assert rg.clean_campaign_problems(st) == []
+    assert st["settled_cash"] == 100_000.0 and st["reserved_capital"] == 0 and st["open_positions"] == 0
+    assert st["exit_unresolved"] == 0 and st["pending_entry_intents"] == 0 and st["active_account_blocks"] == 0
+    assert st["realized_pnl"] == 0 and st["dividend_receivables"] == 0 and st["v2_alert_outbox_rows"] == 0
+    c = st["campaign"]
+    assert (c["campaign_id"], c["strategy"], c["strategy_version"], c["execution_mode"], c["provenance"]) == (
+        "V2-PAPER-RC1", "INSIDER_BUY_CLUSTER_V2", "INSIDER_BUY_CLUSTER_V2@1", "PAPER", "SEEDED_AT_CREATION")
+    assert c["starting_cash_usd"] == 100_000.0 and c["per_position_allocation_usd"] == 10_000.0
+    assert c["config_fingerprint"] == "e2acf6454789217e"
+    with pytest.raises(RuntimeError):                                        # a campaign is created exactly once
+        rg.init_release_campaign(db)
+    with pytest.raises(RuntimeError):                                        # the legacy ledger is never a target
+        rg.init_release_campaign(tmp_path / "v2_lane.db")
+    assert not (tmp_path / "v2_lane.db").exists()
+
+
+def test_freeze_clean_check_detects_any_inherited_state(tmp_path):
+    db = tmp_path / "c.db"
+    rg.init_release_campaign(db)
+    con = sqlite3.connect(db)
+    con.execute("UPDATE portfolio SET cash = 99000")
+    con.commit(); con.close()
+    assert any("settled cash" in p for p in rg.clean_campaign_problems(rg.campaign_state(db)))
+    assert rg.clean_campaign_problems({"exists": False}) == ["ledger does not exist"]
+
+
+def test_freeze_gate_is_ready_on_the_fresh_release_campaign_and_refuses_legacy_identities(tmp_path):
+    db = tmp_path / "v2_release_rc1.db"
+    rg.init_release_campaign(db)
+    env, vp = good_env(tmp_path)
+    ok = gate(tmp_path, env=env, vpath=vp, db=db)
+    assert ok.status == "READY", [f"{c.name}: {c.detail}" for c in ok.failed]
+    by = {c.name: c for c in ok.checks}
+    assert by["release_campaign_config"].status == "PASS" and by["campaign_identity"].status == "PASS"
+    # no ledger yet -> WARN (prepared for creation), still no FAIL
+    pre = gate(tmp_path, env=env, vpath=vp, db=tmp_path / "not_yet.db")
+    assert pre.status == "READY" and {c.name: c for c in pre.checks}["campaign_identity"].status == "WARN"
+    for bad_key, bad_val in (("TALONX_V2_CAMPAIGN_ID", "V2"), ("TALONX_V2_STARTING_CASH_USD", "300000"),
+                             ("TALONX_V2_ALLOCATION_USD", "25000"), ("TALONX_V2_EXECUTION_MODE", "LIVE")):
+        rep = gate(tmp_path, env=dict(env, **{bad_key: bad_val}), vpath=vp, db=db)
+        assert "release_campaign_config" in {c.name for c in rep.failed}, bad_key
+    rep = gate(tmp_path, env=env, vpath=vp, db=tmp_path / "v2_lane.db")                     # legacy ledger file name
+    assert "release_campaign_config" in {c.name for c in rep.failed}
+    # a ledger seeded under another identity / cash is refused even with the right env
+    other = tmp_path / "other.db"
+    V2Store(str(other), starting_cash=300_000.0)                                            # default identity "V2"
+    assert "campaign_identity" in {c.name for c in gate(tmp_path, env=env, vpath=vp, db=other).failed}
+
+
+def test_freeze_campaign_ledger_selection_is_env_driven_and_default_unchanged(tmp_path, monkeypatch):
+    import importlib
+    from talonx_ops.prospective import paths
+    try:
+        monkeypatch.delenv("TALONX_V2_DB_PATH", raising=False)
+        monkeypatch.delenv("TALONX_V2_STATUS_PATH", raising=False)
+        importlib.reload(paths)
+        assert paths.V2_DB_PATH == paths.REPO_ROOT / "v2_lane.db"                           # default: the legacy path, unchanged
+        assert paths.V2_STATUS_PATH == paths.REPO_ROOT / "v2_service_status.json"
+        monkeypatch.setenv("TALONX_V2_DB_PATH", "v2_release_rc1.db")
+        monkeypatch.setenv("TALONX_V2_STATUS_PATH", "v2_release_rc1_status.json")
+        importlib.reload(paths)
+        assert paths.V2_DB_PATH == paths.REPO_ROOT / "v2_release_rc1.db"
+        assert paths.V2_STATUS_PATH == paths.REPO_ROOT / "v2_release_rc1_status.json"
+    finally:
+        monkeypatch.undo()
+        importlib.reload(paths)
+
+
+def test_freeze_launch_env_block_names_the_release_campaign_and_no_secret():
+    blk = rg.release_env_block()
+    for frag in ("V2-PAPER-RC1", "v2_release_rc1.db", "100000", "10000", "PAPER"):
+        assert frag in blk
+    assert "TOKEN" not in blk and "SECRET" not in blk
+
+
+def _mk_repo(tmp_path):
+    import subprocess
+    def g(*a):
+        return subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *a], cwd=tmp_path, check=True,
+                              capture_output=True, text=True).stdout.strip()
+    g("init", "-q")
+    (tmp_path / "talonx_v2").mkdir(); (tmp_path / "docs").mkdir(); (tmp_path / "tests").mkdir()
+    (tmp_path / "talonx_v2" / "core.py").write_text("x=1\n")
+    g("add", "-A"); g("commit", "-q", "-m", "frozen")
+    return g
+
+
+def test_freeze_pin_accepts_the_frozen_sha_and_descendants_that_only_touch_docs_tests_and_the_pin(tmp_path):
+    from talonx_ops.prospective.preflight import frozen_release_ok
+    g = _mk_repo(tmp_path)
+    frozen = g("rev-parse", "HEAD")
+    assert frozen_release_ok(frozen, frozen[:7], repo=tmp_path)[0]                           # exact
+    (tmp_path / "docs" / "n.md").write_text("n")
+    (tmp_path / "tests" / "t.py").write_text("t")
+    (tmp_path / "talonx_ops" / "prospective").mkdir(parents=True)
+    (tmp_path / "talonx_ops" / "prospective" / "__init__.py").write_text("RELEASE_SHA_EXPECTED='x'")
+    g("add", "-A"); g("commit", "-q", "-m", "docs+pin")
+    ok, why = frozen_release_ok(g("rev-parse", "HEAD"), frozen[:7], repo=tmp_path)
+    assert ok, why
+
+
+def test_freeze_pin_refuses_a_runtime_change_after_the_freeze_and_unrelated_history(tmp_path):
+    from talonx_ops.prospective.preflight import frozen_release_ok
+    g = _mk_repo(tmp_path)
+    frozen = g("rev-parse", "HEAD")
+    (tmp_path / "talonx_v2" / "core.py").write_text("x=2\n")                                 # runtime drift
+    g("add", "-A"); g("commit", "-q", "-m", "drift")
+    ok, why = frozen_release_ok(g("rev-parse", "HEAD"), frozen[:7], repo=tmp_path)
+    assert not ok and "runtime files changed" in why
+    assert not frozen_release_ok(g("rev-parse", "HEAD"), "deadbeef", repo=tmp_path)[0]       # unknown / non-ancestor SHA
+
+
+def test_freeze_operator_reads_the_fresh_release_campaign_read_only(tmp_path):
+    import hashlib
+    db = tmp_path / "v2_release_rc1.db"
+    rg.init_release_campaign(db)
+    h = lambda: hashlib.md5(Path(db).read_bytes()).hexdigest()   # noqa: E731
+    before = h()
+    from talonx_ops.operator_read import operator_snapshot
+    snap = operator_snapshot(Path(db), status={})
+    assert h() == before                                                                     # the read mutated nothing
+    a = snap["account"]
+    assert a["starting_capital"] == 100_000.0 and a["settled_cash"] == 100_000.0
+    assert snap["campaign"]["campaign_id"] == "V2-PAPER-RC1" and snap["campaign"]["execution_mode"] == "PAPER"
+    assert snap["campaign"]["strategy_version"] == "INSIDER_BUY_CLUSTER_V2@1"
+    assert snap["blocks"] == [] and snap["reconciliation"]["state"] == "HEALTHY"
+    assert all(len(v) == 0 for v in snap["positions"].values())
+    from talonx_ops.prospective.ledger_guard import check_ledger_continuity
+    lc = check_ledger_continuity(db)
+    assert lc.ok and lc.cash == 100_000.0 and lc.n_open == 0 and lc.n_trades == 0                # restart-continuity guard accepts it

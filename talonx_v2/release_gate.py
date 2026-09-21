@@ -47,6 +47,10 @@ class ReleaseProfile:
     fallback_mode: str = "NONE"
     default_starting_cash_usd: float = 100_000.0
     default_allocation_usd: float = 10_000.0
+    # FIRST FROZEN RELEASE CAMPAIGN: a NEW clean ledger (never the legacy $300k `v2_lane.db`).
+    campaign_id: str = "V2-PAPER-RC1"
+    campaign_db_filename: str = "v2_release_rc1.db"
+    campaign_status_filename: str = "v2_release_rc1_status.json"
     signal_destination: str = "TRADE_EVENT"          # TalonX Signal
     sentinel_destination: str = "OPERATIONS"         # TalonX Sentinel
     lab_destination: str = "RESEARCH"                # TalonX Lab
@@ -225,9 +229,33 @@ def evaluate_release_readiness(*, db_path: str | Path, pricing_mode: str | None,
             else "Intelligence card delivery is OFF (company developments stay dashboard-visible)")
 
     # 7. ledger / campaign / account state (read-only)
+    # 7a. the configured campaign identity must be the release campaign (a legacy/default identity is refused)
+    _cash_env = str(env.get("TALONX_V2_STARTING_CASH_USD", "") or profile.default_starting_cash_usd)
+    _alloc_env = str(env.get("TALONX_V2_ALLOCATION_USD", "") or profile.default_allocation_usd)
+    _cid_env = str(env.get("TALONX_V2_CAMPAIGN_ID", "") or "V2")
+    _mode_env = str(env.get("TALONX_V2_EXECUTION_MODE", "") or profile.execution_mode)
+    _env_problems = []
+    if _cid_env != profile.campaign_id:
+        _env_problems.append(f"TALONX_V2_CAMPAIGN_ID={_cid_env!r} (release campaign is {profile.campaign_id!r})")
+    try:
+        if float(_cash_env) != profile.default_starting_cash_usd:
+            _env_problems.append(f"TALONX_V2_STARTING_CASH_USD={_cash_env} (release is {profile.default_starting_cash_usd:g})")
+        if float(_alloc_env) != profile.default_allocation_usd:
+            _env_problems.append(f"TALONX_V2_ALLOCATION_USD={_alloc_env} (release is {profile.default_allocation_usd:g})")
+    except ValueError:
+        _env_problems.append("non-numeric starting cash / allocation")
+    if _mode_env != profile.execution_mode:
+        _env_problems.append(f"TALONX_V2_EXECUTION_MODE={_mode_env!r}")
+    if Path(db_path).name == "v2_lane.db":
+        _env_problems.append("ledger is the LEGACY v2_lane.db (the first frozen release runs on a new campaign ledger)")
+    rep.add("release_campaign_config", "PASS" if not _env_problems else "FAIL",
+            f"campaign_id={profile.campaign_id} cash={profile.default_starting_cash_usd:g} "
+            f"allocation={profile.default_allocation_usd:g} mode={profile.execution_mode}"
+            if not _env_problems else "; ".join(_env_problems) + f".  Required env: {release_env_block(profile)}")
     con = _ro(db_path)
     if con is None:
-        rep.add("campaign_identity", "WARN", "no ledger file yet: a fresh campaign is seeded once at first open")
+        rep.add("campaign_identity", "WARN",
+                "release campaign ledger not created yet: create it once with `python -m talonx_v2.release_gate --init-campaign`")
         rep.add("account_blocks", "PASS", "no ledger -> no active block")
         rep.add("startup_reconciliation", "PASS", "no ledger -> nothing to reconcile")
     else:
@@ -235,10 +263,13 @@ def evaluate_release_readiness(*, db_path: str | Path, pricing_mode: str | None,
             tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             row = con.execute("SELECT * FROM campaign WHERE id=1").fetchone() if "campaign" in tables else None
             if row is None:
-                rep.add("campaign_identity", "WARN",
-                        "legacy ledger without a campaign record: it is migrated once (starting cash NOT fabricated)")
+                rep.add("campaign_identity", "FAIL",
+                        "ledger has no campaign record (legacy): the first frozen release requires the NEW campaign ledger")
             else:
-                ok = (row["strategy_version"] == profile.strategy_version and row["execution_mode"] == profile.execution_mode)
+                ok = (row["strategy_version"] == profile.strategy_version and row["execution_mode"] == profile.execution_mode
+                      and row["campaign_id"] == profile.campaign_id and row["provenance"] == "SEEDED_AT_CREATION"
+                      and row["starting_cash_usd"] == profile.default_starting_cash_usd
+                      and row["per_position_allocation_usd"] == profile.default_allocation_usd)
                 rep.add("campaign_identity", "PASS" if ok else "FAIL",
                         f"campaign_id={row['campaign_id']} strategy_version={row['strategy_version']} "
                         f"execution_mode={row['execution_mode']} provenance={row['provenance']}")
@@ -260,16 +291,128 @@ def evaluate_release_readiness(*, db_path: str | Path, pricing_mode: str | None,
     return rep
 
 
+def release_env_block(profile: ReleaseProfile = RELEASE_PROFILE) -> str:
+    """The non-secret environment that selects the release campaign (PowerShell form)."""
+    return "; ".join([
+        f"$env:TALONX_V2_CAMPAIGN_ID='{profile.campaign_id}'",
+        f"$env:TALONX_V2_DB_PATH='{profile.campaign_db_filename}'",
+        f"$env:TALONX_V2_STATUS_PATH='{profile.campaign_status_filename}'",
+        f"$env:TALONX_V2_STARTING_CASH_USD='{profile.default_starting_cash_usd:g}'",
+        f"$env:TALONX_V2_ALLOCATION_USD='{profile.default_allocation_usd:g}'",
+        f"$env:TALONX_V2_EXECUTION_MODE='{profile.execution_mode}'"])
+
+
+def campaign_state(db_path: str | Path) -> dict:
+    """READ-ONLY account state of a campaign ledger (opened ``mode=ro``): what a launch preflight must see."""
+    con = _ro(db_path)
+    if con is None:
+        return {"exists": False}
+    try:
+        def n(sql):
+            try:
+                return con.execute(sql).fetchone()[0] or 0
+            except sqlite3.OperationalError:
+                return 0
+        camp = None
+        try:
+            r = con.execute("SELECT * FROM campaign WHERE id=1").fetchone()
+            camp = dict(r) if r else None
+        except sqlite3.OperationalError:
+            pass
+        cash = n("SELECT cash FROM portfolio WHERE id=1")
+        return {
+            "exists": True, "campaign": camp,
+            "settled_cash": cash,
+            "open_positions": n("SELECT COUNT(*) FROM positions WHERE status='OPEN'"),
+            "closed_positions": n("SELECT COUNT(*) FROM positions WHERE status='CLOSED'"),
+            "exit_unresolved": n("SELECT COUNT(*) FROM positions WHERE status='EXIT_UNRESOLVED'"),
+            "reserved_capital": n("SELECT COALESCE(SUM(position_cost),0) FROM positions WHERE status IN ('OPEN','EXIT_UNRESOLVED')"),
+            "pending_entry_intents": n("SELECT COUNT(*) FROM pending_entry_intents WHERE status='PENDING'"),
+            "entry_intents_total": n("SELECT COUNT(*) FROM pending_entry_intents"),
+            "active_account_blocks": n("SELECT COUNT(*) FROM account_blocks WHERE status='ACTIVE'"),
+            "realized_pnl": n("SELECT COALESCE(SUM(realized_pnl_usd),0) FROM positions WHERE status='CLOSED'"),
+            "dividend_receivables": n("SELECT COUNT(*) FROM dividend_entitlements"),
+            "trades": n("SELECT COUNT(*) FROM trades"),
+            "processed_episodes": n("SELECT COUNT(*) FROM processed_episodes"),
+            "v2_alert_outbox_rows": n("SELECT COUNT(*) FROM v2_alert_outbox"),
+            "corporate_action_rows": n("SELECT COUNT(*) FROM position_corporate_actions"),
+        }
+    finally:
+        con.close()
+
+
+def clean_campaign_problems(state: dict, profile: ReleaseProfile = RELEASE_PROFILE) -> list:
+    """Empty list <=> the ledger is a CLEAN, fresh release campaign (no inherited trading/account/notification state)."""
+    if not state.get("exists"):
+        return ["ledger does not exist"]
+    p = []
+    c = state.get("campaign") or {}
+    for k, want in (("campaign_id", profile.campaign_id), ("strategy_version", profile.strategy_version),
+                    ("execution_mode", profile.execution_mode), ("provenance", "SEEDED_AT_CREATION"),
+                    ("starting_cash_usd", profile.default_starting_cash_usd),
+                    ("per_position_allocation_usd", profile.default_allocation_usd)):
+        if c.get(k) != want:
+            p.append(f"campaign.{k}={c.get(k)!r} expected {want!r}")
+    cash_want = profile.default_starting_cash_usd
+    if state["settled_cash"] != cash_want:
+        p.append(f"settled cash {state['settled_cash']} != {cash_want}")
+    for k in ("open_positions", "closed_positions", "exit_unresolved", "reserved_capital", "pending_entry_intents",
+              "entry_intents_total", "active_account_blocks", "realized_pnl", "dividend_receivables", "trades",
+              "processed_episodes", "v2_alert_outbox_rows", "corporate_action_rows"):
+        if state[k]:
+            p.append(f"{k}={state[k]} (must be 0)")
+    return p
+
+
+def init_release_campaign(db_path: str | Path, *, profile: ReleaseProfile = RELEASE_PROFILE) -> dict:
+    """Create the NEW release campaign ledger ONCE.  Refuses to touch an existing file, refuses the legacy
+    ``v2_lane.db``, then verifies the ledger is clean.  Never touches any other ledger; sends nothing."""
+    from talonx_v2.store import V2Store
+    p = Path(db_path)
+    if p.name == "v2_lane.db":
+        raise RuntimeError("REFUSED: v2_lane.db is the legacy campaign ledger; the release campaign has its own ledger")
+    if p.exists():
+        raise RuntimeError(f"REFUSED: {p} already exists (a campaign is created exactly once; use --verify-campaign)")
+    V2Store(str(p), starting_cash=profile.default_starting_cash_usd, campaign_id=profile.campaign_id,
+            strategy=profile.strategy, strategy_version=profile.strategy_version,
+            execution_mode=profile.execution_mode,
+            per_position_allocation_usd=profile.default_allocation_usd,
+            config_fingerprint=profile.strategy_fingerprint)
+    st = campaign_state(p)
+    prob = clean_campaign_problems(st, profile)
+    if prob:
+        raise RuntimeError(f"created campaign is NOT clean: {prob}")
+    return st
+
+
 def main(argv=None) -> int:      # pragma: no cover - CLI, read-only
     import argparse
     from dotenv import load_dotenv
     load_dotenv(".env", override=False)
     ap = argparse.ArgumentParser(description="V2 release readiness gate (read-only; sends nothing)")
-    ap.add_argument("--db", default=str(REPO_ROOT / "v2_lane.db"))
+    ap.add_argument("--db", default=os.environ.get("TALONX_V2_DB_PATH") or RELEASE_PROFILE.campaign_db_filename)
     ap.add_argument("--pricing-mode", default="sip")
     ap.add_argument("--deliver", action="store_true", default=True)
     ap.add_argument("--transport", default="telegram")
+    ap.add_argument("--print-env", action="store_true", help="print the release campaign environment and exit")
+    ap.add_argument("--init-campaign", action="store_true",
+                    help="create the NEW release campaign ledger once (refuses if it exists / is the legacy ledger)")
+    ap.add_argument("--verify-campaign", action="store_true",
+                    help="read-only: verify the campaign ledger is clean / correctly identified")
     a = ap.parse_args(argv)
+    a.db = str(a.db if Path(a.db).is_absolute() else REPO_ROOT / a.db)
+    if a.print_env:
+        print(release_env_block())
+        return 0
+    if a.init_campaign or a.verify_campaign:
+        try:
+            st = init_release_campaign(a.db) if a.init_campaign else campaign_state(a.db)
+        except RuntimeError as exc:
+            print(str(exc))
+            return 2
+        prob = clean_campaign_problems(st)
+        print(json.dumps({"state": st, "clean": not prob, "problems": prob}, indent=2, default=str))
+        return 0 if not prob else 2
     rep = evaluate_release_readiness(db_path=a.db, pricing_mode=a.pricing_mode, deliver=a.deliver, transport=a.transport)
     print(json.dumps(rep.to_dict(), indent=2))
     return 0 if rep.status == "READY" else 2
