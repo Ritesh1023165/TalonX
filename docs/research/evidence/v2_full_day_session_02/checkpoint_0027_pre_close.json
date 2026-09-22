@@ -1,0 +1,327 @@
+{
+  "checkpoint_version": 1,
+  "time": {
+    "utc": "2026-09-22T19:52:12.851345+00:00",
+    "europe_london": "2026-09-22T20:52:12.851345+01:00"
+  },
+  "campaign": {
+    "start_date": "2026-09-08",
+    "campaign_day": 11,
+    "day1_outcome": "NO_NATURAL_V2_SIGNAL"
+  },
+  "release": {
+    "head_sha": "032def9877e45eb063856df9558553709d8bf590",
+    "head_short": "032def9",
+    "tree_clean": false,
+    "v1_fingerprint": "ed8272fe568d",
+    "v1_fingerprint_ok": true,
+    "v2_fingerprint": "e2acf6454789217e",
+    "v2_fingerprint_ok": true
+  },
+  "service_health": {
+    "health": "HEALTHY",
+    "heartbeat_age_s": 24.6,
+    "heartbeat_ttl_s": 180.0,
+    "heartbeat_kind": "LIGHTWEIGHT",
+    "tick": 312,
+    "last_tick_utc": "2026-09-22T19:50:47.860543+00:00",
+    "strategy_version": "INSIDER_BUY_CLUSTER_V2@1",
+    "active_profile": "INSIDER_BUY_CLUSTER_V2",
+    "startup": {
+      "state": "NOT_IN_STARTUP",
+      "reason": "components + first data ready",
+      "components": {
+        "heartbeat_fresh": true,
+        "strategy_version_ok": true,
+        "first_tick_data_ready": true
+      }
+    }
+  },
+  "data_state": "CURRENT",
+  "business_activity": "NO_OPPORTUNITIES",
+  "v2": {
+    "strategy_version": "INSIDER_BUY_CLUSTER_V2@1",
+    "strategy_version_ok": true,
+    "source": "insider",
+    "live_lookback_days": 45,
+    "form4_records_seen": 10,
+    "ripe_episodes_this_tick": 1,
+    "stale_entry_skipped_this_tick": 1,
+    "entries_this_tick": 0,
+    "exits_this_tick": 0,
+    "open_positions": 0,
+    "cash": 100000.0,
+    "exit_unresolved": [],
+    "eod_forced_flatten": false,
+    "real_capital": false,
+    "shorts": false
+  },
+  "ledger": {
+    "ok": true,
+    "db_path": "C:\\workspace\\TalonX\\v2_release_rc1.db",
+    "exists": true,
+    "cash": 100000.0,
+    "n_open": 0,
+    "n_closed": 0,
+    "n_trades": 0,
+    "n_buys": 0,
+    "n_sells": 0,
+    "n_unresolved": 0,
+    "n_processed_episodes": 2,
+    "stale_skipped_episodes": [
+      "07242bc857569f60"
+    ],
+    "problems": [],
+    "notes": [
+      "carry-forward: cash=100000.0 open=0 closed=0 trades=0 processed_episodes=2"
+    ]
+  },
+  "funnel": {
+    "as_of": "2026-09-22",
+    "scope": {
+      "today_utc": "2026-09-22",
+      "window_days": 45,
+      "execution_scope_enforced": true,
+      "execution_scope_count": 39,
+      "watchlist_only_count": 39,
+      "broad_discovery_included": false,
+      "evidence": {
+        "qualification": "FRESH_VALID",
+        "broad_discovery_active": false,
+        "reason": "fresh, owned snapshot; narrow (watchlist-only) scope confirmed -- reported as narrow, not as successful broad coverage",
+        "reported_scope_count": 39,
+        "watchlist_only_count": 39,
+        "reconstructed_scope_count": 39
+      }
+    },
+    "available": true,
+    "form4": {
+      "code_p_records_window": 10,
+      "code_p_records_today": 0,
+      "distinct_issuers_window": 3,
+      "distinct_issuers_today": 0
+    },
+    "clusters": {
+      "single_insider_near_miss_issuers": [
+        "INTC"
+      ],
+      "single_insider_near_miss_count": 1,
+      "clusters_ge2_distinct_insiders": 2,
+      "cluster_symbols": [
+        "ABCL",
+        "ADC"
+      ],
+      "stale_historical_clusters": 1,
+      "stale_episode_ids": [
+        "07242bc857569f60"
+      ],
+      "fresh_eligible_clusters": 1,
+      "fresh_eligible_episode_ids": [
+        "19f814d1f3ec3250"
+      ],
+      "not_yet_eligible_clusters": 0
+    },
+    "terminal": {
+      "processed_episode_dispositions": {
+        "SKIPPED_ENTRY_STALE": 1,
+        "SKIPPED_NO_PRIOR_INTENT": 1
+      },
+      "signals": 0,
+      "buys": 0,
+      "sells": 0,
+      "open_positions": 0
+    },
+    "intents": {
+      "by_status": {},
+      "pending": [],
+      "pending_count": 0
+    },
+    "delivery": {
+      "by_state": {},
+      "by_kind": {},
+      "recent": [],
+      "sent": 0,
+      "held": 0,
+      "failed": 0,
+      "retry": 0,
+      "pending": 0,
+      "ambiguous": 0
+    },
+    "interpretation": "REVIEW_POSSIBLE_SUPPRESSION"
+  },
+  "market": {
+    "state": "HEALTHY",
+    "producer_live": true,
+    "symbols_priced": 51,
+    "newest_tick_age_seconds": 4,
+    "coverage_ratio": 1.0,
+    "session_phase": null
+  },
+  "intelligence": {
+    "processing_log_age_s": 55.083155,
+    "newest_insider_event_utc": "2026-09-21T20:30:18+00:00",
+    "intel_events_discovered_today": 7
+  },
+  "experimental": {
+    "override_active": false,
+    "sent_today": 0,
+    "held": 0
+  },
+  "official_dispatch": {
+    "alerts_today": 0,
+    "telegram_failures_today": 0
+  },
+  "telegram_poller": {
+    "logical_owners": 1,
+    "healthy": true,
+    "network_pids": [
+      22208
+    ],
+    "cmdline_matches": 1,
+    "method": "network",
+    "detail": "1 distinct PID(s) with an established Telegram connection"
+  },
+  "supervisor": {
+    "generated_at": "2026-09-22T19:52:12.955529+00:00",
+    "telegram_get_updates_owners": 1,
+    "producers": {
+      "original": {
+        "live": true,
+        "reason": "pid alive",
+        "metadata": {
+          "commit_sha": "032def9877e45eb063856df9558553709d8bf590",
+          "market_data_provider_configured": "YFINANCE_POLLING",
+          "modules_enabled": {
+            "brain": true,
+            "core": true,
+            "dispatch": true,
+            "paper_trading": true,
+            "quant": true
+          },
+          "paper_execution_path": "LOCAL_SIMULATED_LEDGER (talonx_paper, SQLite -- not a broker)",
+          "pid": 22208,
+          "run_mode": "FULL_APP",
+          "started_at": "2026-09-22T06:52:25.897808+00:00"
+        }
+      },
+      "experimental": {
+        "live": true,
+        "reason": "talonx_signals.run process found"
+      },
+      "intelligence": {
+        "live": true,
+        "reason": "heartbeat 55s old",
+        "heartbeat_at": "2026-09-22T19:51:17.815815+00:00"
+      }
+    },
+    "market": {
+      "state": "HEALTHY",
+      "producer_live": true,
+      "producer_reason": "pid alive",
+      "symbols_priced": 51,
+      "newest_tick": "2026-09-22T19:52:08.667485+00:00",
+      "newest_tick_age_seconds": 4,
+      "last_bar_age_seconds": null,
+      "session_phase": null,
+      "active_poller": null,
+      "configured_symbols": 48,
+      "selected_symbols": 43,
+      "coverage_ratio": 1.0,
+      "provider_failures": null,
+      "provider_retries": null,
+      "redis_failures": null,
+      "redis_reconnects": null,
+      "redis_reachable": null,
+      "source": "talonx_ingest.market_data.manager (via run_talonx.py); taps: paper_trading.db.latest_prices, watchlist.db, talonx:ingest:liveness",
+      "notes": []
+    },
+    "eod_latest": {
+      "session_date": "2026-09-21",
+      "status": "PARTIAL",
+      "generated_at_utc": "2026-09-21T20:06:17.032495+00:00",
+      "original_paper": {
+        "open_positions": 0,
+        "trades_all_time": 0,
+        "trades_today": 0
+      },
+      "experimental_paper": {
+        "open_positions": 0,
+        "trades_all_time": 10,
+        "trades_today": 0
+      },
+      "piv_paper": {
+        "positions": null,
+        "orders": null
+      },
+      "alert_counts": {
+        "official": 0,
+        "experimental": 513,
+        "intelligence_events": 64114
+      },
+      "component_status": [
+        {
+          "name": "original_paper",
+          "outcome": "CHECKED",
+          "detail": "read-only local ledger"
+        },
+        {
+          "name": "experimental_paper",
+          "outcome": "CHECKED",
+          "detail": "read-only local ledger"
+        },
+        {
+          "name": "piv_paper",
+          "outcome": "NOT_CHECKED",
+          "detail": "no piv_reader injected (offline / not opted in)"
+        },
+        {
+          "name": "alert_stores",
+          "outcome": "CHECKED",
+          "detail": "dispatch_audit.db / exp_alerts.db / ingestion_ledger.db"
+        }
+      ],
+      "mismatches": []
+    },
+    "eod_reconciled_today": false,
+    "eod_reconciled_today_available_scope": false,
+    "answers": {
+      "talonx_running": true,
+      "original_ready": true,
+      "market_feed_healthy": true,
+      "market_feed_state": "HEALTHY",
+      "experimental_shadow_alive": true,
+      "intelligence_alive": true,
+      "telegram_send_ok": true,
+      "telegram_receive_owner_count": 1,
+      "original_open_positions": 0,
+      "experimental_open_positions": 0,
+      "eod_reconciled_today": false,
+      "eod_reconciled_today_available_scope": false,
+      "dashboard_url": "http://localhost:8787",
+      "intelligence_deep_viewer": "http://localhost:8760"
+    }
+  },
+  "eod": {
+    "state": "NOT_DUE_YET",
+    "reason": "XNYS close 2026-09-22T20:00:00+00:00 not reached",
+    "close_utc": "2026-09-22T20:00:00+00:00"
+  },
+  "invariants": {
+    "negative_cash": false,
+    "ledger_equation_broken": false,
+    "duplicate_buy": false,
+    "duplicate_position": false,
+    "stale_episode_entered": false,
+    "experimental_external_send": false,
+    "experimental_override_active": false,
+    "multiple_telegram_pollers": false,
+    "v2_eod_forced_flatten": false,
+    "v2_real_capital": false,
+    "v2_shorts": false,
+    "v2_source_not_insider": false,
+    "strategy_version_mismatch": false,
+    "v2_process_dead": false,
+    "v2_startup_failed": false,
+    "any_critical": false
+  }
+}

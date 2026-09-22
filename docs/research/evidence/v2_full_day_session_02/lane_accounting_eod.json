@@ -1,0 +1,118 @@
+{
+  "generated_utc": "2026-09-22T20:05:42.188394+00:00",
+  "session_date": "2026-09-22",
+  "lanes": {
+    "original_intraday": {
+      "lane": "ORIGINAL_INTRADAY",
+      "terminal_dispositions_by_gate": {
+        "volatility_gate/LOW_VOLATILITY": 18547,
+        "confluence_gate/LOW_CONFLUENCE": 17,
+        "opening_blackout_gate/OPENING_BLACKOUT": 9
+      },
+      "terminal_total": 18573,
+      "distinct_tickers_with_a_rejection": 43,
+      "published_intraday_alerts": 0,
+      "off_counter_disposition_class": {
+        "what": "THROTTLE / COOLDOWN / failed-revalidation",
+        "recorded_where": "talonx:quant:rejected channel + rejected_candidates DB (gate LIKE '%throttle%' / '%cooldown%' / '%reval%')",
+        "count_today": 0,
+        "in_metrics_quant_counter": false
+      }
+    },
+    "experimental": {
+      "lane": "EXPERIMENTAL",
+      "directional_alerts": 0,
+      "would_pass": 0,
+      "paper_trades_opened": 0,
+      "external_sends": 0,
+      "channel": "talonx:exp:* (isolated -- never routed to Brain/Core/Dispatch)"
+    },
+    "v2_trading": {
+      "lane": "V2_TRADING",
+      "ledger_present": true,
+      "processed_episodes": 2,
+      "dispositions": {
+        "SKIPPED_ENTRY_STALE": 1,
+        "SKIPPED_NO_PRIOR_INTENT": 1
+      },
+      "buys": 0,
+      "sells": 0,
+      "open_positions": 0,
+      "pending_entry_intents": 0,
+      "alert_outbox_by_state": {}
+    }
+  },
+  "comingled_metrics_quant": {
+    "present": true,
+    "keys": {
+      "metrics:2026-09-22:quant:dropped_opening_blackout": 37,
+      "metrics:2026-09-22:quant:dropped_closing_blackout": 4,
+      "metrics:2026-09-22:quant:regime_shadow_OLD_FAIL_NEW_PASS": 30217,
+      "metrics:2026-09-22:quant:failed_rr_gate": 12,
+      "metrics:2026-09-22:quant:failed_min_volatility": 35238,
+      "metrics:2026-09-22:quant:published": 13,
+      "metrics:2026-09-22:quant:failed_confluence": 138,
+      "metrics:2026-09-22:quant:dropped_uk_session_closed": 4,
+      "metrics:2026-09-22:quant:regime_shadow_BOTH_PASS": 4222,
+      "metrics:2026-09-22:quant:failed_trend_gate": 2,
+      "metrics:2026-09-22:quant:dropped_duplicate_bars": 59419,
+      "metrics:2026-09-22:quant:published_no_subscriber": 13,
+      "metrics:2026-09-22:quant:regime_shadow_OLD_PASS_NEW_FAIL": 51,
+      "metrics:2026-09-22:quant:regime_shadow_BOTH_FAIL": 5021,
+      "metrics:2026-09-22:quant:evaluated": 221
+    },
+    "lane_attributable": false,
+    "note": "no lane suffix -- Original + Experimental comingled (D6)",
+    "warning": "metrics:<date>:quant:* is COMINGLED Original+Experimental with NO lane suffix. Its 'published' is NOT an Original official-publication count. Original official publications = dispatch_audit.alerts (0 today). V2 publications = 0. The dashboard does not display this counter as Original's."
+  },
+  "off_counter_dispositions_from_records": {
+    "throttle": 0,
+    "cooldown": 0,
+    "revalidation": 0,
+    "lockout": 0,
+    "source": "dispatch_audit.rejected_candidates (the talonx:quant:rejected sink)"
+  },
+  "final_day_funnel_closure": {
+    "status": "COUNTER_RESIDUAL",
+    "evaluated": 221,
+    "terminal_with_counter": {
+      "dropped_opening_blackout": 37,
+      "dropped_closing_blackout": 4,
+      "failed_rr_gate": 12,
+      "published": 13,
+      "failed_confluence": 138,
+      "dropped_uk_session_closed": 4,
+      "failed_trend_gate": 2,
+      "published_no_subscriber": 13
+    },
+    "terminal_with_counter_sum": 223,
+    "residual": -2,
+    "residual_explained_by_records": false,
+    "residual_attribution": "NO corresponding disposition records found -- the residual is NOT attributed to throttle/cooldown/revalidation (there are none on this day) and is NOT defined as the arithmetic remainder. UNEXPLAINED_FROM_RECORDS.",
+    "pre_evaluation_drops_excluded": {
+      "dropped_duplicate_bars": 59419,
+      "failed_min_volatility": 35238
+    },
+    "published_counter": 13,
+    "published_is_comingled": true,
+    "original_official_publications": 0,
+    "v2_publications": 0
+  },
+  "in_flight": {
+    "v2_pending_entry_intents": 0,
+    "v2_alert_outbox_pending": 0,
+    "note": "reconciliation must account for these before declaring a lane closed"
+  },
+  "historical_16_24_ping_snapshot": {
+    "reported": "candidates 126; displayed rejections confluence 18 / opening-blackout 10 / trend 1; quant publications 3",
+    "status": "NOT_RECONSTRUCTABLE",
+    "why": "metrics:<date>:quant:* counters are CUMULATIVE, not point-in-time; there is no 16:24:25Z snapshot of them. The final-day counter (evaluated=221) cannot reconstruct the mid-session 126/3. Final-day reconciliation and the ping attribution are kept SEPARATE."
+  },
+  "historical_94_candidate_gap": {
+    "status": "SUPERSEDED_BY_FINAL_DAY_RECONCILIATION",
+    "note": "the '94' arose from '126 - 18 - 10 - 1 - 3' (the 16:24 ping vs the EOD displayed 3-gate breakdown) -- an apples-to-oranges subtraction. The final-day funnel is reconciled against the comingled counter above (evaluated=221, terminal-with-counter=223, residual=-2 NO corresponding disposition records found -- the residual is NOT attributed to throttle/cooldown/revalidation (there are none on this day) and is NOT defined as the arithmetic remainder. UNEXPLAINED_FROM_RECORDS.). The residual is NOT the 94 and is NOT defined as throttle/cooldown/revalidation (no such records exist for the day)."
+  },
+  "lane_attribution_defect": {
+    "D6": "metrics:<date>:quant:* keys carry no lane suffix; Original + Experimental increment the same keys. Lane-suffixing them is a change to the hot quant path -- proposed, not made here. This snapshot is the interim lane-scoped surface, built from the durable per-lane stores."
+  }
+}
