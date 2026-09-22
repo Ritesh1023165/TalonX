@@ -42,7 +42,7 @@ Rules:
 
 | Question | Existing durable source | Survives restarts / gaps? |
 |---|---|---|
-| Filing first available at SEC | `insider_transactions.accepted_at_utc` (`~/.talonx/ingestion_ledger.db`) | Yes |
+| Filing first available at SEC | `insider_transactions.accepted_at_utc` (`~/.talonx/ingestion_ledger.db`). **Despite its name this is SEC's New York wall-clock time** (add 4 h in EDT or 5 h in EST for UTC). See the [39-stock audit](../v2_39_stock_missed_opportunity_audit/README.md), finding F1. | Yes |
 | Filing first received by TalonX | `insider_filings.ingested_at_utc`; also `intel_event_processing.discovered_at_utc` | Yes |
 | Activation timestamp / entry session | `processed_episodes.eligible_entry_session` for dispositioned episodes; otherwise rebuild read-only with frozen `talonx_v2.pipeline.detect_episodes` against a **copy** of the ledger | Yes |
 | Intent timing (if any) | `pending_entry_intents.created_at_utc`, `source_event_ts_utc`, `receipt_ts_utc`, `target_entry_session` | Yes |
@@ -58,13 +58,16 @@ Rules:
 
 ## 4. Classification of opportunities to date
 
-| Cluster | Symbol | SEC-accepted (activating) | TalonX receipt | Entry session | Ledger disposition | Category | Note |
+| Cluster | Symbol | SEC-accepted (activating, ET) | TalonX receipt (UTC) | Entry session | Ledger disposition | Category | Note |
 |---|---|---|---|---|---|---|---|
-| `07242bc857569f60` | ABCL | 2026-08-14 16:04:25Z | 2026-09-04 10:18:49Z | 2026-08-17 | `SKIPPED_ENTRY_STALE` | pre-campaign (would be 5/6) | entry session predates the campaign; excluded from counts |
-| `19f814d1f3ec3250` | ADC | 2026-09-17 11:00:24Z | 2026-09-21 18:42:40Z | 2026-09-18 | `SKIPPED_NO_PRIOR_INTENT` | `MISSED_DUE_TO_INGESTION_DOWNTIME` (pre-campaign) | ingester offline 09-16 to 09-20; campaign created 09-21. System response = LEGITIMATE_TIMING_REJECTION ([forensic](../v2_full_day_session_02/cluster_19f814d1f3ec3250_forensic.md)). |
+| `07242bc857569f60` | ABCL | 2026-08-14 16:04:25 ET (20:04:25Z) | 2026-09-04 10:18:49Z | 2026-08-17 | `SKIPPED_ENTRY_STALE` | `MISSED_DUE_TO_INGESTION_DOWNTIME` (pre-campaign; ingestion not yet deployed, first ran 09-04) | excluded from in-campaign counts |
+| `19f814d1f3ec3250` | ADC | 2026-09-17 11:00:24 ET (15:00:24Z) | 2026-09-21 18:42:40Z | 2026-09-18 | `SKIPPED_NO_PRIOR_INTENT` | `MISSED_DUE_TO_INGESTION_DOWNTIME` (pre-campaign) | ingester offline 09-16 to 09-20; campaign created 09-21. System response = LEGITIMATE_TIMING_REJECTION ([forensic](../v2_full_day_session_02/cluster_19f814d1f3ec3250_forensic.md); see audit erratum E1 for the ET correction) |
+
+The full 39-symbol audit of 2026-09-16 → 09-22 is in [v2_39_stock_missed_opportunity_audit/](../v2_39_stock_missed_opportunity_audit/README.md): 2 clusters, 0 received on time, 0 implementation defects, 0 undelivered alerts.
 
 ## 5. Bounded follow-ups (known, not in scope now)
 
 1. **SHUTDOWN notification timing.** The SHUTDOWN event is enqueued at `close` but stays PENDING because the stack stops before draining it. The 2-hour STARTUP/SHUTDOWN expiry prevents out-of-order delivery the next day. Reproduced in Session 02.
 2. **Funnel `fresh_eligible` ignores terminal state.** `talonx_ops/prospective/funnel.py:158-165` counts terminally dispositioned episodes as fresh-eligible, which yields a spurious `REVIEW_POSSIBLE_SUPPRESSION` (ADC in Session 02). This is observability only, with no admission or accounting effect. `BOUNDED_OBSERVABILITY_FOLLOWUP`, not changed.
 3. **No durable ingestion poll history / ingester start-stop log** (section 3). Exact inter-session downtime is inferred, not recorded. Non-blocking.
+4. **`accepted_at_utc` is SEC New York wall-clock time labelled UTC** (audit F1). This has no V2 decision impact (the binding receipt check uses the true-UTC `ingested_at_utc`), but any SEC→receipt lag computed from it is overstated by 4–5 h. Correct for this in forensic arithmetic.

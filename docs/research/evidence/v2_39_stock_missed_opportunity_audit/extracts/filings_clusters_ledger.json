@@ -1,0 +1,879 @@
+{
+ "as_of": "2026-09-22",
+ "since": "2026-08-08",
+ "universe": [
+  "AAPL",
+  "ABCL",
+  "ABT",
+  "ACHR",
+  "ADC",
+  "ADP",
+  "AFL",
+  "AGNC",
+  "AMAT",
+  "AMD",
+  "AVGO",
+  "BAC",
+  "BLK",
+  "C",
+  "CSCO",
+  "CVX",
+  "DELL",
+  "GOOGL",
+  "IBM",
+  "INTC",
+  "JNJ",
+  "JPM",
+  "KO",
+  "MA",
+  "MCD",
+  "MSFT",
+  "MSTR",
+  "NUE",
+  "NVDA",
+  "ORCL",
+  "PG",
+  "PYPL",
+  "SHOP",
+  "STX",
+  "TSLA",
+  "UNH",
+  "V",
+  "VRT",
+  "WMT"
+ ],
+ "operating_history": [
+  {
+   "session_dir": "prospective_2026-09-09",
+   "first_checkpoint_utc": "2026-09-09T06:57:30.759512+00:00",
+   "last_checkpoint_utc": "2026-09-09T19:57:48.898693+00:00",
+   "eod_reconciled_utc": null,
+   "n_checkpoints": 27
+  },
+  {
+   "session_dir": "prospective_2026-09-10",
+   "first_checkpoint_utc": "2026-09-10T07:44:34.076815+00:00",
+   "last_checkpoint_utc": "2026-09-10T20:14:46.694096+00:00",
+   "eod_reconciled_utc": null,
+   "n_checkpoints": 26
+  },
+  {
+   "session_dir": "prospective_2026-09-11",
+   "first_checkpoint_utc": "2026-09-11T08:11:57.856866+00:00",
+   "last_checkpoint_utc": "2026-09-11T15:50:27.699365+00:00",
+   "eod_reconciled_utc": null,
+   "n_checkpoints": 38
+  },
+  {
+   "session_dir": "prospective_2026-09-14",
+   "first_checkpoint_utc": "2026-09-14T09:50:26.784899+00:00",
+   "last_checkpoint_utc": "2026-09-14T22:21:04.487160+00:00",
+   "eod_reconciled_utc": null,
+   "n_checkpoints": 27
+  },
+  {
+   "session_dir": "prospective_2026-09-15",
+   "first_checkpoint_utc": "2026-09-15T02:30:50.351884+00:00",
+   "last_checkpoint_utc": "2026-09-15T20:27:10.889444+00:00",
+   "eod_reconciled_utc": null,
+   "n_checkpoints": 39
+  },
+  {
+   "session_dir": "prospective_2026-09-21",
+   "first_checkpoint_utc": "2026-09-21T18:42:37.836309+00:00",
+   "last_checkpoint_utc": "2026-09-21T19:42:41.132445+00:00",
+   "eod_reconciled_utc": "2026-09-21T20:06:22.382379+00:00",
+   "n_checkpoints": 3
+  },
+  {
+   "session_dir": "prospective_2026-09-22",
+   "first_checkpoint_utc": "2026-09-22T06:51:46.298647+00:00",
+   "last_checkpoint_utc": "2026-09-22T19:52:12.851345+00:00",
+   "eod_reconciled_utc": "2026-09-22T20:05:47.626736+00:00",
+   "n_checkpoints": 27
+  }
+ ],
+ "issuers": {
+  "AAPL": {
+   "issuer_cik": "0000320193",
+   "company_name": "Apple Inc."
+  },
+  "ABCL": {
+   "issuer_cik": "0001703057",
+   "company_name": "AbCellera Biologics Inc."
+  },
+  "ABT": {
+   "issuer_cik": "0000001800",
+   "company_name": "ABBOTT LABORATORIES"
+  },
+  "ACHR": {
+   "issuer_cik": "0001824502",
+   "company_name": "Archer Aviation Inc."
+  },
+  "ADC": {
+   "issuer_cik": "0000917251",
+   "company_name": "AGREE REALTY CORP"
+  },
+  "ADP": {
+   "issuer_cik": "0000008670",
+   "company_name": "AUTOMATIC DATA PROCESSING INC"
+  },
+  "AFL": {
+   "issuer_cik": "0000004977",
+   "company_name": "AFLAC INC"
+  },
+  "AGNC": {
+   "issuer_cik": "0001423689",
+   "company_name": "AGNC Investment Corp."
+  },
+  "AMAT": {
+   "issuer_cik": "0000006951",
+   "company_name": "APPLIED MATERIALS INC /DE"
+  },
+  "AMD": {
+   "issuer_cik": "0000002488",
+   "company_name": "ADVANCED MICRO DEVICES INC"
+  },
+  "AVGO": {
+   "issuer_cik": "0001730168",
+   "company_name": "Broadcom Inc."
+  },
+  "BAC": {
+   "issuer_cik": "0000070858",
+   "company_name": "BANK OF AMERICA CORP /DE/"
+  },
+  "BLK": {
+   "issuer_cik": "0002012383",
+   "company_name": "BlackRock, Inc."
+  },
+  "C": {
+   "issuer_cik": "0000831001",
+   "company_name": "CITIGROUP INC"
+  },
+  "CSCO": {
+   "issuer_cik": "0000858877",
+   "company_name": "CISCO SYSTEMS, INC."
+  },
+  "CVX": {
+   "issuer_cik": "0000093410",
+   "company_name": "CHEVRON CORP"
+  },
+  "DELL": {
+   "issuer_cik": "0001571996",
+   "company_name": "Dell Technologies Inc."
+  },
+  "GOOGL": {
+   "issuer_cik": "0001652044",
+   "company_name": "Alphabet Inc."
+  },
+  "IBM": {
+   "issuer_cik": "0000051143",
+   "company_name": "INTERNATIONAL BUSINESS MACHINES CORP"
+  },
+  "INTC": {
+   "issuer_cik": "0000050863",
+   "company_name": "INTEL CORP"
+  },
+  "JNJ": {
+   "issuer_cik": "0000200406",
+   "company_name": "JOHNSON & JOHNSON"
+  },
+  "JPM": {
+   "issuer_cik": "0000019617",
+   "company_name": "JPMORGAN CHASE & CO"
+  },
+  "KO": {
+   "issuer_cik": "0000021344",
+   "company_name": "COCA COLA CO"
+  },
+  "MA": {
+   "issuer_cik": "0001141391",
+   "company_name": "Mastercard Inc"
+  },
+  "MCD": {
+   "issuer_cik": "0000063908",
+   "company_name": "MCDONALDS CORP"
+  },
+  "MSFT": {
+   "issuer_cik": "0000789019",
+   "company_name": "MICROSOFT CORP"
+  },
+  "MSTR": {
+   "issuer_cik": "0001050446",
+   "company_name": "Strategy Inc"
+  },
+  "NUE": {
+   "issuer_cik": "0000073309",
+   "company_name": "NUCOR CORP"
+  },
+  "NVDA": {
+   "issuer_cik": "0001045810",
+   "company_name": "NVIDIA CORP"
+  },
+  "ORCL": {
+   "issuer_cik": "0001341439",
+   "company_name": "ORACLE CORP"
+  },
+  "PG": {
+   "issuer_cik": "0000080424",
+   "company_name": "PROCTER & GAMBLE Co"
+  },
+  "PYPL": {
+   "issuer_cik": "0001633917",
+   "company_name": "PayPal Holdings, Inc."
+  },
+  "SHOP": {
+   "issuer_cik": "0001594805",
+   "company_name": "SHOPIFY INC.",
+   "_src": "company_tickers.json"
+  },
+  "STX": {
+   "issuer_cik": "0001137789",
+   "company_name": "Seagate Technology Holdings plc"
+  },
+  "TSLA": {
+   "issuer_cik": "0001318605",
+   "company_name": "Tesla, Inc."
+  },
+  "UNH": {
+   "issuer_cik": "0000731766",
+   "company_name": "UNITEDHEALTH GROUP INC"
+  },
+  "V": {
+   "issuer_cik": "0001403161",
+   "company_name": "VISA INC."
+  },
+  "VRT": {
+   "issuer_cik": "0001674101",
+   "company_name": "Vertiv Holdings Co"
+  },
+  "WMT": {
+   "issuer_cik": "0000104169",
+   "company_name": "Walmart Inc."
+  }
+ },
+ "per_symbol": {
+  "AAPL": {
+   "form4_accessions_45d": 7,
+   "form4_accessions_0916_0922": 1,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "ABCL": {
+   "form4_accessions_45d": 5,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 4,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": [
+    "0001352908",
+    "0001834411",
+    "0001834423"
+   ]
+  },
+  "ABT": {
+   "form4_accessions_45d": 4,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "ACHR": {
+   "form4_accessions_45d": 5,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "ADC": {
+   "form4_accessions_45d": 5,
+   "form4_accessions_0916_0922": 2,
+   "codeP_filings_45d": 4,
+   "codeP_filings_0916_0922": 2,
+   "codeP_owners_45d": [
+    "0001348490",
+    "0001528153"
+   ]
+  },
+  "ADP": {
+   "form4_accessions_45d": 18,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "AFL": {
+   "form4_accessions_45d": 29,
+   "form4_accessions_0916_0922": 6,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "AGNC": {
+   "form4_accessions_45d": 1,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "AMAT": {
+   "form4_accessions_45d": 3,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "AMD": {
+   "form4_accessions_45d": 27,
+   "form4_accessions_0916_0922": 1,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "AVGO": {
+   "form4_accessions_45d": 2,
+   "form4_accessions_0916_0922": 2,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "BAC": {
+   "form4_accessions_45d": 3,
+   "form4_accessions_0916_0922": 1,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "BLK": {
+   "form4_accessions_45d": 0,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "C": {
+   "form4_accessions_45d": 0,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "CSCO": {
+   "form4_accessions_45d": 27,
+   "form4_accessions_0916_0922": 10,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "CVX": {
+   "form4_accessions_45d": 7,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "DELL": {
+   "form4_accessions_45d": 59,
+   "form4_accessions_0916_0922": 23,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "GOOGL": {
+   "form4_accessions_45d": 23,
+   "form4_accessions_0916_0922": 13,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "IBM": {
+   "form4_accessions_45d": 2,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "INTC": {
+   "form4_accessions_45d": 1,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 1,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": [
+    "0001008463"
+   ]
+  },
+  "JNJ": {
+   "form4_accessions_45d": 6,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "JPM": {
+   "form4_accessions_45d": 2,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "KO": {
+   "form4_accessions_45d": 3,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "MA": {
+   "form4_accessions_45d": 4,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "MCD": {
+   "form4_accessions_45d": 1,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "MSFT": {
+   "form4_accessions_45d": 40,
+   "form4_accessions_0916_0922": 5,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "MSTR": {
+   "form4_accessions_45d": 4,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "NUE": {
+   "form4_accessions_45d": 2,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "NVDA": {
+   "form4_accessions_45d": 11,
+   "form4_accessions_0916_0922": 5,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "ORCL": {
+   "form4_accessions_45d": 6,
+   "form4_accessions_0916_0922": 6,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "PG": {
+   "form4_accessions_45d": 50,
+   "form4_accessions_0916_0922": 5,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "PYPL": {
+   "form4_accessions_45d": 11,
+   "form4_accessions_0916_0922": 1,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "SHOP": {
+   "form4_accessions_45d": 0,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "STX": {
+   "form4_accessions_45d": 30,
+   "form4_accessions_0916_0922": 5,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "TSLA": {
+   "form4_accessions_45d": 1,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "UNH": {
+   "form4_accessions_45d": 3,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "V": {
+   "form4_accessions_45d": 7,
+   "form4_accessions_0916_0922": 0,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "VRT": {
+   "form4_accessions_45d": 3,
+   "form4_accessions_0916_0922": 1,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  },
+  "WMT": {
+   "form4_accessions_45d": 13,
+   "form4_accessions_0916_0922": 2,
+   "codeP_filings_45d": 0,
+   "codeP_filings_0916_0922": 0,
+   "codeP_owners_45d": []
+  }
+ },
+ "codeP_filings": [
+  {
+   "symbol": "ABCL",
+   "owner_cik": "0001352908",
+   "owner_name": "Hayden Michael R",
+   "accession": "0001628280-26-057007",
+   "event_id": "SEC:0001628280-26-057007:INSIDER_TRANSACTION",
+   "accepted_at_utc": "2026-08-14T15:50:16+00:00",
+   "ingested_at_utc": "2026-09-04T10:18:49.786573+00:00",
+   "transaction_date": "2026-08-12",
+   "is_amendment": 0
+  },
+  {
+   "symbol": "ABCL",
+   "owner_cik": "0001834411",
+   "owner_name": "Booth Andrew",
+   "accession": "0001834411-26-000008",
+   "event_id": "SEC:0001834411-26-000008:INSIDER_TRANSACTION",
+   "accepted_at_utc": "2026-08-14T16:04:25+00:00",
+   "ingested_at_utc": "2026-09-04T10:18:49.713736+00:00",
+   "transaction_date": "2026-08-14",
+   "is_amendment": 0
+  },
+  {
+   "symbol": "INTC",
+   "owner_cik": "0001008463",
+   "owner_name": "TAN LIP BU",
+   "accession": "0000050863-26-000177",
+   "event_id": "SEC:0000050863-26-000177:INSIDER_TRANSACTION",
+   "accepted_at_utc": "2026-08-14T20:27:15+00:00",
+   "ingested_at_utc": "2026-09-04T12:50:49.729711+00:00",
+   "transaction_date": "2026-08-11",
+   "is_amendment": 0
+  },
+  {
+   "symbol": "ABCL",
+   "owner_cik": "0001834423",
+   "owner_name": "Montalbano John S.",
+   "accession": "0001834423-26-000008",
+   "event_id": "SEC:0001834423-26-000008:INSIDER_TRANSACTION",
+   "accepted_at_utc": "2026-08-18T18:45:24+00:00",
+   "ingested_at_utc": "2026-09-04T10:18:49.668923+00:00",
+   "transaction_date": "2026-08-18",
+   "is_amendment": 0
+  },
+  {
+   "symbol": "ABCL",
+   "owner_cik": "0001352908",
+   "owner_name": "Hayden Michael R",
+   "accession": "0001628280-26-058684",
+   "event_id": "SEC:0001628280-26-058684:INSIDER_TRANSACTION",
+   "accepted_at_utc": "2026-08-24T21:21:48+00:00",
+   "ingested_at_utc": "2026-09-04T10:18:49.612837+00:00",
+   "transaction_date": "2026-08-24",
+   "is_amendment": 0
+  },
+  {
+   "symbol": "ADC",
+   "owner_cik": "0001528153",
+   "owner_name": "RAKOLTA JOHN JR",
+   "accession": "0001528153-26-000011",
+   "event_id": "SEC:0001528153-26-000011:INSIDER_TRANSACTION",
+   "accepted_at_utc": "2026-08-31T11:00:11+00:00",
+   "ingested_at_utc": "2026-09-04T10:38:14.005054+00:00",
+   "transaction_date": "2026-08-27",
+   "is_amendment": 0
+  },
+  {
+   "symbol": "ADC",
+   "owner_cik": "0001528153",
+   "owner_name": "RAKOLTA JOHN JR",
+   "accession": "0001528153-26-000013",
+   "event_id": "SEC:0001528153-26-000013:INSIDER_TRANSACTION",
+   "accepted_at_utc": "2026-09-02T20:05:28+00:00",
+   "ingested_at_utc": "2026-09-04T10:38:13.940532+00:00",
+   "transaction_date": "2026-08-31",
+   "is_amendment": 0
+  },
+  {
+   "symbol": "ADC",
+   "owner_cik": "0001348490",
+   "owner_name": "Agree Joey",
+   "accession": "0001348490-26-000006",
+   "event_id": "SEC:0001348490-26-000006:INSIDER_TRANSACTION",
+   "accepted_at_utc": "2026-09-17T11:00:24+00:00",
+   "ingested_at_utc": "2026-09-21T18:42:40.122770+00:00",
+   "transaction_date": "2026-09-16",
+   "is_amendment": 0
+  },
+  {
+   "symbol": "ADC",
+   "owner_cik": "0001528153",
+   "owner_name": "RAKOLTA JOHN JR",
+   "accession": "0001528153-26-000015",
+   "event_id": "SEC:0001528153-26-000015:INSIDER_TRANSACTION",
+   "accepted_at_utc": "2026-09-17T11:00:41+00:00",
+   "ingested_at_utc": "2026-09-21T18:42:40.039547+00:00",
+   "transaction_date": "2026-09-16",
+   "is_amendment": 0
+  }
+ ],
+ "codeP_value_rows": 10,
+ "ingest_by_day": [
+  {
+   "day": "2026-09-04",
+   "n": 7542,
+   "first": "2026-09-04T08:57:40.676020+00:00",
+   "last": "2026-09-04T21:03:55.822817+00:00"
+  },
+  {
+   "day": "2026-09-08",
+   "n": 3,
+   "first": "2026-09-08T07:09:18.142312+00:00",
+   "last": "2026-09-08T20:07:48.625071+00:00"
+  },
+  {
+   "day": "2026-09-09",
+   "n": 31,
+   "first": "2026-09-09T06:57:38.930618+00:00",
+   "last": "2026-09-09T20:13:19.949452+00:00"
+  },
+  {
+   "day": "2026-09-10",
+   "n": 20,
+   "first": "2026-09-10T07:44:42.508641+00:00",
+   "last": "2026-09-10T20:31:00.154109+00:00"
+  },
+  {
+   "day": "2026-09-11",
+   "n": 12,
+   "first": "2026-09-11T08:12:00.993340+00:00",
+   "last": "2026-09-11T08:12:10.139306+00:00"
+  },
+  {
+   "day": "2026-09-14",
+   "n": 9415,
+   "first": "2026-09-14T09:50:30.522115+00:00",
+   "last": "2026-09-14T23:58:58.331467+00:00"
+  },
+  {
+   "day": "2026-09-15",
+   "n": 17125,
+   "first": "2026-09-15T00:07:56.437953+00:00",
+   "last": "2026-09-15T20:46:43.649971+00:00"
+  },
+  {
+   "day": "2026-09-21",
+   "n": 98,
+   "first": "2026-09-21T18:42:37.993633+00:00",
+   "last": "2026-09-21T18:53:33.190731+00:00"
+  },
+  {
+   "day": "2026-09-22",
+   "n": 7,
+   "first": "2026-09-22T06:51:55.474338+00:00",
+   "last": "2026-09-22T06:51:56.220810+00:00"
+  }
+ ],
+ "classes_seen": [
+  "A|GRANT_OR_AWARD",
+  "C|EXERCISE_OR_CONVERSION",
+  "D|SALE_OR_DISPOSITION_TO_ISSUER",
+  "F|TAX_WITHHOLDING",
+  "G|GIFT",
+  "I|PLAN_DISCRETIONARY",
+  "J|OTHER_ACQ_DISP",
+  "M|EXERCISE_OR_CONVERSION",
+  "None|INITIAL_HOLDING",
+  "P|OPEN_MARKET_PURCHASE",
+  "S|OPEN_MARKET_SALE"
+ ],
+ "form4_source_records": 10,
+ "ledger": {
+  "campaign": {
+   "campaign_id": "V2-PAPER-RC1",
+   "created_at_utc": "2026-09-21T18:38:19.350731+00:00"
+  },
+  "processed_episodes": [
+   {
+    "episode_id": "07242bc857569f60",
+    "symbol": "ABCL",
+    "issuer_cik": "0001703057",
+    "activation_filing_date": "",
+    "eligible_entry_session": "2026-08-17",
+    "disposition": "SKIPPED_ENTRY_STALE",
+    "detail": "eligible 2026-08-17 > 3 sessions before 2026-09-21",
+    "first_seen_at": "2026-09-21T19:42:34.361901+01:00",
+    "updated_at": "2026-09-21T19:42:34.361901+01:00"
+   },
+   {
+    "episode_id": "19f814d1f3ec3250",
+    "symbol": "ADC",
+    "issuer_cik": "0000917251",
+    "activation_filing_date": "",
+    "eligible_entry_session": "2026-09-18",
+    "disposition": "SKIPPED_NO_PRIOR_INTENT",
+    "detail": "no durable PENDING intent existed before this tick's OPEN phase, and the intent-creation window has closed -- a cold-start entry is never admitted (Task 131 Directive 2; TALONX_V2_DURABLE_STORE_ENABLED=true)",
+    "first_seen_at": "2026-09-21T19:45:03.698300+01:00",
+    "updated_at": "2026-09-21T19:45:03.698300+01:00"
+   }
+  ],
+  "intents": [],
+  "v2_alert_outbox": [],
+  "positions": 0,
+  "trades": 0,
+  "cash": 100000.0
+ },
+ "clusters": [
+  {
+   "episode_id": "07242bc857569f60",
+   "symbol": "ABCL",
+   "issuer_cik": "0001703057",
+   "owners": [
+    "0001352908",
+    "0001834411"
+   ],
+   "n_filings": 2,
+   "first_filing_date": "2026-08-14",
+   "activation_filing_date": "2026-08-14",
+   "filings": [
+    {
+     "symbol": "ABCL",
+     "owner_cik": "0001352908",
+     "owner_name": "Hayden Michael R",
+     "accession": "0001628280-26-057007",
+     "event_id": "SEC:0001628280-26-057007:INSIDER_TRANSACTION",
+     "accepted_at_utc": "2026-08-14T15:50:16+00:00",
+     "ingested_at_utc": "2026-09-04T10:18:49.786573+00:00",
+     "transaction_date": "2026-08-12",
+     "is_amendment": 0
+    },
+    {
+     "symbol": "ABCL",
+     "owner_cik": "0001834411",
+     "owner_name": "Booth Andrew",
+     "accession": "0001834411-26-000008",
+     "event_id": "SEC:0001834411-26-000008:INSIDER_TRANSACTION",
+     "accepted_at_utc": "2026-08-14T16:04:25+00:00",
+     "ingested_at_utc": "2026-09-04T10:18:49.713736+00:00",
+     "transaction_date": "2026-08-14",
+     "is_amendment": 0
+    }
+   ],
+   "activation_sec_accepted_utc": "2026-08-14T15:50:16+00:00",
+   "activation_received_utc": "2026-09-04T10:18:49.786573+00:00",
+   "entry_session": "2026-08-17",
+   "entry_rth_open_utc": "2026-08-17T13:30:00+00:00",
+   "planned_exit_session": "2026-08-31",
+   "received_before_open": false,
+   "sec_before_open": true,
+   "talonx_runs_in_actionable_window": [],
+   "entry_before_campaign": true,
+   "ledger_disposition": {
+    "episode_id": "07242bc857569f60",
+    "symbol": "ABCL",
+    "issuer_cik": "0001703057",
+    "activation_filing_date": "",
+    "eligible_entry_session": "2026-08-17",
+    "disposition": "SKIPPED_ENTRY_STALE",
+    "detail": "eligible 2026-08-17 > 3 sessions before 2026-09-21",
+    "first_seen_at": "2026-09-21T19:42:34.361901+01:00",
+    "updated_at": "2026-09-21T19:42:34.361901+01:00"
+   },
+   "intent": [],
+   "aggregate_purchase_value": 864937.19
+  },
+  {
+   "episode_id": "19f814d1f3ec3250",
+   "symbol": "ADC",
+   "issuer_cik": "0000917251",
+   "owners": [
+    "0001528153",
+    "0001348490"
+   ],
+   "n_filings": 3,
+   "first_filing_date": "2026-09-02",
+   "activation_filing_date": "2026-09-17",
+   "filings": [
+    {
+     "symbol": "ADC",
+     "owner_cik": "0001528153",
+     "owner_name": "RAKOLTA JOHN JR",
+     "accession": "0001528153-26-000013",
+     "event_id": "SEC:0001528153-26-000013:INSIDER_TRANSACTION",
+     "accepted_at_utc": "2026-09-02T20:05:28+00:00",
+     "ingested_at_utc": "2026-09-04T10:38:13.940532+00:00",
+     "transaction_date": "2026-08-31",
+     "is_amendment": 0
+    },
+    {
+     "symbol": "ADC",
+     "owner_cik": "0001348490",
+     "owner_name": "Agree Joey",
+     "accession": "0001348490-26-000006",
+     "event_id": "SEC:0001348490-26-000006:INSIDER_TRANSACTION",
+     "accepted_at_utc": "2026-09-17T11:00:24+00:00",
+     "ingested_at_utc": "2026-09-21T18:42:40.122770+00:00",
+     "transaction_date": "2026-09-16",
+     "is_amendment": 0
+    },
+    {
+     "symbol": "ADC",
+     "owner_cik": "0001528153",
+     "owner_name": "RAKOLTA JOHN JR",
+     "accession": "0001528153-26-000015",
+     "event_id": "SEC:0001528153-26-000015:INSIDER_TRANSACTION",
+     "accepted_at_utc": "2026-09-17T11:00:41+00:00",
+     "ingested_at_utc": "2026-09-21T18:42:40.039547+00:00",
+     "transaction_date": "2026-09-16",
+     "is_amendment": 0
+    }
+   ],
+   "activation_sec_accepted_utc": "2026-09-17T11:00:24+00:00",
+   "activation_received_utc": "2026-09-21T18:42:40.122770+00:00",
+   "entry_session": "2026-09-18",
+   "entry_rth_open_utc": "2026-09-18T13:30:00+00:00",
+   "planned_exit_session": "2026-10-02",
+   "received_before_open": false,
+   "sec_before_open": true,
+   "talonx_runs_in_actionable_window": [],
+   "entry_before_campaign": true,
+   "ledger_disposition": {
+    "episode_id": "19f814d1f3ec3250",
+    "symbol": "ADC",
+    "issuer_cik": "0000917251",
+    "activation_filing_date": "",
+    "eligible_entry_session": "2026-09-18",
+    "disposition": "SKIPPED_NO_PRIOR_INTENT",
+    "detail": "no durable PENDING intent existed before this tick's OPEN phase, and the intent-creation window has closed -- a cold-start entry is never admitted (Task 131 Directive 2; TALONX_V2_DURABLE_STORE_ENABLED=true)",
+    "first_seen_at": "2026-09-21T19:45:03.698300+01:00",
+    "updated_at": "2026-09-21T19:45:03.698300+01:00"
+   },
+   "intent": [],
+   "aggregate_purchase_value": 2600721.6
+  }
+ ],
+ "sip_errors": {},
+ "sip_rejected": [],
+ "sip_fetched_at_utc": "2026-09-22T21:00:07.170125+00:00",
+ "sip_adapter": "alpaca:sip:1Day:adjustment=split"
+}
