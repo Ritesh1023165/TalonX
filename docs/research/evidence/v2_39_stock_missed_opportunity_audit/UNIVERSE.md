@@ -14,7 +14,7 @@ Column notes:
 - **Form 4 (45d lookback):** distinct accessions accepted since 2026-08-08, the live companion's `--live-lookback-days 45` window.
 - **09-16..09-22 (store):** accessions accepted on or after 2026-09-16.
 - **at SEC:** the same count read from SEC EDGAR submissions JSON at 2026-09-22 ~21:05Z. The only difference (+6) is filings accepted after the stack stopped; see README §4.
-- Acceptance dates use SEC's New York wall-clock date (see README finding F1).
+- Acceptance-date counts use the stored `accepted_at_utc` date. *Correction:* that field has mixed ET/UTC semantics (README F1, superseded), which can move an evening-ET filing by one calendar day in these per-window counts. The SEC `filingDate` backfill (`../v2_sec_filing_date_release_fix/`) is authoritative.
 
 | # | Symbol | Issuer | Issuer CIK | In enforced scope 09-21 & 09-22 | Form 4 filings (45d lookback) | Form 4 filings 09-16..09-22 (store) | Form 4 at SEC 09-16..now | Code-P filings (45d) | Code-P 09-16..09-22 | Distinct code-P owners (45d) |
 |---|---|---|---|---|---|---|---|---|---|---|

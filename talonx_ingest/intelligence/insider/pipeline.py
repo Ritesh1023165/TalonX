@@ -209,6 +209,7 @@ def ingest_form4_xml(
     form_type_hint: str | None = None,
     source_url: str | None = None,
     now: datetime | None = None,
+    filing_date: date | None = None,
 ) -> InsiderIngestResult:
     now = now or utc_now()
     acc = normalize_accession(accession)
@@ -221,6 +222,7 @@ def ingest_form4_xml(
         source_reference=(source_url and f"SEC_EDGAR_ARCHIVES:{source_url}")
         or f"SEC_EDGAR_ARCHIVES:{acc}",
         ingested_at_utc=now,
+        filing_date=filing_date,
     )
     out = InsiderIngestResult(filings_seen=1)
     eid = None

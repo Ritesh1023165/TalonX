@@ -268,6 +268,7 @@ class Backfill:
                 form_type=nf.form, accepted_at_utc=nf.acceptance_datetime,
                 primary_document=nf.primary_document,
                 cache_dir=self.config.state_dir / "form_ownership_xml_cache",
+                filing_date=nf.filing_date,
             )
             if outcome.ok:
                 sr.ownership_filings += 1

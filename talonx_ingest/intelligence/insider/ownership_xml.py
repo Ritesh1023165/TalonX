@@ -10,7 +10,7 @@ parser produces, so a filing seen through both routes deduplicates.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from xml.etree import ElementTree as ET
 
 from talonx_ingest.intelligence.identity import normalize_accession
@@ -85,6 +85,7 @@ def parse_ownership_xml(
     form_type_hint: str | None = None,
     source_reference: str | None = None,
     ingested_at_utc: datetime | None = None,
+    filing_date: date | None = None,
 ) -> tuple[InsiderFiling, list[InsiderTransaction]]:
     from talonx_ingest.intelligence.domain import utc_now
 
@@ -137,7 +138,9 @@ def parse_ownership_xml(
         owners = [OwnerContext(owner_cik=None, owner_name="")]
     primary = owners[0]
 
-    filed_date = None  # ownership XML has no filing_date element; comes from submissions/context
+    # The ownership XML has no filing-date element; SEC's authoritative `filingDate` comes from the
+    # submissions feed via the caller. Never derived from accepted_at_utc (its SEC semantics are unstable).
+    filed_date = filing_date
     fc_flags: list[str] = []
     if accepted_at_utc is None:
         fc_flags.append(InsiderQualityFlag.FILING_DATE_USED_AS_ACCEPTANCE.value)

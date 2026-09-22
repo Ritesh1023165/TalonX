@@ -79,6 +79,7 @@ async def replay_filing(
                     cik=cik, accession=accession, symbol=symbol,
                     form_type=match.form, accepted_at_utc=match.acceptance_datetime,
                     primary_document=match.primary_document,
+                    filing_date=match.filing_date,
                 )
                 eid = make_event_id(
                     SourceType.SEC_EDGAR_SUBMISSIONS, accession, EventType.INSIDER_TRANSACTION

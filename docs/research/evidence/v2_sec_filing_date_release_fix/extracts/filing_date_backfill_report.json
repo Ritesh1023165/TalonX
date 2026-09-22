@@ -1,0 +1,29 @@
+{
+ "db_path": "~/.talonx/ingestion_ledger.db",
+ "applied": true,
+ "run_at_utc": "2026-09-22T22:10:45.992773+00:00",
+ "rows": {
+  "insider_filings": {
+   "total": 34253,
+   "already_populated": 0,
+   "backfilled": 34253,
+   "unresolved": 0
+  },
+  "insider_transactions": {
+   "total": 115461,
+   "already_populated": 0,
+   "backfilled": 115461,
+   "unresolved": 0
+  }
+ },
+ "accessions_missing": 34253,
+ "accessions_resolved": 34253,
+ "resolved_by_source": {
+  "persisted_text_events": 0,
+  "sec_submissions_filingDate": 34253
+ },
+ "accessions_unresolved": 0,
+ "unresolved_sample": [],
+ "unresolved_code_p_accessions": [],
+ "cik_errors": {}
+}

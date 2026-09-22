@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from talonx_ingest.config import settings
@@ -106,6 +106,7 @@ async def ingest_form_ownership(
     primary_document: str | None = None,
     cache_dir: Path | None = None,
     enforce_issuer_identity: bool = True,
+    filing_date: date | None = None,
 ) -> OwnershipIngestOutcome:
     """``enforce_issuer_identity`` (Task 131 Directive 4, default ON): once
     the ownership XML is retrieved, its OWN declared ``issuerCik`` is
@@ -174,7 +175,8 @@ async def ingest_form_ownership(
         try:
             probe_filing, _probe_txns = parse_ownership_xml(
                 xml, accession=accession, accepted_at_utc=accepted_at_utc,
-                symbol_hint=symbol, form_type_hint=form_type, source_reference=xml_url)
+                symbol_hint=symbol, form_type_hint=form_type, source_reference=xml_url,
+                filing_date=filing_date)
         except Exception as exc:  # noqa: BLE001
             return OwnershipIngestOutcome(accession, symbol, False, from_cache=from_cache,
                                          error=f"identity pre-parse: {exc}", xml_url=xml_url,
@@ -194,7 +196,7 @@ async def ingest_form_ownership(
         r1 = ingest_form4_xml(
             insider_store, xml, accession=accession, accepted_at_utc=accepted_at_utc,
             event_store=event_store, symbol_hint=symbol, form_type_hint=form_type,
-            source_url=xml_url,
+            source_url=xml_url, filing_date=filing_date,
         )
     except Exception as exc:  # noqa: BLE001
         return OwnershipIngestOutcome(accession, symbol, False, from_cache=from_cache,
