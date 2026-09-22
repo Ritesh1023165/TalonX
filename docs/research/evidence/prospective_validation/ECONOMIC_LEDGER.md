@@ -10,12 +10,12 @@ Update it after every session's EOD reconciliation, from the ledger (`v2_release
 
 Use one row per cluster that reached ≥2 distinct owners. The category column comes from the taxonomy in [README.md](README.md) §2.
 
-SEC acceptance times are New York wall clock (the stored `accepted_at_utc` is ET, per audit F1). Receipt times are UTC. Only ACTUAL campaign outcomes go here; hypothetical outcomes for missed opportunities are kept separately in [v2_39_stock_missed_opportunity_audit/ECONOMIC_OUTCOMES.md](../v2_39_stock_missed_opportunity_audit/ECONOMIC_OUTCOMES.md).
+SEC acceptance times are shown in New York time (ET), taken from SEC's raw filing header; the stored `accepted_at_utc` has mixed legacy semantics (corrected; see `../v2_sec_filing_date_release_fix/`). Receipt times are UTC. Only ACTUAL campaign outcomes go here; hypothetical outcomes for missed opportunities are kept separately in [v2_39_stock_missed_opportunity_audit/ECONOMIC_OUTCOMES.md](../v2_39_stock_missed_opportunity_audit/ECONOMIC_OUTCOMES.md).
 
 | Cluster | Symbol | Activation (SEC-accepted, ET) | Durable receipt (UTC) | Entry session | Category | Admission result | Fill price | Shares | Capital used | Exit target session | Actual exit (session / price) | Realized price P&L | Dividends | Total return | R | Reason if not traded |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `07242bc857569f60` | ABCL | 2026-08-14 16:04:25 ET | 2026-09-04 10:18:49Z | 2026-08-17 | `MISSED_DUE_TO_INGESTION_DOWNTIME` (pre-campaign; ingestion not yet deployed) | `SKIPPED_ENTRY_STALE` | — | — | — | — | — | — | — | — | n/a | entry session predated the campaign and insider ingestion (first ran 09-04); stale |
-| `19f814d1f3ec3250` | ADC | 2026-09-17 11:00:24 ET | 2026-09-21 18:42:40Z | 2026-09-18 | `MISSED_DUE_TO_INGESTION_DOWNTIME` (pre-campaign) | `SKIPPED_NO_PRIOR_INTENT` (intent path NOT_REACHED) | — | — | — | — | — | — | — | — | n/a | filing received after the entry session; ingester offline 09-16 to 09-20; campaign created 09-21 |
+| `07242bc857569f60` | ABCL | 2026-08-14 12:04:25 ET | 2026-09-04 10:18:49Z | 2026-08-17 | `MISSED_DUE_TO_INGESTION_DOWNTIME` (pre-campaign; ingestion not yet deployed) | `SKIPPED_ENTRY_STALE` | — | — | — | — | — | — | — | — | n/a | entry session predated the campaign and insider ingestion (first ran 09-04); stale |
+| `19f814d1f3ec3250` | ADC | 2026-09-17 07:00:24 ET | 2026-09-21 18:42:40Z | 2026-09-18 | `MISSED_DUE_TO_INGESTION_DOWNTIME` (pre-campaign) | `SKIPPED_NO_PRIOR_INTENT` (intent path NOT_REACHED) | — | — | — | — | — | — | — | — | n/a | filing received after the entry session; ingester offline 09-16 to 09-20; campaign created 09-21 |
 
 "R" is not supported: V2@1 has no stop (`stop_loss_enabled=False`), so no risk unit is defined. Report percentage return on capital used instead, and leave R as `n/a`.
 
