@@ -1,0 +1,186 @@
+{
+ "checked_at_utc": "2026-09-22T21:01:38Z",
+ "symbols": {
+  "AAPL": 1,
+  "ABCL": 0,
+  "ABT": 0,
+  "ACHR": 0,
+  "ADC": 2,
+  "ADP": 0,
+  "AFL": 7,
+  "AGNC": 0,
+  "AMAT": 0,
+  "AMD": 1,
+  "AVGO": 2,
+  "BAC": 1,
+  "BLK": 0,
+  "C": 0,
+  "CSCO": 10,
+  "CVX": 0,
+  "DELL": 26,
+  "GOOGL": 13,
+  "IBM": 0,
+  "INTC": 0,
+  "JNJ": 0,
+  "JPM": 0,
+  "KO": 0,
+  "MA": 0,
+  "MCD": 0,
+  "MSFT": 5,
+  "MSTR": 0,
+  "NUE": 0,
+  "NVDA": 6,
+  "ORCL": 6,
+  "PG": 5,
+  "PYPL": 1,
+  "SHOP": 0,
+  "STX": 6,
+  "TSLA": 0,
+  "UNH": 0,
+  "V": 0,
+  "VRT": 1,
+  "WMT": 2
+ },
+ "missing_in_store": [
+  {
+   "symbol": "AFL",
+   "form": "4",
+   "accession": "0001104659-26-109651",
+   "accepted": "2026-09-22T16:27:06.000Z"
+  },
+  {
+   "symbol": "DELL",
+   "form": "4",
+   "accession": "0001193125-26-397994",
+   "accepted": "2026-09-22T16:30:09.000Z"
+  },
+  {
+   "symbol": "DELL",
+   "form": "4",
+   "accession": "0001193125-26-397993",
+   "accepted": "2026-09-22T16:30:06.000Z"
+  },
+  {
+   "symbol": "DELL",
+   "form": "4",
+   "accession": "0001193125-26-397990",
+   "accepted": "2026-09-22T16:30:04.000Z"
+  },
+  {
+   "symbol": "NVDA",
+   "form": "4",
+   "accession": "0001199039-26-000016",
+   "accepted": "2026-09-22T16:56:23.000Z"
+  },
+  {
+   "symbol": "STX",
+   "form": "4",
+   "accession": "0001137789-26-000256",
+   "accepted": "2026-09-22T16:49:47.000Z"
+  }
+ ],
+ "after_stop_filings": [],
+ "errors": {},
+ "sec_form4_total_0916_now": 95,
+ "post_stop_filing_codes": [
+  {
+   "symbol": "AFL",
+   "form": "4",
+   "accession": "0001104659-26-109651",
+   "accepted": "2026-09-22T16:27:06.000Z",
+   "accepted_true_utc_note": "acceptance is ET; +4h for UTC",
+   "owner_cik": "0001783464",
+   "transaction_codes": [
+    "S",
+    "S"
+   ]
+  },
+  {
+   "symbol": "DELL",
+   "form": "4",
+   "accession": "0001193125-26-397994",
+   "accepted": "2026-09-22T16:30:09.000Z",
+   "accepted_true_utc_note": "acceptance is ET; +4h for UTC",
+   "owner_cik": "0001552054",
+   "transaction_codes": [
+    "J",
+    "S",
+    "S",
+    "S",
+    "S"
+   ]
+  },
+  {
+   "symbol": "DELL",
+   "form": "4",
+   "accession": "0001193125-26-397993",
+   "accepted": "2026-09-22T16:30:06.000Z",
+   "accepted_true_utc_note": "acceptance is ET; +4h for UTC",
+   "owner_cik": "0001767114",
+   "transaction_codes": [
+    "J"
+   ]
+  },
+  {
+   "symbol": "DELL",
+   "form": "4",
+   "accession": "0001193125-26-397990",
+   "accepted": "2026-09-22T16:30:04.000Z",
+   "accepted_true_utc_note": "acceptance is ET; +4h for UTC",
+   "owner_cik": "0001737659",
+   "transaction_codes": [
+    "J"
+   ]
+  },
+  {
+   "symbol": "NVDA",
+   "form": "4",
+   "accession": "0001199039-26-000016",
+   "accepted": "2026-09-22T16:56:23.000Z",
+   "accepted_true_utc_note": "acceptance is ET; +4h for UTC",
+   "owner_cik": "0001199039",
+   "transaction_codes": [
+    "S",
+    "S"
+   ]
+  },
+  {
+   "symbol": "STX",
+   "form": "4",
+   "accession": "0001137789-26-000256",
+   "accepted": "2026-09-22T16:49:47.000Z",
+   "accepted_true_utc_note": "acceptance is ET; +4h for UTC",
+   "owner_cik": "0001988271",
+   "transaction_codes": [
+    "M",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "S",
+    "M"
+   ]
+  }
+ ]
+}

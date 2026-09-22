@@ -1,0 +1,375 @@
+{
+ "sip_fetched_at_utc": "2026-09-22T21:00:07.170125+00:00",
+ "bar_0921_final": true,
+ "bar_0922_final": false,
+ "economics": [
+  {
+   "episode_id": "07242bc857569f60",
+   "symbol": "ABCL",
+   "entry_session": "2026-08-17",
+   "planned_exit_session": "2026-08-31",
+   "liquidity": {
+    "ok": true,
+    "reason": "PASS",
+    "last_close": 11.38,
+    "median_dollar_volume": 32399585.45,
+    "n_sessions": 20
+   },
+   "entry_bar": {
+    "date": "2026-08-17",
+    "open": 11.3,
+    "high": 11.645,
+    "low": 10.6044,
+    "close": 11.2,
+    "volume": 7836508.0,
+    "_source_timestamp": "2026-08-17T04:00:00Z",
+    "_adjustment_state": "SPLIT_ADJUSTED",
+    "_basis_as_of": "2026-09-22",
+    "_feed": "sip",
+    "_receipt_timestamp": "2026-09-22T20:59:52.118791+00:00"
+   },
+   "entry_bar_final": true,
+   "sizing": {
+    "shares": 884,
+    "entry_total": 9989.2,
+    "reason": "OK"
+   },
+   "exit": {
+    "status": "CLOSED_HYPOTHETICAL",
+    "exit_close": 11.48,
+    "pnl_usd": 159.12,
+    "pnl_pct": 1.592920353982301
+   },
+   "corporate_actions": {
+    "ok": true,
+    "events": [],
+    "error": null
+   }
+  },
+  {
+   "episode_id": "19f814d1f3ec3250",
+   "symbol": "ADC",
+   "entry_session": "2026-09-18",
+   "planned_exit_session": "2026-10-02",
+   "liquidity": {
+    "ok": true,
+    "reason": "PASS",
+    "last_close": 68.16,
+    "median_dollar_volume": 93603742.675,
+    "n_sessions": 20
+   },
+   "entry_bar": {
+    "date": "2026-09-18",
+    "open": 68.27,
+    "high": 68.46,
+    "low": 67.7,
+    "close": 68.05,
+    "volume": 3168325.0,
+    "_source_timestamp": "2026-09-18T04:00:00Z",
+    "_adjustment_state": "SPLIT_ADJUSTED",
+    "_basis_as_of": "2026-09-22",
+    "_feed": "sip",
+    "_receipt_timestamp": "2026-09-22T20:59:53.163663+00:00"
+   },
+   "entry_bar_final": true,
+   "sizing": {
+    "shares": 146,
+    "entry_total": 9967.42,
+    "reason": "OK"
+   },
+   "exit": {
+    "status": "OPEN_HYPOTHETICAL (exit session not reached)",
+    "mtm_final_session": "2026-09-21",
+    "mtm_final_close": 67.62,
+    "mtm_final_pnl_usd": -94.9,
+    "mtm_final_pnl_pct": -0.9521019481470632,
+    "mtm_provisional_session": "2026-09-22",
+    "mtm_provisional_close": 67.32,
+    "mtm_provisional_pnl_usd": -138.7,
+    "mtm_provisional_pnl_pct": -1.3915336165226306
+   },
+   "corporate_actions": {
+    "ok": true,
+    "events": [
+     "CorporateActionEvent(action_key='DIV|ADC|2026-08-31|0.267', symbol='ADC', kind='CASH_DIVIDEND', provider_type='cash_dividends', ex_date=datetime.date(2026, 8, 31), ratio=None, cash_rate='0.267', source='alpaca:v1/corporate-actions', provider_id='edcc5231-4bea-45f7-b6c0-c84bac068f3f', received_at_utc='2026-09-22T21:04:45.851935+00:00', raw={'cusip': '008492100', 'ex_date': '2026-08-31', 'foreign': False, 'id': 'edcc5231-4bea-45f7-b6c0-c84bac068f3f', 'payable_date': '2026-09-15', 'process_date': '2026-09-15', 'rate': 0.267, 'record_date': '2026-08-31', 'special': False, 'symbol': 'ADC'}, malformed=None, payable_date=datetime.date(2026, 9, 15), record_date=datetime.date(2026, 8, 31))"
+    ],
+    "error": null
+   }
+  }
+ ],
+ "price_context": [
+  {
+   "symbol": "AAPL",
+   "prior_close_0921": 338.98,
+   "open_0922": 340.135,
+   "close_0922": 339.75,
+   "pct_0922_vs_prior_close": 0.23
+  },
+  {
+   "symbol": "ABCL",
+   "prior_close_0921": 12.66,
+   "open_0922": 12.56,
+   "close_0922": 12.65,
+   "pct_0922_vs_prior_close": -0.08
+  },
+  {
+   "symbol": "ABT",
+   "prior_close_0921": 102.98,
+   "open_0922": 104.01,
+   "close_0922": 103.69,
+   "pct_0922_vs_prior_close": 0.69
+  },
+  {
+   "symbol": "ACHR",
+   "prior_close_0921": 5.43,
+   "open_0922": 5.6,
+   "close_0922": 5.69,
+   "pct_0922_vs_prior_close": 4.79
+  },
+  {
+   "symbol": "ADC",
+   "prior_close_0921": 67.62,
+   "open_0922": 67.66,
+   "close_0922": 67.32,
+   "pct_0922_vs_prior_close": -0.44
+  },
+  {
+   "symbol": "ADP",
+   "prior_close_0921": 269.94,
+   "open_0922": 271.18,
+   "close_0922": 269.64,
+   "pct_0922_vs_prior_close": -0.11
+  },
+  {
+   "symbol": "AFL",
+   "prior_close_0921": 115.18,
+   "open_0922": 115.02,
+   "close_0922": 114.6,
+   "pct_0922_vs_prior_close": -0.5
+  },
+  {
+   "symbol": "AGNC",
+   "prior_close_0921": 9.97,
+   "open_0922": 10.04,
+   "close_0922": 10.09,
+   "pct_0922_vs_prior_close": 1.2
+  },
+  {
+   "symbol": "AMAT",
+   "prior_close_0921": 464.24,
+   "open_0922": 457.9,
+   "close_0922": 472.46,
+   "pct_0922_vs_prior_close": 1.77
+  },
+  {
+   "symbol": "AMD",
+   "prior_close_0921": 615.52,
+   "open_0922": 606.565,
+   "close_0922": 623.77,
+   "pct_0922_vs_prior_close": 1.34
+  },
+  {
+   "symbol": "AVGO",
+   "prior_close_0921": 362.66,
+   "open_0922": 363.23,
+   "close_0922": 364.54,
+   "pct_0922_vs_prior_close": 0.52
+  },
+  {
+   "symbol": "BAC",
+   "prior_close_0921": 57.96,
+   "open_0922": 58.1,
+   "close_0922": 56.2,
+   "pct_0922_vs_prior_close": -3.04
+  },
+  {
+   "symbol": "BLK",
+   "prior_close_0921": 1090.27,
+   "open_0922": 1089.94,
+   "close_0922": 1066.66,
+   "pct_0922_vs_prior_close": -2.17
+  },
+  {
+   "symbol": "C",
+   "prior_close_0921": 135.05,
+   "open_0922": 134.87,
+   "close_0922": 132.47,
+   "pct_0922_vs_prior_close": -1.91
+  },
+  {
+   "symbol": "CSCO",
+   "prior_close_0921": 111.46,
+   "open_0922": 110.275,
+   "close_0922": 106.44,
+   "pct_0922_vs_prior_close": -4.5
+  },
+  {
+   "symbol": "CVX",
+   "prior_close_0921": 203.67,
+   "open_0922": 201.87,
+   "close_0922": 202.41,
+   "pct_0922_vs_prior_close": -0.62
+  },
+  {
+   "symbol": "DELL",
+   "prior_close_0921": 575.31,
+   "open_0922": 569.8,
+   "close_0922": 548.92,
+   "pct_0922_vs_prior_close": -4.59
+  },
+  {
+   "symbol": "GOOGL",
+   "prior_close_0921": 354.97,
+   "open_0922": 357.65,
+   "close_0922": 351.16,
+   "pct_0922_vs_prior_close": -1.07
+  },
+  {
+   "symbol": "IBM",
+   "prior_close_0921": 231.93,
+   "open_0922": 234.47,
+   "close_0922": 231.38,
+   "pct_0922_vs_prior_close": -0.24
+  },
+  {
+   "symbol": "INTC",
+   "prior_close_0921": 121.78,
+   "open_0922": 120.15,
+   "close_0922": 123.86,
+   "pct_0922_vs_prior_close": 1.71
+  },
+  {
+   "symbol": "JNJ",
+   "prior_close_0921": 269.47,
+   "open_0922": 267.51,
+   "close_0922": 269.19,
+   "pct_0922_vs_prior_close": -0.1
+  },
+  {
+   "symbol": "JPM",
+   "prior_close_0921": 352.04,
+   "open_0922": 352.0,
+   "close_0922": 340.0,
+   "pct_0922_vs_prior_close": -3.42
+  },
+  {
+   "symbol": "KO",
+   "prior_close_0921": 87.12,
+   "open_0922": 87.6,
+   "close_0922": 88.61,
+   "pct_0922_vs_prior_close": 1.71
+  },
+  {
+   "symbol": "MA",
+   "prior_close_0921": 567.65,
+   "open_0922": 571.18,
+   "close_0922": 555.89,
+   "pct_0922_vs_prior_close": -2.07
+  },
+  {
+   "symbol": "MCD",
+   "prior_close_0921": 247.88,
+   "open_0922": 250.68,
+   "close_0922": 250.35,
+   "pct_0922_vs_prior_close": 1.0
+  },
+  {
+   "symbol": "MSFT",
+   "prior_close_0921": 501.61,
+   "open_0922": 507.32,
+   "close_0922": 498.0,
+   "pct_0922_vs_prior_close": -0.72
+  },
+  {
+   "symbol": "MSTR",
+   "prior_close_0921": 168.5,
+   "open_0922": 167.545,
+   "close_0922": 167.33,
+   "pct_0922_vs_prior_close": -0.69
+  },
+  {
+   "symbol": "NUE",
+   "prior_close_0921": 242.4,
+   "open_0922": 241.5,
+   "close_0922": 245.66,
+   "pct_0922_vs_prior_close": 1.34
+  },
+  {
+   "symbol": "NVDA",
+   "prior_close_0921": 227.38,
+   "open_0922": 226.85,
+   "close_0922": 228.87,
+   "pct_0922_vs_prior_close": 0.66
+  },
+  {
+   "symbol": "ORCL",
+   "prior_close_0921": 148.56,
+   "open_0922": 151.25,
+   "close_0922": 149.2,
+   "pct_0922_vs_prior_close": 0.43
+  },
+  {
+   "symbol": "PG",
+   "prior_close_0921": 146.08,
+   "open_0922": 147.42,
+   "close_0922": 148.22,
+   "pct_0922_vs_prior_close": 1.46
+  },
+  {
+   "symbol": "PYPL",
+   "prior_close_0921": 52.62,
+   "open_0922": 53.2,
+   "close_0922": 52.89,
+   "pct_0922_vs_prior_close": 0.51
+  },
+  {
+   "symbol": "SHOP",
+   "prior_close_0921": 137.92,
+   "open_0922": 144.55,
+   "close_0922": 147.74,
+   "pct_0922_vs_prior_close": 7.12
+  },
+  {
+   "symbol": "STX",
+   "prior_close_0921": 877.325,
+   "open_0922": 857.69,
+   "close_0922": 919.84,
+   "pct_0922_vs_prior_close": 4.85
+  },
+  {
+   "symbol": "TSLA",
+   "prior_close_0921": 375.3,
+   "open_0922": 379.069,
+   "close_0922": 378.9,
+   "pct_0922_vs_prior_close": 0.96
+  },
+  {
+   "symbol": "UNH",
+   "prior_close_0921": 377.56,
+   "open_0922": 381.39,
+   "close_0922": 372.95,
+   "pct_0922_vs_prior_close": -1.22
+  },
+  {
+   "symbol": "V",
+   "prior_close_0921": 369.95,
+   "open_0922": 371.76,
+   "close_0922": 362.04,
+   "pct_0922_vs_prior_close": -2.14
+  },
+  {
+   "symbol": "VRT",
+   "prior_close_0921": 250.86,
+   "open_0922": 250.3,
+   "close_0922": 253.46,
+   "pct_0922_vs_prior_close": 1.04
+  },
+  {
+   "symbol": "WMT",
+   "prior_close_0921": 107.44,
+   "open_0922": 108.12,
+   "close_0922": 110.12,
+   "pct_0922_vs_prior_close": 2.49
+  }
+ ]
+}
