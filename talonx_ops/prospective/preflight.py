@@ -104,6 +104,22 @@ FREEZE_OPS_HARDENING_FILES = (
     "talonx_v2/release_gate.py",
     "talonx_v2/run.py",
 )
+# POST-FREEZE RELEASE-FIDELITY FIX (SEC filing date) -- an EXPLICIT, closed list. SEC's submissions feed serves a fresh
+# filing's acceptanceDateTime as New York wall-clock labelled `Z` and rewrites it to true UTC hours later, so V2's
+# filing date must come from SEC `filingDate` (persisted on ingest, backfilled for history, fail-closed in release
+# mode) and never from accepted_at_utc.date(). Ingestion plumbing + the V2 form-4 reader/service only: no strategy-
+# fingerprint file, no provider/pricing/accounting/ledger file (guarded by a test). Any other runtime change is NO_GO.
+FREEZE_RELEASE_FIDELITY_FIX_FILES = (
+    "talonx_ingest/intelligence/insider/ownership_xml.py",
+    "talonx_ingest/intelligence/insider/pipeline.py",
+    "talonx_ingest/intelligence/insider/filing_date_backfill.py",
+    "talonx_ingest/intelligence/service/_insider.py",
+    "talonx_ingest/intelligence/service/poller.py",
+    "talonx_ingest/intelligence/service/backfill.py",
+    "talonx_ingest/intelligence/service/replay.py",
+    "talonx_v2/form4_source.py",
+    "talonx_v2/service.py",
+)
 
 
 def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None) -> tuple[bool, str]:
@@ -121,10 +137,11 @@ def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None)
     except Exception as exc:  # noqa: BLE001 -- fail closed
         return False, f"could not verify ancestry: {type(exc).__name__}"
     extra = [f for f in diff if not (f.startswith(FREEZE_ALLOWED_PREFIXES) or f in FREEZE_ALLOWED_FILES
-                                       or f in FREEZE_OPS_HARDENING_FILES)]
+                                       or f in FREEZE_OPS_HARDENING_FILES or f in FREEZE_RELEASE_FIDELITY_FIX_FILES)]
     if extra:
         return False, f"runtime files changed after the frozen release: {extra[:5]}"
-    return True, f"HEAD descends from the frozen release; only docs/tests/pin/declared ops-hardening files changed ({len(diff)} files)"
+    return True, (f"HEAD descends from the frozen release; only docs/tests/pin/declared ops-hardening and "
+                  f"release-fidelity-fix files changed ({len(diff)} files)")
 
 
 def run_preflight(*, expected_sha: str = RELEASE_SHA_EXPECTED,

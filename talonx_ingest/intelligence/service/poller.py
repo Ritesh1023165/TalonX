@@ -206,6 +206,7 @@ class EdgarPoller:
                     form_type=nf.form, accepted_at_utc=nf.acceptance_datetime,
                     primary_document=nf.primary_document,
                     cache_dir=self.config.state_dir / "form_ownership_xml_cache",
+                    filing_date=nf.filing_date,
                 )
                 if outcome.ok:
                     result.new_form4_filings += 1

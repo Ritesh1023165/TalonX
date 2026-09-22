@@ -23,7 +23,7 @@ import os
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -152,12 +152,14 @@ def evaluate_release_readiness(*, db_path: str | Path, pricing_mode: str | None,
                                transport: str | None = None, env: dict | None = None,
                                http_get: Callable | None = None, now: Callable[[], datetime] | None = None,
                                validation_path: str | Path | None = None,
-                               profile: ReleaseProfile = RELEASE_PROFILE) -> ReleaseReadinessReport:
+                               profile: ReleaseProfile = RELEASE_PROFILE,
+                               insider_ledger_path: str | Path | None = None) -> ReleaseReadinessReport:
     from talonx_ops.notify import DESTINATIONS, resolve_destination_config
     from talonx_ops.operator_read import notification_validation_view
     from talonx_v2 import provider_contract as pc
     from talonx_v2.config import V2Config
 
+    process_env = env is None
     env = os.environ if env is None else env
     rep = ReleaseReadinessReport()
 
@@ -335,7 +337,44 @@ def evaluate_release_readiness(*, db_path: str | Path, pricing_mode: str | None,
                     "ledger reconciles" if not lc.problems else f"problems: {lc.problems[:3]}")
         except Exception as exc:  # noqa: BLE001
             rep.add("startup_reconciliation", "FAIL", f"could not verify: {type(exc).__name__}: {exc}"[:200])
+
+    # Release admission maps filings to sessions ONLY by SEC's filingDate (fail closed when absent).
+    _ledger = insider_ledger_path or env.get("TALONX_LEDGER_PATH")
+    if _ledger is None and process_env:
+        from talonx_ingest.config import settings as _ingest_settings
+        _ledger = _ingest_settings.ledger.path
+    rep.add(*_filing_date_readiness(_ledger, now=(now or (lambda: datetime.now(timezone.utc)))()))
     return rep
+
+
+FILING_DATE_READINESS_WINDOW_DAYS = 60   # >= the live 45-day lookback plus Form-4 filing slack
+
+
+def _filing_date_readiness(ledger_path: str | Path | None, *, now: datetime) -> tuple[str, str, str]:
+    name = "authoritative_filing_date_readiness"
+    if ledger_path is None:
+        return name, "WARN", "no ingestion ledger configured in the supplied environment -- not checked"
+    con = _ro(ledger_path)
+    if con is None:
+        return name, "FAIL", f"ingestion ledger {Path(ledger_path).name!r} not found -- cannot prove filing dates"
+    try:
+        cols = {r[1] for r in con.execute("PRAGMA table_info(insider_transactions)")}
+        if "filing_date" not in cols:
+            return name, "FAIL", "insider_transactions has no filing_date column"
+        since = (now - timedelta(days=FILING_DATE_READINESS_WINDOW_DAYS)).isoformat()
+        n, missing = con.execute(
+            "SELECT COUNT(*), SUM(filing_date IS NULL) FROM insider_transactions "
+            "WHERE transaction_code='P' AND accepted_at_utc >= ?", (since,)).fetchone()
+        missing = int(missing or 0)
+        if missing:
+            return name, "FAIL", (f"{missing}/{n} recent code-P rows lack SEC filingDate -- V2 would exclude those "
+                                  "issuers (MISSING_AUTHORITATIVE_FILING_DATE); run "
+                                  "`python -m talonx_ingest.intelligence.insider.filing_date_backfill --apply`")
+        return name, "PASS", f"all {n} code-P rows in the last {FILING_DATE_READINESS_WINDOW_DAYS}d carry SEC filingDate"
+    except sqlite3.Error as exc:
+        return name, "FAIL", f"could not verify: {exc}"[:200]
+    finally:
+        con.close()
 
 
 def release_env_block(profile: ReleaseProfile = RELEASE_PROFILE) -> str:

@@ -73,7 +73,8 @@ class V2Service:
                  broad_discovery_symbols: list[str] | None = None,
                  ops_notify_store=None,
                  corporate_actions=None,
-                 release_mode: bool = False):
+                 release_mode: bool = False,
+                 require_authoritative_filing_date: bool | None = None):
         # FINAL ACCEPTANCE (defence in depth): a release-mode service can ONLY run on the qualified SIP
         # provider with the corporate-action guard -- it can never silently sit on the stale csv default.
         if release_mode and pricing_mode != "sip":
@@ -81,6 +82,11 @@ class V2Service:
         if release_mode and corporate_actions is None:
             raise ValueError("release_mode requires the corporate-action guard")
         self.release_mode = bool(release_mode)
+        # Release admission maps filings to sessions ONLY by SEC's filingDate (fail closed if absent);
+        # defaults to on in release mode, explicitly settable for isolated tests/replays.
+        self.require_authoritative_filing_date = (
+            self.release_mode if require_authoritative_filing_date is None
+            else bool(require_authoritative_filing_date))
         self.cfg = config
         self.cfg.validate_frozen()
         self.store = V2Store(config.db_path, starting_cash=config.starting_cash_usd,
@@ -365,8 +371,13 @@ class V2Service:
             try:
                 from talonx_ingest.intelligence.insider.store import InsiderStore
                 st = InsiderStore()  # default ingestion_ledger.db (read side)
-                recs = form4_source.from_insider_store(st, since=since, causal_cutoff=cutoff)
+                missing: list[dict] = []
+                recs = form4_source.from_insider_store(
+                    st, since=since, causal_cutoff=cutoff,
+                    require_filing_date=self.require_authoritative_filing_date,
+                    missing_filing_date=missing)
                 self._refresh_dissemination_lookup(st, since=since, causal_cutoff=cutoff)
+                self._record_missing_filing_dates(missing)
             except Exception as exc:  # noqa: BLE001
                 self._source_state.update(actual="insider", ok=False, records=0, error=repr(exc))
                 logger.error("live Form-4 source (InsiderStore) unavailable: %r -- NOT "
@@ -389,6 +400,18 @@ class V2Service:
             last_ok_utc=datetime.now(timezone.utc).isoformat(),
             note="OFFLINE research parquet -- explicit --form4-source parquet (NOT live)")
         return recs
+
+    def _record_missing_filing_dates(self, missing: list[dict]) -> None:
+        symbols = sorted({m["symbol"] for m in missing})
+        self._source_state.update(missing_authoritative_filing_date={
+            "reason": form4_source.MISSING_AUTHORITATIVE_FILING_DATE,
+            "required": self.require_authoritative_filing_date,
+            "count": len(missing), "blocked_symbols": symbols,
+            "accessions": [m["accession"] for m in missing][:20]})
+        if missing:
+            logger.error("%s: %d code-P record(s) without SEC filingDate -- issuers excluded from "
+                         "admission (fail closed): %s", form4_source.MISSING_AUTHORITATIVE_FILING_DATE,
+                         len(missing), ", ".join(symbols))
 
     def _refresh_dissemination_lookup(self, insider_store, *, since: date,
                                       causal_cutoff: datetime) -> None:
@@ -435,7 +458,12 @@ class V2Service:
         for t in txns:
             if not t.symbol or not t.accepted_at_utc:
                 continue
-            fd = t.filing_date or t.accepted_at_utc.date()
+            if self.require_authoritative_filing_date:
+                if t.filing_date is None:
+                    continue  # issuer already excluded by from_insider_store (fail closed)
+                fd = t.filing_date
+            else:
+                fd = t.filing_date or t.accepted_at_utc.date()
             key = (t.symbol.upper(), fd.isoformat())
             prev = lookup.get(key)
             if prev is None or t.accepted_at_utc > prev:

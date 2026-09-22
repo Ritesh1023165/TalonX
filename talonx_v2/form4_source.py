@@ -103,9 +103,14 @@ def from_research_parquet(
     return from_rows(rows)
 
 
+MISSING_AUTHORITATIVE_FILING_DATE = "MISSING_AUTHORITATIVE_FILING_DATE"
+
+
 def from_insider_store(store, *, symbols: list[str] | None = None,
                        since: date | None = None,
-                       causal_cutoff: datetime | None = None) -> list[PurchaseRecord]:
+                       causal_cutoff: datetime | None = None,
+                       require_filing_date: bool = False,
+                       missing_filing_date: list | None = None) -> list[PurchaseRecord]:
     """``store`` = talonx_ingest.intelligence.insider.store.InsiderStore.
 
     ``since`` bounds the DISSEMINATION window (contract: the episode "fires"
@@ -115,21 +120,41 @@ def from_insider_store(store, *, symbols: list[str] | None = None,
     dissemination-date filter is re-applied here -- a late-filed Form 4 for an
     older transaction stays in the window.  ``causal_cutoff`` still bounds
     acceptance from above (no future knowledge in an as-of replay).
+
+    ``require_filing_date`` (release mode): the calendar date is ONLY SEC's own
+    ``filingDate``. ``accepted_at_utc`` is never used for it -- SEC first serves
+    fresh filings' acceptanceDateTime as New York wall-clock labelled ``Z`` and
+    rewrites it to true UTC hours later, so its ``.date()`` can land on the next
+    day. Any issuer with a code-P record lacking ``filing_date`` is excluded
+    entirely (fail closed: no partial cluster) and reported via
+    ``missing_filing_date``.
     """
     from talonx_ingest.intelligence.insider.domain import TransactionClass
 
     query_since = (since - timedelta(days=_DISSEMINATION_SLACK_DAYS)) if since is not None else None
     syms = symbols or [None]
     recs: list[PurchaseRecord] = []
+    blocked: set[str] = set()
     for sym in syms:
         txns = store.query_transactions(
             symbol=sym, classification=TransactionClass.OPEN_MARKET_PURCHASE,
             since=query_since, causal_cutoff=causal_cutoff, newest_first=False,
         )
         for t in txns:
-            fd = t.filing_date or (t.accepted_at_utc.date() if t.accepted_at_utc else None)
-            if fd is None or not t.symbol or not t.owner_cik:
+            if not t.symbol or not t.owner_cik:
                 continue
+            if require_filing_date:
+                if t.filing_date is None:
+                    blocked.add(t.symbol.upper())
+                    if missing_filing_date is not None:
+                        missing_filing_date.append({"symbol": t.symbol.upper(), "accession": t.accession,
+                                                    "reason": MISSING_AUTHORITATIVE_FILING_DATE})
+                    continue
+                fd = t.filing_date
+            else:
+                fd = t.filing_date or (t.accepted_at_utc.date() if t.accepted_at_utc else None)
+                if fd is None:
+                    continue
             if since is not None and fd < since:
                 continue  # disseminated before the window -- exclude
             recs.append(PurchaseRecord(
@@ -141,4 +166,6 @@ def from_insider_store(store, *, symbols: list[str] | None = None,
                 is_ten_percent=bool(t.is_ten_percent_owner),
                 transaction_code=(t.transaction_code or "P").upper()[:1] or "P",
             ))
+    if blocked:
+        recs = [r for r in recs if r.symbol not in blocked]
     return recs
