@@ -27,12 +27,13 @@ For each fill, record `entry_price_provenance` / `exit_price_provenance` from `p
 |---|---|---|---|---|---|---|---|---|---|---|
 | 2026-09-21 | 01 | partial day (started late session) | ABCL, ADC first seen (both pre-campaign) | pre-campaign 2 | 0 | 0 | 0 | 0 | $100,000.00 | see `v2_full_day_session_01/` |
 | 2026-09-22 | 02 | full day, 07:51 UK to 21:05 UK, 0 restarts | none new | `NO_QUALIFYING_CLUSTER` | 0 | 0 | 0 | 0 | $100,000.00 | `FULL_DAY_PASS_WITH_FINDINGS` |
+| 2026-09-23 | 03 | full day, 06:47Z to 20:13Z, 0 restarts; `FULL_PROSPECTIVE_COVERAGE: YES_WITH_INFERENCE` | none new (1 new code-P: ADC 3rd insider, single-owner in a new window) | `NO_QUALIFYING_CLUSTER` | 0 | 0 | 0 | 0 | $100,000.00 | `PROSPECTIVE_SESSION_PASS_WITH_FINDINGS` (EOD `PASS_WITH_FINDINGS`) |
 
-## C. Cumulative totals (as of 2026-09-22 EOD)
+## C. Cumulative totals (as of 2026-09-23 EOD)
 
 | Metric | Value |
 |---|---|
-| Prospective market days operated | 2 (1 partial, 1 full) |
+| Prospective market days operated | 3 (1 partial, 2 full; 1 with FULL_PROSPECTIVE_COVERAGE YES_WITH_INFERENCE) |
 | Qualifying clusters (in-campaign) | 0 |
 | Qualifying clusters received on time | 0 |
 | Opportunities missed due to ingestion downtime (in-campaign) | 0 (2 pre-campaign: ADC, ABCL; see the 39-stock audit) |
