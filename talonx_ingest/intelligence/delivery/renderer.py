@@ -64,9 +64,13 @@ def _resolved_acceptance(card):
     ``timestamp_utc`` holds SEC's feed value with MIXED semantics (fresh filings are
     New York wall clock labelled Z); never print it raw as UTC."""
     from talonx_ingest.intelligence.sec_time import format_acceptance, resolve_acceptance
-    res = resolve_acceptance(card.timestamp_utc,
-                             observed_at=getattr(card, "source_observed_at_utc", None),
-                             filing_date=getattr(card, "filing_date", None))
+    observed = getattr(card, "source_observed_at_utc", None)
+    fdate = getattr(card, "filing_date", None)
+    res = resolve_acceptance(card.timestamp_utc, observed_at=observed, filing_date=fdate)
+    if res.utc is None and card.timestamp_utc is not None and fdate is None:
+        # no filing date to fall back on (legacy/serialized card): show the feed value honestly, never as "UTC"
+        ts = card.timestamp_utc if card.timestamp_utc.tzinfo else card.timestamp_utc.replace(tzinfo=timezone.utc)
+        return ts, f"SEC feed time {ts:%Y-%m-%d %H:%M} (UTC/ET rendering unverified)"
     return res.utc, format_acceptance(res)
 
 

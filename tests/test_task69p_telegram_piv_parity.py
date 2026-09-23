@@ -116,7 +116,8 @@ async def test_handle_ping_pipeline_line_annotated_for_piv_context(tmp_path):
     sent = {}
 
     async def _fake_reply(text, plain=False):
-        sent["text"] = text
+        # /ping may split into two budget-capped parts; the pin is about the combined reply
+        sent["text"] = sent.get("text", "") + chr(10) + text
 
     listener._reply = _fake_reply
     await listener._handle_ping()

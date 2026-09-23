@@ -47,12 +47,14 @@ def _make_ledger_db(path, *, delivery_rows=(), text_event_rows=()):
         "CREATE TABLE text_events (event_id TEXT PRIMARY KEY, ingested_at_utc TEXT)"
     )
     con.execute(
-        "CREATE TABLE intelligence_delivery (delivery_id TEXT PRIMARY KEY, state TEXT, sent_at_utc TEXT)"
+        "CREATE TABLE intelligence_delivery (delivery_id TEXT PRIMARY KEY, state TEXT, sent_at_utc TEXT, "
+        "route TEXT DEFAULT 'IMMEDIATE', enqueued_at_utc TEXT, updated_at_utc TEXT)"
     )
     for i, (eid, ts) in enumerate(text_event_rows):
         con.execute("INSERT INTO text_events VALUES (?, ?)", (eid or f"e{i}", ts))
     for i, (did, state, sent) in enumerate(delivery_rows):
-        con.execute("INSERT INTO intelligence_delivery VALUES (?, ?, ?)", (did or f"d{i}", state, sent))
+        con.execute("INSERT INTO intelligence_delivery (delivery_id, state, sent_at_utc) VALUES (?, ?, ?)",
+                    (did or f"d{i}", state, sent))
     con.commit()
     con.close()
 
@@ -148,7 +150,8 @@ def test_discovery_v2_section_reads_real_snapshot_files(listener, tmp_path, monk
     assert "Execution-eligible scope: 626" in text
     assert "out_of_scope=16" in text
     assert "Admission mode: GATED" in text
-    assert "pending: 2, sent: 1, expired/held: 1" in text
+    # Session 03 A5: live queue vs historical expiry (talonx_ops.intel_queue), not all-time totals
+    assert "LIVE_PENDING: 2" in text and "LIVE_FAILED (24h): 0" in text and "all-time 1;" in text
     assert "2026-09-11T08:15:56" in text  # last successful discovery delivery
 
 

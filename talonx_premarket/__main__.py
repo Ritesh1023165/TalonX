@@ -32,10 +32,12 @@ PROTECTED_DB_NAMES = {"v2_release_rc1.db", "v2_release_rc1_notifications.db", "v
 logger = logging.getLogger("talonx_premarket")
 
 
-def _env():
+def _env(env_file: str | None = None):
+    """Loads .env with override=False (a process-scoped value always wins). ``--env-file`` lets the engine run
+    from a separate worktree while reading the main checkout's .env in place (never copied)."""
     try:
         from dotenv import load_dotenv
-        load_dotenv(REPO_ROOT / ".env", override=False)
+        load_dotenv(Path(env_file) if env_file else REPO_ROOT / ".env", override=False)
     except Exception:  # noqa: BLE001
         pass
 
@@ -204,8 +206,8 @@ def cmd_status(args) -> int:
 def main(argv=None) -> int:
     import talonx_ops.log_redaction  # noqa: F401  (process-wide secret redaction before any HTTP/logging)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    _env()
     ap = argparse.ArgumentParser(prog="python -m talonx_premarket")
+    ap.add_argument("--env-file", help="path to the .env to load (default: <repo>/.env)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     u = sub.add_parser("universe")
     u.add_argument("--out", default=str(UNIVERSE_PATH))
@@ -222,6 +224,7 @@ def main(argv=None) -> int:
     g.add_argument("--v2-scope-log")
     sub.add_parser("status")
     a = ap.parse_args(argv)
+    _env(a.env_file)
     return {"universe": cmd_universe, "replay": cmd_replay, "run": cmd_run, "status": cmd_status}[a.cmd](a)
 
 

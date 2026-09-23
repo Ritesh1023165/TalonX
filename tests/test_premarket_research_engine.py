@@ -340,6 +340,8 @@ def test_research_destination_refuses_to_alias_the_primary_chat(monkeypatch):
     monkeypatch.setenv("TALONX_NOTIFY_RESEARCH_CHAT_ID", "same-chat")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "primary-token")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "same-chat")
+    monkeypatch.setenv("TALONX_NOTIFY_TRADE_EVENT_BOT_TOKEN", "primary-token")
+    monkeypatch.setenv("TALONX_NOTIFY_TRADE_EVENT_CHAT_ID", "same-chat")
     assert resolve_destination_config(RESEARCH).enabled is False
     monkeypatch.setenv("TALONX_NOTIFY_RESEARCH_CHAT_ID", "research-chat")
     assert resolve_destination_config(RESEARCH).enabled is True
