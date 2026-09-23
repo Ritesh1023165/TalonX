@@ -68,3 +68,26 @@
 | Causal replay | 41 scans, 9–14 s each once the SEC cache is warm; 59 Alpaca + 595 SEC requests; 0 errors |
 | Release gate on branch HEAD (release env) | READY, 21 checks; strategy / provider fingerprints PASS; `lab_off` PASS; `authoritative_filing_date_readiness` PASS; `intelligence_card_delivery` WARN `configured=OFF runtime_requested_by_start=ON effective=ON` |
 | Preflight `frozen_release_ok(HEAD, a56ec8c)` | `True`: "only docs/tests/pin/declared ops-hardening, release-fidelity-fix, Session-03-hardening and isolated research-lane files changed" |
+
+## PR19 hardening pass (2026-09-23 night)
+
+**NEW:** `tests/test_premarket_canary_hardening.py`, **44 pass / 0 fail**. It covers provider completeness and watermarks, the daily partial cache, duplicate bars, the single SIP delay, restart/resume, invalidation safety, SEC unknown and 429 handling, the cap, enqueued vs sent, stop flags, session edges, status/report and poll history.
+
+**All pre-market + Session 03 tests:** 105 pass / 0 fail. **V2 test files** (`tests/test_v2_*.py`): 60 pass / 0 fail.
+
+**Targeted regression** (every test file importing a changed module, plus the new files): **1,808 pass / 10 fail / 6 skipped**.
+
+| Failing test | Classification | Reproduction |
+|---|---|---|
+| `test_ri3_operator::test_renderer_shows_end_to_end_fixture` | PRE_EXISTING | fails identically on the clean `origin/main` worktree |
+| `test_task117_release_rehearsal::test_bounded_release_rehearsal` | PRE_EXISTING | fails identically on clean main |
+| `test_task118a_dashboard_message_count::test_immediate_and_digest_sends_count_messages_correctly` | PRE_EXISTING | fails identically on clean main |
+| `test_task117_migration` (5) and `test_task117_deployment_rehearsal` (1) | ENVIRONMENTAL | They require the untracked legacy `v2_lane.db` to have an older md5. The main checkout's copy is `cff00b0f…` (unchanged by this work); on the base worktree the file is absent and they skip. |
+| `test_task118a_checkpoint_daemon_restart::test_a_real_session_loop_exits_immediately_with_a_stale_stop_flag` | ENVIRONMENTAL (timing under load) | Failed once while the network-heavy replay ran concurrently; passes 3/3 in isolation on the branch **and** 3/3 on clean main |
+
+**Replay equivalence.** The 2026-09-23 replay was re-run on the hardened code (`results/premarket_research/replay_2026-09-23_hardened`):
+- The scan funnels are identical scan for scan.
+- Candidates (141, with the same states, first-alert times and reference prices) and outcomes are **identical**.
+- 223 alert events. Exactly one differs: a transient SEC fetch failure for NWG during the re-run was correctly labelled `catalyst lookup incomplete: SEC lookup failed`. Its score was 46.5 instead of 61.5 (catalyst points unknown → 0, exactly as the frozen scoring treats NONE). Same WATCH classification, same candidate.
+
+**Full suite:** not completed, for the same reason as before. It stalls on clean main too, in `test_backtest_sample_data`.

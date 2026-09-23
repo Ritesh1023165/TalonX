@@ -132,6 +132,7 @@ FREEZE_SESSION03_HARDENING_FILES = (
     "talonx_ingest/intelligence/pipeline.py",
     "talonx_ingest/intelligence/delivery/renderer.py",
     "talonx_ingest/intelligence/service/runner.py",
+    "talonx_ingest/intelligence/service/poll_history.py",
     "talonx_ops/intel_queue.py",
     "talonx_ops/prospective/proc.py",
     "talonx_dispatch/telegram_listener.py",

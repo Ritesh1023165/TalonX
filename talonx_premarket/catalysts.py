@@ -115,12 +115,13 @@ def evaluate(filings: list[Filing], *, prev_session: date, scan_day: date, decis
 
 def insider_open_market_owners(ledger_path: str, symbol: str, *, scan_day: date, decision_utc: datetime,
                                lookback_days: int = 30) -> int:
-    """Distinct owners with code-P purchases filed in the lookback window, causally (filing_date before
-    the scan day, or same day with a resolvable acceptance <= decision time). Read-only URI connection."""
+    """Distinct owners with code-P purchases filed in the lookback window, causally: TalonX must have RECEIVED the
+    filing by the decision time (replay-safe), and a same-day filing also needs a resolvable acceptance <= decision.
+    Read-only URI connection. Returns None when the ledger cannot be read (unknown, not zero)."""
     try:
         con = sqlite3.connect(f"file:{ledger_path}?mode=ro", uri=True, timeout=2.0)
     except sqlite3.Error:
-        return 0
+        return None
     try:
         rows = con.execute(
             "SELECT owner_cik, filing_date, accepted_at_utc, accession FROM insider_transactions "
@@ -130,16 +131,18 @@ def insider_open_market_owners(ledger_path: str, symbol: str, *, scan_day: date,
             "SELECT accession, ingested_at_utc FROM insider_filings WHERE issuer_cik IN "
             "(SELECT DISTINCT issuer_cik FROM insider_transactions WHERE symbol = ?)", (symbol,)).fetchall()}
     except sqlite3.Error:
-        return 0
+        return None
     finally:
         con.close()
     owners = set()
     for owner, fd, acc_raw, accession in rows:
         fdd = date.fromisoformat(fd)
+        obs = ingested.get(accession)
+        if obs and datetime.fromisoformat(obs) > decision_utc:
+            continue                                    # TalonX did not have it yet at decision time
         if fdd < scan_day:
             owners.add(owner)
             continue
-        obs = ingested.get(accession)
         res = resolve_acceptance(datetime.fromisoformat(acc_raw) if acc_raw else None,
                                  observed_at=datetime.fromisoformat(obs) if obs else None, filing_date=fdd)
         # causal: TalonX must also have HAD it -- receipt <= decision time
@@ -160,6 +163,9 @@ class SecSubmissions:
         self._last = 0.0
         self.requests = 0
         self.errors: list[str] = []
+        self.backoff_s = 60.0
+        self._backoff_until = 0.0
+        self.throttled = 0          # lookups skipped while backing off after a 429
 
     def _default_get(self, url: str, headers: dict) -> dict:  # pragma: no cover - network
         wait = 0.21 - (time.monotonic() - self._last)
@@ -170,16 +176,24 @@ class SecSubmissions:
             return json.loads(r.read())
 
     def get(self, cik: str) -> tuple[dict | None, datetime | None]:
+        """(submissions, observed_at) or (None, None) when the lookup could not complete (-> CATALYST UNKNOWN).
+        A stale cached copy is preferred over no data if a refresh fails. After a 429 all lookups pause for
+        ``backoff_s`` (fair access) instead of hammering SEC."""
         hit = self._cache.get(cik)
         if hit and self.clock() - hit[0] < self.ttl_s:
             return hit[1], hit[2]
+        if self.clock() < self._backoff_until:
+            self.throttled += 1
+            return (hit[1], hit[2]) if hit else (None, None)
         try:
             self.requests += 1
             j = self._get(SUBMISSIONS_URL.format(cik=str(cik).zfill(10)),
                           {"User-Agent": self._ua, "Accept-Encoding": "identity"})
         except Exception as exc:  # noqa: BLE001
-            self.errors.append(f"{cik}: {type(exc).__name__}")
-            return None, None
+            self.errors.append(f"{cik}: {type(exc).__name__}: {str(exc)[:80]}")
+            if "429" in str(exc):
+                self._backoff_until = self.clock() + self.backoff_s
+            return (hit[1], hit[2]) if hit else (None, None)
         observed = datetime.now(timezone.utc)
         self._cache[cik] = (self.clock(), j, observed)
         return j, observed

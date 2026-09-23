@@ -20,6 +20,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections import deque
+from dataclasses import dataclass, field
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
@@ -59,6 +60,21 @@ class RateLimiter:
         self._hits.append(now)
 
 
+@dataclass
+class FetchResult:
+    """Result of a batched fetch. ``failed`` lists symbols whose batch did not complete (after retries);
+    their bars are NOT included (a batch's pages are merged only when the whole batch succeeded)."""
+    bars: dict[str, list[dict]] = field(default_factory=dict)
+    failed: set[str] = field(default_factory=set)
+    batches: int = 0
+    failed_batches: int = 0
+    retried_batches: int = 0
+
+    @property
+    def complete(self) -> bool:
+        return not self.failed
+
+
 class AlpacaData:
     """``http_get(url, params, headers) -> dict`` is injectable for tests (no network in tests)."""
 
@@ -71,6 +87,9 @@ class AlpacaData:
         self.limiter = limiter or RateLimiter(cfg.max_requests_per_minute)
         self.requests = 0
         self.errors: list[str] = []
+        self.failed_batches_total = 0
+        self.retried_batches_total = 0
+        self.last_success_utc: datetime | None = None
 
     @staticmethod
     def _default_get(url: str, params: dict, headers: dict) -> dict:  # pragma: no cover - network
@@ -96,30 +115,62 @@ class AlpacaData:
         return self._call(ASSETS_URL, {"status": "active", "asset_class": "us_equity"})  # type: ignore[return-value]
 
     def bars(self, symbols: list[str], *, timeframe: str, start: datetime, end: datetime) -> dict[str, list[dict]]:
-        """All bars for ``symbols`` in [start, end), batched + paginated. Never requests data newer than
-        the SIP delay allows (``end`` is clamped by the caller via ``data_as_of``)."""
-        out: dict[str, list[dict]] = {}
+        """Compatibility wrapper: bars only (failures are recorded in ``errors``)."""
+        return self.bars_ex(symbols, timeframe=timeframe, start=start, end=end).bars
+
+    def bars_ex(self, symbols: list[str], *, timeframe: str, start: datetime, end: datetime,
+                attempts: int = 2) -> FetchResult:
+        """All bars for ``symbols`` with ``start <= t <= end`` (Alpaca's ``end`` is INCLUSIVE -- verified), batched
+        and paginated. Each batch is retried up to ``attempts`` times; its pages are merged only if the whole batch
+        succeeded, otherwise every symbol in it is reported in ``failed`` (never a silent empty result)."""
+        res = FetchResult()
         n = self.cfg.bars_symbols_per_request
         for i in range(0, len(symbols), n):
             batch = symbols[i:i + n]
-            token = None
-            while True:
-                params = {"symbols": ",".join(batch), "timeframe": timeframe, "start": iso(start),
-                          "end": iso(end), "feed": self.cfg.feed, "adjustment": self.cfg.adjustment,
-                          "limit": str(self.cfg.bars_page_limit)}
-                if token:
-                    params["page_token"] = token
+            res.batches += 1
+            for attempt in range(1, attempts + 1):
+                got: dict[str, list[dict]] = {}
+                token = None
                 try:
-                    j = self._call(DATA_URL, params)
-                except Exception as exc:  # noqa: BLE001 -- a failed batch is reported, never silently empty
-                    self.errors.append(f"bars {timeframe} batch@{i}: {exc}")
+                    while True:
+                        params = {"symbols": ",".join(batch), "timeframe": timeframe, "start": iso(start),
+                                  "end": iso(end), "feed": self.cfg.feed, "adjustment": self.cfg.adjustment,
+                                  "limit": str(self.cfg.bars_page_limit)}
+                        if token:
+                            params["page_token"] = token
+                        j = self._call(DATA_URL, params)
+                        for sym, rows in (j.get("bars") or {}).items():
+                            got.setdefault(sym, []).extend(rows)
+                        token = j.get("next_page_token")
+                        if not token:
+                            break
+                except Exception as exc:  # noqa: BLE001 -- recorded, retried, then reported per symbol
+                    self.errors.append(f"bars {timeframe} batch@{i} attempt {attempt}: {exc}")
+                    if attempt < attempts:
+                        res.retried_batches += 1
+                        self.retried_batches_total += 1
+                        continue
+                    res.failed_batches += 1
+                    self.failed_batches_total += 1
+                    res.failed.update(batch)
                     break
-                for sym, rows in (j.get("bars") or {}).items():
-                    out.setdefault(sym, []).extend(rows)
-                token = j.get("next_page_token")
-                if not token:
-                    break
-        return out
+                for sym, rows in got.items():
+                    res.bars.setdefault(sym, []).extend(rows)
+                self.last_success_utc = datetime.now(timezone.utc)
+                break
+        return res
+
+
+def merge_bars(store: dict[str, dict[str, dict]], new: dict[str, list[dict]]) -> None:
+    """Canonical key symbol + bar time: a re-fetched bar REPLACES the earlier copy (never double-counted)."""
+    for sym, rows in new.items():
+        d = store.setdefault(sym, {})
+        for r in rows:
+            d[r["t"]] = r
+
+
+def sorted_bars(store: dict[str, dict[str, dict]]) -> dict[str, list[dict]]:
+    return {s: [d[k] for k in sorted(d)] for s, d in store.items()}
 
 
 def data_as_of(now: datetime, cfg: PremarketConfig = PREMARKET_RESEARCH_V1) -> datetime:

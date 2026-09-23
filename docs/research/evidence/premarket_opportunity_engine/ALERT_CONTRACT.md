@@ -39,6 +39,17 @@ Research alert only. Not a V2 trade event. Paper execution not started.
 
 Every alert event is persisted in `premarket_research.db` (`alerts`, `candidates`, `scans`), whether delivered or not. Capped candidates are recorded as `SUPPRESSED:SESSION_NEW_ALERT_CAP`.
 
+**Data state unknown (PR19 hardening).**
+- **What counts as unknown.** A symbol whose provider fetch is incomplete (`UNKNOWN:PROVIDER_INCOMPLETE`), or every symbol when the provider is stale (`UNKNOWN:PROVIDER_STALE`).
+- **Effect.** The symbol is **held**: no new candidate, no update and **no INVALIDATED**. INVALIDATED is reserved for market facts computed from complete data.
+- **Catalysts.** A failed catalyst lookup is `CATALYST UNKNOWN`, never "none".
+
+**Routing vs delivery.**
+- **Routing.** `alerts.routed` is the routing result (`RECORDED_NOT_DELIVERED` / `ENQUEUED_RESEARCH` / `ENQUEUED_RESEARCH_DESTINATION_DISABLED` / `SUPPRESSED:…` / `PENDING_ROUTE`).
+- **Delivery.** `alerts.delivery_state` is the outbox's real state, synced every scan (PENDING / SENT / RETRY / FAILED / EXPIRED / HELD / AMBIGUOUS).
+- **`candidates.delivered`** is 1 **only after an alert is actually SENT**.
+- **Persistence order.** The alert and candidate are persisted in one transaction **before** routing; a crash in between is re-routed idempotently on restart.
+
 **Tests:** `test_alert_state_machine_new_upgrade_update_invalidate_and_no_duplicates`, `test_new_alert_cap_suppresses_instead_of_spamming`, `test_session_cap_keeps_the_highest_scoring_new_candidates`, `test_replay_scan_cannot_see_future_bars` (an unchanged re-scan produces no alert).
 
 ## Routing (Telegram): an isolated RESEARCH path only

@@ -82,13 +82,29 @@ C:\workspace\TalonX\.venv\Scripts\python.exe -m talonx_premarket --env-file C:\w
 **Check the first status block the process prints:**
 - `"config_fingerprint": "62ba413daf85e674"` (frozen PREMARKET_RESEARCH_V1);
 - `"universe_eligible"` about 5,600, and `"v2_scope_size": 39` (if 0, the scope-log path is wrong: labels only, no other effect);
-- `"delivery": {"deliver_flag": false, ...}`. **This is the default canary: every alert is recorded, nothing is sent.**
+- `"delivery_mode": {"deliver_flag": false, ...}`. **This is the default canary: every alert is recorded, nothing is sent.**
 
 The process sleeps until 08:15Z, scans every 15 min in EARLY and every 5 min in CORE/NEAR_OPEN, then tracks outcomes until about 20:17Z and exits.
 
 **Monitor:** `.venv\Scripts\python.exe -m talonx_premarket status` shows the heartbeat, last scan funnel (UNIVERSE / DATA_READY / HARD_REJECTED / SCORED / WATCH / BULLISH_SETUP / BEARISH_SETUP), alerts, `duration_s` and request counts.
 
 **Stop:** create `results\premarket_research\2026-09-24\stop.flag` (in the directory the engine runs from), or press Ctrl+C. This is safe at any time: the lane holds no positions.
+- The flag is checked before every scan and during outcome tracking. It is **never deleted automatically**.
+- While a same-session `stop.flag` exists, `run` **refuses to start** (exit code 3). To restart deliberately, rename it (for example to `stop.flag.0915`).
+- A flag from another session date is in a different directory and has no effect.
+
+**Restart** (for example after a crash or reboot): run the same `run` command again. The session DB is reused: candidates, the cap, invalidated identities and update timing are restored, and no duplicate NEW alert is produced. The data watermark is rebuilt from 04:00 ET, and each start is recorded in the `runs` table.
+
+**Status fields** (`status`; add `--date 2026-09-24` from another day):
+- **Process:** SESSION, PID, STATE, HEARTBEAT_AGE_S, CONFIG_FP, UNIVERSE / ELIGIBLE, CURRENT_PHASE, LAST_SCAN / NEXT_SCAN / SCAN_DURATION_S, DATA_AS_OF, EFFECTIVE_SIP_DELAY.
+- **Provider:** PROVIDER_REQUESTS / ERRORS / FAILED_BATCHES / **PROVIDER_COMPLETE** / DATA_GAPS / LAST_SUCCESSFUL_PROVIDER_FETCH, CATALYST_UNKNOWN.
+- **Funnel:** DATA_READY … BEARISH_SETUP, PROVIDER_INCOMPLETE.
+- **Alerts and delivery:** NEW_ALERTS_USED (x/25), SUPPRESSED_BY_CAP, DELIVERY_MODE, DELIVERY_STATES.
+- **Outcomes and runs:** OUTCOMES, RUNS_THIS_SESSION.
+
+**Healthy looks like:** HEARTBEAT_AGE_S < 60 while waiting for a scan (< 660 during post-open tracking, which updates every 10 min), PROVIDER_COMPLETE True, DATA_GAPS 0, and a scan duration well under 300 s. If PROVIDER_COMPLETE is False, affected symbols are **held** (no alerts, no invalidations) and re-fetched automatically on the next scan; check PROVIDER_ERRORS.
+
+**Evidence:** `python -m talonx_premarket report --date 2026-09-24` writes `evidence/canary_evidence.json` and `evidence/CANARY_EVIDENCE.md` inside the session directory. They contain the scan timeline with provider completeness, the funnel, every alert with its routing and delivery state, suppressed candidates, outcomes, errors and runs.
 
 ## 3. Optional: live Telegram research delivery (explicit, operator-only)
 
@@ -112,7 +128,8 @@ Messages start with `[PREMARKET RESEARCH]` and end with `Research alert only. No
 |---|---|
 | Broad universe loads | PASS: 14,373 total, 5,655 eligible |
 | Provider supports pre-market data | PASS: SIP 1-min from 04:00 ET, verified; 15-min delay |
-| Scan finishes inside cadence | PASS: replay scans 9–14 s with a warm SEC cache; the first scan with prefetch is about 51 s; cadence is ≥ 300 s |
+| Scan finishes inside cadence | PASS: replay scans 7–14 s with a warm SEC cache; live incremental path ~25 s; cold first scan ~51–136 s; cadence is ≥ 300 s |
+| Provider partial failure | PASS after the PR19 hardening: per-symbol watermarks, batch retry, hold on unknown data (PR19_HARDENING_REVIEW.md) |
 | Rate limits respected | PASS: client limiter at 180/min (provider 200/min); SEC ≤ ~5 req/s |
 | Candidate funnel nonzero on replay | PASS: see SHADOW_REPLAY_2026-09-23.md |
 | Research routing isolated | PASS (tests); live delivery off, and not enableable until a distinct chat is configured |

@@ -16,6 +16,8 @@ Every item below was **verified empirically on 2026-09-23** against this account
 | **Recency limit** | **SIP data newer than 15 minutes is refused.** `end` values of now, now−5 and now−14 min returned `HTTP 403 {"message":"subscription does not permit querying recent SIP data"}`; now−15 min and older returned data. With no `end`, the API returns data up to now−15 min. The SIP `snapshots` endpoint also returns 403. |
 | Rate limit | Response header `X-Ratelimit-Limit: 200` (per minute). The engine budgets 180 per minute, and a client-side limiter blocks rather than exceeding it. A 429 is retried with back-off. |
 | Pagination | `limit` caps bars per page **across all symbols in the request** (10,000 max). `next_page_token` continues. The engine batches 200 symbols per request and follows tokens. |
+| **`end` is INCLUSIVE** | Verified: `[12:00,12:05]` and `[12:05,12:10]` both return the 12:05 bar. Requests therefore end at `end − 1 s`, and bars are keyed by (symbol, t). |
+| Partial failure | Each 200-symbol batch is retried once and merged only if every page succeeded. Failed symbols are reported, keep their own watermark, are re-requested next scan, and are held meanwhile. |
 | Missing bars | A minute with no trades has no bar. That is normal, not an error. Thin names print sporadically, so a symbol with no pre-market bar is `NO_PREMARKET_PRINTS` (not data-ready), not a failure. |
 | Daily bars | `1Day` bars are stamped `YYYY-MM-DDT04:00:00Z` (00:00 New York), and the session date is the New York date. |
 | Split adjustment | `adjustment=split` on both timeframes. A gap above 300% is treated as an implausible print or an unadjusted corporate action and hard-rejected (`IMPLAUSIBLE_GAP`). |
@@ -24,6 +26,7 @@ Every item below was **verified empirically on 2026-09-23** against this account
 
 | Concept | Rule |
 |---|---|
+| Effective latency | **One** 15-min application. The newest usable bar ends at `floor_minute(T − 15 min)`, so the lag from the last included trade to the decision is 15:00–15:59. |
 | `data_as_of` | `now − 15 min`, truncated to the minute. That is the newest instant this subscription may read. Every live alert states "Alpaca SIP 1-min, 15-min delayed, as of HH:MM UTC". |
 | Causal bar filter | A bar is used only if `t + 1 min <= data_as_of` (`complete_bars_as_of`). |
 | Stale price | If the last pre-market print ended more than **45 min** before `data_as_of`, the symbol is hard-rejected `STALE_PREMARKET_PRICE`. |

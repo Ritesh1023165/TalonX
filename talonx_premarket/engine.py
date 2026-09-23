@@ -21,7 +21,7 @@ from pathlib import Path
 from talonx_premarket import alerts as A
 from talonx_premarket import features as F
 from talonx_premarket import scoring as S
-from talonx_premarket.alpaca_data import AlpacaData, complete_bars_as_of, data_as_of, parse_ts
+from talonx_premarket.alpaca_data import AlpacaData, complete_bars_as_of, data_as_of, merge_bars, sorted_bars
 from talonx_premarket.catalysts import CatalystEvidence, SecSubmissions, evaluate, insider_open_market_owners, \
     parse_submissions
 from talonx_premarket.config import PREMARKET_RESEARCH_V1, PremarketConfig
@@ -48,53 +48,85 @@ def v2_scope_from_log(path: str | Path) -> set[str]:
 # data sources
 # ---------------------------------------------------------------------------------------------
 class ReplaySource:
-    """Prefetches the whole pre-market window once; each scan sees only bars complete as-of."""
+    """Prefetches the whole pre-market window once; each scan sees only bars complete as-of.
+
+    Completeness contract (both sources): ``daily()`` and ``premarket()`` return ``(bars, incomplete)`` where
+    ``incomplete`` is the set of symbols whose provider fetch did NOT complete. Their data is unknown -- never
+    treated as "no prints" / "no history". Failed symbols are re-requested on every later call until they
+    succeed; nothing partial is ever cached as authoritative."""
 
     def __init__(self, data: AlpacaData, symbols: list[str], sd: SessionDay, cfg: PremarketConfig):
         self.data, self.symbols, self.sd, self.cfg = data, symbols, sd, cfg
-        self._daily: dict[str, list[dict]] | None = None
-        self._pm: dict[str, list[dict]] | None = None
+        self._daily: dict[str, dict[str, dict]] = {}
+        self._daily_pending: set[str] = set(symbols)
+        self._pm: dict[str, dict[str, dict]] = {}
+        self._pm_pending: set[str] = set(symbols)
+        self.last_fetch: dict = {}
 
-    def daily(self) -> dict[str, list[dict]]:
-        if self._daily is None:
+    def _note(self, kind: str, res) -> None:
+        self.last_fetch[kind] = {"batches": res.batches, "failed_batches": res.failed_batches,
+                                 "retried_batches": res.retried_batches, "failed_symbols": len(res.failed)}
+
+    def daily(self) -> tuple[dict[str, list[dict]], set[str]]:
+        if self._daily_pending:
             start = datetime.combine(self.sd.prev_session - timedelta(days=45), datetime.min.time(), timezone.utc)
-            end = datetime.combine(self.sd.day, datetime.min.time(), timezone.utc)
-            self._daily = self.data.bars(self.symbols, timeframe="1Day", start=start, end=end)
-        return self._daily
+            end = datetime.combine(self.sd.day, datetime.min.time(), timezone.utc) - timedelta(seconds=1)
+            res = self.data.bars_ex(sorted(self._daily_pending), timeframe="1Day", start=start, end=end)
+            self._note("daily", res)
+            merge_bars(self._daily, res.bars)
+            self._daily_pending = set(res.failed)
+        return sorted_bars(self._daily), set(self._daily_pending)
 
-    def premarket(self, as_of: datetime) -> dict[str, list[dict]]:
-        if self._pm is None:
-            self._pm = self.data.bars(self.symbols, timeframe="1Min", start=self.sd.premarket_start_utc,
-                                      end=self.sd.open_utc)
-        return {s: complete_bars_as_of(rows, as_of) for s, rows in self._pm.items()}
+    def premarket(self, as_of: datetime) -> tuple[dict[str, list[dict]], set[str]]:
+        if self._pm_pending:
+            res = self.data.bars_ex(sorted(self._pm_pending), timeframe="1Min", start=self.sd.premarket_start_utc,
+                                    end=self.sd.open_utc - timedelta(seconds=1))
+            self._note("premarket", res)
+            merge_bars(self._pm, res.bars)
+            self._pm_pending = set(res.failed)
+        return ({s: complete_bars_as_of(rows, as_of) for s, rows in sorted_bars(self._pm).items()},
+                set(self._pm_pending))
 
-    def rth(self, symbols: list[str]) -> dict[str, list[dict]]:
-        return self.data.bars(symbols, timeframe="1Min", start=self.sd.open_utc, end=self.sd.close_utc)
+    def rth(self, symbols: list[str]):
+        return self.data.bars_ex(symbols, timeframe="1Min", start=self.sd.open_utc,
+                                 end=self.sd.close_utc - timedelta(seconds=1))
 
 
 class LiveSource(ReplaySource):
-    """Incremental: each scan fetches only [last_end, as_of) and appends (15-min SIP delay honoured)."""
+    """Incremental with a PER-SYMBOL watermark: each symbol's watermark advances only when its batch succeeded, so
+    a failed batch leaves a visible gap that the next scan re-requests (no silent permanent hole). Requests use an
+    exclusive end (``end - 1s``; Alpaca's ``end`` is inclusive) so the boundary bar is never fetched twice, and bars
+    are keyed by (symbol, t) so any re-fetch replaces rather than duplicates."""
 
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
-        self._pm = {}
-        self._fetched_to: datetime | None = None
+        self._wm: dict[str, datetime] = {s: self.sd.premarket_start_utc for s in self.symbols}
 
-    def premarket(self, as_of: datetime) -> dict[str, list[dict]]:
-        start = self._fetched_to or self.sd.premarket_start_utc
+    def premarket(self, as_of: datetime) -> tuple[dict[str, list[dict]], set[str]]:
         end = min(as_of, self.sd.open_utc)
-        if end > start:
-            new = self.data.bars(self.symbols, timeframe="1Min", start=start, end=end)
-            for s, rows in new.items():
-                self._pm.setdefault(s, []).extend(rows)
-            self._fetched_to = end
-        return {s: complete_bars_as_of(rows, as_of) for s, rows in self._pm.items()}
+        groups: dict[datetime, list[str]] = {}
+        for s in self.symbols:
+            if self._wm[s] < end:
+                groups.setdefault(self._wm[s], []).append(s)
+        agg = {"batches": 0, "failed_batches": 0, "retried_batches": 0, "failed_symbols": 0}
+        for start, syms in sorted(groups.items()):
+            res = self.data.bars_ex(syms, timeframe="1Min", start=start, end=end - timedelta(seconds=1))
+            merge_bars(self._pm, res.bars)
+            for s in syms:
+                if s not in res.failed:
+                    self._wm[s] = end
+            for k in agg:
+                agg[k] += len(res.failed) if k == "failed_symbols" else getattr(res, k)
+        self.last_fetch["premarket"] = agg
+        incomplete = {s for s in self.symbols if self._wm[s] < end}
+        return ({s: complete_bars_as_of(rows, as_of) for s, rows in sorted_bars(self._pm).items()}, incomplete)
 
-    def rth(self, symbols: list[str]) -> dict[str, list[dict]]:
+    def rth(self, symbols: list[str]):
+        from talonx_premarket.alpaca_data import FetchResult
         end = min(data_as_of(datetime.now(timezone.utc), self.cfg), self.sd.close_utc)
         if end <= self.sd.open_utc:
-            return {}
-        return self.data.bars(symbols, timeframe="1Min", start=self.sd.open_utc, end=end)
+            return FetchResult()
+        return self.data.bars_ex(symbols, timeframe="1Min", start=self.sd.open_utc, end=end - timedelta(seconds=1))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -128,28 +160,50 @@ class Engine:
 
     # -- catalysts (bounded: gap candidates only) -------------------------------------------
     def _catalyst(self, sym: str, decision: datetime) -> CatalystEvidence:
+        """A lookup that could not complete is CATALYST UNKNOWN, never "no catalyst". Unknown contributes 0 score
+        points exactly as before (frozen scoring unchanged) but is labelled and counted."""
         m = self.members[sym]
         filings = []
+        unknown: list[str] = []
         if self.sec is not None and m.cik:
             subs, observed = self.sec.get(m.cik)
             if subs is not None:
                 filings = parse_submissions(subs, observed_at=observed)
+            else:
+                unknown.append("SEC lookup failed")
         owners = insider_open_market_owners(self.ledger_path, sym, scan_day=self.sd.day, decision_utc=decision) \
             if self.ledger_path else 0
-        return evaluate(filings, prev_session=self.sd.prev_session, scan_day=self.sd.day, decision_utc=decision,
-                        live=(self.mode == "live"), insider_owners=owners)
+        if owners is None:
+            unknown.append("insider ledger unavailable")
+            owners = 0
+        ev = evaluate(filings, prev_session=self.sd.prev_session, scan_day=self.sd.day, decision_utc=decision,
+                      live=(self.mode == "live"), insider_owners=owners)
+        if unknown:
+            ev.labels.append("catalyst lookup incomplete: " + ", ".join(unknown))
+            if ev.strength == "NONE":
+                ev.strength = "UNKNOWN"
+        return ev
 
     # -- one scan ------------------------------------------------------------------------------
     def scan(self, decision: datetime) -> ScanResult:
         t0 = time.monotonic()
         as_of = data_as_of(decision, self.cfg)
         phase = phase_at(decision, self.cfg)
-        daily = self.source.daily()
-        pm = self.source.premarket(as_of)
+        daily, daily_incomplete = self.source.daily()
+        pm, pm_incomplete = self.source.premarket(as_of)
+        incomplete = (daily_incomplete | pm_incomplete) & set(self.members)
+        stale = provider_stale(pm, as_of, self.sd)
         funnel = Counter(UNIVERSE=self.universe_total, ELIGIBLE=len(self.members))
         rejected = Counter()
         observations: dict[str, tuple[A.Observation, dict | None, dict | None, str]] = {}
+        cat_unknown = 0
         for sym in sorted(self.members):
+            if stale or sym in incomplete:
+                # data state unknown: HOLD -- no new candidate, no update, no invalidation for this symbol
+                funnel["PROVIDER_INCOMPLETE"] += 1
+                why = "PROVIDER_STALE" if stale else "PROVIDER_INCOMPLETE"
+                observations[sym] = (A.Observation(sym, f"UNKNOWN:{why}", None, None, None, None), None, None, "")
+                continue
             feats, why = F.compute(sym, daily.get(sym, []), pm.get(sym, []), prev_session=self.sd.prev_session,
                                    data_as_of=as_of, cfg=self.cfg)
             if feats is None:
@@ -166,6 +220,7 @@ class Engine:
                                                    feats.prev_close), feats.as_dict(), None, "")
                 continue
             cat = self._catalyst(sym, decision) if S.needs_catalyst_lookup(feats, self.cfg) else CatalystEvidence()
+            cat_unknown += int(cat.strength == "UNKNOWN")
             sc = S.score(feats, cat.strength, self.cfg)
             cls = S.classify(feats, sc, self.cfg)
             funnel["SCORED"] += 1
@@ -175,8 +230,17 @@ class Engine:
                                  feats.as_dict(), sc.as_dict(), cat.summary())
         funnel["ALERT_WORTHY"] = funnel[S.WATCH] + funnel[S.BULLISH_SETUP] + funnel[S.BEARISH_SETUP]
         emitted = self._apply_alerts(decision, as_of, phase, observations)
+        data = self.source.data
+        provider = {"PROVIDER_COMPLETE": not incomplete and not stale, "PROVIDER_STALE": stale,
+                    "DATA_GAPS": len(incomplete), "DATA_GAP_SYMBOLS": sorted(incomplete)[:50],
+                    "FETCH": dict(self.source.last_fetch),
+                    "FAILED_BATCHES_TOTAL": getattr(data, "failed_batches_total", 0),
+                    "RETRIED_BATCHES_TOTAL": getattr(data, "retried_batches_total", 0),
+                    "LAST_SUCCESSFUL_PROVIDER_FETCH": (data.last_success_utc.isoformat()
+                                                       if getattr(data, "last_success_utc", None) else None),
+                    "CATALYST_UNKNOWN": cat_unknown}
         res = ScanResult(decision.isoformat(), as_of.isoformat(), phase,
-                         {**dict(funnel), "hard_reject_reasons": dict(rejected)}, emitted,
+                         {**dict(funnel), "hard_reject_reasons": dict(rejected), "provider": provider}, emitted,
                          round(time.monotonic() - t0, 2))
         self.store.add_scan({"scan_id": f"{self.mode}:{decision.isoformat()}", "session_date": self.session,
                              "decision_utc": decision.isoformat(), "data_as_of_utc": as_of.isoformat(), "phase": phase,
@@ -192,8 +256,7 @@ class Engine:
     def _new_alerts_so_far(self) -> int:
         return sum(1 for rows in self._cands.values() for c in rows if c["first_alert_utc"])
 
-    def _upsert_candidate(self, row: dict) -> None:
-        self.store.upsert_candidate(row)
+    def _mirror_candidate(self, row: dict) -> None:
         rows = self._cands.setdefault(row["symbol"], [])
         for i, c in enumerate(rows):
             if c["candidate_id"] == row["candidate_id"]:
@@ -230,32 +293,47 @@ class Engine:
                      "data_as_of_utc": as_of.isoformat(), "score": obs.score, "gap_pct": obs.gap_pct,
                      "ref_price": obs.last_price, "text": text, "features_json": feats or {}, "score_json": sc or {},
                      "catalyst": cat, "mode": self.mode}
-            if d.suppressed:
-                alert["routed"] = f"SUPPRESSED:{d.suppressed}"
-            else:
-                alert["routed"] = self.route(alert)
-            self.store.add_alert(alert)
+            alert["routed"] = f"SUPPRESSED:{d.suppressed}" if d.suppressed else PENDING_ROUTE
             first = prev["first_alert_utc"] if prev else (None if d.suppressed else decision.isoformat())
-            self._upsert_candidate({
+            cand = {
                 "candidate_id": d.candidate_id, "session_date": self.session, "symbol": sym, "family": fam,
                 "state": d.new_state if not d.suppressed else f"SUPPRESSED_{d.new_state}",
                 "first_alert_utc": first, "last_alert_utc": decision.isoformat(),
                 "last_alert_score": obs.score, "last_alert_gap": obs.gap_pct,
                 "ref_price": prev["ref_price"] if prev else obs.last_price,
                 "prev_close": prev["prev_close"] if prev else obs.prev_close,
-                "delivered": int(bool(prev and prev["delivered"]) or alert["routed"].startswith("ENQUEUED")),
-                "updated_utc": decision.isoformat()})
+                "delivered": int(bool(prev and prev.get("delivered"))),   # 1 only once an alert was actually SENT
+                "updated_utc": decision.isoformat()}
+            # durable FIRST (alert + candidate in one transaction), THEN route: a crash between the two can only
+            # leave a PENDING_ROUTE alert that is re-routed idempotently on restart -- never a second NEW alert.
+            self.store.persist_decision(alert, cand)
+            self._mirror_candidate(cand)
+            if not d.suppressed:
+                alert["routed"] = self.route(alert)
+                self.store.set_routed(alert["alert_id"], alert["routed"])
             emitted.append(alert)
         return emitted
+
+    def resume_pending_routes(self) -> int:
+        """Re-route alerts persisted but not yet routed (crash window). Routing is idempotent (event_id)."""
+        n = 0
+        for a in self.store.alerts_for(self.session):
+            if a["routed"] == PENDING_ROUTE:
+                self.store.set_routed(a["alert_id"], self.route(a))
+                n += 1
+        return n
 
     # -- post-open tracking (evaluation only) -------------------------------------------------
     def track_outcomes(self, now: datetime) -> list[dict]:
         cands = [c for c in self.store.candidates_for(self.session) if c["first_alert_utc"]]
         if not cands:
             return []
-        bars = self.source.rth(sorted({c["symbol"] for c in cands}))
+        fetched = self.source.rth(sorted({c["symbol"] for c in cands}))
+        bars = fetched.bars
         out = []
         for c in cands:
+            if c["symbol"] in fetched.failed:
+                continue                      # provider failure: keep the last persisted outcome, retry next cycle
             m = measure(family=c["family"], ref_price=c["ref_price"], prev_close=c["prev_close"],
                         rth_bars=bars.get(c["symbol"], []), open_utc=self.sd.open_utc, close_utc=self.sd.close_utc,
                         confirm_min=self.cfg.confirm_horizon_min)
@@ -267,6 +345,23 @@ class Engine:
             self.store.upsert_outcome(row)
             out.append(row)
         return out
+
+
+PENDING_ROUTE = "PENDING_ROUTE"
+# Universe-wide data-state guard (not a scoring rule): once the pre-market has been open for this long, at least one
+# of ~5.6k symbols prints every few minutes. If the newest complete bar anywhere is older than this, the provider is
+# lagging and every symbol is HELD as unknown (no candidate created, updated or invalidated from stale data).
+PROVIDER_STALE_AFTER = timedelta(minutes=15)
+
+
+def provider_stale(pm: dict[str, list[dict]], as_of: datetime, sd: SessionDay) -> bool:
+    if as_of - sd.premarket_start_utc < PROVIDER_STALE_AFTER:
+        return False
+    newest = max((rows[-1]["t"] for rows in pm.values() if rows), default=None)
+    if newest is None:
+        return True
+    from talonx_premarket.alpaca_data import parse_ts
+    return as_of - (parse_ts(newest) + timedelta(minutes=1)) > PROVIDER_STALE_AFTER
 
 
 def write_status(path: Path, payload: dict) -> None:

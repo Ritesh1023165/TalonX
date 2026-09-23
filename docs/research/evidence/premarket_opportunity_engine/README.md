@@ -29,6 +29,7 @@
 | [ALERT_CONTRACT.md](ALERT_CONTRACT.md) | Research-only semantics, dedup and state machine, isolated RESEARCH routing, post-open outcomes |
 | [SHADOW_REPLAY_2026-09-23.md](SHADOW_REPLAY_2026-09-23.md) | Causal replay, comparison with Session 03, ADC, legacy Quant, outcome table |
 | [TEST_EVIDENCE.md](TEST_EVIDENCE.md) | Tests and regression comparison |
+| [PR19_HARDENING_REVIEW.md](PR19_HARDENING_REVIEW.md) | Final review: 2 CRITICAL + 4 HIGH + 6 MEDIUM findings fixed (provider watermark, inclusive `end` duplication, false invalidation, restart duplicates, enqueued≠sent, …) |
 | [TOMORROW_CANARY_RUNBOOK.md](TOMORROW_CANARY_RUNBOOK.md) | Exact commands for 2026-09-24 |
 
 ## Readiness: `READY_WITH_BOUNDED_FINDINGS`

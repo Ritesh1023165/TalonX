@@ -136,8 +136,12 @@ def test_bars_client_batches_paginates_and_reports_errors():
     d = AlpacaData(key_id="k", secret="s", cfg=cfg, http_get=get, limiter=RateLimiter(1000))
     out = d.bars(["A0", "A1", "B0"], timeframe="1Min", start=datetime(2026, 9, 23, 8, tzinfo=UTC),
                  end=datetime(2026, 9, 23, 9, tzinfo=UTC))
-    assert out == {"A0": [{"t": "x"}], "A1": [{"t": "y"}]} and len(calls) == 3
+    assert out == {"A0": [{"t": "x"}], "A1": [{"t": "y"}]}
+    assert len(calls) == 4                      # A-batch: 2 pages; B-batch: 1 attempt + 1 retry
     assert d.errors and "HTTP 500" in d.errors[0]
+    res = d.bars_ex(["B0"], timeframe="1Min", start=datetime(2026, 9, 23, 8, tzinfo=UTC),
+                    end=datetime(2026, 9, 23, 9, tzinfo=UTC))
+    assert res.failed == {"B0"} and not res.complete and res.failed_batches == 1 and res.retried_batches == 1
 
 
 def test_rate_limiter_waits_instead_of_exceeding_budget():
@@ -315,7 +319,7 @@ def test_research_router_uses_only_the_research_destination(tmp_path, monkeypatc
     from talonx_ops.notify.outbox import NotifyStore
     from talonx_premarket.__main__ import _router
     monkeypatch.delenv("TALONX_NOTIFY_RESEARCH_ENABLED", raising=False)
-    route, drain, info = _router(True, tmp_path / "research.db")
+    route, drain, sync, info = _router(True, tmp_path / "research.db")
     assert info["research_destination_enabled"] is False
     alert = {"alert_id": "2026-09-23:XYZ:GAP_UP:WATCH:t", "decision_utc": "2026-09-23T12:00:00+00:00",
              "alert_type": "WATCH", "text": "x", "candidate_id": "c", "symbol": "XYZ"}
@@ -326,7 +330,7 @@ def test_research_router_uses_only_the_research_destination(tmp_path, monkeypatc
     assert len(rows) == 1 and rows[0]["event_type"].startswith("PREMARKET_RESEARCH_")
     assert not st.outbox_due(now_iso="2026-09-23T12:01:00+00:00", destination=TRADE_EVENT)
     assert drain()["skipped_disabled"] == 1                                   # disabled -> nothing sent
-    r2, _, _ = _router(False, tmp_path / "x.db")
+    r2, _, _, _ = _router(False, tmp_path / "x.db")
     assert r2(alert) == "RECORDED_NOT_DELIVERED"
     for protected in ("v2_release_rc1_notifications.db", "notifications.db", "v2_release_rc1.db"):
         with pytest.raises(SystemExit):
@@ -373,16 +377,33 @@ def test_outcome_horizons_mfe_mae_and_confirmation_status():
 
 # ------------------------------------------------------------------------ engine: causal / no lookahead
 class _FakeData:
-    requests = 0
-    errors: list = []
+    """Provider fake with Alpaca's verified semantics: ``end`` INCLUSIVE; optional per-symbol failure injection."""
 
-    def __init__(self, daily, pm, rth=None):
+    def __init__(self, daily, pm, rth=None, fail=None):
         self._d, self._pm, self._rth = daily, pm, rth or {}
+        self.fail = fail if fail is not None else set()      # symbols whose batch fails (mutable during a test)
+        self.requests, self.errors, self.calls = 0, [], []
+        self.failed_batches_total = self.retried_batches_total = 0
+        self.last_success_utc = None
+
+    def bars_ex(self, symbols, *, timeframe, start, end, attempts=2):
+        from talonx_premarket.alpaca_data import FetchResult, parse_ts
+        self.requests += 1
+        self.calls.append((timeframe, start, end, tuple(symbols)))
+        src = self._d if timeframe == "1Day" else (self._rth if (start.hour, start.minute) >= (13, 30) else self._pm)
+        res = FetchResult(batches=1)
+        bad = set(symbols) & self.fail
+        if bad:
+            res.failed = set(bad)
+            res.failed_batches = 1
+            self.failed_batches_total += 1
+            self.errors.append(f"injected failure {sorted(bad)}")
+        res.bars = {s: [b for b in src.get(s, []) if start <= parse_ts(b["t"]) <= end]
+                    for s in symbols if s not in bad}
+        return res
 
     def bars(self, symbols, *, timeframe, start, end):
-        src = self._d if timeframe == "1Day" else (self._rth if start.hour >= 13 and start.minute >= 30 else self._pm)
-        from talonx_premarket.alpaca_data import parse_ts
-        return {s: [b for b in src.get(s, []) if start <= parse_ts(b["t"]) < end] for s in symbols}
+        return self.bars_ex(symbols, timeframe=timeframe, start=start, end=end).bars
 
 
 def _engine(tmp_path, pm, rth=None):

@@ -58,8 +58,13 @@ class AlertDecision:
 
 def decide(prev: dict | None, obs: Observation, *, session_date: str, now: datetime, new_alerts_so_far: int,
            cfg: PremarketConfig = PREMARKET_RESEARCH_V1) -> AlertDecision | None:
-    """``prev`` is the stored candidate row for obs' identity (or None). Pure function."""
+    """``prev`` is the stored candidate row for obs' identity (or None). Pure function.
+
+    ``UNKNOWN:*`` (provider fetch incomplete / provider stale) is DATA_STATE_UNKNOWN, not a market fact: it never
+    creates, updates or invalidates a candidate. Only an observation computed from complete data can invalidate."""
     cls = obs.classification
+    if cls.startswith("UNKNOWN:"):
+        return None
     if prev is None:
         if cls not in ACTIVE_STATES or obs.gap_pct is None:
             return None

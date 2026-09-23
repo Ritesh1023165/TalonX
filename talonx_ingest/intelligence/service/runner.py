@@ -579,6 +579,11 @@ class IntelligenceService:
                 logger.warning("Operations health recording failed")
             cycle_summaries.append(summary)
             cycles += 1
+            try:  # durable bounded per-poll history (pure telemetry; never affects the cycle)
+                from talonx_ingest.intelligence.service.poll_history import record as _record_poll
+                _record_poll(self.config.state_dir, cycle=cycles, summary=summary)
+            except Exception:  # noqa: BLE001
+                logger.debug("poll-history record failed", exc_info=True)
 
             if with_backfill and self.backfill is not None:
                 nxt = self._next_backfill_symbol()
