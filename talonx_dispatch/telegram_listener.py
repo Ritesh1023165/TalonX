@@ -880,6 +880,7 @@ class TelegramReplyListener:
         new counters (see their own docstrings for why brain_llm_calls
         specifically must NOT be used as a reports_generated proxy)."""
         published = await _get_metric(client, "quant", "published")
+        published_no_sub = await _get_metric(client, "quant", "published_no_subscriber")
         brain_received = await _get_metric(client, "brain", "received")
         brain_reports = await _get_metric(client, "brain", "reports_generated")
         core_signals = await _get_metric(client, "core", "signals_received")
@@ -899,8 +900,12 @@ class TelegramReplyListener:
 
         lines = [
             "\U0001F504 SIGNAL LIFECYCLE",
-            f"  Quant published: {_fmt_metric(published)}",
-            f"  Brain received: {_fmt_metric(brain_received)}",
+            # Session 03 A4: this counter is SHARED -- the Experimental lane's own Quant instance increments
+            # the same key when it publishes on its isolated talonx:exp:signals:quant channel, which
+            # Brain/Core never subscribe to by design. It is not an Original->Brain delivery count.
+            f"  Quant published (all lanes incl. Experimental talonx:exp:*): {_fmt_metric(published)}",
+            f"  Quant published with zero subscribers: {_fmt_metric(published_no_sub)}",
+            f"  Brain received (Original talonx:signals:quant only): {_fmt_metric(brain_received)}",
             f"  Brain reports generated: {_fmt_metric(brain_reports)}",
             f"  Core signals received: {_fmt_metric(core_signals)}",
             f"  Core reports received: {_fmt_metric(core_reports)}",
@@ -1084,20 +1089,14 @@ class TelegramReplyListener:
         #    + V2 actionable outbox (already in v2_service_status.json) ---
         lines.append("")
         lines.append("\U0001F4EC DELIVERY")
-        counts, last_sent = self._intel_delivery_counts()
-        if counts is None:
+        # Session 03 A5: live queue vs historical expiry, not all-time totals (talonx_ops.intel_queue).
+        breakdown = self._intel_delivery_breakdown()
+        if breakdown is None:
             lines.append("  Discovery informational queue: unknown (ledger DB unavailable)")
         else:
-            lines.append(
-                "  Discovery informational queue -- pending: {p}, sent: {s}, "
-                "expired/held: {e}, failed: {f}".format(
-                    p=counts.get("PENDING", 0), s=counts.get("SENT", 0),
-                    e=counts.get("EXPIRED", 0), f=counts.get("FAILED", 0),
-                )
-            )
-            lines.append(
-                "  Last successful discovery delivery: " + (last_sent if last_sent else "none in retained history")
-            )
+            from talonx_ops.intel_queue import format_breakdown
+            lines.extend(format_breakdown(breakdown))
+
         if v2 is not None:
             ao = v2.get("alert_outbox") or {}
             lines.append(
@@ -1168,27 +1167,19 @@ class TelegramReplyListener:
             logger.warning("Discovery bounded-count query failed: %s", exc)
             return None
 
-    def _intel_delivery_counts(self) -> tuple[dict | None, str | None]:
-        """Two single bounded queries (GROUP BY state; MAX(sent_at_utc)) --
-        no per-row scan, no filing content read. (None, None) on failure."""
+    def _intel_delivery_breakdown(self) -> dict | None:
         try:
             import sqlite3
-            path = self._intel_ledger_path()
-            con = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=2.0)
+
+            from talonx_ops.intel_queue import delivery_queue_breakdown
+            con = sqlite3.connect(f"file:{self._intel_ledger_path()}?mode=ro", uri=True, timeout=2.0)
             try:
-                rows = con.execute(
-                    "SELECT state, COUNT(*) FROM intelligence_delivery GROUP BY state"
-                ).fetchall()
-                counts = {state: n for state, n in rows}
-                last = con.execute(
-                    "SELECT MAX(sent_at_utc) FROM intelligence_delivery WHERE state='SENT'"
-                ).fetchone()
-                return counts, (last[0] if last else None)
+                return delivery_queue_breakdown(con)
             finally:
                 con.close()
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Discovery delivery-count query failed: %s", exc)
-            return None, None
+            logger.warning("Discovery delivery breakdown query failed: %s", exc)
+            return None
 
     async def _ws_status(self) -> str:
         client = getattr(self.dispatch_agent, "_client", None)

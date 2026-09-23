@@ -97,6 +97,12 @@ def cmd_start(args) -> int:
                                           deliver=args.deliver, transport=args.transport,
                                           env={**os.environ, **env})
         atomic_write(sd / "release_gate.json", json.dumps(gate.to_dict(), indent=2, default=str))
+        # Session 03 A1: the operator sees the EFFECTIVE Intelligence delivery state, not the pre-start env.
+        from talonx_v2.release_gate import intelligence_delivery_state
+        _ids = intelligence_delivery_state({**os.environ, **env}, deliver=args.deliver, transport=args.transport)
+        print(f"INTELLIGENCE DELIVERY: configured={_ids['configured']} "
+              f"runtime_requested_by_start={'ON' if _ids['runtime_requested'] else 'OFF'} "
+              f"effective={_ids['effective']}")
         if gate.status != "READY":
             print("START REFUSED: release readiness gate NOT_READY")
             for c in gate.failed:
@@ -191,6 +197,33 @@ def cmd_start(args) -> int:
             "FAILED_WITH_RESIDUALS": 4}.get(verdict, 2)
 
 
+SHUTDOWN_NOTICE_DRAIN_TIMEOUT_S = 20.0
+
+
+def drain_operations_bounded(store, *, timeout_s: float = SHUTDOWN_NOTICE_DRAIN_TIMEOUT_S, drain=None) -> dict:
+    """Drain the OPERATIONS destination once, in a daemon thread with a hard wall-clock bound, so a
+    slow/unreachable Telegram can never hang `prospective close`. Disabled destination -> rows stay
+    PENDING (worker.drain semantics); a timeout leaves the row for its normal deadline expiry."""
+    import threading
+
+    from talonx_ops.notify import OPERATIONS
+    if drain is None:
+        from talonx_ops.notify.worker import drain
+    out: dict = {"status": "TIMEOUT", "timeout_s": timeout_s}
+
+    def _run() -> None:
+        try:
+            summary = drain(store, destination=OPERATIONS)
+            out.update(status="DRAINED", summary=summary)
+        except Exception as exc:  # noqa: BLE001
+            out.update(status="ERROR", error=type(exc).__name__)
+
+    t = threading.Thread(target=_run, name="shutdown-notice-drain", daemon=True)
+    t.start()
+    t.join(timeout_s)
+    return dict(out)
+
+
 def cmd_close(args) -> int:
     from talonx_ops.prospective.close import render_report, run_close
     sd = session_dir()
@@ -205,10 +238,14 @@ def cmd_close(args) -> int:
         from talonx_ops.notify.producers import enqueue_lifecycle_event
         from talonx_ops.prospective.close import _default_ops_notify_store
         campaign_id = (res.v2_reconciliation or {}).get("campaign_id", "V2")
+        _ops_store = _default_ops_notify_store()
         enqueue_lifecycle_event(
-            _default_ops_notify_store(), event_type="SHUTDOWN", campaign_id=campaign_id,
+            _ops_store, event_type="SHUTDOWN", campaign_id=campaign_id,
             detail=f"prospective close: verdict={res.verdict} shutdown_performed="
                    f"{res.shutdown.get('performed')}")
+        # Session 03 A6: the V2 companion (the only Operations drainer) is already stopped here, so
+        # SHUTDOWN used to sit PENDING until it expired. One bounded drain of OPERATIONS only.
+        res.shutdown["shutdown_notice"] = drain_operations_bounded(_ops_store)
     except Exception:  # noqa: BLE001
         pass
     eod_evidence = dict(res.to_dict(), reconciled_at_utc=now_pair()["utc"])

@@ -170,25 +170,61 @@ def enqueue_delivery_subsystem_failure(ops_store, *, destination: str, reason: s
     )
 
 
-def enqueue_degraded_health(ops_store, *, component: str, condition: str, now=None) -> bool:
-    """One incident per component/condition/hour; raw errors never enter payloads."""
+def enqueue_degraded_health(ops_store, *, component: str, condition: str, now=None,
+                            causes: list[str] | tuple[str, ...] = ()) -> bool:
+    """One incident per component/condition/hour; raw errors never enter payloads. ``causes`` are
+    fixed cause CODES (never raw error text) so the incident says which predicate fired."""
     from datetime import timedelta
     now = now or datetime.now(timezone.utc)
     key = f"health:{component}:{condition}:{now:%Y-%m-%dT%H}"
+    cause_txt = f" Causes: {', '.join(causes)}." if causes else ""
     return ops_store.enqueue(
         event_id=_event_id(key), destination=OPERATIONS, event_type="DEGRADED_HEALTH",
         producer=component, dedup_key=key,
-        payload_text=f"OPERATIONS: {component}: {condition}. Inspect dashboard and local evidence.",
-        provenance={"component": component, "condition": condition},
+        payload_text=f"OPERATIONS: {component}: {condition}.{cause_txt} Inspect dashboard and local evidence.",
+        provenance={"component": component, "condition": condition, "causes": list(causes)},
         deliver_by_utc=(now + timedelta(hours=1)).isoformat())
 
 
-def record_intelligence_health(*, degraded: bool, now=None):
+# Session 03 A3: cause codes for the Intelligence health predicate. The recovery pass (bounded backlog/
+# deferred-event enrichment) is reported separately from the live poll / source / delivery path: on
+# 2026-09-22 and 2026-09-23 the only trigger was a recovery-pass per-event timeout caused by SEC 429s on
+# historical 10-Q comparison fetches while live polling was 39/39 FRESH.
+INTEL_RECOVERY_CAUSES = frozenset({"RECOVERY_PASS_TIMED_OUT", "RECOVERY_PASS_FAILED"})
+
+
+def intelligence_health_causes(*, symbols_failed: int, poll_errors: int, recovery: dict | None,
+                               delivery_ok: bool, freshness: str | None) -> list[str]:
+    recovery = recovery or {}
+    causes: list[str] = []
+    if symbols_failed:
+        causes.append("POLL_SYMBOL_FAILURES")
+    if poll_errors:
+        causes.append("POLL_ERRORS")
+    if recovery.get("timed_out"):
+        causes.append("RECOVERY_PASS_TIMED_OUT")
+    if recovery.get("failed"):
+        causes.append("RECOVERY_PASS_FAILED")
+    if not delivery_ok:
+        causes.append("DELIVERY_NOT_OK")
+    if freshness in ("DOWN", "STALE"):
+        causes.append(f"SOURCE_{freshness}")
+    return causes
+
+
+def intelligence_health_condition(causes) -> str:
+    if causes and set(causes) <= INTEL_RECOVERY_CAUSES:
+        return "RECOVERY_PASS_DEGRADED"      # live poll/source/delivery healthy this cycle
+    return "PROCESSING_OR_INPUT_DEGRADED"
+
+
+def record_intelligence_health(*, degraded: bool, now=None, causes: list[str] | None = None):
     """Runtime-only opt-in; shared independently enabled Operations outbox."""
     import os
     if not degraded or os.environ.get("TALONX_NOTIFY_OPERATIONS_ENABLED", "0") != "1":
         return False
     from talonx_ops.notify.outbox import NotifyStore
+    causes = list(causes or [])
     return enqueue_degraded_health(
         NotifyStore(os.environ.get("TALONX_NOTIFY_DB_PATH", "notifications.db")),
-        component="intelligence", condition="PROCESSING_OR_INPUT_DEGRADED", now=now)
+        component="intelligence", condition=intelligence_health_condition(causes), now=now, causes=causes)

@@ -263,11 +263,10 @@ def _start_stack_locked(sd, logs, py, *, env, tick_seconds, heartbeat_seconds,
     # should govern both lanes together, not two separately-remembered
     # switches. `--transport dryrun` intentionally does NOT flip these
     # (dry-run stays dry-run for Intelligence too).
-    if transport == "telegram" and deliver:
-        if "TALONX_INTEL_DELIVER_CARDS" not in env and "TALONX_INTEL_DELIVER_CARDS" not in os.environ:
-            env = {**env, "TALONX_INTEL_DELIVER_CARDS": "1"}
-        if "TALONX_INTEL_DRY_RUN_DELIVERY" not in env and "TALONX_INTEL_DRY_RUN_DELIVERY" not in os.environ:
-            env = {**env, "TALONX_INTEL_DRY_RUN_DELIVERY": "0"}
+    # Session 03 A1: the SAME helper the release gate uses to report configured/runtime/effective state.
+    from talonx_v2.release_gate import intelligence_delivery_env_overrides
+    env = {**env, **intelligence_delivery_env_overrides({**os.environ, **env}, deliver=deliver,
+                                                        transport=transport)}
     try:
         sup_argv = [py, "-m", "talonx_ops.supervisor", "run"]
         if not with_dashboard:

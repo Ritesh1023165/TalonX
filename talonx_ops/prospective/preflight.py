@@ -122,6 +122,26 @@ FREEZE_RELEASE_FIDELITY_FIX_FILES = (
 )
 
 
+# POST-FREEZE SESSION 03 HARDENING -- an EXPLICIT, closed list (A1 effective Intelligence delivery state, A2 Intelligence
+# card acceptance-time rendering, A3 Intelligence health cause codes, A4/A5 /ping clarity, A6 bounded SHUTDOWN drain).
+# Intelligence/ops observability only: no strategy-fingerprint file, no provider/pricing/accounting/ledger file and no V2
+# admission input (guarded by a test). Any other runtime change is still NO_GO.
+FREEZE_SESSION03_HARDENING_FILES = (
+    "talonx_ingest/intelligence/sec_time.py",
+    "talonx_ingest/intelligence/domain.py",
+    "talonx_ingest/intelligence/pipeline.py",
+    "talonx_ingest/intelligence/delivery/renderer.py",
+    "talonx_ingest/intelligence/service/runner.py",
+    "talonx_ingest/intelligence/service/poll_history.py",
+    "talonx_ops/intel_queue.py",
+    "talonx_ops/prospective/proc.py",
+    "talonx_dispatch/telegram_listener.py",
+)
+# ISOLATED RESEARCH LANE -- the broad-universe pre-market research engine is a separate package run as its own process.
+# Nothing in the frozen release imports it (guarded by a test), it never trades, and it never writes a V2 ledger/outbox.
+FREEZE_RESEARCH_LANE_PREFIXES = ("talonx_premarket/",)
+
+
 def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None) -> tuple[bool, str]:
     if head.startswith(expected_sha):
         return True, "HEAD is the frozen release SHA"
@@ -137,11 +157,14 @@ def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None)
     except Exception as exc:  # noqa: BLE001 -- fail closed
         return False, f"could not verify ancestry: {type(exc).__name__}"
     extra = [f for f in diff if not (f.startswith(FREEZE_ALLOWED_PREFIXES) or f in FREEZE_ALLOWED_FILES
-                                       or f in FREEZE_OPS_HARDENING_FILES or f in FREEZE_RELEASE_FIDELITY_FIX_FILES)]
+                                       or f in FREEZE_OPS_HARDENING_FILES or f in FREEZE_RELEASE_FIDELITY_FIX_FILES
+                                       or f in FREEZE_SESSION03_HARDENING_FILES
+                                       or f.startswith(FREEZE_RESEARCH_LANE_PREFIXES))]
     if extra:
         return False, f"runtime files changed after the frozen release: {extra[:5]}"
-    return True, (f"HEAD descends from the frozen release; only docs/tests/pin/declared ops-hardening and "
-                  f"release-fidelity-fix files changed ({len(diff)} files)")
+    return True, (f"HEAD descends from the frozen release; only docs/tests/pin/declared ops-hardening, "
+                  f"release-fidelity-fix, Session-03-hardening and isolated research-lane files changed "
+                  f"({len(diff)} files)")
 
 
 def run_preflight(*, expected_sha: str = RELEASE_SHA_EXPECTED,

@@ -1,0 +1,27 @@
+{
+ "summary": {
+  "total": 14373,
+  "eligible": 5655,
+  "excluded": 8718,
+  "excluded_by_reason": {
+   "DEPOSITARY_NON_ADR": 5,
+   "FUND_ETF_ETN": 5968,
+   "MALFORMED_OR_NON_COMMON_SYMBOL": 447,
+   "NOTE_DEBT": 167,
+   "NOT_LISTED_EXCHANGE": 308,
+   "NOT_SEC_REGISTRANT_TICKER": 26,
+   "NOT_TRADABLE": 878,
+   "PREFERRED": 109,
+   "RIGHT": 126,
+   "UNIT": 274,
+   "WARRANT": 410
+  },
+  "eligible_by_exchange": {
+   "AMEX": 246,
+   "ARCA": 20,
+   "BATS": 1,
+   "NASDAQ": 3391,
+   "NYSE": 1997
+  }
+ }
+}
