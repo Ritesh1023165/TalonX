@@ -163,7 +163,9 @@ def _router(deliver: bool, notify_db: Path):
             counts[st] = counts.get(st, 0) + 1
         return counts
 
-    return route, drain, sync, {"deliver_flag": deliver, "research_destination_enabled": cfg.enabled,
+    return route, drain, sync, {"deliver_flag": deliver, "destination": RESEARCH,
+                                "bot": "LAB" if cfg.enabled else None,        # identity label only, never the token
+                                "research_destination_enabled": cfg.enabled,
                                 "research_destination_reason": cfg.reason}
 
 

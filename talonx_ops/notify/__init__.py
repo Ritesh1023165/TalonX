@@ -76,16 +76,19 @@ def resolve_destination_config(destination: str) -> DestinationConfig:
             return DestinationConfig(RESEARCH, False, None, None,
                                      "RESEARCH enabled but TALONX_NOTIFY_RESEARCH_BOT_TOKEN/"
                                      "_CHAT_ID not configured -- no fallback to the primary bot")
-        # A distinct token does not isolate output if it targets the primary chat.
-        primary_chat = _env("TALONX_NOTIFY_TRADE_EVENT_CHAT_ID") or _env("TELEGRAM_CHAT_ID")
-        primary_token = _env("TALONX_NOTIFY_TRADE_EVENT_BOT_TOKEN") or _env("TELEGRAM_BOT_TOKEN")
-        if primary_token and token == primary_token:
-            return DestinationConfig(RESEARCH, False, None, None,
-                                     "RESEARCH bot aliases TRADE_EVENT; independent poller required")
-        if primary_chat and chat == primary_chat:
-            return DestinationConfig(RESEARCH, False, None, None,
-                                     "RESEARCH chat aliases TRADE_EVENT; isolation required")
-        return DestinationConfig(RESEARCH, True, token, chat, "RESEARCH explicitly enabled")
+        # Isolation = logical destination + bot identity + event contract, NOT chat_id uniqueness.
+        # A chat_id names the Telegram conversation; the bot token names the sender. The owner's
+        # private chat_id is identical for every bot, so Signal/Sentinel/Lab MAY share it -- each
+        # bot still posts into its own conversation. What must never be shared is the bot token:
+        # a reused token would put RESEARCH output under the Signal/Sentinel identity.
+        for other, other_token in (
+                (TRADE_EVENT, _env("TALONX_NOTIFY_TRADE_EVENT_BOT_TOKEN")),
+                (OPERATIONS, _env("TALONX_NOTIFY_OPERATIONS_BOT_TOKEN")),
+                ("the legacy primary bot", _env("TELEGRAM_BOT_TOKEN"))):
+            if other_token and token == other_token:
+                return DestinationConfig(RESEARCH, False, None, None,
+                                         f"RESEARCH bot aliases {other}; a distinct Lab bot token is required")
+        return DestinationConfig(RESEARCH, True, token, chat, "RESEARCH explicitly enabled (distinct Lab bot)")
 
     # TRADE_EVENT / OPERATIONS: destination-specific credentials, or fall
     # back to the existing single official bot (today's behavior).
