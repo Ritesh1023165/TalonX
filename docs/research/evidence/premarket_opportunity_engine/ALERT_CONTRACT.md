@@ -56,16 +56,16 @@ Every alert event is persisted in `premarket_research.db` (`alerts`, `candidates
 
 | Item | Value |
 |---|---|
-| **RESEARCH DESTINATION** | Logical destination `RESEARCH` in `talonx_ops.notify`, which is TalonX Lab. It needs its own bot token **and** chat, plus `TALONX_NOTIFY_RESEARCH_ENABLED=1`. It refuses to alias the TRADE_EVENT bot or chat, and has no fallback. |
+| **RESEARCH DESTINATION** | Logical destination `RESEARCH` in `talonx_ops.notify`, which is TalonX Lab. It needs its own **bot token** and a chat, plus `TALONX_NOTIFY_RESEARCH_ENABLED=1`. It refuses a bot token shared with Signal, Sentinel or the legacy primary bot, and has no fallback. The chat_id **may** be the same private owner chat Signal and Sentinel use (see [`docs/NOTIFICATION_CONTRACT.md`](../../../NOTIFICATION_CONTRACT.md)). |
 | Outbox | Its own file, `results/premarket_research/premarket_research_notifications.db`. The engine refuses `v2_release_rc1_notifications.db`, `notifications.db`, `v2_release_rc1.db` and `v2_lane.db`. |
 | Event types | `PREMARKET_RESEARCH_<TYPE>` (never TRADE_EVENT) |
 | Freshness | `deliver_by = decision + 30 min`, so an alert that can't be sent promptly expires rather than arriving late |
-| **LIVE ENABLED NOW** | **NO.** `.env` has `TALONX_NOTIFY_RESEARCH_ENABLED=0`, **and** the configured research chat ID equals the primary chat ID, so `resolve_destination_config(RESEARCH)` refuses it ("RESEARCH chat aliases TRADE_EVENT; isolation required"). |
+| **LIVE ENABLED NOW** | **NO.** `.env` has `TALONX_NOTIFY_RESEARCH_ENABLED=0`. Lab is configured (distinct bot, shared owner chat allowed) and becomes enabled only in a process that sets the flag itself. |
 | Default canary mode | `python -m talonx_premarket run`, without `--deliver`: every alert is recorded (`routed=RECORDED_NOT_DELIVERED`) and nothing is sent. |
 
 **Explicit canary enable step** (operator action; secrets typed by the operator, never echoed):
-1. Create or pick a separate Telegram chat for TalonX Lab. It must not be the Signal/primary chat.
-2. Set `TALONX_NOTIFY_RESEARCH_CHAT_ID` to that chat in `.env`. The research bot token is already distinct.
+1. Make sure `TALONX_NOTIFY_RESEARCH_BOT_TOKEN` is the TalonX Lab bot (distinct from Signal and Sentinel).
+2. `TALONX_NOTIFY_RESEARCH_CHAT_ID` may be your private owner chat, the same one Signal and Sentinel use.
 3. Start the engine with the flag scoped to **its own process only**, never in the V2 stack's shell. The V2 release gate's `lab_off` check must stay PASS:
    ```powershell
    $env:TALONX_NOTIFY_RESEARCH_ENABLED = "1"; .venv\Scripts\python.exe -m talonx_premarket run --deliver
@@ -75,7 +75,7 @@ Every alert event is persisted in `premarket_research.db` (`alerts`, `candidates
 
 **Guards and tests:**
 - `test_research_router_uses_only_the_research_destination`: only RESEARCH rows are written; a disabled destination sends nothing; protected DBs are refused.
-- `test_research_destination_refuses_to_alias_the_primary_chat`.
+- `test_research_destination_allows_same_chat_but_refuses_the_primary_bot` and `tests/test_notify_same_chat_isolation.py`: same chat_id allowed; reused Signal/Sentinel/legacy bot token rejected; each destination drains through its own bot only.
 - `test_research_lane_has_no_trading_or_v2_ledger_capability`: token scan for `TRADE_EVENT`, `submit_order`, `PaperTradingStore`, `execute_buy/sell`, and any `talonx_v2` import.
 - `test_no_frozen_release_module_imports_the_research_lane`.
 

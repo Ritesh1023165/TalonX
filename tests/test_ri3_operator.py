@@ -176,7 +176,7 @@ def test_explicit_validation_evidence_requires_current_destination_config(tmp_pa
     monkeypatch.setenv('TALONX_NOTIFY_OPERATIONS_CHAT_ID', 'different-chat')
     assert not notification_view([], [], validation_path=evidence)['OPERATIONS']['real_delivery_validated']
 
-@pytest.mark.parametrize('enabled,chat,expected',[('0','research',False),('1','primary',False),('1','research',True)])
+@pytest.mark.parametrize('enabled,chat,expected',[('0','research',False),('1','primary',True),('1','research',True)])  # same chat + own bot is allowed
 def test_research_no_primary_fallback(monkeypatch,enabled,chat,expected):
     monkeypatch.setenv('TELEGRAM_CHAT_ID','primary')
     monkeypatch.setenv('TELEGRAM_BOT_TOKEN','primary-token')

@@ -108,17 +108,15 @@ The process sleeps until 08:15Z, scans every 15 min in EARLY and every 5 min in 
 
 ## 3. Optional: live Telegram research delivery (explicit, operator-only)
 
-Research delivery is **OFF**, and currently **cannot** be enabled by accident. The configured `TALONX_NOTIFY_RESEARCH_CHAT_ID` equals the primary chat, so `resolve_destination_config(RESEARCH)` refuses it.
+Research delivery is **OFF** persistently (`.env` has `TALONX_NOTIFY_RESEARCH_ENABLED=0`). The TalonX Lab bot is distinct from Signal and Sentinel. It posts to the same private owner chat, which is allowed: isolation comes from the bot identity and the destination, not the chat_id ([`docs/NOTIFICATION_CONTRACT.md`](../../../NOTIFICATION_CONTRACT.md)).
 
-To enable it for the canary:
-1. Use a separate Telegram chat for TalonX Lab. It must not be the Signal/primary chat.
-2. Put that chat ID into `TALONX_NOTIFY_RESEARCH_CHAT_ID` in `.env`, and keep `TALONX_NOTIFY_RESEARCH_ENABLED=0` there.
-3. Start the engine with the flag scoped to this one process:
-   ```powershell
-   $env:TALONX_NOTIFY_RESEARCH_ENABLED = "1"
-   .venv\Scripts\python.exe -m talonx_premarket run --deliver --v2-scope-log results\prospective_2026-09-24\logs\v2_companion.log
-   ```
-4. The status block must show `"research_destination_enabled": true`. If it's false, it prints the reason, and alerts are enqueued to the research outbox only, never sent.
+To enable it for the canary, in a **new PowerShell window used only for Research**:
+```powershell
+cd C:\workspace\TalonX
+$env:TALONX_NOTIFY_RESEARCH_ENABLED = "1"
+.venv\Scripts\python.exe -m talonx_premarket run --deliver --v2-scope-log results\prospective_2026-09-24\logs\v2_companion.log
+```
+The first status block must show `config_fingerprint` `62ba413daf85e674`, `v2_scope_size` 39, and in `delivery_mode`: `deliver_flag` true, `destination` `"RESEARCH"`, `bot` `"LAB"` and `research_destination_enabled` true. If any of these is wrong, stop the research process (Ctrl+C). If the destination is disabled, alerts are enqueued to the research outbox only and never sent.
 
 Messages start with `[PREMARKET RESEARCH]` and end with `Research alert only. Not a V2 trade event. Paper execution not started.` There are at most 25 new candidates per session (highest score first), and each undelivered alert expires after 30 min.
 
@@ -132,7 +130,7 @@ Messages start with `[PREMARKET RESEARCH]` and end with `Research alert only. No
 | Provider partial failure | PASS after the PR19 hardening: per-symbol watermarks, batch retry, hold on unknown data (PR19_HARDENING_REVIEW.md) |
 | Rate limits respected | PASS: client limiter at 180/min (provider 200/min); SEC ≤ ~5 req/s |
 | Candidate funnel nonzero on replay | PASS: see SHADOW_REPLAY_2026-09-23.md |
-| Research routing isolated | PASS (tests); live delivery off, and not enableable until a distinct chat is configured |
+| Research routing isolated | PASS (tests plus one controlled Lab send); persistent delivery OFF, enabled only per process |
 | Dedup | PASS (tests plus replay) |
 | Post-open tracker | PASS (tests plus replay outcomes) |
 | V2 unchanged | PASS: strategy `e2acf6454789217e`, provider `ac5e51aa3599d6c9`, 39-name scope, V2-PAPER-RC1 untouched |

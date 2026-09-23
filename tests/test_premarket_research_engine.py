@@ -337,7 +337,8 @@ def test_research_router_uses_only_the_research_destination(tmp_path, monkeypatc
             _router(True, tmp_path / protected)
 
 
-def test_research_destination_refuses_to_alias_the_primary_chat(monkeypatch):
+def test_research_destination_allows_same_chat_but_refuses_the_primary_bot(monkeypatch):
+    """Isolation is bot identity, not chat_id: the owner's private chat may be shared, the bot token may not."""
     from talonx_ops.notify import RESEARCH, resolve_destination_config
     monkeypatch.setenv("TALONX_NOTIFY_RESEARCH_ENABLED", "1")
     monkeypatch.setenv("TALONX_NOTIFY_RESEARCH_BOT_TOKEN", "research-token")
@@ -346,9 +347,10 @@ def test_research_destination_refuses_to_alias_the_primary_chat(monkeypatch):
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "same-chat")
     monkeypatch.setenv("TALONX_NOTIFY_TRADE_EVENT_BOT_TOKEN", "primary-token")
     monkeypatch.setenv("TALONX_NOTIFY_TRADE_EVENT_CHAT_ID", "same-chat")
+    cfg = resolve_destination_config(RESEARCH)
+    assert cfg.enabled is True and cfg.bot_token == "research-token"
+    monkeypatch.setenv("TALONX_NOTIFY_RESEARCH_BOT_TOKEN", "primary-token")
     assert resolve_destination_config(RESEARCH).enabled is False
-    monkeypatch.setenv("TALONX_NOTIFY_RESEARCH_CHAT_ID", "research-chat")
-    assert resolve_destination_config(RESEARCH).enabled is True
 
 
 # ------------------------------------------------------------------------------ post-open outcomes
