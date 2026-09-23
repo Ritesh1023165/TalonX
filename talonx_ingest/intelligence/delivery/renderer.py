@@ -59,6 +59,17 @@ _SECTION_KEY_LABEL = {
 # ---------------------------------------------------------------------------
 # small helpers
 # ---------------------------------------------------------------------------
+def _resolved_acceptance(card):
+    """Session 03 A2: the card's true acceptance instant (or None) + operator text.
+    ``timestamp_utc`` holds SEC's feed value with MIXED semantics (fresh filings are
+    New York wall clock labelled Z); never print it raw as UTC."""
+    from talonx_ingest.intelligence.sec_time import format_acceptance, resolve_acceptance
+    res = resolve_acceptance(card.timestamp_utc,
+                             observed_at=getattr(card, "source_observed_at_utc", None),
+                             filing_date=getattr(card, "filing_date", None))
+    return res.utc, format_acceptance(res)
+
+
 def _iso_min(dt: datetime | None) -> str:
     if dt is None:
         return "time unknown"
@@ -107,7 +118,7 @@ def _event_lines(card, *, expanded: bool) -> list[str]:
     lines = [esc(EVENT_TYPE_LABEL.get(card.event_type, card.event_type.value))]
     if card.title:
         lines.append(esc(_trim(card.title, _TITLE_MAX)))
-    lines.append(f"Accepted: {esc(_iso_min(card.timestamp_utc))}")
+    lines.append(esc(_resolved_acceptance(card)[1]))
     if expanded:
         items = ", ".join(card.filing_items) if card.filing_items else "—"
         lines.append(f"Form {esc(card.form_type or '?')} · items {esc(items)}")
@@ -408,15 +419,14 @@ def render_concise(card, *, disposition_reason: str | None = None, now: datetime
               or EVENT_TYPE_LABEL.get(card.event_type, card.event_type.value))
     summary = _trim(summary, 180)
 
-    ts = card.timestamp_utc
+    ts, acceptance_txt = _resolved_acceptance(card)
     if ts is not None:
-        ts = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
         age_s = (now - ts).total_seconds()
         age_h = age_s / 3600.0
         age_txt = f"{age_h:.1f}h" if age_h >= 1 else f"{max(0, age_s) / 60:.0f}m"
-        source_line = f"Source: {_iso_min(ts)} (source age: {age_txt})"
+        source_line = f"Source: {acceptance_txt} (source age: {age_txt})"
     else:
-        source_line = "Source: time unknown"
+        source_line = f"Source: {acceptance_txt}"
 
     event_label = EVENT_TYPE_LABEL.get(card.event_type, card.event_type.value)
     disclaimer = card.disclaimer or DISCLAIMER_SHORT

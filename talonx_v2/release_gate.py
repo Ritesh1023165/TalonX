@@ -148,6 +148,39 @@ def _ro(path: str | Path) -> sqlite3.Connection | None:
     return con
 
 
+_INTEL_CARDS = "TALONX_INTEL_DELIVER_CARDS"
+_INTEL_DRY_RUN = "TALONX_INTEL_DRY_RUN_DELIVERY"
+
+
+def _truthy(v) -> bool:
+    return str(v).strip().lower() in ("1", "true", "yes", "on")
+
+
+def intelligence_delivery_env_overrides(env, *, deliver: bool, transport: str | None) -> dict:
+    """The env keys `prospective start` adds for the supervised Intelligence child (Task 140): one operator
+    intent (`--deliver --transport telegram`) governs both lanes. An explicitly present key always wins;
+    `--transport dryrun` never flips anything. The ONE implementation shared by the launcher and the gate."""
+    add: dict = {}
+    if transport == "telegram" and deliver:
+        if _INTEL_CARDS not in env:
+            add[_INTEL_CARDS] = "1"
+        if _INTEL_DRY_RUN not in env:
+            add[_INTEL_DRY_RUN] = "0"
+    return add
+
+
+def intelligence_delivery_state(env, *, deliver: bool, transport: str | None) -> dict:
+    """configured (pre-start env only) / runtime_requested (keys the launcher will inject) / effective
+    (what the Intelligence child will run with). Values: ON | DRY_RUN | OFF. No secrets are read."""
+    def mode(e) -> str:
+        cards = _truthy(e.get(_INTEL_CARDS, "0"))
+        dry = _truthy(e.get(_INTEL_DRY_RUN, "1"))
+        return "OFF" if not cards else ("DRY_RUN" if dry else "ON")
+    add = intelligence_delivery_env_overrides(env, deliver=deliver, transport=transport)
+    return {"configured": mode(env), "runtime_requested": bool(add), "runtime_keys": sorted(add),
+            "effective": mode({**dict(env), **add})}
+
+
 def evaluate_release_readiness(*, db_path: str | Path, pricing_mode: str | None, deliver: bool = False,
                                transport: str | None = None, env: dict | None = None,
                                http_get: Callable | None = None, now: Callable[[], datetime] | None = None,
@@ -230,11 +263,18 @@ def evaluate_release_readiness(*, db_path: str | Path, pricing_mode: str | None,
     # 6b. Company-development (Intelligence) Telegram delivery is opt-in and NOT part of the V2 primary release:
     #     primary Telegram for company developments requires the Session 7 acceptance criteria (OPS-011, not built).
     #     Disclosed, not blocking -- an operator decision.
-    intel_on = str(env.get("TALONX_INTEL_DELIVER_CARDS", "")).strip().lower() in ("1", "true", "yes", "on")
+    #     Session 03 A1: report the EFFECTIVE runtime state, not just the pre-start env -- `prospective start
+    #     --deliver --transport telegram` injects TALONX_INTEL_DELIVER_CARDS=1 for the supervised Intelligence
+    #     child (talonx_ops/prospective/proc.py), so an env-only reading said OFF while cards were being sent.
+    ids = intelligence_delivery_state(env, deliver=deliver, transport=transport)
+    intel_on = ids["effective"] == "ON"
     rep.add("intelligence_card_delivery", "WARN" if intel_on else "PASS",
-            "Intelligence card delivery is ENABLED: company-development Telegram is opt-in and its Session-7 "
-            "acceptance (OPS-011) is not built -- disclosed operator decision" if intel_on
-            else "Intelligence card delivery is OFF (company developments stay dashboard-visible)")
+            f"INTELLIGENCE DELIVERY configured={ids['configured']} "
+            f"runtime_requested_by_start={'ON' if ids['runtime_requested'] else 'OFF'} "
+            f"effective={ids['effective']} -- "
+            + ("company-development [INFO] Telegram cards WILL be sent (opt-in; Session-7 acceptance OPS-011 "
+               "not built) -- disclosed operator decision" if intel_on
+               else "no Intelligence Telegram cards will be sent (company developments stay dashboard-visible)"))
 
     # 7. ledger / campaign / account state (read-only)
     # 7a. the configured campaign identity must be the release campaign (a legacy/default identity is refused)

@@ -567,7 +567,7 @@ async def test_ping_signal_lifecycle_reports_brain_reports_generated(listener, s
     await listener._handle_update(_update(1, "/ping"))
 
     reply = telegram_client.send.await_args.args[0]
-    assert "Brain received: 22" in reply
+    assert "Brain received (Original talonx:signals:quant only): 22" in reply
     assert "Brain reports generated: 19" in reply
 
 

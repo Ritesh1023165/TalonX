@@ -250,6 +250,8 @@ def build_alert_card(event: TextEvent) -> AlertCard:
         significance=None,
         significance_reasons=(),
         timestamp_utc=event.accepted_at_utc,
+        filing_date=event.filing_date,
+        source_observed_at_utc=event.ingested_at_utc,
         session_bucket=event.session_bucket,
         form_type=event.form_type,
         filing_items=event.filing_items,

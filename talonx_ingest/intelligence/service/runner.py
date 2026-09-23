@@ -563,11 +563,18 @@ class IntelligenceService:
                 "errors": res.errors[:10],
             }
             try:
-                from talonx_ops.notify.producers import record_intelligence_health
-                record_intelligence_health(
-                    degraded=bool(res.symbols_failed or res.errors or recovery.get("failed")
-                                  or recovery.get("timed_out") or not summary["delivery_ok"]
-                                  or res.submissions_freshness in ("DOWN", "STALE")), now=now)
+                from talonx_ops.notify.producers import (
+                    intelligence_health_causes,
+                    record_intelligence_health,
+                )
+                # Session 03 A3: same predicate as before, now with cause codes (logged + in the incident).
+                causes = intelligence_health_causes(
+                    symbols_failed=res.symbols_failed, poll_errors=len(res.errors), recovery=recovery,
+                    delivery_ok=summary["delivery_ok"], freshness=res.submissions_freshness)
+                summary["health_causes"] = causes
+                if causes:
+                    logger.warning("intelligence health degraded this cycle: causes=%s", causes)
+                record_intelligence_health(degraded=bool(causes), now=now, causes=causes)
             except Exception:  # notification bookkeeping cannot interrupt ingestion
                 logger.warning("Operations health recording failed")
             cycle_summaries.append(summary)

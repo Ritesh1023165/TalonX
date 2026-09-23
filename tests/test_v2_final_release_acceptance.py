@@ -732,8 +732,16 @@ def test_gate_discloses_intelligence_card_delivery_as_a_warning_not_a_blocker(tm
     on = gate(tmp_path, env=dict(env, TALONX_INTEL_DELIVER_CARDS="1"), vpath=vp)
     c = {x.name: x for x in on.checks}["intelligence_card_delivery"]
     assert c.status == "WARN" and "OPS-011" in c.detail and on.status == "READY"
-    off = {x.name: x for x in gate(tmp_path, env=env, vpath=vp).checks}["intelligence_card_delivery"]
-    assert off.status == "PASS"
+    # Session 03 A1: with no explicit key, `--deliver --transport telegram` makes the launcher inject
+    # TALONX_INTEL_DELIVER_CARDS=1, so the EFFECTIVE state is ON even though the pre-start env says OFF.
+    implicit = {x.name: x for x in gate(tmp_path, env=env, vpath=vp).checks}["intelligence_card_delivery"]
+    assert implicit.status == "WARN" and "configured=OFF" in implicit.detail
+    assert "runtime_requested_by_start=ON" in implicit.detail and "effective=ON" in implicit.detail
+    off = {x.name: x for x in gate(tmp_path, env=dict(env, TALONX_INTEL_DELIVER_CARDS="0"),
+                                   vpath=vp).checks}["intelligence_card_delivery"]
+    assert off.status == "PASS" and "effective=OFF" in off.detail
+    dry = {x.name: x for x in gate(tmp_path, env=env, vpath=vp, transport="dryrun").checks}
+    assert "effective=OFF" in dry["intelligence_card_delivery"].detail
 
 
 # =========================================================================== #

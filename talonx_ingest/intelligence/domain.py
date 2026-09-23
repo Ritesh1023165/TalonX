@@ -271,7 +271,11 @@ class AlertCard(BaseModel):
     significance: SignificanceBand | None = None
     significance_reasons: tuple[str, ...] = ()
 
-    timestamp_utc: datetime | None = None
+    timestamp_utc: datetime | None = None       # stored accepted_at_utc (MIXED legacy semantics)
+    # Session 03 A2: display provenance so renderers resolve the true acceptance
+    # instant (talonx_ingest.intelligence.sec_time) instead of printing the raw value.
+    filing_date: date | None = None             # SEC filingDate (ET calendar day)
+    source_observed_at_utc: datetime | None = None  # when TalonX read the value (true UTC)
     session_bucket: SessionBucket = SessionBucket.UNKNOWN
     form_type: str = ""
     filing_items: tuple[str, ...] = ()
