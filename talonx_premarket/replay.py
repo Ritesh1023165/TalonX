@@ -27,6 +27,8 @@ def run_replay(*, day: date, universe: list[UniverseMember], data: AlpacaData, s
                ledger_path: str | None, v2_scope: set[str], out_dir: Path,
                cfg: PremarketConfig = PREMARKET_RESEARCH_V1, progress=print) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
+    if sec is not None:
+        sec.ttl_s = float("inf")     # one fetch per CIK; causality is enforced by acceptance <= decision time
     sd = session_day(day, cfg)
     store = ResearchStore(out_dir / "premarket_research_replay.db")
     symbols = sorted(m.symbol for m in universe if m.status == "ELIGIBLE")

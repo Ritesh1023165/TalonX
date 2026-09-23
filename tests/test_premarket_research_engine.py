@@ -460,3 +460,22 @@ def test_preflight_accepts_the_research_lane_but_still_rejects_other_runtime_cha
     assert "talonx_premarket/engine.py".startswith(pf.FREEZE_RESEARCH_LANE_PREFIXES)
     assert not "talonx_v2/cluster_engine.py".startswith(pf.FREEZE_RESEARCH_LANE_PREFIXES)
     assert "talonx_v2/cluster_engine.py" not in pf.FREEZE_SESSION03_HARDENING_FILES
+
+
+def test_session_cap_keeps_the_highest_scoring_new_candidates(tmp_path):
+    """Replay finding (before outcomes): the cap used to follow alphabetical order."""
+    from talonx_premarket.universe import UniverseMember
+    syms = ["AAA", "BBB", "ZZZ"]
+    start = datetime(2026, 9, 23, 11, 0, tzinfo=UTC)
+    pm = {"AAA": [_bar(start + timedelta(minutes=i), 10.25, v=500) for i in range(120)],
+          "BBB": [_bar(start + timedelta(minutes=i), 10.3, v=800) for i in range(120)],
+          "ZZZ": [_bar(start + timedelta(minutes=i), 11.0, v=60000) for i in range(120)]}
+    sd = session_day(D)
+    data = _FakeData({s: _daily(10.0) for s in syms}, pm)
+    cfg = PremarketConfig(max_new_alerts_per_session=1)
+    eng = Engine(universe=[UniverseMember(s, s, "NASDAQ", None, "ELIGIBLE", "") for s in syms],
+                 source=ReplaySource(data, syms, sd, cfg), store=ResearchStore(tmp_path / "c.db"), sd=sd,
+                 mode="replay", v2_scope=set(), sec=None, ledger_path=None, cfg=cfg, route=lambda a: "R")
+    r = eng.scan(datetime(2026, 9, 23, 13, 15, tzinfo=UTC))
+    routed = {a["symbol"]: a["routed"] for a in r.alerts}
+    assert routed["ZZZ"] == "R" and all(v.startswith("SUPPRESSED") for k, v in routed.items() if k != "ZZZ")

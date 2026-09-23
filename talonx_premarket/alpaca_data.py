@@ -130,4 +130,6 @@ def data_as_of(now: datetime, cfg: PremarketConfig = PREMARKET_RESEARCH_V1) -> d
 def complete_bars_as_of(rows: list[dict], as_of: datetime) -> list[dict]:
     """Causal filter: keep bars whose interval ended at or before ``as_of`` (t + 1 min <= as_of)."""
     cutoff = as_of - timedelta(minutes=1)
-    return [r for r in rows if parse_ts(r["t"]) <= cutoff]
+    key = iso(cutoff)   # Alpaca bar times are fixed-format "YYYY-MM-DDTHH:MM:SSZ" -> lexical order == time order
+    return [r for r in rows if (r["t"] <= key if len(r["t"]) == 20 and r["t"].endswith("Z")
+                                else parse_ts(r["t"]) <= cutoff)]

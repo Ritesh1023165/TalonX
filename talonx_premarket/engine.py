@@ -121,7 +121,10 @@ class Engine:
         self.v2_scope = v2_scope
         self.route = route or (lambda alert: "NOT_ROUTED")
         self.session = sd.day.isoformat()
-        self._cat_cache: dict[str, CatalystEvidence] = {}
+        # in-memory mirror of this session's candidate rows (the store stays the durable source of truth)
+        self._cands: dict[str, list[dict]] = {}
+        for row in store.candidates_for(self.session):
+            self._cands.setdefault(row["symbol"], []).append(row)
 
     # -- catalysts (bounded: gap candidates only) -------------------------------------------
     def _catalyst(self, sym: str, decision: datetime) -> CatalystEvidence:
@@ -183,22 +186,36 @@ class Engine:
         return res
 
     def _active_candidate(self, sym: str) -> dict | None:
-        rows = [c for c in self.store.candidates_for(self.session) if c["symbol"] == sym]
-        active = [c for c in rows if c["state"] != A.INVALIDATED]
+        active = [c for c in self._cands.get(sym, []) if c["state"] != A.INVALIDATED]
         return active[-1] if active else None
+
+    def _new_alerts_so_far(self) -> int:
+        return sum(1 for rows in self._cands.values() for c in rows if c["first_alert_utc"])
+
+    def _upsert_candidate(self, row: dict) -> None:
+        self.store.upsert_candidate(row)
+        rows = self._cands.setdefault(row["symbol"], [])
+        for i, c in enumerate(rows):
+            if c["candidate_id"] == row["candidate_id"]:
+                rows[i] = {**c, **row}
+                return
+        rows.append(dict(row))
 
     def _apply_alerts(self, decision, as_of, phase, observations) -> list[dict]:
         emitted: list[dict] = []
-        for sym, (obs, feats, sc, cat) in observations.items():
+        # Highest score first, so the per-session new-alert cap keeps the strongest candidates (ties: symbol).
+        ordered = sorted(observations.items(),
+                         key=lambda kv: (-(kv[1][0].score if kv[1][0].score is not None else float("-inf")), kv[0]))
+        for sym, (obs, feats, sc, cat) in ordered:
             prev = self._active_candidate(sym)
             if prev is not None and prev["state"].startswith("SUPPRESSED_"):
                 continue                          # capped this session: recorded once, never re-alerted
             if prev is None and obs.gap_pct is not None and obs.classification in A.ACTIVE_STATES:
-                closed = self.store.get_candidate(A.candidate_id(self.session, sym, A.family_of(obs.gap_pct)))
-                if closed is not None:
+                cid = A.candidate_id(self.session, sym, A.family_of(obs.gap_pct))
+                if any(c["candidate_id"] == cid for c in self._cands.get(sym, [])):
                     continue                      # identity invalidated earlier this session: stays closed
             d = A.decide(prev, obs, session_date=self.session, now=decision,
-                         new_alerts_so_far=self.store.count_new_alerts(self.session), cfg=self.cfg)
+                         new_alerts_so_far=self._new_alerts_so_far(), cfg=self.cfg)
             if d is None:
                 continue
             name = self.members[sym].name
@@ -219,7 +236,7 @@ class Engine:
                 alert["routed"] = self.route(alert)
             self.store.add_alert(alert)
             first = prev["first_alert_utc"] if prev else (None if d.suppressed else decision.isoformat())
-            self.store.upsert_candidate({
+            self._upsert_candidate({
                 "candidate_id": d.candidate_id, "session_date": self.session, "symbol": sym, "family": fam,
                 "state": d.new_state if not d.suppressed else f"SUPPRESSED_{d.new_state}",
                 "first_alert_utc": first, "last_alert_utc": decision.isoformat(),
