@@ -304,6 +304,9 @@ class DashboardReadModel:
         rt = runtime.get("telegram_receive")
         if rt == "DEGRADED":
             out.append("Telegram receive: >1 getUpdates owner reported (check logical/network owner)")
+        opp = runtime.get("opportunity_engine")
+        if opp in ("DEGRADED", "DOWN"):      # NOT_RUNNING is a valid state for the optional research lane
+            out.append(f"Opportunity Engine {opp} -- see the Opportunity Engine tab (components restart independently)")
         return out
 
     def _overall_health(self, orig_live: bool, exp_live: bool, intel_live: bool, market_state: str) -> str:
@@ -439,12 +442,18 @@ class DashboardReadModel:
         except Exception as exc:  # noqa: BLE001
             return {"status": "UNKNOWN", "source": source, "note": f"read error: {exc!r}"}
 
-        exp_live = self.arm.experimental_producer().get("live")
+        exp_prod = self.arm.experimental_producer()
+        exp_live = exp_prod.get("live")
         status = sess.get("status", "UNKNOWN")
         if status in ("NO_SESSION_TODAY",) and not exp_live:
             status = "NO_ACTIVE_PRODUCER"
+        retired = bool(exp_prod.get("retired")) and not exp_live
         return {
             "status": status,
+            # S14: the producer of this 43-name view (the Experimental lane) is RETIRED; the rows below are
+            # historical once it stops. Broad pre-market (and all-phase) discovery lives in the Opportunity Engine.
+            "producer_retired": retired,
+            "superseded_by": "opportunity_engine" if retired else None,
             "source": source,
             "session_date": sess.get("session_date"),
             "generated_at": sess.get("generated_at"),

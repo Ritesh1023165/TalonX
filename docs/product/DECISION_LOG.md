@@ -3624,3 +3624,22 @@ Decisions recorded:
    - V2 strategy `e2acf6454789217e`, provider `ac5e51aa3599d6c9`, campaign `V2-PAPER-RC1` ($100k/$10k).
    - V1 scoring weights and thresholds, the 45-minute stale-price gate, and V1 lifecycle deltas.
    - Paper only; no paid provider; Signal/Sentinel/Lab isolation.
+
+### Continuous Opportunity Engine: implementation decisions (2026-09-24, Stage B)
+
+1. **Isolated package, V1 untouched.** `talonx_opportunity` imports the frozen V1 feature/score/lifecycle/outcome functions. `talonx_premarket` is not edited, so `PREMARKET_RESEARCH_V1` stays reproducible.
+2. **Feature equivalence.** Window-to-date aggregates reproduce `features.compute` bit-for-bit (Neumaier float sums, as CPython ≥ 3.12 `sum()` does). PREMARKET classification equals V1.
+3. **`CONTINUOUS_RESEARCH_V1`.** Pre-registered before any continuous outcome existed, never tuned on Session-04 hindsight. It embeds V1 unchanged and adds only phase mechanics:
+   - cadence;
+   - `stale_invalidates_phases = (PREMARKET, REGULAR)`: in AFTER_HOURS a stale print HOLDS an identity rather than invalidating it. The 45-minute stale gate is unchanged, so a stale symbol can never create a candidate;
+   - idle expiry after one full trading window (EXPIRED is bookkeeping, never notified).
+4. **Reference price** is the previous session close for every phase of a trading window. Identity continues across 04:00, 09:30 and 16:00 ET and is carried across the 20:00 ET roll (REFERENCE_ROLLED).
+5. **Notification budget** `LAB_NOTIFY_POLICY_V1`: 25 per window (V1 figure), WATCH ≤ 15, setups have priority, no time-of-day buckets. These are configuration values, not evidence-derived.
+6. **Deployment classification rules.** An unchanged restart is OPERATIONS_ONLY. A config-fingerprint change forces the component's material class and cannot be declared down. An undeclared code change gets a conservative default (discovery and evaluators: STRATEGY_MATERIAL).
+7. **Experimental lane retired** from active startup (see OPS-029). Its shared utilities stay. The Original chain is **retained**: it hosts the single Telegram `getUpdates` poller and official dispatch. Retiring it needs a separate owner decision and a listener migration.
+8. **Intelligence.**
+   - The stale-at-enqueue guard applies the outbox rule verbatim.
+   - The digest default is unchanged (DIGEST_DISABLED made visible).
+   - The IMMEDIATE cutoff and routing are unchanged.
+9. **yfinance.** Incident accounting only. The V2 Alpaca contract is untouched.
+10. **V2 release allowlist.** `talonx_opportunity/` is added as an isolated lane prefix. Changed runtime files are listed in the closed `FREEZE_CONTINUOUS_ENGINE_FILES` (no strategy/provider/ledger file; guarded by tests). V2 fingerprints are unchanged.

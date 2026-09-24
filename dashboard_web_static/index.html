@@ -292,6 +292,8 @@ function renderPremarket(d){
          (pw.last_updated_age_seconds!=null?` (${ageStr(pw.last_updated_age_seconds)} ago)`:'')+
          ` · coverage ${num(cov.covered)}/${num(cov.active)}</div>`;
     if(pw.note) pwh+=`<div class="muted small">${esc(pw.note)}</div>`;
+    if(pw.producer_retired) pwh+=`<div class="banner internal small">Producer (Experimental lane) RETIRED — rows are historical.
+      Broad pre-market and all-phase discovery: <b>Opportunity Engine</b> tab.</div>`;
     const order=['GAP_UP','GAP_DOWN','ABNORMAL_VOLUME','BULLISH_WATCH','BEARISH_WATCH'];
     const any=order.some(k=>(fam[k]||[]).length);
     if(!any){ pwh+=`<div class="empty">no persisted movers for this session (or the field is NOT_AVAILABLE)</div>`; }

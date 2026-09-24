@@ -318,12 +318,12 @@ without naming which of these applies.
 | S13-23 | FINAL V2 RELEASE ACCEPTANCE — requirement-by-requirement release gate | Agreed release gate | Authorized and completed; no launch, no freeze, no production mutation, no real Telegram send | Explicit gated release profile `V2_RELEASE_CANDIDATE_PROFILE@1` (`talonx_v2/release_gate.py`; `--release` on `talonx_v2.run` and `talonx_ops.prospective start`): forces SIP + `V2_RELEASE_PRICE_CONTRACT@1` (`ac5e51aa3599d6c9`), never the stale csv default; refuses to start unless 17 read-only readiness checks pass. Matrix: 34 PASS / 4 BOUNDED_FOLLOWUP / 0 FAIL / 0 blocking. Fixed: dashboard health masking, alert wording (OPEN disclosure), stale whole-share test expectation. Strategy fingerprint `e2acf6454789217e` unchanged; profitability UNPROVEN. | `docs/research/evidence/v2_final_release_acceptance/` |
 | S13-24 | Release freeze + preflight + controlled merge (v2-paper-rc1) | Agreed release gate | Authorized and completed; no launch, no session, no real send | Frozen SHA `a56ec8c` (tag `v2-paper-rc1`), pin `RELEASE_SHA_EXPECTED`; NEW clean campaign `V2-PAPER-RC1` ($100k/$10k, own ledger, PREPARED_FOR_CREATION_AT_LAUNCH); release gate hardened with campaign identity; main fast-forwarded. Fingerprints unchanged; profitability UNPROVEN. | `docs/research/evidence/release_freeze_preflight/` |
 | S13-25 | Notification contract: Signal/Sentinel/Lab may share one private chat_id; isolation = destination + bot identity + event contract | Agreed (owner clarification 2026-09-24) | Authorized and implemented | Implemented (`resolve_destination_config(RESEARCH)` no longer rejects a shared chat_id; it rejects a Lab token equal to the Signal, Sentinel or legacy token; no fallback unchanged; Signal subscribers/broadcast NOT implemented, roadmap only in `docs/NOTIFICATION_CONTRACT.md`) | `tests/test_notify_same_chat_isolation.py`; one controlled Lab send (evidence `docs/research/evidence/lab_channel_enablement/`) |
-| S14-01 | Continuous phase-aware opportunity discovery (OVERNIGHT/PREMARKET/REGULAR/AFTER_HOURS; CLOSED/DATA_UNAVAILABLE); market phase never globally suspends discovery. SUPERSEDES the pre-market-only research lane contract (`PREMARKET_RESEARCH_V1` kept frozen for replay/history) | Agreed (gatekeeper Stage-B authorization 2026-09-24) | Authorized (branch `feature/continuous-opportunity-engine`) | IN_PROGRESS | `docs/research/evidence/SESSION04_MISSED_OPPORTUNITY_FORENSIC.md` |
-| S14-02 | Candidate detection and durable persistence are independent from notification limits (budget lives only in a versioned notification policy) | Agreed | Authorized | IN_PROGRESS | same |
-| S14-03 | Runtime components independently restartable (ingestion, discovery, evaluators per horizon, notification, outcomes, reporting) with durable boundaries | Agreed | Authorized | IN_PROGRESS | same |
-| S14-04 | Durable deployment/change boundaries with classification + affects_* flags; reports segment on material boundaries | Agreed | Authorized | IN_PROGRESS | same |
-| S14-05 | Provider capability per phase exposed honestly; unsupported phase fails closed; BOATS never treated as SIP | Agreed | Authorized | IN_PROGRESS | same |
-| S14-06 | Horizon architecture INTRADAY/SAME_DAY/SHORT_TERM/LONG_TERM; BUY/SELL only from an authorizing strategy, never for alert volume | Agreed | Authorized | IN_PROGRESS | same |
+| S14-01 | Continuous phase-aware opportunity discovery (OVERNIGHT/PREMARKET/REGULAR/AFTER_HOURS; CLOSED/DATA_UNAVAILABLE); market phase never globally suspends discovery. SUPERSEDES the pre-market-only research lane contract (`PREMARKET_RESEARCH_V1` kept frozen for replay/history) | Agreed (gatekeeper Stage-B authorization 2026-09-24) | Authorized (branch `feature/continuous-opportunity-engine`) | Implemented on branch (`talonx_opportunity` ingestion+discovery; PREMARKET/REGULAR/AFTER_HOURS run; OVERNIGHT fails closed) -- NOT live-validated | Isolated test: `tests/test_continuous_opportunity_engine.py`, `tests/test_legacy_cleanup_continuous.py` |
+| S14-02 | Candidate detection and durable persistence are independent from notification limits (budget lives only in a versioned notification policy) | Agreed | Authorized | Implemented on branch (uncapped `opportunity.db`; `LAB_NOTIFY_POLICY_V1` only in notifier) -- NOT live-validated | Isolated test: `tests/test_continuous_opportunity_engine.py`, `tests/test_legacy_cleanup_continuous.py` |
+| S14-03 | Runtime components independently restartable (ingestion, discovery, evaluators per horizon, notification, outcomes, reporting) with durable boundaries | Agreed | Authorized | Implemented on branch (one process + single-writer store per component; `up --supervise`, `restart <c>`) -- real multi-process restart test | Isolated test: `tests/test_continuous_opportunity_engine.py`, `tests/test_legacy_cleanup_continuous.py` |
+| S14-04 | Durable deployment/change boundaries with classification + affects_* flags; reports segment on material boundaries | Agreed | Authorized | Implemented on branch (`runtime.db` deployment_events; boundary-aware reports) -- NOT live-validated | Isolated test: `tests/test_continuous_opportunity_engine.py`, `tests/test_legacy_cleanup_continuous.py` |
+| S14-05 | Provider capability per phase exposed honestly; unsupported phase fails closed; BOATS never treated as SIP | Agreed | Authorized | Implemented on branch (`capabilities.py` + per-phase probes) -- NOT live-validated | Isolated test: `tests/test_continuous_opportunity_engine.py`, `tests/test_legacy_cleanup_continuous.py` |
+| S14-06 | Horizon architecture INTRADAY/SAME_DAY/SHORT_TERM/LONG_TERM; BUY/SELL only from an authorizing strategy, never for alert volume | Agreed | Authorized | Implemented on branch (4 evaluators, own cursors; LONG_TERM NOT_IMPLEMENTED; no authorized BUY/SELL strategy) -- NOT live-validated | Isolated test: `tests/test_continuous_opportunity_engine.py`, `tests/test_legacy_cleanup_continuous.py` |
 
 ---
 
@@ -3388,6 +3388,11 @@ logic read). **Dependency**: none.
 
 ## S8-02 — No retrospective entry; distinct timestamps; no guaranteed overnight completion
 
+> **PARTIALLY SUPERSEDED 2026-09-24 (S14-01, gatekeeper Stage-B authorization):** "overnight operation not
+> required" no longer holds for opportunity discovery -- while TalonX runs, discovery is continuous across all
+> SUPPORTED phases (overnight fails closed until a consolidated overnight feed is demonstrated). The V2
+> no-retrospective-entry and distinct-timestamp parts of this requirement are unchanged.
+
 **Decision**: Agreed. **Authorization**: Not authorized.
 **Implementation**: Partially implemented — `S8-01`'s temporal-
 boundary check structurally prevents retrospective entry; whether
@@ -4428,3 +4433,22 @@ defect in `_v2_reconcile()` is fixed — `OPS-015`'s own described gap,
 `eod_reconciliation.py`'s missing admission-block wiring, is
 untouched). Both findings' own account-block-clearance requirements
 are unaffected and remain `Package 2`'s scope.
+
+
+---
+
+## S14-01..S14-06 — Continuous Opportunity Engine (2026-09-24)
+
+**Decision**: Agreed (gatekeeper Stage-B authorization after `FORENSIC_ANALYSIS: PASS_WITH_FINDINGS`).
+**Authorization**: Authorized on branch `feature/continuous-opportunity-engine`.
+
+**Implementation**: see the summary rows above and `docs/product/PRODUCT_DEFINITION.md` §6m.
+
+**Validation**:
+- Isolated tests: 20 required scenarios plus aggregate/V1 bit-equivalence, a real multi-process restart test and V2-preflight guards.
+- **Not live-validated.** The next live session is the first prospective run.
+
+**Supersedes**:
+- the pre-market-only research contract (V1 kept for replay);
+- the in-lifecycle 25-cap;
+- the Experimental lane as an active runtime component.

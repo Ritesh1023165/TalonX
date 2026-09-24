@@ -1763,3 +1763,89 @@ Full table: `docs/research/evidence/v2_final_release_acceptance/ops_classificati
 **OPS-029 - Telegram bot tokens written to logs** (found in the canary, code closed / rotation pending user action): httpx INFO request lines carry the token in the URL path; central redaction now applies. Two tokens (legacy primary, Sentinel) are compromised until rotated. Class: RELEASE_BLOCKING until rotated.
 **OPS-030 - Sentinel lifecycle/label issues** (BOUNDED, closed for label and staleness): STARTUP labelled the campaign `V2`; SHUTDOWN is enqueued after the drain process is stopped (never delivered; now expires instead of arriving out of order).
 **OPS-031 - Intelligence/insider store ~6 days stale at start** (BOUNDED): caught up in ~30 min after start; operational rule: start >= 45 min before pre-open and confirm freshness.
+
+---
+
+## Session 04 (2026-09-24) forensic findings and their S14 dispositions
+
+Source: `docs/research/evidence/SESSION04_MISSED_OPPORTUNITY_FORENSIC.md` §9.
+
+## OPS-027 — Broad Research discovery stopped at the regular open (HIGH)
+
+**Status**: FIXED on branch `feature/continuous-opportunity-engine`. Not live-validated.
+
+**Evidence**: 322 of 558 actionable ≥5% movers first moved after the V1 canary's last data horizon (category E). The canary ran 0 scans at or after 13:30Z.
+
+**Root cause**: `talonx_premarket` `run_session` breaks at the open, and `scan_schedule` covers the pre-market only.
+
+**Fix**: `talonx_opportunity` continuous phase-aware discovery (S14-01). V1 is unchanged and kept for replay.
+
+## OPS-028 — Notification cap coupled to the candidate lifecycle (HIGH)
+
+**Status**: FIXED on branch.
+
+**Evidence**: detection was **not** capped: 174 identities were recorded. The 149 cap-suppressed identities were frozen, though, and never updated, invalidated or outcome-tracked. 10 setups and all 7 V2-scope names were never surfaced.
+
+**Fix**: uncapped candidate store; the budget exists only in `LAB_NOTIFY_POLICY_V1` (S14-02).
+
+## OPS-029 — Experimental directional consumer silently absent (HIGH)
+
+**Status**: RESOLVED BY RETIREMENT on branch (lane removed from active startup).
+
+**Evidence**: the consumer never subscribed on 8 of 9 lane starts since 2026-09-15. Directional alerts were 0 on exactly those days. 09-24 had 17 ZERO-subscriber publishes on `talonx:exp:signals:quant`.
+
+**Root cause**: an unsupervised asyncio task, a single subscribe attempt, and exceptions gathered only at shutdown. The trigger is undetermined, because the failure was swallowed.
+
+**Disposition**: retired (superseded by the continuous engine). A live start is refused unless `--allow-retired`.
+
+## OPS-030 — Quant metrics mixed CONTROL and Experimental; /ping inferred "never reached Brain" (MEDIUM)
+
+**Status**: FIXED on branch. With the lane retired, CONTROL is the only writer. `/ping` labels the counters CONTROL and states only measured facts.
+
+## OPS-031 — yfinance failure counts multiplied one upstream throttle ~43× (LOW)
+
+**Status**: FIXED on branch. One degraded cycle is one incident (THROTTLE or HARD); per-symbol errors inside an incident are counted separately.
+
+The feed is used only by the legacy CONTROL lane. V2, Research and Intelligence are unaffected.
+
+## OPS-032 — IMMEDIATE Intelligence cards for after-close filings expired before the morning start (MEDIUM)
+
+**Status**: MITIGATED OPERATIONALLY, open.
+
+**Evidence**: 7 HIGH cards (ORCL ×6, NVDA) expired at 04:22Z, 9.0–11.5 h old against the 6 h cutoff.
+
+**Root cause**: the stack was stopped overnight.
+
+**Disposition**: no cutoff or routing change (a notification-policy decision). The continuous-runtime model (S14-03) and `docs/runbooks/CONTINUOUS_ENGINE.md` keep ingestion running. Running the Intelligence service overnight under the V2 supervisor remains an operator/runbook item. It is tracked here, not silently changed.
+
+## OPS-033 — DIGEST delivery disabled, so HIGH-band DIGEST cards are never surfaced (MEDIUM)
+
+**Status**: VISIBLE on branch (`DIGEST: DIGEST_DISABLED, N pending will not be sent` in `/ping` and the queue breakdown).
+
+**Disposition**: the default is **not** changed. Enabling digests is an operator opt-in (`TALONX_INTEL_DELIVER_DIGEST_ENABLED`).
+
+## OPS-034 — Historical recovery backlog enqueued cards that expired in the same cycle (LOW)
+
+**Status**: FIXED on branch. The stale-at-enqueue guard applies the outbox's own rule and only when enforcement is on. Fresh-event semantics are unchanged.
+
+## OPS-035 — /ping close to its 3,500-character budget; listener tests read the live Intelligence ledger (LOW)
+
+**Status**: OPEN (observed while implementing S14).
+
+**Evidence**: the S14 additions had to be compacted to keep `/ping` at 3,473 characters in the test environment.
+
+**Detail**: `tests/test_telegram_listener.py` builds the DISCOVERY block from the real `~/.talonx` ledger, so its message length depends on live data.
+
+**Recommended action**: isolate those tests from the live ledger, and move rarely-read `/ping` blocks behind a sub-command.
+
+## OPS-036 — Pre-existing failing and hanging baseline tests (LOW)
+
+**Status**: OPEN, pre-existing on `696370e` (verified on a clean baseline worktree).
+
+**Failing on the baseline**, because they compare Original files against old SHAs changed by earlier tasks:
+- `test_task102_operational_finalization::test_36_original_strategy_unchanged`
+- `test_task104_p2_cleanup::test_32_33_original_strategy_and_thresholds_unchanged`
+- `test_task112_tuesday_release::test_03_v1_fingerprint_intact`
+- `test_task131_dashboard_broad_discovery::test_original_watchlist_view_untouched_shape`
+
+**Hanging**: `test_backtest_cost_sensitivity::test_multi_trade_fixture_produces_three_trades_in_every_scenario` produces no result within 180 s on the baseline.

@@ -33,7 +33,9 @@ experience across Original, Intelligence and V2.
 |---|---|
 | [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md) | **the single authoritative architecture description** — supervision, market path, Original, Experimental, Intelligence, Ops, UI, Telegram, PIV, boundaries |
 | [OPERATIONS.md](OPERATIONS.md) | start / status / stop / EOD; which script is authoritative; the pending live qualification |
-| [DASHBOARD.md](DASHBOARD.md) | `:8787` cockpit (six sections + legacy tabs), false-zero semantics, `:8760`, `:8770`, `:8501` |
+| [DASHBOARD.md](DASHBOARD.md) | `:8787` cockpit (sections incl. Opportunity Engine + legacy tabs), false-zero semantics, `:8760`, `:8770` (deprecated), `:8501` |
+| [runbooks/CONTINUOUS_ENGINE.md](runbooks/CONTINUOUS_ENGINE.md) | Continuous Opportunity Engine operator runbook (start, restart one component, hot-fix declarations, EOD report) |
+| [LEGACY_MANIFEST.md](LEGACY_MANIFEST.md) | S14 repository/runtime relevance audit (KEEP_ACTIVE … REMOVE) |
 | [ADMIN.md](ADMIN.md) | `:8787/admin/` — the 9 controls, the denylist, the audit log, safety properties |
 | [INTELLIGENCE.md](INTELLIGENCE.md) | the Risk & Event Intelligence layer (Task 96) — descriptive, deterministic, no forward-return |
 | [PAPER_TRADING.md](PAPER_TRADING.md) | the three separate simulated ledgers, EOD reconciliation, forward outcomes |

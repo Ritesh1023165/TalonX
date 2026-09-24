@@ -130,6 +130,18 @@ Every session's `DECISION_LOG.md` entry ends with:
 
 ---
 
+## Carry-forward for the next knowledge-transfer session (added 2026-09-24, S14)
+
+Topics that are agreed at the requirement level (§6m / S14-01..S14-06) but need owner discussion before further build:
+
+- **Overnight consolidated data.** Whether to evaluate a paid consolidated overnight feed. It needs explicit approval; BOATS is single-venue.
+- **Horizon strategies.** Which strategy, if any, is authorised to emit BUY/SELL per horizon (today none for the research lane). LONG_TERM scope.
+- **Notification policy.** Whether `LAB_NOTIFY_POLICY_V1`'s 25/15/10 defaults should change as a new pre-registered version.
+- **Original CONTROL lane.** Retirement, and migration of the Telegram listener off `run_talonx.py`.
+- **Intelligence DIGEST opt-in, and overnight operation of the Intelligence service.**
+
+---
+
 *See `PRODUCT_DEFINITION.md` for the current accepted product
 definition, `DECISION_LOG.md` for the full session-by-session record,
 and `REQUIREMENTS_TRACKER.md` for the authoritative per-requirement

@@ -155,6 +155,9 @@ FREEZE_CONTINUOUS_ENGINE_FILES = (
     "talonx_ingest/market_data/yfinance_poll.py",             # upstream incident accounting (legacy CONTROL feed)
     "talonx_ingest/intelligence/service/enrichment.py",       # stale-at-enqueue guard (no enqueue->expire churn)
     "talonx_ingest/intelligence/service/observability.py",    # counter for the guard
+    "scripts/start_talonx_supervised.ps1",                    # comment only: Experimental retired
+    ".env.example",                                           # comments only: research-lane + digest opt-ins
+    "README.md",                                              # documentation only
 )
 
 

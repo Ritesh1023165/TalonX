@@ -41,7 +41,17 @@ Watchlist attention ranking, Company pages, Filings + comparison drill-down, Evi
 policy page. The `:8787` INTELLIGENCE section summarises and deep-links here rather than
 duplicating it.
 
-## `:8770` — legacy validation dashboard `[COMPATIBILITY]`
+## OPPORTUNITY ENGINE section (S14)
+
+System (overall, commit, latest deployment boundary) · Data (phase, as-of, incomplete symbols, capability per
+phase + probes) · Discovery (last scan, universe/eligible, alert-worthy, candidates this window / persisted /
+active) · Horizons (INTRADAY/SAME_DAY/SHORT_TERM/LONG_TERM health, records, BUY/SELL count) · Notification (Lab
+decisions + real delivery states, policy version) · Reporting (material boundaries, ops-only restarts,
+comparability warnings) · Components table (each independently restartable) · Paper (V2, read-only). Source:
+`talonx_ops.opportunity_read` (`?mode=ro` over `results/opportunity/*`). The Validation tab is the historical
+view of the RETIRED Experimental lane; the Premarket tab's 43-name watch panel is marked `producer_retired`.
+
+## `:8770` — legacy validation dashboard `[COMPATIBILITY]` — DEPRECATED (host lane RETIRED 2026-09-24)
 
 Embedded in `python -m talonx_signals.run`. **Not started by the supervisor.** `:8787`'s
 VALIDATION section reached 5/5 offline feature parity (Task 100C). Physical removal is pending one

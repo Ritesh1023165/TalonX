@@ -2,9 +2,10 @@
 
 TalonX is a **descriptive, human-in-the-loop, event-driven trading & risk-intelligence system**
 for US equities. It ingests live market data and SEC filings, runs one frozen selective intraday
-strategy (**Original**), runs a second internal-only validation lane (**Experimental**), produces
-deterministic event/risk intelligence, and surfaces everything on a single read-only operator
-cockpit.
+strategy (**Original**), continuously discovers broad-universe research opportunities across every
+supported market phase (**Continuous Opportunity Engine**, S14), runs the frozen **V2** paper strategy,
+produces deterministic event/risk intelligence, and surfaces everything on a single read-only operator
+cockpit. (The former internal-only **Experimental** lane is RETIRED from active startup, 2026-09-24.)
 
 **TalonX makes no profitability claim. It executes no real capital, takes no short positions, and
 uses no paid data. The current Original strategy is deliberately selective and its edge is
@@ -15,17 +16,20 @@ architecture: **[`docs/CURRENT_ARCHITECTURE.md`](docs/CURRENT_ARCHITECTURE.md)**
 
 ## 1. What TalonX is
 
-An operator's cockpit over four supervised processes: an Original control pipeline, an
-internal-only Experimental shadow lane, a descriptive SEC intelligence service, and a read-only
-dashboard — all owned by `talonx_ops.supervisor`.
+An operator's cockpit over the supervised processes (Original control pipeline, descriptive SEC
+intelligence service, optional V2 companion, read-only dashboard — owned by `talonx_ops.supervisor`)
+plus the separately launched, independently restartable Continuous Opportunity Engine
+(`python -m talonx_opportunity up`, [`docs/runbooks/CONTINUOUS_ENGINE.md`](docs/runbooks/CONTINUOUS_ENGINE.md)).
 
 ## 2. Current capabilities
 
 - Live market ingestion → one authoritative market path + one authoritative health accessor.
 - Original Quant → Brain → Decision pipeline with **frozen** thresholds; long-only local paper.
-- Experimental shadow lane: relaxed-profile directional alerts, `WOULD_PASS`/`WOULD_REJECT`
-  labels, experimental paper, forward outcomes (MFE/MAE/+30m/+60m/EOD/+1D), persisted pre-market
-  surface — **never externally dispatched**.
+- Continuous Opportunity Engine: phase-aware (PREMARKET/REGULAR/AFTER_HOURS; OVERNIGHT fails closed on
+  the current feed) broad-universe discovery with an **uncapped** durable candidate store, horizon
+  evaluators, a notification-only attention budget (Lab), deployment boundaries and boundary-aware
+  reports — research only, never a trade event.
+- Experimental shadow lane — **RETIRED** from active startup (2026-09-24); historical stores kept.
 - Risk & Event Intelligence: SEC 8-K/10-Q/10-K + Form 3/4/5, deterministic "what changed",
   insider aggregation, an explainable **Information Significance** band — **no forward-return
   input, no direction**.
@@ -34,9 +38,10 @@ dashboard — all owned by `talonx_ops.supervisor`.
 
 ## 3. Architecture overview
 
-`talonx_ops.supervisor` → `run_talonx.py` (Original, MANDATORY) ∥ `talonx_signals.run`
-(Experimental, OPTIONAL) ∥ `talonx_ingest.intelligence.service` (Intelligence, OPTIONAL) ∥
-`dashboard_web.py` (`:8787`, OPTIONAL). Market data has a single publisher; Telegram has one
+`talonx_ops.supervisor` → `run_talonx.py` (Original, MANDATORY) ∥
+`talonx_ingest.intelligence.service` (Intelligence, OPTIONAL) ∥ `talonx_v2.run` (V2, OPTIONAL) ∥
+`dashboard_web.py` (`:8787`, OPTIONAL). Separately: `python -m talonx_opportunity up` (research lane,
+one process per component). Market data has a single publisher; Telegram has one
 send path and one poller. See [`docs/CURRENT_ARCHITECTURE.md`](docs/CURRENT_ARCHITECTURE.md).
 
 ## 4. Runtime components
@@ -50,7 +55,9 @@ send path and one poller. See [`docs/CURRENT_ARCHITECTURE.md`](docs/CURRENT_ARCH
 | `talonx_dispatch` | official Telegram + audit trail + the one `get_updates` listener |
 | `talonx_paper` | Original local paper engine (no broker) |
 | `talonx_watchlist` | watchlist store (config, editable via `/admin/`) |
-| `talonx_signals` | the internal-only Experimental lane |
+| `talonx_signals` | shared utilities (external-send boundary, market sessions, pre-market store, reply resolver); its Experimental lane process is RETIRED |
+| `talonx_opportunity` | Continuous Opportunity Engine (research lane, S14) |
+| `talonx_premarket` | frozen `PREMARKET_RESEARCH_V1` scoring (reused by the engine); its pre-market-only canary is SUPERSEDED |
 | `talonx_ops` | supervisor, read model, market health, EOD store, official router, admin config, dashboard read model |
 | `talonx_compare` | Original-vs-PIV comparison collector (dormant with PIV) |
 | `talonx_piv` | opt-in Alpaca **PAPER-only** order-lifecycle validation harness |

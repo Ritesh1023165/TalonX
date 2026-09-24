@@ -4,21 +4,23 @@
 .DESCRIPTION
     Thin wrapper around `python -m talonx_ops.supervisor run`. The supervisor
     owns start / health / restart policy / controlled stop / dependency order
-    for the four TalonX processes:
+    for the TalonX processes:
 
         original      run_talonx.py                                   (MANDATORY)
-        experimental  python -m talonx_signals.run                    (OPTIONAL)
         intelligence  python -m talonx_ingest.intelligence.service poll --with-backfill   (OPTIONAL)
         dashboard     dashboard_web.py                                (OPTIONAL)
+
+    The Experimental lane (talonx_signals.run) is RETIRED from active startup (2026-09-24, S14). The Continuous
+    Opportunity Engine is a SEPARATE process set: python -m talonx_opportunity up (docs/runbooks/CONTINUOUS_ENGINE.md).
 
     It does NOT change any process's own internals -- it launches the existing
     entrypoints as child processes and watches them. An OPTIONAL component
     crashing never kills Original; the supervisor restarts it with bounded
-    backoff. Ctrl+C triggers the Phase 14 controlled shutdown (experimental ->
-    intelligence -> original -> dashboard, then EOD reconciliation persist,
+    backoff. Ctrl+C triggers the Phase 14 controlled shutdown (intelligence ->
+    original -> dashboard, then EOD reconciliation persist,
     then orphan verification).
 
-    Redis is still required by original + experimental exactly as before;
+    Redis is still required by original exactly as before;
     ensure the talonx-redis container is up first (start_talonx.ps1 does this).
 .PARAMETER NoDashboard
     Do not supervise dashboard_web.py.
