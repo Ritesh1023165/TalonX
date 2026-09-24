@@ -137,9 +137,17 @@ FREEZE_SESSION03_HARDENING_FILES = (
     "talonx_ops/prospective/proc.py",
     "talonx_dispatch/telegram_listener.py",
 )
-# ISOLATED RESEARCH LANE -- the broad-universe pre-market research engine is a separate package run as its own process.
-# Nothing in the frozen release imports it (guarded by a test), it never trades, and it never writes a V2 ledger/outbox.
-FREEZE_RESEARCH_LANE_PREFIXES = ("talonx_premarket/",)
+# ISOLATED RESEARCH LANES -- the broad-universe pre-market research engine (V1, frozen for replay/history) and the
+# Continuous Opportunity Engine are separate packages run as their own processes. Nothing in the frozen release imports
+# them (guarded by tests), they never trade, and they never write a V2 ledger/outbox.
+FREEZE_RESEARCH_LANE_PREFIXES = ("talonx_premarket/", "talonx_opportunity/")
+# POST-FREEZE CONTINUOUS-ENGINE INTEGRATION (S14-01..S14-06) -- an EXPLICIT, closed list: the read-only operator view of
+# the research lane, the retirement of the silently-broken Experimental lane from active startup, un-mixed /ping Quant
+# metrics, accurate yfinance incident accounting and the Intelligence stale-enqueue guard / digest visibility. No
+# strategy-fingerprint file, no provider/pricing/accounting/ledger file and no V2 admission input (guarded by a test).
+FREEZE_CONTINUOUS_ENGINE_FILES = (
+    "talonx_ops/opportunity_read.py",
+)
 
 
 def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None) -> tuple[bool, str]:
@@ -159,11 +167,13 @@ def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None)
     extra = [f for f in diff if not (f.startswith(FREEZE_ALLOWED_PREFIXES) or f in FREEZE_ALLOWED_FILES
                                        or f in FREEZE_OPS_HARDENING_FILES or f in FREEZE_RELEASE_FIDELITY_FIX_FILES
                                        or f in FREEZE_SESSION03_HARDENING_FILES
+                                       or f in FREEZE_CONTINUOUS_ENGINE_FILES
                                        or f.startswith(FREEZE_RESEARCH_LANE_PREFIXES))]
     if extra:
         return False, f"runtime files changed after the frozen release: {extra[:5]}"
     return True, (f"HEAD descends from the frozen release; only docs/tests/pin/declared ops-hardening, "
-                  f"release-fidelity-fix, Session-03-hardening and isolated research-lane files changed "
+                  f"release-fidelity-fix, Session-03-hardening, continuous-engine integration and isolated research-lane "
+                  f"files changed "
                   f"({len(diff)} files)")
 
 
