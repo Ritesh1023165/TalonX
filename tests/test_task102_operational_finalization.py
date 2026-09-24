@@ -397,7 +397,7 @@ def test_29_8770_no_default_startup():
 
     specs = default_talonx_components()
     names = {s.name for s in specs}
-    assert names == {"original", "experimental", "intelligence", "dashboard"}
+    assert names == {"original", "intelligence", "dashboard"}  # SUPERSEDED 2026-09-24 (S14): Experimental lane RETIRED from active startup
     # no component launches a :8770-hosting dashboard, and no argv mentions 8770
     for s in specs:
         argv = " ".join(s.argv)
@@ -450,7 +450,7 @@ def test_34_optional_component_degradation_represented():
     # no producers running -> overview marks optional components DEGRADED, original FAILED,
     # overall FAILED, but the sections still render
     ov = DashboardReadModel(check_processes=False).overview()
-    assert ov["runtime"]["experimental"] in ("READY", "DEGRADED", "FAILED")
+    assert ov["runtime"]["experimental"] in ("READY", "DEGRADED", "FAILED", "RETIRED")  # S14: RETIRED
     assert ov["runtime"]["intelligence"] in ("READY", "DEGRADED", "FAILED")
 
 

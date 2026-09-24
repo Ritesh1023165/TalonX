@@ -647,7 +647,9 @@ async def test_ping_market_section_reports_provider_and_redis_publisher_metrics(
     await listener._handle_update(_update(1, "/ping"))
 
     reply = telegram_client.send.await_args.args[0]
-    assert "Provider failures today: 2" in reply
+    # SUPERSEDED 2026-09-24 (S14): isolated per-symbol failures are labelled separately from upstream incidents
+    assert "Provider failures today (isolated): 2" in reply
+    assert "; incidents " in reply
     assert "Provider retries today: 1" in reply
     assert "Provider rate limits today: 0" in reply
     assert "Redis publish failures today: 0" in reply

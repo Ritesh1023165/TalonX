@@ -197,9 +197,12 @@ class AuthoritativeReadModel:
                 "metadata": getattr(self, "_orig_meta", None)}
 
     def experimental_producer(self) -> dict[str, Any]:
+        """The Experimental lane is RETIRED from active startup (S14, 2026-09-24); a still-running manual copy is
+        reported as such so a half-dead process is visible rather than silently counted as healthy."""
         live = self.check_processes and _proc_matches("talonx_signals.run")
-        return {"live": bool(live),
-                "reason": "talonx_signals.run process found" if live else "no talonx_signals.run process"}
+        return {"live": bool(live), "retired": True, "status": "RUNNING_DESPITE_RETIREMENT" if live else "RETIRED",
+                "reason": ("talonx_signals.run process found although the lane is retired" if live
+                           else "RETIRED from active startup; superseded by the Continuous Opportunity Engine")}
 
     def intelligence_producer(self) -> dict[str, Any]:
         if self._intel_live is None:

@@ -503,6 +503,8 @@ class TelegramReplyListener:
             *await self._signal_lifecycle_section(client),
             "",
             *self._session_section(),
+            "",
+            *self._opportunity_section(),
         ]
         discovery_lines = self._discovery_v2_section()
         await self._send_ping_reply(lines, discovery_lines)
@@ -618,6 +620,11 @@ class TelegramReplyListener:
         provider_failed = await _get_metric(client, "ingest", "provider_requests_failed")
         provider_retries = await _get_metric(client, "ingest", "provider_retries")
         provider_rate_limited = await _get_metric(client, "ingest", "provider_rate_limited")
+        # S14: one upstream throttle is ONE incident, not ~43 per-symbol "failures" (yfinance_poll.stream)
+        provider_incidents = await _get_metric(client, "ingest", "provider_upstream_incidents")
+        provider_throttle = await _get_metric(client, "ingest", "provider_throttle_incidents")
+        provider_hard = await _get_metric(client, "ingest", "provider_hard_incidents")
+        provider_in_incident = await _get_metric(client, "ingest", "provider_symbol_errors_in_incidents")
         redis_publish_failed = await _get_metric(client, "ingest", "market_redis_publish_failures")
         redis_reconnects = await _get_metric(client, "ingest", "market_redis_reconnect_successes")
         # Task 87B FC_02: the Redis counter can under-count an in-progress
@@ -646,7 +653,9 @@ class TelegramReplyListener:
             f"  Bars/events received today: {_fmt_metric(bars_read)}",
             f"  Last market event: {last_event_at}",
             f"  Feed status: {health}",
-            f"  Provider failures today: {_fmt_metric(provider_failed)}",
+            f"  Provider failures today (isolated): {_fmt_metric(provider_failed)}; incidents "
+            f"{_fmt_metric(provider_incidents)} (throttle {_fmt_metric(provider_throttle)}/hard "
+            f"{_fmt_metric(provider_hard)}, {_fmt_metric(provider_in_incident)} sym)",
             f"  Provider retries today: {_fmt_metric(provider_retries)}",
             f"  Provider rate limits today: {_fmt_metric(provider_rate_limited)}",
             f"  Redis publish failures today: {publish_failed_display}",
@@ -790,6 +799,15 @@ class TelegramReplyListener:
         "LOSS_LOCKOUT", "COOLDOWN", "HTF_DATA_UNAVAILABLE", "US_MARKET_SESSION_CLOSED",
     )
 
+    def _opportunity_section(self) -> list[str]:
+        """S14: Continuous Opportunity Engine health (read-only; research lane, never a trade event)."""
+        try:
+            from talonx_ops.opportunity_read import ping_lines
+
+            return ping_lines()
+        except Exception as exc:  # noqa: BLE001 -- /ping must never fail because a research store is unreadable
+            return ["\U0001F50E OPPORTUNITY ENGINE", f"  status unavailable ({type(exc).__name__})"]
+
     async def _quant_section(self, client) -> list[str]:
         evaluated = await _get_metric(client, "quant", "evaluated")
         published = await _get_metric(client, "quant", "published")
@@ -805,7 +823,7 @@ class TelegramReplyListener:
         bar_level, candidate_breakdown = self._quant_rejection_breakdown_today()
 
         lines = [
-            "\U0001F9E0 QUANT",
+            "\U0001F9E0 QUANT (CONTROL)",
             "  Volatility-stage:",
             f"    LOW_VOLATILITY: {_fmt_metric(bar_level)}",
             "",
@@ -825,9 +843,12 @@ class TelegramReplyListener:
                 lines.append(f"    {reason}: {candidate_breakdown[reason]:,}")
         lines.append(f"  Signals published today: {_fmt_metric(published)}")
         if published_no_sub is not None and published_no_sub > 0:
+            # S14: the Experimental lane (a second QuantScanner writing the SAME metrics:{date}:quant:* keys) is
+            # RETIRED from active startup, so these counters are no longer a CONTROL+Experimental blend. Wording
+            # states only the measured fact -- a zero-subscriber publish -- never an inferred destination.
             lines.append(
-                f"    WARNING: {published_no_sub} of those had ZERO Redis subscribers "
-                f"at publish time -- likely never reached Brain"
+                f"    WARNING: {published_no_sub} publish(es) had ZERO Redis subscribers at publish time "
+                f"(CONTROL talonx:signals:quant; the Experimental lane is RETIRED)"
             )
         return lines
 
@@ -900,10 +921,10 @@ class TelegramReplyListener:
 
         lines = [
             "\U0001F504 SIGNAL LIFECYCLE",
-            # Session 03 A4: this counter is SHARED -- the Experimental lane's own Quant instance increments
-            # the same key when it publishes on its isolated talonx:exp:signals:quant channel, which
-            # Brain/Core never subscribe to by design. It is not an Original->Brain delivery count.
-            f"  Quant published (all lanes incl. Experimental talonx:exp:*): {_fmt_metric(published)}",
+            # Session 03 A4 / S14: this counter used to be SHARED with the Experimental lane's own Quant
+            # instance (isolated talonx:exp:* channels). That lane is RETIRED from active startup, so the
+            # counter now reflects the CONTROL lane only.
+            f"  Quant published (CONTROL; Experimental retired): {_fmt_metric(published)}",
             f"  Quant published with zero subscribers: {_fmt_metric(published_no_sub)}",
             f"  Brain received (Original talonx:signals:quant only): {_fmt_metric(brain_received)}",
             f"  Brain reports generated: {_fmt_metric(brain_reports)}",

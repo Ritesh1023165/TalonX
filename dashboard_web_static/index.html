@@ -139,11 +139,12 @@
 
 <nav id="primary">
   <button data-sec="overview" class="active">Overview</button>
+  <button data-sec="opportunity_engine">Opportunity Engine</button>
   <button data-sec="premarket">Premarket</button>
   <button data-sec="original_quant">Original Quant</button>
   <button data-sec="v2_active_strategy">Active V2</button>
   <button data-sec="v2_broad_discovery">Broad Discovery</button>
-  <button data-sec="validation">Validation</button>
+  <button data-sec="validation">Validation (Experimental — retired)</button>
   <button data-sec="intelligence">Intelligence</button>
   <button data-sec="paper_eod">Paper / EOD</button>
 </nav>
@@ -785,8 +786,46 @@ function renderV2Discovery(d){
   return h;
 }
 
+/* S14 Continuous Opportunity Engine -- research lane, read-only. Never a trade event. */
+function renderOpportunity(d){
+  let h=`<h2 class="section-title">Opportunity Engine</h2>`;
+  if(!d||d.available===false||!d.system){
+    return h+`<div class="banner internal">Not running / no data. Start with <code>python -m talonx_opportunity up</code>.
+      ${esc((d&&d.error)||'')}</div>`;
+  }
+  const sys=d.system||{}, data=d.data||{}, disc=d.discovery||{}, ls=disc.last_scan||{}, n=d.notification||{},
+        rep=d.reporting||{}, cap=data.capability||{}, ing=data.ingestion||{};
+  h+=`<div class="banner internal">Research lane: continuous, phase-aware discovery. Candidate detection and
+      persistence are independent of Telegram capacity. Never a V2 TRADE_EVENT; no paper orders.</div><div class="grid">`;
+  h+=`<div class="card"><h3>System ${pill(sys.overall)}</h3>`+kv('commit', esc(sys.commit))+
+     kv('latest deployment', sys.latest_deployment?esc(`${String(sys.latest_deployment.at_utc).slice(0,19)} ${sys.latest_deployment.component} ${sys.latest_deployment.classification}`):null)+
+     kv('recent errors', num((sys.recent_errors||[]).length))+`</div>`;
+  h+=`<div class="card"><h3>Data</h3>`+kv('phase', esc(ing.phase))+kv('as-of (UTC)', esc(String(ing.as_of_utc||'').slice(0,19)))+
+     kv('incomplete symbols', num(ing.incomplete))+kv('capability', `${esc(cap.provider||'')}/${esc(cap.feed||'')} ${pill(cap.availability)} delay ${esc(cap.delay_minutes)}`)+
+     Object.entries(data.probes||{}).map(([p,v])=>kv('probe '+p, `${v.ok?'ok':'FAIL'} ${esc(String(v.at_utc).slice(11,19))}`)).join('')+`</div>`;
+  h+=`<div class="card"><h3>Discovery</h3>`+kv('last scan', `${esc(ls.phase)} ${pill(ls.state)} ${esc(String(ls.decision_utc||'').slice(11,19))}`)+
+     kv('universe / eligible', `${num(ls.universe)} / ${num(ls.eligible)}`)+kv('alert-worthy (last scan)', num(ls.alert_worthy))+
+     kv('candidates this window', num(disc.candidates_this_window))+kv('persisted (all)', num(disc.candidates_persisted_total))+
+     kv('active', num(disc.candidates_active))+`</div>`;
+  h+=`<div class="card"><h3>Horizons</h3>`+Object.entries(d.horizons||{}).map(([k,v])=>kv(k, `${pill(v.health)} ${esc(v.state||'')} records ${num(v.records)} · BUY/SELL ${num(v.buy_sell)}`)).join('')+`</div>`;
+  h+=`<div class="card"><h3>Notification (Lab)</h3>`+kv('policy', esc(n.policy?n.policy.policy_version:'—'))+
+     Object.entries((n.lab||{}).decisions||{}).map(([k,v])=>kv(k, num(v))).join('')+
+     Object.entries((n.lab||{}).delivery||{}).map(([k,v])=>kv('delivery '+k, num(v))).join('')+
+     `<div class="small muted">${esc(n.signal_sentinel||'')}</div></div>`;
+  h+=`<div class="card"><h3>Reporting</h3>`+kv('window', esc(rep.window_id))+kv('material boundaries', num(rep.material_changes))+
+     kv('ops-only restarts', num(rep.operations_only_restarts))+
+     (rep.warnings||[]).map(w=>`<div class="small" style="color:var(--warn)">${esc(w)}</div>`).join('')+`</div>`;
+  h+=`<div class="card card-wide"><h3>Components (independently restartable)</h3>`+
+     boundedTable(d.components, [{label:'logical', get:r=>r.logical},{label:'component', get:r=>r.component},
+       {label:'health', get:r=>r.health},{label:'hb age s', get:r=>r.heartbeat_age_s},{label:'restarts', get:r=>r.restarts},
+       {label:'version', get:r=>r.version}], 12, r=>r.component)+`</div>`;
+  h+=`<div class="card"><h3>Paper (V2, read-only)</h3>`+kv('v2', esc(JSON.stringify((d.paper||{}).v2||{}).slice(0,160)))+
+     kv('research paper orders', num((d.paper||{}).research_lane_paper_orders))+`</div>`;
+  return h+`</div>`;
+}
+
 const SECTION_RENDER = {
-  overview: renderOverview, premarket: renderPremarket, original_quant: renderOriginalQuant,
+  overview: renderOverview, opportunity_engine: renderOpportunity, premarket: renderPremarket, original_quant: renderOriginalQuant,
   v2_active_strategy: renderV2, v2_broad_discovery: renderV2Discovery,
   validation: renderValidation, intelligence: renderIntelligence, paper_eod: renderPaperEod,
 };

@@ -366,7 +366,7 @@ def test_30_no_default_startup():
     from talonx_ops.supervisor import default_talonx_components
 
     specs = {s.name: s for s in default_talonx_components()}
-    assert set(specs) == {"original", "experimental", "intelligence", "dashboard"}
+    assert set(specs) == {"original", "intelligence", "dashboard"}  # SUPERSEDED 2026-09-24 (S14): Experimental lane RETIRED from active startup
     for s in specs.values():
         assert "8770" not in " ".join(s.argv)
 

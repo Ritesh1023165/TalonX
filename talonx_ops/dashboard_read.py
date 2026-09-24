@@ -150,14 +150,17 @@ class DashboardReadModel:
                 return "READY"
             return "FAILED" if mandatory else "DEGRADED"
 
+        exp_retired = bool(exp.get("retired")) and not exp["live"]
         runtime = {
-            "overall": self._overall_health(orig["live"], exp["live"], intel["live"], mh.state),
+            # S14: the Experimental lane is RETIRED from active startup -> never degrades overall health
+            "overall": self._overall_health(orig["live"], exp["live"] or exp_retired, intel["live"], mh.state),
             "original": cstate(orig["live"], True),
-            "experimental": cstate(exp["live"], False),
+            "experimental": "RETIRED" if exp_retired else cstate(exp["live"], False),
             "intelligence": cstate(intel["live"], False),
             "telegram_send": self._telegram_send_state(oa),
             "telegram_receive": self._telegram_receive_state(orig["live"], sup),
-            "forward_outcomes": "READY" if exp["live"] else "DEGRADED",
+            "forward_outcomes": "RETIRED" if exp_retired else ("READY" if exp["live"] else "DEGRADED"),
+            "opportunity_engine": self._opportunity_overall(),
             "eod": eod.values.get("status", "NOT_DUE") if eod.values else "NOT_DUE",
             "notes": {
                 "original": orig["reason"], "experimental": exp["reason"],
@@ -586,7 +589,8 @@ class DashboardReadModel:
         }
         exp = self.arm.experimental_alerts()
         exp_prod = self.arm.experimental_producer()
-        out["experimental_state"] = "READY" if exp_prod["live"] else "DOWN"
+        out["experimental_state"] = ("READY" if exp_prod["live"] else
+                                     "RETIRED" if exp_prod.get("retired") else "DOWN")   # S14: lane retired
         out["experimental_state_reason"] = exp_prod["reason"]
         out["by_family"] = exp.values.get("by_family", {})
         out["external_boundary"] = "BLOCKED -- structural (Task 100B Phase 6)"
@@ -1839,9 +1843,26 @@ class DashboardReadModel:
             now=self.now, check_processes=self.check_processes,
         )
 
+    def _opportunity_overall(self) -> str:
+        try:
+            from talonx_ops.opportunity_read import read_opportunity_status
+            return read_opportunity_status()["system"]["overall"]
+        except Exception as exc:  # noqa: BLE001 -- research-lane visibility must never break the dashboard
+            return f"UNKNOWN ({type(exc).__name__})"
+
+    def opportunity_engine(self) -> dict[str, Any]:
+        """S14 Continuous Opportunity Engine: SYSTEM / DATA (capability per phase) / DISCOVERY / HORIZONS /
+        NOTIFICATION / PAPER / REPORTING, read-only (talonx_ops.opportunity_read; no research-lane import)."""
+        try:
+            from talonx_ops.opportunity_read import read_opportunity_status
+            return read_opportunity_status()
+        except Exception as exc:  # noqa: BLE001
+            return {"available": False, "error": f"{type(exc).__name__}: {exc}"[:200]}
+
     def all_sections(self) -> dict[str, Any]:
         return {
             "overview": self.overview(),
+            "opportunity_engine": self.opportunity_engine(),         # S14 -- continuous research lane
             "premarket": self.premarket(),
             "original_quant": self.original_quant(),
             "v2_active_strategy": self.v2_active_strategy(),   # Task 112 -- UNCHANGED, the

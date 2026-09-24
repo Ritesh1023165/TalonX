@@ -1,4 +1,4 @@
-"""Task 99A -- supervised experimental + directional lane.
+"""Task 99A -- supervised experimental + directional lane.  **RETIRED from active startup (2026-09-24, S14).**
 
 Runs ALONGSIDE ``python run_talonx.py`` (CONTROL, unchanged) as its own
 process -- the same "separate process" pattern PIV, the Streamlit dashboard,
@@ -594,7 +594,17 @@ def main() -> None:
     ap.add_argument("--port", type=int, default=8770)
     ap.add_argument("--bridge-interval", type=float, default=300.0,
                     help="seconds between live-intelligence bridge cycles")
+    ap.add_argument("--allow-retired", action="store_true",
+                    help="explicitly run this RETIRED lane (historical reproduction only)")
     args = ap.parse_args()
+    if not args.offline and not args.allow_retired:
+        # RETIRED 2026-09-24 (S14 legacy cleanup): the directional consumer silently failed to subscribe on 8 of 9
+        # starts since 2026-09-15 and the lane is superseded by the Continuous Opportunity Engine
+        # (python -m talonx_opportunity up). Refusing to start avoids a half-dead runtime process.
+        print("RETIRED: the Experimental lane is no longer part of active startup; use "
+              "`python -m talonx_opportunity up` (or pass --allow-retired for historical reproduction).",
+              file=sys.stderr)
+        sys.exit(4)
     try:
         sys.exit(asyncio.run(_amain(args)))
     except KeyboardInterrupt:

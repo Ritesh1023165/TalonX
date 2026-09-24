@@ -191,7 +191,7 @@ def ping_lines(root=None) -> list[str]:
     """Compact /ping block."""
     s = read_opportunity_status(root)
     if not s["available"] or s["system"]["overall"] == "NOT_RUNNING":
-        return ["\U0001F50E OPPORTUNITY ENGINE", "  not running (python -m talonx_opportunity up)"]
+        return ["\U0001F50E OPPORTUNITY ENGINE: not running"]
     L = ["\U0001F50E OPPORTUNITY ENGINE", f"  overall: {s['system']['overall']}"]
     down = [c["component"] for c in s["components"] if c["health"] != "UP"]
     if down:

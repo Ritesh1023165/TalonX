@@ -400,8 +400,8 @@ def test_27_supervisor_can_own_v2_optionally_without_touching_original():
     from talonx_ops.supervisor import default_talonx_components
     base = default_talonx_components(include_dashboard=False)
     withv2 = default_talonx_components(include_dashboard=False, include_v2=True)
-    assert {c.name for c in base} == {"original", "experimental", "intelligence"}
-    assert {c.name for c in withv2} == {"original", "experimental", "intelligence", "v2"}
+    assert {c.name for c in base} == {"original", "intelligence"}  # SUPERSEDED 2026-09-24 (S14): Experimental lane RETIRED from active startup
+    assert {c.name for c in withv2} == {"original", "intelligence", "v2"}
     orig_base = next(c for c in base if c.name == "original")
     orig_v2 = next(c for c in withv2 if c.name == "original")
     assert orig_base.argv == orig_v2.argv                 # Original spec byte-identical
