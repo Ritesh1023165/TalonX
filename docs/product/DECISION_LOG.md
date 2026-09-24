@@ -3596,3 +3596,31 @@ Decisions recorded:
 2. **Secrets are redacted at log-record level for the whole process** (`talonx_ops/log_redaction.py`). Two Telegram bot tokens found in local logs are treated as compromised: a release start is refused until they are rotated (fingerprint check). Rotation itself is a user action.
 3. STARTUP notice carries the real campaign id; STARTUP/SHUTDOWN notices expire (+2 h). Frozen release identity remains `v2-paper-rc1 / a56ec8c`; the runtime delta is an explicit closed list of operational files (no strategy/provider/pricing/accounting/ledger file).
 4. Full-day session tomorrow is NO_GO until rotation + Sentinel re-validation.
+
+---
+
+## Continuous Opportunity Engine: requirement decision (2026-09-24, gatekeeper Stage-B authorization)
+
+Evidence: [`docs/research/evidence/SESSION04_MISSED_OPPORTUNITY_FORENSIC.md`](../research/evidence/SESSION04_MISSED_OPPORTUNITY_FORENSIC.md) (`FORENSIC_ANALYSIS: PASS_WITH_FINDINGS`).
+
+Decisions recorded:
+
+1. **Continuous discovery is authoritative (REQ-CONT-01).** "While TalonX is running, it continuously discovers and evaluates market opportunities across all supported trading phases and investment horizons. Market phase may alter data source, liquidity assumptions, classification, confidence and execution eligibility, but must not globally suspend opportunity discovery."
+   - Phases: OVERNIGHT, PREMARKET, REGULAR, AFTER_HOURS, and CLOSED / DATA_UNAVAILABLE.
+   - Horizons: INTRADAY, SAME_DAY, SHORT_TERM, LONG_TERM.
+   - This **SUPERSEDES** the pre-market-only research lane contract: `talonx_premarket run` scans only before the open (`PREMARKET_RESEARCH_V1`). `PREMARKET_RESEARCH_V1` stays frozen and reproducible for replay and history; it is not deleted.
+2. **Detection is independent of notification (REQ-CONT-02).** "Candidate detection and durable persistence are independent from notification limits."
+   - Stage-A correction: the V1 cap did **not** limit raw detection. 174 identities were detected and recorded: 25 delivered, 149 cap-suppressed.
+   - The cap constrained surfaced visibility and later lifecycle delivery: suppressed identities were frozen, never updated, invalidated or outcome-tracked.
+   - The budget now lives only in a versioned notification policy.
+3. **Independent restartability (REQ-CONT-03).** "Runtime components should be independently restartable so operational fixes can be deployed without unnecessarily terminating unrelated live flows."
+4. **Deployment boundaries (REQ-CONT-04).** Every live code or config change is recorded with a change classification and `affects_*` flags. Reports segment on material boundaries and never blend materially different strategy periods.
+5. **Provider honesty (REQ-CONT-05).**
+   - A phase without demonstrated consolidated data fails closed and is shown as such.
+   - Overnight consolidated (SIP) is **not supported** on the current subscription.
+   - BOATS (Blue Ocean ATS) is single-venue and sparse. It is never treated as SIP, and it is off by default.
+6. **BUY/SELL vocabulary.** BUY/SELL are actionable strategy states. They are never produced by the research lane to increase alert volume, and require an authorising strategy. WATCH/BULLISH/BEARISH are research states.
+7. **Unchanged:**
+   - V2 strategy `e2acf6454789217e`, provider `ac5e51aa3599d6c9`, campaign `V2-PAPER-RC1` ($100k/$10k).
+   - V1 scoring weights and thresholds, the 45-minute stale-price gate, and V1 lifecycle deltas.
+   - Paper only; no paid provider; Signal/Sentinel/Lab isolation.
