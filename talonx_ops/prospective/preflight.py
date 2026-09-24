@@ -146,7 +146,15 @@ FREEZE_RESEARCH_LANE_PREFIXES = ("talonx_premarket/", "talonx_opportunity/")
 # metrics, accurate yfinance incident accounting and the Intelligence stale-enqueue guard / digest visibility. No
 # strategy-fingerprint file, no provider/pricing/accounting/ledger file and no V2 admission input (guarded by a test).
 FREEZE_CONTINUOUS_ENGINE_FILES = (
-    "talonx_ops/opportunity_read.py",
+    "talonx_ops/opportunity_read.py",                         # read-only operator view of the research lane
+    "talonx_ops/dashboard_read.py",                           # Opportunity section; Experimental shown RETIRED
+    "talonx_ops/authoritative_read_model.py",                 # Experimental producer reported RETIRED
+    "dashboard_web.py",                                       # section whitelist += opportunity_engine
+    "dashboard_web_static/index.html",                        # Opportunity tab (read-only)
+    "talonx_signals/run.py",                                  # retired lane refuses a live start (--allow-retired)
+    "talonx_ingest/market_data/yfinance_poll.py",             # upstream incident accounting (legacy CONTROL feed)
+    "talonx_ingest/intelligence/service/enrichment.py",       # stale-at-enqueue guard (no enqueue->expire churn)
+    "talonx_ingest/intelligence/service/observability.py",    # counter for the guard
 )
 
 

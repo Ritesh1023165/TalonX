@@ -115,7 +115,12 @@ async def test_stream_emits_category_tagged_provider_metrics(monkeypatch):
     await poller.stream(["AAPL", "MSFT", "NVDA"], lambda e: _noop())
 
     counters = {c for c, _ in flushed}
-    assert "provider_requests_failed" in counters
+    # SUPERSEDED 2026-09-24 (S14): a cycle where EVERY symbol failed is ONE upstream incident (a schema error in a
+    # fully degraded cycle = THROTTLE), and its per-symbol errors are counted separately -- never as dozens of
+    # provider_requests_failed. The per-symbol category diagnostic is still flushed.
+    assert "provider_upstream_incidents" in counters and "provider_throttle_incidents" in counters
+    assert "provider_symbol_errors_in_incidents" in counters
+    assert "provider_requests_failed" not in counters
     assert "provider_err_provider_schema_error" in counters
 
 

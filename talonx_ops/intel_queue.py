@@ -11,12 +11,22 @@ staleness cutoff). This separates:
   HELD          -- rows held (no transport / not qualified); not a failure
   EXPIRED       -- expired in the last 24 h, and all-time (stale-by-design, not a failure)
   DRAIN_RATE    -- SENT in the last 1 h / 24 h
+  DIGEST_DELIVERY -- ENABLED or DIGEST_DISABLED (S14): DIGEST-routed cards are only ever sent when the operator
+                     opts in (TALONX_INTEL_DELIVER_DIGEST_ENABLED); otherwise they wait and expire after 24 h.
+                     Reported, never changed silently.
 """
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 
 _WAITING = ("PENDING", "RETRY", "IN_FLIGHT")
+
+
+def digest_delivery_state() -> str:
+    """Same env semantics as ServiceConfig (TALONX_INTEL_DELIVER_DIGEST_ENABLED, default OFF)."""
+    v = os.environ.get("TALONX_INTEL_DELIVER_DIGEST_ENABLED")
+    return "ENABLED" if v is not None and v.strip().lower() in ("1", "true", "yes", "on") else "DIGEST_DISABLED"
 
 
 def delivery_queue_breakdown(con, *, now: datetime | None = None) -> dict:
@@ -53,6 +63,7 @@ def delivery_queue_breakdown(con, *, now: datetime | None = None) -> dict:
         "SENT_1H": count("SELECT COUNT(*) FROM intelligence_delivery WHERE state = 'SENT' AND sent_at_utc >= ?", h1),
         "SENT_24H": count("SELECT COUNT(*) FROM intelligence_delivery WHERE state = 'SENT' AND sent_at_utc >= ?", d1),
         "LAST_SENT_UTC": q("SELECT MAX(sent_at_utc) FROM intelligence_delivery WHERE state = 'SENT'")[0][0],
+        "DIGEST_DELIVERY": digest_delivery_state(),
     }
 
 
@@ -65,4 +76,14 @@ def format_breakdown(b: dict) -> list[str]:
         f"  Drain -- sent 1h: {b['SENT_1H']}, sent 24h: {b['SENT_24H']}; EXPIRED 24h: {b['EXPIRED_24H']} "
         f"(all-time {b['EXPIRED_ALL_TIME']:,}; stale backlog cards expire by design)",
         "  Last successful discovery delivery: " + (b["LAST_SENT_UTC"] or "none in retained history"),
-    ]
+    ] + _digest_line(b)
+
+
+def _digest_line(b: dict) -> list[str]:
+    pend = (b.get("LIVE_PENDING_BY_ROUTE") or {}).get("DIGEST", 0)
+    state = b.get("DIGEST_DELIVERY")
+    if state is None:
+        return []
+    if state == "DIGEST_DISABLED":
+        return [f"  DIGEST: DIGEST_DISABLED, {pend} pending will not be sent (opt-in)"]
+    return [f"  DIGEST delivery: ENABLED ({pend} pending)"]
