@@ -117,6 +117,10 @@ def main(argv=None) -> int:
         names = tuple(x for x in a.only.split(",") if x) or SV.COMPONENTS
         print(json.dumps(SV.up(root, names, env=env), indent=1))
         if a.deliver:
+            # resolve exactly as the notifier will: it loads .env (override=False) before resolving (2026-09-25 fix:
+            # this line used to report a false negative because `up` itself never loaded .env)
+            from talonx_premarket import __main__ as _M
+            _M._env()
             from talonx_ops.notify import RESEARCH, resolve_destination_config
             cfg = resolve_destination_config(RESEARCH)
             print(f"LAB DELIVERY: deliver_flag=true research_destination_enabled={cfg.enabled} ({cfg.reason})")

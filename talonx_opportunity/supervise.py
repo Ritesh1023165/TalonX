@@ -21,6 +21,11 @@ from talonx_opportunity.runtime import RuntimeStore, _pid_alive, lock_path, stop
 COMPONENTS = ("ingestion", "discovery", "evaluator:INTRADAY", "evaluator:SAME_DAY", "evaluator:SHORT_TERM",
               "evaluator:LONG_TERM", "notifier", "outcomes", "reporting")
 HEARTBEAT_STALE_S = 180.0
+# A just-spawned component needs a few seconds (imports) before it writes its lock; judging it "dead" earlier made the
+# supervisor spawn a second copy (refused by the lock, but logged as a spurious SUPERVISOR_RESTART). 2026-09-25 fix.
+STARTUP_GRACE_S = 90.0
+_SPAWNED_AT: dict[str, float] = {}
+SUPERVISOR_SOURCES = ("talonx_opportunity/supervise.py", "talonx_opportunity/__main__.py")
 
 
 def _lock_pid(root, name: str) -> int | None:
@@ -49,7 +54,23 @@ def spawn(root, name: str, *, env: dict | None = None) -> int:
     p = subprocess.Popen([sys.executable, "-m", "talonx_opportunity", "component", name], cwd=str(REPO_ROOT),
                          stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, env=e,
                          creationflags=flags, close_fds=True)
+    _SPAWNED_AT[name] = time.monotonic()
     return p.pid
+
+
+def in_startup_grace(name: str, grace_s: float = STARTUP_GRACE_S) -> bool:
+    t = _SPAWNED_AT.get(name)
+    return t is not None and time.monotonic() - t < grace_s
+
+
+def supervisor_version() -> str:
+    import hashlib
+    h = hashlib.sha256()
+    for rel in SUPERVISOR_SOURCES:
+        f = REPO_ROOT / rel
+        h.update(rel.encode())
+        h.update(f.read_bytes().replace(b"\r\n", b"\n") if f.exists() else b"MISSING")
+    return h.hexdigest()[:12]
 
 
 def request_stop(root, name: str) -> None:
@@ -112,9 +133,13 @@ def supervise(root, names=COMPONENTS, *, env: dict | None = None, poll_s: float 
     fails: dict[str, int] = {}
     next_ok: dict[str, float] = {}
     rt = RuntimeStore(root)
+    # the supervisor records its own deployment boundary (OPERATIONS_ONLY; never part of any component's version)
+    from talonx_opportunity.runtime import commit_sha
+    rt.record_start("supervisor", version=supervisor_version(),
+                    config_fps={"deliver": (env or os.environ).get("TALONX_OPP_DELIVER", "0")}, commit=commit_sha())
     while not should_stop():
         for n in names:
-            if is_running(root, n) or stop_flag(root, n).exists():
+            if is_running(root, n) or stop_flag(root, n).exists() or in_startup_grace(n):
                 continue
             if time.monotonic() < next_ok.get(n, 0.0):
                 continue

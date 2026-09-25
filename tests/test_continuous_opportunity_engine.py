@@ -629,3 +629,45 @@ def test_frozen_release_does_not_import_the_opportunity_lane():
         for p in (REPO / pkg).rglob("*.py"):
             text = p.read_text(encoding="utf-8", errors="replace")
             assert "import talonx_opportunity" not in text and "from talonx_opportunity" not in text, p
+
+
+# --------------------------------------------------------------------------------------------- 2026-09-25 live fixes
+def test_supervisor_does_not_respawn_a_component_inside_its_startup_grace(tmp_path, monkeypatch):
+    """Live finding 1: supervise() judged just-spawned components dead before they wrote their lock."""
+    from talonx_opportunity import supervise as SV
+    spawned = []
+    monkeypatch.setattr(SV.subprocess, "Popen", lambda *a, **k: type("P", (), {"pid": 1})())
+    SV.spawn(tmp_path, "reporting")                                    # as `up` does
+    monkeypatch.setattr(SV, "spawn", lambda root, n, env=None: spawned.append(n) or 2)
+    monkeypatch.setattr(SV, "is_running", lambda root, n: False)       # lock not written yet
+    ticks = iter([False, True])
+    monkeypatch.setattr(SV.time, "sleep", lambda s: None)
+    SV.supervise(tmp_path, ("reporting",), should_stop=lambda: next(ticks))
+    assert spawned == []                                               # no spurious second copy
+    deps = RuntimeStore(tmp_path, readonly=True).deployments()
+    assert deps[-1]["component"] == "supervisor" and deps[-1]["classification"] == "OPERATIONS_ONLY"
+
+
+def test_supervisor_still_restarts_a_dead_component_after_grace(tmp_path, monkeypatch):
+    from talonx_opportunity import supervise as SV
+    spawned = []
+    SV._SPAWNED_AT.pop("reporting", None)
+    monkeypatch.setattr(SV, "spawn", lambda root, n, env=None: spawned.append(n) or 2)
+    monkeypatch.setattr(SV, "is_running", lambda root, n: False)
+    ticks = iter([False, True])
+    monkeypatch.setattr(SV.time, "sleep", lambda s: None)
+    SV.supervise(tmp_path, ("reporting",), should_stop=lambda: next(ticks))
+    assert spawned == ["reporting"]
+
+
+def test_up_deliver_status_resolves_like_the_notifier(tmp_path, monkeypatch, capsys):
+    """Live finding 3: `up --deliver` must load .env before resolving RESEARCH (no false negative)."""
+    import talonx_opportunity.__main__ as CLI
+    from talonx_opportunity import supervise as SV
+    monkeypatch.setattr(SV, "up", lambda root, names, env=None: {})
+    called = []
+    import talonx_premarket.__main__ as PM
+    monkeypatch.setattr(PM, "_env", lambda *a, **k: called.append(1))
+    monkeypatch.setenv("TALONX_OPP_ROOT", str(tmp_path))
+    CLI.main(["up", "--deliver"])
+    assert called and "LAB DELIVERY:" in capsys.readouterr().out
