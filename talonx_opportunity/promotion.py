@@ -194,6 +194,9 @@ class Promoter:
             return "REJECTED", "CAUSALITY"
         if self.con.execute("SELECT 1 FROM promotions WHERE candidate_id=?", (ev["candidate_id"],)).fetchone():
             return "REJECTED", "DUPLICATE"
+        from talonx_ops.operator_control.gates import is_excluded           # always False unless ACTIVE
+        if is_excluded(ev["symbol"]):
+            return "REJECTED", "OPERATOR_EXCLUDED"
         if cand is None:
             return "REJECTED", "NO_CANDIDATE"
         return self.still_valid(ev, cand, now)
@@ -292,6 +295,13 @@ class Promoter:
             cand = s.candidate(q["candidate_id"])
             ev = {"data_as_of_utc": q["data_as_of_utc"], "last_price": q["reference_price"]}
             dec, why = self.still_valid(ev, cand or {"state": None}, now)
+            from talonx_ops.operator_control.gates import is_excluded
+            if dec == "ELIGIBLE" and is_excluded(q["symbol"]):
+                with self.con:
+                    self.con.execute("UPDATE promotions SET state='EXPIRED', reason_code='OPERATOR_EXCLUDED', "
+                                     "decision_utc=? WHERE promotion_id=?", (iso(now), q["promotion_id"]))
+                out["expired"] += 1
+                continue
             if dec != "ELIGIBLE":
                 with self.con:
                     self.con.execute("UPDATE promotions SET state='REJECTED_WHILE_QUEUED', reason_code=?, "

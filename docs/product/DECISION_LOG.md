@@ -3672,3 +3672,27 @@ Decisions recorded:
 7. **Paper outcomes** (long direction) are tracked for every promotion from the causal reference: +15m / +30m / +1h / close / MFE / MAE, plus the lifecycle end state.
 8. **Not advice, not orders.** This is **not proven profitable** and **not BUY/SELL advice**. It **places no broker order** and uses no real capital. Messages are paper-development outputs labelled "PAPER OPPORTUNITY". **V2 remains an independent strategy**: no import, no ledger, no outbox, and a separate dedup namespace (`OPPORTUNITY_ENGINE:` vs V2 event ids).
 9. **Policy fingerprint** `OPPORTUNITY_PROMOTION_V1` covers phases, the long-only rule, classes, freshness, rate, expiry and ordering. No existing strategy fingerprint changes.
+
+### Sentinel operator control plane (2026-09-25, DRY_RUN until post-EOD activation)
+
+1. **Channel.** Operator commands belong to TalonX **Sentinel** (the OPERATIONS bot) only.
+   - Today the single primary listener (DispatchAgent inside run_talonx) polls the **Signal** bot.
+   - So the control plane has its own `SentinelCommandPoller`, which polls only the OPERATIONS bot (credentials from `telegram_client_for(OPERATIONS)`). It is off unless `TALONX_SENTINEL_COMMANDS_ENABLED=1`.
+   - Authorisation is owner chat-id equality, the same rule as the existing listener. Unauthorised requests never mutate and are audited without secrets.
+2. **Commands.**
+   - `/help`, `/help <universe|exclude|scanned|status>`
+   - `/universe add|remove|list|status <SYMBOL>`
+   - `/exclude add|remove|list|status <SYMBOL>`
+   - `/scanned [file|candidates|setups|signals]`: read-only, from the authoritative stores; the file is a CSV sent as a document.
+   - Invalid input gets concise usage text or a "did you mean" suggestion.
+3. **Durable intent.** `operator_control.db` holds operator_universe, symbol_exclusions and operator_audit. It survives restarts.
+4. **Effective universe.** `BASE + operator-added − removed − excluded`; an exclusion always wins.
+5. **Mutation mode `OPERATOR_UNIVERSE_MUTATION_MODE`.**
+   - **DRY_RUN (default):** intents persist as PENDING_ACTIVATION, and every gate is an exact identity.
+   - **ACTIVE (post-EOD authorisation only):**
+     - The gates run before the Alpaca batch is built (`Ingestion.tick`) and before the yfinance batch is built (`YFinancePoller.stream`), so excluded symbols are never fetched.
+     - Discovery's member map drops them (no scoring, SEC or candidates) and adds operator-added symbols (with no CIK, so no SEC lookup).
+     - Promotion rejects them with OPERATOR_EXCLUDED and expires queued unsent promotions. Already-sent outcomes keep tracking.
+     - Restoring or re-adding never replays history.
+   - Operator ADDs do not extend the Original yfinance watchlist stream (Original strategy input); exclusions do apply to it.
+6. **Frozen-release allowlist.** A closed list, `FREEZE_OPERATOR_CONTROL_FILES`. The control plane never imports the research lane.

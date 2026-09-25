@@ -168,6 +168,18 @@ FREEZE_CONTINUOUS_ENGINE_FILES = (
 FREEZE_SIGNAL_ROUTING_FIX_FILES = (
     "talonx_v2/delivery.py",
 )
+# POST-FREEZE SENTINEL OPERATOR CONTROL PLANE (2026-09-25) -- an EXPLICIT, closed list: owner-only Sentinel commands
+# (/help /universe /exclude /scanned), a durable operator-intent store and fetch-universe gates that are exact
+# identities unless OPERATOR_UNIVERSE_MUTATION_MODE=ACTIVE (post-EOD authorisation). No strategy-fingerprint input,
+# no provider/pricing/accounting/ledger/admission change, never imports the research lane (guarded by tests).
+FREEZE_OPERATOR_CONTROL_FILES = (
+    "talonx_ops/operator_control/__init__.py",
+    "talonx_ops/operator_control/store.py",
+    "talonx_ops/operator_control/gates.py",
+    "talonx_ops/operator_control/commands.py",
+    "talonx_ops/operator_control/scanned.py",
+    "talonx_ops/operator_control/sentinel.py",
+)
 
 def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None) -> tuple[bool, str]:
     if head.startswith(expected_sha):
@@ -188,6 +200,7 @@ def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None)
                                        or f in FREEZE_SESSION03_HARDENING_FILES
                                        or f in FREEZE_CONTINUOUS_ENGINE_FILES
                                        or f in FREEZE_SIGNAL_ROUTING_FIX_FILES
+                                       or f in FREEZE_OPERATOR_CONTROL_FILES
                                        or f.startswith(FREEZE_RESEARCH_LANE_PREFIXES))]
     if extra:
         return False, f"runtime files changed after the frozen release: {extra[:5]}"

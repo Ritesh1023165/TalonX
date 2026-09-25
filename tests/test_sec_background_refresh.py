@@ -52,7 +52,7 @@ def test_read_path_is_identical_to_sec_get_without_refresher():
     for when, cik in ((0, "1"), (10, "1"), (599, "1"), (600, "1"), (601, "2"), (1300, "1")):
         ta[0] = tb[0] = when
         ra, rw = a.get(cik), w.get(cik)
-        assert ra[0] == rw[0] and ra[1] == rw[1]
+        assert ra[0] == rw[0] and (ra[1] is None) == (rw[1] is None)     # observed_at is each instance's wall clock
         assert ca["n"] == cb["n"]                          # same request decisions, same count
 
 

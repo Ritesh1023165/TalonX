@@ -277,8 +277,12 @@ class YFinancePoller:
             # existing test that monkeypatches or calls it directly is
             # unaffected).
             failed_before, rate_limited_before = self._requests_failed, self._rate_limited
+            # Sentinel operator control: excluded symbols are dropped BEFORE the batch is built (identity unless
+            # OPERATOR_UNIVERSE_MUTATION_MODE=ACTIVE; operator ADDs do not extend this Original watchlist stream).
+            from talonx_ops.operator_control.gates import effective_symbols
+            cycle_symbols = effective_symbols(symbols, include_added=False)
             try:
-                snapshots = await asyncio.to_thread(self._fetch_snapshots, symbols)
+                snapshots = await asyncio.to_thread(self._fetch_snapshots, cycle_symbols)
             except Exception as exc:  # noqa: BLE001 -- keep polling alive regardless
                 consecutive_failures += 1
                 self._retries += 1

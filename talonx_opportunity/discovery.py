@@ -119,6 +119,8 @@ class Discovery:
         incomplete = set(unj(ing["incomplete_json"], []))
         self._expire_and_roll(now, w)
         members = {m["symbol"]: m for m in st["members"] if m.get("status") == "ELIGIBLE"}
+        from talonx_ops.operator_control.gates import effective_members      # identity unless ACTIVE (operator control)
+        members = effective_members(members)
         funnel = {"UNIVERSE": len(st["members"]), "ELIGIBLE": len(members), "DATA_READY": 0, "HARD_REJECTED": 0,
                   "NOT_DATA_READY": 0, "PROVIDER_INCOMPLETE": 0, "SCORED": 0, "WATCH": 0, "BULLISH_SETUP": 0,
                   "BEARISH_SETUP": 0, "CATALYST_UNKNOWN": 0, "HELD_STALE_NON_INVALIDATING_PHASE": 0}

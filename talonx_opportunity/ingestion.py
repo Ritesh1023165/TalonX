@@ -156,7 +156,8 @@ class Ingestion:
             probe = self.probe(phase, now)
             self._last_probe[phase] = time.monotonic()
         cap = C.effective_capability(phase, probe or self.latest_probe(phase))
-        symbols = self.eligible(w.window_id)
+        from talonx_ops.operator_control.gates import effective_symbols     # identity unless ACTIVE (operator control)
+        symbols = effective_symbols(self.eligible(w.window_id))
         self._ensure_daily(w, symbols, now)
         if not cap.usable_for_discovery:
             self.last_note = f"{phase}: {cap.availability} ({cap.evidence[:80]})"
