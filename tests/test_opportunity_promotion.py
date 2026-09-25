@@ -313,3 +313,9 @@ def test_22b_shadow_queue_is_not_carried_into_paper_signal(tmp_path):
     assert rows(pr2, "SELECT state, reason_code FROM promotions WHERE symbol='S0'") == [("EXPIRED", "MODE_SWITCH_NO_CARRYOVER")]
     c = sqlite3.connect(P.signal_outbox_path(tmp_path))
     assert c.execute("SELECT COUNT(*) FROM ops_notification_outbox").fetchone() == (0,)
+
+
+def test_main_loads_dotenv_before_resolving_the_signal_destination():
+    src = (REPO / "talonx_opportunity" / "promotion.py").read_text(encoding="utf-8")
+    body = src[src.index("def main("):]
+    assert body.index("M._env()") < body.index("mode_from_env()") < body.index("Promoter(")

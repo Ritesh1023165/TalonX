@@ -405,6 +405,8 @@ def measure_long(ref_time: datetime, ref_price: float, bars: list[dict], close_u
 
 def main(argv=None) -> int:
     from talonx_opportunity.runtime import run_component
+    from talonx_premarket import __main__ as M
+    M._env()        # load .env (override=False) like the notifier: the TRADE_EVENT (Signal) credentials live there
     root = os.environ.get("TALONX_OPP_ROOT")
     mode = mode_from_env()
     pr = Promoter(root=root, mode=mode)
