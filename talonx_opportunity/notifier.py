@@ -19,6 +19,7 @@ together with the real outbox delivery state (ENQUEUED is not SENT).
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -28,9 +29,22 @@ from talonx_opportunity.config import LAB_NOTIFY_POLICY_V1, NotificationPolicy
 # start). Each is its own version + fingerprint, so starting one is a forced ROUTING_FIX boundary. 2026-09-25: the
 # 25 NEW budget was exhausted during PREMARKET; +15 slots usable ONLY by BULLISH/BEARISH (WATCH stays 40-25 = 15).
 # Counters are never reset: budget use is read from durable decisions, and decided events are never re-evaluated.
+@dataclass(frozen=True)
+class PhaseReservedPolicy(NotificationPolicy):
+    """Delivery reserve per later phase: a NEW setup surfacing in phase P is selected only if the NEW budget left
+    AFTER it still covers ``later_phase_reserve[P]`` (the capacity kept for phases that have not begun). Unused
+    capacity rolls forward automatically; an earlier phase can never consume a later phase's reserve."""
+    later_phase_reserve: tuple[tuple[str, int], ...] = ()
+
+
 NOTIFY_POLICY_OVERRIDES: dict[str, NotificationPolicy] = {
     "LAB_NOTIFY_POLICY_V1_LIVE_OVERRIDE_20260925": NotificationPolicy(
         version="LAB_NOTIFY_POLICY_V1_LIVE_OVERRIDE_20260925", total_new_per_window=40, setup_reserved=25),
+    # 2026-09-25 second live ROUTING_FIX: of the 15 extra setup slots, PREMARKET may use at most 5 (40-25-10), REGULAR
+    # keeps >=7 and AFTER_HOURS >=3 until they begin. WATCH unchanged (40-25 = 15).
+    "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925": PhaseReservedPolicy(
+        version="LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925", total_new_per_window=40, setup_reserved=25,
+        later_phase_reserve=(("OVERNIGHT", 10), ("PREMARKET", 10), ("REGULAR", 3), ("AFTER_HOURS", 0))),
 }
 
 
@@ -143,6 +157,10 @@ class Notifier:
             if cls == "WATCH" and used_w >= p.total_new_per_window - p.setup_reserved:
                 return ("BUDGET_EXHAUSTED_WATCH", f"WATCH share {used_w}/{p.total_new_per_window - p.setup_reserved} "
                         f"used; {p.setup_reserved} kept for BULLISH/BEARISH", 0)
+            reserve = dict(getattr(p, "later_phase_reserve", ()) or ()).get(ev["phase"], 0)
+            if cls != "WATCH" and p.total_new_per_window - used - 1 < reserve:
+                return ("BUDGET_RESERVED_LATER_PHASE", f"{used}/{p.total_new_per_window} used; {reserve} kept for "
+                        f"phases after {ev['phase']}", 0)
             return "SELECTED", "new surfacing within budget", 1
         if typ == "UPGRADE":
             return "SELECTED", "upgrade of a surfaced candidate", 0

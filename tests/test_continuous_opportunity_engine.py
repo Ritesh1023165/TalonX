@@ -681,7 +681,8 @@ def test_live_budget_override_adds_setup_only_capacity_without_replay(tmp_path):
     assert ov.fingerprint() != LAB_NOTIFY_POLICY_V1.fingerprint() and selected_policy({}) is LAB_NOTIFY_POLICY_V1
     with pytest.raises(SystemExit):
         selected_policy({"TALONX_OPP_NOTIFY_POLICY": "ANYTHING_ELSE"})
-    assert set(NOTIFY_POLICY_OVERRIDES) == {"LAB_NOTIFY_POLICY_V1_LIVE_OVERRIDE_20260925"}
+    assert set(NOTIFY_POLICY_OVERRIDES) == {"LAB_NOTIFY_POLICY_V1_LIVE_OVERRIDE_20260925",
+                                            "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925"}
     # exhaust V1 (25 = 15 WATCH + 10 setups) and hold some of each
     pre = ([(f"W{i:02d}", "WATCH", "NEW", 50.0, "2026-09-24T08:30:00+00:00") for i in range(20)]
            + [(f"B{i:02d}", "BULLISH", "NEW", 70.0, "2026-09-24T08:40:00+00:00") for i in range(12)])
@@ -707,3 +708,63 @@ def test_live_budget_override_adds_setup_only_capacity_without_replay(tmp_path):
     assert sum(d == "SELECTED" for s, d in rows.items() if s.startswith("S")) == 15
     assert sum(d == "BUDGET_EXHAUSTED_TOTAL" for s, d in rows.items() if s.startswith("S")) == 1
     assert n2._used("2026-09-24") == (40, 15)
+
+
+def _seed_phase_events(root, specs):
+    """specs: (symbol, classification, phase, at)."""
+    s = OpportunityStore(root)
+    for i, (sym, cls, ph, at) in enumerate(specs):
+        cid = f"2026-09-24:{sym}:GAP_UP"
+        s.upsert_candidate({"candidate_id": cid, "window_id": "2026-09-24", "symbol": sym, "family": "GAP_UP",
+                            "state": cls, "classification": cls, "first_seen_utc": at, "first_seen_phase": ph,
+                            "in_v2_scope": 0})
+        s.add_event({"event_id": f"{cid}:NEW:{at}:{i}", "candidate_id": cid, "window_id": "2026-09-24", "symbol": sym,
+                     "at_utc": at, "phase": ph, "event_type": "NEW", "classification": cls, "score": 70.0,
+                     "features_json": "{}", "score_json": "{}", "provenance_json": "{}"})
+    s.commit()
+    s.close()
+
+
+def test_phase_reserved_override_keeps_later_phase_capacity_without_replay(tmp_path):
+    from talonx_opportunity.notifier import selected_policy
+    pr = selected_policy({"TALONX_OPP_NOTIFY_POLICY": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925"})
+    ov = selected_policy({"TALONX_OPP_NOTIFY_POLICY": "LAB_NOTIFY_POLICY_V1_LIVE_OVERRIDE_20260925"})
+    assert pr.fingerprint() != ov.fingerprint()
+    base = ([(f"W{i:02d}", "WATCH", "PREMARKET", "2026-09-24T09:00:00+00:00") for i in range(15)]
+            + [(f"B{i:02d}", "BULLISH", "PREMARKET", "2026-09-24T09:10:00+00:00") for i in range(10)])
+    _seed_phase_events(tmp_path, base + [("P00", "BULLISH", "PREMARKET", "2026-09-24T12:36:00+00:00")])
+    n = Notifier(root=tmp_path, policy=ov)
+    n.tick()
+    assert n._used("2026-09-24") == (26, 15)                    # one extra PREMARKET slot used before the change
+    before = n.con.execute("SELECT * FROM decisions ORDER BY event_id").fetchall()
+    n2 = Notifier(root=tmp_path, policy=pr)
+    n2.tick()
+    assert n2.con.execute("SELECT * FROM decisions ORDER BY event_id").fetchall() == before    # no re-decision
+    later = ([(f"P{i:02d}", "BEARISH", "PREMARKET", "2026-09-24T13:00:00+00:00") for i in range(1, 8)]
+             + [("WX", "WATCH", "PREMARKET", "2026-09-24T13:01:00+00:00")]
+             + [(f"R{i:02d}", "BULLISH", "REGULAR", "2026-09-24T14:00:00+00:00") for i in range(9)]
+             + [(f"A{i:02d}", "BEARISH", "AFTER_HOURS", "2026-09-24T20:30:00+00:00") for i in range(5)])
+    _seed_phase_events(tmp_path, later)
+    n2.tick()
+    d = {r["symbol"]: r["decision"] for r in n2.con.execute("SELECT symbol, decision FROM decisions")}
+    pm = [d[f"P{i:02d}"] for i in range(1, 8)]
+    assert pm.count("SELECTED") == 4 and pm.count("BUDGET_RESERVED_LATER_PHASE") == 3   # PREMARKET extra capped at 5
+    assert d["WX"] == "BUDGET_EXHAUSTED_WATCH"
+    rg = [d[f"R{i:02d}"] for i in range(9)]
+    assert rg.count("SELECTED") == 7 and rg.count("BUDGET_RESERVED_LATER_PHASE") == 2  # REGULAR leaves 3
+    ah = [d[f"A{i:02d}"] for i in range(5)]
+    assert ah.count("SELECTED") == 3 and ah.count("BUDGET_EXHAUSTED_TOTAL") == 2
+    assert n2._used("2026-09-24") == (40, 15)
+
+
+def test_phase_reserve_rolls_unused_capacity_forward(tmp_path):
+    from talonx_opportunity.notifier import selected_policy
+    pr = selected_policy({"TALONX_OPP_NOTIFY_POLICY": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925"})
+    base = ([(f"W{i:02d}", "WATCH", "PREMARKET", "2026-09-24T09:00:00+00:00") for i in range(15)]
+            + [(f"B{i:02d}", "BULLISH", "PREMARKET", "2026-09-24T09:10:00+00:00") for i in range(10)]
+            + [(f"R{i:02d}", "BULLISH", "REGULAR", "2026-09-24T14:00:00+00:00") for i in range(14)])
+    _seed_phase_events(tmp_path, base)
+    n = Notifier(root=tmp_path, policy=pr)
+    n.tick()
+    rg = [r["decision"] for r in n.con.execute("SELECT decision FROM decisions WHERE symbol GLOB 'R*'")]
+    assert rg.count("SELECTED") == 12              # unused PREMARKET reserve rolled into REGULAR; 3 kept for AH
