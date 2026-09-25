@@ -249,4 +249,5 @@ Paper signals: {s['paper_signal_promotions']} (shadow {s['shadow_promotions']})
     keys = ("symbol", "score", "reference_price", "state") if sub == "signals" else ("symbol", "state", "max_score",
                                                                                      "last_gap_pct")
     more = f"\n… {n - len(rows)} more — /scanned file" if n > len(rows) else ""
-    return Reply(f"{HEAD} — {sub.upper()} ({n})\n" + (_fmt_rows(rows, keys) if rows else "None") + more)
+    label = {"candidates": "ACTIVE CANDIDATES", "setups": "ACTIVE SETUPS", "signals": "PAPER PROMOTIONS"}[sub]
+    return Reply(f"{HEAD} — {label} ({n})\n" + (_fmt_rows(rows, keys) if rows else "None") + more)
