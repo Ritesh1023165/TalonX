@@ -12,6 +12,11 @@ Telegram is irrelevant to evaluation. Two models, both direction-adjusted (a fal
   30 min; CONFIRMED if +30M is on the setup's side of the reference; else FAILED_CONFIRMATION.
 * first seen at/after the regular close (AFTER_HOURS) -> NOT_APPLICABLE_SAME_DAY (no same-day regular session
   remains). OVERNIGHT precedes the open, so it would use the pre-open model (overnight discovery is fail-closed).
+
+"Before the open" / "at/after the close" are judged on the candidate's CAUSAL data time (``first_data_as_of_utc``:
+every bar used ended at or before it), not the wall-clock ``first_seen_utc`` (2026-09-25 fix, CAUSAL_DATA_PHASE_V1):
+the SIP entitlement is ~15 min delayed, so a candidate processed at 13:35Z from 13:19Z bars is PREMARKET data and one
+processed at 20:05Z from 19:49Z bars still has regular minutes to measure. Fallback without a data time: first_seen.
 """
 from __future__ import annotations
 
@@ -37,6 +42,25 @@ CREATE TABLE IF NOT EXISTS outcomes (
 
 def outcomes_db(root=None) -> Path:
     return root_dir(root) / "outcomes.db"
+
+
+PRE_OPEN, SINCE_FIRST_SEEN, NOT_APPLICABLE_KIND = "PRE_OPEN", "SINCE_FIRST_SEEN", "NOT_APPLICABLE"
+
+
+def outcome_basis(c: dict, w) -> tuple[str, datetime, str]:
+    """(kind, causal reference time, DATA_PHASE) from the causal data time, never the wall clock alone.
+
+    kind: PRE_OPEN if every bar used is pre-open (ref <= open); NOT_APPLICABLE if no regular minute remains after
+    the causal time (ref >= close); else SINCE_FIRST_SEEN. DATA_PHASE = phase of the newest bar that could have been
+    used (ref - 1 min)."""
+    ref = datetime.fromisoformat(c.get("first_data_as_of_utc") or c["first_seen_utc"])
+    last_bar = ref - timedelta(minutes=1)
+    data_phase = w.phase_at(last_bar)
+    if ref <= w.open_utc:
+        return PRE_OPEN, ref, data_phase
+    if ref >= w.close_utc:
+        return NOT_APPLICABLE_KIND, ref, data_phase
+    return SINCE_FIRST_SEEN, ref, data_phase
 
 
 def _ret(px, ref, sign):
@@ -119,7 +143,7 @@ class OutcomeTracker:
         measured = 0
         for wid, cs in by_window.items():
             w = trading_window(date.fromisoformat(wid))
-            post = [c for c in cs if datetime.fromisoformat(c["first_seen_utc"]) >= w.close_utc]
+            post = [c for c in cs if outcome_basis(c, w)[0] == NOT_APPLICABLE_KIND]
             for c in post:
                 self._upsert(c, "N/A", {"status": NOT_APPLICABLE, "session_complete": True}, None)
             live = [c for c in cs if c not in post]
@@ -132,8 +156,7 @@ class OutcomeTracker:
                 if c["symbol"] in res.failed:
                     continue                          # provider failure: keep the last outcome, retry next tick
                 bars = res.bars.get(c["symbol"], [])
-                first = datetime.fromisoformat(c["first_seen_utc"])
-                if first < w.open_utc:
+                if outcome_basis(c, w)[0] == PRE_OPEN:
                     m = measure(family=c["family"], ref_price=c["ref_price"], prev_close=c["prev_close"],
                                 rth_bars=bars, open_utc=w.open_utc, close_utc=w.close_utc)
                     model = "PREMARKET_RESEARCH_V1.measure"
@@ -167,5 +190,6 @@ def main(argv=None) -> int:
     root = os.environ.get("TALONX_OPP_ROOT")
     t = OutcomeTracker(root=root)
     run_component("outcomes", tick=t.tick, root=root, detail=t.detail,
-                  config_fps={"models": "PREMARKET_RESEARCH_V1.measure+SINCE_FIRST_SEEN_V1"})
+                  config_fps={"models": "PREMARKET_RESEARCH_V1.measure+SINCE_FIRST_SEEN_V1",
+                              "phase_basis": "CAUSAL_DATA_PHASE_V1"})
     return 0

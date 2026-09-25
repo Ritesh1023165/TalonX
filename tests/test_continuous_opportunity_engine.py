@@ -584,8 +584,17 @@ def test_independent_processes_restart_one_component_only(tmp_path):
             time.sleep(0.5)
         assert SV._lock_pid(tmp_path, "evaluator:LONG_TERM") not in (None, old)
         assert SV._lock_pid(tmp_path, "reporting") == rep_pid          # untouched
-        deps = RuntimeStore(tmp_path, readonly=True).deployments()
-        lt = [d for d in deps if d["component"] == "evaluator:LONG_TERM"]
+        # the lock (PID) is written BEFORE record_start (version hash + git commit lookup); under load the restart's
+        # deployment row can lag the PID -- wait for it instead of reading the first-start row (2026-09-25 flake)
+        deadline = time.time() + 60
+        lt = []
+        while time.time() < deadline:
+            deps = RuntimeStore(tmp_path, readonly=True).deployments()
+            lt = [d for d in deps if d["component"] == "evaluator:LONG_TERM"]
+            if len(lt) >= 2:
+                break
+            time.sleep(0.5)
+        assert len(lt) == 2
         assert lt[-1]["classification"] == "OPERATIONS_ONLY" and lt[-1]["restart_only"] == 1
     finally:
         for n in ("evaluator:LONG_TERM", "reporting"):
@@ -768,3 +777,45 @@ def test_phase_reserve_rolls_unused_capacity_forward(tmp_path):
     n.tick()
     rg = [r["decision"] for r in n.con.execute("SELECT decision FROM decisions WHERE symbol GLOB 'R*'")]
     assert rg.count("SELECTED") == 12              # unused PREMARKET reserve rolled into REGULAR; 3 kept for AH
+
+
+# ------------------------------------------------ outcome phase basis = causal data time (2026-09-25 F3 fix)
+def _cand(first_seen, as_of):
+    return {"first_seen_utc": first_seen.isoformat(), "first_data_as_of_utc": as_of.isoformat() if as_of else None}
+
+
+def test_outcome_basis_uses_causal_data_phase_not_wall_clock():
+    from talonx_opportunity.outcome_tracker import NOT_APPLICABLE_KIND, PRE_OPEN, SINCE_FIRST_SEEN, outcome_basis
+    from talonx_opportunity.phases import phase_at, trading_window
+    w = trading_window(U(9).date())
+    # A: processed 13:35Z (wall REGULAR) from 13:20Z data -> PREMARKET data -> pre-open model
+    assert phase_at(U(13, 35))[0] == "REGULAR"
+    assert outcome_basis(_cand(U(13, 35), U(13, 20)), w) == (PRE_OPEN, U(13, 20), "PREMARKET")
+    # B: processed 20:05Z (wall AFTER_HOURS) from 19:50Z data -> REGULAR data -> still measurable same day
+    assert phase_at(U(20, 5))[0] == "AFTER_HOURS"
+    assert outcome_basis(_cand(U(20, 5), U(19, 50)), w) == (SINCE_FIRST_SEEN, U(19, 50), "REGULAR")
+    # C: true AFTER_HOURS data -> not applicable same day
+    assert outcome_basis(_cand(U(20, 20), U(20, 5)), w) == (NOT_APPLICABLE_KIND, U(20, 5), "AFTER_HOURS")
+    # data horizon exactly at the close: the last RTH bar was used, no regular minute remains -> not applicable
+    assert outcome_basis(_cand(U(20, 15), U(20)), w)[0] == NOT_APPLICABLE_KIND
+    # data horizon exactly at the open: only pre-open bars were used -> pre-open model
+    assert outcome_basis(_cand(U(13, 45), U(13, 30)), w)[:2] == (PRE_OPEN, U(13, 30))
+    # fallback: no causal data time recorded -> the wall-clock first sighting (previous behaviour)
+    assert outcome_basis(_cand(U(20, 5), None), w)[0] == NOT_APPLICABLE_KIND
+    assert outcome_basis(_cand(U(12), None), w)[0] == PRE_OPEN
+    # ordinary cases unchanged
+    assert outcome_basis(_cand(U(9), U(8, 45)), w)[0] == PRE_OPEN
+    assert outcome_basis(_cand(U(15), U(14, 45)), w) == (SINCE_FIRST_SEEN, U(14, 45), "REGULAR")
+
+
+def test_outcome_after_hours_wall_clock_with_regular_data_is_measured(eng):
+    """Case B end-to-end: first discovered at 20:05Z from 19:50Z bars -> measured, not NOT_APPLICABLE_SAME_DAY."""
+    _step(eng, U(20, 5))
+    cands = {c["symbol"]: c for c in _cands(eng["root"])}
+    assert "BBB" in cands and cands["BBB"]["first_seen_phase"] == "AFTER_HOURS"
+    eng["clock"].t = U(20, 30)
+    ot = OutcomeTracker(root=eng["root"], data=eng["data"], clock=eng["clock"])
+    ot.tick()
+    row = dict(ot.con.execute("SELECT * FROM outcomes WHERE symbol='BBB'").fetchone())
+    assert row["model"] == "SINCE_FIRST_SEEN_V1" and row["status"] != "NOT_APPLICABLE_SAME_DAY"
+    assert row["ref_time_utc"] == cands["BBB"]["first_data_as_of_utc"]
