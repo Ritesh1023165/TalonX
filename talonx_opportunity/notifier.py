@@ -45,6 +45,11 @@ NOTIFY_POLICY_OVERRIDES: dict[str, NotificationPolicy] = {
     "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925": PhaseReservedPolicy(
         version="LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925", total_new_per_window=40, setup_reserved=25,
         later_phase_reserve=(("OVERNIGHT", 10), ("PREMARKET", 10), ("REGULAR", 3), ("AFTER_HOURS", 0))),
+    # 2026-09-25 third live ROUTING_FIX: the market-open burst exhausted REGULAR at 13:51Z; total 75 for FUTURE
+    # REGULAR setups (setup_reserved 60 keeps WATCH at 75-60 = 15), AFTER_HOURS still keeps its last 3.
+    "LAB_NOTIFY_POLICY_V1_REGULAR_EXT_20260925": PhaseReservedPolicy(
+        version="LAB_NOTIFY_POLICY_V1_REGULAR_EXT_20260925", total_new_per_window=75, setup_reserved=60,
+        later_phase_reserve=(("OVERNIGHT", 10), ("PREMARKET", 10), ("REGULAR", 3), ("AFTER_HOURS", 0))),
 }
 
 

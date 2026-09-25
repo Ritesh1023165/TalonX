@@ -691,7 +691,8 @@ def test_live_budget_override_adds_setup_only_capacity_without_replay(tmp_path):
     with pytest.raises(SystemExit):
         selected_policy({"TALONX_OPP_NOTIFY_POLICY": "ANYTHING_ELSE"})
     assert set(NOTIFY_POLICY_OVERRIDES) == {"LAB_NOTIFY_POLICY_V1_LIVE_OVERRIDE_20260925",
-                                            "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925"}
+                                            "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+                                            "LAB_NOTIFY_POLICY_V1_REGULAR_EXT_20260925"}
     # exhaust V1 (25 = 15 WATCH + 10 setups) and hold some of each
     pre = ([(f"W{i:02d}", "WATCH", "NEW", 50.0, "2026-09-24T08:30:00+00:00") for i in range(20)]
            + [(f"B{i:02d}", "BULLISH", "NEW", 70.0, "2026-09-24T08:40:00+00:00") for i in range(12)])
@@ -819,3 +820,36 @@ def test_outcome_after_hours_wall_clock_with_regular_data_is_measured(eng):
     row = dict(ot.con.execute("SELECT * FROM outcomes WHERE symbol='BBB'").fetchone())
     assert row["model"] == "SINCE_FIRST_SEEN_V1" and row["status"] != "NOT_APPLICABLE_SAME_DAY"
     assert row["ref_time_utc"] == cands["BBB"]["first_data_as_of_utc"]
+
+
+def test_regular_extension_keeps_held_cohort_watch_cap_and_after_hours_reserve(tmp_path):
+    from talonx_opportunity.notifier import selected_policy
+    pr = selected_policy({"TALONX_OPP_NOTIFY_POLICY": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925"})
+    ext = selected_policy({"TALONX_OPP_NOTIFY_POLICY": "LAB_NOTIFY_POLICY_V1_REGULAR_EXT_20260925"})
+    assert (ext.total_new_per_window, ext.total_new_per_window - ext.setup_reserved) == (75, 15)
+    base = ([(f"W{i:02d}", "WATCH", "PREMARKET", "2026-09-24T09:00:00+00:00") for i in range(15)]
+            + [(f"B{i:02d}", "BULLISH", "PREMARKET", "2026-09-24T09:10:00+00:00") for i in range(13)]
+            + [(f"R{i:02d}", "BULLISH", "REGULAR", "2026-09-24T13:50:00+00:00") for i in range(9)]
+            + [(f"H{i:02d}", "BEARISH", "REGULAR", "2026-09-24T13:55:00+00:00") for i in range(17)])
+    _seed_phase_events(tmp_path, base)
+    n = Notifier(root=tmp_path, policy=pr)
+    n.tick()
+    assert n._used("2026-09-24") == (37, 15)
+    before = n.con.execute("SELECT * FROM decisions ORDER BY event_id").fetchall()
+    held = [r["symbol"] for r in n.con.execute("SELECT symbol FROM decisions WHERE decision='BUDGET_RESERVED_LATER_PHASE'")]
+    assert sorted(held) == [f"H{i:02d}" for i in range(17)]
+    n2 = Notifier(root=tmp_path, policy=ext)
+    n2.tick()
+    assert n2.con.execute("SELECT * FROM decisions ORDER BY event_id").fetchall() == before     # held cohort frozen
+    later = ([(f"N{i:02d}", "BULLISH", "REGULAR", "2026-09-24T14:10:00+00:00") for i in range(40)]
+             + [("WX", "WATCH", "REGULAR", "2026-09-24T14:10:00+00:00")]
+             + [(f"A{i:02d}", "BEARISH", "AFTER_HOURS", "2026-09-24T20:30:00+00:00") for i in range(4)])
+    _seed_phase_events(tmp_path, later)
+    n2.tick()
+    d = {r["symbol"]: r["decision"] for r in n2.con.execute("SELECT symbol, decision FROM decisions")}
+    nd = [d[f"N{i:02d}"] for i in range(40)]
+    assert nd.count("SELECTED") == 35 and nd.count("BUDGET_RESERVED_LATER_PHASE") == 5    # 75-37-3 for REGULAR
+    assert d["WX"] == "BUDGET_EXHAUSTED_WATCH"
+    ah = [d[f"A{i:02d}"] for i in range(4)]
+    assert ah.count("SELECTED") == 3 and ah.count("BUDGET_EXHAUSTED_TOTAL") == 1
+    assert n2._used("2026-09-24") == (75, 15)
