@@ -301,10 +301,13 @@ def main(argv=None) -> int:
     from talonx_premarket import __main__ as M
     M._env()
     root = os.environ.get("TALONX_OPP_ROOT")
-    sec = M._sec()
+    from talonx_opportunity import sec_refresh
+    sec = sec_refresh.maybe_wrap(M._sec())          # OFF by default: the plain synchronous SecSubmissions
     scope = M._v2_scope(None)
     disc = Discovery(root=root, sec=sec, ledger_path=str(M.DEFAULT_LEDGER), v2_scope=scope)
-    run_component("discovery", tick=disc.tick, root=root, detail=disc.detail,
-                  config_fps={"CONTINUOUS_RESEARCH": CONTINUOUS_RESEARCH_V1.fingerprint(),
-                              "PREMARKET_RESEARCH_V1": CONTINUOUS_RESEARCH_V1.base.fingerprint()})
+    fps = {"CONTINUOUS_RESEARCH": CONTINUOUS_RESEARCH_V1.fingerprint(),
+           "PREMARKET_RESEARCH_V1": CONTINUOUS_RESEARCH_V1.base.fingerprint()}
+    if sec_refresh.enabled():                       # key only when ON, so OFF keeps today's config fingerprints
+        fps["SEC_CATALYST_CACHE"] = "BACKGROUND_REFRESH_V1"
+    run_component("discovery", tick=disc.tick, root=root, detail=disc.detail, config_fps=fps)
     return 0
