@@ -671,3 +671,39 @@ def test_up_deliver_status_resolves_like_the_notifier(tmp_path, monkeypatch, cap
     monkeypatch.setenv("TALONX_OPP_ROOT", str(tmp_path))
     CLI.main(["up", "--deliver"])
     assert called and "LAB DELIVERY:" in capsys.readouterr().out
+
+
+def test_live_budget_override_adds_setup_only_capacity_without_replay(tmp_path):
+    from talonx_opportunity.config import LAB_NOTIFY_POLICY_V1
+    from talonx_opportunity.notifier import NOTIFY_POLICY_OVERRIDES, selected_policy
+    ov = selected_policy({"TALONX_OPP_NOTIFY_POLICY": "LAB_NOTIFY_POLICY_V1_LIVE_OVERRIDE_20260925"})
+    assert (ov.total_new_per_window, ov.total_new_per_window - ov.setup_reserved) == (40, 15)
+    assert ov.fingerprint() != LAB_NOTIFY_POLICY_V1.fingerprint() and selected_policy({}) is LAB_NOTIFY_POLICY_V1
+    with pytest.raises(SystemExit):
+        selected_policy({"TALONX_OPP_NOTIFY_POLICY": "ANYTHING_ELSE"})
+    assert set(NOTIFY_POLICY_OVERRIDES) == {"LAB_NOTIFY_POLICY_V1_LIVE_OVERRIDE_20260925"}
+    # exhaust V1 (25 = 15 WATCH + 10 setups) and hold some of each
+    pre = ([(f"W{i:02d}", "WATCH", "NEW", 50.0, "2026-09-24T08:30:00+00:00") for i in range(20)]
+           + [(f"B{i:02d}", "BULLISH", "NEW", 70.0, "2026-09-24T08:40:00+00:00") for i in range(12)])
+    _seed_events(tmp_path, pre)
+    n1 = Notifier(root=tmp_path)
+    n1.tick()
+    before = n1.con.execute("SELECT event_id, decision, policy_version FROM decisions ORDER BY event_id").fetchall()
+    assert n1._used("2026-09-24") == (25, 15)
+    held = [r for r in before if r[1].startswith("BUDGET")]
+    assert len(held) == 7
+    # restart under the override: nothing already decided is re-evaluated (no backlog replay)
+    n2 = Notifier(root=tmp_path, policy=ov)
+    n2.tick()
+    assert n2.con.execute("SELECT event_id, decision, policy_version FROM decisions ORDER BY event_id").fetchall() == before
+    # later events: WATCH stays capped, only setups use the 15 extra slots
+    post = ([(f"X{i:02d}", "WATCH", "NEW", 60.0, "2026-09-24T14:00:00+00:00") for i in range(3)]
+            + [(f"S{i:02d}", "BEARISH", "NEW", 70.0, "2026-09-24T14:10:00+00:00") for i in range(16)])
+    _seed_events(tmp_path, post)
+    n2.tick()
+    rows = {r["symbol"]: r["decision"] for r in n2.con.execute(
+        "SELECT symbol, decision FROM decisions WHERE decided_utc IS NOT NULL AND symbol GLOB '[XS]*'")}
+    assert all(rows[f"X{i:02d}"] == "BUDGET_EXHAUSTED_WATCH" for i in range(3))
+    assert sum(d == "SELECTED" for s, d in rows.items() if s.startswith("S")) == 15
+    assert sum(d == "BUDGET_EXHAUSTED_TOTAL" for s, d in rows.items() if s.startswith("S")) == 1
+    assert n2._used("2026-09-24") == (40, 15)

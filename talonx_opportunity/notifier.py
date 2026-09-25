@@ -23,6 +23,24 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from talonx_opportunity.config import LAB_NOTIFY_POLICY_V1, NotificationPolicy
+
+# Named, closed-list live overrides (selected per process via TALONX_OPP_NOTIFY_POLICY; unknown name -> refuse to
+# start). Each is its own version + fingerprint, so starting one is a forced ROUTING_FIX boundary. 2026-09-25: the
+# 25 NEW budget was exhausted during PREMARKET; +15 slots usable ONLY by BULLISH/BEARISH (WATCH stays 40-25 = 15).
+# Counters are never reset: budget use is read from durable decisions, and decided events are never re-evaluated.
+NOTIFY_POLICY_OVERRIDES: dict[str, NotificationPolicy] = {
+    "LAB_NOTIFY_POLICY_V1_LIVE_OVERRIDE_20260925": NotificationPolicy(
+        version="LAB_NOTIFY_POLICY_V1_LIVE_OVERRIDE_20260925", total_new_per_window=40, setup_reserved=25),
+}
+
+
+def selected_policy(env=None) -> NotificationPolicy:
+    name = (env if env is not None else os.environ).get("TALONX_OPP_NOTIFY_POLICY", "").strip()
+    if not name or name == LAB_NOTIFY_POLICY_V1.version:
+        return LAB_NOTIFY_POLICY_V1
+    if name not in NOTIFY_POLICY_OVERRIDES:
+        raise SystemExit(f"unknown TALONX_OPP_NOTIFY_POLICY {name!r}; allowed: {sorted(NOTIFY_POLICY_OVERRIDES)}")
+    return NOTIFY_POLICY_OVERRIDES[name]
 from talonx_opportunity.db import PROTECTED_DB_NAMES, connect, iso, j, root_dir, unj, utcnow
 from talonx_opportunity.store import OpportunityStore, opportunity_db
 
@@ -229,8 +247,9 @@ def main(argv=None) -> int:
     M._env()
     root = os.environ.get("TALONX_OPP_ROOT")
     deliver = os.environ.get("TALONX_OPP_DELIVER", "0").strip() == "1"
-    n = Notifier(root=root, deliver=deliver)
+    policy = selected_policy()
+    n = Notifier(root=root, policy=policy, deliver=deliver)
     run_component("notifier", tick=n.tick, root=root, detail=n.detail,
-                  config_fps={"LAB_NOTIFY_POLICY": LAB_NOTIFY_POLICY_V1.fingerprint(),
+                  config_fps={"LAB_NOTIFY_POLICY": policy.fingerprint(),
                               "deliver": "1" if deliver else "0"})
     return 0
