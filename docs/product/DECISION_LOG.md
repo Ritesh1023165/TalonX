@@ -3643,3 +3643,32 @@ Decisions recorded:
    - The IMMEDIATE cutoff and routing are unchanged.
 9. **yfinance.** Incident accounting only. The V2 Alpaca contract is untouched.
 10. **V2 release allowlist.** `talonx_opportunity/` is added as an isolated lane prefix. Changed runtime files are listed in the closed `FREEZE_CONTINUOUS_ENGINE_FILES` (no strategy/provider/ledger file; guarded by tests). V2 fingerprints are unchanged.
+
+### Opportunity promotion lane: OPPORTUNITY_PROMOTION_V1 (2026-09-25, SHADOW first)
+
+**Purpose.** Turn validated research setups into measurable **PAPER** Signal opportunities. This closes the gap between the Opportunity Engine and TalonX Signal (found → promoted → paper-actionable → Signal → measured outcome) without touching discovery, scoring or lifecycle.
+
+1. **Separate component.** `talonx_opportunity/promotion.py` runs as `python -m talonx_opportunity component promotion`.
+   - It has its own `promotion.db`, heartbeat and deployment boundary.
+   - Its source hash is recorded in the component's config fingerprints (`promotion_src`), so the shared, version-stamped `runtime.py` is not edited.
+   - It reads `opportunity.db` read-only through its own cursor. A crash cannot stop discovery, Lab delivery or V2.
+2. **No replay.** The first start fixes `PROMOTION_START_UTC` and `PROMOTION_START_SEQ` (the store's current maximum sequence number). Only a candidate's first setup surfacing *after* that boundary is considered. Switching SHADOW → PAPER_SIGNAL never re-sends shadow history.
+3. **Eligibility (v1, narrow, no new alpha threshold).** All of the following must hold:
+   - The event is a NEW or UPGRADE with classification **BULLISH**.
+   - The processing phase is **REGULAR**, and so is the data phase (the causal bar horizon).
+   - The candidate is still an active BULLISH_SETUP at promotion time.
+   - The data is fresh under the existing 15-minute provider-lag contract.
+   - Timestamps are causal (data_as_of ≤ event time ≤ now).
+   - The reference price is above 0.
+   - At most **one promotion per candidate identity**: `promotion_id = OPPORTUNITY_ENGINE:<candidate_id>`.
+   - Otherwise the candidate is rejected, with one reason: WATCH, BEARISH, PHASE, DATA_PHASE, STALE, INVALIDATED, FADED, DUPLICATE, BAD_PRICE, CAUSALITY.
+4. **Long-only.** BEARISH is never actionable; it stays research/Lab.
+5. **Queue.** Durable, ordered by score descending, at most **3 per rolling 5 minutes**, with a **30-minute** expiry. A queued candidate is re-validated at release.
+   - This ordering exists to avoid missing the highest-scoring setups during bursts. Today's causal simulation found **no return advantage** for it.
+6. **Modes.** `TALONX_OPPORTUNITY_PROMOTION_MODE`:
+   - **SHADOW (default):** records PROMOTED_SHADOW (WOULD_SIGNAL) and sends nothing.
+   - **PAPER_SIGNAL (requires operator authorisation):** enqueues a `PAPER_OPPORTUNITY` message to the TRADE_EVENT (TalonX Signal) destination through `talonx_ops.notify`.
+   - It never uses the Lab bot or the legacy default client. Its outbox is `promotion_signal_notifications.db`.
+7. **Paper outcomes** (long direction) are tracked for every promotion from the causal reference: +15m / +30m / +1h / close / MFE / MAE, plus the lifecycle end state.
+8. **Not advice, not orders.** This is **not proven profitable** and **not BUY/SELL advice**. It **places no broker order** and uses no real capital. Messages are paper-development outputs labelled "PAPER OPPORTUNITY". **V2 remains an independent strategy**: no import, no ledger, no outbox, and a separate dedup namespace (`OPPORTUNITY_ENGINE:` vs V2 event ids).
+9. **Policy fingerprint** `OPPORTUNITY_PROMOTION_V1` covers phases, the long-only rule, classes, freshness, rate, expiry and ordering. No existing strategy fingerprint changes.

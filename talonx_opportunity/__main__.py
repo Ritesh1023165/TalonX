@@ -44,6 +44,9 @@ def cmd_component(name: str) -> int:
     if name == "reporting":
         from talonx_opportunity.reporting import main
         return main()
+    if name == "promotion":                    # 2026-09-25: separate downstream paper-promotion lane (SHADOW default)
+        from talonx_opportunity.promotion import main
+        return main()
     if name.startswith("evaluator:"):
         from talonx_opportunity.evaluators import main
         return main(name.split(":", 1)[1])

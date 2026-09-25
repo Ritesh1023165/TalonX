@@ -465,6 +465,8 @@ def _lane_sources():
 
 def test_15_research_cannot_emit_v2_trade_event():
     for p in _lane_sources():
+        if p.name == "promotion.py":
+            continue            # the ONE sanctioned Signal producer; held to its own stricter guard (test_15b)
         text = p.read_text(encoding="utf-8")
         tree = ast.parse(text)
         names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)} | \
@@ -475,6 +477,21 @@ def test_15_research_cannot_emit_v2_trade_event():
     src = (REPO / "talonx_opportunity" / "notifier.py").read_text(encoding="utf-8")
     assert "destination=RESEARCH" in src and "TRADE_EVENT" not in src
 
+
+
+def test_15b_promotion_is_the_only_signal_producer_and_only_paper_opportunities():
+    """2026-09-25 OPPORTUNITY_PROMOTION_V1: the promotion lane may reach the TRADE_EVENT (TalonX Signal) destination,
+    but only as event_type PAPER_OPPORTUNITY, only in PAPER_SIGNAL mode (default SHADOW), never V2 / orders."""
+    p = REPO / "talonx_opportunity" / "promotion.py"
+    text = p.read_text(encoding="utf-8")
+    for forbidden in ("import talonx_v2", "from talonx_v2", "/v2/orders", "paper_trading.db", "submit_order",
+                      "execute_buy", "execute_sell", "OPERATIONS", 'event_type="TRADE_EVENT"'):
+        assert forbidden not in text, forbidden
+    assert text.count("destination=TRADE_EVENT") == 2 and 'event_type="PAPER_OPPORTUNITY"' in text   # enqueue + drain
+    assert "if self.mode == PAPER_SIGNAL and self.outbox is not None:" in text                         # enqueue gate
+    assert "if self.mode != PAPER_SIGNAL or self.outbox is None:\n            return None" in text      # drain gate
+    assert 'str((env if env is not None else os.environ).get(MODE_ENV, SHADOW))' in text      # default SHADOW
+    # every OTHER lane source is still held to test_15's AST guard (no TRADE_EVENT / OPERATIONS name in code)
 
 def test_16_lab_signal_sentinel_isolation(tmp_path, monkeypatch):
     from talonx_ops.notify import RESEARCH, resolve_destination_config
