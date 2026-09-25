@@ -507,10 +507,11 @@ def test_19_dashboard_reflects_component_degradation_independently(tmp_path):
     rt.set_component("evaluator:INTRADAY", heartbeat_utc=(now - timedelta(hours=1)).isoformat())
     s = read_opportunity_status(tmp_path)
     health = {c["component"]: c["health"] for c in s["components"]}
-    assert health["notifier"] == "DEGRADED" and health["evaluator:INTRADAY"] == "DOWN"
+    # alive pid + 1 h old heartbeat = STALE_HEARTBEAT (possibly hung), not DOWN (2026-09-25 status semantics)
+    assert health["notifier"] == "DEGRADED" and health["evaluator:INTRADAY"] == "STALE_HEARTBEAT"
     assert health["discovery"] == "UP" and health["ingestion"] == "UP"
     assert s["system"]["overall"] == "DEGRADED"
-    assert s["horizons"]["INTRADAY"]["health"] == "DOWN" and s["horizons"]["SAME_DAY"]["health"] == "UP"
+    assert s["horizons"]["INTRADAY"]["health"] == "STALE_HEARTBEAT" and s["horizons"]["SAME_DAY"]["health"] == "UP"
 
 
 def test_20_no_real_money_execution_path():
@@ -867,3 +868,51 @@ def test_outcome_rows_are_already_direction_adjusted_so_tools_must_not_flip_agai
     up = since_first_seen(family="GAP_UP", ref_price=10.0, ref_time=ref_t, prev_close=9.0, bars=bars, close_utc=U(20))
     assert down["ret_30m_pct"] > 0 and down["ret_1h_pct"] > 0 and down["mfe_pct"] > 0
     assert up["ret_30m_pct"] < 0 and abs(up["ret_30m_pct"] + down["ret_30m_pct"]) < 1e-9
+
+
+# --------------------------------------------- status semantics: a long tick is BUSY, not DOWN (2026-09-25, reporting)
+def _row(pid, age_s, name="discovery", state="RUNNING"):
+    now = datetime(2026, 9, 25, 15, 18, tzinfo=timezone.utc)
+    return {"name": name, "pid": pid, "state": state,
+            "heartbeat_utc": (now - timedelta(seconds=age_s)).isoformat()}, now
+
+
+def _lock(root, name, pid):
+    (root / "locks").mkdir(parents=True, exist_ok=True)
+    (root / "locks" / (name.replace(":", "_") + ".lock")).write_text(str(pid))
+
+
+def test_live_pid_old_heartbeat_with_lock_is_busy_long_scan_not_down(tmp_path):
+    from talonx_ops.opportunity_read import component_health
+    me = os.getpid()
+    _lock(tmp_path, "discovery", me)
+    row, now = _row(me, 244)
+    assert component_health(row, now, root=tmp_path) == "BUSY_LONG_SCAN"
+
+
+def test_dead_pid_is_down(tmp_path):
+    from talonx_ops.opportunity_read import component_health
+    row, now = _row(999_999_991, 20)
+    assert component_health(row, now, root=tmp_path) == "DOWN"
+
+
+def test_alive_but_heartbeat_beyond_ceiling_is_stale_heartbeat(tmp_path):
+    from talonx_ops.opportunity_read import component_health
+    me = os.getpid()
+    _lock(tmp_path, "discovery", me)
+    row, now = _row(me, 1200)
+    assert component_health(row, now, root=tmp_path) == "STALE_HEARTBEAT"
+
+
+def test_old_heartbeat_with_a_foreign_lock_owner_is_stale_not_busy(tmp_path):
+    from talonx_ops.opportunity_read import component_health
+    me = os.getpid()
+    _lock(tmp_path, "discovery", me + 1)
+    row, now = _row(me, 244)
+    assert component_health(row, now, root=tmp_path) == "STALE_HEARTBEAT"
+
+
+def test_fresh_heartbeat_is_up(tmp_path):
+    from talonx_ops.opportunity_read import component_health
+    row, now = _row(os.getpid(), 12)
+    assert component_health(row, now, root=tmp_path) == "UP"

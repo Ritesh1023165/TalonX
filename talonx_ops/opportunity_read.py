@@ -59,15 +59,39 @@ def _pid_alive(pid) -> bool | None:
         return None
 
 
-def component_health(row: dict | None, now: datetime) -> str:
+# A component heartbeats BETWEEN ticks, so one long tick (e.g. a discovery scan paying an SEC cache-refresh wave) ages
+# the heartbeat while the process is alive and holding its lock. 2026-09-25: that was reported as DOWN. Reporting only.
+BUSY_CEILING_S = 900.0          # 3x the 300 s cadence: beyond this an alive process is treated as possibly hung
+LIVE_STATES = ("UP", "DEGRADED", "BUSY_LONG_SCAN")
+
+
+def _lock_held_by(root: Path | None, name: str | None, pid) -> bool | None:
+    """True if the component's lock file names this (alive) pid; None when it cannot be read."""
+    if root is None or not name:
+        return None
+    try:
+        v = int((root / "locks" / (name.replace(":", "_") + ".lock")).read_text().strip() or 0)
+    except (OSError, ValueError):
+        return None
+    return bool(pid) and v == int(pid)
+
+
+def component_health(row: dict | None, now: datetime, *, root: Path | None = None) -> str:
+    """NOT_STARTED | STOPPED | CRASHED | DOWN (pid dead / no heartbeat) | UP | DEGRADED
+    | BUSY_LONG_SCAN (alive, lock held, heartbeat 180-900 s old: a long tick in progress)
+    | STALE_HEARTBEAT (alive but heartbeat > 900 s, or > 180 s without lock evidence)."""
     if row is None:
         return "NOT_STARTED"
     st, age = row.get("state"), _age(row.get("heartbeat_utc"), now)
     if st in ("STOPPED", "CRASHED"):
         return st
     alive = _pid_alive(row.get("pid"))
-    if alive is False or age is None or age > HEARTBEAT_STALE_S:
+    if alive is False or age is None:
         return "DOWN"
+    if age > HEARTBEAT_STALE_S:
+        if alive and age <= BUSY_CEILING_S and _lock_held_by(root, row.get("name"), row.get("pid")) is not False:
+            return "BUSY_LONG_SCAN"
+        return "STALE_HEARTBEAT"
     return "DEGRADED" if st == "DEGRADED" else "UP"
 
 
@@ -85,7 +109,7 @@ def read_opportunity_status(root=None, *, now: datetime | None = None) -> dict:
     for n in COMPONENTS:
         c = comps.get(n)
         det = _j(c.get("detail_json"), {}) if c else {}
-        components.append({"component": n, "logical": LOGICAL[n], "health": component_health(c, now),
+        components.append({"component": n, "logical": LOGICAL[n], "health": component_health(c, now, root=r),
                            "state": c.get("state") if c else None, "pid": c.get("pid") if c else None,
                            "heartbeat_age_s": _age(c.get("heartbeat_utc"), now) if c else None,
                            "version": c.get("version") if c else None, "restarts": c.get("restarts") if c else 0,
@@ -93,7 +117,7 @@ def read_opportunity_status(root=None, *, now: datetime | None = None) -> dict:
     healths = [c["health"] for c in components]
     if not comps:
         overall = "NOT_RUNNING"
-    elif all(h == "UP" for h in healths):
+    elif all(h in ("UP", "BUSY_LONG_SCAN") for h in healths):
         overall = "HEALTHY"
     elif all(h in ("DOWN", "STOPPED", "CRASHED", "NOT_STARTED") for h in healths):
         overall = "DOWN"
@@ -193,9 +217,12 @@ def ping_lines(root=None) -> list[str]:
     if not s["available"] or s["system"]["overall"] == "NOT_RUNNING":
         return ["\U0001F50E OPPORTUNITY ENGINE: not running"]
     L = ["\U0001F50E OPPORTUNITY ENGINE", f"  overall: {s['system']['overall']}"]
-    down = [c["component"] for c in s["components"] if c["health"] != "UP"]
+    down = [c["component"] for c in s["components"] if c["health"] not in ("UP", "BUSY_LONG_SCAN")]
+    busy = [c["component"] for c in s["components"] if c["health"] == "BUSY_LONG_SCAN"]
     if down:
         L.append(f"  not UP: {', '.join(down)}")
+    if busy:
+        L.append(f"  busy (long tick, alive): {', '.join(busy)}")
     ls = s["discovery"].get("last_scan")
     if ls:
         L.append(f"  discovery: {ls['phase']} {ls['state']} as-of {str(ls['data_as_of_utc'])[11:16]}Z "
