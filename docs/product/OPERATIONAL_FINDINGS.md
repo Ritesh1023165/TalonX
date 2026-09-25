@@ -1838,14 +1838,28 @@ The feed is used only by the legacy CONTROL lane. V2, Research and Intelligence 
 
 **Recommended action**: isolate those tests from the live ledger, and move rarely-read `/ping` blocks behind a sub-command.
 
-## OPS-036 — Pre-existing failing and hanging baseline tests (LOW)
+## OPS-036 — Pre-existing failing, hanging and environment-bound baseline tests (LOW)
 
-**Status**: OPEN, pre-existing on `696370e` (verified on a clean baseline worktree).
+**Status**: OPEN. Nothing here is attributable to S14.
 
-**Failing on the baseline**, because they compare Original files against old SHAs changed by earlier tasks:
+**Full suite on this branch** (2026-09-24): 5,500 passed, 15 failed, 6 skipped, 4 deselected, in 40 min.
+
+**Hanging / very slow (deselected):** the module-scoped `multi_trade_scenario_rows` fixture in `test_backtest_cost_sensitivity.py`, which runs a full cost-sensitivity backtest. It produces no result within 180 s on the `696370e` baseline either.
+
+**Failing identically on the clean `696370e` baseline worktree (8):**
 - `test_task102_operational_finalization::test_36_original_strategy_unchanged`
 - `test_task104_p2_cleanup::test_32_33_original_strategy_and_thresholds_unchanged`
 - `test_task112_tuesday_release::test_03_v1_fingerprint_intact`
+- `test_task111_v2_e2e::test_item3_original_strategy_fingerprint_unchanged`
 - `test_task131_dashboard_broad_discovery::test_original_watchlist_view_untouched_shape`
+- `test_ri3_operator::test_renderer_shows_end_to_end_fixture`
+- `test_task117_release_rehearsal::test_bounded_release_rehearsal`
+- `test_task118a_dashboard_message_count::test_immediate_and_digest_sends_count_messages_correctly`
 
-**Hanging**: `test_backtest_cost_sensitivity::test_multi_trade_fixture_produces_three_trades_in_every_scenario` produces no result within 180 s on the baseline.
+**Environment-bound (6):**
+- `test_task117_migration` ×5
+- `test_task117_deployment_rehearsal::test_bounded_controlled_deployment_rehearsal`
+
+These hash-pin the legacy production `v2_lane.db` to two known MD5s. Its content was last modified on 2026-09-15, so it no longer matches; S14 never opens it. They are skipped wherever that gitignored file is absent.
+
+**Flaky under load (1):** `test_task118a_checkpoint_daemon_restart::test_a_real_session_loop_stays_up_once_the_stale_flag_is_cleared`. It failed during the full run, which overlapped a live smoke test, and passed on rerun.

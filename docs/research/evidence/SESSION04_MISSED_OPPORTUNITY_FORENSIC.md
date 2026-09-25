@@ -200,7 +200,7 @@ Nothing here is a profitability claim. The outcome columns describe a single ses
   - It is **single-venue**, so it is not the consolidated SIP contract.
   - Only 201 of 557 actionable-mover symbols had any BOATS bars, with a median of **4 bars** per night (p90 85).
   - 61 showed ≥ 2% versus the previous close.
-- **09-24 after-hours.** This session was still running when the data was pulled (window to 21:24Z). Ten actionable movers had moved ≥ 5% further by then: AIXI, AKAM, BENF, BMM, GLND, JELD, NCPL, SVRN, VOGX, YMAT. A complete after-hours pass is pending (`market_day.py ah` after 00:16Z).
+- **09-24 after-hours (complete pass, 16:00–20:00 ET, fetched 00:17Z, 0 failures).** All 557 actionable-mover symbols printed. **57** ended after-hours ≥ 2% away from the regular close, and **15** ≥ 5%: AKAM, ALXO, BMM, GLND, GRML, IPDN, LXEH, MOBI, NCPL, PFSA, SCTX, SVRN, VOGX, WHLR, YMAT. By Stage-A category those 15 were B 7, E 4, G 3, A 1. (The earlier partial pass, to 21:24Z, had listed 10; AIXI, BENF and JELD fell back below 5% by 20:00 ET.) **This refresh changes no Stage-A conclusion.** The category counts are identical (A 13 / B 69 / C 5 / D 2 / E 322 / F 1 / G 146) and outcome parity is still 25/25. Per the Stage-B authorization it was folded in as fact only, with no strategy, config or implementation parameter derived from it.
 
 ### Provider capability, demonstrated on this subscription (probes 2026-09-24)
 
