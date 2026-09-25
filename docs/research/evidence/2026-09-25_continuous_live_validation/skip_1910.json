@@ -1,0 +1,195 @@
+{
+ "SKIPPED_SLOT_TIME": "19:10:00",
+ "PREVIOUS_SCAN_START": "19:05:00",
+ "PREVIOUS_SCAN_END": "19:10:08",
+ "NEXT_ACTUAL_SCAN_START": "19:15:00",
+ "NEXT_SCAN_DATA_AS_OF": "18:58",
+ "SKIPPED_SLOT_WOULD_HAVE_USED_AS_OF": "18:53",
+ "EXTRA_DISCOVERY_LATENCY_S": 300,
+ "CANDIDATES_FIRST_SEEN_ON_NEXT_SCAN": 10,
+ "SETUPS_FIRST_SEEN_ON_NEXT_SCAN": 2,
+ "classes": {
+  "A": 0,
+  "B": 7,
+  "C": 5,
+  "D": 0
+ },
+ "MATERIALLY_DELAYED(C setups)": [
+  {
+   "symbol": "AIR",
+   "type": "UPGRADE",
+   "actual": "BEARISH@87.8",
+   "move_now": -3.37,
+   "class": "C",
+   "estimated_at_skipped_slot": "BEARISH_SETUP@87.9 gap -3.4",
+   "delay_s": 300,
+   "lab": "BUDGET_RESERVED_LATER_PHASE",
+   "outcome": {
+    "status": "OUTCOME_PENDING",
+    "ret_30m_pct": null,
+    "ret_1h_pct": null,
+    "mfe_pct": 1.102
+   }
+  },
+  {
+   "symbol": "ELE",
+   "type": "UPGRADE",
+   "actual": "BULLISH@66.4",
+   "move_now": 3.23,
+   "class": "C",
+   "estimated_at_skipped_slot": "BULLISH_SETUP@65.9 gap 3.1",
+   "delay_s": 300,
+   "lab": "BUDGET_RESERVED_LATER_PHASE",
+   "outcome": {
+    "status": "CONFIRMED",
+    "ret_30m_pct": 0.049,
+    "ret_1h_pct": 0.292,
+    "mfe_pct": 0.875
+   }
+  }
+ ],
+ "detail": [
+  {
+   "symbol": "AIR",
+   "type": "UPGRADE",
+   "actual": "BEARISH@87.8",
+   "move_now": -3.37,
+   "class": "C",
+   "estimated_at_skipped_slot": "BEARISH_SETUP@87.9 gap -3.4",
+   "delay_s": 300,
+   "lab": "BUDGET_RESERVED_LATER_PHASE",
+   "outcome": {
+    "status": "OUTCOME_PENDING",
+    "ret_30m_pct": null,
+    "ret_1h_pct": null,
+    "mfe_pct": 1.102
+   }
+  },
+  {
+   "symbol": "FCNCA",
+   "type": "NEW",
+   "actual": "WATCH@71.7",
+   "move_now": 2.09,
+   "class": "C",
+   "estimated_at_skipped_slot": "WATCH@71.7 gap 2.1",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_WATCH",
+   "outcome": null
+  },
+  {
+   "symbol": "FLS",
+   "type": "NEW",
+   "actual": "WATCH@70.2",
+   "move_now": -2.39,
+   "class": "C",
+   "estimated_at_skipped_slot": "WATCH@67.8 gap -2.02",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_WATCH",
+   "outcome": null
+  },
+  {
+   "symbol": "ELE",
+   "type": "UPGRADE",
+   "actual": "BULLISH@66.4",
+   "move_now": 3.23,
+   "class": "C",
+   "estimated_at_skipped_slot": "BULLISH_SETUP@65.9 gap 3.1",
+   "delay_s": 300,
+   "lab": "BUDGET_RESERVED_LATER_PHASE",
+   "outcome": {
+    "status": "CONFIRMED",
+    "ret_30m_pct": 0.049,
+    "ret_1h_pct": 0.292,
+    "mfe_pct": 0.875
+   }
+  },
+  {
+   "symbol": "BBWI",
+   "type": "NEW",
+   "actual": "WATCH@63.4",
+   "move_now": -2.17,
+   "class": "C",
+   "estimated_at_skipped_slot": "WATCH@63.2 gap -2.11",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_WATCH",
+   "outcome": null
+  },
+  {
+   "symbol": "AORT",
+   "type": "NEW",
+   "actual": "WATCH@62.4",
+   "move_now": -2.08,
+   "class": "B",
+   "estimated_at_skipped_slot": "SCORED@61.7 gap -1.93",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_WATCH",
+   "outcome": null
+  },
+  {
+   "symbol": "SABS",
+   "type": "NEW",
+   "actual": "WATCH@58.5",
+   "move_now": -2.09,
+   "class": "B",
+   "estimated_at_skipped_slot": "SCORED@54.7 gap -1.49",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_WATCH",
+   "outcome": null
+  },
+  {
+   "symbol": "PIPR",
+   "type": "NEW",
+   "actual": "WATCH@58.3",
+   "move_now": 2.01,
+   "class": "B",
+   "estimated_at_skipped_slot": "SCORED@57.8 gap 1.93",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_WATCH",
+   "outcome": null
+  },
+  {
+   "symbol": "IOT",
+   "type": "NEW",
+   "actual": "WATCH@57.0",
+   "move_now": -2.01,
+   "class": "B",
+   "estimated_at_skipped_slot": "SCORED@56.4 gap -1.83",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_WATCH",
+   "outcome": null
+  },
+  {
+   "symbol": "SABR",
+   "type": "NEW",
+   "actual": "WATCH@53.8",
+   "move_now": -2.07,
+   "class": "B",
+   "estimated_at_skipped_slot": "SCORED@52.6 gap -1.74",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_WATCH",
+   "outcome": null
+  },
+  {
+   "symbol": "GRRR",
+   "type": "NEW",
+   "actual": "WATCH@50.0",
+   "move_now": -2.09,
+   "class": "B",
+   "estimated_at_skipped_slot": "SCORED@49.2 gap -1.88",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_WATCH",
+   "outcome": null
+  },
+  {
+   "symbol": "TMCI",
+   "type": "NEW",
+   "actual": "WATCH@43.6",
+   "move_now": -2.09,
+   "class": "B",
+   "estimated_at_skipped_slot": "SCORED@43.0 gap -1.98",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_WATCH",
+   "outcome": null
+  }
+ ]
+}

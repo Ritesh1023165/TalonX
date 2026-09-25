@@ -1,0 +1,163 @@
+{
+ "SKIPPED_SLOT_TIME": "20:35:00",
+ "PREVIOUS_SCAN_START": "20:30:00",
+ "PREVIOUS_SCAN_END": "20:35:27",
+ "NEXT_ACTUAL_SCAN_START": "20:40:00",
+ "NEXT_SCAN_DATA_AS_OF": "20:23",
+ "SKIPPED_SLOT_WOULD_HAVE_USED_AS_OF": "20:18",
+ "EXTRA_DISCOVERY_LATENCY_S": 300,
+ "CANDIDATES_FIRST_SEEN_ON_NEXT_SCAN": 10,
+ "SETUPS_FIRST_SEEN_ON_NEXT_SCAN": 1,
+ "classes": {
+  "A": 0,
+  "B": 6,
+  "C": 5,
+  "D": 0
+ },
+ "MATERIALLY_DELAYED(C setups)": [
+  {
+   "symbol": "AMPL",
+   "type": "UPGRADE",
+   "actual": "BEARISH@73.7",
+   "move_now": -4.75,
+   "class": "C",
+   "estimated_at_skipped_slot": "BEARISH_SETUP@73.7 gap -4.75",
+   "delay_s": 300,
+   "lab": null,
+   "outcome": {
+    "status": "FAILED_CONFIRMATION",
+    "ret_30m_pct": -0.224,
+    "ret_1h_pct": 0.149,
+    "mfe_pct": 1.194
+   }
+  }
+ ],
+ "detail": [
+  {
+   "symbol": "GNL",
+   "type": "NEW",
+   "actual": "WATCH@85.0",
+   "move_now": -2.32,
+   "class": "B",
+   "estimated_at_skipped_slot": "SCORED@67.7 gap -0.93",
+   "delay_s": 300,
+   "lab": null,
+   "outcome": null
+  },
+  {
+   "symbol": "AMPL",
+   "type": "UPGRADE",
+   "actual": "BEARISH@73.7",
+   "move_now": -4.75,
+   "class": "C",
+   "estimated_at_skipped_slot": "BEARISH_SETUP@73.7 gap -4.75",
+   "delay_s": 300,
+   "lab": null,
+   "outcome": {
+    "status": "FAILED_CONFIRMATION",
+    "ret_30m_pct": -0.224,
+    "ret_1h_pct": 0.149,
+    "mfe_pct": 1.194
+   }
+  },
+  {
+   "symbol": "THO",
+   "type": "NEW",
+   "actual": "WATCH@71.0",
+   "move_now": 2.92,
+   "class": "B",
+   "estimated_at_skipped_slot": "SCORED@59.4 gap 1.72",
+   "delay_s": 300,
+   "lab": null,
+   "outcome": null
+  },
+  {
+   "symbol": "NTAP",
+   "type": "NEW",
+   "actual": "WATCH@70.9",
+   "move_now": 2.59,
+   "class": "B",
+   "estimated_at_skipped_slot": "SCORED@68.1 gap 1.98",
+   "delay_s": 300,
+   "lab": null,
+   "outcome": null
+  },
+  {
+   "symbol": "ADUR",
+   "type": "NEW",
+   "actual": "WATCH@59.5",
+   "move_now": 2.31,
+   "class": "B",
+   "estimated_at_skipped_slot": "SCORED@41.3 gap 0.4",
+   "delay_s": 300,
+   "lab": null,
+   "outcome": null
+  },
+  {
+   "symbol": "LBGJ",
+   "type": "NEW",
+   "actual": "WATCH@56.3",
+   "move_now": -2.14,
+   "class": "B",
+   "estimated_at_skipped_slot": "SCORED@58.9 gap 0.47",
+   "delay_s": 300,
+   "lab": null,
+   "outcome": null
+  },
+  {
+   "symbol": "QNC",
+   "type": "NEW",
+   "actual": "WATCH@56.1",
+   "move_now": -2.93,
+   "class": "C",
+   "estimated_at_skipped_slot": "WATCH@56.1 gap -2.93",
+   "delay_s": 300,
+   "lab": null,
+   "outcome": null
+  },
+  {
+   "symbol": "RSKD",
+   "type": "NEW",
+   "actual": "WATCH@54.3",
+   "move_now": -2.01,
+   "class": "C",
+   "estimated_at_skipped_slot": "WATCH@54.3 gap -2.01",
+   "delay_s": 300,
+   "lab": null,
+   "outcome": null
+  },
+  {
+   "symbol": "IQ",
+   "type": "NEW",
+   "actual": "WATCH@53.2",
+   "move_now": -2.88,
+   "class": "C",
+   "estimated_at_skipped_slot": "WATCH@53.2 gap -2.88",
+   "delay_s": 300,
+   "lab": null,
+   "outcome": null
+  },
+  {
+   "symbol": "SRPT",
+   "type": "NEW",
+   "actual": "WATCH@51.7",
+   "move_now": 2.83,
+   "class": "C",
+   "estimated_at_skipped_slot": "WATCH@51.7 gap 2.83",
+   "delay_s": 300,
+   "lab": null,
+   "outcome": null
+  },
+  {
+   "symbol": "WAFU",
+   "type": "NEW",
+   "actual": "WATCH@44.5",
+   "move_now": -6.41,
+   "class": "B",
+   "estimated_at_skipped_slot": "SCORED@39.0 gap -4.49",
+   "delay_s": 300,
+   "lab": null,
+   "outcome": null
+  }
+ ]
+}
