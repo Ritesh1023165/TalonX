@@ -136,6 +136,15 @@ class Promoter:
             self.outbox = NotifyStore(str(signal_outbox_path(root)))
         self.last: dict = {}
         self._init_boundary()
+        if mode == PAPER_SIGNAL:
+            self._no_mode_carryover()
+
+    def _no_mode_carryover(self) -> None:
+        """SHADOW -> PAPER_SIGNAL: anything still QUEUED from a SHADOW run is never sent (only newly eligible
+        post-switch candidates reach Signal)."""
+        with self.con:
+            self.con.execute("UPDATE promotions SET state='EXPIRED', reason_code='MODE_SWITCH_NO_CARRYOVER', "
+                             "decision_utc=? WHERE state='QUEUED' AND promotion_mode!=?", (iso(self.clock()), PAPER_SIGNAL))
 
     # -- activation boundary: never replay anything that predates the first start -------------------------------------
     def _init_boundary(self) -> None:

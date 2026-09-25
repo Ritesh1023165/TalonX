@@ -300,3 +300,16 @@ def test_policy_fingerprint_and_mode_contract():
     assert P.mode_from_env({}) == P.SHADOW
     with pytest.raises(SystemExit):
         P.mode_from_env({P.MODE_ENV: "LIVE"})
+
+
+def test_22b_shadow_queue_is_not_carried_into_paper_signal(tmp_path):
+    pr = promoter(tmp_path, T(15))
+    seed(tmp_path, [dict(sym=f"S{i}", at=T(15), score=60 + i) for i in range(4)])
+    pr.tick()                                              # 3 PROMOTED_SHADOW + 1 QUEUED (rate)
+    assert rows(pr, "SELECT COUNT(*) FROM promotions WHERE state='QUEUED'") == [(1,)]
+    pr2 = P.Promoter(root=tmp_path, clock=Clock(T(15, 6)), mode=P.PAPER_SIGNAL, drain=lambda s: {"sent": 0},
+                     data=_NoData())
+    pr2.tick()
+    assert rows(pr2, "SELECT state, reason_code FROM promotions WHERE symbol='S0'") == [("EXPIRED", "MODE_SWITCH_NO_CARRYOVER")]
+    c = sqlite3.connect(P.signal_outbox_path(tmp_path))
+    assert c.execute("SELECT COUNT(*) FROM ops_notification_outbox").fetchone() == (0,)
