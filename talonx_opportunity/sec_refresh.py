@@ -14,6 +14,9 @@ waiting for SEC. The catalyst freshness contract is unchanged:
   (including its stale-copy-on-failure and 429 back-off);
 * every SEC request (refresher or fallback) goes through the one ``SecSubmissions`` instance under one lock, so its
   own >= 0.21 s spacing still bounds the combined rate to today's ~5 req/s;
+* discovery has priority: the refresher only works while discovery is IDLE (no lookup for ``IDLE_GAP_S``), oldest
+  entries first, one request at a time -- a scan waits for at most one in-flight refresh request. (2026-09-25 bench:
+  a refresher that competed for the lock during scans starved discovery above ~1,000 symbols.);
 * nothing is persisted: a restart starts cold, exactly like today.
 
 Parsing, evaluation, scoring and classification are untouched: the wrapper returns the same ``(submissions,
@@ -30,7 +33,8 @@ from typing import Callable
 log = logging.getLogger("talonx_opportunity.sec_refresh")
 
 FLAG = "TALONX_SEC_BACKGROUND_REFRESH_ENABLED"
-REFRESH_AHEAD_S = 240.0       # refresh an entry once it is this close to the TTL
+REFRESH_AHEAD_S = 480.0       # an entry becomes refreshable once it is this close to the TTL (i.e. age >= 120 s)
+IDLE_GAP_S = 2.0              # the refresher only runs when discovery has made no lookup for this long
 FORGET_AFTER_S = 1800.0       # stop refreshing a CIK discovery has not asked for in this long
 MAX_TRACKED = 5000            # bound on tracked CIKs (least-recently-requested evicted)
 
@@ -44,16 +48,17 @@ class BackgroundSecCache:
 
     def __init__(self, sec, *, refresh_ahead_s: float = REFRESH_AHEAD_S, forget_after_s: float = FORGET_AFTER_S,
                  max_tracked: int = MAX_TRACKED, clock: Callable[[], float] | None = None, start: bool = True,
-                 idle_sleep_s: float = 1.0):
+                 idle_sleep_s: float = 1.0, idle_gap_s: float = IDLE_GAP_S):
         self.sec = sec
         self.clock = clock or sec.clock
         self.refresh_ahead_s, self.forget_after_s, self.max_tracked = refresh_ahead_s, forget_after_s, max_tracked
-        self.idle_sleep_s = idle_sleep_s
+        self.idle_sleep_s, self.idle_gap_s = idle_sleep_s, idle_gap_s
+        self._last_get = float("-inf")         # time of discovery's most recent lookup
         self._lock = threading.Lock()          # guards sec._cache reads/writes AND every SEC request
         self._wanted: dict[str, float] = {}    # cik -> last time discovery asked for it
         self._stop = threading.Event()
         self.stats = {"served_fresh": 0, "sync_fallback": 0, "refreshed": 0, "refresh_errors": 0,
-                      "throttled_skips": 0, "evicted": 0}
+                      "throttled_skips": 0, "evicted": 0, "yielded_to_discovery": 0}
         self._thread = None
         if start:
             self.start()
@@ -61,6 +66,7 @@ class BackgroundSecCache:
     # -- discovery read path ------------------------------------------------------------------------------------------
     def get(self, cik: str):
         now = self.clock()
+        self._last_get = now
         with self._lock:
             self._track(cik, now)
             hit = self.sec._cache.get(cik)
@@ -104,17 +110,26 @@ class BackgroundSecCache:
                 self.sec._cache[cik] = (float("-inf"), prev[1], prev[2])   # force a fetch on the next get
             before = self.sec.requests
             errs = len(self.sec.errors)
-            self.sec.get(cik)
-            ok = self.sec.requests > before and len(self.sec.errors) == errs
+            try:
+                self.sec.get(cik)
+                ok = self.sec.requests > before and len(self.sec.errors) == errs
+            except Exception:  # noqa: BLE001 -- unexpected (e.g. cache write) failure: treat as a failed refresh
+                ok = False
             if not ok and prev is not None:
                 self.sec._cache[cik] = prev                    # failure: restore the untouched previous copy
             self.stats["refreshed" if ok else "refresh_errors"] += 1
             return ok
 
+    def discovery_idle(self) -> bool:
+        return self.clock() - self._last_get >= self.idle_gap_s
+
     def run_once(self) -> int:
         n = 0
         for cik in self.due():
             if self._stop.is_set():
+                break
+            if not self.discovery_idle():                      # a scan started: yield immediately
+                self.stats["yielded_to_discovery"] += 1
                 break
             self.refresh_one(cik)
             n += 1
