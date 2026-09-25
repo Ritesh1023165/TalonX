@@ -161,6 +161,14 @@ FREEZE_CONTINUOUS_ENGINE_FILES = (
 )
 
 
+# POST-FREEZE V2 SIGNAL ROUTING FIX (2026-09-25, operator-authorized ROUTING_FIX) -- an EXPLICIT, closed list: the V2
+# actionable Telegram transport resolved a bare TelegramClient() from the legacy TELEGRAM_BOT_TOKEN (revoked -> 401)
+# instead of the TRADE_EVENT (TalonX Signal) destination. Delivery routing only: no strategy-fingerprint input, no
+# provider/pricing/accounting/ledger/admission change (the fingerprint is guarded by a test).
+FREEZE_SIGNAL_ROUTING_FIX_FILES = (
+    "talonx_v2/delivery.py",
+)
+
 def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None) -> tuple[bool, str]:
     if head.startswith(expected_sha):
         return True, "HEAD is the frozen release SHA"
@@ -179,6 +187,7 @@ def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None)
                                        or f in FREEZE_OPS_HARDENING_FILES or f in FREEZE_RELEASE_FIDELITY_FIX_FILES
                                        or f in FREEZE_SESSION03_HARDENING_FILES
                                        or f in FREEZE_CONTINUOUS_ENGINE_FILES
+                                       or f in FREEZE_SIGNAL_ROUTING_FIX_FILES
                                        or f.startswith(FREEZE_RESEARCH_LANE_PREFIXES))]
     if extra:
         return False, f"runtime files changed after the frozen release: {extra[:5]}"
