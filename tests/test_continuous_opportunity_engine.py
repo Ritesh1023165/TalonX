@@ -853,3 +853,16 @@ def test_regular_extension_keeps_held_cohort_watch_cap_and_after_hours_reserve(t
     ah = [d[f"A{i:02d}"] for i in range(4)]
     assert ah.count("SELECTED") == 3 and ah.count("BUDGET_EXHAUSTED_TOTAL") == 1
     assert n2._used("2026-09-24") == (75, 15)
+
+
+def test_outcome_rows_are_already_direction_adjusted_so_tools_must_not_flip_again():
+    """Contract validation tooling relies on (2026-09-25: a live study script flipped GAP_DOWN a second time).
+    A GAP_DOWN candidate whose price FALLS must produce POSITIVE ret/MFE in the stored row."""
+    from talonx_opportunity.outcome_tracker import since_first_seen
+    ref_t = U(14)
+    bars = [{"t": (ref_t + timedelta(minutes=i)).strftime("%Y-%m-%dT%H:%M:%SZ"), "o": 10 - 0.02 * i, "h": 10 - 0.02 * i + 0.01,
+             "l": 10 - 0.02 * i - 0.01, "c": 10 - 0.02 * i, "v": 1000} for i in range(0, 90)]
+    down = since_first_seen(family="GAP_DOWN", ref_price=10.0, ref_time=ref_t, prev_close=11.0, bars=bars, close_utc=U(20))
+    up = since_first_seen(family="GAP_UP", ref_price=10.0, ref_time=ref_t, prev_close=9.0, bars=bars, close_utc=U(20))
+    assert down["ret_30m_pct"] > 0 and down["ret_1h_pct"] > 0 and down["mfe_pct"] > 0
+    assert up["ret_30m_pct"] < 0 and abs(up["ret_30m_pct"] + down["ret_30m_pct"]) < 1e-9
