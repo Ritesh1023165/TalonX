@@ -236,7 +236,7 @@ def _scanned(args, scanned) -> Reply:
 Phase: {s['current_phase']} · last scan {(s['last_scan_utc'] or '')[11:16]}Z ({s['last_scan_s']}s)
 Symbols seen (with prints): {s['unique_symbols_seen']}
 Evaluated last scan: {s['symbols_evaluated_last_scan']} (data-ready {s['data_ready_last_scan']})
-Candidates: {s['candidates']} · Setups: {s['setups']}
+Candidates: {s['candidates']} · Setups (any time today): {s['setups']}
 Paper signals: {s['paper_signal_promotions']} (shadow {s['shadow_promotions']})
 /scanned file for the full CSV""")
     if sub not in SUBS["scanned"]:

@@ -233,7 +233,7 @@ def test_scanned_summary_uses_authoritative_counts(store, scanned):
 def test_scanned_lists_and_file(store, scanned):
     assert "CANDIDATES (" in run(store, "/scanned candidates", scanned=scanned).text
     assert "SETUPS (" in run(store, "/scanned setups", scanned=scanned).text
-    assert "SIGNALS (0)" in run(store, "/scanned signals", scanned=scanned).text
+    assert "PAPER PROMOTIONS (0)" in run(store, "/scanned signals", scanned=scanned).text
     f = run(store, "/scanned file", scanned=scanned)
     rows = list(csv.DictReader(io.StringIO(f.document.decode())))
     assert f.filename.endswith(".csv") and {"symbol", "max_score", "candidate", "excluded", "universe_source"} <= set(rows[0])
