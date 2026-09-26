@@ -1,0 +1,85 @@
+{
+ "SKIPPED_SLOT_TIME": "21:00:00",
+ "PREVIOUS_SCAN_START": "20:55:00",
+ "PREVIOUS_SCAN_END": "21:00:28",
+ "NEXT_ACTUAL_SCAN_START": "21:05:00",
+ "NEXT_SCAN_DATA_AS_OF": "20:49",
+ "SKIPPED_SLOT_WOULD_HAVE_USED_AS_OF": "20:44",
+ "EXTRA_DISCOVERY_LATENCY_S": 300,
+ "CANDIDATES_FIRST_SEEN_ON_NEXT_SCAN": 3,
+ "SETUPS_FIRST_SEEN_ON_NEXT_SCAN": 1,
+ "classes": {
+  "A": 0,
+  "B": 1,
+  "C": 2,
+  "D": 0
+ },
+ "MATERIALLY_DELAYED(C setups)": [
+  {
+   "symbol": "POWW",
+   "type": "NEW",
+   "actual": "BEARISH@71.6",
+   "move_now": -3.66,
+   "class": "C",
+   "estimated_at_skipped_slot": "BEARISH_SETUP@71.6 gap -3.66",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_TOTAL",
+   "outcome": {
+    "status": "NOT_APPLICABLE_SAME_DAY",
+    "ret_30m_pct": null,
+    "ret_1h_pct": null,
+    "mfe_pct": null
+   }
+  }
+ ],
+ "detail": [
+  {
+   "symbol": "POWW",
+   "type": "NEW",
+   "actual": "BEARISH@71.6",
+   "move_now": -3.66,
+   "class": "C",
+   "estimated_at_skipped_slot": "BEARISH_SETUP@71.6 gap -3.66",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_TOTAL",
+   "outcome": {
+    "status": "NOT_APPLICABLE_SAME_DAY",
+    "ret_30m_pct": null,
+    "ret_1h_pct": null,
+    "mfe_pct": null
+   }
+  },
+  {
+   "symbol": "USPH",
+   "type": "NEW",
+   "actual": "WATCH@70.4",
+   "move_now": 2.3,
+   "class": "C",
+   "estimated_at_skipped_slot": "WATCH@70.4 gap 2.3",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_TOTAL",
+   "outcome": {
+    "status": "NOT_APPLICABLE_SAME_DAY",
+    "ret_30m_pct": null,
+    "ret_1h_pct": null,
+    "mfe_pct": null
+   }
+  },
+  {
+   "symbol": "MIRM",
+   "type": "NEW",
+   "actual": "WATCH@66.4",
+   "move_now": 2.38,
+   "class": "B",
+   "estimated_at_skipped_slot": "SCORED@63.0 gap 1.67",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_TOTAL",
+   "outcome": {
+    "status": "NOT_APPLICABLE_SAME_DAY",
+    "ret_30m_pct": null,
+    "ret_1h_pct": null,
+    "mfe_pct": null
+   }
+  }
+ ]
+}

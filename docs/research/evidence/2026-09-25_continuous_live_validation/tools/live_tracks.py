@@ -40,7 +40,7 @@ def stats(xs):
     return {"n": len(xs), "mean": round(st.mean(xs), 3), "median": round(st.median(xs), 3)} if xs else {"n": 0}
 
 
-now = datetime.now(timezone.utc)
+now = datetime.fromisoformat(os.environ["TRACK_NOW"]) if os.environ.get("TRACK_NOW") else datetime.now(timezone.utc)
 phase, w = phase_at(now)
 wid = w.window_id if w else now.date().isoformat()
 o, n, ob, oc, mk = (ro(R / f) for f in ("opportunity.db", "notification.db", "opportunity_research_notifications.db",

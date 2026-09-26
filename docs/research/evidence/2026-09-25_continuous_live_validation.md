@@ -4,7 +4,7 @@
 - **Branch:** `feature/continuous-opportunity-engine`. `main` is untouched at `696370e`.
 - **Execution:** paper only, with no broker path.
 - **Evidence:** this report plus the machine-readable files in [`2026-09-25_continuous_live_validation/`](2026-09-25_continuous_live_validation/).
-- **Snapshot time:** the body reflects the stores at about 21:00Z. §18, *EOD closure*, is appended at true session end.
+- **Snapshot time:** §§1–17 reflect the stores at about 21:00Z; §7 and §6.2 carry final totals. §18, *EOD closure*, holds the end-of-session numbers (00:10Z).
 
 | | |
 |---|---|
@@ -12,7 +12,7 @@
 | Detection | **PASS_WITH_FINDINGS**: 2,002 candidates / 713 setups; missed-mover class G (data present, not detected) **= 0** all day |
 | Paper Signal (promotion) | **PASS**: 36 PAPER_OPPORTUNITY alerts via @TalonXSignalBot, 0 duplicates / failures / cross-sends / broker calls. Signal quality is **unproven** (see §5.3) |
 | AFTER_HOURS | **DISCOVERY PASS / NOTIFICATION FAIL**: true-AH candidates and setups found; A7 = **BLOCKED_BY_NOTIFICATION_POLICY** (reserve defect, §6.2) |
-| Scalability | **DEGRADED**: 7 skipped discovery slots by 21:01Z (final in §18); heavy scans 290–328 s; root cause is synchronous SEC cache refresh (fix prepared, NOT enabled) |
+| Scalability | **DEGRADED**: 7 skipped discovery slots (final; none after 21:00Z); heavy scans 290–328 s; root cause is synchronous SEC cache refresh (fix prepared, NOT enabled) |
 | V2 | **HEALTHY / CURRENT**, frozen, campaign untouched; one authorized ROUTING_FIX (V2 Signal transport) |
 | Sentinel control plane | Built, tested and pushed; **DRY_RUN**; not activated |
 
@@ -31,7 +31,7 @@
 
 **Defects found (none lost data or state):**
 1. **After-hours reserve accounting used processing phase, not data phase.** Three delayed REGULAR-data setups consumed all three after-hours Lab slots at 20:01Z, so no genuine after-hours setup reached Lab.
-2. **Discovery overran its 300 s cadence 7 times by 21:01Z.** Each overrun delayed discovery by 5 minutes; one delayed a real paper Signal (ELE, 19:10Z slot).
+2. **Discovery overran its 300 s cadence 7 times.** Each overrun delayed discovery by 5 minutes; one delayed a real paper Signal (ELE, 19:10Z slot).
 3. **A latent V2 routing defect,** since fixed: the actionable Signal transport used the revoked legacy bot token.
 
 ---
@@ -167,7 +167,7 @@ Returns are measured from the reference price of the causal (15-minute delayed) 
 |---|---|
 | AH_RESERVE_ROOT_CAUSE | `talonx_opportunity/notifier.py:165` looks up `later_phase_reserve` by `ev["phase"]`, which is the **processing** (wall-clock) phase. After 20:00Z every event is "AFTER_HOURS", so the REGULAR reserve of 3 no longer applies. Events whose data is still REGULAR (as-of ≤ 19:59, visible until ~20:16 because of the SIP delay) can therefore spend the 3 slots kept for true after-hours data. |
 | AFFECTED_SLOTS | 3 of 3: VEON (BULLISH 72.86, +3.01 %), CERT (70.94, +3.09 %), DRVN (70.76, +3.20 %). All UPGRADE, data as-of 19:44Z, decided 20:01:07Z |
-| TRUE_AH_SETUPS_HELD | 22 `BUDGET_EXHAUSTED_TOTAL` true after-hours-data setup events by 21:00Z (first: HP 20:20). The final count is in §18 |
+| TRUE_AH_SETUPS_HELD | **49** `BUDGET_EXHAUSTED_TOTAL` true after-hours-data setup events by session end (first: HP 20:20), plus 68 `NOT_SURFACED_PARENT` (by design) |
 | DATA_LOSS | none. Every event is persisted with its decision and reason |
 | STATE_LOSS | none. Candidates, lifecycle and outcome tracking are unaffected |
 | DISCOVERY_IMPACT | none. Detection, classification and candidate counts are unaffected |
@@ -193,12 +193,12 @@ Returns are measured from the reference price of the causal (15-minute delayed) 
 | 20:10 | AFTER_HOURS | 20:05:00–20:10:00 | 300.1 s | 20:15 | 300 s | 45 | 20 | 29 | 0 (REGULAR-only) | 0 lost (75/75) | 0 |
 | 20:35 | AFTER_HOURS | 20:30:00–20:35:27 | 327.0 s | 20:40 | 300 s | 10 | 1 (AMPL) | 5 | 0 | 0 lost (75/75) | 0 |
 | 20:50 | AFTER_HOURS | 20:45:00–20:50:10 | 310.5 s | 20:55 | 300 s | 2 | 1 (ADCT) | 3 | 0 | 0 lost (75/75) | 0 |
-| 21:00 | AFTER_HOURS | 20:55:00–21:00:28 | 328.3 s | 21:05 | 300 s | see §18 | see §18 | see §18 | 0 | 0 lost (75/75) | see §18 |
+| 21:00 | AFTER_HOURS | 20:55:00–21:00:28 | 328.3 s | 21:05 | 300 s | 3 | 1 (POWW) | 2 | 0 | 0 lost (75/75) | 0 |
 
 - Every skip has cause `PREV_SCAN_OVERRAN`. Every one has **0 data loss and 0 state loss**: the next scan evaluates the full window-to-date aggregate, and class D (unknown) = 0 in every impact file.
 - Classes A–D in the impact files: A = not observable yet, B = observable below threshold, C = would have qualified at the skipped slot, D = unknown.
-- Running totals at ~21:01Z: 7 skips, ≥ 111 candidates and ≥ 42 setups first seen 300 s late (21:00 impact pending), **1 paper Signal delayed** (ELE), max scan 328.31 s, category G = 0. Final totals are in §18.
-- The after-hours overrun rate is higher than REGULAR's: 4 of 12 after-hours slots vs 3 of 78 REGULAR slots.
+- **Final totals:** 7 skips (none after 21:00Z), 114 candidates and 43 setups first seen 300 s late (77 class C), **1 paper Signal delayed** (ELE), max scan 328.31 s, category G = 0, data loss 0, state loss 0.
+- The overruns cluster in the first hour after the close: 4 of the 12 slots from 20:00 to 20:55, then 0 of 36 from 21:05 to 23:55. REGULAR had 3 of 78.
 
 ## 8. SEC scalability findings
 
@@ -235,7 +235,7 @@ Returns are measured from the reference price of the causal (15-minute delayed) 
   | 1,500 | 2,000 | TIGHT |
   | 2,000 | 2,667 | INSUFFICIENT; the synchronous fallback preserves the contract |
 
-- **Live evidence for the fix:** 7 skipped slots by 21:01Z; 1 paper Signal delayed 300 s; heavy-scan compute is up to 291 s (p90) of the Signal latency budget.
+- **Live evidence for the fix:** 7 skipped slots; 1 paper Signal delayed 300 s; heavy-scan compute is up to 291 s (p90) of the Signal latency budget.
 
 **Next-version enablement plan:**
 1. **A.** Add `talonx_opportunity/sec_refresh.py` to discovery `COMPONENT_SOURCES`, so the version hash covers it.
@@ -254,7 +254,7 @@ Returns are measured from the reference price of the causal (15-minute delayed) 
 7. **G. Rollback:** unset the flag, declare DATA_FIX, restart discovery only. The plain `SecSubmissions` path is byte-identical to today's.
 
 ## 9. Notifier findings
-- **Lab totals:** 275 SENT, all RESEARCH. Decisions:
+- **Lab totals** at ~21:00Z: 275 SENT, all RESEARCH (294 at session end; see §18). Decisions:
 
   | Decision | Count |
   |---|---|
@@ -342,7 +342,7 @@ G was 0 at every checkpoint: 16:51 (190 movers), 17:36 (208), 19:16 (228) and 20
 
 | # | Item | Problem / evidence | Component | Strategy-material? | Restart | Tests | Live acceptance | Depends on |
 |---|---|---|---|---|---|---|---|---|
-| **P0-1** | SEC background refresh enablement | 7+ skips, heavy p90 285 s, ELE +300 s (§7, §8) | discovery | No (DATA_FIX; classification parity) | discovery only | existing 17 + parity replay | §8 F | — |
+| **P0-1** | SEC background refresh enablement | 7 skips, heavy p90 285 s, ELE +300 s (§7, §8) | discovery | No (DATA_FIX; classification parity) | discovery only | existing 17 + parity replay | §8 F | — |
 | **P0-2** | AH reserve keyed on DATA_PHASE | 3 of 3 AH slots consumed by REGULAR data; A7 blocked (§6.2) | notifier | No (ROUTING_FIX, notification only) | notifier only | transition + delayed-data (§6.2) | the first true after-hours setup within capacity is sent; 0 REGULAR-data consumption after 20:00 | — |
 | **P0-3** | Sentinel health check + poller activation | single-poller check would flag the Sentinel poller (§13) | talonx_ops prospective + operator_control | No (OPERATIONS_ONLY) | new poller process | health-check unit test; real-Telegram DRY_RUN | 7 commands answered; no `multiple_telegram_pollers` | — |
 | **P0-4** | Provider-mutation activation proof | ACTIVE never exercised live | ingestion, discovery, promotion, run_talonx | Universe change is DATA_FIX per component | the 4 in §13 | existing 28 + live proof | exclude / restore proof with no replay | P0-3 |
@@ -356,6 +356,7 @@ G was 0 at every checkpoint: 16:51 (190 movers), 17:36 (208), 19:16 (228) and 20
 | P2-4 | Flip-back identity handling | 20 flips, 3 requalify; original identities mostly invalidated | discovery lifecycle | **Yes** | discovery | identity tests | no duplicate identities | P2-3 |
 | P3-1 | Legacy cleanup | retired Experimental dispatcher keeps a default-client pattern (not reachable) | talonx_signals | No | none | — | — | — |
 | P3-2 | Telegram / CONTROL cleanup | legacy `TELEGRAM_BOT_TOKEN` is revoked but still the DispatchConfig default; 24 pre-existing `/ping` listener test failures | talonx_dispatch | No | run_talonx | listener suite green | — | — |
+| P3-4 | Prospective status default paths | bare `prospective status` reads legacy `v2_lane.db` / `v2_service_status.json`, giving a false `v2_process_dead` (§18.4) | talonx_ops/prospective/paths.py | No | none (CLI) | path-resolution test | status without env overrides reports the release session | — |
 | P3-3 | Stale config / dead fallback cleanup | `declared=0` display flag on the fingerprint rule path; outcome-card freshness UNKNOWN | runtime.py (all hashes), renderer | No (REPORTING_ONLY) | all (runtime.py is in every hash), so batch it with a planned restart | — | — | planned full restart |
 
 **PROMOTION_HARDENING_ITEMS** (prepared, not implemented):
@@ -396,5 +397,61 @@ G was 0 at every checkpoint: 16:51 (190 movers), 17:36 (208), 19:16 (228) and 20
 - **Providers:** no paid provider or subscription added.
 - **Secrets:** no bot token printed or committed.
 
-## 18. EOD closure
-*(appended at true session end)*
+## 18. EOD closure (00:10–00:13Z, 2026-09-26)
+
+After-hours ended at 00:00Z. The last after-hours-data scan was 23:55Z (as-of ~23:44). Final evidence is in `eod_evidence_final.json`, `missed_movers_final.json` (pinned to 23:59:30Z, window 2026-09-25), `outcome_studies_final.json` and `skip_2100.json`.
+
+### 18.1 Final after-hours numbers
+- **After-hours scans:** 44; p50 36.2 s, p90 289.6 s, max 328.3 s. 4 skips, all between 20:00 and 21:00.
+- **After-hours-data volume:** 355 events, 99 new candidates, 140 setup events.
+- **True after-hours setups held:** 117 in total.
+  - 49 held `BUDGET_EXHAUSTED_TOTAL`.
+  - 68 held `NOT_SURFACED_PARENT` (by design).
+- **True after-hours Lab surfacings:** **0**. A7 stays BLOCKED_BY_NOTIFICATION_POLICY for the whole evening.
+- **Lab after hours:** 33 SELECTED in total. Only 3 counted as new surfacings: VEON, CERT and DRVN, the REGULAR-data reserve consumers.
+- **F3 cross-check:** outcome rows `NOT_APPLICABLE_SAME_DAY` = 99 = the after-hours-data new candidates. The causal-data-phase outcome basis behaved exactly as designed; no REGULAR-data candidate was marked N/A.
+
+### 18.2 Final missed-mover pass (23:59:30Z)
+
+| A | B | C | D | E | F | **G** | H | I | Total |
+|---|---|---|---|---|---|---|---|---|---|
+| 27 | 174 | 16 | 7 | 5 | 0 | **0** | 16 | 0 | 245 |
+
+Compared with 20:55: C appears (16) and E/H shrink, because after-hours re-scoring moved closed identities from "worthy now" to "not worthy now". G stayed 0 all day.
+
+### 18.3 Final outcome study: shifts from the 17:30 checkpoint
+- **Sent vs held (all):** unchanged within noise. SENT n = 75, ret30 median +0.62 %, 61 % confirmed. HELD n = 1,990, −0.13 %, 39 %.
+- **Paper-Signal cohort:** unchanged since 20:00 (outcomes are REGULAR-close based). 13 confirmed, 20 failed, 3 pending.
+- **Lifecycle shadows ("would requalify now"):**
+
+  | Rule | 20:55 | 00:10 |
+  |---|---|---|
+  | stale | 26 | 10 of 46 |
+  | fade | 178 | 74 of 881 |
+  | flip | 3 | 5 of 29 |
+
+  The drop reflects the end-of-evening thin after-hours tape, not new evidence against re-entry. **No meaningful shift; small samples; no conclusion changed.**
+- **Fatigue:** 294 Lab sends; MU LOW 66 (52 at 20:55).
+
+### 18.4 Closure checks
+
+| Check | Result |
+|---|---|
+| All expected components healthy | **PASS**. 10 engine components RUNNING, heartbeats < 4 s. Supervisor loop, run_talonx, ops supervisor, dashboard, intelligence poller and V2 companion are each exactly one shim/real pair |
+| No unexpected positions/orders | **PASS**. V2 positions 0, trades 0, pending intents 0; no broker path in the engine |
+| V2 state current | **PASS**. HEALTHY / CURRENT, tick 199, cash $100,000, campaign V2-PAPER-RC1, contract `ac5e51aa3599d6c9`, 0 critical flags (release paths) |
+| Promotion stopped after REGULAR | **PASS**. 0 promotions after 20:00; 236 evaluations rejected (PHASE 50, WATCH 152, BEARISH 34) |
+| AH discovery completed | **PASS**. Last AH-data scan 23:55Z |
+| No duplicate watchers | **PASS**. No validation script running; all trackers exited |
+| No pending Signal outbox failures | **PASS**. Promotion outbox 36/36 SENT, 0 retries, 0 errors. V2 alert outbox 0. V2 ops outbox 1 SENT |
+| No Lab cross-send | **PASS**. Lab 294/294 RESEARCH; promotion 36/36 TRADE_EVENT; 0 BUY/SELL |
+| No provider-incomplete | **PASS**. Max 0 across 173 scans; 756 ingestion cycles, 0 failed batches |
+| No cursor lag | **PASS**. All 6 consumers at seq 4,550 |
+| Runtime DBs consistent | **PASS**. `PRAGMA quick_check` ok on all 12 engine DBs and `v2_release_rc1.db` |
+
+**New finding (LOW, operations):** a bare `python -m talonx_ops.prospective status` defaults to the legacy `v2_lane.db` / `v2_service_status.json` (09-15, $300k). It reports a false `v2_process_dead`. With `TALONX_V2_DB_PATH` / `TALONX_V2_STATUS_PATH` pointed at the release files it reports HEALTHY with 0 flags. This is backlog item P3-4.
+
+**Not run:** the V2 prospective EOD close (`eod: NOT_DUE_YET` at 00:12Z). It belongs to the V2 release procedure and is left for the operator.
+
+### EOD_VERDICT: **EOD_CLOSED_CLEAN_WITH_FINDINGS**
+Findings: the AH reserve defect (P0-2), the discovery overrun / SEC refresh (P0-1), and the prospective-status default paths (P3-4).
