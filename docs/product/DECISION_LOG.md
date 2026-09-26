@@ -3696,3 +3696,18 @@ Decisions recorded:
      - Restoring or re-adding never replays history.
    - Operator ADDs do not extend the Original yfinance watchlist stream (Original strategy input); exclusions do apply to it.
 6. **Frozen-release allowlist.** A closed list, `FREEZE_OPERATOR_CONTROL_FILES`. The control plane never imports the research lane.
+
+### SEC catalyst cache background refresh: enabled at a DATA_FIX boundary (2026-09-26)
+
+1. **Activation.** `TALONX_SEC_BACKGROUND_REFRESH_ENABLED=1` is set in discovery (and in the supervisor loop's environment so a respawn keeps it). Only `discovery.main` reads it.
+2. **Boundary.** `20260926T090536Z-discovery-efcad5`, **DATA_FIX** via the closed `CONFIG_KEY_CLASS` list (`SEC_CATALYST_CACHE` only, plus a matching declaration). Any other discovery config change stays forced STRATEGY_MATERIAL. Strategy fingerprints are unchanged.
+3. **Identity.** `sec_refresh.py` is part of discovery's version hash.
+4. **Evidence.** Same-data parity with real SEC: 0 mismatches over 5,653 symbols and 380 events; the refreshed scan took 15.9 s against 109.2 s for the sync reference. Benchmarks and failure tests are unchanged and green.
+5. **Status.** **Live acceptance pending** (first live session: 2026-09-28). Rollback: unset the flag, declare DATA_FIX, restart discovery only.
+
+### Later-phase notification reserve keyed on causal DATA_PHASE (2026-09-26)
+
+1. **Rule.** A NEW setup surfacing consumes the `later_phase_reserve` of its **data** phase, `phase_at(data_as_of − 1 min)`, not the phase in which it was processed. An undeterminable data phase fails closed.
+2. **Why.** On 2026-09-25, three REGULAR-data setups processed at 20:01Z took all three AFTER_HOURS slots, so no true after-hours setup reached Lab.
+3. **Boundary.** `20260926T085833Z-notifier-4c02a5`, ROUTING_FIX (config fingerprint gains `reserve_phase_basis=CAUSAL_DATA_PHASE_V1`). No replay. Caps, WATCH share, ranking and rates are unchanged.
+4. **Acceptance.** Accepted on a deterministic replay of the 2026-09-25 transition: HP, EXFY and OVID are served; VEON, CERT and DRVN are held. Live confirmation on the next after-hours window.

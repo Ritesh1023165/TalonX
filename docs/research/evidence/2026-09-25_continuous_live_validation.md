@@ -455,3 +455,8 @@ Compared with 20:55: C appears (16) and E/H shrink, because after-hours re-scori
 
 ### EOD_VERDICT: **EOD_CLOSED_CLEAN_WITH_FINDINGS**
 Findings: the AH reserve defect (P0-2), the discovery overrun / SEC refresh (P0-1), and the prospective-status default paths (P3-4).
+
+## 19. Follow-up (2026-09-26)
+- Items P0-1 (SEC background refresh) and P0-2 (AH reserve on DATA_PHASE) were implemented and deployed on 2026-09-26 (non-trading day). See [2026-09-26_p0_package1_acceptance.md](2026-09-26_p0_package1_acceptance.md).
+- **Erratum:** 2026-09-25 was a **Friday** (not Thursday, as the header states).
+- The V2 end-of-day close for this session was not run (finding F-P3 in the follow-up).

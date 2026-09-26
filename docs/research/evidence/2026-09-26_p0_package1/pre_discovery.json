@@ -1,0 +1,245 @@
+{
+ "utc": "2026-09-26T09:05:33+00:00",
+ "components": {
+  "ingestion": {
+   "pid": 19072,
+   "state": "RUNNING",
+   "version": "fded2ee1b565",
+   "config_fps": {},
+   "commit": "6fa1581823cb",
+   "heartbeat": "2026-09-26T09:05:30.900686+00:00"
+  },
+  "evaluator:INTRADAY": {
+   "pid": 12596,
+   "state": "RUNNING",
+   "version": "622140e9e504",
+   "config_fps": {
+    "authorized_strategies": "none",
+    "phase_scope": "PREMARKET,REGULAR"
+   },
+   "commit": "6fa1581823cb",
+   "heartbeat": "2026-09-26T09:05:32.387756+00:00"
+  },
+  "evaluator:SAME_DAY": {
+   "pid": 21528,
+   "state": "RUNNING",
+   "version": "622140e9e504",
+   "config_fps": {
+    "authorized_strategies": "none",
+    "phase_scope": "OVERNIGHT,PREMARKET,REGULAR,AFTER_HOURS"
+   },
+   "commit": "6fa1581823cb",
+   "heartbeat": "2026-09-26T09:05:32.254840+00:00"
+  },
+  "discovery": {
+   "pid": 15904,
+   "state": "RUNNING",
+   "version": "cd560a2b3190",
+   "config_fps": {
+    "CONTINUOUS_RESEARCH": "2ef115ee19f99574",
+    "PREMARKET_RESEARCH_V1": "62ba413daf85e674"
+   },
+   "commit": "6fa1581823cb",
+   "heartbeat": "2026-09-26T09:05:30.068332+00:00"
+  },
+  "evaluator:SHORT_TERM": {
+   "pid": 23280,
+   "state": "RUNNING",
+   "version": "622140e9e504",
+   "config_fps": {
+    "authorized_strategies": "none",
+    "phase_scope": "AFTER_HOURS,OVERNIGHT"
+   },
+   "commit": "6fa1581823cb",
+   "heartbeat": "2026-09-26T09:05:32.775553+00:00"
+  },
+  "evaluator:LONG_TERM": {
+   "pid": 14440,
+   "state": "RUNNING",
+   "version": "622140e9e504",
+   "config_fps": {
+    "authorized_strategies": "none",
+    "phase_scope": ""
+   },
+   "commit": "6fa1581823cb",
+   "heartbeat": "2026-09-26T09:05:32.291818+00:00"
+  },
+  "notifier": {
+   "pid": 9384,
+   "state": "RUNNING",
+   "version": "e4c8cc285ff6",
+   "config_fps": {
+    "LAB_NOTIFY_POLICY": "dec8d1a865f25424",
+    "deliver": "1",
+    "reserve_phase_basis": "CAUSAL_DATA_PHASE_V1"
+   },
+   "commit": "18f3426e33e6",
+   "heartbeat": "2026-09-26T09:05:28.505941+00:00"
+  },
+  "outcomes": {
+   "pid": 2052,
+   "state": "RUNNING",
+   "version": "98480e88130f",
+   "config_fps": {
+    "models": "PREMARKET_RESEARCH_V1.measure+SINCE_FIRST_SEEN_V1",
+    "phase_basis": "CAUSAL_DATA_PHASE_V1"
+   },
+   "commit": "478d6fc8f149",
+   "heartbeat": "2026-09-26T09:05:31.368791+00:00"
+  },
+  "reporting": {
+   "pid": 15840,
+   "state": "RUNNING",
+   "version": "3480557b7485",
+   "config_fps": {},
+   "commit": "f5a1d92037c7",
+   "heartbeat": "2026-09-26T09:05:30.572096+00:00"
+  },
+  "promotion": {
+   "pid": 16348,
+   "state": "RUNNING",
+   "version": "ce9d915e611a",
+   "config_fps": {
+    "PROMOTION_POLICY": "4926c12e5eace04e",
+    "mode": "PAPER_SIGNAL",
+    "promotion_src": "bf0dea2167d9"
+   },
+   "commit": "063d4faabfbb",
+   "heartbeat": "2026-09-26T09:05:31.173930+00:00"
+  }
+ },
+ "cursors": {
+  "events_max_seq": 4550,
+  "notifier": 4550,
+  "promotion": 4550,
+  "intraday": 4550,
+  "same_day": 4550,
+  "short_term": 4550,
+  "long_term": 4550
+ },
+ "counts": {
+  "candidates": 2065,
+  "candidate_ids_distinct": 2065,
+  "events": 4550,
+  "event_ids_distinct": 4550,
+  "scans": 283,
+  "decisions": {
+   "SELECTED": 294,
+   "BUDGET_EXHAUSTED_WATCH": 1825,
+   "NOT_SURFACED_PARENT": 1579,
+   "BUDGET_EXHAUSTED_TOTAL": 264,
+   "BUDGET_RESERVED_LATER_PHASE": 588
+  },
+  "decisions_total": 4550,
+  "surfaced": 75,
+  "lab_outbox": {
+   "RESEARCH|SENT": 294
+  },
+  "promotions": {
+   "EXPIRED": 1,
+   "PROMOTED_SHADOW": 6,
+   "PROMOTED_SIGNAL": 36,
+   "REJECTED_WHILE_QUEUED": 3
+  },
+  "promotion_outbox": {
+   "TRADE_EVENT|SENT": 36
+  },
+  "open_queue": 0
+ },
+ "decisions_columns": [
+  "event_id",
+  "seq",
+  "candidate_id",
+  "window_id",
+  "symbol",
+  "event_type",
+  "classification",
+  "phase",
+  "priority",
+  "decision",
+  "reason",
+  "counted_new",
+  "budget_json",
+  "policy_version",
+  "policy_fp",
+  "decided_utc",
+  "routed",
+  "outbox_event_id",
+  "delivery_state",
+  "delivery_updated_utc",
+  "data_phase"
+ ],
+ "ingestion": {
+  "window_id": "2026-09-25",
+  "as_of_utc": "2026-09-25T23:44:00+00:00",
+  "cycle_utc": "2026-09-25T23:59:25.398767+00:00",
+  "phase": "AFTER_HOURS"
+ },
+ "last_scan": {
+  "decision_utc": "2026-09-26T09:05:00.060292+00:00",
+  "phase": "CLOSED",
+  "state": "CLOSED"
+ },
+ "deployments_last5": [
+  {
+   "deployment_id": "20260926T085833Z-notifier-4c02a5",
+   "component": "notifier",
+   "classification": "ROUTING_FIX",
+   "decided_by": "RULE:CONFIG_FINGERPRINT_CHANGED",
+   "declared": 0,
+   "old_version": "a3f10999a967",
+   "new_version": "e4c8cc285ff6"
+  },
+  {
+   "deployment_id": "20260925T180733Z-promotion-d10677",
+   "component": "promotion",
+   "classification": "STRATEGY_MATERIAL",
+   "decided_by": "RULE:CONFIG_FINGERPRINT_CHANGED",
+   "declared": 0,
+   "old_version": "ce9d915e611a",
+   "new_version": "ce9d915e611a"
+  },
+  {
+   "deployment_id": "20260925T175359Z-promotion-148442",
+   "component": "promotion",
+   "classification": "OPERATIONS_ONLY",
+   "decided_by": "FIRST_START",
+   "declared": 0,
+   "old_version": null,
+   "new_version": "ce9d915e611a"
+  },
+  {
+   "deployment_id": "20260925T141001Z-supervisor-4fc4a3",
+   "component": "supervisor",
+   "classification": "OPERATIONS_ONLY",
+   "decided_by": "RULE:UNCHANGED_RESTART",
+   "declared": 0,
+   "old_version": "c87ea35f2378",
+   "new_version": "c87ea35f2378"
+  },
+  {
+   "deployment_id": "20260925T140949Z-notifier-5a7ae1",
+   "component": "notifier",
+   "classification": "ROUTING_FIX",
+   "decided_by": "RULE:CONFIG_FINGERPRINT_CHANGED",
+   "declared": 0,
+   "old_version": "4a9487bdff10",
+   "new_version": "a3f10999a967"
+  }
+ ],
+ "v2": {
+  "heartbeat_utc": "2026-09-26T09:05:09.283694+00:00",
+  "tick": 412,
+  "data_state": "CURRENT",
+  "campaign_id": "V2-PAPER-RC1",
+  "strategy_version": "INSIDER_BUY_CLUSTER_V2@1",
+  "execution_mode": "PAPER",
+  "provider_fp": "ac5e51aa3599d6c9",
+  "tables": {
+   "positions": 0,
+   "trades": 0,
+   "pending_entry_intents": 0
+  },
+  "db_sha": "891cddac6ce2a1a6"
+ }
+}
