@@ -1,0 +1,177 @@
+======== /help ========
+⚙️ TALONX SENTINEL — COMMAND HELP
+
+🌐 Universe
+/universe add <SYMBOL>
+/universe remove <SYMBOL>
+/universe list
+/universe status <SYMBOL>
+
+🚫 Exclusions
+/exclude add <SYMBOL>
+/exclude remove <SYMBOL>
+/exclude list
+/exclude status <SYMBOL>
+
+🔎 Scanning
+/scanned
+/scanned file
+/scanned candidates
+/scanned setups
+/scanned signals
+
+🖥 System
+/status  ·  /help  ·  /help <command>
+
+⏳ Mode: DRY_RUN — changes are recorded as PENDING and do not affect provider fetching, discovery, Lab or Signal until an approved activation boundary.
+======== /help exclude ========
+⚙️ TALONX SENTINEL — /exclude
+
+Stop all work on a symbol without deleting history.
+/exclude add TSLA — exclude TSLA
+/exclude remove TSLA — restore TSLA
+/exclude list — all current exclusions
+/exclude status TSLA — current state of one symbol
+
+When ACTIVE, an excluded symbol is:
+• dropped from yfinance and Alpaca fetch batches (never fetched)
+• skipped by discovery (no scoring, SEC lookup, candidates or lifecycle)
+• never sent to Lab or promoted to Signal; queued promotions expire (OPERATOR_EXCLUDED)
+• history kept; already-sent paper signals keep their outcome tracking
+Restoring never replays the excluded period — only new events count.
+
+⏳ Mode: DRY_RUN — changes are recorded as PENDING and do not affect provider fetching, discovery, Lab or Signal until an approved activation boundary.
+======== /help universe ========
+⚙️ TALONX SENTINEL — /universe
+
+Manage operator-added symbols in the fetch universe.
+/universe add PLTR — add PLTR to future provider fetches
+/universe remove PLTR — stop fetching an operator-added symbol
+/universe list — operator-added / removed symbols
+/universe status PLTR — current state of one symbol
+
+• Discovery starts from the activation boundary forward — no history backfill or replay.
+• History is kept when a symbol is removed; re-adding never replays it.
+• An exclusion always wins over the universe.
+
+⏳ Mode: DRY_RUN — changes are recorded as PENDING and do not affect provider fetching, discovery, Lab or Signal until an approved activation boundary.
+======== /help scanned ========
+⚙️ TALONX SENTINEL — /scanned
+
+/scanned — today's scan summary (symbols seen, candidates, setups, paper signals)
+/scanned candidates — active candidates (top by score)
+/scanned setups — BULLISH/BEARISH setups
+/scanned signals — paper-signal promotions
+/scanned file — CSV export of today's session
+======== /status ========
+🛰 TalonX Sentinel — /status
+🧭 Engine: HEALTHY
+   all components up
+🔎 Last scan: 10:00Z CLOSED CLOSED
+📈 Promotion: PAPER_SIGNAL · UP
+🛡 Control plane: DRY_RUN (changes recorded as PENDING)
+🏦 V2: CURRENT · heartbeat 5s · PAPER V2-PAPER-RC1
+Paper only · no broker orders · /help for commands
+======== /scanned ========
+⚙️ TALONX SENTINEL — SCANNED (2026-09-25)
+Phase: AFTER_HOURS · last scan 23:55Z (110s)
+Symbols seen (with prints): 5505
+Evaluated last scan: 5653 (data-ready 5503)
+Candidates: 2065 · Setups (any time today): 740
+Paper signals: 36 (shadow 6)
+/scanned file for the full CSV
+======== /scanned candidates ========
+⚙️ TALONX SENTINEL — ACTIVE CANDIDATES (1109)
+ZS · BEARISH_SETUP · 100.0 · -10.1
+KITT · BEARISH_SETUP · 100.0 · -21.0
+ACAD · BEARISH_SETUP · 100.0 · -6.6
+CLBT · BEARISH_SETUP · 100.0 · -4.9
+DRI · BEARISH_SETUP · 100.0 · -3.6
+INLF · BULLISH_SETUP · 100.0 · 66.8
+AKAM · BULLISH_SETUP · 100.0 · 2.8
+WNC · BULLISH_SETUP · 100.0 · 10.4
+FFAI · BULLISH_SETUP · 100.0 · 32.1
+COST · WATCH · 100.0 · 2.7
+LEA · BULLISH_SETUP · 99.4 · 3.8
+MH · BEARISH_SETUP · 99.2 · -7.0
+AFYA · BEARISH_SETUP · 99.0 · -5.3
+GCTK · BEARISH_SETUP · 97.2 · -32.2
+AER · BULLISH_SETUP · 97.1 · 2.6
+… 1094 more — /scanned file
+======== /scanned setups ========
+⚙️ TALONX SENTINEL — ACTIVE SETUPS (609)
+ZS · BEARISH_SETUP · 100.0 · -10.1
+KITT · BEARISH_SETUP · 100.0 · -21.0
+ACAD · BEARISH_SETUP · 100.0 · -6.6
+CLBT · BEARISH_SETUP · 100.0 · -4.9
+DRI · BEARISH_SETUP · 100.0 · -3.6
+INLF · BULLISH_SETUP · 100.0 · 66.8
+AKAM · BULLISH_SETUP · 100.0 · 2.8
+WNC · BULLISH_SETUP · 100.0 · 10.4
+FFAI · BULLISH_SETUP · 100.0 · 32.1
+LEA · BULLISH_SETUP · 99.4 · 3.8
+MH · BEARISH_SETUP · 99.2 · -7.0
+AFYA · BEARISH_SETUP · 99.0 · -5.3
+GCTK · BEARISH_SETUP · 97.2 · -32.2
+AER · BULLISH_SETUP · 97.1 · 2.6
+VRME · BEARISH_SETUP · 97.1 · -21.4
+… 594 more — /scanned file
+======== /scanned signals ========
+⚙️ TALONX SENTINEL — PAPER PROMOTIONS (42)
+IBEX · 67.5 · 44.5 · PROMOTED_SHADOW
+CV · 64.6 · 6.6 · PROMOTED_SHADOW
+ALTG · 62.1 · 6.1 · PROMOTED_SHADOW
+SIGA · 61.6 · 3.4 · PROMOTED_SHADOW
+EZPW · 72.6 · 31.3 · PROMOTED_SHADOW
+ALOY · 62.1 · 8.8 · PROMOTED_SHADOW
+PRLB · 78.3 · 95.8 · PROMOTED_SIGNAL
+GM · 64.0 · 83.0 · PROMOTED_SIGNAL
+CX · 76.8 · 9.8 · PROMOTED_SIGNAL
+KSPI · 73.6 · 95.6 · PROMOTED_SIGNAL
+ASIC · 62.6 · 27.4 · PROMOTED_SIGNAL
+AIB · 70.0 · 1.6 · PROMOTED_SIGNAL
+CPA · 76.3 · 132.8 · PROMOTED_SIGNAL
+COGT · 69.9 · 32.4 · PROMOTED_SIGNAL
+VCTR · 72.3 · 109.5 · PROMOTED_SIGNAL
+… 27 more — /scanned file
+======== /scanned file ========
+⚙️ TALONX SENTINEL — scanned export: 5653 symbols (2026-09-25)
+[document talonx_scanned_2026-09-25.csv, 618959 bytes]
+======== /exclude status TSLA ========
+⚙️ TALONX SENTINEL — TSLA
+Operator universe: not operator-managed
+Exclusion: none
+Mode: DRY_RUN
+======== /universe status TSLA ========
+⚙️ TALONX SENTINEL — TSLA
+Operator universe: not operator-managed
+Exclusion: none
+Mode: DRY_RUN
+======== /exclude add TSLA weekend-test ========
+⚙️ TALONX SENTINEL — OPERATOR CONTROL
+
+🚫 TSLA exclusion accepted as PENDING
+
+Live provider fetching: unchanged until activation
+Historical records: preserved
+Replay on restore: NO
+
+Activation: next approved runtime boundary
+
+Audit: 830c20bbb19e4288
+======== /exclude list ========
+⚙️ TALONX SENTINEL — EXCLUSIONS (1) · mode DRY_RUN
+🚫 TSLA · PENDING_ACTIVATION · since 2026-09-26T10:05Z
+======== /exclude remove TSLA ========
+⚙️ TALONX SENTINEL — OPERATOR CONTROL
+
+✅ TSLA restore accepted as PENDING — no replay; live fetching unchanged until activation
+
+Audit: bc422c87b50d49ca
+======== /exclude status TSLA ========
+⚙️ TALONX SENTINEL — TSLA
+Operator universe: not operator-managed
+Exclusion: RESTORED (PENDING_ACTIVATION)
+Mode: DRY_RUN
+======== unauthorised /exclude add AAPL ========
+⛔ Not authorised. Operator commands are owner-only on TalonX Sentinel.

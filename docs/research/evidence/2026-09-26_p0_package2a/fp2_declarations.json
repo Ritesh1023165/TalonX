@@ -1,0 +1,128 @@
+[
+ {
+  "component": "discovery",
+  "recorded_version": "a5bd67035a4d",
+  "recorded_commit": "18f3426e33e6",
+  "current_version": "eb716fb149b8",
+  "status": "ELIGIBLE",
+  "changed": [
+   "talonx_opportunity/runtime.py"
+  ],
+  "reason": "shared runtime only: talonx_opportunity/runtime.py changed since 18f3426e33e6 (a5bd67035a4d -> eb716fb149b8); no component source changed (verified from git)",
+  "declaration_id": 8
+ },
+ {
+  "component": "evaluator:INTRADAY",
+  "recorded_version": "622140e9e504",
+  "recorded_commit": "6fa1581823cb",
+  "current_version": "31f79a510fb8",
+  "status": "ELIGIBLE",
+  "changed": [
+   "talonx_opportunity/runtime.py"
+  ],
+  "reason": "shared runtime only: talonx_opportunity/runtime.py changed since 6fa1581823cb (622140e9e504 -> 31f79a510fb8); no component source changed (verified from git)",
+  "declaration_id": 9
+ },
+ {
+  "component": "evaluator:LONG_TERM",
+  "recorded_version": "622140e9e504",
+  "recorded_commit": "6fa1581823cb",
+  "current_version": "31f79a510fb8",
+  "status": "ELIGIBLE",
+  "changed": [
+   "talonx_opportunity/runtime.py"
+  ],
+  "reason": "shared runtime only: talonx_opportunity/runtime.py changed since 6fa1581823cb (622140e9e504 -> 31f79a510fb8); no component source changed (verified from git)",
+  "declaration_id": 10
+ },
+ {
+  "component": "evaluator:SAME_DAY",
+  "recorded_version": "622140e9e504",
+  "recorded_commit": "6fa1581823cb",
+  "current_version": "31f79a510fb8",
+  "status": "ELIGIBLE",
+  "changed": [
+   "talonx_opportunity/runtime.py"
+  ],
+  "reason": "shared runtime only: talonx_opportunity/runtime.py changed since 6fa1581823cb (622140e9e504 -> 31f79a510fb8); no component source changed (verified from git)",
+  "declaration_id": 11
+ },
+ {
+  "component": "evaluator:SHORT_TERM",
+  "recorded_version": "622140e9e504",
+  "recorded_commit": "6fa1581823cb",
+  "current_version": "31f79a510fb8",
+  "status": "ELIGIBLE",
+  "changed": [
+   "talonx_opportunity/runtime.py"
+  ],
+  "reason": "shared runtime only: talonx_opportunity/runtime.py changed since 6fa1581823cb (622140e9e504 -> 31f79a510fb8); no component source changed (verified from git)",
+  "declaration_id": 12
+ },
+ {
+  "component": "ingestion",
+  "recorded_version": "fded2ee1b565",
+  "recorded_commit": "6fa1581823cb",
+  "current_version": "429d877fee26",
+  "status": "REFUSED",
+  "changed": [
+   "talonx_opportunity/ingestion.py",
+   "talonx_opportunity/runtime.py"
+  ],
+  "why": "component source changed: talonx_opportunity/ingestion.py"
+ },
+ {
+  "component": "notifier",
+  "recorded_version": "e4c8cc285ff6",
+  "recorded_commit": "18f3426e33e6",
+  "current_version": "07045afceef8",
+  "status": "ELIGIBLE",
+  "changed": [
+   "talonx_opportunity/runtime.py"
+  ],
+  "reason": "shared runtime only: talonx_opportunity/runtime.py changed since 18f3426e33e6 (e4c8cc285ff6 -> 07045afceef8); no component source changed (verified from git)",
+  "declaration_id": 13
+ },
+ {
+  "component": "outcomes",
+  "recorded_version": "98480e88130f",
+  "recorded_commit": "478d6fc8f149",
+  "current_version": "e7d155ffff30",
+  "status": "ELIGIBLE",
+  "changed": [
+   "talonx_opportunity/runtime.py"
+  ],
+  "reason": "shared runtime only: talonx_opportunity/runtime.py changed since 478d6fc8f149 (98480e88130f -> e7d155ffff30); no component source changed (verified from git)",
+  "declaration_id": 14
+ },
+ {
+  "component": "promotion",
+  "recorded_version": "ce9d915e611a",
+  "recorded_commit": "063d4faabfbb",
+  "current_version": "3dc2ce224318",
+  "status": "ELIGIBLE",
+  "changed": [
+   "talonx_opportunity/runtime.py"
+  ],
+  "reason": "shared runtime only: talonx_opportunity/runtime.py changed since 063d4faabfbb (ce9d915e611a -> 3dc2ce224318); no component source changed (verified from git)",
+  "declaration_id": 15
+ },
+ {
+  "component": "reporting",
+  "recorded_version": "3480557b7485",
+  "recorded_commit": "f5a1d92037c7",
+  "current_version": "43ed6fe35817",
+  "status": "ELIGIBLE",
+  "changed": [
+   "talonx_opportunity/runtime.py"
+  ],
+  "reason": "shared runtime only: talonx_opportunity/runtime.py changed since f5a1d92037c7 (3480557b7485 -> 43ed6fe35817); no component source changed (verified from git)",
+  "declaration_id": 16
+ },
+ {
+  "component": "supervisor",
+  "status": "NOT_APPLICABLE",
+  "why": "supervisor default class is OPERATIONS_ONLY"
+ }
+]
+APPLIED (version-bound declarations recorded)
