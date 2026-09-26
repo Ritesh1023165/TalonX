@@ -9,6 +9,8 @@ python -m talonx_opportunity <command>
   stop <component> | down                     graceful stop via the component's stop flag
   component <name>                            run one component in the foreground (what `up` spawns)
   declare-change <component> --class C --reason "..."   classify the NEXT start of a component (B7)
+  declare-shared-runtime [--apply] [--component X]      F-P2: verified OPERATIONS_ONLY declarations for components
+                                              whose ONLY source change since their last boundary is shared runtime
   deployments [--window D]                    deployment / change boundaries
   report [--window D]                         write the boundary-aware session report
   capabilities                                provider capability per phase
@@ -109,6 +111,9 @@ def main(argv=None) -> int:
     dc.add_argument("component")
     dc.add_argument("--class", dest="cls", required=True)
     dc.add_argument("--reason", required=True)
+    ds = sub.add_parser("declare-shared-runtime")
+    ds.add_argument("--apply", action="store_true")
+    ds.add_argument("--component", action="append", default=None)
     dp = sub.add_parser("deployments")
     dp.add_argument("--window", default=None)
     rp = sub.add_parser("report")
@@ -156,6 +161,14 @@ def main(argv=None) -> int:
         from talonx_opportunity.runtime import RuntimeStore
         print(f"declaration #{RuntimeStore(root).declare_change(a.component, a.cls, a.reason)} recorded for the next "
               f"start of {a.component}")
+        return 0
+    if a.cmd == "declare-shared-runtime":
+        from talonx_opportunity.runtime import RuntimeStore
+        rs = RuntimeStore(root)
+        plan = rs.declare_shared_runtime_changes(a.component) if a.apply else rs.plan_shared_runtime_declarations(
+            a.component)
+        print(json.dumps(plan, indent=1))
+        print("APPLIED (version-bound declarations recorded)" if a.apply else "DRY RUN (use --apply to record)")
         return 0
     if a.cmd in ("deployments", "report"):
         from talonx_opportunity.db import utcnow
