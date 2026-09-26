@@ -180,6 +180,16 @@ FREEZE_OPERATOR_CONTROL_FILES = (
     "talonx_ops/operator_control/scanned.py",
     "talonx_ops/operator_control/sentinel.py",
 )
+# POST-FREEZE P0 PACKAGE 2A (2026-09-26) -- an EXPLICIT, closed list of operations-observability files: a missed
+# previous-session EOD close is surfaced as OVERDUE_EOD_CLOSE instead of hiding behind a weekend NOT_DUE_YET (and still
+# needs --force to close), and the Telegram poller health check recognises the two expected, distinct command pollers
+# (Signal + Sentinel) while still flagging duplicates of either role and unknown clients. No strategy-fingerprint
+# input, no provider/pricing/accounting/ledger/admission change.
+FREEZE_P0_2A_OPS_FILES = (
+    "talonx_ops/prospective/checkpoint.py",
+    "talonx_ops/prospective/close.py",
+    "talonx_ops/prospective/telegram_owner.py",
+)
 
 def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None) -> tuple[bool, str]:
     if head.startswith(expected_sha):
@@ -201,6 +211,7 @@ def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None)
                                        or f in FREEZE_CONTINUOUS_ENGINE_FILES
                                        or f in FREEZE_SIGNAL_ROUTING_FIX_FILES
                                        or f in FREEZE_OPERATOR_CONTROL_FILES
+                                       or f in FREEZE_P0_2A_OPS_FILES
                                        or f.startswith(FREEZE_RESEARCH_LANE_PREFIXES))]
     if extra:
         return False, f"runtime files changed after the frozen release: {extra[:5]}"

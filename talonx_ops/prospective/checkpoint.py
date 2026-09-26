@@ -235,22 +235,48 @@ def _official_dispatch_today() -> dict[str, Any]:
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
-def eod_state(now: datetime | None = None) -> dict[str, Any]:
+def _overdue_previous_close(cal, today: date, now: datetime, results_root: Path | None) -> dict[str, Any] | None:
+    """F-P3 (2026-09-26): the most recent XNYS session before ``today`` had a prospective session (its session dir
+    was started) but was never closed (no ``eod.json``) -> OVERDUE_EOD_CLOSE. Surfaces only; never closes."""
+    from talonx_ops.prospective.paths import RESULTS_ROOT
+    root = Path(results_root) if results_root else RESULTS_ROOT
+    prev = cal.date_to_session(today, direction="previous")
+    if prev.date() == today:
+        prev = cal.previous_session(prev)
+    s = prev.date()
+    sd = root / f"prospective_{s.isoformat()}"
+    started = sd.is_dir() and any((sd / f).exists() for f in ("start_verify.json", "session.pids.json"))
+    if not started or (sd / "eod.json").exists():
+        return None
+    close = cal.session_close(prev).to_pydatetime()
+    deadline = close + timedelta(minutes=90)
+    if now < deadline:
+        return None
+    return {"state": "OVERDUE_EOD_CLOSE", "session_date": s.isoformat(), "session_dir": str(sd),
+            "reason": f"session {s.isoformat()} was started but never closed (no eod.json); deadline "
+                      f"{deadline.isoformat()} passed -- run the bounded close for that session dir",
+            "close_utc": close.isoformat(), "deadline_utc": deadline.isoformat()}
+
+
+def eod_state(now: datetime | None = None, *, results_root: Path | None = None) -> dict[str, Any]:
     """Market-phase-aware EOD state (Task 114 A5.4): NOT_DUE_YET before the
     close, PENDING in the grace window, STALE only after the deadline is
-    actually missed."""
+    actually missed. A previous session that was started but never closed is
+    OVERDUE_EOD_CLOSE (F-P3) -- never hidden behind NOT_DUE_YET on a weekend."""
     now = now or datetime.now(timezone.utc)
     try:
         import exchange_calendars as xc
         cal = xc.get_calendar("XNYS")
         d = now.date()
         if not cal.is_session(d):
-            return {"state": "NOT_DUE_YET", "reason": "not an XNYS session today"}
+            over = _overdue_previous_close(cal, d, now, results_root)
+            return over or {"state": "NOT_DUE_YET", "reason": "not an XNYS session today"}
         close = cal.session_close(d).to_pydatetime()
         deadline = close + timedelta(minutes=90)
         if now < close:
-            return {"state": "NOT_DUE_YET", "reason": f"XNYS close {close.isoformat()} not reached",
-                    "close_utc": close.isoformat()}
+            over = _overdue_previous_close(cal, d, now, results_root)
+            return over or {"state": "NOT_DUE_YET", "reason": f"XNYS close {close.isoformat()} not reached",
+                            "close_utc": close.isoformat()}
         if now < deadline:
             return {"state": "PENDING", "reason": "within the post-close EOD grace window",
                     "close_utc": close.isoformat(), "deadline_utc": deadline.isoformat()}

@@ -648,6 +648,7 @@ def test_this_branch_still_passes_the_v2_frozen_release_check():
                          or f in pf.FREEZE_OPS_HARDENING_FILES or f in pf.FREEZE_RELEASE_FIDELITY_FIX_FILES
                          or f in pf.FREEZE_SESSION03_HARDENING_FILES or f in pf.FREEZE_CONTINUOUS_ENGINE_FILES
                          or f in pf.FREEZE_SIGNAL_ROUTING_FIX_FILES or f in pf.FREEZE_OPERATOR_CONTROL_FILES
+                         or f in pf.FREEZE_P0_2A_OPS_FILES
                          or f.startswith(pf.FREEZE_RESEARCH_LANE_PREFIXES))
     assert sorted(f for f in changed if not allowed(f)) == []
 
