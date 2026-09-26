@@ -98,6 +98,11 @@ class SentinelComponent:
         self.bot, self.poller, self.identity = operations_poller(
             loop=self.loop, env=self.env, store=self.store, bot_factory=self.bot_factory,
             status_provider=lambda: status_text(self.root, self.env))
+        self.poller.reply_log = self._append_reply
+
+    def _append_reply(self, rec: dict) -> None:
+        with (root_dir(self.root) / "sentinel_replies.jsonl").open("a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
     def tick(self) -> float:
         if not self.enabled:

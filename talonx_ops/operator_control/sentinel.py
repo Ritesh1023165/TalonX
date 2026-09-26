@@ -36,6 +36,8 @@ class SentinelCommandPoller:
         self.status_provider = status_provider
         self.handled = 0
         self.last_error: str | None = None
+        self.reply_log = None                   # optional callable(dict): per-update reply ledger (evidence)
+        self._current_update: int | None = None
 
     async def handle_message(self, message) -> bool:
         if message is None or not getattr(message, "text", None):
@@ -43,18 +45,37 @@ class SentinelCommandPoller:
         user = str(getattr(getattr(message, "from_user", None), "id", "") or "")
         rep = handle(message.text, chat_id=message.chat_id, user=user, owner_chat_id=self.owner, store=self.store,
                      mode=mutation_mode(self.env), scanned=self.scanned_factory())
-        if rep is None and self.status_provider is not None and _is_status(message.text)                 and str(message.chat_id) == str(self.owner):
+        if rep is None and self.status_provider is not None and _is_status(message.text) \
+                and str(message.chat_id) == str(self.owner):
             from talonx_ops.operator_control.commands import Reply
             rep = Reply(self.status_provider())
+        rec = {"command": " ".join(str(message.text).split()[:4])[:80],
+               "authorized": str(message.chat_id) == str(self.owner)}
         if rep is None:
+            self._log({**rec, "result": "NO_REPLY"})
             return False
         if rep.document is not None:
-            await self.bot.send_document(chat_id=message.chat_id, document=rep.document, filename=rep.filename,
-                                         caption=rep.text[:1000])
+            sent = await self.bot.send_document(chat_id=message.chat_id, document=rep.document, filename=rep.filename,
+                                                caption=rep.text[:1000])
+            rec.update(kind="DOCUMENT", filename=rep.filename, bytes=_size(rep.document))
         else:
-            await self.bot.send_message(chat_id=message.chat_id, text=rep.text[:4000])
+            sent = await self.bot.send_message(chat_id=message.chat_id, text=rep.text[:4000])
+            rec.update(kind="MESSAGE", chars=len(rep.text[:4000]))
         self.handled += 1
+        self._log({**rec, "result": "SENT", "telegram_message_id": getattr(sent, "message_id", None),
+                   "reply_head": rep.text.splitlines()[0][:80] if rep.text else ""})
         return True
+
+    def _log(self, rec: dict) -> None:
+        """Reply ledger (JSONL): one line per handled update. Never records chat ids or tokens."""
+        if self.reply_log is None:
+            return
+        try:
+            from datetime import datetime, timezone
+            self.reply_log({"at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                            "update_id": self._current_update, **rec})
+        except Exception:  # noqa: BLE001 -- evidence logging must never break command handling
+            log.exception("sentinel reply ledger write failed")
 
     async def poll_once(self, offset: int | None, timeout: int = 30, on_offset=None) -> int | None:
         """One long-poll. ``on_offset(next_offset)`` is called BEFORE each update is handled, so a crash mid-command can
@@ -64,10 +85,13 @@ class SentinelCommandPoller:
             offset = u.update_id + 1
             if on_offset is not None:
                 on_offset(offset)
+            self._current_update = u.update_id
             try:
                 await self.handle_message(u.message)
             except Exception as exc:  # noqa: BLE001 -- one bad command must never stop the poller
                 self.last_error = f"{type(exc).__name__}"
+                self._log({"command": " ".join(str(getattr(u.message, "text", "") or "").split()[:4])[:80],
+                           "result": "FAILED", "error": type(exc).__name__})
                 log.exception("sentinel command failed")
         return offset
 
@@ -89,6 +113,13 @@ def operations_poller(*, loop, env=None, store=None, status_provider=None, bot_f
         ident = "@" + str(bot.username)
     return bot, SentinelCommandPoller(bot=bot, owner_chat_id=cfg.chat_id, env=env, store=store,
                                       status_provider=status_provider), ident
+
+
+def _size(doc) -> int | None:
+    try:
+        return len(doc.getvalue()) if hasattr(doc, "getvalue") else len(doc)
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _is_status(text: str | None) -> bool:

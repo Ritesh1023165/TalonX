@@ -360,3 +360,17 @@ def test_supervisor_respawn_env_keeps_promotion_mode_and_never_enables_active_mu
     """Runbook contract: the supervisor loop env carries PAPER_SIGNAL (respawn keeps the mode) and never ACTIVE."""
     from talonx_ops.operator_control import mutation_mode
     assert mutation_mode({}) == "DRY_RUN" and mutation_mode({"OPERATOR_UNIVERSE_MUTATION_MODE": "yes"}) == "DRY_RUN"
+
+
+def test_reply_ledger_records_every_update_without_chat_ids_or_tokens(tmp_path, ops, monkeypatch):
+    monkeypatch.setattr("talonx_opportunity.sentinel_component.status_text", lambda root, env: "🛰 status ok")
+    bot = _Bot([[_Upd(50, "/help"), _Upd(51, "hello"), _Upd(52, "/exclude add TSLA x"),
+                 _Upd(53, "/exclude add AAPL", chat="999")]])
+    c = _comp(tmp_path, bot, ops)
+    c.tick()
+    rows = [json.loads(x) for x in (tmp_path / "sentinel_replies.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert [r["update_id"] for r in rows] == [50, 51, 52, 53]
+    assert [r["result"] for r in rows] == ["SENT", "NO_REPLY", "SENT", "SENT"]
+    assert rows[0]["kind"] == "MESSAGE" and rows[3]["authorized"] is False
+    blob = json.dumps(rows)
+    assert OWNER not in blob and "999" not in blob and "SECRET" not in blob
