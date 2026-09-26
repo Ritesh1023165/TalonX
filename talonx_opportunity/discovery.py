@@ -126,6 +126,10 @@ class Discovery:
                   "BEARISH_SETUP": 0, "CATALYST_UNKNOWN": 0, "HELD_STALE_NON_INVALIDATING_PHASE": 0}
         rejected: dict[str, int] = {}
         obs: dict[str, tuple] = {}
+        sec_begin = getattr(self.sec, "begin_scan", None)       # observability only (background SEC cache)
+        sec_req0 = getattr(self.sec, "requests", None)
+        if sec_begin is not None:
+            sec_begin()
         for sym in sorted(members):
             if sym in incomplete:
                 funnel["PROVIDER_INCOMPLETE"] += 1
@@ -158,6 +162,10 @@ class Discovery:
                         feats.as_dict(), sc.as_dict(), cat.summary())
         funnel["ALERT_WORTHY"] = funnel["WATCH"] + funnel["BULLISH_SETUP"] + funnel["BEARISH_SETUP"]
         funnel["hard_reject_reasons"] = rejected
+        if sec_begin is not None:
+            funnel["sec_cache"] = self.sec.end_scan()
+        elif sec_req0 is not None:
+            funnel["sec_cache"] = {"mode": "SYNC", "sec_requests": self.sec.requests - sec_req0}
         prov = {"provider": cap.provider, "feed": cap.feed, "delay_minutes": cap.delay_minutes,
                 "adjustment": cap.adjustment, "data_as_of_utc": as_of.isoformat(), "phase": phase,
                 "ingestion_cycle_utc": ing["cycle_utc"], "provider_complete": not incomplete,

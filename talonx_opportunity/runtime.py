@@ -58,6 +58,12 @@ COMPONENT_DEFAULT_CLASS = {
 # Class a CONFIG-fingerprint change forces (cannot be declared down).
 COMPONENT_CONFIG_CLASS = {"discovery": "STRATEGY_MATERIAL", "notifier": "ROUTING_FIX", "ingestion": "DATA_FIX",
                           "outcomes": "REPORTING_ONLY"}
+# Closed list of config keys that are NOT strategy-material for their component, with the class they map to. Used only
+# when EVERY changed key is listed here AND an operator declaration of exactly that class is present; otherwise the
+# forced class above stands (so an unlisted or undeclared change can never be downgraded).
+# 2026-09-26: the SEC catalyst cache mode serves the same submissions under the same 600 s freshness bound (parity
+# tested); switching it changes latency, not classification -> DATA_FIX.
+CONFIG_KEY_CLASS: dict[str, dict[str, str]] = {"discovery": {"SEC_CATALYST_CACHE": "DATA_FIX"}}
 
 _P = "talonx_opportunity/"
 _SHARED = [_P + "db.py", _P + "runtime.py", _P + "phases.py", _P + "config.py"]
@@ -66,7 +72,7 @@ COMPONENT_SOURCES: dict[str, list[str]] = {
                   "talonx_premarket/universe.py"],
     "discovery": [_P + "discovery.py", _P + "aggregates.py", _P + "capabilities.py", "talonx_premarket/features.py",
                   "talonx_premarket/scoring.py", "talonx_premarket/alerts.py", "talonx_premarket/catalysts.py",
-                  "talonx_premarket/config.py"],
+                  "talonx_premarket/config.py", _P + "sec_refresh.py"],
     "notifier": [_P + "notifier.py", "talonx_ops/notify/__init__.py", "talonx_ops/notify/outbox.py",
                  "talonx_ops/notify/worker.py"],
     "outcomes": [_P + "outcome_tracker.py", "talonx_premarket/outcomes.py", "talonx_premarket/alpaca_data.py"],
@@ -119,6 +125,16 @@ def component_version(component: str) -> str:
     return h.hexdigest()[:12]
 
 
+def _mapped_config_class(component: str, old_fps: dict, new_fps: dict, decl) -> bool:
+    """True iff every changed config key is in CONFIG_KEY_CLASS[component] and the pending declaration names exactly
+    the class those keys map to."""
+    changed = {k for k in set(old_fps) | set(new_fps) if old_fps.get(k) != new_fps.get(k)}
+    mapped = CONFIG_KEY_CLASS.get(component, {})
+    if decl is None or not changed or not changed <= set(mapped):
+        return False
+    return {mapped[k] for k in changed} == {decl["classification"]}
+
+
 def impact_for(classification: str, component: str) -> dict[str, bool]:
     keys = set(CLASS_IMPACT.get(classification, set()))
     if classification != "OPERATIONS_ONLY":
@@ -161,6 +177,8 @@ class RuntimeStore:
         elif not (config_changed or code_changed):
             cls, restart_only, decided = "OPERATIONS_ONLY", 1, "RULE:UNCHANGED_RESTART"
             why = reason or (decl["reason"] if decl else "restart, no code/config change")
+        elif config_changed and _mapped_config_class(component, old_fps, config_fps, decl):
+            cls, restart_only, decided, why = decl["classification"], 0, "RULE:CONFIG_KEY_MAPPED+DECLARED", decl["reason"]
         elif config_changed:
             cls = COMPONENT_CONFIG_CLASS.get(component, COMPONENT_DEFAULT_CLASS.get(component, "STRATEGY_MATERIAL"))
             restart_only, decided = 0, "RULE:CONFIG_FINGERPRINT_CHANGED"
@@ -178,7 +196,7 @@ class RuntimeStore:
             (dep_id, iso(), component, old_v, version, commit, j(old_fps), j(config_fps), why, cls, restart_only,
              int(imp["detection"]), int(imp["classification"]), int(imp["execution"]), int(imp["notification"]),
              int(imp["candidate_counts"]), int(imp["pnl"]), int(imp["profitability_analysis"]), j(imp),
-             int(decl is not None and decided == "DECLARED"), decided))
+             int(decl is not None and decided in ("DECLARED", "RULE:CONFIG_KEY_MAPPED+DECLARED")), decided))
         if decl is not None and (config_changed or code_changed or restart_only):
             self.con.execute("UPDATE change_declarations SET consumed_by=? WHERE id=?", (dep_id, decl["id"]))
         self.con.commit()

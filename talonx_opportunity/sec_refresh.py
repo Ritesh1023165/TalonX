@@ -60,11 +60,14 @@ class BackgroundSecCache:
         self.stats = {"served_fresh": 0, "sync_fallback": 0, "refreshed": 0, "refresh_errors": 0,
                       "throttled_skips": 0, "evicted": 0, "yielded_to_discovery": 0}
         self._thread = None
+        self._mlock = threading.Lock()         # guards the per-scan metrics only (never held while calling SEC)
+        self._scan: dict | None = None
         if start:
             self.start()
 
     # -- discovery read path ------------------------------------------------------------------------------------------
     def get(self, cik: str):
+        t_call = time.monotonic()
         now = self.clock()
         self._last_get = now
         with self._lock:
@@ -72,9 +75,50 @@ class BackgroundSecCache:
             hit = self.sec._cache.get(cik)
             if hit and now - hit[0] < self.sec.ttl_s:          # identical freshness test to SecSubmissions.get
                 self.stats["served_fresh"] += 1
+                self._note(t_call, hit=True, age=now - hit[0])
                 return hit[1], hit[2]
             self.stats["sync_fallback"] += 1
-            return self.sec.get(cik)                           # absent/expired: exactly today's synchronous path
+            res = self.sec.get(cik)                            # absent/expired: exactly today's synchronous path
+            cur = self.sec._cache.get(cik)
+            age = (self.clock() - cur[0]) if cur is not None and res[0] is not None and cur[1] is res[0] else None
+            self._note(t_call, hit=False, age=age)
+            return res
+
+    # -- per-scan observability (read-only bookkeeping; never changes what is served) ---------------------------------
+    def _note(self, t_call: float, *, hit: bool, age: float | None) -> None:
+        with self._mlock:
+            m = self._scan
+            if m is None:
+                return
+            (m["hit_waits"] if hit else m["fallback_waits"]).append(time.monotonic() - t_call)
+            if age is not None and age > m["max_served_age_s"]:
+                m["max_served_age_s"] = age
+
+    def begin_scan(self) -> None:
+        with self._mlock:
+            self._scan = {"t0": time.monotonic(), "base": dict(self.stats), "req0": self.sec.requests,
+                          "hit_waits": [], "fallback_waits": [], "max_served_age_s": 0.0, "refresh_during_scan": 0}
+
+    def end_scan(self) -> dict:
+        """Per-scan SEC cache metrics (waits are wall-clock seconds inside ``get``, i.e. what discovery waited)."""
+        with self._mlock:
+            m, self._scan = self._scan, None
+        if m is None:
+            return {"mode": "BACKGROUND_REFRESH"}
+        dur = max(time.monotonic() - m["t0"], 1e-9)
+        hw = sorted(m["hit_waits"])
+        fw = m["fallback_waits"]
+        d = {k: self.stats[k] - m["base"].get(k, 0) for k in self.stats}
+        req = self.sec.requests - m["req0"]
+        return {"mode": "BACKGROUND_REFRESH", "lookups": len(hw) + len(fw), "cache_hits": len(hw),
+                "cache_misses": len(fw), "sync_fallbacks": d["sync_fallback"],
+                "hit_wait_p99_s": round(hw[min(len(hw) - 1, int(0.99 * (len(hw) - 1) + 0.5))], 4) if hw else None,
+                "hit_wait_max_s": round(hw[-1], 4) if hw else None,
+                "fallback_wait_total_s": round(sum(fw), 2), "max_served_age_s": round(m["max_served_age_s"], 1),
+                "sec_requests": req, "sec_request_rate_per_s": round(req / dur, 3),
+                "refresher_requests_during_scan": m["refresh_during_scan"],
+                "refresher_yields": d["yielded_to_discovery"], "refreshed_total": self.stats["refreshed"],
+                "refresh_errors": d["refresh_errors"], "tracked": len(self._wanted)}
 
     def _track(self, cik: str, now: float) -> None:
         self._wanted[cik] = now
@@ -118,6 +162,9 @@ class BackgroundSecCache:
             if not ok and prev is not None:
                 self.sec._cache[cik] = prev                    # failure: restore the untouched previous copy
             self.stats["refreshed" if ok else "refresh_errors"] += 1
+            with self._mlock:
+                if self._scan is not None:                     # a scan began while this request was in flight
+                    self._scan["refresh_during_scan"] += 1
             return ok
 
     def discovery_idle(self) -> bool:
