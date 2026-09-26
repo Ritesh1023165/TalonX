@@ -20,10 +20,12 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from functools import lru_cache
 from pathlib import Path
 
 from talonx_opportunity.config import LAB_NOTIFY_POLICY_V1, NotificationPolicy
+from talonx_opportunity.phases import AFTER_HOURS, OVERNIGHT, PREMARKET, REGULAR, trading_window
 
 # Named, closed-list live overrides (selected per process via TALONX_OPP_NOTIFY_POLICY; unknown name -> refuse to
 # start). Each is its own version + fingerprint, so starting one is a forced ROUTING_FIX boundary. 2026-09-25: the
@@ -31,9 +33,13 @@ from talonx_opportunity.config import LAB_NOTIFY_POLICY_V1, NotificationPolicy
 # Counters are never reset: budget use is read from durable decisions, and decided events are never re-evaluated.
 @dataclass(frozen=True)
 class PhaseReservedPolicy(NotificationPolicy):
-    """Delivery reserve per later phase: a NEW setup surfacing in phase P is selected only if the NEW budget left
+    """Delivery reserve per later phase: a NEW setup surfacing from phase-P DATA is selected only if the NEW budget left
     AFTER it still covers ``later_phase_reserve[P]`` (the capacity kept for phases that have not begun). Unused
-    capacity rolls forward automatically; an earlier phase can never consume a later phase's reserve."""
+    capacity rolls forward automatically; an earlier phase can never consume a later phase's reserve.
+
+    P is the event's causal DATA_PHASE (``data_phase``), not the wall-clock phase it was processed in: with the SIP
+    delay the first ~16 min after a transition still carry previous-phase data (2026-09-25: three REGULAR-data setups
+    processed at 20:01Z consumed all three AFTER_HOURS slots)."""
     later_phase_reserve: tuple[tuple[str, int], ...] = ()
 
 
@@ -51,6 +57,40 @@ NOTIFY_POLICY_OVERRIDES: dict[str, NotificationPolicy] = {
         version="LAB_NOTIFY_POLICY_V1_REGULAR_EXT_20260925", total_new_per_window=75, setup_reserved=60,
         later_phase_reserve=(("OVERNIGHT", 10), ("PREMARKET", 10), ("REGULAR", 3), ("AFTER_HOURS", 0))),
 }
+
+
+# reserve accounting basis (recorded in the notifier config fingerprint)
+RESERVE_PHASE_BASIS = "CAUSAL_DATA_PHASE_V1"
+DATA_PHASE_ORDER = (OVERNIGHT, PREMARKET, REGULAR, AFTER_HOURS)
+
+
+@lru_cache(maxsize=64)
+def _window(window_id: str):
+    return trading_window(date.fromisoformat(window_id))
+
+
+def data_phase(ev: dict) -> str | None:
+    """Causal DATA_PHASE of an event: the phase of the newest bar it could have used (``data_as_of - 1 min``) in the
+    event's own trading window -- the engine convention shared with promotion and the outcome tracker. None when it
+    cannot be determined (no data time / unknown window / outside the window's phases)."""
+    try:
+        asof = datetime.fromisoformat(ev["data_as_of_utc"])
+        ph = _window(ev["window_id"]).phase_at(asof - timedelta(minutes=1))
+    except Exception:  # noqa: BLE001 -- missing/invalid data time or window: undeterminable, caller fails closed
+        return None
+    return ph if ph in DATA_PHASE_ORDER else None
+
+
+def reserve_for(policy, ev: dict) -> tuple[int, str]:
+    """(capacity that must remain after this surfacing, basis). Unknown data phase fails CLOSED: the event is treated as
+    the earliest phase up to its processing phase, i.e. it can never consume any reserve kept for a later phase."""
+    reserves = dict(getattr(policy, "later_phase_reserve", ()) or ())
+    dph = data_phase(ev)
+    if dph is not None:
+        return reserves.get(dph, 0), dph
+    upto = DATA_PHASE_ORDER[:DATA_PHASE_ORDER.index(ev["phase"]) + 1] if ev["phase"] in DATA_PHASE_ORDER \
+        else DATA_PHASE_ORDER
+    return max((reserves.get(ph, 0) for ph in upto), default=0), "UNKNOWN"
 
 
 def selected_policy(env=None) -> NotificationPolicy:
@@ -73,7 +113,7 @@ CREATE TABLE IF NOT EXISTS decisions (
     event_id TEXT PRIMARY KEY, seq INTEGER, candidate_id TEXT, window_id TEXT, symbol TEXT, event_type TEXT,
     classification TEXT, phase TEXT, priority INTEGER, decision TEXT, reason TEXT, counted_new INTEGER,
     budget_json TEXT, policy_version TEXT, policy_fp TEXT, decided_utc TEXT, routed TEXT, outbox_event_id TEXT,
-    delivery_state TEXT, delivery_updated_utc TEXT);
+    delivery_state TEXT, delivery_updated_utc TEXT, data_phase TEXT);
 CREATE INDEX IF NOT EXISTS ix_dec_window ON decisions(window_id);
 CREATE TABLE IF NOT EXISTS surfaced (candidate_id TEXT PRIMARY KEY, window_id TEXT, first_surfaced_utc TEXT,
     event_id TEXT);
@@ -128,6 +168,10 @@ class Notifier:
                  drain=None, batch: int = 2000):
         self.root, self.policy, self.deliver, self.batch = root, policy, deliver, batch
         self.con = connect(notification_db(root), schema=SCHEMA)
+        cols = {r[1] for r in self.con.execute("PRAGMA table_info(decisions)")}
+        if "data_phase" not in cols:                     # additive migration (2026-09-26); older rows keep NULL
+            with self.con:
+                self.con.execute("ALTER TABLE decisions ADD COLUMN data_phase TEXT")
         from talonx_ops.notify.outbox import NotifyStore
         self.outbox = NotifyStore(str(outbox_path(root)))
         self._drain = drain
@@ -162,10 +206,13 @@ class Notifier:
             if cls == "WATCH" and used_w >= p.total_new_per_window - p.setup_reserved:
                 return ("BUDGET_EXHAUSTED_WATCH", f"WATCH share {used_w}/{p.total_new_per_window - p.setup_reserved} "
                         f"used; {p.setup_reserved} kept for BULLISH/BEARISH", 0)
-            reserve = dict(getattr(p, "later_phase_reserve", ()) or ()).get(ev["phase"], 0)
+            reserve, basis = reserve_for(p, ev)
             if cls != "WATCH" and p.total_new_per_window - used - 1 < reserve:
+                where = basis if basis == ev["phase"] else (
+                    f"{basis} data (processed in {ev['phase']})" if basis != "UNKNOWN"
+                    else f"UNKNOWN data phase, fail-closed (processed in {ev['phase']})")
                 return ("BUDGET_RESERVED_LATER_PHASE", f"{used}/{p.total_new_per_window} used; {reserve} kept for "
-                        f"phases after {ev['phase']}", 0)
+                        f"phases after {where}", 0)
             return "SELECTED", "new surfacing within budget", 1
         if typ == "UPGRADE":
             return "SELECTED", "upgrade of a surfaced candidate", 0
@@ -214,13 +261,16 @@ class Notifier:
                     used, used_w = self._used(ev["window_id"])
                     with self.con:
                         self.con.execute(
-                            "INSERT OR IGNORE INTO decisions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                            "INSERT OR IGNORE INTO decisions (event_id, seq, candidate_id, window_id, symbol, "
+                            "event_type, classification, phase, priority, decision, reason, counted_new, budget_json, "
+                            "policy_version, policy_fp, decided_utc, routed, outbox_event_id, delivery_state, "
+                            "delivery_updated_utc, data_phase) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                             (ev["event_id"], ev["seq"], ev["candidate_id"], ev["window_id"], ev["symbol"],
                              ev["event_type"], ev.get("classification"), ev["phase"], _priority(ev)[0], dec, why,
                              counted, j({"used_new": used + counted, "used_watch": used_w + (
                                  counted if ev.get("classification") == "WATCH" else 0)}),
                              self.policy.version, self.policy.fingerprint(), iso(), routed, obid,
-                             "PENDING" if obid else None, None))
+                             "PENDING" if obid else None, None, data_phase(ev)))
                         if dec == "SELECTED":
                             self.con.execute("INSERT OR IGNORE INTO surfaced VALUES (?,?,?,?)",
                                              (ev["candidate_id"], ev["window_id"], iso(), ev["event_id"]))
@@ -235,8 +285,36 @@ class Notifier:
         drained = self.drain()
         synced = self.sync()
         self.last = {"cursor": self.cursor(), "processed": processed, "selected": selected, "drain": drained,
-                     "delivery": synced, "deliver": self.deliver, "policy": self.policy.version}
+                     "delivery": synced, "deliver": self.deliver, "policy": self.policy.version,
+                     "after_hours_reserve": self.reserve_status()}
         return 15.0
+
+    def reserve_status(self, window_id: str | None = None) -> dict:
+        """AFTER_HOURS reserve accounting for one window (default: the latest decided window). Counts only rows decided
+        with the data-phase basis (data_phase recorded); earlier rows are never re-interpreted."""
+        reserves = dict(getattr(self.policy, "later_phase_reserve", ()) or ())
+        if not reserves:
+            return {}
+        if window_id is None:
+            r = self.con.execute("SELECT window_id FROM decisions ORDER BY seq DESC LIMIT 1").fetchone()
+            window_id = r["window_id"] if r else None
+        if window_id is None:
+            return {}
+        total = reserves.get(REGULAR, 0)             # capacity kept after REGULAR data = the AFTER_HOURS reserve
+        used, _ = self._used(window_id)
+        q = ("SELECT decision, counted_new, classification FROM decisions WHERE window_id=? AND data_phase=? "
+             "AND phase=?")
+        true_ah = self.con.execute(q, (window_id, AFTER_HOURS, AFTER_HOURS)).fetchall()
+        reg_after = self.con.execute(q, (window_id, REGULAR, AFTER_HOURS)).fetchall()
+        setups = [r for r in true_ah if r["classification"] in SETUPS]
+        return {"window_id": window_id, "basis": RESERVE_PHASE_BASIS, "AH_RESERVED_TOTAL": total,
+                "AH_RESERVED_USED_BY_TRUE_AH": sum(r["counted_new"] or 0 for r in true_ah),
+                "AH_RESERVED_REMAINING": max(0, min(total, self.policy.total_new_per_window - used)),
+                "REGULAR_DATA_AFTER_CLOSE": {d: sum(1 for r in reg_after if r["decision"] == d)
+                                             for d in sorted({r["decision"] for r in reg_after})},
+                "REGULAR_DATA_AFTER_CLOSE_COUNTED_NEW": sum(r["counted_new"] or 0 for r in reg_after),
+                "TRUE_AH_SENT": sum(1 for r in setups if r["decision"] == "SELECTED" and r["counted_new"]),
+                "TRUE_AH_HELD": sum(1 for r in setups if r["decision"].startswith("BUDGET"))}
 
     def drain(self) -> dict | None:
         if not self.deliver:
@@ -274,5 +352,6 @@ def main(argv=None) -> int:
     n = Notifier(root=root, policy=policy, deliver=deliver)
     run_component("notifier", tick=n.tick, root=root, detail=n.detail,
                   config_fps={"LAB_NOTIFY_POLICY": policy.fingerprint(),
-                              "deliver": "1" if deliver else "0"})
+                              "deliver": "1" if deliver else "0",
+                              "reserve_phase_basis": RESERVE_PHASE_BASIS})
     return 0

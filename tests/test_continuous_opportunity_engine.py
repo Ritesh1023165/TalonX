@@ -740,16 +740,18 @@ def test_live_budget_override_adds_setup_only_capacity_without_replay(tmp_path):
 
 
 def _seed_phase_events(root, specs):
-    """specs: (symbol, classification, phase, at)."""
+    """specs: (symbol, classification, phase, at). Data as-of = at - 16 min (15-min SIP delay + minute flooring), as
+    every live discovery event carries (the reserve is keyed on that causal data phase since 2026-09-26)."""
     s = OpportunityStore(root)
     for i, (sym, cls, ph, at) in enumerate(specs):
         cid = f"2026-09-24:{sym}:GAP_UP"
+        asof = (datetime.fromisoformat(at) - timedelta(minutes=16)).isoformat()
         s.upsert_candidate({"candidate_id": cid, "window_id": "2026-09-24", "symbol": sym, "family": "GAP_UP",
                             "state": cls, "classification": cls, "first_seen_utc": at, "first_seen_phase": ph,
                             "in_v2_scope": 0})
         s.add_event({"event_id": f"{cid}:NEW:{at}:{i}", "candidate_id": cid, "window_id": "2026-09-24", "symbol": sym,
-                     "at_utc": at, "phase": ph, "event_type": "NEW", "classification": cls, "score": 70.0,
-                     "features_json": "{}", "score_json": "{}", "provenance_json": "{}"})
+                     "at_utc": at, "data_as_of_utc": asof, "phase": ph, "event_type": "NEW", "classification": cls,
+                     "score": 70.0, "features_json": "{}", "score_json": "{}", "provenance_json": "{}"})
     s.commit()
     s.close()
 
