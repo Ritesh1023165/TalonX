@@ -16,11 +16,26 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HEARTBEAT_STALE_S = 180.0
 COMPONENTS = ("ingestion", "discovery", "evaluator:INTRADAY", "evaluator:SAME_DAY", "evaluator:SHORT_TERM",
-              "evaluator:LONG_TERM", "notifier", "outcomes", "reporting")
+              "evaluator:LONG_TERM", "notifier", "outcomes", "reporting", "promotion", "sentinel")
 LOGICAL = {"ingestion": "DATA_INGESTION", "discovery": "DISCOVERY", "evaluator:INTRADAY": "INTRADAY_EVALUATOR",
            "evaluator:SAME_DAY": "SAME_DAY_EVALUATOR", "evaluator:SHORT_TERM": "SHORT_TERM_EVALUATOR",
            "evaluator:LONG_TERM": "LONG_TERM_EVALUATOR", "notifier": "NOTIFICATION_WORKER",
-           "outcomes": "OUTCOME_TRACKING", "reporting": "REPORTING"}
+           "outcomes": "OUTCOME_TRACKING", "reporting": "REPORTING", "promotion": "PAPER_PROMOTION",
+           "sentinel": "SENTINEL_COMMANDS"}
+
+
+def _mode_fields(name: str, c: dict | None, det: dict) -> dict:
+    """Operator-relevant mode of the two downstream components (read-only; from their own registry rows)."""
+    if not c:
+        return {}
+    fps = _j(c.get("config_fps_json"), {}) or {}
+    if name == "promotion":
+        return {"mode": fps.get("mode"), "config_fp": fps.get("PROMOTION_POLICY")}
+    if name == "sentinel":
+        return {"mode": "ENABLED" if det.get("enabled", fps.get("enabled") == "1") else "DISABLED",
+                "mutation_mode": det.get("mutation_mode") or fps.get("mutation_mode"), "bot": det.get("bot"),
+                "last_error": det.get("last_error")}
+    return {}
 
 
 def opp_root(root: str | Path | None = None) -> Path:
@@ -113,7 +128,7 @@ def read_opportunity_status(root=None, *, now: datetime | None = None) -> dict:
                            "state": c.get("state") if c else None, "pid": c.get("pid") if c else None,
                            "heartbeat_age_s": _age(c.get("heartbeat_utc"), now) if c else None,
                            "version": c.get("version") if c else None, "restarts": c.get("restarts") if c else 0,
-                           "detail": det})
+                           "detail": det, **_mode_fields(n, c, det)})
     healths = [c["health"] for c in components]
     if not comps:
         overall = "NOT_RUNNING"

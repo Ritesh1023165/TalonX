@@ -19,7 +19,10 @@ from talonx_opportunity.db import REPO_ROOT, root_dir
 from talonx_opportunity.runtime import RuntimeStore, _pid_alive, lock_path, stop_flag
 
 COMPONENTS = ("ingestion", "discovery", "evaluator:INTRADAY", "evaluator:SAME_DAY", "evaluator:SHORT_TERM",
-              "evaluator:LONG_TERM", "notifier", "outcomes", "reporting")
+              "evaluator:LONG_TERM", "notifier", "outcomes", "reporting",
+              # 2026-09-26 (P0 package 2A): supervised like every other component (one instance via its lock,
+              # heartbeat, respawn only after an unrequested death). Mode/enable flags come from the supervisor env.
+              "promotion", "sentinel")
 HEARTBEAT_STALE_S = 180.0
 # A just-spawned component needs a few seconds (imports) before it writes its lock; judging it "dead" earlier made the
 # supervisor spawn a second copy (refused by the lock, but logged as a spurious SUPERVISOR_RESTART). 2026-09-25 fix.

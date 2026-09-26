@@ -47,6 +47,9 @@ def cmd_component(name: str) -> int:
     if name == "promotion":                    # 2026-09-25: separate downstream paper-promotion lane (SHADOW default)
         from talonx_opportunity.promotion import main
         return main()
+    if name == "sentinel":                     # 2026-09-26: Sentinel operator-command poller (off unless enabled)
+        from talonx_opportunity.sentinel_component import main
+        return main()
     if name.startswith("evaluator:"):
         from talonx_opportunity.evaluators import main
         return main(name.split(":", 1)[1])
@@ -66,7 +69,10 @@ def _print_status(as_json: bool) -> int:
     print("COMPONENTS")
     for c in s["components"]:
         print(f"  {c['logical']:<22} {c['component']:<22} {c['health']:<11} hb_age={c['heartbeat_age_s']} "
-              f"restarts={c['restarts']} v={c['version']}")
+              f"restarts={c['restarts']} v={c['version']}"
+              + (f" pid={c['pid']} mode={c.get('mode')}" if c.get("mode") else "")
+              + (f" universe={c['mutation_mode']}" if c.get("mutation_mode") else "")
+              + (f" last_error={c['last_error']}" if c.get("last_error") else ""))
     d = s["data"]
     print(f"DATA     ingestion={d.get('ingestion')}")
     for ph, p in (d.get("probes") or {}).items():
