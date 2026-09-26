@@ -52,12 +52,16 @@ COMPONENT_EXTRA_IMPACT: dict[str, set[str]] = {"outcomes": {"mfe_mae", "win_rate
 COMPONENT_DEFAULT_CLASS = {
     "ingestion": "DATA_FIX", "discovery": "STRATEGY_MATERIAL", "notifier": "ROUTING_FIX",
     "outcomes": "REPORTING_ONLY", "reporting": "REPORTING_ONLY",
+    # 2026-09-26 (F-P1): the supervisor loop and the Sentinel command poller only spawn / answer operator commands --
+    # neither can change detection, classification, notification or execution, so an undeclared code change of either
+    # is an operations restart (it used to fall through to the STRATEGY_MATERIAL fallback).
+    "supervisor": "OPERATIONS_ONLY", "sentinel": "OPERATIONS_ONLY",
     "evaluator:INTRADAY": "STRATEGY_MATERIAL", "evaluator:SAME_DAY": "STRATEGY_MATERIAL",
     "evaluator:SHORT_TERM": "STRATEGY_MATERIAL", "evaluator:LONG_TERM": "STRATEGY_MATERIAL",
 }
 # Class a CONFIG-fingerprint change forces (cannot be declared down).
 COMPONENT_CONFIG_CLASS = {"discovery": "STRATEGY_MATERIAL", "notifier": "ROUTING_FIX", "ingestion": "DATA_FIX",
-                          "outcomes": "REPORTING_ONLY"}
+                          "outcomes": "REPORTING_ONLY", "sentinel": "OPERATIONS_ONLY"}
 # Closed list of config keys that are NOT strategy-material for their component, with the class they map to. Used only
 # when EVERY changed key is listed here AND an operator declaration of exactly that class is present; otherwise the
 # forced class above stands (so an unlisted or undeclared change can never be downgraded).
@@ -77,6 +81,9 @@ COMPONENT_SOURCES: dict[str, list[str]] = {
                  "talonx_ops/notify/worker.py"],
     "outcomes": [_P + "outcome_tracker.py", "talonx_premarket/outcomes.py", "talonx_premarket/alpaca_data.py"],
     "reporting": [_P + "reporting.py"],
+    "sentinel": ["talonx_ops/operator_control/__init__.py", "talonx_ops/operator_control/commands.py",
+                 "talonx_ops/operator_control/scanned.py", "talonx_ops/operator_control/sentinel.py",
+                 "talonx_ops/operator_control/store.py", _P + "sentinel_component.py"],
     **{f"evaluator:{h}": [_P + "evaluators.py"] for h in ("INTRADAY", "SAME_DAY", "SHORT_TERM", "LONG_TERM")},
 }
 
@@ -95,7 +102,7 @@ CREATE TABLE IF NOT EXISTS deployment_events (
 CREATE INDEX IF NOT EXISTS ix_dep_at ON deployment_events(at_utc);
 CREATE TABLE IF NOT EXISTS change_declarations (
     id INTEGER PRIMARY KEY AUTOINCREMENT, at_utc TEXT, component TEXT, classification TEXT, reason TEXT,
-    consumed_by TEXT);
+    consumed_by TEXT, expected_version TEXT);
 """
 
 
@@ -112,6 +119,16 @@ def commit_sha() -> str:
         return sha + ("-dirty" if dirty else "")
     except Exception:  # noqa: BLE001
         return "unknown"
+
+
+# Shared runtime modules whose changes can never alter what a component detects / classifies / notifies / executes
+# (registry, boundaries, hashing). A component whose ONLY source differences since its last recorded deployment are in
+# this list may be declared OPERATIONS_ONLY by ``plan_shared_runtime_declarations`` (F-P2, 2026-09-26). Closed list.
+SHARED_RUNTIME_OPS_FILES = (_P + "runtime.py",)
+
+
+def component_sources(component: str) -> list[str]:
+    return sorted(set(COMPONENT_SOURCES.get(component, []) + _SHARED))
 
 
 def component_version(component: str) -> str:
@@ -142,21 +159,106 @@ def impact_for(classification: str, component: str) -> dict[str, bool]:
     return {k: (k in keys) for k in IMPACT_KEYS}
 
 
+def _git_blob(commit: str, rel: str) -> bytes | None:
+    r = subprocess.run(["git", "show", f"{commit}:{rel}"], cwd=REPO_ROOT, capture_output=True, timeout=30)
+    return r.stdout if r.returncode == 0 else None
+
+
+def version_at_commit(component: str, commit: str) -> str:
+    """Rebuild ``component_version`` from the git blobs of ``commit`` (same file list, same LF normalisation)."""
+    h = hashlib.sha256()
+    for rel in component_sources(component):
+        b = _git_blob(commit, rel)
+        h.update(rel.encode())
+        h.update(b.replace(b"\r\n", b"\n") if b is not None else b"MISSING")
+    return h.hexdigest()[:12]
+
+
+def changed_sources_since(component: str, commit: str) -> list[str]:
+    out = []
+    for rel in component_sources(component):
+        b = _git_blob(commit, rel)
+        f = REPO_ROOT / rel
+        cur = f.read_bytes().replace(b"\r\n", b"\n") if f.exists() else None
+        old = b.replace(b"\r\n", b"\n") if b is not None else None
+        if cur != old:
+            out.append(rel)
+    return out
+
+
 class RuntimeStore:
     def __init__(self, root=None, *, readonly: bool = False):
         self.path = runtime_db(root)
         self.con = connect(self.path, readonly=readonly, schema=None if readonly else SCHEMA)
+        if not readonly and "expected_version" not in {r[1] for r in self.con.execute(
+                "PRAGMA table_info(change_declarations)")}:
+            self.con.execute("ALTER TABLE change_declarations ADD COLUMN expected_version TEXT")  # additive (F-P2)
+            self.con.commit()
 
     # -- deployment boundaries ------------------------------------------------------------------------------------
-    def declare_change(self, component: str, classification: str, reason: str) -> int:
+    def declare_change(self, component: str, classification: str, reason: str,
+                       expected_version: str | None = None) -> int:
+        """Record the classification of the NEXT start of ``component``. With ``expected_version`` the declaration
+        applies ONLY if that start runs exactly this version (any further code change is classified normally)."""
         if classification not in CLASSIFICATIONS:
             raise ValueError(f"unknown classification {classification!r}; one of {CLASSIFICATIONS}")
         if not reason.strip():
             raise ValueError("a declaration needs a reason")
-        cur = self.con.execute("INSERT INTO change_declarations(at_utc, component, classification, reason) "
-                               "VALUES (?,?,?,?)", (iso(), component, classification, reason.strip()))
+        cur = self.con.execute("INSERT INTO change_declarations(at_utc, component, classification, reason, "
+                               "expected_version) VALUES (?,?,?,?,?)",
+                               (iso(), component, classification, reason.strip(), expected_version))
         self.con.commit()
         return int(cur.lastrowid)
+
+    def plan_shared_runtime_declarations(self, components: list[str] | None = None) -> list[dict]:
+        """F-P2: for each component, compare its hash sources at the commit of its LAST recorded deployment with the
+        working tree. ELIGIBLE (OPERATIONS_ONLY) only if (a) that commit is clean, (b) rebuilding the version from the
+        commit reproduces the recorded version, and (c) every changed source is in SHARED_RUNTIME_OPS_FILES.
+        Anything else is REFUSED (classified normally at the next start) or NOT_NEEDED (version unchanged)."""
+        names = components or [r["component"] for r in self.con.execute(
+            "SELECT DISTINCT component FROM deployment_events ORDER BY component")]
+        plan = []
+        for c in names:
+            last = self._last_deployment(c)
+            if last is None:
+                plan.append({"component": c, "status": "REFUSED", "why": "no recorded deployment"})
+                continue
+            recorded, commit = last["new_version"], (last["commit_sha"] or "")
+            if c == "supervisor":
+                plan.append({"component": c, "status": "NOT_APPLICABLE",
+                             "why": "supervisor default class is OPERATIONS_ONLY"})
+                continue
+            now_v = component_version(c)
+            row = {"component": c, "recorded_version": recorded, "recorded_commit": commit, "current_version": now_v}
+            if now_v == recorded:
+                plan.append({**row, "status": "NOT_NEEDED", "why": "version unchanged"})
+                continue
+            if not commit or commit == "unknown" or commit.endswith("-dirty"):
+                plan.append({**row, "status": "REFUSED", "why": f"recorded commit {commit!r} is not verifiable"})
+                continue
+            rebuilt = version_at_commit(c, commit)
+            if rebuilt != recorded:
+                plan.append({**row, "status": "REFUSED",
+                             "why": f"version rebuilt from {commit} is {rebuilt}, not the recorded {recorded}"})
+                continue
+            changed = changed_sources_since(c, commit)
+            other = [f for f in changed if f not in SHARED_RUNTIME_OPS_FILES]
+            if not changed or other:
+                plan.append({**row, "status": "REFUSED", "changed": changed,
+                             "why": "component source changed: " + ", ".join(other) if other else "no source diff"})
+                continue
+            plan.append({**row, "status": "ELIGIBLE", "changed": changed,
+                         "reason": f"shared runtime only: {', '.join(changed)} changed since {commit} "
+                                   f"({recorded} -> {now_v}); no component source changed (verified from git)"})
+        return plan
+
+    def declare_shared_runtime_changes(self, components: list[str] | None = None) -> list[dict]:
+        plan = self.plan_shared_runtime_declarations(components)
+        for p in plan:
+            if p["status"] == "ELIGIBLE":
+                p["declaration_id"] = self.declare_change(p["component"], "OPERATIONS_ONLY", p["reason"],
+                                                          expected_version=p["current_version"])
+        return plan
 
     def _last_deployment(self, component: str):
         return self.con.execute("SELECT * FROM deployment_events WHERE component=? ORDER BY at_utc DESC, rowid DESC "
@@ -169,6 +271,8 @@ class RuntimeStore:
         old_fps = unj(prev["config_fps_json"], {}) if prev else {}
         decl = self.con.execute("SELECT * FROM change_declarations WHERE component=? AND consumed_by IS NULL "
                                 "ORDER BY id DESC LIMIT 1", (component,)).fetchone()
+        if decl is not None and decl["expected_version"] and decl["expected_version"] != version:
+            decl = None                              # bound to another version: never applies to this start
         config_changed = prev is not None and old_fps != config_fps
         code_changed = prev is not None and old_v != version
         if prev is None:
