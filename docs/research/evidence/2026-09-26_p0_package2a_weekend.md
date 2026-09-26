@@ -164,3 +164,29 @@ The one real failure during development was the research-lane guard `test_15`: t
 - The SEC refresher (still deployed and pending).
 - The AH reserve fix (accepted on replay).
 - No ACTIVE provider mutation, no fetch-universe change, no broker path, no real orders.
+
+## 10. Controlled weekend shutdown (2026-09-26 17:46–17:49Z)
+- **Pre-shutdown (17:46:52Z), PASS:**
+  - HEAD `1098633`, clean tracked tree, `main` `696370e`.
+  - 34 python processes, i.e. 17 logical, 0 duplicates; pollers `EXPECTED_DISTINCT_POLLERS` (Signal 1, Sentinel 1).
+  - Every engine cursor at 4,550 (lag 0); 2,065 candidates, 4,550 events.
+  - Promotion PAPER_SIGNAL, 0 queued; Sentinel handled 14, offset 920191867.
+  - 0 pending or failed in the Lab, Signal-promotion, V2 and shared outboxes.
+  - V2 $100,000, 0 positions/trades/intents/actionable rows, 09-25 closed.
+  - 19 of 19 databases pass `quick_check`.
+- **Method** (supported paths, in order):
+  1. Stop the engine supervisor loop (its own two PIDs; the loop has no stop command, only Ctrl-C) so nothing can respawn.
+  2. `python -m talonx_opportunity down`: all 11 components graceful, 10 s.
+  3. `talonx_ops.prospective.proc.stop_stack(results/prospective_2026-09-25)`, the ownership-verified teardown `prospective close` uses. `close` itself was not re-run, so the accepted 09-25 EOD evidence was not overwritten.
+     - Checkpoint daemon: not running.
+     - V2 companion tree (3): stopped.
+     - Ops supervisor tree (9: Original/run_talonx with the Signal poller, intelligence, dashboard): stopped.
+     - 0 residual; ports 8787/8760/8770/8501 closed; PID registry cleared; V2 start-lock released with its owner token.
+- **Post-shutdown (17:49:19Z, 70 s later), CLEAN:**
+  - 0 TalonX processes, 0 Telegram pollers, 0 supervisors, 0 validation tasks; no respawn.
+  - Outboxes byte-identical, with 0 pending/failed created.
+  - Engine counts, cursors, promotion states and Sentinel offset unchanged.
+  - V2 ledger sha unchanged; only the companion's final status tick (620 → 621).
+  - 19 of 19 databases `ok`; no broker calls.
+- **Monday:** start at **08:00 UK = 07:00Z**, following `docs/runbooks/2026-09-28_MONDAY_RUNBOOK.md` §S. Every mode comes from an explicit versioned start command or a persisted store (no reliance on this session's shell). Provider mutation stays DRY_RUN.
+- **Evidence:** `2026-09-26_p0_package2a/weekend_shutdown/`.

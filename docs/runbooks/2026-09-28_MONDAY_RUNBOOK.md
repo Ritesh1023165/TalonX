@@ -6,21 +6,99 @@
 - Run engine CLI commands with `TALONX_OPP_ROOT` unset.
 - Times are UTC (EDT: PREMARKET from 08:00Z, the SIP delay makes the first REGULAR bar visible at about 13:46Z, close 20:00Z, first after-hours data about 20:16Z).
 
-**State left on Saturday 2026-09-26:**
+**State left on Saturday 2026-09-26 (after the controlled weekend shutdown at 17:47–17:49Z):**
 
 | Item | State |
 |---|---|
-| Engine processes | 10 engine components + `sentinel` running, supervised by one loop (`up --deliver --supervise`) |
-| Supervisor-loop environment | `TALONX_SEC_BACKGROUND_REFRESH_ENABLED=1`<br>`TALONX_NOTIFY_RESEARCH_ENABLED=1`<br>`TALONX_OPP_NOTIFY_POLICY=LAB_NOTIFY_POLICY_V1_REGULAR_EXT_20260925`<br>`TALONX_OPPORTUNITY_PROMOTION_MODE=PAPER_SIGNAL`<br>`TALONX_SENTINEL_COMMANDS_ENABLED=1`<br>`OPERATOR_UNIVERSE_MUTATION_MODE=DRY_RUN` |
+| Processes | **0 TalonX processes** (stack fully stopped, no supervisor, no pollers). Evidence: `docs/research/evidence/2026-09-26_p0_package2a/weekend_shutdown/` |
+| Opportunity Engine | all 11 components `STOPPED` via `down`; all cursors at 4,550; stop flags present (cleared automatically by the next `up`) |
+| V2 / ops stack | stopped via `stop_stack` (V2 companion, ops supervisor → Original/run_talonx, intelligence, dashboard); start-lock released; PID registry cleared |
 | SEC background refresh | DEPLOYED; live acceptance **pending** |
 | AH reserve fix | ACCEPTED on replay; live confirmation **pending** |
-| Sentinel | ENABLED, **DRY_RUN** (no provider mutation) |
-| V2 | 2026-09-25 EOD closed (PASS_WITH_FINDINGS); healthy, $100,000, 0 positions |
+| Sentinel | real DRY_RUN round-trip ACCEPTED; saved Telegram offset `920191867` (`results/opportunity/sentinel_state.json`) |
+| Operator control | `operator_control.db`: TSLA `RESTORED / PENDING_ACTIVATION` (harmless: not excluded under ACTIVE); 2 audit rows |
+| V2 | V2-PAPER-RC1, strategy `e2acf6454789217e`, provider `ac5e51aa3599d6c9`, $100,000, 0 positions/trades/intents, 2026-09-25 EOD closed; ledger sha `891cddac6ce2a1a6` |
 | Pending version-bound OPERATIONS_ONLY declarations (F-P2) | discovery, 4 evaluators, notifier, outcomes, promotion, reporting |
-| Ingestion | **not** declared: its own source changed (the dormant operator gate), so it classifies normally |
+| Ingestion | **not** declared: its own source changed (the dormant operator gate), so its first Monday start records `DATA_FIX` (conservative default) |
+
+## S. MONDAY START: 08:00 UK = **07:00Z** (BST, UTC+1, until 2026-10-25)
+Starting at 07:00Z gives about 60 minutes before PREMARKET (08:00Z); the ops guidance is at least 45 minutes before the pre-open.
+
+### S1. Pre-start checks (do not start if any fails)
+```
+git branch --show-current                 # feature/continuous-opportunity-engine
+git rev-parse --short HEAD                # the weekend HEAD, or an explicitly approved descendant
+git status --porcelain --untracked-files=no   # empty
+git rev-parse --short origin/main         # 696370e
+```
+- **No stale processes:** `Get-CimInstance Win32_Process -Filter "Name='python.exe'" | ? { $_.CommandLine -match 'talonx|run_talonx|dashboard_web' }` must return nothing.
+- **Trading day:** `PY -c "import exchange_calendars as x; print(x.get_calendar('XNYS').is_session('2026-09-28'))"` must print `True`.
+- **Integrity:** `PY results\weekend_2026-09-26\shutdown_snap.py` (or the copy in the evidence folder). Every `db_integrity` value must be `ok`, the Sentinel offset 920191867, pending/failed outboxes empty, and V2 cash 100000 with 0 positions.
+- **Release environment** (window 1): V2 readiness and routes.
+  - `PY -m talonx_v2.release_gate`: expect READY, with the Signal transport bound and its bot live.
+  - `PY -m talonx_ops.prospective status`: expect `eod` not `OVERDUE_EOD_CLOSE`.
+- **Routes:** `PY -m talonx_ops.notify.validate --destination OPERATIONS` (dry-run) must resolve the Sentinel bot. The Research (Lab) destination resolves only in the engine window (window 2), where `TALONX_NOTIFY_RESEARCH_ENABLED=1`.
+- **Operator DB:** readable, with no `EXCLUDED` rows. `.env` must contain **no** `OPERATOR_UNIVERSE_MUTATION_MODE=ACTIVE` (checked 2026-09-26: the key is absent, and the default is DRY_RUN).
+
+### S2. Start the V2 / ops stack (PowerShell window 1: release environment, as in `docs/OPERATIONS.md`)
+```
+$env:TALONX_V2_CAMPAIGN_ID='V2-PAPER-RC1'; $env:TALONX_V2_DB_PATH='v2_release_rc1.db'; $env:TALONX_V2_STATUS_PATH='v2_release_rc1_status.json'
+$env:TALONX_V2_STARTING_CASH_USD='100000'; $env:TALONX_V2_ALLOCATION_USD='10000'; $env:TALONX_V2_EXECUTION_MODE='PAPER'
+$env:TALONX_NOTIFY_DB_PATH='v2_release_rc1_notifications.db'
+.venv\Scripts\python.exe -m talonx_ops.prospective start --release --expected-sha a56ec8c --tick-seconds 150 --heartbeat-seconds 30 --live-lookback-days 45 --execution-scope resolved-active-watchlist --deliver --transport telegram
+```
+This starts: the ops supervisor (Original/run_talonx = the **Signal** command poller, intelligence, dashboard), the V2 companion, and the checkpoint/session loop.
+
+### S3. Start the Opportunity Engine (PowerShell window 2, a SEPARATE window; never the V2 window)
+```
+$env:TALONX_SEC_BACKGROUND_REFRESH_ENABLED='1'
+$env:TALONX_NOTIFY_RESEARCH_ENABLED='1'
+$env:TALONX_OPP_NOTIFY_POLICY='LAB_NOTIFY_POLICY_V1_REGULAR_EXT_20260925'
+$env:TALONX_OPPORTUNITY_PROMOTION_MODE='PAPER_SIGNAL'
+$env:TALONX_SENTINEL_COMMANDS_ENABLED='1'
+$env:OPERATOR_UNIVERSE_MUTATION_MODE='DRY_RUN'
+Remove-Item Env:TALONX_OPP_ROOT -ErrorAction SilentlyContinue
+.venv\Scripts\python.exe -u -m talonx_opportunity up --deliver --supervise
+```
+**Durable sources of every Monday setting:**
+
+| Setting | Source |
+|---|---|
+| Promotion `PAPER_SIGNAL` | **this explicit command** (window 2). The code default is SHADOW, so the supervisor loop env **must** carry it. A respawn inherits it from the loop |
+| Sentinel enabled / `DRY_RUN` | this explicit command. DRY_RUN is also the code default; an unrecognised value fails safe to DRY_RUN |
+| SEC background refresh | this explicit command (read only by discovery) |
+| Lab delivery | this explicit command + `up --deliver` (double opt-in; never in `.env`) |
+| Notifier policy | this explicit command (closed-list name) |
+| Sentinel offset | persisted `results/opportunity/sentinel_state.json` (`next_offset`) |
+| Engine cursors / dedup / promotion queue | persisted engine SQLite stores (`results/opportunity/*.db`) |
+| Operator intent | persisted `operator_control.db` (DRY_RUN: never applied to fetching) |
+| V2 campaign / fingerprints | `v2_release_rc1.db` (campaign row) + the release gate (frozen fingerprints) |
+| Declarations (F-P2) | persisted in `runtime.db` (version-bound) |
+
+### S4. Post-start checks (within 5 minutes)
+1. **Health:** `PY -m talonx_opportunity status` (window 2). Expect:
+   - overall HEALTHY
+   - 11 components UP
+   - `promotion mode=PAPER_SIGNAL`
+   - `sentinel mode=ENABLED universe=DRY_RUN`
+2. **Boundaries:** `PY -m talonx_opportunity deployments --window 2026-09-28`. Expect:
+   - discovery, evaluators, notifier, outcomes, promotion and reporting: `OPERATIONS_ONLY / DECLARED`, with the F-P2 declarations consumed;
+   - discovery config still carrying `SEC_CATALYST_CACHE=BACKGROUND_REFRESH_V1`;
+   - ingestion: `DATA_FIX / UNDECLARED_CODE_CHANGE_DEFAULT`;
+   - sentinel and supervisor: `OPERATIONS_ONLY` (unchanged restart).
+3. **Poller health:** `EXPECTED_DISTINCT_POLLERS` with Signal 1 and Sentinel 1, 0 unknown, 0 duplicates.
+4. **One copy of everything:** exactly one shim/real pair per component, one engine supervisor loop, one ops supervisor, one V2 and one Original.
+5. **No replay:**
+   - engine cursors resume at 4,550;
+   - no new events until the first PREMARKET data (~08:15Z);
+   - promotion states unchanged (36 SIGNAL / 6 SHADOW / 1 EXPIRED / 3 REJECTED; 0 queued);
+   - `sentinel_replies.jsonl` gains no line for any Saturday command (offset resumes at 920191867);
+   - no new Lab or Signal outbox rows before live Monday data;
+   - V2 cash 100000, 0 positions; no broker path.
+6. **Optional Sentinel read-only commands:** `/status`, `/help`, `/scanned`. No mutations.
 
 ## 0. ORDER OF OPERATIONS (owner-confirmed 2026-09-26)
-1. Preflight (§1).
+1. Start at 07:00Z (08:00 UK) per §S, then preflight (§1).
 2. Keep promotion in **PAPER_SIGNAL**. This is decided: do **not** switch to SHADOW (§6).
 3. SEC live acceptance (§2).
 4. Only if SEC passes:

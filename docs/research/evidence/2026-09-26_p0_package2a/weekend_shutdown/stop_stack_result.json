@@ -1,0 +1,35 @@
+{
+ "checkpoint_daemon": {
+  "status": "not_running",
+  "signalled": 8396,
+  "tree_size": 0,
+  "reaped": [],
+  "residual": []
+ },
+ "v2_companion": {
+  "status": "stopped",
+  "signalled": 20216,
+  "tree_size": 3,
+  "reaped": [],
+  "residual": []
+ },
+ "supervisor": {
+  "status": "stopped",
+  "signalled": 1644,
+  "tree_size": 9,
+  "reaped": [],
+  "residual": []
+ },
+ "residual_talonx_processes": [],
+ "overall_budget_s": 120.0,
+ "elapsed_s": 2.6,
+ "ports": {
+  "8787": false,
+  "8760": false,
+  "8770": false,
+  "8501": false
+ },
+ "pid_registry_cleared": true,
+ "v2_lane_db_intact": true,
+ "startlock_released": true
+}
