@@ -77,7 +77,6 @@ def main(wid, warmup=2):
     seq = o.execute("SELECT MAX(seq) FROM candidate_events").fetchone()[0]
     lag = {"notifier": seq - n.execute("SELECT last_seq FROM cursor").fetchone()[0]}
     try:
-        from talonx_opportunity.notifier import NOTIFY_POLICY_OVERRIDES, Notifier  # noqa: F401
         det = json.loads(rt.execute("SELECT detail_json FROM components WHERE name='notifier'").fetchone()[0] or "{}")
         reserve = det.get("after_hours_reserve")
     except Exception as exc:  # noqa: BLE001
