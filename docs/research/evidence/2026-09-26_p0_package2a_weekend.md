@@ -85,8 +85,59 @@ python -m talonx_ops.prospective close --session-dir results/prospective_2026-09
   - The poller only ever holds the Sentinel bot, so Signal and Lab bots cannot deliver commands to it.
   - Detail, config and logs contain no token (the sentinel log was scanned: 0 token patterns; httpx request logging is suppressed).
 
-### 6.1 Real Telegram round-trip
-*(recorded after the owner's live test; see the addendum below)*
+### 6.1 Real Telegram round-trip: **ACCEPTED** (2026-09-26 13:28–13:35Z)
+The owner sent the commands to **@TalonXSentinalBot** in its private owner chat. There was no webhook, and before sending 0 updates were pending.
+
+**Sources:** the Sentinel reply ledger (`sentinel_replies.jsonl`, added in `cd6797a`), the saved offset (`sentinel_state.json`), operator audit rows, runtime detail and poller health. Chat IDs and user IDs are deliberately omitted.
+
+| # | UTC | Command | Result | Reply (first line) | Telegram msg id | Audit |
+|---|---|---|---|---|---|---|
+| 1 | 13:28:22 | `/help` | SENT, 523 chars | ⚙️ TALONX SENTINEL — COMMAND HELP | 26 | — |
+| 2 | 13:29:11 | `/help exclude` | SENT, 796 chars | ⚙️ … — /exclude | 28 | — |
+| 3 | 13:29:28 | `/help scanned` | SENT, 297 chars | ⚙️ … — /scanned | 30 | — |
+| 4 | 13:29:58 | `/status` | SENT, 288 chars | 🛰 TalonX Sentinel — /status | 32 | — |
+| 5 | 13:30:10 | `/scanned` | SENT, 248 chars | ⚙️ … — SCANNED (2026-09-26) | 34 | — |
+| 6 | 13:30:22 | `/scanned candidates` | SENT | ACTIVE CANDIDATES (0) | 36 | — |
+| 7 | 13:30:36 | `/scanned setups` | SENT | ACTIVE SETUPS (0) | 38 | — |
+| 8 | 13:30:48 | `/scanned signals` | SENT | PAPER PROMOTIONS (0) | 40 | — |
+| 9 | 13:30:56 | `/scanned file` | **DOCUMENT SENT** `talonx_scanned_2026-09-26.csv`, 134 B (header only, 0 rows) | scanned export: 0 symbols (2026-09-26) | 42 | — |
+| 10 | 13:31:18 | `/exclude status TSLA` | SENT | ⚙️ … — TSLA | 44 | — |
+| 11 | 13:31:32 | `/universe status TSLA` | SENT | ⚙️ … — TSLA | 46 | — |
+| 12 | 13:31:47 | `/exclude add TSLA weekend-test` | SENT: accepted as **PENDING** | OPERATOR CONTROL | 48 | `8073f2ccc0b04a2f`: authorized, DRY_RUN, `PENDING_ACTIVATION`, reason `weekend-test`; state `EXCLUDED / PENDING_ACTIVATION` |
+| 13 | 13:32:04 | `/exclude remove TSLA` | SENT: restore accepted as **PENDING** | OPERATOR CONTROL | 50 | `e8b4cd23868c4c13`: authorized, DRY_RUN, `PENDING_ACTIVATION`; state `RESTORED / PENDING_ACTIVATION` |
+| 14 | 13:34:43 | `/help universe` (sent last) | SENT, 666 chars | ⚙️ … — /universe | 52 | — |
+
+**Checks:**
+- **Exactly once:**
+  - 14 expected, 14 received, 14 SENT.
+  - 0 NO_REPLY, 0 FAILED.
+  - Update IDs are 14 consecutive values with no gap and no repeat.
+  - Runtime `handled = 14`.
+  - 2 audit rows, exactly the two mutations.
+- **No replay:** the saved offset is `next_offset = last update + 1`, written before each update was handled. A restart resumes after command 14.
+- **DRY_RUN and no provider mutation:**
+  - Every mutation is `PENDING_ACTIVATION` in DRY_RUN, and the gate is an exact identity.
+  - Ingestion fetch universe is 5,653 symbols, unchanged (last cycle 2026-09-25 23:59Z; no weekend cycle).
+  - No discovery or promotion effect: 0 candidate events and 0 promotions since 10:00Z.
+- **Routing / isolation:** every reply came from @TalonXSentinalBot. Since 10:00Z:
+  - Lab outbox: 0 rows.
+  - Promotion (Signal) outbox: 0.
+  - V2 outbox: 0.
+  - Signal-side logs: no command traffic.
+- **V2:** unchanged. Ledger sha `891cddac6ce2a1a6`, cash $100,000, 0 positions, trades and intents; status CURRENT.
+- **Broker calls:** 0; there is no order path.
+- **Poller health after the burst:** `EXPECTED_DISTINCT_POLLERS`, SIGNAL_COMMANDS 1 and SENTINEL_COMMANDS 1, with 0 unknown and 0 duplicates. Sentinel heartbeat fresh.
+- **Transient:** one getUpdates long-poll `TimedOut` at 13:36:10Z, after all commands had been handled (1 in 578 polls). The runtime backed off 20 s; the component showed DEGRADED for about 20 s, then RUNNING with 0 consecutive failures. Overall HEALTHY again at 13:37Z.
+
+**Findings / follow-ups (not fixed; UX only):**
+- **S-UX1:** on a non-trading day `/scanned` reads the current (empty) window and renders placeholders: `Phase: None · last scan Z (Nones)`, `data-ready None`. It should say `CLOSED · No scans today` and point to the last session.
+- **S-UX2:** consider an optional historical form, e.g. `/scanned file YYYY-MM-DD`, for the last session's CSV on weekends. Today's file was correctly the empty 2026-09-26 export.
+- **S-OPS1 (LOW):** a single Telegram long-poll timeout flips the component to DEGRADED until the next poll. Consider treating `TimedOut` on `get_updates` as an empty poll.
+
+**Verdicts:**
+- `SENTINEL_DRY_RUN_ROUNDTRIP = ACCEPTED`
+- `CONTROL_PLANE_ACTIVE_MUTATION = STILL_OFF`
+- `READY_FOR_MONDAY_ACTIVE_PROOF = YES`, subject to the runbook gates: SEC live acceptance passes, the F-W2 declarations are made, and the owner authorises ACTIVE.
 
 ## 7. Tests
 
