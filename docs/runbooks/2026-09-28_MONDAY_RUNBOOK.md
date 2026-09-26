@@ -19,6 +19,24 @@
 | Pending version-bound OPERATIONS_ONLY declarations (F-P2) | discovery, 4 evaluators, notifier, outcomes, promotion, reporting |
 | Ingestion | **not** declared: its own source changed (the dormant operator gate), so it classifies normally |
 
+## 0. ORDER OF OPERATIONS (owner-confirmed 2026-09-26)
+1. Preflight (§1).
+2. Keep promotion in **PAPER_SIGNAL**. This is decided: do **not** switch to SHADOW (§6).
+3. SEC live acceptance (§2).
+4. Only if SEC passes:
+   - address F-W2 (§3, "Boundaries"): fingerprint fix, or fresh DATA_FIX declarations for every ACTIVE restart;
+   - obtain explicit owner authorisation for ACTIVE provider mutation.
+5. Start the ACTIVE mutation boundary (§3, "Restart set").
+6. Controlled exclusion test.
+7. Alpaca proof.
+8. yfinance proof.
+9. Restore the symbol.
+10. No-replay proof.
+11. Optional universe-add proof.
+12. AFTER_HOURS reserve live confirmation, Monday evening (§4).
+
+**ACTIVE is never enabled before step 4 completes.**
+
 ## 1. MONDAY MORNING (before 08:00Z)
 
 1. **Preflight and V2.** Use the release environment from `docs/OPERATIONS.md`, i.e. `TALONX_V2_DB_PATH`, `TALONX_V2_STATUS_PATH` and `TALONX_NOTIFY_DB_PATH` pointing at the `v2_release_rc1*` files.
@@ -28,7 +46,7 @@
    - Note: `status` without the release environment reads the legacy `v2_lane.db` and shows a false `v2_process_dead`.
 2. **Engine health.** Run `PY -m talonx_opportunity status`. Expect:
    - overall HEALTHY
-   - `promotion` mode=PAPER_SIGNAL (see the **decision** in §6)
+   - `promotion` mode=PAPER_SIGNAL (decided; see §6)
    - `sentinel` mode=ENABLED universe=DRY_RUN
 3. **Boundaries.** Run `PY -m talonx_opportunity deployments --window 2026-09-28` and check for no unexpected STRATEGY_MATERIAL rows.
 4. **Poller health.** Run `PY -c "from talonx_ops.prospective.telegram_owner import logical_poller_report as r; print(r().to_dict())"`.
@@ -64,7 +82,18 @@
 - `/exclude list` and `/universe list` in Sentinel. Any leftover PENDING intent would become effective on ACTIVE, so clear it first.
 - Choose a liquid, non-V2-scope test symbol (not one of the 39 V2 names). Example: `/exclude add SNAP P0-2B proof`.
 
-**Boundaries.** `OPERATOR_UNIVERSE_MUTATION_MODE` is **not** in any component's config fingerprint (finding F-W2), so declare every restart explicitly **before** it. A fresh declaration supersedes the pending OPERATIONS_ONLY one (the latest wins).
+**Boundaries (F-W2 guard; mandatory).** `OPERATOR_UNIVERSE_MUTATION_MODE` is **not** in any component's config fingerprint. ACTIVE must **never** inherit an old OPERATIONS_ONLY declaration: version-bound OPERATIONS_ONLY declarations are pending for discovery and promotion. Choose one:
+- **Preferred:** land a change that adds `operator_universe_mode` to the config fingerprints of ingestion, discovery and promotion, with a CONFIG_KEY_CLASS mapping to DATA_FIX that requires a declaration. Deploy it first, in DRY_RUN, as its own boundary.
+- **Or, if deferred:** make a fresh declaration **immediately before each** ACTIVE restart; the latest unconsumed declaration wins. Check with `deployments` afterwards that each ACTIVE restart recorded DATA_FIX or OPERATIONS_ONLY with the ACTIVE reason, and not a pre-existing weekend declaration.
+
+Affected paths:
+
+| Path | Component | Required boundary |
+|---|---|---|
+| Alpaca fetch batch | `ingestion` | fresh `DATA_FIX` declaration |
+| discovery members | `discovery` | fresh `DATA_FIX` declaration |
+| promotion exclusion gate | `promotion` | fresh declaration: `OPERATIONS_ONLY`, or `DATA_FIX` if the owner prefers conservative |
+| yfinance batch (Original) | `run_talonx.py` under `talonx_ops.supervisor` | outside the engine boundary registry: record a manual boundary note (UTC, reason, `ACTIVE`) in the session evidence |
 ```
 PY -m talonx_opportunity declare-change ingestion --class DATA_FIX --reason "ACTIVE operator universe gate (Alpaca batch)"
 PY -m talonx_opportunity declare-change discovery --class DATA_FIX --reason "ACTIVE operator universe gate (members)"
@@ -98,8 +127,10 @@ PY -m talonx_opportunity declare-change promotion --class OPERATIONS_ONLY --reas
 - The V2 prospective close runs as normal (release environment; the close deadline is the close + 90 min).
 - Write the full-day evidence under `docs/research/evidence/`.
 
-## 6. Open decisions for the owner
-- **Promotion PAPER_SIGNAL scope:** the 2026-09-25 authorisation covered "the remainder of REGULAR" that day. The component was left running in PAPER_SIGNAL (the status quo) and will send paper Signals on Monday's REGULAR session.
-  - To switch to SHADOW before 13:30Z:
-    1. Relaunch the supervisor loop with `TALONX_OPPORTUNITY_PROMOTION_MODE=SHADOW`.
-    2. `restart promotion` (a mode change records a STRATEGY_MATERIAL boundary by the fingerprint rule; no replay).
+## 6. Promotion mode for Monday: DECIDED (owner, 2026-09-26)
+- **MODE = PAPER_SIGNAL** for Monday 2026-09-28. Do **not** switch to SHADOW.
+- **Contract:** REGULAR only · BULLISH only · PAPER only · max 3 per 5 min · 30-min queue expiry · no replay · no broker orders.
+- **Persistence (verified 2026-09-26 10:2xZ):** both the supervisor-loop process and the running promotion process carry `TALONX_OPPORTUNITY_PROMOTION_MODE=PAPER_SIGNAL`, so a supervised respawn keeps PAPER_SIGNAL.
+  - Any relaunch of the supervisor loop **must** keep this variable.
+  - A relaunch without it would respawn promotion as SHADOW, the code default, and record a STRATEGY_MATERIAL mode-change boundary.
+- **Check at preflight:** `status` shows `promotion ... mode=PAPER_SIGNAL`.
