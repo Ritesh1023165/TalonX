@@ -156,9 +156,10 @@ def test_discovery_output_is_identical_off_vs_on_for_the_same_snapshots(tmp_path
     assert any("8-K" in (c or "") for _, _, c in off[1]) or any("8-K" in (e[4] or "") for e in off[0])
 
 
-def test_refresher_yields_while_discovery_is_scanning():
+def test_legacy_idle_only_mode_yields_while_discovery_is_scanning():
+    """scan_refresh_rate_per_s=0 reproduces the pre-2026-09-28 idle-only refresher exactly."""
     sec, t, calls = _pair()
-    w = SR.BackgroundSecCache(sec, start=False, idle_gap_s=2.0)
+    w = SR.BackgroundSecCache(sec, start=False, idle_gap_s=2.0, scan_refresh_rate_per_s=0)
     w.get("1")
     w.get("2")
     t[0] = 400.0
@@ -167,6 +168,24 @@ def test_refresher_yields_while_discovery_is_scanning():
     assert w.run_once() == 0 and calls["n"] == n and w.stats["yielded_to_discovery"] == 1
     t[0] = 403.0                                           # scan over: idle >= 2 s
     assert w.run_once() >= 2
+
+
+def test_refresher_keeps_working_during_a_scan_but_paced_to_its_scan_budget():
+    """2026-09-28 remediation: during a scan the refresher continues at <= scan_refresh_rate_per_s (one request per
+    pass, then it steps aside until its pacing allows the next); outside scans it drains the due queue."""
+    sec, t, calls = _pair()
+    w = SR.BackgroundSecCache(sec, start=False, idle_gap_s=2.0, scan_refresh_rate_per_s=0.5)
+    w.get("1")
+    w.get("2")
+    t[0] = 400.0
+    w.begin_scan()
+    w.get("3")
+    n = calls["n"]
+    assert w.run_once() == 1 and calls["n"] == n + 1 and w.stats["yielded_to_discovery"] == 1
+    assert w.run_once() == 0                                # still inside the 2 s pacing interval
+    w.end_scan()
+    t[0] = 403.0
+    assert w.run_once() >= 1
 
 
 def test_entries_younger_than_120s_are_not_refetched():
@@ -204,7 +223,8 @@ def test_discovery_waits_at_most_about_one_in_flight_request_while_refresher_is_
             w.get(str(i))
             waits.append(time.monotonic() - a)
         assert max(waits) <= 2.5 * REQ + 0.05, max(waits)  # <= the in-flight request (+ one racing start), never a queue
-        assert w.stats["yielded_to_discovery"] >= 1
+        # 2026-09-28: the refresher's request runs outside the cache lock, so a cache hit does not wait for it at all
+        assert sorted(waits)[int(0.9 * (len(waits) - 1))] < REQ / 2
     finally:
         w.stop()
 
@@ -254,16 +274,14 @@ def test_refresher_crash_never_affects_discovery(monkeypatch):
         w.stop()
 
 
-def test_cache_write_failure_during_refresh_restores_the_previous_copy(monkeypatch):
+def test_unexpected_refresh_failure_keeps_the_previous_copy(monkeypatch):
     sec, t, calls = _pair()
     w = SR.BackgroundSecCache(sec, start=False)
     first = w.get("1")
     fetched_at = sec._cache["1"][0]
     t[0] = 400.0
-    real_get = sec.get
-    monkeypatch.setattr(sec, "get", lambda cik: (_ for _ in ()).throw(OSError("write failed")))
+    monkeypatch.setattr(w, "_fetch", lambda cik: (_ for _ in ()).throw(OSError("write failed")))
     assert w.refresh_one("1") is False                     # no exception escapes the refresher
-    monkeypatch.setattr(sec, "get", real_get)
     assert sec._cache["1"] == (fetched_at, first[0], first[1])   # previous copy AND fetch time restored
     t[0] = 450.0
     got = w.get("1")                                       # still served the original copy or refetched synchronously

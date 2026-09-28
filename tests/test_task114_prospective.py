@@ -134,6 +134,9 @@ def test_b6_shim_child_pair_is_one_logical_owner(monkeypatch):
     from talonx_ops.prospective import telegram_owner as to
     monkeypatch.setattr(to, "_network_pids", lambda: ([], "psutil-unavailable"))
     monkeypatch.setattr("talonx_ops.supervisor.count_telegram_get_updates_owners", lambda: 2)
+    # hermetic: never read the real process table / registry (a live Sentinel poller would count as a 2nd role)
+    monkeypatch.setattr(to, "_sentinel_cmdline_count", lambda: 0)
+    monkeypatch.setattr(to, "_sentinel_expected_but_dead", lambda: False)
     r = to.logical_poller_report()
     assert r.logical_owners == 1 and r.healthy, r.to_dict()
 
@@ -141,6 +144,7 @@ def test_b6_shim_child_pair_is_one_logical_owner(monkeypatch):
 def test_b6_two_independent_network_pollers_is_degraded(monkeypatch):
     from talonx_ops.prospective import telegram_owner as to
     monkeypatch.setattr(to, "_network_pids", lambda: ([111, 222], "ok"))
+    monkeypatch.setattr(to, "_sentinel_expected_but_dead", lambda: False)   # hermetic (no live registry read)
     r = to.logical_poller_report()
     assert r.logical_owners == 2 and not r.healthy
 
@@ -148,6 +152,7 @@ def test_b6_two_independent_network_pollers_is_degraded(monkeypatch):
 def test_b6_single_network_poller_healthy(monkeypatch):
     from talonx_ops.prospective import telegram_owner as to
     monkeypatch.setattr(to, "_network_pids", lambda: ([3160], "ok"))
+    monkeypatch.setattr(to, "_sentinel_expected_but_dead", lambda: False)   # hermetic (no live registry read)
     r = to.logical_poller_report()
     assert r.logical_owners == 1 and r.healthy
 
