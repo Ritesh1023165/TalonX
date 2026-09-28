@@ -1,0 +1,14 @@
+INTELLIGENCE DELIVERY: configured=OFF runtime_requested_by_start=ON effective=ON
+==================================================================
+  PROSPECTIVE V2 -- MORNING START   2026-09-28T08:00:35.231296+01:00 (Europe/London)
+==================================================================
+  preflight overall : NOT_READY
+    [FINDING] repo_tree_clean  {'porcelain_lines': ['?? notifications.db-shm', '?? notifications.db-wal', '?? operator_control.db-shm', '?? operator_control.db-wal', '?? v2_release_rc1.db-shm', '?? v2_release_rc1.db-wal', '?? v2_release_rc1_notifications.db-shm', '?? v2_release_rc1_notifications.db-wal']}
+    [NO_GO  ] redis_reachable  {'error': 'network:ConnectionError'}
+  session dir      : C:\workspace\TalonX\results\prospective_2026-09-28
+  env (non-secret) : profile=INSIDER_BUY_CLUSTER_V2 cash=100000
+==================================================================
+  startup verdict  : NOT_STARTED
+  NOT_STARTED -- nothing was spawned (resolve the STOP rows above).
+  Evening:  python -m talonx_ops.prospective close
+==================================================================

@@ -1,0 +1,116 @@
+{
+ "parity_start_utc": "2026-09-28T16:05:46+00:00",
+ "decision_clock": "2026-09-28T16:05:47.254038+00:00",
+ "ingestion_as_of": "2026-09-28T15:49:00+00:00",
+ "interval_s": 0.5,
+ "runs": {
+  "R1_SYNC_REFERENCE": {
+   "wall_s": 679.5,
+   "sec_cache": {
+    "mode": "SYNC",
+    "sec_requests": 1326
+   },
+   "events": 1267,
+   "catalyst_unknown": 0
+  },
+  "R2_ON_COLD": {
+   "wall_s": 677.5,
+   "sec_cache": {
+    "cache_hits": 4,
+    "cache_misses": 1326,
+    "fallback_wait_total_s": 632.64,
+    "hit_wait_max_s": 0.0,
+    "hit_wait_p99_s": 0.0,
+    "lookups": 1330,
+    "max_served_age_s": 1.2,
+    "mode": "BACKGROUND_REFRESH",
+    "refresh_errors": 0,
+    "refreshed_total": 0,
+    "refresher_requests_during_scan": 0,
+    "refresher_yields": 0,
+    "sec_request_rate_per_s": 1.958,
+    "sec_requests": 1326,
+    "sync_fallbacks": 1326,
+    "tracked": 1326
+   },
+   "events": 1267,
+   "catalyst_unknown": 0
+  },
+  "R3_ON_REFRESHED": {
+   "wall_s": 382.1,
+   "sec_cache": {
+    "cache_hits": 607,
+    "cache_misses": 723,
+    "fallback_wait_total_s": 343.16,
+    "hit_wait_max_s": 0.0,
+    "hit_wait_p99_s": 0.0,
+    "lookups": 1330,
+    "max_served_age_s": 553.7,
+    "mode": "BACKGROUND_REFRESH",
+    "refresh_errors": 0,
+    "refreshed_total": 3255,
+    "refresher_requests_during_scan": 0,
+    "refresher_yields": 0,
+    "sec_request_rate_per_s": 1.894,
+    "sec_requests": 723,
+    "sync_fallbacks": 723,
+    "tracked": 1326
+   },
+   "events": 1267,
+   "catalyst_unknown": 0
+  }
+ },
+ "background_refresh": {
+  "refreshed": 3255,
+  "seconds": 1674.6,
+  "served_fresh": 611,
+  "sync_fallback": 2049,
+  "refresh_errors": 0,
+  "throttled_skips": 0,
+  "evicted": 0,
+  "yielded_to_discovery": 0
+ },
+ "parity_sec": {
+  "r1_requests": 1326,
+  "r2_plus_refresh_requests": 5304,
+  "r1_errors": [],
+  "r2_errors": [],
+  "r1_throttled": 0,
+  "r2_throttled": 0,
+  "max_parity_rate_per_s": 2.0
+ },
+ "r3_raw_served_age": {
+  "n": 1330,
+  "max": 553.6879999999946,
+  "ge_590": 0,
+  "ge_595": 0,
+  "ge_600": 0
+ },
+ "R1_vs_R2": {
+  "candidate_identity": [],
+  "candidate_presence_events": [],
+  "classification": [],
+  "score": [],
+  "catalyst": [],
+  "lifecycle_event_type": [],
+  "total": 0,
+  "symbols_checked": 5652,
+  "events_checked": 1267,
+  "candidates_checked": 1267,
+  "catalyst_detail": {}
+ },
+ "R1_vs_R3": {
+  "candidate_identity": [],
+  "candidate_presence_events": [],
+  "classification": [],
+  "score": [],
+  "catalyst": [],
+  "lifecycle_event_type": [],
+  "total": 0,
+  "symbols_checked": 5652,
+  "events_checked": 1267,
+  "candidates_checked": 1267,
+  "catalyst_detail": {}
+ },
+ "parity_end_utc": "2026-09-28T17:04:45+00:00"
+}

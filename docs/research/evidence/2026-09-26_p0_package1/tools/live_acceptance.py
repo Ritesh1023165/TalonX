@@ -51,7 +51,10 @@ def main(wid, warmup=2):
                          k: sc.get(k) for k in ("mode", "lookups", "cache_hits", "cache_misses", "sync_fallbacks",
                                                 "hit_wait_p99_s", "hit_wait_max_s", "max_served_age_s", "sec_requests",
                                                 "sec_request_rate_per_s", "refresher_requests_during_scan",
-                                                "refresher_yields")}})
+                                                "refresher_yields", "max_served_age_raw", "stale_fallback_count",
+                                                "stale_fallback_reasons", "stale_fallback_max_age_raw",
+                                                "count_age_ge_590", "count_age_ge_595", "count_age_ge_600",
+                                                "lookup_wait_p99_s", "lookup_wait_max_s")}})
     steady = rows[warmup:]
     starts = {datetime.fromisoformat(s["decision_utc"]).replace(second=0, microsecond=0) for s in scans}
     skipped = []
@@ -66,7 +69,11 @@ def main(wid, warmup=2):
             t += timedelta(minutes=5)
     dur = [r["duration_s"] for r in steady if r["duration_s"] is not None]
     waits = [r["hit_wait_p99_s"] for r in steady if r["hit_wait_p99_s"] is not None]
-    ages = [r["max_served_age_s"] for r in steady if r["max_served_age_s"] is not None]
+    # 2026-09-28: the criterion (< 600 s) is evaluated on the RAW served age when the scan recorded it; the historical
+    # 0.1 s-rounded value is used only for scans that predate the raw field (and cannot prove strict < 600 s).
+    ages = [(r["max_served_age_raw"] if r.get("max_served_age_raw") is not None else r["max_served_age_s"])
+            for r in steady if (r.get("max_served_age_raw") is not None or r["max_served_age_s"] is not None)]
+    stale = sum(r.get("stale_fallback_count") or 0 for r in steady)
     rates = [r["sec_request_rate_per_s"] for r in steady if r["sec_request_rate_per_s"] is not None]
     crit = {"heavy_scan_p90_lt_120s": (pct(dur, .9) is not None and pct(dur, .9) < 120),
             "no_skipped_slots": not skipped,
@@ -86,6 +93,9 @@ def main(wid, warmup=2):
            "max_hit_wait_p99_s": max(waits) if waits else None, "max_served_age_s": max(ages) if ages else None,
            "max_sec_rate": max(rates) if rates else None,
            "sync_fallbacks_steady": sum(r["sync_fallbacks"] or 0 for r in steady),
+           "raw_age_available_scans": sum(r.get("max_served_age_raw") is not None for r in steady),
+           "stale_fallback_count_steady": stale,
+           "items_age_ge_600_steady": sum(r.get("count_age_ge_600") or 0 for r in steady),
            "skipped_slots": skipped, "criteria": crit, "cursor_lag": lag, "after_hours_reserve": reserve,
            "VERDICT": "ACCEPTED" if steady and all(crit.values()) else "NOT_ACCEPTED" if steady else "NO_LIVE_SCANS_YET",
            "scans": rows}
