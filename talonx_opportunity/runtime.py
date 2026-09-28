@@ -56,6 +56,8 @@ COMPONENT_DEFAULT_CLASS = {
     # neither can change detection, classification, notification or execution, so an undeclared code change of either
     # is an operations restart (it used to fall through to the STRATEGY_MATERIAL fallback).
     "supervisor": "OPERATIONS_ONLY", "sentinel": "OPERATIONS_ONLY",
+    # promotion decides what reaches Signal: an undeclared change stays conservative (explicit since 2026-09-28)
+    "promotion": "STRATEGY_MATERIAL",
     "evaluator:INTRADAY": "STRATEGY_MATERIAL", "evaluator:SAME_DAY": "STRATEGY_MATERIAL",
     "evaluator:SHORT_TERM": "STRATEGY_MATERIAL", "evaluator:LONG_TERM": "STRATEGY_MATERIAL",
 }
@@ -67,7 +69,12 @@ COMPONENT_CONFIG_CLASS = {"discovery": "STRATEGY_MATERIAL", "notifier": "ROUTING
 # forced class above stands (so an unlisted or undeclared change can never be downgraded).
 # 2026-09-26: the SEC catalyst cache mode serves the same submissions under the same 600 s freshness bound (parity
 # tested); switching it changes latency, not classification -> DATA_FIX.
-CONFIG_KEY_CLASS: dict[str, dict[str, str]] = {"discovery": {"SEC_CATALYST_CACHE": "DATA_FIX"}}
+# 2026-09-28 (F-M1): promotion.py is now in the promotion component's version hash; ``promotion_src`` (its stop-gap
+# source fingerprint) changes with ANY promotion.py edit, so a declared presentation-only change (Signal message format,
+# PROMOTION_POLICY fingerprint unchanged) may be recorded UI_ONLY -- only with a UI_ONLY declaration bound to the
+# exact new version; an undeclared or differently-declared promotion_src change stays STRATEGY_MATERIAL.
+CONFIG_KEY_CLASS: dict[str, dict[str, str]] = {"discovery": {"SEC_CATALYST_CACHE": "DATA_FIX"},
+                                               "promotion": {"promotion_src": "UI_ONLY"}}
 
 _P = "talonx_opportunity/"
 _SHARED = [_P + "db.py", _P + "runtime.py", _P + "phases.py", _P + "config.py"]
@@ -77,8 +84,13 @@ COMPONENT_SOURCES: dict[str, list[str]] = {
     "discovery": [_P + "discovery.py", _P + "aggregates.py", _P + "capabilities.py", "talonx_premarket/features.py",
                   "talonx_premarket/scoring.py", "talonx_premarket/alerts.py", "talonx_premarket/catalysts.py",
                   "talonx_premarket/config.py", _P + "sec_refresh.py"],
-    "notifier": [_P + "notifier.py", "talonx_ops/notify/__init__.py", "talonx_ops/notify/outbox.py",
-                 "talonx_ops/notify/worker.py"],
+    "notifier": [_P + "notifier.py", _P + "lab_delivery.py", _P + "store.py", "talonx_ops/notify/__init__.py",
+                 "talonx_ops/notify/outbox.py", "talonx_ops/notify/worker.py"],
+    # 2026-09-28 (F-M1): promotion had NO own sources (hash = shared modules only; its change was caught solely by the
+    # promotion_src config fingerprint). Now every module that decides or renders a Signal is hashed.
+    "promotion": [_P + "promotion.py", _P + "store.py", "talonx_ops/notify/__init__.py", "talonx_ops/notify/outbox.py",
+                  "talonx_ops/notify/worker.py", "talonx_ops/operator_control/gates.py",
+                  "talonx_premarket/alpaca_data.py"],
     "outcomes": [_P + "outcome_tracker.py", "talonx_premarket/outcomes.py", "talonx_premarket/alpaca_data.py"],
     "reporting": [_P + "reporting.py"],
     "sentinel": ["talonx_ops/operator_control/__init__.py", "talonx_ops/operator_control/commands.py",

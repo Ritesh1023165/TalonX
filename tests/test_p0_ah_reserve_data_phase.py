@@ -162,8 +162,8 @@ def test_no_replay_after_the_policy_boundary_and_old_rows_are_not_reinterpreted(
                         "WHERE symbol IN ('VEON','CERT','DRVN')")
     old.con.close()
     con = sqlite3.connect(tmp_path / "notification.db")
-    rows = con.execute("SELECT * FROM decisions ORDER BY event_id").fetchall()
     cols = [r[1] for r in con.execute("PRAGMA table_info(decisions)") if r[1] != "data_phase"]
+    rows = con.execute("SELECT " + ",".join(cols) + " FROM decisions ORDER BY event_id").fetchall()   # by name
     con.execute("CREATE TABLE d2 AS SELECT " + ",".join(cols) + " FROM decisions")
     con.execute("DROP TABLE decisions")
     con.execute("ALTER TABLE d2 RENAME TO decisions")
@@ -172,7 +172,7 @@ def test_no_replay_after_the_policy_boundary_and_old_rows_are_not_reinterpreted(
     n = Notifier(root=tmp_path, policy=EXT)                        # migration adds data_phase; nothing re-decided
     n.tick()
     after = n.con.execute("SELECT " + ",".join(cols) + " FROM decisions ORDER BY event_id").fetchall()
-    assert [tuple(r) for r in after] == [tuple(r[:len(cols)]) for r in rows]
+    assert [tuple(r) for r in after] == [tuple(r) for r in rows]
     assert n._used(WID) == (75, 15)                                # budget honours the historical sends
     _seed(tmp_path, [("HP", "BEARISH", "UPGRADE", T(20, 20), T(20, 3))])
     n.tick()

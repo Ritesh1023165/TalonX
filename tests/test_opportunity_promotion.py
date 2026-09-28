@@ -173,7 +173,8 @@ def test_13_paper_signal_enqueues_to_trade_event_destination_with_signal_credent
     c = sqlite3.connect(P.signal_outbox_path(tmp_path))
     dest, etype, dedup, text = c.execute("SELECT destination, event_type, dedup_key, payload_text FROM ops_notification_outbox").fetchone()
     assert (dest, etype, dedup) == ("TRADE_EVENT", "PAPER_OPPORTUNITY", "OPPORTUNITY_ENGINE:2026-09-24:AAA:GAP_UP")
-    assert "PAPER OPPORTUNITY" in text and "BUY" not in text.upper().replace("NOT BUY/SELL", "")
+    assert "TALONX SIGNAL — PAPER" in text and "no order placed" in text                 # 2026-09-28 compact format
+    assert "BUY" not in text.upper() and "SELL" not in text.upper()
     assert used == ["signal-token"]                                             # 14: never lab / legacy
 
 

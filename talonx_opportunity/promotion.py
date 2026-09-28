@@ -110,15 +110,25 @@ def _ts(s):
     return datetime.fromisoformat(s.replace("Z", "+00:00")) if s else None
 
 
+SIGNAL_FOOTER = "Paper opportunity only · no order placed · not proven profitable"
+
+
+def _ref(px) -> str:
+    px = float(px or 0)
+    return f"${px:,.2f}" if px >= 1 else f"${px:.4f}"
+
+
 def render(p: dict) -> str:
+    """Compact mobile-first Signal message (presentation only, 2026-09-28). Plain text (parse_mode=None). Same fields
+    as before: symbol, direction, score, reference, phase + data time, horizons, paper/no-order status."""
     return "\n".join([
-        "[TALONX SIGNAL - PAPER OPPORTUNITY]",
-        f"Source: Opportunity Engine  |  Mode: PAPER (no order placed)",
-        f"Symbol: {p['symbol']}  Direction: BULLISH (long-only)  Score: {round(p['score'] or 0, 1)}",
-        f"Phase: REGULAR  Data as of: {(p['data_as_of_utc'] or '')[11:16]}Z  Reference: {p['reference_price']}",
-        f"Horizon: {', '.join(json.loads(p['horizons_json'] or '[]')) or 'SAME_DAY'}",
-        "Reason: valid REGULAR setup promoted from the Opportunity Engine (paper development output; "
-        "not proven profitable; not BUY/SELL advice)",
+        "🚨 TALONX SIGNAL — PAPER", "",
+        f"🟢 {p['symbol']} · BULLISH",
+        f"⭐ Score {round(p['score'] or 0, 1)}",
+        f"💵 Ref {_ref(p['reference_price'])}",
+        f"🕒 {p.get('processing_phase') or 'REGULAR'} · data {(p['data_as_of_utc'] or '')[11:16]}Z",
+        f"⏱ {' / '.join(json.loads(p['horizons_json'] or '[]')) or 'SAME_DAY'}", "",
+        SIGNAL_FOOTER,
     ])
 
 

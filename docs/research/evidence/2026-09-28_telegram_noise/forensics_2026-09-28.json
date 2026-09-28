@@ -1,0 +1,458 @@
+{
+ "window_id": "2026-09-28",
+ "generated_utc": "2026-09-28T23:04:09.751641+01:00",
+ "SIGNAL": {
+  "outbox": {
+   "total_rows": 154,
+   "by_state": {
+    "SENT": 154
+   },
+   "sent": 154,
+   "retry_sends (attempts>1)": 0,
+   "duplicate_dedup_keys": 0,
+   "queued (PENDING/RETRY)": 0,
+   "expired": 0,
+   "failed/held/ambiguous": 0
+  },
+  "classification": {
+   "NEW_PAPER_OPPORTUNITY": 154
+  },
+  "duplicates": {
+   "same_promotion_id_twice": 0,
+   "same_candidate_twice": 0,
+   "symbols_with_multiple_identities": {}
+  },
+  "per_symbol": {
+   "unique_symbols": 154,
+   "messages_per_symbol_mean": 1.0,
+   "max_messages_one_symbol": 1,
+   "top20": [
+    [
+     "NVDA",
+     1
+    ],
+    [
+     "ANNX",
+     1
+    ],
+    [
+     "IONQ",
+     1
+    ],
+    [
+     "MAT",
+     1
+    ],
+    [
+     "SG",
+     1
+    ],
+    [
+     "QMCO",
+     1
+    ],
+    [
+     "CANG",
+     1
+    ],
+    [
+     "MTUS",
+     1
+    ],
+    [
+     "AMC",
+     1
+    ],
+    [
+     "CAAP",
+     1
+    ],
+    [
+     "ABVX",
+     1
+    ],
+    [
+     "LXRX",
+     1
+    ],
+    [
+     "PSKY",
+     1
+    ],
+    [
+     "FOXF",
+     1
+    ],
+    [
+     "GTN",
+     1
+    ],
+    [
+     "HHH",
+     1
+    ],
+    [
+     "HAFN",
+     1
+    ],
+    [
+     "SFIX",
+     1
+    ],
+    [
+     "STNG",
+     1
+    ],
+    [
+     "TFX",
+     1
+    ]
+   ],
+   "symbols_with_ge_5": 0
+  },
+  "candidate_origin_window": {
+   "2026-09-28": 154
+  },
+  "latency_min": {
+   "queued_to_released_p50": 1.46,
+   "queued_to_released_p90": 9.03,
+   "queued_to_released_max": 13.59,
+   "event_to_sent_p50": 3.35,
+   "event_to_sent_p90": 10.18,
+   "event_to_sent_max": 14.99,
+   "data_as_of_to_sent_p50": 19.55,
+   "data_as_of_to_sent_p90": 26.66
+  },
+  "released_after_ge_10min_queue": 7,
+  "limiter": {
+   "max_sends_any_rolling_5min": 3,
+   "policy": "3 per 5 min",
+   "score_order_inversions": 0
+  },
+  "promotions_queued_today_by_state": {
+   "PROMOTED_SIGNAL:OK": 154,
+   "REJECTED_WHILE_QUEUED:STALE": 28,
+   "EXPIRED:QUEUE_EXPIRY_30M": 25
+  },
+  "evaluations_today": {
+   "REJECTED:WATCH": 2342,
+   "REJECTED:BEARISH": 767,
+   "ELIGIBLE:OK": 207,
+   "REJECTED:PHASE": 37
+  },
+  "score_distribution": {
+   "65-70": 32,
+   "70-75": 34,
+   "75-80": 23,
+   "80-85": 13,
+   "85+": 3,
+   "<65": 49
+  },
+  "price_bands": {
+   "$1-5": 27,
+   "$100+": 16,
+   "$20-100": 59,
+   "$5-20": 52
+  },
+  "horizons": {
+   "[\"INTRADAY\", \"SAME_DAY\"]": 154
+  },
+  "data_phase": {
+   "REGULAR": 154
+  },
+  "hour_utc": {
+   "13": 6,
+   "14": 33,
+   "15": 23,
+   "16": 30,
+   "17": 26,
+   "18": 12,
+   "19": 21,
+   "20": 3
+  },
+  "outcomes_by_score_band (descriptive only, not evidence of edge)": {
+   "<65": {
+    "n_sent": 49,
+    "n_30m": 48,
+    "confirmed_30m": 19,
+    "mean_ret_30m_pct": -0.095,
+    "n_close": 49,
+    "mean_close_ret_pct": -0.188
+   },
+   "65-70": {
+    "n_sent": 32,
+    "n_30m": 28,
+    "confirmed_30m": 11,
+    "mean_ret_30m_pct": -0.893,
+    "n_close": 32,
+    "mean_close_ret_pct": -0.011
+   },
+   "70-75": {
+    "n_sent": 34,
+    "n_30m": 34,
+    "confirmed_30m": 18,
+    "mean_ret_30m_pct": -0.023,
+    "n_close": 34,
+    "mean_close_ret_pct": 0.206
+   },
+   "75-80": {
+    "n_sent": 23,
+    "n_30m": 23,
+    "confirmed_30m": 10,
+    "mean_ret_30m_pct": 0.301,
+    "n_close": 23,
+    "mean_close_ret_pct": 0.033
+   },
+   "80-85": {
+    "n_sent": 13,
+    "n_30m": 12,
+    "confirmed_30m": 4,
+    "mean_ret_30m_pct": -0.091,
+    "n_close": 13,
+    "mean_close_ret_pct": -0.38
+   },
+   "85+": {
+    "n_sent": 3,
+    "n_30m": 3,
+    "confirmed_30m": 2,
+    "mean_ret_30m_pct": 0.616,
+    "n_close": 3,
+    "mean_close_ret_pct": 3.146
+   }
+  }
+ },
+ "LAB": {
+  "outbox": {
+   "total_rows": 314,
+   "by_state": {
+    "SENT": 314
+   },
+   "sent": 314,
+   "retry_sends (attempts>1)": 0,
+   "duplicate_dedup_keys": 0,
+   "queued (PENDING/RETRY)": 0,
+   "expired": 0,
+   "failed/held/ambiguous": 0
+  },
+  "sent_by_kind": {
+   "MATERIAL_UPDATE_BULLISH": 91,
+   "INVALIDATED": 73,
+   "MATERIAL_UPDATE_BEARISH": 56,
+   "UPGRADE_TO_BEARISH": 40,
+   "WATCH": 15,
+   "UPGRADE_TO_BULLISH": 14,
+   "NEW_BEARISH": 11,
+   "NEW_BULLISH": 7,
+   "MATERIAL_UPDATE_WATCH": 7
+  },
+  "sent_by_phase": {
+   "PREMARKET": 159,
+   "REGULAR": 135,
+   "AFTER_HOURS": 20
+  },
+  "per_symbol": {
+   "unique_symbols": 117,
+   "messages_per_symbol_mean": 2.68,
+   "max_messages_one_symbol": 16,
+   "top20": [
+    [
+     "MEDS",
+     16
+    ],
+    [
+     "ONCO",
+     15
+    ],
+    [
+     "NAMI",
+     15
+    ],
+    [
+     "INLF",
+     12
+    ],
+    [
+     "MSGY",
+     11
+    ],
+    [
+     "SDEV",
+     10
+    ],
+    [
+     "MX",
+     10
+    ],
+    [
+     "AMPX",
+     8
+    ],
+    [
+     "TDIC",
+     8
+    ],
+    [
+     "SHMD",
+     7
+    ],
+    [
+     "SRFM",
+     7
+    ],
+    [
+     "KITT",
+     6
+    ],
+    [
+     "BUR",
+     6
+    ],
+    [
+     "ANNX",
+     6
+    ],
+    [
+     "ACET",
+     5
+    ],
+    [
+     "AIFF",
+     5
+    ],
+    [
+     "LABT",
+     5
+    ],
+    [
+     "USDE",
+     4
+    ],
+    [
+     "CRCL",
+     4
+    ],
+    [
+     "MT",
+     4
+    ]
+   ],
+   "symbols_with_ge_5": 17
+  },
+  "per_candidate_max": 16,
+  "decisions_today_all": {
+   "NOT_SURFACED_PARENT": 3219,
+   "SELECTED": 314,
+   "BUDGET_EXHAUSTED_WATCH": 2278,
+   "BUDGET_RESERVED_LATER_PHASE": 913,
+   "BUDGET_EXHAUSTED_TOTAL": 75
+  }
+ },
+ "SENTINEL": {
+  "operations_outbox": {
+   "total_rows": 1,
+   "by_state": {
+    "SENT": 1
+   },
+   "sent": 1,
+   "retry_sends (attempts>1)": 0,
+   "duplicate_dedup_keys": 0,
+   "queued (PENDING/RETRY)": 0,
+   "expired": 0,
+   "failed/held/ambiguous": 0
+  },
+  "operations_by_type": {
+   "STARTUP": 1
+  },
+  "command_replies": 1,
+  "total_sent": 2
+ },
+ "LEGACY_AND_V2": {
+  "legacy_last_telegram_push_today": 0,
+  "v2_trade_event_outbox_today": 0
+ },
+ "FUTURE_SIGNAL_POLICIES_READ_ONLY": {
+  "_note": "estimates: queue replayed at 30 s ticks with the real run's invalidation times; outcome metrics exist only for items the REAL run promoted (coverage reported); descriptive, n small, no edge claim",
+  "eligible_queued_today": 207,
+  "eligible_ge_80": 16,
+  "P0_CURRENT_3_PER_5MIN (simulated)": {
+   "SIGNALS_SENT": 164,
+   "UNIQUE_SYMBOLS": 164,
+   "HIGH_SCORE_CAPTURE": "16/16",
+   "MISSED_80_PLUS": 0,
+   "OUTCOME_COVERAGE": "154/164",
+   "CONFIRMED_30M_RATE": 0.432,
+   "MEAN_RET_30M_PCT": -0.153,
+   "MEAN_CLOSE_RET_PCT": 0.017
+  },
+  "P1_SCORE_GE_70": {
+   "SIGNALS_SENT": 73,
+   "UNIQUE_SYMBOLS": 73,
+   "HIGH_SCORE_CAPTURE": "16/16",
+   "MISSED_80_PLUS": 0,
+   "OUTCOME_COVERAGE": "73/73",
+   "CONFIRMED_30M_RATE": 0.472,
+   "MEAN_RET_30M_PCT": 0.096,
+   "MEAN_CLOSE_RET_PCT": 0.168
+  },
+  "P2_SCORE_GE_75": {
+   "SIGNALS_SENT": 39,
+   "UNIQUE_SYMBOLS": 39,
+   "HIGH_SCORE_CAPTURE": "16/16",
+   "MISSED_80_PLUS": 0,
+   "OUTCOME_COVERAGE": "39/39",
+   "CONFIRMED_30M_RATE": 0.421,
+   "MEAN_RET_30M_PCT": 0.202,
+   "MEAN_CLOSE_RET_PCT": 0.135
+  },
+  "P3_TOP1_PER_5MIN": {
+   "SIGNALS_SENT": 78,
+   "UNIQUE_SYMBOLS": 78,
+   "HIGH_SCORE_CAPTURE": "16/16",
+   "MISSED_80_PLUS": 0,
+   "OUTCOME_COVERAGE": "78/78",
+   "CONFIRMED_30M_RATE": 0.411,
+   "MEAN_RET_30M_PCT": 0.04,
+   "MEAN_CLOSE_RET_PCT": -0.103
+  },
+  "P4_TOP2_PER_15MIN": {
+   "SIGNALS_SENT": 52,
+   "UNIQUE_SYMBOLS": 52,
+   "HIGH_SCORE_CAPTURE": "16/16",
+   "MISSED_80_PLUS": 0,
+   "OUTCOME_COVERAGE": "52/52",
+   "CONFIRMED_30M_RATE": 0.36,
+   "MEAN_RET_30M_PCT": -0.005,
+   "MEAN_CLOSE_RET_PCT": -0.249
+  },
+  "P5_TRADABILITY_PRICE_GE_5_AND_SESSION_DOLLARS_GE_5M": {
+   "SIGNALS_SENT": 71,
+   "UNIQUE_SYMBOLS": 71,
+   "HIGH_SCORE_CAPTURE": "10/16",
+   "MISSED_80_PLUS": 6,
+   "OUTCOME_COVERAGE": "60/71",
+   "CONFIRMED_30M_RATE": 0.386,
+   "MEAN_RET_30M_PCT": -0.068,
+   "MEAN_CLOSE_RET_PCT": -0.03
+  },
+  "P6_ONE_PER_SYMBOL_PER_DAY": {
+   "SIGNALS_SENT": 164,
+   "UNIQUE_SYMBOLS": 164,
+   "HIGH_SCORE_CAPTURE": "16/16",
+   "MISSED_80_PLUS": 0,
+   "OUTCOME_COVERAGE": "154/164",
+   "CONFIRMED_30M_RATE": 0.432,
+   "MEAN_RET_30M_PCT": -0.153,
+   "MEAN_CLOSE_RET_PCT": 0.017
+  },
+  "P7_SCORE_GE_70_AND_TRADABILITY": {
+   "SIGNALS_SENT": 38,
+   "UNIQUE_SYMBOLS": 38,
+   "HIGH_SCORE_CAPTURE": "10/16",
+   "MISSED_80_PLUS": 6,
+   "OUTCOME_COVERAGE": "38/38",
+   "CONFIRMED_30M_RATE": 0.447,
+   "MEAN_RET_30M_PCT": -0.083,
+   "MEAN_CLOSE_RET_PCT": -0.09
+  }
+ }
+}
