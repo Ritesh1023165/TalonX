@@ -318,6 +318,9 @@ def main(argv=None) -> int:
     fps = {"CONTINUOUS_RESEARCH": CONTINUOUS_RESEARCH_V1.fingerprint(),
            "PREMARKET_RESEARCH_V1": CONTINUOUS_RESEARCH_V1.base.fingerprint()}
     if sec_refresh.enabled():                       # key only when ON, so OFF keeps today's config fingerprints
-        fps["SEC_CATALYST_CACHE"] = "BACKGROUND_REFRESH_V1"
+        # OBSERVABILITY_ONLY refreshes exactly like the live V1 refresher (+ metrics) -> same value; the opt-in capacity
+        # remediation is a distinct value (still the SEC_CATALYST_CACHE key: DATA_FIX only when declared)
+        fps["SEC_CATALYST_CACHE"] = "BACKGROUND_REFRESH_V1" if sec_refresh.capacity_mode() == \
+            sec_refresh.OBSERVABILITY_ONLY else "BACKGROUND_REFRESH_V1+CAPACITY_REMEDIATION_V1"
     run_component("discovery", tick=disc.tick, root=root, detail=disc.detail, config_fps=fps)
     return 0

@@ -154,7 +154,7 @@ def test_waiting_discovery_request_goes_before_the_refresher():
 def test_production_wrap_installs_the_global_limiter_on_every_sec_request(monkeypatch):
     sec, t, calls = _sec()
     monkeypatch.setattr(SR, "MIN_INTERVAL_S", 0.01)
-    w = SR.maybe_wrap(sec, env={SR.FLAG: "1"})
+    w = SR.maybe_wrap(sec, env={SR.FLAG: "1", SR.CAPACITY_ENV: SR.REMEDIATION_V1})    # opt-in capacity mode
     try:
         assert w.limiter is not None and w.limiter.min_interval_s == 0.01
         w.get("1")                                         # discovery synchronous path -> limiter (high)

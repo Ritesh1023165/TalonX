@@ -35,6 +35,13 @@ Still one background thread; no unbounded growth; any refresher failure leaves d
 
 Parsing, evaluation, scoring and classification are untouched: the wrapper returns the same ``(submissions,
 observed_at)`` tuples ``SecSubmissions.get`` returns. OFF (the default) = discovery uses the plain ``SecSubmissions``.
+
+2026-09-29 -- capacity mode (``TALONX_SEC_REFRESH_CAPACITY``). SEC capacity is NOT scaled until the Dynamic Tradable
+Universe study settles which symbols need continuous processing. Production therefore defaults to
+``OBSERVABILITY_ONLY``: the refresher behaves exactly like the live 2026-09-26 one (cf0cffb: refreshes only while
+discovery is idle, one request at a time through ``SecSubmissions.get`` under the cache lock, no global limiter, no
+reuse window) and ONLY the observability is added (served_source, stale-fallback reason, raw ages, >=590/595/600
+counts, p95/p99). ``REMEDIATION_V1`` (the capacity changes above) is opt-in and not deployed.
 """
 from __future__ import annotations
 
@@ -48,6 +55,9 @@ from typing import Callable
 log = logging.getLogger("talonx_opportunity.sec_refresh")
 
 FLAG = "TALONX_SEC_BACKGROUND_REFRESH_ENABLED"
+CAPACITY_ENV = "TALONX_SEC_REFRESH_CAPACITY"
+OBSERVABILITY_ONLY, REMEDIATION_V1 = "OBSERVABILITY_ONLY", "REMEDIATION_V1"
+CAPACITY_MODES = (OBSERVABILITY_ONLY, REMEDIATION_V1)
 REFRESH_AHEAD_S = 480.0       # an entry becomes refreshable once it is this close to the TTL (i.e. age >= 120 s)
 IDLE_GAP_S = 2.0              # no discovery lookup for this long (and no open scan) = discovery idle
 FORGET_AFTER_S = 1800.0       # stop tracking a CIK discovery has not asked for in this long
@@ -65,6 +75,14 @@ FETCH_ERROR, RATE_LIMIT, RATE_LIMIT_BACKOFF, TIMEOUT, OTHER = ("FETCH_ERROR", "R
 
 def enabled(env=None) -> bool:
     return str((env if env is not None else os.environ).get(FLAG, "0")).strip().lower() in ("1", "true", "yes", "on")
+
+
+def capacity_mode(env=None) -> str:
+    m = str((env if env is not None else os.environ).get(CAPACITY_ENV, OBSERVABILITY_ONLY)).strip().upper() \
+        or OBSERVABILITY_ONLY
+    if m not in CAPACITY_MODES:
+        raise SystemExit(f"{CAPACITY_ENV}={m!r}: allowed {' | '.join(CAPACITY_MODES)}")
+    return m
 
 
 def failure_reason(error_text: str) -> str:
@@ -146,7 +164,13 @@ class BackgroundSecCache:
     def __init__(self, sec, *, refresh_ahead_s: float = REFRESH_AHEAD_S, forget_after_s: float = FORGET_AFTER_S,
                  max_tracked: int = MAX_TRACKED, clock: Callable[[], float] | None = None, start: bool = True,
                  idle_sleep_s: float = 1.0, idle_gap_s: float = IDLE_GAP_S, reuse_window_s: float = REUSE_WINDOW_S,
-                 min_interval_s: float | None = None, scan_refresh_rate_per_s: float = SCAN_REFRESH_RATE_PER_S):
+                 min_interval_s: float | None = None, scan_refresh_rate_per_s: float = SCAN_REFRESH_RATE_PER_S,
+                 capacity: str = REMEDIATION_V1):
+        if capacity not in CAPACITY_MODES:
+            raise ValueError(f"capacity {capacity!r}: one of {CAPACITY_MODES}")
+        self.capacity = capacity
+        if capacity == OBSERVABILITY_ONLY:             # exactly the pre-remediation (cf0cffb) refresher behaviour
+            min_interval_s, scan_refresh_rate_per_s, reuse_window_s = None, 0.0, float("inf")
         self.sec = sec
         self.clock = clock or sec.clock
         self.refresh_ahead_s, self.forget_after_s, self.max_tracked = refresh_ahead_s, forget_after_s, max_tracked
@@ -302,7 +326,10 @@ class BackgroundSecCache:
 
     def refresh_one(self, cik: str) -> bool:
         """Re-fetch one CIK (same URL, headers, error bookkeeping and 429 back-off as ``SecSubmissions.get``). The
-        network request runs outside the cache lock; a failed refresh never touches the previous cached copy."""
+        network request runs outside the cache lock; a failed refresh never touches the previous cached copy.
+        OBSERVABILITY_ONLY: the pre-remediation path (one request through ``SecSubmissions.get`` under the lock)."""
+        if self.capacity == OBSERVABILITY_ONLY:
+            return self._refresh_one_locked(cik)
         with self._lock:
             if self.clock() < getattr(self.sec, "_backoff_until", 0.0):
                 self.stats["throttled_skips"] += 1
@@ -331,6 +358,29 @@ class BackgroundSecCache:
         self._count_scan_refresh(scan_open)
         return True
 
+    def _refresh_one_locked(self, cik: str) -> bool:
+        """cf0cffb ``refresh_one``: same request, spacing, error and 429 handling as ``SecSubmissions.get`` (under the
+        cache lock); a failed refresh restores the untouched previous copy AND its original fetch time."""
+        with self._lock:
+            if self.clock() < getattr(self.sec, "_backoff_until", 0.0):
+                self.stats["throttled_skips"] += 1
+                return False
+            prev = self.sec._cache.get(cik)
+            if prev is not None:
+                self.sec._cache[cik] = (float("-inf"), prev[1], prev[2])   # force a fetch on the next get
+            before = self.sec.requests
+            errs = len(self.sec.errors)
+            try:
+                self.sec.get(cik)
+                ok = self.sec.requests > before and len(self.sec.errors) == errs
+            except Exception:  # noqa: BLE001 -- unexpected (e.g. cache write) failure: treat as a failed refresh
+                ok = False
+            if not ok and prev is not None:
+                self.sec._cache[cik] = prev                    # failure: restore the untouched previous copy
+            self.stats["refreshed" if ok else "refresh_errors"] += 1
+            self._count_scan_refresh(True)
+            return ok
+
     def _count_scan_refresh(self, scan_open_at_start: bool) -> None:
         """Count a refresher request that overlapped an open scan (it started or finished while one was open)."""
         with self._mlock:
@@ -338,6 +388,8 @@ class BackgroundSecCache:
                 self._scan["refresh_during_scan"] += 1
 
     def discovery_idle(self) -> bool:
+        if self.capacity == OBSERVABILITY_ONLY:                # cf0cffb semantics: idle = no lookup for idle_gap_s
+            return self.clock() - self._last_get >= self.idle_gap_s
         return self._scan is None and self.clock() - self._last_get >= self.idle_gap_s
 
     def run_once(self) -> int:
@@ -388,16 +440,20 @@ class BackgroundSecCache:
 
     def detail(self) -> dict:
         with self._lock:
-            return {"mode": "BACKGROUND_REFRESH", "tracked": len(self._wanted), **self.stats,
-                    "sec_requests": self.sec.requests,
+            return {"mode": "BACKGROUND_REFRESH", "capacity": self.capacity, "tracked": len(self._wanted),
+                    **self.stats, "sec_requests": self.sec.requests,
                     "limiter_min_interval_s": self.limiter.min_interval_s if self.limiter else None}
 
 
 def maybe_wrap(sec, env=None):
-    """``sec`` unchanged unless the flag is ON (default OFF)."""
+    """``sec`` unchanged unless the flag is ON (default OFF). Capacity mode defaults to OBSERVABILITY_ONLY."""
     if sec is None or not enabled(env):
         return sec
+    if capacity_mode(env) == OBSERVABILITY_ONLY:
+        log.warning("SEC BACKGROUND REFRESH ENABLED (%s=1), capacity OBSERVABILITY_ONLY: pre-remediation refresher + "
+                    "raw freshness observability; catalyst freshness bound unchanged (%.0f s TTL)", FLAG, sec.ttl_s)
+        return BackgroundSecCache(sec, capacity=OBSERVABILITY_ONLY)
     log.warning("SEC BACKGROUND REFRESH ENABLED (%s=1): catalyst freshness bound unchanged (%.0f s TTL); "
                 "global request spacing %.2f s; scan-time refresher budget %.1f req/s", FLAG, sec.ttl_s,
                 MIN_INTERVAL_S, SCAN_REFRESH_RATE_PER_S)
-    return BackgroundSecCache(sec, min_interval_s=MIN_INTERVAL_S)
+    return BackgroundSecCache(sec, min_interval_s=MIN_INTERVAL_S, capacity=REMEDIATION_V1)

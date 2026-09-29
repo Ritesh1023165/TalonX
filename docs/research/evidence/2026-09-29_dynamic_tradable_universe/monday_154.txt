@@ -1,0 +1,22 @@
+E0_CORE_ONLY 1200 154 Counter({'MISSED': 115, 'CORE': 38, 'OPERATOR_ADDED': 1}) Counter()
+E5_E4+PROTECT_ACTIVE 1200 154 Counter({'PROTECTED_ACTIVE_IDENTITY': 102, 'CORE': 38, 'EVENT_RECOVERED': 8, 'EVENT_RECOVERED_1_SCAN_LATE': 5, 'OPERATOR_ADDED': 1}) Counter({'GAP_SNAPSHOT>=3.0%': 8, 'FILING_8K': 3, 'FORM4_CLUSTER': 2})
+E5_E4+PROTECT_ACTIVE 500 154 Counter({'PROTECTED_ACTIVE_IDENTITY': 132, 'CORE': 8, 'EVENT_RECOVERED': 8, 'EVENT_RECOVERED_1_SCAN_LATE': 5, 'OPERATOR_ADDED': 1}) Counter({'GAP_SNAPSHOT>=3.0%': 8, 'FILING_8K': 3, 'FORM4_CLUSTER': 2})
+
+named examples:
+SMJF price 1.6 adv20 1268585 advRank 3802 cov 0.3949 spread_bps 157.53 score 75.7 E0@1200 MISSED E5@1200 PROTECTED_ACTIVE_IDENTITY  ret30 0.0 close 15.873 CONFIRMED
+URG price 1.13 adv20 7831503 advRank 2780 cov 0.9769 spread_bps 87.72 score 70.7 E0@1200 MISSED E5@1200 PROTECTED_ACTIVE_IDENTITY  ret30 -1.288 close -3.863 FAILED_CONFIRMATION
+ECX price 1.09 adv20 1270649 advRank 3801 cov 0.4949 spread_bps 90.56 score 75.0 E0@1200 MISSED E5@1200 PROTECTED_ACTIVE_IDENTITY  ret30 -0.873 close -2.183 FAILED_CONFIRMATION
+ANNX price 3.64 adv20 12546681 advRank 2459 cov 0.9897 spread_bps 27.06 score 70.5 E0@1200 MISSED E5@1200 PROTECTED_ACTIVE_IDENTITY  ret30 -2.679 close 2.168 FAILED_CONFIRMATION
+CRCT price 6.14 adv20 3956802 advRank 3184 cov 0.7103 spread_bps 16.5 score 66.3 E0@1200 MISSED E5@1200 PROTECTED_ACTIVE_IDENTITY  ret30 0.005 close 0.005 CONFIRMED
+
+outcomes by tradability bucket (Monday Signals, descriptive; V2 reference friction 20 bps round trip):
+price < $3                         n= 15 conf30=9/15 mean30=-0.71% med30=+1.06% meanClose=+1.77% halfSpread_med=37bps
+price >= $3                        n=139 conf30=55/133 mean30=-0.09% med30=-0.19% meanClose=-0.17% halfSpread_med=11bps
+ADV20 < $2M                        n= 12 conf30=4/12 mean30=-1.11% med30=-1.09% meanClose=+0.98% halfSpread_med=48bps
+ADV20 >= $2M                       n=142 conf30=60/136 mean30=-0.07% med30=-0.10% meanClose=-0.06% halfSpread_med=12bps
+spread > 100 bps                   n= 17 conf30=7/16 mean30=-1.96% med30=-0.99% meanClose=+0.08% halfSpread_med=79bps
+spread <= 100 bps                  n=137 conf30=57/132 mean30=+0.07% med30=-0.13% meanClose=+0.01% halfSpread_med=11bps
+RTH coverage D-1 < 0.8             n= 74 conf30=31/72 mean30=-0.30% med30=-0.17% meanClose=-0.17% halfSpread_med=23bps
+RTH coverage D-1 >= 0.8            n= 80 conf30=33/76 mean30=-0.01% med30=-0.14% meanClose=+0.19% halfSpread_med=8bps
+ADV rank <= 1200                   n= 39 conf30=16/38 mean30=-0.07% med30=-0.24% meanClose=+0.00% halfSpread_med=7bps
+ADV rank > 1200                    n=115 conf30=48/110 mean30=-0.18% med30=-0.10% meanClose=+0.02% halfSpread_med=16bps
