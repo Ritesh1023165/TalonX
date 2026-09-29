@@ -81,3 +81,22 @@ stays INCONCLUSIVE until a live session is measured with these metrics.
 **Deploying the SEC observability** requires a discovery restart and is not done here. The boundary would be a
 code-only change with the config fingerprint unchanged, so it must be declared. Proposed class: REPORTING_ONLY-like
 (no detection impact), recorded as **DATA_FIX** for consistency with the SEC cache history.
+
+## 3. Live confirmation at 08:30Z (TELEGRAM_DEPLOYMENT = PASS)
+
+Evidence: `2026-09-29_telegram_deploy/telegram_verify_0830.json` (read-only).
+
+| Check | Result |
+|---|---|
+| Lab rows since deploy | 50, all in the new 🧪 format, all SENT |
+| Duplicate dedup keys (Lab / Signal) | 0 / 0 |
+| Every decision since deploy routed by the new policy (no legacy SELECTED rows) | yes (0 unrouted) |
+| Event both immediate and digested | 0 |
+| Notifier cursor lag | 0 |
+| Signal rows since deploy | 0 (no REGULAR session yet; all rows will use the new format) |
+| Digests | 0 so far (no digest-class event yet) |
+
+**Observation (follow-up, not changed).** All 50 messages are `SENT_SETUP_INVALIDATED`, a burst at the first scans of
+the new trading window. Setups carried from 09-28 are re-measured against the new reference close and fade below 1%.
+They are HIGH-information by policy, but the burst itself is a noise candidate: for example, one roll-over summary
+instead of individual messages for carried identities. Decide in a separate routing task.
