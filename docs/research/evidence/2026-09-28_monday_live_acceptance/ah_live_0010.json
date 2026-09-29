@@ -1,0 +1,104 @@
+{
+ "window": "2026-09-28",
+ "ah_decisions": 517,
+ "missing_data_phase": 0,
+ "case_A_regular_data_after_close": {
+  "n": 164,
+  "counted_new": 0,
+  "decisions": {
+   "BUDGET_EXHAUSTED_WATCH": 42,
+   "BUDGET_RESERVED_LATER_PHASE": 34,
+   "NOT_SURFACED_PARENT": 82,
+   "SELECTED": 6
+  }
+ },
+ "case_B_true_ah": {
+  "n": 353,
+  "counted_new": 3,
+  "setups": 164,
+  "decisions": {
+   "BUDGET_EXHAUSTED_TOTAL": 102,
+   "NOT_SURFACED_PARENT": 232,
+   "SELECTED": 19
+  }
+ },
+ "first_regular_data_setup_after_20": {
+  "symbol": "CCB",
+  "event_type": "MATERIAL_UPDATE",
+  "classification": "BEARISH",
+  "decision": "SELECTED",
+  "reason": "material update of a surfaced candidate",
+  "counted_new": 0,
+  "data_phase": "REGULAR",
+  "data_as_of_utc": "2026-09-28T19:44:00+00:00",
+  "decided_utc": "2026-09-28T20:01:19.329709+00:00",
+  "score": 100.0,
+  "outbox_event_id": "2026-09-28:CCB:GAP_DOWN:MATERIAL_UPDATE:2026-09-28T20:00:00.045185+00:00",
+  "delivery_state": "SENT"
+ },
+ "first_true_ah_candidate": {
+  "symbol": "NWSA",
+  "event_type": "NEW",
+  "classification": "WATCH",
+  "decision": "BUDGET_EXHAUSTED_TOTAL",
+  "reason": "75/75 new surfacings used",
+  "counted_new": 0,
+  "data_phase": "AFTER_HOURS",
+  "data_as_of_utc": "2026-09-28T20:04:00+00:00",
+  "decided_utc": "2026-09-28T20:21:17.298186+00:00",
+  "score": 90.26,
+  "outbox_event_id": null,
+  "delivery_state": null
+ },
+ "first_true_ah_setup": {
+  "symbol": "SCHL",
+  "event_type": "MATERIAL_UPDATE",
+  "classification": "BULLISH",
+  "decision": "NOT_SURFACED_PARENT",
+  "reason": "material update of a never-surfaced candidate",
+  "counted_new": 0,
+  "data_phase": "AFTER_HOURS",
+  "data_as_of_utc": "2026-09-28T20:04:00+00:00",
+  "decided_utc": "2026-09-28T20:21:17.070656+00:00",
+  "score": 86.65,
+  "outbox_event_id": null,
+  "delivery_state": null
+ },
+ "first_true_ah_send": {
+  "symbol": "MED",
+  "event_type": "UPGRADE",
+  "classification": "BEARISH",
+  "decision": "SELECTED",
+  "reason": "new surfacing within budget",
+  "counted_new": 1,
+  "data_phase": "AFTER_HOURS",
+  "data_as_of_utc": "2026-09-28T20:04:00+00:00",
+  "decided_utc": "2026-09-28T20:21:16.960304+00:00",
+  "score": 81.01,
+  "outbox_event_id": "2026-09-28:MED:GAP_DOWN:UPGRADE:2026-09-28T20:20:00.042462+00:00",
+  "delivery_state": "SENT"
+ },
+ "first_true_ah_send_outbox": {
+  "state": "SENT",
+  "sent_at_utc": "2026-09-28T20:21:18.872137+00:00",
+  "destination": "RESEARCH"
+ },
+ "notifier_after_hours_reserve": {
+  "AH_RESERVED_REMAINING": 0,
+  "AH_RESERVED_TOTAL": 3,
+  "AH_RESERVED_USED_BY_TRUE_AH": 3,
+  "REGULAR_DATA_AFTER_CLOSE": {
+   "BUDGET_EXHAUSTED_WATCH": 42,
+   "BUDGET_RESERVED_LATER_PHASE": 34,
+   "NOT_SURFACED_PARENT": 82,
+   "SELECTED": 6
+  },
+  "REGULAR_DATA_AFTER_CLOSE_COUNTED_NEW": 0,
+  "TRUE_AH_HELD": 36,
+  "TRUE_AH_SENT": 3,
+  "basis": "CAUSAL_DATA_PHASE_V1",
+  "window_id": "2026-09-28"
+ },
+ "duplicate_outbox_events": 0,
+ "VERDICT": "ACCEPTED"
+}

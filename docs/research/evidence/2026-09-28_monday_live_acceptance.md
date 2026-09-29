@@ -170,3 +170,18 @@ $env:TALONX_SEC_BACKGROUND_REFRESH_ENABLED='1'   # plus the rest of runbook §S3
   - In production it is now fronted by the `perf_counter` limiter, which governs the cap.
   - Other engine uses of `time.monotonic` are duration measurements and have not been audited for sub-tick precision.
 - **Follow-ups (not in this task):** Dynamic Tradable Universe / symbol-count reduction (needed beyond ~1,500 lookups/scan), S-UX1 / S-OPS1, ACTIVE provider mutation proof.
+
+## 10. AFTER_HOURS reserve — live confirmation (AH_RESERVE_LIVE_VERDICT = ACCEPTED)
+
+Checked read-only with `tools/ah_live_check.py` at 21:30Z and 00:10Z. Results are in `ah_live_2130.json` and
+`ah_live_0010.json`; both returned ACCEPTED.
+
+| Case | Decisions (00:10Z) | Counted against the reserve | Outcome |
+|---|---|---|---|
+| A: processed AFTER_HOURS, REGULAR data | 164 | **0** | 34 held as BUDGET_RESERVED_LATER_PHASE; 6 SELECTED were non-counting updates |
+| B: processed AFTER_HOURS, true AFTER_HOURS data | 353 (164 setups) | **3** = AH_RESERVED_TOTAL | 36 true-AH setups held once the reserve was used |
+
+- The first true-AH send was MED (BEARISH upgrade, score 81.0). Its data was as of 20:04Z; it was decided at 20:21Z
+  and delivered to RESEARCH at 20:21:18Z.
+- Every decision had a data phase recorded (0 missing), and the outbox had 0 duplicates.
+- The Friday failure shape (REGULAR-data setups consuming the AFTER_HOURS slots) did not recur live.
