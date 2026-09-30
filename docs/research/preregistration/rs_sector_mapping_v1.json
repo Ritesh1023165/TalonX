@@ -1,0 +1,57 @@
+{
+ "note": "FROZEN SIC -> benchmark mapping for RS_ALPHA_V1. One SIC -> one benchmark; unmapped/unknown -> SPY. Any change = new hypothesis version.",
+ "hypothesis_version": "RS_ALPHA_V1",
+ "mapping": {
+  "version": "SIC_ETF_MAP_V1",
+  "default": "SPY",
+  "ranges": [
+   {
+    "sic_lo": 1000,
+    "sic_hi": 1499,
+    "benchmark": "XLE"
+   },
+   {
+    "sic_lo": 2830,
+    "sic_hi": 2836,
+    "benchmark": "XBI"
+   },
+   {
+    "sic_lo": 2900,
+    "sic_hi": 2999,
+    "benchmark": "XLE"
+   },
+   {
+    "sic_lo": 3570,
+    "sic_hi": 3579,
+    "benchmark": "XLK"
+   },
+   {
+    "sic_lo": 3600,
+    "sic_hi": 3699,
+    "benchmark": "XLI"
+   },
+   {
+    "sic_lo": 3700,
+    "sic_hi": 3799,
+    "benchmark": "XLI"
+   },
+   {
+    "sic_lo": 3840,
+    "sic_hi": 3851,
+    "benchmark": "XLV"
+   },
+   {
+    "sic_lo": 6000,
+    "sic_hi": 6799,
+    "benchmark": "XLF"
+   },
+   {
+    "sic_lo": 7370,
+    "sic_hi": 7379,
+    "benchmark": "XLK"
+   }
+  ]
+ },
+ "mapping_hash": "5c861b56a91c8858",
+ "sic_source": "EDGAR submissions JSON (data.sec.gov/submissions/CIK##########.json 'sic'), CIK from market.db universe"
+}
