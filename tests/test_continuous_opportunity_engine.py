@@ -658,6 +658,8 @@ def test_frozen_release_does_not_import_the_opportunity_lane():
         for p in (REPO / pkg).rglob("*.py"):
             text = p.read_text(encoding="utf-8", errors="replace")
             assert "import talonx_opportunity" not in text and "from talonx_opportunity" not in text, p
+            for lane in ("talonx_shadow", "talonx_paperperf"):             # research tooling is never imported either
+                assert f"import {lane}" not in text and f"from {lane}" not in text, p
 
 
 # --------------------------------------------------------------------------------------------- 2026-09-25 live fixes

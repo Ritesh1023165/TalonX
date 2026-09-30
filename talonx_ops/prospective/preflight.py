@@ -140,7 +140,9 @@ FREEZE_SESSION03_HARDENING_FILES = (
 # ISOLATED RESEARCH LANES -- the broad-universe pre-market research engine (V1, frozen for replay/history) and the
 # Continuous Opportunity Engine are separate packages run as their own processes. Nothing in the frozen release imports
 # them (guarded by tests), they never trade, and they never write a V2 ledger/outbox.
-FREEZE_RESEARCH_LANE_PREFIXES = ("talonx_premarket/", "talonx_opportunity/")
+# 2026-09-30: + the read-only research tooling packages (DTU shadow collector, PAPER_SIGNAL profitability forensics /
+# forward-alpha framework): own processes / CLIs, read production stores mode=ro, never imported by the frozen release.
+FREEZE_RESEARCH_LANE_PREFIXES = ("talonx_premarket/", "talonx_opportunity/", "talonx_shadow/", "talonx_paperperf/")
 # POST-FREEZE CONTINUOUS-ENGINE INTEGRATION (S14-01..S14-06) -- an EXPLICIT, closed list: the read-only operator view of
 # the research lane, the retirement of the silently-broken Experimental lane from active startup, un-mixed /ping Quant
 # metrics, accurate yfinance incident accounting and the Intelligence stale-enqueue guard / digest visibility. No
@@ -179,6 +181,7 @@ FREEZE_OPERATOR_CONTROL_FILES = (
     "talonx_ops/operator_control/commands.py",
     "talonx_ops/operator_control/scanned.py",
     "talonx_ops/operator_control/sentinel.py",
+    "talonx_ops/operator_control/universe_view.py",            # 2026-09-30: read-only /universe summary|excluded views
 )
 # POST-FREEZE P0 PACKAGE 2A (2026-09-26) -- an EXPLICIT, closed list of operations-observability files: a missed
 # previous-session EOD close is surfaced as OVERDUE_EOD_CLOSE instead of hiding behind a weekend NOT_DUE_YET (and still

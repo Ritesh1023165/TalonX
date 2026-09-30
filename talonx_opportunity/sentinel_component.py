@@ -52,6 +52,7 @@ def status_text(root=None, env=None) -> str:
         p = comps.get("promotion")
         if p:
             lines.append(f"📈 Promotion: {(p.get('detail') or {}).get('mode') or p.get('mode') or '?'} · {p['health']}")
+        lines += _scope_lines(root)
     except Exception as exc:  # noqa: BLE001
         lines.append(f"🧭 Engine: status unavailable ({type(exc).__name__})")
     mode = mutation_mode(env)
@@ -66,6 +67,58 @@ def status_text(root=None, env=None) -> str:
         lines.append("🏦 V2: status file unavailable")
     lines.append("Paper only · no broker orders · /help for commands")
     return "\n".join(lines)
+
+
+def _scope_lines(root=None) -> list[str]:
+    """Scope + today's Opportunity Engine delivery counts, labelled per lane (no ambiguous 'pushed 0')."""
+    import sqlite3
+    out = []
+    r = root_dir(root)
+
+    def ro(name):
+        p = r / name
+        return sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=5) if p.exists() else None
+    try:
+        from talonx_ops.operator_control.universe_view import UniverseView
+        v = UniverseView(r)
+        if v.available():
+            s = v.summary()
+            c = s.get("counts", {})
+            out.append(f"🌐 OE universe: Core {c.get('ACTIVE_CORE', s['snapshot_counts'].get('ACTIVE_CORE', 0))} · "
+                       f"event-promoted {c.get('EVENT_PROMOTED', 0)} · effective active {s.get('n_active', 'n/a')} · "
+                       f"event-eligible {c.get('EVENT_ELIGIBLE', s['snapshot_counts'].get('EVENT_ELIGIBLE', 0))}"
+                       + (" ⚠️ fallback full" if s.get("fallback") else ""))
+        else:
+            m = ro("market.db")
+            n = m.execute("SELECT symbols FROM ingestion_state ORDER BY window_id DESC LIMIT 1").fetchone() if m else None
+            out.append(f"🌐 OE universe: full ({n[0] if n else '?'} symbols, Dynamic Universe OFF)")
+    except Exception:  # noqa: BLE001
+        out.append("🌐 OE universe: unavailable")
+    try:
+        from talonx_premarket import __main__ as M
+        out.append(f"🏛 V2 / filing scope: {len(M._v2_scope(None))} names (separate lane)")
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        today = datetime.now(timezone.utc).date().isoformat()
+        p = ro("promotion.db")
+        if p:
+            wid = p.execute("SELECT MAX(window_id) FROM promotions").fetchone()[0]
+            st = dict(p.execute("SELECT state, COUNT(*) FROM promotions WHERE window_id=? GROUP BY 1", (wid,)).fetchall())
+            out.append(f"🚨 PAPER_SIGNAL (OE, window {wid}): sent {st.get('PROMOTED_SIGNAL', 0)} · queued "
+                       f"{st.get('QUEUED', 0)} · expired {st.get('EXPIRED', 0)} · rejected "
+                       f"{st.get('REJECTED_WHILE_QUEUED', 0)}")
+        n = ro("notification.db")
+        lab = ro("opportunity_research_notifications.db")
+        if n and lab:
+            imm = lab.execute("SELECT COUNT(*) FROM ops_notification_outbox WHERE state='SENT' AND sent_at_utc LIKE ? "
+                              "AND event_type NOT LIKE '%DIGEST'", (today + "%",)).fetchone()[0]
+            dg = lab.execute("SELECT COUNT(*) FROM ops_notification_outbox WHERE state='SENT' AND sent_at_utc LIKE ? "
+                             "AND event_type LIKE '%DIGEST'", (today + "%",)).fetchone()[0]
+            out.append(f"🧪 Lab today: immediate {imm} · digests {dg}")
+    except Exception:  # noqa: BLE001
+        out.append("🚨/🧪 delivery counts unavailable")
+    return out
 
 
 class SentinelComponent:

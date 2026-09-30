@@ -15,7 +15,7 @@ from talonx_ops.operator_control.store import OperatorStore, normalize_symbol
 
 HEAD = "⚙️ TALONX SENTINEL"
 COMMANDS = ("help", "universe", "exclude", "scanned", "status")
-SUBS = {"universe": ("add", "remove", "list", "status"), "exclude": ("add", "remove", "list", "status"),
+SUBS = {"universe": ("add", "remove", "list", "status", "summary", "excluded"), "exclude": ("add", "remove", "list", "status"),
         "scanned": ("file", "candidates", "setups", "signals")}
 
 
@@ -63,7 +63,9 @@ Manage operator-added symbols in the fetch universe.
 /universe add PLTR — add PLTR to future provider fetches
 /universe remove PLTR — stop fetching an operator-added symbol
 /universe list — operator-added / removed symbols
-/universe status PLTR — current state of one symbol
+/universe status PLTR — current state of one symbol (operator + Dynamic Universe tier)
+/universe summary — Core / event-promoted / event-eligible / excluded / effective active counts
+/universe excluded — non-Core summary by reason · /universe excluded file — CSV of every non-Core symbol
 
 • Discovery starts from the activation boundary forward — no history backfill or replay.
 • History is kept when a symbol is removed; re-adding never replays it.
@@ -146,10 +148,22 @@ def handle(text: str, *, chat_id, user: str, owner_chat_id, store: OperatorStore
         return Reply(_usage(cmd, sub))
     if sub == "list":
         return Reply(_list(cmd, store, mode))
+    if cmd == "universe" and sub in ("summary", "excluded"):  # read-only Dynamic Universe views
+        from talonx_ops.operator_control import universe_view as UV
+        v = UV.UniverseView()
+        if sub == "summary":
+            return Reply(UV.summary_text(v, HEAD))
+        if len(args) > 1 and args[1].lower() == "file" and v.available():
+            return Reply(f"{HEAD} — non-Core universe ({v.wid})", document=v.excluded_csv(),
+                         filename=f"universe_excluded_{v.wid}.csv")
+        return Reply(UV.excluded_text(v, HEAD))
     sym, err = normalize_symbol(args[1] if len(args) > 1 else None)
     if err:
         return Reply(f"❗ {err}\n{_usage(cmd, sub)}")
     if sub == "status":
+        if cmd == "universe":
+            from talonx_ops.operator_control import universe_view as UV
+            return Reply(_status(sym, store, mode) + "\n" + UV.status_text(UV.UniverseView(), sym, "Dynamic Universe"))
         return Reply(_status(sym, store, mode))
     reason = " ".join(args[2:])[:120] or None
     return _mutate(cmd, sub, sym, reason, store=store, user=user, chat=str(chat_id), mode=mode, raw=raw)

@@ -48,7 +48,11 @@ def market_db(root=None) -> Path:
 
 class Ingestion:
     def __init__(self, *, data=None, root=None, cycle_s: float = 60.0, probe_every_s: float = 900.0,
-                 clock=None, universe_loader=None):
+                 clock=None, universe_loader=None, dtu_mode: str | None = None, dtu=None):
+        from talonx_opportunity import universe_tiers as U
+        self.dtu_mode = dtu_mode or U.mode()
+        self._dtu, self.dtu_last = dtu, None
+        self._dtu_cache: tuple[str, list[dict], dict] | None = None
         self.root = root
         self.con = connect(market_db(root), schema=SCHEMA)
         self._data = data
@@ -163,6 +167,9 @@ class Ingestion:
             self.last_note = f"{phase}: {cap.availability} ({cap.evidence[:80]})"
             self._write_cycle(w, phase, None, 0, 0, None, t0, self.last_note)
             return 300.0
+        from talonx_opportunity import universe_tiers as U
+        if self.dtu_mode == U.ACTIVE:                   # DTU: the effective active set, BEFORE any fetch batch is built
+            symbols = self._dtu_symbols(w, symbols, now)
         as_of = data_as_of(now)
         bounds_start = w.premarket_start_utc          # SIP extended session starts 04:00 ET (no SIP overnight)
         end = min(as_of, w.after_hours_end_utc)
@@ -203,6 +210,34 @@ class Ingestion:
         self._write_cycle(w, phase, end, len(changed), nbars, (len(failed), agg_stats), t0, self.last_note)
         return self.cycle_s
 
+    def _dtu_symbols(self, w, symbols: list[str], now: datetime) -> list[str]:
+        from talonx_opportunity import universe_tiers as U
+        from talonx_ops.operator_control.gates import _state
+        if self._dtu is None:
+            from talonx_premarket import __main__ as M
+            M._env()
+            self._dtu = U.DTU(self.con, root=self.root, headers=dict(self.data._headers), sec_ua=M._sec()._ua,
+                              clock=self.clock)
+        if self._dtu_cache is None or self._dtu_cache[0] != w.window_id:
+            row = self.con.execute("SELECT members_json FROM universe WHERE window_id=?", (w.window_id,)).fetchone()
+            daily = {r["symbol"]: unj(r["bars_json"], []) for r in
+                     self.con.execute("SELECT symbol, bars_json FROM daily WHERE window_id=?", (w.window_id,))}
+            self._dtu_cache = (w.window_id, unj(row["members_json"], []) if row else [], daily)
+        st = _state()                                   # operator overrides apply only in mutation mode ACTIVE
+        added, removed, excluded = st if st is not None else (set(), set(), set())
+        try:
+            from talonx_premarket import __main__ as M
+            v2 = set(M._v2_scope(None))
+        except Exception:  # noqa: BLE001 -- unknown V2 scope: fall back safely (full universe) below
+            v2 = None
+        if v2 is None:
+            self.dtu_last = {"fallback": "V2_SCOPE_UNAVAILABLE", "effective_active": len(symbols)}
+            return symbols
+        fetch, self.dtu_last = self._dtu.active_symbols(
+            w, symbols, members=self._dtu_cache[1], daily=self._dtu_cache[2], sip_as_of=data_as_of(now),
+            operator_added=set(added), operator_excluded=set(excluded) | set(removed), v2_forced=v2)
+        return fetch
+
     def latest_probe(self, phase: str) -> dict | None:
         r = self.con.execute("SELECT * FROM probes WHERE phase=? ORDER BY id DESC LIMIT 1", (phase,)).fetchone()
         return {"ok": bool(r["ok"]), "at_utc": r["at_utc"], "detail": r["detail"]} if r else None
@@ -219,7 +254,8 @@ class Ingestion:
 
     def detail(self) -> dict:
         return {"window_id": self._window_id, "note": self.last_note,
-                "requests": getattr(self._data, "requests", 0) if self._data else 0}
+                "requests": getattr(self._data, "requests", 0) if self._data else 0,
+                "dtu_mode": self.dtu_mode, "dtu": self.dtu_last}
 
 
 # -- read-only accessors used by other components -------------------------------------------------------------
@@ -235,8 +271,9 @@ def read_state(root, window_id: str) -> dict:
         probes = {}
         for r in con.execute("SELECT * FROM probes ORDER BY id"):
             probes[r["phase"]] = {"ok": bool(r["ok"]), "at_utc": r["at_utc"], "detail": r["detail"]}
+        from talonx_opportunity.universe_tiers import latest_active
         return {"state": dict(st) if st else None, "members": unj(uni["members_json"], []) if uni else [],
-                "daily": daily, "aggs": aggs, "probes": probes}
+                "daily": daily, "aggs": aggs, "probes": probes, "dtu": latest_active(con, window_id)}
     finally:
         con.close()
 
@@ -245,5 +282,7 @@ def main(argv=None) -> int:
     from talonx_opportunity.runtime import run_component
     root = os.environ.get("TALONX_OPP_ROOT")
     ing = Ingestion(root=root)
-    run_component("ingestion", tick=ing.tick, config_fps={}, root=root, detail=ing.detail)
+    from talonx_opportunity import universe_tiers as U
+    fps = {} if ing.dtu_mode == U.OFF else {"DTU": U.DTU_V1.fingerprint()}   # OFF keeps today's fingerprints
+    run_component("ingestion", tick=ing.tick, config_fps=fps, root=root, detail=ing.detail)
     return 0

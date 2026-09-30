@@ -66,6 +66,8 @@ class Discovery:
         self.v2_scope = v2_scope or set()
         self.clock = clock or utcnow
         self.state_reader = state_reader or (lambda wid: read_state(root, wid))
+        from talonx_opportunity import universe_tiers as U
+        self.dtu_mode = U.mode()
         self.last_summary: dict = {}
 
     # -- catalyst (identical to V1 Engine._catalyst, parameterised by the window) --------------------------------
@@ -121,7 +123,17 @@ class Discovery:
         members = {m["symbol"]: m for m in st["members"] if m.get("status") == "ELIGIBLE"}
         from talonx_ops.operator_control.gates import effective_members      # identity unless ACTIVE (operator control)
         members = effective_members(members)
-        funnel = {"UNIVERSE": len(st["members"]), "ELIGIBLE": len(members), "DATA_READY": 0, "HARD_REJECTED": 0,
+        from talonx_opportunity import universe_tiers as U
+        dtu_info = {"mode": self.dtu_mode}
+        if self.dtu_mode == U.ACTIVE:                   # DTU: evaluate only the active set (BEFORE features / SEC)
+            act = st.get("dtu")
+            if act and not act["fallback"]:
+                members = {k: v for k, v in members.items() if k in act["symbols"]}
+                dtu_info.update(applied=True, active=len(act["symbols"]), cycle_utc=act["cycle_utc"])
+            else:                                       # fail safe: full universe, visible in the funnel
+                dtu_info.update(applied=False, fallback=(act or {}).get("fallback") or "NO_ACTIVE_SET")
+        funnel = {"UNIVERSE": len(st["members"]), "ELIGIBLE": len(members), "DTU": dtu_info, "DATA_READY": 0,
+                  "HARD_REJECTED": 0,
                   "NOT_DATA_READY": 0, "PROVIDER_INCOMPLETE": 0, "SCORED": 0, "WATCH": 0, "BULLISH_SETUP": 0,
                   "BEARISH_SETUP": 0, "CATALYST_UNKNOWN": 0, "HELD_STALE_NON_INVALIDATING_PHASE": 0}
         rejected: dict[str, int] = {}
@@ -322,5 +334,8 @@ def main(argv=None) -> int:
         # remediation is a distinct value (still the SEC_CATALYST_CACHE key: DATA_FIX only when declared)
         fps["SEC_CATALYST_CACHE"] = "BACKGROUND_REFRESH_V1" if sec_refresh.capacity_mode() == \
             sec_refresh.OBSERVABILITY_ONLY else "BACKGROUND_REFRESH_V1+CAPACITY_REMEDIATION_V1"
+    from talonx_opportunity import universe_tiers as U
+    if disc.dtu_mode == U.ACTIVE:                       # key only when ACTIVE: OFF keeps today's fingerprints (rollback)
+        fps["DTU"] = U.DTU_V1.fingerprint()
     run_component("discovery", tick=disc.tick, root=root, detail=disc.detail, config_fps=fps)
     return 0

@@ -80,10 +80,11 @@ _P = "talonx_opportunity/"
 _SHARED = [_P + "db.py", _P + "runtime.py", _P + "phases.py", _P + "config.py"]
 COMPONENT_SOURCES: dict[str, list[str]] = {
     "ingestion": [_P + "ingestion.py", _P + "aggregates.py", _P + "capabilities.py", "talonx_premarket/alpaca_data.py",
-                  "talonx_premarket/universe.py"],
+                  "talonx_premarket/universe.py", _P + "universe_tiers.py", "talonx_ops/operator_control/gates.py"],
     "discovery": [_P + "discovery.py", _P + "aggregates.py", _P + "capabilities.py", "talonx_premarket/features.py",
                   "talonx_premarket/scoring.py", "talonx_premarket/alerts.py", "talonx_premarket/catalysts.py",
-                  "talonx_premarket/config.py", _P + "sec_refresh.py"],
+                  "talonx_premarket/config.py", _P + "sec_refresh.py", _P + "universe_tiers.py",
+                  "talonx_ops/operator_control/gates.py", _P + "ingestion.py"],
     "notifier": [_P + "notifier.py", _P + "lab_delivery.py", _P + "store.py", "talonx_ops/notify/__init__.py",
                  "talonx_ops/notify/outbox.py", "talonx_ops/notify/worker.py"],
     # 2026-09-28 (F-M1): promotion had NO own sources (hash = shared modules only; its change was caught solely by the
@@ -95,7 +96,8 @@ COMPONENT_SOURCES: dict[str, list[str]] = {
     "reporting": [_P + "reporting.py"],
     "sentinel": ["talonx_ops/operator_control/__init__.py", "talonx_ops/operator_control/commands.py",
                  "talonx_ops/operator_control/scanned.py", "talonx_ops/operator_control/sentinel.py",
-                 "talonx_ops/operator_control/store.py", _P + "sentinel_component.py"],
+                 "talonx_ops/operator_control/store.py", _P + "sentinel_component.py",
+                 "talonx_ops/operator_control/universe_view.py"],
     **{f"evaluator:{h}": [_P + "evaluators.py"] for h in ("INTRADAY", "SAME_DAY", "SHORT_TERM", "LONG_TERM")},
 }
 
