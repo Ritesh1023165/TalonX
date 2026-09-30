@@ -1,0 +1,193 @@
+{
+ "segments_queried": [
+  [
+   "2019-01-01",
+   "2024-05-31"
+  ],
+  [
+   "2024-09-03",
+   "2024-10-20"
+  ],
+  [
+   "2024-12-21",
+   "2026-09-30"
+  ]
+ ],
+ "reserved_windows_not_queried": [
+  "2024-06-01..2024-09-02",
+  "2024-10-21..2024-12-20"
+ ],
+ "events": [
+  {
+   "symbol": "AAPL",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2020-08-31",
+   "split_ratio": "4:1",
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "TSLA",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2020-08-31",
+   "split_ratio": "5:1",
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "NVDA",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2021-07-20",
+   "split_ratio": "4:1",
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "MXIM",
+   "action_type": "stock_mergers",
+   "ex_or_effective_date": "2021-08-26",
+   "split_ratio": null,
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "ISRG",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2021-10-05",
+   "split_ratio": "3:1",
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "XLNX",
+   "action_type": "stock_mergers",
+   "ex_or_effective_date": "2022-02-14",
+   "split_ratio": null,
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "AMZN",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2022-06-06",
+   "split_ratio": "20:1",
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "SHOP",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2022-06-29",
+   "split_ratio": "10:1",
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "GOOGL",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2022-07-18",
+   "split_ratio": "20:1",
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "TSLA",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2022-08-25",
+   "split_ratio": "3:1",
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "PANW",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2022-09-14",
+   "split_ratio": "3:1",
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "VMW",
+   "action_type": "stock_mergers",
+   "ex_or_effective_date": "2023-11-22",
+   "split_ratio": null,
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "VMW",
+   "action_type": "stock_mergers",
+   "ex_or_effective_date": "2023-11-24",
+   "split_ratio": null,
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "LRCX",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2024-10-03",
+   "split_ratio": "10:1",
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "HON",
+   "action_type": "spin_offs",
+   "ex_or_effective_date": "2025-10-30",
+   "split_ratio": null,
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "NFLX",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2025-11-17",
+   "split_ratio": "10:1",
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "CMCSA",
+   "action_type": "spin_offs",
+   "ex_or_effective_date": "2026-01-05",
+   "split_ratio": null,
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": null,
+   "action_type": "unit_splits",
+   "ex_or_effective_date": "2026-02-11",
+   "split_ratio": "2.2005:1",
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "BKNG",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2026-04-06",
+   "split_ratio": "25:1",
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "KLAC",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2026-06-12",
+   "split_ratio": "10:1",
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "HON",
+   "action_type": "reverse_splits",
+   "ex_or_effective_date": "2026-06-29",
+   "split_ratio": "1:2",
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  },
+  {
+   "symbol": "HON",
+   "action_type": "spin_offs",
+   "ex_or_effective_date": "2026-06-29",
+   "split_ratio": null,
+   "source": "Alpaca /v1/corporate-actions (process-date query, ex-date selection)"
+  }
+ ],
+ "reserved_window_public_facts": [
+  {
+   "symbol": "NVDA",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "~2024-06-10",
+   "split_ratio": "10:1",
+   "source": "Task75A corporate_action_policy.json (public knowledge; reserved window NOT queried)"
+  },
+  {
+   "symbol": "AVGO",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "~2024-07-15",
+   "split_ratio": "10:1",
+   "source": "Task75A corporate_action_policy.json (public knowledge; reserved window NOT queried)"
+  }
+ ],
+ "count": 22
+}

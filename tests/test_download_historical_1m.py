@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
@@ -151,10 +152,10 @@ def test_fetch_yfinance_returns_normalized_bars(monkeypatch):
     monkeypatch.setattr(time, "sleep", lambda _: None)
 
     with patch("yfinance.download", return_value=_yf_download_df(5)) as mock_download:
-        bars = fetch_yfinance("AAPL", "2026-08-01", "2026-08-02", max_retries=3)
+        bars = fetch_yfinance("AAPL", "2026-08-01", "2026-08-02", max_retries=3, adjustment='all')
 
     # single-day span -> exactly one chunk -> exactly one yf.download call
-    mock_download.assert_called_once_with("AAPL", start="2026-08-01", end="2026-08-02", interval="1m", prepost=True, progress=False)
+    mock_download.assert_called_once_with("AAPL", start="2026-08-01", end="2026-08-02", interval="1m", prepost=True, progress=False, auto_adjust=True)
     assert len(bars) == 5
     assert bars[0]["open"] == 100.0
     assert bars[0]["timestamp"].tzinfo is not None
@@ -164,7 +165,7 @@ def test_fetch_yfinance_empty_history_returns_empty_list(monkeypatch):
     monkeypatch.setattr(time, "sleep", lambda _: None)
 
     with patch("yfinance.download", return_value=pd.DataFrame()):
-        bars = fetch_yfinance("AAPL", "2026-08-01", "2026-08-02", max_retries=3)
+        bars = fetch_yfinance("AAPL", "2026-08-01", "2026-08-02", max_retries=3, adjustment='all')
     assert bars == []
 
 
@@ -172,7 +173,7 @@ def test_fetch_yfinance_warns_on_wide_date_range(monkeypatch, caplog):
     monkeypatch.setattr(time, "sleep", lambda _: None)
     with patch("yfinance.download", return_value=pd.DataFrame()):
         with caplog.at_level("WARNING"):
-            fetch_yfinance("AAPL", "2024-01-01", "2024-06-30", max_retries=3)
+            fetch_yfinance("AAPL", "2024-01-01", "2024-06-30", max_retries=3, adjustment='all')
     assert any("30 trailing days" in rec.message for rec in caplog.records)
 
 
@@ -182,7 +183,7 @@ def test_fetch_yfinance_chunks_wide_ranges_into_7_day_windows(monkeypatch):
     frames = [_yf_download_df(2, start=f"2026-07-{d:02d} 09:30:00") for d in (1, 8, 15)]
 
     with patch("yfinance.download", side_effect=frames) as mock_download:
-        bars = fetch_yfinance("AAPL", "2026-07-01", "2026-07-22", max_retries=3)
+        bars = fetch_yfinance("AAPL", "2026-07-01", "2026-07-22", max_retries=3, adjustment='all')
 
     assert mock_download.call_count == 3
     called_ranges = [(c.kwargs["start"], c.kwargs["end"]) for c in mock_download.call_args_list]
@@ -196,7 +197,7 @@ def test_fetch_yfinance_sleeps_half_a_second_between_chunks(monkeypatch):
     frames = [_yf_download_df(1, start=f"2026-07-{d:02d} 09:30:00") for d in (1, 8, 15)]
 
     with patch("yfinance.download", side_effect=frames):
-        fetch_yfinance("AAPL", "2026-07-01", "2026-07-22", max_retries=3)
+        fetch_yfinance("AAPL", "2026-07-01", "2026-07-22", max_retries=3, adjustment='all')
 
     # 3 chunks -> 2 inter-chunk pauses (never a trailing sleep after the last chunk)
     assert sleep_calls == [0.5, 0.5]
@@ -217,7 +218,7 @@ def test_fetch_yfinance_dedupes_and_sorts_across_chunk_boundaries(monkeypatch):
     )
 
     with patch("yfinance.download", side_effect=[chunk1, chunk2]):
-        bars = fetch_yfinance("AAPL", "2026-07-01", "2026-07-15", max_retries=3)
+        bars = fetch_yfinance("AAPL", "2026-07-01", "2026-07-15", max_retries=3, adjustment='all')
 
     timestamps = [b["timestamp"] for b in bars]
     assert timestamps == sorted(timestamps)
@@ -245,7 +246,7 @@ def test_fetch_polygon_normalizes_aggs(monkeypatch):
     fake_polygon_module.RESTClient.return_value = mock_client
 
     with patch.dict("sys.modules", {"polygon": fake_polygon_module}):
-        bars = fetch_polygon("AAPL", "2026-08-01", "2026-08-02", max_retries=3)
+        bars = fetch_polygon("AAPL", "2026-08-01", "2026-08-02", max_retries=3, adjustment='split')
 
     fake_polygon_module.RESTClient.assert_called_once_with("fake-key")
     mock_client.list_aggs.assert_called_once_with("AAPL", 1, "minute", "2026-08-01", "2026-08-02", limit=50000, adjusted=True)
@@ -277,7 +278,7 @@ def test_fetch_alpaca_paginates_via_next_page_token(monkeypatch):
     fake_requests.get.side_effect = [page1, page2]
 
     with patch.dict("sys.modules", {"requests": fake_requests}):
-        bars = fetch_alpaca("AAPL", "2026-08-01", "2026-08-02", max_retries=3)
+        bars = fetch_alpaca("AAPL", "2026-08-01", "2026-08-02", max_retries=3, adjustment='all')
 
     assert len(bars) == 2
     assert fake_requests.get.call_count == 2
@@ -290,7 +291,7 @@ def test_fetch_alpaca_paginates_via_next_page_token(monkeypatch):
 def test_download_symbol_returns_empty_status_on_empty_result(monkeypatch):
     monkeypatch.setattr(time, "sleep", lambda _: None)
     with patch("yfinance.download", return_value=pd.DataFrame()):
-        result = download_symbol("AAPL", "2026-08-01", "2026-08-02", "yfinance", max_retries=2)
+        result = download_symbol("AAPL", "2026-08-01", "2026-08-02", "yfinance", max_retries=2, adjustment='all')
     assert isinstance(result, DownloadResult)
     assert result.status == "EMPTY"
     assert result.df is None
@@ -306,7 +307,7 @@ def test_main_writes_a_valid_csv_that_passes_data_quality_checks(tmp_path, monke
     with patch("yfinance.download", return_value=_yf_download_df(10)):
         exit_code = main([
             "--symbols", "AAPL", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
-            "--output-dir", str(tmp_path), "--provider", "yfinance",
+            "--output-dir", str(tmp_path), "--adjustment", "all", "--provider", "yfinance",
         ])
 
     assert exit_code == 0
@@ -328,7 +329,7 @@ def test_main_reports_failed_symbols_without_aborting_the_batch(tmp_path, monkey
     with patch("yfinance.download", return_value=pd.DataFrame()):  # empty for every symbol
         exit_code = main([
             "--symbols", "AAPL,MSFT", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
-            "--output-dir", str(tmp_path), "--provider", "yfinance",
+            "--output-dir", str(tmp_path), "--adjustment", "all", "--provider", "yfinance",
         ])
 
     assert exit_code == 1  # every symbol failed/empty
@@ -350,7 +351,7 @@ def test_all_success_exits_zero(tmp_path, monkeypatch):
     with patch("yfinance.download", return_value=_yf_download_df(5)):
         exit_code = main([
             "--symbols", "AAPL,MSFT,NVDA", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
-            "--output-dir", str(tmp_path), "--provider", "yfinance",
+            "--output-dir", str(tmp_path), "--adjustment", "all", "--provider", "yfinance",
         ])
 
     assert exit_code == 0
@@ -374,7 +375,7 @@ def test_partial_failure_still_processes_remaining_symbols_but_exits_nonzero(tmp
     with patch("yfinance.download", side_effect=fake_download):
         exit_code = main([
             "--symbols", "AAPL,MSFT,NVDA", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
-            "--output-dir", str(tmp_path), "--provider", "yfinance",
+            "--output-dir", str(tmp_path), "--adjustment", "all", "--provider", "yfinance",
         ])
 
     assert exit_code != 0
@@ -395,7 +396,7 @@ def test_all_failure_exits_nonzero(tmp_path, monkeypatch, capsys):
     with patch("yfinance.download", return_value=pd.DataFrame()):
         exit_code = main([
             "--symbols", "AAPL,MSFT,NVDA", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
-            "--output-dir", str(tmp_path), "--provider", "yfinance",
+            "--output-dir", str(tmp_path), "--adjustment", "all", "--provider", "yfinance",
         ])
 
     assert exit_code != 0
@@ -474,7 +475,7 @@ def test_download_symbol_full_status(monkeypatch):
     # TEST 1 -- FULL: requested a single day, data covers that whole day.
     monkeypatch.setattr(time, "sleep", lambda _: None)
     with patch("yfinance.download", return_value=_bars_at("2026-08-01 09:30", "2026-08-01 09:31")):
-        result = download_symbol("AAPL", "2026-08-01", "2026-08-01", "yfinance", max_retries=2)
+        result = download_symbol("AAPL", "2026-08-01", "2026-08-01", "yfinance", max_retries=2, adjustment='all')
     assert result.status == "FULL"
     assert result.bars == 2
     assert result.df is not None
@@ -485,7 +486,7 @@ def test_download_symbol_partial_status(monkeypatch):
     # TEST 2 -- PARTIAL: requested 2 days, data only covers the first.
     monkeypatch.setattr(time, "sleep", lambda _: None)
     with patch("yfinance.download", return_value=_yf_download_df(5, start="2026-08-01 09:30:00")):
-        result = download_symbol("AAPL", "2026-08-01", "2026-08-02", "yfinance", max_retries=2)
+        result = download_symbol("AAPL", "2026-08-01", "2026-08-02", "yfinance", max_retries=2, adjustment='all')
     assert result.status == "PARTIAL"
     assert result.bars == 5
     assert result.df is not None
@@ -495,7 +496,7 @@ def test_download_symbol_empty_status(monkeypatch):
     # TEST 3 -- EMPTY: provider call succeeds but returns zero bars.
     monkeypatch.setattr(time, "sleep", lambda _: None)
     with patch("yfinance.download", return_value=pd.DataFrame()):
-        result = download_symbol("AAPL", "2026-08-01", "2026-08-02", "yfinance", max_retries=2)
+        result = download_symbol("AAPL", "2026-08-01", "2026-08-02", "yfinance", max_retries=2, adjustment='all')
     assert result.status == "EMPTY"
     assert result.bars == 0
     assert result.df is None
@@ -506,7 +507,7 @@ def test_download_symbol_failed_status(monkeypatch):
     # TEST 4 -- FAILED: provider call raises on every attempt.
     monkeypatch.setattr(time, "sleep", lambda _: None)
     with patch("yfinance.download", side_effect=ConnectionError("simulated network failure")):
-        result = download_symbol("AAPL", "2026-08-01", "2026-08-02", "yfinance", max_retries=2)
+        result = download_symbol("AAPL", "2026-08-01", "2026-08-02", "yfinance", max_retries=2, adjustment='all')
     assert result.status == "FAILED"
     assert result.bars == 0
     assert result.df is None
@@ -542,7 +543,7 @@ def test_mixed_full_partial_failed_across_symbols(tmp_path, monkeypatch, capsys)
     with patch("yfinance.download", side_effect=fake_download):
         exit_code = main([
             "--symbols", "AAPL,MSFT,NVDA", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
-            "--output-dir", str(tmp_path), "--provider", "yfinance", "--max-retries", "1",
+            "--output-dir", str(tmp_path), "--adjustment", "all", "--provider", "yfinance", "--max-retries", "1",
         ])
 
     assert exit_code != 0  # NVDA's failure alone must force a non-zero exit
@@ -574,7 +575,7 @@ def test_summary_json_is_written_with_the_documented_schema(tmp_path, monkeypatc
     with patch("yfinance.download", side_effect=fake_download):
         main([
             "--symbols", "AAPL,MSFT,NVDA", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
-            "--output-dir", str(tmp_path), "--provider", "yfinance", "--max-retries", "1",
+            "--output-dir", str(tmp_path), "--adjustment", "all", "--provider", "yfinance", "--max-retries", "1",
         ])
 
     summary_path = tmp_path / "download_summary.json"
@@ -606,7 +607,7 @@ def test_partial_alone_does_not_force_a_nonzero_exit(tmp_path, monkeypatch):
     with patch("yfinance.download", return_value=_yf_download_df(5, start="2026-08-01 09:30:00")):
         exit_code = main([
             "--symbols", "AAPL", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
-            "--output-dir", str(tmp_path), "--provider", "yfinance",
+            "--output-dir", str(tmp_path), "--adjustment", "all", "--provider", "yfinance",
         ])
     assert exit_code == 0
     summary = json.loads((tmp_path / "download_summary.json").read_text(encoding="utf-8"))
@@ -622,13 +623,74 @@ def test_task_1_1_exit_code_contract_still_holds_with_the_new_status_field(tmp_p
     with patch("yfinance.download", return_value=_yf_download_df(5)):
         all_success_exit = main([
             "--symbols", "AAPL", "--start-date", "2026-08-01", "--end-date", "2026-08-01",
-            "--output-dir", str(tmp_path / "a"), "--provider", "yfinance",
+            "--output-dir", str(tmp_path / "a"), "--provider", "yfinance", "--adjustment", "all",
         ])
     assert all_success_exit == 0
 
     with patch("yfinance.download", return_value=pd.DataFrame()):
         all_empty_exit = main([
             "--symbols", "AAPL", "--start-date", "2026-08-01", "--end-date", "2026-08-01",
-            "--output-dir", str(tmp_path / "b"), "--provider", "yfinance",
+            "--output-dir", str(tmp_path / "b"), "--provider", "yfinance", "--adjustment", "all",
         ])
     assert all_empty_exit != 0
+
+
+# --- 2026-10-01 raw-adjustment audit: no default adjustment, raw refused unless explicitly intraday-only ---
+
+def test_adjustment_is_required_no_default(tmp_path):
+    with pytest.raises(SystemExit):
+        main(["--symbols", "AAPL", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
+              "--output-dir", str(tmp_path), "--provider", "yfinance"])
+
+
+def test_raw_is_refused_without_intraday_only_flag(tmp_path, caplog):
+    code = main(["--symbols", "AAPL", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
+                 "--output-dir", str(tmp_path), "--provider", "alpaca", "--adjustment", "raw"])
+    assert code == 2 and not (tmp_path / "AAPL.csv").exists()
+    assert "allow-raw-intraday-only" in caplog.text
+
+
+def test_raw_allowed_only_with_explicit_flag_and_recorded(tmp_path, monkeypatch):
+    monkeypatch.setenv("APCA_API_KEY_ID", "id")
+    monkeypatch.setenv("APCA_API_SECRET_KEY", "secret")
+    monkeypatch.setattr(time, "sleep", lambda _: None)
+    page = MagicMock()
+    page.status_code = 200
+    page.json.return_value = {"bars": [{"t": "2026-08-03T13:30:00Z", "o": 1, "h": 1, "l": 1, "c": 1, "v": 1}],
+                              "next_page_token": None}
+    fake = MagicMock()
+    fake.get.return_value = page
+    with patch.dict("sys.modules", {"requests": fake}):
+        code = main(["--symbols", "AAPL", "--start-date", "2026-08-03", "--end-date", "2026-08-03",
+                     "--output-dir", str(tmp_path), "--provider", "alpaca", "--adjustment", "raw",
+                     "--allow-raw-intraday-only"])
+    assert fake.get.call_args.kwargs["params"]["adjustment"] == "raw"
+    summ = json.loads((tmp_path / "download_summary.json").read_text())
+    assert summ["adjustment"] == "raw" and summ["raw_intraday_only_declared"] is True
+    assert code in (0, 1)
+
+
+@pytest.mark.parametrize("adj", ["split", "all"])
+def test_alpaca_receives_the_requested_adjustment(monkeypatch, adj):
+    monkeypatch.setenv("APCA_API_KEY_ID", "id")
+    monkeypatch.setenv("APCA_API_SECRET_KEY", "secret")
+    page = MagicMock()
+    page.status_code = 200
+    page.json.return_value = {"bars": [], "next_page_token": None}
+    fake = MagicMock()
+    fake.get.return_value = page
+    with patch.dict("sys.modules", {"requests": fake}):
+        fetch_alpaca("AAPL", "2026-08-01", "2026-08-02", max_retries=1, adjustment=adj)
+    assert fake.get.call_args.kwargs["params"]["adjustment"] == adj
+
+
+@pytest.mark.parametrize("provider,adj", [("yfinance", "split"), ("polygon", "all")])
+def test_unsupported_provider_adjustment_is_refused_before_any_request(tmp_path, provider, adj):
+    code = main(["--symbols", "AAPL", "--start-date", "2026-08-01", "--end-date", "2026-08-02",
+                 "--output-dir", str(tmp_path), "--provider", provider, "--adjustment", adj])
+    assert code == 2
+
+
+def test_no_hardcoded_raw_left_in_the_alpaca_request():
+    src = Path(__file__).resolve().parents[1].joinpath("scripts", "download_historical_1m.py").read_text()
+    assert '"adjustment": "raw"' not in src

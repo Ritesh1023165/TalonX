@@ -38,10 +38,18 @@ talonx_backtest.data.check_data_quality and prints the report -- so a
 "did this download actually produce something talonx_backtest can use"
 answer is part of running this script, not a separate manual step.
 
+Price adjustment (2026-10-01 raw-adjustment audit): there is NO default. --adjustment {raw,split,all} is REQUIRED
+and is passed to the provider and recorded in download_summary.json. RAW (unadjusted) bars carry split / dividend
+discontinuities that corrupt any multi-day feature, lookback or holding, so --adjustment raw is REFUSED unless
+--allow-raw-intraday-only is also given (an explicit statement that the data will only be used within single
+sessions). Provider support: Alpaca raw|split|all (its own `adjustment` parameter); Polygon raw (adjusted=false) |
+split (adjusted=true, splits only), all refused (no dividend adjustment); yfinance all only (auto_adjust=True) --
+raw/split refused because yfinance cannot reliably deliver them.
+
 Usage:
-    python scripts/download_historical_1m.py --symbols AAPL,MSFT,NVDA --start-date 2024-01-01 --end-date 2024-06-30
-    python scripts/download_historical_1m.py --symbols tickers.txt --start-date 2025-01-01 --end-date 2025-12-31 --output-dir data/historical_1m
-    python scripts/download_historical_1m.py --symbols AAPL --provider yfinance --start-date 2026-08-01 --end-date 2026-08-10
+    python scripts/download_historical_1m.py --symbols AAPL,MSFT,NVDA --start-date 2025-01-02 --end-date 2025-06-30 --adjustment all
+    python scripts/download_historical_1m.py --symbols tickers.txt --start-date 2025-01-01 --end-date 2025-12-31 --adjustment all --output-dir data/historical_1m
+    python scripts/download_historical_1m.py --symbols AAPL --provider alpaca --start-date 2026-08-03 --end-date 2026-08-07 --adjustment raw --allow-raw-intraday-only
 """
 from __future__ import annotations
 
@@ -65,6 +73,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(na
 logger = logging.getLogger("scripts.download_historical_1m")
 
 _BAR_COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
+
+
+ADJUSTMENTS = ("raw", "split", "all")
+
+
+class UnsupportedAdjustmentError(ValueError):
+    """The chosen provider cannot deliver the requested price adjustment -- refused, never silently substituted."""
 
 
 class DownloadError(Exception):
@@ -171,7 +186,9 @@ def _retry(fn, *, max_retries: int, base_seconds: float, max_seconds: float, des
 # raises and is handled by _retry/the per-symbol loop.
 # ------------------------------------------------------------------
 
-def fetch_polygon(symbol: str, start_date: str, end_date: str, *, max_retries: int) -> list[dict]:
+def fetch_polygon(symbol: str, start_date: str, end_date: str, *, max_retries: int, adjustment: str) -> list[dict]:
+    if adjustment not in ("raw", "split"):
+        raise UnsupportedAdjustmentError(f"polygon cannot deliver adjustment={adjustment!r} (raw|split only)")
     from polygon import RESTClient  # lazy import -- optional dependency, see scripts/requirements.txt
 
     api_key = os.environ["POLYGON_API_KEY"]
@@ -181,7 +198,7 @@ def fetch_polygon(symbol: str, start_date: str, end_date: str, *, max_retries: i
         bars = []
         # list_aggs is a generator that auto-paginates via Polygon's own
         # next_url cursor internally -- no manual pagination needed.
-        for agg in client.list_aggs(symbol, 1, "minute", start_date, end_date, limit=50000, adjusted=True):
+        for agg in client.list_aggs(symbol, 1, "minute", start_date, end_date, limit=50000, adjusted=(adjustment == "split")):
             ts = pd.Timestamp(agg.timestamp, unit="ms", tz="UTC")
             bars.append({
                 "timestamp": ts, "open": agg.open, "high": agg.high,
@@ -192,7 +209,9 @@ def fetch_polygon(symbol: str, start_date: str, end_date: str, *, max_retries: i
     return _retry(_call, max_retries=max_retries, base_seconds=2.0, max_seconds=60.0, description=f"Polygon fetch for {symbol}")
 
 
-def fetch_alpaca(symbol: str, start_date: str, end_date: str, *, max_retries: int) -> list[dict]:
+def fetch_alpaca(symbol: str, start_date: str, end_date: str, *, max_retries: int, adjustment: str) -> list[dict]:
+    if adjustment not in ADJUSTMENTS:
+        raise UnsupportedAdjustmentError(f"unknown adjustment {adjustment!r}")
     import requests  # lazy import -- optional dependency, see scripts/requirements.txt
 
     key_id = os.environ["APCA_API_KEY_ID"]
@@ -205,7 +224,7 @@ def fetch_alpaca(symbol: str, start_date: str, end_date: str, *, max_retries: in
     while True:
         params = {
             "timeframe": "1Min", "start": f"{start_date}T00:00:00Z", "end": f"{end_date}T23:59:59Z",
-            "limit": 10000, "adjustment": "raw",
+            "limit": 10000, "adjustment": adjustment,
         }
         if page_token:
             params["page_token"] = page_token
@@ -259,7 +278,9 @@ def _chunk_date_range(start_date: str, end_date: str, chunk_days: int = _YFINANC
     return chunks
 
 
-def fetch_yfinance(symbol: str, start_date: str, end_date: str, *, max_retries: int) -> list[dict]:
+def fetch_yfinance(symbol: str, start_date: str, end_date: str, *, max_retries: int, adjustment: str) -> list[dict]:
+    if adjustment != "all":
+        raise UnsupportedAdjustmentError(f"yfinance cannot reliably deliver adjustment={adjustment!r} (all only)")
     import yfinance as yf  # lazy import, same as talonx_quant/preseed.py
 
     span_days = (pd.Timestamp(end_date) - pd.Timestamp(start_date)).days
@@ -277,7 +298,7 @@ def fetch_yfinance(symbol: str, start_date: str, end_date: str, *, max_retries: 
         def _call(chunk_start=chunk_start, chunk_end=chunk_end):
             return yf.download(
                 symbol.upper(), start=chunk_start, end=chunk_end,
-                interval="1m", prepost=True, progress=False,
+                interval="1m", prepost=True, progress=False, auto_adjust=True,
             )
 
         chunk_df = _retry(
@@ -322,6 +343,14 @@ def fetch_yfinance(symbol: str, start_date: str, end_date: str, *, max_retries: 
 
 
 _PROVIDERS = {"polygon": fetch_polygon, "alpaca": fetch_alpaca, "yfinance": fetch_yfinance}
+_PROVIDER_ADJUSTMENTS = {"polygon": ("raw", "split"), "alpaca": ADJUSTMENTS, "yfinance": ("all",)}
+
+
+def _check_provider_adjustment(provider: str, adjustment: str) -> None:
+    if adjustment not in _PROVIDER_ADJUSTMENTS[provider]:
+        raise UnsupportedAdjustmentError(
+            f"provider {provider!r} cannot deliver adjustment={adjustment!r} "
+            f"(supported: {', '.join(_PROVIDER_ADJUSTMENTS[provider])})")
 
 
 def select_provider(requested: str | None) -> str:
@@ -362,13 +391,20 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-dir", default="data/historical_1m", help="Target directory (default: data/historical_1m/).")
     parser.add_argument("--provider", choices=list(_PROVIDERS), default=None, help="Force a specific provider (default: auto-select by available API key).")
     parser.add_argument("--max-retries", type=int, default=5, help="Retry attempts per provider call before giving up on a symbol (default: 5).")
+    parser.add_argument("--adjustment", required=True, choices=ADJUSTMENTS,
+                        help="REQUIRED price adjustment (no default): raw | split | all. raw is refused unless "
+                             "--allow-raw-intraday-only is also given.")
+    parser.add_argument("--allow-raw-intraday-only", action="store_true",
+                        help="Explicitly allow --adjustment raw, declaring the data is used ONLY within single "
+                             "sessions (never for multi-day features, lookbacks or holdings).")
     return parser
 
 
-def download_symbol(symbol: str, start_date: str, end_date: str, provider: str, max_retries: int) -> DownloadResult:
+def download_symbol(symbol: str, start_date: str, end_date: str, provider: str, max_retries: int, *,
+                    adjustment: str) -> DownloadResult:
     fetch = _PROVIDERS[provider]
     try:
-        bars = fetch(symbol, start_date, end_date, max_retries=max_retries)
+        bars = fetch(symbol, start_date, end_date, max_retries=max_retries, adjustment=adjustment)
     except DownloadError as exc:
         logger.warning("Giving up on %s via %s: %s", symbol, provider, exc)
         return DownloadResult(
@@ -399,13 +435,23 @@ def download_symbol(symbol: str, start_date: str, end_date: str, provider: str, 
 
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
+    if args.adjustment == "raw" and not args.allow_raw_intraday_only:
+        logger.error("--adjustment raw is refused: unadjusted bars corrupt multi-day features/holdings. Pass "
+                     "--allow-raw-intraday-only to declare single-session use only, or use split/all.")
+        return 2
     symbols = _parse_symbols(args.symbols)
     if not symbols:
         logger.error("No symbols to download (empty --symbols).")
         return 1
 
     provider = select_provider(args.provider)
-    logger.info("Provider: %s | Symbols: %s | Range: %s -> %s", provider, ", ".join(symbols), args.start_date, args.end_date)
+    logger.info("Provider: %s | Adjustment: %s | Symbols: %s | Range: %s -> %s", provider, args.adjustment,
+                ", ".join(symbols), args.start_date, args.end_date)
+    try:                                                   # fail fast before any request if unsupported
+        _check_provider_adjustment(provider, args.adjustment)
+    except UnsupportedAdjustmentError as exc:
+        logger.error("%s", exc)
+        return 2
 
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -413,7 +459,8 @@ def main(argv: list[str] | None = None) -> int:
     total_bars = 0
     results: list[DownloadResult] = []
     for symbol in symbols:
-        result = download_symbol(symbol, args.start_date, args.end_date, provider, args.max_retries)
+        result = download_symbol(symbol, args.start_date, args.end_date, provider, args.max_retries,
+                                 adjustment=args.adjustment)
         results.append(result)
         if result.df is None:
             continue
@@ -453,6 +500,8 @@ def main(argv: list[str] | None = None) -> int:
 
     summary = {
         "provider": provider,
+        "adjustment": args.adjustment,
+        "raw_intraday_only_declared": bool(args.allow_raw_intraday_only),
         "requested_start": args.start_date,
         "requested_end": args.end_date,
         "symbols": {
