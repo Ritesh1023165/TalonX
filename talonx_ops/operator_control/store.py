@@ -26,7 +26,22 @@ CREATE TABLE IF NOT EXISTS operator_audit (
     symbol TEXT, before_state TEXT, after_state TEXT, mode TEXT, result TEXT, reason TEXT
 );
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+-- 2026-09-30 DTU operator OVERRIDE layer. The system DTU state (market.db) is NEVER rewritten: an override is a
+-- separate operator intent; the effective state is derived. One current row per symbol + an append-only request log.
+CREATE TABLE IF NOT EXISTS operator_overrides (
+    symbol TEXT PRIMARY KEY,
+    override TEXT NOT NULL,                                  -- NONE | FORCE_ACTIVE | FORCE_ELIGIBLE | FORCE_EXCLUDED
+    status TEXT NOT NULL,                                    -- PENDING (DRY_RUN) | APPLIED (ACTIVE) | CLEARED
+    request_id TEXT, requested_at TEXT, applied_at TEXT, changed_by TEXT, reason TEXT, mode TEXT, seq INTEGER
+);
+CREATE TABLE IF NOT EXISTS override_requests (
+    request_id TEXT PRIMARY KEY, symbol TEXT, previous_system_state TEXT, previous_effective_state TEXT,
+    previous_override TEXT, requested_override TEXT, operator TEXT, source TEXT, requested_at TEXT, mode TEXT,
+    status TEXT,                                             -- PENDING | APPLIED | HELD_PROTECTED | ALREADY_* | REJECTED
+    reason TEXT, applied_at TEXT, snapshot_id TEXT, state_as_of TEXT
+);
 """
+OVERRIDES = ("NONE", "FORCE_ACTIVE", "FORCE_ELIGIBLE", "FORCE_EXCLUDED")
 
 
 def db_path(path=None) -> Path:
@@ -113,6 +128,84 @@ class OperatorStore:
                 "INSERT OR REPLACE INTO symbol_exclusions VALUES (?,?,?,?,?,?,?,?)",
                 (sym, status, t if status == "EXCLUDED" else (prev or {}).get("excluded_at"),
                  t if status == "RESTORED" else None, by, reason, activation, self._next_seq()))
+
+    # -- DTU override layer ---------------------------------------------------------------------------------------------
+    def override_row(self, sym: str) -> dict | None:
+        if self.con is None:
+            return None
+        try:
+            r = self.con.execute("SELECT * FROM operator_overrides WHERE symbol=?", (sym,)).fetchone()
+        except sqlite3.Error:                                  # read-only store created before the override layer
+            return None
+        return dict(r) if r else None
+
+    def current_override(self, sym: str) -> str:
+        r = self.override_row(sym)
+        return r["override"] if r and r["status"] != "CLEARED" else "NONE"
+
+    def overrides(self) -> list[dict]:
+        if self.con is None:
+            return []
+        try:
+            return [dict(r) for r in self.con.execute("SELECT * FROM operator_overrides WHERE status != 'CLEARED' "
+                                                      "ORDER BY symbol")]
+        except sqlite3.Error:
+            return []
+
+    def record_override_request(self, *, symbol: str, requested: str, status: str, operator: str, source: str,
+                                mode: str, previous_system_state: str, previous_effective_state: str,
+                                reason: str, snapshot_id: str | None, state_as_of: str | None,
+                                apply_current: bool) -> str:
+        """Append the request (always). When ``apply_current`` the current-override row (and the legacy table the
+        existing ACTIVE gates read) is updated in the SAME transaction; DRY_RUN rows are PENDING, never APPLIED."""
+        assert requested in OVERRIDES
+        rid = uuid.uuid4().hex[:16]
+        t = now_iso()
+        prev = self.current_override(symbol)
+        with self.con:
+            self.con.execute("INSERT INTO override_requests VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                             (rid, symbol, previous_system_state, previous_effective_state, prev, requested, operator,
+                              source, t, mode, status, reason[:300], t if status == "APPLIED" else None, snapshot_id,
+                              state_as_of))
+            if apply_current:
+                row_status = "CLEARED" if requested == "NONE" else ("APPLIED" if status == "APPLIED" else "PENDING")
+                self.con.execute("INSERT OR REPLACE INTO operator_overrides VALUES (?,?,?,?,?,?,?,?,?,?)",
+                                 (symbol, requested, row_status, rid, t, t if status == "APPLIED" else None, operator,
+                                  reason[:120], mode, self._next_seq()))
+                # legacy intent tables consumed by the EXISTING ACTIVE-mode gates (identity in DRY_RUN):
+                # FORCE_ACTIVE -> operator_universe ACTIVE; FORCE_EXCLUDED -> symbol_exclusions EXCLUDED;
+                # NONE / FORCE_ELIGIBLE -> both cleared (FORCE_ELIGIBLE has no gate representation yet: documented gap)
+                act = "ACTIVE" if status == "APPLIED" else "PENDING_ACTIVATION"
+                u, e = self.universe_row(symbol), self.exclusion_row(symbol)
+                if requested == "FORCE_ACTIVE":
+                    self._legacy_universe(symbol, "ACTIVE", operator, reason, act, u)
+                elif u and u["status"] == "ACTIVE":
+                    self._legacy_universe(symbol, "CLEARED", operator, reason, act, u)
+                if requested == "FORCE_EXCLUDED":
+                    self._legacy_exclusion(symbol, "EXCLUDED", operator, reason, act, e)
+                elif e and e["status"] == "EXCLUDED":
+                    self._legacy_exclusion(symbol, "RESTORED", operator, reason, act, e)
+        return rid
+
+    def _legacy_universe(self, sym, status, by, reason, activation, prev):
+        t = now_iso()
+        self.con.execute("INSERT OR REPLACE INTO operator_universe VALUES (?,?,?,?,?,?,?,?,?)",
+                         (sym, status, t if status == "ACTIVE" else (prev or {}).get("added_at"),
+                          t if status != "ACTIVE" else None, by, reason, "OVERRIDE", activation, self._next_seq()))
+
+    def _legacy_exclusion(self, sym, status, by, reason, activation, prev):
+        t = now_iso()
+        self.con.execute("INSERT OR REPLACE INTO symbol_exclusions VALUES (?,?,?,?,?,?,?,?)",
+                         (sym, status, t if status == "EXCLUDED" else (prev or {}).get("excluded_at"),
+                          t if status == "RESTORED" else None, by, reason, activation, self._next_seq()))
+
+    def override_requests(self, sym: str | None = None) -> list[dict]:
+        if self.con is None:
+            return []
+        q, a = "SELECT * FROM override_requests", ()
+        if sym:
+            q, a = q + " WHERE symbol=?", (sym,)
+        return [dict(r) for r in self.con.execute(q + " ORDER BY requested_at", a)]
 
     def audit(self, *, actor: str, chat: str, authorized: bool, command: str, symbol: str | None,
               before: dict | None, after: dict | None, mode: str, result: str, reason: str = "") -> str:

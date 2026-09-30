@@ -121,6 +121,58 @@ def _scope_lines(root=None) -> list[str]:
     return out
 
 
+class LiveDTUDeps:
+    """Production DTU logic handed to the read-only Sentinel universe views (talonx_ops never imports this lane).
+    Every method is read-only: the trading window, universe_tiers.resolve, the DTU protection readers (open setups /
+    today's Signals / V2 positions + intents) and the V2 pending-intent split for display."""
+
+    def __init__(self, root=None, readers: dict | None = None):
+        self.root, self.readers = root, readers or {}
+
+    def window(self, wid: str):
+        from datetime import date
+        from talonx_opportunity.phases import trading_window
+        return trading_window(date.fromisoformat(wid))
+
+    def resolve(self, *a, **k):
+        from talonx_opportunity import universe_tiers as U
+        return U.resolve(*a, **k)
+
+    def protections(self, w, now: str):
+        from talonx_opportunity import universe_tiers as U
+        root, readers = self.root, self.readers
+
+        class _RO(U.DTU):                          # the production readers; no market.db handle is opened
+            def __init__(self):
+                self.root, self.readers, self.clock = root, readers, (lambda: datetime.fromisoformat(now))
+        return _RO().protections(w)
+
+    def intents(self, w) -> set[str]:
+        if "intents" in self.readers:
+            return set(self.readers["intents"](w))
+        import sqlite3
+        from talonx_opportunity.db import REPO_ROOT
+        p = Path(os.environ.get("TALONX_V2_DB_PATH") or REPO_ROOT / "v2_release_rc1.db")
+        if not p.exists():
+            return set()
+        try:
+            c = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=5)
+            cols = {x[1] for x in c.execute("PRAGMA table_info(pending_entry_intents)")}
+            q = "SELECT symbol FROM pending_entry_intents"
+            if "status" in cols:
+                q += " WHERE UPPER(status) NOT IN ('CLOSED','EXITED','CANCELLED','CANCELED','RESOLVED','EXPIRED')"
+            return {x[0] for x in c.execute(q)}
+        except sqlite3.Error:
+            return set()
+
+
+def universe_factory(root=None, readers: dict | None = None, **kw):
+    """store -> LiveUniverse bound to the live market.db (read-only) and the production DTU deps."""
+    from talonx_ops.operator_control.universe_view import LiveUniverse
+    deps = LiveDTUDeps(root, readers)
+    return lambda store: LiveUniverse(root_dir(root), store=store, deps=deps, **kw)
+
+
 class SentinelComponent:
     def __init__(self, *, root=None, env=None, bot_factory=None, store=None):
         self.root, self.env = root, (env if env is not None else os.environ)
@@ -150,7 +202,7 @@ class SentinelComponent:
         self.loop = asyncio.new_event_loop()
         self.bot, self.poller, self.identity = operations_poller(
             loop=self.loop, env=self.env, store=self.store, bot_factory=self.bot_factory,
-            status_provider=lambda: status_text(self.root, self.env))
+            status_provider=lambda: status_text(self.root, self.env), universe_factory=universe_factory(self.root))
         self.poller.reply_log = self._append_reply
 
     def _append_reply(self, rec: dict) -> None:

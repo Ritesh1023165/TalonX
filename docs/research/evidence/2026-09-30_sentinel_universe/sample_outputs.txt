@@ -1,0 +1,322 @@
+
+>>> /universe summary   (0.0s)
+⚙️ TALONX SENTINEL — UNIVERSE (2026-09-30)
+Core: 1162
+Event-promoted: 934 (protected 0)
+Event-eligible: 1780
+Auto-excluded: 1735
+Operator-added: 39 · Operator-excluded: 0
+Structurally excluded: 8728
+Effective active: 2135
+Snapshot: 2026-09-30@2026-09-29#da27de22a3bb839a
+Operator overrides: FORCE_ACTIVE 0 · FORCE_ELIGIBLE 0 · FORCE_EXCLUDED 0
+/universe active · eligible · excluded · structural [file]
+
+>>> /universe active   (0.2s)
+⚙️ TALONX SENTINEL — ACTIVE UNIVERSE (2135) · 2026-09-30
+effective active now: Core + event-promoted + operator/V2 + protected (the exact set ingestion fetches and discovery evaluates)
+ACTIVE_CORE 1162 · EVENT_PROMOTED 934 · OPERATOR_ADDED 39
+Preview: A AA AAL AAOI AAON AAP AAPL ABAT ABBV ABCL ABEO ABNB ABOS ABR ABSI ABT ABTC ABUS ABVX ACA ACB ACDC ACET ACGL ACHR ACHV ACI ACM ACMR ACN ACRE ACT ACVA ADBE ADC ADCT ADEA ADI ADIG ADM … +2095
+Full list: /universe active file
+As of 18:04:45Z · snapshot 2026-09-30@2026-09-29#da27de22a3bb839a
+
+>>> /universe eligible   (0.1s)
+⚙️ TALONX SENTINEL — EVENT-ELIGIBLE (1780) · 2026-09-30
+system EVENT_ELIGIBLE and NOT active now (reachable by the gap / 8-K event tier)
+Preview: AADX AAMI AAT AAUC AB ABCB ABEV ABG ABM ABX ACAD ACCO ACEL ACFN ACHC ACIC ACIW ACLS ACNB ACRS ACU AD ADAM ADMA ADNT ADPT ADT ADTN ADUS AEBI AEG AENT AERO AFG AGIO AGL AGM AGNT AGO AGRO … +1740
+Full list: /universe eligible file
+As of 18:04:45Z · snapshot 2026-09-30@2026-09-29#da27de22a3bb839a
+
+>>> /universe excluded   (0.2s)
+⚙️ TALONX SENTINEL — AUTO-EXCLUDED (1735) · 2026-09-30
+system AUTO_EXCLUDED (below V1 price / ADV20 floors at D-1)
+• 1350 BELOW_V1_ADV20_FLOOR
+• 384 BELOW_V1_PRICE_FLOOR
+• 1 NO_D1_DAILY_HISTORY
+Preview: AAC AACG AACI AACO AACP AAME AAPG AARD ABLV ABTS ABVC ACAA ACCL ACCS ACGC ACH ACIU ACNT ACOG ACON ACR ACRV ACTG ACTU ACXP ADAC ADAG ADBT ADGM ADIL ADSE ADVB ADXN AEAQ AEC AEI AEON AERT AESP AEXA … +1695
+Full list: /universe excluded file
+As of 18:04:45Z · snapshot 2026-09-30@2026-09-29#da27de22a3bb839a
+
+>>> /universe structural   (0.2s)
+⚙️ TALONX SENTINEL — STRUCTURALLY EXCLUDED (8728) · 2026-09-30
+funds / ETFs / warrants / units / preferreds / non-tradable ...
+• 5981 STRUCTURAL:FUND_ETF_ETN
+• 878 STRUCTURAL:NOT_TRADABLE
+• 445 STRUCTURAL:MALFORMED_OR_NON_COMMON_SYMBOL
+• 408 STRUCTURAL:WARRANT
+• 308 STRUCTURAL:NOT_LISTED_EXCHANGE
+• 273 STRUCTURAL:UNIT
+• 166 STRUCTURAL:NOTE_DEBT
+• 124 STRUCTURAL:RIGHT
+Preview: AAA AAAA AAAC AAAD AAAP AAAU AAC.U AAC.WS AACIU AACIW AACOU AACOW AACPR AACPU AACPW AACRF AADR AAEQ AAGIY AAGR AAGRW AALG AAMCF AAOG AAOX AAOZ AAPB AAPD AAPE AAPR AAPU AAPW AAPX AAPY AATC AAUA AAUAF AAUB AAUS AAVM … +8688
+Full list: /universe structural file
+As of 18:04:45Z · snapshot 2026-09-30@2026-09-29#da27de22a3bb839a
+
+>>> /universe list   (0.0s)
+⚙️ TALONX SENTINEL — OPERATOR OVERRIDES
+
+Operator-added: 0 (via override 0)
+Operator-excluded: 0 (via override 0)
+Operator-eligible (FORCE_ELIGIBLE): 0
+Mode: DRY_RUN
+
+This is NOT the full DTU universe.
+
+Use:
+/universe summary
+/universe active
+/universe eligible
+/universe excluded
+/universe overrides
+
+>>> /universe status A   (0.2s)
+⚙️ TALONX SENTINEL — A
+
+System state: ACTIVE_CORE
+Effective state: ACTIVE (ACTIVE_CORE)
+Operator override: NONE
+
+Core: YES (rank 317)
+Event promoted: NO
+Event eligible: NO
+Auto excluded: NO
+Structural exclusion: NO
+
+V2 protected: NO
+Open-position protected: NO
+Pending-intent protected: NO
+Lifecycle protected: NO
+
+Fetch eligible: YES
+Discovery eligible: YES
+
+Reason: ADV20_RANK_317
+Snapshot: 2026-09-30@2026-09-29#da27de22a3bb839a
+As of: 2026-09-30T18:04:45.033396+00:00
+
+>>> /universe status ABAT   (0.2s)
+⚙️ TALONX SENTINEL — ABAT
+
+System state: EVENT_ELIGIBLE
+Effective state: ACTIVE (EVENT_PROMOTED)
+Operator override: NONE
+
+Core: NO (rank 2790)
+Event promoted: YES
+Event eligible: YES
+Auto excluded: NO
+Structural exclusion: NO
+
+V2 protected: NO
+Open-position protected: NO
+Pending-intent protected: NO
+Lifecycle protected: PROTECT_WATCH_THIS_WINDOW
+
+Fetch eligible: YES
+Discovery eligible: YES
+
+Reason: GAP_TRIGGER
+Promotion: GAP_TRIGGER since 13:34Z · expires 2026-10-01T00:00
+Snapshot: 2026-09-30@2026-09-29#da27de22a3bb839a
+As of: 2026-09-30T18:04:45.033396+00:00
+
+>>> /universe status AAC   (0.2s)
+⚙️ TALONX SENTINEL — AAC
+
+System state: AUTO_EXCLUDED
+Effective state: EXCLUDED (AUTO_EXCLUDED)
+Operator override: NONE
+
+Core: NO
+Event promoted: NO
+Event eligible: NO
+Auto excluded: YES
+Structural exclusion: NO
+
+V2 protected: NO
+Open-position protected: NO
+Pending-intent protected: NO
+Lifecycle protected: NO
+
+Fetch eligible: NO
+Discovery eligible: NO
+
+Reason: BELOW_V1_ADV20_FLOOR
+Snapshot: 2026-09-30@2026-09-29#da27de22a3bb839a
+As of: 2026-09-30T18:04:45.033396+00:00
+
+>>> /universe move AAC active   (0.2s)
+⚙️ TALONX SENTINEL — OVERRIDE REQUEST
+
+AAC
+
+System state: AUTO_EXCLUDED
+Current effective state: EXCLUDED
+Current override: NONE
+
+Requested override: FORCE_ACTIVE
+
+Mode: DRY_RUN
+Status: PENDING
+
+No provider/discovery change has been applied.
+Request: bf81bcef2bb148db
+
+>>> /universe move AAC active   (0.2s)
+⚙️ TALONX SENTINEL — OVERRIDE REQUEST
+
+AAC
+
+System state: AUTO_EXCLUDED
+Current effective state: EXCLUDED
+Current override: FORCE_ACTIVE
+
+Requested override: FORCE_ACTIVE
+
+Mode: DRY_RUN
+Status: ALREADY_REQUESTED
+No change (idempotent).
+Request: 3a7b89dcf44a46a8
+
+>>> /universe move A excluded   (0.2s)
+⚙️ TALONX SENTINEL — OVERRIDE REQUEST
+
+A
+
+System state: ACTIVE_CORE
+Current effective state: ACTIVE
+Current override: NONE
+
+Requested override: FORCE_EXCLUDED
+
+Mode: DRY_RUN
+Status: PENDING
+
+No provider/discovery change has been applied.
+Request: 266bf9a8340c4b97
+
+>>> /universe move AAPL excluded   (0.2s)
+⚙️ TALONX SENTINEL — OVERRIDE REQUEST
+
+AAPL
+
+System state: ACTIVE_CORE
+Current effective state: ACTIVE
+Current override: NONE
+
+Requested override: FORCE_EXCLUDED
+
+Mode: DRY_RUN
+Status: HELD_PROTECTED
+Reason: V2_SCOPE_PROTECTED
+Effective state remains ACTIVE until the protection clears.
+Nothing recorded as pending.
+Request: a1697462f8884de9
+
+>>> /universe move ABAT eligible   (0.2s)
+⚙️ TALONX SENTINEL — OVERRIDE REQUEST
+
+ABAT
+
+System state: EVENT_ELIGIBLE
+Current effective state: ACTIVE
+Current override: NONE
+
+Requested override: FORCE_ELIGIBLE
+
+Mode: DRY_RUN
+Status: PENDING
+
+No provider/discovery change has been applied.
+Note: FORCE_ELIGIBLE has no runtime representation yet (architectural gap) — recorded as intent only.
+Request: 0fb043e3365747b0
+
+>>> /universe move AAC auto   (0.2s)
+⚙️ TALONX SENTINEL — OVERRIDE REQUEST
+
+AAC
+
+System state: AUTO_EXCLUDED
+Current effective state: EXCLUDED
+Current override: FORCE_ACTIVE
+
+Requested override: NONE
+
+Mode: DRY_RUN
+Status: PENDING
+
+No provider/discovery change has been applied.
+Request: c98f963367fc4939
+
+>>> /universe move AAC auto   (0.1s)
+⚙️ TALONX SENTINEL — OVERRIDE REQUEST
+
+AAC
+
+System state: AUTO_EXCLUDED
+Current effective state: EXCLUDED
+Current override: NONE
+
+Requested override: NONE
+
+Mode: DRY_RUN
+Status: ALREADY_AUTO
+No change (idempotent).
+Request: ddcd4f38c17e47cc
+
+>>> /universe overrides   (0.1s)
+⚙️ TALONX SENTINEL — OPERATOR OVERRIDES (2) · 2026-09-30
+operator intent only -- NOT the DTU universe
+A · FORCE_EXCLUDED (PENDING) · system ACTIVE_CORE · effective ACTIVE
+ABAT · FORCE_ELIGIBLE (PENDING) · system EVENT_ELIGIBLE · effective ACTIVE
+As of 18:04:45Z · snapshot 2026-09-30@2026-09-29#da27de22a3bb839a
+
+>>> /universe active file   (0.2s)
+⚙️ TALONX SENTINEL — ACTIVE UNIVERSE (2135) · 2026-09-30 
+[FILE universe_active_2026-09-30.csv: 2135 rows]
+SYMBOL,SYSTEM_STATE,EFFECTIVE_STATE,OPERATOR_OVERRIDE,OVERRIDE_STATUS,REASON,CORE,EVENT_PROMOTED,EVENT_ELIGIBLE,AUTO_EXCLUDED,STRUCTURAL_EXCLUSION,V2_PROTECTED,POSITION_PROTECTED,INTENT_PROTECTED,LIFECYCLE_PROTECTED,FETCH_ELIGIBLE,DISCOVERY_ELIGIBLE,CORE_RANK,PRICE,ADV20,STATE_AS_OF,SNAPSHOT_ID
+A,ACTIVE_CORE,ACTIVE,FORCE_EXCLUDED,PENDING,ADV20_RANK_317,YES,NO,NO,NO,NO,NO,NO,NO,,YES,YES,317,175.03,394666710.6835,2026-09-30T18:04:45.033396+00:00,2026-09-30@2026-09-29#da27de22a3bb839a
+AA,ACTIVE_CORE,ACTIVE,NONE,,ADV20_RANK_681,YES,NO,NO,NO,NO,NO,NO,NO,,YES,YES,681,41.97,177010132.50550002,2026-09-30T18:04:45.033396+00:00,2026-09-30@2026-09-29#da27de22a3bb839a
+
+>>> /help   (0.0s)
+⚙️ TALONX SENTINEL — COMMAND HELP
+
+🌐 DTU Visibility (read-only, LIVE)
+/universe summary
+/universe active [file]
+/universe eligible [file]
+/universe excluded [file]
+/universe structural [file]
+/universe core [file]
+/universe promoted [file]
+/universe status <SYMBOL>
+
+🛠 Operator Overrides
+/universe move <SYMBOL> active
+/universe move <SYMBOL> eligible
+/universe move <SYMBOL> excluded
+/universe move <SYMBOL> auto
+/universe overrides [file]
+
+🚫 Exclusions (legacy)
+/exclude add|remove|list|status <SYMBOL>
+
+🔎 Scanning
+/scanned
+/scanned file
+/scanned candidates
+/scanned setups
+/scanned signals
+
+🖥 System
+/status  ·  /help  ·  /help <command>
+
+⏳ Mutation mode: DRY_RUN
+
+Read-only commands show LIVE state.
+
+Move commands are recorded as PENDING only and do not affect provider fetching, DTU membership, discovery, Lab or Signal until an approved activation boundary.
+
+sandbox override_requests: [('AAC', 'FORCE_ACTIVE', 'PENDING'), ('AAC', 'FORCE_ACTIVE', 'ALREADY_REQUESTED'), ('A', 'FORCE_EXCLUDED', 'PENDING'), ('AAPL', 'FORCE_EXCLUDED', 'HELD_PROTECTED'), ('ABAT', 'FORCE_ELIGIBLE', 'PENDING'), ('AAC', 'NONE', 'PENDING'), ('AAC', 'NONE', 'ALREADY_AUTO')]
+real operator_control.db unchanged: True
+live active set unchanged by these commands (same latest cycle -> same set): True

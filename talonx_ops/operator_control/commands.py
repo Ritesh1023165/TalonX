@@ -15,7 +15,8 @@ from talonx_ops.operator_control.store import OperatorStore, normalize_symbol
 
 HEAD = "⚙️ TALONX SENTINEL"
 COMMANDS = ("help", "universe", "exclude", "scanned", "status")
-SUBS = {"universe": ("add", "remove", "list", "status", "summary", "excluded"), "exclude": ("add", "remove", "list", "status"),
+POPULATIONS = ("active", "eligible", "excluded", "structural", "core", "promoted", "overrides")
+SUBS = {"universe": ("summary", "status", "move", "list", "add", "remove") + POPULATIONS, "exclude": ("add", "remove", "list", "status"),
         "scanned": ("file", "candidates", "setups", "signals")}
 
 
@@ -31,17 +32,25 @@ class Reply:
 
 HELP_TOP = f"""{HEAD} — COMMAND HELP
 
-🌐 Universe
-/universe add <SYMBOL>
-/universe remove <SYMBOL>
-/universe list
+🌐 DTU Visibility (read-only, LIVE)
+/universe summary
+/universe active [file]
+/universe eligible [file]
+/universe excluded [file]
+/universe structural [file]
+/universe core [file]
+/universe promoted [file]
 /universe status <SYMBOL>
 
-🚫 Exclusions
-/exclude add <SYMBOL>
-/exclude remove <SYMBOL>
-/exclude list
-/exclude status <SYMBOL>
+🛠 Operator Overrides
+/universe move <SYMBOL> active
+/universe move <SYMBOL> eligible
+/universe move <SYMBOL> excluded
+/universe move <SYMBOL> auto
+/universe overrides [file]
+
+🚫 Exclusions (legacy)
+/exclude add|remove|list|status <SYMBOL>
 
 🔎 Scanning
 /scanned
@@ -53,23 +62,30 @@ HELP_TOP = f"""{HEAD} — COMMAND HELP
 🖥 System
 /status  ·  /help  ·  /help <command>"""
 
-PRE_EOD = ("\n\n⏳ Mode: DRY_RUN — changes are recorded as PENDING and do not affect provider fetching, "
-           "discovery, Lab or Signal until an approved activation boundary.")
+PRE_EOD = ("\n\n⏳ Mutation mode: DRY_RUN\n\nRead-only commands show LIVE state.\n\nMove commands are recorded as "
+           "PENDING only and do not affect provider fetching, DTU membership, discovery, Lab or Signal until an "
+           "approved activation boundary.")
 
 HELP = {
     "universe": f"""{HEAD} — /universe
 
-Manage operator-added symbols in the fetch universe.
-/universe add PLTR — add PLTR to future provider fetches
-/universe remove PLTR — stop fetching an operator-added symbol
-/universe list — operator-added / removed symbols
-/universe status PLTR — current state of one symbol (operator + Dynamic Universe tier)
-/universe summary — Core / event-promoted / event-eligible / excluded / effective active counts
-/universe excluded — non-Core summary by reason · /universe excluded file — CSV of every non-Core symbol
+Visibility (read-only, LIVE DTU state — never mutates anything):
+/universe summary — counts per population
+/universe active [file] — what TalonX is processing NOW (Core + event-promoted + operator/V2 + protected)
+/universe eligible [file] — EVENT_ELIGIBLE and not active now (reachable by the gap / 8-K event tier)
+/universe excluded [file] — AUTO_EXCLUDED (below V1 price / ADV20 floors)
+/universe structural [file] — STRUCTURALLY_EXCLUDED (ETFs, warrants, units, preferreds ...)
+/universe core [file] · /universe promoted [file]
+/universe status PLTR — system state, override, effective state, protections, reason
 
-• Discovery starts from the activation boundary forward — no history backfill or replay.
-• History is kept when a symbol is removed; re-adding never replays it.
-• An exclusion always wins over the universe.""",
+Operator overrides (the system DTU state is never rewritten; the effective state is derived):
+/universe move PLTR active — FORCE_ACTIVE
+/universe move PLTR eligible — FORCE_ELIGIBLE (event tier only, no continuous scan)
+/universe move PLTR excluded — FORCE_EXCLUDED (held while an open position / intent / V2 scope protects it)
+/universe move PLTR auto — clear the override (back to the automatic DTU)
+/universe overrides [file] — operator overrides only (NOT the DTU universe)
+
+Legacy: /universe add PLTR · /universe remove PLTR (operator-added fetch list; shown in /universe list).""",
     "exclude": f"""{HEAD} — /exclude
 
 Stop all work on a symbol without deleting history.
@@ -116,8 +132,9 @@ def _fmt_rows(rows: list[dict], keys: tuple[str, ...]) -> str:
 
 
 def handle(text: str, *, chat_id, user: str, owner_chat_id, store: OperatorStore, mode: str = DRY_RUN,
-           scanned=None) -> Reply | None:
-    """Returns None for non-command text (so other resolvers keep working)."""
+           scanned=None, universe=None) -> Reply | None:
+    """Returns None for non-command text (so other resolvers keep working). ``universe``: host-supplied factory
+    ``store -> LiveUniverse`` (None -> live DTU views report unavailable; never a guess)."""
     raw = (text or "").strip()
     if not raw.startswith("/"):
         return None
@@ -127,7 +144,7 @@ def handle(text: str, *, chat_id, user: str, owner_chat_id, store: OperatorStore
     if cmd == "ping":
         return None                                             # the existing /ping handler owns it
     authorized = owner_chat_id is not None and str(chat_id) == str(owner_chat_id)
-    mutating = cmd in ("universe", "exclude") and args and args[0].lower() in ("add", "remove")
+    mutating = cmd in ("universe", "exclude") and args and args[0].lower() in ("add", "remove", "move")
     if not authorized:
         store.audit(actor=user, chat=str(chat_id), authorized=False, command=raw, symbol=None, before=None,
                     after=None, mode=mode, result="REJECTED_UNAUTHORIZED")
@@ -146,27 +163,140 @@ def handle(text: str, *, chat_id, user: str, owner_chat_id, store: OperatorStore
     sub = args[0].lower() if args else None
     if sub not in SUBS[cmd]:
         return Reply(_usage(cmd, sub))
+    if cmd == "universe" and sub == "list":             # ambiguous legacy name: explain, never "0 active"
+        return Reply(_overrides_redirect(store, mode))
     if sub == "list":
         return Reply(_list(cmd, store, mode))
-    if cmd == "universe" and sub in ("summary", "excluded"):  # read-only Dynamic Universe views
+    if cmd == "universe" and (sub == "summary" or sub in POPULATIONS):   # read-only LIVE DTU views
         from talonx_ops.operator_control import universe_view as UV
-        v = UV.UniverseView()
         if sub == "summary":
-            return Reply(UV.summary_text(v, HEAD))
+            return Reply(UV.summary_text(UV.UniverseView(), HEAD) + "\n" + _override_counts(store) +
+                         "\n/universe active · eligible · excluded · structural [file]")
+        v = universe(store) if universe else UV.LiveUniverse(store=store)
         if len(args) > 1 and args[1].lower() == "file" and v.available():
-            return Reply(f"{HEAD} — non-Core universe ({v.wid})", document=v.excluded_csv(),
-                         filename=f"universe_excluded_{v.wid}.csv")
-        return Reply(UV.excluded_text(v, HEAD))
+            rows = v.population(sub)
+            return Reply(f"{HEAD} — {UV.POP_TITLE[sub][0]} ({len(rows)}) · {v.wid}", document=v.csv(rows),
+                         filename=f"universe_{sub}_{v.wid}.csv")
+        return Reply(UV.population_text(v, sub, HEAD))
+    if cmd == "universe" and sub == "move":
+        sym, err = normalize_symbol(args[1] if len(args) > 1 else None)
+        target = args[2].lower() if len(args) > 2 else None
+        if err or target not in MOVE_TARGETS:
+            return Reply(f"❗ {err or 'target must be one of: ' + ' | '.join(MOVE_TARGETS)}\n"
+                         "Usage: /universe move <SYMBOL> <active|eligible|excluded|auto>\n"
+                         "Example: /universe move PLTR active")
+        return _move(sym, target, " ".join(args[3:])[:120], store=store, user=user, chat=str(chat_id), mode=mode,
+                     raw=raw, universe=universe)
     sym, err = normalize_symbol(args[1] if len(args) > 1 else None)
     if err:
         return Reply(f"❗ {err}\n{_usage(cmd, sub)}")
     if sub == "status":
         if cmd == "universe":
             from talonx_ops.operator_control import universe_view as UV
-            return Reply(_status(sym, store, mode) + "\n" + UV.status_text(UV.UniverseView(), sym, "Dynamic Universe"))
+            return Reply(UV.live_status_text(universe(store) if universe else UV.LiveUniverse(store=store), sym,
+                                             HEAD, mode) +
+                         _legacy_intent(sym, store))
         return Reply(_status(sym, store, mode))
     reason = " ".join(args[2:])[:120] or None
     return _mutate(cmd, sub, sym, reason, store=store, user=user, chat=str(chat_id), mode=mode, raw=raw)
+
+
+def _legacy_intent(sym: str, store: OperatorStore) -> str:
+    u, e = store.universe_row(sym), store.exclusion_row(sym)
+    out = []
+    if u and u["status"] in ("ACTIVE", "REMOVED"):
+        out.append(f"Operator universe (legacy): {u['status']} ({u['activation']})")
+    if e and e["status"] == "EXCLUDED":
+        out.append(f"Operator exclusion (legacy): EXCLUDED ({e['activation']})")
+    return ("\n" + "\n".join(out)) if out else ""
+
+
+MOVE_TARGETS = {"active": "FORCE_ACTIVE", "eligible": "FORCE_ELIGIBLE", "excluded": "FORCE_EXCLUDED", "auto": "NONE"}
+
+
+def _override_counts(store: OperatorStore) -> str:
+    ov = store.overrides()
+    by = {k: sum(1 for r in ov if r["override"] == k) for k in ("FORCE_ACTIVE", "FORCE_ELIGIBLE", "FORCE_EXCLUDED")}
+    return (f"Operator overrides: FORCE_ACTIVE {by['FORCE_ACTIVE']} · FORCE_ELIGIBLE {by['FORCE_ELIGIBLE']} · "
+            f"FORCE_EXCLUDED {by['FORCE_EXCLUDED']}")
+
+
+def _overrides_redirect(store: OperatorStore, mode: str) -> str:
+    """/universe list: operator intent only (overrides + legacy add / exclude rows) -- never a '0 active' universe."""
+    ov = store.overrides()
+    n = {k: sum(1 for r in ov if r["override"] == k) for k in ("FORCE_ACTIVE", "FORCE_EXCLUDED", "FORCE_ELIGIBLE")}
+    added, excluded = sorted(store.added()), sorted(store.excluded())
+    rows = []
+    for s_ in added:
+        u = store.universe_row(s_) or {}
+        rows.append(f"➕ {s_} · {u.get('activation', '')}")
+    for s_ in excluded:
+        e = store.exclusion_row(s_) or {}
+        rows.append(f"🚫 {s_} · {e.get('activation', '')}")
+    for r in ov:
+        if r["override"] == "FORCE_ELIGIBLE":
+            rows.append(f"↔ {r['symbol']} · FORCE_ELIGIBLE · {r['status']}")
+    return "\n".join([f"{HEAD} — OPERATOR OVERRIDES", "",
+                      f"Operator-added: {len(added)} (via override {n['FORCE_ACTIVE']})",
+                      f"Operator-excluded: {len(excluded)} (via override {n['FORCE_EXCLUDED']})",
+                      f"Operator-eligible (FORCE_ELIGIBLE): {n['FORCE_ELIGIBLE']}",
+                      f"Mode: {mode}"] + (["", *rows[:40]] if rows else []) +
+                     ["", "This is NOT the full DTU universe.", "",
+                      "Use:", "/universe summary", "/universe active", "/universe eligible", "/universe excluded",
+                      "/universe overrides"])
+
+
+def _move(sym, target, reason, *, store, user, chat, mode, raw, universe=None) -> Reply:
+    """Operator override request. The system DTU state is never rewritten. Safety protections win; DRY_RUN records
+    PENDING only (no provider / discovery / DTU change). Idempotent."""
+    from talonx_ops.operator_control import universe_view as UV
+    v = universe(store) if universe else UV.LiveUniverse(store=store)
+    req = MOVE_TARGETS[target]
+    if not v.available():
+        return Reply("❗ DTU state unavailable — /universe move not recorded.")
+    x = v.rows().get(sym)
+    if x is None:
+        store.audit(actor=user, chat=chat, authorized=True, command=raw, symbol=sym, before=None, after=None,
+                    mode=mode, result="REJECTED_NOT_IN_BASE_UNIVERSE")
+        return Reply(f"❗ {sym} is not in the TalonX base universe ({v.wid}) — move rejected.")
+    cur = store.current_override(sym)
+    sysst, eff = x["SYSTEM_STATE"], x["EFFECTIVE_STATE"]
+    why = reason or ""
+    if req == cur:
+        status = "ALREADY_AUTO" if req == "NONE" else "ALREADY_REQUESTED"
+    elif cur == "NONE" and ((req == "FORCE_ACTIVE" and eff == "ACTIVE") or
+                            (req == "FORCE_EXCLUDED" and sysst in ("AUTO_EXCLUDED", "STRUCTURALLY_EXCLUDED")) or
+                            (req == "FORCE_ELIGIBLE" and sysst == "EVENT_ELIGIBLE" and eff != "ACTIVE")):
+        status = "ALREADY_EFFECTIVE"
+    elif req in ("FORCE_EXCLUDED", "FORCE_ELIGIBLE") and (x["POSITION_PROTECTED"] or x["INTENT_PROTECTED"]
+                                                          or x["V2_PROTECTED"]):
+        status = "HELD_PROTECTED"
+        why = ("OPEN_POSITION_PROTECTED" if x["POSITION_PROTECTED"] else "PENDING_INTENT_PROTECTED"
+               if x["INTENT_PROTECTED"] else "V2_SCOPE_PROTECTED")
+    else:
+        status = "APPLIED" if mode == ACTIVE else "PENDING"
+    record = status in ("PENDING", "APPLIED")
+    rid = store.record_override_request(symbol=sym, requested=req, status=status, operator=user, source="SENTINEL",
+                                        mode=mode, previous_system_state=sysst, previous_effective_state=eff,
+                                        reason=why, snapshot_id=x["SNAPSHOT_ID"], state_as_of=x["STATE_AS_OF"],
+                                        apply_current=record)
+    store.audit(actor=user, chat=chat, authorized=True, command=raw, symbol=sym, before={"override": cur},
+                after={"override": req if record else cur, "status": status}, mode=mode, result=status, reason=why)
+    lines = [f"{HEAD} — OVERRIDE REQUEST", "", sym, "", f"System state: {sysst}",
+             f"Current effective state: {eff}", f"Current override: {cur}", "", f"Requested override: {req}", "",
+             f"Mode: {mode}", f"Status: {status}"]
+    if status == "HELD_PROTECTED":
+        lines += [f"Reason: {why}", f"Effective state remains {eff} until the protection clears.",
+                  "Nothing recorded as pending."]
+    elif status.startswith("ALREADY"):
+        lines.append("No change (idempotent).")
+    elif mode != ACTIVE:
+        lines += ["", "No provider/discovery change has been applied."]
+        if req == "FORCE_ELIGIBLE":
+            lines.append("Note: FORCE_ELIGIBLE has no runtime representation yet (architectural gap) — "
+                         "recorded as intent only.")
+    lines.append(f"Request: {rid}")
+    return Reply("\n".join(lines), mutated=record, audit_id=rid)
 
 
 def _activation(mode: str) -> str:

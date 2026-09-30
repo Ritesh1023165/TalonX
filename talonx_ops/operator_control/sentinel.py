@@ -25,7 +25,7 @@ ENABLE_ENV = "TALONX_SENTINEL_COMMANDS_ENABLED"
 
 class SentinelCommandPoller:
     def __init__(self, *, bot, owner_chat_id, store: OperatorStore | None = None, scanned_factory=None, env=None,
-                 status_provider=None):
+                 status_provider=None, universe_factory=None):
         self.bot, self.owner = bot, owner_chat_id
         self.store = store or OperatorStore()
         self.env = env
@@ -34,6 +34,7 @@ class SentinelCommandPoller:
         # /status on Sentinel: a compact read-only health summary supplied by the host (``handle`` defers /status so
         # the Signal-side /status path is untouched). Owner-only, like every other Sentinel command.
         self.status_provider = status_provider
+        self.universe_factory = universe_factory      # host-supplied live DTU view (store -> LiveUniverse)
         self.handled = 0
         self.last_error: str | None = None
         self.reply_log = None                   # optional callable(dict): per-update reply ledger (evidence)
@@ -44,7 +45,7 @@ class SentinelCommandPoller:
             return False
         user = str(getattr(getattr(message, "from_user", None), "id", "") or "")
         rep = handle(message.text, chat_id=message.chat_id, user=user, owner_chat_id=self.owner, store=self.store,
-                     mode=mutation_mode(self.env), scanned=self.scanned_factory())
+                     mode=mutation_mode(self.env), scanned=self.scanned_factory(), universe=self.universe_factory)
         if rep is None and self.status_provider is not None and _is_status(message.text) \
                 and str(message.chat_id) == str(self.owner):
             from talonx_ops.operator_control.commands import Reply
@@ -96,7 +97,7 @@ class SentinelCommandPoller:
         return offset
 
 
-def operations_poller(*, loop, env=None, store=None, status_provider=None, bot_factory=None):
+def operations_poller(*, loop, env=None, store=None, status_provider=None, bot_factory=None, universe_factory=None):
     """(bot, poller, bot_identity) bound to the TalonX Sentinel (OPERATIONS) bot ONLY -- the one place a supervised
     host obtains Sentinel credentials (the research lane never names that destination)."""
     from talonx_ops.notify import OPERATIONS, resolve_destination_config
@@ -112,7 +113,7 @@ def operations_poller(*, loop, env=None, store=None, status_provider=None, bot_f
         loop.run_until_complete(bot.initialize())
         ident = "@" + str(bot.username)
     return bot, SentinelCommandPoller(bot=bot, owner_chat_id=cfg.chat_id, env=env, store=store,
-                                      status_provider=status_provider), ident
+                                      status_provider=status_provider, universe_factory=universe_factory), ident
 
 
 def _size(doc) -> int | None:
