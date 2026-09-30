@@ -46,3 +46,29 @@ as `UNKNOWN_DATA`, never dropped.
   data pipeline*. A different causal hypothesis is then proposed instead of more filters.
 
 ## Sessions
+
+### In-sample reference, 2026-09-28 + 2026-09-29 (NOT validation; the data the hypothesis came from)
+
+| | CONTROL | SHADOW SQF_V1 |
+|---|---|---|
+| Signals | 307 | 113 pass |
+| Resolved at +30m | 274 | 104 |
+| **Gross +30m** | **−0.055%** | **−0.000%** |
+| Net +30m | −0.573% | −0.204% |
+| Win rate / profit factor | 30.3% / 0.28 | 40.4% / 0.52 |
+| Paper P&L (+30m, $100k / $10k) | −$11,279 | −$1,951 |
+
+**SHADOW fail reasons (CONTROL signals):**
+
+| Reason | Count |
+|---|---|
+| `SPREAD_GT_25BPS` | 154 |
+| `ADV20_LT_20M` | 147 |
+| `CATALYST_8K_ONLY` | 10 |
+| `SPREAD_UNKNOWN_DATA` | 7 |
+| `NO_ACTIONABLE_ENTRY` | 6 |
+
+**Read-out, recorded before validation:** even in-sample, SQF_V1 only removes *cost*. Its gross expectancy is ~0,
+the same as CONTROL. Because the first gate is gross > 0, the hypothesis needs future sessions to show a gross edge
+that the derivation sample did not show. If they don't, the premise escalates as registered.
+
