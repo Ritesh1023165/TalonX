@@ -209,3 +209,55 @@ def test_declaration_binds_all_adjustment_identically_for_spy():
     assert (b["provider"], b["feed"], b["timeframe"], b["adjustment"]) == ("alpaca", "sip", "1Min", "all")
     assert "IDENTICAL" in b["symbols"] and "SPY" in b["symbols"]
     assert d["strategy_semantics_changed"] == "NO" and d["fingerprint_changed"] == "NO"
+
+
+# ------------------------------------------------------------------ Task75 closure (A1/A2)
+def test_ca_audit_v2_selects_by_ex_date_not_process_date():
+    from research.task75b_preflight.ca_audit_v2 import select_by_ex_date
+    rows = {"cash_dividends": [
+        {"symbol": "GOOGL", "ex_date": "2025-03-10", "process_date": "2025-03-17", "rate": 0.2},   # ex in window
+        {"symbol": "TXN", "ex_date": "2025-01-31", "process_date": "2025-02-11", "rate": 1.36}]}  # ex before window
+    got = select_by_ex_date(rows, "2025-02-03", "2025-03-14")
+    assert [(e["symbol"], e["ex_or_effective_date"]) for e in got] == [("GOOGL", "2025-03-10")]
+
+
+def test_ca_audit_v2_query_ranges_never_touch_reserved_windows(tmp_path):
+    import json as _j
+    from datetime import date as _d, timedelta as _t
+    from research.task75b_preflight.ca_audit_v2 import LOOKBACK_PAD_DAYS, PROCESS_TRAIL_DAYS
+    man = _j.loads((Path(__file__).resolve().parents[1] / "results" / "task74_alpha_discovery_v2" /
+                    "development_data_manifest.json").read_text())
+    gd = H.HoldoutGuard("PREFLIGHT", tmp_path / "s.json")
+    for s in man["slices"].values():
+        lo = (_d.fromisoformat(s["start"]) - _t(days=LOOKBACK_PAD_DAYS)).isoformat()
+        hi = (_d.fromisoformat(s["end"]) + _t(days=PROCESS_TRAIL_DAYS)).isoformat()
+        gd.check_range(lo, hi, layer="DOWNLOAD")                     # raises if any widened range hits 2024 windows
+
+
+def test_cent_rounding_relabel_is_bounded():
+    from research.task75b_preflight.attribution_v2 import relabel, rounding_bound
+    raw = pd.DataFrame([{"symbol": "AAA", "decision_day": "2025-03-05", "entry_price": 170.53, "exit_price": 165.88,
+                         "market_adjusted_return_pct": 1.0},
+                        {"symbol": "BBB", "decision_day": "2025-03-05", "entry_price": 100.0, "exit_price": 99.0,
+                         "market_adjusted_return_pct": 1.0}])
+    f = 0.9941
+    allp = pd.DataFrame([{"symbol": "AAA", "decision_day": "2025-03-05", "entry_price": round(170.53 * f, 2),
+                          "exit_price": round(165.88 * f, 2), "market_adjusted_return_pct": 1.0},
+                         {"symbol": "BBB", "decision_day": "2025-03-05", "entry_price": 99.0, "exit_price": 90.0,
+                          "market_adjusted_return_pct": 1.0}])
+    diff = pd.DataFrame([{"symbol": "AAA", "decision_day": "2025-03-05", "change": "PRICE_OR_PNL_CHANGED",
+                          "category": "UNEXPLAINED"},
+                         {"symbol": "BBB", "decision_day": "2025-03-05", "change": "PRICE_OR_PNL_CHANGED",
+                          "category": "UNEXPLAINED"}])
+    out = relabel(diff, raw, allp).set_index("symbol")["category"].to_dict()
+    assert out == {"AAA": "OTHER_EXPLAINED_CENT_ROUNDING", "BBB": "UNEXPLAINED"}   # real changes stay unexplained
+    assert rounding_bound(100, 100) == pytest.approx(1e-4, abs=1e-8)
+
+
+def test_survival_thresholds_unchanged_by_closure():
+    assert S.NET_10BPS_MIN_PCT == 0.15 and S.SEED == 670067 and S.RETURN_TOL_PCT == 1e-6 and S.FACTOR_TOL == 1e-5
+
+
+def test_guard_state_left_in_preflight_with_both_windows_locked():
+    g2 = H.HoldoutGuard.load()
+    assert g2.state == "PREFLIGHT" and g2.validation_locked() and g2.replication_locked()

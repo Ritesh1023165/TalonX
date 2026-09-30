@@ -49,6 +49,13 @@
    "survival": "FAIL (A,C,D)",
    "substance": "candidate should be retired: corrected development gross 0.2296%, net@10 0.1296%, cluster CI lows negative; RAW edge came from 4 split-spanning shorts",
    "holdout": "validation and replication NOT downloaded, NOT read; no state transition"
+  },
+  {
+   "at_utc": "2026-09-30T23:22:13.197278+00:00",
+   "event": "OWNER_DECISION",
+   "decision": "TASK75_RETIRED_AFTER_CORPORATE_ACTION_CORRECTION",
+   "basis": "survival A/C/D FAIL; bound argument; attribution V2 explains all 391 (0 unexplained)",
+   "holdout": "never consumed; state stays PREFLIGHT, both windows locked for future use"
   }
  ],
  "state": "PREFLIGHT",

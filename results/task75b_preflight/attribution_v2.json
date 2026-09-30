@@ -1,0 +1,34 @@
+{
+ "version": "ATTRIBUTION_V2 (ex-date audit + cent-rounding tolerance; survival NOT re-run)",
+ "ledgers_reproduce_registered_selection": true,
+ "by_category": {
+  "DIRECT_CORPORATE_ACTION": {
+   "count": 97,
+   "gross_pp": -380.5161
+  },
+  "OTHER_EXPLAINED": {
+   "count": 276,
+   "gross_pp": 0.0052
+  },
+  "OTHER_EXPLAINED_CENT_ROUNDING": {
+   "count": 377,
+   "gross_pp": -0.0676
+  },
+  "RANK_BOUNDARY_PROPAGATION": {
+   "count": 11,
+   "gross_pp": 3.1653
+  },
+  "UNCHANGED": {
+   "count": 250,
+   "gross_pp": 0.0
+  }
+ },
+ "v1_unexplained_391_now": {
+  "OTHER_EXPLAINED_CENT_ROUNDING": 377,
+  "DIRECT_CORPORATE_ACTION": 11,
+  "RANK_BOUNDARY_PROPAGATION": 3
+ },
+ "unexplained_now": 0,
+ "residual_unexplained_gross_pp": 0.0,
+ "total_change_pp": -377.4132904142532
+}
