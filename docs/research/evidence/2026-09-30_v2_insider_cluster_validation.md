@@ -197,3 +197,20 @@ the task forbids.
 - 2026Q2 is a data holdout that the freeze did not use, but it is not prospective.
 - **The first truly forward date is 2026-09-07** (activation filings after the 2026-09-06 freeze).
 - The Jul–Sep 2026 crawl, including the prospective September events, is added in checkpoint 2.
+
+## Checkpoint 2 (2026-09-30 16:02Z): Jul–Sep 2026 via EDGAR per-filing crawl, including the first prospective events
+
+**Crawl:** 63 trading days, 33,849 Form 4 filings (1 failed fetch), 29,901 code P/S rows. It is merged with the bulk data
+through 2026Q2. **The forward tracker runs daily until 2026-10-31** and writes `results/v2_validation/forward/<date>.json`.
+
+| +10 sessions, 20 bps | n | Gross | Net | PF (net) | vs SPY | Without best 3 (net) | RC1 portfolio |
+|---|---|---|---|---|---|---|---|
+| POST_Q2, entries 2026-07-02 → 09-15 | 99 | **−2.27%** | **−2.47%** | 0.48 | −2.01% | −3.15% | −$14,969, max drawdown −15.6% |
+| PROSPECTIVE, activation after the 2026-09-06 freeze | 10 | −2.06% | −2.26% | 0.64 | −3.18% | — | −$2,264 |
+| **All unseen, 2026Q2 + Q3** | 244 | +0.83% | +0.63% | 1.19 | **−0.08%** | **−0.23%** | **−$8,722**, max drawdown −18.0% |
+
+**Q2 did not repeat.** The unseen-period average is carried entirely by MNTS, whose best single trade is **96%** of total
+net points: without it the mean is +0.02%, without the best 3 it is −0.23%, and it is flat against SPY. The prospective
+sample so far is 10 trades, all negative except GME, KMT and TSM.
+
+**Verdict unchanged, and now stronger: `INSIDER_BUY_CLUSTER_V2@1 = UNSUPPORTED`.**
