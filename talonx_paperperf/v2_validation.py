@@ -133,7 +133,7 @@ def build_episodes() -> dict:
 
 
 # ============================================================================================================ prices
-def fetch_prices(symbols: list[str], start: date, end: date) -> None:
+def fetch_prices(symbols: list[str], start: date, end: date, refresh: set[str] = frozenset()) -> None:
     """Alpaca SIP daily bars, adjustment=all, multi-symbol + paginated; cache per symbol in one JSON (resumable)."""
     from talonx_paperperf.rs_phase_a import _alpaca
     data = _alpaca(150)
@@ -142,7 +142,7 @@ def fetch_prices(symbols: list[str], start: date, end: date) -> None:
     import re as _re
     ok = _re.compile(r"^[A-Z][A-Z0-9.\-]{0,6}$")
     malformed = sorted(s for s in set(symbols) if not ok.match(s))        # e.g. '"OMEX"': never priceable
-    need = [s for s in sorted(set(symbols)) if s not in have and ok.match(s)]
+    need = [s for s in sorted(set(symbols)) if (s not in have or s in refresh) and ok.match(s)]
     print(json.dumps({"malformed_symbols_unpriceable": len(malformed), "examples": malformed[:10]}), flush=True)
     import re
     rejected = []
@@ -502,6 +502,32 @@ def evaluate() -> dict:
     return res
 
 
+def forward() -> dict:
+    """SHADOW-only forward tracker: every episode whose activation filing is after the 2026-09-06 freeze, with its
+    entry, +1/+3/+5/+10 outcomes and cost-adjusted primary result (resolved as bars arrive). Writes
+    results/v2_validation/forward/<today>.json. Sends nothing; changes no V2 state."""
+    import glob
+    import os
+    rows = json.loads((OUT / "rows.json").read_text(encoding="utf-8"))
+    panel = {os.path.basename(p)[:-4] for p in glob.glob(str(REPO / "results/task95g_broad_cross_sectional/_daily/*.csv"))}
+    fw = [r for r in rows if r.get("prospective")]
+    keep = ("episode_id", "symbol", "activation_filing_date", "entry_session", "status", "liq_reason", "entry_open",
+            "g1", "g3", "g5", "g10", "net10", "s10", "exit_session", "spy10", "n_distinct_owners",
+            "aggregate_purchase_value")
+    ev = [r for r in fw if r.get("g10") is not None]
+    out = {"as_of": date.today().isoformat(), "version": V2_VERSION, "freeze": FREEZE_DATE.isoformat(),
+           "episodes_after_freeze": len(fw), "v2_eligible": sum(1 for r in fw if r.get("liq_reason") == "PASS"),
+           "resolved_+10": len(ev), "primary_net_+10": stats([r["net10"] for r in ev]),
+           "primary_gross_+10": stats([r["g10"] for r in ev]),
+           "sp500_panel_subset_net_+10": stats([r["net10"] for r in ev if r["symbol"] in panel]),
+           "open_or_pending": sum(1 for r in fw if r.get("liq_reason") == "PASS" and r.get("g10") is None),
+           "rows": [{k: r.get(k) for k in keep} | {"sp500_panel": r["symbol"] in panel} for r in fw]}
+    d = OUT / "forward"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{out['as_of']}.json").write_text(json.dumps(out, indent=1, default=str), encoding="utf-8")
+    return out
+
+
 def main(argv):
     if argv[0] == "episodes":
         r = build_episodes()
@@ -512,7 +538,11 @@ def main(argv):
     elif argv[0] == "prices":
         E = json.loads((OUT / "episodes.json").read_text(encoding="utf-8"))
         syms = sorted({e["symbol"] for e in E["episodes"]} | {"SPY"})
-        fetch_prices(syms, date(2018, 11, 1), date.today() - timedelta(days=1))
+        recent = {e["symbol"] for e in E["episodes"] if e["eligible_entry_session"] >= "2026-08-01"} | {"SPY"}
+        fetch_prices(syms, date(2018, 11, 1), date.today() - timedelta(days=1), refresh=recent)
+    elif argv[0] == "forward":
+        r = forward()
+        print(json.dumps({k: v for k, v in r.items() if k != "rows"}, indent=1, default=str))
     elif argv[0] == "evaluate":
         r = evaluate()
         print(json.dumps({k: v for k, v in r.items()}, indent=1, default=str)[:20000])
