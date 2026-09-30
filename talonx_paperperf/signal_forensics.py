@@ -214,7 +214,8 @@ def analyse_window(wid: str, live: bool = False) -> dict:
         sp = r.get("spread_bps")
         r["cost_basis"] = "MAX(V2_FRICTION_20BPS, MEASURED_SPREAD)" if sp is not None else "V2_FRICTION_20BPS_ONLY"
         r["cost_frac"] = max(V2_FRICTION_BPS, sp if sp is not None else 0.0) / 1e4
-        from talonx_paperperf.hypotheses import SQF_V1, is_8k_only
+        from talonx_paperperf.hypotheses import SQF_V1, boundary_of, is_8k_only
+        r["dtu_boundary"] = boundary_of(r["event_utc"])
         ok, why = SQF_V1.decide(r)
         r["catalyst_type"] = ("8-K_ONLY" if is_8k_only(r["catalyst"]) else "NONE" if r["catalyst"] in (None, "none found")
                               else "SEC_OTHER")
@@ -232,9 +233,38 @@ def analyse_window(wid: str, live: bool = False) -> dict:
     return res
 
 
+def production_dtu_state(wid: str, sigs: list[dict]) -> dict[str, str]:
+    """Signal symbol's PRODUCTION DTU state at its decision time (market.db, read-only), when DTU was ACTIVE."""
+    p = LIVE / "market.db"
+    try:
+        m = ro(p)
+        snap = {r[0]: r[1] for r in m.execute("SELECT symbol, state FROM dtu_snapshot WHERE window_id=?", (wid,))}
+        prom = [tuple(r) for r in m.execute("SELECT symbol, reason, started_utc, expires_utc FROM dtu_promotions")]
+    except sqlite3.Error:
+        return {}
+    if not snap:
+        return {}
+    from talonx_premarket import __main__ as M
+    v2 = set(M._v2_scope(None))
+    out = {}
+    for s in sigs:
+        t, sym = s["event_utc"], s["symbol"]
+        if sym in v2:
+            out[s["promotion_id"]] = "OPERATOR_V2_PROTECTED"
+        elif snap.get(sym) == "ACTIVE_CORE":
+            out[s["promotion_id"]] = "ACTIVE_CORE"
+        else:
+            live = [x for x in prom if x[0] == sym and x[2] <= t and (x[3] is None or t < x[3])]
+            out[s["promotion_id"]] = f"EVENT_PROMOTED:{live[0][1]}" if live else "PROTECTED_OR_UNEXPLAINED"
+    return out
+
+
 def shadow_status(wid: str, sigs: list[dict]) -> dict[str, str]:
-    """Dynamic Universe classification per Signal. 09-29 onwards: live shadow (Core 1200, POLICY protection);
-    2026-09-28: the 09-29 study replay (E5, Core 1200)."""
+    """Dynamic Universe classification per Signal. When production DTU was ACTIVE: the production state at decision.
+    Otherwise: 09-29 onwards the live shadow (Core 1200, POLICY protection); 2026-09-28 the study replay."""
+    prod = production_dtu_state(wid, sigs)
+    if prod:
+        return prod
     out = {}
     try:
         from talonx_shadow.dtu_eval import Policy, Window

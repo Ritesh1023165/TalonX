@@ -78,8 +78,10 @@ def verdict(s: dict, sessions: int) -> str:
     return "FAILED (gross/net/PF gate)"
 
 
-def report(wids: list[str], live: bool = False) -> dict:
-    rows = [r for w in wids for r in rows_for(w, live)]
+def report(wids: list[str], live: bool = False, segment: str | None = None) -> dict:
+    """``segment`` = "PRE_DTU" | "POST_DTU" (prefix match on the row's dtu_boundary); None = all rows."""
+    rows = [r for w in wids for r in rows_for(w, live)
+            if segment is None or str(r.get("dtu_boundary", "PRE_DTU")).startswith(segment)]
     ctl = side(rows, "CONTROL")
     shw = side([r for r in rows if r.get("shadow_filter_pass")], "SHADOW_SQF_V1")
     drift = [r["entry_drift_pct"] for r in rows if r.get("entry_drift_pct") is not None]
@@ -88,7 +90,13 @@ def report(wids: list[str], live: bool = False) -> dict:
     for r in rows:
         for x in filter(None, (r.get("shadow_filter_fail_reason") or "").split(";")):
             fail[x] = fail.get(x, 0) + 1
-    return {"windows": wids, "live": live, "control": ctl, "shadow": shw, "shadow_fail_reasons": fail,
+    split = {}
+    for k in ("ACTIVE_CORE", "EVENT_PROMOTED", "OPERATOR_V2_PROTECTED", "PROTECTED_OR_UNEXPLAINED"):
+        sub = [r for r in rows if str(r.get("shadow_state")).startswith(k)]
+        split[k] = {"n": len(sub), "gross_30m": F.stats([gross(r, H) for r in sub]),
+                    "net_30m": F.stats([F.net(r, "act", H) for r in sub])}
+    return {"windows": wids, "live": live, "segment": segment or "ALL", "dtu_state_split": split,
+            "control": ctl, "shadow": shw, "shadow_fail_reasons": fail,
             "entry_drift_median_pct": round(statistics.median(drift), 3) if drift else None,
             "data_to_send_median_s": statistics.median(lat) if lat else None,
             "control_verdict": verdict(ctl, len(wids)), "shadow_verdict": verdict(shw, len(wids)),
@@ -127,6 +135,9 @@ def checkpoint(rep: dict, title: str) -> str:
         f"DTU ${s['dtu']['DTU_NET_PNL']:,.0f})",
         f"TOP3_CONCENTRATION (control): top3 {conc.get('top_3_contribution_pct_points')} pp; mean without best 3 "
         f"{conc.get('mean_without_best_3_pct')}%",
+        "DTU_STATE_SPLIT (control, +30m): " + "; ".join(
+            f"{k} n={v['n']} gross {fmt(v['gross_30m'])} net {fmt(v['net_30m'])}"
+            for k, v in rep.get("dtu_state_split", {}).items() if v["n"]),
         f"CURRENT_VERDICT: CONTROL = {rep['control_verdict']} | SHADOW = {rep['shadow_verdict']}"])
 
 
@@ -136,12 +147,16 @@ def append_session(wid: str) -> bool:
     text = DOC.read_text(encoding="utf-8") if DOC.exists() else ""
     if marker in text:
         return False
-    day = report([wid])
-    cum = report(windows_done())
-    block = "\n".join(["", marker, f"## Session {wid} (appended {datetime.now(timezone.utc):%Y-%m-%dT%H:%MZ})", "",
-                       "```", checkpoint(day, wid), "```", "",
-                       f"Cumulative since {SQF_V1.validation_start} ({len(cum['windows'])} sessions):", "", "```",
-                       checkpoint(cum, "CUMULATIVE " + ",".join(cum["windows"])), "```", ""])
+    parts = ["", marker, f"## Session {wid} (appended {datetime.now(timezone.utc):%Y-%m-%dT%H:%MZ})", ""]
+    for seg in ("PRE_DTU", "POST_DTU"):                  # never aggregated across the DTU boundary
+        day = report([wid], False, seg)
+        if day["control"]["signals"]:
+            parts += [f"### {seg}", "", "```", checkpoint(day, f"{wid} {seg}"), "```", ""]
+        cum = report(windows_done(), False, seg)
+        if cum["control"]["signals"]:
+            parts += [f"Cumulative {seg} since {SQF_V1.validation_start} ({len(cum['windows'])} sessions):", "", "```",
+                      checkpoint(cum, f"CUMULATIVE {seg} " + ",".join(cum["windows"])), "```", ""]
+    block = "\n".join(parts)
     with open(DOC, "a", encoding="utf-8") as fh:
         fh.write(block)
     return True
@@ -150,9 +165,17 @@ def append_session(wid: str) -> bool:
 def main(argv):
     if argv[0] == "day":
         live = "--live" in argv
-        print(checkpoint(report([argv[1]], live), argv[1] + (" (LIVE)" if live else "")))
+        for seg in ("PRE_DTU", "POST_DTU"):
+            rep = report([argv[1]], live, seg)
+            if rep["control"]["signals"]:
+                print(checkpoint(rep, f"{argv[1]} {seg}" + (" (LIVE)" if live else "")))
+                print()
     elif argv[0] == "cumulative":
-        print(checkpoint(report(windows_done()), "CUMULATIVE " + ",".join(windows_done())))
+        for seg in ("PRE_DTU", "POST_DTU"):
+            rep = report(windows_done(), False, seg)
+            if rep["control"]["signals"]:
+                print(checkpoint(rep, f"CUMULATIVE {seg} " + ",".join(windows_done())))
+                print()
     elif argv[0] == "append":
         print("appended" if append_session(argv[1]) else "already present")
 

@@ -72,3 +72,15 @@ as `UNKNOWN_DATA`, never dropped.
 the same as CONTROL. Because the first gate is gross > 0, the hypothesis needs future sessions to show a gross edge
 that the derivation sample did not show. If they don't, the premise escalates as registered.
 
+
+<!-- boundary:DTU_V1@2026-09-30T09:40:04Z -->
+### BOUNDARY — DTU_V1 activated 2026-09-30T09:40:04Z (`DTU_V1@2026-09-30T09:40:04Z`)
+
+`TALONX_DTU_MODE=ACTIVE`: CONTROL Signals are now produced from the effective active universe (Core 1,200 +
+event-promoted + V2/operator + protected), not the full universe.
+- **Unchanged:** the CONTROL promotion policy (4926c12e5eace04e), SQF_V1 (460ee466c5ae8d6f), scoring and lifecycle.
+- **Segmentation:** every Signal row carries `dtu_boundary` = `PRE_DTU` | `POST_DTU:<id>` and its production DTU
+  state at decision time. All session and cumulative reports are split PRE_DTU / POST_DTU and never aggregated
+  across the boundary.
+- **Today:** 0 Signals existed before activation (09:40Z, premarket), so the entire 2026-09-30 validation session
+  is POST_DTU.

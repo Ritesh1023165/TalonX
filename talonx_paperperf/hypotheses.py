@@ -75,6 +75,24 @@ SQF_V1 = ShadowFilter(
 
 REGISTRY = {SQF_V1.hypothesis_id: SQF_V1}
 
+# Measurement boundaries (append-only). Profitability is never aggregated across a boundary: every Signal row carries
+# PRE_DTU or POST_DTU:<id>, and forward reports segment on it.
+BOUNDARIES = (
+    {"id": "DTU_V1@2026-09-30T09:40:04Z", "kind": "DTU_ACTIVATION", "utc": "2026-09-30T09:40:04+00:00",
+     "detail": "TALONX_DTU_MODE=ACTIVE (c9b8e4e): discovery evaluates only the effective active set; ingestion "
+               "restart 09:38:29Z (DATA_FIX), discovery 09:40:07Z (STRATEGY_MATERIAL). CONTROL promotion policy "
+               "unchanged (4926c12e5eace04e); discovery config fp now includes DTU da27de22a3bb839a."},
+)
+
+
+def boundary_of(event_utc: str | None) -> str:
+    """PRE_DTU or POST_DTU:<id> for a Signal's decision (event) time."""
+    last = None
+    for b in BOUNDARIES:
+        if event_utc and event_utc >= b["utc"]:
+            last = b
+    return f"POST_DTU:{last['id']}" if last else "PRE_DTU"
+
 
 def control_fingerprint(promotion_policy_fp: str, promotion_version: str, discovery_config_fp: str,
                         premarket_config_fp: str) -> str:

@@ -48,11 +48,28 @@ def test_cumulative_doc_is_append_only(tmp_path, monkeypatch):
     doc = tmp_path / "fav.md"
     doc.write_text("# header\n", encoding="utf-8")
     monkeypatch.setattr(FW, "DOC", doc)
-    monkeypatch.setattr(FW, "report", lambda wids, live=False: {
-        "windows": wids, "control": FW.side([], "C"), "shadow": FW.side([], "S"), "shadow_fail_reasons": {},
+    monkeypatch.setattr(FW, "report", lambda wids, live=False, segment=None: {
+        "windows": wids, "control": dict(FW.side([], "C"), signals=1), "shadow": FW.side([], "S"),
+        "shadow_fail_reasons": {},
         "entry_drift_median_pct": None, "data_to_send_median_s": None, "control_verdict": "x", "shadow_verdict": "y"})
     monkeypatch.setattr(FW, "windows_done", lambda: ["2026-09-30"])
     assert FW.append_session("2026-09-30") is True
     first = doc.read_text(encoding="utf-8")
     assert FW.append_session("2026-09-30") is False and doc.read_text(encoding="utf-8") == first
     assert first.startswith("# header\n")
+
+
+def test_dtu_boundary_segments_every_row_and_never_aggregates_across_it(monkeypatch):
+    assert H.boundary_of("2026-09-30T09:40:03+00:00") == "PRE_DTU"
+    assert H.boundary_of("2026-09-30T09:40:04+00:00") == "POST_DTU:DTU_V1@2026-09-30T09:40:04Z"
+    assert H.boundary_of(None) == "PRE_DTU"
+    common = {"window_id": "2026-09-30", "cost_frac": 0.002, "act_entry_utc": "2026-09-30T14:00:00+00:00",
+              "data_as_of_utc": "2026-09-30T13:45:00+00:00"}
+    rows = [{**common, "symbol": "A", "dtu_boundary": "PRE_DTU", "act_r30": 0.01, "shadow_state": "ACTIVE_CORE"},
+            {**common, "symbol": "B", "dtu_boundary": "POST_DTU:DTU_V1@2026-09-30T09:40:04Z", "act_r30": -0.01,
+             "shadow_state": "EVENT_PROMOTED:GAP_TRIGGER"}]
+    monkeypatch.setattr(FW, "rows_for", lambda w, live=False: rows)
+    pre, post = FW.report(["d"], segment="PRE_DTU"), FW.report(["d"], segment="POST_DTU")
+    assert pre["control"]["signals"] == 1 and post["control"]["signals"] == 1
+    assert pre["control"]["gross_30m"]["mean_pct"] == 1.0 and post["control"]["gross_30m"]["mean_pct"] == -1.0
+    assert post["dtu_state_split"]["EVENT_PROMOTED"]["n"] == 1 and post["dtu_state_split"]["ACTIVE_CORE"]["n"] == 0
