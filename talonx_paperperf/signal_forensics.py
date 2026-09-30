@@ -84,6 +84,9 @@ def load_signals(wid: str) -> list[dict]:
         s["catalyst"] = (e["catalyst"] if e and e["catalyst"] else (c["catalyst"] if c else None)) or "none found"
         s["adv20_usd"] = feats.get("adv20_dollars") or liq.get("adv20_dollars")
         s["gap_pct"] = feats.get("gap_pct")
+        s["rvol_adv_fraction"] = feats.get("activity_adv_fraction")
+        ev = op.execute("SELECT event_type FROM candidate_events WHERE event_id=?", (s["event_id"],)).fetchone()
+        s["event_type"] = ev[0] if ev else None
         out.append(s)
     return out
 
@@ -179,6 +182,7 @@ def analyse_window(wid: str, live: bool = False) -> dict:
              "data_as_of_utc": s["data_as_of_utc"], "event_utc": s["event_utc"], "queued_utc": s["queued_utc"],
              "decision_utc": s["decision_utc"], "sent_at_utc": s["sent_at_utc"], "reference_price": ref_p,
              "catalyst": s["catalyst"], "adv20_usd": s["adv20_usd"], "gap_pct": s["gap_pct"],
+             "rvol_adv_fraction": s["rvol_adv_fraction"], "event_type": s["event_type"],
              "shadow_state": shadow.get(s["promotion_id"], "UNKNOWN")}
         # latency decomposition
         r["provider_delay_s"] = round((ts(s["event_utc"]) - ref_t).total_seconds())
@@ -210,6 +214,12 @@ def analyse_window(wid: str, live: bool = False) -> dict:
         sp = r.get("spread_bps")
         r["cost_basis"] = "MAX(V2_FRICTION_20BPS, MEASURED_SPREAD)" if sp is not None else "V2_FRICTION_20BPS_ONLY"
         r["cost_frac"] = max(V2_FRICTION_BPS, sp if sp is not None else 0.0) / 1e4
+        from talonx_paperperf.hypotheses import SQF_V1, is_8k_only
+        ok, why = SQF_V1.decide(r)
+        r["catalyst_type"] = ("8-K_ONLY" if is_8k_only(r["catalyst"]) else "NONE" if r["catalyst"] in (None, "none found")
+                              else "SEC_OTHER")
+        r["shadow_hypothesis"], r["shadow_filter_pass"] = SQF_V1.hypothesis_id, ok
+        r["shadow_filter_fail_reason"] = ";".join(why)
     res = {"window_id": wid, "live": live, "resolve_until": iso(resolve_until), "signals": len(rows),
            "sent": sum(1 for s in sigs if s["send_state"] == "SENT"), "rows": rows}
     OUT.mkdir(parents=True, exist_ok=True)
