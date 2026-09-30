@@ -1,0 +1,55 @@
+{
+ "audit": [
+  {
+   "at_utc": "2026-09-30T22:25:33.333799+00:00",
+   "event": "PREFLIGHT_INITIALISED",
+   "note": "Task75B corporate-action preflight; validation and replication LOCKED"
+  },
+  {
+   "at_utc": "2026-09-30T22:25:33.333799+00:00",
+   "event": "RESEARCHER_EXPOSURE",
+   "date": "2026-09-30",
+   "hypothesis": "LARGE_GAP_REVERSION_V1",
+   "data_span": "2024-01-02..2026-09-25 (Alpaca SIP daily + 1-min, market.db ELIGIBLE universe, gap>=+10% opening events)",
+   "nature": "a DIFFERENT hypothesis and population (large positive opening gaps, 30-min short reference); NOT a Task75 evaluation; no Task75 feature, rank or outcome was computed; the Task75 35-symbol universe was not evaluated as such",
+   "interpretation": "recorded honestly as researcher exposure to 2024 market data overlapping the reserved windows; NOT Task75 holdout consumption"
+  },
+  {
+   "at_utc": "2026-09-30T22:25:52.979535+00:00",
+   "event": "RESEARCHER_EXPOSURE_DETAIL",
+   "hypothesis": "LARGE_GAP_REVERSION_V1",
+   "finding": "The gap study's event set contains 16 events on Task75-universe symbols inside the reserved windows, for which INTRADAY short-reference outcomes (+15/+30/+60 min, session close from 09:31 ET entry) were computed and pooled into aggregate statistics.",
+   "validation_window_events": [
+    "AVGO 2024-06-13",
+    "ADBE 2024-06-14",
+    "GILD 2024-06-20",
+    "TSLA 2024-07-02",
+    "AMAT 2024-07-31",
+    "NVDA 2024-08-13",
+    "SBUX 2024-08-13"
+   ],
+   "replication_window_events": [
+    "TSLA 2024-10-24",
+    "TSLA 2024-11-06",
+    "TSLA 2024-11-11",
+    "TSLA 2024-11-18",
+    "ADI 2024-11-26",
+    "LRCX 2024-11-29",
+    "AVGO 2024-12-11",
+    "MDLZ 2024-12-11",
+    "AVGO 2024-12-13"
+   ],
+   "not_computed": "no Task75 3-day market-adjusted feature, no cross-sectional rank, no Day1-open to Day3-close short outcome for any symbol; per-event values were not individually inspected",
+   "classification": "RESEARCHER_EXPOSURE (different hypothesis/horizon/population); NOT Task75 holdout consumption; recorded for transparency"
+  }
+ ],
+ "state": "PREFLIGHT",
+ "validation": [
+  "2024-06-01",
+  "2024-09-02"
+ ],
+ "replication": [
+  "2024-10-21",
+  "2024-12-20"
+ ]
+}

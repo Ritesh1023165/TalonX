@@ -1,0 +1,73 @@
+{
+ "RAW_PARITY": "PASS",
+ "checks": {
+  "n_trades": true,
+  "gross": true,
+  "symbol_ci": true,
+  "day_ci": true
+ },
+ "hashes": {
+  "2026_q3_f6_era": {
+   "expected": "b8787cb099be",
+   "actual": "b8787cb099be",
+   "match": true
+  },
+  "2025_q1_orpb_era": {
+   "expected": "efeccf93e369",
+   "actual": "efeccf93e369",
+   "match": true
+  },
+  "2025_q3_fprc_era": {
+   "expected": "a51b01dc7844",
+   "actual": "a51b01dc7844",
+   "match": true
+  },
+  "2025_q4_task46_56_era": {
+   "expected": "e2a34c50a60e",
+   "actual": "e2a34c50a60e",
+   "match": true
+  }
+ },
+ "anchor_recorded": {
+  "n_trades": 1000,
+  "gross_mean_pct": 0.6070373392207478,
+  "symbol_ci": [
+   0.0684783612766727,
+   1.2709696249914204
+  ],
+  "day_ci": [
+   0.0340162678638659,
+   1.201483098898035
+  ],
+  "bootstrap_call": "cell_summary -> bootstrap_ci_clustered(n_resamples=2000, seed=670067)"
+ },
+ "reproduced": {
+  "n_trades": 1000,
+  "n_symbols": 35,
+  "gross_mean_pct": 0.6070373392207478,
+  "original_2000": {
+   "symbol": [
+    0.06847836127667274,
+    1.2709696249914204
+   ],
+   "day": [
+    0.034016267863865975,
+    1.201483098898035
+   ]
+  },
+  "spec_10000": {
+   "symbol": [
+    0.09184418920489655,
+    1.2820765397739222
+   ],
+   "entry_day": [
+    0.029868556767181295,
+    1.2049509674984649
+   ]
+  },
+  "decision_to_entry_day_bijective": true,
+  "seed": 670067
+ },
+ "float_tolerance": 1e-12,
+ "archive_root": "C:\\workspace\\TalonX-alpha-phenomenon-discovery"
+}
