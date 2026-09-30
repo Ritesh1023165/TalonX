@@ -52,8 +52,13 @@ def main(wid: str) -> dict:
     score = {r[0] for r in sh.execute("SELECT symbol FROM snapshot WHERE window_id=? AND is_shadow_core=1", (wid,))}
     pg = {r[0]: r[1] for r in m.execute("SELECT symbol, started_utc FROM dtu_promotions WHERE window_id=? AND "
                                         "reason='GAP_TRIGGER'", (wid,))}
+    t0 = tl[0][0]                                         # production DTU start: compare like with like
+    ncore = {r[0] for r in sh.execute("SELECT symbol FROM snapshot WHERE window_id=? AND is_shadow_core=0", (wid,))}
     sg = {r[0]: r[1] for r in sh.execute("SELECT symbol, first_at_utc FROM promotions WHERE window_id=? AND "
-                                         "reason='GAP_TRIGGER'", (wid,))}
+                                         "reason='GAP_TRIGGER'", (wid,)) if r[0] in ncore}
+    # a shadow gap-crossing that happened before production DTU existed and had faded by then is not a DTU miss:
+    # only symbols whose >=3 % crossing was observed after t0 (or still >=3 % at t0) are comparable
+    sg_after = {s for s, t in sg.items() if t >= t0}
     scans = [r[0] for r in o.execute("SELECT decision_utc FROM scans WHERE window_id=? AND state='SCANNED' ORDER BY "
                                       "decision_utc", (wid,))]
     v1 = {r[0] for r in sh.execute("SELECT symbol FROM snapshot WHERE window_id=? AND v1_floor_eligible=1", (wid,))}
@@ -78,12 +83,16 @@ def main(wid: str) -> dict:
         ev[name] = {"total": len(rows), "active_at_decision": sum(1 for s, t in rows if s in active_at(tl, t))}
     out = {"window_id": wid, "production_cycles": len(tl), "fallback_cycles": sum(1 for x in tl if x[2]),
            "core_identical": pcore == score, "core_diff": sorted(pcore ^ score)[:20],
-           "gap_promotions": {"production": len(pg), "shadow": len(sg), "only_production": sorted(set(pg) - set(sg))[:20],
-                              "only_shadow": sorted(set(sg) - set(pg))[:20]},
+           "gap_promotions": {"production": len(pg), "shadow_non_core": len(sg),
+                              "shadow_non_core_after_dtu_start": len(sg_after),
+                              "only_production": sorted(set(pg) - set(sg))[:20],
+                              "only_shadow_after_dtu_start": sorted(sg_after - set(pg))[:20],
+                              "only_shadow_before_dtu_start (faded before DTU existed)": len(set(sg) - sg_after
+                                                                                           - set(pg))},
            "gapper_coverage_ge3pct": cov, "gapper_missed": missed[:30], "events": ev,
            "effective_active_median": sorted(len(x[1]) for x in tl)[len(tl) // 2],
            "effective_active_peak": max(len(x[1]) for x in tl)}
-    out["UNEXPLAINED_DIFFERENCES"] = (not out["core_identical"]) or bool(missed)
+    out["UNEXPLAINED_DIFFERENCES"] = (not out["core_identical"]) or bool(missed) or bool(sg_after - set(pg))
     print(json.dumps(out, indent=1))
     return out
 
