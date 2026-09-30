@@ -1,0 +1,103 @@
+{
+ "survival_id": "DEVELOPMENT_CORPORATE_ACTION_SURVIVAL_V1",
+ "dataset": "TASK75_DATASET_ALL_V1",
+ "dataset_aggregate_sha256": "41f53eae82bc003a68bdd698e58d1cff3f83bcbcf917f8fff76173b8c7248d18",
+ "fingerprints_ok": true,
+ "raw_parity": "PASS",
+ "semantics_proven": true,
+ "dataset_integrity": {
+  "hash_mismatch": [],
+  "missing_files": [],
+  "empty": [],
+  "duplicates": [],
+  "rejected": []
+ },
+ "coverage": {
+  "2026_q3_f6_era": {
+   "spy_sessions_all": 63,
+   "spy_sessions_raw": 63,
+   "missing_vs_spy_all": {},
+   "sessions_in_raw_not_in_all": {}
+  },
+  "2025_q1_orpb_era": {
+   "spy_sessions_all": 29,
+   "spy_sessions_raw": 29,
+   "missing_vs_spy_all": {},
+   "sessions_in_raw_not_in_all": {}
+  },
+  "2025_q3_fprc_era": {
+   "spy_sessions_all": 28,
+   "spy_sessions_raw": 28,
+   "missing_vs_spy_all": {},
+   "sessions_in_raw_not_in_all": {}
+  },
+  "2025_q4_task46_56_era": {
+   "spy_sessions_all": 29,
+   "spy_sessions_raw": 29,
+   "missing_vs_spy_all": {},
+   "sessions_in_raw_not_in_all": {}
+  }
+ },
+ "dataset_ok": true,
+ "corrected_development": {
+  "n_trades": 1000,
+  "n_symbols": 35,
+  "gross_mean_pct": 0.22962404880649456,
+  "net_0bps_pct": 0.22962404880649456,
+  "net_5bps_pct": 0.17962404880649452,
+  "net_10bps_pct": 0.12962404880649467,
+  "net_15bps_pct": 0.07962404880649454,
+  "net_20bps_pct": 0.029624048806494573,
+  "net_25bps_pct": -0.020375951193505458,
+  "original_2000": {
+   "symbol": [
+    -0.008658668017174059,
+    0.4706023695042574
+   ],
+   "day": [
+    -0.29133723101867637,
+    0.7265502796182252
+   ]
+  },
+  "spec_10000": {
+   "symbol": [
+    -0.004336776691135217,
+    0.4743004937210114
+   ],
+   "entry_day": [
+    -0.2928223930545099,
+    0.7459001322876767
+   ]
+  },
+  "decision_to_entry_day_bijective": true
+ },
+ "gates": {
+  "gates": {
+   "A_net_10bps_ge_0.15": false,
+   "B_gross_positive": true,
+   "C_symbol_cluster_ci_low_gt_0": false,
+   "D_entry_day_cluster_ci_low_gt_0": false,
+   "E_F_same_bootstrap_implementation_and_parameters": true,
+   "G_no_unexplained_differences": false
+  },
+  "pass": false
+ },
+ "diff_changes": {
+  "PRICE_OR_PNL_CHANGED": 739,
+  "NONE": 250,
+  "NEWLY_SELECTED": 11,
+  "NO_LONGER_SELECTED": 11
+ },
+ "diff_categories": {
+  "UNEXPLAINED": 391,
+  "OTHER_EXPLAINED": 285,
+  "UNCHANGED": 250,
+  "DIRECT_CORPORATE_ACTION": 75,
+  "RANK_BOUNDARY_PROPAGATION": 10
+ },
+ "unexplained": 391,
+ "holdout_state": "PREFLIGHT",
+ "validation_data_present": false,
+ "replication_data_present": false,
+ "classification": "TASK75B_BLOCKED_DATA_INTEGRITY"
+}

@@ -41,6 +41,14 @@
    ],
    "not_computed": "no Task75 3-day market-adjusted feature, no cross-sectional rank, no Day1-open to Day3-close short outcome for any symbol; per-event values were not individually inspected",
    "classification": "RESEARCHER_EXPOSURE (different hypothesis/horizon/population); NOT Task75 holdout consumption; recorded for transparency"
+  },
+  {
+   "at_utc": "2026-09-30T22:45:58.570956+00:00",
+   "event": "PREFLIGHT_RESULT",
+   "classification": "TASK75B_BLOCKED_DATA_INTEGRITY",
+   "survival": "FAIL (A,C,D)",
+   "substance": "candidate should be retired: corrected development gross 0.2296%, net@10 0.1296%, cluster CI lows negative; RAW edge came from 4 split-spanning shorts",
+   "holdout": "validation and replication NOT downloaded, NOT read; no state transition"
   }
  ],
  "state": "PREFLIGHT",
