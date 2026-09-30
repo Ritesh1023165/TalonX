@@ -133,3 +133,79 @@ def test_bootstrap_deterministic_seed_and_grouping():
     day = np.tile([f"D{i}" for i in range(40)], 10)
     c = bootstrap_ci_clustered(v, day, n_resamples=10_000, ci_level=0.95, seed=DEFAULT_SEED)
     assert (c.ci_low, c.ci_high) != (a.ci_low, a.ci_high)      # grouping matters: symbol vs entry_day
+
+
+# ------------------------------------------------------------------ survival / attribution / manifest helpers
+from research.task75b_preflight import survival as S  # noqa: E402
+
+
+def _st(net10=0.3, gross=0.4, cs=(0.01, 0.05), cd=(0.01, 0.02), bij=True):
+    return {"net_10bps_pct": net10, "gross_mean_pct": gross, "decision_to_entry_day_bijective": bij,
+            "original_2000": {"symbol": [cs[0], 1], "day": [cd[0], 1]},
+            "spec_10000": {"symbol": [cs[1], 1], "entry_day": [cd[1], 1]}}
+
+
+def test_survival_requires_both_bootstrap_calls_and_no_discretion():
+    assert S.survival_gates(_st(), 0)["pass"]
+    assert not S.survival_gates(_st(cd=(0.034, 0.0)), 0)["pass"]          # 10k day CI at exactly 0 fails
+    assert not S.survival_gates(_st(cd=(-0.001, 0.03)), 0)["pass"]        # original call slightly negative fails
+    assert not S.survival_gates(_st(net10=0.1499), 0)["pass"]
+    assert not S.survival_gates(_st(), 1)["pass"]                          # unexplained blocks
+
+
+def test_classification_order():
+    ok = {"pass": True}
+    assert S.classify(ok, fingerprints_ok=True, raw_parity_ok=False, semantics_ok=True, dataset_ok=True, unexplained=0,
+                      holdout_untouched=True) == "TASK75B_BLOCKED_ENVIRONMENT_DRIFT"
+    assert S.classify(ok, fingerprints_ok=True, raw_parity_ok=True, semantics_ok=True, dataset_ok=True, unexplained=2,
+                      holdout_untouched=True) == "TASK75B_BLOCKED_DATA_INTEGRITY"
+    assert S.classify({"pass": False}, fingerprints_ok=True, raw_parity_ok=True, semantics_ok=True, dataset_ok=True,
+                      unexplained=0, holdout_untouched=True) == "TASK75_RETIRED_AFTER_CORPORATE_ACTION_CORRECTION"
+    assert S.classify(ok, fingerprints_ok=True, raw_parity_ok=True, semantics_ok=True, dataset_ok=True, unexplained=0,
+                      holdout_untouched=True) == "TASK75B_READY"
+
+
+def _led(rows):
+    cols = ["symbol", "decision_day", "cross_sectional_rank_pct", "data_ready", "entry_price", "exit_price",
+            "gross_return_pct", "exit_day"]
+    return pd.DataFrame(rows, columns=cols)
+
+
+def test_trade_diff_attribution_categories():
+    cal = {"x": ["2026-06-01", "2026-06-02", "2026-06-03", "2026-06-04", "2026-06-05", "2026-06-08", "2026-06-09"]}
+    raw = _led([["KLAC", "2026-06-04", .9, True, 2000, 250, 87.5, "2026-06-09"],     # spans a split
+                ["AAA", "2026-06-04", .9, True, 100, 99, 1.0, "2026-06-09"],         # uniform factor only
+                ["BBB", "2026-06-04", .85, True, 50, 50, 0.0, "2026-06-09"],         # drops out (rank propagation)
+                ["CCC", "2026-06-04", .5, False, None, None, None, None]])
+    alled = _led([["KLAC", "2026-06-04", .9, True, 200, 250, -25.0, "2026-06-09"],
+                  ["AAA", "2026-06-04", .9, True, 99.0, 98.01, 1.0, "2026-06-09"],
+                  ["BBB", "2026-06-04", .75, False, None, None, None, None],
+                  ["CCC", "2026-06-04", .5, False, None, None, None, None]])
+    ca = [{"symbol": "KLAC", "ex_or_effective_date": "2026-06-03"}]   # inside the 06-01..06-04 lookback span
+    d = S.attribute_diff(raw, alled, ca, cal).set_index("symbol")["category"].to_dict()
+    assert d == {"KLAC": "DIRECT_CORPORATE_ACTION", "AAA": "OTHER_EXPLAINED", "BBB": "RANK_BOUNDARY_PROPAGATION"}
+
+
+def test_unexplained_when_nothing_accounts_for_a_change():
+    cal = {"x": ["2026-06-01", "2026-06-02", "2026-06-03", "2026-06-04"]}
+    raw = _led([["AAA", "2026-06-04", .9, True, 100, 99, 1.0, "2026-06-04"]])
+    alled = _led([["AAA", "2026-06-04", .9, True, 100, 90, 10.0, "2026-06-04"]])
+    d = S.attribute_diff(raw, alled, [], cal)
+    assert list(d["category"]) == ["UNEXPLAINED"]
+
+
+def test_manifest_hash_is_order_and_path_independent(tmp_path):
+    a = tmp_path / "a.csv"
+    a.write_bytes(b"x,y\n1,2\n")
+    h = S.file_sha256(a)
+    assert S.aggregate_hash({"A.csv": h, "B.csv": "0"}) == S.aggregate_hash({"B.csv": "0", "A.csv": h})
+    assert S.aggregate_hash({"A.csv": h}) != S.aggregate_hash({"A.csv": "0"})
+
+
+def test_declaration_binds_all_adjustment_identically_for_spy():
+    p = Path(__file__).resolve().parents[1] / "results" / "task75b_preflight" / "dataset_basis_declaration.json"
+    d = json.loads(p.read_text())
+    b = d["dataset_basis"]
+    assert (b["provider"], b["feed"], b["timeframe"], b["adjustment"]) == ("alpaca", "sip", "1Min", "all")
+    assert "IDENTICAL" in b["symbols"] and "SPY" in b["symbols"]
+    assert d["strategy_semantics_changed"] == "NO" and d["fingerprint_changed"] == "NO"

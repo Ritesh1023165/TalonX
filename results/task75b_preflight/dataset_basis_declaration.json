@@ -1,0 +1,57 @@
+{
+ "declaration": "TASK75B_DATASET_BASIS + DEVELOPMENT_CORPORATE_ACTION_SURVIVAL_V1 (pre-registered BEFORE any ALL-adjusted outcome exists)",
+ "declared_utc": "2026-09-30T23:00:00Z",
+ "research_branch": "research/task75b-corporate-action-preflight",
+ "research_base": "16d2b2aac39ae20263c6ce5b79fc29c546bcf96b",
+ "frozen_fingerprints": {"full": "08930fb2bbbd1f8acbf2071be2e7bf6b2ead784a94e38837d05f4e8937eebff3",
+                         "contract_only": "677adccd7e653e30c96122f0149356523f3a2fb3cb82a3d4967c3a1a06aa6f06",
+                         "status": "MATCH (verified before this declaration)"},
+ "dataset_basis": {
+  "id": "TASK75_DATASET_ALL_V1",
+  "provider": "alpaca", "feed": "sip", "timeframe": "1Min", "adjustment": "all",
+  "symbols": "the frozen 35 (research/task75_v1/contracts.py::UNIVERSE) + SPY, IDENTICAL parameters for every symbol (SPY is downloaded in the same request stream, never from a separate/older directory)",
+  "windows": {"2026_q3_f6_era": ["2026-05-15", "2026-08-14"], "2025_q1_orpb_era": ["2025-02-03", "2025-03-14"],
+              "2025_q3_fprc_era": ["2025-06-02", "2025-07-11"], "2025_q4_task46_56_era": ["2025-10-27", "2025-12-05"]},
+  "windows_source": "results/task74_alpha_discovery_v2/development_data_manifest.json (authoritative; four slices -- the task text listed three)",
+  "query_bounds": "each window from its start 00:00 ET to its end 23:59:59 ET (UTC-converted), all sessions incl. extended hours exactly as returned; the frozen evaluator itself restricts to the regular session",
+  "excluded": "VALIDATION 2024-06-01..2024-09-02 and REPLICATION 2024-10-21..2024-12-20 are NOT downloaded (guard at DOWNLOAD and LOAD layers, state PREFLIGHT)",
+  "no_iex": true, "no_yfinance": true, "no_synthetic_bars": true, "no_interpolation": true, "no_forward_fill": true,
+  "authority": "ALL adjustment is download-date dependent (proven: provider_semantics.json -- later dividends re-scale earlier prices). The ARCHIVED BYTES and their sha256 hashes are authoritative; a later re-download with the same parameters is NOT claimed identical."
+ },
+ "why_all": [
+  "the frozen contract records RAW because RAW was the original discovery dataset -- that field is provenance and is NOT edited (research/task75_v1/contracts.py unchanged; both fingerprints unchanged)",
+  "Task75A explicitly BLOCKED validation on RAW (corporate_action_policy.json)",
+  "the Task75A handoff authorises adjustment=split OR adjustment=all as the corporate-action remediation",
+  "Task75 has no explicit dividend cash accounting for a SHORT (it owes dividends to the lender); ALL neutralises dividend price drops -- the corporate-action-safe basis. SPLIT would leave dividend drops in price as an unearned short gain.",
+  "the DEVELOPMENT audit (corporate_action_audit.json) shows real in-window events: KLAC 10:1 split 2026-06-12, NFLX 10:1 split 2025-11-17, HON spin-off / 1:2 event 2026-06-29, 61 cash dividends (incl. SPY)"
+ ],
+ "strategy_semantics_changed": "NO",
+ "fingerprint_changed": "NO",
+ "dataset_basis_changed_under_preauthorized_blocker_remediation": "YES",
+ "known_before_registration": "The RAW DEVELOPMENT ledger (already-existing evidence) contains two KLAC shorts spanning the unadjusted 10:1 split (+88.21 % and +88.40 % gross; ~176.6 of ~607 total gross percentage points). This is a property of the RAW data, disclosed here; NO ALL-adjusted outcome has been computed. The gate below is the task's own, unchanged.",
+ "survival_rule": {
+  "id": "DEVELOPMENT_CORPORATE_ACTION_SURVIVAL_V1",
+  "code": "research/task75b_preflight/survival.py (survival_stats, survival_gates, classify, attribute_diff)",
+  "evaluator": "research/task75_v1/strategy.py::evaluate() UNMODIFIED, run per development slice, data_ready trades concatenated -- identical to the RAW anchor procedure (gross, pre-stop, exactly as the anchor was defined)",
+  "gates_all_required": {
+   "A": "net expectancy @10bps (gross - 0.10 pct) >= +0.15 %",
+   "B": "gross mean > 0",
+   "C": "symbol-cluster GROSS bootstrap CI lower bound > 0 under BOTH (i) the ORIGINAL anchor call research.task71_lib.diagnostics.cell_summary -> bootstrap_ci_clustered(n_resamples=2000, seed=670067, 95 %) AND (ii) bootstrap_ci_clustered(n_resamples=10000, ci_level=0.95, seed=670067), grouping = symbol",
+   "D": "entry-day-cluster GROSS bootstrap CI lower bound > 0 under BOTH (i) the original call (day_col=decision_day, which must be verified bijective with entry_day) AND (ii) 10,000 resamples grouped by entry_day",
+   "E_F": "same implementation research_stats.bootstrap_ci_clustered, 95 %, seed 670067",
+   "G": "RAW vs ALL trade diff has UNEXPLAINED == 0"
+  },
+  "resample_resolution": "The recorded anchor CIs were produced with 2000 resamples (verified bit-exact), while the task specifies 10,000. Both are REQUIRED to pass -- the stricter of the two binds. Neither is chosen after seeing results.",
+  "no_discretion": "A day-cluster lower bound of 0 or below under either call FAILS, however small the miss.",
+  "diagnostics_non_binding": "net @0/5/15/20/25 bps reported only",
+  "classification": {
+   "TASK75B_READY": "fingerprints match AND raw parity PASS AND semantics proven AND ALL development dataset complete AND all gates pass AND unexplained == 0 AND validation/replication untouched",
+   "TASK75_RETIRED_AFTER_CORPORATE_ACTION_CORRECTION": "survival gates fail",
+   "TASK75B_BLOCKED_ENVIRONMENT_DRIFT": "raw baseline not reproduced",
+   "TASK75B_BLOCKED_DATA_INTEGRITY": "unexplained trade differences > 0",
+   "TASK75B_BLOCKED_DATASET": "corrected development data incomplete / untrustworthy"
+  },
+  "run_once": true,
+  "after_ready": "STOP -- validation is NOT downloaded or run in this task; explicit operator authorisation required"
+ }
+}

@@ -1,0 +1,1184 @@
+{
+ "queried_utc": "2026-09-30T22:28:15.089343+00:00",
+ "symbols": [
+  "AAPL",
+  "MSFT",
+  "NVDA",
+  "AMZN",
+  "META",
+  "AMD",
+  "TSLA",
+  "GOOGL",
+  "PYPL",
+  "STX",
+  "ADBE",
+  "ADI",
+  "AMAT",
+  "AVGO",
+  "BKNG",
+  "CMCSA",
+  "COST",
+  "CSCO",
+  "GILD",
+  "HON",
+  "INTC",
+  "INTU",
+  "ISRG",
+  "KLAC",
+  "LRCX",
+  "MDLZ",
+  "MU",
+  "NFLX",
+  "PANW",
+  "PEP",
+  "QCOM",
+  "REGN",
+  "SBUX",
+  "TXN",
+  "VRTX",
+  "SPY"
+ ],
+ "windows": {
+  "2026_q3_f6_era": {
+   "data_dir": "data\\historical_1m\\task67a_development",
+   "start": "2026-05-15",
+   "end": "2026-08-14",
+   "dataset_hash_sha256": "b8787cb099be",
+   "total_bars": 1433278,
+   "all_clean": true
+  },
+  "2025_q1_orpb_era": {
+   "data_dir": "data\\historical_1m\\task71_development_2025q1",
+   "start": "2025-02-03",
+   "end": "2025-03-14",
+   "dataset_hash_sha256": "efeccf93e369",
+   "total_bars": 561876,
+   "all_clean": true
+  },
+  "2025_q3_fprc_era": {
+   "data_dir": "data\\historical_1m\\task71_development_2025q3",
+   "start": "2025-06-02",
+   "end": "2025-07-11",
+   "dataset_hash_sha256": "a51b01dc7844",
+   "total_bars": 516199,
+   "all_clean": true
+  },
+  "2025_q4_task46_56_era": {
+   "data_dir": "data\\historical_1m\\task71_development_2025q4",
+   "start": "2025-10-27",
+   "end": "2025-12-05",
+   "dataset_hash_sha256": "e2a34c50a60e",
+   "total_bars": 598542,
+   "all_clean": true
+  }
+ },
+ "events": [
+  {
+   "symbol": "AAPL",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-02-10",
+   "split_ratio": null,
+   "dividend": 0.25,
+   "record_date": "2025-02-10",
+   "payable_date": "2025-02-13",
+   "development_window": "2025_q1_orpb_era",
+   "window": [
+    "2025-02-03",
+    "2025-03-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "AMAT",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-02-20",
+   "split_ratio": null,
+   "dividend": 0.4,
+   "record_date": "2025-02-20",
+   "payable_date": "2025-03-13",
+   "development_window": "2025_q1_orpb_era",
+   "window": [
+    "2025-02-03",
+    "2025-03-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "COST",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-02-07",
+   "split_ratio": null,
+   "dividend": 1.16,
+   "record_date": "2025-02-07",
+   "payable_date": "2025-02-21",
+   "development_window": "2025_q1_orpb_era",
+   "window": [
+    "2025-02-03",
+    "2025-03-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "HON",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-02-28",
+   "split_ratio": null,
+   "dividend": 1.13,
+   "record_date": "2025-02-28",
+   "payable_date": "2025-03-14",
+   "development_window": "2025_q1_orpb_era",
+   "window": [
+    "2025-02-03",
+    "2025-03-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "KLAC",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-02-24",
+   "split_ratio": null,
+   "dividend": 1.7,
+   "record_date": "2025-02-24",
+   "payable_date": "2025-03-04",
+   "development_window": "2025_q1_orpb_era",
+   "window": [
+    "2025-02-03",
+    "2025-03-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "MSFT",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-02-20",
+   "split_ratio": null,
+   "dividend": 0.83,
+   "record_date": "2025-02-20",
+   "payable_date": "2025-03-13",
+   "development_window": "2025_q1_orpb_era",
+   "window": [
+    "2025-02-03",
+    "2025-03-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "SBUX",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-02-14",
+   "split_ratio": null,
+   "dividend": 0.61,
+   "record_date": "2025-02-14",
+   "payable_date": "2025-02-28",
+   "development_window": "2025_q1_orpb_era",
+   "window": [
+    "2025-02-03",
+    "2025-03-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "TXN",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-01-31",
+   "split_ratio": null,
+   "dividend": 1.36,
+   "record_date": "2025-01-31",
+   "payable_date": "2025-02-11",
+   "development_window": "2025_q1_orpb_era",
+   "window": [
+    "2025-02-03",
+    "2025-03-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "ADI",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-06-04",
+   "split_ratio": null,
+   "dividend": 0.99,
+   "record_date": "2025-06-04",
+   "payable_date": "2025-06-18",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "AMAT",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-05-22",
+   "split_ratio": null,
+   "dividend": 0.46,
+   "record_date": "2025-05-22",
+   "payable_date": "2025-06-12",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "AVGO",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-06-20",
+   "split_ratio": null,
+   "dividend": 0.59,
+   "record_date": "2025-06-20",
+   "payable_date": "2025-06-30",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "BKNG",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-06-06",
+   "split_ratio": null,
+   "dividend": 9.6,
+   "record_date": "2025-06-06",
+   "payable_date": "2025-06-30",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "GILD",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-06-13",
+   "split_ratio": null,
+   "dividend": 0.79,
+   "record_date": "2025-06-13",
+   "payable_date": "2025-06-27",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "GOOGL",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-06-09",
+   "split_ratio": null,
+   "dividend": 0.21,
+   "record_date": "2025-06-09",
+   "payable_date": "2025-06-16",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "HON",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-05-16",
+   "split_ratio": null,
+   "dividend": 1.13,
+   "record_date": "2025-05-16",
+   "payable_date": "2025-06-06",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "KLAC",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-05-19",
+   "split_ratio": null,
+   "dividend": 1.9,
+   "record_date": "2025-05-19",
+   "payable_date": "2025-06-03",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "LRCX",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-06-18",
+   "split_ratio": null,
+   "dividend": 0.23,
+   "record_date": "2025-06-18",
+   "payable_date": "2025-07-09",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "META",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-06-16",
+   "split_ratio": null,
+   "dividend": 0.525,
+   "record_date": "2025-06-16",
+   "payable_date": "2025-06-26",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "MSFT",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-05-15",
+   "split_ratio": null,
+   "dividend": 0.83,
+   "record_date": "2025-05-15",
+   "payable_date": "2025-06-12",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "NVDA",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-06-11",
+   "split_ratio": null,
+   "dividend": 0.01,
+   "record_date": "2025-06-11",
+   "payable_date": "2025-07-03",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "PEP",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-06-06",
+   "split_ratio": null,
+   "dividend": 1.4225,
+   "record_date": "2025-06-06",
+   "payable_date": "2025-06-30",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "QCOM",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-06-05",
+   "split_ratio": null,
+   "dividend": 0.89,
+   "record_date": "2025-06-05",
+   "payable_date": "2025-06-26",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "REGN",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-05-20",
+   "split_ratio": null,
+   "dividend": 0.88,
+   "record_date": "2025-05-20",
+   "payable_date": "2025-06-06",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "STX",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-06-25",
+   "split_ratio": null,
+   "dividend": 0.72,
+   "record_date": "2025-06-25",
+   "payable_date": "2025-07-08",
+   "development_window": "2025_q3_fprc_era",
+   "window": [
+    "2025-06-02",
+    "2025-07-11"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": null,
+   "action_type": "spin_offs",
+   "ex_or_effective_date": "2025-10-30",
+   "split_ratio": null,
+   "dividend": null,
+   "record_date": "2025-10-17",
+   "payable_date": "2025-10-30",
+   "development_window": "2025_q4_task46_56_era",
+   "window": [
+    "2025-10-27",
+    "2025-12-05"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "AAPL",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-11-10",
+   "split_ratio": null,
+   "dividend": 0.26,
+   "record_date": "2025-11-10",
+   "payable_date": "2025-11-13",
+   "development_window": "2025_q4_task46_56_era",
+   "window": [
+    "2025-10-27",
+    "2025-12-05"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "COST",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-10-31",
+   "split_ratio": null,
+   "dividend": 1.3,
+   "record_date": "2025-10-31",
+   "payable_date": "2025-11-14",
+   "development_window": "2025_q4_task46_56_era",
+   "window": [
+    "2025-10-27",
+    "2025-12-05"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "HON",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-11-14",
+   "split_ratio": null,
+   "dividend": 1.19,
+   "record_date": "2025-11-14",
+   "payable_date": "2025-12-05",
+   "development_window": "2025_q4_task46_56_era",
+   "window": [
+    "2025-10-27",
+    "2025-12-05"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "KLAC",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-11-17",
+   "split_ratio": null,
+   "dividend": 1.9,
+   "record_date": "2025-11-17",
+   "payable_date": "2025-12-02",
+   "development_window": "2025_q4_task46_56_era",
+   "window": [
+    "2025-10-27",
+    "2025-12-05"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "NFLX",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2025-11-17",
+   "split_ratio": "10:1",
+   "dividend": null,
+   "record_date": "2025-11-10",
+   "payable_date": "2025-11-14",
+   "development_window": "2025_q4_task46_56_era",
+   "window": [
+    "2025-10-27",
+    "2025-12-05"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "REGN",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-11-20",
+   "split_ratio": null,
+   "dividend": 0.88,
+   "record_date": "2025-11-20",
+   "payable_date": "2025-12-05",
+   "development_window": "2025_q4_task46_56_era",
+   "window": [
+    "2025-10-27",
+    "2025-12-05"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "SBUX",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-11-14",
+   "split_ratio": null,
+   "dividend": 0.62,
+   "record_date": "2025-11-14",
+   "payable_date": "2025-11-28",
+   "development_window": "2025_q4_task46_56_era",
+   "window": [
+    "2025-10-27",
+    "2025-12-05"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "SPY",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-09-19",
+   "split_ratio": null,
+   "dividend": 1.831114,
+   "record_date": "2025-09-19",
+   "payable_date": "2025-10-31",
+   "development_window": "2025_q4_task46_56_era",
+   "window": [
+    "2025-10-27",
+    "2025-12-05"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "TXN",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-10-31",
+   "split_ratio": null,
+   "dividend": 1.42,
+   "record_date": "2025-10-31",
+   "payable_date": "2025-11-12",
+   "development_window": "2025_q4_task46_56_era",
+   "window": [
+    "2025-10-27",
+    "2025-12-05"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": null,
+   "action_type": "spin_offs",
+   "ex_or_effective_date": "2026-06-29",
+   "split_ratio": null,
+   "dividend": null,
+   "record_date": "2026-06-15",
+   "payable_date": "2026-06-29",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "AAPL",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-08-10",
+   "split_ratio": null,
+   "dividend": 0.27,
+   "record_date": "2026-08-10",
+   "payable_date": "2026-08-13",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "ADI",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-06-02",
+   "split_ratio": null,
+   "dividend": 1.1,
+   "record_date": "2026-06-02",
+   "payable_date": "2026-06-16",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "AMAT",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-05-21",
+   "split_ratio": null,
+   "dividend": 0.53,
+   "record_date": "2026-05-21",
+   "payable_date": "2026-06-11",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "AVGO",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-06-22",
+   "split_ratio": null,
+   "dividend": 0.65,
+   "record_date": "2026-06-22",
+   "payable_date": "2026-06-30",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "BKNG",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-06-05",
+   "split_ratio": null,
+   "dividend": 0.42,
+   "record_date": "2026-06-05",
+   "payable_date": "2026-06-30",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "CMCSA",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-07-01",
+   "split_ratio": null,
+   "dividend": 0.33,
+   "record_date": "2026-07-01",
+   "payable_date": "2026-07-22",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "COST",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-05-01",
+   "split_ratio": null,
+   "dividend": 1.47,
+   "record_date": "2026-05-01",
+   "payable_date": "2026-05-15",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "COST",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-07-24",
+   "split_ratio": null,
+   "dividend": 1.47,
+   "record_date": "2026-07-24",
+   "payable_date": "2026-08-07",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "CSCO",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-07-06",
+   "split_ratio": null,
+   "dividend": 0.42,
+   "record_date": "2026-07-06",
+   "payable_date": "2026-07-22",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "GILD",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-06-15",
+   "split_ratio": null,
+   "dividend": 0.82,
+   "record_date": "2026-06-15",
+   "payable_date": "2026-06-29",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "GOOGL",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-06-08",
+   "split_ratio": null,
+   "dividend": 0.22,
+   "record_date": "2026-06-08",
+   "payable_date": "2026-06-15",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "HON",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-05-15",
+   "split_ratio": null,
+   "dividend": 1.19,
+   "record_date": "2026-05-15",
+   "payable_date": "2026-06-05",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "HON",
+   "action_type": "reverse_splits",
+   "ex_or_effective_date": "2026-06-29",
+   "split_ratio": "1:2",
+   "dividend": null,
+   "record_date": "2026-06-29",
+   "payable_date": "2026-06-29",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "INTU",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-07-09",
+   "split_ratio": null,
+   "dividend": 1.2,
+   "record_date": "2026-07-09",
+   "payable_date": "2026-07-17",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "KLAC",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-05-18",
+   "split_ratio": null,
+   "dividend": 2.3,
+   "record_date": "2026-05-18",
+   "payable_date": "2026-06-02",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "KLAC",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2026-06-12",
+   "split_ratio": "10:1",
+   "dividend": null,
+   "record_date": "2026-06-04",
+   "payable_date": "2026-06-12",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "LRCX",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-06-17",
+   "split_ratio": null,
+   "dividend": 0.26,
+   "record_date": "2026-06-17",
+   "payable_date": "2026-07-08",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "MDLZ",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-06-30",
+   "split_ratio": null,
+   "dividend": 0.5,
+   "record_date": "2026-06-30",
+   "payable_date": "2026-07-14",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "META",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-06-15",
+   "split_ratio": null,
+   "dividend": 0.525,
+   "record_date": "2026-06-15",
+   "payable_date": "2026-06-25",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "MSFT",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-05-21",
+   "split_ratio": null,
+   "dividend": 0.91,
+   "record_date": "2026-05-21",
+   "payable_date": "2026-06-11",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "MU",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-07-06",
+   "split_ratio": null,
+   "dividend": 0.15,
+   "record_date": "2026-07-06",
+   "payable_date": "2026-07-21",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "NVDA",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-06-04",
+   "split_ratio": null,
+   "dividend": 0.25,
+   "record_date": "2026-06-04",
+   "payable_date": "2026-06-26",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "PEP",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-06-05",
+   "split_ratio": null,
+   "dividend": 1.48,
+   "record_date": "2026-06-05",
+   "payable_date": "2026-06-30",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "PYPL",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-06-04",
+   "split_ratio": null,
+   "dividend": 0.14,
+   "record_date": "2026-06-04",
+   "payable_date": "2026-06-25",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "QCOM",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-06-04",
+   "split_ratio": null,
+   "dividend": 0.92,
+   "record_date": "2026-06-04",
+   "payable_date": "2026-06-25",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "REGN",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-05-20",
+   "split_ratio": null,
+   "dividend": 0.94,
+   "record_date": "2026-05-20",
+   "payable_date": "2026-06-04",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "SBUX",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-05-15",
+   "split_ratio": null,
+   "dividend": 0.62,
+   "record_date": "2026-05-15",
+   "payable_date": "2026-05-29",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "SPY",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-06-18",
+   "split_ratio": null,
+   "dividend": 1.903516,
+   "record_date": "2026-06-18",
+   "payable_date": "2026-07-31",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "STX",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-06-24",
+   "split_ratio": null,
+   "dividend": 0.74,
+   "record_date": "2026-06-24",
+   "payable_date": "2026-07-07",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "TXN",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-05-05",
+   "split_ratio": null,
+   "dividend": 1.42,
+   "record_date": "2026-05-05",
+   "payable_date": "2026-05-19",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "TXN",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-07-31",
+   "split_ratio": null,
+   "dividend": 1.42,
+   "record_date": "2026-07-31",
+   "payable_date": "2026-08-11",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  }
+ ],
+ "count": 66,
+ "by_type": {
+  "cash_dividends": 61,
+  "spin_offs": 2,
+  "forward_splits": 2,
+  "reverse_splits": 1
+ },
+ "symbols_with_events": [
+  "AAPL",
+  "ADI",
+  "AMAT",
+  "AVGO",
+  "BKNG",
+  "CMCSA",
+  "COST",
+  "CSCO",
+  "GILD",
+  "GOOGL",
+  "HON",
+  "INTU",
+  "KLAC",
+  "LRCX",
+  "MDLZ",
+  "META",
+  "MSFT",
+  "MU",
+  "NFLX",
+  "NVDA",
+  "PEP",
+  "PYPL",
+  "QCOM",
+  "REGN",
+  "SBUX",
+  "SPY",
+  "STX",
+  "TXN"
+ ],
+ "spy_events": [
+  {
+   "symbol": "SPY",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2025-09-19",
+   "split_ratio": null,
+   "dividend": 1.831114,
+   "record_date": "2025-09-19",
+   "payable_date": "2025-10-31",
+   "development_window": "2025_q4_task46_56_era",
+   "window": [
+    "2025-10-27",
+    "2025-12-05"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "SPY",
+   "action_type": "cash_dividends",
+   "ex_or_effective_date": "2026-06-18",
+   "split_ratio": null,
+   "dividend": 1.903516,
+   "record_date": "2026-06-18",
+   "payable_date": "2026-07-31",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  }
+ ],
+ "splits": [
+  {
+   "symbol": "NFLX",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2025-11-17",
+   "split_ratio": "10:1",
+   "dividend": null,
+   "record_date": "2025-11-10",
+   "payable_date": "2025-11-14",
+   "development_window": "2025_q4_task46_56_era",
+   "window": [
+    "2025-10-27",
+    "2025-12-05"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "HON",
+   "action_type": "reverse_splits",
+   "ex_or_effective_date": "2026-06-29",
+   "split_ratio": "1:2",
+   "dividend": null,
+   "record_date": "2026-06-29",
+   "payable_date": "2026-06-29",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  },
+  {
+   "symbol": "KLAC",
+   "action_type": "forward_splits",
+   "ex_or_effective_date": "2026-06-12",
+   "split_ratio": "10:1",
+   "dividend": null,
+   "record_date": "2026-06-04",
+   "payable_date": "2026-06-12",
+   "development_window": "2026_q3_f6_era",
+   "window": [
+    "2026-05-15",
+    "2026-08-14"
+   ],
+   "source": "Alpaca /v1/corporate-actions (free metadata; no prices)"
+  }
+ ],
+ "note": "DEVELOPMENT windows only; reserved 2024 windows never queried (guard at DOWNLOAD layer)."
+}

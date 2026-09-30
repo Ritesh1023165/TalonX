@@ -1,0 +1,206 @@
+{
+ "cases": {
+  "KLAC": {
+   "event": "split 10:1",
+   "ex_date": "2026-06-12",
+   "pre_day": "2026-06-11",
+   "post_day": "2026-06-12",
+   "close_ratio_post_over_pre": {
+    "raw": 0.10554643313264003,
+    "split": 1.0554818377840438,
+    "all": 1.055460998796131
+   },
+   "split_over_raw_on_pre_day": 0.09999834137765172,
+   "all_over_split_on_pre_day": 0.998880411345165,
+   "all_over_split_on_post_day": 0.9988606898719259,
+   "rows": [
+    {
+     "day": "2026-06-08",
+     "raw": 2108.06,
+     "split": 210.81,
+     "all": 210.57
+    },
+    {
+     "day": "2026-06-09",
+     "raw": 2139.37,
+     "split": 213.94,
+     "all": 213.7
+    },
+    {
+     "day": "2026-06-10",
+     "raw": 2135.64,
+     "split": 213.56,
+     "all": 213.32
+    },
+    {
+     "day": "2026-06-11",
+     "raw": 2411.64,
+     "split": 241.16,
+     "all": 240.89
+    },
+    {
+     "day": "2026-06-12",
+     "raw": 254.54,
+     "split": 254.54,
+     "all": 254.25
+    },
+    {
+     "day": "2026-06-15",
+     "raw": 256.42,
+     "split": 256.42,
+     "all": 256.13
+    },
+    {
+     "day": "2026-06-16",
+     "raw": 237.33,
+     "split": 237.33,
+     "all": 237.06
+    },
+    {
+     "day": "2026-06-17",
+     "raw": 238.73,
+     "split": 238.73,
+     "all": 238.46
+    }
+   ]
+  },
+  "ORLY": {
+   "event": "split 15:1",
+   "ex_date": "2025-06-10",
+   "pre_day": "2025-06-09",
+   "post_day": "2025-06-10",
+   "close_ratio_post_over_pre": {
+    "raw": 0.06802907796157555,
+    "split": 1.0204740180260374,
+    "all": 1.0204740180260374
+   },
+   "split_over_raw_on_pre_day": 0.06666419405088644,
+   "all_over_split_on_pre_day": 1.0,
+   "all_over_split_on_post_day": 1.0,
+   "rows": [
+    {
+     "day": "2025-06-04",
+     "raw": 1366.59,
+     "split": 91.11,
+     "all": 91.11
+    },
+    {
+     "day": "2025-06-05",
+     "raw": 1371.8,
+     "split": 91.45,
+     "all": 91.45
+    },
+    {
+     "day": "2025-06-06",
+     "raw": 1377.72,
+     "split": 91.85,
+     "all": 91.85
+    },
+    {
+     "day": "2025-06-09",
+     "raw": 1348.1,
+     "split": 89.87,
+     "all": 89.87
+    },
+    {
+     "day": "2025-06-10",
+     "raw": 91.71,
+     "split": 91.71,
+     "all": 91.71
+    },
+    {
+     "day": "2025-06-11",
+     "raw": 90.01,
+     "split": 90.01,
+     "all": 90.01
+    },
+    {
+     "day": "2025-06-12",
+     "raw": 91.05,
+     "split": 91.05,
+     "all": 91.05
+    },
+    {
+     "day": "2025-06-13",
+     "raw": 89.91,
+     "split": 89.91,
+     "all": 89.91
+    }
+   ]
+  },
+  "SPY": {
+   "event": "dividend 1.903516",
+   "ex_date": "2026-06-18",
+   "pre_day": "2026-06-17",
+   "post_day": "2026-06-18",
+   "close_ratio_post_over_pre": {
+    "raw": 1.0078006909954653,
+    "split": 1.0078006909954653,
+    "all": 1.0103902445641115
+   },
+   "split_over_raw_on_pre_day": 1.0,
+   "all_over_split_on_pre_day": 0.9949659900669402,
+   "all_over_split_on_post_day": 0.9975225647481051,
+   "rows": [
+    {
+     "day": "2026-06-12",
+     "raw": 741.75,
+     "split": 741.75,
+     "all": 738.01
+    },
+    {
+     "day": "2026-06-15",
+     "raw": 754.83,
+     "split": 754.83,
+     "all": 751.03
+    },
+    {
+     "day": "2026-06-16",
+     "raw": 750.33,
+     "split": 750.33,
+     "all": 746.55
+    },
+    {
+     "day": "2026-06-17",
+     "raw": 740.96,
+     "split": 740.96,
+     "all": 737.23
+    },
+    {
+     "day": "2026-06-18",
+     "raw": 746.74,
+     "split": 746.74,
+     "all": 744.89
+    },
+    {
+     "day": "2026-06-22",
+     "raw": 744.39,
+     "split": 744.39,
+     "all": 742.55
+    },
+    {
+     "day": "2026-06-23",
+     "raw": 733.58,
+     "split": 733.58,
+     "all": 731.76
+    },
+    {
+     "day": "2026-06-24",
+     "raw": 733.24,
+     "split": 733.24,
+     "all": 731.42
+    }
+   ]
+  }
+ },
+ "verdict": {
+  "RAW_contains_split_discontinuity": true,
+  "SPLIT_removes_split_discontinuity": true,
+  "SPLIT_does_not_neutralize_dividend": true,
+  "ALL_split_adjusted": true,
+  "ALL_dividend_adjusts_pre_ex_prices_down": true,
+  "ALL_dividend_factor_step_matches_cash_amount": true,
+  "ALL_is_download_date_dependent": true
+ },
+ "all_proven": true
+}
