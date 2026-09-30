@@ -39,6 +39,13 @@ def main(wid: str) -> dict:
     out["production_universe_eligible"] = sum(1 for x in uni if x.get("status") == "ELIGIBLE")
     ing = m.execute("SELECT symbols FROM ingestion_state WHERE window_id=?", (wid,)).fetchone()
     out["production_fetch_symbols"] = ing[0] if ing else None
+    try:                                                   # DTU ACTIVE: the resolved active set is the expected list
+        d = m.execute("SELECT n_active, fallback_reason FROM dtu_active WHERE window_id=? ORDER BY cycle_utc DESC "
+                      "LIMIT 1", (wid,)).fetchone()
+    except sqlite3.Error:
+        d = None
+    out["dtu_active"] = {"n_active": d[0], "fallback": d[1]} if d else None
+    expected = d[0] if d and not d[1] else out["production_universe_eligible"]
     oc = ro(REPO / "operator_control.db")
     out["operator_added"] = oc.execute("SELECT COUNT(*) FROM operator_universe").fetchone()[0]
     for name in ("opportunity_research_notifications.db", "promotion_signal_notifications.db"):
@@ -48,9 +55,10 @@ def main(wid: str) -> dict:
     fun = [json.loads(r[0]).get("ELIGIBLE") for r in o.execute(
         "SELECT funnel_json FROM scans WHERE window_id=? AND state='SCANNED'", (wid,))]
     out["discovery_eligible_per_scan"] = sorted(set(x for x in fun if x is not None))
-    out["STOP_CONDITION"] = ("TRIGGERED" if (out["production_fetch_symbols"] not in (None, out["production_universe_eligible"])
-                                             or any(v for k, v in out.items() if k.startswith("dup_dedup"))
-                                             or out["discovery_eligible_per_scan"] not in ([], [out["production_universe_eligible"]]))
+    fetch_ok = out["production_fetch_symbols"] in (None, expected) or (d and not d[1])
+    disc_ok = d is not None or out["discovery_eligible_per_scan"] in ([], [out["production_universe_eligible"]])
+    out["STOP_CONDITION"] = ("TRIGGERED" if (not fetch_ok or not disc_ok
+                                             or any(v for k, v in out.items() if k.startswith("dup_dedup")))
                              else "CLEAR")
     print(json.dumps(out, indent=1))
     return out
