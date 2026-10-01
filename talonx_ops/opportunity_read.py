@@ -149,16 +149,19 @@ def read_opportunity_status(root=None, *, now: datetime | None = None) -> dict:
     mk = _ro(r / "market.db")
     data = {"ingestion": None, "probes": {}, "last_cycle": None}
     if mk:
+        mk.execute("BEGIN")          # 2026-10-01 (P0): one read transaction -> one committed ingestion generation
         st = mk.execute("SELECT * FROM ingestion_state ORDER BY cycle_utc DESC LIMIT 1").fetchone()
         if st:
             data["ingestion"] = {"window_id": st["window_id"], "as_of_utc": st["as_of_utc"], "phase": st["phase"],
                                  "symbols": st["symbols"], "incomplete": len(_j(st["incomplete_json"], [])),
-                                 "last_cycle_age_s": _age(st["cycle_utc"], now)}
+                                 "last_cycle_age_s": _age(st["cycle_utc"], now),
+                                 "generation": st["generation"] if "generation" in st.keys() else None}
         for p in mk.execute("SELECT * FROM probes ORDER BY id"):
             data["probes"][p["phase"]] = {"ok": bool(p["ok"]), "at_utc": p["at_utc"], "feed": p["feed"],
                                           "detail": p["detail"]}
         lc = mk.execute("SELECT * FROM cycles ORDER BY id DESC LIMIT 1").fetchone()
         data["last_cycle"] = dict(lc) if lc else None
+        mk.rollback()
         mk.close()
     oc = _ro(r / "opportunity.db")
     disc: dict = {"last_scan": None}

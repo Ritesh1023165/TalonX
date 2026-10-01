@@ -96,7 +96,12 @@ def test_cli_restart_while_supervised_never_yields_two_instances(tmp_path, monke
     """The CLI and the supervisor are separate processes: the supervisor cannot see the CLI's in-memory spawn
     grace. Model: the component is mid-startup (not yet holding its lock) right after a CLI-driven spawn."""
     spawns = []
-    monkeypatch.setattr(SV, "spawn", lambda root, name, env=None: spawns.append(name) or (9000 + len(spawns)))
+
+    def fake_spawn(root, name, env=None):            # like the real spawn: records this process's startup grace
+        spawns.append(name)
+        SV._SPAWNED_AT[name] = time.monotonic()
+        return 9000 + len(spawns)
+    monkeypatch.setattr(SV, "spawn", fake_spawn)
     monkeypatch.setattr(SV, "stop", lambda root, name, *a, **k: True)
     monkeypatch.setattr(SV, "is_running", lambda root, name: False)          # still starting (no lock yet)
     rt = RT.RuntimeStore(tmp_path)
@@ -225,3 +230,118 @@ def test_dtu_active_set_and_as_of_are_published_under_one_generation(tmp_path, m
     assert st["dtu"] is not None and st["state"] is not None
     assert st["dtu"]["cycle_utc"] == st["state"]["cycle_utc"], \
         f"active set of cycle {st['dtu']['cycle_utc']} served with as_of of cycle {st['state']['cycle_utc']}"
+
+
+# ================================================================================================ acceptance (after fix)
+def test_generations_are_published_monotonically_and_read_consistently(tmp_path):
+    from talonx_opportunity import ingestion as I
+    ing, clock, U = _engine(tmp_path)
+    for t in (U(9), U(9, 30), U(10)):
+        clock.t = t
+        ing.tick()
+    wid = ing._window_id
+    assert ing.published_generation == 3
+    con = sqlite3.connect(tmp_path / "market.db")
+    gens = [r[0] for r in con.execute("SELECT generation FROM snapshot_generations WHERE window_id=? ORDER BY 1",
+                                      (wid,))]
+    assert gens == [1, 2, 3]
+    assert con.execute("SELECT MAX(generation) FROM aggregates WHERE window_id=?", (wid,)).fetchone()[0] == 3
+    st = I.read_state(tmp_path, wid)
+    assert st["generation"] == 3 and st["state"]["generation"] == 3 and _mixed(st) == []
+    row = con.execute("SELECT as_of_utc, cycle_utc FROM snapshot_generations WHERE generation=3").fetchone()
+    assert (row[0], row[1]) == (st["state"]["as_of_utc"], st["state"]["cycle_utc"])
+
+
+def test_a_dtu_active_set_from_another_generation_is_never_served(tmp_path):
+    from talonx_opportunity import ingestion as I
+    ing, clock, U = _engine(tmp_path)
+    clock.t = U(9)
+    ing.tick()
+    wid = ing._window_id
+    con = sqlite3.connect(tmp_path / "market.db")
+    from talonx_opportunity import universe_tiers as UT
+    UT.DTU(con, policy=UT.DTU_V1)                        # create DTU tables only
+    with con:                                            # a dtu_active row NOT recorded for the published generation
+        con.execute("INSERT INTO dtu_active VALUES (?,?,?,?,?,?,?)",
+                    (wid, "2099-01-01T00:00:00+00:00", 1, "{}", json.dumps(["AAA"]), None, "fp"))
+    st = I.read_state(tmp_path, wid)
+    assert st["dtu"] is None                             # -> discovery's existing fail-safe (full universe)
+
+
+def test_failed_cycle_commit_publishes_nothing_and_keeps_dtu_diff_honest(tmp_path):
+    from talonx_opportunity import universe_tiers as UT
+
+    class Con:                                           # stand-in DTU store: only the deferred-write contract matters
+        def __init__(self):
+            self.rows = []
+
+        def execute(self, sql, row=()):
+            self.rows.append(row)
+
+    d = UT.DTU.__new__(UT.DTU)
+    d.con, d._last_fetch, d.pending_active = Con(), ["A"], None
+    d.pending_active = (("w", "c1", 2, "{}", json.dumps(["A", "B"]), None, "fp"), ["A", "B"])
+    d.discard_pending()                                  # the cycle transaction failed
+    assert d._last_fetch == ["A"] and d.pending_active is None    # next cycle still sees the list as CHANGED
+    d.pending_active = (("w", "c2", 2, "{}", json.dumps(["A", "B"]), None, "fp"), ["A", "B"])
+    assert d.write_pending() == "c2"
+    d.confirm_pending()
+    assert d._last_fetch == ["A", "B"]
+
+
+def test_universe_view_reads_one_pinned_snapshot(tmp_path):
+    from talonx_opportunity import universe_tiers as UT
+    from talonx_ops.operator_control.universe_view import UniverseView
+    con = sqlite3.connect(tmp_path / "market.db")
+    con.execute("PRAGMA journal_mode=WAL")
+    UT.DTU(con, policy=UT.DTU_V1)
+    with con:
+        con.execute("INSERT INTO dtu_snapshots VALUES (?,?,?,?,?,?,?)", ("W", "v", "c", "{}", 1, 1, "fp"))
+        con.execute("INSERT INTO dtu_active VALUES (?,?,?,?,?,?,?)", ("W", "t1", 1, "{}", '["A"]', None, "fp"))
+    v = UniverseView(tmp_path)
+    assert v.latest()["cycle_utc"] == "t1"
+    with con:                                            # the writer publishes the next cycle mid-command
+        con.execute("INSERT INTO dtu_active VALUES (?,?,?,?,?,?,?)", ("W", "t2", 2, "{}", '["A","B"]', None, "fp"))
+    assert v.latest()["cycle_utc"] == "t1"               # same command, same generation
+    v.close()
+    assert UniverseView(tmp_path).latest()["cycle_utc"] == "t2"
+
+
+def _sup_child(root: str, q) -> None:
+    sys.path.insert(0, str(REPO))
+    from talonx_opportunity import runtime as R
+    lk = R.ComponentLock(R.lock_path(root, "supervisor"))
+    q.put(lk.try_acquire())
+    time.sleep(3)
+
+
+def test_only_one_supervisor_can_run(tmp_path, monkeypatch):
+    ctx = mp.get_context("spawn")
+    q = ctx.Queue()
+    p = ctx.Process(target=_sup_child, args=(str(tmp_path), q))
+    p.start()
+    assert q.get(timeout=60) is True                     # another process holds the supervisor lock
+    with pytest.raises(RT.AlreadyRunning):
+        SV.supervise(tmp_path, (), env={}, poll_s=0, should_stop=lambda: True)
+    p.join(30)
+
+
+def test_cli_restart_routing(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(SV, "restart", lambda root, name, env=None: calls.append(name) or {"ok": True, "pid": 1})
+    assert SV.cli_restart(tmp_path, "outcomes")["direct"] is True and calls == ["outcomes"]   # no supervisor
+    rt = RT.RuntimeStore(tmp_path)
+    rt.set_component("supervisor", pid=1, state="RUNNING", heartbeat_utc=RT.iso())
+    res = SV.cli_restart(tmp_path, "outcomes")
+    assert res.get("requested") and calls == ["outcomes"] and SV.restart_request_path(tmp_path, "outcomes").exists()
+    stale = (datetime.now(UTC) - timedelta(seconds=SV.SUPERVISOR_FRESH_S + 5)).isoformat()
+    rt.set_component("supervisor", heartbeat_utc=stale)
+    assert SV.supervisor_alive(tmp_path) is False        # stale heartbeat -> CLI may restart directly
+
+
+def test_force_kill_never_targets_a_reused_pid(tmp_path):
+    other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    try:
+        assert SV._is_component_process(other.pid, "discovery") is False
+    finally:
+        other.kill()
