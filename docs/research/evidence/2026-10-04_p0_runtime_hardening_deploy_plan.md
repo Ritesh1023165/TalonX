@@ -6,7 +6,7 @@
 |---|---|
 | **Branch** | `fix/p0-runtime-ownership-snapshot`, from `86f7375` (the live head). The live branch was not touched. |
 | **When** | Sunday 2026-10-04, after the Gate D review. The engine is in its **CLOSED** phase: no trading window, and ingestion and discovery idle. |
-| **Before the deploy** | Phase D (`\TalonX\ERM_V1_PhaseD_2026-10-03`) must have **finished**. Check that the task's `LastTaskResult` is set and that `phase_d_runner.log` ends with END or ABORT. |
+| **Before the deploy** | **The owner's go after Gate D.** Phase D (`\TalonX\ERM_V1_PhaseD_2026-10-03`) must have **finished**. Check that the task's `LastTaskResult` is set and that `phase_d_runner.log` ends with END or ABORT. |
 | **Strategy, scoring, thresholds, notification policy, promotion** | Unchanged. Every strategy fingerprint is byte-identical to `86f7375` (§6). |
 
 **Owner decision (2026-10-01).** Ingestion and discovery are declared **DATA_FIX**, with version-bound declarations. This follows the 2026-09-26 SEC refresh DATA_FIX precedent.
@@ -64,7 +64,7 @@ Versions were computed from git (`runtime.version_at_commit` vs the working tree
 
 ## 3. Procedure (Sunday, CLOSED phase)
 
-Run from `C:\workspace\TalonX`. The p0 branch is first merged into the live branch through the normal PR flow, which is outside this plan's scope; this plan starts from "the live worktree is at the merged commit".
+Run from `C:\workspace\TalonX`. **Production never runs from the fix branch.** It runs only from `feature/continuous-opportunity-engine` after the fast-forward in step 3.
 
 **Trackers are out of scope. Do NOT restart, stop, reconfigure or modify any of them:**
 - the profitability forward tracker (`forward_day.sh`);
@@ -76,6 +76,12 @@ Run from `C:\workspace\TalonX`. The p0 branch is first merged into the live bran
 They keep running against the same stores. The schema change is additive and they read named columns.
 
 0. **Preconditions.**
+   - **Branch pre-check (amended 2026-10-01):** run `git fetch origin`, then `git rev-parse origin/feature/continuous-opportunity-engine`. It **must be `86f7375`**.
+     If it moved, **STOP** and do not deploy:
+     - rebase `fix/p0-runtime-ownership-snapshot` onto the new head;
+     - re-run the 450-test engine lane (the 21 files plus `test_p0_runtime_ownership_snapshot.py` and `test_universe_view_boundary.py`) and the strategy-fingerprint comparison;
+     - recompute the §2 versions;
+     - report to the owner, and wait for a new go.
    - `python -m talonx_opportunity status` shows the phase CLOSED and all components RUNNING.
    - Phase D has finished.
    - No Lab or promotion outbox item is PENDING.
@@ -88,7 +94,19 @@ They keep running against the same stores. The schema change is additive and the
    - Then run `python -m talonx_opportunity down`, which stops all 11 components, including **sentinel**.
    - Confirm every `results\opportunity\locks\*.lock` owner PID is gone (`Get-Process -Id <pid>` fails for each).
    - **Do not continue while any old component is alive.** Trackers are not touched.
-3. **Update the code**: check out the merged commit in the live worktree.
+3. **Update the code** (amended 2026-10-01). Production never runs from the fix branch.
+   1. **Fast-forward merge `f32f7ac` into the live branch, then push**, without touching any worktree:
+      `git push origin f32f7ac6653bed9403f32bf80b7e5a1e29041d97:refs/heads/feature/continuous-opportunity-engine`
+      This is fast-forward only: git refuses a non-fast-forward push, and no force is ever used. Then confirm `git ls-remote origin feature/continuous-opportunity-engine` = `f32f7ac`.
+   2. **Check out that head in the live worktree:**
+      `git -C C:\workspace\TalonX pull --ff-only origin feature/continuous-opportunity-engine`
+      Confirm `git rev-parse HEAD` = `f32f7ac` and that the tracked files are clean.
+   3. **Deploy commit (doc-only), on the live branch.**
+      - Apply the runbook update in §3a to `docs/runbooks/CONTINUOUS_ENGINE.md`.
+      - Bring over this amended plan with `git checkout origin/fix/p0-runtime-ownership-snapshot -- docs/research/evidence/2026-10-04_p0_runtime_hardening_deploy_plan.md`.
+      - Commit with the message `docs(runbook): P0 restart semantics + retire interim "stop supervise before restart" directive`, then push (fast-forward).
+      - Before committing, confirm that no component version changed: `python -c "from talonx_opportunity import runtime as R, supervise as SV; print({c: R.component_version(c) for c in SV.COMPONENTS})"` is identical before and after. Neither doc is in any `COMPONENT_SOURCES` entry.
+      - The live worktree is now at the deploy commit.
 4. **Declare boundaries.**
    - `python -m talonx_opportunity declare-shared-runtime` (dry run). Expect ELIGIBLE for the 8 components and REFUSED for ingestion, discovery and sentinel.
    - `python -m talonx_opportunity declare-shared-runtime --apply`
@@ -126,6 +144,16 @@ python -c "from talonx_opportunity.runtime import RuntimeStore, component_versio
    - Promotion SENT unchanged, 0 queued.
    - Scans only + CLOSED ticks.
    - `market.db`: the schema has `snapshot_generations`, and the old rows read as generation NULL.
+
+   **Supervisor respawn and single-instance checks (amended 2026-10-01):**
+   - **Kill reporting.** Take the PID from `results\opportunity\locks\reporting.pid`; this is the real worker that holds the lock, not the venv shim. Run `Stop-Process -Id <pid> -Force`, then confirm the lock is released (`python -c "from talonx_opportunity.runtime import lock_held; print(lock_held(None,'reporting'))"` → False).
+   - **Respawn.** The supervisor respawns reporting within **poll (15 s) + startup grace (90 s) = 105 s** at most:
+     - a `SUPERVISOR_RESTART` event appears for reporting;
+     - `lock_held(None,'reporting')` is True again with a new PID;
+     - the new deployment row is **OPERATIONS_ONLY, `restart_only=1`, `decided_by=RULE:UNCHANGED_RESTART`**.
+   - **No duplicate instance.** `Get-CimInstance Win32_Process | ? { $_.CommandLine -like '*talonx_opportunity component reporting*' }` shows exactly one worker (plus its venv shim, if any). The component events show no second START for reporting.
+   - **A second `up` is refused** for every component: `python -m talonx_opportunity up --only <c>` returns `ALREADY_RUNNING` for each of the 11 components and spawns nothing, so no new START event appears. `python -m talonx_opportunity component reporting` exits with `AlreadyRunning`.
+   - Rollback trigger: a missed respawn after 105 s, two reporting workers, any new deployment row other than OPERATIONS_ONLY/restart_only, or a second instance that starts.
 8. **Evidence.** Write `docs/research/evidence/2026-10-04_p0_runtime_hardening_deploy.md` in the 2026-09-26 format:
    - the restart set with PIDs old → new (11 components, including sentinel, plus the supervisor and the `:8787` cockpit; trackers listed as **not restarted**);
    - the declarations, with IDs and bound versions;
@@ -136,6 +164,34 @@ python -c "from talonx_opportunity.runtime import RuntimeStore, component_versio
    - **Discovery and candidate statistics, and every forward-tracker statistic, SEGMENT at this boundary** (ingestion and discovery are DATA_FIX).
    - Funnel counts, candidate creation/updates, alert counts, MFE/MAE, missed-opportunity and the forward trackers' CONTROL/SHADOW and VR/V2 forward statistics are reported **separately before and after** the boundary's `at_utc`, and are never pooled across it.
    - The trackers themselves are not restarted or modified. Only the analysis segments at the boundary timestamp.
+
+## 3a. Runbook update (part of the deploy commit, step 3.3)
+
+In `docs/runbooks/CONTINUOUS_ENGINE.md`, add the following section after the restart example (the `restart notifier` line):
+
+```markdown
+### Restart semantics (since the 2026-10-04 P0 runtime hardening)
+
+- **Ownership and liveness = the OS lock.** Each component holds an exclusive OS lock on
+  `results/opportunity/locks/<component>.lock` (msvcrt byte-range lock on Windows) for its whole lifetime. A component
+  is running if and only if that lock is held. The OS releases it when the process exits for any reason.
+- **The PID file is display only.** `locks/<component>.pid` shows the current owner's PID. It is never used to decide
+  liveness, so a reused PID after a reboot can neither block a start nor be force-killed (force-kill also requires the
+  process command line to be that component).
+- **`restart <component>` routes via the supervisor.** While a supervisor (`up --supervise`) has a fresh heartbeat
+  (< 60 s), the CLI only writes `control/<component>.restart`, and the supervisor performs the restart with its own
+  environment (`RESTART_REQUESTED` -> `SUPERVISOR_PERFORMED_RESTART`). The CLI spawns directly only when no supervisor is
+  alive.
+- **A failed stop never spawns.** A restart spawns only after the old owner's lock is confirmed released; otherwise it is
+  recorded as `RESTART_ABORTED_STOP_FAILED` and the CLI exits non-zero.
+- **One supervisor.** The supervisor holds its own lock (`locks/supervisor.lock`); a second `up --supervise` is refused.
+- **A second instance is refused.** `up` reports `ALREADY_RUNNING` for a running component, and `component <c>` exits with
+  `AlreadyRunning`.
+
+**Retired:** the interim directive "stop `up --supervise` before running `restart`" is **retired** as of this deploy.
+It existed only because a CLI restart and the supervisor could both spawn the same component. Run `restart` with the
+supervisor running; that is now the intended path.
+```
 
 ## 4. Rollback
 
