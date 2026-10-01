@@ -5,11 +5,29 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 import sqlite3
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_STATES = ("ACTIVE_CORE", "EVENT_PROMOTED", "OPERATOR_ADDED")
+
+# V2 execution scope, read-only, WITHOUT importing the research lane (2026-10-01 boundary fix). Same source, regex and
+# file selection as talonx_premarket.__main__._v2_scope(None): the newest results/prospective_*/logs/v2_companion.log
+# that logged a non-empty scope; within a log the LAST "scope ENFORCED" line wins. Parity is pinned by a test.
+_V2_SCOPE_RE = re.compile(r"V2 execution scope ENFORCED -- \d+ allowed issuers: (.*)$")
+
+
+def v2_scope(repo_root: Path | None = None) -> set[str]:
+    for p in reversed(sorted(Path(repo_root or REPO_ROOT).glob("results/prospective_*/logs/v2_companion.log"))):
+        scope: set[str] = set()
+        for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+            m = _V2_SCOPE_RE.search(line)
+            if m:
+                scope = {x.strip().upper() for x in m.group(1).split(",") if x.strip()}
+        if scope:
+            return scope
+    return set()
 
 
 class UniverseView:
@@ -142,8 +160,7 @@ class LiveUniverse(UniverseView):
         now = self._now or datetime.now(timezone.utc).isoformat()
         snap = self._snapshot()
         if self._v2 is None:
-            from talonx_premarket import __main__ as M
-            self._v2 = set(M._v2_scope(None))
+            self._v2 = v2_scope()                     # no research-lane import (boundary)
         prot, positions, intents = self._protections(w, now)
         # the resolver's operator inputs in the CURRENT mode (DRY_RUN -> none applied: identity)
         from talonx_ops.operator_control import gates
